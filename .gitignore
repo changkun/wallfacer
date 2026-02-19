@@ -1,2 +1,6 @@
 .env
-observability/*.jsonl
+traces/*.jsonl
+data/
+data.json
+data.json.bak
+wallfacer
