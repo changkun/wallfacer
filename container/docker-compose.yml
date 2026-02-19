@@ -1,0 +1,18 @@
+services:
+  claude:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wallfacer:latest
+    container_name: wallfacer
+    environment:
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN}
+    volumes:
+      - ${WORKSPACE:-../}:/workspace
+      - claude-config:/home/claude/.claude
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+
+volumes:
+  claude-config:
