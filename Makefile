@@ -7,7 +7,7 @@ TRACE_DIR := observability
 WORKSPACES ?= $(CURDIR)
 
 # Load .env if it exists
--include container/.env
+-include sandbox/.env
 export
 
 # Generate -v flags: /path/to/foo -> -v /path/to/foo:/workspace/foo:z
@@ -15,9 +15,9 @@ VOLUME_MOUNTS := $(foreach ws,$(WORKSPACES),-v $(ws):/workspace/$(notdir $(ws)):
 
 .PHONY: build run interactive shell stop clean traces
 
-# Build the container image
+# Build the sandbox image
 build:
-	$(PODMAN) build -t $(IMAGE) -f container/Dockerfile container/
+	$(PODMAN) build -t $(IMAGE) -f sandbox/Dockerfile sandbox/
 
 # Headless mode: make run PROMPT="fix the failing tests"
 run:

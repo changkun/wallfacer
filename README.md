@@ -1,6 +1,6 @@
 # Wallfacer
 
-A containerized Claude Code execution environment. Runs Claude Code headlessly in a Linux dev container with Go, Node.js, and Python pre-installed.
+A sandbox Claude Code execution environment. Runs Claude Code headlessly in a Linux dev sandbox with Go, Node.js, and Python pre-installed.
 
 ## Setup
 
@@ -9,8 +9,8 @@ A containerized Claude Code execution environment. Runs Claude Code headlessly i
 claude setup-token
 
 # 2. Configure
-cp container/.env.example container/.env
-# Edit container/.env and paste your token
+cp sandbox/.env.example sandbox/.env
+# Edit sandbox/.env and paste your token
 
 # 3. Build
 make build
@@ -30,7 +30,7 @@ make run PROMPT="fix the failing tests"
 make run WORKSPACES="/path/to/repo-a /path/to/repo-b" PROMPT="compare these projects"
 ```
 
-Each folder is mounted as `/workspace/<basename>` inside the container.
+Each folder is mounted as `/workspace/<basename>` inside the sandbox.
 
 ### Interactive TUI
 
@@ -48,12 +48,12 @@ make shell
 
 | Target | Description |
 |---|---|
-| `make build` | Build the container image |
+| `make build` | Build the sandbox image |
 | `make run PROMPT="..."` | Run Claude headlessly with a prompt |
 | `make interactive` | Start Claude's interactive TUI |
-| `make shell` | Open a bash shell in the container |
-| `make stop` | Stop the running container |
-| `make clean` | Remove container, volumes, and image |
+| `make shell` | Open a bash shell in the sandbox |
+| `make stop` | Stop the running sandbox |
+| `make clean` | Remove sandbox, volumes, and image |
 
 ## What's Inside
 
@@ -69,7 +69,7 @@ make shell
 ```
 .
 ├── Makefile                  # Top-level convenience targets
-├── container/
+├── sandbox/
 │   ├── Dockerfile            # Ubuntu 24.04 + Go + Node + Python + Claude Code
 │   ├── entrypoint.sh         # git safe.directory fix, launches Claude
 │   ├── docker-compose.yml    # Service definition (optional, for compose users)
@@ -82,7 +82,7 @@ make shell
 
 ## Configuration
 
-Set these in `container/.env`:
+Set these in `sandbox/.env`:
 
 | Variable | Description |
 |---|---|

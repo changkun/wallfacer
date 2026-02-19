@@ -20,16 +20,16 @@ This opens a browser OAuth flow. After authenticating, copy the token.
 ### 2. Configure your token
 
 ```bash
-cp container/.env.example container/.env
+cp sandbox/.env.example sandbox/.env
 ```
 
-Edit `container/.env` and set your token:
+Edit `sandbox/.env` and set your token:
 
 ```
 CLAUDE_CODE_OAUTH_TOKEN=your-oauth-token-here
 ```
 
-### 3. Build the image
+### 3. Build the sandbox image
 
 ```bash
 make build
@@ -41,21 +41,21 @@ make build
 make run
 ```
 
-This launches Claude Code's interactive TUI inside the container with `--dangerously-skip-permissions` enabled. The repo root is mounted at `/workspace`.
+This launches Claude Code's interactive TUI inside the sandbox with `--dangerously-skip-permissions` enabled. The repo root is mounted at `/workspace`.
 
 ## Make Targets
 
 | Command | Description |
 |---|---|
-| `make build` | Build the Docker image |
+| `make build` | Build the sandbox image |
 | `make run` | Start Claude interactively |
-| `make shell` | Open a bash shell in the container (useful for debugging) |
-| `make stop` | Stop the running container |
-| `make clean` | Stop container, remove volumes and image |
+| `make shell` | Open a bash shell in the sandbox (useful for debugging) |
+| `make stop` | Stop the running sandbox |
+| `make clean` | Stop sandbox, remove volumes and image |
 
 ## Mounting a Different Repo
 
-By default the container mounts the current repo root. To point it at a different git repo, set `WORKSPACE` in `container/.env`:
+By default the sandbox mounts the current repo root. To point it at a different git repo, set `WORKSPACE` in `sandbox/.env`:
 
 ```
 WORKSPACE=/absolute/path/to/your/repo
@@ -77,13 +77,13 @@ make run ARGS='-p "fix the failing tests"'
 
 ## Using the Shell
 
-To inspect the container environment or run tools manually:
+To inspect the sandbox environment or run tools manually:
 
 ```bash
 make shell
 ```
 
-Inside the container you have access to:
+Inside the sandbox you have access to:
 
 ```bash
 go version          # Go 1.24.x
@@ -106,7 +106,7 @@ impl -h
 
 ## Session Persistence
 
-Claude's configuration and session data are stored in a named Podman volume (`claude-config`). This persists across container restarts so Claude retains context between runs.
+Claude's configuration and session data are stored in a named Podman volume (`claude-config`). This persists across sandbox restarts so Claude retains context between runs.
 
 To reset session data:
 
@@ -118,7 +118,7 @@ make build   # rebuild
 ## Architecture
 
 ```
-container/
+sandbox/
 ├── Dockerfile          # Ubuntu 24.04 + Go + Node + Python + Claude Code
 ├── entrypoint.sh       # Sets up git safe.directory, launches Claude
 ├── docker-compose.yml  # Service definition, volumes, env vars
@@ -126,19 +126,19 @@ container/
 └── .env.example        # Template for environment variables
 ```
 
-The container runs as a non-root user `claude` (UID 1000) with passwordless sudo. This matches typical host user UIDs to minimize volume permission issues.
+The sandbox runs as a non-root user `claude` (UID 1000) with passwordless sudo. This matches typical host user UIDs to minimize volume permission issues.
 
 ## Troubleshooting
 
 **"dubious ownership" git errors** — Handled automatically by the entrypoint. If you still see them, the entrypoint may not be running; check with `make shell`.
 
-**Permission denied on mounted files** — The container user has UID 1000. If your host user has a different UID, rebuild with:
+**Permission denied on mounted files** — The sandbox user has UID 1000. If your host user has a different UID, rebuild with:
 
 ```bash
 /opt/podman/bin/podman build -t wallfacer:latest \
   --build-arg USER_UID=$(id -u) \
   --build-arg USER_GID=$(id -g) \
-  -f container/Dockerfile container/
+  -f sandbox/Dockerfile sandbox/
 ```
 
-**Claude can't authenticate** — Verify `CLAUDE_CODE_OAUTH_TOKEN` is set in `container/.env` and the container has network access. Regenerate the token with `claude setup-token` if it has expired.
+**Claude can't authenticate** — Verify `CLAUDE_CODE_OAUTH_TOKEN` is set in `sandbox/.env` and the sandbox has network access. Regenerate the token with `claude setup-token` if it has expired.
