@@ -168,6 +168,27 @@ func (r *Runner) CommitAndPush(taskID uuid.UUID, sessionID string) {
 	r.commitAndPush(ctx, taskID, sessionID, task.Turns)
 }
 
+// workspacePaths returns the container-side paths for mounted workspaces.
+func (r *Runner) workspacePaths() []string {
+	var paths []string
+	if r.workspaces == "" {
+		return paths
+	}
+	for _, ws := range strings.Fields(r.workspaces) {
+		ws = strings.TrimSpace(ws)
+		if ws == "" {
+			continue
+		}
+		parts := strings.Split(ws, "/")
+		basename := parts[len(parts)-1]
+		if basename == "" && len(parts) > 1 {
+			basename = parts[len(parts)-2]
+		}
+		paths = append(paths, "/workspace/"+basename)
+	}
+	return paths
+}
+
 // commitAndPush runs an additional container turn to commit and push changes.
 func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID string, turns int) {
 	bgCtx := context.Background()
@@ -177,10 +198,22 @@ func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID 
 		"result": "Auto-running commit-and-push...",
 	})
 
-	prompt := "Commit and push all changes. Check `git status` in each workspace directory. " +
-		"If there are uncommitted changes, stage them with `git add -A`, " +
-		"create a commit with a descriptive message summarizing the changes, " +
-		"and push to the remote. Report what you committed and pushed."
+	dirs := r.workspacePaths()
+	var prompt string
+	if len(dirs) > 0 {
+		prompt = fmt.Sprintf(
+			"Commit and push all changes. The workspace repositories are at: %s. "+
+				"For each directory, cd into it, run `git status`, and if there are "+
+				"uncommitted changes, stage them with `git add -A`, create a commit "+
+				"with a descriptive message summarizing the changes, and push to the "+
+				"remote. Report what you committed and pushed.",
+			strings.Join(dirs, ", "))
+	} else {
+		prompt = "Commit and push all changes. Check `git status` in each subdirectory " +
+			"of /workspace. If there are uncommitted changes, stage them with `git add -A`, " +
+			"create a commit with a descriptive message summarizing the changes, " +
+			"and push to the remote. Report what you committed and pushed."
+	}
 
 	turns++
 	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID)
@@ -203,11 +236,8 @@ func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID 
 		"session_id":  output.SessionID,
 	})
 
-	sid := sessionID
-	if output.SessionID != "" {
-		sid = output.SessionID
-	}
-	r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sid, output.StopReason, turns)
+	// Keep the original task session ID — this is a throwaway session.
+	r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, turns)
 	r.store.AccumulateTaskUsage(bgCtx, taskID, TaskUsage{
 		InputTokens:          output.Usage.InputTokens,
 		OutputTokens:         output.Usage.OutputTokens,
