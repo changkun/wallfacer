@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallfacer — Kanban</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<style>
+  body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
+  .column { min-height: calc(100vh - 160px); }
+  .card { cursor: grab; transition: transform 0.1s, box-shadow 0.1s; }
+  .card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .card.sortable-ghost { opacity: 0.4; }
+  .card.sortable-chosen { box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+  .badge-backlog { background: #334155; color: #94a3b8; }
+  .badge-in_progress { background: #1e3a5f; color: #60a5fa; }
+  .badge-waiting { background: #422006; color: #fbbf24; }
+  .badge-done { background: #052e16; color: #4ade80; }
+  .badge-failed { background: #450a0a; color: #f87171; }
+  .spinner { border: 2px solid #334155; border-top-color: #60a5fa; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  pre { white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="border-b border-slate-700 px-6 py-4">
+  <h1 class="text-xl font-bold text-white">Wallfacer</h1>
+</header>
+
+<!-- Board -->
+<main class="grid grid-cols-4 gap-4 p-6" id="board">
+  <div class="flex flex-col">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide">Backlog</h2>
+      <span id="count-backlog" class="text-xs text-slate-500">0</span>
+    </div>
+    <button id="new-task-btn" onclick="showNewTaskForm()"
+      class="w-full border border-dashed border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-400 hover:text-slate-200 hover:border-slate-400 transition-colors mb-2">+ New Task</button>
+    <div id="new-task-form" class="hidden mb-2">
+      <textarea id="new-prompt" rows="4" placeholder="Describe your task (Markdown supported)..."
+        class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono resize-none"></textarea>
+      <div class="flex items-center gap-2 mt-2">
+        <button onclick="createTask()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg text-sm font-medium text-white">Save</button>
+        <button onclick="hideNewTaskForm()" class="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-slate-200">Cancel</button>
+        <div class="ml-auto flex items-center gap-1.5">
+          <label for="new-timeout" class="text-xs text-slate-500">Timeout</label>
+          <select id="new-timeout" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+            <option value="5" selected>5 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">1 hour</option>
+            <option value="120">2 hours</option>
+            <option value="360">6 hours</option>
+            <option value="720">12 hours</option>
+            <option value="1440">24 hours</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div id="col-backlog" class="column bg-slate-800/50 rounded-xl p-3 space-y-2" data-status="backlog"></div>
+  </div>
+  <div class="flex flex-col">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="text-sm font-semibold text-blue-400 uppercase tracking-wide">In Progress</h2>
+      <span id="count-in_progress" class="text-xs text-slate-500">0</span>
+    </div>
+    <div id="col-in_progress" class="column bg-slate-800/50 rounded-xl p-3 space-y-2" data-status="in_progress"></div>
+  </div>
+  <div class="flex flex-col">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="text-sm font-semibold text-yellow-400 uppercase tracking-wide">Waiting</h2>
+      <span id="count-waiting" class="text-xs text-slate-500">0</span>
+    </div>
+    <div id="col-waiting" class="column bg-slate-800/50 rounded-xl p-3 space-y-2" data-status="waiting"></div>
+  </div>
+  <div class="flex flex-col">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="text-sm font-semibold text-green-400 uppercase tracking-wide">Done</h2>
+      <span id="count-done" class="text-xs text-slate-500">0</span>
+    </div>
+    <div id="col-done" class="column bg-slate-800/50 rounded-xl p-3 space-y-2" data-status="done"></div>
+  </div>
+</main>
+
+<!-- Detail Modal -->
+<div id="modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+  <div class="bg-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-700">
+    <div class="p-6">
+      <div class="flex items-start justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <span id="modal-badge" class="px-2 py-0.5 rounded text-xs font-medium"></span>
+          <span id="modal-time" class="text-xs text-slate-500"></span>
+        </div>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+
+      <h3 class="text-lg font-semibold text-white mb-2">Prompt</h3>
+      <pre id="modal-prompt" class="bg-slate-900 rounded-lg p-4 text-sm text-slate-300 mb-4"></pre>
+
+      <!-- Editable prompt/timeout for backlog tasks -->
+      <div id="modal-edit-section" class="hidden mb-4">
+        <textarea id="modal-edit-prompt" rows="4"
+          class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono resize-none"></textarea>
+        <div class="flex items-center gap-2 mt-2">
+          <span id="modal-edit-status" class="text-xs text-slate-500"></span>
+          <div class="ml-auto flex items-center gap-1.5">
+            <label for="modal-edit-timeout" class="text-xs text-slate-500">Timeout</label>
+            <select id="modal-edit-timeout" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-slate-300 focus:outline-none focus:border-blue-500">
+              <option value="5">5 min</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="60">1 hour</option>
+              <option value="120">2 hours</option>
+              <option value="360">6 hours</option>
+              <option value="720">12 hours</option>
+              <option value="1440">24 hours</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prompt history (collapsible) -->
+      <div id="modal-history-section" class="hidden mb-4">
+        <details>
+          <summary class="text-sm font-medium text-slate-400 cursor-pointer hover:text-slate-200">Prompt History</summary>
+          <div id="modal-history-list" class="mt-2 space-y-2"></div>
+        </details>
+      </div>
+
+      <!-- Retry section for done/failed tasks -->
+      <div id="modal-retry-section" class="hidden mb-4">
+        <h3 class="text-lg font-semibold text-white mb-2">Retry</h3>
+        <textarea id="modal-retry-prompt" rows="4"
+          class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono resize-none"></textarea>
+        <button onclick="retryTask()" class="mt-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-medium text-white">Move to Backlog</button>
+      </div>
+
+      <div id="modal-result-section" class="hidden">
+        <h3 class="text-lg font-semibold text-white mb-2">Result</h3>
+        <pre id="modal-result" class="bg-slate-900 rounded-lg p-4 text-sm text-slate-300 mb-4"></pre>
+      </div>
+
+      <!-- Live logs for in-progress tasks -->
+      <div id="modal-logs-section" class="hidden mb-4">
+        <h3 class="text-lg font-semibold text-white mb-2">Live Output</h3>
+        <pre id="modal-logs" class="bg-slate-900 rounded-lg p-4 text-xs text-green-300 max-h-96 overflow-y-auto font-mono"></pre>
+      </div>
+
+      <!-- Feedback form for waiting tasks -->
+      <div id="modal-feedback-section" class="hidden mb-4">
+        <h3 class="text-lg font-semibold text-white mb-2">Provide Feedback</h3>
+        <textarea id="modal-feedback" rows="3" placeholder="Type your response..."
+          class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"></textarea>
+        <button onclick="submitFeedback()" class="mt-2 bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded-lg text-sm font-medium text-white">Submit Feedback</button>
+      </div>
+
+      <!-- Events timeline -->
+      <h3 class="text-lg font-semibold text-white mb-2">Events</h3>
+      <div id="modal-events" class="space-y-2"></div>
+
+      <!-- Delete button -->
+      <div class="mt-6 pt-4 border-t border-slate-700">
+        <button onclick="deleteCurrentTask()" class="text-red-400 hover:text-red-300 text-sm">Delete task</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let tasks = [];
+let currentTaskId = null;
+let logsAbort = null;
+
+// --- API ---
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+async function fetchTasks() {
+  try {
+    tasks = await api('/api/tasks');
+    render();
+  } catch (e) {
+    console.error('fetch tasks:', e);
+  }
+}
+
+async function createTask() {
+  const textarea = document.getElementById('new-prompt');
+  const prompt = textarea.value.trim();
+  if (!prompt) {
+    textarea.focus();
+    textarea.classList.add('border-red-500');
+    setTimeout(() => textarea.classList.remove('border-red-500'), 2000);
+    return;
+  }
+  try {
+    const timeout = parseInt(document.getElementById('new-timeout').value, 10) || 5;
+    await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout }) });
+    hideNewTaskForm();
+    fetchTasks();
+  } catch (e) {
+    alert('Error creating task: ' + e.message);
+  }
+}
+
+function showNewTaskForm() {
+  document.getElementById('new-task-btn').classList.add('hidden');
+  document.getElementById('new-task-form').classList.remove('hidden');
+  const textarea = document.getElementById('new-prompt');
+  textarea.value = '';
+  textarea.style.height = '';
+  textarea.focus();
+}
+
+function hideNewTaskForm() {
+  document.getElementById('new-task-form').classList.add('hidden');
+  document.getElementById('new-task-btn').classList.remove('hidden');
+  const textarea = document.getElementById('new-prompt');
+  textarea.value = '';
+  textarea.style.height = '';
+}
+
+async function updateTaskStatus(id, status) {
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    fetchTasks();
+  } catch (e) {
+    alert('Error updating task: ' + e.message);
+  }
+}
+
+async function deleteTask(id) {
+  try {
+    await api(`/api/tasks/${id}`, { method: 'DELETE' });
+    fetchTasks();
+  } catch (e) {
+    alert('Error deleting task: ' + e.message);
+  }
+}
+
+async function submitFeedback() {
+  const textarea = document.getElementById('modal-feedback');
+  const message = textarea.value.trim();
+  if (!message || !currentTaskId) return;
+  try {
+    await api(`/api/tasks/${currentTaskId}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+    textarea.value = '';
+    closeModal();
+    fetchTasks();
+  } catch (e) {
+    alert('Error submitting feedback: ' + e.message);
+  }
+}
+
+async function retryTask() {
+  const textarea = document.getElementById('modal-retry-prompt');
+  const prompt = textarea.value.trim();
+  if (!prompt || !currentTaskId) return;
+  try {
+    await api(`/api/tasks/${currentTaskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'backlog', prompt }),
+    });
+    closeModal();
+    fetchTasks();
+  } catch (e) {
+    alert('Error retrying task: ' + e.message);
+  }
+}
+
+let editDebounce = null;
+function scheduleBacklogSave() {
+  const statusEl = document.getElementById('modal-edit-status');
+  statusEl.textContent = '';
+  clearTimeout(editDebounce);
+  editDebounce = setTimeout(async () => {
+    if (!currentTaskId) return;
+    const prompt = document.getElementById('modal-edit-prompt').value.trim();
+    if (!prompt) return;
+    const timeout = parseInt(document.getElementById('modal-edit-timeout').value, 10) || 5;
+    try {
+      await api(`/api/tasks/${currentTaskId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ prompt, timeout }),
+      });
+      statusEl.textContent = 'Saved';
+      setTimeout(() => { if (statusEl.textContent === 'Saved') statusEl.textContent = ''; }, 1500);
+      fetchTasks();
+    } catch (e) {
+      statusEl.textContent = 'Save failed';
+    }
+  }, 500);
+}
+document.getElementById('modal-edit-prompt').addEventListener('input', scheduleBacklogSave);
+document.getElementById('modal-edit-timeout').addEventListener('change', scheduleBacklogSave);
+
+function deleteCurrentTask() {
+  if (!currentTaskId) return;
+  if (!confirm('Delete this task?')) return;
+  deleteTask(currentTaskId);
+  closeModal();
+}
+
+// --- Rendering ---
+function render() {
+  const columns = { backlog: [], in_progress: [], waiting: [], done: [], failed: [] };
+  for (const t of tasks) {
+    const col = columns[t.status];
+    if (col) col.push(t);
+  }
+
+  // Failed tasks show in the Done column with a different badge
+  columns.done = columns.done.concat(columns.failed);
+  delete columns.failed;
+
+  for (const [status, items] of Object.entries(columns)) {
+    const el = document.getElementById(`col-${status}`);
+    if (!el) continue;
+    const countEl = document.getElementById(`count-${status}`);
+    if (countEl) countEl.textContent = items.length;
+
+    const existing = new Map();
+    for (const child of el.children) {
+      existing.set(child.dataset.id, child);
+    }
+
+    const newIds = new Set(items.map(t => t.id));
+
+    // Remove cards that are no longer in this column
+    for (const [id, child] of existing) {
+      if (!newIds.has(id)) child.remove();
+    }
+
+    // Add or update cards
+    for (let i = 0; i < items.length; i++) {
+      const t = items[i];
+      let card = existing.get(t.id);
+      if (!card) {
+        card = createCard(t);
+        el.appendChild(card);
+      } else {
+        updateCard(card, t);
+      }
+    }
+  }
+}
+
+function createCard(t) {
+  const card = document.createElement('div');
+  card.className = 'card bg-slate-700/80 rounded-lg p-3 border border-slate-600';
+  card.dataset.id = t.id;
+  card.onclick = () => openModal(t.id);
+  updateCard(card, t);
+  return card;
+}
+
+function formatTimeout(minutes) {
+  if (!minutes) return '5m';
+  if (minutes < 60) return minutes + 'm';
+  if (minutes % 60 === 0) return (minutes / 60) + 'h';
+  return Math.floor(minutes / 60) + 'h' + (minutes % 60) + 'm';
+}
+
+function updateCard(card, t) {
+  const badgeClass = `badge-${t.status}`;
+  const statusLabel = t.status === 'in_progress' ? 'in progress' : t.status;
+  card.innerHTML = `
+    <div class="flex items-center justify-between mb-1">
+      <div class="flex items-center gap-1.5">
+        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeClass}">${statusLabel}</span>
+        ${t.status === 'in_progress' ? '<span class="spinner"></span>' : ''}
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="text-[10px] text-slate-500" title="Timeout">${formatTimeout(t.timeout)}</span>
+        <span class="text-[10px] text-slate-500">${timeAgo(t.created_at)}</span>
+      </div>
+    </div>
+    <p class="text-sm text-slate-200 line-clamp-3">${escapeHtml(t.prompt)}</p>
+    ${t.result ? `<p class="text-xs text-slate-400 mt-1 line-clamp-2">${escapeHtml(t.result)}</p>` : ''}
+  `;
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function timeAgo(dateStr) {
+  const d = new Date(dateStr);
+  const s = Math.floor((Date.now() - d) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+
+// --- Modal ---
+async function openModal(id) {
+  currentTaskId = id;
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+
+  document.getElementById('modal-badge').className = `px-2 py-0.5 rounded text-xs font-medium badge-${task.status}`;
+  document.getElementById('modal-badge').textContent = task.status === 'in_progress' ? 'in progress' : task.status;
+  document.getElementById('modal-time').textContent = new Date(task.created_at).toLocaleString();
+  const editSection = document.getElementById('modal-edit-section');
+  if (task.status === 'backlog') {
+    document.getElementById('modal-prompt').classList.add('hidden');
+    editSection.classList.remove('hidden');
+    document.getElementById('modal-edit-prompt').value = task.prompt;
+    document.getElementById('modal-edit-timeout').value = String(task.timeout || 5);
+  } else {
+    document.getElementById('modal-prompt').classList.remove('hidden');
+    document.getElementById('modal-prompt').textContent = task.prompt;
+    editSection.classList.add('hidden');
+  }
+
+  const resultSection = document.getElementById('modal-result-section');
+  if (task.result) {
+    document.getElementById('modal-result').textContent = task.result;
+    resultSection.classList.remove('hidden');
+  } else {
+    resultSection.classList.add('hidden');
+  }
+
+  const logsSection = document.getElementById('modal-logs-section');
+  if (task.status === 'in_progress') {
+    logsSection.classList.remove('hidden');
+    startLogStream(id);
+  } else {
+    logsSection.classList.add('hidden');
+  }
+
+  const feedbackSection = document.getElementById('modal-feedback-section');
+  feedbackSection.classList.toggle('hidden', task.status !== 'waiting');
+
+  // Retry section (done/failed only)
+  const retrySection = document.getElementById('modal-retry-section');
+  if (task.status === 'done' || task.status === 'failed') {
+    retrySection.classList.remove('hidden');
+    document.getElementById('modal-retry-prompt').value = task.prompt;
+  } else {
+    retrySection.classList.add('hidden');
+  }
+
+  // Prompt history
+  const historySection = document.getElementById('modal-history-section');
+  if (task.prompt_history && task.prompt_history.length > 0) {
+    historySection.classList.remove('hidden');
+    const historyList = document.getElementById('modal-history-list');
+    historyList.innerHTML = task.prompt_history.map((p, i) =>
+      `<pre class="bg-slate-900/60 rounded-lg p-3 text-xs text-slate-400 border border-slate-700"><span class="text-slate-500 text-[10px]">#${i + 1}</span>\n${escapeHtml(p)}</pre>`
+    ).join('');
+  } else {
+    historySection.classList.add('hidden');
+  }
+
+  // Load events
+  try {
+    const events = await api(`/api/tasks/${id}/events`);
+    const container = document.getElementById('modal-events');
+    container.innerHTML = events.map(e => {
+      const time = new Date(e.created_at).toLocaleTimeString();
+      let detail = '';
+      const data = e.data || {};
+      if (e.event_type === 'state_change') {
+        detail = `${data.from || '(new)'} → ${data.to}`;
+      } else if (e.event_type === 'feedback') {
+        detail = `"${escapeHtml(data.message)}"`;
+      } else if (e.event_type === 'output') {
+        detail = `stop_reason: ${data.stop_reason || '(none)'}`;
+      } else if (e.event_type === 'error') {
+        detail = escapeHtml(data.error);
+      }
+      const typeColors = {
+        state_change: 'text-blue-400',
+        output: 'text-green-400',
+        feedback: 'text-yellow-400',
+        error: 'text-red-400',
+      };
+      return `<div class="flex items-start gap-2 text-xs">
+        <span class="text-slate-500 shrink-0">${time}</span>
+        <span class="${typeColors[e.event_type] || 'text-slate-400'} shrink-0">${e.event_type}</span>
+        <span class="text-slate-300">${detail}</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    document.getElementById('modal-events').innerHTML = '<span class="text-xs text-red-400">Failed to load events</span>';
+  }
+
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('modal').classList.add('flex');
+}
+
+function closeModal() {
+  if (logsAbort) {
+    logsAbort.abort();
+    logsAbort = null;
+  }
+  document.getElementById('modal-logs').textContent = '';
+  currentTaskId = null;
+  document.getElementById('modal').classList.add('hidden');
+  document.getElementById('modal').classList.remove('flex');
+}
+
+function startLogStream(id) {
+  if (logsAbort) logsAbort.abort();
+  logsAbort = new AbortController();
+  const logsEl = document.getElementById('modal-logs');
+  logsEl.textContent = '';
+  const decoder = new TextDecoder();
+  const ansiRegex = /\x1b\[[0-9;]*[a-zA-Z]/g;
+
+  fetch(`/api/tasks/${id}/logs`, { signal: logsAbort.signal })
+    .then(res => {
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      function read() {
+        reader.read().then(({ done, value }) => {
+          if (done) return;
+          const text = decoder.decode(value, { stream: true });
+          const cleaned = text.replace(ansiRegex, '');
+          logsEl.textContent += cleaned;
+          logsEl.scrollTop = logsEl.scrollHeight;
+          read();
+        }).catch(() => {});
+      }
+      read();
+    })
+    .catch(() => {});
+}
+
+// Close modal on overlay click
+document.getElementById('modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+// Close modal on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// Textarea keyboard shortcuts & auto-grow
+document.getElementById('new-prompt').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    createTask();
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    hideNewTaskForm();
+  }
+});
+document.getElementById('new-prompt').addEventListener('input', (e) => {
+  e.target.style.height = '';
+  e.target.style.height = e.target.scrollHeight + 'px';
+});
+
+// --- Drag and Drop ---
+function initSortable() {
+  const backlog = document.getElementById('col-backlog');
+  const inProgress = document.getElementById('col-in_progress');
+
+  // Backlog: can drag out
+  Sortable.create(backlog, {
+    group: { name: 'kanban', pull: true, put: false },
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+  });
+
+  // In Progress: can receive from backlog
+  Sortable.create(inProgress, {
+    group: { name: 'kanban', pull: false, put: true },
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onAdd: function(evt) {
+      const id = evt.item.dataset.id;
+      updateTaskStatus(id, 'in_progress');
+    },
+  });
+
+  // Waiting and Done: no drag interaction
+  Sortable.create(document.getElementById('col-waiting'), {
+    group: { name: 'kanban', pull: false, put: false },
+    animation: 150,
+    sort: false,
+  });
+  Sortable.create(document.getElementById('col-done'), {
+    group: { name: 'kanban', pull: false, put: false },
+    animation: 150,
+    sort: false,
+  });
+}
+
+// --- Init ---
+try { initSortable(); } catch (e) { console.error('sortable init:', e); }
+fetchTasks();
+setInterval(fetchTasks, 2000);
+</script>
+</body>
+</html>
