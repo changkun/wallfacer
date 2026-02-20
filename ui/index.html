@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
 <style>
   /* --- Theme variables --- */
   :root, [data-theme="light"] {
@@ -212,6 +213,61 @@
   .text-v-muted { color: var(--text-muted); }
   .border-v { border-color: var(--border); }
   .section-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+
+  /* --- Icon buttons (toggle/copy) --- */
+  .btn-icon {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: 5px; padding: 2px 7px; font-size: 11px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 3px; line-height: 1.6;
+  }
+  .btn-icon:hover { color: var(--text); border-color: var(--text-muted); }
+
+  /* --- Markdown prose (modal detail view) --- */
+  .prose-content { font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
+  .prose-content h1, .prose-content h2, .prose-content h3,
+  .prose-content h4, .prose-content h5, .prose-content h6 {
+    font-weight: 600; line-height: 1.3; color: var(--text); margin: 0.75em 0 0.3em;
+  }
+  .prose-content h1 { font-size: 1.25em; }
+  .prose-content h2 { font-size: 1.1em; }
+  .prose-content h3 { font-size: 1em; }
+  .prose-content p { margin: 0.4em 0; }
+  .prose-content p:first-child { margin-top: 0; }
+  .prose-content p:last-child { margin-bottom: 0; }
+  .prose-content ul, .prose-content ol { padding-left: 1.5em; margin: 0.4em 0; }
+  .prose-content li { margin: 0.15em 0; }
+  .prose-content code {
+    background: var(--bg); border-radius: 4px; padding: 1px 5px; font-size: 0.88em;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; color: var(--text);
+  }
+  .prose-content pre {
+    background: var(--bg); border-radius: 6px; padding: 12px; overflow-x: auto;
+    margin: 0.5em 0; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px; white-space: pre-wrap; word-break: break-word;
+  }
+  .prose-content pre code { background: none; padding: 0; font-size: inherit; }
+  .prose-content blockquote {
+    border-left: 3px solid var(--border); padding-left: 1em;
+    color: var(--text-muted); margin: 0.5em 0;
+  }
+  .prose-content a { color: var(--accent); text-decoration: none; }
+  .prose-content a:hover { text-decoration: underline; }
+  .prose-content hr { border: none; border-top: 1px solid var(--border); margin: 0.75em 0; }
+  .prose-content table { border-collapse: collapse; width: 100%; margin: 0.5em 0; font-size: 13px; }
+  .prose-content th, .prose-content td { border: 1px solid var(--border); padding: 5px 10px; text-align: left; }
+  .prose-content th { background: var(--bg-input); font-weight: 600; color: var(--text); }
+  .prose-content strong { font-weight: 600; color: var(--text); }
+
+  /* --- Inline markdown in card previews --- */
+  .card code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85em; background: var(--bg-input); border-radius: 3px; padding: 0 3px;
+  }
+  .card strong { font-weight: 600; }
+  .card em { font-style: italic; }
+  .card .card-md-raw {
+    font-family: inherit; margin: 0; white-space: pre-wrap; word-break: break-word;
+  }
 </style>
 </head>
 <body class="h-screen overflow-hidden flex flex-col">
@@ -300,11 +356,9 @@
     <div id="col-waiting" class="column col-bg space-y-2" data-status="waiting"></div>
   </div>
   <div class="flex flex-col min-h-0">
-    <div class="flex flex-col gap-1 mb-3 px-1">
-      <div class="flex items-center gap-2">
-        <h2 class="col-header col-header-done">Done</h2>
-        <span id="count-done" class="text-xs text-v-muted">0</span>
-      </div>
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="col-header col-header-done">Done</h2>
+      <span id="count-done" class="text-xs text-v-muted">0</span>
       <span id="done-stats" class="text-[10px] text-v-muted hidden"></span>
     </div>
     <div id="col-done" class="column col-bg space-y-2" data-status="done"></div>
@@ -330,8 +384,18 @@
         <button onclick="closeModal()" class="text-v-muted text-xl leading-none" style="background:none;border:none;cursor:pointer;font-size:20px;">&times;</button>
       </div>
 
-      <h3 class="section-title">Prompt</h3>
-      <pre id="modal-prompt" class="code-block mb-4"></pre>
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="section-title" style="margin-bottom:0;">Prompt</h3>
+        <div id="modal-prompt-actions" class="flex items-center gap-1.5 hidden">
+          <button id="copy-prompt-btn" onclick="copyModalText('prompt')" class="btn-icon" title="Copy to clipboard">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            Copy
+          </button>
+          <button id="toggle-prompt-btn" onclick="toggleModalSection('prompt')" class="btn-icon">Raw</button>
+        </div>
+      </div>
+      <div id="modal-prompt-rendered" class="code-block mb-4 prose-content hidden"></div>
+      <pre id="modal-prompt" class="code-block mb-4 hidden"></pre>
 
       <!-- Editable prompt/timeout for backlog tasks -->
       <div id="modal-edit-section" class="hidden mb-4">
@@ -377,8 +441,18 @@
       </div>
 
       <div id="modal-result-section" class="hidden">
-        <h3 class="section-title">Result</h3>
-        <pre id="modal-result" class="code-block mb-4"></pre>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="section-title" style="margin-bottom:0;">Result</h3>
+          <div class="flex items-center gap-1.5">
+            <button id="copy-result-btn" onclick="copyModalText('result')" class="btn-icon" title="Copy to clipboard">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              Copy
+            </button>
+            <button id="toggle-result-btn" onclick="toggleModalSection('result')" class="btn-icon">Raw</button>
+          </div>
+        </div>
+        <div id="modal-result-rendered" class="code-block mb-4 prose-content"></div>
+        <pre id="modal-result" class="code-block mb-4 hidden"></pre>
       </div>
 
       <!-- Usage stats -->
@@ -676,6 +750,78 @@ async function unarchiveTask() {
   }
 }
 
+// --- Markdown helpers ---
+function renderMarkdown(text) {
+  if (!text) return '';
+  if (typeof marked === 'undefined') return escapeHtml(text);
+  return marked.parse(text);
+}
+
+function renderMarkdownInline(text) {
+  if (!text) return '';
+  if (typeof marked === 'undefined') return escapeHtml(text);
+  return marked.parseInline(text);
+}
+
+function toggleModalSection(section) {
+  const renderedEl = document.getElementById('modal-' + section + '-rendered');
+  const rawEl = document.getElementById('modal-' + section);
+  const btn = document.getElementById('toggle-' + section + '-btn');
+  const showingRaw = !rawEl.classList.contains('hidden');
+  if (showingRaw) {
+    renderedEl.classList.remove('hidden');
+    rawEl.classList.add('hidden');
+    btn.textContent = 'Raw';
+  } else {
+    renderedEl.classList.add('hidden');
+    rawEl.classList.remove('hidden');
+    btn.textContent = 'Preview';
+  }
+}
+
+function copyModalText(section) {
+  const rawEl = document.getElementById('modal-' + section);
+  const text = rawEl.textContent;
+  const btn = document.getElementById('copy-' + section + '-btn');
+  navigator.clipboard.writeText(text).then(function() {
+    const origHTML = btn.innerHTML;
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
+  }).catch(function() {});
+}
+
+function toggleCardMarkdown(event, btn) {
+  event.stopPropagation();
+  const card = btn.closest('.card');
+  const renderedEls = card.querySelectorAll('.card-md-rendered');
+  const rawEls = card.querySelectorAll('.card-md-raw');
+  const nowShowingRaw = card.dataset.rawView === 'true';
+  if (nowShowingRaw) {
+    card.dataset.rawView = 'false';
+    renderedEls.forEach(function(el) { el.classList.remove('hidden'); });
+    rawEls.forEach(function(el) { el.classList.add('hidden'); });
+    btn.textContent = 'Raw';
+  } else {
+    card.dataset.rawView = 'true';
+    renderedEls.forEach(function(el) { el.classList.add('hidden'); });
+    rawEls.forEach(function(el) { el.classList.remove('hidden'); });
+    btn.textContent = 'Preview';
+  }
+}
+
+function copyCardText(event, taskId) {
+  event.stopPropagation();
+  const task = tasks.find(function(t) { return t.id === taskId; });
+  if (!task) return;
+  const text = task.prompt + (task.result ? '\n\n' + task.result : '');
+  const btn = event.currentTarget;
+  navigator.clipboard.writeText(text).then(function() {
+    const origHTML = btn.innerHTML;
+    btn.textContent = '\u2713';
+    setTimeout(function() { btn.innerHTML = origHTML; }, 1500);
+  }).catch(function() {});
+}
+
 // --- Rendering ---
 function render() {
   const columns = { backlog: [], in_progress: [], waiting: [], committing: [], done: [], failed: [] };
@@ -757,6 +903,8 @@ function updateCard(card, t) {
   const statusLabel = isArchived ? 'archived' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
   card.style.opacity = isArchived ? '0.55' : '';
+  const showingRaw = card.dataset.rawView === 'true';
+  const copyIconSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
@@ -764,12 +912,18 @@ function updateCard(card, t) {
         ${showSpinner ? '<span class="spinner"></span>' : ''}
       </div>
       <div class="flex items-center gap-1.5">
+        <button class="btn-icon" onclick="copyCardText(event, '${t.id}')" title="Copy to clipboard">${copyIconSvg}</button>
+        <button class="btn-icon" onclick="toggleCardMarkdown(event, this)">${showingRaw ? 'Preview' : 'Raw'}</button>
         <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>
         <span class="text-[10px] text-v-muted">${timeAgo(t.created_at)}</span>
       </div>
     </div>
-    <p class="text-sm line-clamp-3">${escapeHtml(t.prompt)}</p>
-    ${t.result ? `<p class="text-xs text-v-secondary mt-1 line-clamp-2">${escapeHtml(t.result)}</p>` : ''}
+    <div class="text-sm line-clamp-3 card-md-rendered${showingRaw ? ' hidden' : ''}">${renderMarkdownInline(t.prompt)}</div>
+    <pre class="text-sm line-clamp-3 card-md-raw${showingRaw ? '' : ' hidden'}">${escapeHtml(t.prompt)}</pre>
+    ${t.result ? `
+    <div class="text-xs text-v-secondary mt-1 line-clamp-2 card-md-rendered${showingRaw ? ' hidden' : ''}">${renderMarkdownInline(t.result)}</div>
+    <pre class="text-xs text-v-secondary mt-1 line-clamp-2 card-md-raw${showingRaw ? '' : ' hidden'}">${escapeHtml(t.result)}</pre>
+    ` : ''}
   `;
 }
 
