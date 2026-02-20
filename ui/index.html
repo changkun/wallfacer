@@ -575,12 +575,14 @@ async function api(path, opts = {}) {
 }
 
 let tasksSource = null;
+let tasksRetryDelay = 1000;
 
 function startTasksStream() {
   if (tasksSource) tasksSource.close();
   const url = showArchived ? '/api/tasks/stream?include_archived=true' : '/api/tasks/stream';
   tasksSource = new EventSource(url);
   tasksSource.onmessage = function(e) {
+    tasksRetryDelay = 1000;
     try {
       tasks = JSON.parse(e.data);
       render();
@@ -589,7 +591,11 @@ function startTasksStream() {
     }
   };
   tasksSource.onerror = function() {
-    console.error('tasks SSE connection error');
+    if (tasksSource.readyState === EventSource.CLOSED) {
+      tasksSource = null;
+      setTimeout(startTasksStream, tasksRetryDelay);
+      tasksRetryDelay = Math.min(tasksRetryDelay * 2, 30000);
+    }
   };
 }
 
@@ -1252,11 +1258,13 @@ function initSortable() {
 // --- Git status ---
 let gitStatuses = [];
 let gitStatusSource = null;
+let gitRetryDelay = 1000;
 
 function startGitStream() {
   if (gitStatusSource) gitStatusSource.close();
   gitStatusSource = new EventSource('/api/git/stream');
   gitStatusSource.onmessage = function(e) {
+    gitRetryDelay = 1000;
     try {
       gitStatuses = JSON.parse(e.data);
       renderWorkspaces();
@@ -1265,7 +1273,11 @@ function startGitStream() {
     }
   };
   gitStatusSource.onerror = function() {
-    console.error('git SSE connection error');
+    if (gitStatusSource.readyState === EventSource.CLOSED) {
+      gitStatusSource = null;
+      setTimeout(startGitStream, gitRetryDelay);
+      gitRetryDelay = Math.min(gitRetryDelay * 2, 30000);
+    }
   };
 }
 
