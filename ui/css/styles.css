@@ -396,6 +396,50 @@ pre { white-space: pre-wrap; word-break: break-word; }
   color: var(--text-muted);
 }
 
+/* --- Failed tasks displayed in Waiting column --- */
+.card-failed-waiting {
+  border-left: 3px solid #a02828;
+}
+[data-theme="dark"] .card-failed-waiting {
+  border-left-color: #d46868;
+}
+.card-error-reason {
+  margin-top: 6px;
+  padding: 4px 6px;
+  background: rgba(140, 32, 32, 0.07);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  word-break: break-word;
+}
+[data-theme="dark"] .card-error-reason {
+  background: rgba(212, 104, 104, 0.1);
+}
+.card-error-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8c2020;
+  margin-right: 6px;
+}
+[data-theme="dark"] .card-error-label {
+  color: #d46868;
+}
+.card-error-text {
+  color: #7a2c2c;
+}
+[data-theme="dark"] .card-error-text {
+  color: #c47070;
+}
+
+/* --- Error result in live output --- */
+.cc-final-error {
+  color: #d46868;
+  border-top-color: #341414;
+}
+
 /* --- Markdown in card previews (compact overrides) --- */
 .card-prose { }
 .card-prose p { margin: 0 !important; }

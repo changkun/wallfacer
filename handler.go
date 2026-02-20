@@ -510,8 +510,10 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// serveStoredLogs serves the saved turn output (raw NDJSON) for tasks that are
-// no longer running (container removed with --rm so live logs are unavailable).
+// serveStoredLogs serves the saved turn output (raw NDJSON + sandbox stderr)
+// for tasks that are no longer running (container removed with --rm so live
+// logs are unavailable). Entries are served in alphabetical order so each
+// turn's .json events are followed by its .stderr.txt sandbox trace.
 // The frontend handles all rendering (pretty and raw modes).
 func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	outputsDir := filepath.Join(h.store.dir, id.String(), "outputs")
@@ -531,7 +533,11 @@ func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uui
 			continue
 		}
 		name := entry.Name()
-		if !strings.HasPrefix(name, "turn-") || !strings.HasSuffix(name, ".json") {
+		if !strings.HasPrefix(name, "turn-") {
+			continue
+		}
+		// Include both NDJSON turn output and sandbox stderr traces.
+		if !strings.HasSuffix(name, ".json") && !strings.HasSuffix(name, ".stderr.txt") {
 			continue
 		}
 		content, readErr := os.ReadFile(filepath.Join(outputsDir, name))

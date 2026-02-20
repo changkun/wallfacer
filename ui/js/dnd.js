@@ -24,18 +24,13 @@ function initSortable() {
     },
   });
 
-  // Waiting, Done, and Failed: no drag interaction
+  // Waiting, Done, and Cancelled: no drag interaction
   Sortable.create(document.getElementById('col-waiting'), {
     group: { name: 'kanban', pull: false, put: false },
     animation: 150,
     sort: false,
   });
   Sortable.create(document.getElementById('col-done'), {
-    group: { name: 'kanban', pull: false, put: false },
-    animation: 150,
-    sort: false,
-  });
-  Sortable.create(document.getElementById('col-failed'), {
     group: { name: 'kanban', pull: false, put: false },
     animation: 150,
     sort: false,

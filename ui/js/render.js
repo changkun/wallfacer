@@ -49,9 +49,11 @@ function render() {
     if (col) col.push(t);
   }
 
-  // Committing tasks show in the Waiting column with a spinner
-  columns.waiting = columns.waiting.concat(columns.committing);
+  // Failed and committing tasks show in the Waiting column.
+  // Failed tasks are visually distinguished by a red left border on the card.
+  columns.waiting = columns.waiting.concat(columns.failed).concat(columns.committing);
   delete columns.committing;
+  delete columns.failed;
 
   for (const [status, items] of Object.entries(columns)) {
     const el = document.getElementById(`col-${status}`);
@@ -86,8 +88,8 @@ function render() {
       if (el.children[i] !== card) {
         el.insertBefore(card, el.children[i] || null);
       }
-      // Load diff for waiting tasks that have worktrees
-      if (t.status === 'waiting' && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
+      // Load diff for waiting/failed tasks that have worktrees
+      if ((t.status === 'waiting' || t.status === 'failed') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
         fetchDiff(card, t.id, t.updated_at);
       }
     }
@@ -123,8 +125,14 @@ function updateCard(card, t) {
   const badgeClass = isArchived ? 'badge-archived' : `badge-${t.status}`;
   const statusLabel = isArchived ? 'archived' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
-  const showDiff = t.status === 'waiting' && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
+  const showDiff = (t.status === 'waiting' || t.status === 'failed') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
   card.style.opacity = isArchived ? '0.55' : '';
+  // Failed tasks in the waiting column get a red left border to distinguish them.
+  if (t.status === 'failed') {
+    card.classList.add('card-failed-waiting');
+  } else {
+    card.classList.remove('card-failed-waiting');
+  }
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
@@ -141,7 +149,12 @@ function updateCard(card, t) {
       <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
     </div>` : ''}
     <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${renderMarkdown(t.prompt)}</div>
-    ${t.result ? `
+    ${t.status === 'failed' && t.result ? `
+    <div class="card-error-reason">
+      <span class="card-error-label">Error</span><span class="card-error-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>
+    </div>
+    ${t.stop_reason ? `<div style="margin-top:4px;"><span class="badge badge-failed" style="font-size:9px;">${escapeHtml(t.stop_reason)}</span></div>` : ''}
+    ` : t.result ? `
     <div class="text-xs text-v-secondary mt-1 card-prose overflow-hidden" style="max-height:3.2em;">${renderMarkdown(t.result)}</div>
     ` : ''}
     ${showDiff ? `<div class="diff-block" data-diff><span style="color:var(--text-muted)">loading diff\u2026</span></div>` : ''}
