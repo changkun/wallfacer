@@ -227,3 +227,20 @@ The output will look like:
 ```
 
 ---
+
+## Task: cd87e594
+
+**Date**: 2026-02-20 23:37:46  
+**Branch**: task/cd87e594  
+**Commit**: `662dd6711a0358669f56ced30d53db8b93c8b4e6`
+
+**Prompt**:
+> The git changes per tasks seems not strict to it's own worktree? when there are more progress and commits happened on the original branch, the diff seems large. Consider add a mechanism to:
+> 
+> 1. detect if the task worktree is behind, warn it in the diff column.
+> 2. add a button to allow move it back to in progress and let it resolve conflicts/sync with latest changes on the original branch.
+
+**Result**:
+(no result recorded)
+
+---
