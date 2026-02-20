@@ -326,14 +326,33 @@ func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, ses
 		}
 		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
 	}
-	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+
+	// Claude Code may output a single JSON result or a stream of NDJSON events
+	// (one JSON object per line). Try parsing the whole output first; if that
+	// fails, scan lines from the end to find the result record.
+	parseErr := json.Unmarshal([]byte(raw), &output)
+	if parseErr != nil {
+		lines := strings.Split(raw, "\n")
+		for i := len(lines) - 1; i >= 0; i-- {
+			line := strings.TrimSpace(lines[i])
+			if len(line) == 0 || line[0] != '{' {
+				continue
+			}
+			if err := json.Unmarshal([]byte(line), &output); err == nil {
+				parseErr = nil
+				break
+			}
+		}
+	}
+
+	if parseErr != nil {
 		if runErr != nil {
 			if exitErr, ok := runErr.(*exec.ExitError); ok {
 				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited with code %d: stderr=%s stdout=%s", exitErr.ExitCode(), stderr.String(), truncate(raw, 500))
 			}
 			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
 		}
-		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("parse output: %w (raw: %s)", err, truncate(raw, 200))
+		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
 	}
 
 	// Claude Code may exit non-zero even when it produces a valid result.

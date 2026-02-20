@@ -316,7 +316,8 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 	if task.Status != "in_progress" {
-		http.Error(w, "task is not in progress", http.StatusBadRequest)
+		// Container is gone (--rm). Serve saved stderr from disk instead.
+		h.serveStoredLogs(w, r, id)
 		return
 	}
 
@@ -450,6 +451,39 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+	}
+}
+
+// serveStoredLogs serves saved stderr output files for tasks that are no longer
+// running (container removed with --rm so live logs are unavailable).
+func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	outputsDir := filepath.Join(h.store.dir, id.String(), "outputs")
+	entries, err := os.ReadDir(outputsDir)
+	if err != nil {
+		http.Error(w, "no logs saved for this task", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+
+	wrote := false
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".stderr.txt") {
+			continue
+		}
+		content, readErr := os.ReadFile(filepath.Join(outputsDir, entry.Name()))
+		if readErr != nil {
+			continue
+		}
+		fmt.Fprintf(w, "=== %s ===\n", entry.Name())
+		w.Write(content)
+		fmt.Fprintln(w)
+		wrote = true
+	}
+	if !wrote {
+		fmt.Fprintln(w, "(no stderr output saved for this task)")
 	}
 }
 
