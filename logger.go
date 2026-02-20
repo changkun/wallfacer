@@ -96,9 +96,12 @@ func isColorEnabled(w io.Writer) bool {
 }
 
 func (h *prettyHandler) clone() *prettyHandler {
-	cp := *h
-	cp.preAttrs = h.preAttrs[:len(h.preAttrs):len(h.preAttrs)]
-	return &cp
+	return &prettyHandler{
+		w:        h.w,
+		opts:     h.opts,
+		preAttrs: h.preAttrs[:len(h.preAttrs):len(h.preAttrs)],
+		color:    h.color,
+	}
 }
 
 func (h *prettyHandler) Enabled(_ context.Context, level slog.Level) bool {
