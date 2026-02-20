@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // WorkspaceGitStatus holds the git state for a single workspace directory.
@@ -27,6 +29,66 @@ func (h *Handler) GitStatus(w http.ResponseWriter, r *http.Request) {
 		statuses = append(statuses, workspaceGitStatus(ws))
 	}
 	writeJSON(w, http.StatusOK, statuses)
+}
+
+// GitStatusStream streams git status for all workspaces as SSE, pushing an
+// update whenever the status changes (checked every 5 seconds).
+func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	collect := func() []WorkspaceGitStatus {
+		workspaces := h.runner.Workspaces()
+		statuses := make([]WorkspaceGitStatus, 0, len(workspaces))
+		for _, ws := range workspaces {
+			statuses = append(statuses, workspaceGitStatus(ws))
+		}
+		return statuses
+	}
+
+	send := func(statuses []WorkspaceGitStatus) bool {
+		data, err := json.Marshal(statuses)
+		if err != nil {
+			return false
+		}
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+			return false
+		}
+		flusher.Flush()
+		return true
+	}
+
+	current := collect()
+	if !send(current) {
+		return
+	}
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ticker.C:
+			next := collect()
+			nextData, _ := json.Marshal(next)
+			curData, _ := json.Marshal(current)
+			if string(nextData) != string(curData) {
+				if !send(next) {
+					return
+				}
+				current = next
+			}
+		}
+	}
 }
 
 // GitPush runs `git push` locally for the requested workspace.

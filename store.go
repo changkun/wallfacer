@@ -30,6 +30,7 @@ type Task struct {
 	Status        string    `json:"status"`
 	Archived      bool      `json:"archived,omitempty"`
 	SessionID     *string   `json:"session_id"`
+	FreshStart    bool      `json:"fresh_start,omitempty"`
 	Result        *string   `json:"result"`
 	StopReason    *string   `json:"stop_reason"`
 	Turns         int       `json:"turns"`
@@ -360,7 +361,7 @@ func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int
 	return nil
 }
 
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int) error {
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -381,6 +382,9 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 		}
 		t.Timeout = v
 	}
+	if freshStart != nil {
+		t.FreshStart = *freshStart
+	}
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
@@ -400,7 +404,9 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 
 	t.PromptHistory = append(t.PromptHistory, t.Prompt)
 	t.Prompt = newPrompt
-	t.SessionID = nil
+	// Preserve SessionID so the task can resume from where it left off.
+	// FreshStart=false (default) means it will resume; user can toggle via UI.
+	t.FreshStart = false
 	t.Result = nil
 	t.StopReason = nil
 	t.Turns = 0

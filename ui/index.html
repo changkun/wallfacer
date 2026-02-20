@@ -258,16 +258,15 @@
   .prose-content th { background: var(--bg-input); font-weight: 600; color: var(--text); }
   .prose-content strong { font-weight: 600; color: var(--text); }
 
-  /* --- Inline markdown in card previews --- */
-  .card code {
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 0.85em; background: var(--bg-input); border-radius: 3px; padding: 0 3px;
-  }
-  .card strong { font-weight: 600; }
-  .card em { font-style: italic; }
-  .card .card-md-raw {
-    font-family: inherit; margin: 0; white-space: pre-wrap; word-break: break-word;
-  }
+  /* --- Markdown in card previews (compact overrides) --- */
+  .card-prose { }
+  .card-prose p { margin: 0 !important; }
+  .card-prose h1, .card-prose h2, .card-prose h3,
+  .card-prose h4, .card-prose h5, .card-prose h6 { margin: 0 0 0.1em !important; font-size: 1em !important; }
+  .card-prose ul, .card-prose ol { margin: 0 !important; padding-left: 1.2em !important; }
+  .card-prose li { margin: 0 !important; }
+  .card-prose pre { margin: 0 !important; padding: 2px 6px !important; font-size: 0.85em !important; }
+  .card-prose blockquote { margin: 0 !important; }
 </style>
 </head>
 <body class="h-screen overflow-hidden flex flex-col">
@@ -380,6 +379,7 @@
         <div class="flex items-center gap-3">
           <span id="modal-badge" class="badge"></span>
           <span id="modal-time" class="text-xs text-v-muted"></span>
+          <span id="modal-id" class="text-xs text-v-muted font-mono" title="Task ID"></span>
         </div>
         <button onclick="closeModal()" class="text-v-muted text-xl leading-none" style="background:none;border:none;cursor:pointer;font-size:20px;">&times;</button>
       </div>
@@ -415,6 +415,10 @@
               <option value="1440">24 hours</option>
             </select>
           </div>
+        </div>
+        <div id="modal-edit-resume-row" class="hidden flex items-center gap-2 mt-2">
+          <input type="checkbox" id="modal-edit-resume" onchange="saveResumeOption(this.checked)" style="cursor:pointer;accent-color:var(--accent);">
+          <label for="modal-edit-resume" class="text-xs text-v-secondary" style="cursor:pointer;">Resume previous session</label>
         </div>
       </div>
 
@@ -589,6 +593,12 @@ function startTasksStream() {
   };
 }
 
+async function fetchTasks() {
+  const url = showArchived ? '/api/tasks?include_archived=true' : '/api/tasks';
+  tasks = await api(url);
+  render();
+}
+
 function toggleShowArchived() {
   showArchived = document.getElementById('show-archived-toggle').checked;
   localStorage.setItem('wallfacer-show-archived', showArchived ? 'true' : 'false');
@@ -635,6 +645,14 @@ async function updateTaskStatus(id, status) {
   try {
     await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
     fetchTasks();
+  } catch (e) {
+    alert('Error updating task: ' + e.message);
+  }
+}
+
+async function toggleFreshStart(id, freshStart) {
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ fresh_start: freshStart }) });
   } catch (e) {
     alert('Error updating task: ' + e.message);
   }
@@ -701,6 +719,21 @@ async function resumeTask() {
     fetchTasks();
   } catch (e) {
     alert('Error resuming task: ' + e.message);
+  }
+}
+
+async function saveResumeOption(resume) {
+  if (!currentTaskId) return;
+  const statusEl = document.getElementById('modal-edit-status');
+  try {
+    await api(`/api/tasks/${currentTaskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fresh_start: !resume }),
+    });
+    statusEl.textContent = 'Saved';
+    setTimeout(() => { if (statusEl.textContent === 'Saved') statusEl.textContent = ''; }, 1500);
+  } catch (e) {
+    statusEl.textContent = 'Save failed';
   }
 }
 
@@ -917,8 +950,6 @@ function updateCard(card, t) {
   const statusLabel = isArchived ? 'archived' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
   card.style.opacity = isArchived ? '0.55' : '';
-  const showingRaw = card.dataset.rawView === 'true';
-  const copyIconSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
@@ -926,17 +957,17 @@ function updateCard(card, t) {
         ${showSpinner ? '<span class="spinner"></span>' : ''}
       </div>
       <div class="flex items-center gap-1.5">
-        <button class="btn-icon" onclick="copyCardText(event, '${t.id}')" title="Copy to clipboard">${copyIconSvg}</button>
-        <button class="btn-icon" onclick="toggleCardMarkdown(event, this)">${showingRaw ? 'Preview' : 'Raw'}</button>
         <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>
         <span class="text-[10px] text-v-muted">${timeAgo(t.created_at)}</span>
       </div>
     </div>
-    <div class="text-sm line-clamp-3 card-md-rendered${showingRaw ? ' hidden' : ''}">${renderMarkdownInline(t.prompt)}</div>
-    <pre class="text-sm line-clamp-3 card-md-raw${showingRaw ? '' : ' hidden'}">${escapeHtml(t.prompt)}</pre>
+    ${t.status === 'backlog' && t.session_id ? `<div class="flex items-center gap-1.5 mb-1" onclick="event.stopPropagation()">
+      <input type="checkbox" id="resume-chk-${t.id}" ${!t.fresh_start ? 'checked' : ''} onchange="toggleFreshStart('${t.id}', !this.checked)" style="width:11px;height:11px;cursor:pointer;accent-color:var(--accent);">
+      <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
+    </div>` : ''}
+    <div class="text-sm line-clamp-3 card-prose">${renderMarkdown(t.prompt)}</div>
     ${t.result ? `
-    <div class="text-xs text-v-secondary mt-1 line-clamp-2 card-md-rendered${showingRaw ? ' hidden' : ''}">${renderMarkdownInline(t.result)}</div>
-    <pre class="text-xs text-v-secondary mt-1 line-clamp-2 card-md-raw${showingRaw ? '' : ' hidden'}">${escapeHtml(t.result)}</pre>
+    <div class="text-xs text-v-secondary mt-1 line-clamp-2 card-prose">${renderMarkdown(t.result)}</div>
     ` : ''}
   `;
 }
@@ -964,21 +995,43 @@ async function openModal(id) {
   document.getElementById('modal-badge').className = `badge badge-${task.status}`;
   document.getElementById('modal-badge').textContent = task.status === 'in_progress' ? 'in progress' : task.status;
   document.getElementById('modal-time').textContent = new Date(task.created_at).toLocaleString();
+  document.getElementById('modal-id').textContent = `ID: ${task.id}`;
   const editSection = document.getElementById('modal-edit-section');
   if (task.status === 'backlog') {
+    document.getElementById('modal-prompt-rendered').classList.add('hidden');
     document.getElementById('modal-prompt').classList.add('hidden');
+    document.getElementById('modal-prompt-actions').classList.add('hidden');
     editSection.classList.remove('hidden');
     document.getElementById('modal-edit-prompt').value = task.prompt;
     document.getElementById('modal-edit-timeout').value = String(task.timeout || 5);
+    const resumeRow = document.getElementById('modal-edit-resume-row');
+    if (task.session_id) {
+      resumeRow.classList.remove('hidden');
+      document.getElementById('modal-edit-resume').checked = !task.fresh_start;
+    } else {
+      resumeRow.classList.add('hidden');
+    }
   } else {
-    document.getElementById('modal-prompt').classList.remove('hidden');
-    document.getElementById('modal-prompt').textContent = task.prompt;
+    const promptRaw = document.getElementById('modal-prompt');
+    const promptRendered = document.getElementById('modal-prompt-rendered');
+    promptRaw.textContent = task.prompt;
+    promptRendered.innerHTML = renderMarkdown(task.prompt);
+    promptRendered.classList.remove('hidden');
+    promptRaw.classList.add('hidden');
+    document.getElementById('modal-prompt-actions').classList.remove('hidden');
+    document.getElementById('toggle-prompt-btn').textContent = 'Raw';
     editSection.classList.add('hidden');
   }
 
   const resultSection = document.getElementById('modal-result-section');
   if (task.result) {
-    document.getElementById('modal-result').textContent = task.result;
+    const resultRaw = document.getElementById('modal-result');
+    const resultRendered = document.getElementById('modal-result-rendered');
+    resultRaw.textContent = task.result;
+    resultRendered.innerHTML = renderMarkdown(task.result);
+    resultRendered.classList.remove('hidden');
+    resultRaw.classList.add('hidden');
+    document.getElementById('toggle-result-btn').textContent = 'Raw';
     resultSection.classList.remove('hidden');
   } else {
     resultSection.classList.add('hidden');
@@ -1198,14 +1251,22 @@ function initSortable() {
 
 // --- Git status ---
 let gitStatuses = [];
+let gitStatusSource = null;
 
-async function fetchGitStatus() {
-  try {
-    gitStatuses = await api('/api/git/status');
-    renderWorkspaces();
-  } catch (e) {
-    console.error('fetch git status:', e);
-  }
+function startGitStream() {
+  if (gitStatusSource) gitStatusSource.close();
+  gitStatusSource = new EventSource('/api/git/stream');
+  gitStatusSource.onmessage = function(e) {
+    try {
+      gitStatuses = JSON.parse(e.data);
+      renderWorkspaces();
+    } catch (err) {
+      console.error('git SSE parse error:', err);
+    }
+  };
+  gitStatusSource.onerror = function() {
+    console.error('git SSE connection error');
+  };
 }
 
 function renderWorkspaces() {
@@ -1234,7 +1295,6 @@ async function pushWorkspace(btn) {
   btn.textContent = '...';
   try {
     await api('/api/git/push', { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
-    fetchGitStatus();
   } catch (e) {
     alert('Push failed: ' + e.message);
     btn.disabled = false;
@@ -1244,9 +1304,8 @@ async function pushWorkspace(btn) {
 
 // --- Init ---
 try { initSortable(); } catch (e) { console.error('sortable init:', e); }
-fetchGitStatus();
+startGitStream();
 startTasksStream();
-setInterval(fetchGitStatus, 10000);
 </script>
 </body>
 </html>

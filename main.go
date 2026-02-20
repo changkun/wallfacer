@@ -137,6 +137,7 @@ func runServer(configDir string, args []string) {
 	// API routes
 	mux.HandleFunc("GET /api/config", handler.GetConfig)
 	mux.HandleFunc("GET /api/git/status", handler.GitStatus)
+	mux.HandleFunc("GET /api/git/stream", handler.GitStatusStream)
 	mux.HandleFunc("POST /api/git/push", handler.GitPush)
 	mux.HandleFunc("GET /api/tasks", handler.ListTasks)
 	mux.HandleFunc("GET /api/tasks/stream", handler.StreamTasks)
@@ -352,6 +353,12 @@ type statusResponseWriter struct {
 func (w *statusResponseWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusResponseWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // loggingMiddleware logs each HTTP request with method, path, status, and wall-clock

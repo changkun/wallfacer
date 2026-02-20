@@ -65,9 +65,8 @@ func (r *Runner) Workspaces() []string {
 	return strings.Fields(r.workspaces)
 }
 
-func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
+func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
 	bgCtx := context.Background()
-	resumedFromWaiting := sessionID != ""
 
 	task, err := r.store.GetTask(bgCtx, taskID)
 	if err != nil {
@@ -149,22 +148,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 			continue
 
 		default:
-			// Claude Code may return stop_reason=null with subtype=success when it
-			// completes normally (e.g. long multi-turn runs). Treat this as done.
-			if output.Subtype == "success" {
-				logRunner.Info("treating subtype=success as done", "task", taskID, "stop_reason", output.StopReason)
-				r.store.UpdateTaskStatus(bgCtx, taskID, "done")
-				r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
-					"from": "in_progress", "to": "done",
-				})
-
-				if resumedFromWaiting && sessionID != "" {
-					r.commit(ctx, taskID, sessionID, turns)
-				}
-				return
-			}
-
-			// Empty or unknown stop_reason — waiting for user feedback
+			// Empty or unknown stop_reason — waiting for user feedback.
 			r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
 			r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
 				"from": "in_progress", "to": "waiting",
