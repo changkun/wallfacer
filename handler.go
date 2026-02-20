@@ -491,13 +491,16 @@ func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) 
 		untitled = untitled[:limit]
 	}
 
-	for _, t := range untitled {
+	taskIDs := make([]string, len(untitled))
+	for i, t := range untitled {
+		taskIDs[i] = t.ID.String()
 		go h.runner.GenerateTitle(t.ID, t.Prompt)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]int{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"queued":              len(untitled),
 		"total_without_title": total,
+		"task_ids":            taskIDs,
 	})
 }
 

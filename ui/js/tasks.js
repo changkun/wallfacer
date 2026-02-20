@@ -233,24 +233,79 @@ async function generateMissingTitles() {
   const limit = document.getElementById('generate-titles-limit').value;
 
   btn.disabled = true;
-  statusEl.textContent = 'Checking tasks...';
+  statusEl.innerHTML = '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:4px;"></span>Checking tasks…';
   statusEl.style.color = 'var(--text-muted)';
+
+  let interval = null;
 
   try {
     const params = new URLSearchParams({ limit });
     const res = await api(`/api/tasks/generate-titles?${params}`, { method: 'POST' });
-    const { queued, total_without_title } = res;
+    const { queued, total_without_title, task_ids } = res;
+
     if (queued === 0) {
       statusEl.textContent = total_without_title === 0
         ? 'All tasks already have titles.'
-        : `No tasks queued (limit reached or none found).`;
-    } else {
-      statusEl.textContent = `Queued ${queued} of ${total_without_title} untitled task${total_without_title !== 1 ? 's' : ''}. Titles will appear shortly.`;
+        : 'No tasks queued (limit reached or none found).';
+      btn.disabled = false;
+      return;
     }
+
+    const pending = new Set(task_ids);
+    let succeeded = 0;
+    let failed = 0;
+    const total = queued;
+    const startTime = Date.now();
+    const TIMEOUT_MS = 120_000;
+
+    function updateStatus() {
+      const done = succeeded + failed;
+      const inFlight = pending.size > 0;
+      const spinnerHtml = inFlight
+        ? '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:5px;"></span>'
+        : '';
+      const okHtml = succeeded > 0
+        ? ` <span style="color:#16a34a">${succeeded} ok</span>`
+        : '';
+      const failHtml = failed > 0
+        ? ` <span style="color:var(--danger,#dc2626)">${failed} failed</span>`
+        : '';
+      statusEl.style.color = 'var(--text-muted)';
+      statusEl.innerHTML = `${spinnerHtml}${done}/${total} generated${okHtml}${failHtml}`;
+    }
+
+    updateStatus();
+
+    interval = setInterval(() => {
+      for (const id of [...pending]) {
+        const task = tasks.find(t => t.id === id);
+        if (task && task.title) {
+          pending.delete(id);
+          succeeded++;
+        }
+      }
+
+      updateStatus();
+
+      if (pending.size === 0) {
+        clearInterval(interval);
+        btn.disabled = false;
+        return;
+      }
+
+      if (Date.now() - startTime > TIMEOUT_MS) {
+        failed += pending.size;
+        pending.clear();
+        clearInterval(interval);
+        updateStatus();
+        btn.disabled = false;
+      }
+    }, 1000);
+
   } catch (e) {
+    if (interval) clearInterval(interval);
     statusEl.textContent = 'Error: ' + e.message;
     statusEl.style.color = 'var(--danger, #dc2626)';
-  } finally {
     btn.disabled = false;
   }
 }
