@@ -169,6 +169,7 @@ func runServer(configDir string, args []string) {
 	mux.HandleFunc("GET /api/tasks", handler.ListTasks)
 	mux.HandleFunc("GET /api/tasks/stream", handler.StreamTasks)
 	mux.HandleFunc("POST /api/tasks", handler.CreateTask)
+	mux.HandleFunc("POST /api/tasks/generate-titles", handler.GenerateMissingTitles)
 
 	mux.HandleFunc("PATCH /api/tasks/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := uuid.Parse(r.PathValue("id"))

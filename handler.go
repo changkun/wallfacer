@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -462,6 +463,42 @@ func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.
 		"to": "unarchived",
 	})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unarchived"})
+}
+
+func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) {
+	limit := 10
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			limit = n
+		}
+	}
+
+	tasks, err := h.store.ListTasks(r.Context(), true)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var untitled []Task
+	for _, t := range tasks {
+		if t.Title == "" {
+			untitled = append(untitled, t)
+		}
+	}
+
+	total := len(untitled)
+	if limit > 0 && len(untitled) > limit {
+		untitled = untitled[:limit]
+	}
+
+	for _, t := range untitled {
+		go h.runner.GenerateTitle(t.ID, t.Prompt)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]int{
+		"queued":              len(untitled),
+		"total_without_title": total,
+	})
 }
 
 func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {

@@ -224,3 +224,33 @@ async function syncTask(id) {
     showAlert('Error syncing task: ' + e.message);
   }
 }
+
+// --- Bulk title generation for tasks without a title ---
+
+async function generateMissingTitles() {
+  const statusEl = document.getElementById('generate-titles-status');
+  const btn = document.querySelector('[onclick="generateMissingTitles()"]');
+  const limit = document.getElementById('generate-titles-limit').value;
+
+  btn.disabled = true;
+  statusEl.textContent = 'Checking tasks...';
+  statusEl.style.color = 'var(--text-muted)';
+
+  try {
+    const params = new URLSearchParams({ limit });
+    const res = await api(`/api/tasks/generate-titles?${params}`, { method: 'POST' });
+    const { queued, total_without_title } = res;
+    if (queued === 0) {
+      statusEl.textContent = total_without_title === 0
+        ? 'All tasks already have titles.'
+        : `No tasks queued (limit reached or none found).`;
+    } else {
+      statusEl.textContent = `Queued ${queued} of ${total_without_title} untitled task${total_without_title !== 1 ? 's' : ''}. Titles will appear shortly.`;
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    statusEl.style.color = 'var(--danger, #dc2626)';
+  } finally {
+    btn.disabled = false;
+  }
+}
