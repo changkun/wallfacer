@@ -145,7 +145,7 @@ func runServer(configDir string, args []string) {
 	runner.pruneOrphanedWorktrees(store)
 
 	// Recover orphaned in_progress/committing tasks from a previous server crash.
-	recoverOrphanedTasks(store, runner)
+	recoverOrphanedTasks(store)
 
 	logMain.Info("workspaces", "paths", strings.Join(workspaces, ", "))
 
@@ -444,7 +444,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func recoverOrphanedTasks(store *Store, runner *Runner) {
+func recoverOrphanedTasks(store *Store) {
 	ctx := context.Background()
 	tasks, err := store.ListTasks(ctx, true)
 	if err != nil {
@@ -458,10 +458,8 @@ func recoverOrphanedTasks(store *Store, runner *Runner) {
 		logRecovery.Warn("task was interrupted at startup, marking as failed",
 			"task", t.ID, "status", t.Status)
 
-		// Clean up any worktrees that were created for this task.
-		if len(t.WorktreePaths) > 0 {
-			runner.cleanupWorktrees(t.ID, t.WorktreePaths, t.BranchName)
-		}
+		// Preserve worktrees so the user can review the diff and potentially
+		// resume. Worktrees are cleaned up later by cancel, retry, or delete.
 
 		store.UpdateTaskStatus(ctx, t.ID, "failed")
 		store.InsertEvent(ctx, t.ID, "error", map[string]string{

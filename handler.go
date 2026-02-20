@@ -308,13 +308,9 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		h.runner.KillContainer(id)
 	}
 
-	// Clean up worktrees — discard all changes prepared so far.
-	// Traces, events, and turn outputs are intentionally left intact so the
-	// task history is preserved (useful if the task is later restored to backlog).
-	if len(task.WorktreePaths) > 0 {
-		h.runner.cleanupWorktrees(id, task.WorktreePaths, task.BranchName)
-	}
-
+	// Persist the cancelled status BEFORE cleaning up worktrees. This ensures
+	// that if the server crashes mid-cancel, the task won't be left in a stale
+	// status (e.g. "waiting") with its worktree already deleted.
 	if err := h.store.UpdateTaskStatus(r.Context(), id, "cancelled"); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -324,6 +320,13 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		"from": oldStatus,
 		"to":   "cancelled",
 	})
+
+	// Clean up worktrees — discard all changes prepared so far.
+	// Traces, events, and turn outputs are intentionally left intact so the
+	// task history is preserved (useful if the task is later restored to backlog).
+	if len(task.WorktreePaths) > 0 {
+		h.runner.cleanupWorktrees(id, task.WorktreePaths, task.BranchName)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
@@ -630,18 +633,24 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		// fall back to reconstructing the diff from the stored commit hashes.
 		if _, statErr := os.Stat(worktreePath); statErr != nil {
 			commitHash := task.CommitHashes[repoPath]
-			if commitHash == "" {
-				continue
-			}
 			var out []byte
-			if baseHash := task.BaseCommitHashes[repoPath]; baseHash != "" {
-				// Show the full range of changes the task introduced.
-				out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
-					"diff", baseHash, commitHash).Output()
-			} else {
-				// Older tasks without a stored base hash: show the final commit only.
-				out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
-					"show", commitHash).Output()
+			if commitHash != "" {
+				if baseHash := task.BaseCommitHashes[repoPath]; baseHash != "" {
+					// Show the full range of changes the task introduced.
+					out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
+						"diff", baseHash, commitHash).Output()
+				} else {
+					// Older tasks without a stored base hash: show the final commit only.
+					out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
+						"show", commitHash).Output()
+				}
+			} else if task.BranchName != "" {
+				// No stored commit hashes but the task branch may have checkpoint
+				// commits (e.g. from waiting/failed). Diff the branch vs default.
+				if defBranch, err := defaultBranch(repoPath); err == nil {
+					out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
+						"diff", defBranch+".."+task.BranchName).Output()
+				}
 			}
 			if len(out) > 0 {
 				if len(task.WorktreePaths) > 1 {
