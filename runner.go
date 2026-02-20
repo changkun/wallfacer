@@ -45,11 +45,12 @@ type claudeUsage struct {
 }
 
 type claudeOutput struct {
-	Result       string     `json:"result"`
-	SessionID    string     `json:"session_id"`
-	StopReason   string     `json:"stop_reason"`
-	IsError      bool       `json:"is_error"`
-	TotalCostUSD float64    `json:"total_cost_usd"`
+	Result       string      `json:"result"`
+	SessionID    string      `json:"session_id"`
+	StopReason   string      `json:"stop_reason"`
+	Subtype      string      `json:"subtype"`
+	IsError      bool        `json:"is_error"`
+	TotalCostUSD float64     `json:"total_cost_usd"`
 	Usage        claudeUsage `json:"usage"`
 }
 
@@ -148,6 +149,21 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 			continue
 
 		default:
+			// Claude Code may return stop_reason=null with subtype=success when it
+			// completes normally (e.g. long multi-turn runs). Treat this as done.
+			if output.Subtype == "success" {
+				logRunner.Info("treating subtype=success as done", "task", taskID, "stop_reason", output.StopReason)
+				r.store.UpdateTaskStatus(bgCtx, taskID, "done")
+				r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
+					"from": "in_progress", "to": "done",
+				})
+
+				if resumedFromWaiting && sessionID != "" {
+					r.commit(ctx, taskID, sessionID, turns)
+				}
+				return
+			}
+
 			// Empty or unknown stop_reason — waiting for user feedback
 			r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
 			r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
@@ -297,20 +313,37 @@ func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, ses
 	cmd.Stderr = &stderr
 
 	logRunner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "))
-	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited with code %d: stderr=%s stdout=%s", exitErr.ExitCode(), stderr.String(), truncate(stdout.String(), 500))
-		}
-		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", err)
-	}
+	runErr := cmd.Run()
 
 	var output claudeOutput
 	raw := strings.TrimSpace(stdout.String())
 	if raw == "" {
+		if runErr != nil {
+			if exitErr, ok := runErr.(*exec.ExitError); ok {
+				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), stderr.String())
+			}
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+		}
 		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
 	}
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		if runErr != nil {
+			if exitErr, ok := runErr.(*exec.ExitError); ok {
+				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited with code %d: stderr=%s stdout=%s", exitErr.ExitCode(), stderr.String(), truncate(raw, 500))
+			}
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+		}
 		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("parse output: %w (raw: %s)", err, truncate(raw, 200))
+	}
+
+	// Claude Code may exit non-zero even when it produces a valid result.
+	// Log a warning but trust the parsed output over the exit code.
+	if runErr != nil {
+		if exitErr, ok := runErr.(*exec.ExitError); ok {
+			logRunner.Warn("container exited non-zero but produced valid output", "task", taskID, "code", exitErr.ExitCode())
+		} else {
+			logRunner.Warn("container error but produced valid output", "task", taskID, "error", runErr)
+		}
 	}
 
 	return &output, stdout.Bytes(), stderr.Bytes(), nil

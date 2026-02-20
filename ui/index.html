@@ -845,6 +845,9 @@ function render() {
       existing.set(child.dataset.id, child);
     }
 
+    // Sort by last updated descending (most recently updated first)
+    items.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
     const newIds = new Set(items.map(t => t.id));
 
     // Remove cards that are no longer in this column
@@ -852,15 +855,17 @@ function render() {
       if (!newIds.has(id)) child.remove();
     }
 
-    // Add or update cards
+    // Add or update cards, maintaining sorted order in the DOM
     for (let i = 0; i < items.length; i++) {
       const t = items[i];
       let card = existing.get(t.id);
       if (!card) {
         card = createCard(t);
-        el.appendChild(card);
       } else {
         updateCard(card, t);
+      }
+      if (el.children[i] !== card) {
+        el.insertBefore(card, el.children[i] || null);
       }
     }
   }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -327,16 +328,25 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	containerName := "wallfacer-" + id.String()
 	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
 
-	pipe, err := cmd.StdoutPipe()
-	if err != nil {
-		http.Error(w, "failed to create pipe", http.StatusInternalServerError)
-		return
-	}
+	// Merge container stdout and stderr: podman logs writes container stdout to
+	// its stdout and container stderr to its stderr. Claude Code emits live
+	// progress (tool calls, etc.) to container stderr, so we must capture both.
+	pr, pw := io.Pipe()
+	cmd.Stdout = pw
+	cmd.Stderr = pw
 
 	if err := cmd.Start(); err != nil {
+		pr.Close()
+		pw.Close()
 		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
 		return
 	}
+
+	// Close the write end once the subprocess exits so the scanner terminates.
+	go func() {
+		cmd.Wait()
+		pw.Close()
+	}()
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -344,7 +354,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	scanner := bufio.NewScanner(pipe)
+	scanner := bufio.NewScanner(pr)
 	for scanner.Scan() {
 		line := scanner.Text()
 		_, werr := w.Write([]byte(line + "\n"))
@@ -353,8 +363,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		}
 		flusher.Flush()
 	}
-
-	cmd.Wait()
+	pr.Close()
 }
 
 func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
