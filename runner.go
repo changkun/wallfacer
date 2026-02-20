@@ -14,7 +14,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const maxRebaseRetries = 3
+const (
+	maxRebaseRetries   = 3
+	defaultTaskTimeout = 15 * time.Minute
+)
 
 type Runner struct {
 	store            *Store
@@ -202,7 +205,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Apply per-task total timeout across all turns.
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
-		timeout = 5 * time.Minute
+		timeout = defaultTaskTimeout
 	}
 	ctx, cancel := context.WithTimeout(bgCtx, timeout)
 	defer cancel()
@@ -343,7 +346,7 @@ func (r *Runner) Commit(taskID uuid.UUID, sessionID string) {
 	}
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
-		timeout = 5 * time.Minute
+		timeout = defaultTaskTimeout
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -381,7 +384,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
-		timeout = 5 * time.Minute
+		timeout = defaultTaskTimeout
 	}
 	ctx, cancel := context.WithTimeout(bgCtx, timeout)
 	defer cancel()

@@ -1,3 +1,5 @@
+const DEFAULT_TASK_TIMEOUT = 15; // minutes
+
 // --- Task creation ---
 
 async function createTask() {
@@ -10,7 +12,7 @@ async function createTask() {
     return;
   }
   try {
-    const timeout = parseInt(document.getElementById('new-timeout').value, 10) || 5;
+    const timeout = parseInt(document.getElementById('new-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
     await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout }) });
     hideNewTaskForm();
     fetchTasks();
@@ -22,6 +24,7 @@ async function createTask() {
 function showNewTaskForm() {
   document.getElementById('new-task-btn').classList.add('hidden');
   document.getElementById('new-task-form').classList.remove('hidden');
+  document.getElementById('new-timeout').value = DEFAULT_TASK_TIMEOUT;
   const textarea = document.getElementById('new-prompt');
   textarea.value = '';
   textarea.style.height = '';
@@ -157,7 +160,7 @@ function scheduleBacklogSave() {
     if (!currentTaskId) return;
     const prompt = document.getElementById('modal-edit-prompt').value.trim();
     if (!prompt) return;
-    const timeout = parseInt(document.getElementById('modal-edit-timeout').value, 10) || 5;
+    const timeout = parseInt(document.getElementById('modal-edit-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
     try {
       await api(`/api/tasks/${currentTaskId}`, {
         method: 'PATCH',
