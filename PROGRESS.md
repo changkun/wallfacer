@@ -758,3 +758,30 @@ gitdir: /absolute/host/path/.git/worktrees/task-branch
 That host-absolute path doesn't exist inside the container. So every `git` command Claude Code runs inside the container fails with "not a git repository". The code already documents this at `runner.go:475-476` and works around it with `hostStageAndCommit` — but Claude Code itself can't use git effectively. The virtiofs mount boundary makes this worse...
 
 ---
+
+## Task: b1520028
+
+**Date**: 2026-02-21 01:26:04  
+**Branch**: task/b1520028  
+**Commit**: `325dd33b39af2e88e90ca53b4ef2dc48fca7278e`
+
+**Prompt**:
+> When click "generate missing" button, there is no visual feedback at all.
+> 
+> pls add some sort of indicator and also show the progress for the title generation.
+> 
+> it should indicate number of success and fail.
+
+**Result**:
+Clean. Here's a summary of the changes:
+
+**`handler.go`**: The `GenerateMissingTitles` handler now collects the IDs of the queued tasks and includes them as `task_ids` in the JSON response.
+
+**`ui/js/tasks.js`**: `generateMissingTitles` now:
+1. Shows a spinner immediately on click ("Checking tasks…")
+2. After the API responds, starts a `setInterval` polling the global `tasks` array every second
+3. Displays live progress: `⟳ X/Y generated  N ok  M failed` — the spinner stays visible while any tasks are still pending
+4. The button stays disabled until all queued tasks are resolved (or the 120s timeout fires, at which point remaining ones are counted as failed)
+5. On error the spinner is cleaned up and the error is shown in red
+
+---
