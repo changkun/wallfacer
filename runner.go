@@ -305,6 +305,103 @@ func (r *Runner) Commit(taskID uuid.UUID, sessionID string) {
 	r.commit(ctx, taskID, sessionID, task.Turns, task.WorktreePaths, task.BranchName)
 }
 
+// SyncWorktrees rebases all task worktrees onto the latest default branch
+// without merging. On success the task is restored to prevStatus; on
+// unrecoverable failure it is moved to "failed".
+func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
+	bgCtx := context.Background()
+	task, err := r.store.GetTask(bgCtx, taskID)
+	if err != nil {
+		logRunner.Error("sync: get task", "task", taskID, "error", err)
+		return
+	}
+
+	timeout := time.Duration(task.Timeout) * time.Minute
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(bgCtx, timeout)
+	defer cancel()
+
+	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+		"result": "Syncing worktrees with latest changes on default branch...",
+	})
+
+	for repoPath, worktreePath := range task.WorktreePaths {
+		defBranch, err := defaultBranch(repoPath)
+		if err != nil {
+			r.failSync(bgCtx, taskID, sessionID, task.Turns,
+				fmt.Sprintf("defaultBranch for %s: %v", filepath.Base(repoPath), err))
+			return
+		}
+
+		n, _ := commitsBehind(repoPath, worktreePath)
+		if n == 0 {
+			r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+				"result": fmt.Sprintf("%s is already up to date with %s.", filepath.Base(repoPath), defBranch),
+			})
+			continue
+		}
+
+		r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+			"result": fmt.Sprintf("Rebasing %s onto %s (%d new commit(s))...", filepath.Base(repoPath), defBranch, n),
+		})
+
+		var rebaseErr error
+		for attempt := 1; attempt <= maxRebaseRetries; attempt++ {
+			rebaseErr = rebaseOntoDefault(repoPath, worktreePath)
+			if rebaseErr == nil {
+				break
+			}
+			if attempt == maxRebaseRetries || !isConflictError(rebaseErr) {
+				break
+			}
+			logRunner.Warn("sync rebase conflict, invoking resolver",
+				"task", taskID, "repo", repoPath, "attempt", attempt)
+			r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+				"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d/%d)...",
+					filepath.Base(repoPath), attempt, maxRebaseRetries),
+			})
+			if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID); resolveErr != nil {
+				rebaseErr = fmt.Errorf("conflict resolution failed: %w", resolveErr)
+				break
+			}
+		}
+
+		if rebaseErr != nil {
+			r.failSync(bgCtx, taskID, sessionID, task.Turns,
+				fmt.Sprintf("sync failed for %s: %v", filepath.Base(repoPath), rebaseErr))
+			return
+		}
+
+		r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+			"result": fmt.Sprintf("Successfully synced %s with %s.", filepath.Base(repoPath), defBranch),
+		})
+	}
+
+	r.store.UpdateTaskStatus(bgCtx, taskID, prevStatus)
+	r.store.InsertEvent(bgCtx, taskID, "state_change", map[string]string{
+		"from": "in_progress",
+		"to":   prevStatus,
+	})
+	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+		"result": "Sync complete. Worktrees are up to date with the default branch.",
+	})
+	logRunner.Info("sync completed", "task", taskID)
+}
+
+// failSync transitions a task to "failed" after a sync error.
+func (r *Runner) failSync(ctx context.Context, taskID uuid.UUID, sessionID string, turns int, msg string) {
+	logRunner.Error("sync failed", "task", taskID, "error", msg)
+	r.store.InsertEvent(ctx, taskID, "error", map[string]string{"error": msg})
+	r.store.UpdateTaskStatus(ctx, taskID, "failed")
+	r.store.InsertEvent(ctx, taskID, "state_change", map[string]string{
+		"from": "in_progress",
+		"to":   "failed",
+	})
+	r.store.UpdateTaskResult(ctx, taskID, "Sync failed: "+msg, sessionID, "sync_failed", turns)
+}
+
 // hostStageAndCommit stages and commits all uncommitted changes in each
 // worktree directly on the host. This replaces the broken container-based
 // approach where the worktree's .git file references host-absolute paths

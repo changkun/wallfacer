@@ -131,18 +131,37 @@ async function openModal(id) {
   const feedbackSection = document.getElementById('modal-feedback-section');
   feedbackSection.classList.toggle('hidden', task.status !== 'waiting');
 
-  // Diff section (waiting tasks with worktrees) — shown in right panel
+  // Diff section (waiting/failed tasks with worktrees) — shown in right panel
   const modalCard = document.querySelector('.modal-card');
   const modalRight = document.getElementById('modal-right');
   const hasWorktrees = task.worktree_paths && Object.keys(task.worktree_paths).length > 0;
-  if (task.status === 'waiting' && hasWorktrees) {
+  if ((task.status === 'waiting' || task.status === 'failed') && hasWorktrees) {
     modalCard.classList.add('modal-wide');
     modalRight.classList.remove('hidden');
     const filesEl = document.getElementById('modal-diff-files');
+    const behindEl = document.getElementById('modal-diff-behind');
     filesEl.innerHTML = '<span class="text-xs text-v-muted">Loading diff\u2026</span>';
+    if (behindEl) behindEl.classList.add('hidden');
     api(`/api/tasks/${task.id}/diff`).then(data => {
       const el = document.getElementById('modal-diff-files');
       if (el) renderDiffFiles(el, data.diff);
+      const behindCounts = data.behind_counts || {};
+      const entries = Object.entries(behindCounts);
+      const totalBehind = entries.reduce((s, [, n]) => s + n, 0);
+      const warnEl = document.getElementById('modal-diff-behind');
+      if (warnEl) {
+        if (totalBehind > 0) {
+          const label = entries.length === 1
+            ? `${totalBehind} commit${totalBehind !== 1 ? 's' : ''} behind`
+            : entries.map(([repo, n]) => `${repo}: ${n}`).join(', ') + ' behind';
+          warnEl.innerHTML =
+            `<span>\u26a0 ${escapeHtml(label)}</span>` +
+            `<button class="diff-sync-btn" onclick="syncTask('${task.id}');closeModal()">Sync with latest</button>`;
+          warnEl.classList.remove('hidden');
+        } else {
+          warnEl.classList.add('hidden');
+        }
+      }
     }).catch(() => {
       const el = document.getElementById('modal-diff-files');
       if (el) el.innerHTML = '<span class="text-xs ev-error">Failed to load diff</span>';

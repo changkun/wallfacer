@@ -212,3 +212,15 @@ async function unarchiveTask() {
     alert('Error unarchiving task: ' + e.message);
   }
 }
+
+// --- Sync with latest (rebase worktree onto default branch) ---
+
+async function syncTask(id) {
+  try {
+    await api(`/api/tasks/${id}/sync`, { method: 'POST' });
+    diffCache.delete(id);
+    fetchTasks();
+  } catch (e) {
+    alert('Error syncing task: ' + e.message);
+  }
+}

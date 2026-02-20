@@ -560,11 +560,12 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 	if len(task.WorktreePaths) == 0 {
-		writeJSON(w, http.StatusOK, map[string]string{"diff": ""})
+		writeJSON(w, http.StatusOK, map[string]any{"diff": "", "behind_counts": map[string]int{}})
 		return
 	}
 
 	var combined strings.Builder
+	behindCounts := make(map[string]int)
 	for repoPath, worktreePath := range task.WorktreePaths {
 		defBranch, err := defaultBranch(repoPath)
 		if err != nil {
@@ -578,8 +579,48 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 			}
 			combined.Write(out)
 		}
+		// Count commits the default branch has that the task branch does not.
+		if n, err := commitsBehind(repoPath, worktreePath); err == nil && n > 0 {
+			behindCounts[filepath.Base(repoPath)] = n
+		}
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"diff": combined.String()})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"diff":          combined.String(),
+		"behind_counts": behindCounts,
+	})
+}
+
+func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	if task.Status != "waiting" && task.Status != "failed" {
+		http.Error(w, "only waiting or failed tasks with worktrees can be synced", http.StatusBadRequest)
+		return
+	}
+	if len(task.WorktreePaths) == 0 {
+		http.Error(w, "task has no worktrees to sync", http.StatusBadRequest)
+		return
+	}
+
+	oldStatus := task.Status
+	if err := h.store.UpdateTaskStatus(r.Context(), id, "in_progress"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+		"from": oldStatus,
+		"to":   "in_progress",
+	})
+
+	sessionID := ""
+	if task.SessionID != nil {
+		sessionID = *task.SessionID
+	}
+	go h.runner.SyncWorktrees(id, sessionID, oldStatus)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "syncing"})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

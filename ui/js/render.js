@@ -28,18 +28,37 @@ async function fetchDiff(card, taskId, updatedAt) {
   if (cached === 'loading') return;
   if (cached && cached.updatedAt === updatedAt) {
     const diffEl = card.querySelector('[data-diff]');
-    if (diffEl) renderDiffInto(diffEl, cached.diff);
+    if (diffEl) applyDiffToCard(diffEl, cached.diff, cached.behindCounts, taskId);
     return;
   }
   diffCache.set(taskId, 'loading');
   try {
     const data = await api(`/api/tasks/${taskId}/diff`);
-    diffCache.set(taskId, { diff: data.diff, updatedAt });
+    const behindCounts = data.behind_counts || {};
+    diffCache.set(taskId, { diff: data.diff, behindCounts, updatedAt });
     const latestEl = card.querySelector('[data-diff]');
-    if (latestEl) renderDiffInto(latestEl, data.diff);
+    if (latestEl) applyDiffToCard(latestEl, data.diff, behindCounts, taskId);
   } catch {
     diffCache.delete(taskId);
   }
+}
+
+function applyDiffToCard(el, diff, behindCounts, taskId) {
+  const entries = Object.entries(behindCounts || {});
+  const totalBehind = entries.reduce((s, [, n]) => s + n, 0);
+  let warning = '';
+  if (totalBehind > 0) {
+    const label = entries.length === 1
+      ? `${totalBehind} commit${totalBehind !== 1 ? 's' : ''} behind`
+      : entries.map(([repo, n]) => `${repo}: ${n}`).join(', ') + ' behind';
+    warning = `<div class="diff-behind-warning">` +
+      `<span>\u26a0 ${escapeHtml(label)}</span>` +
+      `<button class="diff-sync-btn" onclick="event.stopPropagation();syncTask('${taskId}')">Sync</button>` +
+      `</div>`;
+  }
+  const tmp = document.createElement('div');
+  renderDiffInto(tmp, diff);
+  el.innerHTML = warning + tmp.innerHTML;
 }
 
 function render() {

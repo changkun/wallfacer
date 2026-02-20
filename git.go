@@ -115,6 +115,24 @@ func getCommitHash(repoPath string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// commitsBehind returns the number of commits the default branch has ahead of
+// the worktree's HEAD (i.e., how many commits the task branch is behind).
+func commitsBehind(repoPath, worktreePath string) (int, error) {
+	defBranch, err := defaultBranch(repoPath)
+	if err != nil {
+		return 0, err
+	}
+	out, err := exec.Command(
+		"git", "-C", worktreePath,
+		"rev-list", "--count", "HEAD.."+defBranch,
+	).Output()
+	if err != nil {
+		return 0, fmt.Errorf("git rev-list in %s: %w", worktreePath, err)
+	}
+	n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	return n, nil
+}
+
 // hasCommitsAheadOf reports whether worktreePath has commits not yet in baseBranch.
 func hasCommitsAheadOf(worktreePath, baseBranch string) (bool, error) {
 	out, err := exec.Command(

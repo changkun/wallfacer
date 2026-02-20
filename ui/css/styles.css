@@ -296,6 +296,73 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .prose-content th { background: var(--bg-input); font-weight: 600; color: var(--text); }
 .prose-content strong { font-weight: 600; color: var(--text); }
 
+/* --- Behind-branch warning banner --- */
+.diff-behind-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: #fef9c3;
+  border: 1px solid #d97706;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 9px;
+  color: #92400e;
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+[data-theme="dark"] .diff-behind-warning {
+  background: rgba(217, 119, 6, 0.15);
+  border-color: #b45309;
+  color: #fbbf24;
+}
+.diff-sync-btn {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 3px;
+  border: 1px solid #d97706;
+  background: #fff;
+  color: #92400e;
+  cursor: pointer;
+  line-height: 1.6;
+}
+.diff-sync-btn:hover {
+  background: #fef3c7;
+}
+[data-theme="dark"] .diff-sync-btn {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: #b45309;
+  color: #fbbf24;
+}
+[data-theme="dark"] .diff-sync-btn:hover {
+  background: rgba(217, 119, 6, 0.35);
+}
+/* Modal-level behind warning (larger) */
+#modal-diff-behind {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #fef9c3;
+  border: 1px solid #d97706;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #92400e;
+  margin-bottom: 10px;
+}
+[data-theme="dark"] #modal-diff-behind {
+  background: rgba(217, 119, 6, 0.15);
+  border-color: #b45309;
+  color: #fbbf24;
+}
+#modal-diff-behind .diff-sync-btn {
+  font-size: 11px;
+  padding: 2px 10px;
+}
+
 /* --- Diff block (waiting task cards) --- */
 .diff-block {
   background: var(--bg-input);
