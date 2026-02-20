@@ -286,7 +286,7 @@ func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, ses
 	}
 
 	args = append(args, "-w", "/workspace", r.sandboxImage)
-	args = append(args, "-p", prompt, "--output-format", "stream-json")
+	args = append(args, "-p", prompt, "--verbose", "--output-format", "stream-json")
 	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
 	}
