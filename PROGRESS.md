@@ -1053,3 +1053,27 @@ The workflow is at `/workspace/wallfacer/.github/workflows/test.yml`. It:
 The tests configure their own git identity (`test@test.com` / `Test`) so no extra git setup step is needed in the workflow.
 
 ---
+
+## Task: 458ea5b1
+
+**Date**: 2026-02-21 02:29:51  
+**Branch**: task/458ea5b1  
+**Commit**: `de32a39e7dd33280cd8b5788d07e54d25a1fc7d2`
+
+**Prompt**:
+> if repos in the workspace is not a git repo, it seems all changes are not eventually extracted out of the sandbox, and only a PROGRESS.md appeared. 
+> 
+> Fix for the non-git repo usage
+
+**Result**:
+Builds clean, all tests pass. Here's a summary of what changed and why:
+
+**Root cause**: For non-git workspaces, `setupWorktrees` simply `continue`d past them, leaving `worktreePaths` empty. The container mounted the original workspace directly via bind mount — which can be unreliable in containerized/rootless-Podman environments — and the entire commit pipeline (Phases 1–2) was skipped since it iterates `worktreePaths`. Only PROGRESS.md appeared because it's written directly by the Go server process, not through the container.
+
+**Fix — 5 changes in `runner.go`:**
+
+1. **`setupWorktrees`** — for non-git workspaces, instead of skipping, it calls `setupNonGitSnapshot` which: copies the workspace into `~/.wallfacer/worktrees/<uuid>/<basename>/`, runs `git init` + initial commit there. The snapshot is added to `worktreePaths` just like a git worktree, so the container mounts it from the managed directory (same reliable path as git worktrees).
+
+2. **`setupNonGitSnapshot`** (new) �...
+
+---
