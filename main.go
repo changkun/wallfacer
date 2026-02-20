@@ -112,10 +112,6 @@ func runServer(configDir string, args []string) {
 	// running wallfacer on different sets of repos never mixes task history.
 	scopedDataDir := filepath.Join(*dataDir, instructionsKey(workspaces))
 
-	// One-time migration: move any UUID task directories that exist directly in
-	// the base data dir (pre-scoping layout) into the scoped subdirectory.
-	migrateUnscopedTaskData(*dataDir, scopedDataDir)
-
 	store, err := NewStore(scopedDataDir)
 	if err != nil {
 		fatal(logMain, "store", "error", err)
@@ -472,45 +468,5 @@ func recoverOrphanedTasks(store *Store, runner *Runner) {
 		store.InsertEvent(ctx, t.ID, "state_change", map[string]string{
 			"from": t.Status, "to": "failed",
 		})
-	}
-}
-
-// migrateUnscopedTaskData performs a one-time migration of task directories from
-// the pre-scoping layout (baseDir/<uuid>/) to the scoped layout (scopedDir/<uuid>/).
-// Only directories whose names are valid UUIDs are moved; fingerprint subdirectories
-// (16-char hex names) are left untouched. Safe to call repeatedly — already-moved
-// entries simply won't be found in baseDir again.
-func migrateUnscopedTaskData(baseDir, scopedDir string) {
-	entries, err := os.ReadDir(baseDir)
-	if err != nil {
-		return // baseDir doesn't exist yet — nothing to migrate
-	}
-
-	if err := os.MkdirAll(scopedDir, 0755); err != nil {
-		logMain.Warn("migrate: create scoped dir", "error", err)
-		return
-	}
-
-	var migrated int
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		// UUID directories have the format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.
-		// Fingerprint directories are 16-char hex strings — not valid UUIDs.
-		if _, err := uuid.Parse(e.Name()); err != nil {
-			continue
-		}
-		src := filepath.Join(baseDir, e.Name())
-		dst := filepath.Join(scopedDir, e.Name())
-		if err := os.Rename(src, dst); err != nil {
-			logMain.Warn("migrate: move task dir", "src", src, "dst", dst, "error", err)
-			continue
-		}
-		migrated++
-	}
-	if migrated > 0 {
-		logMain.Info("migrated unscoped task data to workspace store",
-			"count", migrated, "dest", scopedDir)
 	}
 }
