@@ -42,9 +42,10 @@ type Task struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 
 	// Worktree isolation fields (populated when task moves to in_progress).
-	WorktreePaths map[string]string `json:"worktree_paths,omitempty"` // host repoPath → worktree path
-	BranchName    string            `json:"branch_name,omitempty"`    // "task/<uuid8>"
-	CommitHashes  map[string]string `json:"commit_hashes,omitempty"`  // host repoPath → commit hash after merge
+	WorktreePaths    map[string]string `json:"worktree_paths,omitempty"`     // host repoPath → worktree path
+	BranchName       string            `json:"branch_name,omitempty"`        // "task/<uuid8>"
+	CommitHashes     map[string]string `json:"commit_hashes,omitempty"`      // host repoPath → commit hash after merge
+	BaseCommitHashes map[string]string `json:"base_commit_hashes,omitempty"` // host repoPath → defBranch HEAD before merge
 }
 
 type TaskEvent struct {
@@ -473,6 +474,19 @@ func (s *Store) UpdateTaskCommitHashes(_ context.Context, id uuid.UUID, hashes m
 		return fmt.Errorf("task not found: %s", id)
 	}
 	t.CommitHashes = hashes
+	t.UpdatedAt = time.Now()
+	return s.saveTask(id, t)
+}
+
+func (s *Store) UpdateTaskBaseCommitHashes(_ context.Context, id uuid.UUID, hashes map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.BaseCommitHashes = hashes
 	t.UpdatedAt = time.Now()
 	return s.saveTask(id, t)
 }

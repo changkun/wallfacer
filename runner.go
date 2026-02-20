@@ -556,7 +556,7 @@ func (r *Runner) commit(ctx context.Context, taskID uuid.UUID, sessionID string,
 	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
 		"result": "Phase 2/4: Rebasing and merging into default branch...",
 	})
-	commitHashes, mergeErr := r.rebaseAndMerge(ctx, taskID, worktreePaths, branchName, sessionID)
+	commitHashes, baseHashes, mergeErr := r.rebaseAndMerge(ctx, taskID, worktreePaths, branchName, sessionID)
 	if mergeErr != nil {
 		logRunner.Error("rebase/merge failed", "task", taskID, "error", mergeErr)
 		r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{
@@ -573,6 +573,11 @@ func (r *Runner) commit(ctx context.Context, taskID uuid.UUID, sessionID string,
 	if len(commitHashes) > 0 {
 		if err := r.store.UpdateTaskCommitHashes(bgCtx, taskID, commitHashes); err != nil {
 			logRunner.Warn("save commit hashes", "task", taskID, "error", err)
+		}
+	}
+	if len(baseHashes) > 0 {
+		if err := r.store.UpdateTaskBaseCommitHashes(bgCtx, taskID, baseHashes); err != nil {
+			logRunner.Warn("save base commit hashes", "task", taskID, "error", err)
 		}
 	}
 
@@ -597,22 +602,25 @@ func (r *Runner) commit(ctx context.Context, taskID uuid.UUID, sessionID string,
 
 // rebaseAndMerge performs the host-side git pipeline for all worktrees:
 // rebase onto default branch (with conflict-resolution retries), ff-merge, collect hashes.
+// Returns (commitHashes, baseHashes, error) where baseHashes holds the defBranch HEAD
+// captured just before each ff-merge — used later to reconstruct the diff of the task.
 func (r *Runner) rebaseAndMerge(
 	ctx context.Context,
 	taskID uuid.UUID,
 	worktreePaths map[string]string,
 	branchName string,
 	sessionID string,
-) (map[string]string, error) {
+) (map[string]string, map[string]string, error) {
 	bgCtx := context.Background()
 	commitHashes := make(map[string]string)
+	baseHashes := make(map[string]string)
 
 	for repoPath, worktreePath := range worktreePaths {
 		logRunner.Info("rebase+merge", "task", taskID, "repo", repoPath)
 
 		defBranch, err := defaultBranch(repoPath)
 		if err != nil {
-			return commitHashes, fmt.Errorf("defaultBranch for %s: %w", repoPath, err)
+			return commitHashes, baseHashes, fmt.Errorf("defaultBranch for %s: %w", repoPath, err)
 		}
 
 		// Skip if there are no commits to merge.
@@ -641,7 +649,7 @@ func (r *Runner) rebaseAndMerge(
 			}
 
 			if attempt == maxRebaseRetries {
-				return commitHashes, fmt.Errorf(
+				return commitHashes, baseHashes, fmt.Errorf(
 					"rebase failed after %d attempts in %s: %w",
 					maxRebaseRetries, repoPath, rebaseErr,
 				)
@@ -649,7 +657,7 @@ func (r *Runner) rebaseAndMerge(
 
 			// Only retry on conflict; surface other errors immediately.
 			if !isConflictError(rebaseErr) {
-				return commitHashes, fmt.Errorf("rebase %s: %w", repoPath, rebaseErr)
+				return commitHashes, baseHashes, fmt.Errorf("rebase %s: %w", repoPath, rebaseErr)
 			}
 
 			logRunner.Warn("rebase conflict, invoking resolver",
@@ -659,8 +667,14 @@ func (r *Runner) rebaseAndMerge(
 			})
 
 			if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID); resolveErr != nil {
-				return commitHashes, fmt.Errorf("conflict resolution failed: %w", resolveErr)
+				return commitHashes, baseHashes, fmt.Errorf("conflict resolution failed: %w", resolveErr)
 			}
+		}
+
+		// Capture defBranch HEAD before the merge so TaskDiff can reconstruct
+		// the full task diff even after worktrees are cleaned up.
+		if base, err := getCommitHash(repoPath); err == nil {
+			baseHashes[repoPath] = base
 		}
 
 		// Fast-forward merge into default branch.
@@ -668,7 +682,7 @@ func (r *Runner) rebaseAndMerge(
 			"result": fmt.Sprintf("Fast-forward merging %s into %s...", branchName, defBranch),
 		})
 		if err := ffMerge(repoPath, branchName); err != nil {
-			return commitHashes, fmt.Errorf("ff-merge %s: %w", repoPath, err)
+			return commitHashes, baseHashes, fmt.Errorf("ff-merge %s: %w", repoPath, err)
 		}
 
 		hash, err := getCommitHash(repoPath)
@@ -682,7 +696,7 @@ func (r *Runner) rebaseAndMerge(
 		}
 	}
 
-	return commitHashes, nil
+	return commitHashes, baseHashes, nil
 }
 
 // isConflictError reports whether err wraps ErrConflict.

@@ -626,6 +626,32 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	var combined strings.Builder
 	behindCounts := make(map[string]int)
 	for repoPath, worktreePath := range task.WorktreePaths {
+		// If the worktree directory no longer exists (task done, worktrees cleaned up),
+		// fall back to reconstructing the diff from the stored commit hashes.
+		if _, statErr := os.Stat(worktreePath); statErr != nil {
+			commitHash := task.CommitHashes[repoPath]
+			if commitHash == "" {
+				continue
+			}
+			var out []byte
+			if baseHash := task.BaseCommitHashes[repoPath]; baseHash != "" {
+				// Show the full range of changes the task introduced.
+				out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
+					"diff", baseHash, commitHash).Output()
+			} else {
+				// Older tasks without a stored base hash: show the final commit only.
+				out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
+					"show", commitHash).Output()
+			}
+			if len(out) > 0 {
+				if len(task.WorktreePaths) > 1 {
+					fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
+				}
+				combined.Write(out)
+			}
+			continue
+		}
+
 		defBranch, err := defaultBranch(repoPath)
 		if err != nil {
 			continue
