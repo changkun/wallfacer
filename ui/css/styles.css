@@ -170,9 +170,42 @@ pre { white-space: pre-wrap; word-break: break-word; }
 }
 .logs-block {
   background: #131210; border-radius: 8px; padding: 16px;
-  font-size: 12px; color: #5edb96; max-height: 384px;
+  font-size: 12px; color: #b1bac4; max-height: 384px;
   overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace;
 }
+
+/* --- Claude Code terminal style (pretty NDJSON) --- */
+.cc-block { margin: 2px 0; line-height: 1.5; }
+.cc-marker { color: #79c0ff; margin-right: 6px; }
+.cc-marker-result { color: #3fb950; }
+.cc-text { color: #b1bac4; white-space: pre-wrap; word-break: break-word; }
+.cc-tool-call { color: #b1bac4; }
+.cc-tool-name { color: #ff79c6; font-weight: bold; }
+.cc-tool-input { color: #e3b341; font-weight: normal; word-break: break-all; }
+.cc-tool-result {
+  display: flex; align-items: flex-start; gap: 6px;
+  padding-left: 18px; color: #8b949e;
+}
+.cc-result-pipe { color: #484f58; flex-shrink: 0; }
+.cc-result-text {
+  margin: 0; padding: 0; background: none; font-size: inherit;
+  color: inherit; white-space: pre-wrap; word-break: break-word;
+  font-family: inherit; line-height: inherit; max-width: 100%; overflow: hidden;
+}
+.cc-result-empty { color: #484f58; font-style: italic; }
+.cc-expand { display: contents; }
+.cc-expand-toggle {
+  color: #484f58; cursor: pointer; font-size: 11px;
+  list-style: none; user-select: none;
+}
+.cc-expand-toggle:hover { color: #8b949e; }
+.cc-expand-toggle::-webkit-details-marker { display: none; }
+.cc-final-result {
+  color: #3fb950; white-space: pre-wrap; word-break: break-word;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid #484f58;
+}
+.cc-result-label { font-weight: bold; }
+.cc-stderr { color: #8b949e; }
 
 /* --- Usage stats --- */
 .usage-grid {
