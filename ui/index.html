@@ -654,6 +654,28 @@ function deleteCurrentTask() {
   closeModal();
 }
 
+async function archiveTask() {
+  if (!currentTaskId) return;
+  try {
+    await api(`/api/tasks/${currentTaskId}/archive`, { method: 'POST' });
+    closeModal();
+    fetchTasks();
+  } catch (e) {
+    alert('Error archiving task: ' + e.message);
+  }
+}
+
+async function unarchiveTask() {
+  if (!currentTaskId) return;
+  try {
+    await api(`/api/tasks/${currentTaskId}/unarchive`, { method: 'POST' });
+    closeModal();
+    fetchTasks();
+  } catch (e) {
+    alert('Error unarchiving task: ' + e.message);
+  }
+}
+
 // --- Rendering ---
 function render() {
   const columns = { backlog: [], in_progress: [], waiting: [], committing: [], done: [], failed: [] };
@@ -730,9 +752,11 @@ function formatTimeout(minutes) {
 }
 
 function updateCard(card, t) {
-  const badgeClass = `badge-${t.status}`;
-  const statusLabel = t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status;
+  const isArchived = !!t.archived;
+  const badgeClass = isArchived ? 'badge-archived' : `badge-${t.status}`;
+  const statusLabel = isArchived ? 'archived' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
+  card.style.opacity = isArchived ? '0.55' : '';
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
@@ -832,6 +856,20 @@ async function openModal(id) {
     document.getElementById('modal-retry-prompt').value = task.prompt;
   } else {
     retrySection.classList.add('hidden');
+  }
+
+  // Archive/Unarchive section (done tasks only)
+  const archiveSection = document.getElementById('modal-archive-section');
+  const unarchiveSection = document.getElementById('modal-unarchive-section');
+  if (task.status === 'done' && !task.archived) {
+    archiveSection.classList.remove('hidden');
+    unarchiveSection.classList.add('hidden');
+  } else if (task.status === 'done' && task.archived) {
+    archiveSection.classList.add('hidden');
+    unarchiveSection.classList.remove('hidden');
+  } else {
+    archiveSection.classList.add('hidden');
+    unarchiveSection.classList.add('hidden');
   }
 
   // Prompt history

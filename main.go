@@ -339,7 +339,7 @@ func openBrowser(url string) {
 
 func recoverOrphanedTasks(store *Store) {
 	ctx := context.Background()
-	tasks, err := store.ListTasks(ctx)
+	tasks, err := store.ListTasks(ctx, true)
 	if err != nil {
 		log.Printf("recovery: list tasks: %v", err)
 		return
