@@ -39,6 +39,11 @@ type Task struct {
 	Position      int       `json:"position"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
+
+	// Worktree isolation fields (populated when task moves to in_progress).
+	WorktreePaths map[string]string `json:"worktree_paths,omitempty"` // host repoPath → worktree path
+	BranchName    string            `json:"branch_name,omitempty"`    // "task/<uuid8>"
+	CommitHashes  map[string]string `json:"commit_hashes,omitempty"`  // host repoPath → commit hash after merge
 }
 
 type TaskEvent struct {
@@ -411,12 +416,47 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.StopReason = nil
 	t.Turns = 0
 	t.Status = "backlog"
+	// Clear worktree fields so fresh worktrees are created on next run.
+	t.WorktreePaths = nil
+	t.BranchName = ""
+	t.CommitHashes = nil
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
 	s.notify()
 	return nil
+}
+
+func (s *Store) UpdateTaskWorktrees(_ context.Context, id uuid.UUID, worktreePaths map[string]string, branchName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.WorktreePaths = worktreePaths
+	t.BranchName = branchName
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify()
+	return nil
+}
+
+func (s *Store) UpdateTaskCommitHashes(_ context.Context, id uuid.UUID, hashes map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.CommitHashes = hashes
+	t.UpdatedAt = time.Now()
+	return s.saveTask(id, t)
 }
 
 func (s *Store) ResumeTask(_ context.Context, id uuid.UUID) error {

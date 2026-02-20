@@ -114,15 +114,25 @@ func runServer(configDir string, args []string) {
 	defer store.Close()
 	logMain.Info("store loaded", "path", *dataDir)
 
-	// Recover orphaned in_progress tasks from a previous server crash.
-	recoverOrphanedTasks(store)
+	worktreesDir := filepath.Join(configDir, "worktrees")
+	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
+		fatal(logMain, "create worktrees dir", "error", err)
+	}
 
 	runner := NewRunner(store, RunnerConfig{
 		Command:      *containerCmd,
 		SandboxImage: *sandboxImage,
 		EnvFile:      *envFile,
 		Workspaces:   strings.Join(workspaces, " "),
+		WorktreesDir: worktreesDir,
 	})
+
+	// Clean up any worktree dirs that don't correspond to a known task
+	// (leftover from a crash before the task was persisted with worktree paths).
+	runner.pruneOrphanedWorktrees(store)
+
+	// Recover orphaned in_progress/committing tasks from a previous server crash.
+	recoverOrphanedTasks(store, runner)
 
 	logMain.Info("workspaces", "paths", strings.Join(workspaces, ", "))
 
@@ -378,7 +388,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func recoverOrphanedTasks(store *Store) {
+func recoverOrphanedTasks(store *Store, runner *Runner) {
 	ctx := context.Background()
 	tasks, err := store.ListTasks(ctx, true)
 	if err != nil {
@@ -386,16 +396,23 @@ func recoverOrphanedTasks(store *Store) {
 		return
 	}
 	for _, t := range tasks {
-		if t.Status != "in_progress" {
+		if t.Status != "in_progress" && t.Status != "committing" {
 			continue
 		}
-		logRecovery.Warn("task was in_progress at startup, marking as failed", "task", t.ID)
+		logRecovery.Warn("task was interrupted at startup, marking as failed",
+			"task", t.ID, "status", t.Status)
+
+		// Clean up any worktrees that were created for this task.
+		if len(t.WorktreePaths) > 0 {
+			runner.cleanupWorktrees(t.ID, t.WorktreePaths, t.BranchName)
+		}
+
 		store.UpdateTaskStatus(ctx, t.ID, "failed")
 		store.InsertEvent(ctx, t.ID, "error", map[string]string{
-			"error": "server restarted while task was in progress",
+			"error": "server restarted while task was " + t.Status,
 		})
 		store.InsertEvent(ctx, t.ID, "state_change", map[string]string{
-			"from": "in_progress", "to": "failed",
+			"from": t.Status, "to": "failed",
 		})
 	}
 }

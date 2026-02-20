@@ -152,6 +152,10 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 }
 
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	// Clean up any worktrees before removing the task record.
+	if task, err := h.store.GetTask(r.Context(), id); err == nil && len(task.WorktreePaths) > 0 {
+		h.runner.cleanupWorktrees(id, task.WorktreePaths, task.BranchName)
+	}
 	if err := h.store.DeleteTask(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
