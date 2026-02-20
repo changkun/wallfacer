@@ -340,8 +340,10 @@ pre { white-space: pre-wrap; word-break: break-word; }
   background: rgba(217, 119, 6, 0.35);
 }
 /* Modal-level behind warning (larger) */
-#modal-diff-behind {
+#modal-diff-behind:not(.hidden) {
   display: flex;
+}
+#modal-diff-behind {
   align-items: center;
   justify-content: space-between;
   gap: 8px;

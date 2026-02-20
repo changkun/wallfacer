@@ -135,9 +135,12 @@ async function openModal(id) {
   const modalCard = document.querySelector('.modal-card');
   const modalRight = document.getElementById('modal-right');
   const hasWorktrees = task.worktree_paths && Object.keys(task.worktree_paths).length > 0;
+  const modalBody = document.getElementById('modal-body');
   if ((task.status === 'waiting' || task.status === 'failed') && hasWorktrees) {
     modalCard.classList.add('modal-wide');
     modalRight.classList.remove('hidden');
+    modalBody.style.display = 'flex';
+    modalBody.style.gap = '24px';
     const filesEl = document.getElementById('modal-diff-files');
     const behindEl = document.getElementById('modal-diff-behind');
     filesEl.innerHTML = '<span class="text-xs text-v-muted">Loading diff\u2026</span>';
@@ -169,6 +172,8 @@ async function openModal(id) {
   } else {
     modalCard.classList.remove('modal-wide');
     modalRight.classList.add('hidden');
+    modalBody.style.display = '';
+    modalBody.style.gap = '';
   }
 
   // Resume section (failed with session_id only)
@@ -265,6 +270,9 @@ function closeModal() {
   document.getElementById('modal-logs').innerHTML = '';
   currentTaskId = null;
   document.querySelector('.modal-card').classList.remove('modal-wide');
+  const modalBody = document.getElementById('modal-body');
+  modalBody.style.display = '';
+  modalBody.style.gap = '';
   document.getElementById('modal').classList.add('hidden');
   document.getElementById('modal').classList.remove('flex');
 }
