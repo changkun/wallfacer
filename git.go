@@ -173,12 +173,13 @@ func isConflictOutput(s string) bool {
 
 // WorkspaceGitStatus holds the git state for a single workspace directory.
 type WorkspaceGitStatus struct {
-	Path       string `json:"path"`
-	Name       string `json:"name"`
-	IsGitRepo  bool   `json:"is_git_repo"`
-	Branch     string `json:"branch,omitempty"`
-	HasRemote  bool   `json:"has_remote"`
-	AheadCount int    `json:"ahead_count"`
+	Path        string `json:"path"`
+	Name        string `json:"name"`
+	IsGitRepo   bool   `json:"is_git_repo"`
+	Branch      string `json:"branch,omitempty"`
+	HasRemote   bool   `json:"has_remote"`
+	AheadCount  int    `json:"ahead_count"`
+	BehindCount int    `json:"behind_count"`
 }
 
 // GitStatus returns git status for every configured workspace.
@@ -285,6 +286,56 @@ func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"output": string(out)})
 }
 
+// GitSyncWorkspace fetches from remote and rebases the current branch onto its
+// upstream tracking branch. If the rebase produces a conflict it is immediately
+// aborted and an error is returned so the user can resolve it manually.
+func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Workspace string `json:"workspace"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	allowed := false
+	for _, ws := range h.runner.Workspaces() {
+		if ws == req.Workspace {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		http.Error(w, "workspace not configured", http.StatusBadRequest)
+		return
+	}
+
+	logGit.Info("sync workspace", "workspace", req.Workspace)
+
+	// Fetch to update remote tracking refs.
+	if out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "fetch").CombinedOutput(); err != nil {
+		logGit.Error("fetch failed", "workspace", req.Workspace, "error", err)
+		http.Error(w, "fetch failed: "+string(out), http.StatusInternalServerError)
+		return
+	}
+
+	// Rebase local branch onto upstream.
+	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "rebase", "@{u}").CombinedOutput()
+	if err != nil {
+		// Abort so the repo is not left mid-rebase.
+		exec.Command("git", "-C", req.Workspace, "rebase", "--abort").Run()
+		logGit.Error("sync rebase failed", "workspace", req.Workspace, "error", err)
+		if isConflictOutput(string(out)) {
+			http.Error(w, "rebase conflict: resolve manually in "+req.Workspace, http.StatusConflict)
+			return
+		}
+		http.Error(w, "rebase failed: "+string(out), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"output": string(out)})
+}
+
 // workspaceGitStatus inspects a directory and returns its git status.
 func workspaceGitStatus(path string) WorkspaceGitStatus {
 	s := WorkspaceGitStatus{
@@ -314,6 +365,12 @@ func workspaceGitStatus(path string) WorkspaceGitStatus {
 	if out, err := exec.Command("git", "-C", path, "rev-list", "--count", "@{u}..HEAD").Output(); err == nil {
 		n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
 		s.AheadCount = n
+	}
+
+	// How many remote commits are ahead of local HEAD (behind count)?
+	if out, err := exec.Command("git", "-C", path, "rev-list", "--count", "HEAD..@{u}").Output(); err == nil {
+		n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+		s.BehindCount = n
 	}
 
 	return s
