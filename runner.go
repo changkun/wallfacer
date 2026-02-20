@@ -85,23 +85,21 @@ func (r *Runner) Workspaces() []string {
 	return strings.Fields(r.workspaces)
 }
 
-// setupWorktrees creates an isolated git worktree for each git-backed workspace.
-// Non-git workspaces are skipped and will be mounted directly as before.
+// setupWorktrees creates an isolated working directory for each workspace.
+// For git-backed workspaces a proper git worktree is created.
+// For non-git workspaces a snapshot copy is created and tracked with a local
+// git repo so that the same commit pipeline can be used for both cases.
 // Returns (worktreePaths, branchName, error).
-// Idempotent: if the worktree directory already exists it is reused.
+// Idempotent: if the worktree/snapshot directory already exists it is reused.
 func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, error) {
 	branchName := "task/" + taskID.String()[:8]
 	worktreePaths := make(map[string]string)
 
 	for _, ws := range r.Workspaces() {
-		if !isGitRepo(ws) {
-			continue
-		}
-
 		basename := filepath.Base(ws)
 		worktreePath := filepath.Join(r.worktreesDir, taskID.String(), basename)
 
-		// Idempotent: reuse existing worktree (e.g. task resumed from waiting).
+		// Idempotent: reuse existing worktree/snapshot (e.g. task resumed from waiting).
 		if _, err := os.Stat(worktreePath); err == nil {
 			worktreePaths[ws] = worktreePath
 			continue
@@ -112,9 +110,20 @@ func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, er
 			return nil, "", fmt.Errorf("mkdir worktree parent: %w", err)
 		}
 
-		if err := createWorktree(ws, worktreePath, branchName); err != nil {
-			r.cleanupWorktrees(taskID, worktreePaths, branchName)
-			return nil, "", fmt.Errorf("createWorktree for %s: %w", ws, err)
+		if isGitRepo(ws) {
+			if err := createWorktree(ws, worktreePath, branchName); err != nil {
+				r.cleanupWorktrees(taskID, worktreePaths, branchName)
+				return nil, "", fmt.Errorf("createWorktree for %s: %w", ws, err)
+			}
+		} else {
+			// Non-git workspace: create a snapshot copy with a local git repo
+			// for change tracking. The container mounts the snapshot (same path
+			// structure as git worktrees) so that changes are reliably captured
+			// and explicitly copied back after the task completes.
+			if err := setupNonGitSnapshot(ws, worktreePath); err != nil {
+				r.cleanupWorktrees(taskID, worktreePaths, branchName)
+				return nil, "", fmt.Errorf("snapshot for %s: %w", ws, err)
+			}
 		}
 
 		worktreePaths[ws] = worktreePath
@@ -123,10 +132,14 @@ func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, er
 	return worktreePaths, branchName, nil
 }
 
-// cleanupWorktrees removes all worktrees for a task and the task's worktree
+// cleanupWorktrees removes all worktrees/snapshots for a task and the task's
 // directory. Safe to call multiple times — errors are logged as warnings.
 func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]string, branchName string) {
 	for repoPath, wt := range worktreePaths {
+		if !isGitRepo(repoPath) {
+			// Non-git snapshots are cleaned by os.RemoveAll below.
+			continue
+		}
 		if err := removeWorktree(repoPath, wt, branchName); err != nil {
 			logRunner.Warn("remove worktree", "task", taskID, "repo", repoPath, "error", err)
 		}
@@ -135,6 +148,61 @@ func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 	if err := os.RemoveAll(taskWorktreeDir); err != nil {
 		logRunner.Warn("remove worktree dir", "task", taskID, "error", err)
 	}
+}
+
+// setupNonGitSnapshot copies ws into snapshotPath and initialises a local git
+// repo there for change tracking. This lets the standard commit pipeline work
+// on non-git workspaces: Phase 1 commits changes in the snapshot, Phase 2
+// copies the snapshot back to ws (instead of rebasing into a remote branch).
+func setupNonGitSnapshot(ws, snapshotPath string) error {
+	if err := os.MkdirAll(snapshotPath, 0755); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+	// Copy all files (including hidden) from ws into the snapshot.
+	// The trailing "/." on the source ensures hidden files are included.
+	if out, err := exec.Command("cp", "-a", ws+"/.", snapshotPath).CombinedOutput(); err != nil {
+		os.RemoveAll(snapshotPath)
+		return fmt.Errorf("cp workspace to snapshot: %w\n%s", err, out)
+	}
+	// Initialise a git repo so Phase 1 (hostStageAndCommit) can commit changes.
+	if out, err := exec.Command("git", "-C", snapshotPath, "init").CombinedOutput(); err != nil {
+		os.RemoveAll(snapshotPath)
+		return fmt.Errorf("git init snapshot: %w\n%s", err, out)
+	}
+	exec.Command("git", "-C", snapshotPath, "config", "user.email", "wallfacer@local").Run()
+	exec.Command("git", "-C", snapshotPath, "config", "user.name", "Wallfacer").Run()
+	exec.Command("git", "-C", snapshotPath, "add", "-A").Run()
+	// --allow-empty handles the edge case of an empty workspace.
+	exec.Command("git", "-C", snapshotPath, "commit", "--allow-empty", "-m", "wallfacer: initial snapshot").Run()
+	return nil
+}
+
+// extractSnapshotToWorkspace copies all changes from snapshotPath back to
+// the original workspace at targetPath, excluding the .git directory that was
+// added for change tracking. Uses rsync when available (handles deletions);
+// falls back to cp which covers new/modified files only.
+func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
+	// rsync handles new, modified, AND deleted files correctly.
+	if _, err := exec.LookPath("rsync"); err == nil {
+		out, err := exec.Command(
+			"rsync", "-a", "--delete", "--exclude=.git",
+			snapshotPath+"/", targetPath+"/",
+		).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("rsync snapshot to workspace: %w\n%s", err, out)
+		}
+		return nil
+	}
+	// Fallback: cp covers new/modified files; files deleted inside the sandbox
+	// are not removed from the original workspace.
+	logRunner.Warn("rsync not found; falling back to cp (deletions will not propagate to workspace)",
+		"snapshot", snapshotPath, "target", targetPath)
+	if out, err := exec.Command("cp", "-a", snapshotPath+"/.", targetPath).CombinedOutput(); err != nil {
+		return fmt.Errorf("cp snapshot to workspace: %w\n%s", err, out)
+	}
+	// Remove the .git directory that cp may have brought over from the snapshot.
+	os.RemoveAll(filepath.Join(targetPath, ".git"))
+	return nil
 }
 
 // pruneOrphanedWorktrees scans worktreesDir for directories whose UUID does not
@@ -408,6 +476,13 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 	})
 
 	for repoPath, worktreePath := range task.WorktreePaths {
+		if !isGitRepo(repoPath) {
+			r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+				"result": fmt.Sprintf("Skipping %s — not a git repository, cannot sync.", filepath.Base(repoPath)),
+			})
+			continue
+		}
+
 		defBranch, err := defaultBranch(repoPath)
 		if err != nil {
 			statusSet = true
@@ -617,6 +692,23 @@ func (r *Runner) rebaseAndMerge(
 
 	for repoPath, worktreePath := range worktreePaths {
 		logRunner.Info("rebase+merge", "task", taskID, "repo", repoPath)
+
+		if !isGitRepo(repoPath) {
+			// Non-git workspace: copy snapshot changes back to the original directory.
+			r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+				"result": fmt.Sprintf("Extracting changes from sandbox to %s...", filepath.Base(repoPath)),
+			})
+			if err := extractSnapshotToWorkspace(worktreePath, repoPath); err != nil {
+				return commitHashes, baseHashes, fmt.Errorf("extract snapshot for %s: %w", repoPath, err)
+			}
+			if hash, err := getCommitHash(worktreePath); err == nil {
+				commitHashes[repoPath] = hash
+			}
+			r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+				"result": fmt.Sprintf("Changes extracted to %s.", filepath.Base(repoPath)),
+			})
+			continue
+		}
 
 		defBranch, err := defaultBranch(repoPath)
 		if err != nil {
