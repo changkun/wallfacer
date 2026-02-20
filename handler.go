@@ -459,8 +459,8 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// serveStoredLogs serves saved stderr output files for tasks that are no longer
-// running (container removed with --rm so live logs are unavailable).
+// serveStoredLogs renders the saved stream-json turn output for tasks that are
+// no longer running (container removed with --rm so live logs are unavailable).
 func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	outputsDir := filepath.Join(h.store.dir, id.String(), "outputs")
 	entries, err := os.ReadDir(outputsDir)
@@ -475,20 +475,105 @@ func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uui
 
 	wrote := false
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".stderr.txt") {
+		if entry.IsDir() {
 			continue
 		}
-		content, readErr := os.ReadFile(filepath.Join(outputsDir, entry.Name()))
-		if readErr != nil {
+		name := entry.Name()
+		if !strings.HasPrefix(name, "turn-") || !strings.HasSuffix(name, ".json") {
 			continue
 		}
-		fmt.Fprintf(w, "=== %s ===\n", entry.Name())
-		w.Write(content)
+		content, readErr := os.ReadFile(filepath.Join(outputsDir, name))
+		if readErr != nil || len(strings.TrimSpace(string(content))) == 0 {
+			continue
+		}
+		turnNum := strings.TrimSuffix(strings.TrimPrefix(name, "turn-"), ".json")
+		fmt.Fprintf(w, "=== Turn %s ===\n", turnNum)
+		renderStreamJSON(w, content)
 		fmt.Fprintln(w)
 		wrote = true
 	}
 	if !wrote {
-		fmt.Fprintln(w, "(no stderr output saved for this task)")
+		fmt.Fprintln(w, "(no output saved for this task)")
+	}
+}
+
+// renderStreamJSON parses Claude Code's NDJSON stream-json stdout and writes a
+// human-readable execution trace to w.
+func renderStreamJSON(w io.Writer, data []byte) {
+	type contentBlock struct {
+		Type  string          `json:"type"`
+		Text  string          `json:"text"`
+		Name  string          `json:"name"`
+		Input json.RawMessage `json:"input"`
+		// tool_result fields
+		ToolUseID string           `json:"tool_use_id"`
+		Content   []map[string]any `json:"content"`
+	}
+	type messageObj struct {
+		Role    string         `json:"role"`
+		Content []contentBlock `json:"content"`
+	}
+	type streamEvent struct {
+		Type    string      `json:"type"`
+		Message *messageObj `json:"message"`
+		Result  string      `json:"result"`
+		IsError bool        `json:"is_error"`
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] != '{' {
+			continue
+		}
+		var evt streamEvent
+		if err := json.Unmarshal([]byte(line), &evt); err != nil {
+			continue
+		}
+		switch evt.Type {
+		case "assistant":
+			if evt.Message == nil {
+				continue
+			}
+			for _, block := range evt.Message.Content {
+				switch block.Type {
+				case "text":
+					if block.Text != "" {
+						fmt.Fprintf(w, "%s\n", block.Text)
+					}
+				case "tool_use":
+					input := string(block.Input)
+					if len(input) > 300 {
+						input = input[:300] + "...(truncated)"
+					}
+					fmt.Fprintf(w, "[%s] %s\n", block.Name, input)
+				}
+			}
+		case "user":
+			if evt.Message == nil {
+				continue
+			}
+			for _, block := range evt.Message.Content {
+				if block.Type != "tool_result" {
+					continue
+				}
+				var text string
+				for _, c := range block.Content {
+					if t, ok := c["text"].(string); ok && t != "" {
+						text += t
+					}
+				}
+				if text != "" {
+					if len(text) > 500 {
+						text = text[:500] + "...(truncated)"
+					}
+					fmt.Fprintf(w, "→ %s\n", text)
+				}
+			}
+		case "result":
+			if evt.Result != "" {
+				fmt.Fprintf(w, "\n[Result]\n%s\n", evt.Result)
+			}
+		}
 	}
 }
 

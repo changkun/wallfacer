@@ -66,7 +66,7 @@ async function openModal(id) {
   }
 
   const logsSection = document.getElementById('modal-logs-section');
-  if (task.status === 'in_progress') {
+  if (task.status !== 'backlog') {
     logsSection.classList.remove('hidden');
     startLogStream(id);
   } else {
