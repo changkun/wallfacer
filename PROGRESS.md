@@ -268,3 +268,22 @@ All clean. Here's a summary of what was verified and updated in this pass:
 - Updated the API routes table with the 8...
 
 ---
+
+## Task: e450d712
+
+**Date**: 2026-02-21 00:09:16  
+**Branch**: task/e450d712  
+**Commit**: `47081030c8ec1b2e26fb8e087f0c0c166b4fbe85`
+
+**Prompt**:
+> i don't like the browser based alert "localhost Says ..." Pls implement a proper modal for those cases.
+
+**Result**:
+Done. Here's what was changed:
+
+- **`ui/index.html`** — added an alert modal (`#alert-modal`) above the detail modal. It uses `z-[60]` so it always sits on top, and has an error icon, a message paragraph, and an OK button.
+- **`ui/js/utils.js`** — added `showAlert(message)` and `closeAlert()` helper functions.
+- **`ui/js/tasks.js`**, **`ui/js/git.js`**, **`ui/js/instructions.js`** — all 14 `alert()` calls replaced with `showAlert()`.
+- **`ui/js/events.js`** — Escape key now closes the alert modal first (if open) before the detail modal; clicking the backdrop also closes it.
+
+---
