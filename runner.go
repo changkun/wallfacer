@@ -238,6 +238,19 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			logRunner.Error("save turn output", "task", taskID, "turn", turns, "error", saveErr)
 		}
 		if err != nil {
+			// If resume produced empty output, the session may be stale or
+			// incompatible. Drop the session and retry with the original prompt.
+			if sessionID != "" && strings.Contains(err.Error(), "empty output from container") {
+				logRunner.Warn("resume produced empty output, retrying without session",
+					"task", taskID, "session", sessionID)
+				r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
+					"result": "Session resume failed (empty output). Retrying with fresh session...",
+				})
+				sessionID = ""
+				prompt = task.Prompt
+				continue
+			}
+
 			logRunner.Error("container error", "task", taskID, "error", err)
 			// Don't overwrite a cancelled status — the cancel handler may have
 			// killed the container and already transitioned the task.
@@ -831,6 +844,10 @@ func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, ses
 				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), stderr.String())
 			}
 			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+		}
+		stderrStr := strings.TrimSpace(stderr.String())
+		if stderrStr != "" {
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
 		}
 		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
 	}
