@@ -1,6 +1,10 @@
 // --- Workspace CLAUDE.md (Instructions) ---
 
-async function showInstructionsEditor() {
+async function showInstructionsEditor(event, preloadedContent) {
+  // Stop propagation so the document click listener (which closes the modal on
+  // outside-click) doesn't fire for the same click that opened the modal.
+  if (event) event.stopPropagation();
+
   // Close settings panel before opening editor.
   document.getElementById('settings-panel').classList.add('hidden');
 
@@ -11,9 +15,15 @@ async function showInstructionsEditor() {
 
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
-  statusEl.textContent = 'Loading\u2026';
-  textarea.value = '';
+  textarea.value = preloadedContent != null ? preloadedContent : '';
   pathEl.textContent = '';
+
+  if (preloadedContent != null) {
+    statusEl.textContent = 'Re-initialized.';
+    setTimeout(function() { statusEl.textContent = ''; }, 2000);
+  } else {
+    statusEl.textContent = 'Loading\u2026';
+  }
 
   try {
     var config = await api('/api/config');
@@ -21,6 +31,8 @@ async function showInstructionsEditor() {
       pathEl.textContent = config.instructions_path;
     }
   } catch (e) { /* non-critical */ }
+
+  if (preloadedContent != null) return;
 
   try {
     var data = await api('/api/instructions');
@@ -81,6 +93,9 @@ async function _doReinit(updateEditor) {
         statusEl.textContent = 'Re-initialized.';
         setTimeout(function() { statusEl.textContent = ''; }, 2000);
       }
+    } else {
+      // Called from settings panel: open editor so user sees the result.
+      showInstructionsEditor(null, data.content || '');
     }
   } catch (e) {
     if (updateEditor && statusEl) {
