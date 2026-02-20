@@ -50,7 +50,7 @@
   }
 
   /* --- Layout --- */
-  .column { min-height: calc(100vh - 160px); }
+  .column { flex: 1; min-height: 0; overflow-y: auto; }
   .col-bg { background: var(--bg-raised); border-radius: 12px; padding: 12px; }
 
   /* --- Cards --- */
@@ -105,9 +105,11 @@
   .col-header-progress { color: #3a6db3; }
   .col-header-waiting { color: #a07020; }
   .col-header-done { color: #28804a; }
+  .col-header-failed { color: #a02828; }
   [data-theme="dark"] .col-header-progress { color: #6da0dc; }
   [data-theme="dark"] .col-header-waiting { color: #d4a030; }
   [data-theme="dark"] .col-header-done { color: #45b87a; }
+  [data-theme="dark"] .col-header-failed { color: #d46868; }
 
   /* --- Event type colors --- */
   .ev-state { color: #3a6db3; }
@@ -210,7 +212,7 @@
   .section-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 </style>
 </head>
-<body class="min-h-screen">
+<body class="h-screen overflow-hidden flex flex-col">
 
 <!-- Theme init (before render to prevent flash) -->
 <script>
@@ -246,8 +248,8 @@
 </header>
 
 <!-- Board -->
-<main class="grid grid-cols-4 gap-4 p-6" id="board">
-  <div class="flex flex-col">
+<main class="grid grid-cols-5 gap-4 p-6 flex-1 min-h-0" id="board">
+  <div class="flex flex-col min-h-0">
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-backlog">Backlog</h2>
       <span id="count-backlog" class="text-xs text-v-muted">0</span>
@@ -275,26 +277,33 @@
     </div>
     <div id="col-backlog" class="column col-bg space-y-2" data-status="backlog"></div>
   </div>
-  <div class="flex flex-col">
+  <div class="flex flex-col min-h-0">
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-progress">In Progress</h2>
       <span id="count-in_progress" class="text-xs text-v-muted">0</span>
     </div>
     <div id="col-in_progress" class="column col-bg space-y-2" data-status="in_progress"></div>
   </div>
-  <div class="flex flex-col">
+  <div class="flex flex-col min-h-0">
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-waiting">Waiting</h2>
       <span id="count-waiting" class="text-xs text-v-muted">0</span>
     </div>
     <div id="col-waiting" class="column col-bg space-y-2" data-status="waiting"></div>
   </div>
-  <div class="flex flex-col">
+  <div class="flex flex-col min-h-0">
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-done">Done</h2>
       <span id="count-done" class="text-xs text-v-muted">0</span>
     </div>
     <div id="col-done" class="column col-bg space-y-2" data-status="done"></div>
+  </div>
+  <div class="flex flex-col min-h-0">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="col-header col-header-failed">Failed</h2>
+      <span id="count-failed" class="text-xs text-v-muted">0</span>
+    </div>
+    <div id="col-failed" class="column col-bg space-y-2" data-status="failed"></div>
   </div>
 </main>
 
@@ -624,10 +633,6 @@ function render() {
   columns.waiting = columns.waiting.concat(columns.committing);
   delete columns.committing;
 
-  // Failed tasks show in the Done column with a different badge
-  columns.done = columns.done.concat(columns.failed);
-  delete columns.failed;
-
   for (const [status, items] of Object.entries(columns)) {
     const el = document.getElementById(`col-${status}`);
     if (!el) continue;
@@ -919,7 +924,7 @@ function initSortable() {
     },
   });
 
-  // Waiting and Done: no drag interaction
+  // Waiting, Done, and Failed: no drag interaction
   Sortable.create(document.getElementById('col-waiting'), {
     group: { name: 'kanban', pull: false, put: false },
     animation: 150,
@@ -930,28 +935,65 @@ function initSortable() {
     animation: 150,
     sort: false,
   });
+  Sortable.create(document.getElementById('col-failed'), {
+    group: { name: 'kanban', pull: false, put: false },
+    animation: 150,
+    sort: false,
+  });
 }
 
-// --- Init ---
-async function fetchConfig() {
+// --- Git status ---
+let gitStatuses = [];
+
+async function fetchGitStatus() {
   try {
-    const config = await api('/api/config');
-    const el = document.getElementById('workspace-list');
-    if (config.workspaces && config.workspaces.length > 0) {
-      el.innerHTML = config.workspaces.map(ws => {
-        const name = ws.split('/').filter(Boolean).pop() || ws;
-        return `<span title="${escapeHtml(ws)}" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border);">${escapeHtml(name)}</span>`;
-      }).join('');
-    }
+    gitStatuses = await api('/api/git/status');
+    renderWorkspaces();
   } catch (e) {
-    console.error('fetch config:', e);
+    console.error('fetch git status:', e);
   }
 }
 
+function renderWorkspaces() {
+  const el = document.getElementById('workspace-list');
+  if (!gitStatuses || gitStatuses.length === 0) return;
+  el.innerHTML = gitStatuses.map((ws, i) => {
+    if (!ws.is_git_repo || !ws.has_remote) {
+      return `<span title="${escapeHtml(ws.path)}" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border);">${escapeHtml(ws.name)}</span>`;
+    }
+    const branchLabel = ws.branch ? ` <span style="opacity:0.55;">${escapeHtml(ws.branch)}</span>` : '';
+    const aheadBadge = ws.ahead_count > 0
+      ? `<span style="background:var(--accent);color:#fff;border-radius:3px;padding:0 5px;font-size:10px;font-weight:600;line-height:17px;">${ws.ahead_count}↑</span>`
+      : '';
+    const pushBtn = ws.ahead_count > 0
+      ? `<button data-ws-idx="${i}" onclick="pushWorkspace(this)" style="background:var(--accent);color:#fff;border:none;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:500;cursor:pointer;line-height:17px;">Push</button>`
+      : '';
+    return `<span title="${escapeHtml(ws.path)}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 6px 2px 8px;border-radius:4px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);">${escapeHtml(ws.name)}${branchLabel}${aheadBadge}${pushBtn}</span>`;
+  }).join('');
+}
+
+async function pushWorkspace(btn) {
+  const idx = parseInt(btn.getAttribute('data-ws-idx'), 10);
+  const ws = gitStatuses[idx];
+  if (!ws) return;
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    await api('/api/git/push', { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
+    fetchGitStatus();
+  } catch (e) {
+    alert('Push failed: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'Push';
+  }
+}
+
+// --- Init ---
 try { initSortable(); } catch (e) { console.error('sortable init:', e); }
-fetchConfig();
+fetchGitStatus();
 fetchTasks();
 setInterval(fetchTasks, 2000);
+setInterval(fetchGitStatus, 10000);
 </script>
 </body>
 </html>

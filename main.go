@@ -132,6 +132,8 @@ func runServer(configDir string, args []string) {
 
 	// API routes
 	mux.HandleFunc("GET /api/config", handler.GetConfig)
+	mux.HandleFunc("GET /api/git/status", handler.GitStatus)
+	mux.HandleFunc("POST /api/git/push", handler.GitPush)
 	mux.HandleFunc("GET /api/tasks", handler.ListTasks)
 	mux.HandleFunc("POST /api/tasks", handler.CreateTask)
 

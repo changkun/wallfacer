@@ -137,9 +137,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 				"from": "in_progress", "to": "done",
 			})
 
-			// Auto commit-and-push after feedback-resumed tasks complete.
+			// Auto-commit after feedback-resumed tasks complete.
 			if resumedFromWaiting && sessionID != "" {
-				r.commitAndPush(ctx, taskID, sessionID, turns)
+				r.commit(ctx, taskID, sessionID, turns)
 			}
 			return
 
@@ -159,11 +159,11 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string) {
 	}
 }
 
-// CommitAndPush creates its own timeout context and runs commit-and-push for a task.
-func (r *Runner) CommitAndPush(taskID uuid.UUID, sessionID string) {
+// Commit creates its own timeout context and runs an auto-commit turn for a task.
+func (r *Runner) Commit(taskID uuid.UUID, sessionID string) {
 	task, err := r.store.GetTask(context.Background(), taskID)
 	if err != nil {
-		log.Printf("runner: commit-and-push get task %s: %v", taskID, err)
+		log.Printf("runner: commit get task %s: %v", taskID, err)
 		return
 	}
 	timeout := time.Duration(task.Timeout) * time.Minute
@@ -172,7 +172,7 @@ func (r *Runner) CommitAndPush(taskID uuid.UUID, sessionID string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	r.commitAndPush(ctx, taskID, sessionID, task.Turns)
+	r.commit(ctx, taskID, sessionID, task.Turns)
 }
 
 // workspacePaths returns the container-side paths for mounted workspaces.
@@ -196,46 +196,46 @@ func (r *Runner) workspacePaths() []string {
 	return paths
 }
 
-// commitAndPush runs an additional container turn to commit and push changes.
-func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID string, turns int) {
+// commit runs an additional container turn to stage and commit changes.
+func (r *Runner) commit(ctx context.Context, taskID uuid.UUID, sessionID string, turns int) {
 	bgCtx := context.Background()
-	log.Printf("runner: task %s auto commit-and-push (session=%s)", taskID, sessionID)
+	log.Printf("runner: task %s auto-commit (session=%s)", taskID, sessionID)
 
 	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
-		"result": "Auto-running commit-and-push...",
+		"result": "Auto-running commit...",
 	})
 
 	dirs := r.workspacePaths()
 	var prompt string
 	if len(dirs) > 0 {
 		prompt = fmt.Sprintf(
-			"Commit and push all changes. The workspace repositories are at: %s. "+
+			"Commit all changes. The workspace repositories are at: %s. "+
 				"For each directory, cd into it, run `git status`, and if there are "+
-				"uncommitted changes, stage them with `git add -A`, create a commit "+
-				"with a descriptive message summarizing the changes, and push to the "+
-				"remote. Report what you committed and pushed.",
+				"uncommitted changes, stage them with `git add -A` and create a commit "+
+				"with a descriptive message summarizing the changes. "+
+				"Report what you committed.",
 			strings.Join(dirs, ", "))
 	} else {
-		prompt = "Commit and push all changes. Check `git status` in each subdirectory " +
-			"of /workspace. If there are uncommitted changes, stage them with `git add -A`, " +
-			"create a commit with a descriptive message summarizing the changes, " +
-			"and push to the remote. Report what you committed and pushed."
+		prompt = "Commit all changes. Check `git status` in each subdirectory " +
+			"of /workspace. If there are uncommitted changes, stage them with `git add -A` " +
+			"and create a commit with a descriptive message summarizing the changes. " +
+			"Report what you committed."
 	}
 
 	turns++
 	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID)
 	if saveErr := r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
-		log.Printf("runner: task %s save commit-and-push turn %d output: %v", taskID, turns, saveErr)
+		log.Printf("runner: task %s save commit turn %d output: %v", taskID, turns, saveErr)
 	}
 	if err != nil {
-		log.Printf("runner: task %s commit-and-push error: %v", taskID, err)
+		log.Printf("runner: task %s commit error: %v", taskID, err)
 		r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{
-			"error": "commit-and-push failed: " + err.Error(),
+			"error": "commit failed: " + err.Error(),
 		})
 		return
 	}
 
-	log.Printf("runner: task %s commit-and-push result: %s", taskID, truncate(output.Result, 500))
+	log.Printf("runner: task %s commit result: %s", taskID, truncate(output.Result, 500))
 
 	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
 		"result":      output.Result,
@@ -252,7 +252,7 @@ func (r *Runner) commitAndPush(ctx context.Context, taskID uuid.UUID, sessionID 
 		CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 		CostUSD:              output.TotalCostUSD,
 	})
-	log.Printf("runner: task %s commit-and-push completed", taskID)
+	log.Printf("runner: task %s commit completed", taskID)
 }
 
 func (r *Runner) runContainer(ctx context.Context, taskID uuid.UUID, prompt, sessionID string) (*claudeOutput, []byte, []byte, error) {

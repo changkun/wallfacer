@@ -221,7 +221,7 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 	}
 
 	if task.SessionID != nil && *task.SessionID != "" {
-		// Transition to "committing" while commit-and-push runs in the background.
+		// Transition to "committing" while auto-commit runs in the background.
 		// The goroutine will move the task to "done" when finished.
 		if err := h.store.UpdateTaskStatus(r.Context(), id, "committing"); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -233,7 +233,7 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 		})
 		sessionID := *task.SessionID
 		go func() {
-			h.runner.CommitAndPush(id, sessionID)
+			h.runner.Commit(id, sessionID)
 			bgCtx := context.Background()
 			h.store.UpdateTaskStatus(bgCtx, id, "done")
 			h.store.InsertEvent(bgCtx, id, "state_change", map[string]string{
