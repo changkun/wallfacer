@@ -327,7 +327,7 @@ func TestHostStageAndCommit(t *testing.T) {
 	}
 
 	// Run host-side commit.
-	committed := runner.hostStageAndCommit(worktreePaths, "Add hello world file")
+	committed := runner.hostStageAndCommit(taskID, worktreePaths, "Add hello world file")
 	if !committed {
 		t.Fatal("expected commit to be created")
 	}
@@ -359,7 +359,7 @@ func TestHostStageAndCommitNoChanges(t *testing.T) {
 	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
 
 	// No changes made — commit should be a no-op.
-	committed := runner.hostStageAndCommit(worktreePaths, "Nothing to do")
+	committed := runner.hostStageAndCommit(taskID, worktreePaths, "Nothing to do")
 	if committed {
 		t.Fatal("expected no commit when there are no changes")
 	}

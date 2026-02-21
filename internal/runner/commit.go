@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
@@ -52,7 +53,7 @@ func (r *Runner) commit(
 	if task != nil {
 		taskPrompt = task.Prompt
 	}
-	r.hostStageAndCommit(worktreePaths, taskPrompt)
+	r.hostStageAndCommit(taskID, worktreePaths, taskPrompt)
 
 	// Phase 2: host-side rebase and merge for each git worktree.
 	r.store.InsertEvent(bgCtx, taskID, "output", map[string]string{
@@ -102,8 +103,16 @@ func (r *Runner) commit(
 
 // hostStageAndCommit stages and commits all uncommitted changes in each
 // worktree directly on the host. Returns true if any new commits were created.
-func (r *Runner) hostStageAndCommit(worktreePaths map[string]string, prompt string) bool {
-	committed := false
+func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]string, prompt string) bool {
+	// First pass: stage all changes and collect diff stats for each worktree
+	// that has pending changes.
+	type pendingCommit struct {
+		repoPath     string
+		worktreePath string
+		diffStat     string
+	}
+	var pending []pendingCommit
+
 	for repoPath, worktreePath := range worktreePaths {
 		if out, err := exec.Command("git", "-C", worktreePath, "add", "-A").CombinedOutput(); err != nil {
 			logger.Runner.Warn("host commit: git add -A", "repo", repoPath, "error", err, "output", string(out))
@@ -116,20 +125,102 @@ func (r *Runner) hostStageAndCommit(worktreePaths map[string]string, prompt stri
 			continue
 		}
 
-		line := prompt
-		if idx := strings.IndexByte(line, '\n'); idx >= 0 {
-			line = line[:idx]
+		statOut, _ := exec.Command("git", "-C", worktreePath, "diff", "--cached", "--stat").Output()
+		pending = append(pending, pendingCommit{repoPath, worktreePath, strings.TrimSpace(string(statOut))})
+	}
+
+	if len(pending) == 0 {
+		return false
+	}
+
+	// Build combined diff stat context across all worktrees, then generate a
+	// descriptive commit message via a lightweight Claude container.
+	var allStats strings.Builder
+	for _, p := range pending {
+		if len(pending) > 1 {
+			allStats.WriteString("Repository: " + p.repoPath + "\n")
 		}
-		msg := "wallfacer: " + truncate(line, 72)
-		if out, err := exec.Command("git", "-C", worktreePath, "commit", "-m", msg).CombinedOutput(); err != nil {
-			logger.Runner.Warn("host commit: git commit", "repo", repoPath, "error", err, "output", string(out))
+		allStats.WriteString(p.diffStat + "\n")
+	}
+	msg := r.generateCommitMessage(taskID, prompt, allStats.String())
+
+	// Second pass: commit each worktree with the generated message.
+	committed := false
+	for _, p := range pending {
+		if out, err := exec.Command("git", "-C", p.worktreePath, "commit", "-m", msg).CombinedOutput(); err != nil {
+			logger.Runner.Warn("host commit: git commit", "repo", p.repoPath, "error", err, "output", string(out))
 			continue
 		}
-
 		committed = true
-		logger.Runner.Info("host commit: committed changes", "repo", repoPath)
+		logger.Runner.Info("host commit: committed changes", "repo", p.repoPath)
 	}
 	return committed
+}
+
+// generateCommitMessage runs a lightweight container to produce a descriptive
+// git commit message from the task prompt and staged diff stats.
+// Falls back to a truncated prompt on any error.
+func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat string) string {
+	firstLine := prompt
+	if idx := strings.IndexByte(firstLine, '\n'); idx >= 0 {
+		firstLine = firstLine[:idx]
+	}
+	fallback := "wallfacer: " + truncate(firstLine, 72)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	containerName := "wallfacer-commit-" + taskID.String()[:8]
+	exec.Command(r.command, "rm", "-f", containerName).Run()
+
+	args := []string{"run", "--rm", "--network=host", "--name", containerName}
+	if r.envFile != "" {
+		args = append(args, "--env-file", r.envFile)
+	}
+	args = append(args, "-v", "claude-config:/home/claude/.claude")
+	args = append(args, r.sandboxImage)
+
+	commitPrompt := "Write a git commit message for the following task and file changes.\n" +
+		"Rules:\n" +
+		"- Subject line: imperative mood, max 72 characters, no trailing period\n" +
+		"- Optionally add a blank line followed by a short body (2-4 lines) explaining what changed and why\n" +
+		"- Output ONLY the raw commit message text, no markdown, no code fences, no explanation\n\n" +
+		"Task:\n" + prompt + "\n\n" +
+		"Changed files:\n" + diffStat
+	args = append(args, "-p", commitPrompt, "--output-format", "stream-json", "--verbose")
+
+	cmd := exec.CommandContext(ctx, r.command, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil && ctx.Err() == nil {
+		logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err,
+			"stderr", truncate(stderr.String(), 200))
+		return fallback
+	}
+
+	raw := strings.TrimSpace(stdout.String())
+	if raw == "" {
+		logger.Runner.Warn("commit message generation: empty output", "task", taskID)
+		return fallback
+	}
+
+	output, err := parseOutput(raw)
+	if err != nil {
+		logger.Runner.Warn("commit message generation: parse failure", "task", taskID, "raw", truncate(raw, 200))
+		return fallback
+	}
+
+	msg := strings.TrimSpace(output.Result)
+	msg = strings.Trim(msg, "`")
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
+		logger.Runner.Warn("commit message generation: blank result", "task", taskID)
+		return fallback
+	}
+
+	return msg
 }
 
 // rebaseAndMerge performs the host-side git pipeline for all worktrees:
