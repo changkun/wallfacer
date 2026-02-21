@@ -242,14 +242,31 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// ensureImage checks whether the sandbox image is present locally.
+// ensureImage checks whether the sandbox image is present locally and pulls it
+// from the registry if it is not.  When the pull fails and a local fallback
+// image (wallfacer:latest) is available, that image is used instead.
 // Returns the image reference that should actually be used.
 func ensureImage(containerCmd, image string) string {
 	out, err := exec.Command(containerCmd, "images", "-q", image).Output()
 	if err == nil && strings.TrimSpace(string(out)) != "" {
 		return image // already present
 	}
-	logger.Main.Warn("sandbox image not found locally; run 'make build' to create it", "image", image)
+	logger.Main.Info("sandbox image not found locally, pulling from registry", "image", image)
+	cmd := exec.Command(containerCmd, "pull", image)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Main.Warn("failed to pull sandbox image", "image", image, "error", err)
+		// Try the local fallback image if it differs from the requested one.
+		if image != fallbackSandboxImage {
+			fallbackOut, fallbackErr := exec.Command(containerCmd, "images", "-q", fallbackSandboxImage).Output()
+			if fallbackErr == nil && strings.TrimSpace(string(fallbackOut)) != "" {
+				logger.Main.Info("using local fallback sandbox image", "image", fallbackSandboxImage)
+				return fallbackSandboxImage
+			}
+		}
+		logger.Main.Warn("no sandbox image available; tasks may fail")
+	}
 	return image
 }
 
