@@ -1434,3 +1434,17 @@ Three new test files were created:
 The final push to 83.1% came from adding `resolveConflicts` tests (which was at 0%) and the `setupWorktrees` idempotent branch test.
 
 ---
+
+## Task: e4ade5e4
+
+**Date**: 2026-02-21 19:32:27  
+**Branch**: task/e4ade5e4  
+**Commit**: `44619ce921acfbe290a076d9cda737896770c0ee`
+
+**Prompt**:
+> Prompt input field for the task card in "backlog" column has too little height, update and make it fit similar height style compared to "in progress" cards
+
+**Result**:
+Changed `rows="4"` to `rows="6"` on the new task textarea (`ui/index.html:108`). This adds two extra lines of height (~45px), bringing the textarea closer to the visual height of in-progress cards which include a badge header row, optional title, and up to ~4.5em of prompt text.
+
+---
