@@ -1475,3 +1475,27 @@ Build is clean. Here's a summary of what was added:
 - `ui/js/containers.js` — Opens/closes the modal, fetches `/api/containers`, auto-refreshes every 5 s while open, renders the table. The **Task** column cross-references the live task list to show the task title and status badge. The **State** co...
 
 ---
+
+## Task: 2d8a4476
+
+**Date**: 2026-02-21 19:45:14  
+**Branch**: task/2d8a4476  
+**Commit**: `d7578c775d8b39039ecfe3132e609186812727b4`
+
+**Prompt**:
+> it looks to me the turn 1, 2, 3, ... in the waiting task details order is reversed? It would be helpful if the last turn result can be expanded than collapsed
+
+**Result**:
+The change:
+
+- **Order fixed**: Turns are now displayed newest-first (Turn N at the top, Turn 1 at the bottom) by reversing the chronological array before rendering. Turn labels still reflect the original chronological numbering (Turn 1 = first, Turn N = most recent).
+- **Last turn expanded**: The most recent turn (now at the top) is always rendered as an expanded `<div>`. Older turns render as collapsed `<details>` that can be opened on demand.
+
+So with 3 turns you'd now see:
+```
+[ Turn 3 ] ← expanded, immediately visible
+▶ Turn 2   ← click to expand
+▶ Turn 1   ← click to expand
+```
+
+---
