@@ -53,7 +53,9 @@ func RemoveWorktree(repoPath, worktreePath, branchName string) error {
 	if err != nil {
 		// If the directory is already gone, prune stale refs and carry on so
 		// that the branch deletion below still runs.
-		if strings.Contains(string(out), "not a worktree") || strings.Contains(string(out), "not found") {
+		if strings.Contains(string(out), "not a worktree") ||
+			strings.Contains(string(out), "not a working tree") ||
+			strings.Contains(string(out), "not found") {
 			exec.Command("git", "-C", repoPath, "worktree", "prune").Run()
 		} else {
 			return fmt.Errorf("git worktree remove %s: %w\n%s", worktreePath, err, out)
