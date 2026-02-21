@@ -101,14 +101,14 @@ function renderContainers(containers) {
     if (c.task_id) {
       var task = taskMap[c.task_id];
       if (task) {
-        var taskTitle = escapeHTML(task.title || task.prompt || c.task_id);
+        var taskTitle = escapeHtml(task.title || task.prompt || c.task_id);
         var badgeClass = 'badge badge-' + (task.status || 'backlog');
         taskCell = '<span class="' + badgeClass + '" style="margin-right:6px;">' +
-          escapeHTML(task.status) + '</span>' +
+          escapeHtml(task.status) + '</span>' +
           '<span style="color:var(--text-primary);">' + taskTitle + '</span>';
       } else {
         taskCell = '<span style="font-family:monospace;color:var(--text-muted);">' +
-          escapeHTML(c.task_id.substring(0, 8)) + '</span>';
+          escapeHtml(c.task_id.substring(0, 8)) + '</span>';
       }
     } else {
       taskCell = '<span style="color:var(--text-muted);">—</span>';
@@ -121,11 +121,11 @@ function renderContainers(containers) {
     }
 
     tr.innerHTML = [
-      '<td style="padding:8px 10px;font-family:monospace;color:var(--text-secondary);white-space:nowrap;">' + escapeHTML(shortID) + '</td>',
+      '<td style="padding:8px 10px;font-family:monospace;color:var(--text-secondary);white-space:nowrap;">' + escapeHtml(shortID) + '</td>',
       '<td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + taskCell + '</td>',
-      '<td style="padding:8px 10px;font-family:monospace;color:var(--text-secondary);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHTML(c.image || '') + '">' + escapeHTML(c.image || '—') + '</td>',
-      '<td style="padding:8px 10px;white-space:nowrap;"><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:' + stateColor + ';flex-shrink:0;"></span>' + escapeHTML(stateLabel) + '</span></td>',
-      '<td style="padding:8px 10px;color:var(--text-secondary);white-space:nowrap;">' + escapeHTML(c.status || '—') + '</td>',
+      '<td style="padding:8px 10px;font-family:monospace;color:var(--text-secondary);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(c.image || '') + '">' + escapeHtml(c.image || '—') + '</td>',
+      '<td style="padding:8px 10px;white-space:nowrap;"><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:' + stateColor + ';flex-shrink:0;"></span>' + escapeHtml(stateLabel) + '</span></td>',
+      '<td style="padding:8px 10px;color:var(--text-secondary);white-space:nowrap;">' + escapeHtml(c.status || '—') + '</td>',
       '<td style="padding:8px 10px;color:var(--text-secondary);white-space:nowrap;">' + createdStr + '</td>',
     ].join('');
 
