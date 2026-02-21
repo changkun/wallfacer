@@ -1267,3 +1267,28 @@ Triggers on `v*` tags. Builds a multi-arch image (`linux/amd64` + `linux/arm64`)
 Done.
 
 ---
+
+## Task: f84e5234
+
+**Date**: 2026-02-21 16:03:25  
+**Branch**: task/f84e5234  
+**Commit**: `72da8582d9547b5669b943e1ae8b199d24e835ce`
+
+**Prompt**:
+> write unit tests and make sure the test coverage up to 80%
+> 
+> focus on internal/store package
+
+**Result**:
+The tests are now split into 6 files, each mirroring a source file:
+
+| Test file | Source file | What it covers |
+|---|---|---|
+| `helpers_test.go` | — | Shared `bg()` and `newTestStore()` helpers |
+| `store_test.go` | `store.go` | `NewStore`, `loadAll`/`loadEvents` paths, `OutputsDir`, `Close`, persistence round-trips |
+| `tasks_test.go` | `tasks.go` | `clampTimeout`, all CRUD methods (`Create/Get/List/Delete/Update*`), concurrency |
+| `events_test.go` | `events.go` | `InsertEvent`, `GetEvents`, reload ordering, corrupt/non-JSON trace skipping, concurrent inserts |
+| `io_test.go` | `io.go` | `SaveTurnOutput` (stdout-only, with stderr, turn number formatting) |
+| `subscribe_test.go` | `subscribe.go` | `Subscribe`, `Unsubscribe`, `notify` (non-blocking, buffer, multiple subscribers) |
+
+---
