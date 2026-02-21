@@ -95,8 +95,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		oldStatus := task.Status
 		newStatus := *req.Status
 
-		// Handle retry: done/failed → backlog
-		if newStatus == "backlog" && (oldStatus == "done" || oldStatus == "failed") {
+		// Handle retry: done/failed/cancelled → backlog
+		if newStatus == "backlog" && (oldStatus == "done" || oldStatus == "failed" || oldStatus == "cancelled") {
 			// Clean up any existing worktrees before resetting.
 			if len(task.WorktreePaths) > 0 {
 				h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
@@ -105,7 +105,12 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			if req.Prompt != nil {
 				newPrompt = *req.Prompt
 			}
-			if err := h.store.ResetTaskForRetry(r.Context(), id, newPrompt); err != nil {
+			// Default to resuming the previous session; the client can opt out by sending fresh_start=true.
+			freshStart := false
+			if req.FreshStart != nil {
+				freshStart = *req.FreshStart
+			}
+			if err := h.store.ResetTaskForRetry(r.Context(), id, newPrompt, freshStart); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}

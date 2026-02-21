@@ -113,9 +113,14 @@ async function retryTask() {
   const prompt = textarea.value.trim();
   if (!prompt || !currentTaskId) return;
   try {
+    const body = { status: 'backlog', prompt };
+    const retryResumeRow = document.getElementById('modal-retry-resume-row');
+    if (retryResumeRow && !retryResumeRow.classList.contains('hidden')) {
+      body.fresh_start = !document.getElementById('modal-retry-resume').checked;
+    }
     await api(`/api/tasks/${currentTaskId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status: 'backlog', prompt }),
+      body: JSON.stringify(body),
     });
     closeModal();
     fetchTasks();

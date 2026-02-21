@@ -235,8 +235,10 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 	return nil
 }
 
-// ResetTaskForRetry moves a done/failed task back to backlog with a fresh state.
-func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt string) error {
+// ResetTaskForRetry moves a done/failed/cancelled task back to backlog with a fresh state.
+// freshStart controls whether the task will start a new Claude session (true) or resume the
+// previous one (false, the default) when moved to in_progress.
+func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt string, freshStart bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -247,7 +249,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 
 	t.PromptHistory = append(t.PromptHistory, t.Prompt)
 	t.Prompt = newPrompt
-	t.FreshStart = false
+	t.FreshStart = freshStart
 	t.Result = nil
 	t.StopReason = nil
 	t.Turns = 0

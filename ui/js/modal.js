@@ -287,11 +287,19 @@ async function openModal(id) {
 
   // Retry section (done / failed / cancelled)
   const retrySection = document.getElementById('modal-retry-section');
+  const retryResumeRow = document.getElementById('modal-retry-resume-row');
   if (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled') {
     retrySection.classList.remove('hidden');
     document.getElementById('modal-retry-prompt').value = task.prompt;
+    if (task.session_id) {
+      retryResumeRow.classList.remove('hidden');
+      document.getElementById('modal-retry-resume').checked = !task.fresh_start;
+    } else {
+      retryResumeRow.classList.add('hidden');
+    }
   } else {
     retrySection.classList.add('hidden');
+    retryResumeRow.classList.add('hidden');
   }
 
   // Archive/Unarchive section (done or cancelled tasks)
