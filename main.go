@@ -11,6 +11,10 @@ import (
 	"changkun.de/wallfacer/internal/logger"
 )
 
+// defaultSandboxImage is the published container image pulled automatically
+// when the image is not already present locally.
+const defaultSandboxImage = "ghcr.io/changkun/wallfacer:latest"
+
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: wallfacer <command> [arguments]\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
@@ -52,7 +56,7 @@ func runEnvCheck(configDir string) {
 	fmt.Printf("Data directory:    %s\n", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")))
 	fmt.Printf("Env file:          %s\n", envFile)
 	fmt.Printf("Container command: %s\n", envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman"))
-	fmt.Printf("Sandbox image:     %s\n", envOrDefault("SANDBOX_IMAGE", "wallfacer:latest"))
+	fmt.Printf("Sandbox image:     %s\n", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage))
 	fmt.Println()
 
 	if info, err := os.Stat(configDir); err != nil {
@@ -101,6 +105,16 @@ func runEnvCheck(configDir string) {
 		fmt.Printf("[!] Container runtime not found: %s\n", containerCmd)
 	} else {
 		fmt.Printf("[ok] Container runtime found: %s\n", containerCmd)
+
+		image := envOrDefault("SANDBOX_IMAGE", defaultSandboxImage)
+		out, err := exec.Command(containerCmd, "images", "-q", image).Output()
+		if err != nil || strings.TrimSpace(string(out)) == "" {
+			fmt.Printf("[!] Sandbox image not found locally: %s\n", image)
+			fmt.Printf("    Run 'wallfacer run' to pull it automatically, or manually:\n")
+			fmt.Printf("    %s pull %s\n", containerCmd, image)
+		} else {
+			fmt.Printf("[ok] Sandbox image found: %s\n", image)
+		}
 	}
 }
 

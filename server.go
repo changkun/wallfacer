@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,7 +32,7 @@ func runServer(configDir string, args []string) {
 	addr := fs.String("addr", envOrDefault("ADDR", ":8080"), "listen address")
 	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
 	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", "/opt/podman/bin/podman"), "container runtime command")
-	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", "wallfacer:latest"), "sandbox container image")
+	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage), "sandbox container image")
 	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
 
@@ -98,6 +99,8 @@ func runServer(configDir string, args []string) {
 	} else {
 		logger.Main.Info("workspace instructions", "path", instructionsPath)
 	}
+
+	ensureImage(*containerCmd, *sandboxImage)
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:          *containerCmd,
@@ -234,6 +237,25 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			logger.Handler.Debug(r.Method+" "+r.URL.Path, "status", sw.status, "dur", dur)
 		}
 	})
+}
+
+// ensureImage checks whether the sandbox image is present locally and pulls it
+// from the registry if it is not.  Failures are logged as warnings so that a
+// transient network issue does not prevent the server from starting; the actual
+// container run will surface the error if the image is truly missing.
+func ensureImage(containerCmd, image string) {
+	out, err := exec.Command(containerCmd, "images", "-q", image).Output()
+	if err == nil && strings.TrimSpace(string(out)) != "" {
+		return // already present
+	}
+	logger.Main.Info("sandbox image not found locally, pulling from registry", "image", image)
+	cmd := exec.Command(containerCmd, "pull", image)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Main.Warn("failed to pull sandbox image; tasks may fail if the image is unavailable",
+			"image", image, "error", err)
+	}
 }
 
 // recoverOrphanedTasks transitions in_progress/committing tasks to failed on startup.
