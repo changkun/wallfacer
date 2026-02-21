@@ -10,8 +10,13 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     const alertModal = document.getElementById('alert-modal');
     if (!alertModal.classList.contains('hidden')) { closeAlert(); return; }
+<<<<<<< Updated upstream
     const containerModal = document.getElementById('container-monitor-modal');
     if (!containerModal.classList.contains('hidden')) { closeContainerMonitor(); return; }
+=======
+    const instructionsModal = document.getElementById('instructions-modal');
+    if (instructionsModal && !instructionsModal.classList.contains('hidden')) { closeInstructionsEditor(); return; }
+>>>>>>> Stashed changes
     closeModal();
   }
 });
