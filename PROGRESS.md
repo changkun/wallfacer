@@ -1646,3 +1646,23 @@ The fix adds to the mobile (`≤768px`) media query:
 This only applies on mobile; desktop layout is unchanged.
 
 ---
+
+## Task: 6625bd17
+
+**Date**: 2026-02-21 22:32:53  
+**Branch**: task/6625bd17  
+**Commit**: `52c64f1c8edabb099699062af258d4b66deb71bd`
+
+**Prompt**:
+> add esc button exit support to sandbox monitor modal window
+
+**Result**:
+ESC key support is now added. When pressed, the handler checks modals in priority order:
+
+1. Alert modal (existing)
+2. Container monitor modal (new)
+3. Task detail modal (existing fallback)
+
+This matches the existing pattern in `events.js:9-15`.
+
+---
