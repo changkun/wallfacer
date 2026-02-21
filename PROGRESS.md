@@ -1292,3 +1292,36 @@ The tests are now split into 6 files, each mirroring a source file:
 | `subscribe_test.go` | `subscribe.go` | `Subscribe`, `Unsubscribe`, `notify` (non-blocking, buffer, multiple subscribers) |
 
 ---
+
+## Task: 241f8076
+
+**Date**: 2026-02-21 18:53:20  
+**Branch**: task/241f8076  
+**Commit**: `936a4faed8d6f8365deab3fb2e8ac51a63887048`
+
+**Prompt**:
+> current generated git commit messages do not fit well to the project style.
+> 
+> it should be done the following way:
+> 
+> 1. Run `git status` to see current changes
+> 2. Run `git diff` to see what will be committed
+> 3. Run `git log --oneline -3` to see recent commit style
+> 4. Stage all modified and new files (exclude untracked files that look unrelated)
+> 5. Create a commit with a concise message describing the changes
+> 
+> Make git commit message is done in this way. This means the commit message generation should have access to the git history and inspect how it was done in the relevant projects
+
+**Result**:
+Here's a summary of the changes made:
+
+**`internal/runner/commit.go`**
+
+- `hostStageAndCommit`: added `recentLog` field to `pendingCommit`, runs `git log --oneline -3` per worktree after staging, combines logs across worktrees into `allLogs`, passes it as a new argument to `generateCommitMessage`.
+- `generateCommitMessage`: signature changed from `(taskID, prompt, diffStat)` to `(taskID, prompt, diffStat, recentLog)`. When `recentLog` is non-empty, it's appended to the LLM prompt under a "Recent commits (for style reference):" section. A new rule is also added: "Match the style and tone of the recent commit history shown below".
+
+**`internal/runner/commit_test.go`**
+
+- All 7 direct calls to `generateCommitMessage` updated with the extra `""` argument (empty recent log, which exercises the existing paths unchanged).
+
+---
