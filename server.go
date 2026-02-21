@@ -100,11 +100,11 @@ func runServer(configDir string, args []string) {
 		logger.Main.Info("workspace instructions", "path", instructionsPath)
 	}
 
-	ensureImage(*containerCmd, *sandboxImage)
+	resolvedImage := ensureImage(*containerCmd, *sandboxImage)
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:          *containerCmd,
-		SandboxImage:     *sandboxImage,
+		SandboxImage:     resolvedImage,
 		EnvFile:          *envFile,
 		Workspaces:       strings.Join(workspaces, " "),
 		WorktreesDir:     worktreesDir,
@@ -243,22 +243,31 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 // ensureImage checks whether the sandbox image is present locally and pulls it
-// from the registry if it is not.  Failures are logged as warnings so that a
-// transient network issue does not prevent the server from starting; the actual
-// container run will surface the error if the image is truly missing.
-func ensureImage(containerCmd, image string) {
+// from the registry if it is not.  When the pull fails and a local fallback
+// image (wallfacer:latest) is available, that image is used instead.
+// Returns the image reference that should actually be used.
+func ensureImage(containerCmd, image string) string {
 	out, err := exec.Command(containerCmd, "images", "-q", image).Output()
 	if err == nil && strings.TrimSpace(string(out)) != "" {
-		return // already present
+		return image // already present
 	}
 	logger.Main.Info("sandbox image not found locally, pulling from registry", "image", image)
 	cmd := exec.Command(containerCmd, "pull", image)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		logger.Main.Warn("failed to pull sandbox image; tasks may fail if the image is unavailable",
-			"image", image, "error", err)
+		logger.Main.Warn("failed to pull sandbox image", "image", image, "error", err)
+		// Try the local fallback image if it differs from the requested one.
+		if image != fallbackSandboxImage {
+			fallbackOut, fallbackErr := exec.Command(containerCmd, "images", "-q", fallbackSandboxImage).Output()
+			if fallbackErr == nil && strings.TrimSpace(string(fallbackOut)) != "" {
+				logger.Main.Info("using local fallback sandbox image", "image", fallbackSandboxImage)
+				return fallbackSandboxImage
+			}
+		}
+		logger.Main.Warn("no sandbox image available; tasks may fail")
 	}
+	return image
 }
 
 // recoverOrphanedTasks transitions in_progress/committing tasks to failed on startup.

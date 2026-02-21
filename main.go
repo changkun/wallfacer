@@ -15,6 +15,9 @@ import (
 // when the image is not already present locally.
 const defaultSandboxImage = "ghcr.io/changkun/wallfacer:latest"
 
+// fallbackSandboxImage is used when the remote image cannot be pulled.
+const fallbackSandboxImage = "wallfacer:latest"
+
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: wallfacer <command> [arguments]\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
@@ -110,8 +113,19 @@ func runEnvCheck(configDir string) {
 		out, err := exec.Command(containerCmd, "images", "-q", image).Output()
 		if err != nil || strings.TrimSpace(string(out)) == "" {
 			fmt.Printf("[!] Sandbox image not found locally: %s\n", image)
-			fmt.Printf("    Run 'wallfacer run' to pull it automatically, or manually:\n")
-			fmt.Printf("    %s pull %s\n", containerCmd, image)
+			// Check for the local fallback image.
+			if image != fallbackSandboxImage {
+				fbOut, fbErr := exec.Command(containerCmd, "images", "-q", fallbackSandboxImage).Output()
+				if fbErr == nil && strings.TrimSpace(string(fbOut)) != "" {
+					fmt.Printf("[ok] Local fallback image available: %s\n", fallbackSandboxImage)
+				} else {
+					fmt.Printf("    Run 'wallfacer run' to pull it automatically, or manually:\n")
+					fmt.Printf("    %s pull %s\n", containerCmd, image)
+				}
+			} else {
+				fmt.Printf("    Run 'make build' to build it, or manually:\n")
+				fmt.Printf("    %s pull %s\n", containerCmd, defaultSandboxImage)
+			}
 		} else {
 			fmt.Printf("[ok] Sandbox image found: %s\n", image)
 		}
