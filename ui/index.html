@@ -56,6 +56,11 @@
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Workspace instructions for Claude Code. Re-init merges the default template with each repo's CLAUDE.md.</div>
       </div>
       <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Sandbox Containers</div>
+        <button onclick="showContainerMonitor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Monitor</button>
+        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Inspect running and recent sandbox containers (like <code style="font-family:monospace;">docker ps -a</code>).</div>
+      </div>
+      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Task Titles</div>
         <div style="display: flex; gap: 6px; align-items: center;">
           <select id="generate-titles-limit" class="select" style="font-size: 12px; padding: 3px 6px; height: auto;" title="Max tasks to generate titles for">
@@ -88,6 +93,55 @@
         <button onclick="closeInstructionsEditor()" class="btn-ghost">Cancel</button>
         <button onclick="reinitInstructionsFromEditor()" class="btn-icon" style="margin-left: 8px; font-size: 12px; padding: 4px 10px;">Re-init from repos</button>
         <span id="instructions-status" style="font-size: 12px; color: var(--text-muted); margin-left: auto;"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Container Monitor Modal -->
+<div id="container-monitor-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+  <div class="modal-card" style="max-width: 860px; width: 100%; max-height: 85vh; display: flex; flex-direction: column;">
+    <div class="p-6" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Sandbox Containers</h3>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="container-monitor-runtime" style="font-size: 11px; color: var(--text-muted); font-family: monospace;"></span>
+          <button onclick="refreshContainerMonitor()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Refresh</button>
+          <button onclick="closeContainerMonitor()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
+        </div>
+      </div>
+
+      <div style="flex: 1; min-height: 0; overflow-y: auto;">
+        <!-- Loading state -->
+        <div id="container-monitor-loading" style="display: flex; align-items: center; justify-content: center; padding: 32px; color: var(--text-muted); font-size: 13px;">
+          Loading…
+        </div>
+        <!-- Error state -->
+        <div id="container-monitor-error" class="hidden" style="padding: 12px; background: #f5d5d5; border-radius: 6px; font-size: 12px; color: #8c2020; font-family: monospace; white-space: pre-wrap;"></div>
+        <!-- Empty state -->
+        <div id="container-monitor-empty" class="hidden" style="text-align: center; padding: 32px; color: var(--text-muted); font-size: 13px;">
+          No wallfacer containers found.
+        </div>
+        <!-- Table -->
+        <div id="container-monitor-table-wrap" class="hidden" style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Container ID</th>
+                <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Task</th>
+                <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Image</th>
+                <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">State</th>
+                <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Status</th>
+                <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Created</th>
+              </tr>
+            </thead>
+            <tbody id="container-monitor-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted);">
+        <span id="container-monitor-updated"></span>
       </div>
     </div>
   </div>
@@ -350,5 +404,6 @@
 <script src="/js/dnd.js"></script>
 <script src="/js/events.js"></script>
 <script src="/js/instructions.js"></script>
+<script src="/js/containers.js"></script>
 </body>
 </html>

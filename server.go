@@ -153,6 +153,9 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	uiFS, _ := fsLib.Sub(uiFiles, "ui")
 	mux.Handle("GET /", http.FileServer(http.FS(uiFS)))
 
+	// Container monitoring.
+	mux.HandleFunc("GET /api/containers", h.GetContainers)
+
 	// Configuration & instructions.
 	mux.HandleFunc("GET /api/config", h.GetConfig)
 	mux.HandleFunc("GET /api/instructions", h.GetInstructions)

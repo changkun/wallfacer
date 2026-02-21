@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"os/exec"
 	"strings"
 	"time"
@@ -8,6 +9,66 @@ import (
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
+
+// ContainerInfo represents a single sandbox container returned by ListContainers.
+type ContainerInfo struct {
+	ID        string `json:"id"`       // short container ID
+	Name      string `json:"name"`     // full container name (e.g. wallfacer-<uuid>)
+	TaskID    string `json:"task_id"`  // task UUID extracted from name, empty if not a task container
+	Image     string `json:"image"`    // image name
+	State     string `json:"state"`    // running | exited | paused | …
+	Status    string `json:"status"`   // human-readable status (e.g. "Up 5 minutes")
+	CreatedAt int64  `json:"created_at"` // unix timestamp
+}
+
+// podmanContainer is used to unmarshal `podman/docker ps --format json` output.
+type podmanContainer struct {
+	ID      string   `json:"Id"`
+	Names   []string `json:"Names"`
+	Image   string   `json:"Image"`
+	State   string   `json:"State"`
+	Status  string   `json:"Status"`
+	Created int64    `json:"Created"`
+}
+
+// ListContainers runs `<runtime> ps -a --filter name=wallfacer --format json`
+// and returns structured info for each matching container.
+func (r *Runner) ListContainers() ([]ContainerInfo, error) {
+	out, err := exec.Command(r.command, "ps", "-a",
+		"--filter", "name=wallfacer",
+		"--format", "json",
+	).Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var raw []podmanContainer
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, err
+	}
+
+	result := make([]ContainerInfo, 0, len(raw))
+	for _, c := range raw {
+		name := ""
+		if len(c.Names) > 0 {
+			name = strings.TrimPrefix(c.Names[0], "/") // docker prefixes with "/"
+		}
+		taskID := strings.TrimPrefix(name, "wallfacer-")
+		if taskID == name {
+			taskID = "" // name didn't have the prefix → not a task container
+		}
+		result = append(result, ContainerInfo{
+			ID:        c.ID,
+			Name:      name,
+			TaskID:    taskID,
+			Image:     c.Image,
+			State:     c.State,
+			Status:    c.Status,
+			CreatedAt: c.Created,
+		})
+	}
+	return result, nil
+}
 
 const (
 	maxRebaseRetries   = 3
