@@ -1598,3 +1598,32 @@ On startup it now does the following instead of blindly marking everything faile
 4. **`in_progress` tasks with no container** → moved to `waiting` (not `failed`). The task may have produced use...
 
 ---
+
+## Task: 8dc7c61d
+
+**Date**: 2026-02-21 22:31:22  
+**Branch**: task/8dc7c61d  
+**Commit**: `1bc7eb79b16badf307cb5040d648fab8c9a309a0`
+
+**Prompt**:
+> backlog tasks can only be move to inprogress by drag and drop. this is not super mobile friendly, add some buttons to alllow transit card status
+
+**Result**:
+Done. Here's what was added:
+
+**Buttons on each card** (no drag-and-drop required):
+
+| Card status | Button | Action |
+|---|---|---|
+| Backlog | **▶ Start** | Moves to In Progress |
+| Waiting | **✓ Mark done** | Triggers commit-and-push pipeline |
+| Failed | **↺ Resume** (if session exists) | Resumes in existing session |
+| Failed | **↩ Retry** | Moves back to Backlog |
+| Done / Cancelled | **↩ Retry** | Moves back to Backlog |
+
+**Changes:**
+- `render.js`: Added `buildCardActions(t)` that generates the appropriate button(s) per status, appended to each card's HTML. Buttons use `event.stopPropagation()` so clicking them doesn't open the modal.
+- `tasks.js`: Added `quickDoneTask(id)`, `quickResumeTask(id, timeout)`, and `quickRetryTask(id)` — standalone versions of modal actions that take an ID directly.
+- `styles.css`: Added `.card-actions`, `.card-action-btn`, and per-variant classes (`card-action-start`, `card-action-done`, `card-action-resume`, `card-action-retry`) with l...
+
+---
