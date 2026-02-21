@@ -276,7 +276,8 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .prose-content p { margin: 0.4em 0; }
 .prose-content p:first-child { margin-top: 0; }
 .prose-content p:last-child { margin-bottom: 0; }
-.prose-content ul, .prose-content ol { padding-left: 1.5em; margin: 0.4em 0; }
+.prose-content ul { list-style-type: disc; padding-left: 1.5em; margin: 0.4em 0; }
+.prose-content ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.4em 0; }
 .prose-content li { margin: 0.15em 0; }
 .prose-content code {
   background: var(--bg); border-radius: 4px; padding: 1px 5px; font-size: 0.88em;
@@ -529,7 +530,8 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .card-prose p { margin: 0 !important; }
 .card-prose h1, .card-prose h2, .card-prose h3,
 .card-prose h4, .card-prose h5, .card-prose h6 { margin: 0 0 0.1em !important; font-size: 1em !important; }
-.card-prose ul, .card-prose ol { margin: 0 !important; padding-left: 1.2em !important; }
+.card-prose ul { list-style-type: disc !important; margin: 0 !important; padding-left: 1.2em !important; }
+.card-prose ol { list-style-type: decimal !important; margin: 0 !important; padding-left: 1.2em !important; }
 .card-prose li { margin: 0 !important; }
 .card-prose pre { margin: 0 !important; padding: 2px 6px !important; font-size: 0.85em !important; }
 .card-prose blockquote { margin: 0 !important; }
