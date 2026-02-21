@@ -95,8 +95,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		oldStatus := task.Status
 		newStatus := *req.Status
 
-		// Handle retry: done/failed/cancelled → backlog
-		if newStatus == "backlog" && (oldStatus == "done" || oldStatus == "failed" || oldStatus == "cancelled") {
+		// Handle retry: done/failed/waiting/cancelled → backlog
+		if newStatus == "backlog" && (oldStatus == "done" || oldStatus == "failed" || oldStatus == "cancelled" || oldStatus == "waiting") {
 			// Clean up any existing worktrees before resetting.
 			if len(task.WorktreePaths) > 0 {
 				h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
