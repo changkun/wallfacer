@@ -1713,3 +1713,45 @@ Written to `/workspace/wallfacer/plans/cloud-and-native-deployment.md`.
 The file covers all three cloud options (VPS+Caddy, Docker-in-Docker, K8s+Job API) and both native app approaches (system tray wrapper, Wails), including concrete code sketches, a decision matrix, and the recommended path for each direction. It also calls out the container runtime as the unavoidable constraint that applies regardless of deployment choice.
 
 ---
+
+## Task: 8e4b2f8c
+
+**Date**: 2026-02-21 23:07:17  
+**Branch**: task/8e4b2f8c  
+**Commit**: `0307bf57b4eacc343d58804d29d6b4767fedeedd`
+
+**Prompt**:
+> as of now. the prompt input can only contain pure markdown text. I want to have it also support drag-and-drop for files or images. so that those attached artifacts can further be used as extra context for claude code to execute in the sandbox.
+> 
+> pls investigate:
+> 
+> 1. plan to implement this complex feature
+> 
+> 2. claude code capability to attach image/file context in headless mode
+> 
+> do not implement anything but purely research on the plan and write the plan in the plans folder
+
+**Result**:
+The plan is written at `plans/file-image-attachments.md`. Here's the summary:
+
+---
+
+## Key findings
+
+**Claude Code headless capability:**
+- No `--file`, `--image`, or `--attachment` CLI flags exist in headless (`-p`) mode.
+- The only confirmed headless file-context mechanism is stdin piping (`cat file | claude -p "..."`), which is text-only.
+- However, Claude Code's built-in **`Read` tool** natively handles images (PNG/JPG/GIF/WebP) and PDFs from the filesystem. If the file exists inside the container and the path appears in the prompt, Claude will invoke `Read` on it automatically.
+
+**The strategy — mount-and-reference:**
+Save uploaded files to `data/<uuid>/attachments/` → mount that directory read-only into the container as `/workspace/.attachments/` → append a file listing to the prompt on turn 1. Zero changes to the claude CLI invocation.
+
+---
+
+## Plan overview (6 phases)
+
+| Phase | What | Files |
+|---|---|---|
+| 1 | Store layer: `Attachment` model, `SaveAttachment`/`DeleteAt...
+
+---
