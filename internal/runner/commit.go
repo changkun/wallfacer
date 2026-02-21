@@ -110,6 +110,7 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 		repoPath     string
 		worktreePath string
 		diffStat     string
+		recentLog    string
 	}
 	var pending []pendingCommit
 
@@ -126,23 +127,29 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 		}
 
 		statOut, _ := exec.Command("git", "-C", worktreePath, "diff", "--cached", "--stat").Output()
-		pending = append(pending, pendingCommit{repoPath, worktreePath, strings.TrimSpace(string(statOut))})
+		logOut, _ := exec.Command("git", "-C", worktreePath, "log", "--oneline", "-3").Output()
+		pending = append(pending, pendingCommit{repoPath, worktreePath, strings.TrimSpace(string(statOut)), strings.TrimSpace(string(logOut))})
 	}
 
 	if len(pending) == 0 {
 		return false
 	}
 
-	// Build combined diff stat context across all worktrees, then generate a
-	// descriptive commit message via a lightweight Claude container.
+	// Build combined diff stat and git log context across all worktrees, then
+	// generate a descriptive commit message via a lightweight Claude container.
 	var allStats strings.Builder
+	var allLogs strings.Builder
 	for _, p := range pending {
 		if len(pending) > 1 {
 			allStats.WriteString("Repository: " + p.repoPath + "\n")
+			allLogs.WriteString("Repository: " + p.repoPath + "\n")
 		}
 		allStats.WriteString(p.diffStat + "\n")
+		if p.recentLog != "" {
+			allLogs.WriteString(p.recentLog + "\n")
+		}
 	}
-	msg := r.generateCommitMessage(taskID, prompt, allStats.String())
+	msg := r.generateCommitMessage(taskID, prompt, allStats.String(), allLogs.String())
 
 	// Second pass: commit each worktree with the generated message.
 	committed := false
@@ -158,9 +165,10 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 }
 
 // generateCommitMessage runs a lightweight container to produce a descriptive
-// git commit message from the task prompt and staged diff stats.
+// git commit message from the task prompt, staged diff stats, and recent git
+// log history (used to match the project's commit style).
 // Falls back to a truncated prompt on any error.
-func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat string) string {
+func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recentLog string) string {
 	firstLine := prompt
 	if idx := strings.IndexByte(firstLine, '\n'); idx >= 0 {
 		firstLine = firstLine[:idx]
@@ -184,9 +192,13 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat string
 		"Rules:\n" +
 		"- Subject line: imperative mood, max 72 characters, no trailing period\n" +
 		"- Optionally add a blank line followed by a short body (2-4 lines) explaining what changed and why\n" +
-		"- Output ONLY the raw commit message text, no markdown, no code fences, no explanation\n\n" +
+		"- Output ONLY the raw commit message text, no markdown, no code fences, no explanation\n" +
+		"- Match the style and tone of the recent commit history shown below\n\n" +
 		"Task:\n" + prompt + "\n\n" +
 		"Changed files:\n" + diffStat
+	if recentLog != "" {
+		commitPrompt += "\nRecent commits (for style reference):\n" + recentLog
+	}
 	args = append(args, "-p", commitPrompt, "--output-format", "stream-json", "--verbose")
 
 	cmd := exec.CommandContext(ctx, r.command, args...)

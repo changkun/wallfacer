@@ -67,7 +67,7 @@ func TestGenerateCommitMessageSuccess(t *testing.T) {
 	cmd := fakeCmdScript(t, validStreamJSON, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Add authentication", "auth.go | 50 ++++")
+	msg := runner.generateCommitMessage(uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
 
 	const want = "Add authentication endpoint"
 	if msg != want {
@@ -82,7 +82,7 @@ func TestGenerateCommitMessageFallbackOnInvalidOutput(t *testing.T) {
 	runner := runnerWithCmd(t, "echo") // outputs its args, not valid JSON
 
 	prompt := "Fix the login bug\nwith more detail on a second line"
-	msg := runner.generateCommitMessage(uuid.New(), prompt, "login.go | 3 +-")
+	msg := runner.generateCommitMessage(uuid.New(), prompt, "login.go | 3 +-", "")
 
 	if !strings.HasPrefix(msg, "wallfacer: ") {
 		t.Fatalf("expected fallback 'wallfacer: ...' prefix, got: %q", msg)
@@ -103,7 +103,7 @@ func TestGenerateCommitMessageFallbackOnCommandError(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 1) // exits 1 with empty output
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Refactor database layer", "db/*.go | 120 ++--")
+	msg := runner.generateCommitMessage(uuid.New(), "Refactor database layer", "db/*.go | 120 ++--", "")
 
 	if !strings.HasPrefix(msg, "wallfacer: ") {
 		t.Fatalf("expected fallback prefix, got: %q", msg)
@@ -120,7 +120,7 @@ func TestGenerateCommitMessageFallbackOnBlankResult(t *testing.T) {
 	cmd := fakeCmdScript(t, blankResult, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Update configuration", "config.go | 5 +-")
+	msg := runner.generateCommitMessage(uuid.New(), "Update configuration", "config.go | 5 +-", "")
 
 	if !strings.HasPrefix(msg, "wallfacer: ") {
 		t.Fatalf("expected fallback for blank result, got: %q", msg)
@@ -134,7 +134,7 @@ func TestGenerateCommitMessageFallbackTruncatesLongPrompt(t *testing.T) {
 	longPrompt := strings.Repeat("A", 200)
 	runner := runnerWithCmd(t, "echo") // always triggers fallback
 
-	msg := runner.generateCommitMessage(uuid.New(), longPrompt, "")
+	msg := runner.generateCommitMessage(uuid.New(), longPrompt, "", "")
 
 	// "wallfacer: " (11 chars) + truncate(prompt, 72) → max 86 chars total
 	// because truncate appends "..." (3 chars) when the string is cut.
@@ -154,7 +154,7 @@ func TestGenerateCommitMessageMultiline(t *testing.T) {
 	cmd := fakeCmdScript(t, multilineResult, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Add auth", "auth.go | 80 ++++")
+	msg := runner.generateCommitMessage(uuid.New(), "Add auth", "auth.go | 80 ++++", "")
 
 	if !strings.Contains(msg, "Add auth endpoint") {
 		t.Fatalf("expected subject line in message, got: %q", msg)
@@ -174,7 +174,7 @@ func TestGenerateCommitMessageNDJSON(t *testing.T) {
 	cmd := fakeCmdScript(t, ndjson, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Fix crash", "main.go | 2 +-")
+	msg := runner.generateCommitMessage(uuid.New(), "Fix crash", "main.go | 2 +-", "")
 
 	const want = "Fix null pointer dereference"
 	if msg != want {
