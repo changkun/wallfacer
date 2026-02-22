@@ -165,7 +165,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   background: var(--bg-input); border: 1px solid var(--border); color: var(--text);
   border-radius: 8px; padding: 12px; font-size: 14px; outline: none; width: 100%;
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; resize: none;
-  box-sizing: border-box;
+  box-sizing: border-box; overflow: hidden;
 }
 .field::placeholder { color: var(--text-muted); }
 .field:focus { border-color: var(--accent); }
