@@ -306,17 +306,6 @@
             </div>
           </div>
 
-          <!-- Retry section for done/failed/cancelled tasks -->
-          <div id="modal-retry-section" class="hidden mb-4">
-            <h3 class="section-title">Retry</h3>
-            <textarea id="modal-retry-prompt" rows="4" class="field"></textarea>
-            <div id="modal-retry-resume-row" class="hidden flex items-center gap-2 mt-2">
-              <input type="checkbox" id="modal-retry-resume" style="cursor:pointer;accent-color:var(--accent);">
-              <label for="modal-retry-resume" class="text-xs text-v-secondary" style="cursor:pointer;">Resume previous session</label>
-            </div>
-            <button onclick="retryTask()" class="btn btn-accent mt-2">Move to Backlog</button>
-          </div>
-
           <div id="modal-result-section" class="hidden mb-4">
             <h3 class="section-title">Result</h3>
             <div id="modal-results-list"></div>
@@ -351,6 +340,17 @@
               <button onclick="submitFeedback()" class="btn btn-yellow">Submit Feedback</button>
               <button onclick="completeTask()" class="btn btn-green">Mark as Done</button>
             </div>
+          </div>
+
+          <!-- Retry section for done/failed/cancelled tasks -->
+          <div id="modal-retry-section" class="hidden mb-4">
+            <h3 class="section-title">Retry</h3>
+            <textarea id="modal-retry-prompt" rows="4" class="field"></textarea>
+            <div id="modal-retry-resume-row" class="hidden flex items-center gap-2 mt-2">
+              <input type="checkbox" id="modal-retry-resume" style="cursor:pointer;accent-color:var(--accent);">
+              <label for="modal-retry-resume" class="text-xs text-v-secondary" style="cursor:pointer;">Resume previous session</label>
+            </div>
+            <button onclick="retryTask()" class="btn btn-accent mt-2">Move to Backlog</button>
           </div>
 
           <!-- Events timeline -->
