@@ -120,13 +120,13 @@
         <div>
           <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">OAuth Token (CLAUDE_CODE_OAUTH_TOKEN)</label>
           <input id="env-oauth-token" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">From <code style="font-family:monospace;">claude setup-token</code>. Leave blank to keep the current value.</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">From <code style="font-family:monospace;">claude setup-token</code> (takes precedence if both are set). Leave blank to keep the current value.</div>
         </div>
 
         <div>
           <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">API Key (ANTHROPIC_API_KEY)</label>
           <input id="env-api-key" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Direct API key. Use this <em>or</em> the OAuth token, not both. Leave blank to keep the current value.</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Direct API key. If both are set, the OAuth token takes precedence. Leave blank to keep the current value.</div>
         </div>
 
         <div>

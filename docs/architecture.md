@@ -122,6 +122,8 @@ At least one authentication variable must be set:
 | `ANTHROPIC_BASE_URL` | no | Custom API endpoint; defaults to `https://api.anthropic.com` |
 | `CLAUDE_CODE_MODEL` | no | Model passed as `--model` to every `claude` invocation; omit to use the Claude Code default |
 
+When both `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY` are set, the OAuth token takes precedence. This is Claude Code CLI behavior — wallfacer simply passes both variables through to the container via `--env-file`.
+
 All four variables can be edited at runtime from **Settings → API Configuration** in the web UI. Changes take effect on the next task run without restarting the server.
 
 `wallfacer env` reports the status of all four variables.
