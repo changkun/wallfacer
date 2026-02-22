@@ -74,6 +74,11 @@ function render() {
   delete columns.committing;
   delete columns.failed;
 
+  // Cancelled tasks show in the Done column.
+  // Cancelled tasks are visually distinguished by a purple left border on the card.
+  columns.done = columns.done.concat(columns.cancelled);
+  delete columns.cancelled;
+
   for (const [status, items] of Object.entries(columns)) {
     const el = document.getElementById(`col-${status}`);
     if (!el) continue;
@@ -170,6 +175,12 @@ function updateCard(card, t) {
     card.classList.add('card-failed-waiting');
   } else {
     card.classList.remove('card-failed-waiting');
+  }
+  // Cancelled tasks in the done column get a purple left border to distinguish them.
+  if (t.status === 'cancelled') {
+    card.classList.add('card-cancelled-done');
+  } else {
+    card.classList.remove('card-cancelled-done');
   }
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">

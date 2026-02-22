@@ -153,7 +153,6 @@
   <button class="mobile-col-btn" data-col="col-wrapper-in_progress" onclick="scrollToColumn('col-wrapper-in_progress')">In Progress</button>
   <button class="mobile-col-btn" data-col="col-wrapper-waiting" onclick="scrollToColumn('col-wrapper-waiting')">Waiting</button>
   <button class="mobile-col-btn" data-col="col-wrapper-done" onclick="scrollToColumn('col-wrapper-done')">Done</button>
-  <button class="mobile-col-btn" data-col="col-wrapper-cancelled" onclick="scrollToColumn('col-wrapper-cancelled')">Cancelled</button>
 </nav>
 
 <!-- Board -->
@@ -206,13 +205,6 @@
       <span id="done-stats" class="text-[10px] text-v-muted hidden"></span>
     </div>
     <div id="col-done" class="column col-bg space-y-2" data-status="done"></div>
-  </div>
-  <div class="flex flex-col min-h-0" id="col-wrapper-cancelled">
-    <div class="flex items-center gap-2 mb-3 px-1">
-      <h2 class="col-header col-header-cancelled">Cancelled</h2>
-      <span id="count-cancelled" class="text-xs text-v-muted">0</span>
-    </div>
-    <div id="col-cancelled" class="column col-bg space-y-2" data-status="cancelled"></div>
   </div>
 </main>
 

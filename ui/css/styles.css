@@ -45,10 +45,10 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .column { flex: 1; min-height: 0; overflow-y: auto; }
 .col-bg { background: var(--bg-raised); border-radius: 12px; padding: 12px; }
 
-/* Board grid: 5 equal columns on desktop */
+/* Board grid: 4 equal columns on desktop */
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   padding: 24px;
 }
@@ -503,6 +503,14 @@ pre { white-space: pre-wrap; word-break: break-word; }
 }
 [data-theme="dark"] .card-failed-waiting {
   border-left-color: #d46868;
+}
+
+/* --- Cancelled tasks displayed in Done column --- */
+.card-cancelled-done {
+  border-left: 3px solid #5a3d8a;
+}
+[data-theme="dark"] .card-cancelled-done {
+  border-left-color: #a07ad4;
 }
 .card-error-reason {
   margin-top: 6px;
