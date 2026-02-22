@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -38,10 +39,10 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		return
 	}
 
-	h.store.InsertEvent(r.Context(), id, "feedback", map[string]string{
+	h.store.InsertEvent(r.Context(), id, store.EventTypeFeedback, map[string]string{
 		"message": req.Message,
 	})
-	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 		"from": "waiting",
 		"to":   "in_progress",
 	})
@@ -73,7 +74,7 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 			"from": "waiting",
 			"to":   "committing",
 		})
@@ -82,17 +83,17 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 			bgCtx := context.Background()
 			if err := h.runner.Commit(id, sessionID); err != nil {
 				h.store.UpdateTaskStatus(bgCtx, id, "failed")
-				h.store.InsertEvent(bgCtx, id, "error", map[string]string{
+				h.store.InsertEvent(bgCtx, id, store.EventTypeError, map[string]string{
 					"error": "commit failed: " + err.Error(),
 				})
-				h.store.InsertEvent(bgCtx, id, "state_change", map[string]string{
+				h.store.InsertEvent(bgCtx, id, store.EventTypeStateChange, map[string]string{
 					"from": "committing",
 					"to":   "failed",
 				})
 				return
 			}
 			h.store.UpdateTaskStatus(bgCtx, id, "done")
-			h.store.InsertEvent(bgCtx, id, "state_change", map[string]string{
+			h.store.InsertEvent(bgCtx, id, store.EventTypeStateChange, map[string]string{
 				"from": "committing",
 				"to":   "done",
 			})
@@ -103,7 +104,7 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 			"from": "waiting",
 			"to":   "done",
 		})
@@ -144,7 +145,7 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 		"from": oldStatus,
 		"to":   "cancelled",
 	})
@@ -183,7 +184,7 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 		"from": "failed",
 		"to":   "in_progress",
 	})
@@ -208,7 +209,7 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 		"to": "archived",
 	})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "archived"})
@@ -224,7 +225,7 @@ func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 		"to": "unarchived",
 	})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unarchived"})
@@ -251,7 +252,7 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 		"from": oldStatus,
 		"to":   "in_progress",
 	})

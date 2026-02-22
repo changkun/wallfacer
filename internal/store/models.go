@@ -42,11 +42,22 @@ type Task struct {
 	BaseCommitHashes map[string]string `json:"base_commit_hashes,omitempty"` // host repoPath → defBranch HEAD before merge
 }
 
+// EventType identifies the kind of event stored in a task's audit trail.
+type EventType string
+
+const (
+	EventTypeStateChange EventType = "state_change"
+	EventTypeOutput      EventType = "output"
+	EventTypeFeedback    EventType = "feedback"
+	EventTypeError       EventType = "error"
+	EventTypeSystem      EventType = "system"
+)
+
 // TaskEvent is a single event in a task's audit trail (event sourcing).
 type TaskEvent struct {
 	ID        int64           `json:"id"`
 	TaskID    uuid.UUID       `json:"task_id"`
-	EventType string          `json:"event_type"`
+	EventType EventType       `json:"event_type"`
 	Data      json.RawMessage `json:"data"`
 	CreatedAt time.Time       `json:"created_at"`
 }

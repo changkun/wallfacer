@@ -47,7 +47,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.store.InsertEvent(r.Context(), task.ID, "state_change", map[string]string{
+	h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange, map[string]string{
 		"to": "backlog",
 	})
 
@@ -114,7 +114,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 				"from": oldStatus,
 				"to":   "backlog",
 			})
@@ -123,7 +123,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			h.store.InsertEvent(r.Context(), id, "state_change", map[string]string{
+			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 				"from": oldStatus,
 				"to":   newStatus,
 			})

@@ -11,6 +11,7 @@ import (
 
 	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -47,7 +48,7 @@ func (r *Runner) commit(
 	logger.Runner.Info("auto-commit", "task", taskID, "session", sessionID)
 
 	// Phase 1: stage and commit all uncommitted changes on the host.
-	r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Phase 1/3: Staging and committing changes...",
 	})
 	task, _ := r.store.GetTask(bgCtx, taskID)
@@ -57,27 +58,27 @@ func (r *Runner) commit(
 	}
 	if _, stageErr := r.hostStageAndCommit(taskID, worktreePaths, taskPrompt); stageErr != nil {
 		logger.Runner.Error("host stage/commit failed", "task", taskID, "error", stageErr)
-		r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
 			"error": "stage/commit failed: " + stageErr.Error(),
 		})
 		return fmt.Errorf("stage and commit: %w", stageErr)
 	}
 
 	// Phase 2: host-side rebase and merge for each git worktree.
-	r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Phase 2/3: Rebasing and merging into default branch...",
 	})
 	commitHashes, baseHashes, mergeErr := r.rebaseAndMerge(ctx, taskID, worktreePaths, branchName, sessionID)
 	if mergeErr != nil {
 		logger.Runner.Error("rebase/merge failed", "task", taskID, "error", mergeErr)
-		r.store.InsertEvent(bgCtx, taskID, "error", map[string]string{
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
 			"error": "rebase/merge failed: " + mergeErr.Error(),
 		})
 		return fmt.Errorf("rebase/merge: %w", mergeErr)
 	}
 
 	// Phase 3: persist commit hashes and clean up worktrees.
-	r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Phase 3/3: Cleaning up...",
 	})
 	if len(commitHashes) > 0 {
@@ -92,7 +93,7 @@ func (r *Runner) commit(
 	}
 	r.cleanupWorktrees(taskID, worktreePaths, branchName)
 
-	r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Commit pipeline completed.",
 	})
 	logger.Runner.Info("commit completed", "task", taskID)
@@ -307,7 +308,7 @@ func (r *Runner) rebaseAndMergeOne(
 ) error {
 	if !gitutil.IsGitRepo(repoPath) {
 		// Non-git workspace: copy snapshot changes back to the original directory.
-		r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Extracting changes from sandbox to %s...", filepath.Base(repoPath)),
 		})
 		if err := extractSnapshotToWorkspace(worktreePath, repoPath); err != nil {
@@ -316,7 +317,7 @@ func (r *Runner) rebaseAndMergeOne(
 		if hash, err := gitutil.GetCommitHash(worktreePath); err == nil {
 			commitHashes[repoPath] = hash
 		}
-		r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Changes extracted to %s.", filepath.Base(repoPath)),
 		})
 		return nil
@@ -341,7 +342,7 @@ func (r *Runner) rebaseAndMergeOne(
 	}
 	if !ahead {
 		logger.Runner.Info("no commits to merge, skipping", "task", taskID, "repo", repoPath)
-		r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Skipping %s — no new commits to merge.", repoPath),
 		})
 		return nil
@@ -350,7 +351,7 @@ func (r *Runner) rebaseAndMergeOne(
 	// Rebase with conflict-resolution retry loop.
 	var rebaseErr error
 	for attempt := 1; attempt <= maxRebaseRetries; attempt++ {
-		r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Rebasing %s onto %s (attempt %d/%d)...", repoPath, defBranch, attempt, maxRebaseRetries),
 		})
 
@@ -372,7 +373,7 @@ func (r *Runner) rebaseAndMergeOne(
 
 		logger.Runner.Warn("rebase conflict, invoking resolver",
 			"task", taskID, "repo", repoPath, "attempt", attempt)
-		r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d)...", repoPath, attempt),
 		})
 
@@ -381,7 +382,7 @@ func (r *Runner) rebaseAndMergeOne(
 		}
 	}
 
-	r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": fmt.Sprintf("Fast-forward merging %s into %s...", branchName, defBranch),
 	})
 	if err := gitutil.FFMerge(repoPath, branchName); err != nil {
@@ -393,7 +394,7 @@ func (r *Runner) rebaseAndMergeOne(
 		logger.Runner.Warn("get commit hash", "task", taskID, "repo", repoPath, "error", err)
 	} else {
 		commitHashes[repoPath] = hash
-		r.store.InsertEvent(bgCtx, taskID, "system", map[string]string{
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Merged %s — commit %s", repoPath, hash[:8]),
 		})
 	}
@@ -447,7 +448,7 @@ func (r *Runner) resolveConflicts(
 		return fmt.Errorf("conflict resolver reported error: %s", truncate(output.Result, 300))
 	}
 
-	r.store.InsertEvent(context.Background(), taskID, "system", map[string]string{
+	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
 		"result": "Conflict resolver: " + truncate(output.Result, 500),
 	})
 	return nil

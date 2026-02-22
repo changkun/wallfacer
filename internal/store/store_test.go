@@ -129,8 +129,8 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 	s.UpdateTaskTitle(bg(), task.ID, "Round Trip Title")
 	s.AccumulateTaskUsage(bg(), task.ID, TaskUsage{InputTokens: 100, CostUSD: 0.5})
 	s.UpdateTaskWorktrees(bg(), task.ID, map[string]string{"/repo": "/wt"}, "task/rt")
-	s.InsertEvent(bg(), task.ID, "state_change", "in_progress")
-	s.InsertEvent(bg(), task.ID, "output", "some output")
+	s.InsertEvent(bg(), task.ID, EventTypeStateChange, "in_progress")
+	s.InsertEvent(bg(), task.ID, EventTypeOutput, "some output")
 
 	s2, err := NewStore(dir)
 	if err != nil {

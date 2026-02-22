@@ -312,10 +312,10 @@ func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
 			logger.Recovery.Warn("task was committing at startup, marking as failed",
 				"task", t.ID)
 			s.UpdateTaskStatus(ctx, t.ID, "failed")
-			s.InsertEvent(ctx, t.ID, "error", map[string]string{
+			s.InsertEvent(ctx, t.ID, store.EventTypeError, map[string]string{
 				"error": "server restarted during commit",
 			})
-			s.InsertEvent(ctx, t.ID, "state_change", map[string]string{
+			s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
 				"from": "committing", "to": "failed",
 			})
 
@@ -325,7 +325,7 @@ func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
 				// monitor it; move to waiting once the container stops.
 				logger.Recovery.Info("container still running after restart, monitoring",
 					"task", t.ID)
-				s.InsertEvent(ctx, t.ID, "system", map[string]string{
+				s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
 					"result": "Server restarted while task was running. Container is still active — monitoring for completion.",
 				})
 				go monitorContainerUntilStopped(s, r, t.ID)
@@ -335,10 +335,10 @@ func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
 				logger.Recovery.Warn("task container gone after restart, moving to waiting",
 					"task", t.ID)
 				s.UpdateTaskStatus(ctx, t.ID, "waiting")
-				s.InsertEvent(ctx, t.ID, "system", map[string]string{
+				s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
 					"result": "Server restarted while task was running. Container is no longer active — please review the output and decide whether to continue or mark as done.",
 				})
-				s.InsertEvent(ctx, t.ID, "state_change", map[string]string{
+				s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
 					"from": "in_progress", "to": "waiting",
 				})
 			}
@@ -383,10 +383,10 @@ func monitorContainerUntilStopped(s *store.Store, r *runner.Runner, taskID uuid.
 		}
 		logger.Recovery.Info("monitored container stopped, moving task to waiting", "task", taskID)
 		s.UpdateTaskStatus(ctx, taskID, "waiting")
-		s.InsertEvent(ctx, taskID, "system", map[string]string{
+		s.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Container has stopped. Please review the output and decide whether to continue or mark as done.",
 		})
-		s.InsertEvent(ctx, taskID, "state_change", map[string]string{
+		s.InsertEvent(ctx, taskID, store.EventTypeStateChange, map[string]string{
 			"from": "in_progress", "to": "waiting",
 		})
 		return

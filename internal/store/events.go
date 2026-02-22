@@ -12,7 +12,7 @@ import (
 )
 
 // InsertEvent appends a new event to the task's audit trail.
-func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType string, data any) error {
+func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType EventType, data any) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
