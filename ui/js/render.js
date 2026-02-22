@@ -156,7 +156,7 @@ function buildCardActions(t) {
       parts.push(`<button class="card-action-btn card-action-resume" onclick="event.stopPropagation();quickResumeTask('${t.id}',${t.timeout || 15})" title="Resume in existing session">&#8635; Resume</button>`);
     }
     parts.push(`<button class="card-action-btn card-action-retry" onclick="event.stopPropagation();quickRetryTask('${t.id}')" title="Move back to Backlog">&#8617; Retry</button>`);
-  } else if (t.status === 'done' || t.status === 'cancelled') {
+  } else if (t.status === 'cancelled') {
     parts.push(`<button class="card-action-btn card-action-retry" onclick="event.stopPropagation();quickRetryTask('${t.id}')" title="Move back to Backlog">&#8617; Retry</button>`);
   }
   if (!parts.length) return '';
