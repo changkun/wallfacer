@@ -289,10 +289,10 @@ async function openModal(id) {
   const cancellable = ['backlog', 'in_progress', 'waiting', 'failed'];
   cancelSection.classList.toggle('hidden', !cancellable.includes(task.status));
 
-  // Retry section (failed / waiting / cancelled)
+  // Retry section (done / failed / waiting / cancelled)
   const retrySection = document.getElementById('modal-retry-section');
   const retryResumeRow = document.getElementById('modal-retry-resume-row');
-  if (task.status === 'failed' || task.status === 'waiting' || task.status === 'cancelled') {
+  if (task.status === 'done' || task.status === 'failed' || task.status === 'waiting' || task.status === 'cancelled') {
     retrySection.classList.remove('hidden');
     document.getElementById('modal-retry-prompt').value = task.prompt;
     if (task.session_id) {

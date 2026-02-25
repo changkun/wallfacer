@@ -158,6 +158,8 @@ function buildCardActions(t) {
     parts.push(`<button class="card-action-btn card-action-retry" onclick="event.stopPropagation();quickRetryTask('${t.id}')" title="Move back to Backlog">&#8617; Retry</button>`);
   } else if (t.status === 'cancelled') {
     parts.push(`<button class="card-action-btn card-action-retry" onclick="event.stopPropagation();quickRetryTask('${t.id}')" title="Move back to Backlog">&#8617; Retry</button>`);
+  } else if (t.status === 'done') {
+    parts.push(`<button class="card-action-btn card-action-retry" onclick="event.stopPropagation();quickRetryTask('${t.id}')" title="Move back to Backlog">&#8617; Retry</button>`);
   }
   if (!parts.length) return '';
   return `<div class="card-actions">${parts.join('')}</div>`;
