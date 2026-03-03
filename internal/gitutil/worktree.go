@@ -1,15 +1,25 @@
 package gitutil
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
 )
 
+// ErrEmptyRepo is returned when the repository has no commits (HEAD is invalid).
+var ErrEmptyRepo = errors.New("repository has no commits")
+
 // CreateWorktree creates a new branch and checks it out as a worktree at worktreePath.
 // If branchName already exists (e.g. the worktree directory was lost after a server
 // restart but the branch was preserved), it checks out the existing branch instead.
 func CreateWorktree(repoPath, worktreePath, branchName string) error {
+	// Verify HEAD is resolvable; an empty repo (git init with no commits) has
+	// no valid HEAD and git-worktree-add will fail with "invalid reference: HEAD".
+	if err := exec.Command("git", "-C", repoPath, "rev-parse", "--verify", "HEAD").Run(); err != nil {
+		return ErrEmptyRepo
+	}
+
 	out, err := exec.Command(
 		"git", "-C", repoPath,
 		"worktree", "add", "-b", branchName, worktreePath, "HEAD",

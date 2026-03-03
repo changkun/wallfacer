@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,7 +39,15 @@ func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, er
 		}
 
 		if gitutil.IsGitRepo(ws) {
-			if err := gitutil.CreateWorktree(ws, worktreePath, branchName); err != nil {
+			if err := gitutil.CreateWorktree(ws, worktreePath, branchName); errors.Is(err, gitutil.ErrEmptyRepo) {
+				// Empty repo (no commits) — fall back to snapshot so
+				// the task can still run with a local git for tracking.
+				logger.Runner.Warn("empty git repo, using snapshot instead", "workspace", ws)
+				if err := setupNonGitSnapshot(ws, worktreePath); err != nil {
+					r.cleanupWorktrees(taskID, worktreePaths, branchName)
+					return nil, "", fmt.Errorf("snapshot for empty repo %s: %w", ws, err)
+				}
+			} else if err != nil {
 				r.cleanupWorktrees(taskID, worktreePaths, branchName)
 				return nil, "", fmt.Errorf("createWorktree for %s: %w", ws, err)
 			}
