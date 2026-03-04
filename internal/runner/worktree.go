@@ -73,8 +73,9 @@ func (r *Runner) CleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 // directory. Safe to call multiple times — errors are logged as warnings.
 func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]string, branchName string) {
 	for repoPath, wt := range worktreePaths {
-		if !gitutil.IsGitRepo(repoPath) {
-			// Non-git snapshots are cleaned by os.RemoveAll below.
+		if !gitutil.IsGitRepo(repoPath) || !gitutil.HasCommits(repoPath) {
+			// Non-git snapshots and empty-repo snapshots are cleaned by
+			// os.RemoveAll below — they were never real git worktrees.
 			continue
 		}
 		if err := gitutil.RemoveWorktree(repoPath, wt, branchName); err != nil {

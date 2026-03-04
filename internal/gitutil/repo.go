@@ -15,6 +15,12 @@ func IsGitRepo(path string) bool {
 	return exec.Command("git", "-C", path, "rev-parse", "--git-dir").Run() == nil
 }
 
+// HasCommits reports whether the repository at path has at least one commit.
+// Returns false for empty repos (git init with no commits) and non-git directories.
+func HasCommits(path string) bool {
+	return exec.Command("git", "-C", path, "rev-parse", "--verify", "HEAD").Run() == nil
+}
+
 // DefaultBranch returns the default branch name for a repo (tries the current
 // local HEAD branch first, falls back to origin/HEAD, then "main").
 func DefaultBranch(repoPath string) (string, error) {

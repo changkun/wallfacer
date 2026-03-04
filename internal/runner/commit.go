@@ -309,8 +309,9 @@ func (r *Runner) rebaseAndMergeOne(
 	bgCtx context.Context,
 	commitHashes, baseHashes map[string]string,
 ) error {
-	if !gitutil.IsGitRepo(repoPath) {
-		// Non-git workspace: copy snapshot changes back to the original directory.
+	if !gitutil.IsGitRepo(repoPath) || !gitutil.HasCommits(repoPath) {
+		// Non-git workspace or empty git repo (no commits): the worktree was
+		// set up as a snapshot — copy changes back to the original directory.
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Extracting changes from sandbox to %s...", filepath.Base(repoPath)),
 		})
