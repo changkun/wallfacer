@@ -120,6 +120,10 @@ func runServer(configDir string, args []string) {
 
 	h := handler.NewHandler(s, r, configDir, workspaces)
 
+	// Start the auto-promoter: watches for state changes and promotes
+	// backlog tasks to in_progress when capacity is available.
+	h.StartAutoPromoter(context.Background())
+
 	mux := buildMux(h, r)
 
 	host, _, _ := net.SplitHostPort(*addr)

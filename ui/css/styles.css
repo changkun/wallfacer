@@ -90,6 +90,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .badge-failed { background: #f5d5d5; color: #8c2020; }
 .badge-archived { background: #e4e0d8; color: #6b6560; font-style: italic; }
 .badge-cancelled { background: #e8ddf5; color: #5a3d8a; }
+.badge-priority { background: #c8d0e0; color: #3a4560; font-weight: 700; font-size: 9px; padding: 2px 5px; min-width: 18px; text-align: center; }
 [data-theme="dark"] .badge-backlog { background: #2a2820; color: #7a7770; }
 [data-theme="dark"] .badge-in_progress { background: #1a2d42; color: #6da0dc; }
 [data-theme="dark"] .badge-waiting { background: #352a10; color: #d4a030; }
@@ -98,6 +99,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 [data-theme="dark"] .badge-failed { background: #341414; color: #d46868; }
 [data-theme="dark"] .badge-archived { background: #2a2820; color: #7a7770; font-style: italic; }
 [data-theme="dark"] .badge-cancelled { background: #2a1e3d; color: #a07ad4; }
+[data-theme="dark"] .badge-priority { background: #1e2535; color: #8095c0; }
 
 /* --- Spinner --- */
 .spinner {

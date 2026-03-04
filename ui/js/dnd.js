@@ -4,12 +4,20 @@ function initSortable() {
   const backlog = document.getElementById('col-backlog');
   const inProgress = document.getElementById('col-in_progress');
 
-  // Backlog: can drag out
+  // Backlog: can reorder (sort) and drag out to In Progress
   Sortable.create(backlog, {
     group: { name: 'kanban', pull: true, put: false },
     animation: 150,
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
+    onSort: function() {
+      // Persist new position order after drag-reorder within backlog.
+      const cards = backlog.querySelectorAll('.card[data-id]');
+      cards.forEach((card, idx) => {
+        const id = card.dataset.id;
+        api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ position: idx }) });
+      });
+    },
   });
 
   // In Progress: can receive from backlog

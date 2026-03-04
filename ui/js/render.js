@@ -90,8 +90,13 @@ function render() {
       existing.set(child.dataset.id, child);
     }
 
-    // Sort by last updated descending (most recently updated first)
-    items.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    // Backlog: sort by position ascending (priority order).
+    // Other columns: sort by last updated descending.
+    if (status === 'backlog') {
+      items.sort((a, b) => a.position - b.position);
+    } else {
+      items.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    }
 
     const newIds = new Set(items.map(t => t.id));
 
@@ -184,9 +189,11 @@ function updateCard(card, t) {
   } else {
     card.classList.remove('card-cancelled-done');
   }
+  const priorityBadge = t.status === 'backlog' ? `<span class="badge badge-priority" title="Priority #${t.position + 1}">#${t.position + 1}</span>` : '';
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
+        ${priorityBadge}
         <span class="badge ${badgeClass}">${statusLabel}</span>
         ${showSpinner ? '<span class="spinner"></span>' : ''}
       </div>
