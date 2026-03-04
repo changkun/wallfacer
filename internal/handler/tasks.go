@@ -1,13 +1,16 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
+	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -233,4 +236,79 @@ func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) 
 		"total_without_title": total,
 		"task_ids":            taskIDs,
 	})
+}
+
+// maxConcurrentTasks is the maximum number of tasks that can be in_progress simultaneously.
+const maxConcurrentTasks = 2
+
+// promoteMu serialises auto-promotion so two simultaneous state changes
+// cannot both promote a task, exceeding the concurrency limit.
+var promoteMu sync.Mutex
+
+// StartAutoPromoter subscribes to store change notifications and automatically
+// promotes backlog tasks to in_progress when there are fewer than
+// maxConcurrentTasks running.
+func (h *Handler) StartAutoPromoter(ctx context.Context) {
+	subID, ch := h.store.Subscribe()
+	go func() {
+		defer h.store.Unsubscribe(subID)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ch:
+				h.tryAutoPromote(ctx)
+			}
+		}
+	}()
+}
+
+// tryAutoPromote checks if there is capacity to run more tasks and promotes
+// the highest-priority (lowest position) backlog task if so.
+func (h *Handler) tryAutoPromote(ctx context.Context) {
+	promoteMu.Lock()
+	defer promoteMu.Unlock()
+
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		return
+	}
+
+	inProgressCount := 0
+	var bestBacklog *store.Task
+	for i := range tasks {
+		t := &tasks[i]
+		if t.Status == "in_progress" {
+			inProgressCount++
+		}
+		if t.Status == "backlog" {
+			if bestBacklog == nil || t.Position < bestBacklog.Position {
+				cp := *t
+				bestBacklog = &cp
+			}
+		}
+	}
+
+	if inProgressCount >= maxConcurrentTasks || bestBacklog == nil {
+		return
+	}
+
+	logger.Handler.Info("auto-promoting backlog task",
+		"task", bestBacklog.ID, "position", bestBacklog.Position,
+		"in_progress", inProgressCount)
+
+	if err := h.store.UpdateTaskStatus(ctx, bestBacklog.ID, "in_progress"); err != nil {
+		logger.Handler.Error("auto-promote status update", "task", bestBacklog.ID, "error", err)
+		return
+	}
+	h.store.InsertEvent(ctx, bestBacklog.ID, store.EventTypeStateChange, map[string]string{
+		"from": "backlog",
+		"to":   "in_progress",
+	})
+
+	sessionID := ""
+	if !bestBacklog.FreshStart && bestBacklog.SessionID != nil {
+		sessionID = *bestBacklog.SessionID
+	}
+	go h.runner.Run(bestBacklog.ID, bestBacklog.Prompt, sessionID, false)
 }
