@@ -13,6 +13,7 @@ import (
 type Config struct {
 	OAuthToken       string // CLAUDE_CODE_OAUTH_TOKEN
 	APIKey           string // ANTHROPIC_API_KEY
+	AuthToken        string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
 	BaseURL          string // ANTHROPIC_BASE_URL
 	Model            string // CLAUDE_CODE_MODEL
 	MaxParallelTasks int    // WALLFACER_MAX_PARALLEL (0 means use default)
@@ -45,12 +46,14 @@ func Parse(path string) (Config, error) {
 			continue
 		}
 		k = strings.TrimSpace(k)
-		v = strings.TrimSpace(v)
+		v = unquote(strings.TrimSpace(v))
 		switch k {
 		case "CLAUDE_CODE_OAUTH_TOKEN":
 			cfg.OAuthToken = v
 		case "ANTHROPIC_API_KEY":
 			cfg.APIKey = v
+		case "ANTHROPIC_AUTH_TOKEN":
+			cfg.AuthToken = v
 		case "ANTHROPIC_BASE_URL":
 			cfg.BaseURL = v
 		case "CLAUDE_CODE_MODEL":
@@ -145,6 +148,16 @@ func Update(path string, oauthToken, apiKey, baseURL, model, maxParallel *string
 		return fmt.Errorf("rename env file: %w", err)
 	}
 	return nil
+}
+
+// unquote strips matching double or single quotes surrounding a value.
+func unquote(v string) string {
+	if len(v) >= 2 {
+		if (v[0] == '"' && v[len(v)-1] == '"') || (v[0] == '\'' && v[len(v)-1] == '\'') {
+			return v[1 : len(v)-1]
+		}
+	}
+	return v
 }
 
 // isBlankRemovable returns true for lines that are empty or whitespace-only

@@ -152,11 +152,7 @@
         <div>
           <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Model (CLAUDE_CODE_MODEL)</label>
           <input id="env-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. claude-sonnet-4-5" autocomplete="off" list="env-model-list">
-          <datalist id="env-model-list">
-            <option value="claude-opus-4-5">
-            <option value="claude-sonnet-4-5">
-            <option value="claude-haiku-4-5">
-          </datalist>
+          <datalist id="env-model-list"></datalist>
           <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Override the default model. Clear to use the Claude Code default.</div>
         </div>
       </div>
@@ -243,7 +239,7 @@
             <button onclick="createTask()" class="btn btn-accent">Save</button>
             <button onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
           </div>
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5" style="min-width:0;">
             <select id="new-model" class="select" title="Model">
               <option value="">Default</option>
             </select>
@@ -494,9 +490,9 @@
 <script src="/js/modal.js"></script>
 <script src="/js/git.js"></script>
 <script src="/js/dnd.js"></script>
-<script src="/js/events.js"></script>
+<script src="/js/envconfig.js"></script>
 <script src="/js/instructions.js"></script>
 <script src="/js/containers.js"></script>
-<script src="/js/envconfig.js"></script>
+<script src="/js/events.js"></script>
 </body>
 </html>

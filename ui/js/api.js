@@ -58,8 +58,12 @@ let defaultModel = '';
 function modelDisplayName(id) {
   if (!id) return 'Default';
   // e.g. "claude-sonnet-4-6-20250514" → "sonnet-4-6"
-  const m = id.match(/^claude-(.+)-\d{8}$/);
-  return m ? m[1] : id;
+  var m = id.match(/^claude-(.+)-\d{8}$/);
+  if (m) return m[1];
+  // e.g. "bedrock/claude-sonnet-4.6" → "sonnet-4.6"
+  m = id.match(/(?:^|\/)+claude-(.+)$/);
+  if (m) return m[1];
+  return id;
 }
 
 function populateModelSelects() {
@@ -87,10 +91,18 @@ async function fetchConfig() {
     autopilot = !!cfg.autopilot;
     var toggle = document.getElementById('autopilot-toggle');
     if (toggle) toggle.checked = autopilot;
-    if (cfg.models) {
-      availableModels = cfg.models;
-      defaultModel = cfg.default_model || '';
-      populateModelSelects();
+    availableModels = cfg.models || [];
+    defaultModel = cfg.default_model || '';
+    populateModelSelects();
+    // Also populate the settings datalist for the default model input.
+    var datalist = document.getElementById('env-model-list');
+    if (datalist) {
+      datalist.innerHTML = '';
+      for (var m of availableModels) {
+        var opt = document.createElement('option');
+        opt.value = m;
+        datalist.appendChild(opt);
+      }
     }
   } catch (e) {
     console.error('fetchConfig:', e);
