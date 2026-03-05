@@ -46,3 +46,4 @@ try { initSortable(); } catch (e) { console.error('sortable init:', e); }
 startGitStream();
 startTasksStream();
 loadMaxParallel();
+fetchConfig();

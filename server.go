@@ -164,6 +164,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 
 	// Configuration & instructions.
 	mux.HandleFunc("GET /api/config", h.GetConfig)
+	mux.HandleFunc("PUT /api/config", h.UpdateConfig)
 	mux.HandleFunc("GET /api/env", h.GetEnvConfig)
 	mux.HandleFunc("PUT /api/env", h.UpdateEnvConfig)
 	mux.HandleFunc("GET /api/instructions", h.GetInstructions)

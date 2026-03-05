@@ -15,5 +15,8 @@ let gitStatuses = [];
 let gitStatusSource = null;
 let gitRetryDelay = 1000;
 
+// Autopilot state
+let autopilot = true;
+
 // Debounce timer for backlog prompt auto-save
 let editDebounce = null;

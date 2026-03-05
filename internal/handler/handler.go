@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/runner"
@@ -16,6 +17,9 @@ type Handler struct {
 	configDir  string
 	workspaces []string
 	envFile    string
+
+	autopilotMu sync.RWMutex
+	autopilot   bool
 }
 
 // NewHandler constructs a Handler with the given dependencies.
@@ -26,7 +30,22 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		configDir:  configDir,
 		workspaces: workspaces,
 		envFile:    r.EnvFile(),
+		autopilot:  true,
 	}
+}
+
+// AutopilotEnabled returns whether autopilot mode is active.
+func (h *Handler) AutopilotEnabled() bool {
+	h.autopilotMu.RLock()
+	defer h.autopilotMu.RUnlock()
+	return h.autopilot
+}
+
+// SetAutopilot enables or disables autopilot mode.
+func (h *Handler) SetAutopilot(enabled bool) {
+	h.autopilotMu.Lock()
+	h.autopilot = enabled
+	h.autopilotMu.Unlock()
 }
 
 // writeJSON serialises v as JSON and writes it with the given HTTP status code.

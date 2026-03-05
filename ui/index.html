@@ -28,6 +28,10 @@
   <div style="display: flex; align-items: center; gap: 16px;">
     <h1 style="font-size: 22px; font-weight: 400; letter-spacing: 0.01em; margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-style: italic; background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Wallfacer</h1>
     <div id="workspace-list" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
+      <input type="checkbox" id="autopilot-toggle" onchange="toggleAutopilot()" checked style="cursor: pointer; accent-color: var(--accent);">
+      Autopilot
+    </label>
   </div>
   <div style="position: relative;">
     <button id="settings-btn" class="settings-btn" onclick="toggleSettings(event)" title="Settings">
