@@ -287,6 +287,47 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .border-v { border-color: var(--border); }
 .section-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
 
+/* --- Hint tooltip --- */
+.hint-trigger {
+  position: relative;
+}
+.hint-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+  line-height: 1.45;
+  font-style: normal;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  transition: opacity 0.15s, visibility 0.15s;
+  z-index: 200;
+}
+.hint-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--border);
+}
+.hint-trigger:hover .hint-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
 /* --- Icon buttons (toggle/copy) --- */
 .btn-icon {
   background: none; border: 1px solid var(--border); color: var(--text-muted);
