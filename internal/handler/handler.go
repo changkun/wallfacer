@@ -30,7 +30,7 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		configDir:  configDir,
 		workspaces: workspaces,
 		envFile:    r.EnvFile(),
-		autopilot:  true,
+		autopilot:  false,
 	}
 }
 
