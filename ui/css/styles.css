@@ -176,6 +176,7 @@ textarea.field { overflow-y: auto; }
 .select {
   background: var(--bg-input); border: 1px solid var(--border); color: var(--text-secondary);
   border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none;
+  min-width: 0; max-width: 160px;
 }
 .select:focus { border-color: var(--accent); }
 
