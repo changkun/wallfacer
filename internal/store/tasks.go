@@ -47,7 +47,7 @@ func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 }
 
 // CreateTask creates a new task in backlog status and persists it.
-func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountWorktrees bool) (*Task, error) {
+func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountWorktrees bool, model string) (*Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -68,6 +68,7 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 		Turns:          0,
 		Timeout:        timeout,
 		MountWorktrees: mountWorktrees,
+		Model:          model,
 		Position:       maxPos + 1,
 		CreatedAt:      now,
 		UpdatedAt:      now,
@@ -226,7 +227,7 @@ func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int
 }
 
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, and mount_worktrees for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool) error {
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, model *string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -245,6 +246,9 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 	}
 	if mountWorktrees != nil {
 		t.MountWorktrees = *mountWorktrees
+	}
+	if model != nil {
+		t.Model = *model
 	}
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {

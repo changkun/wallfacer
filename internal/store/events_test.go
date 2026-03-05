@@ -13,7 +13,7 @@ import (
 
 func TestInsertEvent_Basic(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	if err := s.InsertEvent(bg(), task.ID, EventTypeStateChange, map[string]string{"status": "in_progress"}); err != nil {
 		t.Fatalf("InsertEvent: %v", err)
@@ -36,7 +36,7 @@ func TestInsertEvent_Basic(t *testing.T) {
 
 func TestInsertEvent_SequentialIDs(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	for i := 0; i < 5; i++ {
 		if err := s.InsertEvent(bg(), task.ID, EventTypeOutput, i); err != nil {
@@ -65,7 +65,7 @@ func TestInsertEvent_NotFound(t *testing.T) {
 func TestInsertEvent_PersistsAndReloads(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 	s.InsertEvent(bg(), task.ID, EventTypeOutput, "hello world")
 
 	s2, _ := NewStore(dir)
@@ -83,7 +83,7 @@ func TestInsertEvent_PersistsAndReloads(t *testing.T) {
 
 func TestGetEvents_ReturnsCopy(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 	s.InsertEvent(bg(), task.ID, EventTypeStateChange, "test")
 
 	events, _ := s.GetEvents(bg(), task.ID)
@@ -98,7 +98,7 @@ func TestGetEvents_ReturnsCopy(t *testing.T) {
 func TestGetEvents_SortedByIDAfterReload(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	for i := 0; i < 5; i++ {
 		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
@@ -119,7 +119,7 @@ func TestGetEvents_SortedByIDAfterReload(t *testing.T) {
 func TestLoadEvents_SkipsNonJSONFiles(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
 	os.WriteFile(filepath.Join(tracesDir, "README.txt"), []byte("not json"), 0644)
@@ -137,7 +137,7 @@ func TestLoadEvents_SkipsNonJSONFiles(t *testing.T) {
 func TestLoadEvents_SkipsCorruptTraceFiles(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 	s.InsertEvent(bg(), task.ID, EventTypeStateChange, "good")
 
 	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
@@ -155,7 +155,7 @@ func TestLoadEvents_SkipsCorruptTraceFiles(t *testing.T) {
 
 func TestConcurrentInsertEvent(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	var wg sync.WaitGroup
 	const n = 10

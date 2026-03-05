@@ -4,15 +4,33 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/instructions"
 )
 
+// availableModels is the list of Claude models users can select per task.
+var availableModels = []string{
+	"claude-sonnet-4-6-20250514",
+	"claude-opus-4-6-20250610",
+	"claude-haiku-4-5-20251001",
+}
+
 // GetConfig returns the server configuration (workspaces, instructions path).
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
+	// Read the current default model from the env file.
+	defaultModel := ""
+	if h.envFile != "" {
+		if cfg, err := envconfig.Parse(h.envFile); err == nil {
+			defaultModel = cfg.Model
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"workspaces":        h.runner.Workspaces(),
 		"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
 		"autopilot":         h.AutopilotEnabled(),
+		"models":            availableModels,
+		"default_model":     defaultModel,
 	})
 }
 

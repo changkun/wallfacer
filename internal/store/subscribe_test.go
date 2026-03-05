@@ -11,7 +11,7 @@ func TestSubscribe_ReceivesNotificationOnCreate(t *testing.T) {
 	id, ch := s.Subscribe()
 	defer s.Unsubscribe(id)
 
-	s.CreateTask(bg(), "p", 5, false)
+	s.CreateTask(bg(), "p", 5, false, "")
 
 	select {
 	case <-ch:
@@ -22,7 +22,7 @@ func TestSubscribe_ReceivesNotificationOnCreate(t *testing.T) {
 
 func TestSubscribe_ReceivesNotificationOnStatusUpdate(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	id, ch := s.Subscribe()
 	defer s.Unsubscribe(id)
@@ -41,7 +41,7 @@ func TestUnsubscribe_StopsNotifications(t *testing.T) {
 	id, ch := s.Subscribe()
 	s.Unsubscribe(id)
 
-	s.CreateTask(bg(), "p", 5, false)
+	s.CreateTask(bg(), "p", 5, false, "")
 
 	select {
 	case <-ch:
@@ -58,7 +58,7 @@ func TestSubscribe_MultipleSubscribersAllNotified(t *testing.T) {
 	defer s.Unsubscribe(id1)
 	defer s.Unsubscribe(id2)
 
-	s.CreateTask(bg(), "p", 5, false)
+	s.CreateTask(bg(), "p", 5, false, "")
 
 	for i, ch := range []<-chan struct{}{ch1, ch2} {
 		select {

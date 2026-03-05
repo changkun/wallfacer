@@ -48,6 +48,7 @@ func (r *Runner) buildContainerArgs(
 	worktreeOverrides map[string]string,
 	boardDir string,
 	siblingMounts map[string]map[string]string,
+	modelOverride string,
 ) []string {
 	args := []string{"run", "--rm", "--network=host", "--name", containerName}
 
@@ -130,7 +131,10 @@ func (r *Runner) buildContainerArgs(
 	}
 	args = append(args, "-w", workdir, r.sandboxImage)
 	args = append(args, "-p", prompt, "--verbose", "--output-format", "stream-json")
-	if model := r.modelFromEnv(); model != "" {
+	// Per-task model takes priority; fall back to the env-configured default.
+	if modelOverride != "" {
+		args = append(args, "--model", modelOverride)
+	} else if model := r.modelFromEnv(); model != "" {
 		args = append(args, "--model", model)
 	}
 	if sessionID != "" {
@@ -162,13 +166,14 @@ func (r *Runner) runContainer(
 	worktreeOverrides map[string]string,
 	boardDir string,
 	siblingMounts map[string]map[string]string,
+	modelOverride string,
 ) (*claudeOutput, []byte, []byte, error) {
 	containerName := "wallfacer-" + taskID.String()
 
 	// Remove any leftover container from a previous interrupted run.
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	args := r.buildContainerArgs(containerName, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts)
+	args := r.buildContainerArgs(containerName, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride)
 
 	cmd := exec.CommandContext(ctx, r.command, args...)
 	var stdout, stderr bytes.Buffer

@@ -436,7 +436,7 @@ func (r *Runner) resolveConflicts(
 	// Mount only the conflicted worktree for this targeted fix.
 	override := map[string]string{repoPath: worktreePath}
 
-	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, override, "", nil)
+	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, override, "", nil, "")
 
 	task, _ := r.store.GetTask(context.Background(), taskID)
 	turns := 0

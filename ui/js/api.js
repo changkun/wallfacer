@@ -51,12 +51,47 @@ function toggleShowArchived() {
 
 // --- Autopilot ---
 
+// Available model list from server config.
+let availableModels = [];
+let defaultModel = '';
+
+function modelDisplayName(id) {
+  if (!id) return 'Default';
+  // e.g. "claude-sonnet-4-6-20250514" → "sonnet-4-6"
+  const m = id.match(/^claude-(.+)-\d{8}$/);
+  return m ? m[1] : id;
+}
+
+function populateModelSelects() {
+  var selects = [
+    document.getElementById('new-model'),
+    document.getElementById('modal-edit-model'),
+  ];
+  for (var sel of selects) {
+    if (!sel) continue;
+    var current = sel.value;
+    sel.innerHTML = '<option value="">Default' + (defaultModel ? ' (' + modelDisplayName(defaultModel) + ')' : '') + '</option>';
+    for (var m of availableModels) {
+      var opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = modelDisplayName(m);
+      sel.appendChild(opt);
+    }
+    sel.value = current;
+  }
+}
+
 async function fetchConfig() {
   try {
     var cfg = await api('/api/config');
     autopilot = !!cfg.autopilot;
     var toggle = document.getElementById('autopilot-toggle');
     if (toggle) toggle.checked = autopilot;
+    if (cfg.models) {
+      availableModels = cfg.models;
+      defaultModel = cfg.default_model || '';
+      populateModelSelects();
+    }
   } catch (e) {
     console.error('fetchConfig:', e);
   }

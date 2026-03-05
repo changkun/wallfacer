@@ -243,16 +243,21 @@
             <button onclick="createTask()" class="btn btn-accent">Save</button>
             <button onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
           </div>
-          <select id="new-timeout" class="select" title="Timeout">
-            <option value="5">5 min</option>
-            <option value="15">15 min</option>
-            <option value="30">30 min</option>
-            <option value="60">1 hour</option>
-            <option value="120">2 hours</option>
-            <option value="360">6 hours</option>
-            <option value="720">12 hours</option>
-            <option value="1440">24 hours</option>
-          </select>
+          <div class="flex items-center gap-1.5">
+            <select id="new-model" class="select" title="Model">
+              <option value="">Default</option>
+            </select>
+            <select id="new-timeout" class="select" title="Timeout">
+              <option value="5">5 min</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="60">1 hour</option>
+              <option value="120">2 hours</option>
+              <option value="360">6 hours</option>
+              <option value="720">12 hours</option>
+              <option value="1440">24 hours</option>
+            </select>
+          </div>
         </div>
         <div class="flex items-center gap-2 mt-1">
           <input type="checkbox" id="new-mount-worktrees" style="cursor:pointer;accent-color:var(--accent);">
@@ -335,6 +340,10 @@
             <div class="flex items-center gap-2 mt-2">
               <span id="modal-edit-status" class="text-xs text-v-muted"></span>
               <div class="ml-auto flex items-center gap-1.5">
+                <label for="modal-edit-model" class="text-xs text-v-muted">Model</label>
+                <select id="modal-edit-model" class="select" onchange="scheduleBacklogSave()">
+                  <option value="">Default</option>
+                </select>
                 <label for="modal-edit-timeout" class="text-xs text-v-muted">Timeout</label>
                 <select id="modal-edit-timeout" class="select">
                   <option value="5">5 min</option>

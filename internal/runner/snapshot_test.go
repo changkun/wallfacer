@@ -166,7 +166,7 @@ func TestCommitPipelineNonGitWorkspace(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{ws})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Non-git commit test", 5, false)
+	task, err := s.CreateTask(ctx, "Non-git commit test", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func TestRunEndToEndNonGitWorkspace(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{ws}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Non-git E2E test", 5, false)
+	task, err := s.CreateTask(ctx, "Non-git E2E test", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -102,7 +102,7 @@ func TestTaskDiffShowsOnlyTaskChanges(t *testing.T) {
 	gitRun(t, repo, "merge", "--ff-only", "task-a")
 
 	// Create store tasks with worktree paths.
-	taskB, _ := h.store.CreateTask(ctx, "task B", 5, false)
+	taskB, _ := h.store.CreateTask(ctx, "task B", 5, false, "")
 	h.store.UpdateTaskWorktrees(ctx, taskB.ID, map[string]string{repo: wtB}, "task-b")
 
 	// Get diff for task B — should only show b.txt, NOT the inverse of a.txt.
@@ -127,7 +127,7 @@ func TestTaskDiffIncludesUncommittedChanges(t *testing.T) {
 	// Make uncommitted change.
 	os.WriteFile(filepath.Join(wtDir, "file.txt"), []byte("modified\n"), 0644)
 
-	task, _ := h.store.CreateTask(ctx, "test", 5, false)
+	task, _ := h.store.CreateTask(ctx, "test", 5, false, "")
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
 
 	resp := callTaskDiff(t, h, task.ID)
@@ -148,7 +148,7 @@ func TestTaskDiffIncludesUntrackedFiles(t *testing.T) {
 	// Add an untracked file.
 	os.WriteFile(filepath.Join(wtDir, "new-file.txt"), []byte("new content\n"), 0644)
 
-	task, _ := h.store.CreateTask(ctx, "test", 5, false)
+	task, _ := h.store.CreateTask(ctx, "test", 5, false, "")
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
 
 	resp := callTaskDiff(t, h, task.ID)
@@ -166,7 +166,7 @@ func TestTaskDiffEmptyWhenNoChanges(t *testing.T) {
 	wtDir := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
 
-	task, _ := h.store.CreateTask(ctx, "test", 5, false)
+	task, _ := h.store.CreateTask(ctx, "test", 5, false, "")
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
 
 	resp := callTaskDiff(t, h, task.ID)
@@ -191,7 +191,7 @@ func TestTaskDiffFallbackToCommitHashes(t *testing.T) {
 	commitHash := gitRun(t, repo, "rev-parse", "HEAD")
 
 	// Create task pointing to a non-existent worktree path, with commit hashes set.
-	task, _ := h.store.CreateTask(ctx, "test", 5, false)
+	task, _ := h.store.CreateTask(ctx, "test", 5, false, "")
 	nonexistent := filepath.Join(t.TempDir(), "gone")
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task")
 	h.store.UpdateTaskCommitHashes(ctx, task.ID, map[string]string{repo: commitHash})
@@ -222,7 +222,7 @@ func TestTaskDiffFallbackBranchUseMergeBase(t *testing.T) {
 	gitRun(t, repo, "commit", "-m", "main advance")
 
 	// Task with worktree gone, but branch exists with commits ahead.
-	task, _ := h.store.CreateTask(ctx, "test", 5, false)
+	task, _ := h.store.CreateTask(ctx, "test", 5, false, "")
 	nonexistent := filepath.Join(t.TempDir(), "gone")
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task-x")
 
@@ -268,7 +268,7 @@ func TestTaskDiffAfterCommitPipeline(t *testing.T) {
 
 	// Create a task with worktree gone (cleaned up after commit pipeline),
 	// but with correct commit hashes stored using the defBranch ref.
-	task, _ := h.store.CreateTask(ctx, "test", 5, false)
+	task, _ := h.store.CreateTask(ctx, "test", 5, false, "")
 	nonexistent := filepath.Join(t.TempDir(), "cleaned-up")
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task-branch")
 	h.store.UpdateTaskCommitHashes(ctx, task.ID, map[string]string{repo: commitHash})
@@ -306,10 +306,10 @@ func TestTaskDiffIsolationConcurrent(t *testing.T) {
 	gitRun(t, wtB, "add", ".")
 	gitRun(t, wtB, "commit", "-m", "B")
 
-	taskA, _ := h.store.CreateTask(ctx, "A", 5, false)
+	taskA, _ := h.store.CreateTask(ctx, "A", 5, false, "")
 	h.store.UpdateTaskWorktrees(ctx, taskA.ID, map[string]string{repo: wtA}, "task-a")
 
-	taskB, _ := h.store.CreateTask(ctx, "B", 5, false)
+	taskB, _ := h.store.CreateTask(ctx, "B", 5, false, "")
 	h.store.UpdateTaskWorktrees(ctx, taskB.ID, map[string]string{repo: wtB}, "task-b")
 
 	// Query diffs concurrently.

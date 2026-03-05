@@ -52,6 +52,7 @@ type Task struct {
 	CommitHashes     map[string]string `json:"commit_hashes,omitempty"`      // host repoPath → commit hash after merge
 	BaseCommitHashes map[string]string `json:"base_commit_hashes,omitempty"` // host repoPath → defBranch HEAD before merge
 	MountWorktrees   bool              `json:"mount_worktrees,omitempty"`
+	Model            string            `json:"model,omitempty"`
 }
 
 // EventType identifies the kind of event stored in a task's audit trail.

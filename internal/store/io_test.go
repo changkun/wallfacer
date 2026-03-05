@@ -10,7 +10,7 @@ import (
 func TestSaveTurnOutput_StdoutOnly(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	stdout := []byte(`{"hello":"world"}`)
 	if err := s.SaveTurnOutput(task.ID, 1, stdout, nil); err != nil {
@@ -36,7 +36,7 @@ func TestSaveTurnOutput_StdoutOnly(t *testing.T) {
 func TestSaveTurnOutput_WithStderr(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	if err := s.SaveTurnOutput(task.ID, 2, []byte("stdout"), []byte("error output")); err != nil {
 		t.Fatalf("SaveTurnOutput: %v", err)
@@ -55,7 +55,7 @@ func TestSaveTurnOutput_WithStderr(t *testing.T) {
 func TestSaveTurnOutput_TurnNumberFormatted(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	if err := s.SaveTurnOutput(task.ID, 42, []byte("data"), nil); err != nil {
 		t.Fatalf("SaveTurnOutput: %v", err)

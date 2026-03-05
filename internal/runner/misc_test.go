@@ -157,7 +157,7 @@ func TestResolveConflictsSuccess(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "conflict resolve test", 5, false)
+	task, err := s.CreateTask(ctx, "conflict resolve test", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestResolveConflictsContainerError(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "conflict error test", 5, false)
+	task, err := s.CreateTask(ctx, "conflict error test", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestResolveConflictsIsError(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "conflict is_error test", 5, false)
+	task, err := s.CreateTask(ctx, "conflict is_error test", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestPruneOrphanedWorktrees(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "known task", 5, false)
+	task, err := s.CreateTask(ctx, "known task", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,7 +322,7 @@ func TestRunContainerSuccess(t *testing.T) {
 	cmd := fakeCmdScript(t, endTurnOutput, 0)
 	r := runnerWithCmd(t, cmd)
 
-	out, stdout, stderr, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil)
+	out, stdout, stderr, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -339,7 +339,7 @@ func TestRunContainerNonZeroExitWithValidOutput(t *testing.T) {
 	cmd := fakeCmdScript(t, endTurnOutput, 1)
 	r := runnerWithCmd(t, cmd)
 
-	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil)
+	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "")
 	if err != nil {
 		t.Fatalf("expected no error for non-zero exit with valid output, got: %v", err)
 	}
@@ -354,7 +354,7 @@ func TestRunContainerEmptyOutputNonZeroExit(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 1)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil)
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "")
 	if err == nil {
 		t.Fatal("expected error for empty container output with non-zero exit")
 	}
@@ -366,7 +366,7 @@ func TestRunContainerEmptyOutputZeroExit(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 0)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil)
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "")
 	if err == nil {
 		t.Fatal("expected error for empty container output with exit 0")
 	}
@@ -382,7 +382,7 @@ func TestRunContainerWithSessionID(t *testing.T) {
 	r := runnerWithCmd(t, cmd)
 
 	// Should succeed; session ID is passed to args (verified via args tests).
-	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "sess-xyz", nil, "", nil)
+	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "sess-xyz", nil, "", nil, "")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -399,7 +399,7 @@ func TestRunContainerWithSessionID(t *testing.T) {
 // adds --resume <sessionID> to the container args.
 func TestBuildContainerArgsWithSessionID(t *testing.T) {
 	r := newTestRunnerWithInstructions(t, "")
-	args := r.buildContainerArgs("name", "prompt", "sess-abc", nil, "", nil)
+	args := r.buildContainerArgs("name", "prompt", "sess-abc", nil, "", nil, "")
 	if !containsConsecutive(args, "--resume", "sess-abc") {
 		t.Fatalf("expected --resume sess-abc in args; got: %v", args)
 	}
@@ -424,7 +424,7 @@ func TestBuildContainerArgsWithEnvFile(t *testing.T) {
 		SandboxImage: "test:latest",
 		EnvFile:      envFile,
 	})
-	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil)
+	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil, "")
 	if !containsConsecutive(args, "--env-file", envFile) {
 		t.Fatalf("expected --env-file %s in args; got: %v", envFile, args)
 	}
@@ -448,7 +448,7 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 		SandboxImage: "test:latest",
 		Workspaces:   ws,
 	})
-	args := r.buildContainerArgs("name", "prompt", "", map[string]string{ws: wt}, "", nil)
+	args := r.buildContainerArgs("name", "prompt", "", map[string]string{ws: wt}, "", nil, "")
 	basename := filepath.Base(ws)
 	expectedMount := wt + ":/workspace/" + basename + ":z"
 	if !containsConsecutive(args, "-v", expectedMount) {
@@ -482,7 +482,7 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 		SandboxImage: "test:latest",
 		Workspaces:   repo,
 	})
-	args := r.buildContainerArgs("name", "prompt", "", map[string]string{repo: wt}, "", nil)
+	args := r.buildContainerArgs("name", "prompt", "", map[string]string{repo: wt}, "", nil, "")
 
 	// The main repo's .git should be mounted at the same host path.
 	gitDir := filepath.Join(repo, ".git")
@@ -510,7 +510,7 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 		Workspaces:   repo,
 	})
 	// No worktree override — direct mount of workspace.
-	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil)
+	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil, "")
 
 	gitDir := filepath.Join(repo, ".git")
 	gitMount := gitDir + ":" + gitDir + ":z"
@@ -523,7 +523,7 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 // --resume is NOT added to the args.
 func TestBuildContainerArgsNoSessionID(t *testing.T) {
 	r := newTestRunnerWithInstructions(t, "")
-	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil)
+	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil, "")
 	for i, a := range args {
 		if a == "--resume" {
 			t.Fatalf("--resume should not appear when sessionID is empty (found at index %d)", i)
@@ -544,7 +544,7 @@ func TestGenerateTitleSuccess(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Fix the login bug in the authentication module", 5, false)
+	task, err := s.CreateTask(ctx, "Fix the login bug in the authentication module", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -565,7 +565,7 @@ func TestGenerateTitleSkipsExistingTitle(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "test prompt", 5, false)
+	task, err := s.CreateTask(ctx, "test prompt", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -589,7 +589,7 @@ func TestGenerateTitleFallbackOnContainerError(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "test prompt", 5, false)
+	task, err := s.CreateTask(ctx, "test prompt", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -610,7 +610,7 @@ func TestGenerateTitleBlankResult(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "test prompt", 5, false)
+	task, err := s.CreateTask(ctx, "test prompt", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -633,7 +633,7 @@ func TestGenerateTitleNDJSONOutput(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "add authentication feature", 5, false)
+	task, err := s.CreateTask(ctx, "add authentication feature", 5, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -665,7 +665,7 @@ func TestRunContainerParseErrorExitZero(t *testing.T) {
 	cmd := fakeCmdScript(t, "this is not valid json output at all", 0)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil)
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "")
 	if err == nil {
 		t.Fatal("expected error for non-JSON output")
 	}
@@ -681,7 +681,7 @@ func TestRunContainerParseErrorWithExitCode(t *testing.T) {
 	cmd := fakeCmdScript(t, "not valid json", 1)
 	r := runnerWithCmd(t, cmd)
 
-	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil)
+	_, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "")
 	if err == nil {
 		t.Fatal("expected error for invalid JSON with exit code 1")
 	}
@@ -707,7 +707,7 @@ func TestRunContainerContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 
-	_, _, _, err := r.runContainer(ctx, uuid.New(), "prompt", "", nil, "", nil)
+	_, _, _, err := r.runContainer(ctx, uuid.New(), "prompt", "", nil, "", nil, "")
 	if err == nil {
 		t.Fatal("expected error when context is cancelled")
 	}
