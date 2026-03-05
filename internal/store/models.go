@@ -8,23 +8,14 @@ import (
 )
 
 // TaskUsage tracks token consumption and cost for a task across all turns.
+// Each container invocation in -p mode reports per-invocation totals (not
+// session-cumulative), so values are accumulated directly without deltas.
 type TaskUsage struct {
 	InputTokens          int     `json:"input_tokens"`
 	OutputTokens         int     `json:"output_tokens"`
 	CacheReadInputTokens int     `json:"cache_read_input_tokens"`
 	CacheCreationTokens  int     `json:"cache_creation_input_tokens"`
 	CostUSD              float64 `json:"cost_usd"`
-
-	// LastReported* fields store the cumulative values from the most recent
-	// container invocation. Claude Code's stream-json output reports
-	// session-cumulative totals (cost, tokens). When a session is resumed
-	// (--resume), the next invocation includes prior turns' totals. We
-	// subtract the previous cumulative value to get the per-turn delta.
-	LastReportedCost                 float64 `json:"last_reported_cost,omitempty"`
-	LastReportedInputTokens          int     `json:"last_reported_input_tokens,omitempty"`
-	LastReportedOutputTokens         int     `json:"last_reported_output_tokens,omitempty"`
-	LastReportedCacheReadInputTokens int     `json:"last_reported_cache_read_input_tokens,omitempty"`
-	LastReportedCacheCreationTokens  int     `json:"last_reported_cache_creation_tokens,omitempty"`
 }
 
 // Task is the core domain model: a unit of work executed by Claude Code.

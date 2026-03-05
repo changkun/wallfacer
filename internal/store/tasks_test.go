@@ -344,13 +344,11 @@ func TestAccumulateTaskUsage(t *testing.T) {
 	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	delta := TaskUsage{
-		InputTokens:             100,
-		OutputTokens:            50,
-		CacheReadInputTokens:    10,
-		CacheCreationTokens:     5,
-		CostUSD:                 0.01,
-		LastReportedCost:        0.01,
-		LastReportedInputTokens: 100,
+		InputTokens:          100,
+		OutputTokens:         50,
+		CacheReadInputTokens: 10,
+		CacheCreationTokens:  5,
+		CostUSD:              0.01,
 	}
 	s.AccumulateTaskUsage(bg(), task.ID, delta)
 	s.AccumulateTaskUsage(bg(), task.ID, delta)
@@ -370,13 +368,6 @@ func TestAccumulateTaskUsage(t *testing.T) {
 	}
 	if got.Usage.CostUSD < 0.019 || got.Usage.CostUSD > 0.021 {
 		t.Errorf("CostUSD = %f, want ~0.02", got.Usage.CostUSD)
-	}
-	// LastReported fields should reflect the most recent call, not accumulate.
-	if got.Usage.LastReportedCost < 0.009 || got.Usage.LastReportedCost > 0.011 {
-		t.Errorf("LastReportedCost = %f, want ~0.01", got.Usage.LastReportedCost)
-	}
-	if got.Usage.LastReportedInputTokens != 100 {
-		t.Errorf("LastReportedInputTokens = %d, want 100", got.Usage.LastReportedInputTokens)
 	}
 }
 

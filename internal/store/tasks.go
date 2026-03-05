@@ -185,21 +185,6 @@ func (s *Store) AccumulateTaskUsage(_ context.Context, id uuid.UUID, delta TaskU
 	t.Usage.CacheReadInputTokens += delta.CacheReadInputTokens
 	t.Usage.CacheCreationTokens += delta.CacheCreationTokens
 	t.Usage.CostUSD += delta.CostUSD
-	if delta.LastReportedCost > 0 {
-		t.Usage.LastReportedCost = delta.LastReportedCost
-	}
-	if delta.LastReportedInputTokens > 0 {
-		t.Usage.LastReportedInputTokens = delta.LastReportedInputTokens
-	}
-	if delta.LastReportedOutputTokens > 0 {
-		t.Usage.LastReportedOutputTokens = delta.LastReportedOutputTokens
-	}
-	if delta.LastReportedCacheReadInputTokens > 0 {
-		t.Usage.LastReportedCacheReadInputTokens = delta.LastReportedCacheReadInputTokens
-	}
-	if delta.LastReportedCacheCreationTokens > 0 {
-		t.Usage.LastReportedCacheCreationTokens = delta.LastReportedCacheCreationTokens
-	}
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err

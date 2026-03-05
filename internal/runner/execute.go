@@ -86,15 +86,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	turns := task.Turns
 
-	// Track the last cumulative values reported by the container so we can
-	// compute per-turn deltas. Claude Code's stream-json output reports
-	// session-cumulative totals for cost and tokens. On resumed sessions
-	// (--resume), we must subtract the previous values to avoid double-counting.
-	prevCost := task.Usage.LastReportedCost
-	prevInputTokens := task.Usage.LastReportedInputTokens
-	prevOutputTokens := task.Usage.LastReportedOutputTokens
-	prevCacheRead := task.Usage.LastReportedCacheReadInputTokens
-	prevCacheCreation := task.Usage.LastReportedCacheCreationTokens
+	// Claude Code's -p --resume mode reports per-invocation totals for both
+	// cost (total_cost_usd) and usage tokens — they are NOT session-cumulative.
+	// Each container invocation's values represent only that invocation's
+	// consumption, so we accumulate them directly without delta subtraction.
 
 	// Prepare board context (board.json manifest of all tasks).
 	boardDir, boardErr := r.prepareBoardContext(taskID, task.MountWorktrees)
@@ -176,46 +171,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 		r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, turns)
 
-		// Compute per-turn deltas from session-cumulative values.
-		// If a value drops (e.g. new session after retry), use it as-is.
-		costDelta := output.TotalCostUSD - prevCost
-		if costDelta < 0 {
-			costDelta = output.TotalCostUSD
-		}
-		inputDelta := output.Usage.InputTokens - prevInputTokens
-		if inputDelta < 0 {
-			inputDelta = output.Usage.InputTokens
-		}
-		outputDelta := output.Usage.OutputTokens - prevOutputTokens
-		if outputDelta < 0 {
-			outputDelta = output.Usage.OutputTokens
-		}
-		cacheReadDelta := output.Usage.CacheReadInputTokens - prevCacheRead
-		if cacheReadDelta < 0 {
-			cacheReadDelta = output.Usage.CacheReadInputTokens
-		}
-		cacheCreationDelta := output.Usage.CacheCreationInputTokens - prevCacheCreation
-		if cacheCreationDelta < 0 {
-			cacheCreationDelta = output.Usage.CacheCreationInputTokens
-		}
-
-		prevCost = output.TotalCostUSD
-		prevInputTokens = output.Usage.InputTokens
-		prevOutputTokens = output.Usage.OutputTokens
-		prevCacheRead = output.Usage.CacheReadInputTokens
-		prevCacheCreation = output.Usage.CacheCreationInputTokens
-
+		// Accumulate per-invocation cost and token values directly.
 		r.store.AccumulateTaskUsage(bgCtx, taskID, store.TaskUsage{
-			InputTokens:                      inputDelta,
-			OutputTokens:                     outputDelta,
-			CacheReadInputTokens:             cacheReadDelta,
-			CacheCreationTokens:              cacheCreationDelta,
-			CostUSD:                          costDelta,
-			LastReportedCost:                 output.TotalCostUSD,
-			LastReportedInputTokens:          output.Usage.InputTokens,
-			LastReportedOutputTokens:         output.Usage.OutputTokens,
-			LastReportedCacheReadInputTokens: output.Usage.CacheReadInputTokens,
-			LastReportedCacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
 		})
 
 		if output.IsError {
