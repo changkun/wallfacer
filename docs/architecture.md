@@ -137,7 +137,7 @@ The `-container` flag defaults to auto-detection: it checks `/opt/podman/bin/pod
 
 ### Environment File
 
-`~/.wallfacer/.env` is passed into every sandbox container via `--env-file`. The server also parses it to extract the model override.
+`~/.wallfacer/.env` is passed into every sandbox container via `--env-file`. The server also parses it to extract model overrides and gateway credentials.
 
 At least one authentication variable must be set:
 
@@ -145,12 +145,14 @@ At least one authentication variable must be set:
 |---|---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | one of these two | OAuth token from `claude setup-token` (Claude Pro/Max) |
 | `ANTHROPIC_API_KEY` | one of these two | Direct API key from console.anthropic.com |
-| `ANTHROPIC_BASE_URL` | no | Custom API endpoint; defaults to `https://api.anthropic.com` |
-| `CLAUDE_CODE_MODEL` | no | Model passed as `--model` to every `claude` invocation; omit to use the Claude Code default |
+| `ANTHROPIC_AUTH_TOKEN` | no | Bearer token for LLM gateway proxy authentication |
+| `ANTHROPIC_BASE_URL` | no | Custom API endpoint; defaults to `https://api.anthropic.com`. When set, the server queries `{base_url}/v1/models` to populate the model selection dropdown |
+| `WALLFACER_DEFAULT_MODEL` | no | Default model passed as `--model` to task containers; omit to use the Claude Code default |
+| `WALLFACER_TITLE_MODEL` | no | Model used for background title generation; falls back to `WALLFACER_DEFAULT_MODEL` if unset |
 
 When both `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY` are set, the OAuth token takes precedence. This is Claude Code CLI behavior — wallfacer simply passes both variables through to the container via `--env-file`.
 
-All four variables can be edited at runtime from **Settings → API Configuration** in the web UI. Changes take effect on the next task run without restarting the server.
+All variables can be edited at runtime from **Settings → API Configuration** in the web UI. Changes take effect on the next task run without restarting the server.
 
 `wallfacer env` reports the status of all four variables.
 

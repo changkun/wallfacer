@@ -15,7 +15,8 @@ type Config struct {
 	APIKey           string // ANTHROPIC_API_KEY
 	AuthToken        string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
 	BaseURL          string // ANTHROPIC_BASE_URL
-	Model            string // CLAUDE_CODE_MODEL
+	DefaultModel     string // WALLFACER_DEFAULT_MODEL
+	TitleModel       string // WALLFACER_TITLE_MODEL
 	MaxParallelTasks int    // WALLFACER_MAX_PARALLEL (0 means use default)
 }
 
@@ -24,7 +25,8 @@ var knownKeys = []string{
 	"CLAUDE_CODE_OAUTH_TOKEN",
 	"ANTHROPIC_API_KEY",
 	"ANTHROPIC_BASE_URL",
-	"CLAUDE_CODE_MODEL",
+	"WALLFACER_DEFAULT_MODEL",
+	"WALLFACER_TITLE_MODEL",
 	"WALLFACER_MAX_PARALLEL",
 }
 
@@ -56,8 +58,10 @@ func Parse(path string) (Config, error) {
 			cfg.AuthToken = v
 		case "ANTHROPIC_BASE_URL":
 			cfg.BaseURL = v
-		case "CLAUDE_CODE_MODEL":
-			cfg.Model = v
+		case "WALLFACER_DEFAULT_MODEL":
+			cfg.DefaultModel = v
+		case "WALLFACER_TITLE_MODEL":
+			cfg.TitleModel = v
 		case "WALLFACER_MAX_PARALLEL":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.MaxParallelTasks = n
@@ -76,7 +80,7 @@ func Parse(path string) (Config, error) {
 //
 // Keys not already present in the file are appended when non-empty.
 // Comments and unrecognized keys are preserved verbatim.
-func Update(path string, oauthToken, apiKey, baseURL, model, maxParallel *string) error {
+func Update(path string, oauthToken, apiKey, baseURL, defaultModel, titleModel, maxParallel *string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read env file: %w", err)
@@ -86,8 +90,9 @@ func Update(path string, oauthToken, apiKey, baseURL, model, maxParallel *string
 		"CLAUDE_CODE_OAUTH_TOKEN": oauthToken,
 		"ANTHROPIC_API_KEY":      apiKey,
 		"ANTHROPIC_BASE_URL":     baseURL,
-		"CLAUDE_CODE_MODEL":      model,
-		"WALLFACER_MAX_PARALLEL": maxParallel,
+		"WALLFACER_DEFAULT_MODEL": defaultModel,
+		"WALLFACER_TITLE_MODEL":   titleModel,
+		"WALLFACER_MAX_PARALLEL":  maxParallel,
 	}
 
 	lines := strings.Split(string(raw), "\n")

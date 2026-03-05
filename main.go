@@ -116,10 +116,15 @@ func runEnvCheck(configDir string) {
 	} else {
 		fmt.Printf("[ ] ANTHROPIC_BASE_URL not set (using default)\n")
 	}
-	if v := vals["CLAUDE_CODE_MODEL"]; v != "" {
-		fmt.Printf("[ok] CLAUDE_CODE_MODEL = %s\n", v)
+	if v := vals["WALLFACER_DEFAULT_MODEL"]; v != "" {
+		fmt.Printf("[ok] WALLFACER_DEFAULT_MODEL = %s\n", v)
 	} else {
-		fmt.Printf("[ ] CLAUDE_CODE_MODEL not set (using Claude Code default)\n")
+		fmt.Printf("[ ] WALLFACER_DEFAULT_MODEL not set (using Claude Code default)\n")
+	}
+	if v := vals["WALLFACER_TITLE_MODEL"]; v != "" {
+		fmt.Printf("[ok] WALLFACER_TITLE_MODEL = %s\n", v)
+	} else {
+		fmt.Printf("[ ] WALLFACER_TITLE_MODEL not set (falls back to default model)\n")
 	}
 
 	containerCmd := envOrDefault("CONTAINER_CMD", detectContainerRuntime())
@@ -162,8 +167,10 @@ func initConfigDir(configDir, envFile string) {
 			"# ANTHROPIC_API_KEY=sk-ant-...\n\n" +
 			"# Optional: custom Anthropic-compatible API base URL.\n" +
 			"# ANTHROPIC_BASE_URL=https://api.anthropic.com\n\n" +
-			"# Optional: override the model used by Claude Code (e.g. claude-opus-4-5).\n" +
-			"# CLAUDE_CODE_MODEL=\n"
+			"# Optional: default model for tasks.\n" +
+			"# WALLFACER_DEFAULT_MODEL=\n\n" +
+			"# Optional: model for auto-generating task titles (falls back to default model).\n" +
+			"# WALLFACER_TITLE_MODEL=\n"
 		if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
 			logger.Fatal(logger.Main, "create env file", "error", err)
 		}

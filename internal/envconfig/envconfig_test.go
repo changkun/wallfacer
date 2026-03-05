@@ -24,7 +24,8 @@ func TestParse(t *testing.T) {
 CLAUDE_CODE_OAUTH_TOKEN=oauth-abc
 ANTHROPIC_API_KEY=sk-ant-123
 ANTHROPIC_BASE_URL=https://example.com
-CLAUDE_CODE_MODEL=claude-opus-4-5
+WALLFACER_DEFAULT_MODEL=claude-opus-4-5
+WALLFACER_TITLE_MODEL=claude-haiku-4-5
 UNKNOWN_KEY=ignored
 `
 	path := writeEnvFile(t, content)
@@ -41,8 +42,11 @@ UNKNOWN_KEY=ignored
 	if cfg.BaseURL != "https://example.com" {
 		t.Errorf("BaseURL = %q; want https://example.com", cfg.BaseURL)
 	}
-	if cfg.Model != "claude-opus-4-5" {
-		t.Errorf("Model = %q; want claude-opus-4-5", cfg.Model)
+	if cfg.DefaultModel != "claude-opus-4-5" {
+		t.Errorf("DefaultModel = %q; want claude-opus-4-5", cfg.DefaultModel)
+	}
+	if cfg.TitleModel != "claude-haiku-4-5" {
+		t.Errorf("TitleModel = %q; want claude-haiku-4-5", cfg.TitleModel)
 	}
 }
 
@@ -52,7 +56,7 @@ func TestParseEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if cfg.OAuthToken != "" || cfg.APIKey != "" || cfg.BaseURL != "" || cfg.Model != "" {
+	if cfg.OAuthToken != "" || cfg.APIKey != "" || cfg.BaseURL != "" || cfg.DefaultModel != "" || cfg.TitleModel != "" {
 		t.Errorf("expected all empty, got %+v", cfg)
 	}
 }
@@ -63,7 +67,7 @@ func TestUpdateExistingKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=old-token\nANTHROPIC_BASE_URL=https://old.example.com\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), ptr("claude-haiku-4-5"), nil); err != nil {
+	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), ptr("claude-haiku-4-5"), nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -77,8 +81,8 @@ func TestUpdateExistingKeys(t *testing.T) {
 	if cfg.BaseURL != "https://new.example.com" {
 		t.Errorf("BaseURL = %q; want https://new.example.com", cfg.BaseURL)
 	}
-	if cfg.Model != "claude-haiku-4-5" {
-		t.Errorf("Model = %q; want claude-haiku-4-5", cfg.Model)
+	if cfg.DefaultModel != "claude-haiku-4-5" {
+		t.Errorf("DefaultModel = %q; want claude-haiku-4-5", cfg.DefaultModel)
 	}
 }
 
@@ -87,7 +91,7 @@ func TestUpdateNilSkips(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// nil pointer → leave unchanged.
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -101,11 +105,11 @@ func TestUpdateNilSkips(t *testing.T) {
 }
 
 func TestUpdateClearsField(t *testing.T) {
-	content := "ANTHROPIC_BASE_URL=https://old.example.com\nCLAUDE_CODE_MODEL=claude-opus-4-5\n"
+	content := "ANTHROPIC_BASE_URL=https://old.example.com\nWALLFACER_DEFAULT_MODEL=claude-opus-4-5\n"
 	path := writeEnvFile(t, content)
 
 	// Empty string pointer → clear the field.
-	if err := envconfig.Update(path, nil, nil, ptr(""), ptr(""), nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr(""), ptr(""), nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -116,8 +120,8 @@ func TestUpdateClearsField(t *testing.T) {
 	if cfg.BaseURL != "" {
 		t.Errorf("BaseURL = %q; want empty after clear", cfg.BaseURL)
 	}
-	if cfg.Model != "" {
-		t.Errorf("Model = %q; want empty after clear", cfg.Model)
+	if cfg.DefaultModel != "" {
+		t.Errorf("DefaultModel = %q; want empty after clear", cfg.DefaultModel)
 	}
 }
 
@@ -125,7 +129,7 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), ptr("claude-sonnet-4-5"), nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), ptr("claude-sonnet-4-5"), ptr("claude-haiku-4-5"), nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -133,8 +137,11 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	if !strings.Contains(string(raw), "ANTHROPIC_BASE_URL=https://example.com") {
 		t.Errorf("expected ANTHROPIC_BASE_URL in file, got:\n%s", raw)
 	}
-	if !strings.Contains(string(raw), "CLAUDE_CODE_MODEL=claude-sonnet-4-5") {
-		t.Errorf("expected CLAUDE_CODE_MODEL in file, got:\n%s", raw)
+	if !strings.Contains(string(raw), "WALLFACER_DEFAULT_MODEL=claude-sonnet-4-5") {
+		t.Errorf("expected WALLFACER_DEFAULT_MODEL in file, got:\n%s", raw)
+	}
+	if !strings.Contains(string(raw), "WALLFACER_TITLE_MODEL=claude-haiku-4-5") {
+		t.Errorf("expected WALLFACER_TITLE_MODEL in file, got:\n%s", raw)
 	}
 }
 
@@ -142,7 +149,7 @@ func TestUpdatePreservesComments(t *testing.T) {
 	content := "# Auth token\nCLAUDE_CODE_OAUTH_TOKEN=tok\n# end\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 

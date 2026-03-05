@@ -14,7 +14,8 @@ type envConfigResponse struct {
 	OAuthToken       string `json:"oauth_token"`        // masked
 	APIKey           string `json:"api_key"`             // masked
 	BaseURL          string `json:"base_url"`
-	Model            string `json:"model"`
+	DefaultModel     string `json:"default_model"`
+	TitleModel       string `json:"title_model"`
 	MaxParallelTasks int    `json:"max_parallel_tasks"`
 }
 
@@ -33,7 +34,8 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		OAuthToken:       envconfig.MaskToken(cfg.OAuthToken),
 		APIKey:           envconfig.MaskToken(cfg.APIKey),
 		BaseURL:          cfg.BaseURL,
-		Model:            cfg.Model,
+		DefaultModel:     cfg.DefaultModel,
+		TitleModel:       cfg.TitleModel,
 		MaxParallelTasks: maxParallel,
 	})
 }
@@ -52,7 +54,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		OAuthToken       *string `json:"oauth_token"`
 		APIKey           *string `json:"api_key"`
 		BaseURL          *string `json:"base_url"`
-		Model            *string `json:"model"`
+		DefaultModel     *string `json:"default_model"`
+		TitleModel       *string `json:"title_model"`
 		MaxParallelTasks *int    `json:"max_parallel_tasks"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -79,7 +82,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		maxParallel = &s
 	}
 
-	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.Model, maxParallel); err != nil {
+	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.DefaultModel, req.TitleModel, maxParallel); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

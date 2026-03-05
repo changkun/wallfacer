@@ -150,10 +150,15 @@
         </div>
 
         <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Model (CLAUDE_CODE_MODEL)</label>
-          <input id="env-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. claude-sonnet-4-5" autocomplete="off" list="env-model-list">
+          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Default Model (WALLFACER_DEFAULT_MODEL)</label>
+          <input id="env-default-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. bedrock/claude-sonnet-4.6" autocomplete="off" list="env-model-list">
           <datalist id="env-model-list"></datalist>
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Override the default model. Clear to use the Claude Code default.</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Default model for tasks. Clear to use the Claude Code default.</div>
+        </div>
+        <div>
+          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Title Model (WALLFACER_TITLE_MODEL)</label>
+          <input id="env-title-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. bedrock/claude-haiku-4.5" autocomplete="off" list="env-model-list">
+          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Model for auto-generating task titles. Falls back to the default model.</div>
         </div>
       </div>
 

@@ -36,7 +36,7 @@ async function showEnvConfigEditor(event) {
   if (event) event.stopPropagation();
   document.getElementById('settings-panel').classList.add('hidden');
 
-  let cfg = { oauth_token: '', api_key: '', base_url: '', model: '' };
+  let cfg = { oauth_token: '', api_key: '', base_url: '', default_model: '', title_model: '' };
   try {
     cfg = await api('/api/env');
   } catch (e) {
@@ -49,7 +49,8 @@ async function showEnvConfigEditor(event) {
   document.getElementById('env-api-key').value = '';
   document.getElementById('env-api-key').placeholder = cfg.api_key || '(not set)';
   document.getElementById('env-base-url').value = cfg.base_url || '';
-  document.getElementById('env-model').value = cfg.model || '';
+  document.getElementById('env-default-model').value = cfg.default_model || '';
+  document.getElementById('env-title-model').value = cfg.title_model || '';
   document.getElementById('env-config-status').textContent = '';
 
   const modal = document.getElementById('env-config-modal');
@@ -67,15 +68,17 @@ async function saveEnvConfig() {
   const oauthRaw = document.getElementById('env-oauth-token').value.trim();
   const apiKeyRaw = document.getElementById('env-api-key').value.trim();
   const baseURL = document.getElementById('env-base-url').value.trim();
-  const model = document.getElementById('env-model').value.trim();
+  const defaultModel = document.getElementById('env-default-model').value.trim();
+  const titleModel = document.getElementById('env-title-model').value.trim();
 
   // Build the payload — only include token fields when the user typed something
   // so the server doesn't treat empty as "no change" vs "clear".
   const body = {};
   if (oauthRaw) body.oauth_token = oauthRaw;
   if (apiKeyRaw) body.api_key = apiKeyRaw;
-  body.base_url = baseURL;  // empty = clear
-  body.model = model;       // empty = clear
+  body.base_url = baseURL;            // empty = clear
+  body.default_model = defaultModel;  // empty = clear
+  body.title_model = titleModel;      // empty = clear
 
   const statusEl = document.getElementById('env-config-status');
   statusEl.textContent = 'Saving…';

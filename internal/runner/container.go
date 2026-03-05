@@ -144,7 +144,7 @@ func (r *Runner) buildContainerArgs(
 	return args
 }
 
-// modelFromEnv reads CLAUDE_CODE_MODEL from the env file (if configured).
+// modelFromEnv reads WALLFACER_DEFAULT_MODEL from the env file (if configured).
 // Returns an empty string when the file cannot be read or the key is absent.
 func (r *Runner) modelFromEnv() string {
 	if r.envFile == "" {
@@ -154,7 +154,23 @@ func (r *Runner) modelFromEnv() string {
 	if err != nil {
 		return ""
 	}
-	return cfg.Model
+	return cfg.DefaultModel
+}
+
+// titleModelFromEnv reads WALLFACER_TITLE_MODEL from the env file,
+// falling back to WALLFACER_DEFAULT_MODEL if the title model is not set.
+func (r *Runner) titleModelFromEnv() string {
+	if r.envFile == "" {
+		return ""
+	}
+	cfg, err := envconfig.Parse(r.envFile)
+	if err != nil {
+		return ""
+	}
+	if cfg.TitleModel != "" {
+		return cfg.TitleModel
+	}
+	return cfg.DefaultModel
 }
 
 // runContainer executes a Claude Code container and parses its NDJSON output.

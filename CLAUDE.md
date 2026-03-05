@@ -78,8 +78,8 @@ See `docs/orchestration.md` for full details.
 - `GET /api/git/status` — Git status for all workspaces
 - `GET /api/git/stream` — SSE: git status updates
 - `POST /api/git/push` — Push a workspace
-- `GET /api/env` — Get env config (tokens masked); JSON: `{oauth_token, api_key, base_url, model}`
-- `PUT /api/env` — Update env config; JSON: `{oauth_token?, api_key?, base_url?, model?}`; omitted/empty token fields are preserved
+- `GET /api/env` — Get env config (tokens masked); JSON: `{oauth_token, api_key, base_url, default_model, title_model}`
+- `PUT /api/env` — Update env config; JSON: `{oauth_token?, api_key?, base_url?, default_model?, title_model?}`; omitted/empty token fields are preserved
 - `GET /api/instructions` — Get workspace CLAUDE.md content
 - `PUT /api/instructions` — Save workspace CLAUDE.md (JSON: `{content}`)
 - `POST /api/instructions/reinit` — Rebuild workspace CLAUDE.md from default + repo files
@@ -133,7 +133,9 @@ See `docs/architecture.md#configuration` for the full reference.
 - `ANTHROPIC_API_KEY` — direct API key from console.anthropic.com
 
 Optional variables (also in `.env`):
-- `ANTHROPIC_BASE_URL` — custom API endpoint; passed to the container via `--env-file`
-- `CLAUDE_CODE_MODEL` — model override; the server reads this at each container launch and passes it as `--model` to `claude`
+- `ANTHROPIC_AUTH_TOKEN` — bearer token for LLM gateway proxy authentication
+- `ANTHROPIC_BASE_URL` — custom API endpoint; when set, the server queries `{base_url}/v1/models` to populate the model dropdown
+- `WALLFACER_DEFAULT_MODEL` — default model passed as `--model` to task containers
+- `WALLFACER_TITLE_MODEL` — model for background title generation; falls back to `WALLFACER_DEFAULT_MODEL`
 
-All four can be edited from **Settings → API Configuration** in the UI (calls `PUT /api/env`).
+All can be edited from **Settings → API Configuration** in the UI (calls `PUT /api/env`).

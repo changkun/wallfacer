@@ -67,7 +67,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	var models []string
 	if h.envFile != "" {
 		if cfg, err := envconfig.Parse(h.envFile); err == nil {
-			defaultModel = cfg.Model
+			defaultModel = cfg.DefaultModel
 			// Fetch available models from the gateway if a base URL is configured.
 			if cfg.BaseURL != "" {
 				if fetched, err := fetchModelsFromGateway(cfg.BaseURL, cfg.AuthToken, cfg.APIKey); err != nil {

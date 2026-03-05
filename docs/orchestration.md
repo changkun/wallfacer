@@ -10,7 +10,7 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 |---|---|
 | `GET /api/config` | Return workspace paths and instructions file path |
 | `GET /api/env` | Return current env config (tokens masked) |
-| `PUT /api/env` | Update env config (token, base URL, model); writes `~/.wallfacer/.env` atomically |
+| `PUT /api/env` | Update env config (token, base URL, default model, title model); writes `~/.wallfacer/.env` atomically |
 | `GET /api/instructions` | Get workspace CLAUDE.md content |
 | `PUT /api/instructions` | Save workspace CLAUDE.md (`{content}`) |
 | `POST /api/instructions/reinit` | Rebuild workspace CLAUDE.md from default + repo files |
@@ -91,7 +91,7 @@ Each turn launches an ephemeral container via the configured runtime (Podman or 
 
 - `--rm` — container is destroyed on exit; no state leaks between tasks
 - `--env-file` — injects `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`), `ANTHROPIC_BASE_URL`, and any other variables from `~/.wallfacer/.env` into the container environment; Claude Code reads them natively
-- `--model` — added only when `CLAUDE_CODE_MODEL` is set in the env file; the server re-reads the file on every container launch so changes take effect immediately without a restart
+- `--model` — per-task model takes priority; falls back to `WALLFACER_DEFAULT_MODEL` from the env file; the server re-reads the file on every container launch so changes take effect immediately without a restart
 - `--resume` — omitted on the first turn or when `FreshStart` is set
 - Output is captured as NDJSON, parsed, and saved to disk
 - Stderr is saved separately if non-empty
