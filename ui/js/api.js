@@ -48,3 +48,30 @@ function toggleShowArchived() {
   localStorage.setItem('wallfacer-show-archived', showArchived ? 'true' : 'false');
   startTasksStream();
 }
+
+// --- Autopilot ---
+
+async function fetchConfig() {
+  try {
+    var cfg = await api('/api/config');
+    autopilot = !!cfg.autopilot;
+    var toggle = document.getElementById('autopilot-toggle');
+    if (toggle) toggle.checked = autopilot;
+  } catch (e) {
+    console.error('fetchConfig:', e);
+  }
+}
+
+async function toggleAutopilot() {
+  var toggle = document.getElementById('autopilot-toggle');
+  var enabled = toggle ? toggle.checked : !autopilot;
+  try {
+    var res = await api('/api/config', { method: 'PUT', body: JSON.stringify({ autopilot: enabled }) });
+    autopilot = !!res.autopilot;
+    if (toggle) toggle.checked = autopilot;
+  } catch (e) {
+    showAlert('Error toggling autopilot: ' + e.message);
+    // Revert checkbox on failure.
+    if (toggle) toggle.checked = autopilot;
+  }
+}

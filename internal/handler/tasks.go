@@ -276,7 +276,12 @@ func (h *Handler) StartAutoPromoter(ctx context.Context) {
 
 // tryAutoPromote checks if there is capacity to run more tasks and promotes
 // the highest-priority (lowest position) backlog task if so.
+// When autopilot is disabled, no promotion happens.
 func (h *Handler) tryAutoPromote(ctx context.Context) {
+	if !h.AutopilotEnabled() {
+		return
+	}
+
 	promoteMu.Lock()
 	defer promoteMu.Unlock()
 
