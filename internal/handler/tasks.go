@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -238,8 +239,18 @@ func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// maxConcurrentTasks is the maximum number of tasks that can be in_progress simultaneously.
-const maxConcurrentTasks = 2
+// defaultMaxConcurrentTasks is used when WALLFACER_MAX_PARALLEL is not set.
+const defaultMaxConcurrentTasks = 2
+
+// maxConcurrentTasks reads the configured parallel task limit from the env file,
+// falling back to defaultMaxConcurrentTasks.
+func (h *Handler) maxConcurrentTasks() int {
+	cfg, err := envconfig.Parse(h.envFile)
+	if err != nil || cfg.MaxParallelTasks <= 0 {
+		return defaultMaxConcurrentTasks
+	}
+	return cfg.MaxParallelTasks
+}
 
 // promoteMu serialises auto-promotion so two simultaneous state changes
 // cannot both promote a task, exceeding the concurrency limit.
@@ -289,7 +300,8 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		}
 	}
 
-	if inProgressCount >= maxConcurrentTasks || bestBacklog == nil {
+	maxTasks := h.maxConcurrentTasks()
+	if inProgressCount >= maxTasks || bestBacklog == nil {
 		return
 	}
 

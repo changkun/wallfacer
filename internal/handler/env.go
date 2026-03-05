@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"changkun.de/wallfacer/internal/envconfig"
@@ -10,10 +11,11 @@ import (
 // envConfigResponse is the JSON representation of the env config sent to the UI.
 // Sensitive tokens are masked so they are never exposed in full over HTTP.
 type envConfigResponse struct {
-	OAuthToken string `json:"oauth_token"` // masked
-	APIKey     string `json:"api_key"`     // masked
-	BaseURL    string `json:"base_url"`
-	Model      string `json:"model"`
+	OAuthToken       string `json:"oauth_token"`        // masked
+	APIKey           string `json:"api_key"`             // masked
+	BaseURL          string `json:"base_url"`
+	Model            string `json:"model"`
+	MaxParallelTasks int    `json:"max_parallel_tasks"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -23,11 +25,16 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to read env file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	maxParallel := cfg.MaxParallelTasks
+	if maxParallel <= 0 {
+		maxParallel = defaultMaxConcurrentTasks
+	}
 	writeJSON(w, http.StatusOK, envConfigResponse{
-		OAuthToken: envconfig.MaskToken(cfg.OAuthToken),
-		APIKey:     envconfig.MaskToken(cfg.APIKey),
-		BaseURL:    cfg.BaseURL,
-		Model:      cfg.Model,
+		OAuthToken:       envconfig.MaskToken(cfg.OAuthToken),
+		APIKey:           envconfig.MaskToken(cfg.APIKey),
+		BaseURL:          cfg.BaseURL,
+		Model:            cfg.Model,
+		MaxParallelTasks: maxParallel,
 	})
 }
 
@@ -42,10 +49,11 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 // as "no change" to prevent accidental token deletion.
 func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		OAuthToken *string `json:"oauth_token"`
-		APIKey     *string `json:"api_key"`
-		BaseURL    *string `json:"base_url"`
-		Model      *string `json:"model"`
+		OAuthToken       *string `json:"oauth_token"`
+		APIKey           *string `json:"api_key"`
+		BaseURL          *string `json:"base_url"`
+		Model            *string `json:"model"`
+		MaxParallelTasks *int    `json:"max_parallel_tasks"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -60,7 +68,18 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		req.APIKey = nil
 	}
 
-	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.Model); err != nil {
+	// Convert max_parallel_tasks int to string for the env file.
+	var maxParallel *string
+	if req.MaxParallelTasks != nil {
+		v := *req.MaxParallelTasks
+		if v < 1 {
+			v = 1
+		}
+		s := fmt.Sprintf("%d", v)
+		maxParallel = &s
+	}
+
+	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.Model, maxParallel); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

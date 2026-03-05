@@ -63,7 +63,7 @@ func TestUpdateExistingKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=old-token\nANTHROPIC_BASE_URL=https://old.example.com\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), ptr("claude-haiku-4-5")); err != nil {
+	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), ptr("claude-haiku-4-5"), nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -87,7 +87,7 @@ func TestUpdateNilSkips(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// nil pointer → leave unchanged.
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -105,7 +105,7 @@ func TestUpdateClearsField(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// Empty string pointer → clear the field.
-	if err := envconfig.Update(path, nil, nil, ptr(""), ptr("")); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr(""), ptr(""), nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -125,7 +125,7 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), ptr("claude-sonnet-4-5")); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), ptr("claude-sonnet-4-5"), nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -142,7 +142,7 @@ func TestUpdatePreservesComments(t *testing.T) {
 	content := "# Auth token\nCLAUDE_CODE_OAUTH_TOKEN=tok\n# end\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 

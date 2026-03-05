@@ -1,3 +1,35 @@
+// --- Parallel Tasks Setting ---
+
+async function loadMaxParallel() {
+  try {
+    const cfg = await api('/api/env');
+    const input = document.getElementById('max-parallel-input');
+    if (input && cfg.max_parallel_tasks) {
+      input.value = cfg.max_parallel_tasks;
+    }
+  } catch (e) {
+    console.error('Failed to load max parallel setting:', e);
+  }
+}
+
+async function saveMaxParallel() {
+  const input = document.getElementById('max-parallel-input');
+  const statusEl = document.getElementById('max-parallel-status');
+  let value = parseInt(input.value, 10);
+  if (isNaN(value) || value < 1) value = 1;
+  if (value > 20) value = 20;
+  input.value = value;
+
+  statusEl.textContent = 'Saving…';
+  try {
+    await api('/api/env', { method: 'PUT', body: JSON.stringify({ max_parallel_tasks: value }) });
+    statusEl.textContent = 'Saved.';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+}
+
 // --- API Configuration (env file editor) ---
 
 async function showEnvConfigEditor(event) {

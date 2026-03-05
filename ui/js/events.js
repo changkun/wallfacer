@@ -45,3 +45,4 @@ document.getElementById('new-prompt').addEventListener('input', (e) => {
 try { initSortable(); } catch (e) { console.error('sortable init:', e); }
 startGitStream();
 startTasksStream();
+loadMaxParallel();
