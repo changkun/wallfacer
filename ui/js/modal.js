@@ -556,6 +556,8 @@ function renderPrettyLogs(rawBuffer) {
 function renderLogs() {
   const logsEl = document.getElementById('modal-logs');
   const btn = document.getElementById('toggle-logs-btn');
+  // Capture scroll position before updating content so we know if the user was at the bottom.
+  const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 80;
   if (logsPrettyMode) {
     logsEl.innerHTML = renderPrettyLogs(rawLogBuffer);
     if (btn) btn.textContent = 'Raw';
@@ -563,7 +565,9 @@ function renderLogs() {
     logsEl.textContent = rawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
     if (btn) btn.textContent = 'Pretty';
   }
-  logsEl.scrollTop = logsEl.scrollHeight;
+  if (atBottom) {
+    logsEl.scrollTop = logsEl.scrollHeight;
+  }
 }
 
 function toggleLogsMode() {
