@@ -581,6 +581,10 @@ function startLogStream(id) {
 }
 
 function _fetchLogs(id, retryDelay) {
+  // Guard: if the modal was closed or switched to a different task since this
+  // call was scheduled (e.g. by a reconnect setTimeout), bail out so we don't
+  // hijack the log stream or mix logs from a stale task into the buffer.
+  if (currentTaskId !== id) return;
   if (logsAbort) logsAbort.abort();
   logsAbort = new AbortController();
   if (!retryDelay) {
