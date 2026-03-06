@@ -4,9 +4,13 @@ async function loadMaxParallel() {
   try {
     const cfg = await api('/api/env');
     const input = document.getElementById('max-parallel-input');
-    if (input && cfg.max_parallel_tasks) {
-      input.value = cfg.max_parallel_tasks;
+    if (cfg.max_parallel_tasks) {
+      maxParallelTasks = cfg.max_parallel_tasks;
     }
+    if (input) {
+      input.value = maxParallelTasks;
+    }
+    updateInProgressCount();
   } catch (e) {
     console.error('Failed to load max parallel setting:', e);
   }
@@ -23,6 +27,8 @@ async function saveMaxParallel() {
   statusEl.textContent = 'Saving…';
   try {
     await api('/api/env', { method: 'PUT', body: JSON.stringify({ max_parallel_tasks: value }) });
+    maxParallelTasks = value;
+    updateInProgressCount();
     statusEl.textContent = 'Saved.';
     setTimeout(() => { statusEl.textContent = ''; }, 2000);
   } catch (e) {

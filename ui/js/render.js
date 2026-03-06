@@ -1,5 +1,17 @@
 // --- Board rendering ---
 
+function formatInProgressCount(count) {
+  return maxParallelTasks > 0 ? count + ' / ' + maxParallelTasks : '' + count;
+}
+
+function updateInProgressCount() {
+  const countEl = document.getElementById('count-in_progress');
+  if (!countEl) return;
+  const col = document.getElementById('col-in_progress');
+  const current = col ? col.children.length : 0;
+  countEl.textContent = formatInProgressCount(current);
+}
+
 const diffCache = new Map(); // taskId -> {diff: string, updatedAt: string} | 'loading'
 
 function renderDiffInto(el, diff) {
@@ -83,7 +95,13 @@ function render() {
     const el = document.getElementById(`col-${status}`);
     if (!el) continue;
     const countEl = document.getElementById(`count-${status}`);
-    if (countEl) countEl.textContent = items.length;
+    if (countEl) {
+      if (status === 'in_progress') {
+        countEl.textContent = formatInProgressCount(items.length);
+      } else {
+        countEl.textContent = items.length;
+      }
+    }
 
     const existing = new Map();
     for (const child of el.children) {

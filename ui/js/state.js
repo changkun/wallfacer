@@ -18,5 +18,8 @@ let gitRetryDelay = 1000;
 // Autopilot state
 let autopilot = false;
 
+// Max parallel tasks (loaded from /api/env, 0 = not yet loaded)
+let maxParallelTasks = 0;
+
 // Debounce timer for backlog prompt auto-save
 let editDebounce = null;
