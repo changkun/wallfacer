@@ -30,6 +30,10 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	if r.envFile != "" {
 		args = append(args, "--env-file", r.envFile)
 	}
+	// Inject CLAUDE_CODE_MODEL so subagents use the configured model.
+	if m := r.titleModelFromEnv(); m != "" {
+		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
+	}
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
 	args = append(args, r.sandboxImage)
 
