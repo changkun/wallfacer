@@ -216,11 +216,13 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 
 	commitPrompt := "Write a git commit message for the following task and file changes.\n" +
 		"Rules:\n" +
-		"- Format: <primary-path>: <short imperative description>\n" +
+		"- Subject line format: <primary-path>: <short imperative description>\n" +
 		"  where <primary-path> is the common directory or file prefix of the changed files\n" +
 		"  (e.g. 'content/posts', 'Makefile', 'internal/runner', 'ui/js')\n" +
-		"- Single line only — no body, no blank lines\n" +
-		"- Max 72 characters total, no trailing period\n" +
+		"- Subject line: max 72 characters, no trailing period\n" +
+		"- After the subject line, add a blank line followed by a description body\n" +
+		"- The body should briefly explain WHAT was changed and WHY (2-4 lines)\n" +
+		"- Wrap body lines at 72 characters\n" +
 		"- Output ONLY the raw commit message text, no markdown, no code fences, no explanation\n" +
 		"- Match the style and tone of the recent commit history shown below\n\n" +
 		"Task:\n" + prompt + "\n\n" +
