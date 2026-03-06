@@ -56,6 +56,15 @@ func (r *Runner) buildContainerArgs(
 		args = append(args, "--env-file", r.envFile)
 	}
 
+	// Inject CLAUDE_CODE_MODEL so Claude Code's subagent model selection
+	// also uses the configured model (not just the --model CLI flag which
+	// only affects the main session).
+	if m := modelOverride; m != "" {
+		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
+	} else if m := r.modelFromEnv(); m != "" {
+		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
+	}
+
 	// Mount claude config volume.
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
 
