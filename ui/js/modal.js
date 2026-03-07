@@ -46,27 +46,38 @@ function toggleResultEntryRaw(entryId) {
 
 const _copyIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
+function setLeftTab(tab) {
+  ['implementation', 'testing'].forEach(function(t) {
+    const btn = document.getElementById('left-tab-' + t);
+    const panel = document.getElementById('left-panel-' + t);
+    const active = t === tab;
+    if (btn) btn.classList.toggle('active', active);
+    if (panel) panel.classList.toggle('hidden', !active);
+  });
+}
+
 function renderResultsFromEvents(results, opts) {
   opts = opts || {};
-  const sectionId = opts.sectionId || 'modal-result-section';
+  const tabId = opts.tabId || 'left-tab-implementation';
   const listId = opts.listId || 'modal-results-list';
   const entryPrefix = opts.entryPrefix || 'result-entry-';
 
-  const section = document.getElementById(sectionId);
+  const summarySection = document.getElementById('modal-summary-section');
+  const tabBtn = document.getElementById(tabId);
   const listEl = document.getElementById(listId);
   if (!results || results.length === 0) {
-    section.classList.add('hidden');
+    if (tabBtn) tabBtn.classList.add('hidden');
+    const anyVisible = ['implementation', 'testing'].some(function(t) {
+      const btn = document.getElementById('left-tab-' + t);
+      return btn && !btn.classList.contains('hidden');
+    });
+    if (!anyVisible && summarySection) summarySection.classList.add('hidden');
     return;
   }
 
-  const heading = section.querySelector('.section-title');
-  if (heading) {
-    if (opts.headingText) {
-      heading.textContent = opts.headingText;
-    } else {
-      heading.textContent = results.length > 1 ? 'Results' : 'Result';
-    }
-  }
+  if (tabBtn) tabBtn.classList.remove('hidden');
+  if (summarySection) summarySection.classList.remove('hidden');
+  if (opts.autoSwitch) setLeftTab(tabId.replace('left-tab-', ''));
 
   const totalTurns = results.length;
   // Display newest turn first so the most recent result is immediately visible.
@@ -107,16 +118,14 @@ function renderResultsFromEvents(results, opts) {
         '</div>';
     }
   }).join('');
-
-  section.classList.remove('hidden');
 }
 
 function renderTestResultsFromEvents(results) {
   renderResultsFromEvents(results, {
-    sectionId: 'modal-test-result-section',
+    tabId: 'left-tab-testing',
     listId: 'modal-test-results-list',
     entryPrefix: 'test-result-entry-',
-    headingText: results && results.length > 1 ? 'Test Results' : 'Test Result',
+    autoSwitch: results && results.length > 0,
   });
 }
 
@@ -253,13 +262,14 @@ async function openModal(id) {
     document.getElementById('toggle-prompt-btn').textContent = 'Raw';
   }
 
-  // Show task.result as a single-entry fallback; replaced below once events load
+  // Reset left panel tabs; content populated below once events load
+  document.getElementById('left-tab-testing').classList.add('hidden');
+  setLeftTab('implementation');
   if (task.result) {
     renderResultsFromEvents([task.result]);
   } else {
-    document.getElementById('modal-result-section').classList.add('hidden');
+    document.getElementById('modal-summary-section').classList.add('hidden');
   }
-  document.getElementById('modal-test-result-section').classList.add('hidden');
 
   // Usage stats (show when any tokens have been used)
   const usageSection = document.getElementById('modal-usage-section');

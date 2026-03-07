@@ -418,14 +418,17 @@
             </div>
           </div>
 
-          <div id="modal-result-section" class="hidden mb-4">
-            <h3 class="section-title">Result</h3>
-            <div id="modal-results-list"></div>
-          </div>
-
-          <div id="modal-test-result-section" class="hidden mb-4">
-            <h3 class="section-title">Test Result</h3>
-            <div id="modal-test-results-list"></div>
+          <div id="modal-summary-section" class="hidden mb-4">
+            <div class="left-panel-tabs">
+              <button id="left-tab-implementation" onclick="setLeftTab('implementation')" class="left-tab active">Implementation</button>
+              <button id="left-tab-testing" onclick="setLeftTab('testing')" class="left-tab hidden">Testing</button>
+            </div>
+            <div id="left-panel-implementation">
+              <div id="modal-results-list"></div>
+            </div>
+            <div id="left-panel-testing" class="hidden">
+              <div id="modal-test-results-list"></div>
+            </div>
           </div>
 
           <!-- Usage stats -->
