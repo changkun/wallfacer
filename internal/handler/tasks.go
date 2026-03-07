@@ -302,7 +302,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		if t.Status == store.TaskStatusInProgress {
 			inProgressCount++
 		}
-		if t.Status == store.TaskStatusBacklog {
+		if t.Status == store.TaskStatusBacklog && !t.HasTag("idea-agent") {
 			if bestBacklog == nil || t.Position < bestBacklog.Position {
 				cp := *t
 				bestBacklog = &cp

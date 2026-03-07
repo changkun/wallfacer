@@ -120,6 +120,16 @@ type Task struct {
 	Tags []string `json:"tags,omitempty"`
 }
 
+// HasTag reports whether the task has the given tag.
+func (t *Task) HasTag(tag string) bool {
+	for _, v := range t.Tags {
+		if v == tag {
+			return true
+		}
+	}
+	return false
+}
+
 // OversightStatus represents the generation state of a task's aggregated oversight summary.
 type OversightStatus string
 
