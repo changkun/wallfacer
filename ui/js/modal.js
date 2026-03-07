@@ -349,7 +349,7 @@ async function openModal(id) {
       const el = document.getElementById('modal-diff-files');
       if (el) el.innerHTML = '<span class="text-xs ev-error">Failed to load diff</span>';
     });
-  } else {
+  } else if (task.status !== 'backlog') {
     modalCard.classList.remove('modal-wide');
     modalRight.classList.add('hidden');
     modalBody.style.display = '';
