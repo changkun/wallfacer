@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"time"
 
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/runner"
@@ -22,9 +23,15 @@ type Handler struct {
 	autopilot   bool
 
 	// ideationEnabled controls whether brainstorm auto-repeat is active.
-	// Access is serialised by ideationMu.
-	ideationMu      sync.Mutex
-	ideationEnabled bool
+	// ideationInterval is the delay between consecutive brainstorm runs (0 = run immediately on completion).
+	// ideationNextRun is when the pending timer will fire (zero if not scheduled).
+	// ideationTimer is a non-nil pending AfterFunc timer while a delayed run is waiting.
+	// All fields are serialised by ideationMu.
+	ideationMu       sync.Mutex
+	ideationEnabled  bool
+	ideationInterval time.Duration
+	ideationNextRun  time.Time
+	ideationTimer    *time.Timer
 }
 
 // NewHandler constructs a Handler with the given dependencies.
@@ -60,10 +67,48 @@ func (h *Handler) IdeationEnabled() bool {
 }
 
 // SetIdeation enables or disables brainstorm auto-repeat.
+// Disabling cancels any pending scheduled run.
 func (h *Handler) SetIdeation(enabled bool) {
 	h.ideationMu.Lock()
 	h.ideationEnabled = enabled
+	if !enabled {
+		h.cancelIdeationTimerLocked()
+	}
 	h.ideationMu.Unlock()
+}
+
+// IdeationInterval returns the delay between consecutive brainstorm runs.
+func (h *Handler) IdeationInterval() time.Duration {
+	h.ideationMu.Lock()
+	defer h.ideationMu.Unlock()
+	return h.ideationInterval
+}
+
+// SetIdeationInterval updates the delay between brainstorm runs.
+// Any pending timer is cancelled; the caller is responsible for rescheduling.
+func (h *Handler) SetIdeationInterval(d time.Duration) {
+	h.ideationMu.Lock()
+	h.ideationInterval = d
+	h.cancelIdeationTimerLocked()
+	h.ideationMu.Unlock()
+}
+
+// IdeationNextRun returns the scheduled time of the next brainstorm run,
+// or a zero time if no run is pending.
+func (h *Handler) IdeationNextRun() time.Time {
+	h.ideationMu.Lock()
+	defer h.ideationMu.Unlock()
+	return h.ideationNextRun
+}
+
+// cancelIdeationTimerLocked stops and clears the pending ideation timer.
+// Must be called with ideationMu held.
+func (h *Handler) cancelIdeationTimerLocked() {
+	if h.ideationTimer != nil {
+		h.ideationTimer.Stop()
+		h.ideationTimer = nil
+		h.ideationNextRun = time.Time{}
+	}
 }
 
 // writeJSON serialises v as JSON and writes it with the given HTTP status code.

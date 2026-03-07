@@ -39,8 +39,19 @@
       <input type="checkbox" id="ideation-toggle" onchange="toggleIdeation()" style="cursor: pointer; accent-color: var(--accent);">
       Brainstorm
       <span id="ideation-spinner" class="spinner" style="display:none;"></span>
+      <select id="ideation-interval" onchange="updateIdeationInterval(this.value)" title="How often to run brainstorm" style="font-size:12px;color:var(--text-secondary);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:1px 4px;cursor:pointer;display:none;">
+        <option value="0">immediately</option>
+        <option value="15">every 15 min</option>
+        <option value="30">every 30 min</option>
+        <option value="60">every 1h</option>
+        <option value="120">every 2h</option>
+        <option value="240">every 4h</option>
+        <option value="480">every 8h</option>
+        <option value="1440">every 24h</option>
+      </select>
+      <span id="ideation-next-run" style="font-size:12px;color:var(--text-tertiary,#888);display:none;"></span>
       <button onclick="event.preventDefault();triggerIdeation()" title="Run brainstorm now" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--text-tertiary,#888);font-size:12px;line-height:1;">&#9654;</button>
-      <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, the brainstorm agent periodically analyses your repositories and proposes tasks. Tasks created by the agent are tagged <em>idea-agent</em>. Use &#9654; to run on demand.</span></span>
+      <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, the brainstorm agent analyses your repositories and proposes tasks at the configured interval. Tasks created by the agent are tagged <em>idea-agent</em>. Use &#9654; to run on demand.</span></span>
     </label>
   </div>
   <button id="settings-btn" class="settings-btn" onclick="openSettings()" title="Settings">
