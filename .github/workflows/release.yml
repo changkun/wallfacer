@@ -43,8 +43,8 @@ jobs:
       - name: Build and push Claude Code sandbox
         uses: docker/build-push-action@v6
         with:
-          context: sandbox
-          file: sandbox/Dockerfile
+          context: sandbox/claude
+          file: sandbox/claude/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -89,8 +89,8 @@ jobs:
       - name: Build and push OpenAI Codex sandbox
         uses: docker/build-push-action@v6
         with:
-          context: sandbox-codex
-          file: sandbox-codex/Dockerfile
+          context: sandbox/codex
+          file: sandbox/codex/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

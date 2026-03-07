@@ -15,11 +15,11 @@ export
 # Build the Claude Code sandbox image and tag it with both the local name and the ghcr.io
 # name so that 'wallfacer run' finds it under the default image reference.
 build:
-	$(PODMAN) build -t $(IMAGE) -t $(GHCR_IMAGE) -f sandbox/Dockerfile sandbox/
+	$(PODMAN) build -t $(IMAGE) -t $(GHCR_IMAGE) -f sandbox/claude/Dockerfile sandbox/claude/
 
 # Build the OpenAI Codex sandbox image.
 build-codex:
-	$(PODMAN) build -t $(CODEX_IMAGE) -t $(GHCR_CODEX_IMAGE) -f sandbox-codex/Dockerfile sandbox-codex/
+	$(PODMAN) build -t $(CODEX_IMAGE) -t $(GHCR_CODEX_IMAGE) -f sandbox/codex/Dockerfile sandbox/codex/
 
 # Build and run the Go server natively
 server:
