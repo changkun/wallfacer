@@ -242,7 +242,7 @@ func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) 
 }
 
 // defaultMaxConcurrentTasks is used when WALLFACER_MAX_PARALLEL is not set.
-const defaultMaxConcurrentTasks = 2
+const defaultMaxConcurrentTasks = 5
 
 // maxConcurrentTasks reads the configured parallel task limit from the env file,
 // falling back to defaultMaxConcurrentTasks.
