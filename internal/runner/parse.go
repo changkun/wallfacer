@@ -1,0 +1,65 @@
+package runner
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
+
+// parseOutput tries to parse raw as a single JSON object first; if that fails
+// it scans backwards through NDJSON lines looking for the result message.
+//
+// In stream-json format the final "result" message carries a non-empty
+// stop_reason ("end_turn", "max_tokens", etc.). Verbose or debug lines may
+// appear after the result message, so we prefer the last line that has
+// stop_reason set and fall back to the last valid JSON if none does.
+func parseOutput(raw string) (*agentOutput, error) {
+	var output agentOutput
+	if err := json.Unmarshal([]byte(raw), &output); err == nil {
+		return &output, nil
+	}
+	lines := strings.Split(raw, "\n")
+	var fallback *agentOutput
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		var candidate agentOutput
+		if err := json.Unmarshal([]byte(line), &candidate); err != nil {
+			continue
+		}
+		if fallback == nil {
+			c := candidate
+			fallback = &c
+		}
+		// Prefer the message that has stop_reason set — that is the "result"
+		// message emitted by the agent at the end of every run.
+		if candidate.StopReason != "" {
+			return &candidate, nil
+		}
+	}
+	if fallback != nil {
+		return fallback, nil
+	}
+	return nil, fmt.Errorf("no valid JSON object found in output")
+}
+
+// extractSessionID scans raw NDJSON output for a session_id field.
+// The agent emits session_id in early stream messages, so it is often
+// present even when the container is killed mid-execution (e.g. timeout).
+func extractSessionID(raw []byte) string {
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		var obj struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal([]byte(line), &obj) == nil && obj.SessionID != "" {
+			return obj.SessionID
+		}
+	}
+	return ""
+}
