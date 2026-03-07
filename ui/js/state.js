@@ -4,6 +4,11 @@ let currentTaskId = null;
 let logsAbort = null;
 let rawLogBuffer = '';
 let logsPrettyMode = true;
+
+// Test agent monitor state (shown alongside impl logs when is_test_run=true)
+let testLogsAbort = null;
+let testRawLogBuffer = '';
+let testLogsPrettyMode = true;
 let showArchived = localStorage.getItem('wallfacer-show-archived') === 'true';
 
 // Tasks SSE state

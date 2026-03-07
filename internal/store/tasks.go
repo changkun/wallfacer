@@ -409,6 +409,11 @@ func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun boo
 	}
 	t.IsTestRun = isTestRun
 	t.LastTestResult = lastTestResult
+	if isTestRun {
+		// Record the current turn count so we know which turn files belong to
+		// the implementation phase vs the test phase.
+		t.TestRunStartTurn = t.Turns
+	}
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
