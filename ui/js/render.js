@@ -1,13 +1,18 @@
 // --- Board rendering ---
 
 function formatInProgressCount(count) {
-  return maxParallelTasks > 0 ? count + ' / ' + maxParallelTasks : '' + count;
+  return '' + count;
 }
 
 function updateMaxParallelTag() {
   const tag = document.getElementById('max-parallel-tag');
   if (!tag) return;
-  tag.classList.add('hidden');
+  if (maxParallelTasks > 0) {
+    tag.textContent = 'max ' + maxParallelTasks;
+    tag.classList.remove('hidden');
+  } else {
+    tag.classList.add('hidden');
+  }
 }
 
 function updateInProgressCount() {
