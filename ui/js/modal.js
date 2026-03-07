@@ -284,7 +284,7 @@ async function openModal(id) {
         'test': 'Test verification',
         'refinement': 'Refinement',
         'title': 'Title generation',
-        'oversight': 'Oversight summary',
+        'oversight': 'Impl. oversight',
         'oversight-test': 'Test oversight',
       };
       const keys = [
