@@ -225,6 +225,8 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 					"result": "Test verification complete: " + strings.ToUpper(verdict),
 				})
+				r.backgroundWg.Add(1)
+				go func() { defer r.backgroundWg.Done(); r.GenerateOversight(taskID) }()
 			} else if err := r.commit(ctx, taskID, sessionID, turns, worktreePaths, branchName); err != nil {
 				r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
@@ -238,6 +240,8 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 					"from": "in_progress", "to": "done",
 				})
+				r.backgroundWg.Add(1)
+				go func() { defer r.backgroundWg.Done(); r.GenerateOversight(taskID) }()
 			}
 			return
 
@@ -274,6 +278,8 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from": "in_progress", "to": "waiting",
 			})
+			r.backgroundWg.Add(1)
+			go func() { defer r.backgroundWg.Done(); r.GenerateOversight(taskID) }()
 			return
 		}
 	}

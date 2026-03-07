@@ -1077,3 +1077,99 @@ pre.result-entry-body {
   gap: 6px;
 }
 .refine-history-summary::-webkit-details-marker { display: none; }
+
+/* --- Aggregated oversight view --- */
+.oversight-view {
+  padding: 8px 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+}
+.oversight-phase {
+  border-left: 2px solid var(--border);
+  margin-bottom: 16px;
+  padding-left: 14px;
+  position: relative;
+}
+.oversight-phase::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.oversight-phase-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.oversight-phase-num {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.oversight-phase-title {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 13px;
+}
+.oversight-phase-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.oversight-summary {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+.oversight-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.oversight-tool {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-size: 11px;
+  color: #ff79c6;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+[data-theme="light"] .oversight-tool { color: #a02870; }
+.oversight-actions {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.oversight-action { margin: 0; }
+.oversight-loading {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 12px 0;
+  font-style: italic;
+}
+.oversight-error {
+  color: #d46868;
+  font-size: 12px;
+  padding: 12px 0;
+}
+.oversight-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 12px 0;
+  font-style: italic;
+}

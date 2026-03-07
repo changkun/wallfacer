@@ -141,7 +141,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				if !task.FreshStart && task.SessionID != nil {
 					sessionID = *task.SessionID
 				}
-				go h.runner.Run(id, task.Prompt, sessionID, false)
+				h.runner.RunBackground(id, task.Prompt, sessionID, false)
 			}
 		}
 	}
@@ -329,5 +329,5 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 	if !bestBacklog.FreshStart && bestBacklog.SessionID != nil {
 		sessionID = *bestBacklog.SessionID
 	}
-	go h.runner.Run(bestBacklog.ID, bestBacklog.Prompt, sessionID, false)
+	h.runner.RunBackground(bestBacklog.ID, bestBacklog.Prompt, sessionID, false)
 }

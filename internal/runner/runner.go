@@ -224,8 +224,29 @@ type Runner struct {
 	workspaces       string
 	worktreesDir     string
 	instructionsPath string
-	repoMu           sync.Map // per-repo *sync.Mutex for serializing rebase+merge
-	containerNames   sync.Map // taskID (string) → container name (string)
+	repoMu           sync.Map   // per-repo *sync.Mutex for serializing rebase+merge
+	containerNames   sync.Map   // taskID (string) → container name (string)
+	backgroundWg     sync.WaitGroup // tracks fire-and-forget background goroutines
+}
+
+// WaitBackground blocks until all fire-and-forget background goroutines
+// (RunBackground, oversight generation, etc.) have completed. Intended for
+// use in tests to avoid cleanup races with goroutines that write to
+// temporary directories.
+func (r *Runner) WaitBackground() {
+	r.backgroundWg.Wait()
+}
+
+// RunBackground launches Run in a background goroutine tracked by backgroundWg.
+// Callers (handlers, autopilot) should use this instead of a bare "go r.Run(...)"
+// so that WaitBackground can drain all outstanding work — particularly useful
+// in tests to prevent cleanup races with temp-dir removal.
+func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
+	r.backgroundWg.Add(1)
+	go func() {
+		defer r.backgroundWg.Done()
+		r.Run(taskID, prompt, sessionID, resumedFromWaiting)
+	}()
 }
 
 // NewRunner constructs a Runner from the given store and config.

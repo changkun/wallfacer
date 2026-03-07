@@ -79,6 +79,10 @@ func setupRunnerWithCmd(t *testing.T, workspaces []string, cmd string) (*store.S
 		Workspaces:   strings.Join(workspaces, " "),
 		WorktreesDir: worktreesDir,
 	})
+	// Wait for background goroutines (oversight generation) before temp dir
+	// cleanup runs. Registered last so it executes first in LIFO cleanup order,
+	// before any t.TempDir() cleanup removes the store's data directory.
+	t.Cleanup(r.WaitBackground)
 	return s, r
 }
 

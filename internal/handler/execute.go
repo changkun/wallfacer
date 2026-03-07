@@ -54,7 +54,7 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	if task.SessionID != nil {
 		sessionID = *task.SessionID
 	}
-	go h.runner.Run(id, req.Message, sessionID, true)
+	h.runner.RunBackground(id, req.Message, sessionID, true)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
@@ -192,7 +192,7 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		"to":   "in_progress",
 	})
 
-	go h.runner.Run(id, "continue", *task.SessionID, false)
+	h.runner.RunBackground(id, "continue", *task.SessionID, false)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
@@ -304,7 +304,7 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	})
 
 	// Run the test agent in a fresh session so it doesn't continue the implementation session.
-	go h.runner.Run(id, testPrompt, "", false)
+	h.runner.RunBackground(id, testPrompt, "", false)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "testing"})
 }

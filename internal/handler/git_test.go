@@ -51,6 +51,9 @@ func newTestHandler(t *testing.T) *Handler {
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{})
+	// Wait for background goroutines (oversight generation) before the store's
+	// data directory is cleaned up. Registered last so it runs first (LIFO).
+	t.Cleanup(r.WaitBackground)
 	return NewHandler(s, r, t.TempDir(), nil)
 }
 

@@ -70,6 +70,34 @@ type Task struct {
 	TestRunStartTurn int    `json:"test_run_start_turn,omitempty"` // turn count when the test run started (implementation turn boundary)
 }
 
+// OversightStatus represents the generation state of a task's aggregated oversight summary.
+type OversightStatus string
+
+const (
+	OversightStatusPending    OversightStatus = "pending"
+	OversightStatusGenerating OversightStatus = "generating"
+	OversightStatusReady      OversightStatus = "ready"
+	OversightStatusFailed     OversightStatus = "failed"
+)
+
+// OversightPhase is a logical grouping of related agent activities within a task run.
+type OversightPhase struct {
+	Timestamp time.Time `json:"timestamp"`
+	Title     string    `json:"title"`
+	Summary   string    `json:"summary"`
+	ToolsUsed []string  `json:"tools_used,omitempty"`
+	Actions   []string  `json:"actions,omitempty"`
+}
+
+// TaskOversight holds the aggregated high-level summary of a task's agent execution trace.
+// It is generated asynchronously when a task transitions to waiting, done, or failed.
+type TaskOversight struct {
+	Status      OversightStatus  `json:"status"`
+	GeneratedAt time.Time        `json:"generated_at,omitempty"`
+	Error       string           `json:"error,omitempty"`
+	Phases      []OversightPhase `json:"phases,omitempty"`
+}
+
 // EventType identifies the kind of event stored in a task's audit trail.
 type EventType string
 

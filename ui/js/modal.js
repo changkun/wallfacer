@@ -460,6 +460,9 @@ function closeModal() {
   }
   rawLogBuffer = '';
   testRawLogBuffer = '';
+  oversightData = null;
+  oversightFetching = false;
+  logsMode = 'pretty';
   document.getElementById('modal-logs').innerHTML = '';
   document.getElementById('modal-test-logs').innerHTML = '';
   currentTaskId = null;
@@ -625,37 +628,136 @@ function renderPrettyLogs(rawBuffer) {
   return blocks.join('');
 }
 
+// --- Oversight view ---
+
+// oversightData caches the last fetched oversight for the open task.
+// Cleared when the modal opens a different task.
+let oversightData = null;
+let oversightFetching = false;
+
+function renderOversightPhases(phases) {
+  if (!phases || phases.length === 0) {
+    return '<div class="oversight-empty">No phases recorded.</div>';
+  }
+  return phases.map(function(phase, i) {
+    const ts = phase.timestamp ? new Date(phase.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+    const tools = (phase.tools_used || []).map(function(t) {
+      return '<span class="oversight-tool">' + escapeHtml(t) + '</span>';
+    }).join('');
+    const actions = (phase.actions || []).map(function(a) {
+      return '<li class="oversight-action">' + escapeHtml(a) + '</li>';
+    }).join('');
+    return '<div class="oversight-phase">' +
+      '<div class="oversight-phase-header">' +
+        '<span class="oversight-phase-num">Phase ' + (i + 1) + '</span>' +
+        '<span class="oversight-phase-title">' + escapeHtml(phase.title || '') + '</span>' +
+        (ts ? '<span class="oversight-phase-time">' + ts + '</span>' : '') +
+      '</div>' +
+      (phase.summary ? '<div class="oversight-summary">' + escapeHtml(phase.summary) + '</div>' : '') +
+      (tools ? '<div class="oversight-tools">' + tools + '</div>' : '') +
+      (actions ? '<ul class="oversight-actions">' + actions + '</ul>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function renderOversightInLogs() {
+  const logsEl = document.getElementById('modal-logs');
+  if (!oversightData) {
+    if (!oversightFetching && currentTaskId) {
+      oversightFetching = true;
+      const id = currentTaskId;
+      fetch('/api/tasks/' + id + '/oversight')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (currentTaskId !== id) return;
+          oversightData = data;
+          oversightFetching = false;
+          if (logsMode === 'oversight') renderLogs();
+        })
+        .catch(function() {
+          oversightFetching = false;
+          if (currentTaskId === id && logsMode === 'oversight') {
+            logsEl.innerHTML = '<div class="oversight-error">Failed to load oversight summary.</div>';
+          }
+        });
+    }
+    logsEl.innerHTML = '<div class="oversight-loading">Fetching oversight summary\u2026</div>';
+    return;
+  }
+
+  switch (oversightData.status) {
+    case 'pending':
+      logsEl.innerHTML = '<div class="oversight-loading">Oversight summary not yet generated.</div>';
+      break;
+    case 'generating':
+      logsEl.innerHTML = '<div class="oversight-loading">Generating oversight summary\u2026</div>';
+      // Poll again after a delay.
+      setTimeout(function() {
+        if (logsMode === 'oversight' && currentTaskId) {
+          oversightData = null;
+          renderLogs();
+        }
+      }, 3000);
+      break;
+    case 'failed':
+      logsEl.innerHTML = '<div class="oversight-error">Oversight generation failed' +
+        (oversightData.error ? ': ' + escapeHtml(oversightData.error) : '') + '</div>';
+      break;
+    case 'ready':
+      logsEl.innerHTML = '<div class="oversight-view">' + renderOversightPhases(oversightData.phases) + '</div>';
+      break;
+    default:
+      logsEl.innerHTML = '<div class="oversight-loading">Loading\u2026</div>';
+  }
+}
+
 function renderLogs() {
   const logsEl = document.getElementById('modal-logs');
   const btn = document.getElementById('toggle-logs-btn');
+  if (logsMode === 'oversight') {
+    renderOversightInLogs();
+    if (btn) btn.textContent = 'Pretty';
+    return;
+  }
   // Capture scroll position before updating content so we know if the user was at the bottom.
   const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 80;
-  if (logsPrettyMode) {
+  if (logsMode === 'pretty') {
     logsEl.innerHTML = renderPrettyLogs(rawLogBuffer);
     if (btn) btn.textContent = 'Raw';
   } else {
     logsEl.textContent = rawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-    if (btn) btn.textContent = 'Pretty';
+    if (btn) btn.textContent = 'Oversight';
   }
   if (atBottom) {
     logsEl.scrollTop = logsEl.scrollHeight;
   }
 }
 
+// Cycle: pretty → raw → oversight → pretty
 function toggleLogsMode() {
-  logsPrettyMode = !logsPrettyMode;
+  if (logsMode === 'pretty') {
+    logsMode = 'raw';
+  } else if (logsMode === 'raw') {
+    logsMode = 'oversight';
+  } else {
+    logsMode = 'pretty';
+  }
   renderLogs();
 }
 
 function startLogStream(id) {
-  logsPrettyMode = true;
+  logsMode = 'pretty';
+  oversightData = null;
+  oversightFetching = false;
   _fetchLogs(id);
 }
 
 // Fetch implementation-phase logs once (no reconnect — they are static by the
 // time the test agent runs).
 function startImplLogFetch(id) {
-  logsPrettyMode = true;
+  logsMode = 'pretty';
+  oversightData = null;
+  oversightFetching = false;
   rawLogBuffer = '';
   document.getElementById('modal-logs').innerHTML = '';
   const decoder = new TextDecoder();

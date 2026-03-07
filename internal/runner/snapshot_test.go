@@ -220,6 +220,8 @@ func TestRunEndToEndNonGitWorkspace(t *testing.T) {
 
 	cmd := fakeCmdScript(t, endTurnOutput, 0)
 	s, r := setupRunnerWithCmd(t, []string{ws}, cmd)
+	// Wait for background goroutines (e.g. oversight) before temp dir cleanup.
+	t.Cleanup(r.WaitBackground)
 	ctx := context.Background()
 
 	task, err := s.CreateTask(ctx, "Non-git E2E test", 5, false, "")
