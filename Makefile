@@ -10,7 +10,7 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-claude build-codex server run shell clean ui-css
+.PHONY: build build-claude build-codex server run shell clean ui-css test test-backend test-frontend
 
 # Build both sandbox images.
 build: build-claude build-codex
@@ -71,6 +71,17 @@ shell:
 ui-css:
 	npx tailwindcss@3 -i tailwind.input.css -o ui/css/tailwind.css \
 		--content './ui/**/*.{html,js}' --minify
+
+# Run all tests (backend + frontend)
+test: test-backend test-frontend
+
+# Run Go unit tests
+test-backend:
+	go test ./...
+
+# Run frontend JavaScript unit tests
+test-frontend:
+	npm test
 
 # Remove sandbox images
 clean:

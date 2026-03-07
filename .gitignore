@@ -3,3 +3,4 @@ data/
 wallfacer
 .claude/settings.local.json
 coverage.out
+node_modules/
