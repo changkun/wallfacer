@@ -16,6 +16,7 @@ async function createTask() {
     const mount_worktrees = document.getElementById('new-mount-worktrees').checked;
     const model = document.getElementById('new-model').value;
     await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, model }) });
+    localStorage.removeItem('wallfacer-new-task-draft');
     hideNewTaskForm();
     fetchTasks();
   } catch (e) {
@@ -28,8 +29,9 @@ function showNewTaskForm() {
   document.getElementById('new-task-form').classList.remove('hidden');
   document.getElementById('new-timeout').value = DEFAULT_TASK_TIMEOUT;
   const textarea = document.getElementById('new-prompt');
-  textarea.value = '';
-  textarea.style.height = '';
+  const draft = localStorage.getItem('wallfacer-new-task-draft') || '';
+  textarea.value = draft;
+  textarea.style.height = draft ? textarea.scrollHeight + 'px' : '';
   textarea.focus();
 }
 
