@@ -37,6 +37,8 @@ function updateRefineUI(task) {
     running.classList.remove('hidden');
     resultSec.classList.add('hidden');
     errorSec.classList.add('hidden');
+    const idleDesc = document.getElementById('refine-idle-desc');
+    if (idleDesc) idleDesc.classList.add('hidden');
 
     // Attach log stream if this is the active task and not already streaming.
     if (refineTaskId === task.id && !refineLogsAbort) {
@@ -51,6 +53,8 @@ function updateRefineUI(task) {
     running.classList.add('hidden');
     resultSec.classList.remove('hidden');
     errorSec.classList.add('hidden');
+    const idleDesc = document.getElementById('refine-idle-desc');
+    if (idleDesc) idleDesc.classList.add('hidden');
     stopRefineLogStream();
 
     // Only populate the textarea if it is empty or this is the first population.
@@ -76,6 +80,8 @@ function showRefineIdle(startBtn, cancelBtn, running, resultSec, errorSec) {
   running.classList.add('hidden');
   resultSec.classList.add('hidden');
   errorSec.classList.add('hidden');
+  const idleDesc = document.getElementById('refine-idle-desc');
+  if (idleDesc) idleDesc.classList.remove('hidden');
 }
 
 // startRefinement is called by the "Start" button.
@@ -170,13 +176,19 @@ function stopRefineLogStream() {
 function resetRefinePanel() {
   refineTaskId = null;
   stopRefineLogStream();
-  showRefineIdle(
-    document.getElementById('refine-start-btn'),
-    document.getElementById('refine-cancel-btn'),
-    document.getElementById('refine-running'),
-    document.getElementById('refine-result-section'),
-    document.getElementById('refine-error-section'),
-  );
+  // Reset all sub-elements individually to avoid errors when elements are absent.
+  const startBtn  = document.getElementById('refine-start-btn');
+  const cancelBtn = document.getElementById('refine-cancel-btn');
+  const running   = document.getElementById('refine-running');
+  const resultSec = document.getElementById('refine-result-section');
+  const errorSec  = document.getElementById('refine-error-section');
+  if (startBtn)  startBtn.classList.remove('hidden');
+  if (cancelBtn) cancelBtn.classList.add('hidden');
+  if (running)   running.classList.add('hidden');
+  if (resultSec) resultSec.classList.add('hidden');
+  if (errorSec)  errorSec.classList.add('hidden');
+  const idleDesc = document.getElementById('refine-idle-desc');
+  if (idleDesc) idleDesc.classList.remove('hidden');
   const resultTA = document.getElementById('refine-result-prompt');
   if (resultTA) delete resultTA.dataset.jobId;
   const logsEl = document.getElementById('refine-logs');
