@@ -107,13 +107,15 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Resolve the actual container name (slug-based format for new containers,
-	// with label-based fallback for containers created after a server restart).
+	// Resolve the actual container name. ContainerName checks the in-memory map
+	// first (populated when a container is launched), then falls back to scanning
+	// all wallfacer containers by label — covering both the current slug-based
+	// format and the legacy wallfacer-<uuid> format. If it still returns empty,
+	// the container is already gone (race: task status not yet updated to done).
 	containerName := h.runner.ContainerName(id)
 	if containerName == "" {
-		// Last-resort fallback for containers created with the old naming format
-		// (wallfacer-<uuid>) before the slug-based scheme was introduced.
-		containerName = "wallfacer-" + id.String()
+		h.serveStoredLogs(w, r, id)
+		return
 	}
 	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
 
