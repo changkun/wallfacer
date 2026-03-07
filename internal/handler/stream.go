@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,12 +71,22 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 
 // StreamLogs streams live container logs for an in-progress task, or serves
 // saved turn outputs for tasks that are no longer running.
+// When phase=impl is specified, serves only the implementation-phase turn files
+// (up to task.TestRunStartTurn) so the UI can display impl and test outputs separately.
 func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
+
+	// Implementation-phase logs: serve only the turns that belong to the
+	// implementation agent (before the test run started).
+	if r.URL.Query().Get("phase") == "impl" {
+		h.serveStoredLogsUpTo(w, r, id, task.TestRunStartTurn)
+		return
+	}
+
 	if task.Status != "in_progress" && task.Status != "committing" {
 		// Container is gone (--rm). Serve saved stderr from disk instead.
 		h.serveStoredLogs(w, r, id)
@@ -162,6 +173,12 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 // serveStoredLogs serves saved turn output for tasks no longer running.
 func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	h.serveStoredLogsUpTo(w, r, id, 0)
+}
+
+// serveStoredLogsUpTo serves saved turn files up to maxTurn (inclusive).
+// If maxTurn is 0, all turn files are served.
+func (h *Handler) serveStoredLogsUpTo(w http.ResponseWriter, r *http.Request, id uuid.UUID, maxTurn int) {
 	outputsDir := h.store.OutputsDir(id)
 	entries, err := os.ReadDir(outputsDir)
 	if err != nil {
@@ -185,6 +202,9 @@ func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uui
 		if !strings.HasSuffix(name, ".json") && !strings.HasSuffix(name, ".stderr.txt") {
 			continue
 		}
+		if maxTurn > 0 && parseTurnNumber(name) > maxTurn {
+			continue
+		}
 		content, readErr := os.ReadFile(filepath.Join(outputsDir, name))
 		if readErr != nil || len(strings.TrimSpace(string(content))) == 0 {
 			continue
@@ -196,4 +216,16 @@ func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uui
 	if !wrote {
 		fmt.Fprintln(w, "(no output saved for this task)")
 	}
+}
+
+// parseTurnNumber extracts the numeric turn index from a file name like
+// "turn-0001.json" or "turn-0001.stderr.txt". Returns 0 if not parseable.
+func parseTurnNumber(name string) int {
+	base := strings.TrimPrefix(name, "turn-")
+	dotIdx := strings.IndexByte(base, '.')
+	if dotIdx < 0 {
+		return 0
+	}
+	n, _ := strconv.Atoi(base[:dotIdx])
+	return n
 }

@@ -232,11 +232,24 @@ async function openModal(id) {
   }
 
   const logsSection = document.getElementById('modal-logs-section');
+  const testLogsSection = document.getElementById('modal-test-logs-section');
+  const logsTitleEl = document.getElementById('modal-logs-title');
   if (task.status !== 'backlog') {
     logsSection.classList.remove('hidden');
-    startLogStream(id);
+    if (task.is_test_run) {
+      // Split view: implementation logs (static) + live test agent monitor.
+      if (logsTitleEl) logsTitleEl.textContent = 'Implementation Output';
+      startImplLogFetch(id);
+      testLogsSection.classList.remove('hidden');
+      startTestLogStream(id);
+    } else {
+      if (logsTitleEl) logsTitleEl.textContent = 'Live Output';
+      testLogsSection.classList.add('hidden');
+      startLogStream(id);
+    }
   } else {
     logsSection.classList.add('hidden');
+    testLogsSection.classList.add('hidden');
   }
 
   const feedbackSection = document.getElementById('modal-feedback-section');
@@ -411,8 +424,14 @@ function closeModal() {
     logsAbort.abort();
     logsAbort = null;
   }
+  if (testLogsAbort) {
+    testLogsAbort.abort();
+    testLogsAbort = null;
+  }
   rawLogBuffer = '';
+  testRawLogBuffer = '';
   document.getElementById('modal-logs').innerHTML = '';
+  document.getElementById('modal-test-logs').innerHTML = '';
   currentTaskId = null;
   document.querySelector('#modal .modal-card').classList.remove('modal-wide');
   const modalBody = document.getElementById('modal-body');
@@ -601,6 +620,96 @@ function toggleLogsMode() {
 function startLogStream(id) {
   logsPrettyMode = true;
   _fetchLogs(id);
+}
+
+// Fetch implementation-phase logs once (no reconnect — they are static by the
+// time the test agent runs).
+function startImplLogFetch(id) {
+  logsPrettyMode = true;
+  rawLogBuffer = '';
+  document.getElementById('modal-logs').innerHTML = '';
+  const decoder = new TextDecoder();
+  fetch(`/api/tasks/${id}/logs?phase=impl`)
+    .then(res => {
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      function read() {
+        reader.read().then(({ done, value }) => {
+          if (done) { renderLogs(); return; }
+          rawLogBuffer += decoder.decode(value, { stream: true });
+          renderLogs();
+          read();
+        }).catch(() => {});
+      }
+      read();
+    })
+    .catch(() => {});
+}
+
+function renderTestLogs() {
+  const logsEl = document.getElementById('modal-test-logs');
+  const btn = document.getElementById('toggle-test-logs-btn');
+  const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 80;
+  if (testLogsPrettyMode) {
+    logsEl.innerHTML = renderPrettyLogs(testRawLogBuffer);
+    if (btn) btn.textContent = 'Raw';
+  } else {
+    logsEl.textContent = testRawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    if (btn) btn.textContent = 'Pretty';
+  }
+  if (atBottom) {
+    logsEl.scrollTop = logsEl.scrollHeight;
+  }
+}
+
+function toggleTestLogsMode() {
+  testLogsPrettyMode = !testLogsPrettyMode;
+  renderTestLogs();
+}
+
+function startTestLogStream(id) {
+  testLogsPrettyMode = true;
+  _fetchTestLogs(id);
+}
+
+function _fetchTestLogs(id, retryDelay) {
+  if (currentTaskId !== id) return;
+  if (testLogsAbort) testLogsAbort.abort();
+  testLogsAbort = new AbortController();
+  if (!retryDelay) {
+    testRawLogBuffer = '';
+    document.getElementById('modal-test-logs').innerHTML = '';
+  }
+  const delay = retryDelay || 1000;
+  const decoder = new TextDecoder();
+  const url = `/api/tasks/${id}/logs?raw=true`;
+
+  function reconnect() {
+    if (currentTaskId !== id) return;
+    const task = tasks.find(t => t.id === id);
+    if (!task || (task.status !== 'in_progress' && task.status !== 'committing')) return;
+    const nextDelay = Math.min(delay * 2, 15000);
+    setTimeout(() => _fetchTestLogs(id, nextDelay), delay);
+  }
+
+  fetch(url, { signal: testLogsAbort.signal })
+    .then(res => {
+      if (!res.ok || !res.body) { reconnect(); return; }
+      const reader = res.body.getReader();
+      function read() {
+        reader.read().then(({ done, value }) => {
+          if (done) { reconnect(); return; }
+          testRawLogBuffer += decoder.decode(value, { stream: true });
+          renderTestLogs();
+          read();
+        }).catch(() => reconnect());
+      }
+      read();
+    })
+    .catch(err => {
+      if (err.name === 'AbortError') return;
+      reconnect();
+    });
 }
 
 function _fetchLogs(id, retryDelay) {

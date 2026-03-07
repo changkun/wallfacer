@@ -65,8 +65,9 @@ type Task struct {
 	Model            string            `json:"model,omitempty"`
 
 	// Test verification fields.
-	IsTestRun      bool   `json:"is_test_run,omitempty"`       // true while the task is running as a test verifier
-	LastTestResult string `json:"last_test_result,omitempty"`  // "pass", "fail", or "" (not yet tested)
+	IsTestRun        bool   `json:"is_test_run,omitempty"`          // true while the task is running as a test verifier
+	LastTestResult   string `json:"last_test_result,omitempty"`     // "pass", "fail", or "" (not yet tested)
+	TestRunStartTurn int    `json:"test_run_start_turn,omitempty"`  // turn count when the test run started (implementation turn boundary)
 }
 
 // EventType identifies the kind of event stored in a task's audit trail.
