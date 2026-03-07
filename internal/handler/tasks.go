@@ -54,7 +54,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange, map[string]string{
-		"to": "backlog",
+		"to": string(store.TaskStatusBacklog),
 	})
 
 	go h.runner.GenerateTitle(task.ID, task.Prompt)
@@ -65,13 +65,13 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 // UpdateTask handles PATCH requests: status transitions, position, prompt, etc.
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	var req struct {
-		Status         *string `json:"status"`
-		Position       *int    `json:"position"`
-		Prompt         *string `json:"prompt"`
-		Timeout        *int    `json:"timeout"`
-		FreshStart     *bool   `json:"fresh_start"`
-		MountWorktrees *bool   `json:"mount_worktrees"`
-		Model          *string `json:"model"`
+		Status         *store.TaskStatus `json:"status"`
+		Position       *int              `json:"position"`
+		Prompt         *string           `json:"prompt"`
+		Timeout        *int              `json:"timeout"`
+		FreshStart     *bool             `json:"fresh_start"`
+		MountWorktrees *bool             `json:"mount_worktrees"`
+		Model          *string           `json:"model"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -85,7 +85,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	// Allow editing prompt, timeout, fresh_start, mount_worktrees, and model for backlog tasks.
-	if task.Status == "backlog" && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Model != nil) {
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Model != nil) {
 		if err := h.store.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees, req.Model); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -104,7 +104,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		newStatus := *req.Status
 
 		// Handle retry: done/failed/waiting/cancelled → backlog
-		if newStatus == "backlog" && (oldStatus == "done" || oldStatus == "failed" || oldStatus == "cancelled" || oldStatus == "waiting") {
+		if newStatus == store.TaskStatusBacklog && (oldStatus == store.TaskStatusDone || oldStatus == store.TaskStatusFailed || oldStatus == store.TaskStatusCancelled || oldStatus == store.TaskStatusWaiting) {
 			// Clean up any existing worktrees before resetting.
 			if len(task.WorktreePaths) > 0 {
 				h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
@@ -123,8 +123,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				return
 			}
 			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-				"from": oldStatus,
-				"to":   "backlog",
+				"from": string(oldStatus),
+				"to":   string(store.TaskStatusBacklog),
 			})
 		} else {
 			if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
@@ -132,11 +132,11 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				return
 			}
 			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-				"from": oldStatus,
-				"to":   newStatus,
+				"from": string(oldStatus),
+				"to":   string(newStatus),
 			})
 
-			if newStatus == "in_progress" && oldStatus == "backlog" {
+			if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
 				sessionID := ""
 				if !task.FreshStart && task.SessionID != nil {
 					sessionID = *task.SessionID
@@ -296,10 +296,10 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 	var bestBacklog *store.Task
 	for i := range tasks {
 		t := &tasks[i]
-		if t.Status == "in_progress" {
+		if t.Status == store.TaskStatusInProgress {
 			inProgressCount++
 		}
-		if t.Status == "backlog" {
+		if t.Status == store.TaskStatusBacklog {
 			if bestBacklog == nil || t.Position < bestBacklog.Position {
 				cp := *t
 				bestBacklog = &cp
@@ -316,13 +316,13 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		"task", bestBacklog.ID, "position", bestBacklog.Position,
 		"in_progress", inProgressCount)
 
-	if err := h.store.UpdateTaskStatus(ctx, bestBacklog.ID, "in_progress"); err != nil {
+	if err := h.store.UpdateTaskStatus(ctx, bestBacklog.ID, store.TaskStatusInProgress); err != nil {
 		logger.Handler.Error("auto-promote status update", "task", bestBacklog.ID, "error", err)
 		return
 	}
 	h.store.InsertEvent(ctx, bestBacklog.ID, store.EventTypeStateChange, map[string]string{
-		"from": "backlog",
-		"to":   "in_progress",
+		"from": string(store.TaskStatusBacklog),
+		"to":   string(store.TaskStatusInProgress),
 	})
 
 	sessionID := ""

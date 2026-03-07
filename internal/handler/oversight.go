@@ -63,11 +63,11 @@ func (h *Handler) GenerateMissingOversight(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Terminal statuses that have completed agent activity worth summarizing.
-	terminal := map[string]bool{
-		"done":      true,
-		"waiting":   true,
-		"failed":    true,
-		"cancelled": true,
+	terminal := map[store.TaskStatus]bool{
+		store.TaskStatusDone:      true,
+		store.TaskStatusWaiting:   true,
+		store.TaskStatusFailed:    true,
+		store.TaskStatusCancelled: true,
 	}
 
 	var eligible []store.Task

@@ -53,7 +53,7 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 
 	maxPos := -1
 	for _, t := range s.tasks {
-		if t.Status == "backlog" && t.Position > maxPos {
+		if t.Status == TaskStatusBacklog && t.Position > maxPos {
 			maxPos = t.Position
 		}
 	}
@@ -64,7 +64,7 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 	task := &Task{
 		ID:             uuid.New(),
 		Prompt:         prompt,
-		Status:         "backlog",
+		Status:         TaskStatusBacklog,
 		Turns:          0,
 		Timeout:        timeout,
 		MountWorktrees: mountWorktrees,
@@ -115,7 +115,7 @@ func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
 }
 
 // UpdateTaskStatus sets a task's status field.
-func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status string) error {
+func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskStatus) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -281,7 +281,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.Result = nil
 	t.StopReason = nil
 	t.Turns = 0
-	t.Status = "backlog"
+	t.Status = TaskStatusBacklog
 	t.WorktreePaths = nil
 	t.BranchName = ""
 	t.CommitHashes = nil
@@ -307,7 +307,7 @@ func (s *Store) ArchiveAllDone(_ context.Context) ([]uuid.UUID, error) {
 		if t.Archived {
 			continue
 		}
-		if t.Status != "done" && t.Status != "cancelled" {
+		if t.Status != TaskStatusDone && t.Status != TaskStatusCancelled {
 			continue
 		}
 		t.Archived = true
@@ -351,7 +351,7 @@ func (s *Store) ResumeTask(_ context.Context, id uuid.UUID, timeout *int) error 
 		return fmt.Errorf("task not found: %s", id)
 	}
 
-	t.Status = "in_progress"
+	t.Status = TaskStatusInProgress
 	if timeout != nil {
 		t.Timeout = clampTimeout(*timeout)
 	}

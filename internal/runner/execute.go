@@ -29,10 +29,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			logger.Runner.Error("run panic", "task", taskID, "panic", p)
 		}
 		if !statusSet {
-			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
+			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": "in_progress",
-				"to":   "failed",
+				"from": string(store.TaskStatusInProgress),
+				"to":   string(store.TaskStatusFailed),
 			})
 		}
 	}()
@@ -72,11 +72,11 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if err != nil {
 			logger.Runner.Error("setup worktrees", "task", taskID, "error", err)
 			statusSet = true
-			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
+			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", task.Turns)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": "in_progress", "to": "failed",
+				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
 			})
 			return
 		}
@@ -153,16 +153,16 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 			logger.Runner.Error("container error", "task", taskID, "error", err)
 			// Don't overwrite a cancelled status.
-			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == "cancelled" {
+			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 				statusSet = true
 				return
 			}
 			statusSet = true
-			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
+			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", turns)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": "in_progress", "to": "failed",
+				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
 			})
 			return
 		}
@@ -199,9 +199,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 		if output.IsError {
 			statusSet = true
-			r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
+			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": "in_progress", "to": "failed",
+				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
 			})
 			return
 		}
@@ -219,25 +219,25 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				}
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
 				r.GenerateTestOversight(taskID, task.TestRunStartTurn)
-				r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
+				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-					"from": "in_progress", "to": "waiting",
+					"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusWaiting),
 				})
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 					"result": "Test verification complete: " + strings.ToUpper(verdict),
 				})
 			} else if err := r.commit(ctx, taskID, sessionID, turns, worktreePaths, branchName); err != nil {
-				r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
+				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
 					"error": "commit failed: " + err.Error(),
 				})
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-					"from": "in_progress", "to": "failed",
+					"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
 				})
 			} else {
-				r.store.UpdateTaskStatus(bgCtx, taskID, "done")
+				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-					"from": "in_progress", "to": "done",
+					"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusDone),
 				})
 				r.backgroundWg.Add(1)
 				go func() { defer r.backgroundWg.Done(); r.GenerateOversight(taskID) }()
@@ -256,7 +256,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 		default:
 			// Empty or unknown stop_reason — waiting for user feedback.
-			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == "cancelled" {
+			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 				statusSet = true
 				return
 			}
@@ -276,9 +276,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			} else {
 				r.GenerateOversight(taskID)
 			}
-			r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
+			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": "in_progress", "to": "waiting",
+				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusWaiting),
 			})
 			return
 		}
@@ -290,7 +290,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 // conflicts cannot be automatically resolved after retries, the task remains
 // in_progress and Run() is invoked so the agent can resolve them
 // interactively; the task returns to prevStatus only after the agent finishes.
-func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
+func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus) {
 	bgCtx := context.Background()
 
 	statusSet := false
@@ -301,8 +301,8 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 		if !statusSet {
 			r.store.UpdateTaskStatus(bgCtx, taskID, prevStatus)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": "in_progress",
-				"to":   prevStatus,
+				"from": string(store.TaskStatusInProgress),
+				"to":   string(prevStatus),
 			})
 		}
 	}()
@@ -417,8 +417,8 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 	statusSet = true
 	r.store.UpdateTaskStatus(bgCtx, taskID, prevStatus)
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-		"from": "in_progress",
-		"to":   prevStatus,
+		"from": string(store.TaskStatusInProgress),
+		"to":   string(prevStatus),
 	})
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Sync complete. Worktrees are up to date with the default branch.",
@@ -430,10 +430,10 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 func (r *Runner) failSync(ctx context.Context, taskID uuid.UUID, sessionID string, turns int, msg string) {
 	logger.Runner.Error("sync failed", "task", taskID, "error", msg)
 	r.store.InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{"error": msg})
-	r.store.UpdateTaskStatus(ctx, taskID, "failed")
+	r.store.UpdateTaskStatus(ctx, taskID, store.TaskStatusFailed)
 	r.store.InsertEvent(ctx, taskID, store.EventTypeStateChange, map[string]string{
-		"from": "in_progress",
-		"to":   "failed",
+		"from": string(store.TaskStatusInProgress),
+		"to":   string(store.TaskStatusFailed),
 	})
 	r.store.UpdateTaskResult(ctx, taskID, "Sync failed: "+msg, sessionID, "sync_failed", turns)
 }
