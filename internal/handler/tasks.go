@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -75,6 +76,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		FreshStart     *bool             `json:"fresh_start"`
 		MountWorktrees *bool             `json:"mount_worktrees"`
 		Model          *string           `json:"model"`
+		DependsOn      *[]string         `json:"depends_on"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -97,6 +99,42 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	if req.Position != nil {
 		if err := h.store.UpdateTaskPosition(r.Context(), id, *req.Position); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if req.DependsOn != nil {
+		parsedDeps := make([]uuid.UUID, 0, len(*req.DependsOn))
+		for _, depStr := range *req.DependsOn {
+			depID, err := uuid.Parse(depStr)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("invalid dependency UUID %q: %v", depStr, err), http.StatusBadRequest)
+				return
+			}
+			if depID == id {
+				http.Error(w, "task cannot depend on itself", http.StatusBadRequest)
+				return
+			}
+			if _, err := h.store.GetTask(r.Context(), depID); err != nil {
+				http.Error(w, fmt.Sprintf("dependency task not found: %s", depStr), http.StatusBadRequest)
+				return
+			}
+			parsedDeps = append(parsedDeps, depID)
+		}
+		// Cycle detection using full graph including archived tasks.
+		allTasks, _ := h.store.ListTasks(r.Context(), true)
+		for _, depID := range parsedDeps {
+			if taskReachable(allTasks, depID, id) {
+				http.Error(w, fmt.Sprintf("dependency on %s would create a cycle", depID), http.StatusBadRequest)
+				return
+			}
+		}
+		strs := make([]string, len(parsedDeps))
+		for i, d := range parsedDeps {
+			strs[i] = d.String()
+		}
+		if err := h.store.UpdateTaskDependsOn(r.Context(), id, strs); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -279,6 +317,38 @@ func (h *Handler) StartAutoPromoter(ctx context.Context) {
 	}()
 }
 
+// taskReachable reports whether target is reachable from start by following
+// DependsOn edges (i.e., target is a transitive dependency of start).
+// Used to detect cycles before accepting a new dependency edge.
+func taskReachable(taskList []store.Task, start, target uuid.UUID) bool {
+	adj := make(map[uuid.UUID][]uuid.UUID, len(taskList))
+	for _, t := range taskList {
+		for _, s := range t.DependsOn {
+			if id, err := uuid.Parse(s); err == nil {
+				adj[t.ID] = append(adj[t.ID], id)
+			}
+		}
+	}
+	visited := make(map[uuid.UUID]bool)
+	var dfs func(uuid.UUID) bool
+	dfs = func(cur uuid.UUID) bool {
+		if cur == target {
+			return true
+		}
+		if visited[cur] {
+			return false
+		}
+		visited[cur] = true
+		for _, dep := range adj[cur] {
+			if dfs(dep) {
+				return true
+			}
+		}
+		return false
+	}
+	return dfs(start)
+}
+
 // tryAutoPromote checks if there is capacity to run more tasks and promotes
 // the highest-priority (lowest position) backlog task if so.
 // When autopilot is disabled, no promotion happens.
@@ -303,6 +373,10 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			inProgressCount++
 		}
 		if t.Status == store.TaskStatusBacklog && !t.HasTag("idea-agent") {
+			satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
+			if err != nil || !satisfied {
+				continue // skip: dependencies not yet done
+			}
 			if bestBacklog == nil || t.Position < bestBacklog.Position {
 				cp := *t
 				bestBacklog = &cp

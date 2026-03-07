@@ -267,6 +267,57 @@ func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int
 	return nil
 }
 
+// UpdateTaskDependsOn sets the list of task UUID strings that must all reach
+// TaskStatusDone before this task is auto-promoted. An empty or nil slice clears
+// all dependencies.
+func (s *Store) UpdateTaskDependsOn(_ context.Context, id uuid.UUID, dependsOn []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	if len(dependsOn) == 0 {
+		t.DependsOn = nil // normalise so omitempty keeps JSON clean
+	} else {
+		t.DependsOn = dependsOn
+	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify()
+	return nil
+}
+
+// AreDependenciesSatisfied reports whether every task listed in t.DependsOn has
+// status TaskStatusDone. A missing or malformed dependency UUID is treated as
+// unsatisfied to avoid silent unblocking.
+func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return false, fmt.Errorf("task not found: %s", id)
+	}
+	for _, depStr := range t.DependsOn {
+		depID, err := uuid.Parse(depStr)
+		if err != nil {
+			return false, nil // malformed UUID → unsatisfied
+		}
+		dep, ok := s.tasks[depID]
+		if !ok {
+			return false, nil // deleted dependency → unsatisfied (conservative)
+		}
+		if dep.Status != TaskStatusDone {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, and mount_worktrees for backlog tasks.
 func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, model *string) error {
 	s.mu.Lock()

@@ -1,5 +1,27 @@
 const DEFAULT_TASK_TIMEOUT = 60; // minutes
 
+// --- Dependency helpers ---
+
+/**
+ * Populates a <select multiple> with tasks as options.
+ * Excludes the task with excludeId (null to include all).
+ * Pre-selects UUIDs in selectedIds array.
+ */
+function populateDependsOnSelect(selectEl, excludeId, selectedIds) {
+  if (!selectEl) return;
+  selectEl.innerHTML = '';
+  var candidates = tasks.filter(function(t) { return t.id !== excludeId; });
+  for (var i = 0; i < candidates.length; i++) {
+    var t = candidates[i];
+    var opt = document.createElement('option');
+    opt.value = t.id;
+    var label = t.title || (t.prompt.length > 40 ? t.prompt.slice(0, 40) + '\u2026' : t.prompt);
+    opt.textContent = label + ' [' + (t.status === 'in_progress' ? 'in progress' : t.status) + ']';
+    opt.selected = Array.isArray(selectedIds) && selectedIds.indexOf(t.id) !== -1;
+    selectEl.appendChild(opt);
+  }
+}
+
 // --- Task creation ---
 
 async function createTask() {
@@ -15,7 +37,12 @@ async function createTask() {
     const timeout = parseInt(document.getElementById('new-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
     const mount_worktrees = document.getElementById('new-mount-worktrees').checked;
     const model = document.getElementById('new-model').value;
-    await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, model }) });
+    const newTask = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, model }) });
+    const depsEl = document.getElementById('new-depends-on');
+    const dependsOn = depsEl ? Array.from(depsEl.selectedOptions).map(function(o) { return o.value; }) : [];
+    if (dependsOn.length > 0 && newTask && newTask.id) {
+      await api('/api/tasks/' + newTask.id, { method: 'PATCH', body: JSON.stringify({ depends_on: dependsOn }) });
+    }
     localStorage.removeItem('wallfacer-new-task-draft');
     hideNewTaskForm();
     fetchTasks();
@@ -33,6 +60,10 @@ function showNewTaskForm() {
   textarea.value = draft;
   textarea.style.height = draft ? textarea.scrollHeight + 'px' : '';
   textarea.focus();
+  var depsRow = document.getElementById('new-depends-on-row');
+  var depsEl = document.getElementById('new-depends-on');
+  populateDependsOnSelect(depsEl, null, []);
+  if (depsRow) depsRow.style.display = tasks.length > 0 ? '' : 'none';
 }
 
 function hideNewTaskForm() {
@@ -43,6 +74,8 @@ function hideNewTaskForm() {
   textarea.style.height = '';
   document.getElementById('new-mount-worktrees').checked = false;
   document.getElementById('new-model').value = '';
+  var depsEl = document.getElementById('new-depends-on');
+  if (depsEl) depsEl.innerHTML = '';
 }
 
 // --- Task status updates ---
@@ -179,10 +212,16 @@ function scheduleBacklogSave() {
     const timeout = parseInt(document.getElementById('modal-edit-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
     const mount_worktrees = document.getElementById('modal-edit-mount-worktrees').checked;
     const model = document.getElementById('modal-edit-model').value;
+    const depsEl = document.getElementById('modal-edit-depends-on');
+    const depends_on = depsEl
+      ? Array.from(depsEl.selectedOptions).map(function(o) { return o.value; })
+      : null;
+    const patchBody = { prompt, timeout, mount_worktrees, model };
+    if (depends_on !== null) patchBody.depends_on = depends_on;
     try {
       await api(`/api/tasks/${currentTaskId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ prompt, timeout, mount_worktrees, model }),
+        body: JSON.stringify(patchBody),
       });
       statusEl.textContent = 'Saved';
       setTimeout(() => { if (statusEl.textContent === 'Saved') statusEl.textContent = ''; }, 1500);

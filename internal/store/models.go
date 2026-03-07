@@ -118,6 +118,11 @@ type Task struct {
 	// Tags are labels attached to a task for categorisation (e.g. "idea-agent" for
 	// tasks auto-created by the brainstorm agent).
 	Tags []string `json:"tags,omitempty"`
+
+	// DependsOn lists UUIDs of tasks that must all reach TaskStatusDone
+	// before this task is eligible for auto-promotion.
+	// Nil/empty means no dependencies (backward-compatible default).
+	DependsOn []string `json:"depends_on,omitempty"`
 }
 
 // HasTag reports whether the task has the given tag.

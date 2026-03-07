@@ -539,3 +539,265 @@ func TestGenerateMissingTitles_LimitParam(t *testing.T) {
 		t.Errorf("expected total_without_title=5, got %v", resp["total_without_title"])
 	}
 }
+
+// --- PATCH depends_on tests ---
+
+// TestUpdateTask_SetDependsOn_Valid verifies setting a single valid dependency.
+func TestUpdateTask_SetDependsOn_Valid(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	a, _ := h.store.CreateTask(ctx, "dep", 15, false, "", "")
+	b, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
+
+	body := `{"depends_on": ["` + a.ID.String() + `"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+b.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, b.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if len(updated.DependsOn) != 1 || updated.DependsOn[0] != a.ID.String() {
+		t.Errorf("expected DependsOn=[%s], got %v", a.ID, updated.DependsOn)
+	}
+}
+
+// TestUpdateTask_SetDependsOn_Multiple verifies setting multiple dependencies.
+func TestUpdateTask_SetDependsOn_Multiple(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	a, _ := h.store.CreateTask(ctx, "dep-a", 15, false, "", "")
+	b, _ := h.store.CreateTask(ctx, "dep-b", 15, false, "", "")
+	c, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
+
+	body := `{"depends_on": ["` + a.ID.String() + `","` + b.ID.String() + `"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+c.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, c.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if len(updated.DependsOn) != 2 {
+		t.Errorf("expected 2 DependsOn entries, got %v", updated.DependsOn)
+	}
+}
+
+// TestUpdateTask_SetDependsOn_ClearsWithEmpty verifies that sending depends_on: []
+// removes all dependencies.
+func TestUpdateTask_SetDependsOn_ClearsWithEmpty(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	a, _ := h.store.CreateTask(ctx, "dep", 15, false, "", "")
+	b, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
+	h.store.UpdateTaskDependsOn(ctx, b.ID, []string{a.ID.String()})
+
+	body := `{"depends_on": []}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+b.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, b.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if len(updated.DependsOn) != 0 {
+		t.Errorf("expected DependsOn nil/empty after clear, got %v", updated.DependsOn)
+	}
+}
+
+// TestUpdateTask_SetDependsOn_SelfDependency verifies that a task cannot depend on itself.
+func TestUpdateTask_SetDependsOn_SelfDependency(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	a, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
+
+	body := `{"depends_on": ["` + a.ID.String() + `"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+a.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, a.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for self-dependency, got %d", w.Code)
+	}
+}
+
+// TestUpdateTask_SetDependsOn_UnknownUUID verifies that a non-existent dependency UUID returns 400.
+func TestUpdateTask_SetDependsOn_UnknownUUID(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	a, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
+	unknown := "00000000-0000-0000-0000-000000000001"
+
+	body := `{"depends_on": ["` + unknown + `"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+a.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, a.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown UUID, got %d", w.Code)
+	}
+}
+
+// TestUpdateTask_SetDependsOn_InvalidUUID verifies that a malformed UUID returns 400.
+func TestUpdateTask_SetDependsOn_InvalidUUID(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	a, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
+
+	body := `{"depends_on": ["not-a-uuid"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+a.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, a.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid UUID, got %d", w.Code)
+	}
+}
+
+// TestUpdateTask_SetDependsOn_DirectCycle verifies that A→B and then B→A is rejected.
+func TestUpdateTask_SetDependsOn_DirectCycle(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	a, _ := h.store.CreateTask(ctx, "a", 15, false, "", "")
+	b, _ := h.store.CreateTask(ctx, "b", 15, false, "", "")
+	// Set A depends on B.
+	h.store.UpdateTaskDependsOn(ctx, a.ID, []string{b.ID.String()})
+
+	// Now try to set B depends on A (would be a direct cycle).
+	body := `{"depends_on": ["` + a.ID.String() + `"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+b.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, b.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for direct cycle, got %d", w.Code)
+	}
+}
+
+// TestUpdateTask_SetDependsOn_TransitiveCycle verifies that transitive cycles are detected.
+func TestUpdateTask_SetDependsOn_TransitiveCycle(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	a, _ := h.store.CreateTask(ctx, "a", 15, false, "", "")
+	b, _ := h.store.CreateTask(ctx, "b", 15, false, "", "")
+	c, _ := h.store.CreateTask(ctx, "c", 15, false, "", "")
+	// A depends on B; B depends on C.
+	h.store.UpdateTaskDependsOn(ctx, a.ID, []string{b.ID.String()})
+	h.store.UpdateTaskDependsOn(ctx, b.ID, []string{c.ID.String()})
+
+	// Now try to set C depends on A (transitive cycle A→B→C→A).
+	body := `{"depends_on": ["` + a.ID.String() + `"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+c.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, c.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for transitive cycle, got %d", w.Code)
+	}
+}
+
+// TestUpdateTask_SetDependsOn_AbsentFieldNoOp verifies that omitting depends_on in
+// the PATCH body does not clear existing dependencies.
+func TestUpdateTask_SetDependsOn_AbsentFieldNoOp(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	a, _ := h.store.CreateTask(ctx, "dep", 15, false, "", "")
+	b, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
+	h.store.UpdateTaskDependsOn(ctx, b.ID, []string{a.ID.String()})
+
+	// PATCH with position only — no depends_on key.
+	body := `{"position": 5}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+b.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, b.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if len(updated.DependsOn) != 1 || updated.DependsOn[0] != a.ID.String() {
+		t.Errorf("expected DependsOn unchanged, got %v", updated.DependsOn)
+	}
+}
+
+// --- Auto-promoter dependency tests ---
+
+// TestTryAutoPromote_SkipsBlockedTask verifies that the auto-promoter skips the
+// lowest-position backlog task when its dependencies are not satisfied, and
+// promotes the next eligible task instead.
+func TestTryAutoPromote_SkipsBlockedTask(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	h.autopilotMu.Lock()
+	h.autopilot = true
+	h.autopilotMu.Unlock()
+
+	ctx := context.Background()
+	// dep: already in_progress (simulating it was started earlier), so it is
+	// not a backlog candidate. blocked's dependency on dep is unsatisfied because
+	// dep is in_progress, not done.
+	dep, _ := h.store.CreateTask(ctx, "dep", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, dep.ID, store.TaskStatusInProgress)
+
+	// blocked: lowest position (0), but depends on dep (in_progress, not done).
+	blocked, _ := h.store.CreateTask(ctx, "blocked", 15, false, "", "")
+	h.store.UpdateTaskDependsOn(ctx, blocked.ID, []string{dep.ID.String()})
+	h.store.UpdateTaskPosition(ctx, blocked.ID, 0)
+
+	// eligible: higher position (1), no dependencies.
+	eligible, _ := h.store.CreateTask(ctx, "eligible", 15, false, "", "")
+	h.store.UpdateTaskPosition(ctx, eligible.ID, 1)
+
+	h.tryAutoPromote(ctx)
+
+	tasks, _ := h.store.ListTasks(ctx, false)
+	statusOf := func(id interface{ String() string }) store.TaskStatus {
+		for _, t := range tasks {
+			if t.ID.String() == id.String() {
+				return t.Status
+			}
+		}
+		return store.TaskStatus("unknown")
+	}
+
+	if statusOf(blocked.ID) != store.TaskStatusBacklog {
+		t.Errorf("expected blocked task to remain backlog, got %s", statusOf(blocked.ID))
+	}
+	// dep and eligible may or may not be promoted depending on position; verify eligible was promoted.
+	eligibleStatus := statusOf(eligible.ID)
+	if eligibleStatus != store.TaskStatusInProgress {
+		t.Errorf("expected eligible task to be in_progress, got %s", eligibleStatus)
+	}
+}
+
+// TestTryAutoPromote_PromotesWhenDepsSatisfied verifies that a task with all deps
+// done is promoted normally.
+func TestTryAutoPromote_PromotesWhenDepsSatisfied(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	h.autopilotMu.Lock()
+	h.autopilot = true
+	h.autopilotMu.Unlock()
+
+	ctx := context.Background()
+	dep, _ := h.store.CreateTask(ctx, "dep", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, dep.ID, store.TaskStatusDone)
+
+	task, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
+	h.store.UpdateTaskDependsOn(ctx, task.ID, []string{dep.ID.String()})
+
+	h.tryAutoPromote(ctx)
+
+	updated, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != store.TaskStatusInProgress {
+		t.Errorf("expected task to be promoted to in_progress, got %s", updated.Status)
+	}
+}

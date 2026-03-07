@@ -105,6 +105,8 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .badge-test-pass { background: #d0ebdc; color: #1a6030; }
 .badge-test-fail { background: #f5d5d5; color: #8c2020; }
 .badge-test-none { background: #eae8e4; color: #888078; }
+.badge-blocked { background: #fef3c7; color: #92400e; border: 1px solid #92400e40; }
+[data-theme="dark"] .badge-blocked { background: #2a1a00; color: #d97316; border: 1px solid #d9731640; }
 [data-theme="dark"] .badge-backlog { background: #2a2820; color: #7a7770; }
 [data-theme="dark"] .badge-in_progress { background: #1a2d42; color: #6da0dc; }
 [data-theme="dark"] .badge-waiting { background: #352a10; color: #d4a030; }

@@ -1,3 +1,22 @@
+// --- Dependency badge helpers ---
+
+function areDepsBlocked(t) {
+  if (!t.depends_on || t.depends_on.length === 0) return false;
+  return t.depends_on.some(function(depId) {
+    var dep = tasks.find(function(d) { return d.id === depId; });
+    return !dep || dep.status !== 'done';
+  });
+}
+
+function getBlockingTaskNames(t) {
+  if (!t.depends_on) return '';
+  return t.depends_on.map(function(id) {
+    var dep = tasks.find(function(d) { return d.id === id; });
+    if (!dep) return id.slice(0, 8) + '\u2026';
+    return dep.title || (dep.prompt.length > 30 ? dep.prompt.slice(0, 30) + '\u2026' : dep.prompt);
+  }).join(', ');
+}
+
 // --- Board rendering ---
 
 function formatInProgressCount(count) {
@@ -274,6 +293,10 @@ function updateCard(card, t) {
     card.classList.remove('card-cancelled-done');
   }
   const priorityBadge = t.status === 'backlog' ? `<span class="badge badge-priority" title="Priority #${t.position + 1}">#${t.position + 1}</span>` : '';
+  const isBlocked = t.status === 'backlog' && areDepsBlocked(t);
+  const blockedBadge = isBlocked
+    ? `<span class="badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">\uD83D\uDD12</span>`
+    : '';
   const testResultBadge = t.last_test_result === 'pass'
     ? `<span class="badge badge-test-pass" title="Verification passed">\u2713 verified</span>`
     : t.last_test_result === 'fail'
@@ -287,6 +310,7 @@ function updateCard(card, t) {
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
         ${priorityBadge}
+        ${blockedBadge}
         <span class="badge ${badgeClass}">${statusLabel}</span>
         ${showSpinner ? '<span class="spinner"></span>' : ''}
         ${testResultBadge}
