@@ -3,7 +3,9 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -14,6 +16,38 @@ import (
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 )
+
+// ssrfHardenedTransport returns an http.Transport that re-checks the resolved
+// IP address against private/loopback/link-local ranges immediately before
+// opening the TCP connection, providing defense-in-depth against DNS-rebinding
+// attacks even when validateBaseURL already approved the hostname.
+func ssrfHardenedTransport() *http.Transport {
+	dialer := &net.Dialer{
+		Timeout: 30 * time.Second,
+	}
+	return &http.Transport{
+		DisableKeepAlives: true,
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, fmt.Errorf("ssrf guard: %w", err)
+			}
+			addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if err != nil {
+				return nil, fmt.Errorf("ssrf guard: resolve %q: %w", host, err)
+			}
+			if len(addrs) == 0 {
+				return nil, fmt.Errorf("ssrf guard: no addresses resolved for %s", host)
+			}
+			for _, a := range addrs {
+				if isPrivateIP(a.IP) {
+					return nil, fmt.Errorf("ssrf guard: connection to %s (%s) is blocked", host, a.IP)
+				}
+			}
+			return dialer.DialContext(ctx, network, net.JoinHostPort(addrs[0].IP.String(), port))
+		},
+	}
+}
 
 // fetchModelsFromGateway queries the LLM gateway's /v1/models endpoint
 // and returns the list of available model IDs.
@@ -30,7 +64,10 @@ func fetchModelsFromGateway(baseURL, authToken, apiKey string) ([]string, error)
 		req.Header.Set("x-api-key", apiKey)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: ssrfHardenedTransport(),
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

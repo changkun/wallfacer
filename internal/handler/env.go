@@ -4,10 +4,87 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
 )
+
+// privateIPNets lists networks blocked for SSRF prevention: RFC 1918 private
+// ranges, loopback (IPv4 and IPv6), and link-local ranges.
+var privateIPNets []*net.IPNet
+
+func init() {
+	for _, cidr := range []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+		"::1/128",
+		"169.254.0.0/16",
+		"fe80::/10",
+	} {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic("invalid CIDR in privateIPNets: " + cidr)
+		}
+		privateIPNets = append(privateIPNets, network)
+	}
+}
+
+// isPrivateIP reports whether ip falls in a private, loopback, or link-local
+// address range.
+func isPrivateIP(ip net.IP) bool {
+	for _, network := range privateIPNets {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// validateBaseURL validates that u is safe to use as a remote API base URL.
+// It rejects: non-https schemes, bare IP addresses, single-label hostnames
+// (e.g. "localhost"), and hostnames that resolve to private/loopback/link-local
+// IP addresses.
+func validateBaseURL(u string) error {
+	parsed, err := url.Parse(u)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if parsed.Scheme != "https" {
+		return fmt.Errorf("URL scheme must be https, got %q", parsed.Scheme)
+	}
+	hostname := parsed.Hostname()
+	if hostname == "" {
+		return fmt.Errorf("URL must have a non-empty hostname")
+	}
+	// Reject bare IP addresses (IPv4 and IPv6).
+	if ip := net.ParseIP(hostname); ip != nil {
+		return fmt.Errorf("bare IP addresses are not allowed as the base URL hostname")
+	}
+	// Require at least one dot to rule out single-label names like "localhost"
+	// or internal container names that may resolve to private addresses.
+	if !strings.Contains(hostname, ".") {
+		return fmt.Errorf("hostname %q must be a fully qualified domain name (must contain at least one dot)", hostname)
+	}
+	// Resolve to IPs and verify none fall in a blocked range.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, hostname)
+	if err != nil {
+		return fmt.Errorf("cannot resolve hostname %q: %w", hostname, err)
+	}
+	for _, addr := range addrs {
+		if isPrivateIP(addr.IP) {
+			return fmt.Errorf("hostname %q resolves to a restricted IP address (%s)", hostname, addr.IP)
+		}
+	}
+	return nil
+}
 
 // envConfigResponse is the JSON representation of the env config sent to the UI.
 // Sensitive tokens are masked so they are never exposed in full over HTTP.
@@ -81,6 +158,14 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		s := fmt.Sprintf("%d", v)
 		maxParallel = &s
+	}
+
+	// Validate the base URL if provided to prevent SSRF.
+	if req.BaseURL != nil && *req.BaseURL != "" {
+		if err := validateBaseURL(*req.BaseURL); err != nil {
+			http.Error(w, "invalid base_url: "+err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
 	}
 
 	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.DefaultModel, req.TitleModel, maxParallel); err != nil {
