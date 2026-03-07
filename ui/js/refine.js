@@ -81,6 +81,11 @@ function showRefineIdle(startBtn, cancelBtn, running, resultSec, errorSec) {
 // startRefinement is called by the "Start" button.
 async function startRefinement() {
   if (!currentTaskId) return;
+
+  // If refinement is already running, ignore the click.
+  const task = tasks.find(t => t.id === currentTaskId);
+  if (task && task.current_refinement && task.current_refinement.status === 'running') return;
+
   refineTaskId = currentTaskId;
 
   // Clear prior log output.
