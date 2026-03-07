@@ -170,6 +170,13 @@ function render() {
       doneStatsEl.classList.add('hidden');
     }
   }
+
+  // Show/hide "Archive all" button based on whether there are non-archived done tasks
+  const archiveAllBtn = document.getElementById('archive-all-btn');
+  if (archiveAllBtn) {
+    const hasDone = (columns.done || []).some(function(t) { return !t.archived; });
+    archiveAllBtn.classList.toggle('hidden', !hasDone);
+  }
 }
 
 function createCard(t) {

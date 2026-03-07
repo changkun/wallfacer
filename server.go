@@ -206,6 +206,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	mux.HandleFunc("POST /api/tasks/{id}/done", withID(h.CompleteTask))
 	mux.HandleFunc("POST /api/tasks/{id}/cancel", withID(h.CancelTask))
 	mux.HandleFunc("POST /api/tasks/{id}/resume", withID(h.ResumeTask))
+	mux.HandleFunc("POST /api/tasks/archive-done", h.ArchiveAllDone)
 	mux.HandleFunc("POST /api/tasks/{id}/archive", withID(h.ArchiveTask))
 	mux.HandleFunc("POST /api/tasks/{id}/unarchive", withID(h.UnarchiveTask))
 	mux.HandleFunc("POST /api/tasks/{id}/sync", withID(h.SyncTask))
