@@ -277,13 +277,13 @@ function updateCard(card, t) {
         ${t.mount_worktrees ? '<span class="text-[10px] text-v-muted" title="Sibling worktrees mounted">worktrees</span>' : ''}
         <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>
         <span class="text-[10px] text-v-muted">${timeAgo(t.created_at)}</span>
+        ${t.tags && t.tags.length > 0 ? t.tags.map(tag => `<span class="badge badge-${tag.replace(/[^a-z0-9]/g, '-')}" title="Tag: ${escapeHtml(tag)}">${escapeHtml(tag)}</span>`).join('') : ''}
       </div>
     </div>
     ${t.status === 'backlog' && t.session_id ? `<div class="flex items-center gap-1.5 mb-1" onclick="event.stopPropagation()">
       <input type="checkbox" id="resume-chk-${t.id}" ${!t.fresh_start ? 'checked' : ''} onchange="toggleFreshStart('${t.id}', !this.checked)" style="width:11px;height:11px;cursor:pointer;accent-color:var(--accent);">
       <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
     </div>` : ''}
-    ${t.tags && t.tags.length > 0 ? `<div class="flex items-center gap-1 mb-1">${t.tags.map(tag => `<span class="badge badge-${tag.replace(/[^a-z0-9]/g, '-')}" title="Tag: ${escapeHtml(tag)}">${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
     ${t.title ? `<div class="card-title">${escapeHtml(t.title)}</div>` : ''}
     <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${renderMarkdown(t.prompt)}</div>
     ${t.status === 'failed' && t.result ? `
