@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
@@ -490,6 +491,242 @@ func TestGitSyncWorkspace_FailsWithNoUpstream(t *testing.T) {
 	// git fetch with no remote configured exits non-zero → 500.
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500 when no upstream configured, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestDiffCacheHit verifies that a second identical request with a matching
+// If-None-Match header receives HTTP 304 (served from cache, no git subprocess).
+func TestDiffCacheHit(t *testing.T) {
+	repo := setupRepo(t)
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	wtDir := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
+	os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("hello\n"), 0644)
+
+	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
+	// First request — cache miss, expect 200 with ETag.
+	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	w1 := httptest.NewRecorder()
+	h.TaskDiff(w1, req1, task.ID)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("first call: expected 200, got %d", w1.Code)
+	}
+	etag := w1.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("expected ETag header in first response")
+	}
+
+	// Second request with matching If-None-Match — cache hit, expect 304.
+	req2 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	req2.Header.Set("If-None-Match", etag)
+	w2 := httptest.NewRecorder()
+	h.TaskDiff(w2, req2, task.ID)
+	if w2.Code != http.StatusNotModified {
+		t.Errorf("second call: expected 304, got %d", w2.Code)
+	}
+	if w2.Body.Len() != 0 {
+		t.Errorf("304 response should have empty body, got %q", w2.Body.String())
+	}
+
+	// Request without If-None-Match still returns 200 with cached payload.
+	req3 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	w3 := httptest.NewRecorder()
+	h.TaskDiff(w3, req3, task.ID)
+	if w3.Code != http.StatusOK {
+		t.Errorf("third call (no If-None-Match): expected 200, got %d", w3.Code)
+	}
+	if w3.Header().Get("ETag") != etag {
+		t.Errorf("expected same ETag on cache hit, got %q", w3.Header().Get("ETag"))
+	}
+}
+
+// TestDiffCacheImmutable verifies that done/cancelled tasks receive
+// Cache-Control: immutable and a populated ETag header.
+func TestDiffCacheImmutable(t *testing.T) {
+	for _, status := range []store.TaskStatus{store.TaskStatusDone, store.TaskStatusCancelled} {
+		t.Run(string(status), func(t *testing.T) {
+			repo := setupRepo(t)
+			h := newTestHandler(t)
+			ctx := context.Background()
+
+			wtDir := filepath.Join(t.TempDir(), "wt")
+			gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
+			os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("done\n"), 0644)
+
+			task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
+			h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+			h.store.UpdateTaskStatus(ctx, task.ID, status)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+			w := httptest.NewRecorder()
+			h.TaskDiff(w, req, task.ID)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d", w.Code)
+			}
+			if etag := w.Header().Get("ETag"); etag == "" {
+				t.Error("expected ETag header for terminal task")
+			}
+			cc := w.Header().Get("Cache-Control")
+			if !strings.Contains(cc, "immutable") {
+				t.Errorf("expected Cache-Control to contain 'immutable' for %s task, got %q", status, cc)
+			}
+		})
+	}
+
+	// Archived tasks are also immutable.
+	t.Run("archived", func(t *testing.T) {
+		repo := setupRepo(t)
+		h := newTestHandler(t)
+		ctx := context.Background()
+
+		wtDir := filepath.Join(t.TempDir(), "wt")
+		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
+		os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("archived\n"), 0644)
+
+		task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
+		h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+		h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+		h.store.SetTaskArchived(ctx, task.ID, true)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+		w := httptest.NewRecorder()
+		h.TaskDiff(w, req, task.ID)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+		cc := w.Header().Get("Cache-Control")
+		if !strings.Contains(cc, "immutable") {
+			t.Errorf("expected Cache-Control: immutable for archived task, got %q", cc)
+		}
+	})
+}
+
+// TestDiffCacheInvalidation verifies that a PATCH status change causes the next
+// diff request to be a cache miss (fresh git output) rather than stale data.
+func TestDiffCacheInvalidation(t *testing.T) {
+	repo := setupRepo(t)
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	wtDir := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
+	os.WriteFile(filepath.Join(wtDir, "file1.txt"), []byte("first\n"), 0644)
+
+	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
+	// First diff — populate cache.
+	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	w1 := httptest.NewRecorder()
+	h.TaskDiff(w1, req1, task.ID)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("first call: expected 200, got %d", w1.Code)
+	}
+	etag1 := w1.Header().Get("ETag")
+
+	// Add a new untracked file (diff content changes).
+	os.WriteFile(filepath.Join(wtDir, "file2.txt"), []byte("second\n"), 0644)
+
+	// Without a status change, the cache is still valid — second request with
+	// If-None-Match should return 304.
+	req2 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	req2.Header.Set("If-None-Match", etag1)
+	w2 := httptest.NewRecorder()
+	h.TaskDiff(w2, req2, task.ID)
+	if w2.Code != http.StatusNotModified {
+		t.Errorf("before invalidation: expected 304, got %d", w2.Code)
+	}
+
+	// PATCH a status change (backlog → waiting) — this must invalidate the cache.
+	patchBody := `{"status": "waiting"}`
+	patchReq := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(patchBody))
+	patchW := httptest.NewRecorder()
+	h.UpdateTask(patchW, patchReq, task.ID)
+	if patchW.Code != http.StatusOK {
+		t.Fatalf("PATCH: expected 200, got %d: %s", patchW.Code, patchW.Body.String())
+	}
+
+	// After invalidation the same ETag should no longer produce 304 — git must re-run.
+	req3 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	req3.Header.Set("If-None-Match", etag1)
+	w3 := httptest.NewRecorder()
+	h.TaskDiff(w3, req3, task.ID)
+	if w3.Code != http.StatusOK {
+		t.Errorf("after invalidation: expected 200 (cache miss), got %d", w3.Code)
+	}
+	// Fresh diff should include file2.txt (added after the initial cache population).
+	var resp diffResponse
+	if err := json.Unmarshal(w3.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !strings.Contains(resp.Diff, "file2.txt") {
+		t.Error("expected invalidated diff to include file2.txt")
+	}
+}
+
+// TestDiffCacheTTLExpiry verifies that advancing time past the 10-second TTL
+// causes the next diff request for an active task to be a cache miss.
+func TestDiffCacheTTLExpiry(t *testing.T) {
+	repo := setupRepo(t)
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	// Inject a controllable clock.
+	fakeNow := time.Now()
+	h.diffCache.now = func() time.Time { return fakeNow }
+
+	wtDir := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
+	os.WriteFile(filepath.Join(wtDir, "file1.txt"), []byte("first\n"), 0644)
+
+	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+	// Leave task in backlog (non-terminal) so the cache entry has a TTL.
+
+	// First diff — populate cache.
+	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	w1 := httptest.NewRecorder()
+	h.TaskDiff(w1, req1, task.ID)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("first call: expected 200, got %d", w1.Code)
+	}
+	etag1 := w1.Header().Get("ETag")
+
+	// Add a new untracked file while still within the TTL.
+	os.WriteFile(filepath.Join(wtDir, "file2.txt"), []byte("second\n"), 0644)
+
+	// Within TTL — same ETag should still produce 304.
+	req2 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	req2.Header.Set("If-None-Match", etag1)
+	w2 := httptest.NewRecorder()
+	h.TaskDiff(w2, req2, task.ID)
+	if w2.Code != http.StatusNotModified {
+		t.Errorf("within TTL: expected 304, got %d", w2.Code)
+	}
+
+	// Advance time past the TTL.
+	fakeNow = fakeNow.Add(diffCacheTTL + time.Second)
+
+	// After TTL expiry the cache entry is stale — expect a cache miss (200 with fresh data).
+	req3 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	req3.Header.Set("If-None-Match", etag1)
+	w3 := httptest.NewRecorder()
+	h.TaskDiff(w3, req3, task.ID)
+	if w3.Code != http.StatusOK {
+		t.Errorf("after TTL expiry: expected 200 (cache miss), got %d", w3.Code)
+	}
+	var resp diffResponse
+	if err := json.Unmarshal(w3.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !strings.Contains(resp.Diff, "file2.txt") {
+		t.Error("expected TTL-expired diff to include newly added file2.txt")
 	}
 }
 
