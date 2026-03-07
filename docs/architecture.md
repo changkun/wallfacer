@@ -1,6 +1,6 @@
 # Architecture
 
-Wallfacer is a Kanban task runner that executes Claude Code in isolated sandbox containers. Users create tasks on a web board; dragging a card from Backlog to In Progress triggers autonomous AI execution in an isolated git worktree, with auto-merge back to the main branch on completion.
+Wallfacer is an autonomous development board that dispatches Claude Code agents to isolated sandbox containers. Users create tasks on a web board; dragging a card from Backlog to In Progress triggers autonomous AI execution in an isolated git worktree, with auto-merge back to the main branch on completion.
 
 ## System Overview
 
