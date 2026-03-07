@@ -33,21 +33,22 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 // CreateTask creates a new task in backlog status.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Prompt         string `json:"prompt"`
-		Timeout        int    `json:"timeout"`
-		MountWorktrees bool   `json:"mount_worktrees"`
-		Model          string `json:"model"`
+		Prompt         string           `json:"prompt"`
+		Timeout        int              `json:"timeout"`
+		MountWorktrees bool             `json:"mount_worktrees"`
+		Model          string           `json:"model"`
+		Kind           store.TaskKind   `json:"kind"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(req.Prompt) == "" {
+	if strings.TrimSpace(req.Prompt) == "" && req.Kind != store.TaskKindIdeaAgent {
 		http.Error(w, "prompt is required", http.StatusBadRequest)
 		return
 	}
 
-	task, err := h.store.CreateTask(r.Context(), req.Prompt, req.Timeout, req.MountWorktrees, req.Model)
+	task, err := h.store.CreateTask(r.Context(), req.Prompt, req.Timeout, req.MountWorktrees, req.Model, req.Kind)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -57,7 +58,9 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		"to": string(store.TaskStatusBacklog),
 	})
 
-	go h.runner.GenerateTitle(task.ID, task.Prompt)
+	if task.Kind != store.TaskKindIdeaAgent {
+		go h.runner.GenerateTitle(task.ID, task.Prompt)
+	}
 
 	writeJSON(w, http.StatusCreated, task)
 }

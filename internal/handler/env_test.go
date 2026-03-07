@@ -46,7 +46,7 @@ func TestUpdateEnvConfig_TriggersAutoPromote(t *testing.T) {
 
 	// Create a backlog task.
 	ctx := context.Background()
-	_, err := h.store.CreateTask(ctx, "backlog task", 15, false, "")
+	_, err := h.store.CreateTask(ctx, "backlog task", 15, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestUpdateEnvConfig_NoAutoPromoteWhenAutopilotOff(t *testing.T) {
 	// autopilot is false by default.
 
 	ctx := context.Background()
-	_, err := h.store.CreateTask(ctx, "backlog task", 15, false, "")
+	_, err := h.store.CreateTask(ctx, "backlog task", 15, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

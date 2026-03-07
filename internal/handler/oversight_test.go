@@ -42,7 +42,7 @@ func TestGetOversight_NotFound(t *testing.T) {
 func TestGetOversight_PendingWhenNoFile(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/oversight", nil)
 	w := httptest.NewRecorder()
@@ -63,7 +63,7 @@ func TestGetOversight_PendingWhenNoFile(t *testing.T) {
 func TestGetOversight_ReturnsStoredOversight(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	saved := store.TaskOversight{
 		Status: store.OversightStatusReady,
@@ -107,7 +107,7 @@ func TestGetTestOversight_NotFound(t *testing.T) {
 func TestGetTestOversight_PendingWhenNoFile(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/test-oversight", nil)
 	w := httptest.NewRecorder()
@@ -126,7 +126,7 @@ func TestGetTestOversight_PendingWhenNoFile(t *testing.T) {
 func TestGetTestOversight_ReturnsStoredOversight(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	saved := store.TaskOversight{
 		Status: store.OversightStatusReady,
@@ -159,7 +159,7 @@ func TestGenerateMissingOversight_NoEligible(t *testing.T) {
 	h := newTestHandlerForOversight(t)
 	ctx := context.Background()
 	// Backlog task with 0 turns — not eligible.
-	h.store.CreateTask(ctx, "backlog task", 15, false, "")
+	h.store.CreateTask(ctx, "backlog task", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-oversight", nil)
 	w := httptest.NewRecorder()
@@ -178,7 +178,7 @@ func TestGenerateMissingOversight_NoEligible(t *testing.T) {
 func TestGenerateMissingOversight_SkipsAlreadyReady(t *testing.T) {
 	h := newTestHandlerForOversight(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "done task", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "done task", 15, false, "", "")
 	h.store.UpdateTaskResult(ctx, task.ID, "done", "sess", "end_turn", 1)
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
@@ -204,11 +204,11 @@ func TestGenerateMissingOversight_QueuesEligibleTasks(t *testing.T) {
 	ctx := context.Background()
 
 	// Task done with turns — oversight is pending (no file).
-	task1, _ := h.store.CreateTask(ctx, "task 1", 15, false, "")
+	task1, _ := h.store.CreateTask(ctx, "task 1", 15, false, "", "")
 	h.store.UpdateTaskResult(ctx, task1.ID, "done", "sess1", "end_turn", 2)
 	h.store.UpdateTaskStatus(ctx, task1.ID, store.TaskStatusDone)
 
-	task2, _ := h.store.CreateTask(ctx, "task 2", 15, false, "")
+	task2, _ := h.store.CreateTask(ctx, "task 2", 15, false, "", "")
 	h.store.UpdateTaskResult(ctx, task2.ID, "done", "sess2", "end_turn", 1)
 	h.store.UpdateTaskStatus(ctx, task2.ID, store.TaskStatusWaiting)
 
@@ -231,7 +231,7 @@ func TestGenerateMissingOversight_LimitParam(t *testing.T) {
 	ctx := context.Background()
 
 	for i := 0; i < 4; i++ {
-		task, _ := h.store.CreateTask(ctx, "task", 15, false, "")
+		task, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
 		h.store.UpdateTaskResult(ctx, task.ID, "done", "sess", "end_turn", 1)
 		h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 	}
@@ -255,7 +255,7 @@ func TestGenerateMissingOversight_SkipsZeroTurns(t *testing.T) {
 	ctx := context.Background()
 
 	// Done task but 0 turns.
-	task, _ := h.store.CreateTask(ctx, "task with no turns", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "task with no turns", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 	// Turns remain 0 (not updated via UpdateTaskResult).
 

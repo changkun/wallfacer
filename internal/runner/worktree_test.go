@@ -18,7 +18,7 @@ func TestWorktreeConcurrency(t *testing.T) {
 
 	// Pre-create a known task so PruneOrphanedWorktrees has something to
 	// preserve, making it do meaningful read+compare work during the race.
-	knownTask, err := s.CreateTask(ctx, "known task for concurrency test", 5, false, "")
+	knownTask, err := s.CreateTask(ctx, "known task for concurrency test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

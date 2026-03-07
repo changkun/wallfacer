@@ -87,7 +87,7 @@ func TestNewStore_SkipsCorruptTaskJSON(t *testing.T) {
 func TestNewStore_LoadsExistingTask(t *testing.T) {
 	dir := t.TempDir()
 	s1, _ := NewStore(dir)
-	task, _ := s1.CreateTask(bg(), "hello", 10, false, "")
+	task, _ := s1.CreateTask(bg(), "hello", 10, false, "", "")
 
 	s2, err := NewStore(dir)
 	if err != nil {
@@ -124,7 +124,7 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
 
-	task, _ := s.CreateTask(bg(), "round trip prompt", 15, false, "")
+	task, _ := s.CreateTask(bg(), "round trip prompt", 15, false, "", "")
 	s.UpdateTaskStatus(bg(), task.ID, "in_progress")
 	s.UpdateTaskTitle(bg(), task.ID, "Round Trip Title")
 	s.AccumulateTaskUsage(bg(), task.ID, TaskUsage{InputTokens: 100, CostUSD: 0.5})
@@ -169,7 +169,7 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 func TestPersistence_DeletedTaskGoneAfterReload(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "delete me", 5, false, "")
+	task, _ := s.CreateTask(bg(), "delete me", 5, false, "", "")
 	s.DeleteTask(bg(), task.ID)
 
 	s2, _ := NewStore(dir)

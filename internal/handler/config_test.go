@@ -450,7 +450,7 @@ func TestGitCheckout_RejectsWhenTasksInProgress(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a task and move it to in_progress.
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
 	body := `{"workspace": "` + repo + `", "branch": "main"}`
@@ -507,7 +507,7 @@ func TestGitCreateBranch_RejectsWhenTasksInProgress(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
 	body := `{"workspace": "` + repo + `", "branch": "new-branch"}`

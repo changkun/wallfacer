@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/store"
+	"github.com/google/uuid"
 )
 
 const ideationTimeout = 10 * time.Minute
@@ -59,9 +61,15 @@ type IdeateResult struct {
 // RunIdeation runs a lightweight read-only container to analyse the workspaces
 // and returns up to 3 proposed task ideas. The caller is responsible for
 // creating backlog tasks from the results.
-func (r *Runner) RunIdeation(ctx context.Context) ([]IdeateResult, error) {
+// taskID, when non-zero, registers the container under that task ID so that
+// KillContainer(taskID) and log streaming work through the standard task paths.
+func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID) ([]IdeateResult, error) {
 	containerName := fmt.Sprintf("wallfacer-ideate-%d", time.Now().UnixNano()/1e6)
 
+	if taskID != uuid.Nil {
+		r.containerNames.Store(taskID.String(), containerName)
+		defer r.containerNames.Delete(taskID.String())
+	}
 	r.ideateContainerName.Store("current", containerName)
 	defer r.ideateContainerName.Delete("current")
 
@@ -160,6 +168,51 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt string) []stri
 	}
 
 	return args
+}
+
+// runIdeationTask executes the brainstorm agent for an idea-agent task card.
+// It runs RunIdeation, creates backlog tasks from the results, and transitions
+// the idea-agent task to done. On failure it returns an error so Run() can
+// transition the task to failed.
+func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
+	bgCtx := context.Background()
+	taskID := task.ID
+
+	// Set a human-readable title on the idea-agent card.
+	title := "Brainstorm " + time.Now().Format("Jan 2, 2006")
+	r.store.UpdateTaskTitle(bgCtx, taskID, title)
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		"result": "Starting brainstorm agent — exploring workspaces to propose ideas...",
+	})
+
+	ideas, err := r.RunIdeation(ctx, taskID)
+	if err != nil {
+		return err
+	}
+
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		"result": fmt.Sprintf("Brainstorm complete — creating %d idea task(s).", len(ideas)),
+	})
+
+	// Create a backlog task for each proposed idea.
+	for _, idea := range ideas {
+		newTask, createErr := r.store.CreateTask(bgCtx, idea.Prompt, 60, false, "", store.TaskKindTask, "idea-agent")
+		if createErr != nil {
+			logger.Runner.Warn("ideation task: create idea task", "task", taskID, "error", createErr)
+			continue
+		}
+		r.store.InsertEvent(bgCtx, newTask.ID, store.EventTypeStateChange, map[string]string{
+			"to": string(store.TaskStatusBacklog),
+		})
+		if idea.Title != "" {
+			r.store.UpdateTaskTitle(bgCtx, newTask.ID, idea.Title)
+		}
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			"result": fmt.Sprintf("Created idea task: %s", idea.Title),
+		})
+	}
+
+	return nil
 }
 
 // extractIdeas finds a JSON array in the agent's text output and parses it
