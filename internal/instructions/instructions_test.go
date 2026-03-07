@@ -77,8 +77,8 @@ func TestBuildInstructionsContentDefault(t *testing.T) {
 }
 
 // TestBuildInstructionsContentWithWorkspaceCLAUDE verifies that when a single
-// workspace has a CLAUDE.md its content is embedded directly (not path-referenced),
-// because the synthesized file is mounted on top of the repo's own CLAUDE.md.
+// workspace has a CLAUDE.md its path is referenced (not its content embedded),
+// so the agent can read it directly from the workspace.
 func TestBuildInstructionsContentWithWorkspaceCLAUDE(t *testing.T) {
 	dir := t.TempDir()
 	repoInstructions := "# My project rules\n\nDo the thing.\n"
@@ -92,9 +92,15 @@ func TestBuildInstructionsContentWithWorkspaceCLAUDE(t *testing.T) {
 		t.Fatal("content should start with the default template")
 	}
 
-	// For a single workspace the repo content must be embedded, not path-referenced.
-	if !strings.Contains(content, repoInstructions) {
-		t.Fatalf("single-workspace repo CLAUDE.md content should be embedded; got:\n%s", content)
+	// Content must NOT be embedded; only a path reference should appear.
+	if strings.Contains(content, repoInstructions) {
+		t.Fatalf("single-workspace repo CLAUDE.md content should not be embedded; got:\n%s", content)
+	}
+
+	name := filepath.Base(dir)
+	pathRef := "- `/workspace/" + name + "/CLAUDE.md`"
+	if !strings.Contains(content, pathRef) {
+		t.Fatalf("single-workspace should contain path reference %q; got:\n%s", pathRef, content)
 	}
 
 	if !strings.Contains(content, "## Repo-Specific Instructions") {
@@ -115,9 +121,9 @@ func TestBuildInstructionsContentMissingCLAUDE(t *testing.T) {
 	}
 }
 
-// TestBuildInstructionsContentSingleWorkspaceNoRef verifies that in single-repo
-// mode the content is embedded and no path self-reference appears in the output.
-func TestBuildInstructionsContentSingleWorkspaceNoRef(t *testing.T) {
+// TestBuildInstructionsContentSingleWorkspaceRef verifies that in single-repo
+// mode a path reference appears and the content is not embedded.
+func TestBuildInstructionsContentSingleWorkspaceRef(t *testing.T) {
 	dir := t.TempDir()
 	repoInstructions := "# Rules\nDo the thing.\n"
 	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(repoInstructions), 0644); err != nil {
@@ -127,15 +133,14 @@ func TestBuildInstructionsContentSingleWorkspaceNoRef(t *testing.T) {
 	content := BuildContent([]string{dir})
 
 	name := filepath.Base(dir)
-	// Content must be present.
-	if !strings.Contains(content, repoInstructions) {
-		t.Fatal("single-workspace content should be embedded")
-	}
-	// A bare path reference (as opposed to the source attribution line) must
-	// not appear, to avoid confusing Claude with a self-referential path.
+	// A path reference must appear.
 	pathRef := "- `/workspace/" + name + "/CLAUDE.md`"
-	if strings.Contains(content, pathRef) {
-		t.Fatalf("single-workspace output should not contain a bare path reference %q", pathRef)
+	if !strings.Contains(content, pathRef) {
+		t.Fatalf("single-workspace output should contain path reference %q", pathRef)
+	}
+	// Content must NOT be embedded.
+	if strings.Contains(content, repoInstructions) {
+		t.Fatal("single-workspace content should not be embedded")
 	}
 }
 
@@ -194,8 +199,7 @@ func TestBuildInstructionsContentMultipleWorkspaces(t *testing.T) {
 // content always ends with a newline regardless of workspace CLAUDE.md state.
 func TestBuildInstructionsContentTrailingNewline(t *testing.T) {
 	dir := t.TempDir()
-	// Deliberately omit trailing newline in repo CLAUDE.md; the generated
-	// output should still end with a newline even when the content is embedded.
+	// Repo CLAUDE.md exists so a path reference section is emitted.
 	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("no newline at end"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +268,7 @@ func TestEnsureWorkspaceInstructionsIdempotent(t *testing.T) {
 }
 
 // TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE verifies that a
-// newly created instructions file embeds the single workspace's CLAUDE.md content.
+// newly created instructions file references the single workspace's CLAUDE.md path.
 func TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE(t *testing.T) {
 	configDir := t.TempDir()
 	ws := t.TempDir()
@@ -280,9 +284,14 @@ func TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE(t *testing.T) {
 	}
 
 	data, _ := os.ReadFile(path)
-	// For a single workspace the content must be embedded directly.
-	if !strings.Contains(string(data), repoInstructions) {
-		t.Fatalf("instructions file should embed single-workspace CLAUDE.md content; got:\n%s", data)
+	name := filepath.Base(ws)
+	pathRef := "- `/workspace/" + name + "/CLAUDE.md`"
+	// A path reference must appear; content must not be embedded.
+	if !strings.Contains(string(data), pathRef) {
+		t.Fatalf("instructions file should reference single-workspace CLAUDE.md path; got:\n%s", data)
+	}
+	if strings.Contains(string(data), repoInstructions) {
+		t.Fatalf("instructions file should not embed single-workspace CLAUDE.md content; got:\n%s", data)
 	}
 }
 
@@ -323,8 +332,13 @@ func TestReinitWorkspaceInstructionsOverwrites(t *testing.T) {
 	if strings.Contains(string(data), "stale content") {
 		t.Fatal("Reinit should have overwritten stale content")
 	}
-	// For a single workspace the content must be embedded directly.
-	if !strings.Contains(string(data), repoInstructions) {
-		t.Fatalf("Reinit should embed single-workspace CLAUDE.md content; got:\n%s", data)
+	// For a single workspace a path reference must appear; content must not be embedded.
+	name := filepath.Base(ws)
+	pathRef := "- `/workspace/" + name + "/CLAUDE.md`"
+	if !strings.Contains(string(data), pathRef) {
+		t.Fatalf("Reinit should reference single-workspace CLAUDE.md path; got:\n%s", data)
+	}
+	if strings.Contains(string(data), repoInstructions) {
+		t.Fatalf("Reinit should not embed single-workspace CLAUDE.md content; got:\n%s", data)
 	}
 }

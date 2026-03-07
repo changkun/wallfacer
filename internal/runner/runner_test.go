@@ -177,12 +177,11 @@ func TestContainerArgsCLAUDEMDMountIsReadOnly(t *testing.T) {
 	t.Fatal("CLAUDE.md -v mount not found in args")
 }
 
-// TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtRoot verifies that when
-// there is exactly one workspace, CLAUDE.md is mounted inside the workspace
-// directory (not at /workspace/) so Claude Code can discover it at the
-// project root. Claude Code searches for CLAUDE.md at the git project root
-// and at ~/.claude/, but NOT in parent directories above the project root.
-func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtRoot(t *testing.T) {
+// TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace verifies that when
+// there is exactly one workspace, CLAUDE.md is still mounted at /workspace/CLAUDE.md
+// (not inside the workspace subdirectory), so the repo's own CLAUDE.md is not
+// shadowed and can be read directly via the path reference in the instructions.
+func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
 	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -204,17 +203,16 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtRoot(t *testing.T) {
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	basename := filepath.Base(ws)
-	expectedMount := instructionsFile + ":/workspace/" + basename + "/CLAUDE.md:z,ro"
+	expectedMount := instructionsFile + ":/workspace/CLAUDE.md:z,ro"
 	if !containsConsecutive(args, "-v", expectedMount) {
-		t.Fatalf("single workspace: CLAUDE.md should be mounted at /workspace/%s/CLAUDE.md; got args: %v",
-			basename, args)
+		t.Fatalf("single workspace: CLAUDE.md should be mounted at /workspace/CLAUDE.md; got args: %v", args)
 	}
 
-	// Must NOT be mounted at /workspace/CLAUDE.md (parent of project root).
-	wrongMount := instructionsFile + ":/workspace/CLAUDE.md:z,ro"
+	// Must NOT be mounted inside the workspace subdirectory.
+	basename := filepath.Base(ws)
+	wrongMount := instructionsFile + ":/workspace/" + basename + "/CLAUDE.md:z,ro"
 	if containsConsecutive(args, "-v", wrongMount) {
-		t.Fatal("single workspace: CLAUDE.md should NOT be at /workspace/CLAUDE.md")
+		t.Fatalf("single workspace: CLAUDE.md should NOT be at /workspace/%s/CLAUDE.md", basename)
 	}
 }
 

@@ -111,18 +111,12 @@ func (r *Runner) buildContainerArgs(
 	}
 
 	// Mount workspace-level CLAUDE.md so the agent picks it up automatically.
-	// The agent searches for CLAUDE.md at the project root (where .git is)
-	// and at ~/.claude/, but NOT in parent directories above the project root.
-	// For single-workspace tasks, CWD is /workspace/<basename> which IS the
-	// project root, so /workspace/CLAUDE.md (the parent) would be invisible.
-	// Mount directly into the workspace root instead.
+	// Mounted at /workspace/CLAUDE.md so it does not shadow any individual
+	// repo's CLAUDE.md; Claude Code discovers it by traversing parent
+	// directories from any workspace root.
 	if r.instructionsPath != "" {
 		if _, err := os.Stat(r.instructionsPath); err == nil {
-			if len(basenames) == 1 {
-				args = append(args, "-v", r.instructionsPath+":/workspace/"+basenames[0]+"/CLAUDE.md:z,ro")
-			} else {
-				args = append(args, "-v", r.instructionsPath+":/workspace/CLAUDE.md:z,ro")
-			}
+			args = append(args, "-v", r.instructionsPath+":/workspace/CLAUDE.md:z,ro")
 		}
 	}
 

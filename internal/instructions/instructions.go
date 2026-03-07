@@ -111,11 +111,9 @@ func Reinit(configDir string, workspaces []string) (string, error) {
 
 // BuildContent assembles CLAUDE.md content from:
 //  1. The default wallfacer instructions template.
-//  2. For a single workspace: the full content of its CLAUDE.md (if any) is
-//     embedded directly, because the synthesized file is mounted on top of the
-//     repo's own CLAUDE.md and would otherwise shadow it entirely.
-//  3. For multiple workspaces: a reference list of per-repo CLAUDE.md paths so
-//     Claude can read them on demand (those files are not shadowed in this case).
+//  2. A reference list of per-repo CLAUDE.md paths so Claude can read them
+//     on demand. The instructions file is mounted at /workspace/CLAUDE.md so
+//     it does not shadow any individual repo's CLAUDE.md.
 func BuildContent(workspaces []string) string {
 	var sb strings.Builder
 	sb.WriteString(defaultTemplate)
@@ -128,25 +126,7 @@ func BuildContent(workspaces []string) string {
 	}
 	sb.WriteByte('\n')
 
-	if len(workspaces) == 1 {
-		// Single workspace: the synthesized file is mounted at
-		// /workspace/<basename>/CLAUDE.md, overwriting the repo's own file.
-		// Embed the repo's CLAUDE.md content directly so it is not lost.
-		claudePath := filepath.Join(workspaces[0], "CLAUDE.md")
-		if data, err := os.ReadFile(claudePath); err == nil && len(data) > 0 {
-			name := filepath.Base(workspaces[0])
-			sb.WriteString("---\n\n## Repo-Specific Instructions\n\n")
-			sb.WriteString(fmt.Sprintf("The following instructions are from `/workspace/%s/CLAUDE.md`:\n\n", name))
-			sb.Write(data)
-			if !strings.HasSuffix(string(data), "\n") {
-				sb.WriteByte('\n')
-			}
-		}
-		return sb.String()
-	}
-
-	// Multiple workspaces: repo CLAUDE.md files are not shadowed so listing
-	// their paths is sufficient — Claude can read them directly.
+	// List per-repo CLAUDE.md paths so Claude can read them on demand.
 	var refs []string
 	for _, ws := range workspaces {
 		claudePath := filepath.Join(ws, "CLAUDE.md")
