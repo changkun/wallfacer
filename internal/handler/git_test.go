@@ -289,6 +289,210 @@ func TestTaskDiffAfterCommitPipeline(t *testing.T) {
 	}
 }
 
+// TestGitPush_Success verifies that push succeeds when a bare remote is configured.
+func TestGitPush_Success(t *testing.T) {
+	repo := setupRepo(t)
+	// Create a bare repo to serve as the local remote.
+	remoteDir := t.TempDir()
+	gitRun(t, remoteDir, "init", "--bare", "-b", "main")
+	gitRun(t, repo, "remote", "add", "origin", remoteDir)
+	// Configure tracking so `git push` knows where to push without --set-upstream.
+	gitRun(t, repo, "config", "branch.main.remote", "origin")
+	gitRun(t, repo, "config", "branch.main.merge", "refs/heads/main")
+
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+	body := `{"workspace": "` + repo + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/push", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitPush(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for successful push, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if _, ok := resp["output"]; !ok {
+		t.Error("expected 'output' field in push response")
+	}
+}
+
+// TestGitPush_FailsWithoutRemote verifies that push returns 500 when no remote is configured.
+func TestGitPush_FailsWithoutRemote(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+	body := `{"workspace": "` + repo + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/push", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitPush(w, req)
+
+	// git push with no remote configured exits non-zero → 500.
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 for push without remote, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestGitRebaseOnMain_RejectsWhenTasksInProgress verifies that rebase-on-main
+// is refused while any task is in_progress.
+func TestGitRebaseOnMain_RejectsWhenTasksInProgress(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	body := `{"workspace": "` + repo + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitRebaseOnMain(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409 when tasks are in progress, got %d", w.Code)
+	}
+}
+
+// TestGitBranches_IncludesMainBranch verifies that the main branch appears in
+// the branch list and is identified as current.
+func TestGitBranches_IncludesMainBranch(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/git/branches?workspace="+repo, nil)
+	w := httptest.NewRecorder()
+	h.GitBranches(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	branches, ok := resp["branches"].([]any)
+	if !ok {
+		t.Fatalf("expected branches array, got %T", resp["branches"])
+	}
+	found := false
+	for _, b := range branches {
+		if b.(string) == "main" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected 'main' in branches list: %v", branches)
+	}
+	if current, ok := resp["current"].(string); !ok || current != "main" {
+		t.Errorf("expected current='main', got %v", resp["current"])
+	}
+}
+
+// TestGitBranches_IncludesMultipleBranches verifies that extra branches are all returned.
+func TestGitBranches_IncludesMultipleBranches(t *testing.T) {
+	repo := setupRepo(t)
+	gitRun(t, repo, "branch", "feature-a")
+	gitRun(t, repo, "branch", "feature-b")
+
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+	req := httptest.NewRequest(http.MethodGet, "/api/git/branches?workspace="+repo, nil)
+	w := httptest.NewRecorder()
+	h.GitBranches(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp map[string]any
+	json.NewDecoder(w.Body).Decode(&resp)
+	branches, _ := resp["branches"].([]any)
+	if len(branches) < 3 {
+		t.Errorf("expected at least 3 branches (main + feature-a + feature-b), got %d: %v", len(branches), branches)
+	}
+	names := make(map[string]bool)
+	for _, b := range branches {
+		names[b.(string)] = true
+	}
+	for _, want := range []string{"main", "feature-a", "feature-b"} {
+		if !names[want] {
+			t.Errorf("expected branch %q in list", want)
+		}
+	}
+}
+
+// TestGitCheckout_Success verifies that checking out an existing branch succeeds.
+func TestGitCheckout_Success(t *testing.T) {
+	repo := setupRepo(t)
+	// Create an extra branch to switch to.
+	gitRun(t, repo, "branch", "other-branch")
+
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+	body := `{"workspace": "` + repo + `", "branch": "other-branch"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitCheckout(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["branch"] != "other-branch" {
+		t.Errorf("expected branch='other-branch', got %q", resp["branch"])
+	}
+	// Confirm the working tree actually switched.
+	current := gitRun(t, repo, "branch", "--show-current")
+	if current != "other-branch" {
+		t.Errorf("git HEAD should be 'other-branch', got %q", current)
+	}
+}
+
+// TestGitCreateBranch_Success verifies that a new branch is created and checked out.
+func TestGitCreateBranch_Success(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+
+	body := `{"workspace": "` + repo + `", "branch": "new-feature"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitCreateBranch(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["branch"] != "new-feature" {
+		t.Errorf("expected branch='new-feature', got %q", resp["branch"])
+	}
+	// Confirm the working tree is on the new branch.
+	current := gitRun(t, repo, "branch", "--show-current")
+	if current != "new-feature" {
+		t.Errorf("expected to be on 'new-feature', got %q", current)
+	}
+}
+
+// TestGitSyncWorkspace_FailsWithNoUpstream verifies sync returns 500 when the
+// workspace has no configured remote.
+func TestGitSyncWorkspace_FailsWithNoUpstream(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+
+	body := `{"workspace": "` + repo + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/sync", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitSyncWorkspace(w, req)
+
+	// git fetch with no remote configured exits non-zero → 500.
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 when no upstream configured, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestTaskDiffIsolationConcurrent(t *testing.T) {
 	repo := setupRepo(t)
 	h := newTestHandler(t)
