@@ -37,7 +37,7 @@ func (r *Runner) GenerateOversight(taskID uuid.UUID) {
 		Status: store.OversightStatusGenerating,
 	})
 
-	log, err := r.buildActivityLog(ctx, taskID)
+	log, err := r.buildActivityLog(ctx, taskID, 1)
 	if err != nil {
 		logger.Runner.Warn("oversight: build activity log", "task", taskID, "error", err)
 		_ = r.store.SaveOversight(taskID, store.TaskOversight{
@@ -75,6 +75,58 @@ func (r *Runner) GenerateOversight(taskID uuid.UUID) {
 	}
 }
 
+// GenerateTestOversight produces a high-level aggregated summary of the test
+// agent's execution turns and persists it as oversight-test.json in the task
+// directory. fromTurn is the implementation's last turn count; only turns
+// strictly after this boundary (fromTurn+1 onwards) are included.
+//
+// It is called synchronously after a test run transitions the task back to
+// "waiting", so the summary is always in a terminal state when the task
+// becomes visible as "waiting".
+func (r *Runner) GenerateTestOversight(taskID uuid.UUID, fromTurn int) {
+	ctx := context.Background()
+
+	_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
+		Status: store.OversightStatusGenerating,
+	})
+
+	log, err := r.buildActivityLog(ctx, taskID, fromTurn+1)
+	if err != nil {
+		logger.Runner.Warn("test oversight: build activity log", "task", taskID, "error", err)
+		_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
+			Status: store.OversightStatusFailed,
+			Error:  fmt.Sprintf("build activity log: %v", err),
+		})
+		return
+	}
+
+	if len(log) == 0 {
+		_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
+			Status: store.OversightStatusFailed,
+			Error:  "no test agent activity found",
+		})
+		return
+	}
+
+	phases, err := r.runOversightAgent(taskID, log)
+	if err != nil {
+		logger.Runner.Warn("test oversight: agent failed", "task", taskID, "error", err)
+		_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
+			Status: store.OversightStatusFailed,
+			Error:  fmt.Sprintf("oversight agent: %v", err),
+		})
+		return
+	}
+
+	if err := r.store.SaveTestOversight(taskID, store.TaskOversight{
+		Status:      store.OversightStatusReady,
+		GeneratedAt: time.Now(),
+		Phases:      phases,
+	}); err != nil {
+		logger.Runner.Warn("test oversight: save failed", "task", taskID, "error", err)
+	}
+}
+
 // turnActivity is a pre-processed per-turn summary used to build the oversight prompt.
 type turnActivity struct {
 	Turn      int
@@ -84,8 +136,9 @@ type turnActivity struct {
 }
 
 // buildActivityLog reads all turn NDJSON files and produces a compact per-turn
-// activity summary, cross-referencing event timestamps.
-func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID) ([]turnActivity, error) {
+// activity summary, cross-referencing event timestamps. fromTurn is the first
+// turn number to include (1-indexed); pass 1 to include all turns.
+func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID, fromTurn int) ([]turnActivity, error) {
 	outputsDir := r.store.OutputsDir(taskID)
 	entries, err := os.ReadDir(outputsDir)
 	if err != nil {
@@ -115,6 +168,9 @@ func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID) ([]turn
 	var activities []turnActivity
 	for i, path := range turnFiles {
 		turnNum := i + 1
+		if turnNum < fromTurn {
+			continue // Skip turns before the requested boundary.
+		}
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			continue

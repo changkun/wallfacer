@@ -476,7 +476,11 @@
           <div id="modal-test-logs-section" class="hidden mb-4">
             <div class="flex items-center justify-between mb-2">
               <h3 class="section-title" style="margin-bottom:0;">Test Agent Monitor</h3>
-              <button id="toggle-test-logs-btn" onclick="toggleTestLogsMode()" class="btn-icon">Raw</button>
+              <div class="logs-tabs">
+                <button id="test-logs-tab-oversight" onclick="setTestLogsMode('oversight')" class="logs-tab">Oversight</button>
+                <button id="test-logs-tab-pretty" onclick="setTestLogsMode('pretty')" class="logs-tab active">Pretty</button>
+                <button id="test-logs-tab-raw" onclick="setTestLogsMode('raw')" class="logs-tab">Raw</button>
+              </div>
             </div>
             <pre id="modal-test-logs" class="logs-block"></pre>
           </div>

@@ -214,6 +214,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	mux.HandleFunc("POST /api/tasks/{id}/refine", withID(h.RefineChat))
 	mux.HandleFunc("POST /api/tasks/{id}/refine/apply", withID(h.RefineApply))
 	mux.HandleFunc("GET /api/tasks/{id}/oversight", withID(h.GetOversight))
+	mux.HandleFunc("GET /api/tasks/{id}/oversight/test", withID(h.GetTestOversight))
 	mux.HandleFunc("GET /api/tasks/{id}/diff", withID(h.TaskDiff))
 	mux.HandleFunc("GET /api/tasks/{id}/logs", withID(h.StreamLogs))
 	mux.HandleFunc("GET /api/tasks/{id}/outputs/{filename}", func(w http.ResponseWriter, r *http.Request) {

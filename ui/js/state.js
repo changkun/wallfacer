@@ -9,7 +9,8 @@ let logsMode = 'pretty';
 // Test agent monitor state (shown alongside impl logs when is_test_run=true)
 let testLogsAbort = null;
 let testRawLogBuffer = '';
-let testLogsPrettyMode = true;
+// testLogsMode: 'pretty' | 'raw' | 'oversight'
+let testLogsMode = 'pretty';
 let showArchived = localStorage.getItem('wallfacer-show-archived') === 'true';
 
 // Tasks SSE state

@@ -14,6 +14,11 @@ func (s *Store) oversightPath(taskID uuid.UUID) string {
 	return filepath.Join(s.dir, taskID.String(), "oversight.json")
 }
 
+// testOversightPath returns the filesystem path for a task's oversight-test.json file.
+func (s *Store) testOversightPath(taskID uuid.UUID) string {
+	return filepath.Join(s.dir, taskID.String(), "oversight-test.json")
+}
+
 // SaveOversight atomically writes the oversight summary for a task.
 func (s *Store) SaveOversight(taskID uuid.UUID, oversight TaskOversight) error {
 	return atomicWriteJSON(s.oversightPath(taskID), oversight)
@@ -23,6 +28,29 @@ func (s *Store) SaveOversight(taskID uuid.UUID, oversight TaskOversight) error {
 // Returns (nil, nil) when no oversight file exists yet (status pending).
 func (s *Store) GetOversight(taskID uuid.UUID) (*TaskOversight, error) {
 	data, err := os.ReadFile(s.oversightPath(taskID))
+	if errors.Is(err, os.ErrNotExist) {
+		pending := TaskOversight{Status: OversightStatusPending}
+		return &pending, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var o TaskOversight
+	if err := json.Unmarshal(data, &o); err != nil {
+		return nil, err
+	}
+	return &o, nil
+}
+
+// SaveTestOversight atomically writes the test-agent oversight summary for a task.
+func (s *Store) SaveTestOversight(taskID uuid.UUID, oversight TaskOversight) error {
+	return atomicWriteJSON(s.testOversightPath(taskID), oversight)
+}
+
+// GetTestOversight reads the test-agent oversight summary for a task.
+// Returns a pending TaskOversight when no oversight-test.json exists yet.
+func (s *Store) GetTestOversight(taskID uuid.UUID) (*TaskOversight, error) {
+	data, err := os.ReadFile(s.testOversightPath(taskID))
 	if errors.Is(err, os.ErrNotExist) {
 		pending := TaskOversight{Status: OversightStatusPending}
 		return &pending, nil
