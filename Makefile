@@ -1,19 +1,25 @@
-SHELL      := /bin/bash
-PODMAN     := /opt/podman/bin/podman
-IMAGE      := wallfacer:latest
-GHCR_IMAGE := ghcr.io/changkun/wallfacer:latest
-NAME       := wallfacer
+SHELL            := /bin/bash
+PODMAN           := /opt/podman/bin/podman
+IMAGE            := wallfacer:latest
+GHCR_IMAGE       := ghcr.io/changkun/wallfacer:latest
+CODEX_IMAGE      := wallfacer-codex:latest
+GHCR_CODEX_IMAGE := ghcr.io/changkun/wallfacer-codex:latest
+NAME             := wallfacer
 
 # Load .env if it exists
 -include .env
 export
 
-.PHONY: build server run shell clean ui-css
+.PHONY: build build-codex server run shell clean ui-css
 
-# Build the sandbox image and tag it with both the local name and the ghcr.io
+# Build the Claude Code sandbox image and tag it with both the local name and the ghcr.io
 # name so that 'wallfacer run' finds it under the default image reference.
 build:
 	$(PODMAN) build -t $(IMAGE) -t $(GHCR_IMAGE) -f sandbox/Dockerfile sandbox/
+
+# Build the OpenAI Codex sandbox image.
+build-codex:
+	$(PODMAN) build -t $(CODEX_IMAGE) -t $(GHCR_CODEX_IMAGE) -f sandbox-codex/Dockerfile sandbox-codex/
 
 # Build and run the Go server natively
 server:
@@ -63,6 +69,6 @@ ui-css:
 	npx tailwindcss@3 -i tailwind.input.css -o ui/css/tailwind.css \
 		--content './ui/**/*.{html,js}' --minify
 
-# Remove the sandbox image
+# Remove sandbox images
 clean:
-	-$(PODMAN) rmi $(IMAGE) $(GHCR_IMAGE)
+	-$(PODMAN) rmi $(IMAGE) $(GHCR_IMAGE) $(CODEX_IMAGE) $(GHCR_CODEX_IMAGE)
