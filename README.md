@@ -28,91 +28,35 @@ A work management board for autonomous AI agents. Create tasks as cards, drag th
 - **Configurable API** — set token, base URL, and model from the UI; supports OAuth tokens, direct API keys, and any Anthropic-compatible endpoint
 - **Multiple agent runtimes** — bring your own sandbox image; built-in support for Claude Code and OpenAI Codex out of the box
 
-## Prerequisites
-
-- [Go](https://go.dev/) 1.25+
-- [Podman](https://podman.io/) or [Docker](https://www.docker.com/)
-- A Claude credential — either:
-  - An **OAuth token** from `claude setup-token` (requires Claude Pro or Max), or
-  - An **Anthropic API key** (`sk-ant-...`) from [console.anthropic.com](https://console.anthropic.com/)
-
 ## Quick Start
 
-**1. Obtain a credential**
-
 ```bash
-# Option A — OAuth token (Claude Pro/Max)
-claude setup-token   # prints the token; copy it
-
-# Option B — API key
-# Generate one at console.anthropic.com → API Keys
-```
-
-**2. Configure the environment file**
-
-`wallfacer run` creates `~/.wallfacer/.env` automatically on first launch. Edit it and fill in your credential:
-
-```bash
-# Option A — OAuth token
-CLAUDE_CODE_OAUTH_TOKEN=<your-token>
-
-# Option B — API key
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Optional — custom endpoint (proxy, alternative provider, etc.)
-# ANTHROPIC_BASE_URL=https://api.anthropic.com
-
-# Optional — pin a specific model
-# WALLFACER_DEFAULT_MODEL=claude-sonnet-4-5
-
-# Optional — limit how many tasks run concurrently (default: 5)
-# WALLFACER_MAX_PARALLEL=3
-```
-
-You can also edit all of these from **Settings → API Configuration** in the web UI without restarting the server.
-
-**3. Build the sandbox image**
-
-```bash
+# 1. Build the sandbox image (once)
 make build
-```
 
-**4. Build and start the server**
-
-```bash
+# 2. Build the binary
 go build -o wallfacer .
-wallfacer run ~/projects/myapp ~/projects/mylib
+
+# 3. Start with the project directories you want to work on
+./wallfacer run ~/projects/myapp
 ```
 
-The browser opens automatically to http://localhost:8080.
+On first launch, `~/.wallfacer/.env` is created. Edit it to add your Claude credential (OAuth token or API key), then restart. The browser opens to `http://localhost:8080`.
 
-## Usage
+**See [Getting Started](docs/getting-started.md) for the full setup walkthrough**, including credential setup, configuration options, and troubleshooting.
+
+### Common Commands
 
 ```bash
-# Mount specific workspace directories
-wallfacer run ~/project1 ~/project2
-
-# Defaults to current directory if no args given
-wallfacer run
+# Mount multiple workspaces
+./wallfacer run ~/project1 ~/project2
 
 # Custom port, skip auto-opening the browser
-wallfacer run -addr :9090 -no-browser ~/myapp
+./wallfacer run -addr :9090 -no-browser ~/myapp
 
 # Show configuration and env file status
-wallfacer env
-
-# All flags
-wallfacer run -help
+./wallfacer env
 ```
-
-### How It Works
-
-1. Create a task card in the Backlog column with a prompt
-2. Drag it to In Progress — Wallfacer launches a sandbox container and runs the agent
-3. When the agent finishes, the card moves to Done and changes are committed to your repo
-4. If the agent asks a question, the card moves to Waiting — submit feedback to continue
-
-See [Task Lifecycle](docs/task-lifecycle.md) for details on all states and transitions.
 
 ### Make Targets
 
@@ -129,10 +73,17 @@ See [Task Lifecycle](docs/task-lifecycle.md) for details on all states and trans
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) — system overview, tech stack, project structure, configuration
-- [Task Lifecycle](docs/task-lifecycle.md) — states, turn loop, feedback, data models, persistence
-- [Git Worktrees](docs/git-worktrees.md) — per-task isolation, commit pipeline, conflict resolution
-- [Orchestration](docs/orchestration.md) — API routes, container execution, SSE, concurrency
+**User guides**
+
+- [Getting Started](docs/getting-started.md) — installation, credentials, configuration reference, first run
+- [Usage Guide](docs/usage.md) — creating tasks, handling feedback, autopilot, test verification, git branch management
+
+**Internals**
+
+- [Architecture](docs/internals/architecture.md) — system overview, tech stack, project structure
+- [Task Lifecycle](docs/internals/task-lifecycle.md) — states, turn loop, feedback, data models, persistence
+- [Git Worktrees](docs/internals/git-worktrees.md) — per-task isolation, commit pipeline, conflict resolution
+- [Orchestration](docs/internals/orchestration.md) — API routes, container execution, SSE, concurrency
 
 ## Origin Story
 
