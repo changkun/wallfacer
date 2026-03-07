@@ -40,7 +40,7 @@ func (r *Runner) commit(
 	ctx context.Context,
 	taskID uuid.UUID,
 	sessionID string,
-	turns int,
+	_ int,
 	worktreePaths map[string]string,
 	branchName string,
 ) error {
