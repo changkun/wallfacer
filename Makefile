@@ -10,10 +10,14 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-claude build-codex server run shell clean ui-css test test-backend test-frontend
+.PHONY: build build-binary build-claude build-codex server run shell clean ui-css test test-backend test-frontend
 
-# Build both sandbox images.
-build: build-claude build-codex
+# Build the wallfacer binary and both sandbox images.
+build: build-binary build-claude build-codex
+
+# Build the wallfacer Go binary.
+build-binary:
+	go build -o wallfacer .
 
 # Build the Claude Code sandbox image and tag it with both the local name and the ghcr.io
 # name so that 'wallfacer run' finds it under the default image reference.
