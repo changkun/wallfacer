@@ -65,6 +65,27 @@ type claudeResponse struct {
 	} `json:"error"`
 }
 
+// buildMessagesURL returns the full endpoint URL for the Claude Messages API,
+// choosing the appropriate host and path based on which credential is configured.
+//
+// Claude Code OAuth tokens must target api.claude.ai (/api/messages), whereas
+// API keys and gateway auth tokens use api.anthropic.com (/v1/messages). An
+// explicit ANTHROPIC_BASE_URL always takes precedence and uses /v1/messages.
+func buildMessagesURL(baseURL, apiKey, authToken, oauthToken string) string {
+	path := "/v1/messages"
+	if baseURL == "" {
+		if oauthToken != "" && apiKey == "" && authToken == "" {
+			// Claude Code OAuth tokens authenticate against api.claude.ai,
+			// not api.anthropic.com. The former uses the /api/messages path.
+			baseURL = "https://api.claude.ai"
+			path = "/api/messages"
+		} else {
+			baseURL = "https://api.anthropic.com"
+		}
+	}
+	return strings.TrimRight(baseURL, "/") + path
+}
+
 // callClaude sends a conversation to the Anthropic Messages API and returns
 // the assistant reply. It reads credentials from the env file.
 func (h *Handler) callClaude(messages []refineMessage) (string, error) {
@@ -79,12 +100,6 @@ func (h *Handler) callClaude(messages []refineMessage) (string, error) {
 	if apiKey == "" && authToken == "" && oauthToken == "" {
 		return "", fmt.Errorf("no Anthropic API key configured; set ANTHROPIC_API_KEY in the env file")
 	}
-
-	baseURL := cfg.BaseURL
-	if baseURL == "" {
-		baseURL = "https://api.anthropic.com"
-	}
-	baseURL = strings.TrimRight(baseURL, "/")
 
 	model := cfg.DefaultModel
 	if model == "" {
@@ -103,7 +118,8 @@ func (h *Handler) callClaude(messages []refineMessage) (string, error) {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", baseURL+"/v1/messages", bytes.NewReader(body))
+	messagesURL := buildMessagesURL(cfg.BaseURL, apiKey, authToken, oauthToken)
+	req, err := http.NewRequest("POST", messagesURL, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("build request: %w", err)
 	}
