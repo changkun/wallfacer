@@ -1,6 +1,6 @@
 # Architecture
 
-Wallfacer is an autonomous development board that dispatches Claude Code agents to isolated sandbox containers. Users create tasks on a web board; dragging a card from Backlog to In Progress triggers autonomous AI execution in an isolated git worktree, with auto-merge back to the main branch on completion.
+Wallfacer is a work management board that dispatches autonomous agents to isolated sandbox containers. Users create tasks on a web board; dragging a card from Backlog to In Progress triggers autonomous agent execution in an isolated git worktree, with auto-merge back to the main branch on completion.
 
 ## System Overview
 
@@ -30,7 +30,7 @@ The Go server runs natively on the host and persists tasks to per-task directori
 
 **Frontend** — Vanilla JavaScript, Tailwind CSS, Sortable.js, Marked.js. `EventSource` (SSE) for live updates, `localStorage` for theme preferences.
 
-**Infrastructure** — Podman or Docker as container runtime. Ubuntu 24.04 sandbox image with Claude Code CLI installed. Git worktrees for per-task isolation.
+**Infrastructure** — Podman or Docker as container runtime. Bring-your-own sandbox image; built-in images for Claude Code and OpenAI Codex. Git worktrees for per-task isolation.
 
 **Persistence** — Filesystem only, no database. `~/.wallfacer/data/<uuid>/` per task. Atomic writes via temp file + `os.Rename`.
 
@@ -106,13 +106,13 @@ wallfacer/
 
 | Choice | Rationale |
 |---|---|
-| Git worktrees per task | Full isolation; concurrent tasks don't interfere; Claude sees a clean branch |
+| Git worktrees per task | Full isolation; concurrent tasks don't interfere; agent sees a clean branch |
 | Goroutines, no queue | Simplicity; Go's scheduler handles parallelism; tasks are long-running and IO-bound |
 | Filesystem persistence, no DB | Zero dependencies; atomic rename is crash-safe; human-readable for debugging |
 | SSE, not WebSocket | Simpler server-side; one-directional push is all the UI needs |
 | Ephemeral containers | No state leaks between tasks; each run starts clean |
 | Event sourcing (traces/) | Full audit trail; enables crash recovery and replay |
-| Board context (`board.json`) | Cross-task awareness; Claude can see sibling tasks to avoid conflicts |
+| Board context (`board.json`) | Cross-task awareness; agents can see sibling tasks to avoid conflicts |
 | Auto-detect container runtime | Supports both Podman and Docker transparently |
 
 ## Configuration
