@@ -11,6 +11,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// StartRefinementRequest is the optional body for POST /api/tasks/{id}/refine.
+type StartRefinementRequest struct {
+	UserInstructions string `json:"user_instructions"`
+}
+
 // StartRefinement starts a sandbox-based refinement run for a backlog task.
 // The sandbox agent explores the codebase and produces a detailed implementation spec.
 // POST /api/tasks/{id}/refine
@@ -29,6 +34,12 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		return
 	}
 
+	var req StartRefinementRequest
+	if r.ContentLength > 0 {
+		// Body is optional; ignore decode errors (empty or malformed body → no instructions).
+		json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+	}
+
 	job := &store.RefinementJob{
 		ID:        uuid.New().String(),
 		CreatedAt: time.Now(),
@@ -40,7 +51,11 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		return
 	}
 
+<<<<<<< Updated upstream
 	h.runner.RunRefinementBackground(id)
+=======
+	go h.runner.RunRefinement(id, strings.TrimSpace(req.UserInstructions))
+>>>>>>> Stashed changes
 
 	updated, err := h.store.GetTask(r.Context(), id)
 	if err != nil {

@@ -39,6 +39,8 @@ function updateRefineUI(task) {
     errorSec.classList.add('hidden');
     const idleDesc = document.getElementById('refine-idle-desc');
     if (idleDesc) idleDesc.classList.add('hidden');
+    const instrSec = document.getElementById('refine-instructions-section');
+    if (instrSec) instrSec.classList.add('hidden');
 
     // Attach log stream if this is the active task and not already streaming.
     if (refineTaskId === task.id && !refineLogsAbort) {
@@ -55,6 +57,8 @@ function updateRefineUI(task) {
     errorSec.classList.add('hidden');
     const idleDesc = document.getElementById('refine-idle-desc');
     if (idleDesc) idleDesc.classList.add('hidden');
+    const instrSec = document.getElementById('refine-instructions-section');
+    if (instrSec) instrSec.classList.add('hidden');
     stopRefineLogStream();
 
     // Only populate the textarea if it is empty or this is the first population.
@@ -82,6 +86,8 @@ function showRefineIdle(startBtn, cancelBtn, running, resultSec, errorSec) {
   errorSec.classList.add('hidden');
   const idleDesc = document.getElementById('refine-idle-desc');
   if (idleDesc) idleDesc.classList.remove('hidden');
+  const instrSec = document.getElementById('refine-instructions-section');
+  if (instrSec) instrSec.classList.remove('hidden');
 }
 
 // startRefinement is called by the "Start" button.
@@ -106,7 +112,11 @@ async function startRefinement() {
   if (resultTA) delete resultTA.dataset.jobId;
 
   try {
-    await api(`/api/tasks/${currentTaskId}/refine`, { method: 'POST' });
+    const userInstructions = document.getElementById('refine-user-instructions')?.value.trim() || '';
+    await api(`/api/tasks/${currentTaskId}/refine`, {
+      method: 'POST',
+      body: JSON.stringify({ user_instructions: userInstructions }),
+    });
     // SSE task stream will push the updated task; updateRefineUI handles the rest.
   } catch (e) {
     const errorSec = document.getElementById('refine-error-section');
@@ -213,6 +223,10 @@ function resetRefinePanel() {
   if (errorSec)  errorSec.classList.add('hidden');
   const idleDesc = document.getElementById('refine-idle-desc');
   if (idleDesc) idleDesc.classList.remove('hidden');
+  const instrSec = document.getElementById('refine-instructions-section');
+  if (instrSec) instrSec.classList.remove('hidden');
+  const instrTA = document.getElementById('refine-user-instructions');
+  if (instrTA) instrTA.value = '';
   const resultTA = document.getElementById('refine-result-prompt');
   if (resultTA) delete resultTA.dataset.jobId;
   refineRawLogBuffer = '';

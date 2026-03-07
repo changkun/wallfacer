@@ -55,7 +55,9 @@ DO NOT implement anything — only produce the spec.`
 // RunRefinement runs the sandbox agent in read-only mode to produce a
 // detailed implementation spec for the task's current prompt. The task
 // stays in backlog; only CurrentRefinement is updated to track state.
-func (r *Runner) RunRefinement(taskID uuid.UUID) {
+// userInstructions is an optional hint from the user that narrows the
+// agent's focus (e.g. "keep backward compatibility").
+func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	bgCtx := context.Background()
 	ctx, cancel := context.WithTimeout(bgCtx, refinementTimeout)
 	defer cancel()
@@ -67,6 +69,9 @@ func (r *Runner) RunRefinement(taskID uuid.UUID) {
 	}
 
 	prompt := fmt.Sprintf(refinementPromptTemplate, task.Prompt)
+	if strings.TrimSpace(userInstructions) != "" {
+		prompt += "\n\nAdditional focus from the user:\n<user_instructions>\n" + strings.TrimSpace(userInstructions) + "\n</user_instructions>"
+	}
 
 	output, _, _, err := r.runRefinementContainer(ctx, taskID, prompt, task.Model)
 	if err != nil {

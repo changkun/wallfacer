@@ -620,6 +620,12 @@
             Launch a sandbox agent to analyze the codebase and write a detailed spec. Review, edit, then apply it as the task prompt.
           </div>
 
+          <!-- Optional user instructions for the refinement agent (shown when idle) -->
+          <div id="refine-instructions-section" style="margin-top:10px;">
+            <label for="refine-user-instructions" class="text-xs text-v-muted">Focus or context (optional)</label>
+            <textarea id="refine-user-instructions" rows="3" class="field" style="margin-top:4px;font-size:12px;resize:vertical;" placeholder="E.g. Focus on performance, keep backward compatibility, prefer existing patterns…"></textarea>
+          </div>
+
           <!-- Running state: spinner + live log output -->
           <div id="refine-running" class="hidden">
             <div class="flex items-center justify-between mb-2">
