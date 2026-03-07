@@ -20,6 +20,9 @@ import (
 // Returns (worktreePaths, branchName, error).
 // Idempotent: if the worktree/snapshot directory already exists it is reused.
 func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, error) {
+	r.worktreeMu.Lock()
+	defer r.worktreeMu.Unlock()
+
 	branchName := "task/" + taskID.String()[:8]
 	worktreePaths := make(map[string]string)
 
@@ -66,11 +69,14 @@ func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, er
 
 // CleanupWorktrees is the exported variant of cleanupWorktrees for handler use.
 func (r *Runner) CleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]string, branchName string) {
+	r.worktreeMu.Lock()
+	defer r.worktreeMu.Unlock()
 	r.cleanupWorktrees(taskID, worktreePaths, branchName)
 }
 
 // cleanupWorktrees removes all worktrees/snapshots for a task and the task's
-// directory. Safe to call multiple times — errors are logged as warnings.
+// directory. Must be called with r.worktreeMu held (use CleanupWorktrees for
+// the public API). Safe to call multiple times — errors are logged as warnings.
 func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]string, branchName string) {
 	for repoPath, wt := range worktreePaths {
 		if !gitutil.IsGitRepo(repoPath) || !gitutil.HasCommits(repoPath) {
@@ -83,7 +89,7 @@ func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 		}
 	}
 	taskWorktreeDir := filepath.Join(r.worktreesDir, taskID.String())
-	if err := os.RemoveAll(taskWorktreeDir); err != nil {
+	if err := os.RemoveAll(taskWorktreeDir); err != nil && !os.IsNotExist(err) {
 		logger.Runner.Warn("remove worktree dir", "task", taskID, "error", err)
 	}
 }
@@ -92,6 +98,9 @@ func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 // match any known task, removes them, and runs `git worktree prune` on all
 // git workspaces to clean up stale internal references.
 func (r *Runner) PruneOrphanedWorktrees(s *store.Store) {
+	r.worktreeMu.Lock()
+	defer r.worktreeMu.Unlock()
+
 	entries, err := os.ReadDir(r.worktreesDir)
 	if err != nil {
 		if !os.IsNotExist(err) {

@@ -224,6 +224,7 @@ type Runner struct {
 	workspaces           string
 	worktreesDir         string
 	instructionsPath     string
+	worktreeMu           sync.Mutex     // serializes all worktree filesystem operations on worktreesDir
 	repoMu               sync.Map       // per-repo *sync.Mutex for serializing rebase+merge
 	containerNames       sync.Map       // taskID (string) → container name (string)
 	refineContainerNames sync.Map       // taskID (string) → refinement container name (string)
