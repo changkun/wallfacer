@@ -151,9 +151,12 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   flex: 2; min-width: 0; overflow-y: auto; max-height: calc(95vh - 80px);
   border-right: 1px solid var(--border); padding-right: 28px; margin-right: 28px;
 }
-.modal-wide #modal-right,
+.modal-wide #modal-right {
+  flex: 3; min-width: 0; overflow-y: auto; max-height: calc(95vh - 80px);
+}
 .modal-wide #modal-backlog-right {
   flex: 3; min-width: 0; overflow-y: auto; max-height: calc(95vh - 80px);
+  display: flex; flex-direction: column;
 }
 .modal-wide .logs-block {
   max-height: 560px;
@@ -1058,6 +1061,10 @@ pre.result-entry-body {
   flex-direction: column;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+}
+#refine-chat-area {
+  display: flex;
+  flex-direction: column;
 }
 .refine-messages {
   overflow-y: auto;
