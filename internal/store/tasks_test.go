@@ -50,7 +50,7 @@ func TestCreateTask_Basic(t *testing.T) {
 	if task.Prompt != "my prompt" {
 		t.Errorf("Prompt = %q, want 'my prompt'", task.Prompt)
 	}
-	if task.Status != "backlog" {
+	if task.Status != TaskStatusBacklog {
 		t.Errorf("Status = %q, want 'backlog'", task.Status)
 	}
 	if task.Timeout != 10 {
@@ -111,7 +111,7 @@ func TestCreateTask_PersistsToDisk(t *testing.T) {
 func TestCreateTask_PositionOnlyCountsBacklog(t *testing.T) {
 	s := newTestStore(t)
 	t1, _ := s.CreateTask(bg(), "a", 5, false, "")
-	s.UpdateTaskStatus(bg(), t1.ID, "done")
+	s.UpdateTaskStatus(bg(), t1.ID, TaskStatusDone)
 	t2, _ := s.CreateTask(bg(), "b", 5, false, "")
 	// No backlog tasks exist, so maxPos = -1 and t2 gets position 0.
 	if t2.Position != 0 {
@@ -260,18 +260,18 @@ func TestUpdateTaskStatus(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
-	if err := s.UpdateTaskStatus(bg(), task.ID, "in_progress"); err != nil {
+	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
-	if got.Status != "in_progress" {
+	if got.Status != TaskStatusInProgress {
 		t.Errorf("Status = %q, want 'in_progress'", got.Status)
 	}
 }
 
 func TestUpdateTaskStatus_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.UpdateTaskStatus(bg(), uuid.New(), "done"); err == nil {
+	if err := s.UpdateTaskStatus(bg(), uuid.New(), TaskStatusDone); err == nil {
 		t.Error("expected error for unknown task")
 	}
 }
@@ -568,7 +568,7 @@ func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
 func TestResetTaskForRetry_PreservesMountWorktrees(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "mount retry", 5, true, "")
-	s.UpdateTaskStatus(bg(), task.ID, "done")
+	s.UpdateTaskStatus(bg(), task.ID, TaskStatusDone)
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "retry prompt", true); err != nil {
 		t.Fatalf("ResetTaskForRetry: %v", err)
@@ -587,7 +587,7 @@ func TestResetTaskForRetry_PreservesMountWorktrees(t *testing.T) {
 func TestResetTaskForRetry(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "original prompt", 5, false, "")
-	s.UpdateTaskStatus(bg(), task.ID, "done")
+	s.UpdateTaskStatus(bg(), task.ID, TaskStatusDone)
 	s.UpdateTaskResult(bg(), task.ID, "some result", "sess", "end_turn", 2)
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "new prompt", true); err != nil {
@@ -595,7 +595,7 @@ func TestResetTaskForRetry(t *testing.T) {
 	}
 
 	got, _ := s.GetTask(bg(), task.ID)
-	if got.Status != "backlog" {
+	if got.Status != TaskStatusBacklog {
 		t.Errorf("Status = %q, want 'backlog'", got.Status)
 	}
 	if got.Prompt != "new prompt" {
@@ -701,13 +701,13 @@ func TestSetTaskArchived_NotFound(t *testing.T) {
 func TestResumeTask_SetsInProgress(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "p", 5, false, "")
-	s.UpdateTaskStatus(bg(), task.ID, "failed")
+	s.UpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
 
 	if err := s.ResumeTask(bg(), task.ID, nil); err != nil {
 		t.Fatalf("ResumeTask: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
-	if got.Status != "in_progress" {
+	if got.Status != TaskStatusInProgress {
 		t.Errorf("Status = %q, want 'in_progress'", got.Status)
 	}
 }
@@ -850,9 +850,9 @@ func TestConcurrentUpdateStatus(t *testing.T) {
 	task, _ := s.CreateTask(bg(), "p", 5, false, "")
 
 	var wg sync.WaitGroup
-	for _, status := range []string{"in_progress", "done", "failed", "backlog", "waiting"} {
+	for _, status := range []TaskStatus{TaskStatusInProgress, TaskStatusDone, TaskStatusFailed, TaskStatusBacklog, TaskStatusWaiting} {
 		wg.Add(1)
-		go func(st string) {
+		go func(st TaskStatus) {
 			defer wg.Done()
 			s.UpdateTaskStatus(bg(), task.ID, st)
 		}(status)

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"changkun.de/wallfacer/internal/store"
 )
 
 // TestGenerateBoardContext_Basic verifies that generateBoardContext produces
@@ -111,18 +113,18 @@ func TestCanMountWorktree(t *testing.T) {
 	noWT := map[string]string(nil)
 
 	cases := []struct {
-		status string
+		status store.TaskStatus
 		wt     map[string]string
 		want   bool
 	}{
-		{"backlog", existingWT, false},
-		{"in_progress", existingWT, false},
-		{"waiting", existingWT, true},
-		{"failed", existingWT, true},
-		{"done", existingWT, true},
-		{"done", noWT, false},
-		{"done", map[string]string{"/repo": "/nonexistent/path"}, false},
-		{"cancelled", existingWT, false},
+		{store.TaskStatusBacklog, existingWT, false},
+		{store.TaskStatusInProgress, existingWT, false},
+		{store.TaskStatusWaiting, existingWT, true},
+		{store.TaskStatusFailed, existingWT, true},
+		{store.TaskStatusDone, existingWT, true},
+		{store.TaskStatusDone, noWT, false},
+		{store.TaskStatusDone, map[string]string{"/repo": "/nonexistent/path"}, false},
+		{store.TaskStatusCancelled, existingWT, false},
 		{"archived", existingWT, false},
 	}
 

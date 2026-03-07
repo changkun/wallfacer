@@ -24,11 +24,11 @@ type BoardManifest struct {
 // BoardTask is a sanitized view of a single task exposed in board.json.
 // SessionID is deliberately absent to prevent session hijacking.
 type BoardTask struct {
-	ID            string          `json:"id"`
-	ShortID       string          `json:"short_id"`
-	Title         string          `json:"title,omitempty"`
-	Prompt        string          `json:"prompt"`
-	Status        string          `json:"status"`
+	ID            string           `json:"id"`
+	ShortID       string           `json:"short_id"`
+	Title         string           `json:"title,omitempty"`
+	Prompt        string           `json:"prompt"`
+	Status        store.TaskStatus `json:"status"`
 	IsSelf        bool            `json:"is_self"`
 	Turns         int             `json:"turns"`
 	Result        *string         `json:"result"`
@@ -42,11 +42,11 @@ type BoardTask struct {
 
 // canMountWorktree reports whether a sibling task's worktrees are eligible
 // for read-only mounting based on its status.
-func canMountWorktree(status string, worktreePaths map[string]string) bool {
+func canMountWorktree(status store.TaskStatus, worktreePaths map[string]string) bool {
 	switch status {
-	case "waiting", "failed":
+	case store.TaskStatusWaiting, store.TaskStatusFailed:
 		return true
-	case "done":
+	case store.TaskStatusDone:
 		// Only if at least one worktree directory still exists on disk.
 		for _, wt := range worktreePaths {
 			if info, err := os.Stat(wt); err == nil && info.IsDir() {

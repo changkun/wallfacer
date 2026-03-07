@@ -32,12 +32,12 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "waiting" {
+	if task.Status != store.TaskStatusWaiting {
 		http.Error(w, "task is not in waiting status", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.store.UpdateTaskStatus(r.Context(), id, "in_progress"); err != nil {
+	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -46,8 +46,8 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		"message": req.Message,
 	})
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": "waiting",
-		"to":   "in_progress",
+		"from": string(store.TaskStatusWaiting),
+		"to":   string(store.TaskStatusInProgress),
 	})
 
 	sessionID := ""
@@ -66,50 +66,50 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "waiting" {
+	if task.Status != store.TaskStatusWaiting {
 		http.Error(w, "only waiting tasks can be completed", http.StatusBadRequest)
 		return
 	}
 
 	if task.SessionID != nil && *task.SessionID != "" {
 		// Transition to "committing" while auto-commit runs in the background.
-		if err := h.store.UpdateTaskStatus(r.Context(), id, "committing"); err != nil {
+		if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusCommitting); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-			"from": "waiting",
-			"to":   "committing",
+			"from": string(store.TaskStatusWaiting),
+			"to":   string(store.TaskStatusCommitting),
 		})
 		sessionID := *task.SessionID
 		go func() {
 			bgCtx := context.Background()
 			if err := h.runner.Commit(id, sessionID); err != nil {
-				h.store.UpdateTaskStatus(bgCtx, id, "failed")
+				h.store.UpdateTaskStatus(bgCtx, id, store.TaskStatusFailed)
 				h.store.InsertEvent(bgCtx, id, store.EventTypeError, map[string]string{
 					"error": "commit failed: " + err.Error(),
 				})
 				h.store.InsertEvent(bgCtx, id, store.EventTypeStateChange, map[string]string{
-					"from": "committing",
-					"to":   "failed",
+					"from": string(store.TaskStatusCommitting),
+					"to":   string(store.TaskStatusFailed),
 				})
 				return
 			}
-			h.store.UpdateTaskStatus(bgCtx, id, "done")
+			h.store.UpdateTaskStatus(bgCtx, id, store.TaskStatusDone)
 			h.store.InsertEvent(bgCtx, id, store.EventTypeStateChange, map[string]string{
-				"from": "committing",
-				"to":   "done",
+				"from": string(store.TaskStatusCommitting),
+				"to":   string(store.TaskStatusDone),
 			})
 		}()
 	} else {
 		// No session to commit — go directly to done.
-		if err := h.store.UpdateTaskStatus(r.Context(), id, "done"); err != nil {
+		if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusDone); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-			"from": "waiting",
-			"to":   "done",
+			"from": string(store.TaskStatusWaiting),
+			"to":   string(store.TaskStatusDone),
 		})
 	}
 
@@ -124,11 +124,11 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	cancellable := map[string]bool{
-		"backlog":     true,
-		"in_progress": true,
-		"waiting":     true,
-		"failed":      true,
+	cancellable := map[store.TaskStatus]bool{
+		store.TaskStatusBacklog:    true,
+		store.TaskStatusInProgress: true,
+		store.TaskStatusWaiting:    true,
+		store.TaskStatusFailed:     true,
 	}
 	if !cancellable[task.Status] {
 		http.Error(w, "task cannot be cancelled in its current status", http.StatusBadRequest)
@@ -138,19 +138,19 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	oldStatus := task.Status
 
 	// For in_progress tasks: kill the running container first.
-	if oldStatus == "in_progress" {
+	if oldStatus == store.TaskStatusInProgress {
 		h.runner.KillContainer(id)
 	}
 
 	// Persist the cancelled status BEFORE cleaning up worktrees.
-	if err := h.store.UpdateTaskStatus(r.Context(), id, "cancelled"); err != nil {
+	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusCancelled); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": oldStatus,
-		"to":   "cancelled",
+		"from": string(oldStatus),
+		"to":   string(store.TaskStatusCancelled),
 	})
 
 	if len(task.WorktreePaths) > 0 {
@@ -173,7 +173,7 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "failed" {
+	if task.Status != store.TaskStatusFailed {
 		http.Error(w, "only failed tasks can be resumed", http.StatusBadRequest)
 		return
 	}
@@ -188,8 +188,8 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": "failed",
-		"to":   "in_progress",
+		"from": string(store.TaskStatusFailed),
+		"to":   string(store.TaskStatusInProgress),
 	})
 
 	h.runner.RunBackground(id, "continue", *task.SessionID, false)
@@ -219,7 +219,7 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "done" && task.Status != "cancelled" {
+	if task.Status != store.TaskStatusDone && task.Status != store.TaskStatusCancelled {
 		http.Error(w, "only done or cancelled tasks can be archived", http.StatusBadRequest)
 		return
 	}
@@ -265,7 +265,7 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "waiting" {
+	if task.Status != store.TaskStatusWaiting {
 		http.Error(w, "only waiting tasks can be tested", http.StatusBadRequest)
 		return
 	}
@@ -290,13 +290,13 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	}
 
 	// Transition waiting → in_progress.
-	if err := h.store.UpdateTaskStatus(r.Context(), id, "in_progress"); err != nil {
+	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": "waiting",
-		"to":   "in_progress",
+		"from": string(store.TaskStatusWaiting),
+		"to":   string(store.TaskStatusInProgress),
 	})
 	h.store.InsertEvent(r.Context(), id, store.EventTypeSystem, map[string]string{
 		"result":      "Test verification started",
@@ -395,7 +395,7 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "waiting" && task.Status != "failed" {
+	if task.Status != store.TaskStatusWaiting && task.Status != store.TaskStatusFailed {
 		http.Error(w, "only waiting or failed tasks with worktrees can be synced", http.StatusBadRequest)
 		return
 	}
@@ -405,13 +405,13 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	}
 
 	oldStatus := task.Status
-	if err := h.store.UpdateTaskStatus(r.Context(), id, "in_progress"); err != nil {
+	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": oldStatus,
-		"to":   "in_progress",
+		"from": string(oldStatus),
+		"to":   string(store.TaskStatusInProgress),
 	})
 
 	sessionID := ""

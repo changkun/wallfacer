@@ -36,6 +36,19 @@ type RefinementSession struct {
 	ResultPrompt string              `json:"result_prompt,omitempty"`
 }
 
+// TaskStatus represents the lifecycle state of a task.
+type TaskStatus string
+
+const (
+	TaskStatusBacklog    TaskStatus = "backlog"
+	TaskStatusInProgress TaskStatus = "in_progress"
+	TaskStatusWaiting    TaskStatus = "waiting"
+	TaskStatusCommitting TaskStatus = "committing"
+	TaskStatusDone       TaskStatus = "done"
+	TaskStatusFailed     TaskStatus = "failed"
+	TaskStatusCancelled  TaskStatus = "cancelled"
+)
+
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
 	ID             uuid.UUID           `json:"id"`
@@ -43,7 +56,7 @@ type Task struct {
 	Prompt         string              `json:"prompt"`
 	PromptHistory  []string            `json:"prompt_history,omitempty"`
 	RefineSessions []RefinementSession `json:"refine_sessions,omitempty"`
-	Status        string    `json:"status"`
+	Status        TaskStatus `json:"status"`
 	Archived      bool      `json:"archived,omitempty"`
 	SessionID     *string   `json:"session_id"`
 	FreshStart    bool      `json:"fresh_start,omitempty"`

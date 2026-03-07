@@ -81,7 +81,7 @@ func TestUpdateEnvConfig_TriggersAutoPromote(t *testing.T) {
 
 	if !promoted {
 		tasks, _ := h.store.ListTasks(ctx, false)
-		status := "unknown"
+		status := store.TaskStatus("unknown")
 		if len(tasks) > 0 {
 			status = tasks[0].Status
 		}
