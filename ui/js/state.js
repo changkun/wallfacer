@@ -28,5 +28,10 @@ let autopilot = false;
 // Max parallel tasks (loaded from /api/env, 0 = not yet loaded)
 let maxParallelTasks = 0;
 
+// Refine logs state
+let refineRawLogBuffer = '';
+// refineLogsMode: 'pretty' | 'raw'
+let refineLogsMode = 'pretty';
+
 // Debounce timer for backlog prompt auto-save
 let editDebounce = null;

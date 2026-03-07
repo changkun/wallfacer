@@ -94,9 +94,12 @@ async function startRefinement() {
 
   refineTaskId = currentTaskId;
 
-  // Clear prior log output.
+  // Clear prior log output and reset mode.
+  refineRawLogBuffer = '';
+  refineLogsMode = 'pretty';
+  setRefineLogsMode('pretty');
   const logsEl = document.getElementById('refine-logs');
-  if (logsEl) logsEl.textContent = '';
+  if (logsEl) logsEl.innerHTML = '';
 
   // Clear prior result textarea job-id so result gets populated fresh.
   const resultTA = document.getElementById('refine-result-prompt');
@@ -124,13 +127,38 @@ async function cancelRefinement() {
   }
 }
 
+// renderRefineLogs re-renders the refine log area from refineRawLogBuffer.
+function renderRefineLogs() {
+  const logsEl = document.getElementById('refine-logs');
+  if (!logsEl) return;
+  const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 80;
+  if (refineLogsMode === 'pretty') {
+    logsEl.innerHTML = renderPrettyLogs(refineRawLogBuffer);
+  } else {
+    logsEl.textContent = refineRawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+  }
+  if (atBottom) {
+    logsEl.scrollTop = logsEl.scrollHeight;
+  }
+}
+
+// setRefineLogsMode switches between 'pretty' and 'raw' and re-renders.
+function setRefineLogsMode(mode) {
+  refineLogsMode = mode;
+  ['pretty', 'raw'].forEach(function(m) {
+    const tab = document.getElementById('refine-logs-tab-' + m);
+    if (tab) tab.classList.toggle('active', m === mode);
+  });
+  renderRefineLogs();
+}
+
 // startRefineLogStream opens a streaming fetch to /api/tasks/{id}/refine/logs
-// and appends lines to the log display area.
+// and accumulates chunks into refineRawLogBuffer for pretty/raw rendering.
 function startRefineLogStream(taskId) {
   if (refineLogsAbort) return; // already streaming
   refineLogsAbort = new AbortController();
 
-  const logsEl = document.getElementById('refine-logs');
+  const decoder = new TextDecoder();
 
   fetch(`/api/tasks/${taskId}/refine/logs`, { signal: refineLogsAbort.signal })
     .then(async resp => {
@@ -144,15 +172,11 @@ function startRefineLogStream(taskId) {
         return;
       }
       const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const text = decoder.decode(value, { stream: true });
-        if (logsEl) {
-          logsEl.textContent += text;
-          logsEl.scrollTop = logsEl.scrollHeight;
-        }
+        refineRawLogBuffer += decoder.decode(value, { stream: true });
+        renderRefineLogs();
       }
       refineLogsAbort = null;
     })
@@ -191,8 +215,14 @@ function resetRefinePanel() {
   if (idleDesc) idleDesc.classList.remove('hidden');
   const resultTA = document.getElementById('refine-result-prompt');
   if (resultTA) delete resultTA.dataset.jobId;
+  refineRawLogBuffer = '';
+  refineLogsMode = 'pretty';
+  ['pretty', 'raw'].forEach(function(m) {
+    const tab = document.getElementById('refine-logs-tab-' + m);
+    if (tab) tab.classList.toggle('active', m === 'pretty');
+  });
   const logsEl = document.getElementById('refine-logs');
-  if (logsEl) logsEl.textContent = '';
+  if (logsEl) logsEl.innerHTML = '';
 }
 
 // applyRefinement POSTs the (possibly edited) spec as the new task prompt.

@@ -611,9 +611,15 @@
 
           <!-- Running state: spinner + live log output -->
           <div id="refine-running" class="hidden">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="spinner" style="width:12px;height:12px;border-width:2px;"></span>
-              <span class="text-xs text-v-muted">Sandbox agent is analyzing the codebase and writing a spec…</span>
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="spinner" style="width:12px;height:12px;border-width:2px;"></span>
+                <span class="text-xs text-v-muted">Sandbox agent is analyzing the codebase and writing a spec…</span>
+              </div>
+              <div class="logs-tabs">
+                <button id="refine-logs-tab-pretty" onclick="setRefineLogsMode('pretty')" class="logs-tab active">Pretty</button>
+                <button id="refine-logs-tab-raw" onclick="setRefineLogsMode('raw')" class="logs-tab">Raw</button>
+              </div>
             </div>
             <pre id="refine-logs" class="logs-block" style="font-size:11px;"></pre>
           </div>
