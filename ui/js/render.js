@@ -236,6 +236,8 @@ function updateCard(card, t) {
     ? `<span class="badge badge-test-pass" title="Verification passed">\u2713 verified</span>`
     : t.last_test_result === 'fail'
     ? `<span class="badge badge-test-fail" title="Verification failed">\u2717 verify failed</span>`
+    : t.last_test_result === 'unknown'
+    ? `<span class="badge badge-test-none" title="Tested \u2014 no clear verdict detected">no verdict</span>`
     : t.status === 'waiting'
     ? `<span class="badge badge-test-none" title="Not yet verified">unverified</span>`
     : '';
