@@ -87,6 +87,12 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	turns := task.Turns
 
+	// testSessionID tracks the test agent's Claude Code session across turns
+	// so that multi-turn test runs (max_tokens/pause_turn) can resume their
+	// own session rather than starting a fresh empty-prompt session.
+	// It is kept separate from sessionID which holds the implementation session.
+	var testSessionID string
+
 	// Claude Code's -p --resume mode reports per-invocation totals for both
 	// cost (total_cost_usd) and usage tokens — they are NOT session-cumulative.
 	// Each container invocation's values represent only that invocation's
@@ -170,6 +176,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if isTestRun {
 			// During a test run, preserve the implementation agent's result and
 			// session ID — only track the turn count so progress is visible.
+			// Also capture the test agent's session ID for multi-turn continuation.
+			if output.SessionID != "" {
+				testSessionID = output.SessionID
+			}
 			r.store.UpdateTaskTurns(bgCtx, taskID, turns)
 		} else {
 			if output.SessionID != "" {
@@ -234,6 +244,11 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		case "max_tokens", "pause_turn":
 			logger.Runner.Info("auto-continuing", "task", taskID, "stop_reason", output.StopReason)
 			prompt = ""
+			// For test runs, resume the test agent's own session rather than
+			// the implementation session (which must be preserved untouched).
+			if isTestRun && testSessionID != "" {
+				sessionID = testSessionID
+			}
 			continue
 
 		default:
@@ -243,6 +258,18 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				return
 			}
 			statusSet = true
+			if isTestRun {
+				// Test run ended without an explicit stop_reason. Record
+				// "unknown" so the UI shows "no verdict" instead of "unverified".
+				verdict := parseTestVerdict(output.Result)
+				if verdict == "" {
+					verdict = "unknown"
+				}
+				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+					"result": "Test verification complete: " + strings.ToUpper(verdict),
+				})
+			}
 			r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from": "in_progress", "to": "waiting",

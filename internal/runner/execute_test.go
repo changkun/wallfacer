@@ -838,6 +838,109 @@ func TestRunTestRunUnknownVerdictWhenNoMarker(t *testing.T) {
 	}
 }
 
+// TestRunTestRunDefaultStopReasonSetsUnknown verifies that when the test
+// agent's container produces an empty stop_reason (the "default" case), the
+// task is still correctly transitioned to "waiting" with last_test_result set
+// to "unknown" — NOT left as "" ("unverified"). This covers the scenario where
+// Claude Code's --verbose flag appends extra JSON after the result message and
+// parseOutput ends up returning the wrong line.
+func TestRunTestRunDefaultStopReasonSetsUnknown(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Implementation agent: pauses at "waiting" (empty stop_reason).
+	implOutput := `{"result":"impl done","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+	// Test agent: returns output with empty stop_reason (simulates parseOutput
+	// picking up a verbose/debug line instead of the real result message).
+	testOutput := `{"result":"","session_id":"test-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+
+	cmd := fakeStatefulCmd(t, []string{implOutput, testOutput})
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Default stop_reason test run", 5, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "implement the feature", "", false)
+
+	// Mark as test run and run the test agent.
+	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, "in_progress"); err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "verify the implementation", "", false)
+
+	afterTest, _ := s.GetTask(ctx, task.ID)
+	if afterTest.Status != "waiting" {
+		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
+	}
+	// Must NOT be "" (unverified) — must be "unknown" to show "no verdict".
+	if afterTest.LastTestResult != "unknown" {
+		t.Fatalf("expected last_test_result=unknown for empty stop_reason, got %q", afterTest.LastTestResult)
+	}
+	if afterTest.IsTestRun {
+		t.Fatal("IsTestRun should be false after test completion")
+	}
+}
+
+// TestRunTestRunMultiTurnContinuesWithTestSession verifies that when a test
+// agent hits max_tokens and the loop auto-continues, it resumes the test
+// agent's own session (not the implementation session) and correctly records
+// the verdict when the second turn produces end_turn.
+func TestRunTestRunMultiTurnContinuesWithTestSession(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Implementation agent: pauses at "waiting" (empty stop_reason).
+	implOutput := `{"result":"impl done","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+	// Test agent turn 1: hits max_tokens.
+	testTurn1 := `{"result":"partial verification","session_id":"test-sess","stop_reason":"max_tokens","is_error":false,"total_cost_usd":0.001}`
+	// Test agent turn 2: completes with PASS verdict.
+	testTurn2 := `{"result":"All checks passed.\n\n**PASS**","session_id":"test-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`
+
+	cmd := fakeStatefulCmd(t, []string{implOutput, testTurn1, testTurn2})
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Multi-turn test run", 5, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "implement the feature", "", false)
+
+	// Mark as test run and run the test agent.
+	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, "in_progress"); err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "verify the implementation", "", false)
+
+	afterTest, _ := s.GetTask(ctx, task.ID)
+	if afterTest.Status != "waiting" {
+		t.Fatalf("expected status=waiting after multi-turn test run, got %q", afterTest.Status)
+	}
+	if afterTest.LastTestResult != "pass" {
+		t.Fatalf("expected last_test_result=pass, got %q", afterTest.LastTestResult)
+	}
+	// Implementation result and session must be preserved.
+	if afterTest.Result == nil || *afterTest.Result != "impl done" {
+		t.Fatalf("test run overwrote implementation result; got %v", afterTest.Result)
+	}
+	if afterTest.SessionID == nil || *afterTest.SessionID != "impl-sess" {
+		t.Fatalf("test run overwrote implementation session; got %v", afterTest.SessionID)
+	}
+	if afterTest.IsTestRun {
+		t.Fatal("IsTestRun should be false after test completion")
+	}
+}
+
 // Ensure time is imported to avoid unused import warnings.
 var _ = time.Second
 

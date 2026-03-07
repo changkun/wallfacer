@@ -278,21 +278,40 @@ func (r *Runner) runContainer(
 }
 
 // parseOutput tries to parse raw as a single JSON object first; if that fails
-// it scans backwards through NDJSON lines looking for the last valid object.
+// it scans backwards through NDJSON lines looking for the result message.
+//
+// In Claude Code's stream-json format the final "result" message carries a
+// non-empty stop_reason ("end_turn", "max_tokens", etc.). Verbose or debug
+// lines may appear after the result message, so we prefer the last line that
+// has stop_reason set and fall back to the last valid JSON if none does.
 func parseOutput(raw string) (*claudeOutput, error) {
 	var output claudeOutput
 	if err := json.Unmarshal([]byte(raw), &output); err == nil {
 		return &output, nil
 	}
 	lines := strings.Split(raw, "\n")
+	var fallback *claudeOutput
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
 		if len(line) == 0 || line[0] != '{' {
 			continue
 		}
-		if err := json.Unmarshal([]byte(line), &output); err == nil {
-			return &output, nil
+		var candidate claudeOutput
+		if err := json.Unmarshal([]byte(line), &candidate); err != nil {
+			continue
 		}
+		if fallback == nil {
+			c := candidate
+			fallback = &c
+		}
+		// Prefer the message that has stop_reason set — that is the "result"
+		// message emitted by Claude Code at the end of every run.
+		if candidate.StopReason != "" {
+			return &candidate, nil
+		}
+	}
+	if fallback != nil {
+		return fallback, nil
 	}
 	return nil, fmt.Errorf("no valid JSON object found in output")
 }
