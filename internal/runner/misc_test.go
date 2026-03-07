@@ -956,3 +956,41 @@ func TestParseTestVerdict(t *testing.T) {
 		})
 	}
 }
+
+// TestParseOutputPrefersStopReason verifies that parseOutput returns the JSON
+// line with stop_reason set even when additional JSON lines appear after it
+// (e.g. verbose debug output appended by Claude Code's --verbose flag).
+func TestParseOutputPrefersStopReason(t *testing.T) {
+	// Simulate NDJSON stream where a debug/verbose line follows the result.
+	ndjson := `{"type":"system","session_id":"s1"}
+{"type":"assistant","session_id":"s1","message":{"content":[{"type":"text","text":"**PASS**"}]}}
+{"type":"result","subtype":"success","result":"All tests passed.\n\n**PASS**","session_id":"s1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.01}
+{"type":"debug","data":{"elapsed_ms":1234}}`
+
+	out, err := parseOutput(ndjson)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.StopReason != "end_turn" {
+		t.Fatalf("expected stop_reason=end_turn, got %q", out.StopReason)
+	}
+	if !strings.Contains(out.Result, "**PASS**") {
+		t.Fatalf("expected PASS in result, got %q", out.Result)
+	}
+}
+
+// TestParseOutputFallsBackToLastJSON verifies that when no JSON line has
+// stop_reason set, parseOutput still returns the last valid JSON object.
+func TestParseOutputFallsBackToLastJSON(t *testing.T) {
+	ndjson := `{"type":"system","session_id":"s1"}
+{"type":"assistant","session_id":"s2"}`
+
+	out, err := parseOutput(ndjson)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// No stop_reason set, but last valid JSON should be returned as fallback.
+	if out.SessionID != "s2" {
+		t.Fatalf("expected session_id=s2 from last JSON, got %q", out.SessionID)
+	}
+}
