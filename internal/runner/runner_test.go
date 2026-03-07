@@ -1455,6 +1455,73 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Runner.Shutdown
+// ---------------------------------------------------------------------------
+
+// TestRunnerShutdownNoGoroutines verifies that Shutdown returns immediately
+// when no background goroutines are tracked.
+func TestRunnerShutdownNoGoroutines(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		r.Shutdown()
+	}()
+
+	select {
+	case <-done:
+		// success — returned without blocking
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown did not return promptly when no background goroutines exist")
+	}
+}
+
+// TestRunnerShutdownWaitsForBackground verifies that Shutdown blocks until all
+// tracked background goroutines finish, then returns.
+func TestRunnerShutdownWaitsForBackground(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+
+	started := make(chan struct{})
+	finish := make(chan struct{})
+
+	// Directly manipulate backgroundWg to simulate an in-flight background
+	// goroutine (e.g. oversight generation) without launching a real container.
+	r.backgroundWg.Add(1)
+	go func() {
+		defer r.backgroundWg.Done()
+		close(started)
+		<-finish // hold until test releases it
+	}()
+
+	<-started // ensure goroutine is running before we call Shutdown
+
+	shutdownDone := make(chan struct{})
+	go func() {
+		defer close(shutdownDone)
+		r.Shutdown()
+	}()
+
+	// Shutdown must be blocked while the background goroutine is still running.
+	select {
+	case <-shutdownDone:
+		t.Fatal("Shutdown returned before the background goroutine finished")
+	case <-time.After(100 * time.Millisecond):
+		// expected: still waiting
+	}
+
+	// Release the goroutine and verify Shutdown now completes.
+	close(finish)
+
+	select {
+	case <-shutdownDone:
+		// success
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown did not return after the background goroutine finished")
+	}
+}
+
 // TestCommitPipelineNoChangesStoresBaseHash verifies that BaseCommitHashes is
 // populated even when the task has no commits to merge (early return path).
 func TestCommitPipelineNoChangesStoresBaseHash(t *testing.T) {

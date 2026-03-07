@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"changkun.de/wallfacer/internal/handler"
@@ -120,13 +122,17 @@ func runServer(configDir string, args []string) {
 
 	h := handler.NewHandler(s, r, configDir, workspaces)
 
+	// Set up signal-based context so background workers stop on SIGTERM/Interrupt.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+	defer stop()
+
 	// Start the auto-promoter: watches for state changes and promotes
 	// backlog tasks to in_progress when capacity is available.
-	h.StartAutoPromoter(context.Background())
+	h.StartAutoPromoter(ctx)
 
 	// Start the ideation watcher: when ideation is enabled and an idea-agent
 	// task completes, automatically enqueues the next one.
-	h.StartIdeationWatcher(context.Background())
+	h.StartIdeationWatcher(ctx)
 
 	mux := buildMux(h, r)
 
@@ -149,10 +155,39 @@ func runServer(configDir string, args []string) {
 		go openBrowser(fmt.Sprintf("http://%s:%d", browserHost, actualPort))
 	}
 
+	srv := &http.Server{Handler: loggingMiddleware(mux)}
+
+	// Serve in a background goroutine so we can react to the shutdown signal.
+	srvErr := make(chan error, 1)
+	go func() {
+		srvErr <- srv.Serve(ln)
+	}()
+
 	logger.Main.Info("listening", "addr", ln.Addr().String())
-	if err := http.Serve(ln, loggingMiddleware(mux)); err != nil {
-		logger.Fatal(logger.Main, "server", "error", err)
+
+	// Block until a shutdown signal arrives or the server exits on its own.
+	select {
+	case <-ctx.Done():
+		logger.Main.Info("received shutdown signal, shutting down gracefully")
+	case err := <-srvErr:
+		if err != nil && err != http.ErrServerClosed {
+			logger.Fatal(logger.Main, "server", "error", err)
+		}
+		return
 	}
+
+	// Give in-flight HTTP requests up to 30 seconds to complete.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Main.Error("http server shutdown", "error", err)
+	}
+
+	// Wait for background runner goroutines (oversight generation, title
+	// generation, etc.) to finish before the process exits.
+	r.Shutdown()
+
+	logger.Main.Info("shutdown complete")
 }
 
 // buildMux constructs the HTTP request router.

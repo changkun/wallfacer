@@ -240,6 +240,16 @@ func (r *Runner) WaitBackground() {
 	r.backgroundWg.Wait()
 }
 
+// Shutdown waits for all tracked background goroutines to complete before
+// returning. Call this after the HTTP server has stopped accepting new requests
+// to ensure that oversight generation, title generation, and other
+// fire-and-forget work finishes before the process exits.
+// In-progress task containers are intentionally left running; they continue
+// to completion independently and will be recovered on the next server start.
+func (r *Runner) Shutdown() {
+	r.backgroundWg.Wait()
+}
+
 // RunBackground launches Run in a background goroutine tracked by backgroundWg.
 // Callers (handlers, autopilot) should use this instead of a bare "go r.Run(...)"
 // so that WaitBackground can drain all outstanding work — particularly useful
