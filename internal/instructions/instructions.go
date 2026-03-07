@@ -18,12 +18,16 @@ This file provides guidance to Claude Code when working on tasks in this workspa
 
 ## General Notes
 
-- You are operating inside a Wallfacer task. Complete the task described in the prompt.
+- Complete the task described in the prompt.
 - Make focused, well-scoped changes. Prefer editing existing files over creating new ones.
 - Avoid over-engineering: only make changes that are directly requested or clearly necessary.
 - Run tests if available to verify your changes work correctly.
 - Write clear, descriptive commit messages explaining the "why" not just the "what".
 - Do not create documentation files or README updates unless explicitly requested.
+- Think deliberately, modularize and reuse if possible. Think about higher abstractions instead of narrow minded go ahead with implementation
+- Test-driven, write tests to reproduce the feature so that it can be tested reliably and prevent future regression
+- Ensure documents are updated accordingly
+- When asked to create plans or specs, write them under the ` + "`specs/`" + ` in the respective git repository, never under ` + "`.claude/specs/`" + `.
 
 ## Board Context
 
