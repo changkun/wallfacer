@@ -361,10 +361,10 @@ func (s *Store) UpdateTaskBaseCommitHashes(_ context.Context, id uuid.UUID, hash
 	return s.saveTask(id, t)
 }
 
-// clampTimeout ensures timeout stays in [1, 1440] minutes with a default of 5.
+// clampTimeout ensures timeout stays in [1, 1440] minutes with a default of 60.
 func clampTimeout(v int) int {
 	if v <= 0 {
-		return 5
+		return 60
 	}
 	if v > 1440 {
 		return 1440

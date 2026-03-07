@@ -149,7 +149,7 @@ func (r *Runner) ListContainers() ([]ContainerInfo, error) {
 
 const (
 	maxRebaseRetries   = 3
-	defaultTaskTimeout = 15 * time.Minute
+	defaultTaskTimeout = 60 * time.Minute
 )
 
 // RunnerConfig holds all configuration needed to construct a Runner.
