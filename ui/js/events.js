@@ -14,6 +14,8 @@ document.addEventListener('keydown', (e) => {
     if (!containerModal.classList.contains('hidden')) { closeContainerMonitor(); return; }
     const instructionsModal = document.getElementById('instructions-modal');
     if (instructionsModal && !instructionsModal.classList.contains('hidden')) { closeInstructionsEditor(); return; }
+    const settingsModal = document.getElementById('settings-modal');
+    if (settingsModal && !settingsModal.classList.contains('hidden')) { closeSettings(); return; }
     closeModal();
   }
 });
