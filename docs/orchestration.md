@@ -96,7 +96,7 @@ Each turn launches an ephemeral container via the configured runtime (Podman or 
 ```
 
 - `--rm` — container is destroyed on exit; no state leaks between tasks
-- `--env-file` — injects `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`), `ANTHROPIC_BASE_URL`, and any other variables from `~/.wallfacer/.env` into the container environment; Claude Code reads them natively
+- `--env-file` — injects `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`), `ANTHROPIC_BASE_URL`, and any other variables from `~/.wallfacer/.env` into the container environment
 - `--model` — per-task model takes priority; falls back to `WALLFACER_DEFAULT_MODEL` from the env file; the server re-reads the file on every container launch so changes take effect immediately without a restart
 - `--resume` — omitted on the first turn or when `FreshStart` is set
 - Output is captured as NDJSON, parsed, and saved to disk
@@ -116,11 +116,11 @@ Override with `CONTAINER_CMD` env var or `-container` flag. Both Podman and Dock
 
 ### Board Context
 
-Each container receives a read-only board context at `/workspace/.tasks/board.json`. This JSON manifest lists all non-archived tasks on the board — their prompts, statuses, results, branch names, and usage — so Claude has cross-task awareness and can avoid conflicting changes.
+Each container receives a read-only board context at `/workspace/.tasks/board.json`. This JSON manifest lists all non-archived tasks on the board — their prompts, statuses, results, branch names, and usage — so agents have cross-task awareness and can avoid conflicting changes.
 
 The current task is marked with `"is_self": true`. The manifest is regenerated before every turn to reflect the latest state.
 
-When `MountWorktrees` is enabled on a task, eligible sibling worktrees (from tasks in `waiting`, `failed`, or `done` status) are also mounted read-only under `/workspace/.tasks/worktrees/<short-id>/<repo>/`, allowing Claude to reference other tasks' in-progress code.
+When `MountWorktrees` is enabled on a task, eligible sibling worktrees (from tasks in `waiting`, `failed`, or `done` status) are also mounted read-only under `/workspace/.tasks/worktrees/<short-id>/<repo>/`, allowing the agent to reference other tasks' in-progress code.
 
 ## SSE Live Update Flow
 
@@ -156,7 +156,7 @@ Event traces are append-only. Each event is written as a separate file (`traces/
 
 ## Token Tracking & Cost
 
-Per-turn usage is extracted from the Claude Code JSON output and accumulated on the `Task`:
+Per-turn usage is extracted from the agent JSON output and accumulated on the `Task`:
 
 ```
 TaskUsage {
@@ -187,9 +187,9 @@ When `git rebase` fails during the commit pipeline:
 ```
 rebase fails with conflict
   ↓
-wallfacer invokes Claude Code (same session ID) with conflict details
+wallfacer invokes agent (same session ID) with conflict details
   ↓
-Claude resolves conflicts, stages files
+agent resolves conflicts, stages files
   ↓
 wallfacer runs `git rebase --continue`
   ↓
@@ -198,7 +198,7 @@ if still failing: repeat up to 3 times
 if all retries exhausted: mark task failed, clean up worktrees
 ```
 
-Using the same session ID means Claude has full context of the original task when making conflict resolution decisions.
+Using the same session ID means the agent has full context of the original task when making conflict resolution decisions.
 
 ## Test Verification Flow
 

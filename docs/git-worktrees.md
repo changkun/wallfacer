@@ -2,7 +2,7 @@
 
 ## Core Principle
 
-Every task gets its own git worktree. Claude Code operates in an isolated copy of each repository on a dedicated branch, leaving the main working tree untouched and allowing multiple tasks to run concurrently without interfering with each other.
+Every task gets its own git worktree. The agent operates in an isolated copy of each repository on a dedicated branch, leaving the main working tree untouched and allowing multiple tasks to run concurrently without interfering with each other.
 
 ```
 Main repo (~/projects/myapp)          Task worktree
@@ -50,7 +50,7 @@ The sandbox container sees worktrees, not the live main working directory:
 claude-config (named volume)           →  /home/claude/.claude
 ```
 
-Claude Code operates on `/workspace/<repo>` — the isolated worktree branch — so all edits land on `task/<uuid8>` and never touch `main`.
+The agent operates on `/workspace/<repo>` — the isolated worktree branch — so all edits land on `task/<uuid8>` and never touch `main`.
 
 ## Commit Pipeline
 
@@ -82,7 +82,7 @@ git merge --ff-only <task-branch>
 2. Current `HEAD` branch name
 3. Falls back to `"main"`
 
-**Conflict resolution loop:** If `git rebase` exits non-zero, Wallfacer invokes Claude Code again — using the original task's session ID — passing it the conflict details. Claude resolves the conflicts and stages the result. The rebase is then continued and retried. Up to 3 attempts are made before the task is marked `failed`.
+**Conflict resolution loop:** If `git rebase` exits non-zero, Wallfacer invokes the agent again — using the original task's session ID — passing it the conflict details. The agent resolves the conflicts and stages the result. The rebase is then continued and retried. Up to 3 attempts are made before the task is marked `failed`.
 
 ### Phase 3 — Cleanup
 
@@ -116,7 +116,7 @@ task status → in_progress (temporarily)
 for each worktree:
   git fetch origin
   git rebase <default-branch>
-    └─ on conflict: invoke Claude Code (same session) to resolve, up to 3 retries
+    └─ on conflict: invoke agent (same session) to resolve, up to 3 retries
   ↓
 task status → previous status (waiting or failed)    [conflicts resolved]
   ↓
