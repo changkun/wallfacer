@@ -230,12 +230,12 @@ function updateCard(card, t) {
     card.classList.remove('card-cancelled-done');
   }
   const priorityBadge = t.status === 'backlog' ? `<span class="badge badge-priority" title="Priority #${t.position + 1}">#${t.position + 1}</span>` : '';
-  const testResultBadge = t.status === 'waiting'
-    ? (t.last_test_result === 'pass'
-        ? `<span class="badge badge-test-pass" title="Verification passed">\u2713 verified</span>`
-        : t.last_test_result === 'fail'
-        ? `<span class="badge badge-test-fail" title="Verification failed">\u2717 verify failed</span>`
-        : `<span class="badge badge-test-none" title="Not yet verified">unverified</span>`)
+  const testResultBadge = t.last_test_result === 'pass'
+    ? `<span class="badge badge-test-pass" title="Verification passed">\u2713 verified</span>`
+    : t.last_test_result === 'fail'
+    ? `<span class="badge badge-test-fail" title="Verification failed">\u2717 verify failed</span>`
+    : t.status === 'waiting'
+    ? `<span class="badge badge-test-none" title="Not yet verified">unverified</span>`
     : '';
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
