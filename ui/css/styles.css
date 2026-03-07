@@ -222,8 +222,8 @@ pre { white-space: pre-wrap; word-break: break-word; }
   font-size: 14px; color: var(--text-secondary);
 }
 .logs-block {
-  background: #131210; border-radius: 8px; padding: 16px;
-  font-size: 12px; color: #b1bac4; max-height: 384px;
+  background: #1a1917; border-radius: 8px; padding: 16px;
+  font-size: 12px; color: #cdd1d6; max-height: 384px;
   overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace;
 }
 
@@ -231,34 +231,34 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .cc-block { margin: 2px 0; line-height: 1.5; }
 .cc-marker { color: #79c0ff; margin-right: 6px; }
 .cc-marker-result { color: #3fb950; }
-.cc-text { color: #b1bac4; white-space: pre-wrap; word-break: break-word; }
-.cc-tool-call { color: #b1bac4; }
+.cc-text { color: #cdd1d6; white-space: pre-wrap; word-break: break-word; }
+.cc-tool-call { color: #cdd1d6; }
 .cc-tool-name { color: #ff79c6; font-weight: bold; }
 .cc-tool-input { color: #e3b341; font-weight: normal; word-break: break-all; }
 .cc-tool-result {
   display: flex; align-items: flex-start; gap: 6px;
-  padding-left: 18px; color: #8b949e;
+  padding-left: 18px; color: #9faab5;
 }
-.cc-result-pipe { color: #484f58; flex-shrink: 0; }
+.cc-result-pipe { color: #6e7681; flex-shrink: 0; }
 .cc-result-text {
   margin: 0; padding: 0; background: none; font-size: inherit;
   color: inherit; white-space: pre-wrap; word-break: break-word;
   font-family: inherit; line-height: inherit; max-width: 100%; overflow: hidden;
 }
-.cc-result-empty { color: #484f58; font-style: italic; }
+.cc-result-empty { color: #6e7681; font-style: italic; }
 .cc-expand { display: contents; }
 .cc-expand-toggle {
-  color: #484f58; cursor: pointer; font-size: 11px;
+  color: #6e7681; cursor: pointer; font-size: 11px;
   list-style: none; user-select: none;
 }
-.cc-expand-toggle:hover { color: #8b949e; }
+.cc-expand-toggle:hover { color: #9faab5; }
 .cc-expand-toggle::-webkit-details-marker { display: none; }
 .cc-final-result {
   color: #3fb950; white-space: pre-wrap; word-break: break-word;
-  margin-top: 8px; padding-top: 8px; border-top: 1px solid #484f58;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid #3d4450;
 }
 .cc-result-label { font-weight: bold; }
-.cc-stderr { color: #8b949e; }
+.cc-stderr { color: #9faab5; }
 
 /* --- Usage stats --- */
 .usage-grid {
@@ -1375,6 +1375,23 @@ pre.result-entry-body {
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
 [data-theme="light"] .oversight-tool { color: #a02870; }
+/* Inside the dark logs block, chips need a visible background regardless of theme */
+.logs-block .oversight-tool {
+  background: #2d2b27;
+  border-color: #484f58;
+}
+.logs-block .oversight-phase {
+  border-left-color: #484f58;
+}
+.logs-block .oversight-phase-num,
+.logs-block .oversight-phase-time,
+.logs-block .oversight-loading,
+.logs-block .oversight-empty {
+  color: #9faab5;
+}
+.logs-block .oversight-phase-title { color: #cdd1d6; }
+.logs-block .oversight-summary,
+.logs-block .oversight-actions { color: #b0b8c1; }
 .oversight-actions {
   margin: 0;
   padding-left: 16px;
