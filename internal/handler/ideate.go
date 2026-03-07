@@ -98,23 +98,37 @@ func (h *Handler) scheduleIdeation(ctx context.Context) {
 // ideaAgentPrompt is the user-visible prompt shown on idea-agent task cards.
 const ideaAgentPrompt = "Analyzes the workspace and proposes 3 actionable improvements."
 
-// createIdeaAgentTask creates a new idea-agent task card in the backlog.
-func (h *Handler) createIdeaAgentTask(ctx context.Context) {
+// createIdeaAgentTask creates a new idea-agent task card in the backlog and
+// returns it. Returns nil if creation fails.
+func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
 	task, err := h.store.CreateTask(ctx, ideaAgentPrompt, ideaAgentDefaultTimeout, false, "", store.TaskKindIdeaAgent)
 	if err != nil {
 		logger.Handler.Warn("ideation: create idea-agent task", "error", err)
-		return
+		return nil
 	}
 	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{
 		"to": string(store.TaskStatusBacklog),
 	})
 	logger.Handler.Info("ideation: queued new idea-agent task", "task", task.ID)
+	return task
 }
 
 // TriggerIdeation handles POST /api/ideate.
-// Creates an idea-agent task card in the backlog immediately.
+// Creates an idea-agent task card and immediately starts it regardless of
+// whether autopilot is enabled.
 func (h *Handler) TriggerIdeation(w http.ResponseWriter, r *http.Request) {
-	h.createIdeaAgentTask(r.Context())
+	task := h.createIdeaAgentTask(r.Context())
+	if task != nil {
+		if err := h.store.UpdateTaskStatus(r.Context(), task.ID, store.TaskStatusInProgress); err != nil {
+			logger.Handler.Error("ideation: promote idea-agent task", "task", task.ID, "error", err)
+		} else {
+			h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange, map[string]string{
+				"from": string(store.TaskStatusBacklog),
+				"to":   string(store.TaskStatusInProgress),
+			})
+			h.runner.RunBackground(task.ID, task.Prompt, "", false)
+		}
+	}
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"queued": true,
 	})
