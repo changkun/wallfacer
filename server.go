@@ -162,6 +162,9 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	// Container monitoring.
 	mux.HandleFunc("GET /api/containers", h.GetContainers)
 
+	// File listing for @ mention autocomplete.
+	mux.HandleFunc("GET /api/files", h.GetFiles)
+
 	// Configuration & instructions.
 	mux.HandleFunc("GET /api/config", h.GetConfig)
 	mux.HandleFunc("PUT /api/config", h.UpdateConfig)
