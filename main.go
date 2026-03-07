@@ -91,7 +91,9 @@ func runEnvCheck(configDir string) {
 		vals[strings.TrimSpace(k)] = strings.TrimSpace(v)
 	}
 
-	// Authentication: at least one token must be set.
+	// --- Claude Code sandbox ---
+	fmt.Println()
+	fmt.Println("Claude Code sandbox:")
 	oauthToken := vals["CLAUDE_CODE_OAUTH_TOKEN"]
 	apiKey := vals["ANTHROPIC_API_KEY"]
 	switch {
@@ -108,9 +110,8 @@ func runEnvCheck(configDir string) {
 		}
 		fmt.Printf("[ok] ANTHROPIC_API_KEY is set (%s)\n", masked)
 	default:
-		fmt.Printf("[!] No API token found in %s — set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY\n", envFile)
+		fmt.Printf("[ ] No Claude token set (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY)\n")
 	}
-
 	if v := vals["ANTHROPIC_BASE_URL"]; v != "" {
 		fmt.Printf("[ok] ANTHROPIC_BASE_URL = %s\n", v)
 	} else {
@@ -126,6 +127,36 @@ func runEnvCheck(configDir string) {
 	} else {
 		fmt.Printf("[ ] WALLFACER_TITLE_MODEL not set (falls back to default model)\n")
 	}
+
+	// --- OpenAI Codex sandbox ---
+	fmt.Println()
+	fmt.Println("OpenAI Codex sandbox:")
+	openAIKey := vals["OPENAI_API_KEY"]
+	if openAIKey != "" {
+		masked := openAIKey[:4] + "..." + openAIKey[len(openAIKey)-4:]
+		if len(openAIKey) <= 8 {
+			masked = strings.Repeat("*", len(openAIKey))
+		}
+		fmt.Printf("[ok] OPENAI_API_KEY is set (%s)\n", masked)
+	} else {
+		fmt.Printf("[ ] OPENAI_API_KEY not set\n")
+	}
+	if v := vals["OPENAI_BASE_URL"]; v != "" {
+		fmt.Printf("[ok] OPENAI_BASE_URL = %s\n", v)
+	} else {
+		fmt.Printf("[ ] OPENAI_BASE_URL not set (using OpenAI default)\n")
+	}
+	if v := vals["CODEX_DEFAULT_MODEL"]; v != "" {
+		fmt.Printf("[ok] CODEX_DEFAULT_MODEL = %s\n", v)
+	} else {
+		fmt.Printf("[ ] CODEX_DEFAULT_MODEL not set (using Codex default)\n")
+	}
+	if v := vals["CODEX_TITLE_MODEL"]; v != "" {
+		fmt.Printf("[ok] CODEX_TITLE_MODEL = %s\n", v)
+	} else {
+		fmt.Printf("[ ] CODEX_TITLE_MODEL not set (falls back to CODEX_DEFAULT_MODEL)\n")
+	}
+	fmt.Println()
 
 	containerCmd := envOrDefault("CONTAINER_CMD", detectContainerRuntime())
 	if _, err := exec.LookPath(containerCmd); err != nil {
@@ -162,15 +193,29 @@ func initConfigDir(configDir, envFile string) {
 	}
 
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		content := "# Authentication: set ONE of the two token variables below.\n" +
+		content := "# =============================================================================\n" +
+			"# Claude Code sandbox (default)\n" +
+			"# =============================================================================\n\n" +
+			"# Authentication: set ONE of the two variables below.\n" +
 			"CLAUDE_CODE_OAUTH_TOKEN=your-oauth-token-here\n" +
 			"# ANTHROPIC_API_KEY=sk-ant-...\n\n" +
 			"# Optional: custom Anthropic-compatible API base URL.\n" +
 			"# ANTHROPIC_BASE_URL=https://api.anthropic.com\n\n" +
-			"# Optional: default model for tasks.\n" +
+			"# Optional: default model for Claude tasks.\n" +
 			"# WALLFACER_DEFAULT_MODEL=\n\n" +
 			"# Optional: model for auto-generating task titles (falls back to default model).\n" +
-			"# WALLFACER_TITLE_MODEL=\n"
+			"# WALLFACER_TITLE_MODEL=\n\n" +
+			"# =============================================================================\n" +
+			"# OpenAI Codex sandbox (use with wallfacer-codex image)\n" +
+			"# =============================================================================\n\n" +
+			"# Authentication: set your OpenAI API key.\n" +
+			"# OPENAI_API_KEY=sk-...\n\n" +
+			"# Optional: custom OpenAI-compatible API base URL.\n" +
+			"# OPENAI_BASE_URL=https://api.openai.com/v1\n\n" +
+			"# Optional: default model for Codex tasks.\n" +
+			"# CODEX_DEFAULT_MODEL=codex-mini-latest\n\n" +
+			"# Optional: model for auto-generating task titles with Codex (falls back to CODEX_DEFAULT_MODEL).\n" +
+			"# CODEX_TITLE_MODEL=codex-mini-latest\n"
 		if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
 			logger.Fatal(logger.Main, "create env file", "error", err)
 		}

@@ -18,6 +18,12 @@ type Config struct {
 	DefaultModel     string // WALLFACER_DEFAULT_MODEL
 	TitleModel       string // WALLFACER_TITLE_MODEL
 	MaxParallelTasks int    // WALLFACER_MAX_PARALLEL (0 means use default)
+
+	// OpenAI Codex sandbox fields.
+	OpenAIAPIKey      string // OPENAI_API_KEY
+	OpenAIBaseURL     string // OPENAI_BASE_URL
+	CodexDefaultModel string // CODEX_DEFAULT_MODEL
+	CodexTitleModel   string // CODEX_TITLE_MODEL
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -66,6 +72,14 @@ func Parse(path string) (Config, error) {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.MaxParallelTasks = n
 			}
+		case "OPENAI_API_KEY":
+			cfg.OpenAIAPIKey = v
+		case "OPENAI_BASE_URL":
+			cfg.OpenAIBaseURL = v
+		case "CODEX_DEFAULT_MODEL":
+			cfg.CodexDefaultModel = v
+		case "CODEX_TITLE_MODEL":
+			cfg.CodexTitleModel = v
 		}
 	}
 	return cfg, nil

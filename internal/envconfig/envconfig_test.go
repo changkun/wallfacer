@@ -159,6 +159,49 @@ func TestUpdatePreservesComments(t *testing.T) {
 	}
 }
 
+func TestParseCodexFields(t *testing.T) {
+	content := `OPENAI_API_KEY=sk-openai-abc
+OPENAI_BASE_URL=https://api.openai.com/v1
+CODEX_DEFAULT_MODEL=codex-mini-latest
+CODEX_TITLE_MODEL=codex-mini-latest
+`
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.OpenAIAPIKey != "sk-openai-abc" {
+		t.Errorf("OpenAIAPIKey = %q; want sk-openai-abc", cfg.OpenAIAPIKey)
+	}
+	if cfg.OpenAIBaseURL != "https://api.openai.com/v1" {
+		t.Errorf("OpenAIBaseURL = %q; want https://api.openai.com/v1", cfg.OpenAIBaseURL)
+	}
+	if cfg.CodexDefaultModel != "codex-mini-latest" {
+		t.Errorf("CodexDefaultModel = %q; want codex-mini-latest", cfg.CodexDefaultModel)
+	}
+	if cfg.CodexTitleModel != "codex-mini-latest" {
+		t.Errorf("CodexTitleModel = %q; want codex-mini-latest", cfg.CodexTitleModel)
+	}
+}
+
+func TestParseCodexFieldsAbsent(t *testing.T) {
+	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.OpenAIAPIKey != "" {
+		t.Errorf("OpenAIAPIKey = %q; want empty", cfg.OpenAIAPIKey)
+	}
+	if cfg.CodexDefaultModel != "" {
+		t.Errorf("CodexDefaultModel = %q; want empty", cfg.CodexDefaultModel)
+	}
+	if cfg.CodexTitleModel != "" {
+		t.Errorf("CodexTitleModel = %q; want empty", cfg.CodexTitleModel)
+	}
+}
+
 func TestMaskToken(t *testing.T) {
 	tests := []struct {
 		input, want string
