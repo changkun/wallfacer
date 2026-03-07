@@ -218,7 +218,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 					verdict = "unknown"
 				}
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
-				r.GenerateOversight(taskID)
+				r.GenerateTestOversight(taskID, task.TestRunStartTurn)
 				r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 					"from": "in_progress", "to": "waiting",
@@ -272,8 +272,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 					"result": "Test verification complete: " + strings.ToUpper(verdict),
 				})
+				r.GenerateTestOversight(taskID, task.TestRunStartTurn)
+			} else {
+				r.GenerateOversight(taskID)
 			}
-			r.GenerateOversight(taskID)
 			r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from": "in_progress", "to": "waiting",

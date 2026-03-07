@@ -988,8 +988,10 @@ func TestRunOversightTerminalBeforeWaiting(t *testing.T) {
 	}
 }
 
-// TestRunTestRunOversightTerminalBeforeWaiting is the same check for the
-// isTestRun end_turn path, which also transitions to "waiting".
+// TestRunTestRunOversightTerminalBeforeWaiting verifies that when a test run
+// completes (end_turn path), the impl oversight is preserved in terminal state
+// and the test-agent oversight is also in terminal state before the task
+// becomes visible as "waiting".
 func TestRunTestRunOversightTerminalBeforeWaiting(t *testing.T) {
 	repo := setupTestRepo(t)
 
@@ -1021,12 +1023,67 @@ func TestRunTestRunOversightTerminalBeforeWaiting(t *testing.T) {
 		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
 	}
 
+	// Implementation oversight must still be in terminal state (not overwritten).
 	oversight, err := s.GetOversight(task.ID)
 	if err != nil {
-		t.Fatalf("unexpected error reading oversight: %v", err)
+		t.Fatalf("unexpected error reading impl oversight: %v", err)
 	}
 	if oversight.Status == store.OversightStatusPending || oversight.Status == store.OversightStatusGenerating {
-		t.Fatalf("oversight should be in terminal state when task is waiting, got %q", oversight.Status)
+		t.Fatalf("impl oversight should be in terminal state when task is waiting, got %q", oversight.Status)
+	}
+
+	// Test-agent oversight must also be in terminal state.
+	testOversight, err := s.GetTestOversight(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error reading test oversight: %v", err)
+	}
+	if testOversight.Status == store.OversightStatusPending || testOversight.Status == store.OversightStatusGenerating {
+		t.Fatalf("test oversight should be in terminal state when task is waiting, got %q", testOversight.Status)
+	}
+}
+
+// TestRunTestRunDefaultStopReasonTestOversightTerminal verifies that when a
+// test run ends without an explicit stop_reason (default case), the
+// test-agent oversight is also in terminal state before the task becomes
+// visible as "waiting".
+func TestRunTestRunDefaultStopReasonTestOversightTerminal(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	implOutput := `{"result":"impl done","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+	testOutput := `{"result":"","session_id":"test-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+
+	cmd := fakeStatefulCmd(t, []string{implOutput, testOutput})
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Test run default stop_reason test oversight", 5, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "implement feature", "", false)
+
+	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, "in_progress"); err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "verify implementation", "", false)
+
+	afterTest, _ := s.GetTask(ctx, task.ID)
+	if afterTest.Status != "waiting" {
+		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
+	}
+
+	// Test-agent oversight must be in terminal state.
+	testOversight, err := s.GetTestOversight(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error reading test oversight: %v", err)
+	}
+	if testOversight.Status == store.OversightStatusPending || testOversight.Status == store.OversightStatusGenerating {
+		t.Fatalf("test oversight should be in terminal state when task is waiting, got %q", testOversight.Status)
 	}
 }
 

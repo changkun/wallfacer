@@ -775,29 +775,94 @@ function startImplLogFetch(id) {
     .catch(() => {});
 }
 
+// testOversightData caches the last fetched test oversight for the open task.
+let testOversightData = null;
+let testOversightFetching = false;
+
+function renderTestOversightInTestLogs() {
+  const logsEl = document.getElementById('modal-test-logs');
+  if (!testOversightData) {
+    if (!testOversightFetching && currentTaskId) {
+      testOversightFetching = true;
+      const id = currentTaskId;
+      fetch('/api/tasks/' + id + '/oversight/test')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (currentTaskId !== id) return;
+          testOversightData = data;
+          testOversightFetching = false;
+          if (testLogsMode === 'oversight') renderTestLogs();
+        })
+        .catch(function() {
+          testOversightFetching = false;
+          if (currentTaskId === id && testLogsMode === 'oversight') {
+            logsEl.innerHTML = '<div class="oversight-error">Failed to load test oversight summary.</div>';
+          }
+        });
+    }
+    logsEl.innerHTML = '<div class="oversight-loading">Fetching test oversight summary\u2026</div>';
+    return;
+  }
+
+  switch (testOversightData.status) {
+    case 'pending':
+      logsEl.innerHTML = '<div class="oversight-loading">Test oversight summary not yet generated.</div>';
+      break;
+    case 'generating':
+      logsEl.innerHTML = '<div class="oversight-loading">Generating test oversight summary\u2026</div>';
+      setTimeout(function() {
+        if (testLogsMode === 'oversight' && currentTaskId) {
+          testOversightData = null;
+          renderTestLogs();
+        }
+      }, 3000);
+      break;
+    case 'failed':
+      logsEl.innerHTML = '<div class="oversight-error">Test oversight generation failed' +
+        (testOversightData.error ? ': ' + escapeHtml(testOversightData.error) : '') + '</div>';
+      break;
+    case 'ready':
+      logsEl.innerHTML = '<div class="oversight-view">' + renderOversightPhases(testOversightData.phases) + '</div>';
+      break;
+    default:
+      logsEl.innerHTML = '<div class="oversight-loading">Loading\u2026</div>';
+  }
+}
+
+function _updateTestLogsTabs() {
+  ['oversight', 'pretty', 'raw'].forEach(function(m) {
+    const tab = document.getElementById('test-logs-tab-' + m);
+    if (tab) tab.classList.toggle('active', m === testLogsMode);
+  });
+}
+
 function renderTestLogs() {
   const logsEl = document.getElementById('modal-test-logs');
-  const btn = document.getElementById('toggle-test-logs-btn');
+  _updateTestLogsTabs();
+  if (testLogsMode === 'oversight') {
+    renderTestOversightInTestLogs();
+    return;
+  }
   const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 80;
-  if (testLogsPrettyMode) {
+  if (testLogsMode === 'pretty') {
     logsEl.innerHTML = renderPrettyLogs(testRawLogBuffer);
-    if (btn) btn.textContent = 'Raw';
   } else {
     logsEl.textContent = testRawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-    if (btn) btn.textContent = 'Pretty';
   }
   if (atBottom) {
     logsEl.scrollTop = logsEl.scrollHeight;
   }
 }
 
-function toggleTestLogsMode() {
-  testLogsPrettyMode = !testLogsPrettyMode;
+function setTestLogsMode(mode) {
+  testLogsMode = mode;
   renderTestLogs();
 }
 
 function startTestLogStream(id) {
-  testLogsPrettyMode = true;
+  testLogsMode = 'pretty';
+  testOversightData = null;
+  testOversightFetching = false;
   _fetchTestLogs(id);
 }
 
