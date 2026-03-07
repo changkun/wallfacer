@@ -4,12 +4,24 @@ function formatInProgressCount(count) {
   return maxParallelTasks > 0 ? count + ' / ' + maxParallelTasks : '' + count;
 }
 
+function updateMaxParallelTag() {
+  const tag = document.getElementById('max-parallel-tag');
+  if (!tag) return;
+  if (maxParallelTasks > 0) {
+    tag.textContent = 'max ' + maxParallelTasks;
+    tag.classList.remove('hidden');
+  } else {
+    tag.classList.add('hidden');
+  }
+}
+
 function updateInProgressCount() {
   const countEl = document.getElementById('count-in_progress');
   if (!countEl) return;
   const col = document.getElementById('col-in_progress');
   const current = col ? col.children.length : 0;
   countEl.textContent = formatInProgressCount(current);
+  updateMaxParallelTag();
 }
 
 const diffCache = new Map(); // taskId -> {diff: string, updatedAt: string} | 'loading'
