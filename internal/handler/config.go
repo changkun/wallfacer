@@ -95,22 +95,28 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"workspaces":        h.runner.Workspaces(),
 		"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
 		"autopilot":         h.AutopilotEnabled(),
 		"ideation":          h.IdeationEnabled(),
 		"ideation_running":  h.ideationRunning(r.Context()),
+		"ideation_interval": int(h.IdeationInterval().Minutes()),
 		"models":            models,
 		"default_model":     defaultModel,
-	})
+	}
+	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
+		resp["ideation_next_run"] = nextRun
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // UpdateConfig handles PUT /api/config to update server-level settings.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Autopilot *bool `json:"autopilot"`
-		Ideation  *bool `json:"ideation"`
+		Autopilot        *bool `json:"autopilot"`
+		Ideation         *bool `json:"ideation"`
+		IdeationInterval *int  `json:"ideation_interval"` // minutes; 0 = run immediately on completion
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -123,17 +129,33 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if h.AutopilotEnabled() {
 		go h.tryAutoPromote(r.Context())
 	}
+	if req.IdeationInterval != nil {
+		mins := *req.IdeationInterval
+		if mins < 0 {
+			mins = 0
+		}
+		h.SetIdeationInterval(time.Duration(mins) * time.Minute)
+		// Reschedule with new interval if ideation is already active.
+		if h.IdeationEnabled() {
+			go h.maybeScheduleNextIdeation(r.Context())
+		}
+	}
 	if req.Ideation != nil {
 		h.SetIdeation(*req.Ideation)
 		if *req.Ideation {
-			// Immediately enqueue a new idea-agent task card when enabled,
+			// Enqueue or schedule a new idea-agent task card when enabled,
 			// unless one is already backlogged or running.
 			go h.maybeScheduleNextIdeation(r.Context())
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"autopilot":        h.AutopilotEnabled(),
-		"ideation":         h.IdeationEnabled(),
-		"ideation_running": h.ideationRunning(r.Context()),
-	})
+	resp := map[string]any{
+		"autopilot":         h.AutopilotEnabled(),
+		"ideation":          h.IdeationEnabled(),
+		"ideation_running":  h.ideationRunning(r.Context()),
+		"ideation_interval": int(h.IdeationInterval().Minutes()),
+	}
+	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
+		resp["ideation_next_run"] = nextRun
+	}
+	writeJSON(w, http.StatusOK, resp)
 }

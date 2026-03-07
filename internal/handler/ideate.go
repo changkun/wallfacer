@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
@@ -12,8 +13,8 @@ import (
 const ideaAgentDefaultTimeout = 60
 
 // StartIdeationWatcher subscribes to store change notifications and, whenever
-// an idea-agent task transitions to done, creates a new idea-agent task card
-// in the backlog so that autopilot can keep the brainstorm cycle running.
+// an idea-agent task transitions out of active states, schedules the next
+// brainstorm run according to the configured interval.
 func (h *Handler) StartIdeationWatcher(ctx context.Context) {
 	subID, ch := h.store.Subscribe()
 	go func() {
@@ -29,9 +30,10 @@ func (h *Handler) StartIdeationWatcher(ctx context.Context) {
 	}()
 }
 
-// maybeScheduleNextIdeation checks whether any idea-agent task just completed.
-// If ideation is enabled and no idea-agent task is backlogged or in progress,
-// it enqueues a new idea-agent card so the brainstorm cycle continues.
+// maybeScheduleNextIdeation checks whether ideation is enabled and no
+// idea-agent task is already active (backlogged or in progress). If so, it
+// schedules the next brainstorm run — either immediately (interval == 0) or
+// via a delayed timer.
 func (h *Handler) maybeScheduleNextIdeation(ctx context.Context) {
 	if !h.IdeationEnabled() {
 		return
@@ -52,8 +54,45 @@ func (h *Handler) maybeScheduleNextIdeation(ctx context.Context) {
 		}
 	}
 
-	// No active idea-agent task: create one to keep the cycle going.
-	h.createIdeaAgentTask(ctx)
+	// No active idea-agent task: schedule the next one.
+	h.scheduleIdeation(ctx)
+}
+
+// scheduleIdeation enqueues the next brainstorm run. If the interval is zero
+// it creates the task immediately; otherwise it arms a one-shot timer.
+// If a timer is already pending it is left in place (avoid double-scheduling).
+func (h *Handler) scheduleIdeation(ctx context.Context) {
+	h.ideationMu.Lock()
+
+	// If a timer is already waiting, do not create a second one.
+	if h.ideationTimer != nil {
+		h.ideationMu.Unlock()
+		return
+	}
+
+	interval := h.ideationInterval
+
+	if interval == 0 {
+		h.ideationMu.Unlock()
+		h.createIdeaAgentTask(ctx)
+		return
+	}
+
+	nextRun := time.Now().Add(interval)
+	h.ideationNextRun = nextRun
+	h.ideationTimer = time.AfterFunc(interval, func() {
+		h.ideationMu.Lock()
+		enabled := h.ideationEnabled
+		h.ideationTimer = nil
+		h.ideationNextRun = time.Time{}
+		h.ideationMu.Unlock()
+
+		if enabled {
+			h.createIdeaAgentTask(context.Background())
+		}
+	})
+	h.ideationMu.Unlock()
+	logger.Handler.Info("ideation: next run scheduled", "at", nextRun.Format(time.RFC3339))
 }
 
 // ideaAgentPrompt is the user-visible prompt shown on idea-agent task cards.
@@ -128,8 +167,13 @@ func (h *Handler) GetIdeationStatus(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+
+	resp := map[string]any{
 		"enabled": h.IdeationEnabled(),
 		"running": running,
-	})
+	}
+	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
+		resp["next_run_at"] = nextRun
+	}
+	writeJSON(w, http.StatusOK, resp)
 }

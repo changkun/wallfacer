@@ -340,7 +340,7 @@ func TestGitRebaseOnMain_RejectsWhenTasksInProgress(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
 	body := `{"workspace": "` + repo + `"}`

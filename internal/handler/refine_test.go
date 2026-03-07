@@ -32,7 +32,7 @@ func TestStartRefinement_NotFound(t *testing.T) {
 func TestStartRefinement_NotBacklog(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
@@ -48,7 +48,7 @@ func TestStartRefinement_NotBacklog(t *testing.T) {
 func TestStartRefinement_AlreadyRunning(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
 
 	job := &store.RefinementJob{
 		ID:        uuid.New().String(),
@@ -71,7 +71,7 @@ func TestStartRefinement_AlreadyRunning(t *testing.T) {
 func TestStartRefinement_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "implement feature X", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "implement feature X", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -109,7 +109,7 @@ func TestStartRefinement_Success(t *testing.T) {
 func TestStartRefinement_PreviousNonRunningAllowed(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
 
 	// Set a previously failed job.
 	job := &store.RefinementJob{
@@ -148,7 +148,7 @@ func TestCancelRefinement_NotFound(t *testing.T) {
 func TestCancelRefinement_NoRefinementRunning(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -163,7 +163,7 @@ func TestCancelRefinement_NoRefinementRunning(t *testing.T) {
 func TestCancelRefinement_NonRunningJobRejected(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
 
 	// A completed (done) job should not be cancellable.
 	job := &store.RefinementJob{
@@ -187,7 +187,7 @@ func TestCancelRefinement_NonRunningJobRejected(t *testing.T) {
 func TestCancelRefinement_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
 
 	job := &store.RefinementJob{
 		ID:        uuid.New().String(),
@@ -244,7 +244,7 @@ func TestRefineApply_NotFound(t *testing.T) {
 func TestRefineApply_NotBacklog(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
 	body := `{"prompt": "new prompt"}`
@@ -261,7 +261,7 @@ func TestRefineApply_NotBacklog(t *testing.T) {
 func TestRefineApply_InvalidJSON(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader("{bad"))
 	w := httptest.NewRecorder()
@@ -276,7 +276,7 @@ func TestRefineApply_InvalidJSON(t *testing.T) {
 func TestRefineApply_EmptyPrompt(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
 
 	body := `{"prompt": "   "}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))
@@ -293,7 +293,7 @@ func TestRefineApply_EmptyPrompt(t *testing.T) {
 func TestRefineApply_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "", "")
 
 	// Attach a completed refinement job so its result is captured in the session.
 	job := &store.RefinementJob{
@@ -342,7 +342,7 @@ func TestRefineApply_Success(t *testing.T) {
 func TestRefineApply_NoCurrentRefinement(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "", "")
 
 	body := `{"prompt": "manually written detailed prompt"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))
@@ -363,7 +363,7 @@ func TestRefineApply_NoCurrentRefinement(t *testing.T) {
 func TestRefineApply_UpdatesStorePrompt(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "", "")
 
 	body := `{"prompt": "store-verified prompt"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))
