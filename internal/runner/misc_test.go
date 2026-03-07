@@ -933,6 +933,19 @@ func TestParseTestVerdict(t *testing.T) {
 		{"empty", "", ""},
 		{"lowercase trailing pass is matched", "everything looks good. pass", "pass"},
 		{"lowercase mid-sentence fail not matched", "fail detected in the middle", ""},
+		// Trailing punctuation cases.
+		{"PASS with period", "All tests pass.\n\n**PASS**.", "pass"},
+		{"PASS period no bold", "All tests pass. PASS.", "pass"},
+		{"FAIL exclamation", "Build failed. FAIL!", "fail"},
+		{"FAIL colon", "Requirements unmet. FAIL:", "fail"},
+		// Verdict after label on last line.
+		{"verdict label PASS", "Summary of checks.\nResult: PASS", "pass"},
+		{"verdict label FAIL", "Summary of checks.\nVerdict: FAIL", "fail"},
+		// Trailing blank lines should be skipped.
+		{"trailing blank lines", "All good.\nPASS\n\n\n", "pass"},
+		// Bold PASS/FAIL with details on subsequent lines.
+		{"bold PASS then details", "**PASS**\nDetails: all 5 tests passed.", "pass"},
+		{"bold FAIL then details", "**FAIL**\nDetails: test_foo failed.", "fail"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

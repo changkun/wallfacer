@@ -792,6 +792,52 @@ func TestRunTestRunPreservesImplementationResult(t *testing.T) {
 	}
 }
 
+// TestRunTestRunUnknownVerdictWhenNoMarker verifies that when the test agent's
+// output does not contain a recognizable PASS/FAIL marker, the verdict is stored
+// as "unknown" (not "") so the UI can distinguish "never tested" from "tested
+// but no clear verdict".
+func TestRunTestRunUnknownVerdictWhenNoMarker(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Implementation agent: pauses at "waiting".
+	implOutput := `{"result":"implementation done","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+	// Test agent: outputs a result without any explicit PASS/FAIL marker.
+	testOutput := `{"result":"I reviewed the code and everything looks correct.","session_id":"test-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`
+
+	cmd := fakeStatefulCmd(t, []string{implOutput, testOutput})
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Unknown verdict test", 5, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "implement the feature", "", false)
+
+	// Mark as test run and run the test agent.
+	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, "in_progress"); err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "verify the implementation", "", false)
+
+	afterTest, _ := s.GetTask(ctx, task.ID)
+	if afterTest.Status != "waiting" {
+		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
+	}
+	// No clear verdict → should be "unknown", not "".
+	if afterTest.LastTestResult != "unknown" {
+		t.Fatalf("expected last_test_result=unknown for ambiguous output, got %q", afterTest.LastTestResult)
+	}
+	if afterTest.IsTestRun {
+		t.Fatal("IsTestRun should be false after test completion")
+	}
+}
+
 // Ensure time is imported to avoid unused import warnings.
 var _ = time.Second
 

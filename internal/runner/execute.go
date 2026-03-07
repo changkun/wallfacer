@@ -202,6 +202,11 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			if isTestRun {
 				// Test verification complete: don't commit, return to waiting with verdict.
 				verdict := parseTestVerdict(output.Result)
+				if verdict == "" {
+					// Test ran but no clear verdict detected; use "unknown" so the
+					// UI can distinguish "never tested" from "tested but ambiguous".
+					verdict = "unknown"
+				}
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
 				r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
@@ -377,14 +382,40 @@ func (r *Runner) failSync(ctx context.Context, taskID uuid.UUID, sessionID strin
 
 // parseTestVerdict extracts "pass" or "fail" from a test agent's result text.
 // Returns "" if no clear verdict is found.
+//
+// Detection strategy (in priority order):
+//  1. Explicit markdown bold markers (**PASS** or **FAIL**) anywhere in the text.
+//  2. The last non-empty line ends with the verdict word, after stripping common
+//     trailing punctuation (handles "PASS.", "Result: PASS", etc.).
 func parseTestVerdict(result string) string {
 	upper := strings.ToUpper(result)
-	if strings.Contains(upper, "**PASS**") || strings.HasSuffix(strings.TrimSpace(upper), "PASS") {
+
+	// Highest confidence: explicit markdown bold markers.
+	if strings.Contains(upper, "**PASS**") {
 		return "pass"
 	}
-	if strings.Contains(upper, "**FAIL**") || strings.HasSuffix(strings.TrimSpace(upper), "FAIL") {
+	if strings.Contains(upper, "**FAIL**") {
 		return "fail"
 	}
+
+	// Scan lines from the end, stripping trailing punctuation, and check
+	// whether the line ends with the verdict word. Stop at the first
+	// non-empty line to avoid false positives from mid-text occurrences.
+	lines := strings.Split(upper, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimRight(strings.TrimSpace(lines[i]), ".*!?:;,-")
+		if line == "" {
+			continue
+		}
+		if strings.HasSuffix(line, "PASS") {
+			return "pass"
+		}
+		if strings.HasSuffix(line, "FAIL") {
+			return "fail"
+		}
+		break
+	}
+
 	return ""
 }
 

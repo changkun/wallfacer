@@ -313,7 +313,8 @@ func buildTestPrompt(originalPrompt, criteria string) string {
 	b.WriteString("1. Examine the code to understand what was implemented.\n")
 	b.WriteString("2. Run any available tests (unit tests, integration tests, linters, build checks, etc.).\n")
 	b.WriteString("3. Verify the implementation satisfies every requirement listed above.\n")
-	b.WriteString("4. Conclude with a clear **PASS** or **FAIL** verdict and specific details about what was checked.\n\n")
+	b.WriteString("4. End your response with your verdict on its own line: **PASS** if all requirements are met, or **FAIL** if any are not.\n\n")
+	b.WriteString("IMPORTANT: Your final line must be exactly **PASS** or **FAIL** (bold, all caps). This is required for automated verdict detection.\n\n")
 	b.WriteString("Be thorough but focused. Do not modify any code. If tests fail or requirements are unmet, describe exactly what is missing or broken.")
 	return b.String()
 }
