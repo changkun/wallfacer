@@ -119,6 +119,10 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 [data-theme="dark"] .badge-test-fail { background: #341414; color: #d46868; }
 [data-theme="dark"] .badge-test-none { background: #252320; color: #6a6560; }
 
+/* Brainstorm / idea-agent tag badge */
+.badge-idea-agent { background: #e8f0ff; color: #3050b0; font-size: 9px; font-style: italic; }
+[data-theme="dark"] .badge-idea-agent { background: #1a2548; color: #7090e0; }
+
 /* --- Max Parallel Tag --- */
 .max-parallel-tag { padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; background: #dceaf7; color: #2c5f98; white-space: nowrap; }
 [data-theme="dark"] .max-parallel-tag { background: #1a2d42; color: #6da0dc; }

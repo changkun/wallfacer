@@ -124,6 +124,10 @@ func runServer(configDir string, args []string) {
 	// backlog tasks to in_progress when capacity is available.
 	h.StartAutoPromoter(context.Background())
 
+	// Start the ideation loop: runs the brainstorm agent periodically when
+	// enabled, and on-demand when triggered via /api/ideate.
+	h.StartIdeationLoop(context.Background())
+
 	mux := buildMux(h, r)
 
 	host, _, _ := net.SplitHostPort(*addr)
@@ -168,6 +172,11 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	// Configuration & instructions.
 	mux.HandleFunc("GET /api/config", h.GetConfig)
 	mux.HandleFunc("PUT /api/config", h.UpdateConfig)
+
+	// Brainstorm / ideation agent.
+	mux.HandleFunc("GET /api/ideate", h.GetIdeationStatus)
+	mux.HandleFunc("POST /api/ideate", h.TriggerIdeation)
+	mux.HandleFunc("DELETE /api/ideate", h.CancelIdeation)
 	mux.HandleFunc("GET /api/env", h.GetEnvConfig)
 	mux.HandleFunc("PUT /api/env", h.UpdateEnvConfig)
 	mux.HandleFunc("GET /api/instructions", h.GetInstructions)

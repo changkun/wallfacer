@@ -115,6 +115,8 @@ async function fetchConfig() {
         datalist.appendChild(opt);
       }
     }
+    // Sync ideation toggle and spinner state.
+    if (typeof updateIdeationConfig === 'function') updateIdeationConfig(cfg);
   } catch (e) {
     console.error('fetchConfig:', e);
   }

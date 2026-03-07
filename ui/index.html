@@ -35,6 +35,13 @@
       Autopilot
       <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, backlog tasks are automatically moved to In Progress when there is available capacity.</span></span>
     </label>
+    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
+      <input type="checkbox" id="ideation-toggle" onchange="toggleIdeation()" style="cursor: pointer; accent-color: var(--accent);">
+      Brainstorm
+      <span id="ideation-spinner" class="spinner" style="display:none;"></span>
+      <button onclick="event.preventDefault();triggerIdeation()" title="Run brainstorm now" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--text-tertiary,#888);font-size:12px;line-height:1;">&#9654;</button>
+      <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, the brainstorm agent periodically analyses your repositories and proposes tasks. Tasks created by the agent are tagged <em>idea-agent</em>. Use &#9654; to run on demand.</span></span>
+    </label>
   </div>
   <button id="settings-btn" class="settings-btn" onclick="openSettings()" title="Settings">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -659,6 +666,7 @@
 <script src="/js/instructions.js"></script>
 <script src="/js/containers.js"></script>
 <script src="/js/refine.js"></script>
+<script src="/js/ideate.js"></script>
 <script src="/js/events.js"></script>
 <script src="/js/mention.js"></script>
 </body>

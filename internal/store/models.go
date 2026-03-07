@@ -99,6 +99,10 @@ type Task struct {
 	IsTestRun        bool   `json:"is_test_run,omitempty"`         // true while the task is running as a test verifier
 	LastTestResult   string `json:"last_test_result,omitempty"`    // "pass", "fail", "unknown" (tested, no clear verdict), or "" (not yet tested)
 	TestRunStartTurn int    `json:"test_run_start_turn,omitempty"` // turn count when the test run started (implementation turn boundary)
+
+	// Tags are labels attached to a task for categorisation (e.g. "idea-agent" for
+	// tasks auto-created by the brainstorm agent).
+	Tags []string `json:"tags,omitempty"`
 }
 
 // OversightStatus represents the generation state of a task's aggregated oversight summary.

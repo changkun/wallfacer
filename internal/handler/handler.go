@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sync"
@@ -20,17 +21,25 @@ type Handler struct {
 
 	autopilotMu sync.RWMutex
 	autopilot   bool
+
+	// Brainstorm / ideation state.
+	ideationMu      sync.Mutex
+	ideationEnabled bool
+	ideationRunning bool
+	ideationCancel  context.CancelFunc
+	ideationTrigger chan struct{} // buffered(1): send to trigger an immediate run
 }
 
 // NewHandler constructs a Handler with the given dependencies.
 func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces []string) *Handler {
 	return &Handler{
-		store:      s,
-		runner:     r,
-		configDir:  configDir,
-		workspaces: workspaces,
-		envFile:    r.EnvFile(),
-		autopilot:  false,
+		store:           s,
+		runner:          r,
+		configDir:       configDir,
+		workspaces:      workspaces,
+		envFile:         r.EnvFile(),
+		autopilot:       false,
+		ideationTrigger: make(chan struct{}, 1),
 	}
 }
 
@@ -46,6 +55,27 @@ func (h *Handler) SetAutopilot(enabled bool) {
 	h.autopilotMu.Lock()
 	h.autopilot = enabled
 	h.autopilotMu.Unlock()
+}
+
+// IdeationEnabled returns whether periodic brainstorm ideation is active.
+func (h *Handler) IdeationEnabled() bool {
+	h.ideationMu.Lock()
+	defer h.ideationMu.Unlock()
+	return h.ideationEnabled
+}
+
+// SetIdeation enables or disables periodic brainstorm ideation.
+func (h *Handler) SetIdeation(enabled bool) {
+	h.ideationMu.Lock()
+	h.ideationEnabled = enabled
+	h.ideationMu.Unlock()
+}
+
+// IdeationRunning reports whether a brainstorm run is currently in progress.
+func (h *Handler) IdeationRunning() bool {
+	h.ideationMu.Lock()
+	defer h.ideationMu.Unlock()
+	return h.ideationRunning
 }
 
 // writeJSON serialises v as JSON and writes it with the given HTTP status code.

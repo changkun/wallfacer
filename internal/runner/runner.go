@@ -217,17 +217,18 @@ type RunnerConfig struct {
 // Runner orchestrates agent container execution for tasks.
 // It manages worktree isolation, container lifecycle, and the commit pipeline.
 type Runner struct {
-	store               *store.Store
-	command             string
-	sandboxImage        string
-	envFile             string
-	workspaces          string
-	worktreesDir        string
-	instructionsPath    string
-	repoMu              sync.Map       // per-repo *sync.Mutex for serializing rebase+merge
-	containerNames      sync.Map       // taskID (string) → container name (string)
-	refineContainerNames sync.Map      // taskID (string) → refinement container name (string)
-	backgroundWg        sync.WaitGroup // tracks fire-and-forget background goroutines
+	store                *store.Store
+	command              string
+	sandboxImage         string
+	envFile              string
+	workspaces           string
+	worktreesDir         string
+	instructionsPath     string
+	repoMu               sync.Map       // per-repo *sync.Mutex for serializing rebase+merge
+	containerNames       sync.Map       // taskID (string) → container name (string)
+	refineContainerNames sync.Map       // taskID (string) → refinement container name (string)
+	ideateContainerName  sync.Map       // key "current" → ideation container name (string)
+	backgroundWg         sync.WaitGroup // tracks fire-and-forget background goroutines
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -311,6 +312,25 @@ func (r *Runner) KillContainer(taskID uuid.UUID) {
 // Safe to call when no refinement container is running — errors are silently ignored.
 func (r *Runner) KillRefineContainer(taskID uuid.UUID) {
 	name := r.RefineContainerName(taskID)
+	if name == "" {
+		return
+	}
+	exec.Command(r.command, "kill", name).Run()
+}
+
+// IdeateContainerName returns the name of the currently running ideation container,
+// or an empty string if no ideation is in progress.
+func (r *Runner) IdeateContainerName() string {
+	if v, ok := r.ideateContainerName.Load("current"); ok {
+		return v.(string)
+	}
+	return ""
+}
+
+// KillIdeateContainer sends a kill signal to the running ideation container.
+// Safe to call when no ideation container is running.
+func (r *Runner) KillIdeateContainer() {
+	name := r.IdeateContainerName()
 	if name == "" {
 		return
 	}

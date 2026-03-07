@@ -83,6 +83,8 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"workspaces":        h.runner.Workspaces(),
 		"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
 		"autopilot":         h.AutopilotEnabled(),
+		"ideation":          h.IdeationEnabled(),
+		"ideation_running":  h.IdeationRunning(),
 		"models":            models,
 		"default_model":     defaultModel,
 	})
@@ -92,6 +94,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Autopilot *bool `json:"autopilot"`
+		Ideation  *bool `json:"ideation"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -104,7 +107,19 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if h.AutopilotEnabled() {
 		go h.tryAutoPromote(r.Context())
 	}
+	if req.Ideation != nil {
+		h.SetIdeation(*req.Ideation)
+		if *req.Ideation {
+			// Immediately trigger a brainstorm run when enabled.
+			select {
+			case h.ideationTrigger <- struct{}{}:
+			default:
+			}
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"autopilot": h.AutopilotEnabled(),
+		"autopilot":        h.AutopilotEnabled(),
+		"ideation":         h.IdeationEnabled(),
+		"ideation_running": h.IdeationRunning(),
 	})
 }
