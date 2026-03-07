@@ -88,8 +88,12 @@ wallfacer/
 │       └── utils.js         # Shared utility functions
 │
 ├── sandbox/
-│   ├── Dockerfile       # Ubuntu 24.04 + Go + Node + Python + Claude Code
-│   └── entrypoint.sh    # Git config setup, Claude Code launcher
+│   ├── claude/
+│   │   ├── Dockerfile   # Ubuntu 24.04 + Go + Node + Python + Claude Code
+│   │   └── entrypoint.sh# Git config setup, Claude Code launcher
+│   └── codex/
+│       ├── Dockerfile   # Ubuntu 24.04 + Go + Node + Python + OpenAI Codex
+│       └── entrypoint.sh# Codex full-auto launcher
 │
 ├── Makefile             # build, server, run, shell, clean targets
 ├── go.mod, go.sum
