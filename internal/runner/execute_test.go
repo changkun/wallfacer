@@ -945,6 +945,81 @@ func TestRunTestRunMultiTurnContinuesWithTestSession(t *testing.T) {
 	}
 }
 
+// TestRunOversightTerminalBeforeWaiting verifies that when a task transitions
+// to "waiting", the oversight has already reached a terminal state (ready or
+// failed — never pending or generating). Oversight is generated synchronously
+// before the status update so it is always viewable when the task is waiting.
+func TestRunOversightTerminalBeforeWaiting(t *testing.T) {
+	repo := setupTestRepo(t)
+	cmd := fakeCmdScript(t, waitingOutput, 0)
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Oversight before waiting test", 5, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "some prompt", "", false)
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != "waiting" {
+		t.Fatalf("expected status=waiting, got %q", updated.Status)
+	}
+
+	// Oversight must be in a terminal state (ready or failed) — NOT pending or
+	// generating — because it is generated synchronously before the status update.
+	oversight, err := s.GetOversight(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error reading oversight: %v", err)
+	}
+	if oversight.Status == store.OversightStatusPending || oversight.Status == store.OversightStatusGenerating {
+		t.Fatalf("oversight should be in terminal state when task is waiting, got %q", oversight.Status)
+	}
+}
+
+// TestRunTestRunOversightTerminalBeforeWaiting is the same check for the
+// isTestRun end_turn path, which also transitions to "waiting".
+func TestRunTestRunOversightTerminalBeforeWaiting(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	implOutput := `{"result":"impl done","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+	testOutput := `{"result":"All checks passed. **PASS**","session_id":"test-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`
+
+	cmd := fakeStatefulCmd(t, []string{implOutput, testOutput})
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Test run oversight before waiting", 5, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "implement feature", "", false)
+
+	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, "in_progress"); err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "verify implementation", "", false)
+
+	afterTest, _ := s.GetTask(ctx, task.ID)
+	if afterTest.Status != "waiting" {
+		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
+	}
+
+	oversight, err := s.GetOversight(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error reading oversight: %v", err)
+	}
+	if oversight.Status == store.OversightStatusPending || oversight.Status == store.OversightStatusGenerating {
+		t.Fatalf("oversight should be in terminal state when task is waiting, got %q", oversight.Status)
+	}
+}
+
 // Ensure time is imported to avoid unused import warnings.
 var _ = time.Second
 
