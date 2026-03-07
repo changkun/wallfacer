@@ -235,6 +235,56 @@ func TestParseOversightResultValid(t *testing.T) {
 	}
 }
 
+// TestParseOversightResultWithCommands verifies that Bash commands are preserved
+// in the commands field and not conflated with tools_used.
+func TestParseOversightResultWithCommands(t *testing.T) {
+	raw := `{
+		"phases": [
+			{
+				"timestamp": "2024-01-15T10:00:00Z",
+				"title": "Ran tests and committed",
+				"summary": "Ran the test suite and committed changes.",
+				"tools_used": ["Bash", "Read"],
+				"commands": ["go test ./...", "git add -A", "git commit -m \"fix: auth handler\""],
+				"actions": ["Ran Go tests", "Committed changes"]
+			}
+		]
+	}`
+
+	phases, err := parseOversightResult(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(phases) != 1 {
+		t.Fatalf("expected 1 phase, got %d", len(phases))
+	}
+	if len(phases[0].Commands) != 3 {
+		t.Fatalf("expected 3 commands, got %d: %v", len(phases[0].Commands), phases[0].Commands)
+	}
+	if phases[0].Commands[0] != "go test ./..." {
+		t.Fatalf("unexpected first command: %q", phases[0].Commands[0])
+	}
+	if phases[0].Commands[2] != `git commit -m "fix: auth handler"` {
+		t.Fatalf("unexpected third command: %q", phases[0].Commands[2])
+	}
+}
+
+// TestParseOversightResultCommandsAbsent verifies that a phase without Bash
+// calls has a nil/empty commands slice.
+func TestParseOversightResultCommandsAbsent(t *testing.T) {
+	raw := `{"phases":[{"title":"Read files","summary":"Explored code","tools_used":["Read"],"actions":["Read main.go"]}]}`
+	phases, err := parseOversightResult(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(phases) != 1 {
+		t.Fatalf("expected 1 phase, got %d", len(phases))
+	}
+	if len(phases[0].Commands) != 0 {
+		t.Fatalf("expected no commands, got %v", phases[0].Commands)
+	}
+}
+
 // TestParseOversightResultMarkdownFences verifies that markdown code fences
 // are stripped before parsing.
 func TestParseOversightResultMarkdownFences(t *testing.T) {
@@ -443,6 +493,7 @@ func TestSaveAndGetOversight(t *testing.T) {
 				Title:     "Explored codebase",
 				Summary:   "Read key files to understand structure",
 				ToolsUsed: []string{"Read", "Glob"},
+				Commands:  []string{"go test ./...", "git status"},
 				Actions:   []string{"Read main.go", "Listed Go files"},
 			},
 		},
@@ -467,5 +518,11 @@ func TestSaveAndGetOversight(t *testing.T) {
 	}
 	if len(loaded.Phases[0].ToolsUsed) != 2 {
 		t.Fatalf("expected 2 tools, got %d", len(loaded.Phases[0].ToolsUsed))
+	}
+	if len(loaded.Phases[0].Commands) != 2 {
+		t.Fatalf("expected 2 commands, got %d: %v", len(loaded.Phases[0].Commands), loaded.Phases[0].Commands)
+	}
+	if loaded.Phases[0].Commands[0] != "go test ./..." {
+		t.Fatalf("unexpected command: %q", loaded.Phases[0].Commands[0])
 	}
 }

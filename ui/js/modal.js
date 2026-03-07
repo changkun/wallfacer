@@ -669,6 +669,9 @@ function renderOversightPhases(phases) {
     const tools = (phase.tools_used || []).map(function(t) {
       return '<span class="oversight-tool">' + escapeHtml(t) + '</span>';
     }).join('');
+    const commands = (phase.commands || []).map(function(c) {
+      return '<li class="oversight-command">' + escapeHtml(c) + '</li>';
+    }).join('');
     const actions = (phase.actions || []).map(function(a) {
       return '<li class="oversight-action">' + escapeHtml(a) + '</li>';
     }).join('');
@@ -680,6 +683,7 @@ function renderOversightPhases(phases) {
       '</div>' +
       (phase.summary ? '<div class="oversight-summary">' + escapeHtml(phase.summary) + '</div>' : '') +
       (tools ? '<div class="oversight-tools">' + tools + '</div>' : '') +
+      (commands ? '<ul class="oversight-commands">' + commands + '</ul>' : '') +
       (actions ? '<ul class="oversight-actions">' + actions + '</ul>' : '') +
     '</div>';
   }).join('');

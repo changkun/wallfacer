@@ -340,6 +340,7 @@ Produce a JSON response (raw JSON only — no markdown, no code fences, no expla
       "title": "<Short title, 4-7 words max>",
       "summary": "<1-2 sentence description of what the agent accomplished in this phase>",
       "tools_used": ["<unique tool names used>"],
+      "commands": ["<verbatim Bash commands from TOOL: Bash(...) entries in this phase; omit field if none>"],
       "actions": ["<3-7 specific notable actions: what was read, written, searched, run, etc.>"]
     }
   ]
@@ -352,6 +353,8 @@ Rules:
 - Keep titles short and action-oriented (e.g. "Explored codebase structure", "Implemented auth handler")
 - Keep summaries informative but concise
 - List specific filenames or commands in actions where relevant
+- In commands, copy each Bash command verbatim from the TOOL: Bash(...) entries (the text inside the parentheses). Include all of them, do not summarize or deduplicate.
+- Omit the commands field entirely (or use an empty array) if no Bash tool calls appear in the phase
 - Omit phases with no meaningful activity`
 
 // formatActivityLog renders the pre-processed activities as a human-readable text block for the prompt.
@@ -390,6 +393,7 @@ type oversightResult struct {
 		Title     string   `json:"title"`
 		Summary   string   `json:"summary"`
 		ToolsUsed []string `json:"tools_used"`
+		Commands  []string `json:"commands"`
 		Actions   []string `json:"actions"`
 	} `json:"phases"`
 }
@@ -484,6 +488,7 @@ func parseOversightResult(result string) ([]store.OversightPhase, error) {
 			Title:     strings.TrimSpace(p.Title),
 			Summary:   strings.TrimSpace(p.Summary),
 			ToolsUsed: p.ToolsUsed,
+			Commands:  p.Commands,
 			Actions:   p.Actions,
 		}
 		if p.Timestamp != "" {

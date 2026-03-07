@@ -86,6 +86,7 @@ type OversightPhase struct {
 	Title     string    `json:"title"`
 	Summary   string    `json:"summary"`
 	ToolsUsed []string  `json:"tools_used,omitempty"`
+	Commands  []string  `json:"commands,omitempty"`
 	Actions   []string  `json:"actions,omitempty"`
 }
 

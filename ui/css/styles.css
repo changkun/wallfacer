@@ -1296,6 +1296,22 @@ pre.result-entry-body {
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
 [data-theme="light"] .oversight-tool { color: #a02870; }
+.oversight-commands {
+  margin: 4px 0 6px;
+  padding: 5px 8px;
+  padding-left: 20px;
+  background: var(--bg-input);
+  border-radius: 4px;
+  border-left: 2px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.oversight-command {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  margin: 0;
+  word-break: break-all;
+}
 .oversight-actions {
   margin: 0;
   padding-left: 16px;
