@@ -33,6 +33,7 @@ function openSettings() {
   var modal = document.getElementById('settings-modal');
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
+  loadMaxParallel();
 }
 
 function closeSettings() {
