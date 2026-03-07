@@ -870,6 +870,7 @@ function _updateTestLogsTabs() {
 function renderTestLogs() {
   const logsEl = document.getElementById('modal-test-logs');
   _updateTestLogsTabs();
+  logsEl.classList.toggle('oversight-mode', testLogsMode === 'oversight');
   if (testLogsMode === 'oversight') {
     renderTestOversightInTestLogs();
     return;
