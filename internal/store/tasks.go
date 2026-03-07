@@ -58,8 +58,9 @@ func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 }
 
 // CreateTask creates a new task in backlog status and persists it.
+// kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
 // Optional tags are attached to the task for categorisation (e.g. "idea-agent").
-func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountWorktrees bool, model string, tags ...string) (*Task, error) {
+func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountWorktrees bool, model string, kind TaskKind, tags ...string) (*Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -81,6 +82,7 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 		Timeout:        timeout,
 		MountWorktrees: mountWorktrees,
 		Model:          model,
+		Kind:           kind,
 		Tags:           tags,
 		Position:       maxPos + 1,
 		CreatedAt:      now,

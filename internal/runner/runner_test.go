@@ -500,7 +500,7 @@ func TestCommitPipelineBasic(t *testing.T) {
 
 	// Create a task.
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "Add a greeting file", 5, false, "")
+	task, err := s.CreateTask(ctx, "Add a greeting file", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -564,7 +564,7 @@ func TestCommitPipelineDivergedBranch(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "Add feature", 5, false, "")
+	task, err := s.CreateTask(ctx, "Add feature", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -623,7 +623,7 @@ func TestCommitPipelineNoChanges(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "No changes task", 5, false, "")
+	task, err := s.CreateTask(ctx, "No changes task", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -666,7 +666,7 @@ func TestCompleteTaskE2E(t *testing.T) {
 	ctx := context.Background()
 
 	// Step 1: Create the task.
-	task, err := s.CreateTask(ctx, "Add greeting feature", 5, false, "")
+	task, err := s.CreateTask(ctx, "Add greeting feature", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -736,7 +736,7 @@ func TestCommitOnTopOfLatestMain(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "Task on stale branch", 5, false, "")
+	task, err := s.CreateTask(ctx, "Task on stale branch", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -802,11 +802,11 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two tasks.
-	taskA, err := s.CreateTask(ctx, "Add file A", 5, false, "")
+	taskA, err := s.CreateTask(ctx, "Add file A", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	taskB, err := s.CreateTask(ctx, "Add file B", 5, false, "")
+	taskB, err := s.CreateTask(ctx, "Add file B", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -893,7 +893,7 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repoX, repoY})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Change both repos", 5, false, "")
+	task, err := s.CreateTask(ctx, "Change both repos", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -949,11 +949,11 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	taskA, err := s.CreateTask(ctx, "Add line to README", 5, false, "")
+	taskA, err := s.CreateTask(ctx, "Add line to README", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	taskB, err := s.CreateTask(ctx, "Add another line to README", 5, false, "")
+	taskB, err := s.CreateTask(ctx, "Add another line to README", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1110,7 +1110,7 @@ func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "Test feedback resume", 5, false, "")
+	task, err := s.CreateTask(ctx, "Test feedback resume", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1263,11 +1263,11 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two tasks.
-	taskA, err := s.CreateTask(ctx, "Concurrent file A", 5, false, "")
+	taskA, err := s.CreateTask(ctx, "Concurrent file A", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	taskB, err := s.CreateTask(ctx, "Concurrent file B", 5, false, "")
+	taskB, err := s.CreateTask(ctx, "Concurrent file B", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1352,7 +1352,7 @@ func TestConcurrentCompleteTaskCommitErrorPropagated(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Conflict task", 5, false, "")
+	task, err := s.CreateTask(ctx, "Conflict task", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1416,7 +1416,7 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 	gitRun(t, repo, "checkout", "main")
 
 	// Create task and worktree.
-	task, err := s.CreateTask(ctx, "Base hash test", 5, false, "")
+	task, err := s.CreateTask(ctx, "Base hash test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1462,7 +1462,7 @@ func TestCommitPipelineNoChangesStoresBaseHash(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "No changes base hash test", 5, false, "")
+	task, err := s.CreateTask(ctx, "No changes base hash test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

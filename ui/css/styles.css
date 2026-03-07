@@ -706,6 +706,14 @@ pre { white-space: pre-wrap; word-break: break-word; }
 }
 
 /* --- Failed tasks displayed in Waiting column --- */
+/* --- Idea-agent task cards --- */
+.card-idea-agent {
+  border-left: 3px solid #1a7a4a;
+}
+[data-theme="dark"] .card-idea-agent {
+  border-left-color: #3db87a;
+}
+
 .card-failed-waiting {
   border-left: 3px solid #a02828;
 }

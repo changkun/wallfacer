@@ -37,11 +37,11 @@ func TestListTasks_Empty(t *testing.T) {
 func TestListTasks_IncludesCreated(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	_, err := h.store.CreateTask(ctx, "task one", 15, false, "")
+	_, err := h.store.CreateTask(ctx, "task one", 15, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = h.store.CreateTask(ctx, "task two", 15, false, "")
+	_, err = h.store.CreateTask(ctx, "task two", 15, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestListTasks_IncludesCreated(t *testing.T) {
 func TestListTasks_ExcludesArchivedByDefault(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, err := h.store.CreateTask(ctx, "archived task", 15, false, "")
+	task, err := h.store.CreateTask(ctx, "archived task", 15, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestListTasks_ExcludesArchivedByDefault(t *testing.T) {
 func TestListTasks_IncludeArchived(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, err := h.store.CreateTask(ctx, "archived task", 15, false, "")
+	task, err := h.store.CreateTask(ctx, "archived task", 15, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestUpdateTask_NotFound(t *testing.T) {
 func TestUpdateTask_InvalidJSON(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader("{bad"))
 	w := httptest.NewRecorder()
@@ -206,7 +206,7 @@ func TestUpdateTask_InvalidJSON(t *testing.T) {
 func TestUpdateTask_UpdatesPosition(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	body := `{"position": 5}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
@@ -227,7 +227,7 @@ func TestUpdateTask_UpdatesPosition(t *testing.T) {
 func TestUpdateTask_UpdatesBacklogFields(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "", "")
 
 	body := `{"prompt": "new prompt", "timeout": 60}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
@@ -251,7 +251,7 @@ func TestUpdateTask_UpdatesBacklogFields(t *testing.T) {
 func TestUpdateTask_RetryFromDone(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
 	body := `{"status": "backlog"}`
@@ -273,7 +273,7 @@ func TestUpdateTask_RetryFromDone(t *testing.T) {
 func TestUpdateTask_RetryFromFailed(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
 
 	body := `{"status": "backlog"}`
@@ -295,7 +295,7 @@ func TestUpdateTask_RetryFromFailed(t *testing.T) {
 func TestUpdateTask_RetryWithNewPrompt(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "old prompt", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "old prompt", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
 
 	body := `{"status": "backlog", "prompt": "new retry prompt"}`
@@ -330,7 +330,7 @@ func TestDeleteTask_NotFound(t *testing.T) {
 func TestDeleteTask_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "to delete", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "to delete", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+task.ID.String(), nil)
 	w := httptest.NewRecorder()
@@ -350,7 +350,7 @@ func TestDeleteTask_Success(t *testing.T) {
 func TestGetEvents_Empty(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/events", nil)
 	w := httptest.NewRecorder()
@@ -372,7 +372,7 @@ func TestGetEvents_Empty(t *testing.T) {
 func TestGetEvents_ContainsInserted(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{
 		"from": "backlog",
 		"to":   "in_progress",
@@ -406,7 +406,7 @@ func TestGetEvents_ContainsInserted(t *testing.T) {
 func TestServeOutput_NotFound(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/outputs/turn-0001.json", nil)
 	w := httptest.NewRecorder()
@@ -421,7 +421,7 @@ func TestServeOutput_NotFound(t *testing.T) {
 func TestServeOutput_PathTraversal(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/outputs/../secret", nil)
 	w := httptest.NewRecorder()
@@ -436,7 +436,7 @@ func TestServeOutput_PathTraversal(t *testing.T) {
 func TestServeOutput_WithSlash(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/outputs/sub/file.json", nil)
 	w := httptest.NewRecorder()
@@ -451,7 +451,7 @@ func TestServeOutput_WithSlash(t *testing.T) {
 func TestServeOutput_JSONFile(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	// Manually create the outputs directory and a turn file.
 	outputsDir := h.store.OutputsDir(task.ID)
@@ -480,7 +480,7 @@ func TestServeOutput_JSONFile(t *testing.T) {
 func TestGenerateMissingTitles_NoUntitled(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.UpdateTaskTitle(ctx, task.ID, "My Task Title")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-titles", nil)
@@ -501,8 +501,8 @@ func TestGenerateMissingTitles_NoUntitled(t *testing.T) {
 func TestGenerateMissingTitles_WithUntitled(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	h.store.CreateTask(ctx, "task without title", 15, false, "")
-	h.store.CreateTask(ctx, "another without title", 15, false, "")
+	h.store.CreateTask(ctx, "task without title", 15, false, "", "")
+	h.store.CreateTask(ctx, "another without title", 15, false, "", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-titles", nil)
 	w := httptest.NewRecorder()
@@ -523,7 +523,7 @@ func TestGenerateMissingTitles_LimitParam(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	for i := 0; i < 5; i++ {
-		h.store.CreateTask(ctx, "task without title", 15, false, "")
+		h.store.CreateTask(ctx, "task without title", 15, false, "", "")
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-titles?limit=2", nil)

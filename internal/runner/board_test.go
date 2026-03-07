@@ -16,15 +16,15 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := bg()
 
-	t1, err := s.CreateTask(ctx, "Task one", 5, false, "")
+	t1, err := s.CreateTask(ctx, "Task one", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t2, err := s.CreateTask(ctx, "Task two", 10, true, "")
+	t2, err := s.CreateTask(ctx, "Task two", 10, true, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t3, err := s.CreateTask(ctx, "Task three", 15, false, "")
+	t3, err := s.CreateTask(ctx, "Task three", 15, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestPrepareBoardContext(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "test task", 5, false, "")
+	task, err := s.CreateTask(ctx, "test task", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,9 +174,9 @@ func TestBuildSiblingMounts(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := bg()
 
-	t1, _ := s.CreateTask(ctx, "self task", 5, true, "")
-	t2, _ := s.CreateTask(ctx, "waiting task", 5, false, "")
-	t3, _ := s.CreateTask(ctx, "backlog task", 5, false, "")
+	t1, _ := s.CreateTask(ctx, "self task", 5, true, "", "")
+	t2, _ := s.CreateTask(ctx, "waiting task", 5, false, "", "")
+	t3, _ := s.CreateTask(ctx, "backlog task", 5, false, "", "")
 
 	// Set t2 to waiting with worktree paths.
 	s.UpdateTaskStatus(ctx, t2.ID, "waiting")

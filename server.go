@@ -124,9 +124,9 @@ func runServer(configDir string, args []string) {
 	// backlog tasks to in_progress when capacity is available.
 	h.StartAutoPromoter(context.Background())
 
-	// Start the ideation loop: runs the brainstorm agent periodically when
-	// enabled, and on-demand when triggered via /api/ideate.
-	h.StartIdeationLoop(context.Background())
+	// Start the ideation watcher: when ideation is enabled and an idea-agent
+	// task completes, automatically enqueues the next one.
+	h.StartIdeationWatcher(context.Background())
 
 	mux := buildMux(h, r)
 

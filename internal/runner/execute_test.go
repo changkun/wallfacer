@@ -116,7 +116,7 @@ func TestRunEndTurnTransitionsToDone(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test end_turn", 5, false, "")
+	task, err := s.CreateTask(ctx, "Test end_turn", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestRunWaitingTransitionsToWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test waiting", 5, false, "")
+	task, err := s.CreateTask(ctx, "Test waiting", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestRunIsErrorTransitionsToFailed(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test is_error", 5, false, "")
+	task, err := s.CreateTask(ctx, "Test is_error", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestRunContainerErrorTransitionsToFailed(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test container error", 5, false, "")
+	task, err := s.CreateTask(ctx, "Test container error", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func TestRunMaxTokensAutoContinues(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test max_tokens auto-continue", 5, false, "")
+	task, err := s.CreateTask(ctx, "Test max_tokens auto-continue", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +238,7 @@ func TestRunWorktreeSetupFailureTransitionsToFailed(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{nonExistent}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Worktree fail task", 5, false, "")
+	task, err := s.CreateTask(ctx, "Worktree fail task", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +259,7 @@ func TestRunEndTurnRecordsResult(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Result recording test", 5, false, "")
+	task, err := s.CreateTask(ctx, "Result recording test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestSyncWorktreesAlreadyUpToDate(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "sync up-to-date test", 5, false, "")
+	task, err := s.CreateTask(ctx, "sync up-to-date test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +320,7 @@ func TestSyncWorktreesBehindMain(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "sync behind test", 5, false, "")
+	task, err := s.CreateTask(ctx, "sync behind test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,7 +369,7 @@ func TestSyncWorktreesNonGitWorkspaceSkipped(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{nonGitDir})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "non-git sync test", 5, false, "")
+	task, err := s.CreateTask(ctx, "non-git sync test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -403,7 +403,7 @@ func TestSyncWorktreesNoWorktreePaths(t *testing.T) {
 	s, runner := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "no worktrees sync test", 5, false, "")
+	task, err := s.CreateTask(ctx, "no worktrees sync test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +430,7 @@ func TestFailSync(t *testing.T) {
 	s, runner := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "fail sync test", 5, false, "")
+	task, err := s.CreateTask(ctx, "fail sync test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,7 +458,7 @@ func TestFailSyncRecordsErrorEvent(t *testing.T) {
 	s, runner := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "failSync event test", 5, false, "")
+	task, err := s.CreateTask(ctx, "failSync event test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +486,7 @@ func TestRunWithPreexistingWorktrees(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "preexisting worktrees test", 5, false, "")
+	task, err := s.CreateTask(ctx, "preexisting worktrees test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -531,7 +531,7 @@ func TestRunUsageAccumulation(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Usage test", 5, false, "")
+	task, err := s.CreateTask(ctx, "Usage test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,7 +562,7 @@ func TestRunCostMultiTurn(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Multi-turn cost test", 5, false, "")
+	task, err := s.CreateTask(ctx, "Multi-turn cost test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -606,7 +606,7 @@ func TestRunCostResumedFromWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Waiting resume cost test", 5, false, "")
+	task, err := s.CreateTask(ctx, "Waiting resume cost test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -669,7 +669,7 @@ func TestSyncWorktreesPrevStatusRestored(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "status restore test", 5, false, "")
+	task, err := s.CreateTask(ctx, "status restore test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -707,7 +707,7 @@ func TestRunWaitingFeedbackDonePreservesChanges(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Waiting→Done test", 5, false, "")
+	task, err := s.CreateTask(ctx, "Waiting→Done test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -787,7 +787,7 @@ func TestRunTestRunPreservesImplementationResult(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Preserve impl result test", 5, false, "")
+	task, err := s.CreateTask(ctx, "Preserve impl result test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -855,7 +855,7 @@ func TestRunTestRunUnknownVerdictWhenNoMarker(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Unknown verdict test", 5, false, "")
+	task, err := s.CreateTask(ctx, "Unknown verdict test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -904,7 +904,7 @@ func TestRunTestRunDefaultStopReasonSetsUnknown(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Default stop_reason test run", 5, false, "")
+	task, err := s.CreateTask(ctx, "Default stop_reason test run", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -952,7 +952,7 @@ func TestRunTestRunMultiTurnContinuesWithTestSession(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Multi-turn test run", 5, false, "")
+	task, err := s.CreateTask(ctx, "Multi-turn test run", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -998,7 +998,7 @@ func TestRunOversightTerminalBeforeWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Oversight before waiting test", 5, false, "")
+	task, err := s.CreateTask(ctx, "Oversight before waiting test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1035,7 +1035,7 @@ func TestRunTestRunOversightTerminalBeforeWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test run oversight before waiting", 5, false, "")
+	task, err := s.CreateTask(ctx, "Test run oversight before waiting", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1089,7 +1089,7 @@ func TestRunTestRunDefaultStopReasonTestOversightTerminal(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test run default stop_reason test oversight", 5, false, "")
+	task, err := s.CreateTask(ctx, "Test run default stop_reason test oversight", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1130,7 +1130,7 @@ func TestSyncWorktreesBehindMainDirtyWorktree(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "dirty stash sync test", 5, false, "")
+	task, err := s.CreateTask(ctx, "dirty stash sync test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1190,7 +1190,7 @@ func TestSyncWorktreesConflictHandedOffToAgent(t *testing.T) {
 	s, runner := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "conflict handoff test", 5, false, "")
+	task, err := s.CreateTask(ctx, "conflict handoff test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

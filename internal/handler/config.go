@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/store"
 )
 
 // fetchModelsFromGateway queries the LLM gateway's /v1/models endpoint
@@ -60,6 +62,20 @@ func fetchModelsFromGateway(baseURL, authToken, apiKey string) ([]string, error)
 	return models, nil
 }
 
+// ideationRunning returns true if any idea-agent task is currently in_progress.
+func (h *Handler) ideationRunning(ctx context.Context) bool {
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		return false
+	}
+	for _, t := range tasks {
+		if t.Kind == store.TaskKindIdeaAgent && t.Status == store.TaskStatusInProgress {
+			return true
+		}
+	}
+	return false
+}
+
 // GetConfig returns the server configuration (workspaces, instructions path).
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	// Read the current default model from the env file.
@@ -84,7 +100,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
 		"autopilot":         h.AutopilotEnabled(),
 		"ideation":          h.IdeationEnabled(),
-		"ideation_running":  h.IdeationRunning(),
+		"ideation_running":  h.ideationRunning(r.Context()),
 		"models":            models,
 		"default_model":     defaultModel,
 	})
@@ -110,16 +126,14 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if req.Ideation != nil {
 		h.SetIdeation(*req.Ideation)
 		if *req.Ideation {
-			// Immediately trigger a brainstorm run when enabled.
-			select {
-			case h.ideationTrigger <- struct{}{}:
-			default:
-			}
+			// Immediately enqueue a new idea-agent task card when enabled,
+			// unless one is already backlogged or running.
+			go h.maybeScheduleNextIdeation(r.Context())
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"autopilot":        h.AutopilotEnabled(),
 		"ideation":         h.IdeationEnabled(),
-		"ideation_running": h.IdeationRunning(),
+		"ideation_running": h.ideationRunning(r.Context()),
 	})
 }

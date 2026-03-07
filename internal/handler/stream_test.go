@@ -62,7 +62,7 @@ func TestParseTurnNumber_Invalid(t *testing.T) {
 func TestStreamLogs_TaskNotFound(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	// Immediately cancel — non-running task with no logs.
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
 
@@ -81,7 +81,7 @@ func TestStreamLogs_TaskNotFound(t *testing.T) {
 func TestServeStoredLogs_ShowsNoOutputMessage(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	// Create an empty outputs directory but no turn files.
 	outputsDir := h.store.OutputsDir(task.ID)
@@ -102,7 +102,7 @@ func TestServeStoredLogs_ShowsNoOutputMessage(t *testing.T) {
 func TestServeStoredLogs_ServesTurnFiles(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	outputsDir := h.store.OutputsDir(task.ID)
 	os.MkdirAll(outputsDir, 0755)
@@ -128,7 +128,7 @@ func TestServeStoredLogs_ServesTurnFiles(t *testing.T) {
 func TestServeStoredLogsUpTo_FiltersHigherTurns(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	outputsDir := h.store.OutputsDir(task.ID)
 	os.MkdirAll(outputsDir, 0755)
@@ -155,7 +155,7 @@ func TestServeStoredLogsUpTo_FiltersHigherTurns(t *testing.T) {
 func TestServeStoredLogsFrom_FiltersLowerTurns(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	outputsDir := h.store.OutputsDir(task.ID)
 	os.MkdirAll(outputsDir, 0755)
@@ -182,7 +182,7 @@ func TestServeStoredLogsFrom_FiltersLowerTurns(t *testing.T) {
 func TestServeStoredLogs_SkipsEmptyFiles(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	outputsDir := h.store.OutputsDir(task.ID)
 	os.MkdirAll(outputsDir, 0755)
@@ -202,7 +202,7 @@ func TestServeStoredLogs_SkipsEmptyFiles(t *testing.T) {
 func TestServeStoredLogs_SkipsNonTurnFiles(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "")
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 
 	outputsDir := h.store.OutputsDir(task.ID)
 	os.MkdirAll(outputsDir, 0755)
@@ -227,7 +227,7 @@ func TestServeStoredLogs_SkipsNonTurnFiles(t *testing.T) {
 func TestStreamTasks_InitialSend(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	h.store.CreateTask(ctx, "my task", 15, false, "")
+	h.store.CreateTask(ctx, "my task", 15, false, "", "")
 
 	// Use a context that cancels quickly so the streaming loop ends.
 	reqCtx, cancel := context.WithCancel(context.Background())

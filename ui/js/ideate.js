@@ -1,34 +1,19 @@
 // --- Brainstorm / Ideation agent ---
 
-// Client-side ideation state (mirrors server state).
+// Client-side ideation state (mirrors server config).
 let ideation = false;
-let ideationRunning = false;
 
-// pollIdeationTimer is used to poll config while ideation is running.
-let pollIdeationTimer = null;
-
-// setIdeationRunning updates the spinner and running state.
+// setIdeationRunning shows/hides the header spinner.
 function setIdeationRunning(running) {
-  ideationRunning = running;
   const spinner = document.getElementById('ideation-spinner');
   if (spinner) spinner.style.display = running ? 'inline-block' : 'none';
 }
 
-// pollIdeationStatus periodically checks /api/config until ideation stops.
-function startIdeationPoll() {
-  if (pollIdeationTimer) return;
-  pollIdeationTimer = setInterval(async function() {
-    try {
-      const cfg = await api('/api/config');
-      setIdeationRunning(!!cfg.ideation_running);
-      if (!cfg.ideation_running) {
-        clearInterval(pollIdeationTimer);
-        pollIdeationTimer = null;
-      }
-    } catch (e) {
-      // ignore transient errors
-    }
-  }, 3000);
+// updateIdeationFromTasks derives the running state from the live task list
+// (via SSE) instead of polling. Called whenever the task list is refreshed.
+function updateIdeationFromTasks(tasks) {
+  const running = tasks.some(t => t.kind === 'idea-agent' && t.status === 'in_progress');
+  setIdeationRunning(running);
 }
 
 // toggleIdeation is called by the brainstorm checkbox in the header.
@@ -42,45 +27,25 @@ async function toggleIdeation() {
     });
     ideation = !!res.ideation;
     if (toggle) toggle.checked = ideation;
-    if (res.ideation_running) {
-      setIdeationRunning(true);
-      startIdeationPoll();
-    }
   } catch (e) {
     showAlert('Error toggling brainstorm: ' + e.message);
     if (toggle) toggle.checked = ideation;
   }
 }
 
-// triggerIdeation manually fires one brainstorm run via POST /api/ideate.
+// triggerIdeation creates an idea-agent task card immediately via POST /api/ideate.
 async function triggerIdeation() {
-  if (ideationRunning) {
-    showAlert('Brainstorm is already running.');
-    return;
-  }
   try {
     await api('/api/ideate', { method: 'POST' });
-    setIdeationRunning(true);
-    startIdeationPoll();
   } catch (e) {
-    if (e.message && e.message.includes('409')) {
-      showAlert('Brainstorm is already running.');
-    } else {
-      showAlert('Error triggering brainstorm: ' + e.message);
-    }
+    showAlert('Error triggering brainstorm: ' + e.message);
   }
 }
 
 // updateIdeationConfig updates local state from a config response object.
-// Called by fetchConfig (in api.js / state.js) after the initial load.
+// Called by fetchConfig after the initial load.
 function updateIdeationConfig(cfg) {
   ideation = !!cfg.ideation;
   const toggle = document.getElementById('ideation-toggle');
   if (toggle) toggle.checked = ideation;
-  if (cfg.ideation_running) {
-    setIdeationRunning(true);
-    startIdeationPoll();
-  } else {
-    setIdeationRunning(false);
-  }
 }

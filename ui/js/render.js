@@ -100,6 +100,9 @@ function applyDiffToCard(el, diff, behindCounts, taskId) {
 }
 
 function render() {
+  // Sync ideation spinner from live task list (no polling needed).
+  if (typeof updateIdeationFromTasks === 'function') updateIdeationFromTasks(tasks);
+
   const columns = { backlog: [], in_progress: [], waiting: [], committing: [], done: [], failed: [], cancelled: [] };
   for (const t of tasks) {
     const col = columns[t.status];
@@ -235,10 +238,16 @@ function buildCardActions(t) {
 }
 
 function updateCard(card, t) {
+  const isIdeaAgent = t.kind === 'idea-agent';
   const isArchived = !!t.archived;
   const isTestRun = !!t.is_test_run && t.status === 'in_progress';
   const badgeClass = isArchived ? 'badge-archived' : isTestRun ? 'badge-testing' : `badge-${t.status}`;
   const statusLabel = isArchived ? 'archived' : isTestRun ? 'testing' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
+  if (isIdeaAgent) {
+    card.classList.add('card-idea-agent');
+  } else {
+    card.classList.remove('card-idea-agent');
+  }
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
   const showDiff = (t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
   card.style.opacity = isArchived ? '0.55' : '';
@@ -284,8 +293,8 @@ function updateCard(card, t) {
       <input type="checkbox" id="resume-chk-${t.id}" ${!t.fresh_start ? 'checked' : ''} onchange="toggleFreshStart('${t.id}', !this.checked)" style="width:11px;height:11px;cursor:pointer;accent-color:var(--accent);">
       <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
     </div>` : ''}
-    ${t.title ? `<div class="card-title">${escapeHtml(t.title)}</div>` : ''}
-    <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${renderMarkdown(t.prompt)}</div>
+    ${isIdeaAgent ? `<div class="card-title">&#129504; ${escapeHtml(t.title || 'Brainstorm')}</div>` : t.title ? `<div class="card-title">${escapeHtml(t.title)}</div>` : ''}
+    ${!isIdeaAgent ? `<div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${renderMarkdown(t.prompt)}</div>` : ''}
     ${t.status === 'failed' && t.result ? `
     <div class="card-error-reason">
       <span class="card-error-label">Error</span><span class="card-error-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>

@@ -50,6 +50,17 @@ type RefinementJob struct {
 	Error     string    `json:"error,omitempty"`
 }
 
+// TaskKind identifies the execution mode for a task.
+// The zero value ("") and "task" both mean a standard implementation task.
+// "idea-agent" is a special task that runs the brainstorm agent: it analyses
+// the workspaces, proposes ideas, and creates backlog tasks from the results.
+type TaskKind = string
+
+const (
+	TaskKindTask      TaskKind = ""           // default; regular implementation task
+	TaskKindIdeaAgent TaskKind = "idea-agent" // brainstorm / ideation task
+)
+
 // TaskStatus represents the lifecycle state of a task.
 type TaskStatus string
 
@@ -99,6 +110,10 @@ type Task struct {
 	IsTestRun        bool   `json:"is_test_run,omitempty"`         // true while the task is running as a test verifier
 	LastTestResult   string `json:"last_test_result,omitempty"`    // "pass", "fail", "unknown" (tested, no clear verdict), or "" (not yet tested)
 	TestRunStartTurn int    `json:"test_run_start_turn,omitempty"` // turn count when the test run started (implementation turn boundary)
+
+	// Kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
+	// Empty string and "task" are equivalent: a standard implementation task.
+	Kind TaskKind `json:"kind,omitempty"`
 
 	// Tags are labels attached to a task for categorisation (e.g. "idea-agent" for
 	// tasks auto-created by the brainstorm agent).

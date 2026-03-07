@@ -349,7 +349,7 @@ func TestGenerateOversightSuccess(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Add feature X", 5, false, "")
+	task, err := s.CreateTask(ctx, "Add feature X", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +388,7 @@ func TestGenerateOversightContainerError(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Task with failing oversight", 5, false, "")
+	task, err := s.CreateTask(ctx, "Task with failing oversight", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +424,7 @@ func TestGenerateOversightNoTurns(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Task with no turns", 5, false, "")
+	task, err := s.CreateTask(ctx, "Task with no turns", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -455,7 +455,7 @@ func TestGetOversightPendingWhenMissing(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 
-	task, err := s.CreateTask(context.Background(), "test", 5, false, "")
+	task, err := s.CreateTask(context.Background(), "test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,7 +478,7 @@ func TestSaveAndGetOversight(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 
-	task, err := s.CreateTask(context.Background(), "test", 5, false, "")
+	task, err := s.CreateTask(context.Background(), "test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

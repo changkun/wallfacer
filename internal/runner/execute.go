@@ -42,6 +42,38 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		logger.Runner.Error("get task", "task", taskID, "error", err)
 		return // defer moves to "failed"
 	}
+
+	// Idea-agent tasks use a special execution path: run the brainstorm agent,
+	// create backlog tasks from the results, then move directly to done.
+	if task.Kind == store.TaskKindIdeaAgent {
+		statusSet = true
+		ideaTimeout := time.Duration(task.Timeout) * time.Minute
+		if ideaTimeout <= 0 {
+			ideaTimeout = defaultTaskTimeout
+		}
+		ideaCtx, ideaCancel := context.WithTimeout(bgCtx, ideaTimeout)
+		defer ideaCancel()
+
+		if runErr := r.runIdeationTask(ideaCtx, task); runErr != nil {
+			// Don't overwrite a cancelled status.
+			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
+				return
+			}
+			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			r.store.UpdateTaskResult(bgCtx, taskID, runErr.Error(), "", "", 0)
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": runErr.Error()})
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
+			})
+			return
+		}
+		r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+			"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusDone),
+		})
+		return
+	}
+
 	isTestRun := task.IsTestRun
 
 	// Apply per-task total timeout across all turns.
