@@ -16,7 +16,11 @@ import (
 func ideaOutput(ideas []IdeateResult) string {
 	var items []string
 	for _, idea := range ideas {
-		items = append(items, fmt.Sprintf(`{"title":%q,"prompt":%q}`, idea.Title, idea.Prompt))
+		cat := idea.Category
+		if cat == "" {
+			cat = "code quality / refactoring"
+		}
+		items = append(items, fmt.Sprintf(`{"title":%q,"category":%q,"prompt":%q}`, idea.Title, cat, idea.Prompt))
 	}
 	jsonArray := "[" + strings.Join(items, ",") + "]"
 	// Escape the JSON array so it can be embedded inside the result field.
