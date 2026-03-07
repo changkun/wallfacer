@@ -17,9 +17,9 @@ func TestClampTimeout(t *testing.T) {
 	cases := []struct {
 		in, want int
 	}{
-		{0, 5},
-		{-1, 5},
-		{-999, 5},
+		{0, 60},
+		{-1, 60},
+		{-999, 60},
 		{1, 1},
 		{5, 5},
 		{720, 720},
@@ -80,8 +80,8 @@ func TestCreateTask_PositionIncrements(t *testing.T) {
 func TestCreateTask_TimeoutClampedDefault(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "p", 0, false, "")
-	if task.Timeout != 5 {
-		t.Errorf("expected default timeout 5, got %d", task.Timeout)
+	if task.Timeout != 60 {
+		t.Errorf("expected default timeout 60, got %d", task.Timeout)
 	}
 }
 

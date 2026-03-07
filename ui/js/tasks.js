@@ -1,4 +1,4 @@
-const DEFAULT_TASK_TIMEOUT = 15; // minutes
+const DEFAULT_TASK_TIMEOUT = 60; // minutes
 
 // --- Task creation ---
 
