@@ -892,3 +892,64 @@ func TestSyncWorktreesBehindMainDirtyWorktree(t *testing.T) {
 		t.Fatal("advance2.txt should be in worktree after sync:", err)
 	}
 }
+
+// TestSyncWorktreesConflictHandedOffToAgent verifies that when auto-resolution
+// of a rebase conflict fails, the task is kept in_progress and Run() is
+// invoked so the agent can resolve the conflict interactively. On completion
+// of Run() the task transitions to "waiting" (not "failed").
+func TestSyncWorktreesConflictHandedOffToAgent(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// First container invocation: resolver call — empty output causes an
+	// "empty output" error, simulating a resolver that cannot fix conflicts.
+	// Second invocation: Run() — returns waitingOutput so the task ends up
+	// in "waiting" (agent reviewed the conflict and needs user feedback).
+	cmd := fakeStatefulCmd(t, []string{"", waitingOutput})
+	s, runner := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "conflict handoff test", 5, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wt, br, err := runner.setupWorktrees(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { runner.cleanupWorktrees(task.ID, wt, br) })
+
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, wt, br); err != nil {
+		t.Fatal(err)
+	}
+
+	worktreePath := wt[repo]
+
+	// Commit a conflicting change on the task branch.
+	if err := os.WriteFile(filepath.Join(worktreePath, "README.md"), []byte("# Task version\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, worktreePath, "add", ".")
+	gitRun(t, worktreePath, "commit", "-m", "task: modify README")
+
+	// Commit a conflicting change on main (same file, different content).
+	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("# Main version\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "main: modify README")
+
+	if err := s.UpdateTaskStatus(ctx, task.ID, "waiting"); err != nil {
+		t.Fatal(err)
+	}
+
+	// SyncWorktrees detects the conflict, the resolver fails (empty container
+	// output), and the new code hands off to Run() with a conflict prompt.
+	// Run() returns waitingOutput (stop_reason="") → task ends up in "waiting".
+	runner.SyncWorktrees(task.ID, "", "waiting")
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != "waiting" {
+		t.Fatalf("expected status=waiting after conflict handoff to agent, got %q", updated.Status)
+	}
+}

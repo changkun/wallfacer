@@ -118,9 +118,11 @@ for each worktree:
   git rebase <default-branch>
     └─ on conflict: invoke Claude Code (same session) to resolve, up to 3 retries
   ↓
-task status → previous status (waiting or failed)
+task status → previous status (waiting or failed)    [conflicts resolved]
   ↓
-if rebase fails after retries → task status → failed
+if rebase fails after retries:
+  agent (Run) invoked with conflict resolution prompt → task stays in_progress
+  └─ agent resolves conflict → task status → waiting (or done on end_turn)
 ```
 
 This is useful when other tasks have merged changes to the default branch and you want the current task to pick them up before continuing.

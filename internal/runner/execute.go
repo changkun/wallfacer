@@ -253,8 +253,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 }
 
 // SyncWorktrees rebases all task worktrees onto the latest default branch
-// without merging. On success the task is restored to prevStatus; on
-// unrecoverable failure it is moved to "failed".
+// without merging. On success the task is restored to prevStatus. If
+// conflicts cannot be automatically resolved after retries, the task remains
+// in_progress and Run() is invoked so the agent can resolve them
+// interactively; the task returns to prevStatus only after the agent finishes.
 func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 	bgCtx := context.Background()
 
@@ -345,9 +347,32 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID, prevStatus string) {
 		}
 
 		if rebaseErr != nil {
+			// Auto-resolution exhausted: keep the task in_progress and hand
+			// off to the agent so it can resolve the conflict interactively.
+			// The rebase was aborted by RebaseOntoDefault, so the worktree is
+			// clean on the task branch — Claude can inspect the upstream diff
+			// and update the code accordingly.
 			statusSet = true
-			r.failSync(bgCtx, taskID, sessionID, task.Turns,
-				fmt.Sprintf("sync failed for %s: %v", filepath.Base(repoPath), rebaseErr))
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+				"result": fmt.Sprintf(
+					"Sync conflict in %s could not be automatically resolved — "+
+						"handing off to agent for interactive resolution.",
+					filepath.Base(repoPath),
+				),
+			})
+			conflictPrompt := fmt.Sprintf(
+				"Syncing your worktree with the latest %s branch failed due to conflicting "+
+					"changes in %s. The rebase was aborted and the worktree is back to its "+
+					"pre-sync state.\n\n"+
+					"Please incorporate the upstream changes:\n"+
+					"1. Run `git log HEAD..%s` to see what changed upstream\n"+
+					"2. Run `git diff HEAD..%s -- .` to inspect the upstream diff\n"+
+					"3. Update your code to be compatible with those upstream changes\n"+
+					"4. Commit the updated changes\n\n"+
+					"Once your changes are committed and compatible, the sync will be retried.",
+				defBranch, filepath.Base(worktreePath), defBranch, defBranch,
+			)
+			r.Run(taskID, conflictPrompt, sessionID, false)
 			return
 		}
 
