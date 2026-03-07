@@ -403,3 +403,94 @@ async function generateMissingTitles() {
     btn.disabled = false;
   }
 }
+
+// --- Bulk oversight generation for tasks without a summary ---
+
+async function generateMissingOversight() {
+  const statusEl = document.getElementById('generate-oversight-status');
+  const btn = document.querySelector('[onclick="generateMissingOversight()"]');
+  const limit = document.getElementById('generate-oversight-limit').value;
+
+  btn.disabled = true;
+  statusEl.innerHTML = '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:4px;"></span>Checking tasks…';
+  statusEl.style.color = 'var(--text-muted)';
+
+  let interval = null;
+
+  try {
+    const params = new URLSearchParams({ limit });
+    const res = await api(`/api/tasks/generate-oversight?${params}`, { method: 'POST' });
+    const { queued, total_without_oversight, task_ids } = res;
+
+    if (queued === 0) {
+      statusEl.textContent = total_without_oversight === 0
+        ? 'All eligible tasks already have oversight summaries.'
+        : 'No tasks queued (limit reached or none found).';
+      btn.disabled = false;
+      return;
+    }
+
+    const pending = new Set(task_ids);
+    let succeeded = 0;
+    let failed = 0;
+    const total = queued;
+    const startTime = Date.now();
+    const TIMEOUT_MS = 300_000; // 5 min — oversight takes longer than titles
+
+    function updateStatus() {
+      const done = succeeded + failed;
+      const inFlight = pending.size > 0;
+      const spinnerHtml = inFlight
+        ? '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:5px;"></span>'
+        : '';
+      const okHtml = succeeded > 0
+        ? ` <span style="color:#16a34a">${succeeded} ok</span>`
+        : '';
+      const failHtml = failed > 0
+        ? ` <span style="color:var(--danger,#dc2626)">${failed} failed</span>`
+        : '';
+      statusEl.style.color = 'var(--text-muted)';
+      statusEl.innerHTML = `${spinnerHtml}${done}/${total} generated${okHtml}${failHtml}`;
+    }
+
+    updateStatus();
+
+    interval = setInterval(async () => {
+      if (Date.now() - startTime > TIMEOUT_MS) {
+        failed += pending.size;
+        pending.clear();
+        clearInterval(interval);
+        updateStatus();
+        btn.disabled = false;
+        return;
+      }
+
+      const checks = [...pending].map(id =>
+        api(`/api/tasks/${id}/oversight`).then(o => ({ id, status: o.status })).catch(() => ({ id, status: 'error' }))
+      );
+      const results = await Promise.all(checks);
+      for (const { id, status } of results) {
+        if (status === 'ready') {
+          pending.delete(id);
+          succeeded++;
+        } else if (status === 'failed' || status === 'error') {
+          pending.delete(id);
+          failed++;
+        }
+      }
+
+      updateStatus();
+
+      if (pending.size === 0) {
+        clearInterval(interval);
+        btn.disabled = false;
+      }
+    }, 3000);
+
+  } catch (e) {
+    if (interval) clearInterval(interval);
+    statusEl.textContent = 'Error: ' + e.message;
+    statusEl.style.color = 'var(--danger, #dc2626)';
+    btn.disabled = false;
+  }
+}
