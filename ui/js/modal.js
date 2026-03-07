@@ -46,16 +46,27 @@ function toggleResultEntryRaw(entryId) {
 
 const _copyIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
-function renderResultsFromEvents(results) {
-  const section = document.getElementById('modal-result-section');
-  const listEl = document.getElementById('modal-results-list');
+function renderResultsFromEvents(results, opts) {
+  opts = opts || {};
+  const sectionId = opts.sectionId || 'modal-result-section';
+  const listId = opts.listId || 'modal-results-list';
+  const entryPrefix = opts.entryPrefix || 'result-entry-';
+
+  const section = document.getElementById(sectionId);
+  const listEl = document.getElementById(listId);
   if (!results || results.length === 0) {
     section.classList.add('hidden');
     return;
   }
 
   const heading = section.querySelector('.section-title');
-  if (heading) heading.textContent = results.length > 1 ? 'Results' : 'Result';
+  if (heading) {
+    if (opts.headingText) {
+      heading.textContent = opts.headingText;
+    } else {
+      heading.textContent = results.length > 1 ? 'Results' : 'Result';
+    }
+  }
 
   const totalTurns = results.length;
   // Display newest turn first so the most recent result is immediately visible.
@@ -63,7 +74,7 @@ function renderResultsFromEvents(results) {
     const isNewest = i === 0;
     const originalIndex = totalTurns - 1 - i; // chronological index (0-based)
     const isPlan = detectResultType(result) === 'plan';
-    const entryId = 'result-entry-' + originalIndex;
+    const entryId = entryPrefix + originalIndex;
 
     const typeBadgeHtml = isPlan
       ? '<span class="result-type-badge result-type-plan">Plan</span>'
@@ -98,6 +109,15 @@ function renderResultsFromEvents(results) {
   }).join('');
 
   section.classList.remove('hidden');
+}
+
+function renderTestResultsFromEvents(results) {
+  renderResultsFromEvents(results, {
+    sectionId: 'modal-test-result-section',
+    listId: 'modal-test-results-list',
+    entryPrefix: 'test-result-entry-',
+    headingText: results && results.length > 1 ? 'Test Results' : 'Test Result',
+  });
 }
 
 // --- Diff helpers ---
@@ -216,6 +236,7 @@ async function openModal(id) {
   } else {
     document.getElementById('modal-result-section').classList.add('hidden');
   }
+  document.getElementById('modal-test-result-section').classList.add('hidden');
 
   // Usage stats (show when any tokens have been used)
   const usageSection = document.getElementById('modal-usage-section');
@@ -374,13 +395,19 @@ async function openModal(id) {
   try {
     const events = await api(`/api/tasks/${id}/events`);
 
-    // Replace single-result fallback with all turn results from output events
+    // Replace single-result fallback with all turn results from output events.
+    // When a test run has occurred, split output events at the test boundary so
+    // implementation and test agent results are shown in separate sections.
     const outputResults = events
       .filter(e => e.event_type === 'output' && e.data && e.data.result)
       .map(e => e.data.result);
-    if (outputResults.length > 0) {
-      renderResultsFromEvents(outputResults);
+    const testStartTurn = task.test_run_start_turn || 0;
+    const implResults = testStartTurn > 0 ? outputResults.slice(0, testStartTurn) : outputResults;
+    const testResults = testStartTurn > 0 ? outputResults.slice(testStartTurn) : [];
+    if (implResults.length > 0) {
+      renderResultsFromEvents(implResults);
     }
+    renderTestResultsFromEvents(testResults);
 
     const container = document.getElementById('modal-events');
     container.innerHTML = events.map(e => {
