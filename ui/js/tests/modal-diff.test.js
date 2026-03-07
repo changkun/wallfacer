@@ -199,6 +199,79 @@ describe('renderDiffLine', () => {
 });
 
 // ---------------------------------------------------------------------------
+// extToLang
+// ---------------------------------------------------------------------------
+describe('extToLang', () => {
+  let ctx;
+  beforeAll(() => { ctx = makeDiffContext(); });
+
+  it('returns javascript for .js', () => { expect(ctx.extToLang('src/app.js')).toBe('javascript'); });
+  it('returns typescript for .ts', () => { expect(ctx.extToLang('src/app.ts')).toBe('typescript'); });
+  it('returns typescript for .tsx', () => { expect(ctx.extToLang('src/app.tsx')).toBe('typescript'); });
+  it('returns python for .py', () => { expect(ctx.extToLang('main.py')).toBe('python'); });
+  it('returns go for .go', () => { expect(ctx.extToLang('internal/foo.go')).toBe('go'); });
+  it('returns rust for .rs', () => { expect(ctx.extToLang('src/main.rs')).toBe('rust'); });
+  it('returns yaml for .yml', () => { expect(ctx.extToLang('.github/ci.yml')).toBe('yaml'); });
+  it('returns json for .json', () => { expect(ctx.extToLang('package.json')).toBe('json'); });
+  it('returns bash for .sh', () => { expect(ctx.extToLang('scripts/run.sh')).toBe('bash'); });
+  it('returns dockerfile for Dockerfile (no extension)', () => { expect(ctx.extToLang('Dockerfile')).toBe('dockerfile'); });
+  it('returns makefile for Makefile (no extension)', () => { expect(ctx.extToLang('Makefile')).toBe('makefile'); });
+  it('returns null for unknown extensions', () => { expect(ctx.extToLang('archive.tar')).toBeNull(); });
+  it('returns null for files with no extension', () => { expect(ctx.extToLang('README')).toBeNull(); });
+  it('is case-insensitive for extensions', () => { expect(ctx.extToLang('App.JS')).toBe('javascript'); });
+});
+
+// ---------------------------------------------------------------------------
+// splitHighlightedLines
+// ---------------------------------------------------------------------------
+describe('splitHighlightedLines', () => {
+  let ctx;
+  beforeAll(() => { ctx = makeDiffContext(); });
+
+  it('splits plain text by newlines', () => {
+    const lines = ctx.splitHighlightedLines('a\nb\nc');
+    expect(lines).toEqual(['a', 'b', 'c']);
+  });
+
+  it('returns a single-element array for text without newlines', () => {
+    expect(ctx.splitHighlightedLines('hello')).toEqual(['hello']);
+  });
+
+  it('returns empty array for empty string', () => {
+    expect(ctx.splitHighlightedLines('')).toEqual([]);
+  });
+
+  it('preserves self-contained spans within a line', () => {
+    const html = '<span class="hljs-keyword">const</span> x = 1;';
+    const lines = ctx.splitHighlightedLines(html);
+    expect(lines.length).toBe(1);
+    expect(lines[0]).toBe(html);
+  });
+
+  it('closes and reopens spans across line boundaries', () => {
+    // Simulate a multi-line string token: opened on line 1, closed on line 2
+    const html = '<span class="hljs-string">line1\nline2</span>';
+    const lines = ctx.splitHighlightedLines(html);
+    expect(lines.length).toBe(2);
+    expect(lines[0]).toBe('<span class="hljs-string">line1</span>');
+    expect(lines[1]).toBe('<span class="hljs-string">line2</span>');
+  });
+
+  it('handles multiple nested spans across lines', () => {
+    const html = '<span class="a"><span class="b">x\ny</span></span>';
+    const lines = ctx.splitHighlightedLines(html);
+    expect(lines.length).toBe(2);
+    expect(lines[0]).toBe('<span class="a"><span class="b">x</span></span>');
+    expect(lines[1]).toBe('<span class="a"><span class="b">y</span></span>');
+  });
+
+  it('produces correct line count for highlighted multi-line code', () => {
+    const html = 'line1\nline2\nline3';
+    expect(ctx.splitHighlightedLines(html).length).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // renderDiffFiles — DOM-mocked
 // ---------------------------------------------------------------------------
 describe('renderDiffFiles', () => {

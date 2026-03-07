@@ -591,11 +591,9 @@ pre { white-space: pre-wrap; word-break: break-word; }
 }
 .diff-block-modal .diff-line.diff-add {
   background: #dafbe1;
-  color: #1a6638;
 }
 .diff-block-modal .diff-line.diff-del {
   background: #ffebe9;
-  color: #82071e;
 }
 .diff-block-modal .diff-line.diff-hunk {
   background: rgba(56,139,253,0.1);
@@ -606,11 +604,9 @@ pre { white-space: pre-wrap; word-break: break-word; }
 }
 [data-theme="dark"] .diff-block-modal .diff-line.diff-add {
   background: rgba(46,160,67,0.15);
-  color: #3fb950;
 }
 [data-theme="dark"] .diff-block-modal .diff-line.diff-del {
   background: rgba(248,81,73,0.15);
-  color: #ff7b72;
 }
 [data-theme="dark"] .diff-block-modal .diff-line.diff-hunk {
   background: rgba(56,139,253,0.15);
@@ -619,6 +615,73 @@ pre { white-space: pre-wrap; word-break: break-word; }
 [data-theme="dark"] .diff-block-modal .diff-line.diff-header {
   color: var(--text-muted);
 }
+
+/* --- Syntax highlighting tokens inside diff blocks (GitHub-inspired) --- */
+.diff-block-modal .hljs-keyword,
+.diff-block-modal .hljs-template-tag,
+.diff-block-modal .hljs-type,
+.diff-block-modal .hljs-variable.language_ { color: #d73a49; }
+.diff-block-modal .hljs-title,
+.diff-block-modal .hljs-title.class_,
+.diff-block-modal .hljs-title.class_.inherited__,
+.diff-block-modal .hljs-title.function_ { color: #6f42c1; }
+.diff-block-modal .hljs-attr,
+.diff-block-modal .hljs-attribute,
+.diff-block-modal .hljs-literal,
+.diff-block-modal .hljs-meta,
+.diff-block-modal .hljs-number,
+.diff-block-modal .hljs-operator,
+.diff-block-modal .hljs-selector-attr,
+.diff-block-modal .hljs-selector-class,
+.diff-block-modal .hljs-selector-id,
+.diff-block-modal .hljs-variable { color: #005cc5; }
+.diff-block-modal .hljs-meta .hljs-string,
+.diff-block-modal .hljs-regexp,
+.diff-block-modal .hljs-string { color: #032f62; }
+.diff-block-modal .hljs-built_in,
+.diff-block-modal .hljs-symbol { color: #e36209; }
+.diff-block-modal .hljs-code,
+.diff-block-modal .hljs-comment,
+.diff-block-modal .hljs-formula { color: #6a737d; }
+.diff-block-modal .hljs-name,
+.diff-block-modal .hljs-quote,
+.diff-block-modal .hljs-selector-pseudo,
+.diff-block-modal .hljs-selector-tag { color: #22863a; }
+.diff-block-modal .hljs-section { color: #005cc5; font-weight: 700; }
+.diff-block-modal .hljs-bullet { color: #735c0f; }
+
+[data-theme="dark"] .diff-block-modal .hljs-keyword,
+[data-theme="dark"] .diff-block-modal .hljs-template-tag,
+[data-theme="dark"] .diff-block-modal .hljs-type,
+[data-theme="dark"] .diff-block-modal .hljs-variable.language_ { color: #ff7b72; }
+[data-theme="dark"] .diff-block-modal .hljs-title,
+[data-theme="dark"] .diff-block-modal .hljs-title.class_,
+[data-theme="dark"] .diff-block-modal .hljs-title.class_.inherited__,
+[data-theme="dark"] .diff-block-modal .hljs-title.function_ { color: #d2a8ff; }
+[data-theme="dark"] .diff-block-modal .hljs-attr,
+[data-theme="dark"] .diff-block-modal .hljs-attribute,
+[data-theme="dark"] .diff-block-modal .hljs-literal,
+[data-theme="dark"] .diff-block-modal .hljs-meta,
+[data-theme="dark"] .diff-block-modal .hljs-number,
+[data-theme="dark"] .diff-block-modal .hljs-operator,
+[data-theme="dark"] .diff-block-modal .hljs-selector-attr,
+[data-theme="dark"] .diff-block-modal .hljs-selector-class,
+[data-theme="dark"] .diff-block-modal .hljs-selector-id,
+[data-theme="dark"] .diff-block-modal .hljs-variable { color: #79c0ff; }
+[data-theme="dark"] .diff-block-modal .hljs-meta .hljs-string,
+[data-theme="dark"] .diff-block-modal .hljs-regexp,
+[data-theme="dark"] .diff-block-modal .hljs-string { color: #a5d6ff; }
+[data-theme="dark"] .diff-block-modal .hljs-built_in,
+[data-theme="dark"] .diff-block-modal .hljs-symbol { color: #ffa657; }
+[data-theme="dark"] .diff-block-modal .hljs-code,
+[data-theme="dark"] .diff-block-modal .hljs-comment,
+[data-theme="dark"] .diff-block-modal .hljs-formula { color: #8b949e; }
+[data-theme="dark"] .diff-block-modal .hljs-name,
+[data-theme="dark"] .diff-block-modal .hljs-quote,
+[data-theme="dark"] .diff-block-modal .hljs-selector-pseudo,
+[data-theme="dark"] .diff-block-modal .hljs-selector-tag { color: #7ee787; }
+[data-theme="dark"] .diff-block-modal .hljs-section { color: #1f6feb; font-weight: 700; }
+[data-theme="dark"] .diff-block-modal .hljs-bullet { color: #f2cc60; }
 
 /* --- Workspace separators in multi-repo diffs --- */
 .diff-workspace-header {
