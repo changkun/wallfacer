@@ -63,7 +63,17 @@ echo $((count+1)) > %s
 // container command. Useful when tests need to control container output.
 func setupRunnerWithCmd(t *testing.T, workspaces []string, cmd string) (*store.Store, *Runner) {
 	t.Helper()
-	dataDir := t.TempDir()
+	// Use /dev/shm (tmpfs) when available to avoid ENOTEMPTY from overlayfs in
+	// container sandboxes. Heavy create/rename activity on overlayfs can cause
+	// unlinkat(AT_REMOVEDIR) to fail even on apparently-empty directories.
+	// Falling back to t.TempDir() on platforms where /dev/shm is absent (macOS).
+	var dataDir string
+	if dir, err := os.MkdirTemp("/dev/shm", "wallfacer-test-*"); err == nil {
+		dataDir = dir
+		t.Cleanup(func() { os.RemoveAll(dataDir) })
+	} else {
+		dataDir = t.TempDir()
+	}
 	s, err := store.NewStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
