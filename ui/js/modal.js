@@ -249,6 +249,9 @@ async function openModal(id) {
   const modalCard = document.querySelector('#modal .modal-card');
   const modalRight = document.getElementById('modal-right');
   const hasWorktrees = task.worktree_paths && Object.keys(task.worktree_paths).length > 0;
+  // Hide test button when there are no worktrees (no changes produced); refined after diff loads.
+  const testBtn = document.getElementById('modal-test-btn');
+  if (testBtn) testBtn.classList.toggle('hidden', !hasWorktrees);
   const modalBody = document.getElementById('modal-body');
   if ((task.status === 'waiting' || task.status === 'failed' || task.status === 'done') && hasWorktrees) {
     modalCard.classList.add('modal-wide');
@@ -262,6 +265,9 @@ async function openModal(id) {
     api(`/api/tasks/${task.id}/diff`).then(data => {
       const el = document.getElementById('modal-diff-files');
       if (el) renderDiffFiles(el, data.diff);
+      // Hide test button when diff is empty (task produced no changes).
+      const testBtn = document.getElementById('modal-test-btn');
+      if (testBtn) testBtn.classList.toggle('hidden', !data.diff);
       const behindCounts = data.behind_counts || {};
       const entries = Object.entries(behindCounts);
       const totalBehind = entries.reduce((s, [, n]) => s + n, 0);
