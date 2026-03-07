@@ -295,6 +295,18 @@ async function runTestTask() {
   }
 }
 
+async function quickTestTask(id) {
+  try {
+    await api(`/api/tasks/${id}/test`, {
+      method: 'POST',
+      body: JSON.stringify({ criteria: '' }),
+    });
+    fetchTasks();
+  } catch (e) {
+    showAlert('Error starting test verification: ' + e.message);
+  }
+}
+
 // --- Sync with latest (rebase worktree onto default branch) ---
 
 async function syncTask(id) {

@@ -195,7 +195,8 @@ function buildCardActions(t) {
     parts.push(`<button class="card-action-btn card-action-refine" onclick="event.stopPropagation();openRefineModal('${t.id}')" title="Refine task with AI">&#9998; Refine</button>`);
     parts.push(`<button class="card-action-btn card-action-start" onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress">&#9654; Start</button>`);
   } else if (t.status === 'waiting') {
-    parts.push(`<button class="card-action-btn card-action-done" onclick="event.stopPropagation();quickDoneTask('${t.id}')" title="Mark done and commit">&#10003; Mark done</button>`);
+    parts.push(`<button class="card-action-btn card-action-test" onclick="event.stopPropagation();quickTestTask('${t.id}')" title="Run test agent">&#9654; Test</button>`);
+    parts.push(`<button class="card-action-btn card-action-done" onclick="event.stopPropagation();quickDoneTask('${t.id}')" title="Mark done and commit">&#10003; Done</button>`);
   } else if (t.status === 'failed') {
     if (t.session_id) {
       parts.push(`<button class="card-action-btn card-action-resume" onclick="event.stopPropagation();quickResumeTask('${t.id}',${t.timeout || 15})" title="Resume in existing session">&#8635; Resume</button>`);

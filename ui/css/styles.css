@@ -76,9 +76,11 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .card-action-done   { background: #d0ebdc; color: #1a6030; border-color: #a8d9bb; }
 .card-action-resume { background: #dceaf7; color: #2c5f98; border-color: #a8c8ef; }
 .card-action-retry  { background: var(--bg-raised); color: var(--text-secondary); border-color: var(--border); }
+.card-action-test   { background: #ede8f7; color: #5a3fa0; border-color: #c4b0e8; }
 [data-theme="dark"] .card-action-start  { background: #0e2a1a; color: #45b87a; border-color: #1e4a2e; }
 [data-theme="dark"] .card-action-done   { background: #0e2a1a; color: #45b87a; border-color: #1e4a2e; }
 [data-theme="dark"] .card-action-resume { background: #1a2d42; color: #6da0dc; border-color: #2a4460; }
+[data-theme="dark"] .card-action-test   { background: #1e1535; color: #a07fe0; border-color: #3a2860; }
 
 /* --- Badges --- */
 .badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; }
