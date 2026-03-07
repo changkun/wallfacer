@@ -170,6 +170,13 @@ function stopRefineLogStream() {
 function resetRefinePanel() {
   refineTaskId = null;
   stopRefineLogStream();
+  showRefineIdle(
+    document.getElementById('refine-start-btn'),
+    document.getElementById('refine-cancel-btn'),
+    document.getElementById('refine-running'),
+    document.getElementById('refine-result-section'),
+    document.getElementById('refine-error-section'),
+  );
   const resultTA = document.getElementById('refine-result-prompt');
   if (resultTA) delete resultTA.dataset.jobId;
   const logsEl = document.getElementById('refine-logs');
