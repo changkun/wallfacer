@@ -109,7 +109,9 @@ type IdeateResult struct {
 // creating backlog tasks from the results and for persisting the raw output.
 // taskID, when non-zero, registers the container under that task ID so that
 // KillContainer(taskID) and log streaming work through the standard task paths.
-func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID) ([]IdeateResult, *agentOutput, []byte, []byte, error) {
+// prompt is the full ideation prompt to send to the container; callers should
+// generate it with buildIdeationPrompt() and persist it before calling here.
+func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, *agentOutput, []byte, []byte, error) {
 	containerName := fmt.Sprintf("wallfacer-ideate-%d", time.Now().UnixNano()/1e6)
 
 	if taskID != uuid.Nil {
@@ -121,7 +123,7 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID) ([]IdeateRes
 
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	args := r.buildIdeationContainerArgs(containerName, buildIdeationPrompt())
+	args := r.buildIdeationContainerArgs(containerName, prompt)
 
 	cmd := exec.CommandContext(ctx, r.command, args...)
 	var stdout, stderr bytes.Buffer
@@ -227,11 +229,18 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// Set a human-readable title on the idea-agent card.
 	title := "Brainstorm " + time.Now().Format("Jan 2, 2006")
 	r.store.UpdateTaskTitle(bgCtx, taskID, title)
+
+	// Generate the full ideation prompt (with randomly-picked domains) and
+	// persist it to the task so the UI shows what was actually sent to the
+	// sandbox, including which improvement categories were selected.
+	ideationPrompt := buildIdeationPrompt()
+	r.store.UpdateTaskBacklog(bgCtx, taskID, &ideationPrompt, nil, nil, nil, nil)
+
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Starting brainstorm agent — exploring workspaces to propose ideas...",
 	})
 
-	ideas, output, rawStdout, rawStderr, err := r.RunIdeation(ctx, taskID)
+	ideas, output, rawStdout, rawStderr, err := r.RunIdeation(ctx, taskID, ideationPrompt)
 
 	// Always persist the raw container output as turn 1 so that the trace and
 	// oversight features work the same as for regular implementation tasks.

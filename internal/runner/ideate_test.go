@@ -239,6 +239,51 @@ func TestIdeationTaskOversightGeneratedAfterDone(t *testing.T) {
 	}
 }
 
+// TestIdeationTaskStoresActualPrompt verifies that the dynamically-generated
+// ideation prompt (with domain categories) is persisted to task.Prompt so that
+// the UI shows what was actually sent to the sandbox rather than the static
+// placeholder used when the task card is created.
+func TestIdeationTaskStoresActualPrompt(t *testing.T) {
+	ideas := []IdeateResult{
+		{Title: "Add tests", Prompt: "Write unit tests for all handlers."},
+		{Title: "Improve docs", Prompt: "Update the README with usage examples."},
+		{Title: "Refactor auth", Prompt: "Move auth logic to a dedicated package."},
+	}
+	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
+	s, r := setupRunnerWithCmd(t, nil, cmd)
+	ctx := context.Background()
+
+	const staticPlaceholder = "Analyzes the workspace and proposes 3 actionable improvements."
+	task, err := s.CreateTask(ctx, staticPlaceholder, 5, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "", "", false)
+
+	updated, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Prompt == staticPlaceholder {
+		t.Fatal("task.Prompt was not updated: still contains the static placeholder instead of the actual ideation prompt")
+	}
+	if updated.Prompt == "" {
+		t.Fatal("task.Prompt is empty after ideation run")
+	}
+	// The actual prompt must reference domain categories from the pool.
+	if !strings.Contains(updated.Prompt, "domain:") {
+		t.Fatalf("task.Prompt does not look like a generated ideation prompt: %q", updated.Prompt[:min(len(updated.Prompt), 200)])
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // TestIdeationTaskContainerErrorTransitionsToFailed verifies that when the
 // brainstorm container fails (empty output, non-zero exit), the idea-agent
 // task transitions to "failed".
