@@ -887,7 +887,8 @@ function setTestLogsMode(mode) {
 }
 
 function startTestLogStream(id) {
-  testLogsMode = 'pretty';
+  const task = tasks.find(t => t.id === id);
+  testLogsMode = (task && task.status === 'done') ? 'oversight' : 'pretty';
   testOversightData = null;
   testOversightFetching = false;
   _fetchTestLogs(id);
