@@ -573,27 +573,66 @@
   </div>
 </div>
 
-<!-- Refine Modal -->
-<div id="refine-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
-  <div class="modal-card refine-modal-card">
-    <!-- Header -->
-    <div class="refine-header">
+<!-- Inline Refinement Panel (replaces board when open) -->
+<div id="refine-inline" class="refine-inline-container hidden">
+
+  <!-- Header bar -->
+  <div class="refine-inline-header">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button onclick="closeRefineModal()" class="refine-inline-back-btn">&#8592; Board</button>
       <div>
-        <h2 class="refine-title">Refine Task</h2>
+        <span class="refine-title">Refine Task</span>
         <span id="refine-task-id" class="refine-task-id"></span>
       </div>
-      <button onclick="closeRefineModal()" class="refine-close-btn" aria-label="Close">&times;</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="applyRefinement()" class="btn btn-accent">Apply Refinement</button>
+      <button onclick="closeRefineModal()" class="btn btn-ghost">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Hidden: current prompt read by JS for conversation seeding -->
+  <pre id="refine-current-prompt" class="hidden"></pre>
+
+  <!-- Split body -->
+  <div class="refine-inline-split">
+
+    <!-- Left: markdown-rendered task prompt -->
+    <div class="refine-inline-left">
+      <div class="refine-inline-panel-label">Task Prompt</div>
+      <div id="refine-inline-prompt-rendered" class="prose-content"></div>
     </div>
 
-    <!-- Body: vertical stack -->
-    <div class="refine-body">
+    <!-- Right: settings + refinement chat + refined prompt -->
+    <div class="refine-inline-right">
 
-      <!-- Hidden: current prompt read by JS for conversation seeding -->
-      <pre id="refine-current-prompt" class="hidden"></pre>
+      <!-- Settings bar: model, timebox, worktrees -->
+      <div class="refine-inline-settings">
+        <div class="refine-inline-panel-label">Settings</div>
+        <div class="refine-inline-settings-row">
+          <select id="refine-inline-model" class="select" title="Model">
+            <option value="">Default</option>
+          </select>
+          <select id="refine-inline-timeout" class="select" title="Timeout">
+            <option value="5">5 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60" selected>1 hour</option>
+            <option value="120">2 hours</option>
+            <option value="360">6 hours</option>
+            <option value="720">12 hours</option>
+            <option value="1440">24 hours</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-secondary);cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="refine-inline-mount-worktrees" style="cursor:pointer;accent-color:var(--accent);">
+            Worktrees
+          </label>
+        </div>
+      </div>
 
-      <!-- Chat section: clarify intent -->
-      <div class="refine-chat-section">
-        <div id="refine-chat-messages" class="refine-messages"></div>
+      <!-- Chat section: clarify intent (grows to fill space) -->
+      <div class="refine-chat-section refine-inline-chat">
+        <div id="refine-chat-messages" class="refine-messages refine-inline-messages"></div>
         <div id="refine-typing" class="hidden refine-typing-bar">
           <span class="spinner refine-typing-spinner"></span>
           <span class="text-xs text-v-muted">Thinking…</span>
@@ -613,7 +652,7 @@
           <div class="refine-spec-label">Refined Prompt</div>
           <span id="refine-proposal-hint" class="refine-proposal-badge hidden">✦ AI-suggested</span>
         </div>
-        <textarea id="refine-proposed-prompt" rows="8" class="field refine-prompt-textarea"></textarea>
+        <textarea id="refine-proposed-prompt" rows="6" class="field refine-prompt-textarea"></textarea>
       </div>
 
       <!-- Refinement history (collapsible) -->
@@ -624,12 +663,6 @@
         </details>
       </div>
 
-    </div>
-
-    <!-- Action buttons -->
-    <div class="refine-actions">
-      <button onclick="applyRefinement()" class="btn btn-accent">Apply Refinement</button>
-      <button onclick="closeRefineModal()" class="btn btn-ghost">Cancel</button>
     </div>
   </div>
 </div>

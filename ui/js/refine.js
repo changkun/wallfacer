@@ -12,11 +12,22 @@ function openRefineModal(taskId) {
   refineConversation = [];
   refineLoading = false;
 
-  // Populate header and current prompt.
+  // Populate header.
   document.getElementById('refine-task-id').textContent = 'ID: ' + taskId;
   document.getElementById('refine-current-prompt').textContent = task.prompt;
   document.getElementById('refine-proposed-prompt').value = task.prompt;
   document.getElementById('refine-proposal-hint').classList.add('hidden');
+
+  // Left panel: render prompt as markdown.
+  document.getElementById('refine-inline-prompt-rendered').innerHTML = renderMarkdown(task.prompt);
+
+  // Settings: pre-populate from task values.
+  const modelEl = document.getElementById('refine-inline-model');
+  if (modelEl) modelEl.value = task.model || '';
+  const timeoutEl = document.getElementById('refine-inline-timeout');
+  if (timeoutEl) timeoutEl.value = task.timeout || 60;
+  const worktreesEl = document.getElementById('refine-inline-mount-worktrees');
+  if (worktreesEl) worktreesEl.checked = !!task.mount_worktrees;
 
   // Clear chat.
   document.getElementById('refine-chat-messages').innerHTML = '';
@@ -25,10 +36,9 @@ function openRefineModal(taskId) {
   // Populate history from task's refine_sessions.
   renderRefineHistory(task);
 
-  // Show modal.
-  const modal = document.getElementById('refine-modal');
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
+  // Show inline panel, hide board.
+  document.getElementById('board').classList.add('hidden');
+  document.getElementById('refine-inline').classList.remove('hidden');
 
   // Kick off the opening question from the AI.
   sendRefineRequest('');
@@ -38,9 +48,10 @@ function closeRefineModal() {
   refineTaskId = null;
   refineConversation = [];
   refineLoading = false;
-  const modal = document.getElementById('refine-modal');
-  modal.classList.add('hidden');
-  modal.classList.remove('flex');
+
+  // Hide inline panel, restore board.
+  document.getElementById('refine-inline').classList.add('hidden');
+  document.getElementById('board').classList.remove('hidden');
 }
 
 // renderRefineHistory populates the history section from task.refine_sessions.
@@ -195,7 +206,7 @@ async function sendRefineRequest(message) {
   }
 }
 
-// applyRefinement POSTs the refined prompt to the backend.
+// applyRefinement POSTs the refined prompt (and updated settings) to the backend.
 async function applyRefinement() {
   if (!refineTaskId) return;
   const newPrompt = document.getElementById('refine-proposed-prompt').value.trim();
@@ -205,6 +216,15 @@ async function applyRefinement() {
   }
 
   try {
+    // Save model/timeout/worktrees settings alongside the prompt.
+    const model = document.getElementById('refine-inline-model')?.value || '';
+    const timeout = parseInt(document.getElementById('refine-inline-timeout')?.value, 10) || DEFAULT_TASK_TIMEOUT;
+    const mountWorktrees = document.getElementById('refine-inline-mount-worktrees')?.checked || false;
+    await api(`/api/tasks/${refineTaskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ model, timeout, mount_worktrees: mountWorktrees }),
+    });
+
     await api(`/api/tasks/${refineTaskId}/refine/apply`, {
       method: 'POST',
       body: JSON.stringify({

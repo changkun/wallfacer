@@ -1033,6 +1033,23 @@ pre.result-entry-body {
     min-height: 36px;
   }
 
+  /* Stack inline refine split vertically on mobile */
+  .refine-inline-split {
+    flex-direction: column !important;
+    overflow-y: auto !important;
+  }
+  .refine-inline-left {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border);
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+  .refine-inline-right {
+    overflow: visible !important;
+  }
+  .refine-inline-chat {
+    min-height: 240px;
+  }
 
 }
 
@@ -1048,7 +1065,95 @@ pre.result-entry-body {
   border-color: #4a3060;
 }
 
-/* --- Refine modal layout --- */
+/* --- Inline refinement panel (split-view, replaces board) --- */
+.refine-inline-container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.refine-inline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg-raised);
+  gap: 12px;
+}
+.refine-inline-back-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.refine-inline-back-btn:hover {
+  background: var(--bg-input);
+  color: var(--text);
+}
+.refine-inline-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.refine-inline-left {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 24px;
+  border-right: 1px solid var(--border);
+}
+.refine-inline-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.refine-inline-panel-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.refine-inline-settings {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg-raised);
+}
+.refine-inline-settings .refine-inline-panel-label {
+  margin-bottom: 8px;
+}
+.refine-inline-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* Chat section grows to fill available space in the right panel */
+.refine-inline-chat {
+  flex: 1;
+  min-height: 0;
+  border-bottom: none;
+}
+.refine-inline-messages {
+  flex: 1;
+  min-height: 0;
+  max-height: none !important;
+}
+
+/* --- Refine modal layout (legacy, kept for modal-card base styles) --- */
 .refine-modal-card {
   width: 600px;
   max-width: 100%;
