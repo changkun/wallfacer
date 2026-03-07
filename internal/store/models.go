@@ -18,12 +18,31 @@ type TaskUsage struct {
 	CostUSD              float64 `json:"cost_usd"`
 }
 
+// RefinementMessage is a single turn in a refinement chat session.
+type RefinementMessage struct {
+	Role      string    `json:"role"`       // "user" or "assistant"
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// RefinementSession records a single chat-based refinement interaction.
+// StartPrompt is the task prompt at the beginning of the session.
+// ResultPrompt is the prompt after the user applied the refinement (empty if discarded).
+type RefinementSession struct {
+	ID           string              `json:"id"`
+	CreatedAt    time.Time           `json:"created_at"`
+	StartPrompt  string              `json:"start_prompt"`
+	Messages     []RefinementMessage `json:"messages"`
+	ResultPrompt string              `json:"result_prompt,omitempty"`
+}
+
 // Task is the core domain model: a unit of work executed by Claude Code.
 type Task struct {
-	ID            uuid.UUID `json:"id"`
-	Title         string    `json:"title,omitempty"`
-	Prompt        string    `json:"prompt"`
-	PromptHistory []string  `json:"prompt_history,omitempty"`
+	ID             uuid.UUID           `json:"id"`
+	Title          string              `json:"title,omitempty"`
+	Prompt         string              `json:"prompt"`
+	PromptHistory  []string            `json:"prompt_history,omitempty"`
+	RefineSessions []RefinementSession `json:"refine_sessions,omitempty"`
 	Status        string    `json:"status"`
 	Archived      bool      `json:"archived,omitempty"`
 	SessionID     *string   `json:"session_id"`

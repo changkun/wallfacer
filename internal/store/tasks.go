@@ -431,6 +431,28 @@ func (s *Store) UpdateTaskBaseCommitHashes(_ context.Context, id uuid.UUID, hash
 	return s.saveTask(id, t)
 }
 
+// ApplyRefinement saves a refinement session and updates the task prompt.
+// The current prompt is pushed into PromptHistory before being replaced.
+func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt string, session RefinementSession) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	session.ResultPrompt = newPrompt
+	t.PromptHistory = append(t.PromptHistory, t.Prompt)
+	t.RefineSessions = append(t.RefineSessions, session)
+	t.Prompt = newPrompt
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify()
+	return nil
+}
+
 // clampTimeout ensures timeout stays in [1, 1440] minutes with a default of 60.
 func clampTimeout(v int) int {
 	if v <= 0 {

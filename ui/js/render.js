@@ -192,6 +192,7 @@ function buildCardActions(t) {
   if (t.archived) return '';
   const parts = [];
   if (t.status === 'backlog') {
+    parts.push(`<button class="card-action-btn card-action-refine" onclick="event.stopPropagation();openRefineModal('${t.id}')" title="Refine task with AI">&#9998; Refine</button>`);
     parts.push(`<button class="card-action-btn card-action-start" onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress">&#9654; Start</button>`);
   } else if (t.status === 'waiting') {
     parts.push(`<button class="card-action-btn card-action-done" onclick="event.stopPropagation();quickDoneTask('${t.id}')" title="Mark done and commit">&#10003; Mark done</button>`);

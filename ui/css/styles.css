@@ -1015,3 +1015,75 @@ pre.result-entry-body {
 
 
 }
+
+/* --- Refine button on cards --- */
+.card-action-refine {
+  background: #ede8f5;
+  color: #5c3d8a;
+  border-color: #c8b8e8;
+}
+[data-theme="dark"] .card-action-refine {
+  background: #2a1e3d;
+  color: #c0a0e8;
+  border-color: #4a3060;
+}
+
+/* --- Refine modal chat messages --- */
+.refine-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 92%;
+}
+.refine-msg-assistant {
+  align-self: flex-start;
+}
+.refine-msg-user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.refine-msg-role {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.refine-msg-body {
+  font-size: 13px;
+  line-height: 1.55;
+  padding: 8px 12px;
+  border-radius: 8px;
+  word-break: break-word;
+}
+.refine-msg-assistant .refine-msg-body {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 2px 8px 8px 8px;
+}
+.refine-msg-user .refine-msg-body {
+  background: #3d2a1e;
+  color: #f0ede6;
+  border-radius: 8px 8px 2px 8px;
+}
+[data-theme="light"] .refine-msg-user .refine-msg-body {
+  background: #d97757;
+  color: #fff;
+}
+
+/* --- Refine history entries --- */
+.refine-history-entry {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.refine-history-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.refine-history-summary::-webkit-details-marker { display: none; }

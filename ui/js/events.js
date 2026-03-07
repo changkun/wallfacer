@@ -5,6 +5,11 @@ document.getElementById('modal').addEventListener('click', (e) => {
   if (e.target === document.getElementById('modal')) closeModal();
 });
 
+// Close refine modal when clicking the overlay backdrop
+document.getElementById('refine-modal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('refine-modal')) closeRefineModal();
+});
+
 // Close modal on Escape key
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
@@ -14,6 +19,8 @@ document.addEventListener('keydown', (e) => {
     if (!containerModal.classList.contains('hidden')) { closeContainerMonitor(); return; }
     const instructionsModal = document.getElementById('instructions-modal');
     if (instructionsModal && !instructionsModal.classList.contains('hidden')) { closeInstructionsEditor(); return; }
+    const refineModal = document.getElementById('refine-modal');
+    if (refineModal && !refineModal.classList.contains('hidden')) { closeRefineModal(); return; }
     closeModal();
   }
 });
