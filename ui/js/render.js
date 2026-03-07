@@ -228,7 +228,8 @@ function buildCardActions(t) {
   const parts = [];
   if (t.status === 'backlog') {
     parts.push(`<button class="card-action-btn card-action-refine" onclick="event.stopPropagation();openModal('${t.id}').then(()=>startRefinement())" title="Refine task with AI">&#9998; Refine</button>`);
-    parts.push(`<button class="card-action-btn card-action-start" onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress">&#9654; Start</button>`);
+    const refining = t.current_refinement && t.current_refinement.status === 'running';
+    parts.push(`<button class="card-action-btn card-action-start" ${refining ? 'disabled title="Refinement in progress"' : `onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress"`}>&#9654; Start</button>`);
   } else if (t.status === 'waiting') {
     parts.push(`<button class="card-action-btn card-action-test" onclick="event.stopPropagation();quickTestTask('${t.id}')" title="Run test agent">&#9654; Test</button>`);
     parts.push(`<button class="card-action-btn card-action-done" onclick="event.stopPropagation();quickDoneTask('${t.id}')" title="Mark done and commit">&#10003; Done</button>`);
