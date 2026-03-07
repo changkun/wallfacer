@@ -87,6 +87,14 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
+	// Test-phase logs: serve only the turns that belong to the test agent
+	// (after the implementation turns). Only meaningful for completed tasks
+	// where the test agent has already run.
+	if r.URL.Query().Get("phase") == "test" && task.Status != "in_progress" && task.Status != "committing" {
+		h.serveStoredLogsFrom(w, r, id, task.TestRunStartTurn)
+		return
+	}
+
 	if task.Status != "in_progress" && task.Status != "committing" {
 		// Container is gone (--rm). Serve saved stderr from disk instead.
 		h.serveStoredLogs(w, r, id)
@@ -173,12 +181,24 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 // serveStoredLogs serves saved turn output for tasks no longer running.
 func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	h.serveStoredLogsUpTo(w, r, id, 0)
+	h.serveStoredLogsRange(w, r, id, 0, 0)
 }
 
 // serveStoredLogsUpTo serves saved turn files up to maxTurn (inclusive).
 // If maxTurn is 0, all turn files are served.
 func (h *Handler) serveStoredLogsUpTo(w http.ResponseWriter, r *http.Request, id uuid.UUID, maxTurn int) {
+	h.serveStoredLogsRange(w, r, id, 0, maxTurn)
+}
+
+// serveStoredLogsFrom serves saved turn files after fromTurn (exclusive).
+// If fromTurn is 0, all turn files are served.
+func (h *Handler) serveStoredLogsFrom(w http.ResponseWriter, r *http.Request, id uuid.UUID, fromTurn int) {
+	h.serveStoredLogsRange(w, r, id, fromTurn, 0)
+}
+
+// serveStoredLogsRange serves saved turn files in the range (fromTurn, maxTurn].
+// fromTurn=0 means no lower bound; maxTurn=0 means no upper bound.
+func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, r *http.Request, id uuid.UUID, fromTurn, maxTurn int) {
 	outputsDir := h.store.OutputsDir(id)
 	entries, err := os.ReadDir(outputsDir)
 	if err != nil {
@@ -202,7 +222,11 @@ func (h *Handler) serveStoredLogsUpTo(w http.ResponseWriter, r *http.Request, id
 		if !strings.HasSuffix(name, ".json") && !strings.HasSuffix(name, ".stderr.txt") {
 			continue
 		}
-		if maxTurn > 0 && parseTurnNumber(name) > maxTurn {
+		turn := parseTurnNumber(name)
+		if maxTurn > 0 && turn > maxTurn {
+			continue
+		}
+		if fromTurn > 0 && turn <= fromTurn {
 			continue
 		}
 		content, readErr := os.ReadFile(filepath.Join(outputsDir, name))

@@ -257,8 +257,11 @@ async function openModal(id) {
   const logsTitleEl = document.getElementById('modal-logs-title');
   if (task.status !== 'backlog') {
     logsSection.classList.remove('hidden');
-    if (task.is_test_run) {
-      // Split view: implementation logs (static) + live test agent monitor.
+    if (task.is_test_run || task.last_test_result) {
+      // Split view: implementation logs (static) + test agent monitor.
+      // Shown both while the test is running (is_test_run) and after it
+      // completes (last_test_result set, is_test_run cleared), so done/verified
+      // tasks still expose test traces.
       if (logsTitleEl) logsTitleEl.textContent = 'Implementation Output';
       startImplLogFetch(id);
       testLogsSection.classList.remove('hidden');
@@ -709,7 +712,11 @@ function _fetchTestLogs(id, retryDelay) {
   }
   const delay = retryDelay || 1000;
   const decoder = new TextDecoder();
-  const url = `/api/tasks/${id}/logs?raw=true`;
+  // For completed tasks use phase=test to serve only test-agent turns (those
+  // after TestRunStartTurn). For running tasks keep streaming all live logs.
+  const task = tasks.find(t => t.id === id);
+  const isRunning = task && (task.status === 'in_progress' || task.status === 'committing');
+  const url = isRunning ? `/api/tasks/${id}/logs?raw=true` : `/api/tasks/${id}/logs?phase=test`;
 
   function reconnect() {
     if (currentTaskId !== id) return;
