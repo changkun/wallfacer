@@ -462,7 +462,7 @@ function closeModal() {
   testRawLogBuffer = '';
   oversightData = null;
   oversightFetching = false;
-  logsMode = 'pretty';
+  logsMode = 'oversight';
   document.getElementById('modal-logs').innerHTML = '';
   document.getElementById('modal-test-logs').innerHTML = '';
   currentTaskId = null;
@@ -711,42 +711,39 @@ function renderOversightInLogs() {
   }
 }
 
+function _updateLogsTabs() {
+  ['oversight', 'pretty', 'raw'].forEach(function(m) {
+    const tab = document.getElementById('logs-tab-' + m);
+    if (tab) tab.classList.toggle('active', m === logsMode);
+  });
+}
+
 function renderLogs() {
   const logsEl = document.getElementById('modal-logs');
-  const btn = document.getElementById('toggle-logs-btn');
+  _updateLogsTabs();
   if (logsMode === 'oversight') {
     renderOversightInLogs();
-    if (btn) btn.textContent = 'Pretty';
     return;
   }
   // Capture scroll position before updating content so we know if the user was at the bottom.
   const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 80;
   if (logsMode === 'pretty') {
     logsEl.innerHTML = renderPrettyLogs(rawLogBuffer);
-    if (btn) btn.textContent = 'Raw';
   } else {
     logsEl.textContent = rawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-    if (btn) btn.textContent = 'Oversight';
   }
   if (atBottom) {
     logsEl.scrollTop = logsEl.scrollHeight;
   }
 }
 
-// Cycle: pretty → raw → oversight → pretty
-function toggleLogsMode() {
-  if (logsMode === 'pretty') {
-    logsMode = 'raw';
-  } else if (logsMode === 'raw') {
-    logsMode = 'oversight';
-  } else {
-    logsMode = 'pretty';
-  }
+function setLogsMode(mode) {
+  logsMode = mode;
   renderLogs();
 }
 
 function startLogStream(id) {
-  logsMode = 'pretty';
+  logsMode = 'oversight';
   oversightData = null;
   oversightFetching = false;
   _fetchLogs(id);
@@ -755,7 +752,7 @@ function startLogStream(id) {
 // Fetch implementation-phase logs once (no reconnect — they are static by the
 // time the test agent runs).
 function startImplLogFetch(id) {
-  logsMode = 'pretty';
+  logsMode = 'oversight';
   oversightData = null;
   oversightFetching = false;
   rawLogBuffer = '';

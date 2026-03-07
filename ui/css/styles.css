@@ -336,6 +336,28 @@ pre { white-space: pre-wrap; word-break: break-word; }
   opacity: 1;
 }
 
+/* --- Log mode tabs (Oversight / Pretty / Raw) --- */
+.logs-tabs {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.logs-tab {
+  background: none;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1.6;
+  transition: background 0.1s, color 0.1s;
+}
+.logs-tab:last-child { border-right: none; }
+.logs-tab:hover { color: var(--text); background: var(--bg-input); }
+.logs-tab.active { background: var(--bg-input); color: var(--text); font-weight: 600; }
+
 /* --- Icon buttons (toggle/copy) --- */
 .btn-icon {
   background: none; border: 1px solid var(--border); color: var(--text-muted);
