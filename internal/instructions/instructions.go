@@ -107,7 +107,8 @@ func Reinit(configDir string, workspaces []string) (string, error) {
 
 // BuildContent assembles CLAUDE.md content from:
 //  1. The default wallfacer instructions template.
-//  2. Any CLAUDE.md found in the workspace directories (appended in order).
+//  2. A reference list of per-repo CLAUDE.md paths (if they exist) so Claude
+//     can read them on demand rather than embedding their full content here.
 func BuildContent(workspaces []string) string {
 	var sb strings.Builder
 	sb.WriteString(defaultTemplate)
@@ -120,18 +121,25 @@ func BuildContent(workspaces []string) string {
 	}
 	sb.WriteByte('\n')
 
+	// Collect repos that have their own CLAUDE.md and list their paths.
+	// Claude should read these files when working on tasks in those workspaces
+	// rather than having the content duplicated here.
+	var refs []string
 	for _, ws := range workspaces {
 		claudePath := filepath.Join(ws, "CLAUDE.md")
-		raw, err := os.ReadFile(claudePath)
-		if err != nil {
-			continue
+		if _, err := os.Stat(claudePath); err == nil {
+			name := filepath.Base(ws)
+			refs = append(refs, fmt.Sprintf("- `/workspace/%s/CLAUDE.md`", name))
 		}
-		name := filepath.Base(ws)
-		sb.WriteString(fmt.Sprintf("\n---\n\n## Instructions from `%s`\n\n", name))
-		sb.Write(raw)
-		if len(raw) > 0 && raw[len(raw)-1] != '\n' {
-			sb.WriteByte('\n')
+	}
+	if len(refs) > 0 {
+		sb.WriteString("---\n\n## Repo-Specific Instructions\n\n")
+		sb.WriteString("The repositories below have their own `CLAUDE.md` with project-specific\n")
+		sb.WriteString("instructions. Read the relevant file before working on tasks in that workspace:\n\n")
+		for _, ref := range refs {
+			sb.WriteString(ref + "\n")
 		}
+		sb.WriteByte('\n')
 	}
 
 	return sb.String()
