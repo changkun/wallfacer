@@ -34,28 +34,41 @@
       <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, backlog tasks are automatically moved to In Progress when there is available capacity.</span></span>
     </label>
   </div>
-  <div style="position: relative;">
-    <button id="settings-btn" class="settings-btn" onclick="toggleSettings(event)" title="Settings">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-      </svg>
-    </button>
-    <div id="settings-panel" class="settings-panel hidden">
-      <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Theme</div>
-      <div class="theme-switch" id="theme-switch">
-        <button data-mode="light" onclick="setTheme('light')">Light</button>
-        <button data-mode="dark" onclick="setTheme('dark')">Dark</button>
-        <button data-mode="auto" onclick="setTheme('auto')">Auto</button>
+  <button id="settings-btn" class="settings-btn" onclick="openSettings()" title="Settings">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
+</header>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4" onclick="if(event.target===this)closeSettings()">
+  <div class="modal-card" style="max-width: 420px; width: 100%;">
+    <div class="p-6">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Settings</h3>
+        <button onclick="closeSettings()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
       </div>
-      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+
+      <div>
+        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Theme</div>
+        <div class="theme-switch" id="theme-switch">
+          <button data-mode="light" onclick="setTheme('light')">Light</button>
+          <button data-mode="dark" onclick="setTheme('dark')">Dark</button>
+          <button data-mode="auto" onclick="setTheme('auto')">Auto</button>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Done Column</div>
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-secondary);">
           <input type="checkbox" id="show-archived-toggle" onchange="toggleShowArchived()" style="cursor: pointer; accent-color: var(--accent);">
           Show archived tasks
         </label>
       </div>
-      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Parallel Tasks</div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <input type="number" id="max-parallel-input" min="1" max="20" value="5" class="field" style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center;">
@@ -64,28 +77,26 @@
         </div>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Max tasks running concurrently in the In Progress column.</div>
       </div>
-      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">API Configuration</div>
-        <button onclick="showEnvConfigEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
+        <button onclick="closeSettings();showEnvConfigEditor()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Token, base URL, and model for Claude Code.</div>
       </div>
-      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">CLAUDE.md</div>
-        <button onclick="showInstructionsEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
+        <button onclick="closeSettings();showInstructionsEditor()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Workspace instructions for Claude Code.</div>
       </div>
-      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Sandbox Containers</div>
-        <button onclick="showContainerMonitor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Monitor</button>
+        <button onclick="closeSettings();showContainerMonitor()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Monitor</button>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Inspect running and recent sandbox containers (like <code style="font-family:monospace;">docker ps -a</code>).</div>
       </div>
-      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">About</div>
-        <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
-          <a href="https://github.com/changkun/wallfacer" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: none;">github.com/changkun/wallfacer</a>
-        </div>
-      </div>
-      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Task Titles</div>
         <div style="display: flex; gap: 6px; align-items: center;">
           <select id="generate-titles-limit" class="select" style="font-size: 12px; padding: 3px 6px; height: auto;" title="Max tasks to generate titles for">
@@ -99,9 +110,16 @@
         </div>
         <div id="generate-titles-status" style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em;"></div>
       </div>
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">About</div>
+        <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+          <a href="https://github.com/changkun/wallfacer" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: none;">github.com/changkun/wallfacer</a>
+        </div>
+      </div>
     </div>
   </div>
-</header>
+</div>
 
 <!-- Instructions Editor Modal -->
 <div id="instructions-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">

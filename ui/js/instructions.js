@@ -1,12 +1,8 @@
 // --- Workspace CLAUDE.md (Instructions) ---
 
 async function showInstructionsEditor(event, preloadedContent) {
-  // Stop propagation so the document click listener (which closes the modal on
-  // outside-click) doesn't fire for the same click that opened the modal.
   if (event) event.stopPropagation();
-
-  // Close settings panel before opening editor.
-  document.getElementById('settings-panel').classList.add('hidden');
+  closeSettings();
 
   var modal = document.getElementById('instructions-modal');
   var textarea = document.getElementById('instructions-content');

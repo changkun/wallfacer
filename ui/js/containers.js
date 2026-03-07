@@ -4,8 +4,7 @@ var containerMonitorInterval = null;
 
 function showContainerMonitor(e) {
   if (e) e.stopPropagation();
-  // Close the settings panel first.
-  document.getElementById('settings-panel').classList.add('hidden');
+  closeSettings();
 
   var modal = document.getElementById('container-monitor-modal');
   modal.classList.remove('hidden');

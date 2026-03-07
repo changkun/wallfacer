@@ -268,13 +268,7 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .usage-label { color: var(--text-muted); }
 .usage-value { color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; text-align: right; }
 
-/* --- Settings panel --- */
-.settings-panel {
-  position: absolute; top: 100%; right: 0; margin-top: 8px;
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px; min-width: 200px;
-  box-shadow: var(--shadow-lg); z-index: 100;
-}
+/* --- Settings button --- */
 .settings-btn {
   background: none; border: none; color: var(--text-muted);
   cursor: pointer; padding: 6px; display: flex; align-items: center;
@@ -956,12 +950,6 @@ pre.result-entry-body {
     max-width: 140px;
     overflow: hidden;
     flex-wrap: nowrap;
-  }
-
-  /* --- Settings panel: stay within viewport --- */
-  .settings-panel {
-    max-width: calc(100vw - 20px);
-    right: 0;
   }
 
   /* --- Modals: bottom-sheet on mobile --- */

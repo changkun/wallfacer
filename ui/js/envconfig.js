@@ -40,7 +40,7 @@ async function saveMaxParallel() {
 
 async function showEnvConfigEditor(event) {
   if (event) event.stopPropagation();
-  document.getElementById('settings-panel').classList.add('hidden');
+  closeSettings();
 
   let cfg = { oauth_token: '', api_key: '', base_url: '', default_model: '', title_model: '' };
   try {
