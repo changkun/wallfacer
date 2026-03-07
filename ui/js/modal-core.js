@@ -232,6 +232,12 @@ async function openModal(id) {
   // Start section (backlog only)
   const startSection = document.getElementById('modal-start-section');
   startSection.classList.toggle('hidden', task.status !== 'backlog');
+  if (task.status === 'backlog') {
+    const startBtn = startSection.querySelector('button');
+    const refining = task.current_refinement && task.current_refinement.status === 'running';
+    startBtn.disabled = refining;
+    startBtn.title = refining ? 'Refinement in progress — wait for it to finish' : '';
+  }
 
   // Cancel section (backlog / in_progress / waiting / failed)
   const cancelSection = document.getElementById('modal-cancel-section');
