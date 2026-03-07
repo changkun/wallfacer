@@ -194,6 +194,21 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
 
+// ArchiveAllDone archives all done and cancelled tasks in one operation.
+func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
+	archived, err := h.store.ArchiveAllDone(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for _, id := range archived {
+		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
+			"to": "archived",
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"archived": len(archived)})
+}
+
 // ArchiveTask archives a done task.
 func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	task, err := h.store.GetTask(r.Context(), id)

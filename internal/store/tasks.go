@@ -276,6 +276,33 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	return nil
 }
 
+// ArchiveAllDone archives all done and cancelled tasks in a single operation.
+// Returns the IDs of tasks that were archived.
+func (s *Store) ArchiveAllDone(_ context.Context) ([]uuid.UUID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var archived []uuid.UUID
+	for id, t := range s.tasks {
+		if t.Archived {
+			continue
+		}
+		if t.Status != "done" && t.Status != "cancelled" {
+			continue
+		}
+		t.Archived = true
+		t.UpdatedAt = time.Now()
+		if err := s.saveTask(id, t); err != nil {
+			return archived, err
+		}
+		archived = append(archived, id)
+	}
+	if len(archived) > 0 {
+		s.notify()
+	}
+	return archived, nil
+}
+
 // SetTaskArchived sets the archived flag on a task.
 func (s *Store) SetTaskArchived(_ context.Context, id uuid.UUID, archived bool) error {
 	s.mu.Lock()

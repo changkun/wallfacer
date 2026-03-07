@@ -210,6 +210,15 @@ async function cancelTask() {
 
 // --- Archive / Unarchive ---
 
+async function archiveAllDone() {
+  try {
+    const result = await api('/api/tasks/archive-done', { method: 'POST' });
+    fetchTasks();
+  } catch (e) {
+    showAlert('Error archiving tasks: ' + e.message);
+  }
+}
+
 async function archiveTask() {
   if (!currentTaskId) return;
   try {
