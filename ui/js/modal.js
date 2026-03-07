@@ -721,6 +721,7 @@ function _updateLogsTabs() {
 function renderLogs() {
   const logsEl = document.getElementById('modal-logs');
   _updateLogsTabs();
+  logsEl.classList.toggle('oversight-mode', logsMode === 'oversight');
   if (logsMode === 'oversight') {
     renderOversightInLogs();
     return;

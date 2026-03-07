@@ -1288,38 +1288,37 @@ pre.result-entry-body {
 .refine-history-summary::-webkit-details-marker { display: none; }
 
 /* --- Aggregated oversight view --- */
+/* Switch logs-block from terminal style to card style when oversight tab is active */
+.logs-block.oversight-mode {
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+}
 .oversight-view {
-  padding: 8px 0;
+  padding: 4px 0;
   font-family: 'Inter', sans-serif;
   font-size: 13px;
+  white-space: normal;
 }
 .oversight-phase {
-  border-left: 2px solid var(--border);
-  margin-bottom: 16px;
-  padding-left: 14px;
-  position: relative;
-}
-.oversight-phase::before {
-  content: '';
-  position: absolute;
-  left: -5px;
-  top: 6px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: var(--bg-raised);
 }
 .oversight-phase-header {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   flex-wrap: wrap;
 }
 .oversight-phase-num {
   font-size: 10px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   flex-shrink: 0;
@@ -1353,27 +1352,10 @@ pre.result-entry-body {
   border-radius: 4px;
   padding: 1px 7px;
   font-size: 11px;
-  color: #ff79c6;
+  color: var(--accent);
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
 [data-theme="light"] .oversight-tool { color: #a02870; }
-/* Inside the dark logs block, chips need a visible background regardless of theme */
-.logs-block .oversight-tool {
-  background: #2d2b27;
-  border-color: #484f58;
-}
-.logs-block .oversight-phase {
-  border-left-color: #484f58;
-}
-.logs-block .oversight-phase-num,
-.logs-block .oversight-phase-time,
-.logs-block .oversight-loading,
-.logs-block .oversight-empty {
-  color: #9faab5;
-}
-.logs-block .oversight-phase-title { color: #cdd1d6; }
-.logs-block .oversight-summary,
-.logs-block .oversight-actions { color: #b0b8c1; }
 .oversight-actions {
   margin: 0;
   padding-left: 16px;
@@ -1382,20 +1364,24 @@ pre.result-entry-body {
   line-height: 1.6;
 }
 .oversight-action { margin: 0; }
+.oversight-action::marker { color: var(--accent); }
 .oversight-loading {
   color: var(--text-muted);
   font-size: 12px;
   padding: 12px 0;
   font-style: italic;
+  white-space: normal;
 }
 .oversight-error {
   color: #d46868;
   font-size: 12px;
   padding: 12px 0;
+  white-space: normal;
 }
 .oversight-empty {
   color: var(--text-muted);
   font-size: 12px;
   padding: 12px 0;
   font-style: italic;
+  white-space: normal;
 }
