@@ -1,7 +1,9 @@
 package runner
 
 import (
+	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
@@ -62,7 +64,7 @@ func canMountWorktree(status string, worktreePaths map[string]string) bool {
 // generateBoardContext serializes all non-archived tasks into board.json bytes.
 // It strips SessionID, marks is_self, and computes worktree_mount paths.
 func (r *Runner) generateBoardContext(selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, error) {
-	tasks, err := r.store.ListTasks(nil, false)
+	tasks, err := r.store.ListTasks(context.TODO(), false)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +138,7 @@ func (r *Runner) prepareBoardContext(selfTaskID uuid.UUID, mountWorktrees bool) 
 // eligible sibling tasks. Only tasks whose worktrees can be safely mounted
 // read-only are included.
 func (r *Runner) buildSiblingMounts(selfTaskID uuid.UUID) map[string]map[string]string {
-	tasks, err := r.store.ListTasks(nil, false)
+	tasks, err := r.store.ListTasks(context.TODO(), false)
 	if err != nil {
 		logger.Runner.Warn("buildSiblingMounts: list tasks", "error", err)
 		return nil
@@ -152,9 +154,7 @@ func (r *Runner) buildSiblingMounts(selfTaskID uuid.UUID) map[string]map[string]
 		}
 		shortID := t.ID.String()[:8]
 		mounts[shortID] = make(map[string]string, len(t.WorktreePaths))
-		for repoPath, wtPath := range t.WorktreePaths {
-			mounts[shortID][repoPath] = wtPath
-		}
+		maps.Copy(mounts[shortID], t.WorktreePaths)
 	}
 
 	if len(mounts) == 0 {
