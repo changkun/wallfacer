@@ -179,6 +179,22 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .right-tab:hover:not(.active) { color: var(--text-secondary); }
 .right-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
+/* --- Left panel (summary) tabs --- */
+.left-panel-tabs {
+  display: flex; gap: 2px; margin-bottom: 12px;
+  border-bottom: 1px solid var(--border); padding-bottom: 0;
+}
+.left-tab {
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-muted);
+  padding: 6px 10px; border-radius: 4px 4px 0 0;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.left-tab:hover:not(.active) { color: var(--text-secondary); }
+.left-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
 /* --- Column headers --- */
 .col-header { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
 .col-header-backlog { color: var(--text-muted); }
