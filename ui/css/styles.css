@@ -31,6 +31,14 @@
 ::selection { background: rgba(217, 119, 87, 0.35); color: #1f1d1a; }
 [data-theme="dark"] ::selection { background: rgba(217, 119, 87, 0.4); color: #f0ede6; }
 
+/* --- Custom scrollbars --- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar-corner { background: transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
 body {
   margin: 0;
   background: var(--bg);
