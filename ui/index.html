@@ -566,58 +566,19 @@
       <button onclick="closeRefineModal()" class="refine-close-btn" aria-label="Close">&times;</button>
     </div>
 
-    <!-- Two-panel body -->
+    <!-- Body: vertical stack -->
     <div class="refine-body">
 
-      <!-- Left panel: prompts -->
-      <div class="refine-left-panel">
-        <div class="refine-left-scroll">
+      <!-- Hidden: current prompt read by JS for conversation seeding -->
+      <pre id="refine-current-prompt" class="hidden"></pre>
 
-          <!-- Current prompt (read-only) -->
-          <div class="refine-section">
-            <div class="refine-section-label">Current Prompt</div>
-            <pre id="refine-current-prompt" class="code-block text-xs refine-current-pre"></pre>
-          </div>
-
-          <!-- Proposed refinement (editable) -->
-          <div class="refine-section refine-section-grow">
-            <div class="refine-section-header">
-              <div class="refine-section-label">Refined Prompt</div>
-              <span id="refine-proposal-hint" class="refine-proposal-badge hidden">✦ AI-suggested</span>
-            </div>
-            <div class="text-xs text-v-muted">Edit as needed, then apply.</div>
-            <textarea id="refine-proposed-prompt" rows="10" class="field refine-prompt-textarea"></textarea>
-          </div>
-
-          <!-- Refinement history (collapsed) -->
-          <div id="refine-history-section" class="hidden">
-            <details>
-              <summary class="refine-history-toggle">Refinement History</summary>
-              <div id="refine-history-list" class="refine-history-list"></div>
-            </details>
-          </div>
-
-        </div>
-
-        <!-- Action buttons -->
-        <div class="refine-actions">
-          <button onclick="applyRefinement()" class="btn btn-accent">Apply Refinement</button>
-          <button onclick="closeRefineModal()" class="btn btn-ghost">Cancel</button>
-        </div>
-      </div>
-
-      <!-- Right panel: chat -->
-      <div class="refine-right-panel">
-        <!-- Messages -->
+      <!-- Chat section: clarify intent -->
+      <div class="refine-chat-section">
         <div id="refine-chat-messages" class="refine-messages"></div>
-
-        <!-- Typing indicator -->
         <div id="refine-typing" class="hidden refine-typing-bar">
           <span class="spinner refine-typing-spinner"></span>
           <span class="text-xs text-v-muted">Thinking…</span>
         </div>
-
-        <!-- Input -->
         <div class="refine-chat-footer">
           <div class="refine-input-row">
             <textarea id="refine-chat-input" rows="2" placeholder="Reply to continue the conversation…" class="field refine-chat-textarea" onkeydown="refineInputKeydown(event)"></textarea>
@@ -626,6 +587,30 @@
           <div class="refine-send-hint">Ctrl+Enter to send</div>
         </div>
       </div>
+
+      <!-- Refined prompt: the spec output (visually emphasized) -->
+      <div class="refine-spec-section">
+        <div class="refine-spec-header">
+          <div class="refine-spec-label">Refined Prompt</div>
+          <span id="refine-proposal-hint" class="refine-proposal-badge hidden">✦ AI-suggested</span>
+        </div>
+        <textarea id="refine-proposed-prompt" rows="8" class="field refine-prompt-textarea"></textarea>
+      </div>
+
+      <!-- Refinement history (collapsible) -->
+      <div id="refine-history-section" class="hidden refine-history-area">
+        <details>
+          <summary class="refine-history-toggle">Refinement History</summary>
+          <div id="refine-history-list" class="refine-history-list"></div>
+        </details>
+      </div>
+
+    </div>
+
+    <!-- Action buttons -->
+    <div class="refine-actions">
+      <button onclick="applyRefinement()" class="btn btn-accent">Apply Refinement</button>
+      <button onclick="closeRefineModal()" class="btn btn-ghost">Cancel</button>
     </div>
   </div>
 </div>
