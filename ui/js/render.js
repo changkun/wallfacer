@@ -34,7 +34,9 @@ function renderDiffInto(el, diff) {
   const lines = diff.split('\n');
   el.innerHTML = lines.map(line => {
     const escaped = escapeHtml(line);
-    if (line.startsWith('+') && !line.startsWith('+++')) {
+    if (/^=== .+ ===$/.test(line)) {
+      return `<span class="diff-workspace-label">${escaped}</span>`;
+    } else if (line.startsWith('+') && !line.startsWith('+++')) {
       return `<span class="diff-add">${escaped}</span>`;
     } else if (line.startsWith('-') && !line.startsWith('---')) {
       return `<span class="diff-del">${escaped}</span>`;
@@ -147,8 +149,8 @@ function render() {
       if (el.children[i] !== card) {
         el.insertBefore(card, el.children[i] || null);
       }
-      // Load diff for waiting/failed tasks that have worktrees
-      if ((t.status === 'waiting' || t.status === 'failed') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
+      // Load diff for waiting/failed/done tasks that have worktrees
+      if ((t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
         fetchDiff(card, t.id, t.updated_at);
       }
     }
@@ -205,7 +207,7 @@ function updateCard(card, t) {
   const badgeClass = isArchived ? 'badge-archived' : `badge-${t.status}`;
   const statusLabel = isArchived ? 'archived' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
-  const showDiff = (t.status === 'waiting' || t.status === 'failed') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
+  const showDiff = (t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
   card.style.opacity = isArchived ? '0.55' : '';
   // Failed tasks in the waiting column get a red left border to distinguish them.
   if (t.status === 'failed') {

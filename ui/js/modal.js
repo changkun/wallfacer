@@ -104,18 +104,26 @@ function renderResultsFromEvents(results) {
 
 function parseDiffByFile(diff) {
   const files = [];
+  // Track current workspace section from "=== name ===" separators.
+  let currentWorkspace = '';
   const blocks = diff.split(/(?=^diff --git )/m);
   for (const block of blocks) {
     if (!block.trim()) continue;
     const lines = block.split('\n');
+    // Extract workspace separator if present (before or after diff content).
+    for (const line of lines) {
+      const wsMatch = line.match(/^=== (.+) ===$/);
+      if (wsMatch) currentWorkspace = wsMatch[1];
+    }
     const match = lines[0].match(/^diff --git a\/.+ b\/(.+)$/);
-    const filename = match ? match[1] : lines[0];
+    if (!match) continue; // skip blocks without diff header (e.g. bare separators)
+    const filename = match[1];
     let adds = 0, dels = 0;
     for (const line of lines.slice(1)) {
       if (line.startsWith('+') && !line.startsWith('+++')) adds++;
       if (line.startsWith('-') && !line.startsWith('---')) dels++;
     }
-    files.push({ filename, content: block, adds, dels });
+    files.push({ filename, content: block, adds, dels, workspace: currentWorkspace });
   }
   return files;
 }
@@ -139,13 +147,19 @@ function renderDiffFiles(container, diff) {
     container.innerHTML = '<span class="text-xs text-v-muted">No changes</span>';
     return;
   }
+  let lastWorkspace = '';
   container.innerHTML = files.map(f => {
+    let wsHeader = '';
+    if (f.workspace && f.workspace !== lastWorkspace) {
+      lastWorkspace = f.workspace;
+      wsHeader = `<div class="diff-workspace-header">${escapeHtml(f.workspace)}</div>`;
+    }
     const statsHtml = [
       f.adds > 0 ? `<span class="diff-add">+${f.adds}</span>` : '',
       f.dels > 0 ? `<span class="diff-del">&minus;${f.dels}</span>` : '',
     ].filter(Boolean).join(' ');
-    const diffHtml = f.content.split('\n').map(renderDiffLine).join('\n');
-    return `<details class="diff-file">
+    const diffHtml = f.content.split('\n').filter(l => !/^=== .+ ===$/.test(l)).map(renderDiffLine).join('\n');
+    return wsHeader + `<details class="diff-file">
       <summary class="diff-file-summary">
         <span class="diff-filename">${escapeHtml(f.filename)}</span>
         <span class="diff-stats">${statsHtml}</span>
@@ -231,12 +245,12 @@ async function openModal(id) {
   document.getElementById('modal-test-section').classList.add('hidden');
   document.getElementById('modal-test-criteria').value = '';
 
-  // Diff section (waiting/failed tasks with worktrees) — shown in right panel
+  // Diff section (waiting/failed/done tasks with worktrees) — shown in right panel
   const modalCard = document.querySelector('#modal .modal-card');
   const modalRight = document.getElementById('modal-right');
   const hasWorktrees = task.worktree_paths && Object.keys(task.worktree_paths).length > 0;
   const modalBody = document.getElementById('modal-body');
-  if ((task.status === 'waiting' || task.status === 'failed') && hasWorktrees) {
+  if ((task.status === 'waiting' || task.status === 'failed' || task.status === 'done') && hasWorktrees) {
     modalCard.classList.add('modal-wide');
     modalRight.classList.remove('hidden');
     modalBody.style.display = 'flex';

@@ -546,6 +546,24 @@ pre { white-space: pre-wrap; word-break: break-word; }
   color: var(--text-muted);
 }
 
+/* --- Workspace separators in multi-repo diffs --- */
+.diff-workspace-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.diff-workspace-header:first-child {
+  border-top: none;
+  margin-top: 0;
+}
+.diff-workspace-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* --- Failed tasks displayed in Waiting column --- */
 .card-failed-waiting {
   border-left: 3px solid #a02828;
