@@ -336,6 +336,49 @@ func TestUpdateTaskResult_NotFound(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// UpdateTaskTurns
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestUpdateTaskTurns_OnlyUpdatesTurns(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "")
+
+	// Store an implementation result first.
+	if err := s.UpdateTaskResult(bg(), task.ID, "impl output", "impl-sess", "end_turn", 3); err != nil {
+		t.Fatalf("UpdateTaskResult: %v", err)
+	}
+
+	// UpdateTaskTurns should only change Turns.
+	if err := s.UpdateTaskTurns(bg(), task.ID, 7); err != nil {
+		t.Fatalf("UpdateTaskTurns: %v", err)
+	}
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.Turns != 7 {
+		t.Errorf("Turns = %d, want 7", got.Turns)
+	}
+	// Result must not be overwritten.
+	if got.Result == nil || *got.Result != "impl output" {
+		t.Errorf("Result = %v, want 'impl output'", got.Result)
+	}
+	// SessionID must not be overwritten.
+	if got.SessionID == nil || *got.SessionID != "impl-sess" {
+		t.Errorf("SessionID = %v, want 'impl-sess'", got.SessionID)
+	}
+	// StopReason must not be overwritten.
+	if got.StopReason == nil || *got.StopReason != "end_turn" {
+		t.Errorf("StopReason = %v, want 'end_turn'", got.StopReason)
+	}
+}
+
+func TestUpdateTaskTurns_NotFound(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.UpdateTaskTurns(bg(), uuid.New(), 0); err == nil {
+		t.Error("expected error for unknown task")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // AccumulateTaskUsage
 // ─────────────────────────────────────────────────────────────────────────────
 

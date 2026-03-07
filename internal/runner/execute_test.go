@@ -724,6 +724,74 @@ func TestRunWaitingFeedbackDonePreservesChanges(t *testing.T) {
 	}
 }
 
+// TestRunTestRunPreservesImplementationResult verifies that a test run (IsTestRun=true)
+// does not overwrite the implementation agent's Result or SessionID. The test
+// verdict is recorded in LastTestResult but the implementation output is left intact
+// so the user can still see what was implemented and resume the same session.
+func TestRunTestRunPreservesImplementationResult(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Implementation agent: pauses at "waiting" (empty stop_reason).
+	implOutput := `{"result":"implementation complete","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+	// Test agent: concludes with PASS verdict.
+	testOutput := `{"result":"All checks passed. **PASS**","session_id":"test-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`
+
+	cmd := fakeStatefulCmd(t, []string{implOutput, testOutput})
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Preserve impl result test", 5, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Phase 1: implementation run → task goes to "waiting".
+	r.Run(task.ID, "implement the feature", "", false)
+
+	afterImpl, _ := s.GetTask(ctx, task.ID)
+	if afterImpl.Status != "waiting" {
+		t.Fatalf("expected status=waiting after implementation run, got %q", afterImpl.Status)
+	}
+	if afterImpl.Result == nil || *afterImpl.Result != "implementation complete" {
+		t.Fatalf("expected implementation result, got %v", afterImpl.Result)
+	}
+	if afterImpl.SessionID == nil || *afterImpl.SessionID != "impl-sess" {
+		t.Fatalf("expected impl-sess session ID, got %v", afterImpl.SessionID)
+	}
+
+	// Phase 2: mark as test run and run the test agent (fresh session "").
+	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, "in_progress"); err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "verify the implementation", "", false)
+
+	afterTest, _ := s.GetTask(ctx, task.ID)
+	if afterTest.Status != "waiting" {
+		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
+	}
+
+	// Implementation result must NOT be overwritten by the test agent.
+	if afterTest.Result == nil || *afterTest.Result != "implementation complete" {
+		t.Fatalf("test run overwrote implementation result; got %v, want 'implementation complete'", afterTest.Result)
+	}
+	// Implementation session ID must NOT be overwritten by the test agent's session.
+	if afterTest.SessionID == nil || *afterTest.SessionID != "impl-sess" {
+		t.Fatalf("test run overwrote implementation session ID; got %v, want 'impl-sess'", afterTest.SessionID)
+	}
+	// Test verdict must be recorded.
+	if afterTest.LastTestResult != "pass" {
+		t.Fatalf("expected last_test_result=pass, got %q", afterTest.LastTestResult)
+	}
+	// IsTestRun must be cleared after the test completes.
+	if afterTest.IsTestRun {
+		t.Fatal("IsTestRun should be false after test completion")
+	}
+}
+
 // Ensure time is imported to avoid unused import warnings.
 var _ = time.Second
 

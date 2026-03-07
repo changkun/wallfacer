@@ -150,6 +150,26 @@ func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) e
 	return nil
 }
 
+// UpdateTaskTurns updates only the turn counter for a task, leaving all other
+// fields (Result, SessionID, StopReason) unchanged. Used during test runs so
+// that the implementation agent's output is not overwritten.
+func (s *Store) UpdateTaskTurns(_ context.Context, id uuid.UUID, turns int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.Turns = turns
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify()
+	return nil
+}
+
 // UpdateTaskResult stores the final output, session ID, stop reason, and turn count.
 func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessionID, stopReason string, turns int) error {
 	s.mu.Lock()

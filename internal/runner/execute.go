@@ -167,10 +167,16 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			"session_id":  output.SessionID,
 		})
 
-		if output.SessionID != "" {
-			sessionID = output.SessionID
+		if isTestRun {
+			// During a test run, preserve the implementation agent's result and
+			// session ID — only track the turn count so progress is visible.
+			r.store.UpdateTaskTurns(bgCtx, taskID, turns)
+		} else {
+			if output.SessionID != "" {
+				sessionID = output.SessionID
+			}
+			r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, turns)
 		}
-		r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, turns)
 
 		// Accumulate per-invocation cost and token values directly.
 		r.store.AccumulateTaskUsage(bgCtx, taskID, store.TaskUsage{
