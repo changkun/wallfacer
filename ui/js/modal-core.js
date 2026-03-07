@@ -36,10 +36,8 @@ async function openModal(id) {
       resumeRow.classList.add('hidden');
     }
 
-    // Reset refinement chat state
+    // Reset refinement panel state
     resetRefinePanel();
-    document.getElementById('refine-start-btn').classList.remove('hidden');
-    document.getElementById('refine-chat-area').classList.add('hidden');
 
     // Populate refinement history
     renderRefineHistory(task);
