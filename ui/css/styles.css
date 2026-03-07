@@ -158,6 +158,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   flex: 3; min-width: 0; overflow-y: auto; max-height: calc(95vh - 80px);
   display: flex; flex-direction: column;
 }
+.modal-wide #modal-backlog-right.hidden { display: none; }
 .modal-wide .logs-block {
   max-height: 560px;
 }
