@@ -51,11 +51,7 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		return
 	}
 
-<<<<<<< Updated upstream
-	h.runner.RunRefinementBackground(id)
-=======
-	go h.runner.RunRefinement(id, strings.TrimSpace(req.UserInstructions))
->>>>>>> Stashed changes
+	h.runner.RunRefinementBackground(id, strings.TrimSpace(req.UserInstructions))
 
 	updated, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
