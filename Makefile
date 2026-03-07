@@ -10,11 +10,14 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-codex server run shell clean ui-css
+.PHONY: build build-claude build-codex server run shell clean ui-css
+
+# Build both sandbox images.
+build: build-claude build-codex
 
 # Build the Claude Code sandbox image and tag it with both the local name and the ghcr.io
 # name so that 'wallfacer run' finds it under the default image reference.
-build:
+build-claude:
 	$(PODMAN) build -t $(IMAGE) -t $(GHCR_IMAGE) -f sandbox/claude/Dockerfile sandbox/claude/
 
 # Build the OpenAI Codex sandbox image.
