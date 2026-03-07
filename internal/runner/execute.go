@@ -71,6 +71,8 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 			"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusDone),
 		})
+		r.backgroundWg.Add(1)
+		go func() { defer r.backgroundWg.Done(); r.GenerateOversight(taskID) }()
 		return
 	}
 

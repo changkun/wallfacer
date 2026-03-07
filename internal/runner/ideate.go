@@ -59,11 +59,12 @@ type IdeateResult struct {
 }
 
 // RunIdeation runs a lightweight read-only container to analyse the workspaces
-// and returns up to 3 proposed task ideas. The caller is responsible for
-// creating backlog tasks from the results.
+// and returns up to 3 proposed task ideas together with the raw container
+// stdout/stderr and the parsed agent output. The caller is responsible for
+// creating backlog tasks from the results and for persisting the raw output.
 // taskID, when non-zero, registers the container under that task ID so that
 // KillContainer(taskID) and log streaming work through the standard task paths.
-func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID) ([]IdeateResult, error) {
+func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID) ([]IdeateResult, *agentOutput, []byte, []byte, error) {
 	containerName := fmt.Sprintf("wallfacer-ideate-%d", time.Now().UnixNano()/1e6)
 
 	if taskID != uuid.Nil {
@@ -88,33 +89,33 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID) ([]IdeateRes
 	if ctx.Err() != nil {
 		exec.Command(r.command, "kill", containerName).Run()
 		exec.Command(r.command, "rm", "-f", containerName).Run()
-		return nil, fmt.Errorf("ideation container terminated: %w", ctx.Err())
+		return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("ideation container terminated: %w", ctx.Err())
 	}
 
 	raw := strings.TrimSpace(stdout.String())
 	if raw == "" {
 		if runErr != nil {
 			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				return nil, fmt.Errorf("container exited %d: stderr=%s", exitErr.ExitCode(), stderr.String())
+				return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited %d: stderr=%s", exitErr.ExitCode(), stderr.String())
 			}
-			return nil, fmt.Errorf("exec container: %w", runErr)
+			return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
 		}
-		return nil, fmt.Errorf("empty output from ideation container")
+		return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from ideation container")
 	}
 
 	output, parseErr := parseOutput(raw)
 	if parseErr != nil {
-		return nil, fmt.Errorf("parse ideation output: %w", parseErr)
+		return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("parse ideation output: %w", parseErr)
 	}
 	if output == nil || output.Result == "" {
-		return nil, fmt.Errorf("no result in ideation output")
+		return nil, output, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("no result in ideation output")
 	}
 
 	ideas, err := extractIdeas(output.Result)
 	if err != nil {
-		return nil, fmt.Errorf("extract ideas: %w (result: %s)", err, truncate(output.Result, 300))
+		return nil, output, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("extract ideas: %w (result: %s)", err, truncate(output.Result, 300))
 	}
-	return ideas, nil
+	return ideas, output, stdout.Bytes(), stderr.Bytes(), nil
 }
 
 // buildIdeationContainerArgs builds the container run arguments for the
@@ -185,7 +186,41 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		"result": "Starting brainstorm agent — exploring workspaces to propose ideas...",
 	})
 
-	ideas, err := r.RunIdeation(ctx, taskID)
+	ideas, output, rawStdout, rawStderr, err := r.RunIdeation(ctx, taskID)
+
+	// Always persist the raw container output as turn 1 so that the trace and
+	// oversight features work the same as for regular implementation tasks.
+	if len(rawStdout) > 0 {
+		if saveErr := r.store.SaveTurnOutput(taskID, 1, rawStdout, rawStderr); saveErr != nil {
+			logger.Runner.Warn("ideation: save turn output", "task", taskID, "error", saveErr)
+		}
+	}
+
+	// Emit an output event and persist the agent result so the task card shows
+	// the brainstorm summary and the Turns counter is non-zero (enabling oversight).
+	if output != nil {
+		sessionID := output.SessionID
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeOutput, map[string]string{
+			"result":      output.Result,
+			"stop_reason": output.StopReason,
+			"session_id":  sessionID,
+		})
+		r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, 1)
+		r.store.AccumulateSubAgentUsage(bgCtx, taskID, "ideation", store.TaskUsage{
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+		})
+	} else {
+		// No parsed output (e.g. container error before producing JSON); still
+		// increment Turns so the trace file is indexed if stdout was non-empty.
+		if len(rawStdout) > 0 {
+			r.store.UpdateTaskTurns(bgCtx, taskID, 1)
+		}
+	}
+
 	if err != nil {
 		return err
 	}
