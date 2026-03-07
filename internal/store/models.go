@@ -19,21 +19,35 @@ type TaskUsage struct {
 }
 
 // RefinementMessage is a single turn in a refinement chat session.
+// Kept for backward compatibility with older chat-based refinement sessions.
 type RefinementMessage struct {
 	Role      string    `json:"role"`       // "user" or "assistant"
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// RefinementSession records a single chat-based refinement interaction.
+// RefinementSession records a single sandbox-based refinement run.
 // StartPrompt is the task prompt at the beginning of the session.
-// ResultPrompt is the prompt after the user applied the refinement (empty if discarded).
+// Result is the raw spec produced by the sandbox agent.
+// ResultPrompt is the prompt the user applied (may differ from Result if edited).
+// Messages is kept for backward compatibility with older chat-based sessions.
 type RefinementSession struct {
 	ID           string              `json:"id"`
 	CreatedAt    time.Time           `json:"created_at"`
 	StartPrompt  string              `json:"start_prompt"`
-	Messages     []RefinementMessage `json:"messages"`
+	Messages     []RefinementMessage `json:"messages,omitempty"`
+	Result       string              `json:"result,omitempty"`
 	ResultPrompt string              `json:"result_prompt,omitempty"`
+}
+
+// RefinementJob tracks the state of an active or recently completed
+// sandbox refinement run for a backlog task.
+type RefinementJob struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	Status    string    `json:"status"` // "running", "done", "failed"
+	Result    string    `json:"result,omitempty"`
+	Error     string    `json:"error,omitempty"`
 }
 
 // TaskStatus represents the lifecycle state of a task.
@@ -55,7 +69,8 @@ type Task struct {
 	Title          string              `json:"title,omitempty"`
 	Prompt         string              `json:"prompt"`
 	PromptHistory  []string            `json:"prompt_history,omitempty"`
-	RefineSessions []RefinementSession `json:"refine_sessions,omitempty"`
+	RefineSessions     []RefinementSession `json:"refine_sessions,omitempty"`
+	CurrentRefinement  *RefinementJob      `json:"current_refinement,omitempty"`
 	Status         TaskStatus           `json:"status"`
 	Archived       bool                 `json:"archived,omitempty"`
 	SessionID      *string              `json:"session_id"`

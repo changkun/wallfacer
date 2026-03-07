@@ -181,6 +181,83 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 }
 
+// StreamRefineLogs streams live container logs for an active sandbox refinement run.
+// If no refinement container is running, returns 204 No Content so the client
+// knows the run has ended and should read the result from the task object.
+func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	containerName := h.runner.RefineContainerName(id)
+	if containerName == "" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
+
+	pr, pw := io.Pipe()
+	cmd.Stdout = pw
+	cmd.Stderr = pw
+
+	if err := cmd.Start(); err != nil {
+		pr.Close()
+		pw.Close()
+		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
+		return
+	}
+
+	go func() {
+		cmd.Wait()
+		pw.Close()
+	}()
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	lines := make(chan string)
+	go func() {
+		defer close(lines)
+		scanner := bufio.NewScanner(pr)
+		for scanner.Scan() {
+			lines <- scanner.Text()
+		}
+	}()
+
+	keepalive := time.NewTicker(15 * time.Second)
+	defer keepalive.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			pr.Close()
+			return
+		case line, ok := <-lines:
+			if !ok {
+				return
+			}
+			if _, err := w.Write([]byte(line + "\n")); err != nil {
+				pr.Close()
+				return
+			}
+			flusher.Flush()
+		case <-keepalive.C:
+			if _, err := w.Write([]byte("\n")); err != nil {
+				pr.Close()
+				return
+			}
+			flusher.Flush()
+		}
+	}
+}
+
 // serveStoredLogs serves saved turn output for tasks no longer running.
 func (h *Handler) serveStoredLogs(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	h.serveStoredLogsRange(w, r, id, 0, 0)

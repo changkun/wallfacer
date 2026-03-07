@@ -457,8 +457,28 @@ func (s *Store) UpdateTaskBaseCommitHashes(_ context.Context, id uuid.UUID, hash
 	return s.saveTask(id, t)
 }
 
+// UpdateRefinementJob persists the current refinement job state.
+// Pass nil to clear the active refinement job.
+func (s *Store) UpdateRefinementJob(_ context.Context, id uuid.UUID, job *RefinementJob) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.CurrentRefinement = job
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify()
+	return nil
+}
+
 // ApplyRefinement saves a refinement session and updates the task prompt.
 // The current prompt is pushed into PromptHistory before being replaced.
+// The CurrentRefinement job is cleared after applying.
 func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt string, session RefinementSession) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -471,6 +491,7 @@ func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt strin
 	t.PromptHistory = append(t.PromptHistory, t.Prompt)
 	t.RefineSessions = append(t.RefineSessions, session)
 	t.Prompt = newPrompt
+	t.CurrentRefinement = nil
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err

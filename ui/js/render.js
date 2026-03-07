@@ -190,6 +190,16 @@ function render() {
     const hasDone = (columns.done || []).some(function(t) { return !t.archived; });
     archiveAllBtn.classList.toggle('hidden', !hasDone);
   }
+
+  // If the modal is open for a backlog task, refresh its refinement panel
+  // so live sandbox status updates are reflected without reopening the modal.
+  if (currentTaskId) {
+    const openTask = tasks.find(t => t.id === currentTaskId);
+    if (openTask && openTask.status === 'backlog') {
+      updateRefineUI(openTask);
+      renderRefineHistory(openTask);
+    }
+  }
 }
 
 function createCard(t) {
@@ -205,7 +215,7 @@ function buildCardActions(t) {
   if (t.archived) return '';
   const parts = [];
   if (t.status === 'backlog') {
-    parts.push(`<button class="card-action-btn card-action-refine" onclick="event.stopPropagation();openRefineModal('${t.id}')" title="Refine task with AI">&#9998; Refine</button>`);
+    parts.push(`<button class="card-action-btn card-action-refine" onclick="event.stopPropagation();openModal('${t.id}').then(()=>startRefinement())" title="Refine task with AI">&#9998; Refine</button>`);
     parts.push(`<button class="card-action-btn card-action-start" onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress">&#9654; Start</button>`);
   } else if (t.status === 'waiting') {
     parts.push(`<button class="card-action-btn card-action-test" onclick="event.stopPropagation();quickTestTask('${t.id}')" title="Run test agent">&#9654; Test</button>`);

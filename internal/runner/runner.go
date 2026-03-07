@@ -217,16 +217,17 @@ type RunnerConfig struct {
 // Runner orchestrates agent container execution for tasks.
 // It manages worktree isolation, container lifecycle, and the commit pipeline.
 type Runner struct {
-	store            *store.Store
-	command          string
-	sandboxImage     string
-	envFile          string
-	workspaces       string
-	worktreesDir     string
-	instructionsPath string
-	repoMu           sync.Map   // per-repo *sync.Mutex for serializing rebase+merge
-	containerNames   sync.Map   // taskID (string) → container name (string)
-	backgroundWg     sync.WaitGroup // tracks fire-and-forget background goroutines
+	store               *store.Store
+	command             string
+	sandboxImage        string
+	envFile             string
+	workspaces          string
+	worktreesDir        string
+	instructionsPath    string
+	repoMu              sync.Map       // per-repo *sync.Mutex for serializing rebase+merge
+	containerNames      sync.Map       // taskID (string) → container name (string)
+	refineContainerNames sync.Map      // taskID (string) → refinement container name (string)
+	backgroundWg        sync.WaitGroup // tracks fire-and-forget background goroutines
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -287,10 +288,29 @@ func (r *Runner) repoLock(repoPath string) *sync.Mutex {
 	return v.(*sync.Mutex)
 }
 
+// RefineContainerName returns the active refinement container name for a task.
+// Returns an empty string if no refinement container is running.
+func (r *Runner) RefineContainerName(taskID uuid.UUID) string {
+	if v, ok := r.refineContainerNames.Load(taskID.String()); ok {
+		return v.(string)
+	}
+	return ""
+}
+
 // KillContainer sends a kill signal to the running container for a task.
 // Safe to call when no container is running — errors are silently ignored.
 func (r *Runner) KillContainer(taskID uuid.UUID) {
 	name := r.ContainerName(taskID)
+	if name == "" {
+		return
+	}
+	exec.Command(r.command, "kill", name).Run()
+}
+
+// KillRefineContainer sends a kill signal to the running refinement container.
+// Safe to call when no refinement container is running — errors are silently ignored.
+func (r *Runner) KillRefineContainer(taskID uuid.UUID) {
+	name := r.RefineContainerName(taskID)
 	if name == "" {
 		return
 	}

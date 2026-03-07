@@ -586,37 +586,34 @@
             <textarea id="modal-edit-prompt" rows="6" class="field" style="font-family:monospace;font-size:12px;"></textarea>
           </div>
 
-          <!-- Refinement chat -->
+          <!-- Sandbox refinement -->
           <div class="mb-4">
             <div class="flex items-center justify-between mb-2">
               <h3 class="section-title" style="margin-bottom:0;">Refine with AI</h3>
-              <div id="refine-actions" style="display:flex;gap:8px;align-items:center;">
-                <button id="refine-start-btn" onclick="startRefineChat()" class="btn btn-accent">Start</button>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button id="refine-start-btn" onclick="startRefinement()" class="btn btn-accent">Start</button>
+                <button id="refine-cancel-btn" onclick="cancelRefinement()" class="hidden btn btn-ghost text-xs">Cancel</button>
               </div>
             </div>
-            <pre id="refine-current-prompt" class="hidden"></pre>
-            <div id="refine-chat-area" class="hidden">
-              <div id="refine-chat-messages" class="refine-messages"></div>
-              <div id="refine-typing" class="hidden refine-typing-bar">
-                <span class="spinner refine-typing-spinner"></span>
-                <span class="text-xs text-v-muted">Thinking…</span>
+            <!-- Running state: spinner + live log output -->
+            <div id="refine-running" class="hidden">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="spinner" style="width:12px;height:12px;border-width:2px;"></span>
+                <span class="text-xs text-v-muted">Sandbox agent is analyzing the codebase and writing a spec…</span>
               </div>
-              <div class="refine-chat-footer">
-                <div class="refine-input-row">
-                  <textarea id="refine-chat-input" rows="2" placeholder="Reply to continue the conversation…" class="field refine-chat-textarea" onkeydown="refineInputKeydown(event)"></textarea>
-                  <button onclick="sendRefineMessage()" id="refine-send-btn" class="btn btn-accent refine-send-btn">Send</button>
-                </div>
-                <div class="refine-send-hint">Ctrl+Enter to send</div>
+              <pre id="refine-logs" class="logs-block" style="max-height:220px;overflow-y:auto;font-size:11px;"></pre>
+            </div>
+            <!-- Done state: editable result + apply button -->
+            <div id="refine-result-section" class="hidden">
+              <div class="refine-spec-header" style="margin-bottom:4px;">
+                <div class="refine-spec-label">Spec (edit before applying)</div>
               </div>
-              <!-- Refined prompt output -->
-              <div class="refine-spec-section mt-3">
-                <div class="refine-spec-header">
-                  <div class="refine-spec-label">Refined Prompt</div>
-                  <span id="refine-proposal-hint" class="refine-proposal-badge hidden">✦ AI-suggested</span>
-                </div>
-                <textarea id="refine-proposed-prompt" rows="6" class="field refine-prompt-textarea"></textarea>
-                <button onclick="applyRefinement()" class="btn btn-accent mt-2" style="align-self:flex-start;">Apply Refined Prompt</button>
-              </div>
+              <textarea id="refine-result-prompt" rows="10" class="field refine-prompt-textarea"></textarea>
+              <button onclick="applyRefinement()" class="btn btn-accent mt-2" style="align-self:flex-start;">Apply as Prompt</button>
+            </div>
+            <!-- Error state -->
+            <div id="refine-error-section" class="hidden">
+              <div id="refine-error-msg" class="text-xs mt-1" style="color:var(--error,#f87171);"></div>
             </div>
           </div>
 
