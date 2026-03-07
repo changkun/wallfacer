@@ -101,6 +101,10 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 [data-theme="dark"] .badge-cancelled { background: #2a1e3d; color: #a07ad4; }
 [data-theme="dark"] .badge-priority { background: #1e2535; color: #8095c0; }
 
+/* --- Max Parallel Tag --- */
+.max-parallel-tag { padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; background: #dceaf7; color: #2c5f98; white-space: nowrap; }
+[data-theme="dark"] .max-parallel-tag { background: #1a2d42; color: #6da0dc; }
+
 /* --- Spinner --- */
 .spinner {
   border: 2px solid var(--border);
