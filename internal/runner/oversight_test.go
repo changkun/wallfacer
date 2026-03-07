@@ -315,6 +315,51 @@ func TestParseOversightResultPreamble(t *testing.T) {
 	}
 }
 
+// TestParseOversightResultBareArray verifies that a bare JSON array of phase
+// objects (without a wrapping {"phases": ...} envelope) is parsed correctly.
+// This covers the case where the oversight agent returns [{"title":...}, ...]
+// instead of {"phases": [{"title":...}, ...]}.
+func TestParseOversightResultBareArray(t *testing.T) {
+	raw := `[
+		{
+			"timestamp": "2024-01-15T10:00:00Z",
+			"title": "Explored codebase",
+			"summary": "The agent read key files",
+			"tools_used": ["Read", "Glob"],
+			"actions": ["Read main.go", "Listed Go files"]
+		},
+		{
+			"timestamp": "2024-01-15T10:05:00Z",
+			"title": "Implemented feature",
+			"summary": "Added the new handler",
+			"tools_used": ["Write"],
+			"commands": ["go build ./..."],
+			"actions": ["Created handler.go"]
+		}
+	]`
+
+	phases, err := parseOversightResult(raw)
+	if err != nil {
+		t.Fatalf("unexpected error for bare array: %v", err)
+	}
+	if len(phases) != 2 {
+		t.Fatalf("expected 2 phases, got %d", len(phases))
+	}
+	if phases[0].Title != "Explored codebase" {
+		t.Fatalf("unexpected first phase title: %q", phases[0].Title)
+	}
+	if phases[1].Title != "Implemented feature" {
+		t.Fatalf("unexpected second phase title: %q", phases[1].Title)
+	}
+	if len(phases[1].Commands) != 1 || phases[1].Commands[0] != "go build ./..." {
+		t.Fatalf("unexpected commands in second phase: %v", phases[1].Commands)
+	}
+	expected := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	if !phases[0].Timestamp.Equal(expected) {
+		t.Fatalf("unexpected timestamp: %v (expected %v)", phases[0].Timestamp, expected)
+	}
+}
+
 // TestParseOversightResultInvalid verifies that clearly invalid JSON returns
 // an error.
 func TestParseOversightResultInvalid(t *testing.T) {

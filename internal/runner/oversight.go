@@ -386,16 +386,19 @@ func ifStr(cond bool, a, b string) string {
 	return b
 }
 
+// oversightPhaseRaw is the JSON shape for a single phase as the agent produces it.
+type oversightPhaseRaw struct {
+	Timestamp string   `json:"timestamp"`
+	Title     string   `json:"title"`
+	Summary   string   `json:"summary"`
+	ToolsUsed []string `json:"tools_used"`
+	Commands  []string `json:"commands"`
+	Actions   []string `json:"actions"`
+}
+
 // oversightResult is the JSON structure the agent produces.
 type oversightResult struct {
-	Phases []struct {
-		Timestamp string   `json:"timestamp"`
-		Title     string   `json:"title"`
-		Summary   string   `json:"summary"`
-		ToolsUsed []string `json:"tools_used"`
-		Commands  []string `json:"commands"`
-		Actions   []string `json:"actions"`
-	} `json:"phases"`
+	Phases []oversightPhaseRaw `json:"phases"`
 }
 
 // runOversightAgent runs a lightweight agent container with the activity log and
@@ -486,18 +489,37 @@ func parseOversightResult(result string) ([]store.OversightPhase, error) {
 		}
 	}
 
-	// Find the first '{' to skip any preamble text.
-	if i := strings.Index(result, "{"); i > 0 {
+	// Detect the JSON shape and parse accordingly.
+	var rawPhases []oversightPhaseRaw
+	switch {
+	case strings.HasPrefix(result, "["):
+		// Bare array of phase objects: [{...}, {...}]
+		if err := json.Unmarshal([]byte(result), &rawPhases); err != nil {
+			return nil, err
+		}
+	case strings.HasPrefix(result, "{"):
+		// Object with a "phases" key: {"phases": [{...}]}
+		var r oversightResult
+		if err := json.Unmarshal([]byte(result), &r); err != nil {
+			return nil, err
+		}
+		rawPhases = r.Phases
+	default:
+		// Fall back: skip preamble text before the first '{'.
+		i := strings.Index(result, "{")
+		if i < 0 {
+			return nil, fmt.Errorf("no JSON object found in oversight result")
+		}
 		result = result[i:]
+		var r oversightResult
+		if err := json.Unmarshal([]byte(result), &r); err != nil {
+			return nil, err
+		}
+		rawPhases = r.Phases
 	}
 
-	var r oversightResult
-	if err := json.Unmarshal([]byte(result), &r); err != nil {
-		return nil, err
-	}
-
-	phases := make([]store.OversightPhase, 0, len(r.Phases))
-	for _, p := range r.Phases {
+	phases := make([]store.OversightPhase, 0, len(rawPhases))
+	for _, p := range rawPhases {
 		phase := store.OversightPhase{
 			Title:     strings.TrimSpace(p.Title),
 			Summary:   strings.TrimSpace(p.Summary),

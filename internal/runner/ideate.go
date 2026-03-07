@@ -296,6 +296,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 
 	// Store a summary of proposed ideas as the task result so the card
 	// displays what was generated without requiring a click-through.
+	// Pass turns=1 to preserve the turn count set by the earlier UpdateTaskResult call.
 	if len(titles) > 0 {
 		var sb strings.Builder
 		for _, title := range titles {
