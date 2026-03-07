@@ -445,32 +445,6 @@
             </div>
           </div>
 
-          <!-- Live logs for in-progress tasks -->
-          <div id="modal-logs-section" class="hidden mb-4">
-            <div class="flex items-center justify-between mb-2">
-              <h3 id="modal-logs-title" class="section-title" style="margin-bottom:0;">Live Output</h3>
-              <div class="logs-tabs">
-                <button id="logs-tab-oversight" onclick="setLogsMode('oversight')" class="logs-tab">Oversight</button>
-                <button id="logs-tab-pretty" onclick="setLogsMode('pretty')" class="logs-tab active">Pretty</button>
-                <button id="logs-tab-raw" onclick="setLogsMode('raw')" class="logs-tab">Raw</button>
-              </div>
-            </div>
-            <pre id="modal-logs" class="logs-block"></pre>
-          </div>
-
-          <!-- Test agent monitor (shown alongside impl logs when is_test_run=true) -->
-          <div id="modal-test-logs-section" class="hidden mb-4">
-            <div class="flex items-center justify-between mb-2">
-              <h3 class="section-title" style="margin-bottom:0;">Test Agent Monitor</h3>
-              <div class="logs-tabs">
-                <button id="test-logs-tab-oversight" onclick="setTestLogsMode('oversight')" class="logs-tab">Oversight</button>
-                <button id="test-logs-tab-pretty" onclick="setTestLogsMode('pretty')" class="logs-tab active">Pretty</button>
-                <button id="test-logs-tab-raw" onclick="setTestLogsMode('raw')" class="logs-tab">Raw</button>
-              </div>
-            </div>
-            <pre id="modal-test-logs" class="logs-block"></pre>
-          </div>
-
           <!-- Feedback form for waiting tasks -->
           <div id="modal-feedback-section" class="hidden mb-4">
             <h3 class="section-title">Provide Feedback</h3>
@@ -533,11 +507,41 @@
           </div>
         </div>
 
-        <!-- Right panel: diff for waiting/failed tasks with worktrees -->
+        <!-- Right panel: tabbed view for non-backlog tasks -->
         <div id="modal-right" class="hidden">
-          <h3 class="section-title">Changes</h3>
-          <div id="modal-diff-behind" class="hidden"></div>
-          <div id="modal-diff-files"></div>
+          <div class="right-panel-tabs">
+            <button id="right-tab-implementation" onclick="setRightTab('implementation')" class="right-tab active">Implementation</button>
+            <button id="right-tab-testing" onclick="setRightTab('testing')" class="right-tab hidden">Testing</button>
+            <button id="right-tab-changes" onclick="setRightTab('changes')" class="right-tab hidden">Changes</button>
+          </div>
+          <div id="right-panel-implementation">
+            <div id="modal-logs-section" class="mb-4">
+              <div class="flex items-center justify-end mb-2">
+                <div class="logs-tabs">
+                  <button id="logs-tab-oversight" onclick="setLogsMode('oversight')" class="logs-tab">Oversight</button>
+                  <button id="logs-tab-pretty" onclick="setLogsMode('pretty')" class="logs-tab active">Pretty</button>
+                  <button id="logs-tab-raw" onclick="setLogsMode('raw')" class="logs-tab">Raw</button>
+                </div>
+              </div>
+              <pre id="modal-logs" class="logs-block"></pre>
+            </div>
+          </div>
+          <div id="right-panel-testing" class="hidden">
+            <div id="modal-test-logs-section" class="mb-4">
+              <div class="flex items-center justify-end mb-2">
+                <div class="logs-tabs">
+                  <button id="test-logs-tab-oversight" onclick="setTestLogsMode('oversight')" class="logs-tab">Oversight</button>
+                  <button id="test-logs-tab-pretty" onclick="setTestLogsMode('pretty')" class="logs-tab active">Pretty</button>
+                  <button id="test-logs-tab-raw" onclick="setTestLogsMode('raw')" class="logs-tab">Raw</button>
+                </div>
+              </div>
+              <pre id="modal-test-logs" class="logs-block"></pre>
+            </div>
+          </div>
+          <div id="right-panel-changes" class="hidden">
+            <div id="modal-diff-behind" class="hidden"></div>
+            <div id="modal-diff-files"></div>
+          </div>
         </div>
 
         <!-- Right panel: settings + refinement for backlog tasks -->

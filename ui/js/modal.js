@@ -325,37 +325,13 @@ async function openModal(id) {
     usageSection.classList.add('hidden');
   }
 
-  const logsSection = document.getElementById('modal-logs-section');
-  const testLogsSection = document.getElementById('modal-test-logs-section');
-  const logsTitleEl = document.getElementById('modal-logs-title');
-  if (task.status !== 'backlog') {
-    logsSection.classList.remove('hidden');
-    if (task.is_test_run || task.last_test_result) {
-      // Split view: implementation logs (static) + test agent monitor.
-      // Shown both while the test is running (is_test_run) and after it
-      // completes (last_test_result set, is_test_run cleared), so done/verified
-      // tasks still expose test traces.
-      if (logsTitleEl) logsTitleEl.textContent = 'Implementation Output';
-      startImplLogFetch(id);
-      testLogsSection.classList.remove('hidden');
-      startTestLogStream(id);
-    } else {
-      if (logsTitleEl) logsTitleEl.textContent = 'Live Output';
-      testLogsSection.classList.add('hidden');
-      startLogStream(id);
-    }
-  } else {
-    logsSection.classList.add('hidden');
-    testLogsSection.classList.add('hidden');
-  }
-
   const feedbackSection = document.getElementById('modal-feedback-section');
   feedbackSection.classList.toggle('hidden', task.status !== 'waiting');
   // Reset test sub-section each time the modal opens.
   document.getElementById('modal-test-section').classList.add('hidden');
   document.getElementById('modal-test-criteria').value = '';
 
-  // Diff section (waiting/failed/done tasks with worktrees) — shown in right panel
+  // Right panel setup
   const modalCard = document.querySelector('#modal .modal-card');
   const modalRight = document.getElementById('modal-right');
   const hasWorktrees = task.worktree_paths && Object.keys(task.worktree_paths).length > 0;
@@ -363,43 +339,70 @@ async function openModal(id) {
   const testBtn = document.getElementById('modal-test-btn');
   if (testBtn) testBtn.classList.toggle('hidden', !hasWorktrees);
   const modalBody = document.getElementById('modal-body');
-  if ((task.status === 'waiting' || task.status === 'failed' || task.status === 'done') && hasWorktrees) {
+
+  if (task.status !== 'backlog') {
     modalCard.classList.add('modal-wide');
     modalRight.classList.remove('hidden');
     modalBody.style.display = 'flex';
     modalBody.style.gap = '0';
-    const filesEl = document.getElementById('modal-diff-files');
-    const behindEl = document.getElementById('modal-diff-behind');
-    filesEl.innerHTML = '<span class="text-xs text-v-muted">Loading diff\u2026</span>';
-    if (behindEl) behindEl.classList.add('hidden');
-    api(`/api/tasks/${task.id}/diff`).then(data => {
-      const el = document.getElementById('modal-diff-files');
-      if (el) renderDiffFiles(el, data.diff);
-      // Hide test button when diff is empty (task produced no changes).
-      const testBtn = document.getElementById('modal-test-btn');
-      if (testBtn) testBtn.classList.toggle('hidden', !data.diff);
-      const behindCounts = data.behind_counts || {};
-      const entries = Object.entries(behindCounts);
-      const totalBehind = entries.reduce((s, [, n]) => s + n, 0);
-      const warnEl = document.getElementById('modal-diff-behind');
-      if (warnEl) {
-        if (totalBehind > 0) {
-          const label = entries.length === 1
-            ? `${totalBehind} commit${totalBehind !== 1 ? 's' : ''} behind`
-            : entries.map(([repo, n]) => `${repo}: ${n}`).join(', ') + ' behind';
-          warnEl.innerHTML =
-            `<span>\u26a0 ${escapeHtml(label)}</span>` +
-            `<button class="diff-sync-btn" onclick="syncTask('${task.id}');closeModal()">Sync with latest</button>`;
-          warnEl.classList.remove('hidden');
-        } else {
-          warnEl.classList.add('hidden');
+
+    // Start log streaming; show Testing tab when test data exists
+    if (task.is_test_run || task.last_test_result) {
+      // Shown both while the test is running (is_test_run) and after it
+      // completes (last_test_result set, is_test_run cleared), so done/verified
+      // tasks still expose test traces.
+      const testTab = document.getElementById('right-tab-testing');
+      if (testTab) testTab.classList.remove('hidden');
+      startImplLogFetch(id);
+      startTestLogStream(id);
+    } else {
+      const testTab = document.getElementById('right-tab-testing');
+      if (testTab) testTab.classList.add('hidden');
+      startLogStream(id);
+    }
+
+    // Changes tab: show for waiting/failed/done tasks with worktrees
+    const changesTab = document.getElementById('right-tab-changes');
+    if ((task.status === 'waiting' || task.status === 'failed' || task.status === 'done') && hasWorktrees) {
+      if (changesTab) changesTab.classList.remove('hidden');
+      const filesEl = document.getElementById('modal-diff-files');
+      const behindEl = document.getElementById('modal-diff-behind');
+      filesEl.innerHTML = '<span class="text-xs text-v-muted">Loading diff\u2026</span>';
+      if (behindEl) behindEl.classList.add('hidden');
+      api(`/api/tasks/${task.id}/diff`).then(data => {
+        const el = document.getElementById('modal-diff-files');
+        if (el) renderDiffFiles(el, data.diff);
+        // Hide test button when diff is empty (task produced no changes).
+        const testBtn = document.getElementById('modal-test-btn');
+        if (testBtn) testBtn.classList.toggle('hidden', !data.diff);
+        const behindCounts = data.behind_counts || {};
+        const entries = Object.entries(behindCounts);
+        const totalBehind = entries.reduce((s, [, n]) => s + n, 0);
+        const warnEl = document.getElementById('modal-diff-behind');
+        if (warnEl) {
+          if (totalBehind > 0) {
+            const label = entries.length === 1
+              ? `${totalBehind} commit${totalBehind !== 1 ? 's' : ''} behind`
+              : entries.map(([repo, n]) => `${repo}: ${n}`).join(', ') + ' behind';
+            warnEl.innerHTML =
+              `<span>\u26a0 ${escapeHtml(label)}</span>` +
+              `<button class="diff-sync-btn" onclick="syncTask('${task.id}');closeModal()">Sync with latest</button>`;
+            warnEl.classList.remove('hidden');
+          } else {
+            warnEl.classList.add('hidden');
+          }
         }
-      }
-    }).catch(() => {
-      const el = document.getElementById('modal-diff-files');
-      if (el) el.innerHTML = '<span class="text-xs ev-error">Failed to load diff</span>';
-    });
-  } else if (task.status !== 'backlog') {
+      }).catch(() => {
+        const el = document.getElementById('modal-diff-files');
+        if (el) el.innerHTML = '<span class="text-xs ev-error">Failed to load diff</span>';
+      });
+    } else {
+      if (changesTab) changesTab.classList.add('hidden');
+    }
+
+    // Default to Implementation tab
+    setRightTab('implementation');
+  } else {
     modalCard.classList.remove('modal-wide');
     modalRight.classList.add('hidden');
     modalBody.style.display = '';
@@ -815,6 +818,16 @@ function renderLogs() {
   if (atBottom) {
     logsEl.scrollTop = logsEl.scrollHeight;
   }
+}
+
+function setRightTab(tab) {
+  ['implementation', 'testing', 'changes'].forEach(function(t) {
+    const btn = document.getElementById('right-tab-' + t);
+    const panel = document.getElementById('right-panel-' + t);
+    const active = t === tab;
+    if (btn) btn.classList.toggle('active', active);
+    if (panel) panel.classList.toggle('hidden', !active);
+  });
 }
 
 function setLogsMode(mode) {
