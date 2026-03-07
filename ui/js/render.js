@@ -294,7 +294,7 @@ function updateCard(card, t) {
       <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
     </div>` : ''}
     ${isIdeaAgent ? `<div class="card-title">&#129504; ${escapeHtml(t.title || 'Brainstorm')}</div>` : t.title ? `<div class="card-title">${escapeHtml(t.title)}</div>` : ''}
-    ${!isIdeaAgent ? `<div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${renderMarkdown(t.prompt)}</div>` : ''}
+    <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${renderMarkdown(t.prompt)}</div>
     ${t.status === 'failed' && t.result ? `
     <div class="card-error-reason">
       <span class="card-error-label">Error</span><span class="card-error-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>

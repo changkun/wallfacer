@@ -56,9 +56,12 @@ func (h *Handler) maybeScheduleNextIdeation(ctx context.Context) {
 	h.createIdeaAgentTask(ctx)
 }
 
+// ideaAgentPrompt is the user-visible prompt shown on idea-agent task cards.
+const ideaAgentPrompt = "Analyzes the workspace and proposes 3 actionable improvements."
+
 // createIdeaAgentTask creates a new idea-agent task card in the backlog.
 func (h *Handler) createIdeaAgentTask(ctx context.Context) {
-	task, err := h.store.CreateTask(ctx, "", ideaAgentDefaultTimeout, false, "", store.TaskKindIdeaAgent)
+	task, err := h.store.CreateTask(ctx, ideaAgentPrompt, ideaAgentDefaultTimeout, false, "", store.TaskKindIdeaAgent)
 	if err != nil {
 		logger.Handler.Warn("ideation: create idea-agent task", "error", err)
 		return
