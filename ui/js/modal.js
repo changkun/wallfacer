@@ -227,6 +227,9 @@ async function openModal(id) {
 
   const feedbackSection = document.getElementById('modal-feedback-section');
   feedbackSection.classList.toggle('hidden', task.status !== 'waiting');
+  // Reset test sub-section each time the modal opens.
+  document.getElementById('modal-test-section').classList.add('hidden');
+  document.getElementById('modal-test-criteria').value = '';
 
   // Diff section (waiting/failed tasks with worktrees) — shown in right panel
   const modalCard = document.querySelector('#modal .modal-card');

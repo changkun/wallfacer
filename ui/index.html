@@ -429,6 +429,16 @@
             <div class="flex items-center gap-2 mt-2">
               <button onclick="submitFeedback()" class="btn btn-yellow">Submit Feedback</button>
               <button onclick="completeTask()" class="btn btn-green">Mark as Done</button>
+              <button onclick="toggleTestSection()" class="btn btn-accent">Test</button>
+            </div>
+            <!-- Test agent sub-section (hidden until Test is clicked) -->
+            <div id="modal-test-section" class="hidden mt-3" style="border-top: 1px solid var(--border); padding-top: 10px;">
+              <p class="text-xs text-v-secondary mb-2">Launch a fresh test agent to verify the implementation. It will inspect the code changes and run any available tests.</p>
+              <textarea id="modal-test-criteria" rows="3" placeholder="Acceptance criteria (optional) — leave empty to use the original task requirements..." class="field"></textarea>
+              <div class="flex items-center gap-2 mt-2">
+                <button onclick="runTestTask()" class="btn btn-accent">Run Test Agent</button>
+                <button onclick="toggleTestSection()" class="btn btn-ghost">Cancel</button>
+              </div>
             </div>
           </div>
 

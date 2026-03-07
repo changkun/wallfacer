@@ -209,6 +209,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	mux.HandleFunc("POST /api/tasks/{id}/archive", withID(h.ArchiveTask))
 	mux.HandleFunc("POST /api/tasks/{id}/unarchive", withID(h.UnarchiveTask))
 	mux.HandleFunc("POST /api/tasks/{id}/sync", withID(h.SyncTask))
+	mux.HandleFunc("POST /api/tasks/{id}/test", withID(h.TestTask))
 	mux.HandleFunc("GET /api/tasks/{id}/diff", withID(h.TaskDiff))
 	mux.HandleFunc("GET /api/tasks/{id}/logs", withID(h.StreamLogs))
 	mux.HandleFunc("GET /api/tasks/{id}/outputs/{filename}", func(w http.ResponseWriter, r *http.Request) {

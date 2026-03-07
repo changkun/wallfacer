@@ -261,6 +261,31 @@ async function quickRetryTask(id) {
   }
 }
 
+// --- Test agent ---
+
+function toggleTestSection() {
+  const section = document.getElementById('modal-test-section');
+  section.classList.toggle('hidden');
+  if (!section.classList.contains('hidden')) {
+    document.getElementById('modal-test-criteria').focus();
+  }
+}
+
+async function runTestTask() {
+  if (!currentTaskId) return;
+  const criteria = document.getElementById('modal-test-criteria').value.trim();
+  try {
+    const res = await api(`/api/tasks/${currentTaskId}/test`, {
+      method: 'POST',
+      body: JSON.stringify({ criteria }),
+    });
+    closeModal();
+    fetchTasks();
+  } catch (e) {
+    showAlert('Error creating test task: ' + e.message);
+  }
+}
+
 // --- Sync with latest (rebase worktree onto default branch) ---
 
 async function syncTask(id) {

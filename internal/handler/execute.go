@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -229,6 +230,76 @@ func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.
 		"to": "unarchived",
 	})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unarchived"})
+}
+
+// TestTask creates a standalone test agent task to verify a waiting task's acceptance criteria.
+// The test task runs with MountWorktrees=true so it can access sibling worktrees via board.json.
+// The parent task remains in "waiting" state while the test task runs independently.
+func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	var req struct {
+		Criteria string `json:"criteria"`
+	}
+	// Body is optional — ignore decode errors.
+	json.NewDecoder(r.Body).Decode(&req)
+
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	if task.Status != "waiting" {
+		http.Error(w, "only waiting tasks can be tested", http.StatusBadRequest)
+		return
+	}
+
+	testPrompt := buildTestPrompt(task.Prompt, req.Criteria)
+
+	// Create a new test task. MountWorktrees=true lets it read sibling worktrees
+	// and board.json to locate the parent task's code changes.
+	testTask, err := h.store.CreateTask(r.Context(), testPrompt, task.Timeout, true, task.Model)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	h.store.InsertEvent(r.Context(), testTask.ID, store.EventTypeStateChange, map[string]string{
+		"to": "backlog",
+	})
+
+	// Record on the parent task that a test was launched.
+	h.store.InsertEvent(r.Context(), id, store.EventTypeSystem, map[string]string{
+		"result": fmt.Sprintf("Test agent launched (task %s)", testTask.ID),
+	})
+
+	go h.runner.GenerateTitle(testTask.ID, testTask.Prompt)
+
+	writeJSON(w, http.StatusCreated, map[string]string{
+		"test_task_id": testTask.ID.String(),
+		"status":       "created",
+	})
+}
+
+// buildTestPrompt constructs a prompt for the test agent from the original task
+// prompt and optional user-specified acceptance criteria.
+func buildTestPrompt(originalPrompt, criteria string) string {
+	var b strings.Builder
+	b.WriteString("You are a test agent. Your job is to verify that the implementation meets the specified requirements.\n\n")
+	b.WriteString("## Original Task\n\n")
+	b.WriteString(originalPrompt)
+	b.WriteString("\n\n")
+	if strings.TrimSpace(criteria) != "" {
+		b.WriteString("## Acceptance Criteria\n\n")
+		b.WriteString(criteria)
+		b.WriteString("\n\n")
+	}
+	b.WriteString("## Instructions\n\n")
+	b.WriteString("1. Find the sibling task's worktree paths by reading `/workspace/.tasks/board.json` — look for the task in `waiting` status to locate its worktree directories.\n")
+	b.WriteString("2. Examine the code changes in those worktrees to understand what was implemented.\n")
+	b.WriteString("3. Run any available tests (unit tests, integration tests, linters, etc.).\n")
+	b.WriteString("4. Verify the implementation satisfies every requirement listed above.\n")
+	b.WriteString("5. Conclude with a clear **PASS** or **FAIL** verdict and specific details about what was checked.\n\n")
+	b.WriteString("Be thorough but focused. If tests fail or requirements are unmet, describe exactly what is missing or broken.")
+	return b.String()
 }
 
 // SyncTask rebases task worktrees onto the latest default branch without merging.
