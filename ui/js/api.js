@@ -81,7 +81,6 @@ function populateModelSelects() {
   var selects = [
     document.getElementById('new-model'),
     document.getElementById('modal-edit-model'),
-    document.getElementById('refine-inline-model'),
   ];
   for (var sel of selects) {
     if (!sel) continue;

@@ -4,54 +4,43 @@ let refineTaskId = null;
 let refineConversation = []; // [{role, content}] — full conversation shown in chat
 let refineLoading = false;
 
-function openRefineModal(taskId) {
-  const task = tasks.find(t => t.id === taskId);
+// startRefineChat is called from the "Start" button inside the backlog modal.
+function startRefineChat() {
+  if (!currentTaskId) return;
+  const task = tasks.find(t => t.id === currentTaskId);
   if (!task) return;
 
-  refineTaskId = taskId;
+  refineTaskId = currentTaskId;
   refineConversation = [];
   refineLoading = false;
 
-  // Populate header.
-  document.getElementById('refine-task-id').textContent = 'ID: ' + taskId;
+  // Populate hidden current-prompt for conversation seeding.
   document.getElementById('refine-current-prompt').textContent = task.prompt;
   document.getElementById('refine-proposed-prompt').value = task.prompt;
   document.getElementById('refine-proposal-hint').classList.add('hidden');
-
-  // Left panel: render prompt as markdown.
-  document.getElementById('refine-inline-prompt-rendered').innerHTML = renderMarkdown(task.prompt);
-
-  // Settings: pre-populate from task values.
-  const modelEl = document.getElementById('refine-inline-model');
-  if (modelEl) modelEl.value = task.model || '';
-  const timeoutEl = document.getElementById('refine-inline-timeout');
-  if (timeoutEl) timeoutEl.value = task.timeout || 60;
-  const worktreesEl = document.getElementById('refine-inline-mount-worktrees');
-  if (worktreesEl) worktreesEl.checked = !!task.mount_worktrees;
 
   // Clear chat.
   document.getElementById('refine-chat-messages').innerHTML = '';
   document.getElementById('refine-chat-input').value = '';
 
-  // Populate history from task's refine_sessions.
-  renderRefineHistory(task);
-
-  // Show inline panel, hide board.
-  document.getElementById('board').classList.add('hidden');
-  document.getElementById('refine-inline').classList.remove('hidden');
+  // Show chat area, hide start button.
+  document.getElementById('refine-start-btn').classList.add('hidden');
+  document.getElementById('refine-chat-area').classList.remove('hidden');
 
   // Kick off the opening question from the AI.
   sendRefineRequest('');
+}
+
+// openRefineModal opens the backlog modal and auto-starts the refinement chat.
+async function openRefineModal(taskId) {
+  await openModal(taskId);
+  startRefineChat();
 }
 
 function closeRefineModal() {
   refineTaskId = null;
   refineConversation = [];
   refineLoading = false;
-
-  // Hide inline panel, restore board.
-  document.getElementById('refine-inline').classList.add('hidden');
-  document.getElementById('board').classList.remove('hidden');
 }
 
 // renderRefineHistory populates the history section from task.refine_sessions.
@@ -216,10 +205,10 @@ async function applyRefinement() {
   }
 
   try {
-    // Save model/timeout/worktrees settings alongside the prompt.
-    const model = document.getElementById('refine-inline-model')?.value || '';
-    const timeout = parseInt(document.getElementById('refine-inline-timeout')?.value, 10) || DEFAULT_TASK_TIMEOUT;
-    const mountWorktrees = document.getElementById('refine-inline-mount-worktrees')?.checked || false;
+    // Read settings from the modal's edit fields.
+    const model = document.getElementById('modal-edit-model')?.value || '';
+    const timeout = parseInt(document.getElementById('modal-edit-timeout')?.value, 10) || DEFAULT_TASK_TIMEOUT;
+    const mountWorktrees = document.getElementById('modal-edit-mount-worktrees')?.checked || false;
     await api(`/api/tasks/${refineTaskId}`, {
       method: 'PATCH',
       body: JSON.stringify({ model, timeout, mount_worktrees: mountWorktrees }),
@@ -233,6 +222,7 @@ async function applyRefinement() {
       }),
     });
     closeRefineModal();
+    closeModal();
     fetchTasks();
   } catch (e) {
     showAlert('Error applying refinement: ' + e.message);

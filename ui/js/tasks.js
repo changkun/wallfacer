@@ -184,6 +184,9 @@ function scheduleBacklogSave() {
       });
       statusEl.textContent = 'Saved';
       setTimeout(() => { if (statusEl.textContent === 'Saved') statusEl.textContent = ''; }, 1500);
+      // Update rendered prompt on the left panel.
+      document.getElementById('modal-prompt-rendered').innerHTML = renderMarkdown(prompt);
+      document.getElementById('modal-prompt').textContent = prompt;
       fetchTasks();
     } catch (e) {
       statusEl.textContent = 'Save failed';

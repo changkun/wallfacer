@@ -201,24 +201,9 @@ async function openModal(id) {
   document.getElementById('modal-time').textContent = new Date(task.created_at).toLocaleString();
   document.getElementById('modal-id').textContent = `ID: ${task.id}`;
 
-  const editSection = document.getElementById('modal-edit-section');
+  const backlogRight = document.getElementById('modal-backlog-right');
   if (task.status === 'backlog') {
-    document.getElementById('modal-prompt-rendered').classList.add('hidden');
-    document.getElementById('modal-prompt').classList.add('hidden');
-    document.getElementById('modal-prompt-actions').classList.add('hidden');
-    editSection.classList.remove('hidden');
-    document.getElementById('modal-edit-prompt').value = task.prompt;
-    document.getElementById('modal-edit-timeout').value = String(task.timeout || 5);
-    const resumeRow = document.getElementById('modal-edit-resume-row');
-    if (task.session_id) {
-      resumeRow.classList.remove('hidden');
-      document.getElementById('modal-edit-resume').checked = !task.fresh_start;
-    } else {
-      resumeRow.classList.add('hidden');
-    }
-    document.getElementById('modal-edit-mount-worktrees').checked = !!task.mount_worktrees;
-    document.getElementById('modal-edit-model').value = task.model || '';
-  } else {
+    // Left panel: rendered prompt
     const promptRaw = document.getElementById('modal-prompt');
     const promptRendered = document.getElementById('modal-prompt-rendered');
     promptRaw.textContent = task.prompt;
@@ -227,7 +212,45 @@ async function openModal(id) {
     promptRaw.classList.add('hidden');
     document.getElementById('modal-prompt-actions').classList.remove('hidden');
     document.getElementById('toggle-prompt-btn').textContent = 'Raw';
-    editSection.classList.add('hidden');
+
+    // Right panel: settings + edit + refinement
+    backlogRight.classList.remove('hidden');
+    document.getElementById('modal-edit-prompt').value = task.prompt;
+    document.getElementById('modal-edit-timeout').value = String(task.timeout || 60);
+    document.getElementById('modal-edit-mount-worktrees').checked = !!task.mount_worktrees;
+    document.getElementById('modal-edit-model').value = task.model || '';
+    const resumeRow = document.getElementById('modal-edit-resume-row');
+    if (task.session_id) {
+      resumeRow.classList.remove('hidden');
+      document.getElementById('modal-edit-resume').checked = !task.fresh_start;
+    } else {
+      resumeRow.classList.add('hidden');
+    }
+
+    // Reset refinement chat state
+    closeRefineModal();
+    document.getElementById('refine-start-btn').classList.remove('hidden');
+    document.getElementById('refine-chat-area').classList.add('hidden');
+
+    // Populate refinement history
+    renderRefineHistory(task);
+
+    // Make modal wide for split layout
+    const modalCard = document.querySelector('#modal .modal-card');
+    modalCard.classList.add('modal-wide');
+    const modalBody = document.getElementById('modal-body');
+    modalBody.style.display = 'flex';
+    modalBody.style.gap = '0';
+  } else {
+    backlogRight.classList.add('hidden');
+    const promptRaw = document.getElementById('modal-prompt');
+    const promptRendered = document.getElementById('modal-prompt-rendered');
+    promptRaw.textContent = task.prompt;
+    promptRendered.innerHTML = renderMarkdown(task.prompt);
+    promptRendered.classList.remove('hidden');
+    promptRaw.classList.add('hidden');
+    document.getElementById('modal-prompt-actions').classList.remove('hidden');
+    document.getElementById('toggle-prompt-btn').textContent = 'Raw';
   }
 
   // Show task.result as a single-entry fallback; replaced below once events load
@@ -465,6 +488,8 @@ function closeModal() {
   logsMode = 'oversight';
   document.getElementById('modal-logs').innerHTML = '';
   document.getElementById('modal-test-logs').innerHTML = '';
+  closeRefineModal();
+  document.getElementById('modal-backlog-right').classList.add('hidden');
   currentTaskId = null;
   document.querySelector('#modal .modal-card').classList.remove('modal-wide');
   const modalBody = document.getElementById('modal-body');
