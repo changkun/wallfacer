@@ -124,6 +124,7 @@ function render() {
     if (countEl) {
       if (status === 'in_progress') {
         countEl.textContent = formatInProgressCount(items.length);
+        updateMaxParallelTag();
       } else {
         countEl.textContent = items.length;
       }

@@ -5,7 +5,7 @@
  * dependency on a real browser DOM.  Only the minimal browser globals that
  * each script needs at module-evaluation time are provided.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -153,5 +153,71 @@ describe('containerStateColor', () => {
     expect(ctx.containerStateColor('dead')).toBe('#d46868');
     expect(ctx.containerStateColor('paused')).toBe('#d4a030');
     expect(ctx.containerStateColor(null)).toBe('#9c9890'); // default / unknown
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 6 – updateMaxParallelTag (render.js)
+// Verifies that the "max N" badge in the In Progress column header reflects
+// the current maxParallelTasks global and responds to changes so that the UI
+// stays in sync when system settings are updated.
+// ---------------------------------------------------------------------------
+describe('updateMaxParallelTag', () => {
+  let ctx;
+  let tagEl;
+
+  beforeAll(() => {
+    tagEl = {
+      textContent: '',
+      classList: {
+        _hidden: true,
+        add(cls) { if (cls === 'hidden') this._hidden = true; },
+        remove(cls) { if (cls === 'hidden') this._hidden = false; },
+      },
+    };
+
+    ctx = makeContext({
+      document: {
+        getElementById: (id) => {
+          if (id === 'max-parallel-tag') return tagEl;
+          if (id === 'container-monitor-modal') return { addEventListener: () => {} };
+          return null;
+        },
+        querySelectorAll: () => ({ forEach: () => {} }),
+        documentElement: { setAttribute: () => {} },
+        readyState: 'complete',
+        addEventListener: () => {},
+      },
+    });
+
+    loadScript('state.js', ctx);
+    loadScript('render.js', ctx);
+  });
+
+  // Use vm.runInContext to assign into the let binding created by state.js.
+  // Direct ctx property assignment would create a shadowed property, not
+  // update the let binding that the function closes over.
+  function setMax(n) {
+    vm.runInContext(`maxParallelTasks = ${n};`, ctx);
+  }
+
+  it('shows "max N" and removes hidden class when maxParallelTasks > 0', () => {
+    setMax(5);
+    ctx.updateMaxParallelTag();
+    expect(tagEl.textContent).toBe('max 5');
+    expect(tagEl.classList._hidden).toBe(false);
+  });
+
+  it('updates the label when maxParallelTasks changes (simulates settings save)', () => {
+    setMax(10);
+    ctx.updateMaxParallelTag();
+    expect(tagEl.textContent).toBe('max 10');
+    expect(tagEl.classList._hidden).toBe(false);
+  });
+
+  it('hides the tag when maxParallelTasks is 0 (not yet loaded)', () => {
+    setMax(0);
+    ctx.updateMaxParallelTag();
+    expect(tagEl.classList._hidden).toBe(true);
   });
 });

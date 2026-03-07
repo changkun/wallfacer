@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -86,5 +87,12 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// When the parallel task limit changes, re-evaluate immediately so new
+	// capacity is filled without waiting for the next store event.
+	if req.MaxParallelTasks != nil {
+		go h.tryAutoPromote(context.Background())
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
