@@ -159,7 +159,7 @@ func TestTestTask_IncludesCriteriaInTestPrompt(t *testing.T) {
 
 func TestBuildTestPrompt(t *testing.T) {
 	t.Run("without criteria", func(t *testing.T) {
-		p := buildTestPrompt("build a widget", "")
+		p := buildTestPrompt("build a widget", "", "", "")
 		if !strings.Contains(p, "build a widget") {
 			t.Error("prompt should contain original task text")
 		}
@@ -169,7 +169,7 @@ func TestBuildTestPrompt(t *testing.T) {
 	})
 
 	t.Run("with criteria", func(t *testing.T) {
-		p := buildTestPrompt("build a widget", "must render in 100ms")
+		p := buildTestPrompt("build a widget", "must render in 100ms", "", "")
 		if !strings.Contains(p, "build a widget") {
 			t.Error("prompt should contain original task text")
 		}
@@ -182,16 +182,57 @@ func TestBuildTestPrompt(t *testing.T) {
 	})
 
 	t.Run("whitespace-only criteria treated as empty", func(t *testing.T) {
-		p := buildTestPrompt("build a widget", "   \n\t  ")
+		p := buildTestPrompt("build a widget", "   \n\t  ", "", "")
 		if strings.Contains(p, "Acceptance Criteria") {
 			t.Error("whitespace-only criteria should not produce Acceptance Criteria section")
 		}
 	})
 
 	t.Run("prompt instructs not to modify code", func(t *testing.T) {
-		p := buildTestPrompt("build a widget", "")
+		p := buildTestPrompt("build a widget", "", "", "")
 		if !strings.Contains(p, "Do not modify") {
 			t.Error("prompt should instruct test agent not to modify code")
+		}
+	})
+
+	t.Run("with implementation result", func(t *testing.T) {
+		p := buildTestPrompt("build a widget", "", "I added widget.go with a Widget struct", "")
+		if !strings.Contains(p, "Implementation Summary") {
+			t.Error("prompt should contain Implementation Summary section when implResult is set")
+		}
+		if !strings.Contains(p, "I added widget.go with a Widget struct") {
+			t.Error("prompt should contain the implementation result text")
+		}
+	})
+
+	t.Run("whitespace-only implResult treated as empty", func(t *testing.T) {
+		p := buildTestPrompt("build a widget", "", "   \n  ", "")
+		if strings.Contains(p, "Implementation Summary") {
+			t.Error("whitespace-only implResult should not produce Implementation Summary section")
+		}
+	})
+
+	t.Run("with diff", func(t *testing.T) {
+		fakeDiff := "+func Widget() {}\n-old code"
+		p := buildTestPrompt("build a widget", "", "", fakeDiff)
+		if !strings.Contains(p, "Changes Made") {
+			t.Error("prompt should contain Changes Made section when diff is set")
+		}
+		if !strings.Contains(p, fakeDiff) {
+			t.Error("prompt should contain the diff text")
+		}
+		if !strings.Contains(p, "focus your verification on those files") {
+			t.Error("prompt should tell agent to focus on the diff when diff is present")
+		}
+	})
+
+	t.Run("without diff uses generic examine instruction", func(t *testing.T) {
+		p := buildTestPrompt("build a widget", "", "", "")
+		if strings.Contains(p, "Changes Made") {
+			t.Error("prompt should not contain Changes Made section when diff is empty")
+		}
+		if !strings.Contains(p, "Examine the code") {
+			t.Error("prompt should fall back to generic examine instruction when no diff")
 		}
 	})
 }

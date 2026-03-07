@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -267,7 +270,18 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 
-	testPrompt := buildTestPrompt(task.Prompt, req.Criteria)
+	// Include the implementation agent's result as context so the test agent
+	// knows what was reported as done without re-reading the whole codebase.
+	implResult := ""
+	if task.Result != nil {
+		implResult = *task.Result
+	}
+
+	// Generate a git diff from each worktree so the test agent can focus
+	// directly on the changed files instead of exploring from scratch.
+	diff := generateWorktreeDiff(task.WorktreePaths)
+
+	testPrompt := buildTestPrompt(task.Prompt, req.Criteria, implResult, diff)
 
 	// Mark task as a test run and clear any previous verdict.
 	if err := h.store.UpdateTaskTestRun(r.Context(), id, true, ""); err != nil {
@@ -295,9 +309,10 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "testing"})
 }
 
-// buildTestPrompt constructs a prompt for the test verification agent from the original task
-// prompt and optional user-specified acceptance criteria.
-func buildTestPrompt(originalPrompt, criteria string) string {
+// buildTestPrompt constructs a prompt for the test verification agent.
+// implResult is the implementation agent's self-reported summary (may be empty).
+// diff is a git diff of the changes made (may be empty).
+func buildTestPrompt(originalPrompt, criteria, implResult, diff string) string {
 	var b strings.Builder
 	b.WriteString("You are a test verification agent. Your job is to verify that the implementation meets the specified requirements.\n\n")
 	b.WriteString("## Original Task\n\n")
@@ -308,15 +323,69 @@ func buildTestPrompt(originalPrompt, criteria string) string {
 		b.WriteString(criteria)
 		b.WriteString("\n\n")
 	}
+	if strings.TrimSpace(implResult) != "" {
+		b.WriteString("## Implementation Summary\n\n")
+		b.WriteString("The implementation agent reported:\n\n")
+		b.WriteString(strings.TrimSpace(implResult))
+		b.WriteString("\n\n")
+	}
+	if strings.TrimSpace(diff) != "" {
+		b.WriteString("## Changes Made\n\n")
+		b.WriteString("```diff\n")
+		b.WriteString(strings.TrimSpace(diff))
+		b.WriteString("\n```\n\n")
+	}
 	b.WriteString("## Instructions\n\n")
 	b.WriteString("You are running directly in the task's own workspace — the code changes are already present.\n")
-	b.WriteString("1. Examine the code to understand what was implemented.\n")
+	if strings.TrimSpace(diff) != "" {
+		b.WriteString("1. The diff above shows exactly what was changed — focus your verification on those files.\n")
+	} else {
+		b.WriteString("1. Examine the code to understand what was implemented.\n")
+	}
 	b.WriteString("2. Run any available tests (unit tests, integration tests, linters, build checks, etc.).\n")
 	b.WriteString("3. Verify the implementation satisfies every requirement listed above.\n")
 	b.WriteString("4. End your response with your verdict on its own line: **PASS** if all requirements are met, or **FAIL** if any are not.\n\n")
 	b.WriteString("IMPORTANT: Your final line must be exactly **PASS** or **FAIL** (bold, all caps). This is required for automated verdict detection.\n\n")
 	b.WriteString("Be thorough but focused. Do not modify any code. If tests fail or requirements are unmet, describe exactly what is missing or broken.")
 	return b.String()
+}
+
+// maxDiffBytes is the maximum number of bytes to include from the git diff in
+// the test prompt. Diffs beyond this limit are truncated to keep the prompt
+// focused and avoid hitting context limits.
+const maxDiffBytes = 16000
+
+// generateWorktreeDiff produces a unified git diff for each worktree showing
+// all changes on the task branch relative to the default branch. Returns an
+// empty string if no worktrees are provided or no diffs are found.
+func generateWorktreeDiff(worktreePaths map[string]string) string {
+	if len(worktreePaths) == 0 {
+		return ""
+	}
+	var parts []string
+	for repoPath, worktreePath := range worktreePaths {
+		if !gitutil.IsGitRepo(repoPath) {
+			continue
+		}
+		defBranch, err := gitutil.DefaultBranch(repoPath)
+		if err != nil {
+			continue
+		}
+		out, err := exec.Command("git", "-C", worktreePath, "diff", defBranch+"..HEAD").Output()
+		if err != nil || len(strings.TrimSpace(string(out))) == 0 {
+			continue
+		}
+		diff := string(out)
+		if len(worktreePaths) > 1 {
+			diff = "# " + filepath.Base(repoPath) + "\n" + diff
+		}
+		parts = append(parts, diff)
+	}
+	combined := strings.Join(parts, "\n")
+	if len(combined) > maxDiffBytes {
+		combined = combined[:maxDiffBytes] + "\n... (diff truncated)"
+	}
+	return combined
 }
 
 // SyncTask rebases task worktrees onto the latest default branch without merging.
