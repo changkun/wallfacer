@@ -36,8 +36,10 @@ async function openModal(id) {
       resumeRow.classList.add('hidden');
     }
 
-    // Reset refinement panel state
+    // Reset refinement panel state and sync UI with current task.
     resetRefinePanel();
+    refineTaskId = task.id;
+    updateRefineUI(task);
 
     // Populate refinement history
     renderRefineHistory(task);
