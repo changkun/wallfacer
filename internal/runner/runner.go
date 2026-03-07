@@ -214,7 +214,7 @@ type RunnerConfig struct {
 	InstructionsPath string
 }
 
-// Runner orchestrates Claude Code container execution for tasks.
+// Runner orchestrates agent container execution for tasks.
 // It manages worktree isolation, container lifecycle, and the commit pipeline.
 type Runner struct {
 	store            *store.Store

@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Run is the main task execution loop. It sets up worktrees, runs Claude Code
+// Run is the main task execution loop. It sets up worktrees, runs the agent
 // in a container, handles auto-continue turns, and transitions the task to the
 // appropriate terminal state (done/waiting/failed).
 func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
@@ -87,13 +87,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	turns := task.Turns
 
-	// testSessionID tracks the test agent's Claude Code session across turns
-	// so that multi-turn test runs (max_tokens/pause_turn) can resume their
-	// own session rather than starting a fresh empty-prompt session.
+	// testSessionID tracks the test agent's session across turns so that
+	// multi-turn test runs (max_tokens/pause_turn) can resume their own
+	// session rather than starting a fresh empty-prompt session.
 	// It is kept separate from sessionID which holds the implementation session.
 	var testSessionID string
 
-	// Claude Code's -p --resume mode reports per-invocation totals for both
+	// The agent's -p --resume mode reports per-invocation totals for both
 	// cost (total_cost_usd) and usage tokens — they are NOT session-cumulative.
 	// Each container invocation's values represent only that invocation's
 	// consumption, so we accumulate them directly without delta subtraction.

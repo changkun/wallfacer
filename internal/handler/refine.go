@@ -45,16 +45,16 @@ type refineMessage struct {
 	Content string `json:"content"`
 }
 
-// claudeRequest is the payload sent to the Anthropic Messages API.
-type claudeRequest struct {
+// llmRequest is the payload sent to the Messages API.
+type llmRequest struct {
 	Model     string          `json:"model"`
 	MaxTokens int             `json:"max_tokens"`
 	System    string          `json:"system"`
 	Messages  []refineMessage `json:"messages"`
 }
 
-// claudeResponse is the relevant subset of the Anthropic Messages API response.
-type claudeResponse struct {
+// llmResponse is the relevant subset of the Messages API response.
+type llmResponse struct {
 	Content []struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
@@ -65,17 +65,17 @@ type claudeResponse struct {
 	} `json:"error"`
 }
 
-// buildMessagesURL returns the full endpoint URL for the Claude Messages API,
+// buildMessagesURL returns the full endpoint URL for the Messages API,
 // choosing the appropriate host and path based on which credential is configured.
 //
-// Claude Code OAuth tokens must target api.claude.ai (/api/messages), whereas
-// API keys and gateway auth tokens use api.anthropic.com (/v1/messages). An
-// explicit ANTHROPIC_BASE_URL always takes precedence and uses /v1/messages.
+// OAuth tokens must target api.claude.ai (/api/messages), whereas API keys and
+// gateway auth tokens use api.anthropic.com (/v1/messages). An explicit
+// ANTHROPIC_BASE_URL always takes precedence and uses /v1/messages.
 func buildMessagesURL(baseURL, apiKey, authToken, oauthToken string) string {
 	path := "/v1/messages"
 	if baseURL == "" {
 		if oauthToken != "" && apiKey == "" && authToken == "" {
-			// Claude Code OAuth tokens authenticate against api.claude.ai,
+			// OAuth tokens authenticate against api.claude.ai,
 			// not api.anthropic.com. The former uses the /api/messages path.
 			baseURL = "https://api.claude.ai"
 			path = "/api/messages"
@@ -86,9 +86,9 @@ func buildMessagesURL(baseURL, apiKey, authToken, oauthToken string) string {
 	return strings.TrimRight(baseURL, "/") + path
 }
 
-// callClaude sends a conversation to the Anthropic Messages API and returns
-// the assistant reply. It reads credentials from the env file.
-func (h *Handler) callClaude(messages []refineMessage) (string, error) {
+// callLLM sends a conversation to the Messages API and returns the assistant
+// reply. It reads credentials from the env file.
+func (h *Handler) callLLM(messages []refineMessage) (string, error) {
 	cfg, err := envconfig.Parse(h.envFile)
 	if err != nil {
 		return "", fmt.Errorf("read env config: %w", err)
@@ -98,7 +98,7 @@ func (h *Handler) callClaude(messages []refineMessage) (string, error) {
 	authToken := cfg.AuthToken
 	oauthToken := cfg.OAuthToken
 	if apiKey == "" && authToken == "" && oauthToken == "" {
-		return "", fmt.Errorf("no Anthropic API key configured; set ANTHROPIC_API_KEY in the env file")
+		return "", fmt.Errorf("no API key configured; set ANTHROPIC_API_KEY in the env file")
 	}
 
 	model := cfg.DefaultModel
@@ -106,7 +106,7 @@ func (h *Handler) callClaude(messages []refineMessage) (string, error) {
 		model = "claude-haiku-4-5"
 	}
 
-	payload := claudeRequest{
+	payload := llmRequest{
 		Model:     model,
 		MaxTokens: 1024,
 		System:    refineSystemPrompt,
@@ -138,7 +138,7 @@ func (h *Handler) callClaude(messages []refineMessage) (string, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("call Claude API: %w", err)
+		return "", fmt.Errorf("call LLM API: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -147,15 +147,15 @@ func (h *Handler) callClaude(messages []refineMessage) (string, error) {
 		return "", fmt.Errorf("read response: %w", err)
 	}
 
-	var cr claudeResponse
+	var cr llmResponse
 	if err := json.Unmarshal(respBody, &cr); err != nil {
 		return "", fmt.Errorf("parse response: %w", err)
 	}
 	if cr.Error != nil {
-		return "", fmt.Errorf("Claude API error (%s): %s", cr.Error.Type, cr.Error.Message)
+		return "", fmt.Errorf("LLM API error (%s): %s", cr.Error.Type, cr.Error.Message)
 	}
 	if len(cr.Content) == 0 {
-		return "", fmt.Errorf("empty response from Claude API")
+		return "", fmt.Errorf("empty response from LLM")
 	}
 
 	var parts []string
@@ -214,9 +214,9 @@ func (h *Handler) RefineChat(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		messages = append(messages, refineMessage{Role: "user", Content: req.Message})
 	}
 
-	reply, err := h.callClaude(messages)
+	reply, err := h.callLLM(messages)
 	if err != nil {
-		logger.Handler.Error("refine chat: call Claude", "task", id, "error", err)
+		logger.Handler.Error("refine chat: call LLM", "task", id, "error", err)
 		http.Error(w, "failed to get AI response: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

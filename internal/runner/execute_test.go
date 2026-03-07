@@ -538,7 +538,7 @@ func TestRunUsageAccumulation(t *testing.T) {
 }
 
 // TestRunCostMultiTurn verifies that per-invocation cost and token values from
-// each container invocation are accumulated correctly. Claude Code's -p mode
+// each container invocation are accumulated correctly. The agent's -p mode
 // reports per-invocation totals (not session-cumulative), so each turn's values
 // represent only that turn's consumption and should be summed directly.
 func TestRunCostMultiTurn(t *testing.T) {
@@ -846,7 +846,7 @@ func TestRunTestRunUnknownVerdictWhenNoMarker(t *testing.T) {
 // agent's container produces an empty stop_reason (the "default" case), the
 // task is still correctly transitioned to "waiting" with last_test_result set
 // to "unknown" — NOT left as "" ("unverified"). This covers the scenario where
-// Claude Code's --verbose flag appends extra JSON after the result message and
+// The agent's --verbose flag appends extra JSON after the result message and
 // parseOutput ends up returning the wrong line.
 func TestRunTestRunDefaultStopReasonSetsUnknown(t *testing.T) {
 	repo := setupTestRepo(t)

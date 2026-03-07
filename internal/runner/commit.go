@@ -211,7 +211,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	if r.envFile != "" {
 		args = append(args, "--env-file", r.envFile)
 	}
-	// Inject CLAUDE_CODE_MODEL so subagents use the configured model.
+	// Inject CLAUDE_CODE_MODEL so the agent uses the configured model.
 	if m := r.modelFromEnv(); m != "" {
 		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
 	}

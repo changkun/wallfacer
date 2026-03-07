@@ -81,13 +81,13 @@
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">API Configuration</div>
         <button onclick="closeSettings();showEnvConfigEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Token, base URL, and model for Claude Code.</div>
+        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Token, base URL, and model for the agent.</div>
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">CLAUDE.md</div>
         <button onclick="closeSettings();showInstructionsEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Workspace instructions for Claude Code.</div>
+        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Workspace instructions for the agent.</div>
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
@@ -184,14 +184,14 @@
         <div>
           <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Base URL (ANTHROPIC_BASE_URL)</label>
           <input id="env-base-url" type="url" class="field" style="font-family:monospace; font-size:12px;" placeholder="https://api.anthropic.com" autocomplete="off">
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Custom API endpoint. Clear to use the Anthropic default.</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Custom API endpoint. Clear to use the provider default.</div>
         </div>
 
         <div>
           <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Default Model (WALLFACER_DEFAULT_MODEL)</label>
           <input id="env-default-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. bedrock/claude-sonnet-4.6" autocomplete="off" list="env-model-list">
           <datalist id="env-model-list"></datalist>
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Default model for tasks. Clear to use the Claude Code default.</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Default model for tasks. Clear to use the agent default.</div>
         </div>
         <div>
           <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Title Model (WALLFACER_TITLE_MODEL)</label>

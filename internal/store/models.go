@@ -36,7 +36,7 @@ type RefinementSession struct {
 	ResultPrompt string              `json:"result_prompt,omitempty"`
 }
 
-// Task is the core domain model: a unit of work executed by Claude Code.
+// Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
 	ID             uuid.UUID           `json:"id"`
 	Title          string              `json:"title,omitempty"`

@@ -15,24 +15,24 @@ import (
 	"github.com/google/uuid"
 )
 
-// claudeUsage mirrors the token-usage object in Claude Code's JSON output.
-type claudeUsage struct {
+// agentUsage mirrors the token-usage object in the agent's JSON output.
+type agentUsage struct {
 	InputTokens              int `json:"input_tokens"`
 	OutputTokens             int `json:"output_tokens"`
 	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
 }
 
-// claudeOutput is the top-level result object emitted by Claude Code
+// agentOutput is the top-level result object emitted by the agent container
 // (either as a single JSON blob or as the last line of NDJSON stream-json).
-type claudeOutput struct {
-	Result       string      `json:"result"`
-	SessionID    string      `json:"session_id"`
-	StopReason   string      `json:"stop_reason"`
-	Subtype      string      `json:"subtype"`
-	IsError      bool        `json:"is_error"`
-	TotalCostUSD float64     `json:"total_cost_usd"`
-	Usage        claudeUsage `json:"usage"`
+type agentOutput struct {
+	Result       string     `json:"result"`
+	SessionID    string     `json:"session_id"`
+	StopReason   string     `json:"stop_reason"`
+	Subtype      string     `json:"subtype"`
+	IsError      bool       `json:"is_error"`
+	TotalCostUSD float64    `json:"total_cost_usd"`
+	Usage        agentUsage `json:"usage"`
 }
 
 // buildContainerArgs constructs the full argument list for the container run command.
@@ -65,16 +65,16 @@ func (r *Runner) buildContainerArgs(
 		args = append(args, "--env-file", r.envFile)
 	}
 
-	// Inject CLAUDE_CODE_MODEL so Claude Code's subagent model selection
-	// also uses the configured model (not just the --model CLI flag which
-	// only affects the main session).
+	// Inject CLAUDE_CODE_MODEL so subagent model selection also uses the
+	// configured model (not just the --model CLI flag which only affects
+	// the main session).
 	if m := modelOverride; m != "" {
 		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
 	} else if m := r.modelFromEnv(); m != "" {
 		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
 	}
 
-	// Mount claude config volume.
+	// Mount agent config volume.
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
 
 	// Mount workspaces, substituting per-task worktree paths where available.
@@ -110,8 +110,8 @@ func (r *Runner) buildContainerArgs(
 		}
 	}
 
-	// Mount workspace-level CLAUDE.md so Claude Code picks it up automatically.
-	// Claude Code searches for CLAUDE.md at the project root (where .git is)
+	// Mount workspace-level CLAUDE.md so the agent picks it up automatically.
+	// The agent searches for CLAUDE.md at the project root (where .git is)
 	// and at ~/.claude/, but NOT in parent directories above the project root.
 	// For single-workspace tasks, CWD is /workspace/<basename> which IS the
 	// project root, so /workspace/CLAUDE.md (the parent) would be invisible.
@@ -191,7 +191,7 @@ func (r *Runner) titleModelFromEnv() string {
 	return cfg.DefaultModel
 }
 
-// runContainer executes a Claude Code container and parses its NDJSON output.
+// runContainer executes an agent container and parses its NDJSON output.
 // Returns (output, rawStdout, rawStderr, error).
 func (r *Runner) runContainer(
 	ctx context.Context,
@@ -201,7 +201,7 @@ func (r *Runner) runContainer(
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
-) (*claudeOutput, []byte, []byte, error) {
+) (*agentOutput, []byte, []byte, error) {
 	// Build a human-readable container name: wallfacer-<slug>-<uuid8>
 	// The slug is derived from the task prompt so external tools (docker ps,
 	// podman ps) can identify which task is running without needing the UUID.
@@ -264,7 +264,7 @@ func (r *Runner) runContainer(
 			fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
 	}
 
-	// Claude Code may exit non-zero even when it produces a valid result.
+	// The agent may exit non-zero even when it produces a valid result.
 	if runErr != nil {
 		if exitErr, ok := runErr.(*exec.ExitError); ok {
 			logger.Runner.Warn("container exited non-zero but produced valid output",
@@ -280,23 +280,23 @@ func (r *Runner) runContainer(
 // parseOutput tries to parse raw as a single JSON object first; if that fails
 // it scans backwards through NDJSON lines looking for the result message.
 //
-// In Claude Code's stream-json format the final "result" message carries a
-// non-empty stop_reason ("end_turn", "max_tokens", etc.). Verbose or debug
-// lines may appear after the result message, so we prefer the last line that
-// has stop_reason set and fall back to the last valid JSON if none does.
-func parseOutput(raw string) (*claudeOutput, error) {
-	var output claudeOutput
+// In stream-json format the final "result" message carries a non-empty
+// stop_reason ("end_turn", "max_tokens", etc.). Verbose or debug lines may
+// appear after the result message, so we prefer the last line that has
+// stop_reason set and fall back to the last valid JSON if none does.
+func parseOutput(raw string) (*agentOutput, error) {
+	var output agentOutput
 	if err := json.Unmarshal([]byte(raw), &output); err == nil {
 		return &output, nil
 	}
 	lines := strings.Split(raw, "\n")
-	var fallback *claudeOutput
+	var fallback *agentOutput
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
 		if len(line) == 0 || line[0] != '{' {
 			continue
 		}
-		var candidate claudeOutput
+		var candidate agentOutput
 		if err := json.Unmarshal([]byte(line), &candidate); err != nil {
 			continue
 		}
@@ -305,7 +305,7 @@ func parseOutput(raw string) (*claudeOutput, error) {
 			fallback = &c
 		}
 		// Prefer the message that has stop_reason set — that is the "result"
-		// message emitted by Claude Code at the end of every run.
+		// message emitted by the agent at the end of every run.
 		if candidate.StopReason != "" {
 			return &candidate, nil
 		}
@@ -317,7 +317,7 @@ func parseOutput(raw string) (*claudeOutput, error) {
 }
 
 // extractSessionID scans raw NDJSON output for a session_id field.
-// Claude Code emits session_id in early stream messages, so it is often
+// The agent emits session_id in early stream messages, so it is often
 // present even when the container is killed mid-execution (e.g. timeout).
 func extractSessionID(raw []byte) string {
 	for _, line := range strings.Split(string(raw), "\n") {

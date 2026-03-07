@@ -959,7 +959,7 @@ func TestParseTestVerdict(t *testing.T) {
 
 // TestParseOutputPrefersStopReason verifies that parseOutput returns the JSON
 // line with stop_reason set even when additional JSON lines appear after it
-// (e.g. verbose debug output appended by Claude Code's --verbose flag).
+// (e.g. verbose debug output appended by the agent's --verbose flag).
 func TestParseOutputPrefersStopReason(t *testing.T) {
 	// Simulate NDJSON stream where a debug/verbose line follows the result.
 	ndjson := `{"type":"system","session_id":"s1"}
