@@ -167,6 +167,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				"from": string(oldStatus),
 				"to":   string(store.TaskStatusBacklog),
 			})
+			h.diffCache.invalidate(id)
 		} else {
 			if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -176,6 +177,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				"from": string(oldStatus),
 				"to":   string(newStatus),
 			})
+			h.diffCache.invalidate(id)
 
 			if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
 				sessionID := ""

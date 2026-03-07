@@ -22,6 +22,8 @@ type Handler struct {
 	autopilotMu sync.RWMutex
 	autopilot   bool
 
+	diffCache *diffCache
+
 	// ideationEnabled controls whether brainstorm auto-repeat is active.
 	// ideationInterval is the delay between consecutive brainstorm runs (0 = run immediately on completion).
 	// ideationNextRun is when the pending timer will fire (zero if not scheduled).
@@ -42,6 +44,7 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		configDir:  configDir,
 		workspaces: workspaces,
 		envFile:    r.EnvFile(),
+		diffCache:  newDiffCache(),
 	}
 }
 

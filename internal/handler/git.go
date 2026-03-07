@@ -12,6 +12,7 @@ import (
 
 	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -201,6 +202,9 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 }
 
 // TaskDiff returns the git diff for a task's worktrees versus the default branch.
+// Responses are cached: terminal tasks (done/cancelled/archived) are cached
+// indefinitely; active tasks are cached for diffCacheTTL (10 s). ETag and
+// Cache-Control headers are set so browsers can issue conditional requests.
 func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
@@ -209,6 +213,24 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	}
 	if len(task.WorktreePaths) == 0 {
 		writeJSON(w, http.StatusOK, map[string]any{"diff": "", "behind_counts": map[string]int{}})
+		return
+	}
+
+	// Serve from cache when available.
+	if entry, ok := h.diffCache.get(id); ok {
+		cacheControl := "max-age=10"
+		if entry.immutable {
+			cacheControl = "immutable"
+		}
+		w.Header().Set("ETag", `"`+entry.etag+`"`)
+		w.Header().Set("Cache-Control", cacheControl)
+		if r.Header.Get("If-None-Match") == `"`+entry.etag+`"` {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(entry.payload) //nolint:errcheck
 		return
 	}
 
@@ -287,10 +309,37 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	// Serialize, cache, and write the response.
+	payload, err := json.Marshal(map[string]any{
 		"diff":          combined.String(),
 		"behind_counts": behindCounts,
 	})
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	etag := diffETag(payload)
+	immutable := (task.Status == store.TaskStatusDone || task.Status == store.TaskStatusCancelled) || task.Archived
+	entry := diffCacheEntry{
+		payload:   payload,
+		etag:      etag,
+		immutable: immutable,
+	}
+	if !immutable {
+		entry.expiresAt = h.diffCache.now().Add(diffCacheTTL)
+	}
+	h.diffCache.set(id, entry)
+
+	cacheControl := "max-age=10"
+	if immutable {
+		cacheControl = "immutable"
+	}
+	w.Header().Set("ETag", `"`+etag+`"`)
+	w.Header().Set("Cache-Control", cacheControl)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(payload) //nolint:errcheck
 }
 
 // GitBranches returns the list of local branches for a workspace.
