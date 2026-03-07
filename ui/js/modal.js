@@ -743,7 +743,7 @@ function setLogsMode(mode) {
 }
 
 function startLogStream(id) {
-  logsMode = 'oversight';
+  logsMode = 'pretty';
   oversightData = null;
   oversightFetching = false;
   _fetchLogs(id);

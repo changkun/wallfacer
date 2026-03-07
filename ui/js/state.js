@@ -4,7 +4,7 @@ let currentTaskId = null;
 let logsAbort = null;
 let rawLogBuffer = '';
 // logsMode: 'pretty' | 'raw' | 'oversight'
-let logsMode = 'oversight';
+let logsMode = 'pretty';
 
 // Test agent monitor state (shown alongside impl logs when is_test_run=true)
 let testLogsAbort = null;
