@@ -24,7 +24,17 @@ function updateInProgressCount() {
   updateMaxParallelTag();
 }
 
-const diffCache = new Map(); // taskId -> {diff: string, updatedAt: string} | 'loading'
+const diffCache = new Map(); // taskId -> {diff: string, behindCounts, updatedAt, behindFetchedAt} | 'loading'
+
+// Invalidate cached behind-counts for all tasks so that the next render re-checks
+// how many commits each waiting card is behind. Called whenever any task changes.
+function invalidateDiffBehindCounts() {
+  for (const [, cached] of diffCache) {
+    if (cached && cached !== 'loading') {
+      cached.behindFetchedAt = 0;
+    }
+  }
+}
 
 function renderDiffInto(el, diff) {
   if (!diff) {
@@ -52,7 +62,9 @@ function renderDiffInto(el, diff) {
 async function fetchDiff(card, taskId, updatedAt) {
   const cached = diffCache.get(taskId);
   if (cached === 'loading') return;
-  if (cached && cached.updatedAt === updatedAt) {
+  // Cache is valid if the task hasn't changed AND behind-counts were freshly checked.
+  // behindFetchedAt is zeroed by invalidateDiffBehindCounts() whenever any task changes.
+  if (cached && cached.updatedAt === updatedAt && cached.behindFetchedAt) {
     const diffEl = card.querySelector('[data-diff]');
     if (diffEl) applyDiffToCard(diffEl, cached.diff, cached.behindCounts, taskId);
     return;
@@ -61,7 +73,7 @@ async function fetchDiff(card, taskId, updatedAt) {
   try {
     const data = await api(`/api/tasks/${taskId}/diff`);
     const behindCounts = data.behind_counts || {};
-    diffCache.set(taskId, { diff: data.diff, behindCounts, updatedAt });
+    diffCache.set(taskId, { diff: data.diff, behindCounts, updatedAt, behindFetchedAt: Date.now() });
     const latestEl = card.querySelector('[data-diff]');
     if (latestEl) applyDiffToCard(latestEl, data.diff, behindCounts, taskId);
   } catch {

@@ -22,7 +22,18 @@ function startTasksStream() {
   tasksSource.onmessage = function(e) {
     tasksRetryDelay = 1000;
     try {
-      tasks = JSON.parse(e.data);
+      const newTasks = JSON.parse(e.data);
+      // When any task changes, invalidate cached behind-counts so waiting cards
+      // immediately re-check how many commits they are behind the main branch.
+      if (tasks && tasks.length > 0) {
+        const prevById = new Map(tasks.map(t => [t.id, t]));
+        const anyChanged = newTasks.some(t => {
+          const prev = prevById.get(t.id);
+          return !prev || prev.updated_at !== t.updated_at;
+        });
+        if (anyChanged) invalidateDiffBehindCounts();
+      }
+      tasks = newTasks;
       render();
     } catch (err) {
       console.error('tasks SSE parse error:', err);
