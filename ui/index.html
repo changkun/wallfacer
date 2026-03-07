@@ -463,7 +463,11 @@
           <div id="modal-logs-section" class="hidden mb-4">
             <div class="flex items-center justify-between mb-2">
               <h3 id="modal-logs-title" class="section-title" style="margin-bottom:0;">Live Output</h3>
-              <button id="toggle-logs-btn" onclick="toggleLogsMode()" class="btn-icon">Raw</button>
+              <div class="logs-tabs">
+                <button id="logs-tab-oversight" onclick="setLogsMode('oversight')" class="logs-tab active">Oversight</button>
+                <button id="logs-tab-pretty" onclick="setLogsMode('pretty')" class="logs-tab">Pretty</button>
+                <button id="logs-tab-raw" onclick="setLogsMode('raw')" class="logs-tab">Raw</button>
+              </div>
             </div>
             <pre id="modal-logs" class="logs-block"></pre>
           </div>
