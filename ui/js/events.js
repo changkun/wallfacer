@@ -35,10 +35,11 @@ document.getElementById('new-prompt').addEventListener('keydown', (e) => {
   }
 });
 
-// New task textarea: auto-grow height
+// New task textarea: auto-grow height and save draft
 document.getElementById('new-prompt').addEventListener('input', (e) => {
   e.target.style.height = '';
   e.target.style.height = e.target.scrollHeight + 'px';
+  localStorage.setItem('wallfacer-new-task-draft', e.target.value);
 });
 
 // --- Initialization ---
