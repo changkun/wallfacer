@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"strings"
@@ -17,45 +18,89 @@ import (
 
 const ideationTimeout = 10 * time.Minute
 
-// ideationPromptTemplate instructs the agent to explore the workspace and
-// propose exactly 3 actionable improvement ideas as a JSON array.
-const ideationPromptTemplate = `You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 high-impact improvements.
+// ideaCategoryPool is the set of distinct improvement domains from which the
+// brainstorm agent draws one per idea. Sampling 3 unique categories per run
+// ensures each brainstorm covers genuinely different areas of the project.
+var ideaCategoryPool = []string{
+	"product feature",
+	"frontend / UX",
+	"backend / API",
+	"performance optimization",
+	"code quality / refactoring",
+	"test coverage",
+	"developer experience",
+	"security hardening",
+	"observability / debugging",
+	"infrastructure / ops",
+	"data model / storage",
+}
 
-First, explore the workspace to understand the project:
-- Read README files, CLAUDE.md, go.mod, package.json, or similar project files
-- List and scan the main source directories
-- Review recent git history if available (git log --oneline -20)
+// pickCategories returns n unique categories sampled at random from
+// ideaCategoryPool using a Fisher-Yates partial shuffle.
+func pickCategories(n int) []string {
+	pool := make([]string, len(ideaCategoryPool))
+	copy(pool, ideaCategoryPool)
+	for i := len(pool) - 1; i > 0; i-- {
+		j := rand.Intn(i + 1)
+		pool[i], pool[j] = pool[j], pool[i]
+	}
+	if n > len(pool) {
+		n = len(pool)
+	}
+	return pool[:n]
+}
 
-Based on your exploration, identify 3 improvements that would genuinely benefit the project. Consider:
-- Bugs, edge cases, or missing error handling observed in the code
-- Missing features that users of this project would find valuable
-- Performance bottlenecks or scalability concerns
-- Code quality, maintainability, or test coverage gaps
-- Developer experience improvements
-- Security concerns
+// buildIdeationPrompt constructs the full ideation prompt by randomly
+// assigning 3 distinct categories — one per idea slot — so that every
+// brainstorm run surfaces improvements from different areas of the project.
+func buildIdeationPrompt() string {
+	cats := pickCategories(3)
+	var sb strings.Builder
+	sb.WriteString(`You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 improvements — each from a different assigned domain.
 
-For each idea, write a detailed prompt that an AI coding agent could execute to implement it.
+First, explore the workspace thoroughly:
+- Read README files, CLAUDE.md, go.mod, package.json, or similar project manifests
+- Scan the main source directories and read key source files to understand current patterns and pain points
+- Review recent git history (git log --oneline -20) to see what has changed recently
+- Identify concrete opportunities, rough edges, and gaps in the code
+
+Then propose exactly 3 improvements, one per assigned domain:
+`)
+	for i, cat := range cats {
+		sb.WriteString(fmt.Sprintf("  Idea %d domain: %s\n", i+1, cat))
+	}
+	sb.WriteString(`
+Requirements for each improvement:
+- Technically precise: name the specific files, functions, data structures, or API endpoints you observed during exploration — do not stay generic
+- Creative and non-obvious: avoid safe, predictable suggestions like "add more tests" or "improve error handling" in isolation; propose something with genuine engineering interest
+- Actionable end-to-end: write a prompt detailed enough for an AI coding agent to implement the full change without asking follow-up questions
 
 Output ONLY a JSON array with exactly 3 objects. No preamble, no explanation, no markdown — just the JSON array:
 [
   {
     "title": "2-5 word title",
-    "prompt": "Detailed implementation prompt for an AI agent. Reference specific files, functions, and patterns from the codebase. Be concrete and actionable."
+    "category": "assigned domain for idea 1",
+    "prompt": "Detailed implementation prompt referencing specific files, functions, and patterns found during exploration."
   },
   {
     "title": "...",
+    "category": "assigned domain for idea 2",
     "prompt": "..."
   },
   {
     "title": "...",
+    "category": "assigned domain for idea 3",
     "prompt": "..."
   }
-]`
+]`)
+	return sb.String()
+}
 
 // IdeateResult holds a single idea proposed by the brainstorm agent.
 type IdeateResult struct {
-	Title  string `json:"title"`
-	Prompt string `json:"prompt"`
+	Title    string `json:"title"`
+	Category string `json:"category"`
+	Prompt   string `json:"prompt"`
 }
 
 // RunIdeation runs a lightweight read-only container to analyse the workspaces
@@ -76,7 +121,7 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID) ([]IdeateRes
 
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	args := r.buildIdeationContainerArgs(containerName, ideationPromptTemplate)
+	args := r.buildIdeationContainerArgs(containerName, buildIdeationPrompt())
 
 	cmd := exec.CommandContext(ctx, r.command, args...)
 	var stdout, stderr bytes.Buffer
@@ -258,7 +303,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 			sb.WriteString(title)
 			sb.WriteString("\n")
 		}
-		r.store.UpdateTaskResult(bgCtx, taskID, strings.TrimSpace(sb.String()), "", "", 0)
+		r.store.UpdateTaskResult(bgCtx, taskID, strings.TrimSpace(sb.String()), "", "", 1)
 	}
 
 	return nil
