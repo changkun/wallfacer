@@ -195,6 +195,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	})
 
 	// Create a backlog task for each proposed idea.
+	var titles []string
 	for _, idea := range ideas {
 		newTask, createErr := r.store.CreateTask(bgCtx, idea.Prompt, 60, false, "", store.TaskKindTask, "idea-agent")
 		if createErr != nil {
@@ -206,10 +207,23 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		})
 		if idea.Title != "" {
 			r.store.UpdateTaskTitle(bgCtx, newTask.ID, idea.Title)
+			titles = append(titles, idea.Title)
 		}
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Created idea task: %s", idea.Title),
 		})
+	}
+
+	// Store a summary of proposed ideas as the task result so the card
+	// displays what was generated without requiring a click-through.
+	if len(titles) > 0 {
+		var sb strings.Builder
+		for _, title := range titles {
+			sb.WriteString("- ")
+			sb.WriteString(title)
+			sb.WriteString("\n")
+		}
+		r.store.UpdateTaskResult(bgCtx, taskID, strings.TrimSpace(sb.String()), "", "", 0)
 	}
 
 	return nil
