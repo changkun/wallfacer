@@ -199,6 +199,19 @@ function scheduleBacklogSave() {
 document.getElementById('modal-edit-prompt').addEventListener('input', scheduleBacklogSave);
 document.getElementById('modal-edit-timeout').addEventListener('change', scheduleBacklogSave);
 
+// --- Start (backlog → in_progress) ---
+
+async function startTask() {
+  if (!currentTaskId) return;
+  try {
+    await api(`/api/tasks/${currentTaskId}`, { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) });
+    closeModal();
+    fetchTasks();
+  } catch (e) {
+    showAlert('Error starting task: ' + e.message);
+  }
+}
+
 // --- Cancel ---
 
 async function cancelTask() {

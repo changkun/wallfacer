@@ -229,6 +229,10 @@ async function openModal(id) {
     resumeSection.classList.add('hidden');
   }
 
+  // Start section (backlog only)
+  const startSection = document.getElementById('modal-start-section');
+  startSection.classList.toggle('hidden', task.status !== 'backlog');
+
   // Cancel section (backlog / in_progress / waiting / failed)
   const cancelSection = document.getElementById('modal-cancel-section');
   const cancellable = ['backlog', 'in_progress', 'waiting', 'failed'];

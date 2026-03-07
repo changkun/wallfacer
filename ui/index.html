@@ -554,6 +554,13 @@
             <button onclick="unarchiveTask()" class="btn btn-ghost" style="border: 1px solid var(--border);">Unarchive task</button>
           </div>
 
+          <!-- Start section (backlog only) -->
+          <div id="modal-start-section" class="hidden mb-4">
+            <h3 class="section-title">Start Task</h3>
+            <p class="text-sm text-v-secondary mb-2">Move this task to In Progress and begin execution.</p>
+            <button onclick="startTask()" class="btn btn-accent">&#9654; Start task</button>
+          </div>
+
           <!-- Cancel section (backlog / in_progress / waiting / failed) -->
           <div id="modal-cancel-section" class="hidden mb-4">
             <h3 class="section-title">Cancel Task</h3>
