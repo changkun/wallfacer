@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -232,9 +231,10 @@ func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unarchived"})
 }
 
-// TestTask creates a standalone test agent task to verify a waiting task's acceptance criteria.
-// The test task runs with MountWorktrees=true so it can access sibling worktrees via board.json.
-// The parent task remains in "waiting" state while the test task runs independently.
+// TestTask runs a verification agent on the same task to check its acceptance criteria.
+// The task transitions from "waiting" back to "in_progress" with IsTestRun=true so the UI
+// can distinguish a test run from normal work. On end_turn the runner moves it back to
+// "waiting" (instead of "done") and records a pass/fail verdict.
 func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	var req struct {
 		Criteria string `json:"criteria"`
@@ -254,36 +254,37 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 
 	testPrompt := buildTestPrompt(task.Prompt, req.Criteria)
 
-	// Create a new test task. MountWorktrees=true lets it read sibling worktrees
-	// and board.json to locate the parent task's code changes.
-	testTask, err := h.store.CreateTask(r.Context(), testPrompt, task.Timeout, true, task.Model)
-	if err != nil {
+	// Mark task as a test run and clear any previous verdict.
+	if err := h.store.UpdateTaskTestRun(r.Context(), id, true, ""); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	h.store.InsertEvent(r.Context(), testTask.ID, store.EventTypeStateChange, map[string]string{
-		"to": "backlog",
+	// Transition waiting → in_progress.
+	if err := h.store.UpdateTaskStatus(r.Context(), id, "in_progress"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
+		"from": "waiting",
+		"to":   "in_progress",
 	})
-
-	// Record on the parent task that a test was launched.
 	h.store.InsertEvent(r.Context(), id, store.EventTypeSystem, map[string]string{
-		"result": fmt.Sprintf("Test agent launched (task %s)", testTask.ID),
+		"result":      "Test verification started",
+		"test_prompt": testPrompt,
 	})
 
-	go h.runner.GenerateTitle(testTask.ID, testTask.Prompt)
+	// Run the test agent in a fresh session so it doesn't continue the implementation session.
+	go h.runner.Run(id, testPrompt, "", false)
 
-	writeJSON(w, http.StatusCreated, map[string]string{
-		"test_task_id": testTask.ID.String(),
-		"status":       "created",
-	})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "testing"})
 }
 
-// buildTestPrompt constructs a prompt for the test agent from the original task
+// buildTestPrompt constructs a prompt for the test verification agent from the original task
 // prompt and optional user-specified acceptance criteria.
 func buildTestPrompt(originalPrompt, criteria string) string {
 	var b strings.Builder
-	b.WriteString("You are a test agent. Your job is to verify that the implementation meets the specified requirements.\n\n")
+	b.WriteString("You are a test verification agent. Your job is to verify that the implementation meets the specified requirements.\n\n")
 	b.WriteString("## Original Task\n\n")
 	b.WriteString(originalPrompt)
 	b.WriteString("\n\n")
@@ -293,12 +294,12 @@ func buildTestPrompt(originalPrompt, criteria string) string {
 		b.WriteString("\n\n")
 	}
 	b.WriteString("## Instructions\n\n")
-	b.WriteString("1. Find the sibling task's worktree paths by reading `/workspace/.tasks/board.json` — look for the task in `waiting` status to locate its worktree directories.\n")
-	b.WriteString("2. Examine the code changes in those worktrees to understand what was implemented.\n")
-	b.WriteString("3. Run any available tests (unit tests, integration tests, linters, etc.).\n")
-	b.WriteString("4. Verify the implementation satisfies every requirement listed above.\n")
-	b.WriteString("5. Conclude with a clear **PASS** or **FAIL** verdict and specific details about what was checked.\n\n")
-	b.WriteString("Be thorough but focused. If tests fail or requirements are unmet, describe exactly what is missing or broken.")
+	b.WriteString("You are running directly in the task's own workspace — the code changes are already present.\n")
+	b.WriteString("1. Examine the code to understand what was implemented.\n")
+	b.WriteString("2. Run any available tests (unit tests, integration tests, linters, build checks, etc.).\n")
+	b.WriteString("3. Verify the implementation satisfies every requirement listed above.\n")
+	b.WriteString("4. Conclude with a clear **PASS** or **FAIL** verdict and specific details about what was checked.\n\n")
+	b.WriteString("Be thorough but focused. Do not modify any code. If tests fail or requirements are unmet, describe exactly what is missing or broken.")
 	return b.String()
 }
 

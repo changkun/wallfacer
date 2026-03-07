@@ -829,3 +829,32 @@ func TestContainerJSONCreatedNil(t *testing.T) {
 		t.Fatalf("expected 0, got %d", c.createdUnix())
 	}
 }
+
+// ---------------------------------------------------------------------------
+// parseTestVerdict
+// ---------------------------------------------------------------------------
+
+func TestParseTestVerdict(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"bold PASS marker", "The implementation is complete. **PASS**", "pass"},
+		{"trailing PASS", "All tests passed.\nPASS", "pass"},
+		{"bold FAIL marker", "Build failed. **FAIL**", "fail"},
+		{"trailing FAIL", "Requirements not met.\nFAIL", "fail"},
+		{"no verdict", "Some output with no verdict", ""},
+		{"empty", "", ""},
+		{"lowercase trailing pass is matched", "everything looks good. pass", "pass"},
+		{"lowercase mid-sentence fail not matched", "fail detected in the middle", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseTestVerdict(tc.input)
+			if got != tc.expected {
+				t.Errorf("parseTestVerdict(%q) = %q, want %q", tc.input, got, tc.expected)
+			}
+		})
+	}
+}

@@ -204,8 +204,9 @@ function buildCardActions(t) {
 
 function updateCard(card, t) {
   const isArchived = !!t.archived;
-  const badgeClass = isArchived ? 'badge-archived' : `badge-${t.status}`;
-  const statusLabel = isArchived ? 'archived' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
+  const isTestRun = !!t.is_test_run && t.status === 'in_progress';
+  const badgeClass = isArchived ? 'badge-archived' : isTestRun ? 'badge-testing' : `badge-${t.status}`;
+  const statusLabel = isArchived ? 'archived' : isTestRun ? 'testing' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
   const showDiff = (t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
   card.style.opacity = isArchived ? '0.55' : '';
@@ -222,12 +223,20 @@ function updateCard(card, t) {
     card.classList.remove('card-cancelled-done');
   }
   const priorityBadge = t.status === 'backlog' ? `<span class="badge badge-priority" title="Priority #${t.position + 1}">#${t.position + 1}</span>` : '';
+  const testResultBadge = t.status === 'waiting'
+    ? (t.last_test_result === 'pass'
+        ? `<span class="badge badge-test-pass" title="Verification passed">\u2713 verified</span>`
+        : t.last_test_result === 'fail'
+        ? `<span class="badge badge-test-fail" title="Verification failed">\u2717 verify failed</span>`
+        : `<span class="badge badge-test-none" title="Not yet verified">unverified</span>`)
+    : '';
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
         ${priorityBadge}
         <span class="badge ${badgeClass}">${statusLabel}</span>
         ${showSpinner ? '<span class="spinner"></span>' : ''}
+        ${testResultBadge}
       </div>
       <div class="flex items-center gap-1.5">
         ${t.model ? '<span class="text-[10px] text-v-muted" title="Model: ' + escapeHtml(t.model) + '">' + escapeHtml(modelDisplayName(t.model)) + '</span>' : ''}

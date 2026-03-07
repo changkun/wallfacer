@@ -282,7 +282,7 @@ async function runTestTask() {
     closeModal();
     fetchTasks();
   } catch (e) {
-    showAlert('Error creating test task: ' + e.message);
+    showAlert('Error starting test verification: ' + e.message);
   }
 }
 

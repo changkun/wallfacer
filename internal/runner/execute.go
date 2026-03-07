@@ -42,6 +42,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		logger.Runner.Error("get task", "task", taskID, "error", err)
 		return // defer moves to "failed"
 	}
+	isTestRun := task.IsTestRun
 
 	// Apply per-task total timeout across all turns.
 	timeout := time.Duration(task.Timeout) * time.Minute
@@ -192,7 +193,18 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		switch output.StopReason {
 		case "end_turn":
 			statusSet = true
-			if err := r.commit(ctx, taskID, sessionID, turns, worktreePaths, branchName); err != nil {
+			if isTestRun {
+				// Test verification complete: don't commit, return to waiting with verdict.
+				verdict := parseTestVerdict(output.Result)
+				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
+				r.store.UpdateTaskStatus(bgCtx, taskID, "waiting")
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+					"from": "in_progress", "to": "waiting",
+				})
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+					"result": "Test verification complete: " + strings.ToUpper(verdict),
+				})
+			} else if err := r.commit(ctx, taskID, sessionID, turns, worktreePaths, branchName); err != nil {
 				r.store.UpdateTaskStatus(bgCtx, taskID, "failed")
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
 					"error": "commit failed: " + err.Error(),
@@ -355,5 +367,18 @@ func (r *Runner) failSync(ctx context.Context, taskID uuid.UUID, sessionID strin
 		"to":   "failed",
 	})
 	r.store.UpdateTaskResult(ctx, taskID, "Sync failed: "+msg, sessionID, "sync_failed", turns)
+}
+
+// parseTestVerdict extracts "pass" or "fail" from a test agent's result text.
+// Returns "" if no clear verdict is found.
+func parseTestVerdict(result string) string {
+	upper := strings.ToUpper(result)
+	if strings.Contains(upper, "**PASS**") || strings.HasSuffix(strings.TrimSpace(upper), "PASS") {
+		return "pass"
+	}
+	if strings.Contains(upper, "**FAIL**") || strings.HasSuffix(strings.TrimSpace(upper), "FAIL") {
+		return "fail"
+	}
+	return ""
 }
 

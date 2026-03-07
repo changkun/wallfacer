@@ -44,6 +44,10 @@ type Task struct {
 	BaseCommitHashes map[string]string `json:"base_commit_hashes,omitempty"` // host repoPath → defBranch HEAD before merge
 	MountWorktrees   bool              `json:"mount_worktrees,omitempty"`
 	Model            string            `json:"model,omitempty"`
+
+	// Test verification fields.
+	IsTestRun      bool   `json:"is_test_run,omitempty"`       // true while the task is running as a test verifier
+	LastTestResult string `json:"last_test_result,omitempty"`  // "pass", "fail", or "" (not yet tested)
 }
 
 // EventType identifies the kind of event stored in a task's audit trail.

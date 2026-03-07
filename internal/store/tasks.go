@@ -266,6 +266,8 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.BranchName = ""
 	t.CommitHashes = nil
 	t.BaseCommitHashes = nil
+	t.IsTestRun = false
+	t.LastTestResult = ""
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
@@ -345,6 +347,27 @@ func (s *Store) UpdateTaskCommitHashes(_ context.Context, id uuid.UUID, hashes m
 	t.CommitHashes = hashes
 	t.UpdatedAt = time.Now()
 	return s.saveTask(id, t)
+}
+
+// UpdateTaskTestRun sets the IsTestRun flag and LastTestResult on a task atomically.
+// Call with isTestRun=true and empty lastTestResult to mark the start of a test run;
+// call with isTestRun=false and a verdict ("pass"/"fail"/"") when the test completes.
+func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun bool, lastTestResult string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.IsTestRun = isTestRun
+	t.LastTestResult = lastTestResult
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify()
+	return nil
 }
 
 // UpdateTaskBaseCommitHashes stores the default-branch HEAD captured before merge.

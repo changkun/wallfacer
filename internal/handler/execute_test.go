@@ -45,11 +45,20 @@ func TestTestTask_RejectsNonWaiting(t *testing.T) {
 	}
 }
 
-func TestTestTask_CreatesTestTaskWithDefaultPrompt(t *testing.T) {
+func TestTestTask_StartsTestRunOnSameTask(t *testing.T) {
 	h := newTestHandler(t)
 
 	parentPrompt := "implement a login form with email and password fields"
 	parentID := createWaitingTask(t, h, parentPrompt)
+
+	// Count tasks before — should be exactly 1.
+	tasksBefore, err := h.store.ListTasks(context.Background(), false)
+	if err != nil {
+		t.Fatalf("list tasks before: %v", err)
+	}
+	if len(tasksBefore) != 1 {
+		t.Fatalf("expected 1 task before test, got %d", len(tasksBefore))
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+parentID.String()+"/test", bytes.NewBufferString(`{}`))
 	req.SetPathValue("id", parentID.String())
@@ -57,59 +66,60 @@ func TestTestTask_CreatesTestTaskWithDefaultPrompt(t *testing.T) {
 
 	h.TestTask(w, req, parentID)
 
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
 	var resp map[string]string
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	testTaskIDStr := resp["test_task_id"]
-	if testTaskIDStr == "" {
-		t.Fatal("response missing test_task_id")
-	}
-	if resp["status"] != "created" {
-		t.Errorf("expected status=created, got %q", resp["status"])
+	if resp["status"] != "testing" {
+		t.Errorf("expected status=testing, got %q", resp["status"])
 	}
 
-	testTaskID, err := uuid.Parse(testTaskIDStr)
+	// No new task should have been created.
+	tasksAfter, err := h.store.ListTasks(context.Background(), false)
 	if err != nil {
-		t.Fatalf("invalid test_task_id %q: %v", testTaskIDStr, err)
+		t.Fatalf("list tasks after: %v", err)
+	}
+	if len(tasksAfter) != 1 {
+		t.Errorf("expected still 1 task after test start, got %d", len(tasksAfter))
 	}
 
-	testTask, err := h.store.GetTask(context.Background(), testTaskID)
-	if err != nil {
-		t.Fatalf("get test task: %v", err)
-	}
-	if !testTask.MountWorktrees {
-		t.Error("test task should have mount_worktrees=true")
-	}
-	if testTask.Status != "backlog" {
-		t.Errorf("expected test task in backlog, got %q", testTask.Status)
-	}
-	if !strings.Contains(testTask.Prompt, parentPrompt) {
-		t.Error("test task prompt should contain the original task prompt")
-	}
-
-	// A system event should have been added to the parent task.
+	// A state_change event (waiting → in_progress) and system event should exist on the same task.
 	events, err := h.store.GetEvents(context.Background(), parentID)
 	if err != nil {
-		t.Fatalf("get parent events: %v", err)
+		t.Fatalf("get events: %v", err)
 	}
-	var foundSystem bool
+	var foundStateChange, foundSystem bool
 	for _, ev := range events {
+		if ev.EventType == store.EventTypeStateChange {
+			var data map[string]string
+			if jsonErr := json.Unmarshal(ev.Data, &data); jsonErr == nil {
+				if data["from"] == "waiting" && data["to"] == "in_progress" {
+					foundStateChange = true
+				}
+			}
+		}
 		if ev.EventType == store.EventTypeSystem {
-			foundSystem = true
-			break
+			var data map[string]string
+			if jsonErr := json.Unmarshal(ev.Data, &data); jsonErr == nil {
+				if strings.Contains(data["result"], "Test verification started") {
+					foundSystem = true
+				}
+			}
 		}
 	}
+	if !foundStateChange {
+		t.Error("expected state_change event from waiting to in_progress on same task")
+	}
 	if !foundSystem {
-		t.Error("expected system event on parent task after test agent launch")
+		t.Error("expected system event noting test verification started on same task")
 	}
 }
 
-func TestTestTask_IncludesCriteriaInPrompt(t *testing.T) {
+func TestTestTask_IncludesCriteriaInTestPrompt(t *testing.T) {
 	h := newTestHandler(t)
 
 	parentID := createWaitingTask(t, h, "build a widget")
@@ -122,20 +132,28 @@ func TestTestTask_IncludesCriteriaInPrompt(t *testing.T) {
 
 	h.TestTask(w, req, parentID)
 
-	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
-
-	testTaskID, _ := uuid.Parse(resp["test_task_id"])
-	testTask, err := h.store.GetTask(context.Background(), testTaskID)
+	// The test prompt (including criteria) should be recorded in a system event.
+	events, err := h.store.GetEvents(context.Background(), parentID)
 	if err != nil {
-		t.Fatalf("get test task: %v", err)
+		t.Fatalf("get events: %v", err)
 	}
-	if !strings.Contains(testTask.Prompt, criteria) {
-		t.Errorf("test task prompt should contain acceptance criteria, got:\n%s", testTask.Prompt)
+	var foundCriteria bool
+	for _, ev := range events {
+		if ev.EventType == store.EventTypeSystem {
+			var data map[string]string
+			if jsonErr := json.Unmarshal(ev.Data, &data); jsonErr == nil {
+				if strings.Contains(data["test_prompt"], criteria) {
+					foundCriteria = true
+				}
+			}
+		}
+	}
+	if !foundCriteria {
+		t.Error("expected system event test_prompt to contain acceptance criteria")
 	}
 }
 
@@ -167,6 +185,13 @@ func TestBuildTestPrompt(t *testing.T) {
 		p := buildTestPrompt("build a widget", "   \n\t  ")
 		if strings.Contains(p, "Acceptance Criteria") {
 			t.Error("whitespace-only criteria should not produce Acceptance Criteria section")
+		}
+	})
+
+	t.Run("prompt instructs not to modify code", func(t *testing.T) {
+		p := buildTestPrompt("build a widget", "")
+		if !strings.Contains(p, "Do not modify") {
+			t.Error("prompt should instruct test agent not to modify code")
 		}
 	})
 }
