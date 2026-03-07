@@ -37,7 +37,7 @@ async function openModal(id) {
     }
 
     // Reset refinement chat state
-    closeRefineModal();
+    resetRefinePanel();
     document.getElementById('refine-start-btn').classList.remove('hidden');
     document.getElementById('refine-chat-area').classList.add('hidden');
 
@@ -351,7 +351,7 @@ function closeModal() {
   logsMode = 'oversight';
   document.getElementById('modal-logs').innerHTML = '';
   document.getElementById('modal-test-logs').innerHTML = '';
-  closeRefineModal();
+  resetRefinePanel();
   document.getElementById('modal-backlog-right').classList.add('hidden');
   currentTaskId = null;
   document.querySelector('#modal .modal-card').classList.remove('modal-wide');
