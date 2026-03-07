@@ -22,7 +22,12 @@ func (s *Store) ListTasks(_ context.Context, includeArchived bool) ([]Task, erro
 		if !includeArchived && t.Archived {
 			continue
 		}
-		tasks = append(tasks, *t)
+		cp := *t
+		if t.CurrentRefinement != nil {
+			jobCopy := *t.CurrentRefinement
+			cp.CurrentRefinement = &jobCopy
+		}
+		tasks = append(tasks, cp)
 	}
 	sort.Slice(tasks, func(i, j int) bool {
 		if tasks[i].Position != tasks[j].Position {
@@ -33,7 +38,9 @@ func (s *Store) ListTasks(_ context.Context, includeArchived bool) ([]Task, erro
 	return tasks, nil
 }
 
-// GetTask returns a copy of the task with the given ID.
+// GetTask returns a deep copy of the task with the given ID.
+// Pointer fields (CurrentRefinement) are copied so callers cannot
+// accidentally mutate shared store state.
 func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -43,6 +50,10 @@ func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 		return nil, fmt.Errorf("task not found: %s", id)
 	}
 	cp := *t
+	if t.CurrentRefinement != nil {
+		jobCopy := *t.CurrentRefinement
+		cp.CurrentRefinement = &jobCopy
+	}
 	return &cp, nil
 }
 
@@ -469,7 +480,12 @@ func (s *Store) UpdateRefinementJob(_ context.Context, id uuid.UUID, job *Refine
 	if !ok {
 		return fmt.Errorf("task not found: %s", id)
 	}
-	t.CurrentRefinement = job
+	if job != nil {
+		jobCopy := *job
+		t.CurrentRefinement = &jobCopy
+	} else {
+		t.CurrentRefinement = nil
+	}
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
