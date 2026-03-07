@@ -254,11 +254,11 @@ func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resum
 
 // RunRefinementBackground launches RunRefinement in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
-func (r *Runner) RunRefinementBackground(taskID uuid.UUID) {
+func (r *Runner) RunRefinementBackground(taskID uuid.UUID, userInstructions string) {
 	r.backgroundWg.Add(1)
 	go func() {
 		defer r.backgroundWg.Done()
-		r.RunRefinement(taskID)
+		r.RunRefinement(taskID, userInstructions)
 	}()
 }
 
