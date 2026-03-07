@@ -80,19 +80,19 @@
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">API Configuration</div>
-        <button onclick="closeSettings();showEnvConfigEditor()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
+        <button onclick="closeSettings();showEnvConfigEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Token, base URL, and model for Claude Code.</div>
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">CLAUDE.md</div>
-        <button onclick="closeSettings();showInstructionsEditor()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
+        <button onclick="closeSettings();showInstructionsEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Workspace instructions for Claude Code.</div>
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Sandbox Containers</div>
-        <button onclick="closeSettings();showContainerMonitor()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Monitor</button>
+        <button onclick="closeSettings();showContainerMonitor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Monitor</button>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Inspect running and recent sandbox containers (like <code style="font-family:monospace;">docker ps -a</code>).</div>
       </div>
 
