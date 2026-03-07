@@ -198,6 +198,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 textarea.field { overflow-y: auto; }
 .field::placeholder { color: var(--text-muted); }
 .field:focus { border-color: var(--accent); }
+#new-prompt { font-family: inherit; font-size: 12px; }
 
 .select {
   background: var(--bg-input); border: 1px solid var(--border); color: var(--text-secondary);
