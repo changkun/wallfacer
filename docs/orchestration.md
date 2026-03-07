@@ -8,9 +8,10 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 
 | Method + Path | Handler action |
 |---|---|
-| `GET /api/config` | Return workspace paths and instructions file path |
+| `GET /api/config` | Return workspace paths, instructions file path, autopilot state, available models |
+| `PUT /api/config` | Update server config (`{autopilot: bool}`); re-triggers auto-promotion if enabled |
 | `GET /api/env` | Return current env config (tokens masked) |
-| `PUT /api/env` | Update env config (token, base URL, default model, title model); writes `~/.wallfacer/.env` atomically |
+| `PUT /api/env` | Update env config (token, base URL, default model, title model, max parallel); writes `~/.wallfacer/.env` atomically |
 | `GET /api/instructions` | Get workspace CLAUDE.md content |
 | `PUT /api/instructions` | Save workspace CLAUDE.md (`{content}`) |
 | `POST /api/instructions/reinit` | Rebuild workspace CLAUDE.md from default + repo files |
@@ -23,8 +24,12 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 | `POST /api/tasks/{id}/cancel` | Kill container (if running), clean up worktrees, set `cancelled`; traces/logs kept |
 | `POST /api/tasks/{id}/resume` | Resume failed task, same session → launch `runner.Run` goroutine |
 | `POST /api/tasks/{id}/sync` | Rebase task worktrees onto latest default branch (waiting/failed only) |
-| `POST /api/tasks/{id}/archive` | Move done task to archived |
+| `POST /api/tasks/{id}/test` | Start test verification agent on a waiting task; records pass/fail verdict |
+| `POST /api/tasks/{id}/refine` | Single chat turn in a refinement session (backlog tasks only) |
+| `POST /api/tasks/{id}/refine/apply` | Apply refined prompt; persists conversation as `RefinementSession` |
+| `POST /api/tasks/{id}/archive` | Move done or cancelled task to archived |
 | `POST /api/tasks/{id}/unarchive` | Restore archived task |
+| `POST /api/tasks/archive-done` | Archive all done and cancelled tasks in one operation |
 | `GET /api/tasks/stream` | SSE: push task list on any state change |
 | `GET /api/tasks/{id}/events` | Return full event trace log |
 | `GET /api/tasks/{id}/diff` | Git diff for task worktrees vs default branch |
@@ -36,6 +41,7 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 | `GET /api/git/stream` | SSE: poll git status every few seconds |
 | `POST /api/git/push` | Run `git push` on a workspace |
 | `POST /api/git/sync` | Fetch from remote and rebase workspace onto upstream |
+| `POST /api/git/rebase-on-main` | Fetch remote default branch and rebase current workspace branch onto it (blocked while tasks in_progress) |
 | `GET /api/git/branches` | List local branches for a workspace (`?workspace=<path>`) |
 | `POST /api/git/checkout` | Switch the active branch for a workspace |
 | `POST /api/git/create-branch` | Create a new branch and check it out |
@@ -193,3 +199,82 @@ if all retries exhausted: mark task failed, clean up worktrees
 ```
 
 Using the same session ID means Claude has full context of the original task when making conflict resolution decisions.
+
+## Test Verification Flow
+
+`POST /api/tasks/{id}/test` runs a separate verification agent on a `waiting` task without committing:
+
+```
+waiting task + user clicks Test
+  ↓
+handler sets IsTestRun=true, clears LastTestResult
+  ↓
+task status: waiting → in_progress
+  ↓
+fresh container (no --resume) runs with a structured test prompt:
+  "Examine the code, run tests, verify requirements.
+   End your response with **PASS** or **FAIL**."
+  ↓
+runner loop (isTestRun=true):
+  - tracks turn count separately (TestRunStartTurn boundary)
+  - does NOT update the implementation sessionID or result
+  - handles max_tokens / pause_turn by resuming the test session (not impl session)
+  ↓
+on end_turn:
+  parseTestVerdict() extracts verdict from last line or **PASS**/**FAIL** markers
+  verdict: "pass" | "fail" | "unknown"
+  IsTestRun set back to false
+  LastTestResult = verdict
+  task status: in_progress → waiting (no commit pipeline)
+```
+
+The UI splits the live output panel into "Implementation" and "Test" sections using `TestRunStartTurn` as the boundary.
+
+## Autopilot (Auto-Promotion) Flow
+
+Autopilot automatically promotes backlog tasks without user drag-and-drop:
+
+```
+StartAutoPromoter():
+  subscribe to store change notifications (buffered channel, coalesced)
+  on each notification:
+    if autopilot disabled → skip
+    lock promoteMu (serialise concurrent notifications)
+    count in_progress tasks
+    if count < WALLFACER_MAX_PARALLEL and backlog not empty:
+      pick lowest-position backlog task
+      update status: backlog → in_progress
+      go runner.Run(task)
+```
+
+`WALLFACER_MAX_PARALLEL` defaults to 5. The lock ensures two simultaneous state changes cannot both promote tasks, which would exceed the limit. Autopilot state is toggled via `PUT /api/config {"autopilot": true/false}` and does not persist across restarts.
+
+## Refinement Chat Flow
+
+`POST /api/tasks/{id}/refine` runs a direct API call (not a container) to help improve task prompts:
+
+```
+client sends: { message, conversation }
+  ↓
+server reads credentials from env file
+  ↓
+builds Claude Messages API request with refineSystemPrompt + conversation history
+  on first call: primes with task prompt as first user message
+  on subsequent calls: appends user message to conversation
+  ↓
+calls Anthropic Messages API (api.claude.ai for OAuth, api.anthropic.com for API keys)
+  ↓
+parses response for "REFINED PROMPT:" marker
+  if found: strips marker, returns both the assistant message and refined_prompt
+  otherwise: returns assistant message only
+  ↓
+client displays response, shows Apply button when refined_prompt is present
+
+POST /api/tasks/{id}/refine/apply
+  body: { prompt, conversation }
+  ↓
+  saves conversation as RefinementSession on the task
+  moves old prompt to PromptHistory
+  sets task.Prompt = new prompt
+  triggers background title regeneration
+```

@@ -45,14 +45,15 @@ wallfacer/
 │   ├── envconfig/       # .env file parsing and atomic update helpers
 │   ├── gitutil/         # Git operations: repo queries, worktree lifecycle, rebase/merge, status
 │   ├── handler/         # HTTP API handlers (one file per concern)
-│   │   ├── config.go        # GET /api/config
+│   │   ├── config.go        # GET/PUT /api/config (autopilot toggle)
 │   │   ├── containers.go    # GET /api/containers
 │   │   ├── env.go           # GET/PUT /api/env
-│   │   ├── execute.go       # Task lifecycle actions (feedback, done, cancel, resume, sync, archive)
-│   │   ├── git.go           # Git status, push, sync, branches, checkout, create-branch, diff
+│   │   ├── execute.go       # Task lifecycle actions (feedback, done, cancel, resume, sync, archive, test)
+│   │   ├── git.go           # Git status, push, sync, branches, checkout, create-branch, rebase-on-main
 │   │   ├── instructions.go  # GET/PUT /api/instructions, POST reinit
+│   │   ├── refine.go        # POST /api/tasks/{id}/refine and /refine/apply (prompt refinement chat)
 │   │   ├── stream.go        # SSE endpoints (task stream, git stream, container logs)
-│   │   └── tasks.go         # Task CRUD, title generation
+│   │   └── tasks.go         # Task CRUD, title generation, autopilot promoter
 │   ├── instructions/    # Workspace CLAUDE.md management
 │   ├── logger/          # Structured logging (pretty-print + JSON)
 │   ├── runner/          # Container orchestration, task execution, commit pipeline
@@ -84,6 +85,7 @@ wallfacer/
 │       ├── containers.js    # Container monitoring UI
 │       ├── instructions.js  # CLAUDE.md editor
 │       ├── markdown.js      # Markdown rendering (Marked.js)
+│       ├── refine.js        # Prompt refinement chat UI
 │       ├── theme.js         # Dark/light theme toggle
 │       └── utils.js         # Shared utility functions
 │
@@ -143,7 +145,9 @@ The `-container` flag defaults to auto-detection: it checks `/opt/podman/bin/pod
 
 `~/.wallfacer/.env` is passed into every sandbox container via `--env-file`. The server also parses it to extract model overrides and gateway credentials.
 
-At least one authentication variable must be set:
+At least one authentication variable must be set (Claude or Codex):
+
+**Claude Code sandbox**
 
 | Variable | Required | Description |
 |---|---|---|
@@ -153,12 +157,22 @@ At least one authentication variable must be set:
 | `ANTHROPIC_BASE_URL` | no | Custom API endpoint; defaults to `https://api.anthropic.com`. When set, the server queries `{base_url}/v1/models` to populate the model selection dropdown |
 | `WALLFACER_DEFAULT_MODEL` | no | Default model passed as `--model` to task containers; omit to use the Claude Code default |
 | `WALLFACER_TITLE_MODEL` | no | Model used for background title generation; falls back to `WALLFACER_DEFAULT_MODEL` if unset |
+| `WALLFACER_MAX_PARALLEL` | no | Maximum number of concurrently running tasks when autopilot is enabled (default: 5) |
 
 When both `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY` are set, the OAuth token takes precedence. This is Claude Code CLI behavior — wallfacer simply passes both variables through to the container via `--env-file`.
 
+**OpenAI Codex sandbox** (optional; requires building `wallfacer-codex` image)
+
+| Variable | Required | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | yes (for Codex) | OpenAI API key |
+| `OPENAI_BASE_URL` | no | Custom OpenAI-compatible API base URL (default: `https://api.openai.com/v1`) |
+| `CODEX_DEFAULT_MODEL` | no | Default model for Codex tasks (e.g. `codex-mini-latest`) |
+| `CODEX_TITLE_MODEL` | no | Model for auto-generating task titles; falls back to `CODEX_DEFAULT_MODEL` |
+
 All variables can be edited at runtime from **Settings → API Configuration** in the web UI. Changes take effect on the next task run without restarting the server.
 
-`wallfacer env` reports the status of all four variables.
+`wallfacer env` reports the status of all configuration variables.
 
 ## Server Initialization
 
@@ -169,7 +183,8 @@ parse CLI flags / env vars
 → load tasks from data/<uuid>/task.json into memory
 → create worktreesDir (~/.wallfacer/worktrees/)
 → pruneOrphanedWorktrees()   (removes stale worktree dirs + runs `git worktree prune`)
-→ recover crashed tasks      (in_progress / committing → failed)
+→ recover crashed tasks      (in_progress / committing → failed or waiting)
+→ start auto-promoter goroutine (watches store; promotes backlog tasks when autopilot enabled)
 → register HTTP routes
 → start listener on :8080
 → open browser (unless -no-browser)

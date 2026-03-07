@@ -11,6 +11,9 @@ A Kanban task runner for [Claude Code](https://claude.ai/code). Create tasks as 
 - **Git worktree isolation** — every task gets its own git branch and worktree so concurrent changes never conflict
 - **Branch switching** — switch or create branches from the UI; all future tasks branch from the new HEAD
 - **Human-in-the-loop feedback** — when Claude needs clarification, the card moves to Waiting; submit feedback to resume execution
+- **Prompt refinement** — chat with an AI assistant to iteratively improve a task description before running it
+- **Test verification** — trigger a separate test agent on a waiting task to verify it meets acceptance criteria; records a pass/fail verdict
+- **Autopilot mode** — automatically promotes backlog tasks to In Progress as capacity becomes available (configurable concurrency limit)
 - **Auto commit and push** — completed task changes are automatically committed and pushed to the remote
 - **Worktree sync** — rebase waiting/failed task worktrees onto the latest default branch without losing progress
 - **Cross-task awareness** — each container receives a board manifest (`board.json`) so Claude can see sibling tasks and avoid conflicts
@@ -23,6 +26,7 @@ A Kanban task runner for [Claude Code](https://claude.ai/code). Create tasks as 
 - **Diff viewer** — inspect exactly what changed in each task before accepting it
 - **Container runtime auto-detection** — automatically finds Podman or Docker; both are fully supported
 - **Configurable API** — set token, base URL, and model from the UI; supports OAuth tokens, direct API keys, and any Anthropic-compatible endpoint
+- **OpenAI Codex support** — optional second sandbox image (`wallfacer-codex`) for running tasks with OpenAI Codex
 
 ## Prerequisites
 
@@ -59,7 +63,10 @@ ANTHROPIC_API_KEY=sk-ant-...
 # ANTHROPIC_BASE_URL=https://api.anthropic.com
 
 # Optional — pin a specific model
-# CLAUDE_CODE_MODEL=claude-sonnet-4-5
+# WALLFACER_DEFAULT_MODEL=claude-sonnet-4-5
+
+# Optional — limit how many tasks run concurrently (default: 5)
+# WALLFACER_MAX_PARALLEL=3
 ```
 
 You can also edit all of these from **Settings → API Configuration** in the web UI without restarting the server.
@@ -111,11 +118,14 @@ See [Task Lifecycle](docs/task-lifecycle.md) for details on all states and trans
 
 | Target | Description |
 |---|---|
-| `make build` | Build the sandbox image |
+| `make build` | Build both sandbox images (Claude + Codex) |
+| `make build-claude` | Build the Claude Code sandbox image only |
+| `make build-codex` | Build the OpenAI Codex sandbox image only |
 | `make server` | Build and run the Go server |
 | `make run PROMPT="..."` | Headless one-shot Claude execution |
 | `make shell` | Debug shell inside a sandbox container |
-| `make clean` | Remove the sandbox image |
+| `make ui-css` | Regenerate Tailwind CSS from UI sources |
+| `make clean` | Remove both sandbox images |
 
 ## Documentation
 
