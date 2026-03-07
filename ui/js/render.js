@@ -123,20 +123,6 @@ function render() {
   for (const [status, items] of Object.entries(columns)) {
     const el = document.getElementById(`col-${status}`);
     if (!el) continue;
-    const countEl = document.getElementById(`count-${status}`);
-    if (countEl) {
-      if (status === 'in_progress') {
-        countEl.textContent = formatInProgressCount(items.length);
-        updateMaxParallelTag();
-      } else {
-        countEl.textContent = items.length;
-      }
-    }
-
-    const existing = new Map();
-    for (const child of el.children) {
-      existing.set(child.dataset.id, child);
-    }
 
     // Backlog: sort by position ascending (priority order).
     // Other columns: sort by last updated descending.
@@ -146,16 +132,39 @@ function render() {
       items.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
     }
 
-    const newIds = new Set(items.map(t => t.id));
+    // Apply search filter: only show cards matching the current query.
+    const visibleItems = filterQuery ? items.filter(matchesFilter) : items;
 
-    // Remove cards that are no longer in this column
+    const countEl = document.getElementById(`count-${status}`);
+    if (countEl) {
+      const isFiltered = filterQuery && visibleItems.length !== items.length;
+      if (status === 'in_progress') {
+        countEl.textContent = isFiltered
+          ? formatInProgressCount(visibleItems.length) + '\u00a0/\u00a0' + items.length
+          : formatInProgressCount(items.length);
+        updateMaxParallelTag();
+      } else {
+        countEl.textContent = isFiltered
+          ? visibleItems.length + '\u00a0/\u00a0' + items.length
+          : items.length;
+      }
+    }
+
+    const existing = new Map();
+    for (const child of el.children) {
+      existing.set(child.dataset.id, child);
+    }
+
+    const newIds = new Set(visibleItems.map(t => t.id));
+
+    // Remove cards that are no longer in this column or hidden by the filter.
     for (const [id, child] of existing) {
       if (!newIds.has(id)) child.remove();
     }
 
-    // Add or update cards, maintaining sorted order in the DOM
-    for (let i = 0; i < items.length; i++) {
-      const t = items[i];
+    // Add or update visible cards, maintaining sorted order in the DOM.
+    for (let i = 0; i < visibleItems.length; i++) {
+      const t = visibleItems[i];
       let card = existing.get(t.id);
       if (!card) {
         card = createCard(t);
@@ -293,7 +302,7 @@ function updateCard(card, t) {
       <input type="checkbox" id="resume-chk-${t.id}" ${!t.fresh_start ? 'checked' : ''} onchange="toggleFreshStart('${t.id}', !this.checked)" style="width:11px;height:11px;cursor:pointer;accent-color:var(--accent);">
       <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
     </div>` : ''}
-    ${isIdeaAgent ? `<div class="card-title">&#129504; ${escapeHtml(t.title || 'Brainstorm')}</div>` : t.title ? `<div class="card-title">${escapeHtml(t.title)}</div>` : ''}
+    ${isIdeaAgent ? `<div class="card-title">&#129504; ${highlightMatch(t.title || 'Brainstorm', filterQuery)}</div>` : t.title ? `<div class="card-title">${highlightMatch(t.title, filterQuery)}</div>` : ''}
     <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${renderMarkdown(t.prompt)}</div>
     ${t.status === 'failed' && t.result ? `
     <div class="card-error-reason">

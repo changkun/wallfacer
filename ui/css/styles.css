@@ -1508,3 +1508,14 @@ pre.result-entry-body {
   cursor: default;
   padding: 8px 12px;
 }
+
+/* --- Task search highlight --- */
+mark.search-highlight {
+  background: rgba(255, 195, 0, 0.35);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+[data-theme="dark"] mark.search-highlight {
+  background: rgba(255, 195, 0, 0.25);
+}
