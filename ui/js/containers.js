@@ -96,16 +96,26 @@ function renderContainers(containers) {
     var stateColor = containerStateColor(c.state);
     var stateLabel = c.state || '—';
 
-    // Task cell: show title if we can match it, else show the UUID.
+    // Task cell: show title with hover tooltip for full prompt.
+    // Prefer server-enriched task_title, then fall back to window.state lookup.
     var taskCell = '';
     if (c.task_id) {
       var task = taskMap[c.task_id];
-      if (task) {
-        var taskTitle = escapeHtml(task.title || task.prompt || c.task_id);
-        var badgeClass = 'badge badge-' + (task.status || 'backlog');
-        taskCell = '<span class="' + badgeClass + '" style="margin-right:6px;">' +
-          escapeHtml(task.status) + '</span>' +
-          '<span style="color:var(--text-primary);">' + taskTitle + '</span>';
+      // Prefer the server-provided title (always fresh); fall back to state lookup.
+      var displayTitle = c.task_title ||
+        (task ? (task.title || task.prompt || c.task_id) : null);
+      // Build tooltip from the full task prompt (for hover detail).
+      var tooltipText = task ? (task.prompt || '') : (c.task_title || '');
+
+      if (displayTitle) {
+        var badgeClass = task ? 'badge badge-' + (task.status || 'backlog') : '';
+        var badgeHtml = task
+          ? '<span class="' + badgeClass + '" style="margin-right:6px;">' + escapeHtml(task.status) + '</span>'
+          : '';
+        taskCell = '<span title="' + escapeHtml(tooltipText) + '" style="cursor:default;">' +
+          badgeHtml +
+          '<span style="color:var(--text-primary);">' + escapeHtml(displayTitle) + '</span>' +
+          '</span>';
       } else {
         taskCell = '<span style="font-family:monospace;color:var(--text-muted);">' +
           escapeHtml(c.task_id.substring(0, 8)) + '</span>';

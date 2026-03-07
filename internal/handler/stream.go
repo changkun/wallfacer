@@ -88,7 +88,14 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	containerName := "wallfacer-" + id.String()
+	// Resolve the actual container name (slug-based format for new containers,
+	// with label-based fallback for containers created after a server restart).
+	containerName := h.runner.ContainerName(id)
+	if containerName == "" {
+		// Last-resort fallback for containers created with the old naming format
+		// (wallfacer-<uuid>) before the slug-based scheme was introduced.
+		containerName = "wallfacer-" + id.String()
+	}
 	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
 
 	// Merge container stdout and stderr.

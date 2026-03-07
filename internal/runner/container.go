@@ -39,18 +39,27 @@ type claudeOutput struct {
 // It is a pure function of runner configuration and the supplied parameters,
 // which makes it easy to unit-test without actually launching a container.
 //
+// taskID, when non-empty, is used to label the container with wallfacer.task.id
+// so the monitor can correlate containers to tasks even with slug-based names.
 // boardDir, when non-empty, is a host directory containing board.json that
 // will be mounted read-only at /workspace/.tasks/ inside the container.
 // siblingMounts maps shortID → (repoPath → worktreePath) for read-only
 // sibling worktree mounts under /workspace/.tasks/worktrees/.
 func (r *Runner) buildContainerArgs(
-	containerName, prompt, sessionID string,
+	containerName, taskID, prompt, sessionID string,
 	worktreeOverrides map[string]string,
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
 ) []string {
 	args := []string{"run", "--rm", "--network=host", "--name", containerName}
+
+	// Label the container with task metadata so the monitor can correlate
+	// containers to tasks by label rather than by parsing the container name.
+	if taskID != "" {
+		args = append(args, "--label", "wallfacer.task.id="+taskID)
+		args = append(args, "--label", "wallfacer.task.prompt="+truncate(prompt, 80))
+	}
 
 	if r.envFile != "" {
 		args = append(args, "--env-file", r.envFile)
@@ -193,12 +202,20 @@ func (r *Runner) runContainer(
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
 ) (*claudeOutput, []byte, []byte, error) {
-	containerName := "wallfacer-" + taskID.String()
+	// Build a human-readable container name: wallfacer-<slug>-<uuid8>
+	// The slug is derived from the task prompt so external tools (docker ps,
+	// podman ps) can identify which task is running without needing the UUID.
+	slug := slugifyPrompt(prompt, 30)
+	containerName := "wallfacer-" + slug + "-" + taskID.String()[:8]
+
+	// Track the container name so KillContainer and StreamLogs can find it.
+	r.containerNames.Store(taskID.String(), containerName)
+	defer r.containerNames.Delete(taskID.String())
 
 	// Remove any leftover container from a previous interrupted run.
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	args := r.buildContainerArgs(containerName, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride)
+	args := r.buildContainerArgs(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride)
 
 	cmd := exec.CommandContext(ctx, r.command, args...)
 	var stdout, stderr bytes.Buffer

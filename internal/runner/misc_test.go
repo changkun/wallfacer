@@ -399,7 +399,7 @@ func TestRunContainerWithSessionID(t *testing.T) {
 // adds --resume <sessionID> to the container args.
 func TestBuildContainerArgsWithSessionID(t *testing.T) {
 	r := newTestRunnerWithInstructions(t, "")
-	args := r.buildContainerArgs("name", "prompt", "sess-abc", nil, "", nil, "")
+	args := r.buildContainerArgs("name", "", "prompt", "sess-abc", nil, "", nil, "")
 	if !containsConsecutive(args, "--resume", "sess-abc") {
 		t.Fatalf("expected --resume sess-abc in args; got: %v", args)
 	}
@@ -424,7 +424,7 @@ func TestBuildContainerArgsWithEnvFile(t *testing.T) {
 		SandboxImage: "test:latest",
 		EnvFile:      envFile,
 	})
-	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil, "")
+	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
 	if !containsConsecutive(args, "--env-file", envFile) {
 		t.Fatalf("expected --env-file %s in args; got: %v", envFile, args)
 	}
@@ -448,7 +448,7 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 		SandboxImage: "test:latest",
 		Workspaces:   ws,
 	})
-	args := r.buildContainerArgs("name", "prompt", "", map[string]string{ws: wt}, "", nil, "")
+	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{ws: wt}, "", nil, "")
 	basename := filepath.Base(ws)
 	expectedMount := wt + ":/workspace/" + basename + ":z"
 	if !containsConsecutive(args, "-v", expectedMount) {
@@ -482,7 +482,7 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 		SandboxImage: "test:latest",
 		Workspaces:   repo,
 	})
-	args := r.buildContainerArgs("name", "prompt", "", map[string]string{repo: wt}, "", nil, "")
+	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{repo: wt}, "", nil, "")
 
 	// The main repo's .git should be mounted at the same host path.
 	gitDir := filepath.Join(repo, ".git")
@@ -510,7 +510,7 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 		Workspaces:   repo,
 	})
 	// No worktree override — direct mount of workspace.
-	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil, "")
+	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
 
 	gitDir := filepath.Join(repo, ".git")
 	gitMount := gitDir + ":" + gitDir + ":z"
@@ -523,7 +523,7 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 // --resume is NOT added to the args.
 func TestBuildContainerArgsNoSessionID(t *testing.T) {
 	r := newTestRunnerWithInstructions(t, "")
-	args := r.buildContainerArgs("name", "prompt", "", nil, "", nil, "")
+	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
 	for i, a := range args {
 		if a == "--resume" {
 			t.Fatalf("--resume should not appear when sessionID is empty (found at index %d)", i)
@@ -827,6 +827,91 @@ func TestContainerJSONCreatedNil(t *testing.T) {
 	c := containerJSON{}
 	if c.createdUnix() != 0 {
 		t.Fatalf("expected 0, got %d", c.createdUnix())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// slugifyPrompt
+// ---------------------------------------------------------------------------
+
+func TestSlugifyPrompt(t *testing.T) {
+	cases := []struct {
+		name   string
+		input  string
+		maxLen int
+		want   string
+	}{
+		{"simple words", "Add dark mode", 30, "add-dark-mode"},
+		{"special chars", "Fix bug: in #42!", 20, "fix-bug-in-42"},
+		{"leading spaces", "  hello world", 20, "hello-world"},
+		{"consecutive spaces", "a  b  c", 20, "a-b-c"},
+		{"empty string", "", 20, "task"},
+		{"all special", "!@#$%", 20, "task"},
+		{"truncate", "abcdefghijklmnopqrstuvwxyz", 10, "abcdefghij"},
+		{"truncate at dash boundary", "add dark mode toggle feature", 12, "add-dark-mod"},
+		{"numbers preserved", "fix issue 123", 20, "fix-issue-123"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := slugifyPrompt(tc.input, tc.maxLen)
+			if got != tc.want {
+				t.Errorf("slugifyPrompt(%q, %d) = %q, want %q", tc.input, tc.maxLen, got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// isUUID
+// ---------------------------------------------------------------------------
+
+func TestIsUUID(t *testing.T) {
+	cases := []struct {
+		s    string
+		want bool
+	}{
+		{"249e9c9c-1234-5678-abcd-ef0123456789", true},
+		{"00000000-0000-0000-0000-000000000000", true},
+		{"ffffffff-ffff-ffff-ffff-ffffffffffff", true},
+		{"add-dark-mode-249e9c9c", false},          // slug-based name fragment
+		{"249e9c9c", false},                        // short UUID
+		{"", false},
+		{"not-a-uuid-at-all-xxxxxxxxxxxxxxxxxx", false},
+	}
+	for _, tc := range cases {
+		got := isUUID(tc.s)
+		if got != tc.want {
+			t.Errorf("isUUID(%q) = %v, want %v", tc.s, got, tc.want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ListContainers — label-based task ID extraction
+// ---------------------------------------------------------------------------
+
+// TestListContainersLabelExtraction verifies that ListContainers prefers the
+// wallfacer.task.id label over name-based UUID extraction when available.
+func TestListContainersLabelExtraction(t *testing.T) {
+	// Simulate a Podman-format JSON array with a slug-based container name
+	// and the task ID in a label.
+	input := []byte(`[
+		{"Id":"abc123","Names":["wallfacer-add-dark-mode-249e9c9c"],"Image":"wallfacer:latest","State":"running","Status":"Up","Created":1700000000,"Labels":{"wallfacer.task.id":"249e9c9c-1234-5678-abcd-ef0123456789"}}
+	]`)
+	containers, err := parseContainerList(input)
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if len(containers) != 1 {
+		t.Fatalf("expected 1 container, got %d", len(containers))
+	}
+	// Labels should be present.
+	if containers[0].Labels == nil {
+		t.Fatal("expected Labels to be parsed")
+	}
+	taskID := containers[0].Labels["wallfacer.task.id"]
+	if taskID != "249e9c9c-1234-5678-abcd-ef0123456789" {
+		t.Errorf("expected full UUID in label, got %q", taskID)
 	}
 }
 

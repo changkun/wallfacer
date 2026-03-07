@@ -364,7 +364,6 @@ func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
 // to waiting so the user can decide what to do next.
 func monitorContainerUntilStopped(s *store.Store, r *runner.Runner, taskID uuid.UUID) {
 	ctx := context.Background()
-	containerName := "wallfacer-" + taskID.String()
 	ticker := time.NewTicker(containerPollInterval)
 	defer ticker.Stop()
 
@@ -376,7 +375,9 @@ func monitorContainerUntilStopped(s *store.Store, r *runner.Runner, taskID uuid.
 		}
 		running := false
 		for _, c := range containers {
-			if c.Name == containerName && c.State == "running" {
+			// Match by task ID (from label) so this works regardless of
+			// the container name format (slug-based or legacy UUID-based).
+			if c.TaskID == taskID.String() && c.State == "running" {
 				running = true
 				break
 			}

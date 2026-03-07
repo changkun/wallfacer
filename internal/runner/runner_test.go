@@ -117,7 +117,7 @@ func TestContainerArgsMountsCLAUDEMD(t *testing.T) {
 	}
 
 	runner := newTestRunnerWithInstructions(t, instructionsFile)
-	args := runner.buildContainerArgs("test-container", "do something", "", nil, "", nil, "")
+	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	expectedMount := instructionsFile + ":/workspace/CLAUDE.md:z,ro"
 	if !containsConsecutive(args, "-v", expectedMount) {
@@ -129,7 +129,7 @@ func TestContainerArgsMountsCLAUDEMD(t *testing.T) {
 // empty no CLAUDE.md mount is added to the container args.
 func TestContainerArgsNoInstructionsPath(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, "")
-	args := runner.buildContainerArgs("test-container", "do something", "", nil, "", nil, "")
+	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	for _, a := range args {
 		if strings.Contains(a, "CLAUDE.md") {
@@ -144,7 +144,7 @@ func TestContainerArgsNoInstructionsPath(t *testing.T) {
 func TestContainerArgsMissingInstructionsFile(t *testing.T) {
 	missingPath := filepath.Join(t.TempDir(), "nonexistent.md")
 	runner := newTestRunnerWithInstructions(t, missingPath)
-	args := runner.buildContainerArgs("test-container", "do something", "", nil, "", nil, "")
+	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	for _, a := range args {
 		if strings.Contains(a, "CLAUDE.md") {
@@ -162,7 +162,7 @@ func TestContainerArgsCLAUDEMDMountIsReadOnly(t *testing.T) {
 	}
 
 	runner := newTestRunnerWithInstructions(t, instructionsFile)
-	args := runner.buildContainerArgs("test-container", "do something", "", nil, "", nil, "")
+	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	for i, a := range args {
 		if a == "-v" && i+1 < len(args) && strings.Contains(args[i+1], "CLAUDE.md") {
@@ -202,7 +202,7 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtRoot(t *testing.T) {
 		InstructionsPath: instructionsFile,
 		Workspaces:       ws,
 	})
-	args := runner.buildContainerArgs("test-container", "do something", "", nil, "", nil, "")
+	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	basename := filepath.Base(ws)
 	expectedMount := instructionsFile + ":/workspace/" + basename + "/CLAUDE.md:z,ro"
@@ -242,7 +242,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 		InstructionsPath: instructionsFile,
 		Workspaces:       ws1 + " " + ws2,
 	})
-	args := runner.buildContainerArgs("test-container", "do something", "", nil, "", nil, "")
+	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	expectedMount := instructionsFile + ":/workspace/CLAUDE.md:z,ro"
 	if !containsConsecutive(args, "-v", expectedMount) {
@@ -273,7 +273,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 		InstructionsPath: instructionsFile,
 		Workspaces:       ws,
 	})
-	args := runner.buildContainerArgs("test-container", "do something", "", nil, "", nil, "")
+	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	claudeMDIdx := -1
 	imageIdx := -1
@@ -307,7 +307,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 func TestBuildContainerArgs_BoardMount(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, "")
 	boardDir := t.TempDir()
-	args := runner.buildContainerArgs("name", "prompt", "", nil, boardDir, nil, "")
+	args := runner.buildContainerArgs("name", "", "prompt", "", nil, boardDir, nil, "")
 	expected := boardDir + ":/workspace/.tasks:z,ro"
 	if !containsConsecutive(args, "-v", expected) {
 		t.Fatalf("expected board mount %q in args; got: %v", expected, args)
@@ -318,7 +318,7 @@ func TestBuildContainerArgs_BoardMount(t *testing.T) {
 // not add a .tasks mount.
 func TestBuildContainerArgs_NoBoardMount(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, "")
-	args := runner.buildContainerArgs("name", "prompt", "", nil, "", nil, "")
+	args := runner.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
 	for _, a := range args {
 		if strings.Contains(a, ".tasks") {
 			t.Fatalf("should not have .tasks mount when boardDir is empty; found %q", a)
@@ -334,7 +334,7 @@ func TestBuildContainerArgs_SiblingMounts(t *testing.T) {
 	siblingMounts := map[string]map[string]string{
 		"abcd1234": {"/home/user/myrepo": siblingDir},
 	}
-	args := runner.buildContainerArgs("name", "prompt", "", nil, "", siblingMounts, "")
+	args := runner.buildContainerArgs("name", "", "prompt", "", nil, "", siblingMounts, "")
 	expected := siblingDir + ":/workspace/.tasks/worktrees/abcd1234/myrepo:z,ro"
 	if !containsConsecutive(args, "-v", expected) {
 		t.Fatalf("expected sibling mount %q in args; got: %v", expected, args)

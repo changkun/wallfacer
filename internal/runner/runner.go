@@ -15,8 +15,9 @@ import (
 // ContainerInfo represents a single sandbox container returned by ListContainers.
 type ContainerInfo struct {
 	ID        string `json:"id"`         // short container ID
-	Name      string `json:"name"`       // full container name (e.g. wallfacer-<uuid>)
-	TaskID    string `json:"task_id"`    // task UUID extracted from name, empty if not a task container
+	Name      string `json:"name"`       // full container name (e.g. wallfacer-<slug>-<uuid8>)
+	TaskID    string `json:"task_id"`    // task UUID from label, empty if not a task container
+	TaskTitle string `json:"task_title"` // task title populated by the handler from the store
 	Image     string `json:"image"`      // image name
 	State     string `json:"state"`      // running | exited | paused | …
 	Status    string `json:"status"`     // human-readable status (e.g. "Up 5 minutes")
@@ -31,13 +32,14 @@ type ContainerInfo struct {
 //
 // We use json.RawMessage for Names and any for Created to handle both.
 type containerJSON struct {
-	ID        string          `json:"Id"`
-	Names     json.RawMessage `json:"Names"`
-	Image     string          `json:"Image"`
-	State     string          `json:"State"`
-	Status    string          `json:"Status"`
-	Created   any             `json:"Created"`
-	CreatedAt string          `json:"CreatedAt"` // Docker uses CreatedAt (string) instead of Created
+	ID        string            `json:"Id"`
+	Names     json.RawMessage   `json:"Names"`
+	Image     string            `json:"Image"`
+	State     string            `json:"State"`
+	Status    string            `json:"Status"`
+	Created   any               `json:"Created"`
+	CreatedAt string            `json:"CreatedAt"`          // Docker uses CreatedAt (string) instead of Created
+	Labels    map[string]string `json:"Labels"`             // task metadata labels (wallfacer.task.id, etc.)
 }
 
 // name extracts the container name from the Names field, handling both
@@ -130,10 +132,22 @@ func (r *Runner) ListContainers() ([]ContainerInfo, error) {
 	result := make([]ContainerInfo, 0, len(raw))
 	for _, c := range raw {
 		name := c.name()
-		taskID := strings.TrimPrefix(name, "wallfacer-")
-		if taskID == name {
-			taskID = "" // name didn't have the prefix → not a task container
+
+		// Primary: extract task UUID from the wallfacer.task.id label.
+		// This works regardless of the container name format.
+		taskID := ""
+		if c.Labels != nil {
+			taskID = c.Labels["wallfacer.task.id"]
 		}
+		// Fallback for containers created without labels (old format wallfacer-<uuid>):
+		// try stripping the "wallfacer-" prefix and check if the remainder is a UUID.
+		if taskID == "" {
+			candidate := strings.TrimPrefix(name, "wallfacer-")
+			if candidate != name && isUUID(candidate) {
+				taskID = candidate
+			}
+		}
+
 		result = append(result, ContainerInfo{
 			ID:        c.ID,
 			Name:      name,
@@ -145,6 +159,44 @@ func (r *Runner) ListContainers() ([]ContainerInfo, error) {
 		})
 	}
 	return result, nil
+}
+
+// isUUID returns true if s looks like a standard UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).
+func isUUID(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i, c := range s {
+		if i == 8 || i == 13 || i == 18 || i == 23 {
+			if c != '-' {
+				return false
+			}
+		} else if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+// ContainerName returns the active container name for a task.
+// It first checks the in-memory map populated when a container is launched,
+// then falls back to scanning the container list and matching by task ID label.
+// Returns an empty string if no container is found.
+func (r *Runner) ContainerName(taskID uuid.UUID) string {
+	if v, ok := r.containerNames.Load(taskID.String()); ok {
+		return v.(string)
+	}
+	// Fallback: search all wallfacer containers by label.
+	containers, err := r.ListContainers()
+	if err != nil {
+		return ""
+	}
+	for _, c := range containers {
+		if c.TaskID == taskID.String() {
+			return c.Name
+		}
+	}
+	return ""
 }
 
 const (
@@ -173,6 +225,7 @@ type Runner struct {
 	worktreesDir     string
 	instructionsPath string
 	repoMu           sync.Map // per-repo *sync.Mutex for serializing rebase+merge
+	containerNames   sync.Map // taskID (string) → container name (string)
 }
 
 // NewRunner constructs a Runner from the given store and config.
@@ -216,6 +269,9 @@ func (r *Runner) repoLock(repoPath string) *sync.Mutex {
 // KillContainer sends a kill signal to the running container for a task.
 // Safe to call when no container is running — errors are silently ignored.
 func (r *Runner) KillContainer(taskID uuid.UUID) {
-	containerName := "wallfacer-" + taskID.String()
-	exec.Command(r.command, "kill", containerName).Run()
+	name := r.ContainerName(taskID)
+	if name == "" {
+		return
+	}
+	exec.Command(r.command, "kill", name).Run()
 }
