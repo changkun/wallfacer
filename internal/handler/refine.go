@@ -40,7 +40,7 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		return
 	}
 
-	go h.runner.RunRefinement(id)
+	h.runner.RunRefinementBackground(id)
 
 	updated, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
