@@ -26,7 +26,6 @@ func (h *Handler) GetOversight(w http.ResponseWriter, r *http.Request, id uuid.U
 	writeJSON(w, http.StatusOK, oversight)
 }
 
-<<<<<<< Updated upstream
 // GetTestOversight returns the test-agent oversight summary for a task.
 // The summary is generated synchronously when a test run transitions back to
 // waiting; this endpoint returns the current state (pending/generating/ready/failed).
@@ -43,7 +42,8 @@ func (h *Handler) GetTestOversight(w http.ResponseWriter, r *http.Request, id uu
 	}
 
 	writeJSON(w, http.StatusOK, oversight)
-=======
+}
+
 // GenerateMissingOversight triggers background oversight generation for completed
 // tasks that do not yet have a ready oversight summary (status pending or failed).
 // Only tasks in a terminal state (done, waiting, failed, cancelled) with at least
@@ -98,9 +98,8 @@ func (h *Handler) GenerateMissingOversight(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"queued":                len(eligible),
+		"queued":                  len(eligible),
 		"total_without_oversight": total,
-		"task_ids":              taskIDs,
+		"task_ids":                taskIDs,
 	})
->>>>>>> Stashed changes
 }
