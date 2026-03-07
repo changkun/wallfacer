@@ -56,16 +56,19 @@ type Task struct {
 	Prompt         string              `json:"prompt"`
 	PromptHistory  []string            `json:"prompt_history,omitempty"`
 	RefineSessions []RefinementSession `json:"refine_sessions,omitempty"`
-	Status        TaskStatus `json:"status"`
-	Archived      bool      `json:"archived,omitempty"`
-	SessionID     *string   `json:"session_id"`
-	FreshStart    bool      `json:"fresh_start,omitempty"`
-	Result        *string   `json:"result"`
-	StopReason    *string   `json:"stop_reason"`
-	Turns         int       `json:"turns"`
-	Timeout       int       `json:"timeout"`
-	Usage         TaskUsage `json:"usage"`
-	Position      int       `json:"position"`
+	Status         TaskStatus           `json:"status"`
+	Archived       bool                 `json:"archived,omitempty"`
+	SessionID      *string              `json:"session_id"`
+	FreshStart     bool                 `json:"fresh_start,omitempty"`
+	Result         *string              `json:"result"`
+	StopReason     *string              `json:"stop_reason"`
+	Turns          int                  `json:"turns"`
+	Timeout        int                  `json:"timeout"`
+	Usage          TaskUsage            `json:"usage"`
+	// UsageBreakdown tracks token/cost per sub-agent activity (e.g. "implementation",
+	// "test", "title", "oversight", "oversight-test", "refinement").
+	UsageBreakdown map[string]TaskUsage `json:"usage_breakdown,omitempty"`
+	Position       int                  `json:"position"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 

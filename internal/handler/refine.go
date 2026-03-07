@@ -59,10 +59,24 @@ type llmResponse struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
 	} `json:"content"`
+	Usage *struct {
+		InputTokens              int `json:"input_tokens"`
+		OutputTokens             int `json:"output_tokens"`
+		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	} `json:"usage"`
 	Error *struct {
 		Type    string `json:"type"`
 		Message string `json:"message"`
 	} `json:"error"`
+}
+
+// llmUsage holds token counts returned from a Messages API call.
+type llmUsage struct {
+	InputTokens              int
+	OutputTokens             int
+	CacheReadInputTokens     int
+	CacheCreationInputTokens int
 }
 
 // buildMessagesURL returns the full endpoint URL for the Messages API,
@@ -87,18 +101,18 @@ func buildMessagesURL(baseURL, apiKey, authToken, oauthToken string) string {
 }
 
 // callLLM sends a conversation to the Messages API and returns the assistant
-// reply. It reads credentials from the env file.
-func (h *Handler) callLLM(messages []refineMessage) (string, error) {
+// reply along with token usage. It reads credentials from the env file.
+func (h *Handler) callLLM(messages []refineMessage) (string, llmUsage, error) {
 	cfg, err := envconfig.Parse(h.envFile)
 	if err != nil {
-		return "", fmt.Errorf("read env config: %w", err)
+		return "", llmUsage{}, fmt.Errorf("read env config: %w", err)
 	}
 
 	apiKey := cfg.APIKey
 	authToken := cfg.AuthToken
 	oauthToken := cfg.OAuthToken
 	if apiKey == "" && authToken == "" && oauthToken == "" {
-		return "", fmt.Errorf("no API key configured; set ANTHROPIC_API_KEY in the env file")
+		return "", llmUsage{}, fmt.Errorf("no API key configured; set ANTHROPIC_API_KEY in the env file")
 	}
 
 	model := cfg.DefaultModel
@@ -115,13 +129,13 @@ func (h *Handler) callLLM(messages []refineMessage) (string, error) {
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
+		return "", llmUsage{}, fmt.Errorf("marshal request: %w", err)
 	}
 
 	messagesURL := buildMessagesURL(cfg.BaseURL, apiKey, authToken, oauthToken)
 	req, err := http.NewRequest("POST", messagesURL, bytes.NewReader(body))
 	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
+		return "", llmUsage{}, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -138,24 +152,34 @@ func (h *Handler) callLLM(messages []refineMessage) (string, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("call LLM API: %w", err)
+		return "", llmUsage{}, fmt.Errorf("call LLM API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
+		return "", llmUsage{}, fmt.Errorf("read response: %w", err)
 	}
 
 	var cr llmResponse
 	if err := json.Unmarshal(respBody, &cr); err != nil {
-		return "", fmt.Errorf("parse response: %w", err)
+		return "", llmUsage{}, fmt.Errorf("parse response: %w", err)
 	}
 	if cr.Error != nil {
-		return "", fmt.Errorf("LLM API error (%s): %s", cr.Error.Type, cr.Error.Message)
+		return "", llmUsage{}, fmt.Errorf("LLM API error (%s): %s", cr.Error.Type, cr.Error.Message)
 	}
 	if len(cr.Content) == 0 {
-		return "", fmt.Errorf("empty response from LLM")
+		return "", llmUsage{}, fmt.Errorf("empty response from LLM")
+	}
+
+	var usage llmUsage
+	if cr.Usage != nil {
+		usage = llmUsage{
+			InputTokens:              cr.Usage.InputTokens,
+			OutputTokens:             cr.Usage.OutputTokens,
+			CacheReadInputTokens:     cr.Usage.CacheReadInputTokens,
+			CacheCreationInputTokens: cr.Usage.CacheCreationInputTokens,
+		}
 	}
 
 	var parts []string
@@ -164,7 +188,7 @@ func (h *Handler) callLLM(messages []refineMessage) (string, error) {
 			parts = append(parts, c.Text)
 		}
 	}
-	return strings.Join(parts, "\n"), nil
+	return strings.Join(parts, "\n"), usage, nil
 }
 
 // RefineChatRequest is the body for POST /api/tasks/{id}/refine.
@@ -214,11 +238,23 @@ func (h *Handler) RefineChat(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		messages = append(messages, refineMessage{Role: "user", Content: req.Message})
 	}
 
-	reply, err := h.callLLM(messages)
+	reply, usage, err := h.callLLM(messages)
 	if err != nil {
 		logger.Handler.Error("refine chat: call LLM", "task", id, "error", err)
 		http.Error(w, "failed to get AI response: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Accumulate token usage for refinement (Messages API does not expose cost_usd).
+	if usage.InputTokens > 0 || usage.OutputTokens > 0 {
+		if accErr := h.store.AccumulateSubAgentUsage(r.Context(), id, "refinement", store.TaskUsage{
+			InputTokens:          usage.InputTokens,
+			OutputTokens:         usage.OutputTokens,
+			CacheReadInputTokens: usage.CacheReadInputTokens,
+			CacheCreationTokens:  usage.CacheCreationInputTokens,
+		}); accErr != nil {
+			logger.Handler.Warn("refine chat: accumulate usage failed", "task", id, "error", accErr)
+		}
 	}
 
 	// Check if Claude has proposed a refined prompt.

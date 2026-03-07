@@ -56,7 +56,7 @@ func (r *Runner) GenerateOversight(taskID uuid.UUID) {
 		return
 	}
 
-	phases, err := r.runOversightAgent(taskID, log)
+	phases, err := r.runOversightAgent(taskID, "oversight", log)
 	if err != nil {
 		logger.Runner.Warn("oversight: agent failed", "task", taskID, "error", err)
 		_ = r.store.SaveOversight(taskID, store.TaskOversight{
@@ -108,7 +108,7 @@ func (r *Runner) GenerateTestOversight(taskID uuid.UUID, fromTurn int) {
 		return
 	}
 
-	phases, err := r.runOversightAgent(taskID, log)
+	phases, err := r.runOversightAgent(taskID, "oversight-test", log)
 	if err != nil {
 		logger.Runner.Warn("test oversight: agent failed", "task", taskID, "error", err)
 		_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
@@ -399,8 +399,9 @@ type oversightResult struct {
 }
 
 // runOversightAgent runs a lightweight agent container with the activity log and
-// parses the structured JSON it produces.
-func (r *Runner) runOversightAgent(taskID uuid.UUID, activities []turnActivity) ([]store.OversightPhase, error) {
+// parses the structured JSON it produces. agent is the sub-agent name used for
+// usage attribution (e.g. "oversight" or "oversight-test").
+func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []turnActivity) ([]store.OversightPhase, error) {
 	log := formatActivityLog(activities)
 
 	// Cap total log size to avoid exceeding prompt limits.
@@ -448,6 +449,19 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, activities []turnActivity) 
 	output, err := parseOutput(raw)
 	if err != nil {
 		return nil, fmt.Errorf("parse output: %w", err)
+	}
+
+	// Accumulate token/cost usage for this oversight sub-agent.
+	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
+		if accErr := r.store.AccumulateSubAgentUsage(context.Background(), taskID, agent, store.TaskUsage{
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+		}); accErr != nil {
+			logger.Runner.Warn("oversight: accumulate usage failed", "task", taskID, "agent", agent, "error", accErr)
+		}
 	}
 
 	phases, err := parseOversightResult(output.Result)

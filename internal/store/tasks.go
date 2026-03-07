@@ -191,8 +191,11 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 	return nil
 }
 
-// AccumulateTaskUsage adds token/cost deltas to the task's running totals.
-func (s *Store) AccumulateTaskUsage(_ context.Context, id uuid.UUID, delta TaskUsage) error {
+// AccumulateSubAgentUsage adds token/cost deltas to the task's running totals
+// and records the contribution under the named sub-agent in UsageBreakdown.
+// agent should be one of: "implementation", "test", "title", "oversight",
+// "oversight-test", "refinement".
+func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent string, delta TaskUsage) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -200,17 +203,35 @@ func (s *Store) AccumulateTaskUsage(_ context.Context, id uuid.UUID, delta TaskU
 	if !ok {
 		return fmt.Errorf("task not found: %s", id)
 	}
+	// Accumulate into the aggregate total.
 	t.Usage.InputTokens += delta.InputTokens
 	t.Usage.OutputTokens += delta.OutputTokens
 	t.Usage.CacheReadInputTokens += delta.CacheReadInputTokens
 	t.Usage.CacheCreationTokens += delta.CacheCreationTokens
 	t.Usage.CostUSD += delta.CostUSD
+	// Accumulate into the per-sub-agent breakdown.
+	if t.UsageBreakdown == nil {
+		t.UsageBreakdown = make(map[string]TaskUsage)
+	}
+	prev := t.UsageBreakdown[agent]
+	prev.InputTokens += delta.InputTokens
+	prev.OutputTokens += delta.OutputTokens
+	prev.CacheReadInputTokens += delta.CacheReadInputTokens
+	prev.CacheCreationTokens += delta.CacheCreationTokens
+	prev.CostUSD += delta.CostUSD
+	t.UsageBreakdown[agent] = prev
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
 	s.notify()
 	return nil
+}
+
+// AccumulateTaskUsage is a convenience wrapper that accumulates usage without
+// attributing it to a specific sub-agent. Prefer AccumulateSubAgentUsage.
+func (s *Store) AccumulateTaskUsage(ctx context.Context, id uuid.UUID, delta TaskUsage) error {
+	return s.AccumulateSubAgentUsage(ctx, id, "implementation", delta)
 }
 
 // UpdateTaskPosition updates the Kanban column sort position.

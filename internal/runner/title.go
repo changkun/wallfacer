@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -77,5 +78,18 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 
 	if err := r.store.UpdateTaskTitle(context.Background(), taskID, title); err != nil {
 		logger.Runner.Warn("title generation: store update failed", "task", taskID, "error", err)
+	}
+
+	// Accumulate token/cost usage for the title generation sub-agent.
+	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
+		if err := r.store.AccumulateSubAgentUsage(context.Background(), taskID, "title", store.TaskUsage{
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+		}); err != nil {
+			logger.Runner.Warn("title generation: accumulate usage failed", "task", taskID, "error", err)
+		}
 	}
 }

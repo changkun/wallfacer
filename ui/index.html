@@ -436,7 +436,12 @@
               <div class="flex justify-between"><span class="usage-label">Output tokens</span><span id="modal-usage-output" class="usage-value"></span></div>
               <div class="flex justify-between"><span class="usage-label">Cache read</span><span id="modal-usage-cache-read" class="usage-value"></span></div>
               <div class="flex justify-between"><span class="usage-label">Cache creation</span><span id="modal-usage-cache-creation" class="usage-value"></span></div>
-              <div class="flex justify-between" style="grid-column: span 2; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 4px;"><span class="usage-label">Cost</span><span id="modal-usage-cost" class="usage-value"></span></div>
+              <div class="flex justify-between" style="grid-column: span 2; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 4px;"><span class="usage-label">Total cost</span><span id="modal-usage-cost" class="usage-value"></span></div>
+            </div>
+            <!-- Per-sub-agent breakdown (shown when breakdown data is available) -->
+            <div id="modal-usage-breakdown" class="hidden" style="margin-top: 8px;">
+              <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Breakdown</div>
+              <div id="modal-usage-breakdown-rows"></div>
             </div>
           </div>
 

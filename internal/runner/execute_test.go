@@ -585,12 +585,21 @@ func TestRunCostMultiTurn(t *testing.T) {
 
 // TestRunCostResumedFromWaiting verifies that cost/token values are summed
 // correctly when a task goes waiting → in_progress (feedback resume). Each
-// container invocation reports per-invocation values that are accumulated.
+// container invocation reports per-invocation values that are accumulated,
+// including oversight sub-agent calls that are now also tracked.
 func TestRunCostResumedFromWaiting(t *testing.T) {
 	repo := setupTestRepo(t)
-	// First call: waiting, per-invocation cost 0.03, tokens 100/50
-	// Second call: end_turn, per-invocation cost 0.04, tokens 150/70
-	// Total: 0.03 + 0.04 = 0.07 cost, 100+150=250 input, 50+70=120 output
+	// call1: waiting (stop_reason=""), per-invocation cost 0.03, tokens 100/50.
+	// call2: end_turn,               per-invocation cost 0.04, tokens 150/70.
+	//
+	// Invocation sequence (fakeStatefulCmd counter):
+	//   0 → call1: implementation turn 1 (→ waiting)         +0.03, +100in, +50out
+	//   1 → call2: oversight for waiting  (synchronous)       +0.04, +150in, +70out
+	//   2 → call2: implementation turn 2  (→ done)            +0.04, +150in, +70out
+	//   3 → call2: commit message gen     (not accumulated)
+	//   4 → call2: oversight for done     (background goroutine, after WaitBackground)
+	//                                                          +0.04, +150in, +70out
+	// Grand total: 0.15, 550 input, 260 output.
 	call1 := `{"result":"need input","session_id":"s1","stop_reason":"","is_error":false,"total_cost_usd":0.03,"usage":{"input_tokens":100,"output_tokens":50}}`
 	call2 := `{"result":"done","session_id":"s1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.04,"usage":{"input_tokens":150,"output_tokens":70}}`
 	cmd := fakeStatefulCmd(t, []string{call1, call2})
@@ -611,21 +620,45 @@ func TestRunCostResumedFromWaiting(t *testing.T) {
 
 	// Second Run (feedback resume): goes to done.
 	r.Run(task.ID, "continue", *waiting.SessionID, false)
+	// Wait for all background goroutines (done oversight) to finish so the
+	// cost totals are deterministic before we read the final values.
+	r.WaitBackground()
 	final, _ := s.GetTask(ctx, task.ID)
 	if final.Status != "done" {
 		t.Fatalf("expected done, got %q", final.Status)
 	}
 
-	// Cost should be 0.07 total (sum: 0.03 + 0.04).
-	if final.Usage.CostUSD < 0.069 || final.Usage.CostUSD > 0.071 {
-		t.Errorf("CostUSD = %f, want ~0.07", final.Usage.CostUSD)
+	// Total cost: 0.03 (impl1) + 0.04 (oversight-waiting) + 0.04 (impl2) + 0.04 (oversight-done) = 0.15.
+	if final.Usage.CostUSD < 0.149 || final.Usage.CostUSD > 0.151 {
+		t.Errorf("CostUSD = %f, want ~0.15", final.Usage.CostUSD)
 	}
-	// Tokens: 250 input (100 + 150), 120 output (50 + 70).
-	if final.Usage.InputTokens != 250 {
-		t.Errorf("InputTokens = %d, want 250", final.Usage.InputTokens)
+	// Tokens: 100+150+150+150=550 input, 50+70+70+70=260 output.
+	if final.Usage.InputTokens != 550 {
+		t.Errorf("InputTokens = %d, want 550", final.Usage.InputTokens)
 	}
-	if final.Usage.OutputTokens != 120 {
-		t.Errorf("OutputTokens = %d, want 120", final.Usage.OutputTokens)
+	if final.Usage.OutputTokens != 260 {
+		t.Errorf("OutputTokens = %d, want 260", final.Usage.OutputTokens)
+	}
+	// UsageBreakdown should separate implementation and oversight costs.
+	bd := final.UsageBreakdown
+	if bd == nil {
+		t.Fatal("UsageBreakdown is nil")
+	}
+	if impl, ok := bd["implementation"]; !ok {
+		t.Error("missing implementation breakdown")
+	} else {
+		// Turn 1 (0.03) + Turn 2 (0.04) = 0.07.
+		if impl.CostUSD < 0.069 || impl.CostUSD > 0.071 {
+			t.Errorf("implementation CostUSD = %f, want ~0.07", impl.CostUSD)
+		}
+	}
+	if ov, ok := bd["oversight"]; !ok {
+		t.Error("missing oversight breakdown")
+	} else {
+		// Waiting oversight (0.04) + done oversight (0.04) = 0.08.
+		if ov.CostUSD < 0.079 || ov.CostUSD > 0.081 {
+			t.Errorf("oversight CostUSD = %f, want ~0.08", ov.CostUSD)
+		}
 	}
 }
 

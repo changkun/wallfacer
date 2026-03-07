@@ -271,6 +271,56 @@ async function openModal(id) {
     document.getElementById('modal-usage-cache-creation').textContent = u.cache_creation_input_tokens.toLocaleString();
     document.getElementById('modal-usage-cost').textContent = '$' + u.cost_usd.toFixed(4);
     usageSection.classList.remove('hidden');
+
+    // Per-sub-agent breakdown
+    const breakdownEl = document.getElementById('modal-usage-breakdown');
+    const breakdownRows = document.getElementById('modal-usage-breakdown-rows');
+    const bd = task.usage_breakdown;
+    if (bd && Object.keys(bd).length > 0) {
+      // Display order for known agents; unknown agents appended after.
+      const order = ['implementation', 'test', 'refinement', 'title', 'oversight', 'oversight-test'];
+      const agentLabel = {
+        'implementation': 'Implementation',
+        'test': 'Test verification',
+        'refinement': 'Refinement',
+        'title': 'Title generation',
+        'oversight': 'Oversight summary',
+        'oversight-test': 'Test oversight',
+      };
+      const keys = [
+        ...order.filter(k => bd[k]),
+        ...Object.keys(bd).filter(k => !order.includes(k)),
+      ];
+      breakdownRows.innerHTML = '';
+      keys.forEach(function(agent) {
+        const au = bd[agent];
+        if (!au) return;
+        const label = agentLabel[agent] || agent;
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:baseline;font-size:12px;padding:2px 0;';
+        const nameSpan = document.createElement('span');
+        nameSpan.style.color = 'var(--text-muted)';
+        nameSpan.textContent = label;
+        const statsSpan = document.createElement('span');
+        statsSpan.style.cssText = 'font-family:monospace;font-size:11px;color:var(--text-secondary);';
+        const parts = [];
+        if (au.input_tokens || au.output_tokens) {
+          parts.push((au.input_tokens || 0).toLocaleString() + ' in / ' + (au.output_tokens || 0).toLocaleString() + ' out');
+        }
+        if (au.cost_usd) {
+          parts.push('$' + au.cost_usd.toFixed(4));
+        } else if (au.input_tokens || au.output_tokens) {
+          parts.push('(tokens only)');
+        }
+        statsSpan.textContent = parts.join(' · ');
+        row.appendChild(nameSpan);
+        row.appendChild(statsSpan);
+        breakdownRows.appendChild(row);
+      });
+      breakdownEl.classList.remove('hidden');
+    } else {
+      breakdownEl.classList.add('hidden');
+    }
   } else {
     usageSection.classList.add('hidden');
   }

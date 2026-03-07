@@ -189,7 +189,12 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 
 		// Accumulate per-invocation cost and token values directly.
-		r.store.AccumulateTaskUsage(bgCtx, taskID, store.TaskUsage{
+		// Attribute to "test" sub-agent when in test mode, "implementation" otherwise.
+		subAgent := "implementation"
+		if isTestRun {
+			subAgent = "test"
+		}
+		r.store.AccumulateSubAgentUsage(bgCtx, taskID, subAgent, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
