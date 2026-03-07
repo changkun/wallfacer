@@ -71,13 +71,13 @@ func TestBuildInstructionsContentDefault(t *testing.T) {
 	if !strings.Contains(content, "/workspace/"+name+"/") {
 		t.Fatalf("content should list workspace %q", name)
 	}
-	if strings.Contains(content, "## Instructions from") {
-		t.Fatal("content should not include per-repo instructions when no CLAUDE.md exists")
+	if strings.Contains(content, "## Repo-Specific Instructions") {
+		t.Fatal("content should not include Repo-Specific Instructions section when no CLAUDE.md exists")
 	}
 }
 
-// TestBuildInstructionsContentWithWorkspaceCLAUDE verifies that a workspace
-// CLAUDE.md is appended after the default template with the correct header.
+// TestBuildInstructionsContentWithWorkspaceCLAUDE verifies that when a workspace
+// has a CLAUDE.md its path is referenced in the output (not its content).
 func TestBuildInstructionsContentWithWorkspaceCLAUDE(t *testing.T) {
 	dir := t.TempDir()
 	repoInstructions := "# My project rules\n\nDo the thing.\n"
@@ -92,31 +92,37 @@ func TestBuildInstructionsContentWithWorkspaceCLAUDE(t *testing.T) {
 	}
 
 	name := filepath.Base(dir)
-	expectedHeader := "\n---\n\n## Instructions from `" + name + "`\n\n"
-	if !strings.Contains(content, expectedHeader) {
-		t.Fatalf("expected header %q in content:\n%s", expectedHeader, content)
+	expectedRef := "- `/workspace/" + name + "/CLAUDE.md`"
+	if !strings.Contains(content, expectedRef) {
+		t.Fatalf("expected path reference %q in content:\n%s", expectedRef, content)
 	}
 
-	if !strings.Contains(content, repoInstructions) {
-		t.Fatalf("expected repo instructions in content:\n%s", content)
+	// The full file content must NOT be embedded.
+	if strings.Contains(content, repoInstructions) {
+		t.Fatal("repo CLAUDE.md content should not be embedded; only its path should be referenced")
+	}
+
+	if !strings.Contains(content, "## Repo-Specific Instructions") {
+		t.Fatal("content should include Repo-Specific Instructions section")
 	}
 }
 
 // TestBuildInstructionsContentMissingCLAUDE verifies that a workspace without
-// a CLAUDE.md is silently skipped (no per-repo instructions section appended).
+// a CLAUDE.md produces no Repo-Specific Instructions section.
 func TestBuildInstructionsContentMissingCLAUDE(t *testing.T) {
 	dir := t.TempDir() // no CLAUDE.md
 	content := BuildContent([]string{dir})
 	if !strings.HasPrefix(content, defaultTemplate) {
 		t.Fatal("content should start with the default template")
 	}
-	if strings.Contains(content, "## Instructions from") {
-		t.Fatal("workspace without CLAUDE.md should not produce per-repo instructions section")
+	if strings.Contains(content, "## Repo-Specific Instructions") {
+		t.Fatal("workspace without CLAUDE.md should not produce Repo-Specific Instructions section")
 	}
 }
 
-// TestBuildInstructionsContentMultipleWorkspaces verifies that CLAUDE.md from
-// several workspaces are all appended in order, each with its own header.
+// TestBuildInstructionsContentMultipleWorkspaces verifies that CLAUDE.md paths
+// from several workspaces are listed in order, while workspaces without a
+// CLAUDE.md are silently omitted from the reference list.
 func TestBuildInstructionsContentMultipleWorkspaces(t *testing.T) {
 	dirA := t.TempDir()
 	dirB := t.TempDir()
@@ -133,33 +139,44 @@ func TestBuildInstructionsContentMultipleWorkspaces(t *testing.T) {
 
 	content := BuildContent([]string{dirA, dirB, dirC})
 
-	if !strings.Contains(content, "instructions for A") {
-		t.Error("missing instructions from workspace A")
-	}
-	if !strings.Contains(content, "instructions for C") {
-		t.Error("missing instructions from workspace C")
-	}
-
-	// dirB has no CLAUDE.md — its name should not appear as a header.
+	nameA := filepath.Base(dirA)
 	nameB := filepath.Base(dirB)
-	if strings.Contains(content, "## Instructions from `"+nameB+"`") {
-		t.Errorf("workspace B (no CLAUDE.md) should not produce a header")
+	nameC := filepath.Base(dirC)
+
+	refA := "- `/workspace/" + nameA + "/CLAUDE.md`"
+	refC := "- `/workspace/" + nameC + "/CLAUDE.md`"
+	refB := "- `/workspace/" + nameB + "/CLAUDE.md`"
+
+	if !strings.Contains(content, refA) {
+		t.Errorf("expected path reference for workspace A: %q", refA)
+	}
+	if !strings.Contains(content, refC) {
+		t.Errorf("expected path reference for workspace C: %q", refC)
+	}
+	// dirB has no CLAUDE.md — its path should not appear.
+	if strings.Contains(content, refB) {
+		t.Errorf("workspace B (no CLAUDE.md) should not appear in references")
 	}
 
-	// A's section must come before C's section.
-	posA := strings.Index(content, "instructions for A")
-	posC := strings.Index(content, "instructions for C")
+	// Embedded content must not be present.
+	if strings.Contains(content, "instructions for A") || strings.Contains(content, "instructions for C") {
+		t.Error("repo CLAUDE.md content should not be embedded in output")
+	}
+
+	// A's reference must come before C's reference.
+	posA := strings.Index(content, refA)
+	posC := strings.Index(content, refC)
 	if posA > posC {
-		t.Error("workspace A section should appear before workspace C section")
+		t.Error("workspace A reference should appear before workspace C reference")
 	}
 }
 
-// TestBuildInstructionsContentTrailingNewline verifies that a workspace
-// CLAUDE.md without a trailing newline still results in valid content (a
-// newline is appended so headers are not run together).
+// TestBuildInstructionsContentTrailingNewline verifies that the generated
+// content always ends with a newline regardless of workspace CLAUDE.md state.
 func TestBuildInstructionsContentTrailingNewline(t *testing.T) {
 	dir := t.TempDir()
-	// Deliberately omit trailing newline.
+	// Deliberately omit trailing newline in repo CLAUDE.md; the generated
+	// output should still end with a newline since we only reference the path.
 	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("no newline at end"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +184,7 @@ func TestBuildInstructionsContentTrailingNewline(t *testing.T) {
 	content := BuildContent([]string{dir})
 
 	if !strings.HasSuffix(content, "\n") {
-		t.Fatal("content should end with a newline even when CLAUDE.md lacks one")
+		t.Fatal("content should end with a newline")
 	}
 }
 
@@ -228,7 +245,7 @@ func TestEnsureWorkspaceInstructionsIdempotent(t *testing.T) {
 }
 
 // TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE verifies that a
-// newly created instructions file incorporates the workspace's own CLAUDE.md.
+// newly created instructions file references the workspace's own CLAUDE.md path.
 func TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE(t *testing.T) {
 	configDir := t.TempDir()
 	ws := t.TempDir()
@@ -243,9 +260,15 @@ func TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	name := filepath.Base(ws)
 	data, _ := os.ReadFile(path)
-	if !strings.Contains(string(data), repoInstructions) {
-		t.Fatalf("instructions file should include workspace CLAUDE.md content; got:\n%s", data)
+	expectedRef := "- `/workspace/" + name + "/CLAUDE.md`"
+	if !strings.Contains(string(data), expectedRef) {
+		t.Fatalf("instructions file should reference workspace CLAUDE.md path %q; got:\n%s", expectedRef, data)
+	}
+	// Content must not be embedded.
+	if strings.Contains(string(data), repoInstructions) {
+		t.Fatal("instructions file should not embed workspace CLAUDE.md content")
 	}
 }
 
@@ -282,11 +305,17 @@ func TestReinitWorkspaceInstructionsOverwrites(t *testing.T) {
 		t.Fatalf("path should be stable: %q vs %q", path, path2)
 	}
 
+	name := filepath.Base(ws)
 	data, _ := os.ReadFile(path)
 	if strings.Contains(string(data), "stale content") {
 		t.Fatal("Reinit should have overwritten stale content")
 	}
-	if !strings.Contains(string(data), repoInstructions) {
-		t.Fatalf("Reinit should include fresh workspace CLAUDE.md; got:\n%s", data)
+	expectedRef := "- `/workspace/" + name + "/CLAUDE.md`"
+	if !strings.Contains(string(data), expectedRef) {
+		t.Fatalf("Reinit should reference workspace CLAUDE.md path %q; got:\n%s", expectedRef, data)
+	}
+	// Content must not be embedded.
+	if strings.Contains(string(data), repoInstructions) {
+		t.Fatal("Reinit should not embed workspace CLAUDE.md content")
 	}
 }
