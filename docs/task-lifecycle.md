@@ -114,7 +114,15 @@ POST /api/tasks/{id}/refine/apply
   Triggers background title regeneration.
 ```
 
-The refinement assistant calls the Anthropic Messages API directly (not via a container), using the configured credential from the env file. It uses `WALLFACER_DEFAULT_MODEL` (falling back to `claude-haiku-4-5`) and a 1,024-token response budget.
+The refinement assistant calls the Anthropic Messages API directly (not via a container). It reuses whichever credential is already configured in `~/.wallfacer/.env` — no separate API token is needed:
+
+| Credential set | Endpoint used |
+|---|---|
+| `CLAUDE_CODE_OAUTH_TOKEN` | `api.claude.ai/api/messages` |
+| `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` | `api.anthropic.com/v1/messages` |
+| `ANTHROPIC_BASE_URL` set | `/v1/messages` at the custom URL |
+
+It uses `WALLFACER_DEFAULT_MODEL` (falling back to `claude-haiku-4-5`) and a 1,024-token response budget.
 
 ## Test Verification
 
