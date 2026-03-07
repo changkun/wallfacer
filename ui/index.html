@@ -400,6 +400,43 @@
             </details>
           </div>
 
+          <!-- Settings for backlog tasks (hidden for non-backlog) -->
+          <div id="modal-backlog-settings" class="hidden mb-4">
+            <h3 class="section-title">Settings</h3>
+            <div class="flex items-center gap-2 flex-wrap">
+              <label for="modal-edit-model" class="text-xs text-v-muted">Model</label>
+              <select id="modal-edit-model" class="select" onchange="scheduleBacklogSave()">
+                <option value="">Default</option>
+              </select>
+              <label for="modal-edit-timeout" class="text-xs text-v-muted">Timeout</label>
+              <select id="modal-edit-timeout" class="select">
+                <option value="5">5 min</option>
+                <option value="15">15 min</option>
+                <option value="30">30 min</option>
+                <option value="60" selected>1 hour</option>
+                <option value="120">2 hours</option>
+                <option value="360">6 hours</option>
+                <option value="720">12 hours</option>
+                <option value="1440">24 hours</option>
+              </select>
+            </div>
+            <div id="modal-edit-resume-row" class="hidden flex items-center gap-2 mt-2">
+              <input type="checkbox" id="modal-edit-resume" onchange="saveResumeOption(this.checked)" style="cursor:pointer;accent-color:var(--accent);">
+              <label for="modal-edit-resume" class="text-xs text-v-secondary" style="cursor:pointer;">Resume previous session</label>
+            </div>
+            <div class="flex items-center gap-2 mt-2">
+              <input type="checkbox" id="modal-edit-mount-worktrees" onchange="scheduleBacklogSave()" style="cursor:pointer;accent-color:var(--accent);">
+              <label for="modal-edit-mount-worktrees" class="text-xs text-v-secondary" style="cursor:pointer;">Mount sibling worktrees (read-only)</label>
+            </div>
+            <span id="modal-edit-status" class="text-xs text-v-muted"></span>
+          </div>
+
+          <!-- Editable prompt for backlog tasks (hidden for non-backlog) -->
+          <div id="modal-backlog-edit" class="hidden mb-4">
+            <h3 class="section-title">Edit Prompt</h3>
+            <textarea id="modal-edit-prompt" rows="6" class="field" style="font-family:monospace;font-size:12px;"></textarea>
+          </div>
+
           <!-- Resume section for failed tasks with session_id -->
           <div id="modal-resume-section" class="hidden mb-4">
             <h3 class="section-title">Resume Session</h3>
@@ -549,78 +586,47 @@
           </div>
         </div>
 
-        <!-- Right panel: settings + refinement for backlog tasks -->
+        <!-- Right panel: refinement monitor for backlog tasks -->
         <div id="modal-backlog-right" class="hidden">
-          <!-- Settings -->
-          <div class="mb-4">
-            <h3 class="section-title">Settings</h3>
-            <div class="flex items-center gap-2 flex-wrap">
-              <label for="modal-edit-model" class="text-xs text-v-muted">Model</label>
-              <select id="modal-edit-model" class="select" onchange="scheduleBacklogSave()">
-                <option value="">Default</option>
-              </select>
-              <label for="modal-edit-timeout" class="text-xs text-v-muted">Timeout</label>
-              <select id="modal-edit-timeout" class="select">
-                <option value="5">5 min</option>
-                <option value="15">15 min</option>
-                <option value="30">30 min</option>
-                <option value="60" selected>1 hour</option>
-                <option value="120">2 hours</option>
-                <option value="360">6 hours</option>
-                <option value="720">12 hours</option>
-                <option value="1440">24 hours</option>
-              </select>
+          <!-- Header: title + start/cancel controls -->
+          <div class="flex items-center justify-between mb-3" style="border-bottom:1px solid var(--border);padding-bottom:10px;">
+            <h3 class="section-title" style="margin-bottom:0;">Refine with AI</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button id="refine-start-btn" onclick="startRefinement()" class="btn btn-accent">Start</button>
+              <button id="refine-cancel-btn" onclick="cancelRefinement()" class="hidden btn btn-ghost text-xs">Cancel</button>
             </div>
-            <div id="modal-edit-resume-row" class="hidden flex items-center gap-2 mt-2">
-              <input type="checkbox" id="modal-edit-resume" onchange="saveResumeOption(this.checked)" style="cursor:pointer;accent-color:var(--accent);">
-              <label for="modal-edit-resume" class="text-xs text-v-secondary" style="cursor:pointer;">Resume previous session</label>
-            </div>
-            <div class="flex items-center gap-2 mt-2">
-              <input type="checkbox" id="modal-edit-mount-worktrees" onchange="scheduleBacklogSave()" style="cursor:pointer;accent-color:var(--accent);">
-              <label for="modal-edit-mount-worktrees" class="text-xs text-v-secondary" style="cursor:pointer;">Mount sibling worktrees (read-only)</label>
-            </div>
-            <span id="modal-edit-status" class="text-xs text-v-muted"></span>
           </div>
 
-          <!-- Editable prompt -->
-          <div class="mb-4">
-            <h3 class="section-title">Edit Prompt</h3>
-            <textarea id="modal-edit-prompt" rows="6" class="field" style="font-family:monospace;font-size:12px;"></textarea>
+          <!-- Idle state: description -->
+          <div id="refine-idle-desc" class="text-xs text-v-muted" style="line-height:1.6;">
+            Launch a sandbox agent to analyze the codebase and write a detailed spec. Review, edit, then apply it as the task prompt.
           </div>
 
-          <!-- Sandbox refinement -->
-          <div class="mb-4">
-            <div class="flex items-center justify-between mb-2">
-              <h3 class="section-title" style="margin-bottom:0;">Refine with AI</h3>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <button id="refine-start-btn" onclick="startRefinement()" class="btn btn-accent">Start</button>
-                <button id="refine-cancel-btn" onclick="cancelRefinement()" class="hidden btn btn-ghost text-xs">Cancel</button>
-              </div>
+          <!-- Running state: spinner + live log output -->
+          <div id="refine-running" class="hidden">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="spinner" style="width:12px;height:12px;border-width:2px;"></span>
+              <span class="text-xs text-v-muted">Sandbox agent is analyzing the codebase and writing a spec…</span>
             </div>
-            <!-- Running state: spinner + live log output -->
-            <div id="refine-running" class="hidden">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="spinner" style="width:12px;height:12px;border-width:2px;"></span>
-                <span class="text-xs text-v-muted">Sandbox agent is analyzing the codebase and writing a spec…</span>
-              </div>
-              <pre id="refine-logs" class="logs-block" style="max-height:220px;overflow-y:auto;font-size:11px;"></pre>
+            <pre id="refine-logs" class="logs-block" style="font-size:11px;"></pre>
+          </div>
+
+          <!-- Done state: editable result + apply button -->
+          <div id="refine-result-section" class="hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span class="text-xs text-v-muted">Spec — edit before applying</span>
+              <button onclick="applyRefinement()" class="btn btn-accent">Apply as Prompt</button>
             </div>
-            <!-- Done state: editable result + apply button -->
-            <div id="refine-result-section" class="hidden">
-              <div class="refine-spec-header" style="margin-bottom:4px;">
-                <div class="refine-spec-label">Spec (edit before applying)</div>
-              </div>
-              <textarea id="refine-result-prompt" rows="10" class="field refine-prompt-textarea"></textarea>
-              <button onclick="applyRefinement()" class="btn btn-accent mt-2" style="align-self:flex-start;">Apply as Prompt</button>
-            </div>
-            <!-- Error state -->
-            <div id="refine-error-section" class="hidden">
-              <div id="refine-error-msg" class="text-xs mt-1" style="color:var(--error,#f87171);"></div>
-            </div>
+            <textarea id="refine-result-prompt" rows="22" class="field refine-prompt-textarea"></textarea>
+          </div>
+
+          <!-- Error state -->
+          <div id="refine-error-section" class="hidden">
+            <div id="refine-error-msg" class="text-xs mt-1" style="color:var(--error,#f87171);"></div>
           </div>
 
           <!-- Refinement history -->
-          <div id="refine-history-section" class="hidden refine-history-area">
+          <div id="refine-history-section" class="hidden refine-history-area" style="margin-top:16px;">
             <details>
               <summary class="refine-history-toggle">Refinement History</summary>
               <div id="refine-history-list" class="refine-history-list"></div>

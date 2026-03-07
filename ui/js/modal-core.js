@@ -11,19 +11,26 @@ async function openModal(id) {
   document.getElementById('modal-id').textContent = `ID: ${task.id}`;
 
   const backlogRight = document.getElementById('modal-backlog-right');
-  if (task.status === 'backlog') {
-    // Left panel: rendered prompt
-    const promptRaw = document.getElementById('modal-prompt');
-    const promptRendered = document.getElementById('modal-prompt-rendered');
-    promptRaw.textContent = task.prompt;
-    promptRendered.innerHTML = renderMarkdown(task.prompt);
-    promptRendered.classList.remove('hidden');
-    promptRaw.classList.add('hidden');
-    document.getElementById('modal-prompt-actions').classList.remove('hidden');
-    document.getElementById('toggle-prompt-btn').textContent = 'Raw';
+  const backlogSettings = document.getElementById('modal-backlog-settings');
+  const backlogEdit = document.getElementById('modal-backlog-edit');
 
-    // Right panel: settings + edit + refinement
+  // Render prompt in left panel (shared for all statuses)
+  const promptRaw = document.getElementById('modal-prompt');
+  const promptRendered = document.getElementById('modal-prompt-rendered');
+  promptRaw.textContent = task.prompt;
+  promptRendered.innerHTML = renderMarkdown(task.prompt);
+  promptRendered.classList.remove('hidden');
+  promptRaw.classList.add('hidden');
+  document.getElementById('modal-prompt-actions').classList.remove('hidden');
+  document.getElementById('toggle-prompt-btn').textContent = 'Raw';
+
+  if (task.status === 'backlog') {
+    // Show right refinement panel and left backlog-specific sections
     backlogRight.classList.remove('hidden');
+    backlogSettings.classList.remove('hidden');
+    backlogEdit.classList.remove('hidden');
+
+    // Populate settings (now in left panel)
     document.getElementById('modal-edit-prompt').value = task.prompt;
     document.getElementById('modal-edit-timeout').value = String(task.timeout || 60);
     document.getElementById('modal-edit-mount-worktrees').checked = !!task.mount_worktrees;
@@ -36,11 +43,10 @@ async function openModal(id) {
       resumeRow.classList.add('hidden');
     }
 
-    // Reset refinement panel and show idle state (start button visible).
+    // Reset refinement panel then restore state from task data
     resetRefinePanel();
     refineTaskId = task.id;
-
-    // Populate refinement history
+    updateRefineUI(task);
     renderRefineHistory(task);
 
     // Make modal wide for split layout
@@ -51,14 +57,8 @@ async function openModal(id) {
     modalBody.style.gap = '0';
   } else {
     backlogRight.classList.add('hidden');
-    const promptRaw = document.getElementById('modal-prompt');
-    const promptRendered = document.getElementById('modal-prompt-rendered');
-    promptRaw.textContent = task.prompt;
-    promptRendered.innerHTML = renderMarkdown(task.prompt);
-    promptRendered.classList.remove('hidden');
-    promptRaw.classList.add('hidden');
-    document.getElementById('modal-prompt-actions').classList.remove('hidden');
-    document.getElementById('toggle-prompt-btn').textContent = 'Raw';
+    backlogSettings.classList.add('hidden');
+    backlogEdit.classList.add('hidden');
   }
 
   // Reset left panel tabs; content populated below once events load
@@ -212,10 +212,9 @@ async function openModal(id) {
     // Default to Implementation tab
     setRightTab('implementation');
   } else {
-    modalCard.classList.remove('modal-wide');
+    // Backlog tasks: modal-wide and layout already set in the backlog branch above.
+    // Just ensure the non-backlog right panel stays hidden.
     modalRight.classList.add('hidden');
-    modalBody.style.display = '';
-    modalBody.style.gap = '';
   }
 
   // Resume section (failed with session_id only)
@@ -352,6 +351,8 @@ function closeModal() {
   document.getElementById('modal-test-logs').innerHTML = '';
   resetRefinePanel();
   document.getElementById('modal-backlog-right').classList.add('hidden');
+  document.getElementById('modal-backlog-settings').classList.add('hidden');
+  document.getElementById('modal-backlog-edit').classList.add('hidden');
   currentTaskId = null;
   document.querySelector('#modal .modal-card').classList.remove('modal-wide');
   const modalBody = document.getElementById('modal-body');
