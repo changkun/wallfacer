@@ -21,29 +21,15 @@ Create tasks, run them in isolated sandboxes, review diffs, and keep shipping wi
 - **Operator visibility**: live logs, traces, timelines, and usage/cost tracking
 - **Model/runtime flexibility**: support for Claude Code, Codex, and custom sandbox setups
 
-## Features
+## Capability Stack
 
-- **Task board**: Backlog, In Progress, Waiting, Done, and Cancelled columns
-- **Isolated sandbox execution**: each task runs in an ephemeral Podman/Docker container
-- **Git worktree isolation**: every task gets its own branch/worktree for conflict-safe concurrency
-- **Branch switching**: switch/create branches from UI; future tasks branch from current HEAD
-- **Human-in-the-loop feedback**: tasks pause in Waiting when clarification is needed
-- **Prompt refinement**: iterate task prompts with AI before execution
-- **Test verification**: run dedicated test agent on waiting tasks with pass/fail outcome
-- **Autopilot mode**: auto-promote backlog tasks when capacity is available
-- **Auto commit and push**: completed changes can be committed/pushed automatically
-- **Worktree sync**: rebase waiting/failed task worktrees on latest default branch
-- **Cross-task awareness**: each container gets `board.json` context to reduce overlap
-- **Live log streaming**: real-time output via SSE
-- **Task timeline**: full audit trail of state changes and feedback
-- **Usage tracking**: tokens, cache hits, and cost per task
-- **Auto-generated titles**: concise task names from prompts
-- **Workspace instructions**: per-workspace `CLAUDE.md` managed in UI
-- **Multiple workspaces**: mount several project dirs at once
-- **Diff viewer**: inspect exact changes before accepting
-- **Container runtime auto-detection**: Podman and Docker support
-- **Configurable API**: token/base URL/model from UI
-- **Multiple agent runtimes**: built-in Claude Code and OpenAI Codex support
+- **Execution engine**: isolated containers, per-task git worktrees, safe parallel runs
+- **Autonomous loop**: refinement, implementation, testing, auto-submit, autopilot promotion
+- **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility
+- **Repo operations**: branch switching, sync/rebase helpers, auto commit and push
+- **Flexible runtime**: Podman/Docker support, workspace-level instructions, Claude + Codex backends
+
+For a complete walkthrough of workflows and controls, see [Usage Guide](docs/usage.md).
 
 ## Quick Start
 
