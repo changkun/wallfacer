@@ -180,3 +180,12 @@ Optional variables (also in `.env`):
 - `CODEX_TITLE_MODEL` — model for Codex title generation
 
 All can be edited from **Settings → API Configuration** in the UI (calls `PUT /api/env`).
+
+## Commit and push strategy
+
+- Keep commits small and focused on one logical change.
+- Do not include unrelated changes in the same commit.
+- Use scoped, imperative commit messages matching existing style, e.g. `internal/runner: ...`, `ui: ...`, `docs: ...`.
+- Stage only the files required for that change, then commit once.
+- Push only once after creating the commit.
+- If follow-up work is needed, create a new small commit and push again.
