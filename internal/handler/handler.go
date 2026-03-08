@@ -40,13 +40,15 @@ type Handler struct {
 // NewHandler constructs a Handler with the given dependencies.
 func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces []string) *Handler {
 	return &Handler{
-		store:      s,
-		runner:     r,
-		configDir:  configDir,
-		workspaces: workspaces,
-		envFile:    r.EnvFile(),
-		diffCache:  newDiffCache(),
-		startTime:  time.Now(),
+		store:            s,
+		runner:           r,
+		configDir:        configDir,
+		workspaces:       workspaces,
+		envFile:          r.EnvFile(),
+		diffCache:        newDiffCache(),
+		startTime:        time.Now(),
+		ideationEnabled:  true,
+		ideationInterval: 15 * time.Minute,
 	}
 }
 

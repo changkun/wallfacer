@@ -15,7 +15,12 @@ const ideaAgentDefaultTimeout = 60
 // StartIdeationWatcher subscribes to store change notifications and, whenever
 // an idea-agent task transitions out of active states, schedules the next
 // brainstorm run according to the configured interval.
+// It also kicks off an initial schedule immediately so that ideation begins
+// as soon as the server starts (when enabled by default).
 func (h *Handler) StartIdeationWatcher(ctx context.Context) {
+	// Kick off the first brainstorm run (or timer) right away.
+	go h.maybeScheduleNextIdeation(ctx)
+
 	subID, ch := h.store.Subscribe()
 	go func() {
 		defer h.store.Unsubscribe(subID)

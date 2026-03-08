@@ -12,10 +12,10 @@ import (
 
 // --- IdeationInterval state ---
 
-func TestIdeationInterval_DefaultIsZero(t *testing.T) {
+func TestIdeationInterval_DefaultIs15Minutes(t *testing.T) {
 	h := newTestHandler(t)
-	if h.IdeationInterval() != 0 {
-		t.Errorf("expected default interval=0, got %v", h.IdeationInterval())
+	if h.IdeationInterval() != 15*time.Minute {
+		t.Errorf("expected default interval=15m, got %v", h.IdeationInterval())
 	}
 }
 
@@ -81,6 +81,7 @@ func TestIdeationNextRun_ZeroWhenNoTimerPending(t *testing.T) {
 func TestScheduleIdeation_ImmediateWhenIntervalZero(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetIdeation(true)
+	h.SetIdeationInterval(0) // explicitly test the zero-interval path
 	// interval = 0: scheduleIdeation should create the task directly, no timer.
 	h.scheduleIdeation(context.Background())
 
