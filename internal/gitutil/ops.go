@@ -21,7 +21,11 @@ func RebaseOntoDefault(repoPath, worktreePath string) error {
 		// Abort so the repo is not stuck mid-rebase.
 		exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run()
 		if IsConflictOutput(string(out)) {
-			return fmt.Errorf("%w in %s", ErrConflict, worktreePath)
+			return &ConflictError{
+				WorktreePath:    worktreePath,
+				ConflictedFiles: parseConflictedFiles(string(out)),
+				RawOutput:       string(out),
+			}
 		}
 		return fmt.Errorf("git rebase in %s: %w\n%s", worktreePath, err, out)
 	}

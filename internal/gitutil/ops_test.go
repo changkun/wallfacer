@@ -175,7 +175,30 @@ func TestRebaseOntoDefault(t *testing.T) {
 		if !errors.Is(err, ErrConflict) {
 			t.Errorf("expected ErrConflict, got %v", err)
 		}
+		var conflictErr *ConflictError
+		if !errors.As(err, &conflictErr) {
+			t.Fatal("expected *ConflictError, got different type")
+		}
+		if len(conflictErr.ConflictedFiles) == 0 {
+			t.Error("expected at least one conflicted file, got none")
+		}
 	})
+}
+
+func TestParseConflictedFiles(t *testing.T) {
+	input := "CONFLICT (content): Merge conflict in foo/bar.go\n" +
+		"CONFLICT (add/add): Merge conflict in baz.txt\n" +
+		"Automatic merge failed; fix conflicts and then commit the result.\n"
+	files := parseConflictedFiles(input)
+	if len(files) != 2 {
+		t.Fatalf("expected 2 files, got %d: %v", len(files), files)
+	}
+	if files[0] != "foo/bar.go" {
+		t.Errorf("files[0] = %q, want %q", files[0], "foo/bar.go")
+	}
+	if files[1] != "baz.txt" {
+		t.Errorf("files[1] = %q, want %q", files[1], "baz.txt")
+	}
 }
 
 func TestFFMerge(t *testing.T) {
