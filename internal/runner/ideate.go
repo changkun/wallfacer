@@ -53,7 +53,9 @@ func pickCategories(n int) []string {
 // buildIdeationPrompt constructs the full ideation prompt by randomly
 // assigning 3 distinct categories — one per idea slot — so that every
 // brainstorm run surfaces improvements from different areas of the project.
-func buildIdeationPrompt() string {
+// existingTasks lists tasks currently in backlog, in_progress, or waiting state
+// so the agent can avoid proposing duplicates or conflicting ideas.
+func buildIdeationPrompt(existingTasks []store.Task) string {
 	cats := pickCategories(3)
 	var sb strings.Builder
 	sb.WriteString(`You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 improvements — each from a different assigned domain.
@@ -64,7 +66,23 @@ First, explore the workspace thoroughly:
 - Review recent git history (git log --oneline -20) to see what has changed recently
 - Identify concrete opportunities, rough edges, and gaps in the code
 
-Then propose exactly 3 improvements, one per assigned domain:
+`)
+	if len(existingTasks) > 0 {
+		sb.WriteString("The following tasks are already queued or actively being worked on. Do NOT propose ideas that duplicate or directly conflict with any of them. If a proposed idea is closely related to an existing task, you MUST reference it explicitly in the prompt field with a note such as: \"Note: This is related to the existing task '[title]' (status: [status]).\"\n\nExisting active tasks:\n")
+		for i, t := range existingTasks {
+			title := t.Title
+			if title == "" {
+				title = "(untitled)"
+			}
+			prompt := strings.TrimSpace(t.Prompt)
+			if len(prompt) > 120 {
+				prompt = prompt[:120] + "..."
+			}
+			sb.WriteString(fmt.Sprintf("%d. [%s] (status: %s) — %s\n", i+1, title, string(t.Status), prompt))
+		}
+		sb.WriteString("\n")
+	}
+	sb.WriteString(`Then propose exactly 3 improvements, one per assigned domain:
 `)
 	for i, cat := range cats {
 		sb.WriteString(fmt.Sprintf("  Idea %d domain: %s\n", i+1, cat))
@@ -74,6 +92,7 @@ Requirements for each improvement:
 - Technically precise: name the specific files, functions, data structures, or API endpoints you observed during exploration — do not stay generic
 - Creative and non-obvious: avoid safe, predictable suggestions like "add more tests" or "improve error handling" in isolation; propose something with genuine engineering interest
 - Actionable end-to-end: write a prompt detailed enough for an AI coding agent to implement the full change without asking follow-up questions
+- Non-duplicating: do not propose ideas that overlap or conflict with the existing active tasks listed above
 
 Output ONLY a JSON array with exactly 3 objects. No preamble, no explanation, no markdown — just the JSON array:
 [
@@ -230,10 +249,27 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	title := "Brainstorm " + time.Now().Format("Jan 2, 2006 15:04")
 	r.store.UpdateTaskTitle(bgCtx, taskID, title)
 
+	// Collect tasks currently in backlog, in_progress, or waiting so the
+	// brainstorm agent can avoid proposing duplicates or conflicting ideas.
+	allTasks, _ := r.store.ListTasks(bgCtx, false)
+	var activeTasks []store.Task
+	for _, t := range allTasks {
+		if t.ID == taskID {
+			continue // skip the brainstorm task itself
+		}
+		if t.Kind == store.TaskKindIdeaAgent {
+			continue // skip other brainstorm meta-tasks
+		}
+		switch t.Status {
+		case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
+			activeTasks = append(activeTasks, t)
+		}
+	}
+
 	// Generate the full ideation prompt (with randomly-picked domains) and
 	// persist it to the task so the UI shows what was actually sent to the
 	// sandbox, including which improvement categories were selected.
-	ideationPrompt := buildIdeationPrompt()
+	ideationPrompt := buildIdeationPrompt(activeTasks)
 	r.store.UpdateTaskBacklog(bgCtx, taskID, &ideationPrompt, nil, nil, nil, nil)
 
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
