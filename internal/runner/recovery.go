@@ -1,0 +1,160 @@
+package runner
+
+import (
+	"context"
+	"time"
+
+	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/store"
+	"github.com/google/uuid"
+)
+
+const containerPollInterval = 5 * time.Second
+
+// ContainerLister can enumerate currently running containers.
+type ContainerLister interface {
+	ListContainers() ([]ContainerInfo, error)
+}
+
+// RecoverOrphanedTasks reconciles in_progress/committing tasks on startup by
+// checking which containers are still running.
+//
+//   - committing tasks are always moved to failed; the commit pipeline cannot be
+//     safely resumed after a restart.
+//   - in_progress tasks whose container is still running are left in_progress; a
+//     background goroutine monitors the container and moves the task to waiting
+//     once it stops.
+//   - in_progress tasks whose container is already gone are moved to waiting so
+//     the user can inspect the partial results and decide what to do next.
+func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerLister) {
+	tasks, err := s.ListTasks(ctx, true)
+	if err != nil {
+		logger.Recovery.Error("list tasks", "error", err)
+		return
+	}
+
+	// Build a set of task IDs whose containers are currently running.
+	runningContainers := map[string]bool{}
+	if containers, listErr := lister.ListContainers(); listErr != nil {
+		logger.Recovery.Warn("could not list containers during recovery; treating all in_progress tasks as stopped",
+			"error", listErr)
+	} else {
+		for _, c := range containers {
+			if c.State == "running" && c.TaskID != "" {
+				runningContainers[c.TaskID] = true
+			}
+		}
+	}
+
+	for _, t := range tasks {
+		switch t.Status {
+		case "committing":
+			// Commit pipeline cannot be resumed — mark failed.
+			logger.Recovery.Warn("task was committing at startup, marking as failed",
+				"task", t.ID)
+			s.UpdateTaskStatus(ctx, t.ID, "failed")
+			s.InsertEvent(ctx, t.ID, store.EventTypeError, map[string]string{
+				"error": "server restarted during commit",
+			})
+			s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+				"from": "committing", "to": "failed",
+			})
+
+		case "in_progress":
+			if runningContainers[t.ID.String()] {
+				// Container is still active — leave the task in_progress and
+				// monitor it; move to waiting once the container stops.
+				logger.Recovery.Info("container still running after restart, monitoring",
+					"task", t.ID)
+				s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+					"result": "Server restarted while task was running. Container is still active — monitoring for completion.",
+				})
+				go monitorContainerUntilStopped(ctx, s, lister, t.ID)
+			} else {
+				// Container is gone — move to waiting so the user can review
+				// partial results and decide whether to continue or finish.
+				logger.Recovery.Warn("task container gone after restart, moving to waiting",
+					"task", t.ID)
+				s.UpdateTaskStatus(ctx, t.ID, "waiting")
+				s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+					"result": "Server restarted while task was running. Container is no longer active — please review the output and decide whether to continue or mark as done.",
+				})
+				s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+					"from": "in_progress", "to": "waiting",
+				})
+			}
+		}
+	}
+}
+
+// monitorContainerUntilStopped polls the container runtime until the container
+// for taskID is no longer running, then transitions the task from in_progress
+// to waiting so the user can decide what to do next.
+//
+// The goroutine exits when ctx is cancelled (e.g. on server shutdown) or after
+// a 4-hour safety timeout to prevent indefinitely-leaked goroutines.
+func monitorContainerUntilStopped(ctx context.Context, s *store.Store, lister ContainerLister, taskID uuid.UUID) {
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Hour)
+	defer cancel()
+
+	ticker := time.NewTicker(containerPollInterval)
+	defer ticker.Stop()
+
+	// storeCtx is intentionally decoupled from the monitor lifetime so that
+	// store writes always complete even when ctx is cancelled or timed out.
+	storeCtx := context.Background()
+
+	transitionToWaiting := func() {
+		cur, getErr := s.GetTask(storeCtx, taskID)
+		if getErr != nil || cur == nil {
+			return
+		}
+		if cur.Status != "in_progress" {
+			// Task was already transitioned by another path (e.g. cancelled).
+			return
+		}
+		s.UpdateTaskStatus(storeCtx, taskID, "waiting")
+		s.InsertEvent(storeCtx, taskID, store.EventTypeSystem, map[string]string{
+			"result": "Container has stopped. Please review the output and decide whether to continue or mark as done.",
+		})
+		s.InsertEvent(storeCtx, taskID, store.EventTypeStateChange, map[string]string{
+			"from": "in_progress", "to": "waiting",
+		})
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.DeadlineExceeded {
+				logger.Recovery.Warn("monitor: container not seen stopping after 4h, giving up", "task", taskID)
+				transitionToWaiting()
+			}
+			// If cancelled (server shutdown), exit silently.
+			return
+
+		case <-ticker.C:
+			containers, err := lister.ListContainers()
+			if err != nil {
+				logger.Recovery.Warn("monitor: list containers error", "task", taskID, "error", err)
+				continue
+			}
+			running := false
+			for _, c := range containers {
+				// Match by task ID (from label) so this works regardless of
+				// the container name format (slug-based or legacy UUID-based).
+				if c.TaskID == taskID.String() && c.State == "running" {
+					running = true
+					break
+				}
+			}
+			if running {
+				continue
+			}
+
+			// Container stopped — move the task to waiting if it is still in_progress.
+			logger.Recovery.Info("monitored container stopped, moving task to waiting", "task", taskID)
+			transitionToWaiting()
+			return
+		}
+	}
+}
