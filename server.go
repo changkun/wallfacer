@@ -155,7 +155,10 @@ func runServer(configDir string, args []string) {
 		go openBrowser(fmt.Sprintf("http://%s:%d", browserHost, actualPort))
 	}
 
-	srv := &http.Server{Handler: loggingMiddleware(mux)}
+	srv := &http.Server{
+		Handler:     loggingMiddleware(mux),
+		BaseContext: func(_ net.Listener) context.Context { return ctx },
+	}
 
 	// Serve in a background goroutine so we can react to the shutdown signal.
 	srvErr := make(chan error, 1)
@@ -176,8 +179,10 @@ func runServer(configDir string, args []string) {
 		return
 	}
 
-	// Give in-flight HTTP requests up to 30 seconds to complete.
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Give in-flight HTTP requests up to 5 seconds to complete.
+	// SSE handlers exit promptly because their request contexts (derived from
+	// the base context set above) are already cancelled at this point.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Main.Error("http server shutdown", "error", err)
