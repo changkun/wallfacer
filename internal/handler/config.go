@@ -56,20 +56,16 @@ func availableSandboxes(cfg envconfig.Config) []string {
 		sandboxSet[name] = true
 		sandboxes = append(sandboxes, name)
 	}
-	if cfg.DefaultModel != "" {
-		add("claude")
-	}
-	if cfg.CodexDefaultModel != "" {
-		add("codex")
-	}
+	// Always expose both built-in sandboxes in the UI so users can select
+	// either provider even before model/env values are configured.
+	add("claude")
+	add("codex")
+
 	if cfg.DefaultSandbox != "" {
 		add(cfg.DefaultSandbox)
 	}
 	for _, v := range cfg.SandboxByActivity() {
 		add(v)
-	}
-	if len(sandboxes) == 0 {
-		add("claude")
 	}
 	return sandboxes
 }
@@ -133,7 +129,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(sandboxes) == 0 {
-		sandboxes = []string{"claude"}
+		sandboxes = []string{"claude", "codex"}
 	}
 	if defaultSandboxName == "" {
 		defaultSandboxName = sandboxes[0]

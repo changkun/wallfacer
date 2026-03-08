@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -87,6 +88,39 @@ func TestGetConfig_ReturnsInstructionsPath(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&resp)
 	if _, ok := resp["instructions_path"]; !ok {
 		t.Error("expected instructions_path in response")
+	}
+}
+
+func TestGetConfig_AlwaysIncludesCodexSandbox(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	raw, ok := resp["sandboxes"].([]any)
+	if !ok {
+		t.Fatalf("expected sandboxes array, got %T (%v)", resp["sandboxes"], resp["sandboxes"])
+	}
+	sandboxes := make([]string, 0, len(raw))
+	for _, v := range raw {
+		if s, ok := v.(string); ok {
+			sandboxes = append(sandboxes, s)
+		}
+	}
+	if !slices.Contains(sandboxes, "claude") {
+		t.Fatalf("expected sandboxes to include claude, got %v", sandboxes)
+	}
+	if !slices.Contains(sandboxes, "codex") {
+		t.Fatalf("expected sandboxes to include codex, got %v", sandboxes)
 	}
 }
 
