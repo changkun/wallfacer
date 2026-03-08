@@ -249,10 +249,10 @@ describe('buildCardActions refinement guard', () => {
     expect(html).toContain('card-action-start');
   });
 
-  it('Start button is enabled when refinement is done', () => {
+  it('Start button is disabled when refinement is done (requires review)', () => {
     const task = { id: 'abc', status: 'backlog', current_refinement: { status: 'done' } };
     const html = ctx.buildCardActions(task);
-    expect(html).not.toMatch(/disabled/);
+    expect(html).toContain('disabled');
     expect(html).toContain('card-action-start');
   });
 

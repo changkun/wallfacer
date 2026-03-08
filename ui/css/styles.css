@@ -1203,6 +1203,33 @@ pre.result-entry-body {
 
 }
 
+/* --- Refinement state badges on cards --- */
+.badge-refining {
+  background: #ede8f5;
+  color: #5c3d8a;
+  border: 1px solid #c8b8e880;
+  animation: badge-pulse 1.5s ease-in-out infinite;
+}
+.badge-refine-review {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc10760;
+}
+[data-theme="dark"] .badge-refining {
+  background: #2a1e3d;
+  color: #c0a0e8;
+  border-color: #4a306080;
+}
+[data-theme="dark"] .badge-refine-review {
+  background: #2a2000;
+  color: #d4a030;
+  border-color: #a0780040;
+}
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* --- Refine button on cards --- */
 .card-action-refine {
   background: #ede8f5;

@@ -273,6 +273,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/tasks/{id}/refine", withID(h.CancelRefinement))
 	mux.HandleFunc("GET /api/tasks/{id}/refine/logs", withID(h.StreamRefineLogs))
 	mux.HandleFunc("POST /api/tasks/{id}/refine/apply", withID(h.RefineApply))
+	mux.HandleFunc("POST /api/tasks/{id}/refine/dismiss", withID(h.RefineDismiss))
 	mux.HandleFunc("GET /api/tasks/{id}/oversight", withID(h.GetOversight))
 	mux.HandleFunc("GET /api/tasks/{id}/oversight/test", withID(h.GetTestOversight))
 	mux.HandleFunc("GET /api/tasks/{id}/spans", withID(h.GetTaskSpans))

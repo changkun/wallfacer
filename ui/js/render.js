@@ -263,9 +263,11 @@ function buildCardActions(t) {
   if (t.archived) return '';
   const parts = [];
   if (t.status === 'backlog') {
+    const refineStatus = t.current_refinement && t.current_refinement.status;
+    const refineBlocked = refineStatus === 'running' || refineStatus === 'done';
+    const refineTitle = refineStatus === 'running' ? 'Refinement in progress' : refineStatus === 'done' ? 'Review the refined prompt before starting' : '';
     parts.push(`<button class="card-action-btn card-action-refine" onclick="event.stopPropagation();openModal('${t.id}').then(()=>startRefinement())" title="Refine task with AI">&#9998; Refine</button>`);
-    const refining = t.current_refinement && t.current_refinement.status === 'running';
-    parts.push(`<button class="card-action-btn card-action-start" ${refining ? 'disabled title="Refinement in progress"' : `onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress"`}>&#9654; Start</button>`);
+    parts.push(`<button class="card-action-btn card-action-start" ${refineBlocked ? `disabled title="${refineTitle}"` : `onclick="event.stopPropagation();updateTaskStatus('${t.id}','in_progress')" title="Move to In Progress"`}>&#9654; Start</button>`);
   } else if (t.status === 'waiting') {
     parts.push(`<button class="card-action-btn card-action-test" onclick="event.stopPropagation();quickTestTask('${t.id}')" title="Run test agent">&#9654; Test</button>`);
     parts.push(`<button class="card-action-btn card-action-done" onclick="event.stopPropagation();quickDoneTask('${t.id}')" title="Mark done and commit">&#10003; Done</button>`);
@@ -314,6 +316,12 @@ function updateCard(card, t) {
   const blockedBadge = isBlocked
     ? `<span class="badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">\uD83D\uDD12</span>`
     : '';
+  const refineJobStatus = t.status === 'backlog' && t.current_refinement && t.current_refinement.status;
+  const refinementBadge = refineJobStatus === 'running'
+    ? `<span class="badge badge-refining" title="Refinement in progress \u2014 start disabled">refining\u2026</span>`
+    : refineJobStatus === 'done'
+    ? `<span class="badge badge-refine-review" title="Review refined prompt before starting">review prompt</span>`
+    : '';
   const testResultBadge = t.last_test_result === 'pass'
     ? `<span class="badge badge-test-pass" title="Verification passed">\u2713 verified</span>`
     : t.last_test_result === 'fail'
@@ -330,6 +338,7 @@ function updateCard(card, t) {
         ${blockedBadge}
         <span class="badge ${badgeClass}">${statusLabel}</span>
         ${showSpinner ? '<span class="spinner"></span>' : ''}
+        ${refinementBadge}
         ${testResultBadge}
       </div>
       <div class="flex items-center gap-1.5">

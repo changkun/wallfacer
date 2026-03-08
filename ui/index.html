@@ -690,11 +690,14 @@
             <pre id="refine-logs" class="logs-block" style="font-size:11px;"></pre>
           </div>
 
-          <!-- Done state: editable result + apply button -->
+          <!-- Done state: editable result + apply/dismiss buttons -->
           <div id="refine-result-section" class="hidden">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
               <span class="text-xs text-v-muted">Spec — edit before applying</span>
-              <button onclick="applyRefinement()" class="btn btn-accent">Apply as Prompt</button>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button id="refine-dismiss-btn" onclick="dismissRefinement()" class="hidden btn btn-ghost text-xs" title="Discard refined prompt and keep original">Dismiss</button>
+                <button onclick="applyRefinement()" class="btn btn-accent">Apply as Prompt</button>
+              </div>
             </div>
             <textarea id="refine-result-prompt" rows="22" class="field refine-prompt-textarea"></textarea>
           </div>

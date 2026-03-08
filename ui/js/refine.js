@@ -66,6 +66,10 @@ function updateRefineUI(task) {
       resultTA.value = job.result || '';
       resultTA.dataset.jobId = job.id;
     }
+
+    // Show the dismiss button so user can skip applying the refinement.
+    const dismissBtn = document.getElementById('refine-dismiss-btn');
+    if (dismissBtn) dismissBtn.classList.remove('hidden');
     return;
   }
 
@@ -88,6 +92,8 @@ function showRefineIdle(startBtn, cancelBtn, running, resultSec, errorSec) {
   if (idleDesc) idleDesc.classList.remove('hidden');
   const instrSec = document.getElementById('refine-instructions-section');
   if (instrSec) instrSec.classList.remove('hidden');
+  const dismissBtn = document.getElementById('refine-dismiss-btn');
+  if (dismissBtn) dismissBtn.classList.add('hidden');
 }
 
 // startRefinement is called by the "Start" button.
@@ -229,6 +235,8 @@ function resetRefinePanel() {
   if (instrTA) instrTA.value = '';
   const resultTA = document.getElementById('refine-result-prompt');
   if (resultTA) delete resultTA.dataset.jobId;
+  const dismissBtn = document.getElementById('refine-dismiss-btn');
+  if (dismissBtn) dismissBtn.classList.add('hidden');
   refineRawLogBuffer = '';
   refineLogsMode = 'pretty';
   ['pretty', 'raw'].forEach(function(m) {
@@ -237,6 +245,19 @@ function resetRefinePanel() {
   });
   const logsEl = document.getElementById('refine-logs');
   if (logsEl) logsEl.innerHTML = '';
+}
+
+// dismissRefinement clears the refinement result without applying it, allowing
+// the task to be started with the original prompt.
+async function dismissRefinement() {
+  if (!currentTaskId) return;
+  try {
+    await api(`/api/tasks/${currentTaskId}/refine/dismiss`, { method: 'POST' });
+    closeModal();
+    fetchTasks();
+  } catch (e) {
+    showAlert('Error dismissing refinement: ' + e.message);
+  }
 }
 
 // applyRefinement POSTs the (possibly edited) spec as the new task prompt.

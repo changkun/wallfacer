@@ -93,6 +93,39 @@ func (h *Handler) CancelRefinement(w http.ResponseWriter, r *http.Request, id uu
 	writeJSON(w, http.StatusOK, updated)
 }
 
+// RefineDissmiss clears a completed refinement result without applying it.
+// The task prompt remains unchanged; the CurrentRefinement field is cleared so
+// the task can be started normally again.
+// POST /api/tasks/{id}/refine/dismiss
+func (h *Handler) RefineDismiss(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	if task.Status != "backlog" {
+		http.Error(w, "task is not in backlog", http.StatusBadRequest)
+		return
+	}
+	if task.CurrentRefinement == nil || task.CurrentRefinement.Status != "done" {
+		http.Error(w, "no completed refinement to dismiss", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.store.DismissRefinement(r.Context(), id); err != nil {
+		logger.Handler.Error("dismiss refinement", "task", id, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	updated, err := h.store.GetTask(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
 // RefineApplyRequest is the body for POST /api/tasks/{id}/refine/apply.
 type RefineApplyRequest struct {
 	Prompt string `json:"prompt"`

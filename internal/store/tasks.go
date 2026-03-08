@@ -571,6 +571,25 @@ func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt strin
 	return nil
 }
 
+// DismissRefinement clears the current refinement job without changing the prompt.
+// Used when the user chooses not to apply the refined prompt.
+func (s *Store) DismissRefinement(_ context.Context, id uuid.UUID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.CurrentRefinement = nil
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify()
+	return nil
+}
+
 // clampTimeout ensures timeout stays in [1, 1440] minutes with a default of 60.
 func clampTimeout(v int) int {
 	if v <= 0 {
