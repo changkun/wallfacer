@@ -7,7 +7,7 @@ Wallfacer is a work management board that dispatches autonomous agents to isolat
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Browser (Vanilla JS + Tailwind + Sortable.js)              │
-│  5-column Kanban board — SSE for live updates               │
+│  5-column task board — SSE for live updates                 │
 └────────────────────────┬────────────────────────────────────┘
                          │ HTTP / SSE
 ┌────────────────────────▼────────────────────────────────────┐
@@ -89,7 +89,7 @@ wallfacer/
 │       └── subscribe.go     # Change notification channels (buffered, coalesced for SSE)
 │
 ├── ui/
-│   ├── index.html       # 5-column Kanban board layout
+│   ├── index.html       # 5-column task board layout
 │   ├── css/
 │   │   ├── styles.css       # Custom component styles
 │   │   └── tailwind.css     # Tailwind CSS build
@@ -154,7 +154,7 @@ wallfacer/
 
 ### CLI Subcommands
 
-- `wallfacer run [flags] [workspace ...]` — Start the Kanban server
+- `wallfacer run [flags] [workspace ...]` — Start the task board server
 - `wallfacer env` — Show configuration and env file status
 - `wallfacer exec <task-id-prefix> [-- command...]` — Attach to a running task container by UUID prefix; runs an interactive shell if no command is given
 

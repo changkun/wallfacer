@@ -103,7 +103,7 @@ No argument defaults to the current directory:
 ./wallfacer run
 ```
 
-The browser opens automatically to `http://localhost:8080`. You should see a Kanban board with five columns.
+The browser opens automatically to `http://localhost:8080`. You should see a task board with five columns.
 
 ## Verify the Setup
 

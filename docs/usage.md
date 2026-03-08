@@ -2,7 +2,7 @@
 
 ## Board Overview
 
-Wallfacer presents a five-column Kanban board. Every task card moves through these columns as it progresses:
+Wallfacer presents a five-column task board. Every task card moves through these columns as it progresses:
 
 | Column | Meaning |
 |---|---|

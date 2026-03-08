@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Wallfacer is a Kanban task runner for Claude Code. It provides a web UI where tasks are created as cards, dragged to "In Progress" to trigger Claude Code execution in an isolated sandbox container, and results are inspected when done.
+Wallfacer is a task-board runner for Claude Code. It provides a web UI where tasks are created as cards, dragged to "In Progress" to trigger Claude Code execution in an isolated sandbox container, and results are inspected when done.
 
 **Architecture:** Browser → Go server (:8080) → per-task directory storage (`data/<uuid>/`). The server runs natively on the host and launches ephemeral sandbox containers via `os/exec` (podman/docker). Each task gets its own git worktree for isolation.
 
@@ -62,13 +62,13 @@ Key server files:
 - `internal/instructions/` — Workspace-level CLAUDE.md management (`~/.wallfacer/instructions/`)
 - `internal/gitutil/` — Git utility operations (ops, repo, status, stash, worktree)
 - `internal/logger/` — Structured logging utilities
-- `ui/index.html` + `ui/js/` — Kanban board UI (vanilla JS + Tailwind CSS + Sortable.js)
+- `ui/index.html` + `ui/js/` — Task board UI (vanilla JS + Tailwind CSS + Sortable.js)
 
 ## API Routes
 
 See `docs/internals/orchestration.md` for full details.
 
-- `GET /` — Kanban UI (embedded static files)
+- `GET /` — Task board UI (embedded static files)
 - `GET /api/config` — Server config (workspaces, instructions path)
 - `PUT /api/config` — Update config
 - `GET /api/containers` — List running containers

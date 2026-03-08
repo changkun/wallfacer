@@ -6,7 +6,7 @@ function initSortable() {
 
   // Backlog: can reorder (sort) and drag out to In Progress
   Sortable.create(backlog, {
-    group: { name: 'kanban', pull: true, put: false },
+    group: { name: 'taskboard', pull: true, put: false },
     animation: 150,
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
@@ -22,7 +22,7 @@ function initSortable() {
 
   // In Progress: can receive from backlog
   Sortable.create(inProgress, {
-    group: { name: 'kanban', pull: false, put: true },
+    group: { name: 'taskboard', pull: false, put: true },
     animation: 150,
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
@@ -46,12 +46,12 @@ function initSortable() {
 
   // Waiting, Done, and Cancelled: no drag interaction
   Sortable.create(document.getElementById('col-waiting'), {
-    group: { name: 'kanban', pull: false, put: false },
+    group: { name: 'taskboard', pull: false, put: false },
     animation: 150,
     sort: false,
   });
   Sortable.create(document.getElementById('col-done'), {
-    group: { name: 'kanban', pull: false, put: false },
+    group: { name: 'taskboard', pull: false, put: false },
     animation: 150,
     sort: false,
   });

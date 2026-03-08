@@ -1,32 +1,49 @@
 # Wallfacer
 
-A work management board for autonomous AI agents. Create tasks as cards, drag them to execute in isolated sandbox containers, and collect results when the agents are done.
+> Build software with a self-operating engineering team.
 
-![](./images/overview-plain.png)
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Release](https://img.shields.io/github/v/release/changkun/wallfacer?display_name=tag&logo=github)](https://github.com/changkun/wallfacer/releases)
+[![License](https://img.shields.io/github/license/changkun/wallfacer)](./LICENSE)
+[![Stars](https://img.shields.io/github/stars/changkun/wallfacer?style=social)](https://github.com/changkun/wallfacer/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/changkun/wallfacer)](https://github.com/changkun/wallfacer/commits/main)
+
+Wallfacer is a task-board orchestration system for autonomous coding agents.  
+Create tasks, run them in isolated sandboxes, review diffs, and keep shipping with minimal manual overhead.
+
+![Wallfacer overview](./images/overview-plain.png)
+
+## Why Wallfacer
+
+- **Autonomous delivery loop**: backlog -> implementation -> testing -> review -> merge-ready output
+- **Self-development capability**: wallfacer can run tasks that improve wallfacer itself
+- **Isolation by default**: per-task containers and per-task git worktrees for safe parallelism
+- **Operator visibility**: live logs, traces, timelines, and usage/cost tracking
+- **Model/runtime flexibility**: support for Claude Code, Codex, and custom sandbox setups
 
 ## Features
 
-- **Kanban board** — visual task management with Backlog, In Progress, Waiting, Done, and Cancelled columns
-- **Isolated sandbox execution** — each task runs in an ephemeral Podman/Docker container; tasks can run in parallel without interfering
-- **Git worktree isolation** — every task gets its own git branch and worktree so concurrent changes never conflict
-- **Branch switching** — switch or create branches from the UI; all future tasks branch from the new HEAD
-- **Human-in-the-loop feedback** — when the agent needs clarification, the card moves to Waiting; submit feedback to resume execution
-- **Prompt refinement** — chat with an AI assistant to iteratively improve a task description before running it
-- **Test verification** — trigger a separate test agent on a waiting task to verify it meets acceptance criteria; records a pass/fail verdict
-- **Autopilot mode** — automatically promotes backlog tasks to In Progress as capacity becomes available (configurable concurrency limit)
-- **Auto commit and push** — completed task changes are automatically committed and pushed to the remote
-- **Worktree sync** — rebase waiting/failed task worktrees onto the latest default branch without losing progress
-- **Cross-task awareness** — each container receives a board manifest (`board.json`) so agents can see sibling tasks and avoid conflicts
-- **Live log streaming** — real-time container output via Server-Sent Events
-- **Task event timeline** — full audit trail of state changes, outputs, and feedback per task
-- **Usage tracking** — input/output tokens, cache hits, and cost accumulated across all turns per task
-- **Auto-generated titles** — task cards get short titles generated from the prompt
-- **Workspace instructions** — per-workspace `CLAUDE.md` managed from the UI; shared across all tasks for that workspace
-- **Multiple workspaces** — mount several project directories at once; agents can read and write across all of them
-- **Diff viewer** — inspect exactly what changed in each task before accepting it
-- **Container runtime auto-detection** — automatically finds Podman or Docker; both are fully supported
-- **Configurable API** — set token, base URL, and model from the UI; supports OAuth tokens, direct API keys, and any Anthropic-compatible endpoint
-- **Multiple agent runtimes** — bring your own sandbox image; built-in support for Claude Code and OpenAI Codex out of the box
+- **Task board**: Backlog, In Progress, Waiting, Done, and Cancelled columns
+- **Isolated sandbox execution**: each task runs in an ephemeral Podman/Docker container
+- **Git worktree isolation**: every task gets its own branch/worktree for conflict-safe concurrency
+- **Branch switching**: switch/create branches from UI; future tasks branch from current HEAD
+- **Human-in-the-loop feedback**: tasks pause in Waiting when clarification is needed
+- **Prompt refinement**: iterate task prompts with AI before execution
+- **Test verification**: run dedicated test agent on waiting tasks with pass/fail outcome
+- **Autopilot mode**: auto-promote backlog tasks when capacity is available
+- **Auto commit and push**: completed changes can be committed/pushed automatically
+- **Worktree sync**: rebase waiting/failed task worktrees on latest default branch
+- **Cross-task awareness**: each container gets `board.json` context to reduce overlap
+- **Live log streaming**: real-time output via SSE
+- **Task timeline**: full audit trail of state changes and feedback
+- **Usage tracking**: tokens, cache hits, and cost per task
+- **Auto-generated titles**: concise task names from prompts
+- **Workspace instructions**: per-workspace `CLAUDE.md` managed in UI
+- **Multiple workspaces**: mount several project dirs at once
+- **Diff viewer**: inspect exact changes before accepting
+- **Container runtime auto-detection**: Podman and Docker support
+- **Configurable API**: token/base URL/model from UI
+- **Multiple agent runtimes**: built-in Claude Code and OpenAI Codex support
 
 ## Quick Start
 
@@ -87,12 +104,20 @@ On first launch, `~/.wallfacer/.env` is created. Edit it to add your Claude cred
 
 ## Origin Story
 
-Wallfacer was built in about a week of spare time. The idea came from running AI agents on everyday tasks. After a while, the workflow settled into writing task descriptions, running the agent, reviewing the output, and repeating. The main bottleneck was watching execution and managing all these tasks, so a Kanban board felt like a natural fit.
+Wallfacer started as a practical response to a repeated workflow: write a task prompt, run an agent, inspect output, and do it again. The bottleneck was not coding speed, it was coordination and visibility across many concurrent agent tasks. A task board became the control surface.
 
-The first version was a Go server with a simple web UI. Tasks go into a backlog, get dragged to "in progress" to run an agent in a container, and move to "done" when finished. Git worktrees keep each task isolated so multiple can run at the same time without stepping on each other.
+The first version was a Go server with a minimal web UI. Tasks moved from backlog to in progress, executed in isolated containers, and landed in done when complete. Git worktrees provided branch-level isolation so many tasks could run in parallel without collisions.
 
-At some point Wallfacer was stable enough to develop itself — you can create a task card like "add retry logic," drag it to in progress, and let the agent implement the feature inside a Wallfacer sandbox. Most of the later features were built this way.
+Wallfacer is now beyond simple task execution. It has become a fully automated engineering team: planning and refinement, implementation, test verification, commit and sync workflows, and continuous operation controls such as autopilot.
+
+Just as importantly, automation is paired with oversight. Operators can inspect live logs, timelines, traces, diffs, and usage/cost signals before accepting results. The goal is not blind autonomy; it is high-throughput engineering with clear, auditable control.
+
+Most recent capabilities were developed by wallfacer itself, creating a compounding loop where the system continuously improves its own engineering process.
 
 ## License
 
 See [LICENSE](LICENSE).
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=changkun/wallfacer&type=Date)](https://star-history.com/#changkun/wallfacer&Date)

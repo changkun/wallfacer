@@ -40,7 +40,7 @@ func runServer(configDir string, args []string) {
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags] [workspace ...]\n\n")
-		fmt.Fprintf(os.Stderr, "Start the Kanban server and open the web UI.\n\n")
+		fmt.Fprintf(os.Stderr, "Start the task board server and open the web UI.\n\n")
 		fmt.Fprintf(os.Stderr, "Positional arguments:\n")
 		fmt.Fprintf(os.Stderr, "  workspace    directories to mount in the sandbox (default: current directory)\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
@@ -211,7 +211,7 @@ func runServer(configDir string, args []string) {
 func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Static files (Kanban UI).
+	// Static files (task board UI).
 	uiFS, _ := fsLib.Sub(uiFiles, "ui")
 	mux.Handle("GET /", http.FileServer(http.FS(uiFS)))
 

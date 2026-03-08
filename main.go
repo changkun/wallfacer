@@ -21,13 +21,13 @@ const fallbackSandboxImage = "wallfacer:latest"
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: wallfacer <command> [arguments]\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
-	fmt.Fprintf(os.Stderr, "  run          start the Kanban server\n")
+	fmt.Fprintf(os.Stderr, "  run          start the task board server\n")
 	fmt.Fprintf(os.Stderr, "  env          show configuration and env file status\n")
 	fmt.Fprintf(os.Stderr, "  exec         open a shell in a running task container\n")
 	fmt.Fprintf(os.Stderr, "\nThe exec subcommand attaches to a task container by its task UUID prefix:\n")
 	fmt.Fprintf(os.Stderr, "  wallfacer exec <task-id-prefix> [-- command...]\n")
 	fmt.Fprintf(os.Stderr, "  <task-id-prefix>  first 8+ hex characters of the task UUID\n")
-	fmt.Fprintf(os.Stderr, "                    (the UUID prefix shown on Kanban UI task cards)\n")
+	fmt.Fprintf(os.Stderr, "                    (the UUID prefix shown on task board UI task cards)\n")
 	fmt.Fprintf(os.Stderr, "  command defaults to bash; use '-- sh' if bash is not available.\n")
 	fmt.Fprintf(os.Stderr, "\nRun 'wallfacer <command> -help' for more information on a command.\n")
 }
