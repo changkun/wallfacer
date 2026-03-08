@@ -30,6 +30,7 @@ type Handler struct {
 	autosubmit   bool
 
 	diffCache *diffCache
+	fileIndex *fileIndex
 
 	// ideationEnabled controls whether brainstorm auto-repeat is active.
 	// ideationInterval is the delay between consecutive brainstorm runs (0 = run immediately on completion).
@@ -55,6 +56,7 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		workspaces:       workspaces,
 		envFile:          r.EnvFile(),
 		diffCache:        newDiffCache(),
+		fileIndex:        newFileIndex(),
 		startTime:        time.Now(),
 		ideationEnabled:  true,
 		ideationInterval: 60 * time.Minute,
