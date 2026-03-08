@@ -155,10 +155,10 @@ func TestCreateTask_Success(t *testing.T) {
 	}
 }
 
-// TestCreateTask_SetsModel verifies that model is stored on the task.
-func TestCreateTask_SetsModel(t *testing.T) {
+// TestCreateTask_RespectsSandbox verifies that sandbox preference is stored at creation.
+func TestCreateTask_RespectsSandbox(t *testing.T) {
 	h := newTestHandler(t)
-	body := `{"prompt": "build a thing", "model": "claude-opus-4-5"}`
+	body := `{"prompt": "build a thing", "sandbox": "codex"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.CreateTask(w, req)
@@ -167,9 +167,11 @@ func TestCreateTask_SetsModel(t *testing.T) {
 		t.Fatalf("expected 201, got %d", w.Code)
 	}
 	var task store.Task
-	json.NewDecoder(w.Body).Decode(&task)
-	if task.Model != "claude-opus-4-5" {
-		t.Errorf("expected model 'claude-opus-4-5', got %q", task.Model)
+	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if task.Sandbox != "codex" {
+		t.Errorf("expected sandbox 'codex', got %q", task.Sandbox)
 	}
 }
 

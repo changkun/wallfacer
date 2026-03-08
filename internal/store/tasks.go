@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -60,7 +61,7 @@ func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 // CreateTask creates a new task in backlog status and persists it.
 // kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
 // Optional tags are attached to the task for categorisation (e.g. "idea-agent").
-func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountWorktrees bool, model string, kind TaskKind, tags ...string) (*Task, error) {
+func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountWorktrees bool, _ string, kind TaskKind, tags ...string) (*Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -89,7 +90,6 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 		Turns:          0,
 		Timeout:        timeout,
 		MountWorktrees: mountWorktrees,
-		Model:          model,
 		Kind:           kind,
 		Tags:           tags,
 		Position:       newPosition,
@@ -328,7 +328,7 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 }
 
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, and mount_worktrees for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, model *string) error {
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, _ *string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -348,9 +348,24 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 	if mountWorktrees != nil {
 		t.MountWorktrees = *mountWorktrees
 	}
-	if model != nil {
-		t.Model = *model
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
 	}
+	s.notify(t, false)
+	return nil
+}
+
+// UpdateTaskSandbox stores the task sandbox selection (e.g. "claude" or "codex").
+func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sandbox string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.Sandbox = strings.TrimSpace(sandbox)
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
