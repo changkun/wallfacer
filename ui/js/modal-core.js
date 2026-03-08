@@ -378,6 +378,7 @@ async function openModal(id) {
 
   document.getElementById('modal').classList.remove('hidden');
   document.getElementById('modal').classList.add('flex');
+  history.replaceState(null, '', '#' + id);
 }
 
 function closeModal() {
@@ -419,4 +420,5 @@ function closeModal() {
   modalBody.style.gap = '';
   document.getElementById('modal').classList.add('hidden');
   document.getElementById('modal').classList.remove('flex');
+  history.replaceState(null, '', location.pathname + location.search);
 }

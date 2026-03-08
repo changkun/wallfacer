@@ -130,6 +130,9 @@ function setRightTab(tab) {
   } else {
     _stopTimelineRefresh();
   }
+  if (typeof currentTaskId !== 'undefined' && currentTaskId) {
+    history.replaceState(null, '', '#' + currentTaskId + '/' + tab);
+  }
 }
 
 function setLogsMode(mode) {
