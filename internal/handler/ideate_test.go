@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"changkun.de/wallfacer/internal/store"
 )
 
 // --- IdeationInterval state ---
@@ -247,5 +249,43 @@ func TestGetConfig_IdeationNextRunAbsentWhenNotPending(t *testing.T) {
 
 	if _, ok := resp["ideation_next_run"]; ok {
 		t.Error("expected ideation_next_run to be absent when no timer is pending")
+	}
+}
+
+func TestCreateIdeaAgentTask_PopulatesExecutionPrompt(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	_, err := h.store.CreateTask(ctx, "Refactor auth handler", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	existingDone, err := h.store.CreateTask(ctx, "Write tests for sync", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, existingDone.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	task := h.createIdeaAgentTask(ctx)
+	if task == nil {
+		t.Fatal("expected idea-agent task to be created")
+	}
+	created, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ExecutionPrompt == "" {
+		t.Fatal("expected execution prompt to be set immediately")
+	}
+	if created.ExecutionPrompt == ideaAgentPrompt {
+		t.Errorf("execution prompt should be synthesized, got fallback value %q", created.ExecutionPrompt)
+	}
+	if !strings.Contains(created.ExecutionPrompt, "Refactor auth handler") {
+		t.Errorf("expected execution prompt to include active task context, got %q", created.ExecutionPrompt)
+	}
+	if !strings.Contains(created.ExecutionPrompt, "Existing active tasks") {
+		t.Errorf("expected execution prompt to include active tasks section, got %q", created.ExecutionPrompt)
 	}
 }

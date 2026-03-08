@@ -214,6 +214,12 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 	return ideas, output, rawStdout, rawStderr, nil
 }
 
+// BuildIdeationPrompt exposes the ideation prompt construction used by the
+// idea-agent runner for testability and for handler-side task bootstrap.
+func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
+	return buildIdeationPrompt(existingTasks)
+}
+
 // buildIdeationContainerArgs builds the container run arguments for the
 // ideation agent. Workspaces are mounted read-only; no task label, no
 // worktrees, and no board context are used.

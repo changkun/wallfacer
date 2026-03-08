@@ -112,6 +112,29 @@ func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
 		logger.Handler.Warn("ideation: create idea-agent task", "error", err)
 		return nil
 	}
+
+	// Populate the execution prompt immediately so the UI can render the full,
+	// synthesized ideation prompt on the idea-agent card from the start.
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err == nil {
+		activeTasks := make([]store.Task, 0, len(tasks))
+		for _, t := range tasks {
+			if t.Kind == store.TaskKindIdeaAgent {
+				continue
+			}
+			switch t.Status {
+			case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
+				activeTasks = append(activeTasks, t)
+			}
+		}
+		ideationPrompt := h.runner.BuildIdeationPrompt(activeTasks)
+		if err := h.store.UpdateTaskExecutionPrompt(ctx, task.ID, ideationPrompt); err != nil {
+			logger.Handler.Warn("ideation: set execution prompt", "task", task.ID, "error", err)
+		}
+	} else {
+		logger.Handler.Warn("ideation: list tasks for execution prompt", "error", err)
+	}
+
 	// Set the title immediately so the card always shows the date/time.
 	title := "Brainstorm " + time.Now().Format("Jan 2, 2006 15:04")
 	h.store.UpdateTaskTitle(ctx, task.ID, title)
