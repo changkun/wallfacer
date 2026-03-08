@@ -496,6 +496,11 @@
             <textarea id="modal-edit-prompt" rows="6" class="field" style="font-family:monospace;font-size:12px;"></textarea>
           </div>
 
+          <!-- Start section (backlog only) -->
+          <div id="modal-start-section" class="hidden mb-4">
+            <button onclick="startTask()" class="btn btn-accent" style="width:100%;">&#9654; Start task</button>
+          </div>
+
           <!-- Resume section for failed tasks with session_id -->
           <div id="modal-resume-section" class="hidden mb-4">
             <h3 class="section-title">Resume Session</h3>
@@ -599,13 +604,6 @@
             <button onclick="unarchiveTask()" class="btn btn-ghost" style="border: 1px solid var(--border);">Unarchive task</button>
           </div>
 
-          <!-- Start section (backlog only) -->
-          <div id="modal-start-section" class="hidden mb-4">
-            <h3 class="section-title">Start Task</h3>
-            <p class="text-sm text-v-secondary mb-2">Move this task to In Progress and begin execution.</p>
-            <button onclick="startTask()" class="btn btn-accent">&#9654; Start task</button>
-          </div>
-
           <!-- Cancel section (backlog / in_progress / waiting / failed) -->
           <div id="modal-cancel-section" class="hidden mb-4">
             <h3 class="section-title">Cancel Task</h3>
@@ -660,9 +658,9 @@
         <div id="modal-backlog-right" class="hidden">
           <!-- Header: title + start/cancel controls -->
           <div class="flex items-center justify-between mb-3" style="border-bottom:1px solid var(--border);padding-bottom:10px;">
-            <h3 class="section-title" style="margin-bottom:0;">Refine with AI</h3>
+            <h3 class="section-title" style="margin-bottom:0;">Refine with AI <span class="text-xs text-v-muted" style="font-weight:normal;">(optional)</span></h3>
             <div style="display:flex;gap:8px;align-items:center;">
-              <button id="refine-start-btn" onclick="startRefinement()" class="btn btn-accent">Start</button>
+              <button id="refine-start-btn" onclick="startRefinement()" class="btn btn-ghost" style="border: 1px solid var(--border);">Refine</button>
               <button id="refine-cancel-btn" onclick="cancelRefinement()" class="hidden btn btn-ghost text-xs">Cancel</button>
             </div>
           </div>
