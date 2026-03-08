@@ -38,7 +38,7 @@ function highlightMatch(text, query) {
 
     input.addEventListener('input', function() {
       filterQuery = this.value;
-      if (clearBtn) clearBtn.style.display = filterQuery ? '' : 'none';
+      if (clearBtn) clearBtn.style.display = filterQuery ? 'block' : 'none';
       render();
     });
 

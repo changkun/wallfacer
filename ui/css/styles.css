@@ -1571,3 +1571,55 @@ mark.search-highlight {
 [data-theme="dark"] mark.search-highlight {
   background: rgba(255, 195, 0, 0.25);
 }
+
+/* --- Task search bar --- */
+.task-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.task-search-icon {
+  position: absolute;
+  left: 9px;
+  color: var(--text-muted);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+.task-search-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 6px 28px 6px 30px;
+  font-size: 13px;
+  outline: none;
+  width: 240px;
+  font-family: inherit;
+  transition: width 0.2s ease, border-color 0.15s;
+}
+.task-search-input:focus {
+  border-color: var(--accent);
+  width: 300px;
+}
+.task-search-input::placeholder {
+  color: var(--text-muted);
+}
+/* Hide webkit search cancel button since we have our own */
+.task-search-input::-webkit-search-cancel-button { display: none; }
+.task-search-clear {
+  display: none;
+  position: absolute;
+  right: 7px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.1s;
+}
+.task-search-clear:hover {
+  color: var(--text-secondary);
+}
