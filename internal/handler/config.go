@@ -107,11 +107,22 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 			defaultModel = cfg.DefaultModel
 			sandboxes = availableSandboxes(cfg)
 			defaultSandboxName = defaultSandbox(cfg)
+			sandboxUsable := map[string]bool{}
+			sandboxReasons := map[string]string{}
+			for _, sbox := range sandboxes {
+				ok, reason := h.sandboxUsable(sbox)
+				sandboxUsable[sbox] = ok
+				if reason != "" {
+					sandboxReasons[sbox] = reason
+				}
+			}
 			resp := map[string]any{
 				"workspaces":        h.runner.Workspaces(),
 				"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
 				"sandboxes":         sandboxes,
 				"default_sandbox":   defaultSandboxName,
+				"sandbox_usable":    sandboxUsable,
+				"sandbox_reasons":   sandboxReasons,
 				"activity_sandboxes": cfg.SandboxByActivity(),
 				"autopilot":         h.AutopilotEnabled(),
 				"autotest":          h.AutotestEnabled(),
@@ -140,6 +151,13 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
 		"sandboxes":         sandboxes,
 		"default_sandbox":   defaultSandboxName,
+		"sandbox_usable": map[string]bool{
+			"claude": true,
+			"codex":  false,
+		},
+		"sandbox_reasons": map[string]string{
+			"codex": "Codex unavailable: env file is not configured.",
+		},
 		"activity_sandboxes": map[string]string{},
 		"autopilot":         h.AutopilotEnabled(),
 		"autotest":          h.AutotestEnabled(),

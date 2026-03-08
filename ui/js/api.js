@@ -130,6 +130,8 @@ function toggleShowArchived() {
 let availableSandboxes = [];
 let defaultSandbox = '';
 let defaultSandboxByActivity = {};
+let sandboxUsable = {};
+let sandboxReasons = {};
 const SANDBOX_ACTIVITY_KEYS = ['implementation', 'testing', 'refinement', 'title', 'oversight', 'commit_message', 'idea_agent'];
 
 function sandboxDisplayName(id) {
@@ -164,10 +166,18 @@ function populateSandboxSelects() {
       if (!s) continue;
       var opt = document.createElement('option');
       opt.value = s;
-      opt.textContent = sandboxDisplayName(s);
+      var usable = sandboxUsable[s] !== false;
+      opt.textContent = sandboxDisplayName(s) + (usable ? '' : ' (unavailable)');
+      if (!usable) {
+        opt.disabled = true;
+        if (sandboxReasons[s]) opt.title = sandboxReasons[s];
+      }
       sel.appendChild(opt);
     }
     sel.value = current;
+    if (sel.selectedIndex === -1 || sel.value !== current) {
+      sel.value = '';
+    }
   }
 }
 
@@ -206,6 +216,8 @@ async function fetchConfig() {
     availableSandboxes = Array.isArray(cfg.sandboxes) ? cfg.sandboxes : [];
     defaultSandbox = cfg.default_sandbox || '';
     defaultSandboxByActivity = cfg.activity_sandboxes || {};
+    sandboxUsable = cfg.sandbox_usable || {};
+    sandboxReasons = cfg.sandbox_reasons || {};
     populateSandboxSelects();
     // Sync ideation toggle and spinner state.
     if (typeof updateIdeationConfig === 'function') updateIdeationConfig(cfg);

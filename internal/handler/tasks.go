@@ -72,6 +72,10 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "prompt is required", http.StatusBadRequest)
 		return
 	}
+	if err := h.validateRequestedSandboxes(req.Sandbox, req.SandboxByActivity); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	task, err := h.store.CreateTask(r.Context(), req.Prompt, req.Timeout, req.MountWorktrees, "", req.Kind)
 	if err != nil {
@@ -136,6 +140,18 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	// Allow editing prompt, timeout, fresh_start, mount_worktrees, and sandbox for backlog tasks.
 	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil) {
+		sandbox := task.Sandbox
+		if req.Sandbox != nil {
+			sandbox = *req.Sandbox
+		}
+		activity := task.SandboxByActivity
+		if req.SandboxByActivity != nil {
+			activity = *req.SandboxByActivity
+		}
+		if err := h.validateRequestedSandboxes(sandbox, activity); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		if err := h.store.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees, req.SandboxByActivity); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

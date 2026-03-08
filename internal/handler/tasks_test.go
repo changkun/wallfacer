@@ -157,7 +157,15 @@ func TestCreateTask_Success(t *testing.T) {
 
 // TestCreateTask_RespectsSandbox verifies that sandbox preference is stored at creation.
 func TestCreateTask_RespectsSandbox(t *testing.T) {
-	h := newTestHandler(t)
+	h, _ := newTestHandlerWithEnv(t)
+	reqEnv := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"openai_api_key":"sk-test"}`))
+	wEnv := httptest.NewRecorder()
+	h.UpdateEnvConfig(wEnv, reqEnv)
+	if wEnv.Code != http.StatusNoContent {
+		t.Fatalf("expected env update 204, got %d: %s", wEnv.Code, wEnv.Body.String())
+	}
+	h.setSandboxTestPassed("codex", true)
+
 	body := `{"prompt": "build a thing", "sandbox": "codex"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
 	w := httptest.NewRecorder()
@@ -172,6 +180,25 @@ func TestCreateTask_RespectsSandbox(t *testing.T) {
 	}
 	if task.Sandbox != "codex" {
 		t.Errorf("expected sandbox 'codex', got %q", task.Sandbox)
+	}
+}
+
+func TestCreateTask_RejectsCodexWhenUntested(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	reqEnv := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"openai_api_key":"sk-test"}`))
+	wEnv := httptest.NewRecorder()
+	h.UpdateEnvConfig(wEnv, reqEnv)
+	if wEnv.Code != http.StatusNoContent {
+		t.Fatalf("expected env update 204, got %d: %s", wEnv.Code, wEnv.Body.String())
+	}
+
+	body := `{"prompt": "build a thing", "sandbox": "codex"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
