@@ -46,6 +46,12 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		return // defer moves to "failed"
 	}
 
+	// Idea-tagged tasks store a short title in Prompt for card display and the
+	// full implementation text in ExecutionPrompt. Use the latter for the sandbox.
+	if task.ExecutionPrompt != "" {
+		prompt = task.ExecutionPrompt
+	}
+
 	// Idea-agent tasks use a special execution path: run the brainstorm agent,
 	// create backlog tasks from the results, then move directly to done.
 	if task.Kind == store.TaskKindIdeaAgent {
@@ -202,7 +208,11 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 					"result": "Session resume failed (empty output). Retrying with fresh session...",
 				})
 				sessionID = ""
-				prompt = task.Prompt
+				if task.ExecutionPrompt != "" {
+					prompt = task.ExecutionPrompt
+				} else {
+					prompt = task.Prompt
+				}
 				continue
 			}
 

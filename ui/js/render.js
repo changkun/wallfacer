@@ -401,7 +401,7 @@ function updateCard(card, t, rank) {
       <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
     </div>` : ''}
     ${isIdeaAgent ? `<div class="card-title">&#129504; ${highlightMatch(t.title || 'Brainstorm', filterQuery)}</div>` : t.title ? `<div class="card-title">${highlightMatch(t.title, filterQuery)}</div>` : ''}
-    <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${_cachedMarkdown(t.prompt)}</div>
+    ${(() => { const isIdeaTagged = !isIdeaAgent && t.tags && t.tags.includes('idea-agent') && t.title; return isIdeaTagged ? '' : `<div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${_cachedMarkdown(t.prompt)}</div>`; })()}
     ${t.status === 'failed' && t.result ? `
     <div class="card-error-reason">
       <span class="card-error-label">Error</span><span class="card-error-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>

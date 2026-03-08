@@ -171,6 +171,12 @@ type Task struct {
 	// tasks auto-created by the brainstorm agent).
 	Tags []string `json:"tags,omitempty"`
 
+	// ExecutionPrompt overrides Prompt when the sandbox agent is invoked.
+	// When set, the runner passes ExecutionPrompt to the container instead of
+	// Prompt, keeping Prompt as the short human-readable card label (typically
+	// just the task title for idea-tagged cards). Empty means use Prompt.
+	ExecutionPrompt string `json:"execution_prompt,omitempty"`
+
 	// DependsOn lists UUIDs of tasks that must all reach TaskStatusDone
 	// before this task is eligible for auto-promotion.
 	// Nil/empty means no dependencies (backward-compatible default).

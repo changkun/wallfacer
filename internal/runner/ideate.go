@@ -272,11 +272,11 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		}
 	}
 
-	// Generate the full ideation prompt (with randomly-picked domains) and
-	// persist it to the task so the UI shows what was actually sent to the
-	// sandbox, including which improvement categories were selected.
+	// Generate the full ideation prompt (with randomly-picked domains).
+	// Do NOT persist it to the task: the card keeps its original short
+	// description ("Analyzes the workspace…") rather than showing a wall
+	// of text that includes all existing task titles.
 	ideationPrompt := buildIdeationPrompt(activeTasks)
-	r.store.UpdateTaskBacklog(bgCtx, taskID, &ideationPrompt, nil, nil, nil, nil)
 
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Starting brainstorm agent — exploring workspaces to propose ideas...",
@@ -326,13 +326,21 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	})
 
 	// Create a backlog task for each proposed idea.
+	// The card's Prompt is set to the short title so the card stays concise.
+	// The full implementation text is stored in ExecutionPrompt and passed to
+	// the sandbox when the task actually runs.
 	var titles []string
 	for _, idea := range ideas {
 		tags := []string{"idea-agent"}
 		if idea.Category != "" {
 			tags = append(tags, idea.Category)
 		}
-		newTask, createErr := r.store.CreateTask(bgCtx, idea.Prompt, 60, false, "", store.TaskKindTask, tags...)
+		// Use the short title as the display prompt so the card shows a concise label.
+		cardPrompt := idea.Title
+		if cardPrompt == "" {
+			cardPrompt = idea.Prompt // fallback: use full prompt if title is missing
+		}
+		newTask, createErr := r.store.CreateTask(bgCtx, cardPrompt, 60, false, "", store.TaskKindTask, tags...)
 		if createErr != nil {
 			logger.Runner.Warn("ideation task: create idea task", "task", taskID, "error", createErr)
 			continue
@@ -343,6 +351,13 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		if idea.Title != "" {
 			r.store.UpdateTaskTitle(bgCtx, newTask.ID, idea.Title)
 			titles = append(titles, idea.Title)
+		}
+		// Store the full implementation prompt separately so the sandbox agent
+		// receives the complete details even though the card only shows the title.
+		if idea.Prompt != "" && idea.Prompt != cardPrompt {
+			if err := r.store.UpdateTaskExecutionPrompt(bgCtx, newTask.ID, idea.Prompt); err != nil {
+				logger.Runner.Warn("ideation task: set execution prompt", "task", newTask.ID, "error", err)
+			}
 		}
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Created idea task: %s", idea.Title),

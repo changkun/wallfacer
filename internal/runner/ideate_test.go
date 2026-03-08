@@ -315,10 +315,10 @@ func TestIdeationTaskOversightGeneratedAfterDone(t *testing.T) {
 	}
 }
 
-// TestIdeationTaskStoresActualPrompt verifies that the dynamically-generated
-// ideation prompt (with domain categories) is persisted to task.Prompt so that
-// the UI shows what was actually sent to the sandbox rather than the static
-// placeholder used when the task card is created.
+// TestIdeationTaskStoresActualPrompt verifies that the brainstorm agent card
+// keeps its short placeholder prompt (for clean card display) while the result
+// idea tasks store their full implementation text in ExecutionPrompt so the
+// sandbox receives the complete details when those tasks run.
 func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 	ideas := []IdeateResult{
 		{Title: "Add tests", Prompt: "Write unit tests for all handlers."},
@@ -340,19 +340,43 @@ func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 	}
 	r.Run(task.ID, "", "", false)
 
+	// The brainstorm agent card must keep its short placeholder — the full
+	// ideation prompt is not stored in Prompt so the card stays concise.
 	updated, err := s.GetTask(ctx, task.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Prompt == staticPlaceholder {
-		t.Fatal("task.Prompt was not updated: still contains the static placeholder instead of the actual ideation prompt")
+	if updated.Prompt != staticPlaceholder {
+		t.Fatalf("brainstorm card Prompt should remain as short placeholder, got: %q", updated.Prompt)
 	}
-	if updated.Prompt == "" {
-		t.Fatal("task.Prompt is empty after ideation run")
+
+	// Each created idea task must have its full implementation text in
+	// ExecutionPrompt and only a short title in Prompt.
+	allTasks, err := s.ListTasks(ctx, false)
+	if err != nil {
+		t.Fatal(err)
 	}
-	// The actual prompt must reference domain categories from the pool.
-	if !strings.Contains(updated.Prompt, "domain:") {
-		t.Fatalf("task.Prompt does not look like a generated ideation prompt: %q", updated.Prompt[:min(len(updated.Prompt), 200)])
+	var ideaTasks []store.Task
+	for _, tt := range allTasks {
+		if tt.ID != task.ID && tt.Kind != store.TaskKindIdeaAgent {
+			for _, tag := range tt.Tags {
+				if tag == "idea-agent" {
+					ideaTasks = append(ideaTasks, tt)
+					break
+				}
+			}
+		}
+	}
+	if len(ideaTasks) == 0 {
+		t.Fatal("no idea tasks were created")
+	}
+	for _, tt := range ideaTasks {
+		if tt.ExecutionPrompt == "" {
+			t.Errorf("idea task %q has empty ExecutionPrompt; full implementation text must be stored there", tt.Title)
+		}
+		if strings.Contains(tt.Prompt, "domain:") {
+			t.Errorf("idea task %q Prompt should not contain full ideation text; got: %q", tt.Title, tt.Prompt[:min(len(tt.Prompt), 200)])
+		}
 	}
 }
 
@@ -440,7 +464,9 @@ func TestBuildIdeationPromptUntitledTask(t *testing.T) {
 }
 
 // TestIdeationTaskPromptIncludesExistingTasks verifies that when sibling tasks
-// in backlog/in_progress/waiting exist, the stored ideation prompt references them.
+// in backlog/in_progress/waiting exist, the brainstorm card keeps its short
+// placeholder prompt (for clean card display) while the idea result tasks get
+// their full implementation text stored in ExecutionPrompt.
 func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 	ideas := []IdeateResult{
 		{Title: "Add tests", Prompt: "Write unit tests for all handlers."},
@@ -482,18 +508,42 @@ func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 	}
 	r.Run(brainstormTask.ID, "", "", false)
 
+	// The brainstorm card's stored Prompt must NOT be updated with the full
+	// ideation prompt — it keeps the short placeholder for clean card display.
 	updated, err := s.GetTask(ctx, brainstormTask.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(updated.Prompt, "Existing active tasks") {
-		t.Fatal("ideation prompt must include 'Existing active tasks' when sibling tasks exist")
+	if strings.Contains(updated.Prompt, "Existing active tasks") {
+		t.Fatal("brainstorm card Prompt must not contain full ideation text; card should stay concise")
 	}
-	if !strings.Contains(updated.Prompt, "Add dark mode") {
-		t.Fatalf("ideation prompt must reference the backlog task title; got: %q", updated.Prompt[:min(len(updated.Prompt), 400)])
+
+	// Verify that the buildIdeationPrompt function would include existing tasks
+	// context (covered by TestBuildIdeationPromptIncludesActiveTasks unit test).
+	// Here verify that created idea tasks store their full text in ExecutionPrompt.
+	allTasks, err := s.ListTasks(ctx, false)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(updated.Prompt, "Fix login bug") {
-		t.Fatalf("ideation prompt must reference the in_progress task title; got: %q", updated.Prompt[:min(len(updated.Prompt), 400)])
+	var ideaTasks []store.Task
+	for _, tt := range allTasks {
+		if tt.ID == brainstormTask.ID || tt.Kind == store.TaskKindIdeaAgent {
+			continue
+		}
+		for _, tag := range tt.Tags {
+			if tag == "idea-agent" {
+				ideaTasks = append(ideaTasks, tt)
+				break
+			}
+		}
+	}
+	if len(ideaTasks) == 0 {
+		t.Fatal("no idea tasks were created")
+	}
+	for _, tt := range ideaTasks {
+		if tt.ExecutionPrompt == "" {
+			t.Errorf("idea task %q has empty ExecutionPrompt; full implementation text must be stored there", tt.Title)
+		}
 	}
 }
 

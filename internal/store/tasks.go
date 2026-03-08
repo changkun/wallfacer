@@ -225,6 +225,26 @@ func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) e
 	return nil
 }
 
+// UpdateTaskExecutionPrompt sets the full execution prompt used at runtime.
+// When non-empty, the runner passes ExecutionPrompt to the sandbox instead of
+// Prompt, so Prompt can be kept as a short human-readable card label.
+func (s *Store) UpdateTaskExecutionPrompt(_ context.Context, id uuid.UUID, executionPrompt string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.ExecutionPrompt = executionPrompt
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
+}
+
 // UpdateTaskTurns updates only the turn counter for a task, leaving all other
 // fields (Result, SessionID, StopReason) unchanged. Used during test runs so
 // that the implementation agent's output is not overwritten.
