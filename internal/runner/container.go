@@ -373,68 +373,114 @@ func (r *Runner) runContainer(
 		logger.Runner.Warn("runContainer: get task", "task", taskID, "error", err)
 	}
 
-	args := r.buildContainerArgsForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, sandbox)
+	runWithSandbox := func(selectedSandbox string) (*agentOutput, []byte, []byte, error) {
+		args := r.buildContainerArgsForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
 
-	cmd := exec.CommandContext(ctx, r.command, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+		cmd := exec.CommandContext(ctx, r.command, args...)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
 
-	logger.Runner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "))
-	r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: activity})
-	runErr := cmd.Run()
-	r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: activity})
+		logger.Runner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: activity})
+		runErr := cmd.Run()
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: activity})
 
-	// If the context was cancelled or timed out, kill the container explicitly
-	// and return the context error rather than parsing potentially incomplete output.
-	if ctx.Err() != nil {
-		exec.Command(r.command, "kill", containerName).Run()
-		exec.Command(r.command, "rm", "-f", containerName).Run()
-		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container terminated: %w", ctx.Err())
-	}
-
-	raw := strings.TrimSpace(stdout.String())
-	if raw == "" {
-		if runErr != nil {
-			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				return nil, stdout.Bytes(), stderr.Bytes(),
-					fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), stderr.String())
-			}
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+		// If the context was cancelled or timed out, kill the container explicitly
+		// and return the context error rather than parsing potentially incomplete output.
+		if ctx.Err() != nil {
+			exec.Command(r.command, "kill", containerName).Run()
+			exec.Command(r.command, "rm", "-f", containerName).Run()
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container terminated: %w", ctx.Err())
 		}
-		stderrStr := strings.TrimSpace(stderr.String())
-		if stderrStr != "" {
+
+		raw := strings.TrimSpace(stdout.String())
+		if raw == "" {
+			if runErr != nil {
+				if exitErr, ok := runErr.(*exec.ExitError); ok {
+					return nil, stdout.Bytes(), stderr.Bytes(),
+						fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), stderr.String())
+				}
+				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+			}
+			stderrStr := strings.TrimSpace(stderr.String())
+			if stderrStr != "" {
+				return nil, stdout.Bytes(), stderr.Bytes(),
+					fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
+			}
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
+		}
+
+		output, parseErr := parseOutput(raw)
+		if parseErr != nil {
+			if runErr != nil {
+				if exitErr, ok := runErr.(*exec.ExitError); ok {
+					return nil, stdout.Bytes(), stderr.Bytes(),
+						fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
+							exitErr.ExitCode(), stderr.String(), truncate(raw, 500))
+				}
+				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+			}
 			return nil, stdout.Bytes(), stderr.Bytes(),
-				fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
+				fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
 		}
-		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
-	}
 
-	output, parseErr := parseOutput(raw)
-	if parseErr != nil {
+		// The agent may exit non-zero even when it produces a valid result.
 		if runErr != nil {
 			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				return nil, stdout.Bytes(), stderr.Bytes(),
-					fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
-						exitErr.ExitCode(), stderr.String(), truncate(raw, 500))
+				logger.Runner.Warn("container exited non-zero but produced valid output",
+					"task", taskID, "code", exitErr.ExitCode(), "sandbox", selectedSandbox)
+			} else {
+				logger.Runner.Warn("container error but produced valid output", "task", taskID, "error", runErr, "sandbox", selectedSandbox)
 			}
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
 		}
-		return nil, stdout.Bytes(), stderr.Bytes(),
-			fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
+
+		return output, stdout.Bytes(), stderr.Bytes(), nil
 	}
 
-	// The agent may exit non-zero even when it produces a valid result.
-	if runErr != nil {
-		if exitErr, ok := runErr.(*exec.ExitError); ok {
-			logger.Runner.Warn("container exited non-zero but produced valid output",
-				"task", taskID, "code", exitErr.ExitCode())
-		} else {
-			logger.Runner.Warn("container error but produced valid output", "task", taskID, "error", runErr)
+	output, rawStdout, rawStderr, err := runWithSandbox(sandbox)
+	if err != nil {
+		if strings.EqualFold(sandbox, "claude") && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
+			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
+				"task", taskID, "activity", activity)
+			return runWithSandbox("codex")
 		}
+		return nil, rawStdout, rawStderr, err
 	}
 
-	return output, stdout.Bytes(), stderr.Bytes(), nil
+	if strings.EqualFold(sandbox, "claude") && output != nil && output.IsError &&
+		isLikelyTokenLimitError(output.Result, output.Subtype) {
+		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
+			"task", taskID, "activity", activity)
+		return runWithSandbox("codex")
+	}
+
+	return output, rawStdout, rawStderr, nil
+}
+
+func isLikelyTokenLimitError(parts ...string) bool {
+	joined := strings.ToLower(strings.Join(parts, " "))
+	if joined == "" {
+		return false
+	}
+	needles := []string{
+		"token limit",
+		"rate limit",
+		"quota",
+		"insufficient credits",
+		"credit balance is too low",
+		"exceeded your current quota",
+		"too many tokens",
+		"maximum context length",
+		"context length",
+		"prompt is too long",
+	}
+	for _, n := range needles {
+		if strings.Contains(joined, n) {
+			return true
+		}
+	}
+	return false
 }
 
 // runGit is a helper to run a git command and discard output (best-effort).

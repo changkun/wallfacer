@@ -403,6 +403,26 @@ func TestRunContainerWithSessionID(t *testing.T) {
 	}
 }
 
+// TestRunContainerFallsBackToCodexOnTokenLimit verifies that when the initial
+// claude run reports a token/quota error, runContainer retries once using the
+// codex sandbox and returns the successful retry output.
+func TestRunContainerFallsBackToCodexOnTokenLimit(t *testing.T) {
+	tokenLimit := `{"result":"rate limit exceeded: token limit reached","session_id":"sess1","stop_reason":"end_turn","is_error":true,"total_cost_usd":0.001}`
+	cmd := fakeStatefulCmd(t, []string{tokenLimit, endTurnOutput})
+	r := runnerWithCmd(t, cmd)
+
+	out, _, _, err := r.runContainer(context.Background(), uuid.New(), "prompt", "", nil, "", nil, "", "")
+	if err != nil {
+		t.Fatalf("expected fallback success, got error: %v", err)
+	}
+	if out == nil || out.IsError {
+		t.Fatalf("expected non-error output after fallback, got: %+v", out)
+	}
+	if out.StopReason != "end_turn" {
+		t.Fatalf("expected stop_reason=end_turn after fallback, got %q", out.StopReason)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // buildContainerArgs extras (paths not covered by runner_test.go)
 // ---------------------------------------------------------------------------
