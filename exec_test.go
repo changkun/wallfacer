@@ -5,6 +5,53 @@ import (
 	"testing"
 )
 
+func TestParseExecConfig_TaskMode(t *testing.T) {
+	cfg, err := parseExecConfig([]string{"249e9c9c"}, []string{"bash"})
+	if err != nil {
+		t.Fatalf("parseExecConfig returned error: %v", err)
+	}
+	if cfg.mode != execModeTask {
+		t.Fatalf("expected task mode, got %v", cfg.mode)
+	}
+	if cfg.prefix != "249e9c9c" {
+		t.Fatalf("expected prefix 249e9c9c, got %q", cfg.prefix)
+	}
+}
+
+func TestParseExecConfig_SandboxMode(t *testing.T) {
+	cfg, err := parseExecConfig([]string{"--sandbox", "codex"}, []string{"bash"})
+	if err != nil {
+		t.Fatalf("parseExecConfig returned error: %v", err)
+	}
+	if cfg.mode != execModeSandbox {
+		t.Fatalf("expected sandbox mode, got %v", cfg.mode)
+	}
+	if cfg.sandbox != "codex" {
+		t.Fatalf("expected sandbox codex, got %q", cfg.sandbox)
+	}
+}
+
+func TestParseExecConfig_SandboxRejectsPrefix(t *testing.T) {
+	_, err := parseExecConfig([]string{"--sandbox", "claude", "249e9c9c"}, []string{"bash"})
+	if err == nil {
+		t.Fatal("expected error when prefix is provided in sandbox mode")
+	}
+}
+
+func TestResolveSandboxImageForExec_CodexFromWallfacer(t *testing.T) {
+	got := resolveSandboxImageForExec("wallfacer:latest", "codex")
+	if got != "wallfacer-codex:latest" {
+		t.Fatalf("expected wallfacer-codex:latest, got %q", got)
+	}
+}
+
+func TestResolveSandboxImageForExec_CodexKeepsUnrelatedImage(t *testing.T) {
+	got := resolveSandboxImageForExec("ghcr.io/acme/custom:tag", "codex")
+	if got != "ghcr.io/acme/custom:tag" {
+		t.Fatalf("expected unchanged image, got %q", got)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // resolveContainerByPrefix
 // ---------------------------------------------------------------------------

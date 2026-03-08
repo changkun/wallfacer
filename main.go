@@ -27,6 +27,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  exec         open a shell in a running task container\n")
 	fmt.Fprintf(os.Stderr, "\nThe exec subcommand attaches to a task container by its task UUID prefix:\n")
 	fmt.Fprintf(os.Stderr, "  wallfacer exec <task-id-prefix> [-- command...]\n")
+	fmt.Fprintf(os.Stderr, "  wallfacer exec --sandbox <claude|codex> [-- command...]\n")
 	fmt.Fprintf(os.Stderr, "  <task-id-prefix>  first 8+ hex characters of the task UUID\n")
 	fmt.Fprintf(os.Stderr, "                    (the UUID prefix shown on task board UI task cards)\n")
 	fmt.Fprintf(os.Stderr, "  command defaults to bash; use '-- sh' if bash is not available.\n")
