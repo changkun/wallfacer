@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // RebaseOntoDefault rebases the task branch (currently checked out in worktreePath)
@@ -82,6 +83,40 @@ func MergeBase(repoPath, ref1, ref2 string) (string, error) {
 		return "", fmt.Errorf("git merge-base %s %s in %s: %w", ref1, ref2, repoPath, err)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// BranchTipCommit returns the hash, subject, and author timestamp of the most
+// recent commit on branch in repoPath. It runs:
+//
+//	git -C <repoPath> log -1 --format=%H|%s|%aI <branch>
+//
+// Returns an error if the branch does not exist or the path is not a git repo.
+func BranchTipCommit(repoPath, branch string) (hash, subject string, ts time.Time, err error) {
+	out, cmdErr := exec.Command(
+		"git", "-C", repoPath,
+		"log", "-1", "--format=%H|%s|%aI", branch,
+	).Output()
+	if cmdErr != nil {
+		err = fmt.Errorf("git log in %s for branch %s: %w", repoPath, branch, cmdErr)
+		return
+	}
+	line := strings.TrimSpace(string(out))
+	if line == "" {
+		err = fmt.Errorf("branch %s not found or has no commits in %s", branch, repoPath)
+		return
+	}
+	parts := strings.SplitN(line, "|", 3)
+	if len(parts) != 3 {
+		err = fmt.Errorf("unexpected git log output %q in %s", line, repoPath)
+		return
+	}
+	hash = parts[0]
+	subject = parts[1]
+	ts, err = time.Parse(time.RFC3339, parts[2])
+	if err != nil {
+		err = fmt.Errorf("parse commit timestamp %q: %w", parts[2], err)
+	}
+	return
 }
 
 // IsConflictOutput reports whether git output text indicates a merge conflict.

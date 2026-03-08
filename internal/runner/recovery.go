@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -19,8 +20,10 @@ type ContainerLister interface {
 // RecoverOrphanedTasks reconciles in_progress/committing tasks on startup by
 // checking which containers are still running.
 //
-//   - committing tasks are always moved to failed; the commit pipeline cannot be
-//     safely resumed after a restart.
+//   - committing tasks: inspects each worktree's git branch to determine whether
+//     a commit landed after the task's UpdatedAt timestamp. If so, the commit
+//     pipeline completed before the crash and the task is promoted to done.
+//     Otherwise it is moved to failed.
 //   - in_progress tasks whose container is still running are left in_progress; a
 //     background goroutine monitors the container and moves the task to waiting
 //     once it stops.
@@ -49,16 +52,41 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 	for _, t := range tasks {
 		switch t.Status {
 		case "committing":
-			// Commit pipeline cannot be resumed — mark failed.
-			logger.Recovery.Warn("task was committing at startup, marking as failed",
-				"task", t.ID)
-			s.UpdateTaskStatus(ctx, t.ID, "failed")
-			s.InsertEvent(ctx, t.ID, store.EventTypeError, map[string]string{
-				"error": "server restarted during commit",
-			})
-			s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-				"from": "committing", "to": "failed",
-			})
+			// Check whether a commit landed after the last recorded state change.
+			// If so, the commit pipeline completed just before the crash and the
+			// task should be promoted to done rather than failed.
+			recovered := false
+			for repoPath := range t.WorktreePaths {
+				hash, _, commitTS, err := gitutil.BranchTipCommit(repoPath, t.BranchName)
+				if err != nil {
+					// Not a git repo or branch missing — skip.
+					continue
+				}
+				if commitTS.After(t.UpdatedAt) {
+					recovered = true
+					logger.Recovery.Warn("task was committing at startup; commit found after UpdatedAt, auto-recovering to done",
+						"task", t.ID, "repo", repoPath, "commit", hash, "recovered", true)
+					s.UpdateTaskStatus(ctx, t.ID, store.TaskStatusDone)
+					s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+						"result": "server restarted after commit completed; auto-recovered to done",
+					})
+					s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+						"from": "committing", "to": "done",
+					})
+					break
+				}
+			}
+			if !recovered {
+				logger.Recovery.Warn("task was committing at startup, marking as failed",
+					"task", t.ID, "recovered", false)
+				s.UpdateTaskStatus(ctx, t.ID, store.TaskStatusFailed)
+				s.InsertEvent(ctx, t.ID, store.EventTypeError, map[string]string{
+					"error": "server restarted during commit",
+				})
+				s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+					"from": "committing", "to": "failed",
+				})
+			}
 
 		case "in_progress":
 			if runningContainers[t.ID.String()] {
