@@ -263,3 +263,274 @@ describe('loadFlamegraph', () => {
     expect(() => ctx.loadFlamegraph('task-1')).not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// computePhaseRegions
+// ---------------------------------------------------------------------------
+describe('computePhaseRegions', () => {
+  let ctx;
+  beforeAll(() => {
+    ctx = makeFlameContext().ctx;
+  });
+
+  it('returns [] for empty phases array', () => {
+    const result = vm.runInContext(
+      '_flamegraph.computePhaseRegions([], 0, 1000)',
+      ctx
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('returns [] for null phases', () => {
+    const result = vm.runInContext(
+      '_flamegraph.computePhaseRegions(null, 0, 1000)',
+      ctx
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('single phase: startMs from timestamp, endMs from globalEndMs', () => {
+    const ts = new Date(500).toISOString();
+    const result = vm.runInContext(
+      `_flamegraph.computePhaseRegions([{timestamp: ${JSON.stringify(ts)}, title: 'Phase A', summary: 'S'}], 0, 2000)`,
+      ctx
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].startMs).toBe(500);
+    expect(result[0].endMs).toBe(2000);
+    expect(result[0].title).toBe('Phase A');
+  });
+
+  it('two phases: first ends at second start, second ends at globalEndMs', () => {
+    const ts0 = new Date(100).toISOString();
+    const ts1 = new Date(600).toISOString();
+    const result = vm.runInContext(
+      `_flamegraph.computePhaseRegions([
+        {timestamp: ${JSON.stringify(ts0)}, title: 'A', summary: ''},
+        {timestamp: ${JSON.stringify(ts1)}, title: 'B', summary: ''}
+      ], 0, 1000)`,
+      ctx
+    );
+    expect(result.length).toBe(2);
+    expect(result[0].startMs).toBe(100);
+    expect(result[0].endMs).toBe(600);
+    expect(result[1].startMs).toBe(600);
+    expect(result[1].endMs).toBe(1000);
+  });
+
+  it('phase timestamp before globalStartMs is clamped to globalStartMs', () => {
+    const ts = new Date(50).toISOString();
+    const result = vm.runInContext(
+      `_flamegraph.computePhaseRegions([{timestamp: ${JSON.stringify(ts)}, title: 'A', summary: ''}], 200, 1000)`,
+      ctx
+    );
+    expect(result.length).toBe(1);
+    expect(result[0].startMs).toBe(200);
+  });
+
+  it('phase timestamp equal to globalEndMs produces zero-width region that is skipped', () => {
+    const ts = new Date(1000).toISOString();
+    const result = vm.runInContext(
+      `_flamegraph.computePhaseRegions([{timestamp: ${JSON.stringify(ts)}, title: 'A', summary: ''}], 0, 1000)`,
+      ctx
+    );
+    // startMs would be clamped to 1000, endMs = globalEndMs = 1000 → zero width → skipped
+    expect(result.length).toBe(0);
+  });
+
+  it('same title input produces same hue value (deterministic via labelHue)', () => {
+    const ts = new Date(0).toISOString();
+    const r1 = vm.runInContext(
+      `_flamegraph.computePhaseRegions([{timestamp: ${JSON.stringify(ts)}, title: 'Foo', summary: ''}], 0, 1000)`,
+      ctx
+    );
+    const r2 = vm.runInContext(
+      `_flamegraph.computePhaseRegions([{timestamp: ${JSON.stringify(ts)}, title: 'Foo', summary: ''}], 0, 1000)`,
+      ctx
+    );
+    expect(r1[0].hue).toBe(r2[0].hue);
+  });
+
+  it('skips phase with invalid timestamp', () => {
+    const result = vm.runInContext(
+      `_flamegraph.computePhaseRegions([{timestamp: 'not-a-date', title: 'A', summary: ''}], 0, 1000)`,
+      ctx
+    );
+    expect(result.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findPhaseForSpan
+// ---------------------------------------------------------------------------
+describe('findPhaseForSpan', () => {
+  let ctx;
+  beforeAll(() => {
+    ctx = makeFlameContext().ctx;
+  });
+
+  it('returns null for empty phaseRegions', () => {
+    const result = vm.runInContext(
+      '_flamegraph.findPhaseForSpan({startMs: 500}, [])',
+      ctx
+    );
+    expect(result).toBeNull();
+  });
+
+  it('returns null when span startMs is before all region startMs values', () => {
+    const result = vm.runInContext(
+      `_flamegraph.findPhaseForSpan({startMs: 50}, [{startMs: 100, endMs: 500, title: 'A'}])`,
+      ctx
+    );
+    expect(result).toBeNull();
+  });
+
+  it('returns region when span startMs falls within a region', () => {
+    const result = vm.runInContext(
+      `_flamegraph.findPhaseForSpan({startMs: 300}, [{startMs: 100, endMs: 500, title: 'A'}])`,
+      ctx
+    );
+    expect(result).not.toBeNull();
+    expect(result.title).toBe('A');
+  });
+
+  it('inclusive lower boundary: span startMs === region startMs returns that region', () => {
+    const result = vm.runInContext(
+      `_flamegraph.findPhaseForSpan({startMs: 100}, [{startMs: 100, endMs: 500, title: 'A'}])`,
+      ctx
+    );
+    expect(result).not.toBeNull();
+    expect(result.title).toBe('A');
+  });
+
+  it('exclusive upper boundary: span startMs === region endMs returns next region or null', () => {
+    // span.startMs === first region endMs → falls into second region
+    const result = vm.runInContext(
+      `_flamegraph.findPhaseForSpan({startMs: 500}, [
+        {startMs: 100, endMs: 500, title: 'A'},
+        {startMs: 500, endMs: 900, title: 'B'}
+      ])`,
+      ctx
+    );
+    expect(result).not.toBeNull();
+    expect(result.title).toBe('B');
+  });
+
+  it('returns last region when span startMs is within it', () => {
+    const result = vm.runInContext(
+      `_flamegraph.findPhaseForSpan({startMs: 700}, [
+        {startMs: 100, endMs: 500, title: 'A'},
+        {startMs: 500, endMs: 900, title: 'B'}
+      ])`,
+      ctx
+    );
+    expect(result).not.toBeNull();
+    expect(result.title).toBe('B');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// loadFlamegraph — oversight integration tests
+// ---------------------------------------------------------------------------
+describe('loadFlamegraph oversight integration', () => {
+  const now = 1000000; // fixed ms epoch for determinism
+
+  const spansFixture = [
+    {
+      phase: 'impl',
+      label: 'run',
+      started_at: new Date(now).toISOString(),
+      ended_at: new Date(now + 500).toISOString(),
+      duration_ms: 500,
+    },
+  ];
+
+  const oversightReady = {
+    status: 'ready',
+    phases: [
+      {
+        timestamp: new Date(now).toISOString(),
+        title: 'Initial Exploration',
+        summary: 'Explored the codebase.',
+        tools_used: ['Read'],
+        commands: [],
+        actions: [],
+      },
+    ],
+  };
+
+  function makeDispatchFetch(spansResp, oversightResp) {
+    return (url) => {
+      if (typeof url === 'string' && url.includes('/oversight')) {
+        return Promise.resolve({ json: () => Promise.resolve(oversightResp) });
+      }
+      return Promise.resolve({ json: () => Promise.resolve(spansResp) });
+    };
+  }
+
+  it('renders phase band when oversight status is ready with phases', async () => {
+    const { ctx, container } = makeFlameContext(
+      makeDispatchFetch(spansFixture, oversightReady)
+    );
+    ctx.loadFlamegraph('task-1');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(container.innerHTML).toContain('Initial Exploration');
+  });
+
+  it('does not render phase band when oversight status is pending', async () => {
+    const { ctx, container } = makeFlameContext(
+      makeDispatchFetch(spansFixture, { status: 'pending', phases: [] })
+    );
+    ctx.loadFlamegraph('task-1');
+    await new Promise((r) => setTimeout(r, 0));
+    // Should still render spans but no phase band content
+    expect(container.innerHTML).not.toContain('Initial Exploration');
+    expect(container.innerHTML).toContain('impl:run');
+  });
+
+  it('renders normally when oversight fetch rejects', async () => {
+    const fetch = (url) => {
+      if (typeof url === 'string' && url.includes('/oversight')) {
+        return Promise.reject(new Error('network error'));
+      }
+      return Promise.resolve({ json: () => Promise.resolve(spansFixture) });
+    };
+    const { ctx, container } = makeFlameContext(fetch);
+    ctx.loadFlamegraph('task-1');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(container.innerHTML).toContain('impl:run');
+    expect(container.innerHTML).not.toContain('Initial Exploration');
+  });
+
+  it('shows oversight phase title in detail table Oversight Phase column', async () => {
+    const { ctx, container } = makeFlameContext(
+      makeDispatchFetch(spansFixture, oversightReady)
+    );
+    ctx.loadFlamegraph('task-1');
+    await new Promise((r) => setTimeout(r, 0));
+    // The table should include the Oversight Phase header
+    expect(container.innerHTML).toContain('Oversight Phase');
+    // And the phase title in a td
+    expect(container.innerHTML).toContain('Initial Exploration');
+  });
+
+  it('shows dash in Oversight Phase cell when no matching phase for span', async () => {
+    // Span starts before any oversight phase
+    const earlySpans = [
+      {
+        phase: 'impl',
+        label: 'early',
+        started_at: new Date(now - 5000).toISOString(),
+        ended_at: new Date(now - 4000).toISOString(),
+        duration_ms: 1000,
+      },
+    ];
+    // Oversight phase starts at 'now', so the early span has no matching phase
+    const { ctx, container } = makeFlameContext(
+      makeDispatchFetch(earlySpans, oversightReady)
+    );
+    ctx.loadFlamegraph('task-1');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(container.innerHTML).toContain('&mdash;');
+  });
+});
