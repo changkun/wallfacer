@@ -28,6 +28,7 @@ function makeContext(overrides = {}) {
       setItem: vi.fn(),
     },
     location: { hash: '' },
+    fetch: overrides.fetch,
     showAlert: vi.fn(),
     openModal: vi.fn().mockResolvedValue(undefined),
     setRightTab: vi.fn(),
@@ -111,7 +112,8 @@ describe('_handleInitialHash', () => {
     loadScript(ctx, 'state.js');
     loadScript(ctx, 'api.js');
 
-    ctx.tasks = [{ id: '11111111-1111-1111-1111-111111111111', title: 'Task' }];
+    vm.runInContext('tasks = [{ id: "11111111-1111-1111-1111-111111111111", title: "Task" }]; _hashHandled = false;', ctx);
+
     ctx.location.hash = '#11111111-1111-1111-1111-111111111111/testing';
     await ctx._handleInitialHash();
 
@@ -147,27 +149,34 @@ describe('fetchConfig', () => {
     const autopilotToggle = makeInput(false);
     const autotestToggle = makeInput(false);
     const autosubmitToggle = makeInput(false);
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => cfg,
+      text: async () => '',
+    });
     const ctx = makeContext({
       elements: [
         ['autopilot-toggle', autopilotToggle],
         ['autotest-toggle', autotestToggle],
         ['autosubmit-toggle', autosubmitToggle],
       ],
-      api: vi.fn().mockResolvedValue(cfg),
+      fetch,
     });
     loadScript(ctx, 'state.js');
     loadScript(ctx, 'api.js');
+    const populateSandboxByActivitySpy = vi.spyOn(ctx, 'populateSandboxSelects');
 
     await ctx.fetchConfig();
 
     expect(autopilotToggle.checked).toBe(true);
     expect(autotestToggle.checked).toBe(true);
     expect(autosubmitToggle.checked).toBe(false);
-    expect(ctx.populateSandboxSelects).toHaveBeenCalled();
+    expect(populateSandboxByActivitySpy).toHaveBeenCalled();
     expect(ctx.updateIdeationConfig).toHaveBeenCalledWith(cfg);
-    expect(ctx.autopilot).toBe(true);
-    expect(ctx.autotest).toBe(true);
-    expect(ctx.autosubmit).toBe(false);
+    expect(vm.runInContext('autopilot', ctx)).toBe(true);
+    expect(vm.runInContext('autotest', ctx)).toBe(true);
+    expect(vm.runInContext('autosubmit', ctx)).toBe(false);
   });
 });
 

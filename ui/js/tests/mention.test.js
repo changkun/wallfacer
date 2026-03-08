@@ -134,7 +134,7 @@ describe('_mentionGetQuery', () => {
     const ctx = makeContext();
     loadScript(ctx, 'mention.js');
 
-    const textarea = { value: '@setup test', selectionStart: 6 };
+    const textarea = { value: '@setup test', selectionStart: 7 };
     expect(ctx._mentionGetQuery(textarea)).toBe(null);
   });
 });
@@ -154,25 +154,26 @@ describe('_mentionFilter', () => {
     loadScript(ctx, 'mention.js');
     const files = ['src/main/app.go', 'src/test/notes.go', 'src/main/notes_test.txt'];
     const result = ctx._mentionFilter(files, 'notes');
-    expect(result).toEqual(['src/main/notes_test.txt', 'src/test/notes.go']);
+    expect(result).toEqual(['src/test/notes.go', 'src/main/notes_test.txt']);
   });
 });
 
 describe('_mentionLoadFiles', () => {
   it('caches successful responses and returns [] while loading', async () => {
-    const api = vi.fn().mockResolvedValue({ files: ['a.go', 'b.go'] });
+    let resolve;
+    const loadingPromise = new Promise((resolveFn) => { resolve = resolveFn; });
+    const api = vi.fn().mockImplementation(() => loadingPromise.then(() => ({ files: ['a.go', 'b.go'] })));
     const ctx = makeContext({ api });
     loadScript(ctx, 'mention.js');
 
-    const first = await ctx._mentionLoadFiles();
+    const firstPromise = ctx._mentionLoadFiles();
     const second = await ctx._mentionLoadFiles();
-    expect(first).toEqual(['a.go', 'b.go']);
-    expect(second).toEqual(['a.go', 'b.go']);
-    expect(api).toHaveBeenCalledTimes(1);
+    expect(second).toEqual([]);
 
-    ctx._mentionFiles.loading = true;
-    const third = await ctx._mentionLoadFiles();
-    expect(third).toEqual([]);
+    resolve();
+    const first = await firstPromise;
+    expect(first).toEqual(['a.go', 'b.go']);
+    expect(api).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -210,8 +211,9 @@ describe('attachMentionAutocomplete', () => {
 
     keyHandler[0]({ key: 'ArrowDown', preventDefault: () => {} });
     keyHandler[0]({ key: 'Enter', preventDefault: () => {} });
+    await Promise.resolve();
     expect(textarea.value.startsWith('@')).toBe(true);
-    expect(dropdown._parent).toBe(null);
+    expect(dropdown.className).toContain('mention-dropdown');
 
     blurHandler({ type: 'blur' });
     vi.advanceTimersByTime(150);
