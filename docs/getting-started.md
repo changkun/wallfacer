@@ -121,8 +121,8 @@ All configuration lives in `~/.wallfacer/.env`. The server re-reads this file be
 | `ANTHROPIC_API_KEY` | one of these two | API key from console.anthropic.com |
 | `ANTHROPIC_BASE_URL` | no | Custom API endpoint (proxy, alternative provider). When set, Wallfacer queries `{base_url}/v1/models` to populate the model selection dropdown |
 | `ANTHROPIC_AUTH_TOKEN` | no | Bearer token for LLM gateway proxy authentication |
-| `WALLFACER_DEFAULT_MODEL` | no | Default model passed to task containers; omit to use the Claude Code default |
-| `WALLFACER_TITLE_MODEL` | no | Model for background title generation; falls back to `WALLFACER_DEFAULT_MODEL` |
+| `CLAUDE_DEFAULT_MODEL` | no | Default model passed to task containers; omit to use the Claude Code default |
+| `CLAUDE_TITLE_MODEL` | no | Model for background title generation; falls back to `CLAUDE_DEFAULT_MODEL` |
 | `WALLFACER_MAX_PARALLEL` | no | Maximum number of tasks that run concurrently in autopilot mode (default: 5) |
 
 ### OpenAI Codex Variables (Optional)

@@ -155,8 +155,8 @@ At least one authentication variable must be set (Claude or Codex):
 | `ANTHROPIC_API_KEY` | one of these two | Direct API key from console.anthropic.com |
 | `ANTHROPIC_AUTH_TOKEN` | no | Bearer token for LLM gateway proxy authentication |
 | `ANTHROPIC_BASE_URL` | no | Custom API endpoint; defaults to `https://api.anthropic.com`. When set, the server queries `{base_url}/v1/models` to populate the model selection dropdown |
-| `WALLFACER_DEFAULT_MODEL` | no | Default model passed as `--model` to task containers; omit to use the Claude Code default |
-| `WALLFACER_TITLE_MODEL` | no | Model used for background title generation; falls back to `WALLFACER_DEFAULT_MODEL` if unset |
+| `CLAUDE_DEFAULT_MODEL` | no | Default model passed as `--model` to task containers; omit to use the Claude Code default |
+| `CLAUDE_TITLE_MODEL` | no | Model used for background title generation; falls back to `CLAUDE_DEFAULT_MODEL` if unset |
 | `WALLFACER_MAX_PARALLEL` | no | Maximum number of concurrently running tasks when autopilot is enabled (default: 5) |
 
 When both `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY` are set, the OAuth token takes precedence. This is Claude Code CLI behavior — wallfacer simply passes both variables through to the container via `--env-file`.

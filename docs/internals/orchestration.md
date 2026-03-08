@@ -97,7 +97,7 @@ Each turn launches an ephemeral container via the configured runtime (Podman or 
 
 - `--rm` — container is destroyed on exit; no state leaks between tasks
 - `--env-file` — injects `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`), `ANTHROPIC_BASE_URL`, and any other variables from `~/.wallfacer/.env` into the container environment
-- `--model` — per-task model takes priority; falls back to `WALLFACER_DEFAULT_MODEL` from the env file; the server re-reads the file on every container launch so changes take effect immediately without a restart
+- `--model` — per-task model takes priority; falls back to `CLAUDE_DEFAULT_MODEL` from the env file; the server re-reads the file on every container launch so changes take effect immediately without a restart
 - `--resume` — omitted on the first turn or when `FreshStart` is set
 - Output is captured as NDJSON, parsed, and saved to disk
 - Stderr is saved separately if non-empty
