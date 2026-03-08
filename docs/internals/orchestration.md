@@ -37,7 +37,7 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 | `POST /api/tasks/{id}/unarchive` | Restore archived task |
 | `POST /api/tasks/archive-done` | Archive all done and cancelled tasks in one operation |
 | `GET /api/tasks/stream` | SSE: push task list on any state change |
-| `GET /api/tasks/{id}/events` | Return full event trace log |
+| `GET /api/tasks/{id}/events` | Return event trace log; supports cursor pagination (`after`, `limit`) and type filtering (`types`); see [Event Pagination](#event-pagination) |
 | `GET /api/tasks/{id}/diff` | Git diff for task worktrees vs default branch |
 | `GET /api/tasks/{id}/outputs/{filename}` | Serve raw turn output file |
 | `GET /api/tasks/{id}/logs` | SSE: stream live container logs (`podman/docker logs -f`) |
@@ -168,6 +168,64 @@ Live container logs use a different mechanism: `GET /api/tasks/{id}/logs` opens 
 - After every write, `notify()` is called to wake SSE subscribers
 
 Event traces are append-only. Each event is written as a separate file (`traces/NNNN.json`) using the same atomic write pattern. Files are never modified after creation.
+
+## Event Pagination
+
+`GET /api/tasks/{id}/events` supports two modes:
+
+**No query params (backward-compatible)** — returns the full event list as a plain JSON array:
+
+```json
+[{"id": 1, "event_type": "state_change", ...}, ...]
+```
+
+**With any of `after`, `limit`, or `types` present** — returns a paginated envelope:
+
+```json
+{
+  "events": [...],
+  "next_after": 42,
+  "has_more": true,
+  "total_filtered": 150
+}
+```
+
+### Query Params
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `after` | int64 | `0` | Exclusive event ID cursor. Only events with `id > after` are returned. Use `next_after` from the previous response to advance the cursor. |
+| `limit` | int | `200` | Maximum events per page. Must be ≥ 1; values > 1000 are silently capped to 1000. |
+| `types` | string | (all) | Comma-separated list of event types to include. Unknown types return 400. Valid values: `state_change`, `output`, `error`, `system`, `feedback`, `span_start`, `span_end`. |
+
+### Response Fields
+
+| Field | Description |
+|---|---|
+| `events` | The current page of events, ordered by ascending ID. |
+| `next_after` | The ID of the last event in this page; pass as `after` to get the next page. `0` when the page is empty. |
+| `has_more` | `true` if there are additional events beyond this page. |
+| `total_filtered` | Total number of events matching the query (respecting `after` and `types` but ignoring `limit`). Useful for progress display. |
+
+### Pagination Walk Example
+
+```
+GET /api/tasks/{id}/events?limit=100&types=output
+→ { events: [...100 items], next_after: 347, has_more: true, total_filtered: 250 }
+
+GET /api/tasks/{id}/events?after=347&limit=100&types=output
+→ { events: [...100 items], next_after: 503, has_more: true, total_filtered: 250 }
+
+GET /api/tasks/{id}/events?after=503&limit=100&types=output
+→ { events: [...50 items], next_after: 553, has_more: false, total_filtered: 250 }
+```
+
+### Validation
+
+The handler returns 400 for:
+- `after` that is not a non-negative integer
+- `limit` that is not a positive integer (including 0)
+- Any unrecognised value in `types`
 
 ## Token Tracking & Cost
 

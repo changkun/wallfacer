@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -395,6 +396,8 @@ func TestDeleteTask_Success(t *testing.T) {
 	}
 }
 
+// --- GetEvents backward-compatibility and pagination tests ---
+
 // TestGetEvents_Empty verifies that no events returns an empty array.
 func TestGetEvents_Empty(t *testing.T) {
 	h := newTestHandler(t)
@@ -448,6 +451,357 @@ func TestGetEvents_ContainsInserted(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected state_change event")
+	}
+}
+
+// TestGetEvents_BackwardCompatNoParams verifies that calling without params returns
+// a plain JSON array (not a paged envelope), preserving backward compatibility.
+func TestGetEvents_BackwardCompatNoParams(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, "hello")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/events", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	// Must decode as a plain array, not an object.
+	var events []store.TaskEvent
+	if err := json.NewDecoder(w.Body).Decode(&events); err != nil {
+		t.Fatalf("expected plain JSON array: %v", err)
+	}
+	if len(events) == 0 {
+		t.Error("expected at least one event")
+	}
+}
+
+// TestGetEvents_PagedEnvelopeWithLimitParam verifies that providing limit= returns
+// the paginated envelope shape.
+func TestGetEvents_PagedEnvelopeWithLimitParam(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	for i := 0; i < 5; i++ {
+		h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/events?limit=3", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp eventsPageResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode envelope: %v", err)
+	}
+	if len(resp.Events) != 3 {
+		t.Errorf("expected 3 events in page, got %d", len(resp.Events))
+	}
+	if !resp.HasMore {
+		t.Error("expected HasMore=true")
+	}
+}
+
+// TestGetEvents_PagedAfterCursor verifies that the after= cursor excludes earlier events.
+func TestGetEvents_PagedAfterCursor(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	for i := 0; i < 5; i++ {
+		h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
+	}
+
+	// Get first page.
+	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/events?limit=3", nil)
+	w1 := httptest.NewRecorder()
+	h.GetEvents(w1, req1, task.ID)
+
+	var page1 eventsPageResponse
+	json.NewDecoder(w1.Body).Decode(&page1)
+
+	// Use cursor from page1 to get page2.
+	url2 := fmt.Sprintf("/api/tasks/%s/events?after=%d&limit=10", task.ID.String(), page1.NextAfter)
+	req2 := httptest.NewRequest(http.MethodGet, url2, nil)
+	w2 := httptest.NewRecorder()
+	h.GetEvents(w2, req2, task.ID)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200 for page2, got %d", w2.Code)
+	}
+	var page2 eventsPageResponse
+	json.NewDecoder(w2.Body).Decode(&page2)
+
+	// All events in page2 must have IDs strictly greater than the cursor.
+	for _, ev := range page2.Events {
+		if ev.ID <= page1.NextAfter {
+			t.Errorf("event ID %d should be > cursor %d", ev.ID, page1.NextAfter)
+		}
+	}
+	if page2.HasMore {
+		t.Error("expected HasMore=false for last page")
+	}
+}
+
+// TestGetEvents_TypeFilter verifies that the types= param filters by event type.
+func TestGetEvents_TypeFilter(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, "state")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, "out1")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeError, "err")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, "out2")
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?types=output", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp eventsPageResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	for _, ev := range resp.Events {
+		if ev.EventType != store.EventTypeOutput {
+			t.Errorf("unexpected event type %q, want output", ev.EventType)
+		}
+	}
+	if resp.TotalFiltered != 2 {
+		t.Errorf("TotalFiltered = %d, want 2", resp.TotalFiltered)
+	}
+}
+
+// TestGetEvents_MultiTypeFilter verifies comma-separated types= filter.
+func TestGetEvents_MultiTypeFilter(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, "state")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, "out")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeError, "err")
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?types=state_change,error", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp eventsPageResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	if resp.TotalFiltered != 2 {
+		t.Errorf("TotalFiltered = %d, want 2", resp.TotalFiltered)
+	}
+	for _, ev := range resp.Events {
+		if ev.EventType != store.EventTypeStateChange && ev.EventType != store.EventTypeError {
+			t.Errorf("unexpected event type %q", ev.EventType)
+		}
+	}
+}
+
+// TestGetEvents_BadAfterParam verifies 400 for a non-integer after= value.
+func TestGetEvents_BadAfterParam(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?after=notanumber", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+// TestGetEvents_NegativeAfterParam verifies 400 for a negative after= value.
+func TestGetEvents_NegativeAfterParam(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?after=-1", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for negative after, got %d", w.Code)
+	}
+}
+
+// TestGetEvents_BadLimitParam verifies 400 for a non-integer limit= value.
+func TestGetEvents_BadLimitParam(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?limit=abc", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+// TestGetEvents_ZeroLimitParam verifies 400 for limit=0.
+func TestGetEvents_ZeroLimitParam(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?limit=0", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for limit=0, got %d", w.Code)
+	}
+}
+
+// TestGetEvents_LimitCappedAt1000 verifies that limit > 1000 is accepted but capped.
+func TestGetEvents_LimitCappedAt1000(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	for i := 0; i < 3; i++ {
+		h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
+	}
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?limit=9999", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	// Should succeed (limit is silently capped, not rejected).
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp eventsPageResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if len(resp.Events) == 0 {
+		t.Error("expected some events")
+	}
+}
+
+// TestGetEvents_UnknownTypeParam verifies 400 for an unknown event type.
+func TestGetEvents_UnknownTypeParam(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?types=bogus_type", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown type, got %d", w.Code)
+	}
+}
+
+// TestGetEvents_AllValidTypes verifies that all known event types are accepted.
+func TestGetEvents_AllValidTypes(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+
+	allTypes := "state_change,output,error,system,feedback,span_start,span_end"
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?types="+allTypes, nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for all valid types, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestGetEvents_EmptyTypesParamNoFilter verifies that ?types= (empty) is treated
+// as no type filter (returns all event types).
+func TestGetEvents_EmptyTypesParamNoFilter(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, "s")
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, "o")
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?types=", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp eventsPageResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.TotalFiltered < 2 {
+		t.Errorf("expected at least 2 events (no type filter), got TotalFiltered=%d", resp.TotalFiltered)
+	}
+}
+
+// TestGetEvents_HasMoreFalseWhenAllFit verifies HasMore=false when results fit in one page.
+func TestGetEvents_HasMoreFalseWhenAllFit(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	for i := 0; i < 3; i++ {
+		h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
+	}
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?limit=100", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	var resp eventsPageResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.HasMore {
+		t.Error("expected HasMore=false when all events fit in one page")
+	}
+}
+
+// TestGetEvents_TotalFilteredAccountsForTypeFilter verifies TotalFiltered counts
+// only type-matching events, not all events.
+func TestGetEvents_TotalFilteredAccountsForTypeFilter(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	for i := 0; i < 6; i++ {
+		h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, i)
+	}
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeError, "e")
+
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/tasks/"+task.ID.String()+"/events?types=output&limit=2", nil)
+	w := httptest.NewRecorder()
+	h.GetEvents(w, req, task.ID)
+
+	var resp eventsPageResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if len(resp.Events) != 2 {
+		t.Errorf("expected 2 events in page, got %d", len(resp.Events))
+	}
+	if resp.TotalFiltered != 6 {
+		t.Errorf("TotalFiltered = %d, want 6 (output-only count)", resp.TotalFiltered)
+	}
+	if !resp.HasMore {
+		t.Error("expected HasMore=true (6 output events, limit=2)")
 	}
 }
 
