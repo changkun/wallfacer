@@ -354,4 +354,3 @@ func ensureImage(containerCmd, image string) string {
 	}
 	return image
 }
-

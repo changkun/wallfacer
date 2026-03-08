@@ -2,8 +2,11 @@ package gitutil
 
 import (
 	"errors"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestIsConflictOutput(t *testing.T) {
@@ -203,6 +206,61 @@ func TestFFMerge(t *testing.T) {
 
 		if err := FFMerge(repo, "task"); err == nil {
 			t.Error("expected error for non-ff merge, got nil")
+		}
+	})
+}
+
+func TestBranchTipCommit(t *testing.T) {
+	t.Run("returns hash, subject, and timestamp for existing branch", func(t *testing.T) {
+		repo := setupRepo(t)
+		hash, subject, ts, err := BranchTipCommit(repo, "main")
+		if err != nil {
+			t.Fatalf("BranchTipCommit: %v", err)
+		}
+		if len(hash) != 40 {
+			t.Errorf("hash length = %d, want 40", len(hash))
+		}
+		if subject != "initial commit" {
+			t.Errorf("subject = %q, want %q", subject, "initial commit")
+		}
+		if ts.IsZero() {
+			t.Error("timestamp is zero")
+		}
+	})
+
+	t.Run("timestamp reflects explicit commit date", func(t *testing.T) {
+		repo := setupRepo(t)
+		fixedDate := "2020-06-15T12:00:00+00:00"
+		commitCmd := exec.Command("git", "-C", repo, "commit", "--allow-empty", "-m", "dated commit")
+		commitCmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_DATE="+fixedDate,
+			"GIT_COMMITTER_DATE="+fixedDate,
+		)
+		if out, err := commitCmd.CombinedOutput(); err != nil {
+			t.Fatalf("git commit: %v\n%s", err, out)
+		}
+		_, _, ts, err := BranchTipCommit(repo, "main")
+		if err != nil {
+			t.Fatalf("BranchTipCommit: %v", err)
+		}
+		want, _ := time.Parse(time.RFC3339, fixedDate)
+		if !ts.Equal(want) {
+			t.Errorf("ts = %v, want %v", ts, want)
+		}
+	})
+
+	t.Run("returns error for nonexistent branch", func(t *testing.T) {
+		repo := setupRepo(t)
+		_, _, _, err := BranchTipCommit(repo, "nonexistent-branch")
+		if err == nil {
+			t.Error("expected error for nonexistent branch, got nil")
+		}
+	})
+
+	t.Run("returns error for non-git path", func(t *testing.T) {
+		_, _, _, err := BranchTipCommit(t.TempDir(), "main")
+		if err == nil {
+			t.Error("expected error for non-git path, got nil")
 		}
 	})
 }
