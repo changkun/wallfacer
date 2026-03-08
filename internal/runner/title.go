@@ -16,10 +16,16 @@ import (
 // summarising the task prompt, then persists it via the store.
 // Errors are logged and silently dropped so callers can fire-and-forget.
 func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
-	// Skip if the task already has a title.
-	if t, err := r.store.GetTask(context.Background(), taskID); err == nil && t.Title != "" {
+	task, err := r.store.GetTask(context.Background(), taskID)
+	if err != nil {
+		logger.Runner.Warn("GenerateTitle get task failed", "task", taskID, "error", err)
 		return
 	}
+	if task.Title != "" {
+		return
+	}
+	sandbox := r.sandboxForTask(task)
+	model := r.titleModelFromEnvForSandbox(sandbox)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -32,8 +38,8 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		args = append(args, "--env-file", r.envFile)
 	}
 	// Inject CLAUDE_CODE_MODEL so the agent uses the configured model.
-	if m := r.titleModelFromEnv(); m != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
+	if model != "" {
+		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
 	}
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
 	args = append(args, r.sandboxImage)
@@ -41,7 +47,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	titlePrompt := "Respond with ONLY a 2-5 word title that captures the main goal of the following task. " +
 		"No punctuation, no quotes, no explanation — just the title.\n\nTask:\n" + prompt
 	args = append(args, "-p", titlePrompt, "--output-format", "stream-json", "--verbose")
-	if model := r.titleModelFromEnv(); model != "" {
+	if model != "" {
 		args = append(args, "--model", model)
 	}
 

@@ -244,6 +244,18 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 // log history (used to match the project's commit style).
 // Falls back to a truncated prompt on any error.
 func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recentLog string) string {
+	task, err := r.store.GetTask(context.Background(), taskID)
+	if err != nil {
+		logger.Runner.Warn("generate commit message: get task", "task", taskID, "error", err)
+	}
+
+	sandbox := "claude"
+	model := ""
+	if task != nil {
+		sandbox = r.sandboxForTask(task)
+	}
+	model = r.modelFromEnvForSandbox(sandbox)
+
 	firstLine := prompt
 	if idx := strings.IndexByte(firstLine, '\n'); idx >= 0 {
 		firstLine = firstLine[:idx]
@@ -261,8 +273,8 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		args = append(args, "--env-file", r.envFile)
 	}
 	// Inject CLAUDE_CODE_MODEL so the agent uses the configured model.
-	if m := r.modelFromEnv(); m != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
+	if model != "" {
+		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
 	}
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
 	args = append(args, r.sandboxImage)
@@ -284,7 +296,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		commitPrompt += "\nRecent commits (for style reference):\n" + recentLog
 	}
 	args = append(args, "-p", commitPrompt, "--output-format", "stream-json", "--verbose")
-	if model := r.modelFromEnv(); model != "" {
+	if model != "" {
 		args = append(args, "--model", model)
 	}
 

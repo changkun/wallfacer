@@ -73,7 +73,7 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 		prompt += "\n\nAdditional focus from the user:\n<user_instructions>\n" + strings.TrimSpace(userInstructions) + "\n</user_instructions>"
 	}
 
-	output, _, _, err := r.runRefinementContainer(ctx, taskID, prompt, task.Model)
+	output, _, _, err := r.runRefinementContainer(ctx, taskID, prompt, "", task.Sandbox)
 	if err != nil {
 		logger.Runner.Error("refinement container error", "task", taskID, "error", err)
 
@@ -102,7 +102,7 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 // buildRefinementContainerArgs builds container args for a read-only refinement
 // run. Workspaces are mounted read-only; no worktrees, board context, or sibling
 // mounts are used since the agent should only read, not commit.
-func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, modelOverride string) []string {
+func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, modelOverride, sandbox string) []string {
 	args := []string{"run", "--rm", "--network=host", "--name", containerName}
 
 	if taskID != "" {
@@ -114,10 +114,12 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 		args = append(args, "--env-file", r.envFile)
 	}
 
-	if m := modelOverride; m != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
-	} else if m := r.modelFromEnv(); m != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
+	model := modelOverride
+	if model == "" {
+		model = r.modelFromEnvForSandbox(sandbox)
+	}
+	if model != "" {
+		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
 	}
 
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
@@ -152,9 +154,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 	}
 	args = append(args, "-w", workdir, r.sandboxImage)
 	args = append(args, "-p", prompt, "--verbose", "--output-format", "stream-json")
-	if modelOverride != "" {
-		args = append(args, "--model", modelOverride)
-	} else if model := r.modelFromEnv(); model != "" {
+	if model != "" {
 		args = append(args, "--model", model)
 	}
 
@@ -167,7 +167,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 func (r *Runner) runRefinementContainer(
 	ctx context.Context,
 	taskID uuid.UUID,
-	prompt, modelOverride string,
+	prompt, modelOverride, sandbox string,
 ) (*agentOutput, []byte, []byte, error) {
 	slug := slugifyPrompt(prompt, 20)
 	containerName := "wallfacer-refine-" + slug + "-" + taskID.String()[:8]
@@ -177,7 +177,7 @@ func (r *Runner) runRefinementContainer(
 
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	args := r.buildRefinementContainerArgs(containerName, taskID.String(), prompt, modelOverride)
+	args := r.buildRefinementContainerArgs(containerName, taskID.String(), prompt, modelOverride, sandbox)
 
 	cmd := exec.CommandContext(ctx, r.command, args...)
 	var stdout, stderr bytes.Buffer
