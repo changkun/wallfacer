@@ -326,19 +326,19 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	})
 
 	// Create a backlog task for each proposed idea.
-	// The card's Prompt is set to the short title so the card stays concise.
-	// The full implementation text is stored in ExecutionPrompt and passed to
-	// the sandbox when the task actually runs.
+	// The card's Prompt is set to the full implementation text.
+	// ExecutionPrompt is also set so the sandbox uses the full details
+	// even if the Prompt field is later edited.
 	var titles []string
 	for _, idea := range ideas {
 		tags := []string{"idea-agent"}
 		if idea.Category != "" {
 			tags = append(tags, idea.Category)
 		}
-		// Use the short title as the display prompt so the card shows a concise label.
-		cardPrompt := idea.Title
+		// Use the full implementation prompt as the card prompt.
+		cardPrompt := idea.Prompt
 		if cardPrompt == "" {
-			cardPrompt = idea.Prompt // fallback: use full prompt if title is missing
+			cardPrompt = idea.Title // fallback: use title if prompt is missing
 		}
 		newTask, createErr := r.store.CreateTask(bgCtx, cardPrompt, 60, false, "", store.TaskKindTask, tags...)
 		if createErr != nil {
@@ -352,10 +352,8 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 			r.store.UpdateTaskTitle(bgCtx, newTask.ID, idea.Title)
 			titles = append(titles, idea.Title)
 		}
-		// Store the full implementation prompt separately so the sandbox agent
-		// receives the complete details even though the card only shows the title.
-		// extractIdeas guarantees idea.Prompt is non-empty and differs from the
-		// title, so no additional guard is needed here.
+		// Also set ExecutionPrompt so the sandbox always receives the full details
+		// even if the user edits the Prompt field before running the task.
 		if err := r.store.UpdateTaskExecutionPrompt(bgCtx, newTask.ID, idea.Prompt); err != nil {
 			logger.Runner.Warn("ideation task: set execution prompt", "task", newTask.ID, "error", err)
 		}
