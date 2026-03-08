@@ -302,23 +302,28 @@ type ndjsonLine struct {
 }
 
 type ndjsonMessage struct {
-	Content []ndjsonContent `json:"content"`
+	Content json.RawMessage `json:"content"`
 }
 
 type ndjsonContent struct {
 	Type  string          `json:"type"`
 	Text  string          `json:"text"`
 	Name  string          `json:"name"`
+	Tool  string          `json:"tool_name"`
 	Input json.RawMessage `json:"input"`
 }
 
 type ndjsonItem struct {
-	ID               string `json:"id"`
-	Type             string `json:"type"`
-	Text             string `json:"text"`
-	Command          string `json:"command"`
-	AggregatedOutput string `json:"aggregated_output"`
-	ExitCode         *int   `json:"exit_code"`
+	ID               string          `json:"id"`
+	Type             string          `json:"type"`
+	Text             string          `json:"text"`
+	Command          string          `json:"command"`
+	Name             string          `json:"name"`
+	Tool             string          `json:"tool"`
+	ToolName         string          `json:"tool_name"`
+	Input            json.RawMessage `json:"input"`
+	AggregatedOutput string          `json:"aggregated_output"`
+	ExitCode         *int            `json:"exit_code"`
 }
 
 // parseTurnActivity extracts tool calls and text snippets from a raw turn NDJSON file.
@@ -345,21 +350,51 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 					}
 					act.TextNotes = append(act.TextNotes, t)
 				}
-			case "command_execution":
+			case "command_execution", "bash":
 				command := normalizeCodexCommand(item.Command)
 				if len(command) > 120 {
 					command = command[:120] + "…"
 				}
 				if command != "" {
 					if msg.Type == "item.started" {
-						act.ToolCalls = append(act.ToolCalls, "Bash("+command+")")
+						if item.ID != "" && seenCodexCommands[item.ID] {
+							break
+						}
+						act.ToolCalls = append(act.ToolCalls, inferCodexToolName(command)+"("+command+")")
 						if item.ID != "" {
 							seenCodexCommands[item.ID] = true
 						}
-					} else if msg.Type == "item.completed" {
-						if item.ID == "" || !seenCodexCommands[item.ID] {
-							act.ToolCalls = append(act.ToolCalls, "Bash("+command+")")
+					} else if item.ID == "" || !seenCodexCommands[item.ID] {
+						act.ToolCalls = append(act.ToolCalls, inferCodexToolName(command)+"("+command+")")
+						if item.ID != "" {
+							seenCodexCommands[item.ID] = true
 						}
+					}
+				}
+			default:
+				tool, input := codexToolFromItem(item)
+				if tool == "" {
+					continue
+				}
+				if len(input) > 120 {
+					input = input[:120] + "…"
+				}
+				call := tool
+				if input != "" {
+					call += "(" + input + ")"
+				}
+				if msg.Type == "item.started" {
+					if item.ID != "" && seenCodexCommands[item.ID] {
+						break
+					}
+					act.ToolCalls = append(act.ToolCalls, call)
+					if item.ID != "" {
+						seenCodexCommands[item.ID] = true
+					}
+				} else if item.ID == "" || !seenCodexCommands[item.ID] {
+					act.ToolCalls = append(act.ToolCalls, call)
+					if item.ID != "" {
+						seenCodexCommands[item.ID] = true
 					}
 				}
 			}
@@ -372,7 +407,7 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 		if err := json.Unmarshal(msg.Message, &m); err != nil {
 			continue
 		}
-		for _, block := range m.Content {
+		for _, block := range parseContentBlocks(m.Content) {
 			switch block.Type {
 			case "text":
 				if t := strings.TrimSpace(block.Text); t != "" {
@@ -381,12 +416,19 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 					}
 					act.TextNotes = append(act.TextNotes, t)
 				}
-			case "tool_use":
-				input := extractToolInputGo(block.Name, parseRawInput(block.Input))
+			case "tool_use", "tool_call":
+				name := canonicalizeToolName(block.Name)
+				if name == "" {
+					name = canonicalizeToolName(block.Tool)
+				}
+				if name == "" {
+					continue
+				}
+				input := extractToolInputGo(name, parseRawInput(block.Input))
 				if len(input) > 120 {
 					input = input[:120] + "…"
 				}
-				entry := block.Name
+				entry := name
 				if input != "" {
 					entry += "(" + input + ")"
 				}
@@ -397,9 +439,108 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 	return act
 }
 
+func parseContentBlocks(raw json.RawMessage) []ndjsonContent {
+	if len(raw) == 0 {
+		return nil
+	}
+	var blocks []ndjsonContent
+	if err := json.Unmarshal(raw, &blocks); err == nil {
+		return blocks
+	}
+	var single ndjsonContent
+	if err := json.Unmarshal(raw, &single); err == nil {
+		return []ndjsonContent{single}
+	}
+	return nil
+}
+
+func canonicalizeToolName(name string) string {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "bash", "command_execution":
+		return "Bash"
+	case "read", "read_file", "read_file_tool", "file_read", "readfile":
+		return "Read"
+	case "write", "write_file", "write_file_tool", "file_write", "writefile":
+		return "Write"
+	case "edit", "edit_file", "modify_file":
+		return "Edit"
+	case "glob":
+		return "Glob"
+	case "grep", "search", "find":
+		return "Grep"
+	case "websearch", "web_search":
+		return "WebSearch"
+	case "webfetch", "web_fetch":
+		return "WebFetch"
+	case "task":
+		return "Task"
+	default:
+		return strings.TrimSpace(name)
+	}
+}
+
+func codexToolFromItem(item *ndjsonItem) (string, string) {
+	toolName := canonicalizeToolName(item.Type)
+	if toolName == "" || toolName == item.Type {
+		if item.Name != "" {
+			toolName = canonicalizeToolName(item.Name)
+		}
+	}
+	if toolName == "" && item.ToolName != "" {
+		toolName = canonicalizeToolName(item.ToolName)
+	}
+	if toolName == "" && item.Tool != "" {
+		toolName = canonicalizeToolName(item.Tool)
+	}
+	return toolName, extractToolInputGo(toolName, parseRawInput(item.Input))
+}
+
+func inferCodexToolName(command string) string {
+	cmd := strings.ToLower(strings.TrimSpace(command))
+	if cmd == "" {
+		return "Bash"
+	}
+	trim := func(s string) string {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return s
+		}
+		s = strings.TrimPrefix(s, "sudo ")
+		s = strings.TrimSpace(s)
+		return s
+	}
+	command = trim(cmd)
+	if strings.Contains(command, "| tee ") || strings.Contains(command, " > ") || strings.Contains(command, ">>") || strings.HasPrefix(command, "cat >") || strings.HasPrefix(command, "cat>>") {
+		return "Write"
+	}
+
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
+		return "Bash"
+	}
+	first := fields[0]
+	switch first {
+	case "cat", "sed", "head", "tail", "less", "stat", "pwd", "find", "grep", "rg":
+		return "Read"
+	case "git", "apply_patch", "cp", "mv", "rm", "mkdir", "rmdir", "touch", "chmod", "chown", "tee":
+		if first == "git" && len(fields) >= 2 {
+			switch fields[1] {
+			case "add", "commit", "mv", "rm", "reset", "restore", "checkout", "switch":
+				return "Write"
+			case "show", "status", "diff", "log":
+				return "Read"
+			}
+		}
+		return "Write"
+	default:
+		return "Bash"
+	}
+}
+
 // extractToolInputGo returns a short representative string for a tool call
 // given the tool name and its input map. Mirrors the logic in modal.js.
 func extractToolInputGo(name string, input map[string]interface{}) string {
+	name = canonicalizeToolName(name)
 	if input == nil {
 		return ""
 	}

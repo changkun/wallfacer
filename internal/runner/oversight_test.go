@@ -88,6 +88,30 @@ func TestParseTurnActivityCodexItems(t *testing.T) {
 	}
 }
 
+func TestParseTurnActivityCodexToolItems(t *testing.T) {
+	ndjson := `{"type":"item.completed","item":{"id":"item_2","type":"read_file","input":{"file_path":"/workspace/main.go"}}}`
+	act := parseTurnActivity([]byte(ndjson), 5)
+	if len(act.ToolCalls) != 1 {
+		t.Fatalf("expected 1 tool call, got %d: %v", len(act.ToolCalls), act.ToolCalls)
+	}
+	if act.ToolCalls[0] != "Read(/workspace/main.go)" {
+		t.Fatalf("unexpected tool call: %q", act.ToolCalls[0])
+	}
+}
+
+func TestParseTurnActivityLowercaseToolName(t *testing.T) {
+	input := map[string]interface{}{"file_path": "/workspace/main.go"}
+	inputJSON, _ := json.Marshal(input)
+	ndjson := fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"read_file","input":%s}]}}`, inputJSON)
+	act := parseTurnActivity([]byte(ndjson), 6)
+	if len(act.ToolCalls) != 1 {
+		t.Fatalf("expected 1 tool call, got %d: %v", len(act.ToolCalls), act.ToolCalls)
+	}
+	if act.ToolCalls[0] != "Read(/workspace/main.go)" {
+		t.Fatalf("unexpected tool call: %q", act.ToolCalls[0])
+	}
+}
+
 func TestNormalizeCodexCommand(t *testing.T) {
 	got := normalizeCodexCommand("/bin/bash -lc 'echo hello'")
 	if got != "echo hello" {
