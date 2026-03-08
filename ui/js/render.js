@@ -341,7 +341,7 @@ function _cardFingerprint(t, rank) {
   }).join(',');
   return [
     t.status, t.kind, !!t.archived, !!t.is_test_run, t.title || '',
-    t.prompt, t.result || '', t.updated_at, t.session_id || '',
+    t.prompt, t.execution_prompt || '', t.result || '', t.updated_at, t.session_id || '',
     !!t.fresh_start, t.timeout, t.stop_reason || '', t.last_test_result || '',
     t.sandbox || '', JSON.stringify(t.sandbox_by_activity || {}),
     !!t.mount_worktrees, JSON.stringify(t.tags || []),
@@ -350,6 +350,11 @@ function _cardFingerprint(t, rank) {
     JSON.stringify(t.worktree_paths || {}), displayRank,
     filterQuery,
   ].join('\x00');
+}
+
+function cardDisplayPrompt(t) {
+  if (t && t.kind === 'idea-agent' && t.execution_prompt) return t.execution_prompt;
+  return t.prompt;
 }
 
 function updateCard(card, t, rank) {
@@ -431,7 +436,7 @@ function updateCard(card, t, rank) {
       <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
     </div>` : ''}
     ${isIdeaAgent ? `<div class="card-title">&#129504; ${highlightMatch(t.title || 'Brainstorm', filterQuery)}</div>` : t.title ? `<div class="card-title">${highlightMatch(t.title, filterQuery)}</div>` : ''}
-    <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${_cachedMarkdown(t.prompt)}</div>
+    <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${_cachedMarkdown(cardDisplayPrompt(t))}</div>
     ${t.status === 'failed' && t.result ? `
     <div class="card-error-reason">
       <span class="card-error-label">Error</span><span class="card-error-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>

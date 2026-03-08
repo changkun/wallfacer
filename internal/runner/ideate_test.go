@@ -315,10 +315,10 @@ func TestIdeationTaskOversightGeneratedAfterDone(t *testing.T) {
 	}
 }
 
-// TestIdeationTaskStoresActualPrompt verifies that the brainstorm agent card
-// keeps its short placeholder prompt (for clean card display) while the result
-// idea tasks store their full implementation text in ExecutionPrompt so the
-// sandbox receives the complete details when those tasks run.
+// TestIdeationTaskStoresActualPrompt verifies that the brainstorm task stores
+// the full generated ideation prompt in ExecutionPrompt while keeping Prompt
+// unchanged, and idea result tasks store their full implementation text in
+// ExecutionPrompt.
 func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 	ideas := []IdeateResult{
 		{Title: "Add tests", Prompt: "Write unit tests for all handlers."},
@@ -340,14 +340,20 @@ func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 	}
 	r.Run(task.ID, "", "", false)
 
-	// The brainstorm agent card must keep its short placeholder — the full
-	// ideation prompt is not stored in Prompt so the card stays concise.
+	// The brainstorm agent card keeps Prompt unchanged, but the full runtime
+	// prompt must be stored in ExecutionPrompt for accurate display/debugging.
 	updated, err := s.GetTask(ctx, task.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if updated.Prompt != staticPlaceholder {
 		t.Fatalf("brainstorm card Prompt should remain as short placeholder, got: %q", updated.Prompt)
+	}
+	if updated.ExecutionPrompt == "" {
+		t.Fatal("brainstorm card ExecutionPrompt should store the full runtime ideation prompt")
+	}
+	if !strings.Contains(updated.ExecutionPrompt, "Output ONLY a JSON array with exactly 3 objects") {
+		t.Fatalf("brainstorm card ExecutionPrompt does not look like ideation prompt: %q", updated.ExecutionPrompt[:min(len(updated.ExecutionPrompt), 200)])
 	}
 
 	// Each created idea task must have its full implementation text in
@@ -464,9 +470,9 @@ func TestBuildIdeationPromptUntitledTask(t *testing.T) {
 }
 
 // TestIdeationTaskPromptIncludesExistingTasks verifies that when sibling tasks
-// in backlog/in_progress/waiting exist, the brainstorm card keeps its short
-// placeholder prompt (for clean card display) while the idea result tasks get
-// their full implementation text stored in ExecutionPrompt.
+// in backlog/in_progress/waiting exist, the brainstorm task's ExecutionPrompt
+// includes the existing-task context and idea result tasks still store their
+// full implementation text in ExecutionPrompt.
 func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 	ideas := []IdeateResult{
 		{Title: "Add tests", Prompt: "Write unit tests for all handlers."},
@@ -508,14 +514,19 @@ func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 	}
 	r.Run(brainstormTask.ID, "", "", false)
 
-	// The brainstorm card's stored Prompt must NOT be updated with the full
-	// ideation prompt — it keeps the short placeholder for clean card display.
+	// Prompt stays concise, but ExecutionPrompt should include sibling-task context.
 	updated, err := s.GetTask(ctx, brainstormTask.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(updated.Prompt, "Existing active tasks") {
-		t.Fatal("brainstorm card Prompt must not contain full ideation text; card should stay concise")
+		t.Fatal("brainstorm card Prompt should stay concise")
+	}
+	if !strings.Contains(updated.ExecutionPrompt, "Existing active tasks") {
+		t.Fatal("brainstorm card ExecutionPrompt should include full ideation context")
+	}
+	if !strings.Contains(updated.ExecutionPrompt, "Add dark mode") || !strings.Contains(updated.ExecutionPrompt, "Fix login bug") {
+		t.Fatal("brainstorm card ExecutionPrompt missing existing task details")
 	}
 
 	// Verify that the buildIdeationPrompt function would include existing tasks

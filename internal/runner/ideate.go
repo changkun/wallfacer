@@ -273,10 +273,12 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	}
 
 	// Generate the full ideation prompt (with randomly-picked domains).
-	// Do NOT persist it to the task: the card keeps its original short
-	// description ("Analyzes the workspace…") rather than showing a wall
-	// of text that includes all existing task titles.
+	// Persist it as ExecutionPrompt so the UI can display the exact prompt
+	// that was used while keeping Prompt semantics unchanged.
 	ideationPrompt := buildIdeationPrompt(activeTasks)
+	if err := r.store.UpdateTaskExecutionPrompt(bgCtx, taskID, ideationPrompt); err != nil {
+		logger.Runner.Warn("ideation task: set execution prompt on brainstorm card", "task", taskID, "error", err)
+	}
 
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Starting brainstorm agent — exploring workspaces to propose ideas...",
