@@ -385,7 +385,7 @@ function updateCard(card, t, rank) {
         ${refinementBadge}
         ${testResultBadge}
       </div>
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-1.5 card-meta-right">
         <span class="text-[10px] text-v-muted" title="Implementation sandbox: ${escapeHtml(implSandbox)}">${escapeHtml(sandboxDisplayName(implSandbox))}</span>
         ${t.mount_worktrees ? '<span class="text-[10px] text-v-muted" title="Sibling worktrees mounted">worktrees</span>' : ''}
         <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>
