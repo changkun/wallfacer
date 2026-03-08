@@ -355,6 +355,28 @@
             </div>
           </div>
         </div>
+
+        <div style="border:1px solid var(--border); border-radius:8px; padding:12px;">
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px;">Global Sandbox Routing</label>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Default Sandbox (WALLFACER_DEFAULT_SANDBOX)</label>
+              <select id="env-default-sandbox" class="select" style="font-size:12px;" data-sandbox-select="true" data-default-text="Auto (model defaults)"></select>
+            </div>
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Activity-specific defaults</label>
+              <div style="border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px;">
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Implementation</span><select id="env-sandbox-implementation" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Testing</span><select id="env-sandbox-testing" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Refinement</span><select id="env-sandbox-refinement" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Title generation</span><select id="env-sandbox-title" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Oversight summary</span><select id="env-sandbox-oversight" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Commit message</span><select id="env-sandbox-commit_message" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Idea agent</span><select id="env-sandbox-idea_agent" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px;">
@@ -560,7 +582,7 @@
             <button onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
           </div>
           <div class="flex items-center gap-1.5" style="min-width:0;">
-            <select id="new-sandbox" class="select" title="Sandbox">
+            <select id="new-sandbox" class="select" title="Sandbox" data-sandbox-select="true">
               <option value="">Default</option>
             </select>
             <select id="new-timeout" class="select" title="Timeout">
@@ -579,6 +601,18 @@
           <input type="checkbox" id="new-mount-worktrees" style="cursor:pointer;accent-color:var(--accent);">
           <label for="new-mount-worktrees" class="text-xs text-v-muted" style="cursor:pointer;">Mount sibling worktrees (read-only)</label>
         </div>
+        <details class="mt-2">
+          <summary class="text-xs text-v-muted" style="cursor:pointer;">Advanced: per-activity sandbox overrides</summary>
+          <div class="mt-2" style="border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px;">
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Implementation</span><select id="new-sandbox-implementation" class="select text-xs" title="Implementation sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Testing</span><select id="new-sandbox-testing" class="select text-xs" title="Testing sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Refinement</span><select id="new-sandbox-refinement" class="select text-xs" title="Refinement sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Title generation</span><select id="new-sandbox-title" class="select text-xs" title="Title sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Oversight summary</span><select id="new-sandbox-oversight" class="select text-xs" title="Oversight sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Commit message</span><select id="new-sandbox-commit_message" class="select text-xs" title="Commit message sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Idea agent</span><select id="new-sandbox-idea_agent" class="select text-xs" title="Idea agent sandbox" data-sandbox-select="true"></select></div>
+          </div>
+        </details>
         <div id="new-depends-on-row" class="mt-2" style="display:none;">
           <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Depends on</label>
           <div id="new-depends-on-picker" class="dep-picker">
@@ -680,7 +714,7 @@
             <h3 class="section-title">Settings</h3>
             <div class="flex items-center gap-2 flex-wrap">
               <label for="modal-edit-sandbox" class="text-xs text-v-muted">Sandbox</label>
-              <select id="modal-edit-sandbox" class="select" onchange="scheduleBacklogSave()">
+              <select id="modal-edit-sandbox" class="select" onchange="scheduleBacklogSave()" data-sandbox-select="true">
                 <option value="">Default</option>
               </select>
               <label for="modal-edit-timeout" class="text-xs text-v-muted">Timeout</label>
@@ -703,6 +737,18 @@
               <input type="checkbox" id="modal-edit-mount-worktrees" onchange="scheduleBacklogSave()" style="cursor:pointer;accent-color:var(--accent);">
               <label for="modal-edit-mount-worktrees" class="text-xs text-v-secondary" style="cursor:pointer;">Mount sibling worktrees (read-only)</label>
             </div>
+            <details class="mt-2">
+              <summary class="text-xs text-v-muted" style="cursor:pointer;">Advanced: per-activity sandbox overrides</summary>
+              <div class="mt-2" style="border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px;">
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Implementation</span><select id="modal-edit-sandbox-implementation" class="select text-xs" onchange="scheduleBacklogSave()" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Testing</span><select id="modal-edit-sandbox-testing" class="select text-xs" onchange="scheduleBacklogSave()" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Refinement</span><select id="modal-edit-sandbox-refinement" class="select text-xs" onchange="scheduleBacklogSave()" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Title generation</span><select id="modal-edit-sandbox-title" class="select text-xs" onchange="scheduleBacklogSave()" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Oversight summary</span><select id="modal-edit-sandbox-oversight" class="select text-xs" onchange="scheduleBacklogSave()" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Commit message</span><select id="modal-edit-sandbox-commit_message" class="select text-xs" onchange="scheduleBacklogSave()" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Idea agent</span><select id="modal-edit-sandbox-idea_agent" class="select text-xs" onchange="scheduleBacklogSave()" data-sandbox-select="true"></select></div>
+              </div>
+            </details>
             <div class="mt-2" id="modal-edit-depends-on-row">
               <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Depends on</label>
               <div id="modal-edit-depends-on-picker" class="dep-picker" data-onchange="scheduleBacklogSave">
