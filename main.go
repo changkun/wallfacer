@@ -246,6 +246,10 @@ func envOrDefault(key, fallback string) string {
 // It prefers /opt/podman/bin/podman, then falls back to "podman" and "docker"
 // on $PATH. Returns the hardcoded default if nothing is found.
 func detectContainerRuntime() string {
+	if override := strings.TrimSpace(os.Getenv("CONTAINER_CMD")); override != "" {
+		return override
+	}
+
 	// Preferred: explicit podman installation.
 	if _, err := os.Stat("/opt/podman/bin/podman"); err == nil {
 		return "/opt/podman/bin/podman"

@@ -1,6 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
 )
 
@@ -124,4 +129,154 @@ func TestMatchContainersDuplicateTaskID(t *testing.T) {
 	if result["uuid-1"] != "second" {
 		t.Errorf("expected last-write-wins, got %q", result["uuid-1"])
 	}
+}
+
+func TestStatusLabel(t *testing.T) {
+	if got := statusLabel("backlog"); got != "Backlog" {
+		t.Fatalf("statusLabel(backlog) = %q, want Backlog", got)
+	}
+	if got := statusLabel("done"); got != "Done" {
+		t.Fatalf("statusLabel(done) = %q, want Done", got)
+	}
+	if got := statusLabel("mystery"); got != "Mystery" {
+		t.Fatalf("statusLabel(unknown) = %q, want Mystery", got)
+	}
+}
+
+func TestFetchTasks(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/api/tasks" {
+				t.Fatalf("unexpected path: %s", r.URL.Path)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{"id":"11111111-1111-1111-1111-111111111111","title":"A","status":"done","turns":1,"usage":{"cost_usd":1.23}}]`))
+		}))
+		defer ts.Close()
+
+		tasks, err := fetchTasks(ts.URL)
+		if err != nil {
+			t.Fatalf("fetchTasks failed: %v", err)
+		}
+		if len(tasks) != 1 {
+			t.Fatalf("expected 1 task, got %d", len(tasks))
+		}
+		if tasks[0].ID != "11111111-1111-1111-1111-111111111111" {
+			t.Fatalf("unexpected task id: %s", tasks[0].ID)
+		}
+	})
+
+	t.Run("invalid JSON", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(`not-json`))
+		}))
+		defer ts.Close()
+
+		if _, err := fetchTasks(ts.URL); err == nil {
+			t.Fatal("expected error for invalid JSON")
+		}
+	})
+}
+
+func TestFetchContainers(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/containers" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[{"name":"c1","task_id":"11111111-1111-1111-1111-111111111111"}]`))
+	}))
+	defer ts.Close()
+
+	containers, err := fetchContainers(ts.URL)
+	if err != nil {
+		t.Fatalf("fetchContainers failed: %v", err)
+	}
+	if len(containers) != 1 || containers[0].TaskID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("unexpected containers: %#v", containers)
+	}
+}
+
+func TestPrintBoard(t *testing.T) {
+	tasks := []taskSummary{
+		{ID: "1111111111111111111111111111111111111111", Title: "Short", Status: "done", Turns: 1, Usage: taskUsage{CostUSD: 0.1234}},
+		{ID: "2222222222222222222222222222222222222222", Prompt: "Long prompt with many words", Status: "done", Turns: 2, Usage: taskUsage{CostUSD: 1.0}},
+		{ID: "3333333333333333333333333333333333333333", Title: "Backlog", Status: "backlog", Turns: 0, Usage: taskUsage{CostUSD: 0.0}},
+	}
+	containers := map[string]string{"1111111111111111111111111111111111111111": "wallfacer-c1"}
+
+	output := captureStdout(func() {
+		printBoard("http://localhost:8080", tasks, containers)
+	})
+
+	for _, want := range []string{"Done", "Backlog", "[wallfacer-c1]", "Total:", "33333333", "$1.0000"} {
+		if !bytes.Contains([]byte(output), []byte(want)) {
+			t.Fatalf("expected output to contain %q, got: %s", want, output)
+		}
+	}
+}
+
+func TestRunStatus(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/tasks":
+			if r.URL.Query().Get("include_archived") != "false" {
+				t.Fatalf("unexpected include_archived=%q", r.URL.Query().Get("include_archived"))
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{"id":"11111111-1111-1111-1111-111111111111","title":"A","status":"done","turns":1,"usage":{"cost_usd":0.1}}]`))
+		case "/api/containers":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{"name":"wallfacer-task-a","task_id":"11111111-1111-1111-1111-111111111111"}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	output := captureStdout(func() {
+		runStatus("", []string{"--addr", ts.URL})
+	})
+	if !bytes.Contains([]byte(output), []byte("Done")) || !bytes.Contains([]byte(output), []byte("11111111")) {
+		t.Fatalf("expected board output, got: %s", output)
+	}
+
+	jsonOutput := captureStdout(func() {
+		runStatus("", []string{"--addr", ts.URL, "--json"})
+	})
+	if !bytes.Contains([]byte(jsonOutput), []byte("\"id\":\"11111111-1111-1111-1111-111111111111\"")) {
+		t.Fatalf("expected raw JSON output, got: %s", jsonOutput)
+	}
+}
+
+func captureStdout(fn func()) string {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	defer r.Close()
+	defer w.Close()
+	defer func() { os.Stdout = old }()
+	os.Stdout = w
+
+	fn()
+
+	w.Close()
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	return buf.String()
+}
+
+func captureStderr(fn func()) string {
+	old := os.Stderr
+	r, w, _ := os.Pipe()
+	defer r.Close()
+	defer w.Close()
+	defer func() { os.Stderr = old }()
+	os.Stderr = w
+
+	fn()
+
+	w.Close()
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	return buf.String()
 }
