@@ -39,7 +39,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Prompt         string           `json:"prompt"`
 		Timeout        int              `json:"timeout"`
 		MountWorktrees bool             `json:"mount_worktrees"`
-		Model          string           `json:"model"`
+		Sandbox        string           `json:"sandbox"`
 		Kind           store.TaskKind   `json:"kind"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -51,10 +51,22 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := h.store.CreateTask(r.Context(), req.Prompt, req.Timeout, req.MountWorktrees, req.Model, req.Kind)
+	task, err := h.store.CreateTask(r.Context(), req.Prompt, req.Timeout, req.MountWorktrees, "", req.Kind)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if req.Sandbox != "" {
+		if err := h.store.UpdateTaskSandbox(r.Context(), task.ID, req.Sandbox); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		task, err = h.store.GetTask(r.Context(), task.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange, map[string]string{
@@ -77,7 +89,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Timeout        *int              `json:"timeout"`
 		FreshStart     *bool             `json:"fresh_start"`
 		MountWorktrees *bool             `json:"mount_worktrees"`
-		Model          *string           `json:"model"`
+		Sandbox        *string           `json:"sandbox"`
 		DependsOn      *[]string         `json:"depends_on"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -91,11 +103,17 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, timeout, fresh_start, mount_worktrees, and model for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Model != nil) {
-		if err := h.store.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees, req.Model); err != nil {
+	// Allow editing prompt, timeout, fresh_start, mount_worktrees, and sandbox for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil) {
+		if err := h.store.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees, nil); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if req.Sandbox != nil {
+			if err := h.store.UpdateTaskSandbox(r.Context(), id, *req.Sandbox); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 
