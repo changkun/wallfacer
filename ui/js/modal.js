@@ -370,7 +370,8 @@ async function openModal(id) {
 
     // Changes tab: show for waiting/failed/done tasks with worktrees
     const changesTab = document.getElementById('right-tab-changes');
-    if ((task.status === 'waiting' || task.status === 'failed' || task.status === 'done') && hasWorktrees) {
+    const isTestTaskCard = task.status === 'waiting' && !!task.last_test_result && task.test_run_start_turn > 0;
+    if ((task.status === 'failed' || task.status === 'done' || (task.status === 'waiting' && !isTestTaskCard)) && hasWorktrees) {
       if (changesTab) changesTab.classList.remove('hidden');
       const filesEl = document.getElementById('modal-diff-files');
       const behindEl = document.getElementById('modal-diff-behind');
@@ -387,7 +388,7 @@ async function openModal(id) {
         const totalBehind = entries.reduce((s, [, n]) => s + n, 0);
         const warnEl = document.getElementById('modal-diff-behind');
         if (warnEl) {
-          if (totalBehind > 0) {
+          if (!isTestTaskCard && totalBehind > 0) {
             const label = entries.length === 1
               ? `${totalBehind} commit${totalBehind !== 1 ? 's' : ''} behind`
               : entries.map(([repo, n]) => `${repo}: ${n}`).join(', ') + ' behind';
