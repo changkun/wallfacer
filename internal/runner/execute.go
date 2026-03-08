@@ -180,12 +180,15 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			}
 		}
 
-		turnLabel := fmt.Sprintf("agent_turn_%d", turns)
-		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 		runActivity := activityImplementation
 		if isTestRun {
 			runActivity = activityTesting
 		}
+		turnLabel := fmt.Sprintf("implementation_%d", turns)
+		if isTestRun {
+			turnLabel = fmt.Sprintf("test_%d", turns)
+		}
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, worktreePaths, boardDir, siblingMounts, "", runActivity)
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 		if saveErr := r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {

@@ -73,7 +73,9 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 		prompt += "\n\nAdditional focus from the user:\n<user_instructions>\n" + strings.TrimSpace(userInstructions) + "\n</user_instructions>"
 	}
 
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "refinement", Label: "refinement"})
 	output, _, _, err := r.runRefinementContainer(ctx, taskID, prompt, "", r.sandboxForTaskActivity(task, activityRefinement))
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "refinement", Label: "refinement"})
 	if err != nil {
 		logger.Runner.Error("refinement container error", "task", taskID, "error", err)
 

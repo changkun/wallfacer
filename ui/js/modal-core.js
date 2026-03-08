@@ -336,42 +336,59 @@ async function openModal(id) {
     renderTestResultsFromEvents(testResults);
 
     const container = document.getElementById('modal-events');
-    container.innerHTML = events.map(e => {
-      const time = new Date(e.created_at).toLocaleTimeString();
-      let detail = '';
-      const data = e.data || {};
-      if (e.event_type === 'state_change') {
-        detail = `${data.from || '(new)'} → ${data.to}`;
-      } else if (e.event_type === 'feedback') {
-        detail = `"${escapeHtml(data.message)}"`;
-      } else if (e.event_type === 'output') {
-        detail = `stop_reason: ${data.stop_reason || '(none)'}`;
-      } else if (e.event_type === 'system') {
-        detail = escapeHtml(data.result || '');
-      } else if (e.event_type === 'error') {
-        if (data.phase === 'rebase' && Array.isArray(data.conflicted_files) && data.conflicted_files.length > 0) {
-          detail = '<div style="border-left:3px solid #ef4444;padding:8px 10px;margin:4px 0;">' +
-            '<div style="font-weight:600;color:#ef4444;margin-bottom:4px;">Rebase conflict</div>' +
-            '<ul style="margin:0;padding-left:16px;font-size:12px;font-family:monospace;">' +
-            data.conflicted_files.map(f => '<li>' + escapeHtml(f) + '</li>').join('') +
-            '</ul></div>';
-        } else {
-          detail = escapeHtml(data.error);
+    const stopReasonLabels = {
+      'end_turn':   'turn ended',
+      'max_tokens': 'token limit → auto-continue',
+      'pause_turn': 'paused → auto-continue',
+    };
+    const typeLabels = {
+      state_change: 'state',
+      output:       'output',
+      system:       'system',
+      feedback:     'feedback',
+      error:        'error',
+    };
+    const typeClasses = {
+      state_change: 'ev-state',
+      output:       'ev-output',
+      system:       'ev-system',
+      feedback:     'ev-feedback',
+      error:        'ev-error',
+    };
+    container.innerHTML = events
+      .filter(e => e.event_type !== 'span_start' && e.event_type !== 'span_end')
+      .map(e => {
+        const time = new Date(e.created_at).toLocaleTimeString();
+        let detail = '';
+        const data = e.data || {};
+        if (e.event_type === 'state_change') {
+          detail = `${data.from || '(new)'} → ${data.to}`;
+        } else if (e.event_type === 'feedback') {
+          detail = `"${escapeHtml(data.message)}"`;
+        } else if (e.event_type === 'output') {
+          const rawReason = data.stop_reason || '(none)';
+          const humanReason = stopReasonLabels[rawReason] || rawReason;
+          detail = `stop: ${humanReason}`;
+        } else if (e.event_type === 'system') {
+          detail = escapeHtml(data.result || '');
+        } else if (e.event_type === 'error') {
+          if (data.phase === 'rebase' && Array.isArray(data.conflicted_files) && data.conflicted_files.length > 0) {
+            detail = '<div style="border-left:3px solid #ef4444;padding:8px 10px;margin:4px 0;">' +
+              '<div style="font-weight:600;color:#ef4444;margin-bottom:4px;">Rebase conflict</div>' +
+              '<ul style="margin:0;padding-left:16px;font-size:12px;font-family:monospace;">' +
+              data.conflicted_files.map(f => '<li>' + escapeHtml(f) + '</li>').join('') +
+              '</ul></div>';
+          } else {
+            detail = escapeHtml(data.error);
+          }
         }
-      }
-      const typeClasses = {
-        state_change: 'ev-state',
-        output: 'ev-output',
-        system: 'ev-system',
-        feedback: 'ev-feedback',
-        error: 'ev-error',
-      };
-      return `<div class="flex items-start gap-2 text-xs">
-        <span class="text-v-muted shrink-0">${time}</span>
-        <span class="${typeClasses[e.event_type] || 'text-v-muted'} shrink-0">${e.event_type}</span>
-        <span class="text-v-secondary">${detail}</span>
-      </div>`;
-    }).join('');
+        const typeLabel = typeLabels[e.event_type] || e.event_type;
+        return `<div class="flex items-start gap-2 text-xs">
+          <span class="text-v-muted shrink-0">${time}</span>
+          <span class="${typeClasses[e.event_type] || 'text-v-muted'} shrink-0">${typeLabel}</span>
+          <span class="text-v-secondary">${detail}</span>
+        </div>`;
+      }).join('');
   } catch (e) {
     document.getElementById('modal-events').innerHTML = '<span class="text-xs ev-error">Failed to load events</span>';
   }

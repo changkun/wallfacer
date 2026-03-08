@@ -381,9 +381,9 @@ func (r *Runner) runContainer(
 	cmd.Stderr = &stderr
 
 	logger.Runner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "))
-	r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: "container_run"})
+	r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: activity})
 	runErr := cmd.Run()
-	r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: "container_run"})
+	r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: activity})
 
 	// If the context was cancelled or timed out, kill the container explicitly
 	// and return the context error rather than parsing potentially incomplete output.

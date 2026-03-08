@@ -67,10 +67,40 @@ var _phaseColors = {
   agent_turn:     'var(--accent)',
   commit:         '#3fb950',
   container_run:  '#9e6ec7',
+  refinement:     '#d19a66',
 };
 
 function _phaseColor(phase) {
   return _phaseColors[phase] || 'var(--text-muted)';
+}
+
+// Convert a raw span phase+label pair into a human-readable display label.
+function _humanSpanLabel(phase, label) {
+  var m;
+  if (phase === 'agent_turn') {
+    if ((m = label.match(/^implementation_(\d+)$/))) return 'Impl. Turn ' + m[1];
+    if ((m = label.match(/^test_(\d+)$/))) return 'Test Turn ' + m[1];
+    if ((m = label.match(/^agent_turn_(\d+)$/))) return 'Turn ' + m[1]; // legacy
+    return label;
+  }
+  if (phase === 'container_run') {
+    var actMap = {
+      'implementation':  'Container (Impl.)',
+      'test':            'Container (Test)',
+      'commit_message':  'Container (Commit)',
+      'oversight':       'Container (Oversight)',
+      'oversight_test':  'Container (Oversight-Test)',
+      'refinement':      'Container (Refine)',
+      'title':           'Container (Title)',
+      'idea_agent':      'Container (Ideas)',
+      'container_run':   'Container', // legacy
+    };
+    return actMap[label] || ('Container (' + label + ')');
+  }
+  if (phase === 'worktree_setup') return 'Worktree Setup';
+  if (phase === 'commit') return 'Commit & Push';
+  if (phase === 'refinement') return 'Refinement';
+  return label || phase;
 }
 
 // Inject keyframe + tooltip CSS once into <head>.
@@ -195,14 +225,17 @@ function _buildTimelineHtml(spans) {
     var relStart = '+' + _fmtMs(ts - t0);
     var absStart = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
 
+    var humanLabel = _humanSpanLabel(span.phase, span.label);
+
     // Tooltip text (newlines preserved via white-space:pre on the tooltip div)
     var tipText =
+      humanLabel + '\n' +
       'Phase:    ' + span.phase + '\n' +
       'Label:    ' + span.label + '\n' +
       'Start:    ' + relStart + ' (' + absStart + ')\n' +
       'Duration: ' + durStr + (open ? ' (running\u2026)' : '');
 
-    var barLabel = span.label + ' \xb7 ' + durStr + (open ? '\u2026' : '');
+    var barLabel = humanLabel + ' \xb7 ' + durStr + (open ? '\u2026' : '');
 
     var barStyle =
       'position:absolute;left:' + left + '%;width:' + width + '%;height:16px;top:4px;' +
@@ -223,8 +256,8 @@ function _buildTimelineHtml(spans) {
       '<div style="display:flex;align-items:center;height:' + ROW_H + 'px;">' +
         '<div style="width:' + LABEL_W + 'px;flex-shrink:0;font-size:11px;color:var(--text-muted);' +
           'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
-          'padding-right:6px;text-align:right;" title="' + escapeHtml(span.label) + '">' +
-          escapeHtml(span.label) +
+          'padding-right:6px;text-align:right;" title="' + escapeHtml(span.phase + ':' + span.label) + '">' +
+          escapeHtml(humanLabel) +
         '</div>' +
         '<div style="flex:1;position:relative;height:' + ROW_H + 'px;">' +
           '<div class="tl-bar" data-tip="' + escapeHtml(tipText) + '" style="' + barStyle + '">' +
@@ -238,17 +271,25 @@ function _buildTimelineHtml(spans) {
   });
 
   // Phase legend (unique phases present)
+  var _phaseLegendNames = {
+    worktree_setup: 'Worktree Setup',
+    agent_turn:     'Agent Turn',
+    commit:         'Commit & Push',
+    container_run:  'Container',
+    refinement:     'Refinement',
+  };
   var seenPhases = {};
   var legendHtml = '';
   spans.forEach(function(s) {
     if (!seenPhases[s.phase]) {
       seenPhases[s.phase] = true;
+      var phaseName = _phaseLegendNames[s.phase] || s.phase;
       legendHtml +=
         '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;' +
           'color:var(--text-muted);margin-right:10px;">' +
           '<span style="width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block;' +
             'background:' + _phaseColor(s.phase) + ';"></span>' +
-          escapeHtml(s.phase) +
+          escapeHtml(phaseName) +
         '</span>';
     }
   });

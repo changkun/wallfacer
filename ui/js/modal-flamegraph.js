@@ -38,6 +38,38 @@
     return (ms / 1000).toFixed(1) + 's';
   }
 
+  // Convert a raw phase:label key into a human-readable display string.
+  function humanSpanLabel(rawLabel) {
+    var idx = rawLabel.indexOf(':');
+    var phase = idx >= 0 ? rawLabel.slice(0, idx) : rawLabel;
+    var label = idx >= 0 ? rawLabel.slice(idx + 1) : '';
+    var m;
+    if (phase === 'agent_turn') {
+      if ((m = label.match(/^implementation_(\d+)$/))) return 'Impl. Turn ' + m[1];
+      if ((m = label.match(/^test_(\d+)$/))) return 'Test Turn ' + m[1];
+      if ((m = label.match(/^agent_turn_(\d+)$/))) return 'Turn ' + m[1]; // legacy
+      return label || phase;
+    }
+    if (phase === 'container_run') {
+      var actMap = {
+        'implementation':  'Container (Impl.)',
+        'test':            'Container (Test)',
+        'commit_message':  'Container (Commit)',
+        'oversight':       'Container (Oversight)',
+        'oversight_test':  'Container (Oversight-Test)',
+        'refinement':      'Container (Refine)',
+        'title':           'Container (Title)',
+        'idea_agent':      'Container (Ideas)',
+        'container_run':   'Container', // legacy
+      };
+      return actMap[label] || ('Container (' + label + ')');
+    }
+    if (phase === 'worktree_setup') return 'Worktree Setup';
+    if (phase === 'commit') return 'Commit & Push';
+    if (phase === 'refinement') return 'Refinement';
+    return label || phase;
+  }
+
   // Convert OversightPhase[] into rendering-ready region objects.
   // Each region covers [phase[i].timestamp, phase[i+1].timestamp), with
   // the last region extending to globalEndMs. Regions are clamped to
@@ -131,10 +163,11 @@
     });
     if (implTurns.length === 0) return '';
 
-    // Build turn number → span end X-position mapping from agent_turn_N spans.
+    // Build turn number → span end X-position mapping from agent_turn spans.
+    // Supports both new-style labels (implementation_N, test_N) and legacy (agent_turn_N).
     var turnXPct = {};
     spans.forEach(function(span) {
-      var m = span.rawLabel.match(/^agent_turn:agent_turn_(\d+)$/);
+      var m = span.rawLabel.match(/^agent_turn:(?:implementation_|test_|agent_turn_)(\d+)$/);
       if (m) {
         var turnNum = parseInt(m[1], 10);
         var xPct = total > 0 ? ((span.endMs - globalStartMs) / total * 100) : 0;
@@ -228,10 +261,10 @@
       var spans = records.map(function(r) {
         var s = r.started_at ? new Date(r.started_at).getTime() : globalStartMs;
         var e = r.ended_at ? new Date(r.ended_at).getTime() : s + (r.duration_ms || 0);
-        var label = escapeHtml(r.phase) + (r.label ? ':' + escapeHtml(r.label) : '');
+        var rawLabelStr = r.phase + (r.label ? ':' + r.label : '');
         return {
-          label: label,
-          rawLabel: r.phase + (r.label ? ':' + r.label : ''),
+          label: humanSpanLabel(rawLabelStr),
+          rawLabel: rawLabelStr,
           startMs: s,
           endMs: e,
           durationMs: e - s,
@@ -307,7 +340,8 @@
         var hue = labelHue(span.rawLabel);
         var color = 'hsl(' + hue + ',55%,52%)';
         var startOffset = formatMs(span.startMs - globalStartMs);
-        var tooltip = escapeHtml(span.rawLabel) + ' | start: ' + escapeHtml(startOffset) + ' | dur: ' + escapeHtml(formatMs(span.durationMs));
+        var tooltip = escapeHtml(span.label) + ' (' + escapeHtml(span.rawLabel) + ')' +
+          ' | start: ' + escapeHtml(startOffset) + ' | dur: ' + escapeHtml(formatMs(span.durationMs));
         var phaseMatch = findPhaseForSpan(span, phaseRegions);
         if (phaseMatch) {
           tooltip += ' | oversight: ' + escapeHtml(phaseMatch.title);
@@ -337,16 +371,12 @@
         var hue = labelHue(span.rawLabel);
         var swatch = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;' +
           'background:hsl(' + hue + ',55%,52%);margin-right:4px;flex-shrink:0;"></span>';
-        var parts = span.rawLabel.split(':');
-        var phase = escapeHtml(parts[0]);
-        var label = escapeHtml(parts.slice(1).join(':'));
         var rowPhaseMatch = findPhaseForSpan(span, phaseRegions);
         var oversightCell = rowPhaseMatch
           ? '<td style="padding:3px 6px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(rowPhaseMatch.title) + '">' + escapeHtml(rowPhaseMatch.title) + '</td>'
           : '<td style="padding:3px 6px;color:var(--text-muted,#888);">&mdash;</td>';
-        return '<tr style="border-bottom:1px solid var(--border,#333);">' +
-          '<td style="padding:3px 6px;white-space:nowrap;">' + swatch + phase + '</td>' +
-          '<td style="padding:3px 6px;color:var(--text-muted,#888);white-space:nowrap;">' + label + '</td>' +
+        return '<tr style="border-bottom:1px solid var(--border,#333);" title="' + escapeHtml(span.rawLabel) + '">' +
+          '<td style="padding:3px 6px;white-space:nowrap;">' + swatch + escapeHtml(span.label) + '</td>' +
           oversightCell +
           '<td style="padding:3px 6px;text-align:right;white-space:nowrap;">' + startOffset + '</td>' +
           '<td style="padding:3px 6px;text-align:right;white-space:nowrap;">' + escapeHtml(formatMs(span.durationMs)) + '</td>' +
@@ -356,8 +386,7 @@
 
       var tableHtml = '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:12px;">' +
         '<thead><tr style="border-bottom:1px solid var(--border,#333);color:var(--text-muted,#888);">' +
-        '<th style="padding:3px 6px;text-align:left;font-weight:500;">Phase</th>' +
-        '<th style="padding:3px 6px;text-align:left;font-weight:500;">Label</th>' +
+        '<th style="padding:3px 6px;text-align:left;font-weight:500;">Span</th>' +
         '<th style="padding:3px 6px;text-align:left;font-weight:500;">Oversight Phase</th>' +
         '<th style="padding:3px 6px;text-align:right;font-weight:500;">Start</th>' +
         '<th style="padding:3px 6px;text-align:right;font-weight:500;">Duration</th>' +
