@@ -201,7 +201,7 @@ async function openModal(id) {
 
     // Changes tab: show for committing/waiting/failed/done tasks with worktrees
     const changesTab = document.getElementById('right-tab-changes');
-    if ((task.status === 'committing' || task.status === 'failed' || task.status === 'done' || (task.status === 'waiting' && !isTestCard(task))) && hasWorktrees) {
+    if ((task.status === 'committing' || task.status === 'failed' || task.status === 'done' || task.status === 'waiting') && hasWorktrees) {
       if (changesTab) changesTab.classList.remove('hidden');
       const filesEl = document.getElementById('modal-diff-files');
       const behindEl = document.getElementById('modal-diff-behind');
