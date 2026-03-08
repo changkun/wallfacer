@@ -505,17 +505,28 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 	containerName := "wallfacer-oversight-" + taskID.String()[:8]
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
+	task, err := r.store.GetTask(context.Background(), taskID)
+	if err != nil {
+		logger.Runner.Warn("oversight: get task", "task", taskID, "error", err)
+	}
+	sandbox := "claude"
+	model := ""
+	if task != nil {
+		sandbox = r.sandboxForTask(task)
+	}
+	model = r.titleModelFromEnvForSandbox(sandbox)
+
 	args := []string{"run", "--rm", "--network=host", "--name", containerName}
 	if r.envFile != "" {
 		args = append(args, "--env-file", r.envFile)
 	}
-	if m := r.titleModelFromEnv(); m != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
+	if model != "" {
+		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
 	}
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
 	args = append(args, r.sandboxImage)
 	args = append(args, "-p", prompt, "--output-format", "stream-json", "--verbose")
-	if model := r.titleModelFromEnv(); model != "" {
+	if model != "" {
 		args = append(args, "--model", model)
 	}
 

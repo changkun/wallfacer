@@ -406,6 +406,21 @@ func (r *Runner) EnvFile() string {
 	return r.envFile
 }
 
+// WorktreesDir returns the directory where task worktrees are created.
+func (r *Runner) WorktreesDir() string {
+	return r.worktreesDir
+}
+
+// InstructionsPath returns the host path mounted as /workspace/CLAUDE.md.
+func (r *Runner) InstructionsPath() string {
+	return r.instructionsPath
+}
+
+// SandboxImage returns the container image used for task execution.
+func (r *Runner) SandboxImage() string {
+	return r.sandboxImage
+}
+
 // Workspaces returns the list of configured workspace paths.
 func (r *Runner) Workspaces() []string {
 	if r.workspaces == "" {
