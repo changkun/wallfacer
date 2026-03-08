@@ -9,6 +9,30 @@
 function hideDependencyGraph() {
   const svg = document.getElementById('dep-graph-overlay');
   if (svg) svg.remove();
+  _detachColumnScrollListeners();
+}
+
+// Redraw on scroll within any board column, throttled to one redraw per frame.
+let _depGraphScrollPending = false;
+function _onColumnScroll() {
+  if (_depGraphScrollPending) return;
+  _depGraphScrollPending = true;
+  requestAnimationFrame(() => {
+    _depGraphScrollPending = false;
+    if (window.depGraphEnabled && typeof tasks !== 'undefined') renderDependencyGraph(tasks);
+  });
+}
+
+function _attachColumnScrollListeners() {
+  document.querySelectorAll('.column').forEach(col => {
+    col.addEventListener('scroll', _onColumnScroll, { passive: true });
+  });
+}
+
+function _detachColumnScrollListeners() {
+  document.querySelectorAll('.column').forEach(col => {
+    col.removeEventListener('scroll', _onColumnScroll);
+  });
 }
 
 function renderDependencyGraph(tasks) {
@@ -25,6 +49,8 @@ function renderDependencyGraph(tasks) {
     }
   }
   if (edges.length === 0) return;
+
+  _attachColumnScrollListeners();
 
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.id = 'dep-graph-overlay';

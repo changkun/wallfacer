@@ -62,6 +62,9 @@ function makeContext(elementMap = {}) {
       if (!rect) return null;
       return { getBoundingClientRect: () => rect };
     },
+
+    // querySelectorAll used by _attachColumnScrollListeners / _detachColumnScrollListeners.
+    querySelectorAll: () => [],
   };
 
   const ctx = vm.createContext({
@@ -182,6 +185,7 @@ describe('hideDependencyGraph', () => {
         createElementNS: (_ns, tag) => makeSvgElement(tag),
         body: { appendChild: () => {} },
         querySelector: () => null,
+        querySelectorAll: () => [],
       },
       window: { depGraphEnabled: false, addEventListener: () => {} },
       clearTimeout: () => {},
