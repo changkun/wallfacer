@@ -468,7 +468,6 @@ async function syncTask(id) {
   try {
     await api(`/api/tasks/${id}/sync`, { method: 'POST' });
     diffCache.delete(id);
-    fetchTasks();
   } catch (e) {
     showAlert('Error syncing task: ' + e.message);
   }
