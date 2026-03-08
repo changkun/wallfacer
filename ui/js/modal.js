@@ -209,14 +209,15 @@ async function openModal(id) {
   document.getElementById('modal-badge').textContent = task.status === 'in_progress' ? 'in progress' : task.status;
   document.getElementById('modal-time').textContent = new Date(task.created_at).toLocaleString();
   document.getElementById('modal-id').textContent = `ID: ${task.id}`;
+  const displayPrompt = (typeof taskDisplayPrompt === 'function') ? taskDisplayPrompt(task) : (task.prompt || '');
 
   const backlogRight = document.getElementById('modal-backlog-right');
   if (task.status === 'backlog') {
     // Left panel: rendered prompt
     const promptRaw = document.getElementById('modal-prompt');
     const promptRendered = document.getElementById('modal-prompt-rendered');
-    promptRaw.textContent = task.prompt;
-    promptRendered.innerHTML = renderMarkdown(task.prompt);
+    promptRaw.textContent = displayPrompt;
+    promptRendered.innerHTML = renderMarkdown(displayPrompt);
     promptRendered.classList.remove('hidden');
     promptRaw.classList.add('hidden');
     document.getElementById('modal-prompt-actions').classList.remove('hidden');
@@ -251,8 +252,8 @@ async function openModal(id) {
     backlogRight.classList.add('hidden');
     const promptRaw = document.getElementById('modal-prompt');
     const promptRendered = document.getElementById('modal-prompt-rendered');
-    promptRaw.textContent = task.prompt;
-    promptRendered.innerHTML = renderMarkdown(task.prompt);
+    promptRaw.textContent = displayPrompt;
+    promptRendered.innerHTML = renderMarkdown(displayPrompt);
     promptRendered.classList.remove('hidden');
     promptRaw.classList.add('hidden');
     document.getElementById('modal-prompt-actions').classList.remove('hidden');

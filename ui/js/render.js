@@ -353,8 +353,9 @@ function _cardFingerprint(t, rank) {
 }
 
 function cardDisplayPrompt(t) {
+  if (typeof taskDisplayPrompt === 'function') return taskDisplayPrompt(t);
   if (t && t.kind === 'idea-agent' && t.execution_prompt) return t.execution_prompt;
-  return t.prompt;
+  return t ? t.prompt : '';
 }
 
 function updateCard(card, t, rank) {

@@ -116,6 +116,32 @@ describe('formatTimeout', () => {
   });
 });
 
+describe('taskDisplayPrompt', () => {
+  let ctx;
+  beforeAll(() => {
+    ctx = makeContext();
+    loadScript('utils.js', ctx);
+  });
+
+  it('prefers execution_prompt for idea-agent tasks', () => {
+    const prompt = ctx.taskDisplayPrompt({
+      kind: 'idea-agent',
+      prompt: 'Analyzes the workspace and proposes 3 actionable improvements.',
+      execution_prompt: 'Generated brainstorm prompt with synthesized domains.',
+    });
+    expect(prompt).toBe('Generated brainstorm prompt with synthesized domains.');
+  });
+
+  it('falls back to prompt for non-idea tasks', () => {
+    const prompt = ctx.taskDisplayPrompt({
+      kind: 'task',
+      prompt: 'Implement OAuth callback validation.',
+      execution_prompt: 'ignored for normal tasks',
+    });
+    expect(prompt).toBe('Implement OAuth callback validation.');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Test 4 – getResolvedTheme (theme.js)
 // Verifies that explicit 'dark' / 'light' values are returned as-is without

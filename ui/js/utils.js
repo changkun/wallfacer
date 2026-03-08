@@ -35,6 +35,14 @@ function formatTimeout(minutes) {
   return Math.floor(minutes / 60) + 'h' + (minutes % 60) + 'm';
 }
 
+// taskDisplayPrompt returns the prompt text that should be shown to users.
+// For brainstorm runner cards we show the generated execution prompt once it
+// exists so the card/modal reflects the actual synthesized instructions.
+function taskDisplayPrompt(task) {
+  if (task && task.kind === 'idea-agent' && task.execution_prompt) return task.execution_prompt;
+  return task ? task.prompt : '';
+}
+
 // --- Mobile column navigation ---
 
 function scrollToColumn(wrapperId) {

@@ -25,10 +25,11 @@ async function openModal(id) {
   const backlogEdit = document.getElementById('modal-backlog-edit');
 
   // Render prompt in left panel (shared for all statuses)
+  const displayPrompt = (typeof taskDisplayPrompt === 'function') ? taskDisplayPrompt(task) : (task.prompt || '');
   const promptRaw = document.getElementById('modal-prompt');
   const promptRendered = document.getElementById('modal-prompt-rendered');
-  promptRaw.textContent = task.prompt;
-  promptRendered.innerHTML = renderMarkdown(task.prompt);
+  promptRaw.textContent = displayPrompt;
+  promptRendered.innerHTML = renderMarkdown(displayPrompt);
   promptRendered.classList.remove('hidden');
   promptRaw.classList.add('hidden');
   document.getElementById('modal-prompt-actions').classList.remove('hidden');
