@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"os"
@@ -13,6 +14,10 @@ import (
 
 	"github.com/google/uuid"
 )
+
+// ErrRefinementAlreadyRunning is returned by StartRefinementJobIfIdle when a
+// refinement job is already in "running" state for the given task.
+var ErrRefinementAlreadyRunning = errors.New("refinement already running")
 
 // ListTasks returns all tasks sorted by position then creation time.
 // Archived tasks are excluded unless includeArchived is true.
@@ -656,6 +661,31 @@ func (s *Store) UpdateRefinementJob(_ context.Context, id uuid.UUID, job *Refine
 	} else {
 		t.CurrentRefinement = nil
 	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
+}
+
+// StartRefinementJobIfIdle atomically checks that no refinement is currently
+// running for the task and, if so, persists the new job. Returns
+// ErrRefinementAlreadyRunning without modifying the store when the existing
+// CurrentRefinement.Status == "running".
+func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *RefinementJob) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	if t.CurrentRefinement != nil && t.CurrentRefinement.Status == "running" {
+		return ErrRefinementAlreadyRunning
+	}
+	jobCopy := *job
+	t.CurrentRefinement = &jobCopy
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err

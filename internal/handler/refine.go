@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -29,10 +30,6 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		http.Error(w, "task is not in backlog", http.StatusBadRequest)
 		return
 	}
-	if task.CurrentRefinement != nil && task.CurrentRefinement.Status == "running" {
-		http.Error(w, "refinement already running", http.StatusConflict)
-		return
-	}
 
 	var req StartRefinementRequest
 	if r.ContentLength > 0 {
@@ -45,8 +42,12 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		CreatedAt: time.Now(),
 		Status:    "running",
 	}
-	if err := h.store.UpdateRefinementJob(r.Context(), id, job); err != nil {
-		logger.Handler.Error("start refinement: update job", "task", id, "error", err)
+	if err := h.store.StartRefinementJobIfIdle(r.Context(), id, job); err != nil {
+		if errors.Is(err, store.ErrRefinementAlreadyRunning) {
+			http.Error(w, "refinement already running", http.StatusConflict)
+			return
+		}
+		logger.Handler.Error("start refinement: start job", "task", id, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -3,9 +3,11 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -384,5 +386,95 @@ func TestRefineApply_UpdatesStorePrompt(t *testing.T) {
 	}
 	if len(stored.PromptHistory) == 0 || stored.PromptHistory[0] != "original prompt" {
 		t.Errorf("expected 'original prompt' in store history, got %v", stored.PromptHistory)
+	}
+}
+
+// --- Concurrency tests ---
+
+// TestStartRefinement_ConcurrentRequestsOnlyOneSucceeds fires two concurrent
+// POST /api/tasks/{id}/refine requests and asserts exactly one returns 202 and
+// the other returns 409.
+func TestStartRefinement_ConcurrentRequestsOnlyOneSucceeds(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "concurrent test prompt", 15, false, "", "")
+
+	var wg sync.WaitGroup
+	codes := make([]int, 2)
+	for i := range codes {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
+			w := httptest.NewRecorder()
+			h.StartRefinement(w, req, task.ID)
+			codes[idx] = w.Code
+		}(i)
+	}
+	wg.Wait()
+
+	accepted := 0
+	conflict := 0
+	for _, code := range codes {
+		switch code {
+		case http.StatusAccepted:
+			accepted++
+		case http.StatusConflict:
+			conflict++
+		default:
+			t.Errorf("unexpected status code: %d", code)
+		}
+	}
+	if accepted != 1 {
+		t.Errorf("expected exactly 1 accepted (202), got %d", accepted)
+	}
+	if conflict != 1 {
+		t.Errorf("expected exactly 1 conflict (409), got %d", conflict)
+	}
+}
+
+// TestStartRefinementJobIfIdle_AtomicGuard calls StartRefinementJobIfIdle twice
+// from two goroutines and asserts exactly one succeeds and the other returns
+// ErrRefinementAlreadyRunning.
+func TestStartRefinementJobIfIdle_AtomicGuard(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "atomic guard prompt", 15, false, "", "")
+
+	makeJob := func() *store.RefinementJob {
+		return &store.RefinementJob{
+			ID:        uuid.New().String(),
+			CreatedAt: time.Now(),
+			Status:    "running",
+		}
+	}
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i := range errs {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			errs[idx] = h.store.StartRefinementJobIfIdle(ctx, task.ID, makeJob())
+		}(i)
+	}
+	wg.Wait()
+
+	nilCount := 0
+	alreadyRunningCount := 0
+	for _, err := range errs {
+		if err == nil {
+			nilCount++
+		} else if errors.Is(err, store.ErrRefinementAlreadyRunning) {
+			alreadyRunningCount++
+		} else {
+			t.Errorf("unexpected error: %v", err)
+		}
+	}
+	if nilCount != 1 {
+		t.Errorf("expected exactly 1 success (nil), got %d", nilCount)
+	}
+	if alreadyRunningCount != 1 {
+		t.Errorf("expected exactly 1 ErrRefinementAlreadyRunning, got %d", alreadyRunningCount)
 	}
 }
