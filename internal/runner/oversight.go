@@ -516,20 +516,29 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 	}
 	model = r.titleModelFromEnvForSandbox(sandbox)
 
-	args := []string{"run", "--rm", "--network=host", "--name", containerName}
+	spec := ContainerSpec{
+		Runtime: r.command,
+		Name:    containerName,
+		Image:   r.sandboxImage,
+	}
 	if r.envFile != "" {
-		args = append(args, "--env-file", r.envFile)
+		spec.EnvFile = r.envFile
 	}
 	if model != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
+		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
 	}
-	args = append(args, "-v", "claude-config:/home/claude/.claude")
-	args = append(args, r.sandboxImage)
-	args = append(args, "-p", prompt, "--output-format", "stream-json", "--verbose")
+	spec.Volumes = append(spec.Volumes, VolumeMount{
+		Host:      "claude-config",
+		Container: "/home/claude/.claude",
+	})
+	// Note: oversight agent uses no workspace mounts, no instructions mount,
+	// no -w workdir, and the Cmd order is --output-format before --verbose.
+	spec.Cmd = []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}
 	if model != "" {
-		args = append(args, "--model", model)
+		spec.Cmd = append(spec.Cmd, "--model", model)
 	}
 
+	args := spec.Build()
 	cmd := exec.CommandContext(runCtx, r.command, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

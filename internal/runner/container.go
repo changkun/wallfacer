@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"changkun.de/wallfacer/internal/envconfig"
@@ -72,30 +73,43 @@ func (r *Runner) buildContainerArgsForSandbox(
 	siblingMounts map[string]map[string]string,
 	modelOverride, sandbox string,
 ) []string {
-	args := []string{"run", "--rm", "--network=host", "--name", containerName}
+	// Resolve model once: override takes priority, then env default.
+	model := modelOverride
+	if model == "" {
+		model = r.modelFromEnvForSandbox(sandbox)
+	}
+
+	spec := ContainerSpec{
+		Runtime: r.command,
+		Name:    containerName,
+		Image:   r.sandboxImage,
+	}
 
 	// Label the container with task metadata so the monitor can correlate
 	// containers to tasks by label rather than by parsing the container name.
 	if taskID != "" {
-		args = append(args, "--label", "wallfacer.task.id="+taskID)
-		args = append(args, "--label", "wallfacer.task.prompt="+truncate(prompt, 80))
+		spec.Labels = map[string]string{
+			"wallfacer.task.id":     taskID,
+			"wallfacer.task.prompt": truncate(prompt, 80),
+		}
 	}
 
 	if r.envFile != "" {
-		args = append(args, "--env-file", r.envFile)
+		spec.EnvFile = r.envFile
 	}
 
 	// Inject CLAUDE_CODE_MODEL so subagent model selection also uses the
 	// configured model (not just the --model CLI flag which only affects
 	// the main session).
-	if m := modelOverride; m != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
-	} else if m := r.modelFromEnvForSandbox(sandbox); m != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
+	if model != "" {
+		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
 	}
 
 	// Mount agent config volume.
-	args = append(args, "-v", "claude-config:/home/claude/.claude")
+	spec.Volumes = append(spec.Volumes, VolumeMount{
+		Host:      "claude-config",
+		Container: "/home/claude/.claude",
+	})
 
 	// Mount workspaces, substituting per-task worktree paths where available.
 	var basenames []string
@@ -115,7 +129,11 @@ func (r *Runner) buildContainerArgsForSandbox(
 				basename = parts[len(parts)-2]
 			}
 			basenames = append(basenames, basename)
-			args = append(args, "-v", hostPath+":/workspace/"+basename+":z")
+			spec.Volumes = append(spec.Volumes, VolumeMount{
+				Host:      hostPath,
+				Container: "/workspace/" + basename,
+				Options:   "z",
+			})
 
 			// Git worktrees have a .git file (not directory) that references
 			// the main repo's .git/worktrees/<name>/ using an absolute host
@@ -124,7 +142,11 @@ func (r *Runner) buildContainerArgsForSandbox(
 			if _, isWorktree := worktreeOverrides[ws]; isWorktree {
 				gitDir := filepath.Join(ws, ".git")
 				if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
-					args = append(args, "-v", gitDir+":"+gitDir+":z")
+					spec.Volumes = append(spec.Volumes, VolumeMount{
+						Host:      gitDir,
+						Container: gitDir,
+						Options:   "z",
+					})
 				}
 			}
 		}
@@ -136,21 +158,46 @@ func (r *Runner) buildContainerArgsForSandbox(
 	// directories from any workspace root.
 	if r.instructionsPath != "" {
 		if _, err := os.Stat(r.instructionsPath); err == nil {
-			args = append(args, "-v", r.instructionsPath+":/workspace/CLAUDE.md:z,ro")
+			spec.Volumes = append(spec.Volumes, VolumeMount{
+				Host:      r.instructionsPath,
+				Container: "/workspace/CLAUDE.md",
+				Options:   "z,ro",
+			})
 		}
 	}
 
 	// Board context: mount board.json read-only at /workspace/.tasks/.
 	if boardDir != "" {
-		args = append(args, "-v", boardDir+":/workspace/.tasks:z,ro")
+		spec.Volumes = append(spec.Volumes, VolumeMount{
+			Host:      boardDir,
+			Container: "/workspace/.tasks",
+			Options:   "z,ro",
+		})
 	}
 
 	// Sibling worktrees: mount each eligible sibling's worktrees read-only.
-	for shortID, repos := range siblingMounts {
-		for repoPath, wtPath := range repos {
+	// Sort by shortID then by repoPath for deterministic output.
+	shortIDs := make([]string, 0, len(siblingMounts))
+	for shortID := range siblingMounts {
+		shortIDs = append(shortIDs, shortID)
+	}
+	sort.Strings(shortIDs)
+	for _, shortID := range shortIDs {
+		repos := siblingMounts[shortID]
+		repoPaths := make([]string, 0, len(repos))
+		for repoPath := range repos {
+			repoPaths = append(repoPaths, repoPath)
+		}
+		sort.Strings(repoPaths)
+		for _, repoPath := range repoPaths {
+			wtPath := repos[repoPath]
 			basename := filepath.Base(repoPath)
 			containerPath := "/workspace/.tasks/worktrees/" + shortID + "/" + basename
-			args = append(args, "-v", wtPath+":"+containerPath+":z,ro")
+			spec.Volumes = append(spec.Volumes, VolumeMount{
+				Host:      wtPath,
+				Container: containerPath,
+				Options:   "z,ro",
+			})
 		}
 	}
 
@@ -161,19 +208,18 @@ func (r *Runner) buildContainerArgsForSandbox(
 	if len(basenames) == 1 {
 		workdir = "/workspace/" + basenames[0]
 	}
-	args = append(args, "-w", workdir, r.sandboxImage)
-	args = append(args, "-p", prompt, "--verbose", "--output-format", "stream-json")
-	// Per-task model takes priority; fall back to the env-configured default.
-	if modelOverride != "" {
-		args = append(args, "--model", modelOverride)
-	} else if model := r.modelFromEnvForSandbox(sandbox); model != "" {
-		args = append(args, "--model", model)
+	spec.WorkDir = workdir
+
+	// Build the agent command: prompt, verbosity flags, optional model, optional resume.
+	spec.Cmd = []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
+	if model != "" {
+		spec.Cmd = append(spec.Cmd, "--model", model)
 	}
 	if sessionID != "" {
-		args = append(args, "--resume", sessionID)
+		spec.Cmd = append(spec.Cmd, "--resume", sessionID)
 	}
 
-	return args
+	return spec.Build()
 }
 
 // modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file (if configured).

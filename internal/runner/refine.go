@@ -103,26 +103,36 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 // run. Workspaces are mounted read-only; no worktrees, board context, or sibling
 // mounts are used since the agent should only read, not commit.
 func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, modelOverride, sandbox string) []string {
-	args := []string{"run", "--rm", "--network=host", "--name", containerName}
-
-	if taskID != "" {
-		args = append(args, "--label", "wallfacer.task.id="+taskID)
-		args = append(args, "--label", "wallfacer.task.refine=true")
-	}
-
-	if r.envFile != "" {
-		args = append(args, "--env-file", r.envFile)
-	}
-
 	model := modelOverride
 	if model == "" {
 		model = r.modelFromEnvForSandbox(sandbox)
 	}
-	if model != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
+
+	spec := ContainerSpec{
+		Runtime: r.command,
+		Name:    containerName,
+		Image:   r.sandboxImage,
 	}
 
-	args = append(args, "-v", "claude-config:/home/claude/.claude")
+	if taskID != "" {
+		spec.Labels = map[string]string{
+			"wallfacer.task.id":    taskID,
+			"wallfacer.task.refine": "true",
+		}
+	}
+
+	if r.envFile != "" {
+		spec.EnvFile = r.envFile
+	}
+
+	if model != "" {
+		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
+	}
+
+	spec.Volumes = append(spec.Volumes, VolumeMount{
+		Host:      "claude-config",
+		Container: "/home/claude/.claude",
+	})
 
 	var basenames []string
 	if r.workspaces != "" {
@@ -138,13 +148,21 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 			}
 			basenames = append(basenames, basename)
 			// Mount read-only: refinement should inspect, not modify.
-			args = append(args, "-v", ws+":/workspace/"+basename+":z,ro")
+			spec.Volumes = append(spec.Volumes, VolumeMount{
+				Host:      ws,
+				Container: "/workspace/" + basename,
+				Options:   "z,ro",
+			})
 		}
 	}
 
 	if r.instructionsPath != "" {
 		if _, err := os.Stat(r.instructionsPath); err == nil {
-			args = append(args, "-v", r.instructionsPath+":/workspace/CLAUDE.md:z,ro")
+			spec.Volumes = append(spec.Volumes, VolumeMount{
+				Host:      r.instructionsPath,
+				Container: "/workspace/CLAUDE.md",
+				Options:   "z,ro",
+			})
 		}
 	}
 
@@ -152,13 +170,14 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 	if len(basenames) == 1 {
 		workdir = "/workspace/" + basenames[0]
 	}
-	args = append(args, "-w", workdir, r.sandboxImage)
-	args = append(args, "-p", prompt, "--verbose", "--output-format", "stream-json")
+	spec.WorkDir = workdir
+
+	spec.Cmd = []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
 	if model != "" {
-		args = append(args, "--model", model)
+		spec.Cmd = append(spec.Cmd, "--model", model)
 	}
 
-	return args
+	return spec.Build()
 }
 
 // runRefinementContainer executes a refinement container and parses its output.
