@@ -677,6 +677,8 @@ func (s *Store) UpdateRefinementJob(_ context.Context, id uuid.UUID, job *Refine
 // CurrentRefinement.Status == "running". If the existing job completed very
 // recently and recorded an error or output, it is also treated as still
 // in-flight to avoid concurrent duplicate starts during fast failure races.
+// The guard uses task.UpdatedAt so a just-completed runner job does not
+// immediately become eligible for a second start in a tight race.
 func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *RefinementJob) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -691,7 +693,7 @@ func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *R
 			return ErrRefinementAlreadyRunning
 		}
 		if t.CurrentRefinement.Source == "runner" && (status == "failed" || status == "done") {
-			elapsed := time.Since(t.CurrentRefinement.CreatedAt)
+			elapsed := time.Since(t.UpdatedAt)
 			if elapsed >= 0 && elapsed < refinementRecentCompleteWindow && (t.CurrentRefinement.Error != "" || t.CurrentRefinement.Result != "") {
 				return ErrRefinementAlreadyRunning
 			}
