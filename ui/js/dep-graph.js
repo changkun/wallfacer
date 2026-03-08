@@ -57,6 +57,33 @@ function renderDependencyGraph(tasks) {
   svg.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:40;overflow:visible;';
   document.body.appendChild(svg);
 
+  // Clip drawing to the board area so curves don't bleed through the header
+  // or other UI chrome when cards scroll out of view.
+  const boardEl = document.getElementById('board');
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+  clipPath.id = 'dep-graph-clip';
+  const clipRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  if (boardEl) {
+    const br = boardEl.getBoundingClientRect();
+    clipRect.setAttribute('x', br.left);
+    clipRect.setAttribute('y', br.top);
+    clipRect.setAttribute('width', br.width);
+    clipRect.setAttribute('height', br.height);
+  } else {
+    clipRect.setAttribute('x', 0);
+    clipRect.setAttribute('y', 0);
+    clipRect.setAttribute('width', '100vw');
+    clipRect.setAttribute('height', '100vh');
+  }
+  clipPath.appendChild(clipRect);
+  defs.appendChild(clipPath);
+  svg.appendChild(defs);
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('clip-path', 'url(#dep-graph-clip)');
+  svg.appendChild(g);
+
   for (const { from, to, depStatus } of edges) {
     const fromEl = document.querySelector('[data-task-id="' + from + '"]');
     const toEl = document.querySelector('[data-task-id="' + to + '"]');
@@ -91,8 +118,8 @@ function renderDependencyGraph(tasks) {
     marker.setAttribute('r', '4');
     marker.setAttribute('fill', color);
 
-    svg.appendChild(path);
-    svg.appendChild(marker);
+    g.appendChild(path);
+    g.appendChild(marker);
   }
 }
 
