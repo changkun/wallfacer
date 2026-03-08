@@ -42,7 +42,15 @@ function populateDependsOnPicker(wrapperId, excludeId, selectedIds) {
   var search = wrap.querySelector('.dep-picker-search');
   if (search) search.value = '';
   list.innerHTML = '';
-  var candidates = tasks.filter(function(t) { return t.id !== excludeId; });
+  var statusPriority = { in_progress: 0, waiting: 1, backlog: 2, done: 3 };
+  var candidates = tasks
+    .filter(function(t) { return t.id !== excludeId; })
+    .slice()
+    .sort(function(a, b) {
+      var pa = statusPriority[a.status] !== undefined ? statusPriority[a.status] : 4;
+      var pb = statusPriority[b.status] !== undefined ? statusPriority[b.status] : 4;
+      return pa - pb;
+    });
   if (candidates.length === 0) {
     list.innerHTML = '<div class="dep-picker-empty">No other tasks</div>';
     updateDepPickerChips(wrapperId, false);

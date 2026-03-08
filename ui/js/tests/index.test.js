@@ -270,3 +270,98 @@ describe('buildCardActions refinement guard', () => {
     expect(html).toContain('card-action-start');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test 8 – populateDependsOnPicker ordering (tasks.js)
+// Verifies that tasks in the dep-picker are ordered by status priority:
+// in_progress → waiting → backlog → done.
+// ---------------------------------------------------------------------------
+describe('populateDependsOnPicker status ordering', () => {
+  let ctx;
+  let appendedItems;
+
+  beforeEach(() => {
+    appendedItems = [];
+
+    function makeEl() {
+      const el = {
+        _children: [],
+        className: '',
+        textContent: '',
+        type: '',
+        value: '',
+        checked: false,
+        innerHTML: '',
+        style: {},
+        classList: { toggle: () => {}, add: () => {}, remove: () => {}, contains: () => false },
+        appendChild(child) { this._children.push(child); },
+        addEventListener() {},
+        closest() { return null; },
+        querySelector(sel) {
+          if (sel === '.dep-picker-item-text') return el._children[1] || null;
+          return null;
+        },
+        querySelectorAll() { return { forEach: () => {} }; },
+      };
+      return el;
+    }
+
+    const listEl = makeEl();
+    listEl.appendChild = function(child) { appendedItems.push(child); };
+
+    const chipsEl = makeEl();
+
+    const wrapEl = makeEl();
+    wrapEl.querySelector = function(sel) {
+      if (sel === '.dep-picker-list') return listEl;
+      if (sel === '.dep-picker-search') return null;
+      if (sel === '.dep-picker-chips') return chipsEl;
+      return null;
+    };
+    wrapEl.querySelectorAll = function(sel) {
+      if (sel.includes('input[type=checkbox]:checked')) return [];
+      return [];
+    };
+    wrapEl.dataset = {};
+
+    ctx = makeContext({
+      document: {
+        getElementById(id) {
+          if (id === 'dep-picker') return wrapEl;
+          if (id === 'container-monitor-modal') return { addEventListener: () => {} };
+          // tasks.js attaches event listeners to these at module load time
+          if (id === 'modal-edit-prompt') return { addEventListener: () => {} };
+          if (id === 'modal-edit-timeout') return { addEventListener: () => {} };
+          return null;
+        },
+        createElement() { return makeEl(); },
+        querySelectorAll: () => ({ forEach: () => {} }),
+        documentElement: { setAttribute: () => {} },
+        readyState: 'complete',
+        addEventListener: () => {},
+      },
+    });
+
+    loadScript('tasks.js', ctx);
+
+    vm.runInContext(`
+      tasks = [
+        { id: '1', status: 'done',        prompt: 'done task',        title: 'Done Task' },
+        { id: '2', status: 'backlog',      prompt: 'backlog task',     title: 'Backlog Task' },
+        { id: '3', status: 'waiting',      prompt: 'waiting task',     title: 'Waiting Task' },
+        { id: '4', status: 'in_progress',  prompt: 'in progress task', title: 'In Progress Task' },
+      ];
+    `, ctx);
+  });
+
+  it('orders items as in_progress → waiting → backlog → done', () => {
+    ctx.populateDependsOnPicker('dep-picker', null, []);
+    // Each appended item is a label; its 3rd child (index 2) is the badge
+    // with className 'badge badge-<status>'.
+    const statuses = appendedItems.map(function(item) {
+      const badge = item._children[2];
+      return badge.className.replace('badge badge-', '');
+    });
+    expect(statuses).toEqual(['in_progress', 'waiting', 'backlog', 'done']);
+  });
+});
