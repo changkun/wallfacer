@@ -133,7 +133,7 @@ ui/
       instructions.ts    # CLAUDE.md read/write
     components/
       board/
-        Board.vue          # 4-column kanban grid
+        Board.vue          # 4-column task board grid
         Column.vue         # single column with header
         TaskCard.vue       # draggable card (current createCard/updateCard)
         NewTaskForm.vue    # collapsible create form

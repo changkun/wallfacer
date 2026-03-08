@@ -329,7 +329,7 @@ func (s *Store) AccumulateTaskUsage(ctx context.Context, id uuid.UUID, delta Tas
 	return s.AccumulateSubAgentUsage(ctx, id, "implementation", delta)
 }
 
-// UpdateTaskPosition updates the Kanban column sort position.
+// UpdateTaskPosition updates the task board column sort position.
 func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
