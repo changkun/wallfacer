@@ -351,10 +351,18 @@
           <input type="checkbox" id="new-mount-worktrees" style="cursor:pointer;accent-color:var(--accent);">
           <label for="new-mount-worktrees" class="text-xs text-v-muted" style="cursor:pointer;">Mount sibling worktrees (read-only)</label>
         </div>
-        <div id="new-depends-on-row" class="flex items-center gap-2 mt-1" style="display:none;">
-          <label for="new-depends-on" class="text-xs text-v-muted" style="flex-shrink:0;">Depends on</label>
-          <select id="new-depends-on" multiple class="select" size="3"
-                  style="flex:1;font-size:11px;min-height:44px;"></select>
+        <div id="new-depends-on-row" class="mt-2" style="display:none;">
+          <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Depends on</label>
+          <div id="new-depends-on-picker" class="dep-picker">
+            <button type="button" class="dep-picker-trigger" onclick="toggleDepPicker('new-depends-on-picker')">
+              <div class="dep-picker-chips"><span class="dep-picker-placeholder">None</span></div>
+              <svg class="dep-picker-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div class="dep-picker-dropdown" style="display:none">
+              <input class="dep-picker-search" type="text" placeholder="Filter tasks…" oninput="filterDepPicker(this)">
+              <div class="dep-picker-list"></div>
+            </div>
+          </div>
         </div>
       </div>
       <div id="col-backlog" class="space-y-2" data-status="backlog"></div>
@@ -466,11 +474,18 @@
               <input type="checkbox" id="modal-edit-mount-worktrees" onchange="scheduleBacklogSave()" style="cursor:pointer;accent-color:var(--accent);">
               <label for="modal-edit-mount-worktrees" class="text-xs text-v-secondary" style="cursor:pointer;">Mount sibling worktrees (read-only)</label>
             </div>
-            <div class="flex items-center gap-2 mt-2" id="modal-edit-depends-on-row">
-              <label for="modal-edit-depends-on" class="text-xs text-v-muted" style="flex-shrink:0;">Depends on</label>
-              <select id="modal-edit-depends-on" multiple class="select" size="3"
-                      style="flex:1;font-size:11px;min-height:44px;"
-                      onchange="scheduleBacklogSave()"></select>
+            <div class="mt-2" id="modal-edit-depends-on-row">
+              <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Depends on</label>
+              <div id="modal-edit-depends-on-picker" class="dep-picker" data-onchange="scheduleBacklogSave">
+                <button type="button" class="dep-picker-trigger" onclick="toggleDepPicker('modal-edit-depends-on-picker')">
+                  <div class="dep-picker-chips"><span class="dep-picker-placeholder">None</span></div>
+                  <svg class="dep-picker-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div class="dep-picker-dropdown" style="display:none">
+                  <input class="dep-picker-search" type="text" placeholder="Filter tasks…" oninput="filterDepPicker(this)">
+                  <div class="dep-picker-list"></div>
+                </div>
+              </div>
             </div>
             <span id="modal-edit-status" class="text-xs text-v-muted"></span>
           </div>
