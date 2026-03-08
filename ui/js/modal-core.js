@@ -1,6 +1,10 @@
 // --- Modal lifecycle ---
 
 async function openModal(id) {
+  function isTestCard(task) {
+    return task.status === 'waiting' && !!task.last_test_result && task.test_run_start_turn > 0;
+  }
+
   currentTaskId = id;
   const task = tasks.find(t => t.id === id);
   if (!task) return;
@@ -213,7 +217,7 @@ async function openModal(id) {
         const totalBehind = entries.reduce((s, [, n]) => s + n, 0);
         const warnEl = document.getElementById('modal-diff-behind');
         if (warnEl) {
-          if (totalBehind > 0) {
+          if (!isTestCard(task) && totalBehind > 0) {
             const label = entries.length === 1
               ? `${totalBehind} commit${totalBehind !== 1 ? 's' : ''} behind`
               : entries.map(([repo, n]) => `${repo}: ${n}`).join(', ') + ' behind';

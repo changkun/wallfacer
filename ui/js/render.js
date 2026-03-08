@@ -62,6 +62,10 @@ function updateInProgressCount() {
 
 const diffCache = new Map(); // taskId -> {diff: string, behindCounts, updatedAt, behindFetchedAt} | 'loading'
 
+function isTestCard(task) {
+  return task.status === 'waiting' && !!task.last_test_result && task.test_run_start_turn > 0;
+}
+
 // Invalidate cached behind-counts for all tasks so that the next render re-checks
 // how many commits each waiting card is behind. Called whenever any task changes.
 function invalidateDiffBehindCounts() {
@@ -212,7 +216,7 @@ function render() {
         el.insertBefore(card, el.children[i] || null);
       }
       // Load diff for waiting/failed/done tasks that have worktrees
-      if ((t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
+      if ((t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && !isTestCard(t) && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
         fetchDiff(card, t.id, t.updated_at);
       }
     }
@@ -294,6 +298,7 @@ function updateCard(card, t, rank) {
   const isIdeaAgent = t.kind === 'idea-agent';
   const isArchived = !!t.archived;
   const isTestRun = !!t.is_test_run && t.status === 'in_progress';
+  const isTestTaskCard = isTestCard(t);
   const badgeClass = isArchived ? 'badge-archived' : isTestRun ? 'badge-testing' : `badge-${t.status}`;
   const statusLabel = isArchived ? 'archived' : isTestRun ? 'testing' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
   if (isIdeaAgent) {
@@ -302,7 +307,7 @@ function updateCard(card, t, rank) {
     card.classList.remove('card-idea-agent');
   }
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
-  const showDiff = (t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
+  const showDiff = ((t.status === 'failed' || t.status === 'done' || (t.status === 'waiting' && !isTestTaskCard)) && t.worktree_paths && Object.keys(t.worktree_paths).length > 0);
   card.style.opacity = isArchived ? '0.55' : '';
   // Failed tasks in the waiting column get a red left border to distinguish them.
   if (t.status === 'failed') {
