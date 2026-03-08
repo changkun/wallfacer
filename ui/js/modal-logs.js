@@ -5,6 +5,10 @@ function _updateLogsTabs() {
     const tab = document.getElementById('logs-tab-' + m);
     if (tab) tab.classList.toggle('active', m === logsMode);
   });
+  const searchBar = document.getElementById('log-search-bar');
+  if (searchBar) {
+    searchBar.style.display = (logsMode === 'oversight') ? 'none' : 'flex';
+  }
 }
 
 function renderLogs() {
@@ -17,14 +21,65 @@ function renderLogs() {
   }
   // Capture scroll position before updating content so we know if the user was at the bottom.
   const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 80;
+  const countEl = document.getElementById('log-search-count');
   if (logsMode === 'pretty') {
-    logsEl.innerHTML = renderPrettyLogs(rawLogBuffer);
+    if (logSearchQuery) {
+      const query = logSearchQuery.toLowerCase();
+      const allLines = rawLogBuffer.split('\n').filter(function(l) { return l.trim().length > 0; });
+      const filteredLines = allLines.filter(function(line) {
+        return line.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').toLowerCase().includes(query);
+      });
+      logsEl.innerHTML = renderPrettyLogs(filteredLines.join('\n'));
+      highlightLogMatches(logSearchQuery);
+      if (countEl) countEl.textContent = filteredLines.length + ' / ' + allLines.length + ' lines';
+    } else {
+      logsEl.innerHTML = renderPrettyLogs(rawLogBuffer);
+      if (countEl) countEl.textContent = '';
+    }
   } else {
-    logsEl.textContent = rawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    const stripped = rawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    if (logSearchQuery) {
+      const query = logSearchQuery.toLowerCase();
+      const allLines = stripped.split('\n').filter(function(l) { return l.trim().length > 0; });
+      const filteredLines = allLines.filter(function(line) {
+        return line.toLowerCase().includes(query);
+      });
+      logsEl.textContent = filteredLines.join('\n');
+      if (countEl) countEl.textContent = filteredLines.length + ' / ' + allLines.length + ' lines';
+    } else {
+      logsEl.textContent = stripped;
+      if (countEl) countEl.textContent = '';
+    }
   }
-  if (atBottom) {
+  if (!logSearchQuery && atBottom) {
     logsEl.scrollTop = logsEl.scrollHeight;
   }
+}
+
+function highlightLogMatches(query) {
+  if (!query) return;
+  const logsEl = document.getElementById('modal-logs');
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(escaped, 'gi');
+  const walker = document.createTreeWalker(logsEl, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  let node;
+  while ((node = walker.nextNode())) textNodes.push(node);
+  textNodes.forEach(function(tn) {
+    if (!re.test(tn.textContent)) return;
+    re.lastIndex = 0;
+    const wrapper = document.createElement('span');
+    wrapper.innerHTML = tn.textContent.replace(
+      re,
+      '<mark style="background:#fef08a;color:#1a1917;border-radius:2px;">$&</mark>'
+    );
+    tn.parentNode.replaceChild(wrapper, tn);
+  });
+}
+
+function onLogSearchInput(value) {
+  logSearchQuery = value.trim();
+  renderLogs();
 }
 
 function setRightTab(tab) {

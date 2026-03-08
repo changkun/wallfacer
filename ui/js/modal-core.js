@@ -175,6 +175,13 @@ async function openModal(id) {
       }
     }
 
+    // Reset log search state for this task
+    logSearchQuery = '';
+    const _searchInput = document.getElementById('log-search-input');
+    if (_searchInput) _searchInput.value = '';
+    const _searchCount = document.getElementById('log-search-count');
+    if (_searchCount) _searchCount.textContent = '';
+
     // Start log streaming; show Testing tab when test data exists
     if (task.is_test_run || task.last_test_result) {
       // Shown both while the test is running (is_test_run) and after it
@@ -383,6 +390,11 @@ function closeModal() {
   _stopTimelineRefresh();
   rawLogBuffer = '';
   testRawLogBuffer = '';
+  logSearchQuery = '';
+  const searchInput = document.getElementById('log-search-input');
+  if (searchInput) searchInput.value = '';
+  const searchCount = document.getElementById('log-search-count');
+  if (searchCount) searchCount.textContent = '';
   oversightData = null;
   oversightFetching = false;
   logsMode = 'oversight';

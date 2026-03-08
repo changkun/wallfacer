@@ -810,6 +810,12 @@
                   <button id="logs-tab-raw" onclick="setLogsMode('raw')" class="logs-tab">Raw</button>
                 </div>
               </div>
+              <div id="log-search-bar" style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:#1a1917;border-radius:8px 8px 0 0;">
+                <input id="log-search-input" type="search" placeholder="Filter logs…"
+                       style="flex:1;background:transparent;border:1px solid #444;border-radius:4px;padding:2px 6px;font-size:12px;color:#cdd1d6;outline:none;"
+                       oninput="onLogSearchInput(this.value)" />
+                <span id="log-search-count" style="font-size:11px;color:#888;white-space:nowrap;"></span>
+              </div>
               <pre id="modal-logs" class="logs-block"></pre>
             </div>
           </div>

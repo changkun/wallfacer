@@ -5,6 +5,8 @@ let logsAbort = null;
 let rawLogBuffer = '';
 // logsMode: 'pretty' | 'raw' | 'oversight'
 let logsMode = 'pretty';
+// logSearchQuery: active filter string for the implementation log viewer
+let logSearchQuery = '';
 
 // Test agent monitor state (shown alongside impl logs when is_test_run=true)
 let testLogsAbort = null;

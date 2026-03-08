@@ -35,6 +35,7 @@ function makeLogsContext() {
       scrollHeight: 200,
       scrollTop: 200,
       clientHeight: 100,
+      style: {},
       classList: {
         _classes: new Set(),
         add(c) { this._classes.add(c); },
@@ -62,10 +63,16 @@ function makeLogsContext() {
     fetch: () => Promise.reject(new Error('not mocked')),
     setTimeout: () => {},
     clearTimeout: () => {},
+    NodeFilter: { SHOW_TEXT: 4 },
     document: {
       getElementById: (id) => {
         if (!elements[id]) makeEl(id);
         return elements[id];
+      },
+      createTreeWalker: () => ({ nextNode: () => null }),
+      createElement: (tag) => {
+        const el = { tagName: tag, innerHTML: '', style: {}, parentNode: null };
+        return el;
       },
     },
     // Runtime dependencies from other modules
@@ -77,6 +84,7 @@ function makeLogsContext() {
     testRawLogBuffer: '',
     logsMode: 'pretty',
     testLogsMode: 'pretty',
+    logSearchQuery: '',
     oversightData: null,
     oversightFetching: false,
     testOversightData: null,
@@ -307,5 +315,48 @@ describe('renderTestLogs', () => {
     vm.runInContext('testLogsMode = "oversight"', ctx);
     ctx.renderTestLogs();
     expect(elements['modal-test-logs'].classList.contains('oversight-mode')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// onLogSearchInput
+// ---------------------------------------------------------------------------
+describe('onLogSearchInput', () => {
+  let ctx, elements;
+  beforeEach(() => {
+    ({ ctx, elements } = makeLogsContext());
+    vm.runInContext('logsMode = "pretty"', ctx);
+  });
+
+  it('empty query renders all lines and clears count', () => {
+    vm.runInContext('rawLogBuffer = "line one\\nline two\\nline three"', ctx);
+    ctx.onLogSearchInput('');
+    // renderPrettyLogs stub wraps in class="pretty"; with no filter the full buffer is passed
+    expect(elements['modal-logs'].innerHTML).toContain('pretty');
+    expect(elements['log-search-count'].textContent).toBe('');
+  });
+
+  it('non-empty query filters lines and shows match count', () => {
+    // 3 lines, 2 contain 'foo'
+    vm.runInContext('rawLogBuffer = "foo line\\nbar line\\nfoo baz"', ctx);
+    ctx.onLogSearchInput('foo');
+    expect(elements['log-search-count'].textContent).toBe('2 / 3 lines');
+  });
+
+  it('handles regex-special characters without throwing', () => {
+    vm.runInContext('rawLogBuffer = "some content"', ctx);
+    expect(() => ctx.onLogSearchInput('foo(bar[baz')).not.toThrow();
+    // query didn't match anything → 0 / 1 lines
+    expect(elements['log-search-count'].textContent).toMatch(/\d+ \/ \d+ lines/);
+  });
+
+  it('count exactly matches filtered line count', () => {
+    // 5 lines, 3 contain 'target'
+    vm.runInContext(
+      'rawLogBuffer = "target one\\nno match\\ntarget two\\nno match\\ntarget three"',
+      ctx
+    );
+    ctx.onLogSearchInput('target');
+    expect(elements['log-search-count'].textContent).toBe('3 / 5 lines');
   });
 });
