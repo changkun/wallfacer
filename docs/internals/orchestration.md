@@ -12,9 +12,9 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 | `PUT /api/config` | Update server config (`{autopilot: bool}`); re-triggers auto-promotion if enabled |
 | `GET /api/env` | Return current env config (tokens masked) |
 | `PUT /api/env` | Update env config (token, base URL, default model, title model, max parallel); writes `~/.wallfacer/.env` atomically |
-| `GET /api/instructions` | Get workspace CLAUDE.md content |
-| `PUT /api/instructions` | Save workspace CLAUDE.md (`{content}`) |
-| `POST /api/instructions/reinit` | Rebuild workspace CLAUDE.md from default + repo files |
+| `GET /api/instructions` | Get workspace AGENTS.md content |
+| `PUT /api/instructions` | Save workspace AGENTS.md (`{content}`) |
+| `POST /api/instructions/reinit` | Rebuild workspace AGENTS.md from default + repo files |
 | `GET /api/tasks` | List all tasks (from in-memory store) |
 | `POST /api/tasks` | Create task, assign UUID, persist to disk |
 | `PATCH /api/tasks/{id}` | Update status / position / prompt / timeout — may launch `runner.Run` goroutine |

@@ -425,7 +425,7 @@ func (r *Runner) WorktreesDir() string {
 	return r.worktreesDir
 }
 
-// InstructionsPath returns the host path mounted as /workspace/CLAUDE.md.
+// InstructionsPath returns the host path mounted as /workspace/AGENTS.md.
 func (r *Runner) InstructionsPath() string {
 	return r.instructionsPath
 }

@@ -9,12 +9,19 @@ import (
 	"strings"
 )
 
-// defaultTemplate is the baseline CLAUDE.md content written into every
-// new workspace instructions file. It provides general guidance for Claude Code
+const (
+	// InstructionsFilename is the canonical workspace instructions filename.
+	InstructionsFilename = "AGENTS.md"
+	// LegacyInstructionsFilename is kept for backward compatibility.
+	LegacyInstructionsFilename = "CLAUDE.md"
+)
+
+// defaultTemplate is the baseline AGENTS.md content written into every new
+// workspace instructions file. It provides general guidance for agents
 // operating inside a Wallfacer-managed task.
 const defaultTemplate = `# Workspace Instructions
 
-This file provides guidance to Claude Code when working on tasks in this workspace.
+This file provides guidance to coding agents when working on tasks in this workspace.
 
 ## General Notes
 
@@ -42,7 +49,7 @@ completed work. If sibling worktrees are mounted, they appear under
 `
 
 // workspaceLayoutSection is appended to the default template with the actual
-// workspace basenames filled in, so Claude knows exactly where code lives.
+// workspace basenames filled in, so the agent knows exactly where code lives.
 const workspaceLayoutSection = `
 ## Workspace Layout
 
@@ -63,15 +70,16 @@ func Key(workspaces []string) string {
 	return fmt.Sprintf("%x", h[:8]) // 16 hex chars
 }
 
-// FilePath returns the path to the workspace CLAUDE.md for a given set of
+// FilePath returns the path to the workspace AGENTS.md for a given set of
 // workspace directories. Each unique combination of workspaces has its own file.
 func FilePath(configDir string, workspaces []string) string {
 	dir := filepath.Join(configDir, "instructions")
 	return filepath.Join(dir, Key(workspaces)+".md")
 }
 
-// Ensure ensures the CLAUDE.md for the given workspace set exists.
-// If it does not exist yet it is created from the default template plus any CLAUDE.md
+// Ensure ensures the AGENTS.md for the given workspace set exists.
+// If it does not exist yet it is created from the default template plus any
+// AGENTS.md/CLAUDE.md files
 // files found in the workspace directories. Returns the path to the file.
 func Ensure(configDir string, workspaces []string) (string, error) {
 	dir := filepath.Join(configDir, "instructions")
@@ -93,8 +101,8 @@ func Ensure(configDir string, workspaces []string) (string, error) {
 	return path, nil
 }
 
-// Reinit rebuilds the workspace CLAUDE.md from the default template plus any
-// per-repo CLAUDE.md files, overwriting any existing content.
+// Reinit rebuilds the workspace AGENTS.md from the default template plus any
+// per-repo AGENTS.md/CLAUDE.md files, overwriting any existing content.
 func Reinit(configDir string, workspaces []string) (string, error) {
 	dir := filepath.Join(configDir, "instructions")
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -109,11 +117,12 @@ func Reinit(configDir string, workspaces []string) (string, error) {
 	return path, nil
 }
 
-// BuildContent assembles CLAUDE.md content from:
+// BuildContent assembles AGENTS.md content from:
 //  1. The default wallfacer instructions template.
-//  2. A reference list of per-repo CLAUDE.md paths so Claude can read them
-//     on demand. The instructions file is mounted at /workspace/CLAUDE.md so
-//     it does not shadow any individual repo's CLAUDE.md.
+//  2. A reference list of per-repo AGENTS.md/CLAUDE.md paths so agents can
+//     read them on demand. The instructions file is mounted at
+//     /workspace/AGENTS.md so it does not shadow any individual repo's
+//     instructions file.
 func BuildContent(workspaces []string) string {
 	var sb strings.Builder
 	sb.WriteString(defaultTemplate)
@@ -126,18 +135,21 @@ func BuildContent(workspaces []string) string {
 	}
 	sb.WriteByte('\n')
 
-	// List per-repo CLAUDE.md paths so Claude can read them on demand.
+	// List per-repo AGENTS.md/CLAUDE.md paths so the agent can read them on demand.
 	var refs []string
 	for _, ws := range workspaces {
-		claudePath := filepath.Join(ws, "CLAUDE.md")
-		if _, err := os.Stat(claudePath); err == nil {
-			name := filepath.Base(ws)
-			refs = append(refs, fmt.Sprintf("- `/workspace/%s/CLAUDE.md`", name))
+		name := filepath.Base(ws)
+		if _, err := os.Stat(filepath.Join(ws, InstructionsFilename)); err == nil {
+			refs = append(refs, fmt.Sprintf("- `/workspace/%s/%s`", name, InstructionsFilename))
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(ws, LegacyInstructionsFilename)); err == nil {
+			refs = append(refs, fmt.Sprintf("- `/workspace/%s/%s`", name, LegacyInstructionsFilename))
 		}
 	}
 	if len(refs) > 0 {
 		sb.WriteString("---\n\n## Repo-Specific Instructions\n\n")
-		sb.WriteString("The repositories below have their own `CLAUDE.md` with project-specific\n")
+		sb.WriteString("The repositories below have their own `AGENTS.md` (or legacy `CLAUDE.md`) with project-specific\n")
 		sb.WriteString("instructions. Read the relevant file before working on tasks in that workspace:\n\n")
 		for _, ref := range refs {
 			sb.WriteString(ref + "\n")

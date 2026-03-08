@@ -130,7 +130,7 @@ ui/
       tasks.ts           # task CRUD, status transitions
       git.ts             # push, sync, branch ops
       env.ts             # env config read/write
-      instructions.ts    # CLAUDE.md read/write
+      instructions.ts    # AGENTS.md read/write
     components/
       board/
         Board.vue          # 4-column task board grid

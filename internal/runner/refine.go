@@ -195,7 +195,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 		if _, err := os.Stat(r.instructionsPath); err == nil {
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      r.instructionsPath,
-				Container: "/workspace/CLAUDE.md",
+				Container: "/workspace/" + instructionsFilenameForSandbox(sandbox),
 				Options:   "z,ro",
 			})
 		}

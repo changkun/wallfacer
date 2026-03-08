@@ -248,6 +248,23 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	}
 }
 
+// TestContainerArgsCodexMountsAGENTSMD verifies that codex sandbox mounts
+// workspace instructions at /workspace/AGENTS.md.
+func TestContainerArgsCodexMountsAGENTSMD(t *testing.T) {
+	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
+	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	runner := newTestRunnerWithInstructions(t, instructionsFile)
+	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
+
+	expectedMount := instructionsFile + ":/workspace/AGENTS.md:z,ro"
+	if !containsConsecutive(args, "-v", expectedMount) {
+		t.Fatalf("codex sandbox: AGENTS.md should be mounted at /workspace/AGENTS.md; got args: %v", args)
+	}
+}
+
 // TestContainerArgsCLAUDEMDMountPosition verifies that the CLAUDE.md mount
 // appears before the image name in the args list, matching the expected
 // container launch order.

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"changkun.de/wallfacer/internal/envconfig"
+	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -152,15 +153,14 @@ func (r *Runner) buildContainerArgsForSandbox(
 		}
 	}
 
-	// Mount workspace-level CLAUDE.md so the agent picks it up automatically.
-	// Mounted at /workspace/CLAUDE.md so it does not shadow any individual
-	// repo's CLAUDE.md; Claude Code discovers it by traversing parent
-	// directories from any workspace root.
+	// Mount workspace-level instructions file based on sandbox convention:
+	// - Claude sandbox expects /workspace/CLAUDE.md
+	// - Codex sandbox expects /workspace/AGENTS.md
 	if r.instructionsPath != "" {
 		if _, err := os.Stat(r.instructionsPath); err == nil {
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      r.instructionsPath,
-				Container: "/workspace/CLAUDE.md",
+				Container: "/workspace/" + instructionsFilenameForSandbox(sandbox),
 				Options:   "z,ro",
 			})
 		}
@@ -220,6 +220,13 @@ func (r *Runner) buildContainerArgsForSandbox(
 	}
 
 	return spec.Build()
+}
+
+func instructionsFilenameForSandbox(sandbox string) string {
+	if strings.EqualFold(strings.TrimSpace(sandbox), "codex") {
+		return instructions.InstructionsFilename
+	}
+	return instructions.LegacyInstructionsFilename
 }
 
 // modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file (if configured).

@@ -114,7 +114,7 @@ To rebase your current workspace branch onto the latest upstream, use the sync b
 
 ## Workspace Instructions
 
-Each workspace can have a `CLAUDE.md` file that provides instructions to every agent running in that workspace. Open **Settings → Workspace Instructions** to edit this file directly from the UI. All tasks in the workspace share these instructions.
+Each workspace can have a `AGENTS.md` file that provides instructions to every agent running in that workspace. Open **Settings → Workspace Instructions** to edit this file directly from the UI. All tasks in the workspace share these instructions.
 
 Use workspace instructions to set coding standards, preferred patterns, project context, or any constraints the agent should follow.
 
@@ -123,7 +123,7 @@ Use workspace instructions to set coding standards, preferred patterns, project 
 Open **Settings** (gear icon) to access:
 
 - **API Configuration** — credential, base URL, model selection, concurrency limit; changes take effect on the next task run without restarting
-- **Workspace Instructions** — the `CLAUDE.md` content for each workspace
+- **Workspace Instructions** — the `AGENTS.md` content for each workspace
 
 **WALLFACER_OVERSIGHT_INTERVAL** controls how often (in minutes) the server generates intermediate oversight summaries while a task is running. Set to `0` (default) to generate only when the task completes.
 

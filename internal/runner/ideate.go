@@ -58,10 +58,10 @@ func pickCategories(n int) []string {
 func buildIdeationPrompt(existingTasks []store.Task) string {
 	cats := pickCategories(3)
 	var sb strings.Builder
-	sb.WriteString(`You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 improvements — each from a different assigned domain.
+sb.WriteString(`You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 improvements — each from a different assigned domain.
 
 First, explore the workspace thoroughly:
-- Read README files, CLAUDE.md, go.mod, package.json, or similar project manifests
+- Read README files, AGENTS.md (or legacy CLAUDE.md), go.mod, package.json, or similar project manifests
 - Scan the main source directories and read key source files to understand current patterns and pain points
 - Review recent git history (git log --oneline -20) to see what has changed recently
 - Identify concrete opportunities, rough edges, and gaps in the code
@@ -226,7 +226,7 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt, sandbox strin
 
 	if r.instructionsPath != "" {
 		if _, err := os.Stat(r.instructionsPath); err == nil {
-			args = append(args, "-v", r.instructionsPath+":/workspace/CLAUDE.md:z,ro")
+			args = append(args, "-v", r.instructionsPath+":/workspace/"+instructionsFilenameForSandbox(sandbox)+":z,ro")
 		}
 	}
 

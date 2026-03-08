@@ -1,4 +1,4 @@
-// --- Workspace CLAUDE.md (Instructions) ---
+// --- Workspace AGENTS.md (Instructions) ---
 
 async function showInstructionsEditor(event, preloadedContent) {
   if (event) event.stopPropagation();
@@ -63,7 +63,7 @@ async function saveInstructions() {
 
 // Called from the Re-init button inside the editor modal.
 async function reinitInstructionsFromEditor() {
-  if (!confirm('Re-initialize from the default template and each repository\'s CLAUDE.md?\n\nThis will overwrite your current edits.')) {
+  if (!confirm('Re-initialize from the default template and each repository\'s AGENTS.md (or legacy CLAUDE.md)?\n\nThis will overwrite your current edits.')) {
     return;
   }
   var statusEl = document.getElementById('instructions-status');
