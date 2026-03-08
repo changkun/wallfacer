@@ -1479,6 +1479,96 @@ func TestTryAutoTest_TriggersForEligibleTask(t *testing.T) {
 	}
 }
 
+// TestTryAutoTest_RespectsMaxConcurrencyLimit verifies that tryAutoTest does not
+// trigger more test runs than the configured maxConcurrentTasks limit.
+func TestTryAutoTest_RespectsMaxConcurrencyLimit(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	// Set max parallel to 1.
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a repo with two worktrees (one per task).
+	repo := setupRepo(t)
+	wt1 := filepath.Join(t.TempDir(), "wt1")
+	wt2 := filepath.Join(t.TempDir(), "wt2")
+	gitRun(t, repo, "worktree", "add", "-b", "branch-1", wt1, "HEAD")
+	gitRun(t, repo, "worktree", "add", "-b", "branch-2", wt2, "HEAD")
+
+	// Two waiting tasks, both eligible for auto-test.
+	task1, _ := h.store.CreateTask(ctx, "task 1", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task1.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task1.ID, map[string]string{repo: wt1}, "branch-1")
+
+	task2, _ := h.store.CreateTask(ctx, "task 2", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task2.ID, map[string]string{repo: wt2}, "branch-2")
+
+	h.tryAutoTest(ctx)
+
+	// With max=1 and no prior in-progress tasks, exactly one test run should start.
+	tasks, _ := h.store.ListTasks(ctx, false)
+	inProgress := 0
+	for _, task := range tasks {
+		if task.Status == store.TaskStatusInProgress {
+			inProgress++
+		}
+	}
+	if inProgress != 1 {
+		t.Errorf("expected exactly 1 test run to start (max=1), got %d in_progress", inProgress)
+	}
+}
+
+// TestTryAutoTest_RespectsMaxConcurrencyWithExistingInProgress verifies that
+// tryAutoTest counts existing in_progress tasks (including non-test ones) when
+// enforcing the concurrency limit.
+func TestTryAutoTest_RespectsMaxConcurrencyWithExistingInProgress(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	// Set max parallel to 2.
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=2\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// One task already in_progress (fills one slot).
+	existing, _ := h.store.CreateTask(ctx, "existing", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, existing.ID, store.TaskStatusInProgress)
+
+	// Two waiting tasks eligible for auto-test.
+	repo := setupRepo(t)
+	wt1 := filepath.Join(t.TempDir(), "wt1")
+	wt2 := filepath.Join(t.TempDir(), "wt2")
+	gitRun(t, repo, "worktree", "add", "-b", "branch-1", wt1, "HEAD")
+	gitRun(t, repo, "worktree", "add", "-b", "branch-2", wt2, "HEAD")
+
+	task1, _ := h.store.CreateTask(ctx, "task 1", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task1.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task1.ID, map[string]string{repo: wt1}, "branch-1")
+
+	task2, _ := h.store.CreateTask(ctx, "task 2", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task2.ID, map[string]string{repo: wt2}, "branch-2")
+
+	h.tryAutoTest(ctx)
+
+	// With max=2 and 1 already in_progress, only 1 test run should be triggered.
+	tasks, _ := h.store.ListTasks(ctx, false)
+	inProgress := 0
+	for _, task := range tasks {
+		if task.Status == store.TaskStatusInProgress {
+			inProgress++
+		}
+	}
+	if inProgress != 2 {
+		t.Errorf("expected exactly 2 in_progress (1 existing + 1 new test run), got %d", inProgress)
+	}
+}
+
 // TestAutotest_SetAndGet verifies the SetAutotest / AutotestEnabled accessors.
 func TestAutotest_SetAndGet(t *testing.T) {
 	h := newTestHandler(t)

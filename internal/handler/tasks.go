@@ -705,9 +705,19 @@ func (h *Handler) StartAutoTester(ctx context.Context) {
 	}()
 }
 
+// autoTestCandidate holds an eligible waiting task and its pre-built test prompt.
+type autoTestCandidate struct {
+	task       store.Task
+	testPrompt string
+}
+
 // tryAutoTest scans all waiting tasks and triggers the test agent for any
 // that are untested (LastTestResult == "") and whose worktrees are not behind
 // the default branch. Does nothing when auto-test is disabled.
+//
+// Concurrency limit: test runs count against maxConcurrentTasks just like
+// normal in-progress tasks. The promoteMu mutex is shared with tryAutoPromote
+// so that the two cannot simultaneously exceed the limit.
 func (h *Handler) tryAutoTest(ctx context.Context) {
 	if !h.AutotestEnabled() {
 		return
@@ -718,6 +728,10 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 		return
 	}
 
+	// Phase 1 (no lock): build the list of eligible candidates.
+	// Git I/O (CommitsBehind) happens here so we don't hold promoteMu
+	// during potentially slow filesystem operations.
+	var candidates []autoTestCandidate
 	for i := range tasks {
 		t := &tasks[i]
 		if t.Status != store.TaskStatusWaiting {
@@ -752,32 +766,75 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 			continue
 		}
 
-		logger.Handler.Info("auto-test: triggering test agent for waiting task", "task", t.ID)
-
 		implResult := ""
 		if t.Result != nil {
 			implResult = *t.Result
 		}
 		diff := generateWorktreeDiff(t.WorktreePaths)
 		testPrompt := buildTestPrompt(t.Prompt, "", implResult, diff)
+		candidates = append(candidates, autoTestCandidate{task: *t, testPrompt: testPrompt})
+	}
 
-		if err := h.store.UpdateTaskTestRun(ctx, t.ID, true, ""); err != nil {
-			logger.Handler.Error("auto-test: update test run flag", "task", t.ID, "error", err)
+	if len(candidates) == 0 {
+		return
+	}
+
+	// Phase 2 (under promoteMu): enforce the concurrency limit and trigger.
+	// Sharing promoteMu with tryAutoPromote prevents the two from racing to
+	// exceed maxConcurrentTasks simultaneously.
+	promoteMu.Lock()
+	defer promoteMu.Unlock()
+
+	// Re-read for a fresh in-progress count; state may have changed during
+	// the git checks above.
+	freshTasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		return
+	}
+	freshByID := make(map[uuid.UUID]store.Task, len(freshTasks))
+	inProgressCount := 0
+	for _, t := range freshTasks {
+		freshByID[t.ID] = t
+		if t.Status == store.TaskStatusInProgress {
+			inProgressCount++
+		}
+	}
+
+	maxTasks := h.maxConcurrentTasks()
+
+	for _, c := range candidates {
+		if inProgressCount >= maxTasks {
+			logger.Handler.Info("auto-test: concurrency limit reached, deferring remaining tests",
+				"limit", maxTasks)
+			break
+		}
+
+		// Re-verify eligibility using the fresh snapshot.
+		ft, ok := freshByID[c.task.ID]
+		if !ok || ft.Status != store.TaskStatusWaiting || ft.LastTestResult != "" || ft.IsTestRun {
 			continue
 		}
-		if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusInProgress); err != nil {
-			logger.Handler.Error("auto-test: update task status", "task", t.ID, "error", err)
+
+		logger.Handler.Info("auto-test: triggering test agent for waiting task", "task", c.task.ID)
+
+		if err := h.store.UpdateTaskTestRun(ctx, c.task.ID, true, ""); err != nil {
+			logger.Handler.Error("auto-test: update test run flag", "task", c.task.ID, "error", err)
 			continue
 		}
-		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+		if err := h.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
+			logger.Handler.Error("auto-test: update task status", "task", c.task.ID, "error", err)
+			continue
+		}
+		h.store.InsertEvent(ctx, c.task.ID, store.EventTypeStateChange, map[string]string{
 			"from": string(store.TaskStatusWaiting),
 			"to":   string(store.TaskStatusInProgress),
 		})
-		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+		h.store.InsertEvent(ctx, c.task.ID, store.EventTypeSystem, map[string]string{
 			"result": "Auto-test: triggering test verification agent.",
 		})
 
-		h.runner.RunBackground(t.ID, testPrompt, "", false)
+		h.runner.RunBackground(c.task.ID, c.testPrompt, "", false)
+		inProgressCount++
 	}
 }
 
