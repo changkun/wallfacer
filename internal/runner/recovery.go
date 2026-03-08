@@ -130,10 +130,18 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 // The goroutine exits when ctx is cancelled (e.g. on server shutdown) or after
 // a 4-hour safety timeout to prevent indefinitely-leaked goroutines.
 func monitorContainerUntilStopped(ctx context.Context, s *store.Store, lister ContainerLister, taskID uuid.UUID) {
-	ctx, cancel := context.WithTimeout(ctx, 4*time.Hour)
+	monitorContainerUntilStoppedWithConfig(ctx, s, lister, taskID, containerPollInterval, 4*time.Hour)
+}
+
+// monitorContainerUntilStoppedWithConfig is the testable core of
+// monitorContainerUntilStopped. pollInterval controls how often the container
+// runtime is queried; maxWait is the safety deadline after which the function
+// gives up waiting and transitions the task to waiting.
+func monitorContainerUntilStoppedWithConfig(ctx context.Context, s *store.Store, lister ContainerLister, taskID uuid.UUID, pollInterval, maxWait time.Duration) {
+	ctx, cancel := context.WithTimeout(ctx, maxWait)
 	defer cancel()
 
-	ticker := time.NewTicker(containerPollInterval)
+	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
 	// storeCtx is intentionally decoupled from the monitor lifetime so that
@@ -165,7 +173,7 @@ func monitorContainerUntilStopped(ctx context.Context, s *store.Store, lister Co
 		select {
 		case <-ctx.Done():
 			if ctx.Err() == context.DeadlineExceeded {
-				logger.Recovery.Warn("monitor: container not seen stopping after 4h, giving up", "task", taskID)
+				logger.Recovery.Warn("monitor: container not seen stopping after safety timeout, giving up", "task", taskID)
 				transitionToWaiting()
 			}
 			// If cancelled (server shutdown), exit silently.

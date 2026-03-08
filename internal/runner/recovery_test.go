@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"sync"
 	"testing"
 	"time"
 
@@ -258,4 +259,240 @@ func gitCmdWithEnv(dir string, extraEnv []string, args ...string) *exec.Cmd {
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
 	cmd.Env = append(os.Environ(), extraEnv...)
 	return cmd
+}
+
+// listerResponse holds one canned response for sequenceLister.
+type listerResponse struct {
+	containers []ContainerInfo
+	err        error
+}
+
+// sequenceLister is a stateful ContainerLister that cycles through a fixed
+// sequence of responses, repeating the last entry once the sequence is
+// exhausted. Safe for concurrent use.
+type sequenceLister struct {
+	mu  sync.Mutex
+	seq []listerResponse
+	pos int
+}
+
+func (s *sequenceLister) ListContainers() ([]ContainerInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	idx := s.pos
+	if idx >= len(s.seq) {
+		idx = len(s.seq) - 1
+	} else {
+		s.pos++
+	}
+	r := s.seq[idx]
+	return r.containers, r.err
+}
+
+// setupInProgressTask creates a store in a temp directory and a task whose
+// status has been forced to in_progress. Returns the store and the task.
+func setupInProgressTask(t *testing.T) (*store.Store, *store.Task) {
+	t.Helper()
+	s, err := store.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	ctx := context.Background()
+	task, err := s.CreateTask(ctx, "monitor test", 5, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+	task, err = s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	return s, task
+}
+
+// TestMonitorContainerUntilStoppedWithConfig_ContextCancel verifies that
+// cancelling the parent context causes the monitor to exit silently without
+// altering task status or inserting any events.
+func TestMonitorContainerUntilStoppedWithConfig_ContextCancel(t *testing.T) {
+	s, task := setupInProgressTask(t)
+
+	// Lister always reports the container as running.
+	lister := &mockLister{containers: []ContainerInfo{
+		{TaskID: task.ID.String(), State: "running"},
+	}}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		monitorContainerUntilStoppedWithConfig(ctx, s, lister, task.ID, 100*time.Millisecond, time.Hour)
+	}()
+
+	// Cancel before the first poll tick fires.
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("monitor goroutine did not exit after context cancellation")
+	}
+
+	// Task must remain in_progress with no events.
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusInProgress {
+		t.Errorf("status = %q, want in_progress", got.Status)
+	}
+
+	events, err := s.GetEvents(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(events) != 0 {
+		t.Errorf("expected 0 events after context cancel, got %d: %v", len(events), eventTypes(events))
+	}
+}
+
+// TestMonitorContainerUntilStoppedWithConfig_Timeout verifies that when the
+// container never stops within maxWait, the monitor transitions the task from
+// in_progress to waiting and emits exactly one system + one state_change event.
+func TestMonitorContainerUntilStoppedWithConfig_Timeout(t *testing.T) {
+	s, task := setupInProgressTask(t)
+
+	// Lister always reports the container as running — it will never stop.
+	lister := &mockLister{containers: []ContainerInfo{
+		{TaskID: task.ID.String(), State: "running"},
+	}}
+
+	// Short intervals so the test finishes quickly.
+	monitorContainerUntilStoppedWithConfig(
+		context.Background(), s, lister, task.ID,
+		10*time.Millisecond, // pollInterval
+		60*time.Millisecond, // maxWait — triggers timeout path
+	)
+
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("status = %q, want waiting", got.Status)
+	}
+
+	wantEvents := []store.EventType{store.EventTypeSystem, store.EventTypeStateChange}
+	events, err := s.GetEvents(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	got2 := eventTypes(events)
+	if len(got2) != len(wantEvents) {
+		t.Fatalf("event types = %v, want %v", got2, wantEvents)
+	}
+	for i, want := range wantEvents {
+		if got2[i] != want {
+			t.Errorf("event[%d] = %q, want %q", i, got2[i], want)
+		}
+	}
+}
+
+// TestMonitorContainerUntilStoppedWithConfig_AlreadyTransitioned verifies that
+// when the task has already been moved to a terminal state (e.g. cancelled) by
+// another code path, the monitor does not overwrite that status when it
+// observes the container stopping.
+func TestMonitorContainerUntilStoppedWithConfig_AlreadyTransitioned(t *testing.T) {
+	s, task := setupInProgressTask(t)
+
+	// Simulate a concurrent external cancellation: force the task to cancelled
+	// before the monitor's transitionToWaiting runs.
+	if err := s.ForceUpdateTaskStatus(context.Background(), task.ID, store.TaskStatusCancelled); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus to cancelled: %v", err)
+	}
+
+	// Lister reports no running containers — the monitor will see the
+	// container as stopped on the first poll and call transitionToWaiting.
+	lister := &mockLister{}
+
+	monitorContainerUntilStoppedWithConfig(
+		context.Background(), s, lister, task.ID,
+		10*time.Millisecond,
+		time.Hour,
+	)
+
+	// Task must remain cancelled — transitionToWaiting should have bailed
+	// because the status was no longer in_progress.
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusCancelled {
+		t.Errorf("status = %q, want cancelled", got.Status)
+	}
+
+	// No events should have been inserted by the monitor.
+	events, err := s.GetEvents(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(events) != 0 {
+		t.Errorf("expected 0 events, got %d: %v", len(events), eventTypes(events))
+	}
+}
+
+// TestMonitorContainerUntilStoppedWithConfig_IntermittentErrors verifies that
+// transient ListContainers errors do not terminate monitoring: the monitor
+// continues polling and eventually transitions the task to waiting once the
+// container is observed as stopped.
+func TestMonitorContainerUntilStoppedWithConfig_IntermittentErrors(t *testing.T) {
+	s, task := setupInProgressTask(t)
+
+	// Response sequence: two errors, one "still running", then stopped.
+	runningEntry := listerResponse{
+		containers: []ContainerInfo{{TaskID: task.ID.String(), State: "running"}},
+	}
+	stoppedEntry := listerResponse{} // empty containers list → not running
+
+	lister := &sequenceLister{
+		seq: []listerResponse{
+			{err: errors.New("runtime unavailable")}, // call 1: error → continue
+			{err: errors.New("runtime unavailable")}, // call 2: error → continue
+			runningEntry,                              // call 3: running → continue
+			stoppedEntry,                              // call 4: stopped → transition
+		},
+	}
+
+	monitorContainerUntilStoppedWithConfig(
+		context.Background(), s, lister, task.ID,
+		10*time.Millisecond,
+		time.Hour,
+	)
+
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("status = %q, want waiting", got.Status)
+	}
+
+	wantEvents := []store.EventType{store.EventTypeSystem, store.EventTypeStateChange}
+	events, err := s.GetEvents(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	gotTypes := eventTypes(events)
+	if len(gotTypes) != len(wantEvents) {
+		t.Fatalf("event types = %v, want %v", gotTypes, wantEvents)
+	}
+	for i, want := range wantEvents {
+		if gotTypes[i] != want {
+			t.Errorf("event[%d] = %q, want %q", i, gotTypes[i], want)
+		}
+	}
 }
