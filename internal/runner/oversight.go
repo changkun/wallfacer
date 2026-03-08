@@ -569,6 +569,19 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 		}); accErr != nil {
 			logger.Runner.Warn("oversight: accumulate usage failed", "task", taskID, "agent", agent, "error", accErr)
 		}
+		if appErr := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+			Turn:                 1,
+			Timestamp:            time.Now().UTC(),
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+			Sandbox:              sandbox,
+			SubAgent:             agent,
+		}); appErr != nil {
+			logger.Runner.Warn("oversight: append turn usage failed", "task", taskID, "agent", agent, "error", appErr)
+		}
 	}
 
 	phases, err := parseOversightResult(output.Result)

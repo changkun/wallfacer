@@ -20,6 +20,20 @@ type TaskUsage struct {
 	CostUSD              float64 `json:"cost_usd"`
 }
 
+// TurnUsageRecord captures token consumption and stop reason for a single agent turn.
+type TurnUsageRecord struct {
+	Turn                 int       `json:"turn"`
+	Timestamp            time.Time `json:"timestamp"`
+	InputTokens          int       `json:"input_tokens"`
+	OutputTokens         int       `json:"output_tokens"`
+	CacheReadInputTokens int       `json:"cache_read_input_tokens"`
+	CacheCreationTokens  int       `json:"cache_creation_tokens"`
+	CostUSD              float64   `json:"cost_usd"`
+	StopReason           string    `json:"stop_reason,omitempty"`
+	Sandbox              string    `json:"sandbox,omitempty"`
+	SubAgent             string    `json:"sub_agent,omitempty"` // "implementation", "test", "refinement", etc.
+}
+
 // RefinementMessage is a single turn in a refinement chat session.
 // Kept for backward compatibility with older chat-based refinement sessions.
 type RefinementMessage struct {

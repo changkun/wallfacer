@@ -97,5 +97,18 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		}); err != nil {
 			logger.Runner.Warn("title generation: accumulate usage failed", "task", taskID, "error", err)
 		}
+		if err := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+			Turn:                 1,
+			Timestamp:            time.Now().UTC(),
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+			Sandbox:              sandbox,
+			SubAgent:             "title",
+		}); err != nil {
+			logger.Runner.Warn("title generation: append turn usage failed", "task", taskID, "error", err)
+		}
 	}
 }
