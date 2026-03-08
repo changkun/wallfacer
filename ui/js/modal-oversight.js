@@ -9,6 +9,11 @@ let oversightFetching = false;
 let testOversightData = null;
 let testOversightFetching = false;
 
+function _fetchOversightJson(url, signal) {
+  if (typeof api === 'function') return api(url, { signal: signal });
+  return fetch(url, { signal: signal }).then(function(res) { return res.json(); });
+}
+
 function renderOversightPhases(phases) {
   if (!phases || phases.length === 0) {
     return '<div class="oversight-empty">No phases recorded.</div>';
@@ -40,21 +45,24 @@ function renderOversightPhases(phases) {
 
 function renderOversightInLogs() {
   const logsEl = document.getElementById('modal-logs');
+  const seq = typeof modalLoadSeq === 'number' ? modalLoadSeq : null;
   if (!oversightData) {
     if (!oversightFetching && currentTaskId) {
       oversightFetching = true;
       const id = currentTaskId;
-      fetch('/api/tasks/' + id + '/oversight')
-        .then(function(res) { return res.json(); })
+      const signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+      _fetchOversightJson('/api/tasks/' + id + '/oversight', signal)
         .then(function(data) {
           if (currentTaskId !== id) return;
+          if (seq !== null && typeof modalLoadSeq === 'number' && modalLoadSeq !== seq) return;
           oversightData = data;
           oversightFetching = false;
           if (logsMode === 'oversight') renderLogs();
         })
-        .catch(function() {
+        .catch(function(err) {
+          if (err && err.name === 'AbortError') return;
           oversightFetching = false;
-          if (currentTaskId === id && logsMode === 'oversight') {
+          if (currentTaskId === id && (seq === null || (typeof modalLoadSeq === 'number' && modalLoadSeq === seq)) && logsMode === 'oversight') {
             logsEl.innerHTML = '<div class="oversight-error">Failed to load oversight summary.</div>';
           }
         });
@@ -71,7 +79,7 @@ function renderOversightInLogs() {
       logsEl.innerHTML = '<div class="oversight-loading">Generating oversight summary\u2026</div>';
       // Poll again after a delay.
       setTimeout(function() {
-        if (logsMode === 'oversight' && currentTaskId) {
+        if (logsMode === 'oversight' && currentTaskId && (seq === null || (typeof modalLoadSeq === 'number' && modalLoadSeq === seq))) {
           oversightData = null;
           renderLogs();
         }
@@ -91,21 +99,24 @@ function renderOversightInLogs() {
 
 function renderTestOversightInTestLogs() {
   const logsEl = document.getElementById('modal-test-logs');
+  const seq = typeof modalLoadSeq === 'number' ? modalLoadSeq : null;
   if (!testOversightData) {
     if (!testOversightFetching && currentTaskId) {
       testOversightFetching = true;
       const id = currentTaskId;
-      fetch('/api/tasks/' + id + '/oversight/test')
-        .then(function(res) { return res.json(); })
+      const signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+      _fetchOversightJson('/api/tasks/' + id + '/oversight/test', signal)
         .then(function(data) {
           if (currentTaskId !== id) return;
+          if (seq !== null && typeof modalLoadSeq === 'number' && modalLoadSeq !== seq) return;
           testOversightData = data;
           testOversightFetching = false;
           if (testLogsMode === 'oversight') renderTestLogs();
         })
-        .catch(function() {
+        .catch(function(err) {
+          if (err && err.name === 'AbortError') return;
           testOversightFetching = false;
-          if (currentTaskId === id && testLogsMode === 'oversight') {
+          if (currentTaskId === id && (seq === null || (typeof modalLoadSeq === 'number' && modalLoadSeq === seq)) && testLogsMode === 'oversight') {
             logsEl.innerHTML = '<div class="oversight-error">Failed to load test oversight summary.</div>';
           }
         });
@@ -121,7 +132,7 @@ function renderTestOversightInTestLogs() {
     case 'generating':
       logsEl.innerHTML = '<div class="oversight-loading">Generating test oversight summary\u2026</div>';
       setTimeout(function() {
-        if (testLogsMode === 'oversight' && currentTaskId) {
+        if (testLogsMode === 'oversight' && currentTaskId && (seq === null || (typeof modalLoadSeq === 'number' && modalLoadSeq === seq))) {
           testOversightData = null;
           renderTestLogs();
         }

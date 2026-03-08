@@ -1,13 +1,51 @@
 // --- Modal lifecycle ---
 
+function _isActiveModalLoad(seq, taskId) {
+  return typeof modalLoadSeq !== 'undefined' && modalLoadSeq === seq && currentTaskId === taskId;
+}
+
+function _beginModalLoad(taskId) {
+  if (typeof modalAbort !== 'undefined' && modalAbort) modalAbort.abort();
+  modalLoadSeq = (typeof modalLoadSeq === 'number' ? modalLoadSeq + 1 : 1);
+  modalAbort = new AbortController();
+  currentTaskId = taskId;
+  return { seq: modalLoadSeq, signal: modalAbort.signal };
+}
+
+function _renderModalLoadingPlaceholders() {
+  const eventsEl = document.getElementById('modal-events');
+  if (eventsEl) eventsEl.innerHTML = '<span class="text-xs text-v-muted">Loading events…</span>';
+
+  const diffEl = document.getElementById('modal-diff-files');
+  if (diffEl) diffEl.innerHTML = '<span class="text-xs text-v-muted">Loading diff…</span>';
+  const diffBehindEl = document.getElementById('modal-diff-behind');
+  if (diffBehindEl) diffBehindEl.classList.add('hidden');
+
+  const logsEl = document.getElementById('modal-logs');
+  if (logsEl) logsEl.innerHTML = '<div class="oversight-loading">Loading oversight…</div>';
+  const testLogsEl = document.getElementById('modal-test-logs');
+  if (testLogsEl) testLogsEl.innerHTML = '<div class="oversight-loading">Loading oversight…</div>';
+
+  const timelineEl = document.getElementById('modal-timeline-chart');
+  if (timelineEl) {
+    timelineEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Loading timeline…</div>';
+    delete timelineEl.dataset.loaded;
+  }
+}
+
 async function openModal(id) {
   function isTestCard(task) {
     return task.status === 'waiting' && !!task.last_test_result && task.test_run_start_turn > 0;
   }
 
-  currentTaskId = id;
+  const modalLoad = _beginModalLoad(id);
+  const seq = modalLoad.seq;
   const task = tasks.find(t => t.id === id);
   if (!task) return;
+  _renderModalLoadingPlaceholders();
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('modal').classList.add('flex');
+  history.replaceState(null, '', '#' + id);
 
   document.getElementById('modal-badge').className = `badge badge-${task.status}`;
   document.getElementById('modal-badge').textContent = task.status === 'in_progress' ? 'in progress' : task.status;
@@ -198,12 +236,12 @@ async function openModal(id) {
       // tasks still expose test traces.
       const testTab = document.getElementById('right-tab-testing');
       if (testTab) testTab.classList.remove('hidden');
-      startImplLogFetch(id);
-      startTestLogStream(id);
+      startImplLogFetch(id, seq);
+      startTestLogStream(id, seq);
     } else {
       const testTab = document.getElementById('right-tab-testing');
       if (testTab) testTab.classList.add('hidden');
-      startLogStream(id);
+      startLogStream(id, seq);
     }
 
     // Changes tab: show for committing/waiting/failed/done tasks with worktrees
@@ -214,7 +252,8 @@ async function openModal(id) {
       const behindEl = document.getElementById('modal-diff-behind');
       filesEl.innerHTML = '<span class="text-xs text-v-muted">Loading diff\u2026</span>';
       if (behindEl) behindEl.classList.add('hidden');
-      api(`/api/tasks/${task.id}/diff`).then(data => {
+      api(`/api/tasks/${task.id}/diff`, { signal: modalLoad.signal }).then(data => {
+        if (!_isActiveModalLoad(seq, id)) return;
         const el = document.getElementById('modal-diff-files');
         if (el) renderDiffFiles(el, data.diff);
         // Hide test button when diff is empty (task produced no changes).
@@ -237,7 +276,9 @@ async function openModal(id) {
             warnEl.classList.add('hidden');
           }
         }
-      }).catch(() => {
+      }).catch((err) => {
+        if (err && err.name === 'AbortError') return;
+        if (!_isActiveModalLoad(seq, id)) return;
         const el = document.getElementById('modal-diff-files');
         if (el) el.innerHTML = '<span class="text-xs ev-error">Failed to load diff</span>';
       });
@@ -326,7 +367,8 @@ async function openModal(id) {
 
   // Load events
   try {
-    const events = await api(`/api/tasks/${id}/events`);
+    const events = await api(`/api/tasks/${id}/events`, { signal: modalLoad.signal });
+    if (!_isActiveModalLoad(seq, id)) return;
 
     // Replace single-result fallback with all turn results from output events.
     // When a test run has occurred, split output events at the test boundary so
@@ -397,15 +439,20 @@ async function openModal(id) {
         </div>`;
       }).join('');
   } catch (e) {
+    if (e && e.name === 'AbortError') return;
+    if (!_isActiveModalLoad(seq, id)) return;
     document.getElementById('modal-events').innerHTML = '<span class="text-xs ev-error">Failed to load events</span>';
   }
 
-  document.getElementById('modal').classList.remove('hidden');
-  document.getElementById('modal').classList.add('flex');
-  history.replaceState(null, '', '#' + id);
+  if (!_isActiveModalLoad(seq, id)) return;
 }
 
 function closeModal() {
+  if (typeof modalAbort !== 'undefined' && modalAbort) {
+    modalAbort.abort();
+    modalAbort = null;
+  }
+  modalLoadSeq = (typeof modalLoadSeq === 'number' ? modalLoadSeq + 1 : 1);
   if (logsAbort) {
     logsAbort.abort();
     logsAbort = null;

@@ -346,6 +346,7 @@ function _stopTimelineRefresh() {
 
 // Fetch spans and render the Gantt chart into #modal-timeline-chart.
 function renderTimeline(taskId) {
+  var seq = typeof modalLoadSeq === 'number' ? modalLoadSeq : null;
   var el = document.getElementById('modal-timeline-chart');
   if (!el) return;
   // Only show loading placeholder on first load (avoid flicker on refresh)
@@ -354,18 +355,24 @@ function renderTimeline(taskId) {
   }
   _ensureTimelineStyles();
 
-  fetch('/api/tasks/' + taskId + '/spans')
-    .then(function(res) { return res.json(); })
+  var signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+  var req = (typeof api === 'function')
+    ? api('/api/tasks/' + taskId + '/spans', { signal: signal })
+    : fetch('/api/tasks/' + taskId + '/spans', { signal: signal }).then(function(res) { return res.json(); });
+  req
     .then(function(spans) {
       if (currentTaskId !== taskId) return;
+      if (seq !== null && typeof modalLoadSeq === 'number' && modalLoadSeq !== seq) return;
       var el2 = document.getElementById('modal-timeline-chart');
       if (!el2) return;
       el2.dataset.loaded = '1';
       el2.innerHTML = _buildTimelineHtml(spans);
       _attachTimelineTips(el2);
     })
-    .catch(function() {
+    .catch(function(err) {
+      if (err && err.name === 'AbortError') return;
       if (currentTaskId !== taskId) return;
+      if (seq !== null && typeof modalLoadSeq === 'number' && modalLoadSeq !== seq) return;
       var el2 = document.getElementById('modal-timeline-chart');
       if (el2) el2.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Failed to load timeline.</div>';
     });

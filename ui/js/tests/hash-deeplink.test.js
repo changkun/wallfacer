@@ -91,6 +91,8 @@ function makeModalContext() {
     Promise,
     tasks: [task],
     currentTaskId: null,
+    modalLoadSeq: 0,
+    modalAbort: null,
     logsAbort: null,
     testLogsAbort: null,
     rawLogBuffer: '',
@@ -119,6 +121,10 @@ function makeModalContext() {
       body: { appendChild: () => {} },
     },
     fetch: () => Promise.reject(new Error('not mocked')),
+    AbortController: class {
+      constructor() { this.signal = { aborted: false, addEventListener: () => {} }; }
+      abort() { this.signal.aborted = true; }
+    },
     setTimeout: () => {},
     clearTimeout: () => {},
     setInterval: () => 0,

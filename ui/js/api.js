@@ -1,8 +1,10 @@
 // --- API client ---
 
 async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
+    signal: opts.signal,
     ...opts,
   });
   if (!res.ok && res.status !== 204) {

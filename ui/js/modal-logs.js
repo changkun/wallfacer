@@ -22,6 +22,15 @@ function scheduleTestLogRender() {
   });
 }
 
+function _isCurrentModalSeq(seq) {
+  return typeof seq !== 'number' || (typeof modalLoadSeq === 'number' && modalLoadSeq === seq);
+}
+
+function _modalApiJson(url, signal) {
+  if (typeof api === 'function') return api(url, { signal: signal });
+  return fetch(url, { signal: signal }).then(function(res) { return res.json(); });
+}
+
 // --- Log rendering and streaming ---
 
 function _updateLogsTabs() {
@@ -140,16 +149,17 @@ function setLogsMode(mode) {
   renderLogs();
 }
 
-function startLogStream(id) {
+function startLogStream(id, seq) {
   logsMode = 'pretty';
   oversightData = null;
   // Pre-fetch oversight to decide the default view: switch to oversight only if
   // a ready summary already exists.
   oversightFetching = true;
-  fetch('/api/tasks/' + id + '/oversight')
-    .then(function(res) { return res.json(); })
+  var signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+  _modalApiJson('/api/tasks/' + id + '/oversight', signal)
     .then(function(data) {
       if (currentTaskId !== id) return;
+      if (!_isCurrentModalSeq(seq)) return;
       oversightData = data;
       oversightFetching = false;
       if (data.status === 'ready') {
@@ -157,21 +167,25 @@ function startLogStream(id) {
         renderLogs();
       }
     })
-    .catch(function() { oversightFetching = false; });
-  _fetchLogs(id);
+    .catch(function(err) {
+      if (err && err.name === 'AbortError') return;
+      oversightFetching = false;
+    });
+  _fetchLogs(id, null, seq);
 }
 
 // Fetch implementation-phase logs once (no reconnect — they are static by the
 // time the test agent runs).
-function startImplLogFetch(id) {
+function startImplLogFetch(id, seq) {
   logsMode = 'pretty';
   oversightData = null;
   // Pre-fetch oversight to decide default view.
   oversightFetching = true;
-  fetch('/api/tasks/' + id + '/oversight')
-    .then(function(res) { return res.json(); })
+  var signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+  _modalApiJson('/api/tasks/' + id + '/oversight', signal)
     .then(function(data) {
       if (currentTaskId !== id) return;
+      if (!_isCurrentModalSeq(seq)) return;
       oversightData = data;
       oversightFetching = false;
       if (data.status === 'ready') {
@@ -179,16 +193,21 @@ function startImplLogFetch(id) {
         renderLogs();
       }
     })
-    .catch(function() { oversightFetching = false; });
+    .catch(function(err) {
+      if (err && err.name === 'AbortError') return;
+      oversightFetching = false;
+    });
   rawLogBuffer = '';
   document.getElementById('modal-logs').innerHTML = '';
   const decoder = new TextDecoder();
-  fetch(`/api/tasks/${id}/logs?phase=impl`)
+  fetch(`/api/tasks/${id}/logs?phase=impl`, { signal: signal })
     .then(res => {
       if (!res.ok || !res.body) return;
       const reader = res.body.getReader();
       function read() {
         reader.read().then(({ done, value }) => {
+          if (currentTaskId !== id) return;
+          if (!_isCurrentModalSeq(seq)) return;
           if (done) { renderLogs(); return; }
           rawLogBuffer += decoder.decode(value, { stream: true });
           scheduleLogRender();
@@ -197,7 +216,9 @@ function startImplLogFetch(id) {
       }
       read();
     })
-    .catch(() => {});
+    .catch((err) => {
+      if (err && err.name === 'AbortError') return;
+    });
 }
 
 function _updateTestLogsTabs() {
@@ -233,15 +254,16 @@ function setTestLogsMode(mode) {
   renderTestLogs();
 }
 
-function startTestLogStream(id) {
+function startTestLogStream(id, seq) {
   testLogsMode = 'pretty';
   testOversightData = null;
   // Pre-fetch test oversight to decide default view.
   testOversightFetching = true;
-  fetch('/api/tasks/' + id + '/oversight/test')
-    .then(function(res) { return res.json(); })
+  var signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+  _modalApiJson('/api/tasks/' + id + '/oversight/test', signal)
     .then(function(data) {
       if (currentTaskId !== id) return;
+      if (!_isCurrentModalSeq(seq)) return;
       testOversightData = data;
       testOversightFetching = false;
       if (data.status === 'ready') {
@@ -249,12 +271,16 @@ function startTestLogStream(id) {
         renderTestLogs();
       }
     })
-    .catch(function() { testOversightFetching = false; });
-  _fetchTestLogs(id);
+    .catch(function(err) {
+      if (err && err.name === 'AbortError') return;
+      testOversightFetching = false;
+    });
+  _fetchTestLogs(id, null, seq);
 }
 
-function _fetchTestLogs(id, retryDelay) {
+function _fetchTestLogs(id, retryDelay, seq) {
   if (currentTaskId !== id) return;
+  if (!_isCurrentModalSeq(seq)) return;
   if (testLogsAbort) testLogsAbort.abort();
   testLogsAbort = new AbortController();
   if (!retryDelay) {
@@ -271,10 +297,11 @@ function _fetchTestLogs(id, retryDelay) {
 
   function reconnect() {
     if (currentTaskId !== id) return;
+    if (!_isCurrentModalSeq(seq)) return;
     const task = tasks.find(t => t.id === id);
     if (!task || (task.status !== 'in_progress' && task.status !== 'committing')) return;
     const nextDelay = Math.min(delay * 2, 15000);
-    setTimeout(() => _fetchTestLogs(id, nextDelay), delay);
+    setTimeout(() => _fetchTestLogs(id, nextDelay, seq), delay);
   }
 
   fetch(url, { signal: testLogsAbort.signal })
@@ -283,6 +310,8 @@ function _fetchTestLogs(id, retryDelay) {
       const reader = res.body.getReader();
       function read() {
         reader.read().then(({ done, value }) => {
+          if (currentTaskId !== id) return;
+          if (!_isCurrentModalSeq(seq)) return;
           if (done) { reconnect(); return; }
           testRawLogBuffer += decoder.decode(value, { stream: true });
           scheduleTestLogRender();
@@ -297,11 +326,12 @@ function _fetchTestLogs(id, retryDelay) {
     });
 }
 
-function _fetchLogs(id, retryDelay) {
+function _fetchLogs(id, retryDelay, seq) {
   // Guard: if the modal was closed or switched to a different task since this
   // call was scheduled (e.g. by a reconnect setTimeout), bail out so we don't
   // hijack the log stream or mix logs from a stale task into the buffer.
   if (currentTaskId !== id) return;
+  if (!_isCurrentModalSeq(seq)) return;
   if (logsAbort) logsAbort.abort();
   logsAbort = new AbortController();
   if (!retryDelay) {
@@ -315,10 +345,11 @@ function _fetchLogs(id, retryDelay) {
   function reconnect() {
     // Only reconnect if this task modal is still open and task is running.
     if (currentTaskId !== id) return;
+    if (!_isCurrentModalSeq(seq)) return;
     const task = tasks.find(t => t.id === id);
     if (!task || (task.status !== 'in_progress' && task.status !== 'committing')) return;
     const nextDelay = Math.min(delay * 2, 15000);
-    setTimeout(() => _fetchLogs(id, nextDelay), delay);
+    setTimeout(() => _fetchLogs(id, nextDelay, seq), delay);
   }
 
   fetch(url, { signal: logsAbort.signal })
@@ -327,6 +358,8 @@ function _fetchLogs(id, retryDelay) {
       const reader = res.body.getReader();
       function read() {
         reader.read().then(({ done, value }) => {
+          if (currentTaskId !== id) return;
+          if (!_isCurrentModalSeq(seq)) return;
           if (done) { reconnect(); return; }
           rawLogBuffer += decoder.decode(value, { stream: true });
           scheduleLogRender();
