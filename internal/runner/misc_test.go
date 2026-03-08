@@ -747,8 +747,12 @@ func TestParseContainerListPodmanFormat(t *testing.T) {
 	if len(containers) != 2 {
 		t.Fatalf("expected 2 containers, got %d", len(containers))
 	}
-	if containers[0].name() != "wallfacer-task1" {
-		t.Fatalf("expected name 'wallfacer-task1', got %q", containers[0].name())
+	name0, err := containers[0].name()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if name0 != "wallfacer-task1" {
+		t.Fatalf("expected name 'wallfacer-task1', got %q", name0)
 	}
 	if containers[0].createdUnix() != 1700000000 {
 		t.Fatalf("expected created 1700000000, got %d", containers[0].createdUnix())
@@ -768,11 +772,19 @@ func TestParseContainerListDockerFormat(t *testing.T) {
 	if len(containers) != 2 {
 		t.Fatalf("expected 2 containers, got %d", len(containers))
 	}
-	if containers[0].name() != "wallfacer-task1" {
-		t.Fatalf("expected name 'wallfacer-task1', got %q", containers[0].name())
+	name0, err := containers[0].name()
+	if err != nil {
+		t.Fatalf("unexpected error for containers[0]: %v", err)
 	}
-	if containers[1].name() != "wallfacer-task2" {
-		t.Fatalf("expected name 'wallfacer-task2', got %q", containers[1].name())
+	if name0 != "wallfacer-task1" {
+		t.Fatalf("expected name 'wallfacer-task1', got %q", name0)
+	}
+	name1, err := containers[1].name()
+	if err != nil {
+		t.Fatalf("unexpected error for containers[1]: %v", err)
+	}
+	if name1 != "wallfacer-task2" {
+		t.Fatalf("expected name 'wallfacer-task2', got %q", name1)
 	}
 }
 
@@ -784,8 +796,12 @@ func TestParseContainerListDockerSlashPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if containers[0].name() != "wallfacer-task1" {
-		t.Fatalf("expected name without slash prefix, got %q", containers[0].name())
+	name0, err := containers[0].name()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if name0 != "wallfacer-task1" {
+		t.Fatalf("expected name without slash prefix, got %q", name0)
 	}
 }
 
@@ -805,24 +821,36 @@ func TestParseContainerListEmpty(t *testing.T) {
 // TestContainerJSONNamePodman verifies name extraction from Podman's []string format.
 func TestContainerJSONNamePodman(t *testing.T) {
 	c := containerJSON{Names: []byte(`["foo","bar"]`)}
-	if c.name() != "foo" {
-		t.Fatalf("expected 'foo', got %q", c.name())
+	name, err := c.name()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if name != "foo" {
+		t.Fatalf("expected 'foo', got %q", name)
 	}
 }
 
 // TestContainerJSONNameDocker verifies name extraction from Docker's string format.
 func TestContainerJSONNameDocker(t *testing.T) {
 	c := containerJSON{Names: []byte(`"my-container"`)}
-	if c.name() != "my-container" {
-		t.Fatalf("expected 'my-container', got %q", c.name())
+	name, err := c.name()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if name != "my-container" {
+		t.Fatalf("expected 'my-container', got %q", name)
 	}
 }
 
 // TestContainerJSONNameNil verifies that nil Names returns empty string.
 func TestContainerJSONNameNil(t *testing.T) {
 	c := containerJSON{}
-	if c.name() != "" {
-		t.Fatalf("expected empty, got %q", c.name())
+	name, err := c.name()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if name != "" {
+		t.Fatalf("expected empty, got %q", name)
 	}
 }
 
