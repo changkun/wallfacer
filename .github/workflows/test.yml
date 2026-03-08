@@ -24,6 +24,10 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: .
+
       - name: Vet
         run: go vet ./...
         working-directory: .
@@ -42,7 +46,7 @@ jobs:
 
       - name: Frontend tests with coverage
         run: |
-          npx --yes vitest@2 run --coverage --coverage.reportsDirectory=coverage-js --coverage.reporter=lcov --coverage.reporter=json-summary
+          npx vitest run --coverage --coverage.reportsDirectory=coverage-js --coverage.reporter=lcov --coverage.reporter=json-summary
           js_total=$(node -e "const fs = require('node:fs'); const summary = JSON.parse(fs.readFileSync('coverage-js/coverage-summary.json', 'utf8')); process.stdout.write(String(summary.total.lines.pct));")
           echo "total=${js_total}" >> "$GITHUB_OUTPUT"
         id: js-coverage
