@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"changkun.de/wallfacer/internal/handler"
 	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/metrics"
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -152,7 +154,60 @@ func runServer(configDir string, args []string) {
 	// verified (pass), not behind the default branch, and conflict-free.
 	h.StartAutoSubmitter(ctx)
 
-	mux := buildMux(h, r)
+	// Build the Prometheus metrics registry and register scrape-time gauge
+	// collectors. HTTP counter and histogram are created inside loggingMiddleware
+	// so they are available via the same registry for /metrics.
+	reg := metrics.NewRegistry()
+	reg.Gauge(
+		"wallfacer_tasks_total",
+		"Number of tasks grouped by status and archived flag.",
+		func() []metrics.LabeledValue {
+			tasks, err := s.ListTasks(context.Background(), true)
+			if err != nil {
+				return nil
+			}
+			type key struct{ status, archived string }
+			counts := make(map[key]int)
+			for _, t := range tasks {
+				counts[key{string(t.Status), fmt.Sprintf("%v", t.Archived)}]++
+			}
+			vals := make([]metrics.LabeledValue, 0, len(counts))
+			for k, n := range counts {
+				vals = append(vals, metrics.LabeledValue{
+					Labels: map[string]string{"status": k.status, "archived": k.archived},
+					Value:  float64(n),
+				})
+			}
+			return vals
+		},
+	)
+	reg.Gauge(
+		"wallfacer_running_containers",
+		"Number of wallfacer sandbox containers currently tracked by the container runtime.",
+		func() []metrics.LabeledValue {
+			containers, err := r.ListContainers()
+			if err != nil {
+				return []metrics.LabeledValue{{Value: 0}}
+			}
+			return []metrics.LabeledValue{{Value: float64(len(containers))}}
+		},
+	)
+	reg.Gauge(
+		"wallfacer_background_goroutines",
+		"Number of outstanding background goroutines tracked by the runner.",
+		func() []metrics.LabeledValue {
+			return []metrics.LabeledValue{{Value: float64(len(r.PendingGoroutines()))}}
+		},
+	)
+	reg.Gauge(
+		"wallfacer_store_subscribers",
+		"Number of active SSE subscribers listening for task state changes.",
+		func() []metrics.LabeledValue {
+			return []metrics.LabeledValue{{Value: float64(s.SubscriberCount())}}
+		},
+	)
+
+	mux := buildMux(h, r, reg)
 
 	host, _, _ := net.SplitHostPort(*addr)
 	ln, err := net.Listen("tcp", *addr)
@@ -174,7 +229,7 @@ func runServer(configDir string, args []string) {
 	}
 
 	srv := &http.Server{
-		Handler:     loggingMiddleware(mux),
+		Handler:     loggingMiddleware(mux, reg),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
 
@@ -214,7 +269,7 @@ func runServer(configDir string, args []string) {
 }
 
 // buildMux constructs the HTTP request router.
-func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
+func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static files (task board UI).
@@ -333,6 +388,12 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 		h.ServeOutput(w, r, id, r.PathValue("filename"))
 	})
 
+	// Prometheus metrics endpoint.
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		reg.WritePrometheus(w)
+	})
+
 	return mux
 }
 
@@ -353,17 +414,47 @@ func (w *statusResponseWriter) Flush() {
 	}
 }
 
-// loggingMiddleware logs each HTTP request with method, path, status, and duration.
-func loggingMiddleware(next http.Handler) http.Handler {
+// loggingMiddleware logs each HTTP request and records Prometheus metrics.
+// It uses r.Pattern (set by ServeMux in Go 1.22+) as the route label so that
+// parameterised routes like "GET /api/tasks/{id}" are collapsed to a single
+// time series. When r.Pattern is empty it falls back to r.URL.Path.
+func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
+	httpReqs := reg.Counter(
+		"wallfacer_http_requests_total",
+		"Total number of HTTP requests partitioned by method, route, and status code.",
+	)
+	httpDur := reg.Histogram(
+		"wallfacer_http_request_duration_seconds",
+		"HTTP request latency in seconds partitioned by method and route.",
+		metrics.DefaultDurationBuckets,
+	)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusResponseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
-		dur := time.Since(start).Round(time.Millisecond)
+		dur := time.Since(start)
+
+		// Use the matched pattern when available so parameterised routes are
+		// collapsed (e.g. "GET /api/tasks/{id}" rather than a unique path per task).
+		route := r.Pattern
+		if route == "" {
+			route = r.URL.Path
+		}
+
+		httpReqs.Inc(map[string]string{
+			"method": r.Method,
+			"route":  route,
+			"status": strconv.Itoa(sw.status),
+		})
+		httpDur.Observe(map[string]string{
+			"method": r.Method,
+			"route":  route,
+		}, dur.Seconds())
+
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			logger.Handler.Info(r.Method+" "+r.URL.Path, "status", sw.status, "dur", dur)
+			logger.Handler.Info(r.Method+" "+r.URL.Path, "status", sw.status, "dur", dur.Round(time.Millisecond))
 		} else {
-			logger.Handler.Debug(r.Method+" "+r.URL.Path, "status", sw.status, "dur", dur)
+			logger.Handler.Debug(r.Method+" "+r.URL.Path, "status", sw.status, "dur", dur.Round(time.Millisecond))
 		}
 	})
 }

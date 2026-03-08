@@ -25,6 +25,14 @@ func (s *Store) Subscribe() (int, <-chan TaskDelta) {
 	return s.subscribe()
 }
 
+// SubscriberCount returns the number of currently active SSE subscribers.
+// It is safe to call concurrently.
+func (s *Store) SubscriberCount() int {
+	s.subMu.Lock()
+	defer s.subMu.Unlock()
+	return len(s.subscribers)
+}
+
 // Unsubscribe removes the subscriber and drains any buffered deltas to free memory.
 // The channel is NOT closed: StreamTasks is always the one calling Unsubscribe (via
 // defer) after its own goroutine exits, so there is no blocked receiver to wake.
