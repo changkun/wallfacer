@@ -22,6 +22,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: wallfacer <command> [arguments]\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  run          start the task board server\n")
+	fmt.Fprintf(os.Stderr, "  status       print running board state to terminal\n")
 	fmt.Fprintf(os.Stderr, "  env          show configuration and env file status\n")
 	fmt.Fprintf(os.Stderr, "  exec         open a shell in a running task container\n")
 	fmt.Fprintf(os.Stderr, "\nThe exec subcommand attaches to a task container by its task UUID prefix:\n")
@@ -51,6 +52,8 @@ func main() {
 		runExec(configDir, os.Args[2:])
 	case "run":
 		runServer(configDir, os.Args[2:])
+	case "status":
+		runStatus(configDir, os.Args[2:])
 	case "-help", "--help", "-h":
 		printUsage()
 	default:
