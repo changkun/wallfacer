@@ -314,8 +314,8 @@ func (r *Runner) runContainer(
 	containerName := "wallfacer-" + slug + "-" + taskID.String()[:8]
 
 	// Track the container name so KillContainer and StreamLogs can find it.
-	r.containerNames.Store(taskID.String(), containerName)
-	defer r.containerNames.Delete(taskID.String())
+	r.taskContainers.Set(taskID, containerName)
+	defer r.taskContainers.Delete(taskID)
 
 	// Remove any leftover container from a previous interrupted run.
 	exec.Command(r.command, "rm", "-f", containerName).Run()

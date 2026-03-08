@@ -98,21 +98,22 @@ type containerJSON struct {
 
 // name extracts the container name from the Names field, handling both
 // Podman ([]string) and Docker (string) formats.
-func (c *containerJSON) name() string {
+// Returns an error if Names is non-nil but cannot be decoded as either format.
+func (c *containerJSON) name() (string, error) {
 	if c.Names == nil {
-		return ""
+		return "", nil
 	}
 	// Try []string first (Podman format).
 	var names []string
-	if json.Unmarshal(c.Names, &names) == nil && len(names) > 0 {
-		return strings.TrimPrefix(names[0], "/")
+	if err := json.Unmarshal(c.Names, &names); err == nil && len(names) > 0 {
+		return strings.TrimPrefix(names[0], "/"), nil
 	}
 	// Try single string (Docker format).
 	var name string
-	if json.Unmarshal(c.Names, &name) == nil {
-		return strings.TrimPrefix(name, "/")
+	if err := json.Unmarshal(c.Names, &name); err == nil {
+		return strings.TrimPrefix(name, "/"), nil
 	}
-	return ""
+	return "", fmt.Errorf("containerJSON.name: cannot decode Names field: %s", c.Names)
 }
 
 // createdUnix returns the creation time as a unix timestamp.
@@ -185,7 +186,11 @@ func (r *Runner) ListContainers() ([]ContainerInfo, error) {
 
 	result := make([]ContainerInfo, 0, len(raw))
 	for _, c := range raw {
-		name := c.name()
+		name, err := c.name()
+		if err != nil {
+			logger.Runner.Warn("ListContainers: skipping malformed container entry", "error", err)
+			continue
+		}
 
 		// Primary: extract task UUID from the wallfacer.task.id label.
 		// This works regardless of the container name format.
@@ -237,8 +242,8 @@ func isUUID(s string) bool {
 // then falls back to scanning the container list and matching by task ID label.
 // Returns an empty string if no container is found.
 func (r *Runner) ContainerName(taskID uuid.UUID) string {
-	if v, ok := r.containerNames.Load(taskID.String()); ok {
-		return v.(string)
+	if name, ok := r.taskContainers.Get(taskID); ok {
+		return name
 	}
 	// Fallback: search all wallfacer containers by label.
 	containers, err := r.ListContainers()
@@ -278,12 +283,12 @@ type Runner struct {
 	workspaces           string
 	worktreesDir         string
 	instructionsPath     string
-	worktreeMu           sync.Mutex // serializes all worktree filesystem operations on worktreesDir
-	repoMu               sync.Map   // per-repo *sync.Mutex for serializing rebase+merge
-	containerNames       sync.Map   // taskID (string) → container name (string)
-	refineContainerNames sync.Map   // taskID (string) → refinement container name (string)
-	ideateContainerName  sync.Map   // key "current" → ideation container name (string)
-	oversightMu          sync.Map   // taskID (string) → *sync.Mutex for serializing oversight generation
+	worktreeMu       sync.Mutex // serializes all worktree filesystem operations on worktreesDir
+	repoMu           sync.Map   // per-repo *sync.Mutex for serializing rebase+merge
+	taskContainers   *containerRegistry // taskID → container name
+	refineContainers *containerRegistry // taskID → refinement container name
+	ideateContainer  *containerRegistry // singleton: ideation container name
+	oversightMu      sync.Map   // taskID (string) → *sync.Mutex for serializing oversight generation
 	backgroundWg         trackedWg  // tracks fire-and-forget background goroutines
 }
 
@@ -393,6 +398,9 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		workspaces:       cfg.Workspaces,
 		worktreesDir:     cfg.WorktreesDir,
 		instructionsPath: cfg.InstructionsPath,
+		taskContainers:   &containerRegistry{},
+		refineContainers: &containerRegistry{},
+		ideateContainer:  &containerRegistry{},
 	}
 }
 
@@ -446,8 +454,8 @@ func (r *Runner) oversightLock(taskID uuid.UUID) *sync.Mutex {
 // RefineContainerName returns the active refinement container name for a task.
 // Returns an empty string if no refinement container is running.
 func (r *Runner) RefineContainerName(taskID uuid.UUID) string {
-	if v, ok := r.refineContainerNames.Load(taskID.String()); ok {
-		return v.(string)
+	if name, ok := r.refineContainers.Get(taskID); ok {
+		return name
 	}
 	return ""
 }
@@ -475,8 +483,8 @@ func (r *Runner) KillRefineContainer(taskID uuid.UUID) {
 // IdeateContainerName returns the name of the currently running ideation container,
 // or an empty string if no ideation is in progress.
 func (r *Runner) IdeateContainerName() string {
-	if v, ok := r.ideateContainerName.Load("current"); ok {
-		return v.(string)
+	if name, ok := r.ideateContainer.GetSingleton(); ok {
+		return name
 	}
 	return ""
 }

@@ -172,8 +172,8 @@ func (r *Runner) runRefinementContainer(
 	slug := slugifyPrompt(prompt, 20)
 	containerName := "wallfacer-refine-" + slug + "-" + taskID.String()[:8]
 
-	r.refineContainerNames.Store(taskID.String(), containerName)
-	defer r.refineContainerNames.Delete(taskID.String())
+	r.refineContainers.Set(taskID, containerName)
+	defer r.refineContainers.Delete(taskID)
 
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 

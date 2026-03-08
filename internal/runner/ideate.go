@@ -134,11 +134,11 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 	containerName := fmt.Sprintf("wallfacer-ideate-%d", time.Now().UnixNano()/1e6)
 
 	if taskID != uuid.Nil {
-		r.containerNames.Store(taskID.String(), containerName)
-		defer r.containerNames.Delete(taskID.String())
+		r.taskContainers.Set(taskID, containerName)
+		defer r.taskContainers.Delete(taskID)
 	}
-	r.ideateContainerName.Store("current", containerName)
-	defer r.ideateContainerName.Delete("current")
+	r.ideateContainer.SetSingleton(containerName)
+	defer r.ideateContainer.DeleteSingleton()
 
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
