@@ -208,6 +208,164 @@ func TestBuildSiblingMounts(t *testing.T) {
 	}
 }
 
+// TestGenerateBoardContext_AllStatuses verifies that tasks in every
+// non-archived status appear in the manifest with the correct status field.
+func TestGenerateBoardContext_AllStatuses(t *testing.T) {
+	s, r := setupRunnerWithCmd(t, nil, "echo")
+	ctx := bg()
+
+	statuses := []store.TaskStatus{
+		store.TaskStatusBacklog,
+		store.TaskStatusInProgress,
+		store.TaskStatusWaiting,
+		store.TaskStatusFailed,
+		store.TaskStatusCancelled,
+	}
+
+	idByStatus := make(map[store.TaskStatus]string)
+	for _, st := range statuses {
+		task, err := s.CreateTask(ctx, "task for "+string(st), 5, false, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch st {
+		case store.TaskStatusBacklog:
+			// Default status after creation; no update needed.
+		case store.TaskStatusInProgress:
+			s.UpdateTaskStatus(ctx, task.ID, st)
+		default:
+			s.ForceUpdateTaskStatus(ctx, task.ID, st)
+		}
+		idByStatus[st] = task.ID.String()
+	}
+
+	data, err := r.generateBoardContext([16]byte{}, false)
+	if err != nil {
+		t.Fatalf("generateBoardContext: %v", err)
+	}
+
+	var manifest BoardManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(manifest.Tasks) != len(statuses) {
+		t.Fatalf("expected %d tasks, got %d", len(statuses), len(manifest.Tasks))
+	}
+
+	byID := make(map[string]BoardTask)
+	for _, bt := range manifest.Tasks {
+		byID[bt.ID] = bt
+	}
+
+	for _, st := range statuses {
+		id := idByStatus[st]
+		bt, ok := byID[id]
+		if !ok {
+			t.Errorf("task with status %q not found in manifest", st)
+			continue
+		}
+		if bt.Status != st {
+			t.Errorf("task %s: status = %q, want %q", bt.ShortID, bt.Status, st)
+		}
+		if bt.IsSelf {
+			t.Errorf("task %s should not be marked is_self", bt.ShortID)
+		}
+	}
+}
+
+// TestGenerateBoardContext_WorktreeMountPath verifies that generateBoardContext
+// sets worktree_mount to the correct container-side path for eligible siblings,
+// and that the self task has no worktree_mount.
+func TestGenerateBoardContext_WorktreeMountPath(t *testing.T) {
+	s, r := setupRunnerWithCmd(t, nil, "echo")
+	ctx := bg()
+
+	// Create a sibling task in waiting status with a worktree directory.
+	sibling, err := s.CreateTask(ctx, "sibling task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.ForceUpdateTaskStatus(ctx, sibling.ID, store.TaskStatusWaiting)
+	wtDir := t.TempDir()
+	repoPath := "/home/user/myrepo"
+	s.UpdateTaskWorktrees(ctx, sibling.ID, map[string]string{repoPath: wtDir}, "task/"+sibling.ID.String()[:8])
+
+	// Create a self task (stays in backlog).
+	self, err := s.CreateTask(ctx, "self task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := r.generateBoardContext(self.ID, true)
+	if err != nil {
+		t.Fatalf("generateBoardContext: %v", err)
+	}
+
+	var manifest BoardManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	shortID := sibling.ID.String()[:8]
+	expectedMount := "/workspace/.tasks/worktrees/" + shortID + "/" + filepath.Base(repoPath)
+
+	for _, bt := range manifest.Tasks {
+		switch bt.ID {
+		case sibling.ID.String():
+			if bt.WorktreeMount == nil {
+				t.Fatal("sibling WorktreeMount should not be nil")
+			}
+			if *bt.WorktreeMount != expectedMount {
+				t.Errorf("WorktreeMount = %q, want %q", *bt.WorktreeMount, expectedMount)
+			}
+		case self.ID.String():
+			if bt.WorktreeMount != nil {
+				t.Errorf("self task WorktreeMount should be nil, got %q", *bt.WorktreeMount)
+			}
+		}
+	}
+}
+
+// TestGenerateBoardContext_ArchivedTaskExcluded verifies that tasks with the
+// archived flag set do not appear in the board manifest.
+func TestGenerateBoardContext_ArchivedTaskExcluded(t *testing.T) {
+	s, r := setupRunnerWithCmd(t, nil, "echo")
+	ctx := bg()
+
+	normal, err := s.CreateTask(ctx, "normal task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	archived, err := s.CreateTask(ctx, "archived task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTaskArchived(ctx, archived.ID, true); err != nil {
+		t.Fatalf("SetTaskArchived: %v", err)
+	}
+
+	data, err := r.generateBoardContext([16]byte{}, false)
+	if err != nil {
+		t.Fatalf("generateBoardContext: %v", err)
+	}
+
+	var manifest BoardManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	if len(manifest.Tasks) != 1 {
+		t.Fatalf("expected 1 task in manifest, got %d", len(manifest.Tasks))
+	}
+	if manifest.Tasks[0].ID != normal.ID.String() {
+		t.Errorf("manifest task ID = %q, want %q", manifest.Tasks[0].ID, normal.ID.String())
+	}
+	if contains(string(data), archived.ID.String()) {
+		t.Error("archived task ID should not appear in the board manifest")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsString(s, substr))
 }
