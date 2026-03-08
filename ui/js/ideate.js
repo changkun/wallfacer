@@ -4,11 +4,13 @@
 let ideation = false;
 let ideationInterval = 0;  // minutes; 0 = run immediately on completion
 let ideationNextRun = null; // ISO timestamp string, or null
+let _ideationRunning = false;
 
-// setIdeationRunning shows/hides the header spinner.
+// setIdeationRunning tracks whether a brainstorm task is currently in progress
+// and refreshes the header label accordingly.
 function setIdeationRunning(running) {
-  const spinner = document.getElementById('ideation-spinner');
-  if (spinner) spinner.style.display = running ? 'inline-block' : 'none';
+  _ideationRunning = running;
+  updateNextRunDisplay();
 }
 
 // updateIdeationFromTasks derives the running state from the live task list
@@ -64,12 +66,19 @@ async function updateIdeationInterval(minutes) {
   }
 }
 
-// updateNextRunDisplay refreshes the "next in Xm" label next to the selector.
+// updateNextRunDisplay refreshes the header label that shows when the next
+// brainstorm run is scheduled, or indicates that one is currently running.
 function updateNextRunDisplay() {
   const el = document.getElementById('ideation-next-run');
   if (!el) return;
 
-  // Only show when ideation is enabled, interval > 0, and a run is pending.
+  if (_ideationRunning) {
+    el.textContent = 'Brainstorm running\u2026';
+    el.style.display = 'inline';
+    return;
+  }
+
+  // Only show countdown when ideation is enabled, interval > 0, and a run is pending.
   if (!ideation || ideationInterval === 0 || !ideationNextRun) {
     el.textContent = '';
     el.style.display = 'none';
@@ -90,22 +99,24 @@ function updateNextRunDisplay() {
   }
 
   const diffMin = Math.ceil(diffMs / 60000);
-  let label;
+  let countdown;
   if (diffMin < 60) {
-    label = `next in ${diffMin}m`;
+    countdown = `${diffMin}m`;
   } else {
     const h = Math.floor(diffMin / 60);
     const m = diffMin % 60;
-    label = m > 0 ? `next in ${h}h ${m}m` : `next in ${h}h`;
+    countdown = m > 0 ? `${h}h ${m}m` : `${h}h`;
   }
-  el.textContent = label;
+  el.textContent = `Next brainstorm in ${countdown}`;
   el.style.display = 'inline';
 }
 
-// _syncIdeationControls shows/hides the interval selector based on ideation state.
+// _syncIdeationControls keeps the settings modal controls in sync with state.
 function _syncIdeationControls() {
+  const toggle = document.getElementById('ideation-toggle');
+  if (toggle) toggle.checked = ideation;
   const sel = document.getElementById('ideation-interval');
-  if (sel) sel.style.display = ideation ? 'inline-block' : 'none';
+  if (sel) sel.value = String(ideationInterval);
 }
 
 // updateIdeationConfig updates local state from a config response object.
@@ -115,15 +126,7 @@ function updateIdeationConfig(cfg) {
   ideationInterval = cfg.ideation_interval != null ? cfg.ideation_interval : 0;
   ideationNextRun = cfg.ideation_next_run || null;
 
-  const toggle = document.getElementById('ideation-toggle');
-  if (toggle) toggle.checked = ideation;
-
-  const sel = document.getElementById('ideation-interval');
-  if (sel) {
-    sel.value = String(ideationInterval);
-    sel.style.display = ideation ? 'inline-block' : 'none';
-  }
-
+  _syncIdeationControls();
   updateNextRunDisplay();
 }
 

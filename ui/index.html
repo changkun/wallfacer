@@ -46,25 +46,7 @@
       <input type="checkbox" id="dep-graph-toggle" onchange="toggleDependencyGraph()" style="cursor: pointer; accent-color: var(--accent);">
       Dep graph
     </label>
-    <span style="width: 1px; height: 18px; background: var(--border); flex-shrink: 0;"></span>
-    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
-      <input type="checkbox" id="ideation-toggle" onchange="toggleIdeation()" style="cursor: pointer; accent-color: var(--accent);">
-      Brainstorm
-      <span id="ideation-spinner" class="spinner" style="display:none;"></span>
-      <select id="ideation-interval" onchange="updateIdeationInterval(this.value)" title="How often to run brainstorm" style="font-size:12px;color:var(--text-secondary);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:1px 4px;cursor:pointer;display:none;">
-        <option value="0">immediately</option>
-        <option value="15">every 15 min</option>
-        <option value="30">every 30 min</option>
-        <option value="60">every 1h</option>
-        <option value="120">every 2h</option>
-        <option value="240">every 4h</option>
-        <option value="480">every 8h</option>
-        <option value="1440">every 24h</option>
-      </select>
-      <span id="ideation-next-run" style="font-size:12px;color:var(--text-tertiary,#888);display:none;"></span>
-      <button onclick="event.preventDefault();triggerIdeation()" title="Run brainstorm now" style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--text-tertiary,#888);font-size:12px;line-height:1;">&#9654;</button>
-      <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, the brainstorm agent analyses your repositories and proposes tasks at the configured interval. Tasks created by the agent are tagged <em>idea-agent</em>. Use &#9654; to run on demand.</span></span>
-    </label>
+    <span id="ideation-next-run" style="font-size:12px;color:var(--text-tertiary,#888);display:none;"></span>
   </div>
   <!-- Task search -->
   <div class="task-search-wrapper">
@@ -150,6 +132,28 @@
           <span style="font-size: 12px; color: var(--text-muted);">commit(s) ahead</span>
         </div>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Automatically push after the commit pipeline when the workspace is at least N commits ahead of upstream.</div>
+      </div>
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Brainstorm</div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted);">
+            <input type="checkbox" id="ideation-toggle" onchange="toggleIdeation()" style="cursor: pointer; accent-color: var(--accent);">
+            Enable
+          </label>
+          <select id="ideation-interval" onchange="updateIdeationInterval(this.value)" title="How often to run brainstorm" style="font-size:12px;color:var(--text-secondary);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:2px 6px;cursor:pointer;">
+            <option value="0">immediately</option>
+            <option value="15">every 15 min</option>
+            <option value="30">every 30 min</option>
+            <option value="60">every 1h</option>
+            <option value="120">every 2h</option>
+            <option value="240">every 4h</option>
+            <option value="480">every 8h</option>
+            <option value="1440">every 24h</option>
+          </select>
+          <button onclick="event.preventDefault();triggerIdeation()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Run now</button>
+        </div>
+        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">The brainstorm agent analyses repositories and proposes tasks at the configured interval. Tasks are tagged <em>idea-agent</em>.</div>
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
