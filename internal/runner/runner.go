@@ -300,6 +300,12 @@ func (r *Runner) WaitBackground() {
 	r.backgroundWg.Wait()
 }
 
+// PendingGoroutines returns a sorted slice of labels for all background
+// goroutines that have been started but not yet completed.
+func (r *Runner) PendingGoroutines() []string {
+	return r.backgroundWg.Pending()
+}
+
 // Shutdown waits for all tracked background goroutines to complete before
 // returning. Call this after the HTTP server has stopped accepting new requests
 // to ensure that oversight generation, title generation, and other

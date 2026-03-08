@@ -219,6 +219,8 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	mux.HandleFunc("GET /api/debug/health", h.Health)
 	// Aggregate span timing statistics across all tasks.
 	mux.HandleFunc("GET /api/debug/spans", h.GetSpanStats)
+	// Live server internals: pending goroutines, memory, task states, containers.
+	mux.HandleFunc("GET /api/debug/runtime", h.GetRuntimeStatus)
 
 	// Container monitoring.
 	mux.HandleFunc("GET /api/containers", h.GetContainers)
