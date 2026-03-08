@@ -27,6 +27,16 @@ function _getPaletteElements() {
   };
 }
 
+function _setCommandPaletteVisibility(visible) {
+  const els = _getPaletteElements();
+  const root = els.root;
+  if (!root) return;
+
+  root.hidden = !visible;
+  root.classList.toggle('hidden', !visible);
+  root.style.pointerEvents = visible ? 'auto' : 'none';
+}
+
 function _toTaskId(task) {
   return task && task.id ? String(task.id) : '';
 }
@@ -608,13 +618,13 @@ function openCommandPalette() {
   const els = _getPaletteElements();
   if (!els.root || !els.input) return;
 
+  _setCommandPaletteVisibility(true);
   _commandPaletteOpen = true;
   _commandPaletteActiveIndex = 0;
   _commandPaletteTaskRows = [];
   _commandPaletteRows = [];
   _commandPaletteActiveTaskId = '';
 
-  els.root.classList.remove('hidden');
   els.input.value = _commandPaletteQuery || '';
   _updatePaletteFromInput();
   els.input.focus();
@@ -625,8 +635,8 @@ function closeCommandPalette() {
   const els = _getPaletteElements();
   if (!els.root) return;
 
+  _setCommandPaletteVisibility(false);
   _commandPaletteOpen = false;
-  els.root.classList.add('hidden');
   _commandPaletteRows = [];
   _commandPaletteTaskRows = [];
   _commandPaletteActiveIndex = -1;
@@ -699,6 +709,7 @@ function commandPaletteHandlePaletteInput() {
   const els = _getPaletteElements();
   if (!els.root) return;
 
+  _setCommandPaletteVisibility(false);
   document.addEventListener('keydown', commandPaletteHandleGlobalKey);
 
   if (els.input) {

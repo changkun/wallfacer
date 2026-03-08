@@ -1714,6 +1714,11 @@ mark.search-highlight {
   backdrop-filter: blur(4px);
 }
 
+.command-palette.hidden {
+  display: none;
+  pointer-events: none;
+}
+
 .command-palette-panel {
   width: min(940px, 100%);
   max-width: 940px;
