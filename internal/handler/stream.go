@@ -217,18 +217,29 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw
-	cmd.Stderr = pw
+	// Do not pipe cmd.Stderr into the response: errors from the log command
+	// itself (e.g. "no such container" when the container was already removed)
+	// would be forwarded verbatim to the client. Log them server-side only.
+	stderrPR, stderrPW := io.Pipe()
+	cmd.Stderr = stderrPW
 
 	if err := cmd.Start(); err != nil {
 		pr.Close()
 		pw.Close()
+		stderrPR.Close()
+		stderrPW.Close()
 		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
 		return
 	}
 
 	go func() {
+		// Drain stderr so the process is not blocked writing to it.
+		io.Copy(io.Discard, stderrPR)
+	}()
+	go func() {
 		cmd.Wait()
 		pw.Close()
+		stderrPW.Close()
 	}()
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
