@@ -30,6 +30,9 @@ let autopilot = false;
 // Auto-test state
 let autotest = false;
 
+// Auto-submit state
+let autosubmit = false;
+
 // Max parallel tasks (loaded from /api/env, 0 = not yet loaded)
 let maxParallelTasks = 0;
 

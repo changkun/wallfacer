@@ -141,6 +141,9 @@ async function fetchConfig() {
     autotest = !!cfg.autotest;
     var atToggle = document.getElementById('autotest-toggle');
     if (atToggle) atToggle.checked = autotest;
+    autosubmit = !!cfg.autosubmit;
+    var asToggle = document.getElementById('autosubmit-toggle');
+    if (asToggle) asToggle.checked = autosubmit;
     availableModels = cfg.models || [];
     defaultModel = cfg.default_model || '';
     populateModelSelects();
@@ -186,5 +189,19 @@ async function toggleAutotest() {
     showAlert('Error toggling auto-test: ' + e.message);
     // Revert checkbox on failure.
     if (toggle) toggle.checked = autotest;
+  }
+}
+
+async function toggleAutosubmit() {
+  var toggle = document.getElementById('autosubmit-toggle');
+  var enabled = toggle ? toggle.checked : !autosubmit;
+  try {
+    var res = await api('/api/config', { method: 'PUT', body: JSON.stringify({ autosubmit: enabled }) });
+    autosubmit = !!res.autosubmit;
+    if (toggle) toggle.checked = autosubmit;
+  } catch (e) {
+    showAlert('Error toggling auto-submit: ' + e.message);
+    // Revert checkbox on failure.
+    if (toggle) toggle.checked = autosubmit;
   }
 }

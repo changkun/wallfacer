@@ -142,6 +142,10 @@ func runServer(configDir string, args []string) {
 	// untested and not behind the default branch tip, when auto-test is enabled.
 	h.StartAutoTester(ctx)
 
+	// Start the auto-submitter: moves waiting tasks to done when they are
+	// verified (pass), not behind the default branch, and conflict-free.
+	h.StartAutoSubmitter(ctx)
+
 	mux := buildMux(h, r)
 
 	host, _, _ := net.SplitHostPort(*addr)

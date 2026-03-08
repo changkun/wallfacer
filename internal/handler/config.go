@@ -137,6 +137,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
 		"autopilot":         h.AutopilotEnabled(),
 		"autotest":          h.AutotestEnabled(),
+		"autosubmit":        h.AutosubmitEnabled(),
 		"ideation":          h.IdeationEnabled(),
 		"ideation_running":  h.ideationRunning(r.Context()),
 		"ideation_interval": int(h.IdeationInterval().Minutes()),
@@ -154,6 +155,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Autopilot        *bool `json:"autopilot"`
 		Autotest         *bool `json:"autotest"`
+		Autosubmit       *bool `json:"autosubmit"`
 		Ideation         *bool `json:"ideation"`
 		IdeationInterval *int  `json:"ideation_interval"` // minutes; 0 = run immediately on completion
 	}
@@ -174,6 +176,13 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	// Re-trigger auto-test scan in case autotest was just enabled.
 	if h.AutotestEnabled() {
 		go h.tryAutoTest(r.Context())
+	}
+	if req.Autosubmit != nil {
+		h.SetAutosubmit(*req.Autosubmit)
+	}
+	// Re-trigger auto-submit scan in case autosubmit was just enabled.
+	if h.AutosubmitEnabled() {
+		go h.tryAutoSubmit(r.Context())
 	}
 	if req.IdeationInterval != nil {
 		mins := *req.IdeationInterval
@@ -197,6 +206,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{
 		"autopilot":         h.AutopilotEnabled(),
 		"autotest":          h.AutotestEnabled(),
+		"autosubmit":        h.AutosubmitEnabled(),
 		"ideation":          h.IdeationEnabled(),
 		"ideation_running":  h.ideationRunning(r.Context()),
 		"ideation_interval": int(h.IdeationInterval().Minutes()),

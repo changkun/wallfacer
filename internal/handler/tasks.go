@@ -597,3 +597,136 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 		h.runner.RunBackground(t.ID, testPrompt, "", false)
 	}
 }
+
+// autoSubmitInterval is how often the auto-submitter polls for eligible waiting tasks
+// in addition to reacting to store change notifications.
+const autoSubmitInterval = 30 * time.Second
+
+// StartAutoSubmitter subscribes to store change notifications and automatically
+// moves waiting tasks to done when they are verified (LastTestResult == "pass"),
+// not behind the default branch tip, and have no unresolved worktree conflicts.
+func (h *Handler) StartAutoSubmitter(ctx context.Context) {
+	subID, ch := h.store.Subscribe()
+	ticker := time.NewTicker(autoSubmitInterval)
+	go func() {
+		defer h.store.Unsubscribe(subID)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ch:
+				h.tryAutoSubmit(ctx)
+			case <-ticker.C:
+				h.tryAutoSubmit(ctx)
+			}
+		}
+	}()
+}
+
+// tryAutoSubmit scans all waiting tasks and moves any that are verified
+// (LastTestResult == "pass"), not behind the default branch, and free of
+// worktree conflicts directly to done (via the commit pipeline if a session
+// exists). Does nothing when auto-submit is disabled.
+func (h *Handler) tryAutoSubmit(ctx context.Context) {
+	if !h.AutosubmitEnabled() {
+		return
+	}
+
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		return
+	}
+
+	for i := range tasks {
+		t := &tasks[i]
+		if t.Status != store.TaskStatusWaiting {
+			continue
+		}
+		// Only submit tasks that have passed test verification.
+		if t.LastTestResult != "pass" {
+			continue
+		}
+		// Skip while the test agent is still running.
+		if t.IsTestRun {
+			continue
+		}
+
+		// Check that all worktrees are up to date and conflict-free.
+		skip := false
+		for repoPath, worktreePath := range t.WorktreePaths {
+			n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+			if err != nil {
+				logger.Handler.Warn("auto-submit: check commits behind",
+					"task", t.ID, "repo", repoPath, "error", err)
+				skip = true
+				break
+			}
+			if n > 0 {
+				skip = true
+				break
+			}
+			hasConflict, err := gitutil.HasConflicts(worktreePath)
+			if err != nil {
+				logger.Handler.Warn("auto-submit: check conflicts",
+					"task", t.ID, "worktree", worktreePath, "error", err)
+				skip = true
+				break
+			}
+			if hasConflict {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+
+		logger.Handler.Info("auto-submit: completing verified waiting task", "task", t.ID)
+		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+			"result": "Auto-submit: task verified with passing tests, up to date, and no conflicts.",
+		})
+
+		if t.SessionID != nil && *t.SessionID != "" {
+			if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusCommitting); err != nil {
+				logger.Handler.Error("auto-submit: update task status", "task", t.ID, "error", err)
+				continue
+			}
+			h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+				"from": string(store.TaskStatusWaiting),
+				"to":   string(store.TaskStatusCommitting),
+			})
+			sessionID := *t.SessionID
+			taskID := t.ID
+			go func() {
+				bgCtx := context.Background()
+				if err := h.runner.Commit(taskID, sessionID); err != nil {
+					h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+					h.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
+						"error": "auto-submit: commit failed: " + err.Error(),
+					})
+					h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+						"from": string(store.TaskStatusCommitting),
+						"to":   string(store.TaskStatusFailed),
+					})
+					return
+				}
+				h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+				h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+					"from": string(store.TaskStatusCommitting),
+					"to":   string(store.TaskStatusDone),
+				})
+			}()
+		} else {
+			// No session — move directly to done.
+			if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
+				logger.Handler.Error("auto-submit: update task status to done", "task", t.ID, "error", err)
+				continue
+			}
+			h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+				"from": string(store.TaskStatusWaiting),
+				"to":   string(store.TaskStatusDone),
+			})
+		}
+	}
+}

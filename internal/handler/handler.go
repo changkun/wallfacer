@@ -26,6 +26,9 @@ type Handler struct {
 	autotestMu sync.RWMutex
 	autotest   bool
 
+	autosubmitMu sync.RWMutex
+	autosubmit   bool
+
 	diffCache *diffCache
 
 	// ideationEnabled controls whether brainstorm auto-repeat is active.
@@ -81,6 +84,20 @@ func (h *Handler) SetAutotest(enabled bool) {
 	h.autotestMu.Lock()
 	h.autotest = enabled
 	h.autotestMu.Unlock()
+}
+
+// AutosubmitEnabled returns whether auto-submit mode is active.
+func (h *Handler) AutosubmitEnabled() bool {
+	h.autosubmitMu.RLock()
+	defer h.autosubmitMu.RUnlock()
+	return h.autosubmit
+}
+
+// SetAutosubmit enables or disables auto-submit mode.
+func (h *Handler) SetAutosubmit(enabled bool) {
+	h.autosubmitMu.Lock()
+	h.autosubmit = enabled
+	h.autosubmitMu.Unlock()
 }
 
 // IdeationEnabled returns whether brainstorm auto-repeat is active.

@@ -43,6 +43,12 @@
     </label>
     <span style="width: 1px; height: 18px; background: var(--border); flex-shrink: 0;"></span>
     <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
+      <input type="checkbox" id="autosubmit-toggle" onchange="toggleAutosubmit()" style="cursor: pointer; accent-color: var(--accent);">
+      Auto-submit
+      <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, waiting tasks that have passed test verification, are up to date with the default branch, and have no worktree conflicts are automatically moved to done.</span></span>
+    </label>
+    <span style="width: 1px; height: 18px; background: var(--border); flex-shrink: 0;"></span>
+    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
       <input type="checkbox" id="dep-graph-toggle" onchange="toggleDependencyGraph()" style="cursor: pointer; accent-color: var(--accent);">
       Dep graph
     </label>

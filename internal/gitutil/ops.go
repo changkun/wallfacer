@@ -129,3 +129,24 @@ func IsConflictOutput(s string) bool {
 		strings.Contains(s, "Merge conflict") ||
 		strings.Contains(s, "conflict")
 }
+
+// HasConflicts reports whether the worktree at worktreePath has any unresolved
+// merge/rebase conflicts (files with conflict-marker status codes in git status).
+func HasConflicts(worktreePath string) (bool, error) {
+	out, err := exec.Command("git", "-C", worktreePath, "status", "--porcelain").Output()
+	if err != nil {
+		return false, fmt.Errorf("git status in %s: %w", worktreePath, err)
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if len(line) < 2 {
+			continue
+		}
+		// Conflict status codes: UU, AA, DD, AU, UA, DU, UD
+		xy := line[:2]
+		switch xy {
+		case "UU", "AA", "DD", "AU", "UA", "DU", "UD":
+			return true, nil
+		}
+	}
+	return false, nil
+}

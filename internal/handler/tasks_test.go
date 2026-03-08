@@ -1091,3 +1091,191 @@ func TestAutotest_SetAndGet(t *testing.T) {
 		t.Error("expected autotest to be disabled after SetAutotest(false)")
 	}
 }
+
+// --- tryAutoSubmit tests ---
+
+// TestAutosubmit_SetAndGet verifies the SetAutosubmit / AutosubmitEnabled accessors.
+func TestAutosubmit_SetAndGet(t *testing.T) {
+	h := newTestHandler(t)
+	if h.AutosubmitEnabled() {
+		t.Fatal("expected autosubmit to be disabled by default")
+	}
+	h.SetAutosubmit(true)
+	if !h.AutosubmitEnabled() {
+		t.Error("expected autosubmit to be enabled after SetAutosubmit(true)")
+	}
+	h.SetAutosubmit(false)
+	if h.AutosubmitEnabled() {
+		t.Error("expected autosubmit to be disabled after SetAutosubmit(false)")
+	}
+}
+
+// TestTryAutoSubmit_DisabledNoOp verifies that auto-submit does nothing when disabled.
+func TestTryAutoSubmit_DisabledNoOp(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+
+	// autosubmit is disabled by default.
+	h.tryAutoSubmit(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected task to remain waiting when autosubmit disabled, got %s", got.Status)
+	}
+}
+
+// TestTryAutoSubmit_SkipsNonWaiting verifies that non-waiting tasks are not submitted.
+func TestTryAutoSubmit_SkipsNonWaiting(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
+	// Leave in backlog — not waiting.
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+
+	h.tryAutoSubmit(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusBacklog {
+		t.Errorf("expected task to remain in backlog, got %s", got.Status)
+	}
+}
+
+// TestTryAutoSubmit_SkipsNotVerified verifies that unverified tasks are not submitted.
+func TestTryAutoSubmit_SkipsNotVerified(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "unverified task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	// LastTestResult is "" (not tested).
+
+	h.tryAutoSubmit(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected unverified task to remain waiting, got %s", got.Status)
+	}
+}
+
+// TestTryAutoSubmit_SkipsFailedVerification verifies tasks with LastTestResult=="fail" are not submitted.
+func TestTryAutoSubmit_SkipsFailedVerification(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "failed test task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "fail")
+
+	h.tryAutoSubmit(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected failed-test task to remain waiting, got %s", got.Status)
+	}
+}
+
+// TestTryAutoSubmit_SkipsCurrentlyTesting verifies that tasks with IsTestRun=true are not submitted.
+func TestTryAutoSubmit_SkipsCurrentlyTesting(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	// IsTestRun=true means the test agent is currently running.
+	h.store.UpdateTaskTestRun(ctx, task.ID, true, "pass")
+
+	h.tryAutoSubmit(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected currently-testing task to remain waiting, got %s", got.Status)
+	}
+}
+
+// TestTryAutoSubmit_SkipsBehindTip verifies that tasks whose worktrees are behind the
+// default branch are not auto-submitted.
+func TestTryAutoSubmit_SkipsBehindTip(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+
+	// Add a commit to main so the worktree is behind by 1.
+	os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "upstream commit")
+
+	h.tryAutoSubmit(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected behind-tip task to remain waiting, got %s", got.Status)
+	}
+}
+
+// TestTryAutoSubmit_SubmitsEligibleTaskNoSession verifies that a verified, up-to-date,
+// conflict-free waiting task with no session is moved directly to done.
+func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+	// No session ID — task goes directly to done.
+
+	h.tryAutoSubmit(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusDone {
+		t.Errorf("expected eligible task to be moved to done, got %s", got.Status)
+	}
+}
