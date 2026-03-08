@@ -76,7 +76,12 @@ function renderLogs() {
     }
   }
   if (!logSearchQuery && atBottom) {
-    logsEl.scrollTop = logsEl.scrollHeight;
+    // Defer scroll-to-bottom so the browser can batch the layout triggered by
+    // the innerHTML/textContent write with the scroll update, avoiding a forced
+    // synchronous reflow.
+    requestAnimationFrame(function() {
+      logsEl.scrollTop = logsEl.scrollHeight;
+    });
   }
 }
 
@@ -214,7 +219,9 @@ function renderTestLogs() {
     logsEl.textContent = testRawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
   }
   if (atBottom) {
-    logsEl.scrollTop = logsEl.scrollHeight;
+    requestAnimationFrame(function() {
+      logsEl.scrollTop = logsEl.scrollHeight;
+    });
   }
 }
 

@@ -326,7 +326,30 @@ function buildCardActions(t) {
   return `<div class="card-actions">${parts.join('')}</div>`;
 }
 
+// _cardFingerprint computes a lightweight fingerprint string for the card-relevant
+// fields of a task so that updateCard can skip the expensive innerHTML rebuild
+// when nothing visible has changed.
+function _cardFingerprint(t, rank) {
+  const displayRank = rank !== undefined ? rank + 1 : t.position + 1;
+  return [
+    t.status, t.kind, !!t.archived, !!t.is_test_run, t.title || '',
+    t.prompt, t.result || '', t.updated_at, t.session_id || '',
+    !!t.fresh_start, t.timeout, t.stop_reason || '', t.last_test_result || '',
+    t.sandbox || '', JSON.stringify(t.sandbox_by_activity || {}),
+    !!t.mount_worktrees, JSON.stringify(t.tags || []),
+    JSON.stringify(t.depends_on || []),
+    t.current_refinement ? t.current_refinement.status : '',
+    JSON.stringify(t.worktree_paths || {}), displayRank,
+    filterQuery,
+  ].join('\x00');
+}
+
 function updateCard(card, t, rank) {
+  // Skip the expensive innerHTML rebuild if no visible data has changed.
+  const fp = _cardFingerprint(t, rank);
+  if (card.dataset.fp === fp) return;
+  card.dataset.fp = fp;
+
   const isIdeaAgent = t.kind === 'idea-agent';
   const isArchived = !!t.archived;
   const isTestRun = !!t.is_test_run && t.status === 'in_progress';

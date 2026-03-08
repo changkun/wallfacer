@@ -143,10 +143,25 @@ async function cancelRefinement() {
   }
 }
 
+// --- Refine log render scheduler ---
+// Coalesces rapid chunk arrivals into a single paint per animation frame,
+// mirroring the scheduleLogRender() pattern used by modal-logs.js.
+let _refineLogRenderPending = false;
+function scheduleRefineLogRender() {
+  if (_refineLogRenderPending) return;
+  _refineLogRenderPending = true;
+  requestAnimationFrame(function() {
+    _refineLogRenderPending = false;
+    renderRefineLogs();
+  });
+}
+
 // renderRefineLogs re-renders the refine log area from refineRawLogBuffer.
 function renderRefineLogs() {
   const logsEl = document.getElementById('refine-logs');
   if (!logsEl) return;
+  // Read scroll state before mutating the DOM to avoid a forced synchronous layout
+  // between the read and the subsequent innerHTML write.
   const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 80;
   if (refineLogsMode === 'pretty') {
     logsEl.innerHTML = renderPrettyLogs(refineRawLogBuffer);
@@ -154,7 +169,11 @@ function renderRefineLogs() {
     logsEl.textContent = refineRawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
   }
   if (atBottom) {
-    logsEl.scrollTop = logsEl.scrollHeight;
+    // Defer the scroll-to-bottom to the next frame so the browser can batch
+    // the layout triggered by the innerHTML write with the scroll update.
+    requestAnimationFrame(function() {
+      logsEl.scrollTop = logsEl.scrollHeight;
+    });
   }
 }
 
@@ -192,7 +211,7 @@ function startRefineLogStream(taskId) {
         const { done, value } = await reader.read();
         if (done) break;
         refineRawLogBuffer += decoder.decode(value, { stream: true });
-        renderRefineLogs();
+        scheduleRefineLogRender();
       }
       refineLogsAbort = null;
     })
