@@ -20,6 +20,26 @@ import (
 	"github.com/google/uuid"
 )
 
+// SearchTasks handles GET /api/tasks/search?q=<text>.
+// Returns a JSON array of store.TaskSearchResult (at most 50).
+// q must be at least 2 runes; returns 400 otherwise.
+func (h *Handler) SearchTasks(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len([]rune(q)) < 2 {
+		http.Error(w, "q must be at least 2 characters", http.StatusBadRequest)
+		return
+	}
+	results, err := h.store.SearchTasks(r.Context(), q)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if results == nil {
+		results = []store.TaskSearchResult{}
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
 // ListTasks returns all tasks, optionally including archived ones.
 func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	includeArchived := r.URL.Query().Get("include_archived") == "true"

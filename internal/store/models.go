@@ -205,6 +205,13 @@ func (t *Task) HasTag(tag string) bool {
 	return false
 }
 
+// TaskSearchResult wraps a Task with search match metadata.
+type TaskSearchResult struct {
+	*Task
+	MatchedField string `json:"matched_field"` // "title" | "prompt" | "tags" | "oversight"
+	Snippet      string `json:"snippet"`       // HTML-escaped context around the match
+}
+
 // OversightStatus represents the generation state of a task's aggregated oversight summary.
 type OversightStatus string
 

@@ -261,6 +261,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	mux.HandleFunc("POST /api/tasks", h.CreateTask)
 	mux.HandleFunc("POST /api/tasks/generate-titles", h.GenerateMissingTitles)
 	mux.HandleFunc("POST /api/tasks/generate-oversight", h.GenerateMissingOversight)
+	mux.HandleFunc("GET /api/tasks/search", h.SearchTasks)
 
 	// Task instance routes (require UUID parsing).
 	withID := func(fn func(http.ResponseWriter, *http.Request, uuid.UUID)) http.HandlerFunc {
