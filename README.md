@@ -73,6 +73,10 @@ go build -o wallfacer .
 
 On first launch, `~/.wallfacer/.env` is created. Edit it to add your Claude credential (OAuth token or API key), then restart. The browser opens to `http://localhost:8080`.
 
+Codex can be enabled either by:
+- host auth cache at `~/.codex/auth.json` (auto-detected at bootstrap), or
+- `OPENAI_API_KEY` in `~/.wallfacer/.env` / **Settings → API Configuration** (plus one successful Codex test).
+
 **See [Getting Started](docs/getting-started.md) for the full setup walkthrough**, including credential setup, configuration options, and troubleshooting.
 
 ### Common Commands
