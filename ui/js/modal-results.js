@@ -141,7 +141,6 @@ function _buildTimelineHtml(spans) {
 
   var LABEL_W = 130; // px for label column
   var ROW_H   = 24;  // px per row
-  var TICK_MS = 30000; // x-axis tick every 30 s
   var now = Date.now();
 
   // Time bounds
@@ -157,13 +156,28 @@ function _buildTimelineHtml(spans) {
   });
   var totalMs = Math.max(tEnd - t0, 1000);
 
+  // Pick a tick interval that keeps at most ~8 ticks so labels don't overlap.
+  var niceIntervals = [1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000, 1800000, 3600000];
+  var TICK_MS = niceIntervals[niceIntervals.length - 1];
+  for (var ni = 0; ni < niceIntervals.length; ni++) {
+    if (totalMs / niceIntervals[ni] <= 8) { TICK_MS = niceIntervals[ni]; break; }
+  }
+
+  function fmtTickLabel(ms) {
+    if (ms === 0) return '0s';
+    if (ms < 60000) return (ms / 1000) + 's';
+    var m = Math.floor(ms / 60000);
+    var s = (ms % 60000) / 1000;
+    return s === 0 ? m + 'm' : m + 'm' + s + 's';
+  }
+
   function pct(ms) { return Math.min((ms / totalMs) * 100, 100); }
 
   // X-axis tick marks and grid lines
   var ticksHtml = '';
   for (var tickMs = 0; tickMs <= totalMs + TICK_MS / 2; tickMs += TICK_MS) {
     var x = pct(tickMs);
-    var lbl = tickMs === 0 ? '0s' : (tickMs / 1000) + 's';
+    var lbl = fmtTickLabel(tickMs);
     ticksHtml +=
       '<div style="position:absolute;left:' + x + '%;transform:translateX(-50%);bottom:2px;' +
         'font-size:10px;color:var(--text-muted);white-space:nowrap;user-select:none;">' + lbl + '</div>' +
@@ -220,7 +234,7 @@ function _buildTimelineHtml(spans) {
         '<div style="flex:1;position:relative;height:' + ROW_H + 'px;">' +
           '<div class="tl-bar" data-tip="' + escapeHtml(tipText) + '" style="' + barStyle + '">' +
             '<span style="font-size:10px;color:#fff;text-shadow:0 0 3px rgba(0,0,0,.55);' +
-              'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">' +
+              'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;pointer-events:none;">' +
               escapeHtml(barLabel) +
             '</span>' +
           '</div>' +
