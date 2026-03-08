@@ -116,15 +116,17 @@ func runServer(configDir string, args []string) {
 	})
 
 	r.PruneOrphanedWorktrees(s)
-	recoverOrphanedTasks(s, r)
+
+	// Set up signal-based context so background workers stop on SIGTERM/Interrupt.
+	// Created before recovery so orphan monitors can be cancelled on shutdown.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+	defer stop()
+
+	recoverOrphanedTasks(ctx, s, r)
 
 	logger.Main.Info("workspaces", "paths", strings.Join(workspaces, ", "))
 
 	h := handler.NewHandler(s, r, configDir, workspaces)
-
-	// Set up signal-based context so background workers stop on SIGTERM/Interrupt.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
-	defer stop()
 
 	// Start the auto-promoter: watches for state changes and promotes
 	// backlog tasks to in_progress when capacity is available.
@@ -202,6 +204,9 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	// Static files (Kanban UI).
 	uiFS, _ := fsLib.Sub(uiFiles, "ui")
 	mux.Handle("GET /", http.FileServer(http.FS(uiFS)))
+
+	// Operational health check (goroutine count, task counts, uptime).
+	mux.HandleFunc("GET /api/debug/health", h.Health)
 
 	// Container monitoring.
 	mux.HandleFunc("GET /api/containers", h.GetContainers)
@@ -355,8 +360,7 @@ func ensureImage(containerCmd, image string) string {
 //     once it stops.
 //   - in_progress tasks whose container is already gone are moved to waiting so
 //     the user can inspect the partial results and decide what to do next.
-func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
-	ctx := context.Background()
+func recoverOrphanedTasks(ctx context.Context, s *store.Store, r *runner.Runner) {
 	tasks, err := s.ListTasks(ctx, true)
 	if err != nil {
 		logger.Recovery.Error("list tasks", "error", err)
@@ -399,7 +403,7 @@ func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
 				s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
 					"result": "Server restarted while task was running. Container is still active — monitoring for completion.",
 				})
-				go monitorContainerUntilStopped(s, r, t.ID)
+				go monitorContainerUntilStopped(ctx, s, r, t.ID)
 			} else {
 				// Container is gone — move to waiting so the user can review
 				// partial results and decide whether to continue or finish.
@@ -420,32 +424,22 @@ func recoverOrphanedTasks(s *store.Store, r *runner.Runner) {
 // monitorContainerUntilStopped polls the container runtime until the container
 // for taskID is no longer running, then transitions the task from in_progress
 // to waiting so the user can decide what to do next.
-func monitorContainerUntilStopped(s *store.Store, r *runner.Runner, taskID uuid.UUID) {
-	ctx := context.Background()
+//
+// The goroutine exits when ctx is cancelled (e.g. on server shutdown) or after
+// a 4-hour safety timeout to prevent indefinitely-leaked goroutines.
+func monitorContainerUntilStopped(ctx context.Context, s *store.Store, r *runner.Runner, taskID uuid.UUID) {
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Hour)
+	defer cancel()
+
 	ticker := time.NewTicker(containerPollInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		containers, err := r.ListContainers()
-		if err != nil {
-			logger.Recovery.Warn("monitor: list containers error", "task", taskID, "error", err)
-			continue
-		}
-		running := false
-		for _, c := range containers {
-			// Match by task ID (from label) so this works regardless of
-			// the container name format (slug-based or legacy UUID-based).
-			if c.TaskID == taskID.String() && c.State == "running" {
-				running = true
-				break
-			}
-		}
-		if running {
-			continue
-		}
+	// storeCtx is intentionally decoupled from the monitor lifetime so that
+	// store writes always complete even when ctx is cancelled or timed out.
+	storeCtx := context.Background()
 
-		// Container stopped — move the task to waiting if it is still in_progress.
-		cur, getErr := s.GetTask(ctx, taskID)
+	transitionToWaiting := func() {
+		cur, getErr := s.GetTask(storeCtx, taskID)
 		if getErr != nil || cur == nil {
 			return
 		}
@@ -453,14 +447,48 @@ func monitorContainerUntilStopped(s *store.Store, r *runner.Runner, taskID uuid.
 			// Task was already transitioned by another path (e.g. cancelled).
 			return
 		}
-		logger.Recovery.Info("monitored container stopped, moving task to waiting", "task", taskID)
-		s.UpdateTaskStatus(ctx, taskID, "waiting")
-		s.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		s.UpdateTaskStatus(storeCtx, taskID, "waiting")
+		s.InsertEvent(storeCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Container has stopped. Please review the output and decide whether to continue or mark as done.",
 		})
-		s.InsertEvent(ctx, taskID, store.EventTypeStateChange, map[string]string{
+		s.InsertEvent(storeCtx, taskID, store.EventTypeStateChange, map[string]string{
 			"from": "in_progress", "to": "waiting",
 		})
-		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.DeadlineExceeded {
+				logger.Recovery.Warn("monitor: container not seen stopping after 4h, giving up", "task", taskID)
+				transitionToWaiting()
+			}
+			// If cancelled (server shutdown), exit silently.
+			return
+
+		case <-ticker.C:
+			containers, err := r.ListContainers()
+			if err != nil {
+				logger.Recovery.Warn("monitor: list containers error", "task", taskID, "error", err)
+				continue
+			}
+			running := false
+			for _, c := range containers {
+				// Match by task ID (from label) so this works regardless of
+				// the container name format (slug-based or legacy UUID-based).
+				if c.TaskID == taskID.String() && c.State == "running" {
+					running = true
+					break
+				}
+			}
+			if running {
+				continue
+			}
+
+			// Container stopped — move the task to waiting if it is still in_progress.
+			logger.Recovery.Info("monitored container stopped, moving task to waiting", "task", taskID)
+			transitionToWaiting()
+			return
+		}
 	}
 }

@@ -18,6 +18,7 @@ type Handler struct {
 	configDir  string
 	workspaces []string
 	envFile    string
+	startTime  time.Time
 
 	autopilotMu sync.RWMutex
 	autopilot   bool
@@ -45,6 +46,7 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		workspaces: workspaces,
 		envFile:    r.EnvFile(),
 		diffCache:  newDiffCache(),
+		startTime:  time.Now(),
 	}
 }
 
