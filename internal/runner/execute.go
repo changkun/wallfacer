@@ -350,6 +350,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			return
 
 		case "max_tokens", "pause_turn":
+			if output.StopReason == "max_tokens" {
+				r.notifyStopReason(taskID, output.StopReason)
+			}
 			logger.Runner.Info("auto-continuing", "task", taskID, "stop_reason", output.StopReason)
 			prompt = ""
 			// For test runs, resume the test agent's own session rather than

@@ -134,6 +134,11 @@ func runServer(configDir string, args []string) {
 	logger.Main.Info("workspaces", "paths", strings.Join(workspaces, ", "))
 
 	h := handler.NewHandler(s, r, configDir, workspaces)
+	r.SetStopReasonHandler(func(taskID uuid.UUID, stopReason string) {
+		if stopReason == "max_tokens" {
+			h.SetAutopilot(false)
+		}
+	})
 
 	// Start the auto-promoter: watches for state changes and promotes
 	// backlog tasks to in_progress when capacity is available.
