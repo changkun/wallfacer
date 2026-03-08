@@ -908,3 +908,186 @@ func TestCheckAndSyncWaitingTasks_SyncsWhenBehind(t *testing.T) {
 		t.Errorf("unexpected status %s after auto-sync trigger", got.Status)
 	}
 }
+
+// --- tryAutoTest tests ---
+
+// TestTryAutoTest_DisabledNoOp verifies that auto-test does nothing when disabled.
+func TestTryAutoTest_DisabledNoOp(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
+	// autotest is disabled by default.
+	h.tryAutoTest(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected task to remain waiting when autotest disabled, got %s", got.Status)
+	}
+}
+
+// TestTryAutoTest_SkipsNonWaiting verifies that non-waiting tasks are not tested.
+func TestTryAutoTest_SkipsNonWaiting(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	// Leave the task in backlog (not waiting).
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
+	h.tryAutoTest(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusBacklog {
+		t.Errorf("expected task to remain in backlog, got %s", got.Status)
+	}
+}
+
+// TestTryAutoTest_SkipsAlreadyTested verifies that tasks with a test result are skipped.
+func TestTryAutoTest_SkipsAlreadyTested(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	// Simulate a previous test run that passed.
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+
+	h.tryAutoTest(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected already-tested task to remain waiting, got %s", got.Status)
+	}
+}
+
+// TestTryAutoTest_SkipsCurrentlyTesting verifies that tasks being tested (IsTestRun) are skipped.
+func TestTryAutoTest_SkipsCurrentlyTesting(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	// Mark the task as currently running a test.
+	h.store.UpdateTaskTestRun(ctx, task.ID, true, "")
+
+	h.tryAutoTest(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected currently-testing task to remain waiting, got %s", got.Status)
+	}
+}
+
+// TestTryAutoTest_SkipsNoWorktrees verifies that waiting tasks with no worktrees are skipped.
+func TestTryAutoTest_SkipsNoWorktrees(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	// No worktrees set.
+
+	h.tryAutoTest(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected task without worktrees to remain waiting, got %s", got.Status)
+	}
+}
+
+// TestTryAutoTest_SkipsBehindTip verifies that tasks whose worktrees are behind the
+// default branch are not auto-tested.
+func TestTryAutoTest_SkipsBehindTip(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
+	// Add a commit to main so the worktree is behind by 1.
+	os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "upstream commit")
+
+	h.tryAutoTest(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected behind-tip task to remain waiting, got %s", got.Status)
+	}
+}
+
+// TestTryAutoTest_TriggersForEligibleTask verifies that a qualifying waiting task
+// (untested, up-to-date worktree) is transitioned to in_progress to run the test agent.
+func TestTryAutoTest_TriggersForEligibleTask(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	// No new commits — worktree is up to date.
+
+	h.tryAutoTest(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusInProgress {
+		t.Errorf("expected eligible task to be moved to in_progress, got %s", got.Status)
+	}
+	if !got.IsTestRun {
+		t.Error("expected IsTestRun to be set on auto-tested task")
+	}
+}
+
+// TestAutotest_SetAndGet verifies the SetAutotest / AutotestEnabled accessors.
+func TestAutotest_SetAndGet(t *testing.T) {
+	h := newTestHandler(t)
+	if h.AutotestEnabled() {
+		t.Fatal("expected autotest to be disabled by default")
+	}
+	h.SetAutotest(true)
+	if !h.AutotestEnabled() {
+		t.Error("expected autotest to be enabled after SetAutotest(true)")
+	}
+	h.SetAutotest(false)
+	if h.AutotestEnabled() {
+		t.Error("expected autotest to be disabled after SetAutotest(false)")
+	}
+}

@@ -25,6 +25,9 @@ let gitRetryDelay = 1000;
 // Autopilot state
 let autopilot = false;
 
+// Auto-test state
+let autotest = false;
+
 // Max parallel tasks (loaded from /api/env, 0 = not yet loaded)
 let maxParallelTasks = 0;
 

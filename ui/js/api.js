@@ -138,6 +138,9 @@ async function fetchConfig() {
     autopilot = !!cfg.autopilot;
     var toggle = document.getElementById('autopilot-toggle');
     if (toggle) toggle.checked = autopilot;
+    autotest = !!cfg.autotest;
+    var atToggle = document.getElementById('autotest-toggle');
+    if (atToggle) atToggle.checked = autotest;
     availableModels = cfg.models || [];
     defaultModel = cfg.default_model || '';
     populateModelSelects();
@@ -169,5 +172,19 @@ async function toggleAutopilot() {
     showAlert('Error toggling autopilot: ' + e.message);
     // Revert checkbox on failure.
     if (toggle) toggle.checked = autopilot;
+  }
+}
+
+async function toggleAutotest() {
+  var toggle = document.getElementById('autotest-toggle');
+  var enabled = toggle ? toggle.checked : !autotest;
+  try {
+    var res = await api('/api/config', { method: 'PUT', body: JSON.stringify({ autotest: enabled }) });
+    autotest = !!res.autotest;
+    if (toggle) toggle.checked = autotest;
+  } catch (e) {
+    showAlert('Error toggling auto-test: ' + e.message);
+    // Revert checkbox on failure.
+    if (toggle) toggle.checked = autotest;
   }
 }
