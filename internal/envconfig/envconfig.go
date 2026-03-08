@@ -15,8 +15,8 @@ type Config struct {
 	APIKey            string // ANTHROPIC_API_KEY
 	AuthToken         string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
 	BaseURL           string // ANTHROPIC_BASE_URL
-	DefaultModel      string // WALLFACER_DEFAULT_MODEL
-	TitleModel        string // WALLFACER_TITLE_MODEL
+	DefaultModel      string // CLAUDE_DEFAULT_MODEL
+	TitleModel        string // CLAUDE_TITLE_MODEL
 	MaxParallelTasks  int    // WALLFACER_MAX_PARALLEL (0 means use default)
 	OversightInterval int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
 	AutoPushEnabled   bool   // WALLFACER_AUTO_PUSH ("true"/"false")
@@ -34,8 +34,12 @@ var knownKeys = []string{
 	"CLAUDE_CODE_OAUTH_TOKEN",
 	"ANTHROPIC_API_KEY",
 	"ANTHROPIC_BASE_URL",
-	"WALLFACER_DEFAULT_MODEL",
-	"WALLFACER_TITLE_MODEL",
+	"OPENAI_API_KEY",
+	"OPENAI_BASE_URL",
+	"CLAUDE_DEFAULT_MODEL",
+	"CLAUDE_TITLE_MODEL",
+	"CODEX_DEFAULT_MODEL",
+	"CODEX_TITLE_MODEL",
 	"WALLFACER_MAX_PARALLEL",
 	"WALLFACER_OVERSIGHT_INTERVAL",
 	"WALLFACER_AUTO_PUSH",
@@ -51,16 +55,10 @@ func Parse(path string) (Config, error) {
 	}
 	var cfg Config
 	for _, line := range strings.Split(string(raw), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "#") || line == "" {
-			continue
-		}
-		k, v, ok := strings.Cut(line, "=")
+		k, v, ok := parseEnvLine(line)
 		if !ok {
 			continue
 		}
-		k = strings.TrimSpace(k)
-		v = unquote(strings.TrimSpace(v))
 		switch k {
 		case "CLAUDE_CODE_OAUTH_TOKEN":
 			cfg.OAuthToken = v
@@ -70,9 +68,9 @@ func Parse(path string) (Config, error) {
 			cfg.AuthToken = v
 		case "ANTHROPIC_BASE_URL":
 			cfg.BaseURL = v
-		case "WALLFACER_DEFAULT_MODEL":
+		case "CLAUDE_DEFAULT_MODEL":
 			cfg.DefaultModel = v
-		case "WALLFACER_TITLE_MODEL":
+		case "CLAUDE_TITLE_MODEL":
 			cfg.TitleModel = v
 		case "WALLFACER_MAX_PARALLEL":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
@@ -101,6 +99,68 @@ func Parse(path string) (Config, error) {
 	return cfg, nil
 }
 
+// parseEnvLine parses a single .env line in a permissive way:
+// - trims whitespace
+// - ignores blank and comment-only lines
+// - accepts leading "export " prefix
+// - supports inline comments after quoted/unquoted values
+// - preserves literal '#' inside quoted strings
+func parseEnvLine(line string) (key, value string, ok bool) {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return "", "", false
+	}
+
+	if strings.HasPrefix(line, "export ") {
+		line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
+	}
+
+	k, v, hasEquals := strings.Cut(line, "=")
+	if !hasEquals {
+		return "", "", false
+	}
+
+	k = strings.TrimSpace(k)
+	v = strings.TrimSpace(stripEnvInlineComment(v))
+	return k, unquote(v), true
+}
+
+func stripEnvInlineComment(v string) string {
+	inSingleQuote := false
+	inDoubleQuote := false
+	escapeNext := false
+
+	for i := 0; i < len(v); i++ {
+		c := v[i]
+
+		if escapeNext {
+			escapeNext = false
+			continue
+		}
+		if c == '\\' && inDoubleQuote {
+			escapeNext = true
+			continue
+		}
+
+		switch c {
+		case '\'':
+			if !inDoubleQuote {
+				inSingleQuote = !inSingleQuote
+			}
+		case '"':
+			if !inSingleQuote {
+				inDoubleQuote = !inDoubleQuote
+			}
+		case '#':
+			if !inSingleQuote && !inDoubleQuote {
+				return strings.TrimSpace(v[:i])
+			}
+		}
+	}
+
+	return strings.TrimSpace(v)
+}
+
 // Update merges changes into the env file at path.
 //
 // Each pointer field controls how the corresponding key is handled:
@@ -110,7 +170,22 @@ func Parse(path string) (Config, error) {
 //
 // Keys not already present in the file are appended when non-empty.
 // Comments and unrecognized keys are preserved verbatim.
-func Update(path string, oauthToken, apiKey, baseURL, defaultModel, titleModel, maxParallel, oversightInterval, autoPush, autoPushThreshold *string) error {
+func Update(
+	path string,
+	oauthToken,
+	apiKey,
+	baseURL,
+	openAIAPIKey,
+	openAIBaseURL,
+	defaultModel,
+	titleModel,
+	codexDefaultModel,
+	codexTitleModel,
+	maxParallel,
+	oversightInterval,
+	autoPush,
+	autoPushThreshold *string,
+) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read env file: %w", err)
@@ -120,8 +195,12 @@ func Update(path string, oauthToken, apiKey, baseURL, defaultModel, titleModel, 
 		"CLAUDE_CODE_OAUTH_TOKEN":       oauthToken,
 		"ANTHROPIC_API_KEY":             apiKey,
 		"ANTHROPIC_BASE_URL":            baseURL,
-		"WALLFACER_DEFAULT_MODEL":       defaultModel,
-		"WALLFACER_TITLE_MODEL":         titleModel,
+		"OPENAI_API_KEY":                openAIAPIKey,
+		"OPENAI_BASE_URL":               openAIBaseURL,
+		"CLAUDE_DEFAULT_MODEL":          defaultModel,
+		"CLAUDE_TITLE_MODEL":            titleModel,
+		"CODEX_DEFAULT_MODEL":           codexDefaultModel,
+		"CODEX_TITLE_MODEL":             codexTitleModel,
 		"WALLFACER_MAX_PARALLEL":        maxParallel,
 		"WALLFACER_OVERSIGHT_INTERVAL":  oversightInterval,
 		"WALLFACER_AUTO_PUSH":           autoPush,

@@ -24,8 +24,8 @@ func TestParse(t *testing.T) {
 CLAUDE_CODE_OAUTH_TOKEN=oauth-abc
 ANTHROPIC_API_KEY=sk-ant-123
 ANTHROPIC_BASE_URL=https://example.com
-WALLFACER_DEFAULT_MODEL=claude-opus-4-5
-WALLFACER_TITLE_MODEL=claude-haiku-4-5
+CLAUDE_DEFAULT_MODEL=claude-opus-4-5
+CLAUDE_TITLE_MODEL=claude-haiku-4-5
 UNKNOWN_KEY=ignored
 `
 	path := writeEnvFile(t, content)
@@ -50,6 +50,39 @@ UNKNOWN_KEY=ignored
 	}
 }
 
+func TestParseExportedKeys(t *testing.T) {
+	content := `export CLAUDE_CODE_OAUTH_TOKEN=exported-oauth
+export ANTHROPIC_API_KEY=sk-ant-exported
+`
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.OAuthToken != "exported-oauth" {
+		t.Errorf("OAuthToken = %q; want exported-oauth", cfg.OAuthToken)
+	}
+	if cfg.APIKey != "sk-ant-exported" {
+		t.Errorf("APIKey = %q; want sk-ant-exported", cfg.APIKey)
+	}
+}
+
+func TestParseInlineComment(t *testing.T) {
+	content := `CLAUDE_CODE_OAUTH_TOKEN=oauth-abc # set in local env
+CLAUDE_DEFAULT_MODEL=claude-sonnet-4-0 # this is a model`
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.OAuthToken != "oauth-abc" {
+		t.Errorf("OAuthToken = %q; want oauth-abc", cfg.OAuthToken)
+	}
+	if cfg.DefaultModel != "claude-sonnet-4-0" {
+		t.Errorf("DefaultModel = %q; want claude-sonnet-4-0", cfg.DefaultModel)
+ 	}
+}
+
 func TestParseEmpty(t *testing.T) {
 	path := writeEnvFile(t, "# just a comment\n\n")
 	cfg, err := envconfig.Parse(path)
@@ -67,7 +100,7 @@ func TestUpdateExistingKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=old-token\nANTHROPIC_BASE_URL=https://old.example.com\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), nil, nil, ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -91,7 +124,7 @@ func TestUpdateNilSkips(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// nil pointer → leave unchanged.
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -105,11 +138,11 @@ func TestUpdateNilSkips(t *testing.T) {
 }
 
 func TestUpdateClearsField(t *testing.T) {
-	content := "ANTHROPIC_BASE_URL=https://old.example.com\nWALLFACER_DEFAULT_MODEL=claude-opus-4-5\n"
+	content := "ANTHROPIC_BASE_URL=https://old.example.com\nCLAUDE_DEFAULT_MODEL=claude-opus-4-5\n"
 	path := writeEnvFile(t, content)
 
 	// Empty string pointer → clear the field.
-	if err := envconfig.Update(path, nil, nil, ptr(""), ptr(""), nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr(""), nil, nil, ptr(""), nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -129,7 +162,7 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), ptr("claude-sonnet-4-5"), ptr("claude-haiku-4-5"), nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, ptr("claude-sonnet-4-5"), ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -137,11 +170,11 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	if !strings.Contains(string(raw), "ANTHROPIC_BASE_URL=https://example.com") {
 		t.Errorf("expected ANTHROPIC_BASE_URL in file, got:\n%s", raw)
 	}
-	if !strings.Contains(string(raw), "WALLFACER_DEFAULT_MODEL=claude-sonnet-4-5") {
-		t.Errorf("expected WALLFACER_DEFAULT_MODEL in file, got:\n%s", raw)
+	if !strings.Contains(string(raw), "CLAUDE_DEFAULT_MODEL=claude-sonnet-4-5") {
+		t.Errorf("expected CLAUDE_DEFAULT_MODEL in file, got:\n%s", raw)
 	}
-	if !strings.Contains(string(raw), "WALLFACER_TITLE_MODEL=claude-haiku-4-5") {
-		t.Errorf("expected WALLFACER_TITLE_MODEL in file, got:\n%s", raw)
+	if !strings.Contains(string(raw), "CLAUDE_TITLE_MODEL=claude-haiku-4-5") {
+		t.Errorf("expected CLAUDE_TITLE_MODEL in file, got:\n%s", raw)
 	}
 }
 
@@ -149,7 +182,7 @@ func TestUpdatePreservesComments(t *testing.T) {
 	content := "# Auth token\nCLAUDE_CODE_OAUTH_TOKEN=tok\n# end\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -260,7 +293,7 @@ func TestUpdateOversightInterval(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	v := "15"
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, &v, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -313,7 +346,7 @@ func TestUpdateAutoPush(t *testing.T) {
 
 	enabled := "true"
 	threshold := "5"
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, &enabled, &threshold); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &enabled, &threshold); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
