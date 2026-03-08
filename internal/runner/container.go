@@ -52,6 +52,16 @@ func (r *Runner) buildContainerArgs(
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
 ) []string {
+	return r.buildContainerArgsForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, "claude")
+}
+
+func (r *Runner) buildContainerArgsForSandbox(
+	containerName, taskID, prompt, sessionID string,
+	worktreeOverrides map[string]string,
+	boardDir string,
+	siblingMounts map[string]map[string]string,
+	modelOverride, sandbox string,
+) []string {
 	args := []string{"run", "--rm", "--network=host", "--name", containerName}
 
 	// Label the container with task metadata so the monitor can correlate
@@ -70,7 +80,7 @@ func (r *Runner) buildContainerArgs(
 	// the main session).
 	if m := modelOverride; m != "" {
 		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
-	} else if m := r.modelFromEnv(); m != "" {
+	} else if m := r.modelFromEnvForSandbox(sandbox); m != "" {
 		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
 	}
 
@@ -146,7 +156,7 @@ func (r *Runner) buildContainerArgs(
 	// Per-task model takes priority; fall back to the env-configured default.
 	if modelOverride != "" {
 		args = append(args, "--model", modelOverride)
-	} else if model := r.modelFromEnv(); model != "" {
+	} else if model := r.modelFromEnvForSandbox(sandbox); model != "" {
 		args = append(args, "--model", model)
 	}
 	if sessionID != "" {
@@ -156,22 +166,22 @@ func (r *Runner) buildContainerArgs(
 	return args
 }
 
-// modelFromEnv reads WALLFACER_DEFAULT_MODEL from the env file (if configured).
+// modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file (if configured).
 // Returns an empty string when the file cannot be read or the key is absent.
-func (r *Runner) modelFromEnv() string {
-	if r.envFile == "" {
-		return ""
+func (r *Runner) sandboxForTask(task *store.Task) string {
+	if task == nil {
+		return "claude"
 	}
-	cfg, err := envconfig.Parse(r.envFile)
-	if err != nil {
-		return ""
-	}
-	return cfg.DefaultModel
+	return strings.ToLower(strings.TrimSpace(task.Sandbox))
 }
 
-// titleModelFromEnv reads WALLFACER_TITLE_MODEL from the env file,
-// falling back to WALLFACER_DEFAULT_MODEL if the title model is not set.
-func (r *Runner) titleModelFromEnv() string {
+func (r *Runner) modelFromEnv() string {
+	return r.modelFromEnvForSandbox("claude")
+}
+
+// modelFromEnvForSandbox reads the default model for the given sandbox.
+// Supports "claude" and "codex" values.
+func (r *Runner) modelFromEnvForSandbox(sandbox string) string {
 	if r.envFile == "" {
 		return ""
 	}
@@ -179,10 +189,42 @@ func (r *Runner) titleModelFromEnv() string {
 	if err != nil {
 		return ""
 	}
-	if cfg.TitleModel != "" {
-		return cfg.TitleModel
+	switch strings.ToLower(strings.TrimSpace(sandbox)) {
+	case "codex":
+		return cfg.CodexDefaultModel
+	default:
+		return cfg.DefaultModel
 	}
-	return cfg.DefaultModel
+}
+
+// titleModelFromEnv reads CLAUDE_TITLE_MODEL from the env file,
+// falling back to CLAUDE_DEFAULT_MODEL if the title model is not set.
+func (r *Runner) titleModelFromEnv() string {
+	return r.titleModelFromEnvForSandbox("claude")
+}
+
+// titleModelFromEnvForSandbox returns the sandbox-specific title model.
+// Supports "claude" and "codex" values.
+func (r *Runner) titleModelFromEnvForSandbox(sandbox string) string {
+	if r.envFile == "" {
+		return ""
+	}
+	cfg, err := envconfig.Parse(r.envFile)
+	if err != nil {
+		return ""
+	}
+	switch strings.ToLower(strings.TrimSpace(sandbox)) {
+	case "codex":
+		if cfg.CodexTitleModel != "" {
+			return cfg.CodexTitleModel
+		}
+		return cfg.CodexDefaultModel
+	default:
+		if cfg.TitleModel != "" {
+			return cfg.TitleModel
+		}
+		return cfg.DefaultModel
+	}
 }
 
 // runContainer executes an agent container and parses its NDJSON output.
@@ -209,7 +251,14 @@ func (r *Runner) runContainer(
 	// Remove any leftover container from a previous interrupted run.
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	args := r.buildContainerArgs(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride)
+	sandbox := "claude"
+	if task, err := r.store.GetTask(context.Background(), taskID); err == nil {
+		sandbox = r.sandboxForTask(task)
+	} else {
+		logger.Runner.Warn("runContainer: get task", "task", taskID, "error", err)
+	}
+
+	args := r.buildContainerArgsForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, sandbox)
 
 	cmd := exec.CommandContext(ctx, r.command, args...)
 	var stdout, stderr bytes.Buffer
