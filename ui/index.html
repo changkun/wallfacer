@@ -10,9 +10,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/tailwind.css">
 <link rel="stylesheet" href="/css/styles.css">
-<style>
-.btn-active { background-color: #3b82f6; color: #fff; }
-</style>
 <script src="/js/vendor/sortable.min.js"></script>
 <script src="/js/vendor/marked.min.js"></script>
 <script src="/js/vendor/highlight.min.js"></script>
@@ -37,6 +34,11 @@
       <input type="checkbox" id="autopilot-toggle" onchange="toggleAutopilot()" style="cursor: pointer; accent-color: var(--accent);">
       Autopilot
       <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, manually created backlog tasks are automatically moved to In Progress when there is available capacity. Tasks created by the brainstorm agent are not auto-promoted.</span></span>
+    </label>
+    <span style="width: 1px; height: 18px; background: var(--border); flex-shrink: 0;"></span>
+    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
+      <input type="checkbox" id="dep-graph-toggle" onchange="toggleDependencyGraph()" style="cursor: pointer; accent-color: var(--accent);">
+      Dep graph
     </label>
     <span style="width: 1px; height: 18px; background: var(--border); flex-shrink: 0;"></span>
     <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
@@ -69,8 +71,6 @@
     <input type="search" id="task-search" placeholder="Filter tasks…" autocomplete="off" class="task-search-input">
     <button id="task-search-clear" class="task-search-clear" title="Clear search">&times;</button>
   </div>
-
-  <button id="dep-graph-btn" class="btn btn-sm" onclick="toggleDependencyGraph()" title="Toggle dependency graph">Dep graph</button>
 
   <button id="settings-btn" class="settings-btn" onclick="openSettings()" title="Settings">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

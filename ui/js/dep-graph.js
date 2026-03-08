@@ -71,9 +71,8 @@ function renderDependencyGraph(tasks) {
 }
 
 function toggleDependencyGraph() {
-  window.depGraphEnabled = !window.depGraphEnabled;
-  const btn = document.getElementById('dep-graph-btn');
-  if (btn) btn.classList.toggle('btn-active', window.depGraphEnabled);
+  const cb = document.getElementById('dep-graph-toggle');
+  window.depGraphEnabled = cb ? cb.checked : !window.depGraphEnabled;
   if (typeof render === 'function') render();
 }
 
