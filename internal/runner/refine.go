@@ -18,7 +18,13 @@ const refinementTimeout = 30 * time.Minute
 
 // refinementPromptTemplate wraps the task prompt with instructions that
 // direct the sandbox agent to produce a spec without making code changes.
+// It takes three string arguments: task creation date, current date, and task prompt.
 const refinementPromptTemplate = `You are a task specification writer. DO NOT write any code or make any changes to files.
+
+<task_context>
+Task created: %s
+Current date: %s
+</task_context>
 
 Your goal is to explore the codebase and produce a detailed implementation specification for the following task:
 
@@ -27,11 +33,15 @@ Your goal is to explore the codebase and produce a detailed implementation speci
 </task>
 
 Instructions:
-1. Explore relevant parts of the codebase to understand context and existing patterns
-2. Identify the best implementation approach given what already exists
-3. Produce a comprehensive spec using this format:
+1. Consider the task creation date and current date above. If significant time has passed, assess whether the task description is still accurate and relevant given the current state of the codebase. Note any parts that may be outdated or no longer applicable.
+2. Explore relevant parts of the codebase to understand context and existing patterns
+3. Identify the best implementation approach given what already exists
+4. Produce a comprehensive spec using this format:
 
 # Implementation Spec
+
+## Validity Assessment
+[Is the task still valid and relevant? Has the codebase changed in ways that make the task description outdated, partially done, or no longer needed? State clearly if the task should be reconsidered.]
 
 ## Objective
 [Clear statement of what needs to be achieved and why]
@@ -68,7 +78,10 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 		return
 	}
 
-	prompt := fmt.Sprintf(refinementPromptTemplate, task.Prompt)
+	const dateLayout = "2006-01-02"
+	createdAt := task.CreatedAt.Format(dateLayout)
+	today := time.Now().Format(dateLayout)
+	prompt := fmt.Sprintf(refinementPromptTemplate, createdAt, today, task.Prompt)
 	if strings.TrimSpace(userInstructions) != "" {
 		prompt += "\n\nAdditional focus from the user:\n<user_instructions>\n" + strings.TrimSpace(userInstructions) + "\n</user_instructions>"
 	}
