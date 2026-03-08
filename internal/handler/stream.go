@@ -17,7 +17,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// StreamTasks streams the task list as SSE, pushing an update on every state change.
+// StreamTasks streams task changes as SSE with typed events.
+//
+// On connection an initial "snapshot" event is sent containing the full task list
+// (filtered by ?include_archived). Subsequent events are per-task deltas:
+//
+//	event: task-updated  — a single task was created or mutated (data: Task JSON)
+//	event: task-deleted  — a task was deleted (data: {"id":"<uuid>"})
 func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -34,37 +40,47 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 	subID, ch := h.store.Subscribe()
 	defer h.store.Unsubscribe(subID)
 
-	send := func() bool {
-		tasks, err := h.store.ListTasks(r.Context(), includeArchived)
-		if err != nil {
-			return false
-		}
-		if tasks == nil {
-			tasks = []store.Task{}
-		}
-		data, err := json.Marshal(tasks)
-		if err != nil {
-			return false
-		}
-		if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
-			return false
-		}
-		flusher.Flush()
-		return true
-	}
-
-	if !send() {
+	// Send the initial full snapshot so the client can bootstrap its local state.
+	tasks, err := h.store.ListTasks(r.Context(), includeArchived)
+	if err != nil {
 		return
 	}
+	if tasks == nil {
+		tasks = []store.Task{}
+	}
+	snapshot, err := json.Marshal(tasks)
+	if err != nil {
+		return
+	}
+	if _, err := fmt.Fprintf(w, "event: snapshot\ndata: %s\n\n", snapshot); err != nil {
+		return
+	}
+	flusher.Flush()
 
 	for {
 		select {
 		case <-r.Context().Done():
 			return
-		case <-ch:
-			if !send() {
+		case delta, ok := <-ch:
+			if !ok {
 				return
 			}
+			var eventType string
+			var payload []byte
+			if delta.Deleted {
+				eventType = "task-deleted"
+				payload, err = json.Marshal(map[string]string{"id": delta.Task.ID.String()})
+			} else {
+				eventType = "task-updated"
+				payload, err = json.Marshal(delta.Task)
+			}
+			if err != nil {
+				continue
+			}
+			if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", eventType, payload); err != nil {
+				return
+			}
+			flusher.Flush()
 		}
 	}
 }

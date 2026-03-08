@@ -23,7 +23,7 @@ type Store struct {
 	nextSeq map[uuid.UUID]int
 
 	subMu       sync.Mutex
-	subscribers map[int]chan struct{}
+	subscribers map[int]chan TaskDelta
 	nextSubID   int
 }
 
@@ -34,7 +34,7 @@ func NewStore(dir string) (*Store, error) {
 		tasks:       make(map[uuid.UUID]*Task),
 		events:      make(map[uuid.UUID][]TaskEvent),
 		nextSeq:     make(map[uuid.UUID]int),
-		subscribers: make(map[int]chan struct{}),
+		subscribers: make(map[int]chan TaskDelta),
 	}
 
 	if err := os.MkdirAll(dir, 0755); err != nil {

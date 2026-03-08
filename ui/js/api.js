@@ -19,26 +19,62 @@ function startTasksStream() {
   if (tasksSource) tasksSource.close();
   const url = showArchived ? '/api/tasks/stream?include_archived=true' : '/api/tasks/stream';
   tasksSource = new EventSource(url);
-  tasksSource.onmessage = function(e) {
+
+  // Initial full snapshot — replace the local tasks array and re-render.
+  tasksSource.addEventListener('snapshot', function(e) {
     tasksRetryDelay = 1000;
     try {
-      const newTasks = JSON.parse(e.data);
-      // When any task changes, invalidate cached behind-counts so waiting cards
-      // immediately re-check how many commits they are behind the main branch.
-      if (tasks && tasks.length > 0) {
-        const prevById = new Map(tasks.map(t => [t.id, t]));
-        const anyChanged = newTasks.some(t => {
-          const prev = prevById.get(t.id);
-          return !prev || prev.updated_at !== t.updated_at;
-        });
-        if (anyChanged) invalidateDiffBehindCounts();
-      }
-      tasks = newTasks;
+      tasks = JSON.parse(e.data);
       render();
     } catch (err) {
-      console.error('tasks SSE parse error:', err);
+      console.error('tasks SSE snapshot parse error:', err);
     }
-  };
+  });
+
+  // Single-task update — find by ID and replace in-place (or append if new).
+  tasksSource.addEventListener('task-updated', function(e) {
+    tasksRetryDelay = 1000;
+    try {
+      const task = JSON.parse(e.data);
+      // If the task is archived and we're not showing archived tasks, treat as deleted.
+      if (task.archived && !showArchived) {
+        const idx = tasks.findIndex(t => t.id === task.id);
+        if (idx >= 0) {
+          tasks.splice(idx, 1);
+          invalidateDiffBehindCounts();
+          render();
+        }
+        return;
+      }
+      const idx = tasks.findIndex(t => t.id === task.id);
+      if (idx >= 0) {
+        tasks[idx] = task;
+      } else {
+        tasks.push(task);
+      }
+      invalidateDiffBehindCounts();
+      render();
+    } catch (err) {
+      console.error('tasks SSE task-updated parse error:', err);
+    }
+  });
+
+  // Single-task deletion — remove from local array.
+  tasksSource.addEventListener('task-deleted', function(e) {
+    tasksRetryDelay = 1000;
+    try {
+      const { id } = JSON.parse(e.data);
+      const idx = tasks.findIndex(t => t.id === id);
+      if (idx >= 0) {
+        tasks.splice(idx, 1);
+        invalidateDiffBehindCounts();
+        render();
+      }
+    } catch (err) {
+      console.error('tasks SSE task-deleted parse error:', err);
+    }
+  });
+
   tasksSource.onerror = function() {
     if (tasksSource.readyState === EventSource.CLOSED) {
       tasksSource = null;

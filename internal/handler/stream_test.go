@@ -2,12 +2,14 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"changkun.de/wallfacer/internal/store"
 )
@@ -223,28 +225,114 @@ func TestServeStoredLogs_SkipsNonTurnFiles(t *testing.T) {
 	}
 }
 
-// TestStreamTasks_InitialSend verifies that StreamTasks sends the task list on first connect.
-func TestStreamTasks_InitialSend(t *testing.T) {
+// TestStreamTasks_InitialSnapshot verifies that StreamTasks sends a "snapshot" SSE event
+// containing the full task list on first connect.
+func TestStreamTasks_InitialSnapshot(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	h.store.CreateTask(ctx, "my task", 15, false, "", "")
+	task, _ := h.store.CreateTask(ctx, "my task", 15, false, "", "")
 
-	// Use a context that cancels quickly so the streaming loop ends.
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
 	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
 
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		h.StreamTasks(w, req)
 	}()
 
-	// Cancel the context after a brief moment to stop the loop.
+	// The snapshot is written before the select loop, so a short pause is sufficient.
+	time.Sleep(20 * time.Millisecond)
 	cancel()
+	<-done // ensure goroutine exits before reading body
 
-	// Give the goroutine a moment to finish.
-	// We just verify the initial data was written (the goroutine ran send() at least once).
-	// The actual content may vary so we just check for the SSE format prefix.
-	_ = w
+	body := w.Body.String()
+	if !strings.Contains(body, "event: snapshot") {
+		t.Errorf("expected 'event: snapshot' in response, got:\n%s", body)
+	}
+	if !strings.Contains(body, task.ID.String()) {
+		t.Errorf("expected task ID %s in snapshot, got:\n%s", task.ID, body)
+	}
+}
+
+// TestStreamTasks_DeltaOnUpdate verifies that a task mutation after connect emits a
+// single "task-updated" SSE event — not a full list snapshot.
+func TestStreamTasks_DeltaOnUpdate(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "delta test", 15, false, "", "")
+	// Create a second task so the full list has >1 entry; the delta must carry only 1.
+	h.store.CreateTask(ctx, "other task", 15, false, "", "")
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamTasks(w, req)
+	}()
+
+	// Wait for the snapshot to be written, then trigger a mutation.
+	time.Sleep(20 * time.Millisecond)
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	if !strings.Contains(body, "event: task-updated") {
+		t.Errorf("expected 'event: task-updated' in response, got:\n%s", body)
+	}
+	if !strings.Contains(body, task.ID.String()) {
+		t.Errorf("expected mutated task ID %s in delta, got:\n%s", task.ID, body)
+	}
+	// The delta payload must be a single JSON object, not an array.
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		if line == "event: task-updated" && i+1 < len(lines) {
+			data := strings.TrimPrefix(lines[i+1], "data: ")
+			var obj map[string]any
+			if err := json.Unmarshal([]byte(data), &obj); err != nil {
+				t.Errorf("task-updated payload is not a JSON object: %v\ndata: %s", err, data)
+			}
+			break
+		}
+	}
+}
+
+// TestStreamTasks_DeleteEmitsTaskDeleted verifies that deleting a task emits
+// a "task-deleted" event carrying the task ID.
+func TestStreamTasks_DeleteEmitsTaskDeleted(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "to delete", 15, false, "", "")
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamTasks(w, req)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	h.store.DeleteTask(ctx, task.ID)
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	if !strings.Contains(body, "event: task-deleted") {
+		t.Errorf("expected 'event: task-deleted' in response, got:\n%s", body)
+	}
+	if !strings.Contains(body, task.ID.String()) {
+		t.Errorf("expected task ID %s in task-deleted event, got:\n%s", task.ID, body)
+	}
 }
 
 // flushRecorder wraps httptest.ResponseRecorder and implements http.Flusher.

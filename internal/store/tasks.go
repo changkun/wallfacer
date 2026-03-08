@@ -102,7 +102,7 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 	s.tasks[task.ID] = task
 	s.events[task.ID] = nil
 	s.nextSeq[task.ID] = 1
-	s.notify()
+	s.notify(task, false)
 
 	ret := *task
 	return &ret, nil
@@ -113,7 +113,8 @@ func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.tasks[id]; !ok {
+	t, ok := s.tasks[id]
+	if !ok {
 		return fmt.Errorf("task not found: %s", id)
 	}
 
@@ -125,7 +126,7 @@ func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
 	delete(s.tasks, id)
 	delete(s.events, id)
 	delete(s.nextSeq, id)
-	s.notify()
+	s.notify(t, true)
 	return nil
 }
 
@@ -143,7 +144,7 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -161,7 +162,7 @@ func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) e
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -181,7 +182,7 @@ func (s *Store) UpdateTaskTurns(_ context.Context, id uuid.UUID, turns int) erro
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -202,7 +203,7 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -239,7 +240,7 @@ func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent s
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -263,7 +264,7 @@ func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -287,7 +288,7 @@ func (s *Store) UpdateTaskDependsOn(_ context.Context, id uuid.UUID, dependsOn [
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -346,7 +347,7 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -379,7 +380,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -403,9 +404,7 @@ func (s *Store) ArchiveAllDone(_ context.Context) ([]uuid.UUID, error) {
 			return archived, err
 		}
 		archived = append(archived, id)
-	}
-	if len(archived) > 0 {
-		s.notify()
+		s.notify(t, false)
 	}
 	return archived, nil
 }
@@ -424,7 +423,7 @@ func (s *Store) SetTaskArchived(_ context.Context, id uuid.UUID, archived bool) 
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -446,7 +445,7 @@ func (s *Store) ResumeTask(_ context.Context, id uuid.UUID, timeout *int) error 
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -465,7 +464,7 @@ func (s *Store) UpdateTaskWorktrees(_ context.Context, id uuid.UUID, worktreePat
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -505,7 +504,7 @@ func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun boo
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -543,7 +542,7 @@ func (s *Store) UpdateRefinementJob(_ context.Context, id uuid.UUID, job *Refine
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -567,7 +566,7 @@ func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt strin
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
@@ -586,7 +585,7 @@ func (s *Store) DismissRefinement(_ context.Context, id uuid.UUID) error {
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	s.notify()
+	s.notify(t, false)
 	return nil
 }
 
