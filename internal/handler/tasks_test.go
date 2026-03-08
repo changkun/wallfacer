@@ -1205,6 +1205,37 @@ func TestTryAutoPromote_PromotesWhenDepsSatisfied(t *testing.T) {
 	}
 }
 
+// TestTryAutoPromote_DoesNotCountTestRuns verifies that test-run in_progress
+// tasks (IsTestRun=true) do not count against the regular task concurrency limit,
+// so testing tasks cannot starve regular backlog promotions.
+func TestTryAutoPromote_DoesNotCountTestRuns(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	h.autopilotMu.Lock()
+	h.autopilot = true
+	h.autopilotMu.Unlock()
+	ctx := context.Background()
+
+	// Set regular max to 1.
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// One test-run in_progress task (should not occupy the regular slot).
+	testTask, _ := h.store.CreateTask(ctx, "test run", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, testTask.ID, store.TaskStatusInProgress)
+	h.store.UpdateTaskTestRun(ctx, testTask.ID, true, "")
+
+	// One backlog task that should be promoted.
+	backlog, _ := h.store.CreateTask(ctx, "backlog task", 15, false, "", "")
+
+	h.tryAutoPromote(ctx)
+
+	got, _ := h.store.GetTask(ctx, backlog.ID)
+	if got.Status != store.TaskStatusInProgress {
+		t.Errorf("expected backlog task to be promoted (test-run should not block regular slots), got %s", got.Status)
+	}
+}
+
 // --- checkAndSyncWaitingTasks tests ---
 
 // TestCheckAndSyncWaitingTasks_SkipsNonWaiting verifies that tasks not in the
@@ -1479,15 +1510,15 @@ func TestTryAutoTest_TriggersForEligibleTask(t *testing.T) {
 	}
 }
 
-// TestTryAutoTest_RespectsMaxConcurrencyLimit verifies that tryAutoTest does not
-// trigger more test runs than the configured maxConcurrentTasks limit.
-func TestTryAutoTest_RespectsMaxConcurrencyLimit(t *testing.T) {
+// TestTryAutoTest_RespectsMaxTestConcurrencyLimit verifies that tryAutoTest does
+// not trigger more test runs than the configured WALLFACER_MAX_TEST_PARALLEL limit.
+func TestTryAutoTest_RespectsMaxTestConcurrencyLimit(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
 	h.SetAutotest(true)
 	ctx := context.Background()
 
-	// Set max parallel to 1.
-	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
+	// Set test-run max parallel to 1 via the dedicated variable.
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_TEST_PARALLEL=1\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1509,63 +1540,56 @@ func TestTryAutoTest_RespectsMaxConcurrencyLimit(t *testing.T) {
 
 	h.tryAutoTest(ctx)
 
-	// With max=1 and no prior in-progress tasks, exactly one test run should start.
+	// With test max=1 and no prior test-run in-progress tasks, exactly one test run should start.
 	tasks, _ := h.store.ListTasks(ctx, false)
-	inProgress := 0
+	testInProgress := 0
 	for _, task := range tasks {
-		if task.Status == store.TaskStatusInProgress {
-			inProgress++
+		if task.Status == store.TaskStatusInProgress && task.IsTestRun {
+			testInProgress++
 		}
 	}
-	if inProgress != 1 {
-		t.Errorf("expected exactly 1 test run to start (max=1), got %d in_progress", inProgress)
+	if testInProgress != 1 {
+		t.Errorf("expected exactly 1 test run to start (max=1), got %d test in_progress", testInProgress)
 	}
 }
 
-// TestTryAutoTest_RespectsMaxConcurrencyWithExistingInProgress verifies that
-// tryAutoTest counts existing in_progress tasks (including non-test ones) when
-// enforcing the concurrency limit.
-func TestTryAutoTest_RespectsMaxConcurrencyWithExistingInProgress(t *testing.T) {
+// TestTryAutoTest_RegularTasksDoNotConsumeTestSlots verifies that regular
+// in_progress tasks (IsTestRun=false) do not count against the test concurrency
+// limit, so a full backlog of regular work cannot starve auto-test.
+func TestTryAutoTest_RegularTasksDoNotConsumeTestSlots(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
 	h.SetAutotest(true)
 	ctx := context.Background()
 
-	// Set max parallel to 2.
-	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=2\n"), 0644); err != nil {
+	// Set test-run max parallel to 1 and regular max to 2.
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=2\nWALLFACER_MAX_TEST_PARALLEL=1\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	// One task already in_progress (fills one slot).
-	existing, _ := h.store.CreateTask(ctx, "existing", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, existing.ID, store.TaskStatusInProgress)
+	// Two regular tasks already in_progress (fills the regular slots).
+	for i := 0; i < 2; i++ {
+		reg, _ := h.store.CreateTask(ctx, fmt.Sprintf("regular %d", i), 15, false, "", "")
+		h.store.ForceUpdateTaskStatus(ctx, reg.ID, store.TaskStatusInProgress)
+	}
 
-	// Two waiting tasks eligible for auto-test.
+	// One waiting task eligible for auto-test.
 	repo := setupRepo(t)
-	wt1 := filepath.Join(t.TempDir(), "wt1")
-	wt2 := filepath.Join(t.TempDir(), "wt2")
-	gitRun(t, repo, "worktree", "add", "-b", "branch-1", wt1, "HEAD")
-	gitRun(t, repo, "worktree", "add", "-b", "branch-2", wt2, "HEAD")
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
-	task1, _ := h.store.CreateTask(ctx, "task 1", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task1.ID, store.TaskStatusWaiting)
-	h.store.UpdateTaskWorktrees(ctx, task1.ID, map[string]string{repo: wt1}, "branch-1")
-
-	task2, _ := h.store.CreateTask(ctx, "task 2", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusWaiting)
-	h.store.UpdateTaskWorktrees(ctx, task2.ID, map[string]string{repo: wt2}, "branch-2")
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
 	h.tryAutoTest(ctx)
 
-	// With max=2 and 1 already in_progress, only 1 test run should be triggered.
-	tasks, _ := h.store.ListTasks(ctx, false)
-	inProgress := 0
-	for _, task := range tasks {
-		if task.Status == store.TaskStatusInProgress {
-			inProgress++
-		}
+	// The test run must have started despite both regular slots being full.
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusInProgress {
+		t.Errorf("expected test task to be promoted to in_progress (regular slots full should not block tests), got %s", got.Status)
 	}
-	if inProgress != 2 {
-		t.Errorf("expected exactly 2 in_progress (1 existing + 1 new test run), got %d", inProgress)
+	if !got.IsTestRun {
+		t.Error("expected IsTestRun to be set on auto-tested task")
 	}
 }
 

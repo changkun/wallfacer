@@ -105,8 +105,9 @@ type envConfigResponse struct {
 	CodexTitleModel   string            `json:"codex_title_model"`
 	DefaultSandbox    string            `json:"default_sandbox"`
 	SandboxByActivity map[string]string `json:"sandbox_by_activity,omitempty"`
-	MaxParallelTasks  int               `json:"max_parallel_tasks"`
-	OversightInterval int               `json:"oversight_interval"`
+	MaxParallelTasks     int               `json:"max_parallel_tasks"`
+	MaxTestParallelTasks int               `json:"max_test_parallel_tasks"`
+	OversightInterval    int               `json:"oversight_interval"`
 	AutoPushEnabled   bool              `json:"auto_push_enabled"`
 	AutoPushThreshold int               `json:"auto_push_threshold"`
 }
@@ -148,6 +149,10 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 	if maxParallel <= 0 {
 		maxParallel = defaultMaxConcurrentTasks
 	}
+	maxTestParallel := cfg.MaxTestParallelTasks
+	if maxTestParallel <= 0 {
+		maxTestParallel = defaultMaxTestConcurrentTasks
+	}
 	autoPushThreshold := cfg.AutoPushThreshold
 	if autoPushThreshold <= 0 {
 		autoPushThreshold = 1
@@ -164,8 +169,9 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		CodexTitleModel:   cfg.CodexTitleModel,
 		DefaultSandbox:    cfg.DefaultSandbox,
 		SandboxByActivity: cfg.SandboxByActivity(),
-		MaxParallelTasks:  maxParallel,
-		OversightInterval: cfg.OversightInterval,
+		MaxParallelTasks:     maxParallel,
+		MaxTestParallelTasks: maxTestParallel,
+		OversightInterval:    cfg.OversightInterval,
 		AutoPushEnabled:   cfg.AutoPushEnabled,
 		AutoPushThreshold: autoPushThreshold,
 	})
@@ -343,6 +349,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		nil,
 		nil,
 		nil,
+		nil,
 	); err != nil {
 		return "", err
 	}
@@ -425,8 +432,9 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		CodexTitleModel   *string           `json:"codex_title_model"`
 		DefaultSandbox    *string           `json:"default_sandbox"`
 		SandboxByActivity map[string]string `json:"sandbox_by_activity"`
-		MaxParallelTasks  *int              `json:"max_parallel_tasks"`
-		OversightInterval *int              `json:"oversight_interval"`
+		MaxParallelTasks     *int              `json:"max_parallel_tasks"`
+		MaxTestParallelTasks *int              `json:"max_test_parallel_tasks"`
+		OversightInterval    *int              `json:"oversight_interval"`
 		AutoPushEnabled   *bool             `json:"auto_push_enabled"`
 		AutoPushThreshold *int              `json:"auto_push_threshold"`
 	}
@@ -455,6 +463,17 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		s := fmt.Sprintf("%d", v)
 		maxParallel = &s
+	}
+
+	// Convert max_test_parallel_tasks int to string for the env file.
+	var maxTestParallel *string
+	if req.MaxTestParallelTasks != nil {
+		v := *req.MaxTestParallelTasks
+		if v < 1 {
+			v = 1
+		}
+		s := fmt.Sprintf("%d", v)
+		maxTestParallel = &s
 	}
 
 	// Convert oversight_interval int to string for the env file.
@@ -520,6 +539,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		req.CodexDefaultModel,
 		req.CodexTitleModel,
 		maxParallel,
+		maxTestParallel,
 		oversightInterval,
 		autoPush,
 		autoPushThreshold,
@@ -546,6 +566,9 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// capacity is filled without waiting for the next store event.
 	if req.MaxParallelTasks != nil {
 		go h.tryAutoPromote(context.Background())
+	}
+	if req.MaxTestParallelTasks != nil {
+		go h.tryAutoTest(context.Background())
 	}
 
 	w.WriteHeader(http.StatusNoContent)

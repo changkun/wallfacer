@@ -472,6 +472,9 @@ func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) 
 // defaultMaxConcurrentTasks is used when WALLFACER_MAX_PARALLEL is not set.
 const defaultMaxConcurrentTasks = 5
 
+// defaultMaxTestConcurrentTasks is used when WALLFACER_MAX_TEST_PARALLEL is not set.
+const defaultMaxTestConcurrentTasks = 2
+
 // maxConcurrentTasks reads the configured parallel task limit from the env file,
 // falling back to defaultMaxConcurrentTasks.
 func (h *Handler) maxConcurrentTasks() int {
@@ -480,6 +483,16 @@ func (h *Handler) maxConcurrentTasks() int {
 		return defaultMaxConcurrentTasks
 	}
 	return cfg.MaxParallelTasks
+}
+
+// maxTestConcurrentTasks reads the configured parallel test-run limit from the
+// env file, falling back to defaultMaxTestConcurrentTasks.
+func (h *Handler) maxTestConcurrentTasks() int {
+	cfg, err := envconfig.Parse(h.envFile)
+	if err != nil || cfg.MaxTestParallelTasks <= 0 {
+		return defaultMaxTestConcurrentTasks
+	}
+	return cfg.MaxTestParallelTasks
 }
 
 // promoteMu serialises auto-promotion so two simultaneous state changes
@@ -552,12 +565,12 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		return
 	}
 
-	inProgressCount := 0
+	regularInProgress := 0
 	var bestBacklog *store.Task
 	for i := range tasks {
 		t := &tasks[i]
-		if t.Status == store.TaskStatusInProgress {
-			inProgressCount++
+		if t.Status == store.TaskStatusInProgress && !t.IsTestRun {
+			regularInProgress++
 		}
 		if t.Status == store.TaskStatusBacklog && t.Kind != store.TaskKindIdeaAgent {
 			satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
@@ -572,13 +585,13 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 	}
 
 	maxTasks := h.maxConcurrentTasks()
-	if inProgressCount >= maxTasks || bestBacklog == nil {
+	if regularInProgress >= maxTasks || bestBacklog == nil {
 		return
 	}
 
 	logger.Handler.Info("auto-promoting backlog task",
 		"task", bestBacklog.ID, "position", bestBacklog.Position,
-		"in_progress", inProgressCount)
+		"in_progress", regularInProgress)
 
 	if err := h.store.UpdateTaskStatus(ctx, bestBacklog.ID, store.TaskStatusInProgress); err != nil {
 		logger.Handler.Error("auto-promote status update", "task", bestBacklog.ID, "error", err)
@@ -715,9 +728,11 @@ type autoTestCandidate struct {
 // that are untested (LastTestResult == "") and whose worktrees are not behind
 // the default branch. Does nothing when auto-test is disabled.
 //
-// Concurrency limit: test runs count against maxConcurrentTasks just like
-// normal in-progress tasks. The promoteMu mutex is shared with tryAutoPromote
-// so that the two cannot simultaneously exceed the limit.
+// Concurrency limit: test runs have their own independent limit controlled by
+// maxTestConcurrentTasks (WALLFACER_MAX_TEST_PARALLEL). Only IsTestRun
+// in-progress tasks count against this limit; regular tasks are unaffected.
+// The promoteMu mutex is still shared with tryAutoPromote to prevent races on
+// the same task.
 func (h *Handler) tryAutoTest(ctx context.Context) {
 	if !h.AutotestEnabled() {
 		return
@@ -792,20 +807,20 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 		return
 	}
 	freshByID := make(map[uuid.UUID]store.Task, len(freshTasks))
-	inProgressCount := 0
+	testInProgress := 0
 	for _, t := range freshTasks {
 		freshByID[t.ID] = t
-		if t.Status == store.TaskStatusInProgress {
-			inProgressCount++
+		if t.Status == store.TaskStatusInProgress && t.IsTestRun {
+			testInProgress++
 		}
 	}
 
-	maxTasks := h.maxConcurrentTasks()
+	maxTestTasks := h.maxTestConcurrentTasks()
 
 	for _, c := range candidates {
-		if inProgressCount >= maxTasks {
-			logger.Handler.Info("auto-test: concurrency limit reached, deferring remaining tests",
-				"limit", maxTasks)
+		if testInProgress >= maxTestTasks {
+			logger.Handler.Info("auto-test: test concurrency limit reached, deferring remaining tests",
+				"limit", maxTestTasks)
 			break
 		}
 
@@ -834,7 +849,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 		})
 
 		h.runner.RunBackground(c.task.ID, c.testPrompt, "", false)
-		inProgressCount++
+		testInProgress++
 	}
 }
 

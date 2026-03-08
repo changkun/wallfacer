@@ -17,8 +17,9 @@ type Config struct {
 	BaseURL           string // ANTHROPIC_BASE_URL
 	DefaultModel      string // CLAUDE_DEFAULT_MODEL
 	TitleModel        string // CLAUDE_TITLE_MODEL
-	MaxParallelTasks  int    // WALLFACER_MAX_PARALLEL (0 means use default)
-	OversightInterval int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
+	MaxParallelTasks     int // WALLFACER_MAX_PARALLEL (0 means use default)
+	MaxTestParallelTasks int // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
+	OversightInterval    int // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
 	AutoPushEnabled   bool   // WALLFACER_AUTO_PUSH ("true"/"false")
 	AutoPushThreshold int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
 
@@ -50,6 +51,7 @@ var knownKeys = []string{
 	"CODEX_DEFAULT_MODEL",
 	"CODEX_TITLE_MODEL",
 	"WALLFACER_MAX_PARALLEL",
+	"WALLFACER_MAX_TEST_PARALLEL",
 	"WALLFACER_OVERSIGHT_INTERVAL",
 	"WALLFACER_AUTO_PUSH",
 	"WALLFACER_AUTO_PUSH_THRESHOLD",
@@ -92,6 +94,10 @@ func Parse(path string) (Config, error) {
 		case "WALLFACER_MAX_PARALLEL":
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.MaxParallelTasks = n
+			}
+		case "WALLFACER_MAX_TEST_PARALLEL":
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				cfg.MaxTestParallelTasks = n
 			}
 		case "WALLFACER_OVERSIGHT_INTERVAL":
 			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
@@ -244,24 +250,26 @@ func Update(
 	codexDefaultModel,
 	codexTitleModel,
 	maxParallel,
+	maxTestParallel,
 	oversightInterval,
 	autoPush,
 	autoPushThreshold *string,
 ) error {
 	updates := map[string]*string{
-		"CLAUDE_CODE_OAUTH_TOKEN":       oauthToken,
-		"ANTHROPIC_API_KEY":             apiKey,
-		"ANTHROPIC_BASE_URL":            baseURL,
-		"OPENAI_API_KEY":                openAIAPIKey,
-		"OPENAI_BASE_URL":               openAIBaseURL,
-		"CLAUDE_DEFAULT_MODEL":          defaultModel,
-		"CLAUDE_TITLE_MODEL":            titleModel,
-		"CODEX_DEFAULT_MODEL":           codexDefaultModel,
-		"CODEX_TITLE_MODEL":             codexTitleModel,
-		"WALLFACER_MAX_PARALLEL":        maxParallel,
-		"WALLFACER_OVERSIGHT_INTERVAL":  oversightInterval,
-		"WALLFACER_AUTO_PUSH":           autoPush,
-		"WALLFACER_AUTO_PUSH_THRESHOLD": autoPushThreshold,
+		"CLAUDE_CODE_OAUTH_TOKEN":        oauthToken,
+		"ANTHROPIC_API_KEY":              apiKey,
+		"ANTHROPIC_BASE_URL":             baseURL,
+		"OPENAI_API_KEY":                 openAIAPIKey,
+		"OPENAI_BASE_URL":                openAIBaseURL,
+		"CLAUDE_DEFAULT_MODEL":           defaultModel,
+		"CLAUDE_TITLE_MODEL":             titleModel,
+		"CODEX_DEFAULT_MODEL":            codexDefaultModel,
+		"CODEX_TITLE_MODEL":              codexTitleModel,
+		"WALLFACER_MAX_PARALLEL":         maxParallel,
+		"WALLFACER_MAX_TEST_PARALLEL":    maxTestParallel,
+		"WALLFACER_OVERSIGHT_INTERVAL":   oversightInterval,
+		"WALLFACER_AUTO_PUSH":            autoPush,
+		"WALLFACER_AUTO_PUSH_THRESHOLD":  autoPushThreshold,
 	}
 	return updateFile(path, updates)
 }
