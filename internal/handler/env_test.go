@@ -370,6 +370,55 @@ func TestTestSandbox_InvalidBaseURLRejected(t *testing.T) {
 	}
 }
 
+func TestSandboxImageForTest_CodexResolution(t *testing.T) {
+	tests := []struct {
+		name     string
+		sandbox  string
+		inImage  string
+		want     string
+	}{
+		{
+			name:    "codex uses wallfacer-codex default image",
+			sandbox: "codex",
+			inImage: "wallfacer:latest",
+			want:    "wallfacer-codex:latest",
+		},
+		{
+			name:    "codex preserves hosted wallfacer image family",
+			sandbox: "codex",
+			inImage: "ghcr.io/changkun/wallfacer:latest",
+			want:    "ghcr.io/changkun/wallfacer-codex:latest",
+		},
+		{
+			name:    "codex keeps preconfigured codex image",
+			sandbox: "codex",
+			inImage: "wallfacer-codex:latest",
+			want:    "wallfacer-codex:latest",
+		},
+		{
+			name:    "claude keeps default image",
+			sandbox: "claude",
+			inImage: "wallfacer:latest",
+			want:    "wallfacer:latest",
+		},
+		{
+			name:    "codex default fallback",
+			sandbox: "codex",
+			inImage: "",
+			want:    fallbackCodexSandboxImage,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sandboxImageForTest(tt.sandbox, tt.inImage)
+			if got != tt.want {
+				t.Fatalf("sandboxImageForTest(%q, %q) = %q; want %q", tt.sandbox, tt.inImage, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTestSandbox_PersistsTaskAfterRun(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 

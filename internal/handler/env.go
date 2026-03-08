@@ -11,10 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/envconfig"
+	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 )
+
+const fallbackCodexSandboxImage = "wallfacer-codex:latest"
 
 // privateIPNets lists networks blocked for SSRF prevention: RFC 1918 private
 // ranges, loopback (IPv4 and IPv6), and link-local ranges.
@@ -250,7 +252,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 
 	probeRunner := runner.NewRunner(h.store, runner.RunnerConfig{
 		Command:          h.runner.Command(),
-		SandboxImage:     h.runner.SandboxImage(),
+		SandboxImage:     sandboxImageForTest(sandbox, h.runner.SandboxImage()),
 		EnvFile:          tempEnvFile,
 		Workspaces:       strings.Join(h.workspaces, " "),
 		WorktreesDir:     h.runner.WorktreesDir(),
@@ -335,6 +337,52 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 	}
 
 	return tempFile.Name(), nil
+}
+
+func sandboxImageForTest(sandbox, baseImage string) string {
+	if strings.EqualFold(strings.TrimSpace(sandbox), "codex") {
+		return testCodexImage(baseImage)
+	}
+	return strings.TrimSpace(baseImage)
+}
+
+func testCodexImage(baseImage string) string {
+	baseImage = strings.TrimSpace(baseImage)
+	if baseImage == "" {
+		return fallbackCodexSandboxImage
+	}
+
+	low := strings.ToLower(baseImage)
+	if strings.Contains(low, "wallfacer-codex") {
+		return baseImage
+	}
+
+	registry := baseImage
+	digest := ""
+	if at := strings.Index(registry, "@"); at != -1 {
+		digest = registry[at:]
+		registry = registry[:at]
+	}
+
+	// Assume tag format <repo>:<tag> and preserve host:port if present.
+	tag := ""
+	if at := strings.LastIndex(registry, ":"); at != -1 {
+		tag = registry[at:]
+		registry = registry[:at]
+	}
+
+	prefix := ""
+	repoName := registry
+	if idx := strings.LastIndex(repoName, "/"); idx != -1 {
+		prefix = repoName[:idx+1]
+		repoName = repoName[idx+1:]
+	}
+
+	if repoName != "wallfacer" {
+		return baseImage
+	}
+
+	return prefix + "wallfacer-codex" + tag + digest
 }
 
 // UpdateEnvConfig writes changes to the env file.
