@@ -481,7 +481,10 @@ async function openModal(id) {
 
   // Load events
   try {
-    const events = await api(`/api/tasks/${id}/events`);
+    // Fetch first page; server filters out span_start/span_end for us.
+    const page = await api(`/api/tasks/${id}/events?limit=200&types=state_change,output,feedback,error,system`);
+
+    const events = page.events;
 
     // Replace single-result fallback with all turn results from output events.
     // When a test run has occurred, split output events at the test boundary so
@@ -497,6 +500,13 @@ async function openModal(id) {
     }
     renderTestResultsFromEvents(testResults);
 
+    const typeClasses = {
+      state_change: 'ev-state',
+      output: 'ev-output',
+      system: 'ev-system',
+      feedback: 'ev-feedback',
+      error: 'ev-error',
+    };
     const container = document.getElementById('modal-events');
     container.innerHTML = events.map(e => {
       const time = new Date(e.created_at).toLocaleTimeString();
@@ -511,21 +521,60 @@ async function openModal(id) {
       } else if (e.event_type === 'system') {
         detail = escapeHtml(data.result || '');
       } else if (e.event_type === 'error') {
-        detail = escapeHtml(data.error);
+        detail = escapeHtml(data.error || '');
       }
-      const typeClasses = {
-        state_change: 'ev-state',
-        output: 'ev-output',
-        system: 'ev-system',
-        feedback: 'ev-feedback',
-        error: 'ev-error',
-      };
       return `<div class="flex items-start gap-2 text-xs">
         <span class="text-v-muted shrink-0">${time}</span>
         <span class="${typeClasses[e.event_type] || 'text-v-muted'} shrink-0">${e.event_type}</span>
         <span class="text-v-secondary">${detail}</span>
       </div>`;
     }).join('');
+
+    if (page.has_more) {
+      const loadMoreBtn = document.createElement('button');
+      loadMoreBtn.className = 'text-xs text-v-muted hover:text-v-secondary mt-1';
+      loadMoreBtn.textContent = 'Load more events…';
+      let cursor = page.next_after;
+      loadMoreBtn.onclick = async () => {
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.textContent = 'Loading…';
+        try {
+          const next = await api(`/api/tasks/${id}/events?limit=200&types=state_change,output,feedback,error,system&after=${cursor}`);
+          loadMoreBtn.remove();
+          const frag = document.createDocumentFragment();
+          next.events.forEach(e => {
+            const div = document.createElement('div');
+            div.innerHTML = (() => {
+              const time = new Date(e.created_at).toLocaleTimeString();
+              let detail = '';
+              const data = e.data || {};
+              if (e.event_type === 'state_change') detail = `${data.from || '(new)'} → ${data.to}`;
+              else if (e.event_type === 'feedback') detail = `"${escapeHtml(data.message)}"`;
+              else if (e.event_type === 'output') detail = `stop_reason: ${data.stop_reason || '(none)'}`;
+              else if (e.event_type === 'system') detail = escapeHtml(data.result || '');
+              else if (e.event_type === 'error') detail = escapeHtml(data.error || '');
+              return `<div class="flex items-start gap-2 text-xs">
+                <span class="text-v-muted shrink-0">${time}</span>
+                <span class="${typeClasses[e.event_type] || 'text-v-muted'} shrink-0">${e.event_type}</span>
+                <span class="text-v-secondary">${detail}</span>
+              </div>`;
+            })();
+            frag.appendChild(div.firstChild);
+          });
+          container.appendChild(frag);
+          if (next.has_more) {
+            cursor = next.next_after;
+            loadMoreBtn.disabled = false;
+            loadMoreBtn.textContent = 'Load more events…';
+            container.appendChild(loadMoreBtn);
+          }
+        } catch {
+          loadMoreBtn.disabled = false;
+          loadMoreBtn.textContent = 'Load more events…';
+        }
+      };
+      container.appendChild(loadMoreBtn);
+    }
   } catch (e) {
     document.getElementById('modal-events').innerHTML = '<span class="text-xs ev-error">Failed to load events</span>';
   }

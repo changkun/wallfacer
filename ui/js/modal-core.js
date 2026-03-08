@@ -366,9 +366,105 @@ async function openModal(id) {
   }
 
   // Load events
+  const _EVENTS_TYPES = 'state_change,output,feedback,error,system';
+  const _EVENTS_LIMIT = 200;
+
+  const stopReasonLabels = {
+    'end_turn':   'turn ended',
+    'max_tokens': 'token limit → auto-continue',
+    'pause_turn': 'paused → auto-continue',
+  };
+  const typeLabels = {
+    state_change: 'state',
+    output:       'output',
+    system:       'system',
+    feedback:     'feedback',
+    error:        'error',
+  };
+  const typeClasses = {
+    state_change: 'ev-state',
+    output:       'ev-output',
+    system:       'ev-system',
+    feedback:     'ev-feedback',
+    error:        'ev-error',
+  };
+
+  function _renderEventRow(e) {
+    const time = new Date(e.created_at).toLocaleTimeString();
+    let detail = '';
+    const data = e.data || {};
+    if (e.event_type === 'state_change') {
+      detail = `${data.from || '(new)'} → ${data.to}`;
+    } else if (e.event_type === 'feedback') {
+      detail = `"${escapeHtml(data.message)}"`;
+    } else if (e.event_type === 'output') {
+      const rawReason = data.stop_reason || '(none)';
+      const humanReason = stopReasonLabels[rawReason] || rawReason;
+      detail = `stop: ${humanReason}`;
+    } else if (e.event_type === 'system') {
+      detail = escapeHtml(data.result || '');
+    } else if (e.event_type === 'error') {
+      if (data.phase === 'rebase' && Array.isArray(data.conflicted_files) && data.conflicted_files.length > 0) {
+        detail = '<div style="border-left:3px solid #ef4444;padding:8px 10px;margin:4px 0;">' +
+          '<div style="font-weight:600;color:#ef4444;margin-bottom:4px;">Rebase conflict</div>' +
+          '<ul style="margin:0;padding-left:16px;font-size:12px;font-family:monospace;">' +
+          data.conflicted_files.map(f => '<li>' + escapeHtml(f) + '</li>').join('') +
+          '</ul></div>';
+      } else {
+        detail = escapeHtml(data.error || '');
+      }
+    }
+    const typeLabel = typeLabels[e.event_type] || e.event_type;
+    return `<div class="flex items-start gap-2 text-xs">
+      <span class="text-v-muted shrink-0">${time}</span>
+      <span class="${typeClasses[e.event_type] || 'text-v-muted'} shrink-0">${typeLabel}</span>
+      <span class="text-v-secondary">${detail}</span>
+    </div>`;
+  }
+
+  function _appendEventsLoadMore(container, taskId, afterCursor, loadSeq) {
+    const btn = document.createElement('button');
+    btn.className = 'text-xs text-v-muted hover:text-v-secondary mt-1';
+    btn.setAttribute('data-events-load-more', '');
+    btn.textContent = 'Load more events…';
+    btn.onclick = async () => {
+      btn.disabled = true;
+      btn.textContent = 'Loading…';
+      try {
+        const next = await api(
+          `/api/tasks/${taskId}/events?limit=${_EVENTS_LIMIT}&types=${_EVENTS_TYPES}&after=${afterCursor}`,
+          { signal: modalAbort ? modalAbort.signal : undefined }
+        );
+        if (!_isActiveModalLoad(loadSeq, taskId)) return;
+        btn.remove();
+        const frag = document.createDocumentFragment();
+        next.events.forEach(e => {
+          const div = document.createElement('div');
+          div.innerHTML = _renderEventRow(e);
+          frag.appendChild(div.firstChild);
+        });
+        container.appendChild(frag);
+        if (next.has_more) {
+          _appendEventsLoadMore(container, taskId, next.next_after, loadSeq);
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        btn.disabled = false;
+        btn.textContent = 'Load more events…';
+      }
+    };
+    container.appendChild(btn);
+  }
+
   try {
-    const events = await api(`/api/tasks/${id}/events`, { signal: modalLoad.signal });
+    // Fetch first page; server filters out span_start/span_end for us.
+    const page = await api(
+      `/api/tasks/${id}/events?limit=${_EVENTS_LIMIT}&types=${_EVENTS_TYPES}`,
+      { signal: modalLoad.signal }
+    );
     if (!_isActiveModalLoad(seq, id)) return;
+
+    const events = page.events;
 
     // Replace single-result fallback with all turn results from output events.
     // When a test run has occurred, split output events at the test boundary so
@@ -385,59 +481,11 @@ async function openModal(id) {
     renderTestResultsFromEvents(testResults);
 
     const container = document.getElementById('modal-events');
-    const stopReasonLabels = {
-      'end_turn':   'turn ended',
-      'max_tokens': 'token limit → auto-continue',
-      'pause_turn': 'paused → auto-continue',
-    };
-    const typeLabels = {
-      state_change: 'state',
-      output:       'output',
-      system:       'system',
-      feedback:     'feedback',
-      error:        'error',
-    };
-    const typeClasses = {
-      state_change: 'ev-state',
-      output:       'ev-output',
-      system:       'ev-system',
-      feedback:     'ev-feedback',
-      error:        'ev-error',
-    };
-    container.innerHTML = events
-      .filter(e => e.event_type !== 'span_start' && e.event_type !== 'span_end')
-      .map(e => {
-        const time = new Date(e.created_at).toLocaleTimeString();
-        let detail = '';
-        const data = e.data || {};
-        if (e.event_type === 'state_change') {
-          detail = `${data.from || '(new)'} → ${data.to}`;
-        } else if (e.event_type === 'feedback') {
-          detail = `"${escapeHtml(data.message)}"`;
-        } else if (e.event_type === 'output') {
-          const rawReason = data.stop_reason || '(none)';
-          const humanReason = stopReasonLabels[rawReason] || rawReason;
-          detail = `stop: ${humanReason}`;
-        } else if (e.event_type === 'system') {
-          detail = escapeHtml(data.result || '');
-        } else if (e.event_type === 'error') {
-          if (data.phase === 'rebase' && Array.isArray(data.conflicted_files) && data.conflicted_files.length > 0) {
-            detail = '<div style="border-left:3px solid #ef4444;padding:8px 10px;margin:4px 0;">' +
-              '<div style="font-weight:600;color:#ef4444;margin-bottom:4px;">Rebase conflict</div>' +
-              '<ul style="margin:0;padding-left:16px;font-size:12px;font-family:monospace;">' +
-              data.conflicted_files.map(f => '<li>' + escapeHtml(f) + '</li>').join('') +
-              '</ul></div>';
-          } else {
-            detail = escapeHtml(data.error);
-          }
-        }
-        const typeLabel = typeLabels[e.event_type] || e.event_type;
-        return `<div class="flex items-start gap-2 text-xs">
-          <span class="text-v-muted shrink-0">${time}</span>
-          <span class="${typeClasses[e.event_type] || 'text-v-muted'} shrink-0">${typeLabel}</span>
-          <span class="text-v-secondary">${detail}</span>
-        </div>`;
-      }).join('');
+    container.innerHTML = events.map(_renderEventRow).join('');
+
+    if (page.has_more) {
+      _appendEventsLoadMore(container, id, page.next_after, seq);
+    }
   } catch (e) {
     if (e && e.name === 'AbortError') return;
     if (!_isActiveModalLoad(seq, id)) return;

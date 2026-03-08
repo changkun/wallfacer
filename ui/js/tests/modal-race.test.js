@@ -117,21 +117,34 @@ function makeRaceContext() {
   };
 
   const payloads = {
-    '/api/tasks/task-1/events': [{
-      event_type: 'output',
-      created_at: now,
-      data: { result: 'result-from-task-1', stop_reason: 'end_turn' },
-    }],
+    '/api/tasks/task-1/events': {
+      events: [{
+        event_type: 'output',
+        created_at: now,
+        data: { result: 'result-from-task-1', stop_reason: 'end_turn' },
+      }],
+      next_after: 1,
+      has_more: false,
+      total_filtered: 1,
+    },
     '/api/tasks/task-1/diff': { diff: 'diff-from-task-1', behind_counts: {} },
-    '/api/tasks/task-2/events': [{
-      event_type: 'output',
-      created_at: now,
-      data: { result: 'result-from-task-2', stop_reason: 'end_turn' },
-    }],
+    '/api/tasks/task-2/events': {
+      events: [{
+        event_type: 'output',
+        created_at: now,
+        data: { result: 'result-from-task-2', stop_reason: 'end_turn' },
+      }],
+      next_after: 1,
+      has_more: false,
+      total_filtered: 1,
+    },
     '/api/tasks/task-2/diff': { diff: 'diff-from-task-2', behind_counts: {} },
   };
 
   function api(path, opts = {}) {
+    // Strip query params for payload/delay lookup so cursor pagination params
+    // (limit, types, after) don't break the test fixture matching.
+    const basePath = path.split('?')[0];
     return new Promise((resolve, reject) => {
       if (opts.signal && opts.signal.aborted) {
         const err = new Error('aborted');
@@ -139,7 +152,7 @@ function makeRaceContext() {
         reject(err);
         return;
       }
-      const timer = setTimeout(() => resolve(payloads[path]), delays[path] || 0);
+      const timer = setTimeout(() => resolve(payloads[basePath]), delays[basePath] || 0);
       if (opts.signal && typeof opts.signal.addEventListener === 'function') {
         opts.signal.addEventListener('abort', () => {
           clearTimeout(timer);
