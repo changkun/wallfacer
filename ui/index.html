@@ -10,6 +10,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/tailwind.css">
 <link rel="stylesheet" href="/css/styles.css">
+<style>
+.btn-active { background-color: #3b82f6; color: #fff; }
+</style>
 <script src="/js/vendor/sortable.min.js"></script>
 <script src="/js/vendor/marked.min.js"></script>
 <script src="/js/vendor/highlight.min.js"></script>
@@ -66,6 +69,8 @@
     <input type="search" id="task-search" placeholder="Filter tasks…" autocomplete="off" class="task-search-input">
     <button id="task-search-clear" class="task-search-clear" title="Clear search">&times;</button>
   </div>
+
+  <button id="dep-graph-btn" class="btn btn-sm" onclick="toggleDependencyGraph()" title="Toggle dependency graph">Dep graph</button>
 
   <button id="settings-btn" class="settings-btn" onclick="openSettings()" title="Settings">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -740,6 +745,7 @@
 <script src="/js/containers.js"></script>
 <script src="/js/refine.js"></script>
 <script src="/js/ideate.js"></script>
+<script src="/js/dep-graph.js"></script>
 <script src="/js/events.js"></script>
 <script src="/js/mention.js"></script>
 </body>

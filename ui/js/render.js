@@ -248,12 +248,16 @@ function render() {
       renderRefineHistory(openTask);
     }
   }
+
+  if (window.depGraphEnabled && typeof renderDependencyGraph === 'function') renderDependencyGraph(tasks);
+  else if (typeof hideDependencyGraph === 'function') hideDependencyGraph();
 }
 
 function createCard(t) {
   const card = document.createElement('div');
   card.className = 'card';
   card.dataset.id = t.id;
+  card.dataset.taskId = t.id;
   card.onclick = () => openModal(t.id);
   updateCard(card, t);
   return card;
