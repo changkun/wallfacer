@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -29,7 +30,19 @@ import (
 // receives a pre-processed compact activity log extracted from the raw NDJSON
 // turn output files. The agent groups the activities into logical phases and
 // produces a structured JSON response.
+//
+// Concurrent calls for the same task are serialized via a per-task mutex so
+// that periodic and terminal invocations never interleave.
 func (r *Runner) GenerateOversight(taskID uuid.UUID) {
+	mu := r.oversightLock(taskID)
+	mu.Lock()
+	defer mu.Unlock()
+	r.generateOversightLocked(taskID)
+}
+
+// generateOversightLocked is the implementation of GenerateOversight.
+// The caller must hold the per-task oversightLock before calling this function.
+func (r *Runner) generateOversightLocked(taskID uuid.UUID) {
 	ctx := context.Background()
 
 	// Mark as generating so the UI can show a loading state.
@@ -83,7 +96,18 @@ func (r *Runner) GenerateOversight(taskID uuid.UUID) {
 // It is called synchronously after a test run transitions the task back to
 // "waiting", so the summary is always in a terminal state when the task
 // becomes visible as "waiting".
+//
+// Concurrent calls for the same task are serialized via a per-task mutex.
 func (r *Runner) GenerateTestOversight(taskID uuid.UUID, fromTurn int) {
+	mu := r.oversightLock(taskID)
+	mu.Lock()
+	defer mu.Unlock()
+	r.generateTestOversightLocked(taskID, fromTurn)
+}
+
+// generateTestOversightLocked is the implementation of GenerateTestOversight.
+// The caller must hold the per-task oversightLock before calling this function.
+func (r *Runner) generateTestOversightLocked(taskID uuid.UUID, fromTurn int) {
 	ctx := context.Background()
 
 	_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
@@ -124,6 +148,66 @@ func (r *Runner) GenerateTestOversight(taskID uuid.UUID, fromTurn int) {
 		Phases:      phases,
 	}); err != nil {
 		logger.Runner.Warn("test oversight: save failed", "task", taskID, "error", err)
+	}
+}
+
+// oversightIntervalFromEnv reads WALLFACER_OVERSIGHT_INTERVAL from the env file
+// and returns it as a time.Duration. Returns 0 if the file is missing, unset,
+// or set to 0 (disabled). Mirrors the pattern used by titleModelFromEnv.
+func (r *Runner) oversightIntervalFromEnv() time.Duration {
+	if r.envFile == "" {
+		return 0
+	}
+	cfg, err := envconfig.Parse(r.envFile)
+	if err != nil {
+		return 0
+	}
+	if cfg.OversightInterval <= 0 {
+		return 0
+	}
+	return time.Duration(cfg.OversightInterval) * time.Minute
+}
+
+// periodicOversightWorker generates oversight summaries on a fixed interval
+// while the task context (Run's execution context) is alive. It skips a tick
+// if generation is already in progress (TryLock fails) and re-reads the
+// configured interval on each tick so operator changes take effect live.
+func (r *Runner) periodicOversightWorker(ctx context.Context, taskID uuid.UUID) {
+	interval := r.oversightIntervalFromEnv()
+	if interval == 0 {
+		return // disabled; exit immediately
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			newInterval := r.oversightIntervalFromEnv()
+			if newInterval == 0 {
+				return // disabled at runtime; stop
+			}
+			if newInterval != interval {
+				interval = newInterval
+				ticker.Reset(interval)
+			}
+
+			// Skip if a generation is already in progress for this task.
+			mu := r.oversightLock(taskID)
+			if !mu.TryLock() {
+				continue
+			}
+
+			// Skip if there is no agent output yet.
+			entries, err := os.ReadDir(r.store.OutputsDir(taskID))
+			if err == nil && len(entries) > 0 {
+				r.generateOversightLocked(taskID)
+			}
+			mu.Unlock()
+		}
 	}
 }
 

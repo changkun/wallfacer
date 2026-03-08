@@ -278,12 +278,13 @@ type Runner struct {
 	workspaces           string
 	worktreesDir         string
 	instructionsPath     string
-	worktreeMu           sync.Mutex     // serializes all worktree filesystem operations on worktreesDir
-	repoMu               sync.Map       // per-repo *sync.Mutex for serializing rebase+merge
-	containerNames       sync.Map       // taskID (string) → container name (string)
-	refineContainerNames sync.Map       // taskID (string) → refinement container name (string)
-	ideateContainerName  sync.Map       // key "current" → ideation container name (string)
-	backgroundWg         trackedWg // tracks fire-and-forget background goroutines
+	worktreeMu           sync.Mutex // serializes all worktree filesystem operations on worktreesDir
+	repoMu               sync.Map   // per-repo *sync.Mutex for serializing rebase+merge
+	containerNames       sync.Map   // taskID (string) → container name (string)
+	refineContainerNames sync.Map   // taskID (string) → refinement container name (string)
+	ideateContainerName  sync.Map   // key "current" → ideation container name (string)
+	oversightMu          sync.Map   // taskID (string) → *sync.Mutex for serializing oversight generation
+	backgroundWg         trackedWg  // tracks fire-and-forget background goroutines
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -417,6 +418,13 @@ func (r *Runner) Workspaces() []string {
 // Used to serialize rebase+merge operations on the same repository.
 func (r *Runner) repoLock(repoPath string) *sync.Mutex {
 	v, _ := r.repoMu.LoadOrStore(repoPath, &sync.Mutex{})
+	return v.(*sync.Mutex)
+}
+
+// oversightLock returns the per-task mutex for serialising oversight generation.
+// The mutex is created on first access and stored in oversightMu.
+func (r *Runner) oversightLock(taskID uuid.UUID) *sync.Mutex {
+	v, _ := r.oversightMu.LoadOrStore(taskID.String(), &sync.Mutex{})
 	return v.(*sync.Mutex)
 }
 

@@ -17,7 +17,8 @@ type Config struct {
 	BaseURL          string // ANTHROPIC_BASE_URL
 	DefaultModel     string // WALLFACER_DEFAULT_MODEL
 	TitleModel       string // WALLFACER_TITLE_MODEL
-	MaxParallelTasks int    // WALLFACER_MAX_PARALLEL (0 means use default)
+	MaxParallelTasks  int // WALLFACER_MAX_PARALLEL (0 means use default)
+	OversightInterval int // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
 
 	// OpenAI Codex sandbox fields.
 	OpenAIAPIKey      string // OPENAI_API_KEY
@@ -34,6 +35,7 @@ var knownKeys = []string{
 	"WALLFACER_DEFAULT_MODEL",
 	"WALLFACER_TITLE_MODEL",
 	"WALLFACER_MAX_PARALLEL",
+	"WALLFACER_OVERSIGHT_INTERVAL",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -72,6 +74,10 @@ func Parse(path string) (Config, error) {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				cfg.MaxParallelTasks = n
 			}
+		case "WALLFACER_OVERSIGHT_INTERVAL":
+			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+				cfg.OversightInterval = n
+			}
 		case "OPENAI_API_KEY":
 			cfg.OpenAIAPIKey = v
 		case "OPENAI_BASE_URL":
@@ -94,19 +100,20 @@ func Parse(path string) (Config, error) {
 //
 // Keys not already present in the file are appended when non-empty.
 // Comments and unrecognized keys are preserved verbatim.
-func Update(path string, oauthToken, apiKey, baseURL, defaultModel, titleModel, maxParallel *string) error {
+func Update(path string, oauthToken, apiKey, baseURL, defaultModel, titleModel, maxParallel, oversightInterval *string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read env file: %w", err)
 	}
 
 	updates := map[string]*string{
-		"CLAUDE_CODE_OAUTH_TOKEN": oauthToken,
-		"ANTHROPIC_API_KEY":      apiKey,
-		"ANTHROPIC_BASE_URL":     baseURL,
-		"WALLFACER_DEFAULT_MODEL": defaultModel,
-		"WALLFACER_TITLE_MODEL":   titleModel,
-		"WALLFACER_MAX_PARALLEL":  maxParallel,
+		"CLAUDE_CODE_OAUTH_TOKEN":      oauthToken,
+		"ANTHROPIC_API_KEY":            apiKey,
+		"ANTHROPIC_BASE_URL":           baseURL,
+		"WALLFACER_DEFAULT_MODEL":      defaultModel,
+		"WALLFACER_TITLE_MODEL":        titleModel,
+		"WALLFACER_MAX_PARALLEL":       maxParallel,
+		"WALLFACER_OVERSIGHT_INTERVAL": oversightInterval,
 	}
 
 	lines := strings.Split(string(raw), "\n")

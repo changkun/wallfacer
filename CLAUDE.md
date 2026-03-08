@@ -173,6 +173,7 @@ Optional variables (also in `.env`):
 - `WALLFACER_DEFAULT_MODEL` — default model passed as `--model` to task containers
 - `WALLFACER_TITLE_MODEL` — model for background title generation; falls back to `WALLFACER_DEFAULT_MODEL`
 - `WALLFACER_MAX_PARALLEL` — maximum concurrent tasks for auto-promotion (default: 5)
+- `WALLFACER_OVERSIGHT_INTERVAL` — minutes between periodic oversight generation while a task runs (0 = only at task completion, default: 0)
 - `OPENAI_API_KEY` — API key for OpenAI Codex sandbox
 - `OPENAI_BASE_URL` — custom OpenAI API endpoint
 - `CODEX_DEFAULT_MODEL` — default model for Codex sandbox containers

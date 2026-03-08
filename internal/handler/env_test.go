@@ -181,6 +181,71 @@ func TestUpdateEnvConfig_SSRFBaseURLReturns422(t *testing.T) {
 	}
 }
 
+// TestUpdateEnvConfig_OversightIntervalRoundTrip verifies that oversight_interval
+// is stored via PUT and returned by GET.
+func TestUpdateEnvConfig_OversightIntervalRoundTrip(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	body := `{"oversight_interval": 15}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/env", nil)
+	w2 := httptest.NewRecorder()
+	h.GetEnvConfig(w2, req2)
+
+	var resp envConfigResponse
+	if err := json.NewDecoder(w2.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.OversightInterval != 15 {
+		t.Errorf("oversight_interval: want 15, got %d", resp.OversightInterval)
+	}
+}
+
+// TestUpdateEnvConfig_OversightIntervalClamped verifies that values outside
+// [0, 120] are clamped before writing to the env file.
+func TestUpdateEnvConfig_OversightIntervalClamped(t *testing.T) {
+	tests := []struct {
+		name  string
+		input int
+		want  int
+	}{
+		{"negative clamped to 0", -5, 0},
+		{"above max clamped to 120", 200, 120},
+		{"zero stays zero", 0, 0},
+		{"valid stays", 60, 60},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h, _ := newTestHandlerWithEnv(t)
+			body, _ := json.Marshal(map[string]int{"oversight_interval": tc.input})
+			req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(string(body)))
+			w := httptest.NewRecorder()
+			h.UpdateEnvConfig(w, req)
+			if w.Code != http.StatusNoContent {
+				t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+			}
+
+			req2 := httptest.NewRequest(http.MethodGet, "/api/env", nil)
+			w2 := httptest.NewRecorder()
+			h.GetEnvConfig(w2, req2)
+			var resp envConfigResponse
+			if err := json.NewDecoder(w2.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if resp.OversightInterval != tc.want {
+				t.Errorf("oversight_interval: want %d, got %d", tc.want, resp.OversightInterval)
+			}
+		})
+	}
+}
+
 // TestUpdateEnvConfig_ValidHTTPSBaseURL_AcceptedAndStored verifies that a
 // valid HTTPS URL with a public hostname is accepted (HTTP 204) and persisted.
 // This test requires external DNS resolution and is skipped in offline environments.

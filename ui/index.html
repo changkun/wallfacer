@@ -116,6 +116,18 @@
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Oversight Interval</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <input type="number" id="oversight-interval-input" min="0" max="120" value="0"
+                 class="field" style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center;"
+                 onchange="saveOversightInterval()">
+          <span style="font-size: 12px; color: var(--text-muted);">min</span>
+          <span id="oversight-interval-status" style="font-size: 11px; color: var(--text-muted);"></span>
+        </div>
+        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Generate oversight summaries every N minutes while a task runs. 0 = only at task completion.</div>
+      </div>
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">API Configuration</div>
         <button onclick="closeSettings();showEnvConfigEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Token, base URL, and model for the agent.</div>
