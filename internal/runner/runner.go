@@ -295,6 +295,8 @@ type Runner struct {
 	ideateContainer  *containerRegistry // singleton: ideation container name
 	oversightMu      sync.Map           // taskID (string) → *sync.Mutex for serializing oversight generation
 	backgroundWg     trackedWg          // tracks fire-and-forget background goroutines
+	stopReasonMu     sync.RWMutex
+	onStopReason     func(taskID uuid.UUID, stopReason string)
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -309,6 +311,23 @@ func (r *Runner) WaitBackground() {
 // goroutines that have been started but not yet completed.
 func (r *Runner) PendingGoroutines() []string {
 	return r.backgroundWg.Pending()
+}
+
+// SetStopReasonHandler registers a callback that is notified when a non-terminal
+// stop_reason is encountered (for example max_tokens).
+func (r *Runner) SetStopReasonHandler(fn func(taskID uuid.UUID, stopReason string)) {
+	r.stopReasonMu.Lock()
+	r.onStopReason = fn
+	r.stopReasonMu.Unlock()
+}
+
+func (r *Runner) notifyStopReason(taskID uuid.UUID, stopReason string) {
+	r.stopReasonMu.RLock()
+	fn := r.onStopReason
+	r.stopReasonMu.RUnlock()
+	if fn != nil {
+		fn(taskID, stopReason)
+	}
 }
 
 // Shutdown waits for all tracked background goroutines to complete before

@@ -235,6 +235,34 @@ func TestRunMaxTokensAutoContinues(t *testing.T) {
 	}
 }
 
+func TestRunMaxTokensTriggersStopReasonHandler(t *testing.T) {
+	repo := setupTestRepo(t)
+	cmd := fakeStatefulCmd(t, []string{maxTokensOutput, endTurnOutput})
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Stop reason handler test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	seen := false
+	r.SetStopReasonHandler(func(_ uuid.UUID, reason string) {
+		if reason == "max_tokens" {
+			seen = true
+		}
+	})
+	r.Run(task.ID, "prompt", "", false)
+
+	if !seen {
+		t.Fatal("expected max_tokens stop-reason handler to be called")
+	}
+}
+
 // TestRunUnknownTaskDoesNotPanic verifies that Run handles a missing task
 // gracefully (returns without panicking; deferred status update is a no-op).
 func TestRunUnknownTaskDoesNotPanic(t *testing.T) {
