@@ -262,6 +262,16 @@ func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resum
 	}()
 }
 
+// SyncWorktreesBackground launches SyncWorktrees in a background goroutine
+// tracked by backgroundWg so that WaitBackground can drain it before cleanup.
+func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus) {
+	r.backgroundWg.Add(1)
+	go func() {
+		defer r.backgroundWg.Done()
+		r.SyncWorktrees(taskID, sessionID, prevStatus)
+	}()
+}
+
 // RunRefinementBackground launches RunRefinement in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 func (r *Runner) RunRefinementBackground(taskID uuid.UUID, userInstructions string) {
