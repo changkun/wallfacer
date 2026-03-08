@@ -1,0 +1,92 @@
+<!-- Board -->
+<main class="board-grid flex-1 min-h-0" id="board">
+  <div class="flex flex-col min-h-0" id="col-wrapper-backlog">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="col-header col-header-backlog">Backlog</h2>
+      <span id="count-backlog" class="text-xs text-v-muted">0</span>
+    </div>
+    <div class="column col-bg flex flex-col">
+      <button id="new-task-btn" onclick="showNewTaskForm()" class="btn-dashed mb-2">+ New Task</button>
+      <div id="new-task-form" class="hidden mb-2">
+        <textarea id="new-prompt" rows="6" placeholder="Describe your task (Markdown supported)..." class="field"></textarea>
+        <div class="flex items-center justify-between mt-2">
+          <div class="flex items-center gap-1">
+            <button onclick="createTask()" class="btn btn-accent">Save</button>
+            <button onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
+          </div>
+          <div class="flex items-center gap-1.5" style="min-width:0;">
+            <select id="new-sandbox" class="select" title="Sandbox" data-sandbox-select="true">
+              <option value="">Default</option>
+            </select>
+            <select id="new-timeout" class="select" title="Timeout">
+              <option value="5">5 min</option>
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="60" selected>1 hour</option>
+              <option value="120">2 hours</option>
+              <option value="360">6 hours</option>
+              <option value="720">12 hours</option>
+              <option value="1440">24 hours</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 mt-1">
+          <input type="checkbox" id="new-mount-worktrees" style="cursor:pointer;accent-color:var(--accent);">
+          <label for="new-mount-worktrees" class="text-xs text-v-muted" style="cursor:pointer;">Mount sibling worktrees (read-only)</label>
+        </div>
+        <details class="mt-2">
+          <summary class="text-xs text-v-muted" style="cursor:pointer;">Advanced: per-activity sandbox overrides</summary>
+          <div class="mt-2" style="border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px;">
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Implementation</span><select id="new-sandbox-implementation" class="select text-xs" title="Implementation sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Testing</span><select id="new-sandbox-testing" class="select text-xs" title="Testing sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Refinement</span><select id="new-sandbox-refinement" class="select text-xs" title="Refinement sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Title generation</span><select id="new-sandbox-title" class="select text-xs" title="Title sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Oversight summary</span><select id="new-sandbox-oversight" class="select text-xs" title="Oversight sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Commit message</span><select id="new-sandbox-commit_message" class="select text-xs" title="Commit message sandbox" data-sandbox-select="true"></select></div>
+            <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Idea agent</span><select id="new-sandbox-idea_agent" class="select text-xs" title="Idea agent sandbox" data-sandbox-select="true"></select></div>
+          </div>
+        </details>
+        <div id="new-depends-on-row" class="mt-2" style="display:none;">
+          <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Depends on</label>
+          <div id="new-depends-on-picker" class="dep-picker">
+            <button type="button" class="dep-picker-trigger" onclick="toggleDepPicker('new-depends-on-picker')">
+              <div class="dep-picker-chips"><span class="dep-picker-placeholder">None</span></div>
+              <svg class="dep-picker-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div class="dep-picker-dropdown" style="display:none">
+              <input class="dep-picker-search" type="text" placeholder="Filter tasks…" oninput="filterDepPicker(this)">
+              <div class="dep-picker-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="col-backlog" class="space-y-2" data-status="backlog"></div>
+    </div>
+  </div>
+  <div class="flex flex-col min-h-0" id="col-wrapper-in_progress">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="col-header col-header-progress">In Progress</h2>
+      <span id="count-in_progress" class="text-xs text-v-muted">0</span>
+      <span id="max-parallel-tag" class="max-parallel-tag hidden" title="Max parallel tasks"></span>
+      <button onclick="showContainerMonitor(event)" title="Sandbox Monitor" style="margin-left:auto;background:none;border:none;padding:2px 4px;cursor:pointer;color:var(--text-muted);display:inline-flex;align-items:center;border-radius:4px;" onmouseover="this.style.color='var(--text-secondary)'" onmouseout="this.style.color='var(--text-muted)'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></button>
+    </div>
+    <div id="col-in_progress" class="column col-bg space-y-2" data-status="in_progress"></div>
+  </div>
+  <div class="flex flex-col min-h-0" id="col-wrapper-waiting">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="col-header col-header-waiting">Waiting</h2>
+      <span id="count-waiting" class="text-xs text-v-muted">0</span>
+    </div>
+    <div id="col-waiting" class="column col-bg space-y-2" data-status="waiting"></div>
+  </div>
+  <div class="flex flex-col min-h-0" id="col-wrapper-done">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <h2 class="col-header col-header-done">Done</h2>
+      <span id="count-done" class="text-xs text-v-muted">0</span>
+      <span id="done-stats" class="text-[10px] text-v-muted hidden"></span>
+      <button id="archive-all-btn" onclick="archiveAllDone()" class="hidden" style="margin-left: auto; background: none; border: none; padding: 0; cursor: pointer; font-size: 11px; color: var(--text-muted);" onmouseover="this.style.color='var(--text-secondary)'" onmouseout="this.style.color='var(--text-muted)'" title="Archive all done tasks">Archive all</button>
+    </div>
+    <div id="col-done" class="column col-bg space-y-2" data-status="done"></div>
+  </div>
+</main>
+

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallfacer — Task Board</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/tailwind.css">
+<link rel="stylesheet" href="/css/styles.css">
+<script src="/js/vendor/sortable.min.js"></script>
+<script src="/js/vendor/marked.min.js"></script>
+<script src="/js/vendor/highlight.min.js"></script>
+</head>
+<body class="h-screen overflow-hidden flex flex-col">
+
+<!-- Theme init (before render to prevent flash) -->
+<script>
+(function() {
+  var mode = localStorage.getItem('wallfacer-theme') || 'auto';
+  var dark = mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+})();
+</script>
+
+<!-- Header -->
+<header style="border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;">
+  <div style="display: flex; align-items: center; gap: 16px;">
+    <h1 style="font-size: 22px; font-weight: 400; letter-spacing: 0.01em; margin: 0;"><a href="https://github.com/changkun/wallfacer" target="_blank" rel="noopener noreferrer" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic; background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-decoration: none;">Wallfacer</a></h1>
+    <div id="workspace-list" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
+      <input type="checkbox" id="autopilot-toggle" onchange="toggleAutopilot()" style="cursor: pointer; accent-color: var(--accent);">
+      Autopilot
+      <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, manually created backlog tasks are automatically moved to In Progress when there is available capacity. Tasks created by the brainstorm agent are not auto-promoted.</span></span>
+    </label>
+    <span style="width: 1px; height: 18px; background: var(--border); flex-shrink: 0;"></span>
+    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
+      <input type="checkbox" id="autotest-toggle" onchange="toggleAutotest()" style="cursor: pointer; accent-color: var(--accent);">
+      Auto-test
+      <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, the test agent is automatically triggered for waiting tasks that have not yet been tested and whose worktree is up to date with the default branch.</span></span>
+    </label>
+    <span style="width: 1px; height: 18px; background: var(--border); flex-shrink: 0;"></span>
+    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
+      <input type="checkbox" id="autosubmit-toggle" onchange="toggleAutosubmit()" style="cursor: pointer; accent-color: var(--accent);">
+      Auto-submit
+      <span class="hint-trigger" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--text-tertiary, #888); color: var(--text-tertiary, #888); font-size: 11px; font-style: normal; cursor: help; flex-shrink: 0;">?<span class="hint-tooltip">When enabled, waiting tasks that have passed test verification, are up to date with the default branch, and have no worktree conflicts are automatically moved to done.</span></span>
+    </label>
+    <span style="width: 1px; height: 18px; background: var(--border); flex-shrink: 0;"></span>
+    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
+      <input type="checkbox" id="dep-graph-toggle" onchange="toggleDependencyGraph()" style="cursor: pointer; accent-color: var(--accent);">
+      Dep graph
+    </label>
+    <span id="ideation-next-run" style="font-size:12px;color:var(--text-tertiary,#888);display:none;"></span>
+  </div>
+  <!-- Task search -->
+  <div class="task-search-wrapper">
+    <span class="task-search-icon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+    </span>
+    <input type="search" id="task-search" placeholder="Filter tasks… or @search server" autocomplete="off" class="task-search-input">
+    <button id="task-search-clear" class="task-search-clear" title="Clear search">&times;</button>
+  </div>
+
+  <button onclick="openStatsModal()" class="settings-btn" style="margin-right: 6px;" title="Usage Analytics">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="18" y="3" width="4" height="18"></rect>
+      <rect x="10" y="8" width="4" height="13"></rect>
+      <rect x="2" y="13" width="4" height="8"></rect>
+    </svg>
+  </button>
+  <button id="settings-btn" class="settings-btn" onclick="openSettings()" title="Settings">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
+</header>
+

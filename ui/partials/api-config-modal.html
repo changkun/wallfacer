@@ -1,0 +1,122 @@
+<!-- API Configuration Modal -->
+<div id="env-config-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+  <div class="modal-card" style="max-width: 520px; width: 100%;">
+    <div class="p-6">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Sandbox Configuration</h3>
+        <button onclick="closeEnvConfigEditor()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
+      </div>
+
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
+        Changes are written to <code style="font-family:monospace;">~/.wallfacer/.env</code> and take effect on the next task run. Leave token fields blank to keep the existing value.
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="border:1px solid var(--border); border-radius:8px; padding:12px;">
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px;">Claude</label>
+
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">OAuth Token (CLAUDE_CODE_OAUTH_TOKEN)</label>
+              <input id="env-oauth-token" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">From <code style="font-family:monospace;">claude setup-token</code> (takes precedence if both are set). Leave blank to keep the current value.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">API Key (ANTHROPIC_API_KEY)</label>
+              <input id="env-api-key" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Direct API key. If both are set, the OAuth token takes precedence. Leave blank to keep the current value.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Base URL (ANTHROPIC_BASE_URL)</label>
+              <input id="env-claude-base-url" type="url" class="field" style="font-family:monospace; font-size:12px;" placeholder="https://api.anthropic.com" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Custom API endpoint. Clear to use the provider default.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Default Model (CLAUDE_DEFAULT_MODEL)</label>
+              <input id="env-default-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. claude-sonnet-4.6" autocomplete="off" list="env-model-list">
+              <datalist id="env-model-list"></datalist>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Default model for Claude tasks. Clear to use the container default.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Title Model (CLAUDE_TITLE_MODEL)</label>
+              <input id="env-title-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. claude-haiku-4.5" autocomplete="off" list="env-model-list">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Model for auto-generating task titles. Falls back to the default model.</div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+              <button onclick="testSandboxConfig('claude')" type="button" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Test</button>
+              <span id="env-claude-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em;"></span>
+            </div>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:8px; padding:12px;">
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px;">Codex</label>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">API Key (OPENAI_API_KEY)</label>
+              <input id="env-openai-api-key" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Optional for Codex tasks when host `~/.codex/auth.json` is mounted. Leave blank to keep the current value.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Base URL (OPENAI_BASE_URL)</label>
+              <input id="env-openai-base-url" type="url" class="field" style="font-family:monospace; font-size:12px;" placeholder="https://api.openai.com/v1" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Optional OpenAI-compatible endpoint. Clear to use the provider default.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Default Model (CODEX_DEFAULT_MODEL)</label>
+              <input id="env-codex-default-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. gpt-5-codex" autocomplete="off" list="env-model-list">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Default model for Codex tasks.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Title Model (CODEX_TITLE_MODEL)</label>
+              <input id="env-codex-title-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. gpt-5-codex" autocomplete="off" list="env-model-list">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Model for auto-generating task titles. Falls back to Codex default model.</div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+              <button onclick="testSandboxConfig('codex')" type="button" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Test</button>
+              <span id="env-codex-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em;"></span>
+            </div>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border); border-radius:8px; padding:12px;">
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px;">Global Sandbox Routing</label>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Default Sandbox (WALLFACER_DEFAULT_SANDBOX)</label>
+              <select id="env-default-sandbox" class="select" style="font-size:12px;" data-sandbox-select="true" data-default-text="Auto (model defaults)"></select>
+            </div>
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Activity-specific defaults</label>
+              <div style="border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px;">
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Implementation</span><select id="env-sandbox-implementation" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Testing</span><select id="env-sandbox-testing" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Refinement</span><select id="env-sandbox-refinement" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Title generation</span><select id="env-sandbox-title" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Oversight summary</span><select id="env-sandbox-oversight" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Commit message</span><select id="env-sandbox-commit_message" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span style="font-size:12px;color:var(--text-muted);">Idea agent</span><select id="env-sandbox-idea_agent" class="select" style="font-size:12px;" data-sandbox-select="true"></select></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px;">
+        <button onclick="saveEnvConfig()" class="btn btn-accent">Save</button>
+        <button onclick="closeEnvConfigEditor()" class="btn-ghost">Cancel</button>
+        <span id="env-config-status" style="font-size: 12px; color: var(--text-muted); margin-left: auto;"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
