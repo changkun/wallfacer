@@ -182,6 +182,12 @@ async function openModal(id) {
     const _searchCount = document.getElementById('log-search-count');
     if (_searchCount) _searchCount.textContent = '';
 
+    // Show Spans tab for tasks with at least one turn.
+    const spansTabBtn = document.getElementById('right-tab-spans');
+    if (spansTabBtn) {
+      spansTabBtn.classList.toggle('hidden', !(task.turns > 0));
+    }
+
     // Start log streaming; show Testing tab when test data exists
     if (task.is_test_run || task.last_test_result) {
       // Shown both while the test is running (is_test_run) and after it
@@ -402,6 +408,8 @@ function closeModal() {
   document.getElementById('modal-test-logs').innerHTML = '';
   var tlChart = document.getElementById('modal-timeline-chart');
   if (tlChart) { tlChart.innerHTML = ''; delete tlChart.dataset.loaded; }
+  const spansTabBtn = document.getElementById('right-tab-spans');
+  if (spansTabBtn) spansTabBtn.classList.add('hidden');
   resetRefinePanel();
   document.getElementById('modal-backlog-right').classList.add('hidden');
   document.getElementById('modal-backlog-settings').classList.add('hidden');

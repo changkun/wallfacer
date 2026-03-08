@@ -800,6 +800,7 @@
             <button id="right-tab-implementation" onclick="setRightTab('implementation')" class="right-tab active">Implementation</button>
             <button id="right-tab-testing" onclick="setRightTab('testing')" class="right-tab hidden">Testing</button>
             <button id="right-tab-changes" onclick="setRightTab('changes')" class="right-tab hidden">Changes</button>
+            <button id="right-tab-spans" onclick="setRightTab('spans')" class="right-tab hidden">Spans</button>
           </div>
           <div id="right-panel-implementation">
             <div id="modal-logs-section" class="mb-4">
@@ -834,6 +835,9 @@
           <div id="right-panel-changes" class="hidden">
             <div id="modal-diff-behind" class="hidden"></div>
             <div id="modal-diff-files"></div>
+          </div>
+          <div id="right-panel-spans" class="hidden">
+            <div id="modal-flamegraph-container" style="padding:8px;"></div>
           </div>
         </div>
 
@@ -916,6 +920,7 @@
 <script src="/js/modal-results.js"></script>
 <script src="/js/modal-oversight.js"></script>
 <script src="/js/modal-logs.js"></script>
+<script src="/js/modal-flamegraph.js"></script>
 <script src="/js/modal-core.js"></script>
 <script src="/js/git.js"></script>
 <script src="/js/dnd.js"></script>

@@ -83,13 +83,16 @@ function onLogSearchInput(value) {
 }
 
 function setRightTab(tab) {
-  ['implementation', 'testing', 'changes'].forEach(function(t) {
+  ['implementation', 'testing', 'changes', 'spans'].forEach(function(t) {
     const btn = document.getElementById('right-tab-' + t);
     const panel = document.getElementById('right-panel-' + t);
     const active = t === tab;
     if (btn) btn.classList.toggle('active', active);
     if (panel) panel.classList.toggle('hidden', !active);
   });
+  if (tab === 'spans' && typeof loadFlamegraph !== 'undefined' && typeof currentTaskId !== 'undefined' && currentTaskId) {
+    loadFlamegraph(currentTaskId);
+  }
 }
 
 function setLogsMode(mode) {
