@@ -36,6 +36,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			})
 		}
 	}()
+	// Clean up the per-task oversight mutex entry when Run exits to avoid
+	// unbounded growth in the oversightMu sync.Map for long-running servers.
+	defer r.oversightMu.Delete(taskID.String())
 
 	task, err := r.store.GetTask(bgCtx, taskID)
 	if err != nil {
@@ -84,6 +87,16 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	}
 	ctx, cancel := context.WithTimeout(bgCtx, timeout)
 	defer cancel()
+
+	// Launch periodic oversight generation while the turn-loop executes.
+	// The goroutine exits when Run returns (oversightCancel is deferred).
+	// Skip for test runs — those are short verification passes where the
+	// implementation oversight is already finalised.
+	if !isTestRun {
+		oversightCtx, oversightCancel := context.WithCancel(ctx)
+		defer oversightCancel()
+		go r.periodicOversightWorker(oversightCtx, taskID)
+	}
 
 	// Set up worktrees only if not already present.
 	worktreePaths := task.WorktreePaths

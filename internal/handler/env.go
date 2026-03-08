@@ -89,12 +89,13 @@ func validateBaseURL(u string) error {
 // envConfigResponse is the JSON representation of the env config sent to the UI.
 // Sensitive tokens are masked so they are never exposed in full over HTTP.
 type envConfigResponse struct {
-	OAuthToken       string `json:"oauth_token"`        // masked
-	APIKey           string `json:"api_key"`             // masked
-	BaseURL          string `json:"base_url"`
-	DefaultModel     string `json:"default_model"`
-	TitleModel       string `json:"title_model"`
-	MaxParallelTasks int    `json:"max_parallel_tasks"`
+	OAuthToken        string `json:"oauth_token"`        // masked
+	APIKey            string `json:"api_key"`             // masked
+	BaseURL           string `json:"base_url"`
+	DefaultModel      string `json:"default_model"`
+	TitleModel        string `json:"title_model"`
+	MaxParallelTasks  int    `json:"max_parallel_tasks"`
+	OversightInterval int    `json:"oversight_interval"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -109,12 +110,13 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		maxParallel = defaultMaxConcurrentTasks
 	}
 	writeJSON(w, http.StatusOK, envConfigResponse{
-		OAuthToken:       envconfig.MaskToken(cfg.OAuthToken),
-		APIKey:           envconfig.MaskToken(cfg.APIKey),
-		BaseURL:          cfg.BaseURL,
-		DefaultModel:     cfg.DefaultModel,
-		TitleModel:       cfg.TitleModel,
-		MaxParallelTasks: maxParallel,
+		OAuthToken:        envconfig.MaskToken(cfg.OAuthToken),
+		APIKey:            envconfig.MaskToken(cfg.APIKey),
+		BaseURL:           cfg.BaseURL,
+		DefaultModel:      cfg.DefaultModel,
+		TitleModel:        cfg.TitleModel,
+		MaxParallelTasks:  maxParallel,
+		OversightInterval: cfg.OversightInterval,
 	})
 }
 
@@ -129,12 +131,13 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 // as "no change" to prevent accidental token deletion.
 func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		OAuthToken       *string `json:"oauth_token"`
-		APIKey           *string `json:"api_key"`
-		BaseURL          *string `json:"base_url"`
-		DefaultModel     *string `json:"default_model"`
-		TitleModel       *string `json:"title_model"`
-		MaxParallelTasks *int    `json:"max_parallel_tasks"`
+		OAuthToken        *string `json:"oauth_token"`
+		APIKey            *string `json:"api_key"`
+		BaseURL           *string `json:"base_url"`
+		DefaultModel      *string `json:"default_model"`
+		TitleModel        *string `json:"title_model"`
+		MaxParallelTasks  *int    `json:"max_parallel_tasks"`
+		OversightInterval *int    `json:"oversight_interval"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -160,6 +163,21 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		maxParallel = &s
 	}
 
+	// Convert oversight_interval int to string for the env file.
+	// Clamp to [0, 120]: 0 = disabled; 120 minutes = max.
+	var oversightInterval *string
+	if req.OversightInterval != nil {
+		v := *req.OversightInterval
+		if v < 0 {
+			v = 0
+		}
+		if v > 120 {
+			v = 120
+		}
+		s := fmt.Sprintf("%d", v)
+		oversightInterval = &s
+	}
+
 	// Validate the base URL if provided to prevent SSRF.
 	if req.BaseURL != nil && *req.BaseURL != "" {
 		if err := validateBaseURL(*req.BaseURL); err != nil {
@@ -168,7 +186,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.DefaultModel, req.TitleModel, maxParallel); err != nil {
+	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.DefaultModel, req.TitleModel, maxParallel, oversightInterval); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

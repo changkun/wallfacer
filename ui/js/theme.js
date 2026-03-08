@@ -34,6 +34,7 @@ function openSettings() {
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
   loadMaxParallel();
+  loadOversightInterval();
 }
 
 function closeSettings() {

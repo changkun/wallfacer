@@ -67,7 +67,7 @@ func TestUpdateExistingKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=old-token\nANTHROPIC_BASE_URL=https://old.example.com\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), ptr("claude-haiku-4-5"), nil, nil); err != nil {
+	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), ptr("claude-haiku-4-5"), nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -91,7 +91,7 @@ func TestUpdateNilSkips(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// nil pointer → leave unchanged.
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -109,7 +109,7 @@ func TestUpdateClearsField(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// Empty string pointer → clear the field.
-	if err := envconfig.Update(path, nil, nil, ptr(""), ptr(""), nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr(""), ptr(""), nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -129,7 +129,7 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), ptr("claude-sonnet-4-5"), ptr("claude-haiku-4-5"), nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), ptr("claude-sonnet-4-5"), ptr("claude-haiku-4-5"), nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -149,7 +149,7 @@ func TestUpdatePreservesComments(t *testing.T) {
 	content := "# Auth token\nCLAUDE_CODE_OAUTH_TOKEN=tok\n# end\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -199,6 +199,77 @@ func TestParseCodexFieldsAbsent(t *testing.T) {
 	}
 	if cfg.CodexTitleModel != "" {
 		t.Errorf("CodexTitleModel = %q; want empty", cfg.CodexTitleModel)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// OversightInterval
+// ---------------------------------------------------------------------------
+
+func TestParseOversightInterval(t *testing.T) {
+	content := "WALLFACER_OVERSIGHT_INTERVAL=10\n"
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.OversightInterval != 10 {
+		t.Errorf("OversightInterval = %d; want 10", cfg.OversightInterval)
+	}
+}
+
+func TestParseOversightIntervalZero(t *testing.T) {
+	content := "WALLFACER_OVERSIGHT_INTERVAL=0\n"
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.OversightInterval != 0 {
+		t.Errorf("OversightInterval = %d; want 0", cfg.OversightInterval)
+	}
+}
+
+func TestParseOversightIntervalInvalid(t *testing.T) {
+	content := "WALLFACER_OVERSIGHT_INTERVAL=notanumber\n"
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	// Invalid value: should remain zero (default).
+	if cfg.OversightInterval != 0 {
+		t.Errorf("OversightInterval = %d; want 0 for invalid value", cfg.OversightInterval)
+	}
+}
+
+func TestParseOversightIntervalAbsent(t *testing.T) {
+	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.OversightInterval != 0 {
+		t.Errorf("OversightInterval = %d; want 0 when absent", cfg.OversightInterval)
+	}
+}
+
+func TestUpdateOversightInterval(t *testing.T) {
+	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
+	path := writeEnvFile(t, content)
+
+	v := "15"
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, &v); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse after update: %v", err)
+	}
+	if cfg.OversightInterval != 15 {
+		t.Errorf("OversightInterval = %d; want 15", cfg.OversightInterval)
 	}
 }
 

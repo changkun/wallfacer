@@ -36,6 +36,35 @@ async function saveMaxParallel() {
   }
 }
 
+// --- Oversight Interval Setting ---
+
+async function loadOversightInterval() {
+  try {
+    const cfg = await api('/api/env');
+    const input = document.getElementById('oversight-interval-input');
+    if (input) input.value = cfg.oversight_interval ?? 0;
+  } catch (e) {
+    console.error('Failed to load oversight interval setting:', e);
+  }
+}
+
+async function saveOversightInterval() {
+  const input = document.getElementById('oversight-interval-input');
+  const statusEl = document.getElementById('oversight-interval-status');
+  let value = parseInt(input.value, 10);
+  if (isNaN(value) || value < 0) value = 0;
+  if (value > 120) value = 120;
+  input.value = value;
+  statusEl.textContent = 'Saving…';
+  try {
+    await api('/api/env', { method: 'PUT', body: JSON.stringify({ oversight_interval: value }) });
+    statusEl.textContent = 'Saved.';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+}
+
 // --- API Configuration (env file editor) ---
 
 async function showEnvConfigEditor(event) {
