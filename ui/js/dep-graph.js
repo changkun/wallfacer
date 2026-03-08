@@ -126,7 +126,8 @@ function renderDependencyGraph(tasks) {
 function toggleDependencyGraph() {
   const cb = document.getElementById('dep-graph-toggle');
   window.depGraphEnabled = cb ? cb.checked : !window.depGraphEnabled;
-  if (typeof render === 'function') render();
+  if (typeof scheduleRender === 'function') scheduleRender();
+  else if (typeof render === 'function') render();
 }
 
 // Expose via window so that onclick handlers and render.js can call them.

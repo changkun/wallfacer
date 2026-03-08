@@ -66,12 +66,16 @@ function isTestCard(task) {
   return task.status === 'waiting' && !!task.last_test_result && task.test_run_start_turn > 0;
 }
 
-// Invalidate cached behind-counts for all tasks so that the next render re-checks
-// how many commits each waiting card is behind. Called whenever any task changes.
-function invalidateDiffBehindCounts() {
-  for (const [, cached] of diffCache) {
-    if (cached && cached !== 'loading') {
-      cached.behindFetchedAt = 0;
+// Invalidate cached behind-counts so that the next render re-checks how many
+// commits a waiting card is behind.  When taskId is provided only that entry is
+// invalidated; otherwise every entry is reset (used on full snapshots).
+function invalidateDiffBehindCounts(taskId) {
+  if (taskId) {
+    const cached = diffCache.get(taskId);
+    if (cached && cached !== 'loading') cached.behindFetchedAt = 0;
+  } else {
+    for (const [, cached] of diffCache) {
+      if (cached && cached !== 'loading') cached.behindFetchedAt = 0;
     }
   }
 }
@@ -258,6 +262,34 @@ function render() {
   else if (typeof hideDependencyGraph === 'function') hideDependencyGraph();
 }
 
+// --- Board render scheduler ---
+// Coalesces rapid back-to-back render() calls (e.g. SSE bursts) into a single
+// paint per animation frame so the main thread stays responsive.
+let _renderPending = false;
+function scheduleRender() {
+  if (_renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(function() {
+    _renderPending = false;
+    render();
+  });
+}
+
+// --- Markdown cache ---
+// marked.parse() is expensive; cache results keyed by source text so unchanged
+// card content is not re-parsed on every render cycle.
+const _mdCache = new Map();
+function _cachedMarkdown(text) {
+  if (!text) return '';
+  if (_mdCache.has(text)) return _mdCache.get(text);
+  const html = renderMarkdown(text);
+  // Evict the oldest entry once the cache grows large (>1 000 unique strings)
+  // to avoid unbounded memory growth in very long-running sessions.
+  if (_mdCache.size >= 1000) _mdCache.delete(_mdCache.keys().next().value);
+  _mdCache.set(text, html);
+  return html;
+}
+
 function createCard(t, rank) {
   const card = document.createElement('div');
   card.className = 'card';
@@ -369,7 +401,7 @@ function updateCard(card, t, rank) {
       <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
     </div>` : ''}
     ${isIdeaAgent ? `<div class="card-title">&#129504; ${highlightMatch(t.title || 'Brainstorm', filterQuery)}</div>` : t.title ? `<div class="card-title">${highlightMatch(t.title, filterQuery)}</div>` : ''}
-    <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${renderMarkdown(t.prompt)}</div>
+    <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${_cachedMarkdown(t.prompt)}</div>
     ${t.status === 'failed' && t.result ? `
     <div class="card-error-reason">
       <span class="card-error-label">Error</span><span class="card-error-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>
@@ -380,7 +412,7 @@ function updateCard(card, t, rank) {
       <span class="card-output-label">Output</span><span class="card-output-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>
     </div>
     ` : t.result && t.status !== 'in_progress' ? `
-    <div class="text-xs text-v-secondary mt-1 card-prose overflow-hidden" style="max-height:3.2em;">${renderMarkdown(t.result)}</div>
+    <div class="text-xs text-v-secondary mt-1 card-prose overflow-hidden" style="max-height:3.2em;">${_cachedMarkdown(t.result)}</div>
     ` : ''}
     ${showDiff ? `<div class="diff-block" data-diff><span style="color:var(--text-muted)">loading diff\u2026</span></div>` : ''}
     ${buildCardActions(t)}

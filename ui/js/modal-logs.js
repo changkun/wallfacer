@@ -1,3 +1,27 @@
+// --- Log render schedulers ---
+// renderLogs / renderTestLogs re-parse the entire buffer from scratch on every
+// call, so we must not call them on every incoming network chunk.  Instead we
+// batch pending updates and flush at most once per animation frame.
+let _logRenderPending = false;
+function scheduleLogRender() {
+  if (_logRenderPending) return;
+  _logRenderPending = true;
+  requestAnimationFrame(function() {
+    _logRenderPending = false;
+    renderLogs();
+  });
+}
+
+let _testLogRenderPending = false;
+function scheduleTestLogRender() {
+  if (_testLogRenderPending) return;
+  _testLogRenderPending = true;
+  requestAnimationFrame(function() {
+    _testLogRenderPending = false;
+    renderTestLogs();
+  });
+}
+
 // --- Log rendering and streaming ---
 
 function _updateLogsTabs() {
@@ -159,7 +183,7 @@ function startImplLogFetch(id) {
         reader.read().then(({ done, value }) => {
           if (done) { renderLogs(); return; }
           rawLogBuffer += decoder.decode(value, { stream: true });
-          renderLogs();
+          scheduleLogRender();
           read();
         }).catch(() => {});
       }
@@ -251,7 +275,7 @@ function _fetchTestLogs(id, retryDelay) {
         reader.read().then(({ done, value }) => {
           if (done) { reconnect(); return; }
           testRawLogBuffer += decoder.decode(value, { stream: true });
-          renderTestLogs();
+          scheduleTestLogRender();
           read();
         }).catch(() => reconnect());
       }
@@ -295,7 +319,7 @@ function _fetchLogs(id, retryDelay) {
         reader.read().then(({ done, value }) => {
           if (done) { reconnect(); return; }
           rawLogBuffer += decoder.decode(value, { stream: true });
-          renderLogs();
+          scheduleLogRender();
           read();
         }).catch(() => reconnect());
       }

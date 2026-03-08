@@ -25,7 +25,7 @@ function startTasksStream() {
     tasksRetryDelay = 1000;
     try {
       tasks = JSON.parse(e.data);
-      render();
+      scheduleRender();
     } catch (err) {
       console.error('tasks SSE snapshot parse error:', err);
     }
@@ -41,8 +41,8 @@ function startTasksStream() {
         const idx = tasks.findIndex(t => t.id === task.id);
         if (idx >= 0) {
           tasks.splice(idx, 1);
-          invalidateDiffBehindCounts();
-          render();
+          invalidateDiffBehindCounts(task.id);
+          scheduleRender();
         }
         return;
       }
@@ -52,8 +52,8 @@ function startTasksStream() {
       } else {
         tasks.push(task);
       }
-      invalidateDiffBehindCounts();
-      render();
+      invalidateDiffBehindCounts(task.id);
+      scheduleRender();
     } catch (err) {
       console.error('tasks SSE task-updated parse error:', err);
     }
@@ -67,8 +67,8 @@ function startTasksStream() {
       const idx = tasks.findIndex(t => t.id === id);
       if (idx >= 0) {
         tasks.splice(idx, 1);
-        invalidateDiffBehindCounts();
-        render();
+        invalidateDiffBehindCounts(id);
+        scheduleRender();
       }
     } catch (err) {
       console.error('tasks SSE task-deleted parse error:', err);
@@ -87,7 +87,7 @@ function startTasksStream() {
 async function fetchTasks() {
   const url = showArchived ? '/api/tasks?include_archived=true' : '/api/tasks';
   tasks = await api(url);
-  render();
+  scheduleRender();
 }
 
 function toggleShowArchived() {
