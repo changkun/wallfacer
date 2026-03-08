@@ -255,7 +255,7 @@ func TestUpdateEnvConfig_CodexModelRoundTrip(t *testing.T) {
 	if resp.CodexTitleModel != "codex-title-test" {
 		t.Errorf("CodexTitleModel = %q; want codex-title-test", resp.CodexTitleModel)
 	}
-	if resp.OpenAIAPIKey != "***********" {
+	if resp.OpenAIAPIKey != "sk-o...test" {
 		t.Errorf("OpenAIAPIKey = %q; want masked value", resp.OpenAIAPIKey)
 	}
 	if resp.OpenAIBaseURL != "https://api.openai.com/v1" {
