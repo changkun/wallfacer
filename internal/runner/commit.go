@@ -252,7 +252,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	sandbox := "claude"
 	model := ""
 	if task != nil {
-		sandbox = r.sandboxForTask(task)
+		sandbox = r.sandboxForTaskActivity(task, activityCommitMessage)
 	}
 	model = r.modelFromEnvForSandbox(sandbox)
 
@@ -524,7 +524,7 @@ func (r *Runner) resolveConflicts(
 	// Mount only the conflicted worktree for this targeted fix.
 	override := map[string]string{repoPath: worktreePath}
 
-	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, override, "", nil, "")
+	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, override, "", nil, "", activityCommitMessage)
 
 	task, _ := r.store.GetTask(context.Background(), taskID)
 	turns := 0

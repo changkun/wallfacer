@@ -35,6 +35,16 @@ type agentOutput struct {
 	Usage        agentUsage `json:"usage"`
 }
 
+const (
+	activityImplementation = store.SandboxActivityImplementation
+	activityTesting        = store.SandboxActivityTesting
+	activityRefinement     = store.SandboxActivityRefinement
+	activityTitle          = store.SandboxActivityTitle
+	activityOversight      = store.SandboxActivityOversight
+	activityCommitMessage  = store.SandboxActivityCommitMessage
+	activityIdeaAgent      = store.SandboxActivityIdeaAgent
+)
+
 // buildContainerArgs constructs the full argument list for the container run command.
 // It is a pure function of runner configuration and the supplied parameters,
 // which makes it easy to unit-test without actually launching a container.
@@ -169,10 +179,68 @@ func (r *Runner) buildContainerArgsForSandbox(
 // modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file (if configured).
 // Returns an empty string when the file cannot be read or the key is absent.
 func (r *Runner) sandboxForTask(task *store.Task) string {
+	return r.sandboxForTaskActivity(task, activityImplementation)
+}
+
+func (r *Runner) sandboxForTaskActivity(task *store.Task, activity string) string {
 	if task == nil {
 		return "claude"
 	}
-	return strings.ToLower(strings.TrimSpace(task.Sandbox))
+	activity = strings.ToLower(strings.TrimSpace(activity))
+	if task.SandboxByActivity != nil {
+		if sandbox := strings.ToLower(strings.TrimSpace(task.SandboxByActivity[activity])); sandbox != "" {
+			return sandbox
+		}
+	}
+	if sandbox := strings.ToLower(strings.TrimSpace(task.Sandbox)); sandbox != "" {
+		return sandbox
+	}
+	if sandbox := r.sandboxFromEnvForActivity(activity); sandbox != "" {
+		return sandbox
+	}
+	return "claude"
+}
+
+func (r *Runner) sandboxFromEnvForActivity(activity string) string {
+	if r.envFile == "" {
+		return ""
+	}
+	cfg, err := envconfig.Parse(r.envFile)
+	if err != nil {
+		return ""
+	}
+	activity = strings.ToLower(strings.TrimSpace(activity))
+	switch activity {
+	case activityImplementation:
+		if cfg.ImplementationSandbox != "" {
+			return cfg.ImplementationSandbox
+		}
+	case activityTesting:
+		if cfg.TestingSandbox != "" {
+			return cfg.TestingSandbox
+		}
+	case activityRefinement:
+		if cfg.RefinementSandbox != "" {
+			return cfg.RefinementSandbox
+		}
+	case activityTitle:
+		if cfg.TitleSandbox != "" {
+			return cfg.TitleSandbox
+		}
+	case activityOversight:
+		if cfg.OversightSandbox != "" {
+			return cfg.OversightSandbox
+		}
+	case activityCommitMessage:
+		if cfg.CommitMessageSandbox != "" {
+			return cfg.CommitMessageSandbox
+		}
+	case activityIdeaAgent:
+		if cfg.IdeaAgentSandbox != "" {
+			return cfg.IdeaAgentSandbox
+		}
+	}
+	return strings.ToLower(strings.TrimSpace(cfg.DefaultSandbox))
 }
 
 func (r *Runner) modelFromEnv() string {
@@ -237,6 +305,7 @@ func (r *Runner) runContainer(
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
+	activity string,
 ) (*agentOutput, []byte, []byte, error) {
 	// Build a human-readable container name: wallfacer-<slug>-<uuid8>
 	// The slug is derived from the task prompt so external tools (docker ps,
@@ -253,7 +322,7 @@ func (r *Runner) runContainer(
 
 	sandbox := "claude"
 	if task, err := r.store.GetTask(context.Background(), taskID); err == nil {
-		sandbox = r.sandboxForTask(task)
+		sandbox = r.sandboxForTaskActivity(task, activity)
 	} else {
 		logger.Runner.Warn("runContainer: get task", "task", taskID, "error", err)
 	}
