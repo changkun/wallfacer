@@ -44,7 +44,7 @@ function setLogsMode(mode) {
 
 function startLogStream(id) {
   const task = tasks.find(t => t.id === id);
-  logsMode = (task && task.status === 'done') ? 'oversight' : 'pretty';
+  logsMode = (task && (task.status === 'done' || task.status === 'waiting')) ? 'oversight' : 'pretty';
   oversightData = null;
   oversightFetching = false;
   _fetchLogs(id);
