@@ -64,6 +64,8 @@ async function openModal(id) {
 
   // Reset left panel tabs; content populated below once events load
   document.getElementById('left-tab-testing').classList.add('hidden');
+  const timelineTab = document.getElementById('left-tab-timeline');
+  if (timelineTab) timelineTab.classList.add('hidden');
   setLeftTab('implementation');
   if (task.result) {
     renderResultsFromEvents([task.result]);
@@ -155,6 +157,17 @@ async function openModal(id) {
     modalRight.classList.remove('hidden');
     modalBody.style.display = 'flex';
     modalBody.style.gap = '0';
+
+    // Show Timeline tab for tasks with at least one turn (span data may exist).
+    const timelineTabBtn = document.getElementById('left-tab-timeline');
+    if (timelineTabBtn) {
+      if (task.turns > 0) {
+        timelineTabBtn.classList.remove('hidden');
+        document.getElementById('modal-summary-section').classList.remove('hidden');
+      } else {
+        timelineTabBtn.classList.add('hidden');
+      }
+    }
 
     // Start log streaming; show Testing tab when test data exists
     if (task.is_test_run || task.last_test_result) {

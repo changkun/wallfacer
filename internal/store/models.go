@@ -173,7 +173,18 @@ const (
 	EventTypeFeedback    EventType = "feedback"
 	EventTypeError       EventType = "error"
 	EventTypeSystem      EventType = "system"
+	EventTypeSpanStart   EventType = "span_start"
+	EventTypeSpanEnd     EventType = "span_end"
 )
+
+// SpanData holds metadata for a span_start or span_end event.
+// Phase identifies the execution phase (e.g. "worktree_setup", "agent_turn",
+// "container_run", "commit"). Label allows differentiating multiple spans of
+// the same phase (e.g. "agent_turn_1", "agent_turn_2").
+type SpanData struct {
+	Phase string `json:"phase"`
+	Label string `json:"label"`
+}
 
 // TaskEvent is a single event in a task's audit trail (event sourcing).
 type TaskEvent struct {

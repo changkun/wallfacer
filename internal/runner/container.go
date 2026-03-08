@@ -11,6 +11,7 @@ import (
 
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -216,7 +217,9 @@ func (r *Runner) runContainer(
 	cmd.Stderr = &stderr
 
 	logger.Runner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "))
+	r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: "container_run"})
 	runErr := cmd.Run()
+	r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: "container_run"})
 
 	// If the context was cancelled or timed out, kill the container explicitly
 	// and return the context error rather than parsing potentially incomplete output.

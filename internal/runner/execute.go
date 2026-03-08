@@ -102,7 +102,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 	}
 	if needSetup {
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
 		worktreePaths, branchName, err = r.setupWorktrees(taskID)
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
 		if err != nil {
 			logger.Runner.Error("setup worktrees", "task", taskID, "error", err)
 			statusSet = true
@@ -160,7 +162,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			}
 		}
 
+		turnLabel := fmt.Sprintf("agent_turn_%d", turns)
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, worktreePaths, boardDir, siblingMounts, task.Model)
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 		if saveErr := r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
 			logger.Runner.Error("save turn output", "task", taskID, "turn", turns, "error", saveErr)
 		}
@@ -265,21 +270,26 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 					"result": "Test verification complete: " + strings.ToUpper(verdict),
 				})
-			} else if err := r.commit(ctx, taskID, sessionID, turns, worktreePaths, branchName); err != nil {
-				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-				r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
-					"error": "commit failed: " + err.Error(),
-				})
-				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-					"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
-				})
 			} else {
-				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
-				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-					"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusDone),
-				})
-				r.backgroundWg.Add(1)
-				go func() { defer r.backgroundWg.Done(); r.GenerateOversight(taskID) }()
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
+				commitErr := r.commit(ctx, taskID, sessionID, turns, worktreePaths, branchName)
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "commit"})
+				if commitErr != nil {
+					r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+					r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
+						"error": "commit failed: " + commitErr.Error(),
+					})
+					r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+						"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
+					})
+				} else {
+					r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+					r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+						"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusDone),
+					})
+					r.backgroundWg.Add(1)
+					go func() { defer r.backgroundWg.Done(); r.GenerateOversight(taskID) }()
+				}
 			}
 			return
 
