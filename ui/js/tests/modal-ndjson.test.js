@@ -162,6 +162,19 @@ describe('extractToolInput', () => {
   });
 });
 
+describe('stripCodexShellWrapper', () => {
+  let ctx;
+  beforeAll(() => { ctx = makeNdjsonContext(); });
+
+  it('strips /bin/bash -lc wrapper for single-quoted commands', () => {
+    expect(ctx.stripCodexShellWrapper("/bin/bash -lc 'echo hello'")).toBe('echo hello');
+  });
+
+  it('returns command unchanged when no wrapper is present', () => {
+    expect(ctx.stripCodexShellWrapper('go test ./...')).toBe('go test ./...');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // renderPrettyLogs
 // ---------------------------------------------------------------------------
@@ -359,5 +372,49 @@ describe('renderPrettyLogs', () => {
     });
     const result = ctx.renderPrettyLogs(line);
     expect(result).toContain('\u2026'); // ellipsis
+  });
+
+  it('renders codex agent_message item as assistant text', () => {
+    const line = JSON.stringify({
+      type: 'item.completed',
+      item: {
+        id: 'item_4',
+        type: 'agent_message',
+        text: 'I found the manifests and source layout.',
+      },
+    });
+    const result = ctx.renderPrettyLogs(line);
+    expect(result).toContain('cc-text');
+    expect(result).toContain('I found the manifests and source layout.');
+  });
+
+  it('renders codex command_execution start and completion with output', () => {
+    const raw = [
+      JSON.stringify({
+        type: 'item.started',
+        item: {
+          id: 'item_1',
+          type: 'command_execution',
+          command: "/bin/bash -lc 'ls -la /workspace'",
+          status: 'in_progress',
+        },
+      }),
+      JSON.stringify({
+        type: 'item.completed',
+        item: {
+          id: 'item_1',
+          type: 'command_execution',
+          command: "/bin/bash -lc 'ls -la /workspace'",
+          aggregated_output: 'total 12\n-rw-r--r-- AGENTS.md',
+          exit_code: 0,
+          status: 'completed',
+        },
+      }),
+    ].join('\n');
+    const result = ctx.renderPrettyLogs(raw);
+    expect(result).toContain('cc-tool-call');
+    expect(result).toContain('ls -la /workspace');
+    expect(result).toContain('cc-tool-result');
+    expect(result).toContain('AGENTS.md');
   });
 });

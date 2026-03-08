@@ -29,9 +29,37 @@ function extractToolInput(name, inputObj) {
   }
 }
 
+function stripCodexShellWrapper(command) {
+  const raw = String(command || '').trim();
+  const prefix = '/bin/bash -lc ';
+  if (!raw.startsWith(prefix)) return raw;
+  let rest = raw.slice(prefix.length).trim();
+  if ((rest.startsWith("'") && rest.endsWith("'")) || (rest.startsWith('"') && rest.endsWith('"'))) {
+    rest = rest.slice(1, -1);
+  }
+  return rest.replace(/\\'/g, "'").replace(/\\"/g, '"');
+}
+
+function renderToolResultBlock(text) {
+  if (!text) {
+    return `<div class="cc-block cc-tool-result"><span class="cc-result-pipe">&#x23BF;</span> <span class="cc-result-empty">(No output)</span></div>`;
+  }
+  // Clean Read tool output: "   123→\tcode" → "   123  code"
+  text = text.replace(/^(\s*\d+)→\t?/gm, '$1  ');
+  const resultLines = text.split('\n');
+  if (resultLines.length > 5) {
+    const preview = resultLines.slice(0, 3).map(l => escapeHtml(l)).join('\n');
+    const rest = resultLines.slice(3).map(l => escapeHtml(l)).join('\n');
+    const remaining = resultLines.length - 3;
+    return `<div class="cc-block cc-tool-result"><span class="cc-result-pipe">&#x23BF;</span> <pre class="cc-result-text">${preview}</pre><details class="cc-expand"><summary class="cc-expand-toggle">+${remaining} lines</summary><pre class="cc-result-text">${rest}</pre></details></div>`;
+  }
+  return `<div class="cc-block cc-tool-result"><span class="cc-result-pipe">&#x23BF;</span> <pre class="cc-result-text">${escapeHtml(text)}</pre></div>`;
+}
+
 function renderPrettyLogs(rawBuffer) {
   const lines = rawBuffer.split('\n');
   const blocks = [];
+  const codexSeenCommandStarts = new Set();
 
   for (const line of lines) {
     const evt = parseNdjsonLine(line);
@@ -69,21 +97,33 @@ function renderPrettyLogs(rawBuffer) {
         } else if (typeof block.content === 'string') {
           text = block.content;
         }
-        if (!text) {
-          blocks.push(`<div class="cc-block cc-tool-result"><span class="cc-result-pipe">&#x23BF;</span> <span class="cc-result-empty">(No output)</span></div>`);
-          continue;
+        blocks.push(renderToolResultBlock(text));
+      }
+    } else if ((evt.type === 'item.started' || evt.type === 'item.completed') && evt.item) {
+      const item = evt.item;
+      if (item.type === 'agent_message' && item.text) {
+        blocks.push(`<div class="cc-block cc-text"><span class="cc-marker">&#x23FA;</span> ${escapeHtml(item.text)}</div>`);
+        continue;
+      }
+      if (item.type !== 'command_execution') continue;
+      const itemId = item.id || '';
+      const command = stripCodexShellWrapper(item.command || '');
+      const commandHtml = command ? `(<span class="cc-tool-input">${escapeHtml(command.length > 200 ? command.slice(0, 200) + '\u2026' : command)}</span>)` : '';
+      const shouldRenderCall = evt.type === 'item.started' || !itemId || !codexSeenCommandStarts.has(itemId);
+      if (shouldRenderCall) {
+        blocks.push(`<div class="cc-block cc-tool-call"><span class="cc-marker">&#x23FA;</span> <span class="cc-tool-name">Bash</span>${commandHtml}</div>`);
+      }
+      if (itemId && evt.type === 'item.started') {
+        codexSeenCommandStarts.add(itemId);
+      }
+      if (evt.type === 'item.completed') {
+        let text = '';
+        if (typeof item.aggregated_output === 'string' && item.aggregated_output.trim()) {
+          text = item.aggregated_output;
+        } else if (item.exit_code !== null && item.exit_code !== undefined && Number(item.exit_code) !== 0) {
+          text = `Command exited with code ${item.exit_code}`;
         }
-        // Clean Read tool output: "   123→\tcode" → "   123  code"
-        text = text.replace(/^(\s*\d+)→\t?/gm, '$1  ');
-        const resultLines = text.split('\n');
-        if (resultLines.length > 5) {
-          const preview = resultLines.slice(0, 3).map(l => escapeHtml(l)).join('\n');
-          const rest = resultLines.slice(3).map(l => escapeHtml(l)).join('\n');
-          const remaining = resultLines.length - 3;
-          blocks.push(`<div class="cc-block cc-tool-result"><span class="cc-result-pipe">&#x23BF;</span> <pre class="cc-result-text">${preview}</pre><details class="cc-expand"><summary class="cc-expand-toggle">+${remaining} lines</summary><pre class="cc-result-text">${rest}</pre></details></div>`);
-        } else {
-          blocks.push(`<div class="cc-block cc-tool-result"><span class="cc-result-pipe">&#x23BF;</span> <pre class="cc-result-text">${escapeHtml(text)}</pre></div>`);
-        }
+        blocks.push(renderToolResultBlock(text));
       }
     } else if (evt.type === 'result') {
       if (evt.result) {

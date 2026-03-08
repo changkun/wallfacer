@@ -73,6 +73,31 @@ func TestParseTurnActivityMultipleBlocks(t *testing.T) {
 	}
 }
 
+// TestParseTurnActivityCodexItems verifies Codex item.started/item.completed
+// command execution events are mapped into Bash tool calls and text notes.
+func TestParseTurnActivityCodexItems(t *testing.T) {
+	ndjson := `{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Inspecting the repository."}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"/bin/bash -lc 'ls -la /workspace'","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/bash -lc 'ls -la /workspace'","aggregated_output":"total 12","exit_code":0,"status":"completed"}}`
+	act := parseTurnActivity([]byte(ndjson), 4)
+	if len(act.TextNotes) != 1 || act.TextNotes[0] != "Inspecting the repository." {
+		t.Fatalf("unexpected text notes: %v", act.TextNotes)
+	}
+	if len(act.ToolCalls) != 1 || act.ToolCalls[0] != "Bash(ls -la /workspace)" {
+		t.Fatalf("unexpected tool calls: %v", act.ToolCalls)
+	}
+}
+
+func TestNormalizeCodexCommand(t *testing.T) {
+	got := normalizeCodexCommand("/bin/bash -lc 'echo hello'")
+	if got != "echo hello" {
+		t.Fatalf("unexpected normalized command: %q", got)
+	}
+	if got := normalizeCodexCommand("go test ./..."); got != "go test ./..." {
+		t.Fatalf("command should be unchanged, got %q", got)
+	}
+}
+
 // TestParseTurnActivityLongTextTruncated verifies that text longer than 200
 // characters is truncated with an ellipsis.
 func TestParseTurnActivityLongTextTruncated(t *testing.T) {

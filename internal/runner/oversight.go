@@ -298,6 +298,7 @@ func buildTurnTimestamps(events []store.TaskEvent) map[int]time.Time {
 type ndjsonLine struct {
 	Type    string          `json:"type"`
 	Message json.RawMessage `json:"message"`
+	Item    *ndjsonItem     `json:"item"`
 }
 
 type ndjsonMessage struct {
@@ -311,9 +312,19 @@ type ndjsonContent struct {
 	Input json.RawMessage `json:"input"`
 }
 
+type ndjsonItem struct {
+	ID               string `json:"id"`
+	Type             string `json:"type"`
+	Text             string `json:"text"`
+	Command          string `json:"command"`
+	AggregatedOutput string `json:"aggregated_output"`
+	ExitCode         *int   `json:"exit_code"`
+}
+
 // parseTurnActivity extracts tool calls and text snippets from a raw turn NDJSON file.
 func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 	act := turnActivity{Turn: turnNum}
+	seenCodexCommands := map[string]bool{}
 
 	for _, line := range strings.Split(string(raw), "\n") {
 		line = strings.TrimSpace(line)
@@ -322,6 +333,36 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 		}
 		var msg ndjsonLine
 		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			continue
+		}
+		if (msg.Type == "item.started" || msg.Type == "item.completed") && msg.Item != nil {
+			item := msg.Item
+			switch item.Type {
+			case "agent_message":
+				if t := strings.TrimSpace(item.Text); t != "" {
+					if len(t) > 200 {
+						t = t[:200] + "…"
+					}
+					act.TextNotes = append(act.TextNotes, t)
+				}
+			case "command_execution":
+				command := normalizeCodexCommand(item.Command)
+				if len(command) > 120 {
+					command = command[:120] + "…"
+				}
+				if command != "" {
+					if msg.Type == "item.started" {
+						act.ToolCalls = append(act.ToolCalls, "Bash("+command+")")
+						if item.ID != "" {
+							seenCodexCommands[item.ID] = true
+						}
+					} else if msg.Type == "item.completed" {
+						if item.ID == "" || !seenCodexCommands[item.ID] {
+							act.ToolCalls = append(act.ToolCalls, "Bash("+command+")")
+						}
+					}
+				}
+			}
 			continue
 		}
 		if msg.Type != "assistant" || len(msg.Message) == 0 {
@@ -420,6 +461,23 @@ func parseRawInput(raw json.RawMessage) map[string]interface{} {
 	var m map[string]interface{}
 	json.Unmarshal(raw, &m)
 	return m
+}
+
+func normalizeCodexCommand(command string) string {
+	cmd := strings.TrimSpace(command)
+	const prefix = "/bin/bash -lc "
+	if !strings.HasPrefix(cmd, prefix) {
+		return cmd
+	}
+	rest := strings.TrimSpace(strings.TrimPrefix(cmd, prefix))
+	if len(rest) >= 2 {
+		if (rest[0] == '\'' && rest[len(rest)-1] == '\'') || (rest[0] == '"' && rest[len(rest)-1] == '"') {
+			rest = rest[1 : len(rest)-1]
+		}
+	}
+	rest = strings.ReplaceAll(rest, "\\'", "'")
+	rest = strings.ReplaceAll(rest, "\\\"", "\"")
+	return rest
 }
 
 const oversightPrompt = `You are analyzing the execution trace of an AI coding agent. Your job is to produce a high-level structured summary that helps a human quickly understand what the agent did.
