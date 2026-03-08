@@ -296,6 +296,44 @@ func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
 	}
 }
 
+func TestHostCodexAuthStatus_Valid(t *testing.T) {
+	codexAuthDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(codexAuthDir, "auth.json"), []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"header.payload.sig","refresh_token":"rt"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	r := NewRunner(s, RunnerConfig{CodexAuthPath: codexAuthDir})
+	ok, reason := r.HostCodexAuthStatus(time.Now())
+	if !ok {
+		t.Fatalf("expected host codex auth to be valid, got false: %s", reason)
+	}
+}
+
+func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
+	codexAuthDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(codexAuthDir, "auth.json"), []byte(`{"auth_mode":"chatgpt","tokens":{}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	r := NewRunner(s, RunnerConfig{CodexAuthPath: codexAuthDir})
+	ok, _ := r.HostCodexAuthStatus(time.Now())
+	if ok {
+		t.Fatalf("expected invalid host codex auth when no tokens are present")
+	}
+}
+
 // TestContainerArgsCLAUDEMDMountPosition verifies that the CLAUDE.md mount
 // appears before the image name in the args list, matching the expected
 // container launch order.

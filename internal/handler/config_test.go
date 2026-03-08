@@ -154,9 +154,8 @@ func TestGetConfig_ReportsCodexUnavailableWhenUntested(t *testing.T) {
 	}
 }
 
-func TestGetConfig_ReportsCodexUsableWithHostAuthAfterTest(t *testing.T) {
+func TestGetConfig_ReportsCodexUsableWithHostAuth(t *testing.T) {
 	h, _, _ := newTestHandlerWithEnvAndCodexAuth(t)
-	h.setSandboxTestPassed("codex", true)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	w := httptest.NewRecorder()

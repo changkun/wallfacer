@@ -529,8 +529,10 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Any env update may affect sandbox connectivity/model settings; require
-	// a fresh sandbox test before allowing codex tasks again.
+	// a fresh sandbox test before allowing API-key codex tasks again.
+	// If valid host codex auth is present, keep codex usable.
 	h.setSandboxTestPassed("codex", false)
+	h.refreshCodexBootstrapAuthState()
 	if err := envconfig.UpdateSandboxSettings(
 		h.envFile,
 		req.DefaultSandbox,

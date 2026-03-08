@@ -48,7 +48,7 @@ type Handler struct {
 
 // NewHandler constructs a Handler with the given dependencies.
 func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces []string) *Handler {
-	return &Handler{
+	h := &Handler{
 		store:            s,
 		runner:           r,
 		configDir:        configDir,
@@ -63,6 +63,8 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 			"codex":  false,
 		},
 	}
+	h.refreshCodexBootstrapAuthState()
+	return h
 }
 
 func (h *Handler) setSandboxTestPassed(sandbox string, passed bool) {
@@ -77,6 +79,16 @@ func (h *Handler) sandboxTestPassedState(sandbox string) bool {
 	h.sandboxTestMu.RLock()
 	defer h.sandboxTestMu.RUnlock()
 	return h.sandboxTestPassed[s]
+}
+
+func (h *Handler) refreshCodexBootstrapAuthState() {
+	if h.runner == nil {
+		return
+	}
+	ok, _ := h.runner.HostCodexAuthStatus(time.Now())
+	if ok {
+		h.setSandboxTestPassed("codex", true)
+	}
 }
 
 // AutopilotEnabled returns whether autopilot mode is active.

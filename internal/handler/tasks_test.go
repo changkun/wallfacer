@@ -204,7 +204,6 @@ func TestCreateTask_RejectsCodexWhenUntested(t *testing.T) {
 
 func TestCreateTask_AllowsCodexWithHostAuthCache(t *testing.T) {
 	h, _, _ := newTestHandlerWithEnvAndCodexAuth(t)
-	h.setSandboxTestPassed("codex", true)
 
 	body := `{"prompt": "build a thing", "sandbox": "codex"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))

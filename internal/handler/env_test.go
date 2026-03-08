@@ -45,7 +45,7 @@ func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) 
 		t.Fatal(err)
 	}
 	codexAuthDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(codexAuthDir, "auth.json"), []byte(`{"auth_mode":"chatgpt"}`), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(codexAuthDir, "auth.json"), []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"header.payload.sig","refresh_token":"rt"}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath, CodexAuthPath: codexAuthDir})

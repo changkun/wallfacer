@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
 )
@@ -20,20 +21,29 @@ func (h *Handler) sandboxUsable(sandbox string) (bool, string) {
 	if s != "codex" {
 		return true, ""
 	}
-	hasHostAuth := h.runner != nil && h.runner.HasHostCodexAuth()
+	hasHostAuth := false
+	hostAuthReason := ""
+	if h.runner != nil {
+		hasHostAuth, hostAuthReason = h.runner.HostCodexAuthStatus(time.Now())
+	}
+	if hasHostAuth {
+		return true, ""
+	}
 	hasAPIKey := false
 	if h.envFile != "" {
 		cfg, err := envconfig.Parse(h.envFile)
 		if err != nil {
-			if !hasHostAuth {
-				return false, "Codex unavailable: failed to read env configuration."
-			}
+			return false, "Codex unavailable: failed to read env configuration."
 		} else {
 			hasAPIKey = strings.TrimSpace(cfg.OpenAIAPIKey) != ""
 		}
 	}
-	if !hasAPIKey && !hasHostAuth {
-		return false, "Codex unavailable: configure OPENAI_API_KEY or provide host Codex auth cache (~/.codex/auth.json)."
+	if !hasAPIKey {
+		reason := "Codex unavailable: configure OPENAI_API_KEY or sign in via host Codex auth cache (~/.codex/auth.json)."
+		if strings.TrimSpace(hostAuthReason) != "" {
+			reason += " Host auth status: " + hostAuthReason + "."
+		}
+		return false, reason
 	}
 	if !h.sandboxTestPassedState("codex") {
 		return false, "Codex unavailable: run Settings -> API Configuration -> Test (Codex) first."

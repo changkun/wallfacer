@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -442,13 +443,46 @@ func (r *Runner) SandboxImage() string {
 
 // HasHostCodexAuth reports whether a usable host Codex auth cache exists.
 func (r *Runner) HasHostCodexAuth() bool {
-	return r.hostCodexAuthPath() != ""
+	ok, _ := r.HostCodexAuthStatus(time.Now())
+	return ok
 }
 
 // CodexAuthPath returns the validated host path used for codex auth cache
 // mounts, or an empty string when unavailable.
 func (r *Runner) CodexAuthPath() string {
 	return r.hostCodexAuthPath()
+}
+
+// HostCodexAuthStatus validates the host codex auth cache and returns whether
+// it appears usable for sandbox auth, plus a reason when unusable.
+func (r *Runner) HostCodexAuthStatus(now time.Time) (bool, string) {
+	path := r.hostCodexAuthPath()
+	if path == "" {
+		return false, "host codex auth cache not found"
+	}
+	raw, err := os.ReadFile(filepath.Join(path, "auth.json"))
+	if err != nil {
+		return false, "failed to read host codex auth cache"
+	}
+	var parsed struct {
+		AuthMode string `json:"auth_mode"`
+		Tokens   struct {
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
+		} `json:"tokens"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return false, "host codex auth cache is malformed"
+	}
+	access := strings.TrimSpace(parsed.Tokens.AccessToken)
+	refresh := strings.TrimSpace(parsed.Tokens.RefreshToken)
+	if access == "" && refresh == "" {
+		return false, "host codex auth cache has no tokens"
+	}
+	if access != "" && isJWTExpired(access, now) && refresh == "" {
+		return false, "host codex access token is expired and no refresh token is present"
+	}
+	return true, ""
 }
 
 // Workspaces returns the list of configured workspace paths.
@@ -473,6 +507,24 @@ func (r *Runner) hostCodexAuthPath() string {
 		return path
 	}
 	return ""
+}
+
+func isJWTExpired(jwt string, now time.Time) bool {
+	parts := strings.Split(jwt, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return false
+	}
+	var claims struct {
+		Exp int64 `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil || claims.Exp <= 0 {
+		return false
+	}
+	return now.Unix() >= claims.Exp
 }
 
 // repoLock returns a per-repo mutex, creating one on first access.
