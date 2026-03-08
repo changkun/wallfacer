@@ -386,6 +386,31 @@ pre { white-space: pre-wrap; word-break: break-word; }
 }
 .settings-btn:hover { color: var(--text); }
 
+.command-palette-trigger-btn {
+  margin-right: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  padding: 5px 9px;
+  gap: 6px;
+}
+
+.command-palette-trigger-kbd {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 5px;
+  font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.1;
+  color: var(--text);
+  background: var(--bg-card);
+}
+
+.command-palette-trigger-text {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .theme-switch {
   display: flex; background: var(--bg-input); border: 1px solid var(--border);
   border-radius: 8px; overflow: hidden;
