@@ -246,6 +246,8 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	mux.HandleFunc("POST /api/git/checkout", h.GitCheckout)
 	mux.HandleFunc("POST /api/git/create-branch", h.GitCreateBranch)
 
+	mux.HandleFunc("GET /api/usage", h.GetUsageStats)
+
 	// Task collection.
 	mux.HandleFunc("GET /api/tasks", h.ListTasks)
 	mux.HandleFunc("GET /api/tasks/stream", h.StreamTasks)
