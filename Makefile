@@ -85,7 +85,7 @@ test-backend:
 
 # Run frontend JavaScript unit tests
 test-frontend:
-	npm test
+	npx --yes vitest@2 run
 
 # Remove sandbox images
 clean:

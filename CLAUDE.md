@@ -23,7 +23,7 @@ make clean          # Remove all sandbox images
 make run PROMPT="…" # Headless one-shot Claude execution with a prompt
 make test           # Run all tests (backend + frontend)
 make test-backend   # Run Go unit tests (go test ./...)
-make test-frontend  # Run frontend JS unit tests (npm test)
+make test-frontend  # Run frontend JS unit tests (npx vitest@2 run)
 make ui-css         # Regenerate Tailwind CSS from UI sources
 ```
 
@@ -47,7 +47,7 @@ The Go source lives at the top level. Module path: `changkun.de/wallfacer`. Go v
 go build -o wallfacer .   # Build server binary
 go vet ./...              # Lint
 go test ./...             # Run backend tests
-npm test                  # Run frontend tests
+npx --yes vitest@2 run    # Run frontend tests
 ```
 
 The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.

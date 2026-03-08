@@ -44,7 +44,7 @@ To run all tests (backend and frontend):
 ```bash
 make test           # Run all tests (backend + frontend)
 make test-backend   # Run Go unit tests (go test ./...)
-make test-frontend  # Run frontend JS unit tests (npm test)
+make test-frontend  # Run frontend JS unit tests (npx vitest@2 run)
 ```
 
 Building takes a few minutes the first time. Confirm the image exists afterward:
