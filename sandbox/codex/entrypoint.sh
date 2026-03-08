@@ -39,7 +39,7 @@ LAST_MSG_FILE="/tmp/codex-last-message.txt"
 STDERR_FILE="/tmp/codex-stderr.txt"
 rm -f "$LAST_MSG_FILE" "$STDERR_FILE"
 
-CODEX_ARGS=(exec --full-auto --skip-git-repo-check --output-last-message "$LAST_MSG_FILE" --color never)
+CODEX_ARGS=(exec --full-auto --sandbox workspace-write --skip-git-repo-check --output-last-message "$LAST_MSG_FILE" --color never)
 if [ -n "$MODEL" ]; then
     CODEX_ARGS+=(--model "$MODEL")
 fi
