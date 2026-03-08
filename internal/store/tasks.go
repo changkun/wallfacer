@@ -3,11 +3,13 @@ package store
 import (
 	"context"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -703,6 +705,90 @@ func (s *Store) DismissRefinement(_ context.Context, id uuid.UUID) error {
 	}
 	s.notify(t, false)
 	return nil
+}
+
+const maxSearchResults = 50
+const snippetPadding = 60
+
+// SearchTasks performs a case-insensitive substring search across title, prompt,
+// tags (joined), and oversight summary text. Search order favours the cheapest
+// fields first. Each task produces at most one result (first matching field).
+// Results are capped at maxSearchResults. Archived tasks are included.
+func (s *Store) SearchTasks(_ context.Context, query string) ([]TaskSearchResult, error) {
+	q := strings.ToLower(query)
+
+	// Snapshot task pointers under RLock; oversight reads happen outside the lock.
+	s.mu.RLock()
+	snapshot := make([]*Task, 0, len(s.tasks))
+	for _, t := range s.tasks {
+		cp := *t
+		snapshot = append(snapshot, &cp)
+	}
+	s.mu.RUnlock()
+
+	results := make([]TaskSearchResult, 0)
+	for _, t := range snapshot {
+		if len(results) >= maxSearchResults {
+			break
+		}
+		if field, snippet, ok := matchTask(t, q, s); ok {
+			results = append(results, TaskSearchResult{
+				Task:         t,
+				MatchedField: field,
+				Snippet:      snippet,
+			})
+		}
+	}
+	return results, nil
+}
+
+// matchTask checks each field in cheapest-first order. Returns (field, snippet, true)
+// on the first match, or ("", "", false) if nothing matches.
+func matchTask(t *Task, q string, s *Store) (field, snippet string, ok bool) {
+	if idx := strings.Index(strings.ToLower(t.Title), q); idx != -1 {
+		return "title", buildSnippet(t.Title, idx, len(q)), true
+	}
+	if idx := strings.Index(strings.ToLower(t.Prompt), q); idx != -1 {
+		return "prompt", buildSnippet(t.Prompt, idx, len(q)), true
+	}
+	joined := strings.Join(t.Tags, " ")
+	if idx := strings.Index(strings.ToLower(joined), q); idx != -1 {
+		return "tags", buildSnippet(joined, idx, len(q)), true
+	}
+	// Oversight is the most expensive check (disk read) — always last.
+	if text, err := s.LoadOversightText(t.ID); err == nil && text != "" {
+		if idx := strings.Index(strings.ToLower(text), q); idx != -1 {
+			return "oversight", buildSnippet(text, idx, len(q)), true
+		}
+	}
+	return "", "", false
+}
+
+// buildSnippet returns an HTML-escaped substring of src centred on the match at
+// [idx, idx+matchLen) with up to snippetPadding bytes of context on each side.
+// Truncation points are adjusted to UTF-8 rune boundaries, and ellipsis markers
+// are prepended/appended when the window is shorter than src.
+func buildSnippet(src string, idx, matchLen int) string {
+	start := idx - snippetPadding
+	prefix := "…"
+	if start <= 0 {
+		start = 0
+		prefix = ""
+	}
+	end := idx + matchLen + snippetPadding
+	suffix := "…"
+	if end >= len(src) {
+		end = len(src)
+		suffix = ""
+	}
+	// Align to UTF-8 rune boundaries.
+	for start > 0 && !utf8.RuneStart(src[start]) {
+		start--
+	}
+	for end < len(src) && !utf8.RuneStart(src[end]) {
+		end++
+	}
+	return html.EscapeString(prefix + src[start:end] + suffix)
 }
 
 // clampTimeout ensures timeout stays in [1, 1440] minutes with a default of 60.

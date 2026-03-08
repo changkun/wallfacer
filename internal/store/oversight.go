@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -45,6 +46,35 @@ func (s *Store) GetOversight(taskID uuid.UUID) (*TaskOversight, error) {
 // SaveTestOversight atomically writes the test-agent oversight summary for a task.
 func (s *Store) SaveTestOversight(taskID uuid.UUID, oversight TaskOversight) error {
 	return atomicWriteJSON(s.testOversightPath(taskID), oversight)
+}
+
+// LoadOversightText reads oversight.json for taskID and concatenates all
+// phase Title and Summary fields into a single searchable string.
+// Returns ("", nil) when the file does not exist (task never generated oversight).
+func (s *Store) LoadOversightText(taskID uuid.UUID) (string, error) {
+	data, err := os.ReadFile(s.oversightPath(taskID))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	var o TaskOversight
+	if err := json.Unmarshal(data, &o); err != nil {
+		return "", err
+	}
+	var sb strings.Builder
+	for _, phase := range o.Phases {
+		if phase.Title != "" {
+			sb.WriteString(phase.Title)
+			sb.WriteByte(' ')
+		}
+		if phase.Summary != "" {
+			sb.WriteString(phase.Summary)
+			sb.WriteByte(' ')
+		}
+	}
+	return strings.TrimSpace(sb.String()), nil
 }
 
 // GetTestOversight reads the test-agent oversight summary for a task.
