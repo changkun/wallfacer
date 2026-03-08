@@ -126,10 +126,11 @@ async function fetchDiff(card, taskId, updatedAt) {
 }
 
 function applyDiffToCard(el, diff, behindCounts, taskId) {
+  const task = typeof tasks !== 'undefined' ? tasks.find(t => t.id === taskId) : null;
   const entries = Object.entries(behindCounts || {});
   const totalBehind = entries.reduce((s, [, n]) => s + n, 0);
   let warning = '';
-  if (totalBehind > 0) {
+  if (totalBehind > 0 && !(task && isTestCard(task))) {
     const label = entries.length === 1
       ? `${totalBehind} commit${totalBehind !== 1 ? 's' : ''} behind`
       : entries.map(([repo, n]) => `${repo}: ${n}`).join(', ') + ' behind';
@@ -220,7 +221,7 @@ function render() {
         el.insertBefore(card, el.children[i] || null);
       }
       // Load diff for waiting/failed/done tasks that have worktrees
-      if ((t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && !isTestCard(t) && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
+      if ((t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
         fetchDiff(card, t.id, t.updated_at);
       }
     }
@@ -360,7 +361,6 @@ function updateCard(card, t, rank) {
   const isIdeaAgent = t.kind === 'idea-agent';
   const isArchived = !!t.archived;
   const isTestRun = !!t.is_test_run && t.status === 'in_progress';
-  const isTestTaskCard = isTestCard(t);
   const badgeClass = isArchived ? 'badge-archived' : isTestRun ? 'badge-testing' : `badge-${t.status}`;
   const statusLabel = isArchived ? 'archived' : isTestRun ? 'testing' : (t.status === 'in_progress' ? 'in progress' : t.status === 'committing' ? 'committing' : t.status);
   if (isIdeaAgent) {
@@ -369,7 +369,7 @@ function updateCard(card, t, rank) {
     card.classList.remove('card-idea-agent');
   }
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
-  const showDiff = ((t.status === 'failed' || t.status === 'done' || (t.status === 'waiting' && !isTestTaskCard)) && t.worktree_paths && Object.keys(t.worktree_paths).length > 0);
+  const showDiff = (t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
   card.style.opacity = isArchived ? '0.55' : '';
   // Failed tasks in the waiting column get a red left border to distinguish them.
   if (t.status === 'failed') {
