@@ -1,15 +1,13 @@
 #!/bin/bash
 
 # Parse wallfacer-style arguments and translate to codex CLI format.
-# Wallfacer passes Claude Code flags: -p <prompt> --verbose --output-format <val>
-#   [--model <val>] [--resume <val>]
-# Codex CLI expects: [--model <val>] <prompt>
+# Wallfacer passes Claude Code-style flags:
+#   -p <prompt> --verbose --output-format <val> [--model <val>] [--resume <val>]
 #
-# Model priority:
-#   1. --model CLI arg (wallfacer per-task override or CLAUDE_DEFAULT_MODEL)
-#   2. CODEX_DEFAULT_MODEL environment variable
+# We run Codex in non-interactive mode:
+#   codex exec --full-auto [--model <val>] --output-last-message <file> <prompt>
 #
-# After codex runs, wrap the output in a Claude Code-compatible JSON envelope
+# Then wrap the final assistant message in a Claude Code-compatible JSON envelope
 # so wallfacer can parse the result correctly.
 
 PROMPT=""
@@ -37,14 +35,19 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-CODEX_ARGS=(--approval-mode full-auto)
+LAST_MSG_FILE="/tmp/codex-last-message.txt"
+STDERR_FILE="/tmp/codex-stderr.txt"
+rm -f "$LAST_MSG_FILE" "$STDERR_FILE"
+
+CODEX_ARGS=(exec --full-auto --output-last-message "$LAST_MSG_FILE" --color never)
 if [ -n "$MODEL" ]; then
     CODEX_ARGS+=(--model "$MODEL")
 fi
 
-# Run codex, capturing combined stdout+stderr.
+# Run codex, capturing stdout separately from stderr. The final agent message is
+# written to LAST_MSG_FILE; stderr is fallback context for errors.
 set +e
-OUTPUT=$(codex "${CODEX_ARGS[@]}" "$PROMPT" 2>&1)
+STDOUT_OUTPUT=$(codex "${CODEX_ARGS[@]}" "$PROMPT" 2>"$STDERR_FILE")
 EXIT_CODE=$?
 set -e
 
@@ -52,6 +55,15 @@ IS_ERROR="false"
 STOP_REASON="end_turn"
 if [ "$EXIT_CODE" -ne 0 ]; then
     IS_ERROR="true"
+fi
+
+OUTPUT=""
+if [ -s "$LAST_MSG_FILE" ]; then
+    OUTPUT=$(cat "$LAST_MSG_FILE")
+elif [ -n "$STDOUT_OUTPUT" ]; then
+    OUTPUT="$STDOUT_OUTPUT"
+elif [ -s "$STDERR_FILE" ]; then
+    OUTPUT=$(cat "$STDERR_FILE")
 fi
 
 # Emit a Claude Code-compatible JSON result so wallfacer can parse it.
