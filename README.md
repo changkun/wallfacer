@@ -11,7 +11,7 @@
 Wallfacer is a task-board orchestration system for autonomous coding agents.  
 Create tasks, run them in isolated sandboxes, review diffs, and keep shipping with minimal manual overhead.
 
-![Wallfacer overview](./images/overview.png)
+![Wallfacer teaser](./images/usage.png)
 
 ## Why Wallfacer
 
@@ -41,9 +41,13 @@ Coordinate many agent tasks in one place, move cards across the lifecycle, and k
 
 ### Oversight That Is Actually Actionable
 
-| Execution oversight | Timeline + phase detail |
-|---|---|
-| ![Oversight view 1](./images/oversight1.png) | ![Oversight view 2](./images/oversight2.png) |
+**Execution oversight**
+
+![Oversight view 1](./images/oversight1.png)
+
+**Timeline and phase detail**
+
+![Oversight view 2](./images/oversight2.png)
 
 Inspect what happened, when it happened, and why it happened before you accept any automated output.
 
