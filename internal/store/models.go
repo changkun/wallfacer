@@ -106,7 +106,7 @@ var allowedTransitions = map[TaskStatus][]TaskStatus{
 	TaskStatusBacklog:    {TaskStatusInProgress},
 	TaskStatusInProgress: {TaskStatusCommitting, TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled},
 	TaskStatusCommitting: {TaskStatusDone, TaskStatusFailed},
-	TaskStatusWaiting:    {TaskStatusInProgress, TaskStatusDone, TaskStatusCancelled},
+	TaskStatusWaiting:    {TaskStatusInProgress, TaskStatusCommitting, TaskStatusDone, TaskStatusCancelled},
 	TaskStatusFailed:     {TaskStatusBacklog, TaskStatusCancelled},
 	TaskStatusDone:       {TaskStatusCancelled},
 	TaskStatusCancelled:  {TaskStatusBacklog},
