@@ -1,7 +1,7 @@
 /**
  * Tests for markdown.js helpers and clipboard/card markdown toggles.
  */
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -160,9 +160,6 @@ describe('toggleCardMarkdown and copy helpers', () => {
   it('toggles card markdown and raw view state', () => {
     const renderedNode = createVisibilityNode();
     const rawNode = createVisibilityNode();
-    const button = {
-      textContent: '',
-    };
     const card = {
       dataset: { rawView: 'false' },
       closest: () => card,
@@ -171,6 +168,10 @@ describe('toggleCardMarkdown and copy helpers', () => {
         if (selector === '.card-md-raw') return [rawNode];
         return [];
       },
+    };
+    const button = {
+      textContent: '',
+      closest: () => card,
     };
     const ctx = makeContext({ tasks: [] });
     loadScript(ctx, 'markdown.js');
