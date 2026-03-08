@@ -508,6 +508,192 @@ func TestAccumulateTaskUsage_NotFound(t *testing.T) {
 	}
 }
 
+func TestUpdateTaskExecutionPrompt(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+
+	if err := s.UpdateTaskExecutionPrompt(bg(), task.ID, "implementation prompt"); err != nil {
+		t.Fatalf("UpdateTaskExecutionPrompt: %v", err)
+	}
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.ExecutionPrompt != "implementation prompt" {
+		t.Errorf("ExecutionPrompt = %q, want %q", got.ExecutionPrompt, "implementation prompt")
+	}
+}
+
+func TestUpdateTaskSandboxByActivity_NormalizesAndClears(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+
+	updates := map[string]string{
+		"implementation": "CLAUDE",
+		"Testing":       "Codex ",
+		"invalid":       "x",
+		"oversight":     "",
+	}
+
+	if err := s.UpdateTaskSandboxByActivity(bg(), task.ID, updates); err != nil {
+		t.Fatalf("UpdateTaskSandboxByActivity: %v", err)
+	}
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.SandboxByActivity["implementation"] != "claude" {
+		t.Fatalf("expected implementation sandbox 'claude', got %#v", got.SandboxByActivity)
+	}
+	if got.SandboxByActivity["testing"] != "codex" {
+		t.Fatalf("expected testing sandbox 'codex', got %#v", got.SandboxByActivity)
+	}
+	if _, ok := got.SandboxByActivity["oversight"]; ok {
+		t.Fatalf("expected empty oversight value to be dropped, got %#v", got.SandboxByActivity)
+	}
+	if _, ok := got.SandboxByActivity["invalid"]; ok {
+		t.Fatalf("expected invalid activity key to be ignored, got %#v", got.SandboxByActivity)
+	}
+
+	if err := s.UpdateTaskSandboxByActivity(bg(), task.ID, map[string]string{}); err != nil {
+		t.Fatalf("UpdateTaskSandboxByActivity empty: %v", err)
+	}
+	got, _ = s.GetTask(bg(), task.ID)
+	if got.SandboxByActivity != nil {
+		t.Fatalf("expected empty map to clear sandbox overrides, got %#v", got.SandboxByActivity)
+	}
+}
+
+func TestUpdateTaskSandbox_TrimsWhitespace(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+
+	if err := s.UpdateTaskSandbox(bg(), task.ID, "  codex "); err != nil {
+		t.Fatalf("UpdateTaskSandbox: %v", err)
+	}
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.Sandbox != "codex" {
+		t.Fatalf("expected sandbox to trim whitespace, got %q", got.Sandbox)
+	}
+}
+
+func TestUpdateTaskTestRun(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	if err := s.UpdateTaskTurns(bg(), task.ID, 4); err != nil {
+		t.Fatalf("seed turns: %v", err)
+	}
+
+	if err := s.UpdateTaskTestRun(bg(), task.ID, true, ""); err != nil {
+		t.Fatalf("start test run: %v", err)
+	}
+	got, _ := s.GetTask(bg(), task.ID)
+	if !got.IsTestRun {
+		t.Fatal("expected IsTestRun=true while running test")
+	}
+	if got.TestRunStartTurn != 4 {
+		t.Fatalf("expected TestRunStartTurn 4, got %d", got.TestRunStartTurn)
+	}
+
+	if err := s.UpdateTaskTestRun(bg(), task.ID, false, "pass"); err != nil {
+		t.Fatalf("finish test run: %v", err)
+	}
+	got, _ = s.GetTask(bg(), task.ID)
+	if got.IsTestRun {
+		t.Fatal("expected IsTestRun=false after test completion")
+	}
+	if got.LastTestResult != "pass" {
+		t.Fatalf("expected LastTestResult 'pass', got %q", got.LastTestResult)
+	}
+}
+
+func TestUpdateRefinementJob_UpdatesAndClears(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+
+	job := &RefinementJob{ID: "job-1", Status: "running", Result: "draft"}
+	if err := s.UpdateRefinementJob(bg(), task.ID, job); err != nil {
+		t.Fatalf("UpdateRefinementJob: %v", err)
+	}
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.CurrentRefinement == nil || got.CurrentRefinement.ID != "job-1" {
+		t.Fatalf("CurrentRefinement = %#v, want running job", got.CurrentRefinement)
+	}
+
+	if err := s.UpdateRefinementJob(bg(), task.ID, nil); err != nil {
+		t.Fatalf("UpdateRefinementJob clear: %v", err)
+	}
+	got, _ = s.GetTask(bg(), task.ID)
+	if got.CurrentRefinement != nil {
+		t.Fatalf("expected CurrentRefinement to clear, got %#v", got.CurrentRefinement)
+	}
+}
+
+func TestStartRefinementJobIfIdle(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+
+	if err := s.StartRefinementJobIfIdle(bg(), task.ID, &RefinementJob{ID: "job-1", Status: "running"}); err != nil {
+		t.Fatalf("StartRefinementJobIfIdle first start: %v", err)
+	}
+
+	if err := s.StartRefinementJobIfIdle(bg(), task.ID, &RefinementJob{ID: "job-2", Status: "running"}); err == nil {
+		t.Fatal("expected ErrRefinementAlreadyRunning when existing job is running")
+	} else if !errors.Is(err, ErrRefinementAlreadyRunning) {
+		t.Fatalf("expected ErrRefinementAlreadyRunning, got %v", err)
+	}
+
+	// Mark existing job as done then start a new one.
+	if err := s.UpdateRefinementJob(bg(), task.ID, &RefinementJob{ID: "job-1", Status: "done"}); err != nil {
+		t.Fatalf("UpdateRefinementJob: %v", err)
+	}
+	if err := s.StartRefinementJobIfIdle(bg(), task.ID, &RefinementJob{ID: "job-2", Status: "running"}); err != nil {
+		t.Fatalf("StartRefinementJobIfIdle after done: %v", err)
+	}
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.CurrentRefinement == nil || got.CurrentRefinement.ID != "job-2" {
+		t.Fatalf("CurrentRefinement after restart = %#v", got.CurrentRefinement)
+	}
+}
+
+func TestApplyRefinement(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "old prompt", 5, false, "", "")
+
+	session := RefinementSession{ID: "session-1", Result: "suggested", StartPrompt: "old prompt"}
+	if err := s.ApplyRefinement(bg(), task.ID, "new prompt", session); err != nil {
+		t.Fatalf("ApplyRefinement: %v", err)
+	}
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.Prompt != "new prompt" {
+		t.Fatalf("Prompt = %q, want %q", got.Prompt, "new prompt")
+	}
+	if got.CurrentRefinement != nil {
+		t.Fatalf("expected CurrentRefinement cleared, got %#v", got.CurrentRefinement)
+	}
+	if len(got.PromptHistory) != 1 || got.PromptHistory[0] != "old prompt" {
+		t.Fatalf("PromptHistory = %#v, want ['old prompt']", got.PromptHistory)
+	}
+	if len(got.RefineSessions) != 1 || got.RefineSessions[0].Result != "suggested" {
+		t.Fatalf("RefineSessions = %#v", got.RefineSessions)
+	}
+}
+
+func TestDismissRefinement(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	if err := s.UpdateRefinementJob(bg(), task.ID, &RefinementJob{ID: "job-1", Status: "running"}); err != nil {
+		t.Fatalf("seed refinement job: %v", err)
+	}
+
+	if err := s.DismissRefinement(bg(), task.ID); err != nil {
+		t.Fatalf("DismissRefinement: %v", err)
+	}
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.CurrentRefinement != nil {
+		t.Fatalf("expected CurrentRefinement to clear, got %#v", got.CurrentRefinement)
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // UpdateTaskPosition
 // ─────────────────────────────────────────────────────────────────────────────

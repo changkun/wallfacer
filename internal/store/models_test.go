@@ -131,3 +131,20 @@ func TestTaskStatus_AllowedTransitions(t *testing.T) {
 		t.Errorf("AllowedTransitions() for unknown status = %v, want nil", got)
 	}
 }
+
+func TestTask_HasTag(t *testing.T) {
+	task := &Task{Tags: []string{"backend", "idea-agent"}}
+
+	if !task.HasTag("backend") {
+		t.Error("expected HasTag to find existing tag")
+	}
+	if task.HasTag("IDEA-AGENT") {
+		t.Error("expected case-sensitive tag matching")
+	}
+	if !task.HasTag("idea-agent") {
+		t.Error("expected HasTag to find second tag")
+	}
+	if task.HasTag("frontend") {
+		t.Error("expected HasTag to return false for missing tag")
+	}
+}

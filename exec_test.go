@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -31,10 +33,32 @@ func TestParseExecConfig_SandboxMode(t *testing.T) {
 	}
 }
 
-func TestParseExecConfig_SandboxRejectsPrefix(t *testing.T) {
-	_, err := parseExecConfig([]string{"--sandbox", "claude", "249e9c9c"}, []string{"bash"})
+func TestParseExecConfig_SandboxModeAllowsCommand(t *testing.T) {
+	cfg, err := parseExecConfig([]string{"--sandbox", "claude", "sh", "-c", "echo", "hi"}, []string{"bash"})
+	if err != nil {
+		t.Fatalf("parseExecConfig returned error: %v", err)
+	}
+	if cfg.mode != execModeSandbox {
+		t.Fatalf("expected sandbox mode, got %v", cfg.mode)
+	}
+	if cfg.sandbox != "claude" {
+		t.Fatalf("expected sandbox claude, got %q", cfg.sandbox)
+	}
+	want := []string{"sh", "-c", "echo", "hi"}
+	if len(cfg.command) != len(want) {
+		t.Fatalf("expected command %v, got %v", want, cfg.command)
+	}
+	for i, wantCommand := range want {
+		if cfg.command[i] != wantCommand {
+			t.Fatalf("command[%d] = %q, want %q", i, cfg.command[i], wantCommand)
+		}
+	}
+}
+
+func TestParseExecConfig_SandboxRejectsInvalidRuntime(t *testing.T) {
+	_, err := parseExecConfig([]string{"--sandbox", "llama"}, []string{"bash"})
 	if err == nil {
-		t.Fatal("expected error when prefix is provided in sandbox mode")
+		t.Fatal("expected error for invalid runtime")
 	}
 }
 
@@ -147,5 +171,72 @@ func TestResolveContainerByPrefixMultipleContainersOneMatch(t *testing.T) {
 	}
 	if got != "wallfacer-fix-bug-55667788" {
 		t.Fatalf("expected %q, got %q", "wallfacer-fix-bug-55667788", got)
+	}
+}
+
+func TestBuildSandboxExecArgs_UsesDefaultWorkspaceMount(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, ".env"), []byte("CLAUDE_CODE_OAUTH_TOKEN=x"), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	t.Setenv("HOME", tmp)
+	t.Chdir(tmp)
+	base := filepath.Base(tmp)
+
+	args, err := buildSandboxExecArgs("/usr/bin/podman", tmp, "claude", []string{"bash"})
+	if err != nil {
+		t.Fatalf("buildSandboxExecArgs: %v", err)
+	}
+
+	got := strings.Join(args, " ")
+	if !strings.Contains(got, "--env-file "+filepath.Join(tmp, ".env")) {
+		t.Fatalf("expected env-file arg, got %q", got)
+	}
+	if !strings.Contains(got, "-v claude-config:/home/claude/.claude") {
+		t.Fatalf("expected claude config mount, got %q", got)
+	}
+	if !strings.Contains(got, "-v "+tmp+":/workspace/"+base+":z") {
+		t.Fatalf("expected repository workspace mount, got %q", got)
+	}
+}
+
+func TestBuildSandboxExecArgs_UsesCodexAuthWhenAvailable(t *testing.T) {
+	tmp := t.TempDir()
+	authDir := filepath.Join(tmp, ".codex")
+	if err := os.MkdirAll(authDir, 0o755); err != nil {
+		t.Fatalf("mkdir codex: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(authDir, "auth.json"), []byte(`{"access_token":"abc"}`), 0o600); err != nil {
+		t.Fatalf("write auth.json: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, ".env"), []byte("CLAUDE_CODE_OAUTH_TOKEN=x"), 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	t.Setenv("HOME", tmp)
+	t.Chdir(tmp)
+	base := filepath.Base(tmp)
+
+	args, err := buildSandboxExecArgs("/usr/bin/podman", tmp, "codex", []string{"echo", "hi"})
+	if err != nil {
+		t.Fatalf("buildSandboxExecArgs: %v", err)
+	}
+
+	got := strings.Join(args, " ")
+	expectedWorkspaceMount := "-v " + tmp + ":/workspace/" + filepath.Base(tmp) + ":z"
+	if !strings.Contains(got, expectedWorkspaceMount) {
+		t.Fatalf("expected workspace mount, got %q", got)
+	}
+	if !strings.Contains(got, "-v "+authDir+":/home/codex/.codex:z,ro") {
+		t.Fatalf("expected codex auth mount, got %q", got)
+	}
+	if !strings.Contains(got, "-v "+tmp+":/workspace/"+base+":z") {
+		t.Fatalf("expected repository workspace mount, got %q", got)
+	}
+}
+
+func TestResolveSandboxImageForExec_ClonesDockerImageTagAndDigest(t *testing.T) {
+	got := resolveSandboxImageForExec("ghcr.io/acme/wallfacer:latest@sha256:12345", "codex")
+	if got != "ghcr.io/acme/wallfacer-codex:latest@sha256:12345" {
+		t.Fatalf("expected converted digest image, got %q", got)
 	}
 }

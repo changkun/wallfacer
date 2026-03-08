@@ -112,7 +112,10 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 			}
 			cfg.mode = execModeSandbox
 			cfg.sandbox = strings.ToLower(strings.TrimSpace(positional[i+1]))
-			positional = append(positional[:i], positional[i+2:]...)
+			if i+2 < len(positional) {
+				cfg.command = append(cfg.command[:0], positional[i+2:]...)
+			}
+			positional = positional[:0]
 			break
 		}
 	}
@@ -122,7 +125,7 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 		if cfg.sandbox != "claude" && cfg.sandbox != "codex" {
 			return nil, fmt.Errorf("invalid sandbox %q (use claude or codex)", cfg.sandbox)
 		}
-		if len(positional) > 0 {
+		if len(positional) > 0 && len(cfg.command) == 1 && cfg.command[0] == "bash" {
 			return nil, fmt.Errorf("task prefix is not allowed in --sandbox mode")
 		}
 	default:
