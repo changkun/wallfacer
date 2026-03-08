@@ -1,8 +1,3 @@
-# CLAUDE.md (Legacy Alias)
+# CLAUDE.md
 
-This repository now uses `AGENTS.md` as the canonical agent-instructions file.
-
-For compatibility, Claude workflows can still read this file, but the source of
-truth is:
-
-- `AGENTS.md`
+This file is an alias for [AGENTS.md](./AGENTS.md).
