@@ -18,12 +18,15 @@ const refinementTimeout = 30 * time.Minute
 
 // refinementPromptTemplate wraps the task prompt with instructions that
 // direct the sandbox agent to produce a spec without making code changes.
-// It takes three string arguments: task creation date, current date, and task prompt.
+// It takes five arguments: task creation date, current date, task age (days),
+// task status, and task prompt.
 const refinementPromptTemplate = `You are a task specification writer. DO NOT write any code or make any changes to files.
 
 <task_context>
 Task created: %s
 Current date: %s
+Task age: %d days
+Backlog status at refinement start: %s
 </task_context>
 
 Your goal is to explore the codebase and produce a detailed implementation specification for the following task:
@@ -33,15 +36,21 @@ Your goal is to explore the codebase and produce a detailed implementation speci
 </task>
 
 Instructions:
-1. Consider the task creation date and current date above. If significant time has passed, assess whether the task description is still accurate and relevant given the current state of the codebase. Note any parts that may be outdated or no longer applicable.
-2. Explore relevant parts of the codebase to understand context and existing patterns
-3. Identify the best implementation approach given what already exists
-4. Produce a comprehensive spec using this format:
+1. Consider the task creation date, current date, and task age above. If significant time has passed, assess whether the task description is still accurate and relevant given the current state of the codebase.
+2. Specifically evaluate whether this backlog task should still exist as-is, be rewritten, or be closed as obsolete/already-done.
+3. Note any parts of the task description that appear outdated, partially completed already, duplicated by another task, or no longer applicable.
+4. Explore relevant parts of the codebase to understand context and existing patterns
+5. Identify the best implementation approach given what already exists
+6. Produce a comprehensive spec using this format:
 
 # Implementation Spec
 
+## Backlog Validity Decision
+Validity Decision: [KEEP | REWRITE | CLOSE]
+[State one decision and 2-4 concrete reasons tied to repository findings.]
+
 ## Validity Assessment
-[Is the task still valid and relevant? Has the codebase changed in ways that make the task description outdated, partially done, or no longer needed? State clearly if the task should be reconsidered.]
+[Is the task still valid and relevant? Has the codebase changed in ways that make the task description outdated, partially done, duplicated, or no longer needed? State clearly what is outdated and what remains useful.]
 
 ## Objective
 [Clear statement of what needs to be achieved and why]
@@ -78,13 +87,7 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 		return
 	}
 
-	const dateLayout = "2006-01-02"
-	createdAt := task.CreatedAt.Format(dateLayout)
-	today := time.Now().Format(dateLayout)
-	prompt := fmt.Sprintf(refinementPromptTemplate, createdAt, today, task.Prompt)
-	if strings.TrimSpace(userInstructions) != "" {
-		prompt += "\n\nAdditional focus from the user:\n<user_instructions>\n" + strings.TrimSpace(userInstructions) + "\n</user_instructions>"
-	}
+	prompt := buildRefinementPrompt(task, userInstructions, time.Now())
 
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "refinement", Label: "refinement"})
 	output, _, _, err := r.runRefinementContainer(ctx, taskID, prompt, "", r.sandboxForTaskActivity(task, activityRefinement))
@@ -112,6 +115,23 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
 
 	logger.Runner.Info("refinement complete", "task", taskID)
+}
+
+func buildRefinementPrompt(task *store.Task, userInstructions string, now time.Time) string {
+	const dateLayout = "2006-01-02"
+	createdAt := task.CreatedAt.Format(dateLayout)
+	today := now.Format(dateLayout)
+
+	ageDays := int(now.Sub(task.CreatedAt).Hours() / 24)
+	if ageDays < 0 {
+		ageDays = 0
+	}
+
+	prompt := fmt.Sprintf(refinementPromptTemplate, createdAt, today, ageDays, task.Status, task.Prompt)
+	if strings.TrimSpace(userInstructions) != "" {
+		prompt += "\n\nAdditional focus from the user:\n<user_instructions>\n" + strings.TrimSpace(userInstructions) + "\n</user_instructions>"
+	}
+	return prompt
 }
 
 // buildRefinementContainerArgs builds container args for a read-only refinement
