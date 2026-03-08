@@ -37,18 +37,19 @@ done
 
 LAST_MSG_FILE="/tmp/codex-last-message.txt"
 STDERR_FILE="/tmp/codex-stderr.txt"
-rm -f "$LAST_MSG_FILE" "$STDERR_FILE"
+STREAM_FILE="/tmp/codex-stream.jsonl"
+rm -f "$LAST_MSG_FILE" "$STDERR_FILE" "$STREAM_FILE"
 
-CODEX_ARGS=(exec --full-auto --sandbox workspace-write --skip-git-repo-check --output-last-message "$LAST_MSG_FILE" --color never)
+CODEX_ARGS=(exec --full-auto --sandbox workspace-write --skip-git-repo-check --json --output-last-message "$LAST_MSG_FILE" --color never)
 if [ -n "$MODEL" ]; then
     CODEX_ARGS+=(--model "$MODEL")
 fi
 
-# Run codex, capturing stdout separately from stderr. The final agent message is
-# written to LAST_MSG_FILE; stderr is fallback context for errors.
+# Run codex in streaming JSON mode. Stdout is both forwarded (for live logs)
+# and captured to STREAM_FILE for fallback parsing; stderr is captured separately.
 set +e
-STDOUT_OUTPUT=$(codex "${CODEX_ARGS[@]}" "$PROMPT" 2>"$STDERR_FILE")
-EXIT_CODE=$?
+codex "${CODEX_ARGS[@]}" "$PROMPT" 2>"$STDERR_FILE" | tee "$STREAM_FILE"
+EXIT_CODE=${PIPESTATUS[0]}
 set -e
 
 IS_ERROR="false"
@@ -57,8 +58,8 @@ STOP_REASON="end_turn"
 OUTPUT=""
 if [ -s "$LAST_MSG_FILE" ]; then
     OUTPUT=$(cat "$LAST_MSG_FILE")
-elif [ -n "$STDOUT_OUTPUT" ]; then
-    OUTPUT="$STDOUT_OUTPUT"
+elif [ -s "$STREAM_FILE" ]; then
+    OUTPUT=$(tail -n 1 "$STREAM_FILE")
 elif [ -s "$STDERR_FILE" ]; then
     OUTPUT=$(cat "$STDERR_FILE")
 fi
