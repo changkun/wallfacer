@@ -24,7 +24,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	if task.Title != "" {
 		return
 	}
-	sandbox := r.sandboxForTask(task)
+	sandbox := r.sandboxForTaskActivity(task, activityTitle)
 	model := r.titleModelFromEnvForSandbox(sandbox)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

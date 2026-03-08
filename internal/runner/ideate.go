@@ -142,7 +142,13 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	args := r.buildIdeationContainerArgs(containerName, prompt)
+	sandbox := "claude"
+	if taskID != uuid.Nil {
+		if task, err := r.store.GetTask(context.Background(), taskID); err == nil {
+			sandbox = r.sandboxForTaskActivity(task, activityIdeaAgent)
+		}
+	}
+	args := r.buildIdeationContainerArgs(containerName, prompt, sandbox)
 
 	cmd := exec.CommandContext(ctx, r.command, args...)
 	var stdout, stderr bytes.Buffer
@@ -187,14 +193,14 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 // buildIdeationContainerArgs builds the container run arguments for the
 // ideation agent. Workspaces are mounted read-only; no task label, no
 // worktrees, and no board context are used.
-func (r *Runner) buildIdeationContainerArgs(containerName, prompt string) []string {
+func (r *Runner) buildIdeationContainerArgs(containerName, prompt, sandbox string) []string {
 	args := []string{"run", "--rm", "--network=host", "--name", containerName}
 
 	if r.envFile != "" {
 		args = append(args, "--env-file", r.envFile)
 	}
 
-	if m := r.modelFromEnv(); m != "" {
+	if m := r.modelFromEnvForSandbox(sandbox); m != "" {
 		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
 	}
 
@@ -230,7 +236,7 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt string) []stri
 	}
 	args = append(args, "-w", workdir, r.sandboxImage)
 	args = append(args, "-p", prompt, "--verbose", "--output-format", "stream-json")
-	if m := r.modelFromEnv(); m != "" {
+	if m := r.modelFromEnvForSandbox(sandbox); m != "" {
 		args = append(args, "--model", m)
 	}
 

@@ -512,7 +512,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 	sandbox := "claude"
 	model := ""
 	if task != nil {
-		sandbox = r.sandboxForTask(task)
+		sandbox = r.sandboxForTaskActivity(task, activityOversight)
 	}
 	model = r.titleModelFromEnvForSandbox(sandbox)
 

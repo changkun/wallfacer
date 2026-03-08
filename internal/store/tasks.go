@@ -116,6 +116,32 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 	return &ret, nil
 }
 
+func normalizeSandboxByActivity(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+	allowed := make(map[string]struct{}, len(SandboxActivities))
+	for _, key := range SandboxActivities {
+		allowed[key] = struct{}{}
+	}
+	out := make(map[string]string)
+	for k, v := range input {
+		key := strings.ToLower(strings.TrimSpace(k))
+		if _, ok := allowed[key]; !ok {
+			continue
+		}
+		val := strings.ToLower(strings.TrimSpace(v))
+		if val == "" {
+			continue
+		}
+		out[key] = val
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 // DeleteTask removes a task and all its on-disk data.
 func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
 	s.mu.Lock()
@@ -328,7 +354,7 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 }
 
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, and mount_worktrees for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, _ *string) error {
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[string]string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -348,6 +374,28 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 	if mountWorktrees != nil {
 		t.MountWorktrees = *mountWorktrees
 	}
+	if sandboxByActivity != nil {
+		t.SandboxByActivity = normalizeSandboxByActivity(*sandboxByActivity)
+	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
+}
+
+// UpdateTaskSandboxByActivity stores task sandbox overrides by activity key.
+// Passing an empty map clears the override map.
+func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.SandboxByActivity = normalizeSandboxByActivity(sandboxByActivity)
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err

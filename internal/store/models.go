@@ -61,6 +61,26 @@ const (
 	TaskKindIdeaAgent TaskKind = "idea-agent" // brainstorm / ideation task
 )
 
+const (
+	SandboxActivityImplementation = "implementation"
+	SandboxActivityTesting        = "testing"
+	SandboxActivityRefinement     = "refinement"
+	SandboxActivityTitle          = "title"
+	SandboxActivityOversight      = "oversight"
+	SandboxActivityCommitMessage  = "commit_message"
+	SandboxActivityIdeaAgent      = "idea_agent"
+)
+
+var SandboxActivities = []string{
+	SandboxActivityImplementation,
+	SandboxActivityTesting,
+	SandboxActivityRefinement,
+	SandboxActivityTitle,
+	SandboxActivityOversight,
+	SandboxActivityCommitMessage,
+	SandboxActivityIdeaAgent,
+}
+
 // TaskStatus represents the lifecycle state of a task.
 type TaskStatus string
 
@@ -92,6 +112,7 @@ type Task struct {
 	Timeout        int                  `json:"timeout"`
 	Usage          TaskUsage            `json:"usage"`
 	Sandbox        string               `json:"sandbox,omitempty"`
+	SandboxByActivity map[string]string `json:"sandbox_by_activity,omitempty"`
 	// UsageBreakdown tracks token/cost per sub-agent activity (e.g. "implementation",
 	// "test", "title", "oversight", "oversight-test", "refinement").
 	UsageBreakdown map[string]TaskUsage `json:"usage_breakdown,omitempty"`
