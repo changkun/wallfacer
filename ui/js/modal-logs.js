@@ -43,19 +43,45 @@ function setLogsMode(mode) {
 }
 
 function startLogStream(id) {
-  const task = tasks.find(t => t.id === id);
-  logsMode = (task && (task.status === 'done' || task.status === 'waiting')) ? 'oversight' : 'pretty';
+  logsMode = 'pretty';
   oversightData = null;
-  oversightFetching = false;
+  // Pre-fetch oversight to decide the default view: switch to oversight only if
+  // a ready summary already exists.
+  oversightFetching = true;
+  fetch('/api/tasks/' + id + '/oversight')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (currentTaskId !== id) return;
+      oversightData = data;
+      oversightFetching = false;
+      if (data.status === 'ready') {
+        logsMode = 'oversight';
+        renderLogs();
+      }
+    })
+    .catch(function() { oversightFetching = false; });
   _fetchLogs(id);
 }
 
 // Fetch implementation-phase logs once (no reconnect — they are static by the
 // time the test agent runs).
 function startImplLogFetch(id) {
-  logsMode = 'oversight';
+  logsMode = 'pretty';
   oversightData = null;
-  oversightFetching = false;
+  // Pre-fetch oversight to decide default view.
+  oversightFetching = true;
+  fetch('/api/tasks/' + id + '/oversight')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (currentTaskId !== id) return;
+      oversightData = data;
+      oversightFetching = false;
+      if (data.status === 'ready') {
+        logsMode = 'oversight';
+        renderLogs();
+      }
+    })
+    .catch(function() { oversightFetching = false; });
   rawLogBuffer = '';
   document.getElementById('modal-logs').innerHTML = '';
   const decoder = new TextDecoder();
@@ -108,10 +134,22 @@ function setTestLogsMode(mode) {
 }
 
 function startTestLogStream(id) {
-  const task = tasks.find(t => t.id === id);
-  testLogsMode = (task && (task.status === 'done' || task.status === 'waiting')) ? 'oversight' : 'pretty';
+  testLogsMode = 'pretty';
   testOversightData = null;
-  testOversightFetching = false;
+  // Pre-fetch test oversight to decide default view.
+  testOversightFetching = true;
+  fetch('/api/tasks/' + id + '/oversight/test')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (currentTaskId !== id) return;
+      testOversightData = data;
+      testOversightFetching = false;
+      if (data.status === 'ready') {
+        testLogsMode = 'oversight';
+        renderTestLogs();
+      }
+    })
+    .catch(function() { testOversightFetching = false; });
   _fetchTestLogs(id);
 }
 
