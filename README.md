@@ -11,7 +11,7 @@
 Wallfacer is a task-board orchestration system for autonomous coding agents.  
 Create tasks, run them in isolated sandboxes, review diffs, and keep shipping with minimal manual overhead.
 
-![Wallfacer teaser](./images/usage.png)
+![Wallfacer teaser](./images/overview.png)
 
 ## Why Wallfacer
 
