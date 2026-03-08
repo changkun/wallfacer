@@ -606,6 +606,95 @@ func TestIdeationTaskExcludesDoneAndFailedFromContext(t *testing.T) {
 	}
 }
 
+// TestExtractIdeasRejectsPromptEqualsTitle verifies that extractIdeas filters
+// out ideas where the prompt is identical to the title (case-insensitive). This
+// is the degenerate output seen in session bd202e3f where the agent copied each
+// title into its prompt field instead of writing an implementation spec.
+func TestExtractIdeasRejectsPromptEqualsTitle(t *testing.T) {
+	// All three ideas have prompt == title — none should pass the filter.
+	raw := `[
+		{"title": "Batch Task Creation API",        "category": "backend / API",           "prompt": "Batch Task Creation API"},
+		{"title": "Execution Environment Provenance","category": "observability / debugging","prompt": "Execution Environment Provenance"},
+		{"title": "Scheduled Task Auto-Promotion",  "category": "product feature",          "prompt": "Scheduled Task Auto-Promotion"}
+	]`
+	ideas, err := extractIdeas(raw)
+	if err == nil {
+		t.Fatalf("expected error when all prompts equal their titles, got %d ideas", len(ideas))
+	}
+	if len(ideas) != 0 {
+		t.Errorf("expected 0 ideas, got %d", len(ideas))
+	}
+}
+
+// TestExtractIdeasPartiallyRejectsPromptEqualsTitle verifies that valid ideas
+// are still returned when only some entries have prompt == title.
+func TestExtractIdeasPartiallyRejectsPromptEqualsTitle(t *testing.T) {
+	raw := `[
+		{"title": "Add tests",  "category": "test coverage", "prompt": "Add tests"},
+		{"title": "Fix bug",    "category": "backend / API", "prompt": "Reproduce and fix the nil-pointer in handler/tasks.go:82 by adding a guard before the dereference."},
+		{"title": "Refactor auth","category": "code quality","prompt": "Refactor auth"}
+	]`
+	ideas, err := extractIdeas(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ideas) != 1 {
+		t.Fatalf("expected 1 valid idea (only the non-degenerate entry), got %d", len(ideas))
+	}
+	if ideas[0].Title != "Fix bug" {
+		t.Errorf("expected surviving idea to be 'Fix bug', got %q", ideas[0].Title)
+	}
+}
+
+// TestIdeationTaskFailsWhenAllPromptsEqualTitles verifies that when the
+// brainstorm agent returns JSON where every prompt equals its title, the
+// idea-agent task transitions to "failed" rather than silently creating tasks
+// with no implementation details. This reproduces the bd202e3f regression.
+func TestIdeationTaskFailsWhenAllPromptsEqualTitles(t *testing.T) {
+	// Construct output where each prompt is identical to its title — the
+	// degenerate case observed in the bug report.
+	degenerateIdeas := []IdeateResult{
+		{Title: "Batch Task Creation API", Prompt: "Batch Task Creation API"},
+		{Title: "Execution Environment Provenance", Prompt: "Execution Environment Provenance"},
+		{Title: "Scheduled Task Auto-Promotion", Prompt: "Scheduled Task Auto-Promotion"},
+	}
+	cmd := fakeCmdScript(t, ideaOutput(degenerateIdeas), 0)
+	s, r := setupRunnerWithCmd(t, nil, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Analyzes the workspace and proposes 3 actionable improvements.", 5, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "", "", false)
+
+	updated, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The brainstorm should fail loudly, not silently succeed with empty tasks.
+	if updated.Status != store.TaskStatusFailed {
+		t.Fatalf("expected status=failed when all prompts equal their titles, got %q", updated.Status)
+	}
+
+	// No child tasks should have been created.
+	allTasks, err := s.ListTasks(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range allTasks {
+		if tt.ID == task.ID {
+			continue
+		}
+		if tt.HasTag("idea-agent") {
+			t.Errorf("unexpected child task created: %q (prompt=%q, executionPrompt=%q)", tt.Title, tt.Prompt, tt.ExecutionPrompt)
+		}
+	}
+}
+
 // TestIdeationTaskContainerErrorTransitionsToFailed verifies that when the
 // brainstorm container fails (empty output, non-zero exit), the idea-agent
 // task transitions to "failed".

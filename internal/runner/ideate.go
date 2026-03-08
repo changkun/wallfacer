@@ -354,10 +354,10 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		}
 		// Store the full implementation prompt separately so the sandbox agent
 		// receives the complete details even though the card only shows the title.
-		if idea.Prompt != "" && idea.Prompt != cardPrompt {
-			if err := r.store.UpdateTaskExecutionPrompt(bgCtx, newTask.ID, idea.Prompt); err != nil {
-				logger.Runner.Warn("ideation task: set execution prompt", "task", newTask.ID, "error", err)
-			}
+		// extractIdeas guarantees idea.Prompt is non-empty and differs from the
+		// title, so no additional guard is needed here.
+		if err := r.store.UpdateTaskExecutionPrompt(bgCtx, newTask.ID, idea.Prompt); err != nil {
+			logger.Runner.Warn("ideation task: set execution prompt", "task", newTask.ID, "error", err)
 		}
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Created idea task: %s", idea.Title),
@@ -435,14 +435,24 @@ func extractIdeas(text string) ([]IdeateResult, error) {
 	}
 
 	// Filter out any malformed entries.
+	// An idea where prompt equals the title is a degenerate output: the agent
+	// copied the title into the prompt field instead of writing an implementation
+	// spec. Reject these so runIdeationTask fails loudly rather than silently
+	// creating tasks with no actionable implementation details.
 	var valid []IdeateResult
 	for _, r := range results {
-		if strings.TrimSpace(r.Title) != "" && strings.TrimSpace(r.Prompt) != "" {
-			valid = append(valid, r)
+		title := strings.TrimSpace(r.Title)
+		prompt := strings.TrimSpace(r.Prompt)
+		if title == "" || prompt == "" {
+			continue
 		}
+		if strings.EqualFold(title, prompt) {
+			continue // prompt is just the title — not a useful implementation spec
+		}
+		valid = append(valid, r)
 	}
 	if len(valid) == 0 {
-		return nil, fmt.Errorf("no valid ideas in parsed output")
+		return nil, fmt.Errorf("no valid ideas in parsed output (all entries were malformed or had prompt equal to title)")
 	}
 	return valid, nil
 }
