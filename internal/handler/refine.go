@@ -140,7 +140,7 @@ func (h *Handler) RefineApply(w http.ResponseWriter, r *http.Request, id uuid.UU
 	}
 
 	// Regenerate title for the updated prompt.
-	go h.runner.GenerateTitle(id, req.Prompt)
+	h.runner.GenerateTitleBackground(id, req.Prompt)
 
 	updated, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
