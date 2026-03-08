@@ -80,11 +80,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 		model = r.modelFromEnvForSandbox(sandbox)
 	}
 
-	spec := ContainerSpec{
-		Runtime: r.command,
-		Name:    containerName,
-		Image:   r.sandboxImageForSandbox(sandbox),
-	}
+	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
 
 	// Label the container with task metadata so the monitor can correlate
 	// containers to tasks by label rather than by parsing the container name.
@@ -94,24 +90,6 @@ func (r *Runner) buildContainerArgsForSandbox(
 			"wallfacer.task.prompt": truncate(prompt, 80),
 		}
 	}
-
-	if r.envFile != "" {
-		spec.EnvFile = r.envFile
-	}
-
-	// Inject CLAUDE_CODE_MODEL so subagent model selection also uses the
-	// configured model (not just the --model CLI flag which only affects
-	// the main session).
-	if model != "" {
-		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
-	}
-
-	// Mount agent config volume.
-	spec.Volumes = append(spec.Volumes, VolumeMount{
-		Host:      "claude-config",
-		Container: "/home/claude/.claude",
-	})
-	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
 
 	// Mount workspaces, substituting per-task worktree paths where available.
 	var basenames []string
@@ -157,15 +135,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 	// Mount workspace-level instructions file based on sandbox convention:
 	// - Claude sandbox expects /workspace/CLAUDE.md
 	// - Codex sandbox expects /workspace/AGENTS.md
-	if r.instructionsPath != "" {
-		if _, err := os.Stat(r.instructionsPath); err == nil {
-			spec.Volumes = append(spec.Volumes, VolumeMount{
-				Host:      r.instructionsPath,
-				Container: "/workspace/" + instructionsFilenameForSandbox(sandbox),
-				Options:   "z,ro",
-			})
-		}
-	}
+	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sandbox)
 
 	// Board context: mount board.json read-only at /workspace/.tasks/.
 	if boardDir != "" {
@@ -205,17 +175,10 @@ func (r *Runner) buildContainerArgsForSandbox(
 	// When there is exactly one workspace, set CWD directly into it so
 	// Claude operates in the repo directory by default. For multiple
 	// workspaces keep CWD at /workspace so all repos are accessible.
-	workdir := "/workspace"
-	if len(basenames) == 1 {
-		workdir = "/workspace/" + basenames[0]
-	}
-	spec.WorkDir = workdir
+	spec.WorkDir = workdirForBasenames(basenames)
 
 	// Build the agent command: prompt, verbosity flags, optional model, optional resume.
-	spec.Cmd = []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
-	if model != "" {
-		spec.Cmd = append(spec.Cmd, "--model", model)
-	}
+	spec.Cmd = buildAgentCmd(prompt, model)
 	if sessionID != "" {
 		spec.Cmd = append(spec.Cmd, "--resume", sessionID)
 	}
@@ -230,6 +193,46 @@ func instructionsFilenameForSandbox(sandbox string) string {
 	return instructions.LegacyInstructionsFilename
 }
 
+// appendInstructionsMount adds the workspace-level instructions file as a
+// read-only bind mount (CLAUDE.md for claude, AGENTS.md for codex).
+// It is a no-op when instructionsPath is empty or does not exist on the host.
+// Both buildContainerArgsForSandbox and buildIdeationContainerArgs share this logic.
+func (r *Runner) appendInstructionsMount(volumes []VolumeMount, sandbox string) []VolumeMount {
+	if r.instructionsPath == "" {
+		return volumes
+	}
+	if _, err := os.Stat(r.instructionsPath); err != nil {
+		return volumes
+	}
+	return append(volumes, VolumeMount{
+		Host:      r.instructionsPath,
+		Container: "/workspace/" + instructionsFilenameForSandbox(sandbox),
+		Options:   "z,ro",
+	})
+}
+
+// workdirForBasenames returns the container working directory for the given set
+// of workspace basenames. A single workspace sets CWD into that workspace;
+// multiple workspaces keep CWD at /workspace so all repos are accessible.
+func workdirForBasenames(basenames []string) string {
+	if len(basenames) == 1 {
+		return "/workspace/" + basenames[0]
+	}
+	return "/workspace"
+}
+
+// buildAgentCmd returns the standard agent Cmd slice for the given prompt and
+// optional model. All sub-agent invocations follow this pattern:
+//
+//	-p <prompt> --verbose --output-format stream-json [--model <model>]
+func buildAgentCmd(prompt, model string) []string {
+	cmd := []string{"-p", prompt, "--verbose", "--output-format", "stream-json"}
+	if model != "" {
+		cmd = append(cmd, "--model", model)
+	}
+	return cmd
+}
+
 func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sandbox string) []VolumeMount {
 	if !strings.EqualFold(strings.TrimSpace(sandbox), "codex") {
 		return volumes
@@ -242,6 +245,36 @@ func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sandbox string) []V
 		})
 	}
 	return volumes
+}
+
+// buildBaseContainerSpec creates a ContainerSpec pre-populated with the
+// configuration shared across all sub-agent invocations:
+//   - Runtime, Name, and Image resolved from the configured sandbox
+//   - EnvFile (when configured)
+//   - CLAUDE_CODE_MODEL environment variable (when model is non-empty)
+//   - claude-config named volume for agent configuration persistence
+//   - Codex auth bind-mount (when sandbox=="codex" and the path exists on the host)
+//
+// Callers set Labels, additional Volumes (workspace directories, instructions
+// file, board context), WorkDir, and Cmd for their specific needs.
+func (r *Runner) buildBaseContainerSpec(containerName, model, sandbox string) ContainerSpec {
+	spec := ContainerSpec{
+		Runtime: r.command,
+		Name:    containerName,
+		Image:   r.sandboxImageForSandbox(sandbox),
+	}
+	if r.envFile != "" {
+		spec.EnvFile = r.envFile
+	}
+	if model != "" {
+		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
+	}
+	spec.Volumes = append(spec.Volumes, VolumeMount{
+		Host:      "claude-config",
+		Container: "/home/claude/.claude",
+	})
+	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
+	return spec
 }
 
 func (r *Runner) sandboxImageForSandbox(sandbox string) string {

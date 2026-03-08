@@ -33,28 +33,13 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	containerName := "wallfacer-title-" + taskID.String()[:8]
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	args := []string{"run", "--rm", "--network=host", "--name", containerName}
-	if r.envFile != "" {
-		args = append(args, "--env-file", r.envFile)
-	}
-	// Inject CLAUDE_CODE_MODEL so the agent uses the configured model.
-	if model != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
-	}
-	args = append(args, "-v", "claude-config:/home/claude/.claude")
-	if hostPath := r.hostCodexAuthPath(); strings.EqualFold(strings.TrimSpace(sandbox), "codex") && hostPath != "" {
-		args = append(args, "-v", hostPath+":/home/codex/.codex:z,ro")
-	}
-	args = append(args, r.sandboxImageForSandbox(sandbox))
+	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
 
 	titlePrompt := "Respond with ONLY a 2-5 word title that captures the main goal of the following task. " +
 		"No punctuation, no quotes, no explanation — just the title.\n\nTask:\n" + prompt
-	args = append(args, "-p", titlePrompt, "--output-format", "stream-json", "--verbose")
-	if model != "" {
-		args = append(args, "--model", model)
-	}
+	spec.Cmd = buildAgentCmd(titlePrompt, model)
 
-	cmd := exec.CommandContext(ctx, r.command, args...)
+	cmd := exec.CommandContext(ctx, r.command, spec.Build()...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

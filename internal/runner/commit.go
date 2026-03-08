@@ -268,19 +268,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	containerName := "wallfacer-commit-" + taskID.String()[:8]
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	args := []string{"run", "--rm", "--network=host", "--name", containerName}
-	if r.envFile != "" {
-		args = append(args, "--env-file", r.envFile)
-	}
-	// Inject CLAUDE_CODE_MODEL so the agent uses the configured model.
-	if model != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
-	}
-	args = append(args, "-v", "claude-config:/home/claude/.claude")
-	if hostPath := r.hostCodexAuthPath(); strings.EqualFold(strings.TrimSpace(sandbox), "codex") && hostPath != "" {
-		args = append(args, "-v", hostPath+":/home/codex/.codex:z,ro")
-	}
-	args = append(args, r.sandboxImageForSandbox(sandbox))
+	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
 
 	commitPrompt := "Write a git commit message for the following task and file changes.\n" +
 		"Rules:\n" +
@@ -298,12 +286,9 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	if recentLog != "" {
 		commitPrompt += "\nRecent commits (for style reference):\n" + recentLog
 	}
-	args = append(args, "-p", commitPrompt, "--output-format", "stream-json", "--verbose")
-	if model != "" {
-		args = append(args, "--model", model)
-	}
+	spec.Cmd = buildAgentCmd(commitPrompt, model)
 
-	cmd := exec.CommandContext(ctx, r.command, args...)
+	cmd := exec.CommandContext(ctx, r.command, spec.Build()...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

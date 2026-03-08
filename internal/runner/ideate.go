@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -224,20 +223,8 @@ func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
 // ideation agent. Workspaces are mounted read-only; no task label, no
 // worktrees, and no board context are used.
 func (r *Runner) buildIdeationContainerArgs(containerName, prompt, sandbox string) []string {
-	args := []string{"run", "--rm", "--network=host", "--name", containerName}
-
-	if r.envFile != "" {
-		args = append(args, "--env-file", r.envFile)
-	}
-
-	if m := r.modelFromEnvForSandbox(sandbox); m != "" {
-		args = append(args, "-e", "CLAUDE_CODE_MODEL="+m)
-	}
-
-	args = append(args, "-v", "claude-config:/home/claude/.claude")
-	if hostPath := r.hostCodexAuthPath(); strings.EqualFold(strings.TrimSpace(sandbox), "codex") && hostPath != "" {
-		args = append(args, "-v", hostPath+":/home/codex/.codex:z,ro")
-	}
+	model := r.modelFromEnvForSandbox(sandbox)
+	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
 
 	var basenames []string
 	if r.workspaces != "" {
@@ -253,27 +240,20 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt, sandbox strin
 			}
 			basenames = append(basenames, basename)
 			// Read-only mount: ideation should only read, not modify.
-			args = append(args, "-v", ws+":/workspace/"+basename+":z,ro")
+			spec.Volumes = append(spec.Volumes, VolumeMount{
+				Host:      ws,
+				Container: "/workspace/" + basename,
+				Options:   "z,ro",
+			})
 		}
 	}
 
-	if r.instructionsPath != "" {
-		if _, err := os.Stat(r.instructionsPath); err == nil {
-			args = append(args, "-v", r.instructionsPath+":/workspace/"+instructionsFilenameForSandbox(sandbox)+":z,ro")
-		}
-	}
+	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sandbox)
 
-	workdir := "/workspace"
-	if len(basenames) == 1 {
-		workdir = "/workspace/" + basenames[0]
-	}
-	args = append(args, "-w", workdir, r.sandboxImageForSandbox(sandbox))
-	args = append(args, "-p", prompt, "--verbose", "--output-format", "stream-json")
-	if m := r.modelFromEnvForSandbox(sandbox); m != "" {
-		args = append(args, "--model", m)
-	}
+	spec.WorkDir = workdirForBasenames(basenames)
+	spec.Cmd = buildAgentCmd(prompt, model)
 
-	return args
+	return spec.Build()
 }
 
 // runIdeationTask executes the brainstorm agent for an idea-agent task card.
