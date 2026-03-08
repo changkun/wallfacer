@@ -42,6 +42,9 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
 	}
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
+	if hostPath := r.hostCodexAuthPath(); strings.EqualFold(strings.TrimSpace(sandbox), "codex") && hostPath != "" {
+		args = append(args, "-v", hostPath+":/home/codex/.codex:z,ro")
+	}
 	args = append(args, r.sandboxImage)
 
 	titlePrompt := "Respond with ONLY a 2-5 word title that captures the main goal of the following task. " +

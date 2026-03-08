@@ -202,6 +202,27 @@ func TestCreateTask_RejectsCodexWhenUntested(t *testing.T) {
 	}
 }
 
+func TestCreateTask_AllowsCodexWithHostAuthCache(t *testing.T) {
+	h, _, _ := newTestHandlerWithEnvAndCodexAuth(t)
+	h.setSandboxTestPassed("codex", true)
+
+	body := `{"prompt": "build a thing", "sandbox": "codex"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var task store.Task
+	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if task.Sandbox != "codex" {
+		t.Errorf("expected sandbox 'codex', got %q", task.Sandbox)
+	}
+}
+
 // TestUpdateTask_NotFound verifies that updating a non-existent task returns 404.
 func TestUpdateTask_NotFound(t *testing.T) {
 	h := newTestHandler(t)

@@ -20,15 +20,20 @@ func (h *Handler) sandboxUsable(sandbox string) (bool, string) {
 	if s != "codex" {
 		return true, ""
 	}
-	if h.envFile == "" {
-		return false, "Codex unavailable: env file is not configured."
+	hasHostAuth := h.runner != nil && h.runner.HasHostCodexAuth()
+	hasAPIKey := false
+	if h.envFile != "" {
+		cfg, err := envconfig.Parse(h.envFile)
+		if err != nil {
+			if !hasHostAuth {
+				return false, "Codex unavailable: failed to read env configuration."
+			}
+		} else {
+			hasAPIKey = strings.TrimSpace(cfg.OpenAIAPIKey) != ""
+		}
 	}
-	cfg, err := envconfig.Parse(h.envFile)
-	if err != nil {
-		return false, "Codex unavailable: failed to read env configuration."
-	}
-	if strings.TrimSpace(cfg.OpenAIAPIKey) == "" {
-		return false, "Codex unavailable: OPENAI_API_KEY is not configured."
+	if !hasAPIKey && !hasHostAuth {
+		return false, "Codex unavailable: configure OPENAI_API_KEY or provide host Codex auth cache (~/.codex/auth.json)."
 	}
 	if !h.sandboxTestPassedState("codex") {
 		return false, "Codex unavailable: run Settings -> API Configuration -> Test (Codex) first."

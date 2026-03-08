@@ -277,6 +277,9 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		args = append(args, "-e", "CLAUDE_CODE_MODEL="+model)
 	}
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
+	if hostPath := r.hostCodexAuthPath(); strings.EqualFold(strings.TrimSpace(sandbox), "codex") && hostPath != "" {
+		args = append(args, "-v", hostPath+":/home/codex/.codex:z,ro")
+	}
 	args = append(args, r.sandboxImage)
 
 	commitPrompt := "Write a git commit message for the following task and file changes.\n" +

@@ -58,7 +58,7 @@ func pickCategories(n int) []string {
 func buildIdeationPrompt(existingTasks []store.Task) string {
 	cats := pickCategories(3)
 	var sb strings.Builder
-sb.WriteString(`You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 improvements — each from a different assigned domain.
+	sb.WriteString(`You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 improvements — each from a different assigned domain.
 
 First, explore the workspace thoroughly:
 - Read README files, AGENTS.md (or legacy CLAUDE.md), go.mod, package.json, or similar project manifests
@@ -205,6 +205,9 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt, sandbox strin
 	}
 
 	args = append(args, "-v", "claude-config:/home/claude/.claude")
+	if hostPath := r.hostCodexAuthPath(); strings.EqualFold(strings.TrimSpace(sandbox), "codex") && hostPath != "" {
+		args = append(args, "-v", hostPath+":/home/codex/.codex:z,ro")
+	}
 
 	var basenames []string
 	if r.workspaces != "" {

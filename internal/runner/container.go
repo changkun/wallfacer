@@ -111,6 +111,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 		Host:      "claude-config",
 		Container: "/home/claude/.claude",
 	})
+	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
 
 	// Mount workspaces, substituting per-task worktree paths where available.
 	var basenames []string
@@ -227,6 +228,20 @@ func instructionsFilenameForSandbox(sandbox string) string {
 		return instructions.InstructionsFilename
 	}
 	return instructions.LegacyInstructionsFilename
+}
+
+func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sandbox string) []VolumeMount {
+	if !strings.EqualFold(strings.TrimSpace(sandbox), "codex") {
+		return volumes
+	}
+	if hostPath := r.hostCodexAuthPath(); hostPath != "" {
+		volumes = append(volumes, VolumeMount{
+			Host:      hostPath,
+			Container: "/home/codex/.codex",
+			Options:   "z,ro",
+		})
+	}
+	return volumes
 }
 
 // modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file (if configured).

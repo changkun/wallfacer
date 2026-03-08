@@ -103,6 +103,10 @@ func runServer(configDir string, args []string) {
 	}
 
 	resolvedImage := ensureImage(*containerCmd, *sandboxImage)
+	codexAuthPath := ""
+	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
+		codexAuthPath = filepath.Join(home, ".codex")
+	}
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:          *containerCmd,
@@ -111,6 +115,7 @@ func runServer(configDir string, args []string) {
 		Workspaces:       strings.Join(workspaces, " "),
 		WorktreesDir:     worktreesDir,
 		InstructionsPath: instructionsPath,
+		CodexAuthPath:    codexAuthPath,
 	})
 
 	r.PruneOrphanedWorktrees(s)

@@ -117,20 +117,20 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			resp := map[string]any{
-				"workspaces":        h.runner.Workspaces(),
-				"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
-				"sandboxes":         sandboxes,
-				"default_sandbox":   defaultSandboxName,
-				"sandbox_usable":    sandboxUsable,
-				"sandbox_reasons":   sandboxReasons,
+				"workspaces":         h.runner.Workspaces(),
+				"instructions_path":  instructions.FilePath(h.configDir, h.workspaces),
+				"sandboxes":          sandboxes,
+				"default_sandbox":    defaultSandboxName,
+				"sandbox_usable":     sandboxUsable,
+				"sandbox_reasons":    sandboxReasons,
 				"activity_sandboxes": cfg.SandboxByActivity(),
-				"autopilot":         h.AutopilotEnabled(),
-				"autotest":          h.AutotestEnabled(),
-				"autosubmit":        h.AutosubmitEnabled(),
-				"ideation":          h.IdeationEnabled(),
-				"ideation_running":  h.ideationRunning(r.Context()),
-				"ideation_interval": int(h.IdeationInterval().Minutes()),
-				"default_model":     defaultModel,
+				"autopilot":          h.AutopilotEnabled(),
+				"autotest":           h.AutotestEnabled(),
+				"autosubmit":         h.AutosubmitEnabled(),
+				"ideation":           h.IdeationEnabled(),
+				"ideation_running":   h.ideationRunning(r.Context()),
+				"ideation_interval":  int(h.IdeationInterval().Minutes()),
+				"default_model":      defaultModel,
 			}
 			if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 				resp["ideation_next_run"] = nextRun
@@ -153,22 +153,26 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"default_sandbox":   defaultSandboxName,
 		"sandbox_usable": map[string]bool{
 			"claude": true,
-			"codex":  false,
+			"codex":  true,
 		},
-		"sandbox_reasons": map[string]string{
-			"codex": "Codex unavailable: env file is not configured.",
-		},
+		"sandbox_reasons":    map[string]string{},
 		"activity_sandboxes": map[string]string{},
-		"autopilot":         h.AutopilotEnabled(),
-		"autotest":          h.AutotestEnabled(),
-		"autosubmit":        h.AutosubmitEnabled(),
-		"ideation":          h.IdeationEnabled(),
-		"ideation_running":  h.ideationRunning(r.Context()),
-		"ideation_interval": int(h.IdeationInterval().Minutes()),
-		"default_model":     defaultModel,
+		"autopilot":          h.AutopilotEnabled(),
+		"autotest":           h.AutotestEnabled(),
+		"autosubmit":         h.AutosubmitEnabled(),
+		"ideation":           h.IdeationEnabled(),
+		"ideation_running":   h.ideationRunning(r.Context()),
+		"ideation_interval":  int(h.IdeationInterval().Minutes()),
+		"default_model":      defaultModel,
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun
+	}
+	if ok, reason := h.sandboxUsable("codex"); !ok {
+		resp["sandbox_usable"].(map[string]bool)["codex"] = false
+		if reason != "" {
+			resp["sandbox_reasons"].(map[string]string)["codex"] = reason
+		}
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

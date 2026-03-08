@@ -34,6 +34,26 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 	return h, envPath
 }
 
+func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) {
+	t.Helper()
+	s, err := store.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	envPath := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envPath, []byte{}, 0644); err != nil {
+		t.Fatal(err)
+	}
+	codexAuthDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(codexAuthDir, "auth.json"), []byte(`{"auth_mode":"chatgpt"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath, CodexAuthPath: codexAuthDir})
+	t.Cleanup(r.WaitBackground)
+	h := NewHandler(s, r, t.TempDir(), nil)
+	return h, envPath, codexAuthDir
+}
+
 // TestUpdateEnvConfig_TriggersAutoPromote verifies that updating
 // max_parallel_tasks immediately triggers auto-promotion when autopilot is
 // enabled and there are backlog tasks waiting.
@@ -372,10 +392,10 @@ func TestTestSandbox_InvalidBaseURLRejected(t *testing.T) {
 
 func TestSandboxImageForTest_CodexResolution(t *testing.T) {
 	tests := []struct {
-		name     string
-		sandbox  string
-		inImage  string
-		want     string
+		name    string
+		sandbox string
+		inImage string
+		want    string
 	}{
 		{
 			name:    "codex uses wallfacer-codex default image",

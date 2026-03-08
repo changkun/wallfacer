@@ -543,6 +543,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 		Host:      "claude-config",
 		Container: "/home/claude/.claude",
 	})
+	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
 	// Note: oversight agent uses no workspace mounts, no instructions mount,
 	// no -w workdir, and the Cmd order is --output-format before --verbose.
 	spec.Cmd = []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}

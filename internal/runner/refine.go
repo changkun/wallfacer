@@ -151,7 +151,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 
 	if taskID != "" {
 		spec.Labels = map[string]string{
-			"wallfacer.task.id":    taskID,
+			"wallfacer.task.id":     taskID,
 			"wallfacer.task.refine": "true",
 		}
 	}
@@ -168,6 +168,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 		Host:      "claude-config",
 		Container: "/home/claude/.claude",
 	})
+	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
 
 	var basenames []string
 	if r.workspaces != "" {

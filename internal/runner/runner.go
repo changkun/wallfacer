@@ -3,7 +3,9 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -92,8 +94,8 @@ type containerJSON struct {
 	State     string            `json:"State"`
 	Status    string            `json:"Status"`
 	Created   any               `json:"Created"`
-	CreatedAt string            `json:"CreatedAt"`          // Docker uses CreatedAt (string) instead of Created
-	Labels    map[string]string `json:"Labels"`             // task metadata labels (wallfacer.task.id, etc.)
+	CreatedAt string            `json:"CreatedAt"` // Docker uses CreatedAt (string) instead of Created
+	Labels    map[string]string `json:"Labels"`    // task metadata labels (wallfacer.task.id, etc.)
 }
 
 // name extracts the container name from the Names field, handling both
@@ -271,25 +273,27 @@ type RunnerConfig struct {
 	Workspaces       string // space-separated workspace paths
 	WorktreesDir     string
 	InstructionsPath string
+	CodexAuthPath    string // host path to codex auth cache directory (default: ~/.codex)
 }
 
 // Runner orchestrates agent container execution for tasks.
 // It manages worktree isolation, container lifecycle, and the commit pipeline.
 type Runner struct {
-	store                *store.Store
-	command              string
-	sandboxImage         string
-	envFile              string
-	workspaces           string
-	worktreesDir         string
-	instructionsPath     string
-	worktreeMu       sync.Mutex // serializes all worktree filesystem operations on worktreesDir
-	repoMu           sync.Map   // per-repo *sync.Mutex for serializing rebase+merge
+	store            *store.Store
+	command          string
+	sandboxImage     string
+	envFile          string
+	workspaces       string
+	worktreesDir     string
+	instructionsPath string
+	codexAuthPath    string
+	worktreeMu       sync.Mutex         // serializes all worktree filesystem operations on worktreesDir
+	repoMu           sync.Map           // per-repo *sync.Mutex for serializing rebase+merge
 	taskContainers   *containerRegistry // taskID → container name
 	refineContainers *containerRegistry // taskID → refinement container name
 	ideateContainer  *containerRegistry // singleton: ideation container name
-	oversightMu      sync.Map   // taskID (string) → *sync.Mutex for serializing oversight generation
-	backgroundWg         trackedWg  // tracks fire-and-forget background goroutines
+	oversightMu      sync.Map           // taskID (string) → *sync.Mutex for serializing oversight generation
+	backgroundWg     trackedWg          // tracks fire-and-forget background goroutines
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -404,6 +408,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		workspaces:       cfg.Workspaces,
 		worktreesDir:     cfg.WorktreesDir,
 		instructionsPath: cfg.InstructionsPath,
+		codexAuthPath:    strings.TrimSpace(cfg.CodexAuthPath),
 		taskContainers:   &containerRegistry{},
 		refineContainers: &containerRegistry{},
 		ideateContainer:  &containerRegistry{},
@@ -435,12 +440,39 @@ func (r *Runner) SandboxImage() string {
 	return r.sandboxImage
 }
 
+// HasHostCodexAuth reports whether a usable host Codex auth cache exists.
+func (r *Runner) HasHostCodexAuth() bool {
+	return r.hostCodexAuthPath() != ""
+}
+
+// CodexAuthPath returns the validated host path used for codex auth cache
+// mounts, or an empty string when unavailable.
+func (r *Runner) CodexAuthPath() string {
+	return r.hostCodexAuthPath()
+}
+
 // Workspaces returns the list of configured workspace paths.
 func (r *Runner) Workspaces() []string {
 	if r.workspaces == "" {
 		return nil
 	}
 	return strings.Fields(r.workspaces)
+}
+
+func (r *Runner) hostCodexAuthPath() string {
+	path := strings.TrimSpace(r.codexAuthPath)
+	if path == "" {
+		return ""
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.IsDir() {
+		return ""
+	}
+	authFile := filepath.Join(path, "auth.json")
+	if stat, err := os.Stat(authFile); err == nil && !stat.IsDir() {
+		return path
+	}
+	return ""
 }
 
 // repoLock returns a per-repo mutex, creating one on first access.

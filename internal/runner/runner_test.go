@@ -265,6 +265,37 @@ func TestContainerArgsCodexMountsAGENTSMD(t *testing.T) {
 	}
 }
 
+func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
+	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
+	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	codexAuthDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(codexAuthDir, "auth.json"), []byte(`{"auth_mode":"chatgpt"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	runner := NewRunner(s, RunnerConfig{
+		Command:          "podman",
+		SandboxImage:     "wallfacer:latest",
+		InstructionsPath: instructionsFile,
+		CodexAuthPath:    codexAuthDir,
+	})
+	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
+
+	expectedMount := codexAuthDir + ":/home/codex/.codex:z,ro"
+	if !containsConsecutive(args, "-v", expectedMount) {
+		t.Fatalf("codex sandbox: expected host codex auth cache mount %q; got args: %v", expectedMount, args)
+	}
+}
+
 // TestContainerArgsCLAUDEMDMountPosition verifies that the CLAUDE.md mount
 // appears before the image name in the args list, matching the expected
 // container launch order.

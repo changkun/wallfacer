@@ -94,21 +94,21 @@ func validateBaseURL(u string) error {
 // envConfigResponse is the JSON representation of the env config sent to the UI.
 // Sensitive tokens are masked so they are never exposed in full over HTTP.
 type envConfigResponse struct {
-	OAuthToken        string `json:"oauth_token"`         // masked
-	APIKey            string `json:"api_key"`              // masked
-	BaseURL           string `json:"base_url"`
-	OpenAIAPIKey      string `json:"openai_api_key"`      // masked
-	OpenAIBaseURL     string `json:"openai_base_url"`
-	DefaultModel      string `json:"default_model"`
-	TitleModel        string `json:"title_model"`
-	CodexDefaultModel string `json:"codex_default_model"`
-	CodexTitleModel   string `json:"codex_title_model"`
-	DefaultSandbox    string `json:"default_sandbox"`
+	OAuthToken        string            `json:"oauth_token"` // masked
+	APIKey            string            `json:"api_key"`     // masked
+	BaseURL           string            `json:"base_url"`
+	OpenAIAPIKey      string            `json:"openai_api_key"` // masked
+	OpenAIBaseURL     string            `json:"openai_base_url"`
+	DefaultModel      string            `json:"default_model"`
+	TitleModel        string            `json:"title_model"`
+	CodexDefaultModel string            `json:"codex_default_model"`
+	CodexTitleModel   string            `json:"codex_title_model"`
+	DefaultSandbox    string            `json:"default_sandbox"`
 	SandboxByActivity map[string]string `json:"sandbox_by_activity,omitempty"`
-	MaxParallelTasks  int    `json:"max_parallel_tasks"`
-	OversightInterval int    `json:"oversight_interval"`
-	AutoPushEnabled   bool   `json:"auto_push_enabled"`
-	AutoPushThreshold int    `json:"auto_push_threshold"`
+	MaxParallelTasks  int               `json:"max_parallel_tasks"`
+	OversightInterval int               `json:"oversight_interval"`
+	AutoPushEnabled   bool              `json:"auto_push_enabled"`
+	AutoPushThreshold int               `json:"auto_push_threshold"`
 }
 
 type sandboxTestResponse struct {
@@ -121,19 +121,19 @@ type sandboxTestResponse struct {
 }
 
 type sandboxTestRequest struct {
-	Sandbox           *string `json:"sandbox"`
-	Timeout           *int    `json:"timeout"`
-	Prompt            *string `json:"prompt"`
-	OAuthToken        *string `json:"oauth_token"`
-	APIKey            *string `json:"api_key"`
-	BaseURL           *string `json:"base_url"`
-	OpenAIAPIKey      *string `json:"openai_api_key"`
-	OpenAIBaseURL     *string `json:"openai_base_url"`
-	DefaultModel      *string `json:"default_model"`
-	TitleModel        *string `json:"title_model"`
-	CodexDefaultModel *string `json:"codex_default_model"`
-	CodexTitleModel   *string `json:"codex_title_model"`
-	DefaultSandbox    *string `json:"default_sandbox"`
+	Sandbox           *string           `json:"sandbox"`
+	Timeout           *int              `json:"timeout"`
+	Prompt            *string           `json:"prompt"`
+	OAuthToken        *string           `json:"oauth_token"`
+	APIKey            *string           `json:"api_key"`
+	BaseURL           *string           `json:"base_url"`
+	OpenAIAPIKey      *string           `json:"openai_api_key"`
+	OpenAIBaseURL     *string           `json:"openai_base_url"`
+	DefaultModel      *string           `json:"default_model"`
+	TitleModel        *string           `json:"title_model"`
+	CodexDefaultModel *string           `json:"codex_default_model"`
+	CodexTitleModel   *string           `json:"codex_title_model"`
+	DefaultSandbox    *string           `json:"default_sandbox"`
 	SandboxByActivity map[string]string `json:"sandbox_by_activity"`
 }
 
@@ -262,7 +262,8 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		EnvFile:          tempEnvFile,
 		Workspaces:       strings.Join(h.workspaces, " "),
 		WorktreesDir:     h.runner.WorktreesDir(),
-		InstructionsPath:  h.runner.InstructionsPath(),
+		InstructionsPath: h.runner.InstructionsPath(),
+		CodexAuthPath:    h.runner.CodexAuthPath(),
 	})
 	probeRunner.Run(task.ID, prompt, "", false)
 
@@ -413,21 +414,21 @@ func testCodexImage(baseImage string) string {
 // as "no change" to prevent accidental token deletion.
 func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		OAuthToken        *string `json:"oauth_token"`
-		APIKey            *string `json:"api_key"`
-		BaseURL           *string `json:"base_url"`
-		OpenAIAPIKey      *string `json:"openai_api_key"`
-		OpenAIBaseURL     *string `json:"openai_base_url"`
-		DefaultModel      *string `json:"default_model"`
-		TitleModel        *string `json:"title_model"`
-		CodexDefaultModel *string `json:"codex_default_model"`
-		CodexTitleModel   *string `json:"codex_title_model"`
-		DefaultSandbox    *string `json:"default_sandbox"`
+		OAuthToken        *string           `json:"oauth_token"`
+		APIKey            *string           `json:"api_key"`
+		BaseURL           *string           `json:"base_url"`
+		OpenAIAPIKey      *string           `json:"openai_api_key"`
+		OpenAIBaseURL     *string           `json:"openai_base_url"`
+		DefaultModel      *string           `json:"default_model"`
+		TitleModel        *string           `json:"title_model"`
+		CodexDefaultModel *string           `json:"codex_default_model"`
+		CodexTitleModel   *string           `json:"codex_title_model"`
+		DefaultSandbox    *string           `json:"default_sandbox"`
 		SandboxByActivity map[string]string `json:"sandbox_by_activity"`
-		MaxParallelTasks  *int    `json:"max_parallel_tasks"`
-		OversightInterval *int    `json:"oversight_interval"`
-		AutoPushEnabled   *bool   `json:"auto_push_enabled"`
-		AutoPushThreshold *int    `json:"auto_push_threshold"`
+		MaxParallelTasks  *int              `json:"max_parallel_tasks"`
+		OversightInterval *int              `json:"oversight_interval"`
+		AutoPushEnabled   *bool             `json:"auto_push_enabled"`
+		AutoPushThreshold *int              `json:"auto_push_threshold"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
