@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
@@ -45,20 +46,38 @@ func ssrfHardenedTransport() *http.Transport {
 	}
 }
 func availableSandboxes(cfg envconfig.Config) []string {
+	sandboxSet := map[string]bool{}
 	var sandboxes []string
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || sandboxSet[name] {
+			return
+		}
+		sandboxSet[name] = true
+		sandboxes = append(sandboxes, name)
+	}
 	if cfg.DefaultModel != "" {
-		sandboxes = append(sandboxes, "claude")
+		add("claude")
 	}
 	if cfg.CodexDefaultModel != "" {
-		sandboxes = append(sandboxes, "codex")
+		add("codex")
+	}
+	if cfg.DefaultSandbox != "" {
+		add(cfg.DefaultSandbox)
+	}
+	for _, v := range cfg.SandboxByActivity() {
+		add(v)
 	}
 	if len(sandboxes) == 0 {
-		sandboxes = append(sandboxes, "claude")
+		add("claude")
 	}
 	return sandboxes
 }
 
 func defaultSandbox(cfg envconfig.Config) string {
+	if cfg.DefaultSandbox != "" {
+		return cfg.DefaultSandbox
+	}
 	if cfg.DefaultModel != "" {
 		return "claude"
 	}
@@ -92,6 +111,25 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 			defaultModel = cfg.DefaultModel
 			sandboxes = availableSandboxes(cfg)
 			defaultSandboxName = defaultSandbox(cfg)
+			resp := map[string]any{
+				"workspaces":        h.runner.Workspaces(),
+				"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
+				"sandboxes":         sandboxes,
+				"default_sandbox":   defaultSandboxName,
+				"activity_sandboxes": cfg.SandboxByActivity(),
+				"autopilot":         h.AutopilotEnabled(),
+				"autotest":          h.AutotestEnabled(),
+				"autosubmit":        h.AutosubmitEnabled(),
+				"ideation":          h.IdeationEnabled(),
+				"ideation_running":  h.ideationRunning(r.Context()),
+				"ideation_interval": int(h.IdeationInterval().Minutes()),
+				"default_model":     defaultModel,
+			}
+			if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
+				resp["ideation_next_run"] = nextRun
+			}
+			writeJSON(w, http.StatusOK, resp)
+			return
 		}
 	}
 	if len(sandboxes) == 0 {
@@ -106,6 +144,7 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
 		"sandboxes":         sandboxes,
 		"default_sandbox":   defaultSandboxName,
+		"activity_sandboxes": map[string]string{},
 		"autopilot":         h.AutopilotEnabled(),
 		"autotest":          h.AutotestEnabled(),
 		"autosubmit":        h.AutosubmitEnabled(),

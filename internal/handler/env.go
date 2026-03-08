@@ -103,6 +103,8 @@ type envConfigResponse struct {
 	TitleModel        string `json:"title_model"`
 	CodexDefaultModel string `json:"codex_default_model"`
 	CodexTitleModel   string `json:"codex_title_model"`
+	DefaultSandbox    string `json:"default_sandbox"`
+	SandboxByActivity map[string]string `json:"sandbox_by_activity,omitempty"`
 	MaxParallelTasks  int    `json:"max_parallel_tasks"`
 	OversightInterval int    `json:"oversight_interval"`
 	AutoPushEnabled   bool   `json:"auto_push_enabled"`
@@ -131,6 +133,8 @@ type sandboxTestRequest struct {
 	TitleModel        *string `json:"title_model"`
 	CodexDefaultModel *string `json:"codex_default_model"`
 	CodexTitleModel   *string `json:"codex_title_model"`
+	DefaultSandbox    *string `json:"default_sandbox"`
+	SandboxByActivity map[string]string `json:"sandbox_by_activity"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -158,6 +162,8 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		TitleModel:        cfg.TitleModel,
 		CodexDefaultModel: cfg.CodexDefaultModel,
 		CodexTitleModel:   cfg.CodexTitleModel,
+		DefaultSandbox:    cfg.DefaultSandbox,
+		SandboxByActivity: cfg.SandboxByActivity(),
 		MaxParallelTasks:  maxParallel,
 		OversightInterval: cfg.OversightInterval,
 		AutoPushEnabled:   cfg.AutoPushEnabled,
@@ -335,6 +341,13 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 	); err != nil {
 		return "", err
 	}
+	if err := envconfig.UpdateSandboxSettings(
+		tempFile.Name(),
+		req.DefaultSandbox,
+		req.SandboxByActivity,
+	); err != nil {
+		return "", err
+	}
 
 	return tempFile.Name(), nil
 }
@@ -405,6 +418,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		TitleModel        *string `json:"title_model"`
 		CodexDefaultModel *string `json:"codex_default_model"`
 		CodexTitleModel   *string `json:"codex_title_model"`
+		DefaultSandbox    *string `json:"default_sandbox"`
+		SandboxByActivity map[string]string `json:"sandbox_by_activity"`
 		MaxParallelTasks  *int    `json:"max_parallel_tasks"`
 		OversightInterval *int    `json:"oversight_interval"`
 		AutoPushEnabled   *bool   `json:"auto_push_enabled"`
@@ -503,6 +518,14 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		oversightInterval,
 		autoPush,
 		autoPushThreshold,
+	); err != nil {
+		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := envconfig.UpdateSandboxSettings(
+		h.envFile,
+		req.DefaultSandbox,
+		req.SandboxByActivity,
 	); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
