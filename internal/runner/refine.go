@@ -259,6 +259,19 @@ func (r *Runner) runRefinementContainer(
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 		})
+		if appErr := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+			Turn:                 1,
+			Timestamp:            time.Now().UTC(),
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+			Sandbox:              sandbox,
+			SubAgent:             "refinement",
+		}); appErr != nil {
+			logger.Runner.Warn("refinement: append turn usage failed", "task", taskID, "error", appErr)
+		}
 	}
 
 	return output, stdout.Bytes(), stderr.Bytes(), nil

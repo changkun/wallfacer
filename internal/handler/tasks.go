@@ -264,6 +264,21 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// GetTurnUsage returns the per-turn usage log for a task as a JSON array.
+func (h *Handler) GetTurnUsage(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid task id", http.StatusBadRequest)
+		return
+	}
+	records, err := h.store.GetTurnUsages(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, records)
+}
+
 // GetEvents returns the event timeline for a task.
 func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	events, err := h.store.GetEvents(r.Context(), id)

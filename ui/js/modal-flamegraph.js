@@ -79,6 +79,70 @@
     return null;
   }
 
+  // Build a cumulative cost SVG polyline from turn-usage records, aligned to agent_turn_N spans.
+  // Returns an HTML string (SVG element) or empty string if there is no data.
+  function buildCostChart(turnUsages, spans, globalStartMs, total) {
+    // Only include implementation/test turns (not sub-agent overhead).
+    var implTurns = turnUsages.filter(function(u) {
+      return u.sub_agent === 'implementation' || u.sub_agent === 'test';
+    });
+    if (implTurns.length === 0) return '';
+
+    // Build turn number → span end X-position mapping from agent_turn_N spans.
+    var turnXPct = {};
+    spans.forEach(function(span) {
+      var m = span.rawLabel.match(/^agent_turn:agent_turn_(\d+)$/);
+      if (m) {
+        var turnNum = parseInt(m[1], 10);
+        var xPct = total > 0 ? ((span.endMs - globalStartMs) / total * 100) : 0;
+        turnXPct[turnNum] = xPct;
+      }
+    });
+
+    // Compute cumulative cost points (start at 0).
+    var cumCost = 0;
+    var points = [{ xPct: 0, cost: 0 }];
+    implTurns.forEach(function(u) {
+      cumCost += (u.cost_usd || 0);
+      var xPct = turnXPct[u.turn];
+      if (xPct !== undefined) {
+        points.push({ xPct: xPct, cost: cumCost });
+      }
+    });
+    if (points.length < 2) return '';
+
+    var maxCost = points[points.length - 1].cost;
+    if (maxCost <= 0) return '';
+
+    var chartH = 48;
+    var padding = 4;
+    var innerH = chartH - padding * 2;
+
+    var polyPoints = points.map(function(p) {
+      var x = p.xPct.toFixed(3) + '%';
+      var y = (padding + innerH * (1 - p.cost / maxCost)).toFixed(1);
+      return x + ',' + y;
+    }).join(' ');
+
+    var totalLabel = '$' + maxCost.toFixed(4);
+    var lastPt = points[points.length - 1];
+    var lastX = lastPt.xPct.toFixed(3) + '%';
+    var lastY = padding.toFixed(1);
+
+    return '<div style="position:relative;width:100%;height:' + chartH + 'px;margin-top:4px;" ' +
+      'title="Cumulative cost across turns (impl/test only). Total: ' + escapeHtml(totalLabel) + '">' +
+      '<svg width="100%" height="' + chartH + '" style="display:block;overflow:visible;">' +
+      '<polyline points="' + escapeHtml(polyPoints) + '" ' +
+      'fill="none" stroke="hsl(200,60%,55%)" stroke-width="1.5" stroke-linejoin="round"/>' +
+      '<text x="' + escapeHtml(lastX) + '" y="' + lastY + '" ' +
+      'font-size="9" fill="hsl(200,60%,65%)" text-anchor="end" dy="-2">' +
+      escapeHtml(totalLabel) + '</text>' +
+      '</svg>' +
+      '<span style="position:absolute;left:0;top:' + padding + 'px;font-size:9px;' +
+      'color:var(--text-muted,#888);">cost</span>' +
+      '</div>';
+  }
+
   function loadFlamegraph(taskId) {
     var container = document.getElementById('modal-flamegraph-container');
     if (!container) return;
@@ -87,13 +151,16 @@
 
     var spansUrl = '/api/tasks/' + taskId + '/spans';
     var oversightUrl = '/api/tasks/' + taskId + '/oversight';
+    var turnUsageUrl = '/api/tasks/' + taskId + '/turn-usage';
 
     Promise.all([
       fetch(spansUrl).then(function(res) { return res.json(); }).catch(function() { return []; }),
       fetch(oversightUrl).then(function(res) { return res.json(); }).catch(function() { return null; }),
+      fetch(turnUsageUrl).then(function(res) { return res.json(); }).catch(function() { return []; }),
     ]).then(function(results) {
       var records = results[0];
       var oversightData = results[1];
+      var turnUsages = results[2] || [];
 
       var container = document.getElementById('modal-flamegraph-container');
       if (!container) return;
@@ -256,6 +323,8 @@
         '<tbody>' + rowsHtml + '</tbody>' +
         '</table>';
 
+      var costChartHtml = buildCostChart(turnUsages, spans, globalStartMs, total);
+
       container.innerHTML =
         '<div style="position:relative;width:100%;height:' + totalH + 'px;' +
         'margin-bottom:8px;">' +
@@ -266,11 +335,12 @@
         phaseBandHtml +
         blocksHtml +
         '</div>' +
+        costChartHtml +
         tableHtml;
     });
   }
 
   window.loadFlamegraph = loadFlamegraph;
   // Expose internals for testing
-  window._flamegraph = { labelHue: labelHue, assignLanes: assignLanes, computePhaseRegions: computePhaseRegions, findPhaseForSpan: findPhaseForSpan };
+  window._flamegraph = { labelHue: labelHue, assignLanes: assignLanes, computePhaseRegions: computePhaseRegions, findPhaseForSpan: findPhaseForSpan, buildCostChart: buildCostChart };
 })();

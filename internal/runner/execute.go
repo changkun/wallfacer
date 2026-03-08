@@ -266,6 +266,20 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 		})
+		if err := r.store.AppendTurnUsage(task.ID, store.TurnUsageRecord{
+			Turn:                 turns,
+			Timestamp:            time.Now().UTC(),
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+			StopReason:           output.StopReason,
+			Sandbox:              task.Sandbox,
+			SubAgent:             subAgent,
+		}); err != nil {
+			logger.Runner.Warn("append turn usage", "task", task.ID, "error", err)
+		}
 
 		if output.IsError {
 			statusSet = true
