@@ -144,7 +144,8 @@ async function createTask() {
     const timeout = parseInt(document.getElementById('new-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
     const mount_worktrees = document.getElementById('new-mount-worktrees').checked;
     const sandbox = document.getElementById('new-sandbox').value;
-    const newTask = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox }) });
+    const sandbox_by_activity = collectSandboxByActivity('new-sandbox-');
+    const newTask = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity }) });
     const dependsOn = getDepPickerValues('new-depends-on-picker');
     if (dependsOn.length > 0 && newTask && newTask.id) {
       await api('/api/tasks/' + newTask.id, { method: 'PATCH', body: JSON.stringify({ depends_on: dependsOn }) });
@@ -170,6 +171,7 @@ function showNewTaskForm() {
   if (sandboxSelect) {
     sandboxSelect.value = defaultSandbox || '';
   }
+  applySandboxByActivity('new-sandbox-', defaultSandboxByActivity || {});
   var depsRow = document.getElementById('new-depends-on-row');
   populateDependsOnPicker('new-depends-on-picker', null, []);
   if (depsRow) depsRow.style.display = tasks.length > 0 ? '' : 'none';
@@ -186,6 +188,7 @@ function hideNewTaskForm() {
   if (sandboxSelect) {
     sandboxSelect.value = defaultSandbox || '';
   }
+  applySandboxByActivity('new-sandbox-', {});
   var depPicker = document.getElementById('new-depends-on-picker');
   if (depPicker) {
     depPicker.querySelector('.dep-picker-list').innerHTML = '';
@@ -329,8 +332,9 @@ function scheduleBacklogSave() {
     const timeout = parseInt(document.getElementById('modal-edit-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
     const mount_worktrees = document.getElementById('modal-edit-mount-worktrees').checked;
     const sandbox = document.getElementById('modal-edit-sandbox').value;
+    const sandbox_by_activity = collectSandboxByActivity('modal-edit-sandbox-');
     const depends_on = getDepPickerValues('modal-edit-depends-on-picker');
-    const patchBody = { prompt, timeout, mount_worktrees, sandbox, depends_on };
+    const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on };
     try {
       await api(`/api/tasks/${currentTaskId}`, {
         method: 'PATCH',

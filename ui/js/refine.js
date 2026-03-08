@@ -273,11 +273,12 @@ async function applyRefinement() {
   try {
     // Save settings changes (sandbox, timeout, mount_worktrees) alongside the apply.
     const sandbox = document.getElementById('modal-edit-sandbox')?.value || '';
+    const sandboxByActivity = collectSandboxByActivity('modal-edit-sandbox-');
     const timeout = parseInt(document.getElementById('modal-edit-timeout')?.value, 10) || DEFAULT_TASK_TIMEOUT;
     const mountWorktrees = document.getElementById('modal-edit-mount-worktrees')?.checked || false;
     await api(`/api/tasks/${currentTaskId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ sandbox, timeout, mount_worktrees: mountWorktrees }),
+      body: JSON.stringify({ sandbox, sandbox_by_activity: sandboxByActivity, timeout, mount_worktrees: mountWorktrees }),
     });
 
     await api(`/api/tasks/${currentTaskId}/refine/apply`, {
