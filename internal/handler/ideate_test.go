@@ -12,10 +12,10 @@ import (
 
 // --- IdeationInterval state ---
 
-func TestIdeationInterval_DefaultIs15Minutes(t *testing.T) {
+func TestIdeationInterval_DefaultIs60Minutes(t *testing.T) {
 	h := newTestHandler(t)
-	if h.IdeationInterval() != 15*time.Minute {
-		t.Errorf("expected default interval=15m, got %v", h.IdeationInterval())
+	if h.IdeationInterval() != 60*time.Minute {
+		t.Errorf("expected default interval=60m, got %v", h.IdeationInterval())
 	}
 }
 

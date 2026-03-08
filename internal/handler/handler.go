@@ -54,7 +54,7 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		diffCache:        newDiffCache(),
 		startTime:        time.Now(),
 		ideationEnabled:  true,
-		ideationInterval: 15 * time.Minute,
+		ideationInterval: 60 * time.Minute,
 	}
 }
 
