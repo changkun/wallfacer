@@ -114,8 +114,9 @@ describe('renderDependencyGraph', () => {
     expect(appendedToBody).toHaveLength(1);
     const svg = appendedToBody[0];
 
-    // The SVG should contain at least one <path> child.
-    const paths = svg.children.filter(c => c.tagName === 'path');
+    // Paths live inside the <g> clip group, not directly on the SVG.
+    const g = svg.children.find(c => c.tagName === 'g');
+    const paths = g.children.filter(c => c.tagName === 'path');
     expect(paths).toHaveLength(1);
 
     // Done dependency → green stroke, solid line.
@@ -136,7 +137,8 @@ describe('renderDependencyGraph', () => {
     expect(appendedToBody).toHaveLength(1);
     const svg = appendedToBody[0];
 
-    const paths = svg.children.filter(c => c.tagName === 'path');
+    const g = svg.children.find(c => c.tagName === 'g');
+    const paths = g.children.filter(c => c.tagName === 'path');
     expect(paths).toHaveLength(1);
 
     // Failed dependency → red stroke, dashed line.
@@ -168,7 +170,8 @@ describe('renderDependencyGraph', () => {
     ctx.renderDependencyGraph(tasks);
 
     const svg = appendedToBody[0];
-    const paths = svg.children.filter(c => c.tagName === 'path');
+    const g = svg.children.find(c => c.tagName === 'g');
+    const paths = g.children.filter(c => c.tagName === 'path');
     expect(paths[0].attrs.stroke).toBe('#f59e0b');
     expect(paths[0].attrs['stroke-dasharray']).toBe('6,3');
   });
