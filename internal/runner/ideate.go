@@ -227,7 +227,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	taskID := task.ID
 
 	// Set a human-readable title on the idea-agent card.
-	title := "Brainstorm " + time.Now().Format("Jan 2, 2006")
+	title := "Brainstorm " + time.Now().Format("Jan 2, 2006 15:04")
 	r.store.UpdateTaskTitle(bgCtx, taskID, title)
 
 	// Generate the full ideation prompt (with randomly-picked domains) and

@@ -106,6 +106,10 @@ func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
 		logger.Handler.Warn("ideation: create idea-agent task", "error", err)
 		return nil
 	}
+	// Set the title immediately so the card always shows the date/time,
+	// even while the task is still in the backlog.
+	title := "Brainstorm " + time.Now().Format("Jan 2, 2006 15:04")
+	h.store.UpdateTaskTitle(ctx, task.ID, title)
 	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{
 		"to": string(store.TaskStatusBacklog),
 	})
