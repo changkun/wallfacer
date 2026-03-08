@@ -124,6 +124,18 @@ func ValidateTransition(from, to TaskStatus) error {
 	return fmt.Errorf("%w: %s → %s", ErrInvalidTransition, from, to)
 }
 
+// CanTransitionTo reports whether transitioning from s to next is permitted
+// by the task state machine.
+func (s TaskStatus) CanTransitionTo(next TaskStatus) bool {
+	return ValidateTransition(s, next) == nil
+}
+
+// AllowedTransitions returns the list of states reachable from s.
+// Returns nil if s has no outgoing transitions (e.g. terminal or unknown state).
+func (s TaskStatus) AllowedTransitions() []TaskStatus {
+	return allowedTransitions[s]
+}
+
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
 	ID             uuid.UUID           `json:"id"`
