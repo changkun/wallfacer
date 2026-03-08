@@ -203,9 +203,9 @@ async function openModal(id) {
       startLogStream(id);
     }
 
-    // Changes tab: show for waiting/failed/done tasks with worktrees
+    // Changes tab: show for committing/waiting/failed/done tasks with worktrees
     const changesTab = document.getElementById('right-tab-changes');
-    if ((task.status === 'waiting' || task.status === 'failed' || task.status === 'done') && hasWorktrees) {
+    if ((task.status === 'committing' || task.status === 'waiting' || task.status === 'failed' || task.status === 'done') && hasWorktrees) {
       if (changesTab) changesTab.classList.remove('hidden');
       const filesEl = document.getElementById('modal-diff-files');
       const behindEl = document.getElementById('modal-diff-behind');
