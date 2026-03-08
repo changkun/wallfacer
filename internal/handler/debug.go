@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"math"
 	"net/http"
 	"runtime"
+	"sort"
 	"time"
 )
 
@@ -26,6 +28,76 @@ type healthResponse struct {
 	TasksByStatus     map[string]int       `json:"tasks_by_status"`
 	RunningContainers runningContainerInfo `json:"running_containers"`
 	UptimeSeconds     float64              `json:"uptime_seconds"`
+}
+
+// phaseStats holds aggregate latency statistics for a single execution phase.
+type phaseStats struct {
+	Count int   `json:"count"`
+	MinMs int64 `json:"min_ms"`
+	P50Ms int64 `json:"p50_ms"`
+	P95Ms int64 `json:"p95_ms"`
+	P99Ms int64 `json:"p99_ms"`
+	MaxMs int64 `json:"max_ms"`
+}
+
+// spanStatsResponse is the JSON shape returned by GET /api/debug/spans.
+type spanStatsResponse struct {
+	Phases       map[string]phaseStats `json:"phases"`
+	TasksScanned int                   `json:"tasks_scanned"`
+	SpansTotal   int                   `json:"spans_total"`
+}
+
+// percentileIndex returns the slice index for the given percentile (0–100)
+// using the nearest-rank method, clamped to a valid range.
+// With N=1, all percentiles resolve to index 0 (the only element).
+func percentileIndex(n, pct int) int {
+	idx := int(math.Ceil(float64(pct)/100.0*float64(n))) - 1
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= n {
+		idx = n - 1
+	}
+	return idx
+}
+
+// GetSpanStats aggregates span timing data across all tasks (including archived)
+// and returns per-phase latency statistics (count, min, p50, p95, p99, max).
+func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
+	tasks, _ := h.store.ListTasks(r.Context(), true)
+	durations := make(map[string][]int64) // phase → []durationMs
+	spansTotal := 0
+
+	for _, t := range tasks {
+		events, err := h.store.GetEvents(r.Context(), t.ID)
+		if err != nil {
+			continue
+		}
+		for _, sr := range computeSpans(events) {
+			durations[sr.Phase] = append(durations[sr.Phase], sr.DurationMs)
+			spansTotal++
+		}
+	}
+
+	phases := make(map[string]phaseStats, len(durations))
+	for phase, ds := range durations {
+		sort.Slice(ds, func(i, j int) bool { return ds[i] < ds[j] })
+		n := len(ds)
+		phases[phase] = phaseStats{
+			Count: n,
+			MinMs: ds[0],
+			P50Ms: ds[percentileIndex(n, 50)],
+			P95Ms: ds[percentileIndex(n, 95)],
+			P99Ms: ds[percentileIndex(n, 99)],
+			MaxMs: ds[n-1],
+		}
+	}
+
+	writeJSON(w, http.StatusOK, spanStatsResponse{
+		Phases:       phases,
+		TasksScanned: len(tasks),
+		SpansTotal:   spansTotal,
+	})
 }
 
 // Health returns a lightweight operational health snapshot:

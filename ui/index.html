@@ -158,6 +158,12 @@
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Span Statistics</div>
+        <button onclick="closeSettings();showSpanStats()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">View Stats</button>
+        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Aggregate p50/p95/p99 latencies per execution phase across all tasks.</div>
+      </div>
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">About</div>
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
           <div style="width: 32px; height: 32px; border-radius: 7px; background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -305,6 +311,51 @@
 
       <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted);">
         <span id="container-monitor-updated"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Span Stats Modal -->
+<div id="span-stats-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+  <div class="modal-card" style="max-width: 720px; width: 100%; max-height: 85vh; display: flex; flex-direction: column;">
+    <div class="p-6" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Span Statistics</h3>
+        <button onclick="closeSpanStats()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
+      </div>
+
+      <div style="flex: 1; min-height: 0; overflow-y: auto;">
+        <!-- Loading state -->
+        <div id="span-stats-loading" style="display: flex; align-items: center; justify-content: center; padding: 32px; color: var(--text-muted); font-size: 13px;">
+          Loading…
+        </div>
+        <!-- Error state -->
+        <div id="span-stats-error" class="hidden" style="padding: 12px; background: #f5d5d5; border-radius: 6px; font-size: 12px; color: #8c2020; font-family: monospace; white-space: pre-wrap;"></div>
+        <!-- Empty state -->
+        <div id="span-stats-empty" class="hidden" style="text-align: center; padding: 32px; color: var(--text-muted); font-size: 13px;">
+          No span data available.
+        </div>
+        <!-- Table -->
+        <div id="span-stats-content" class="hidden">
+          <div id="span-stats-summary" style="padding: 8px 0 12px; font-size: 12px; color: var(--text-muted);"></div>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Phase</th>
+                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Count</th>
+                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Min</th>
+                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">p50</th>
+                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">p95</th>
+                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">p99</th>
+                  <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Max</th>
+                </tr>
+              </thead>
+              <tbody id="span-stats-tbody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -743,6 +794,7 @@
 <script src="/js/envconfig.js"></script>
 <script src="/js/instructions.js"></script>
 <script src="/js/containers.js"></script>
+<script src="/js/span-stats.js"></script>
 <script src="/js/refine.js"></script>
 <script src="/js/ideate.js"></script>
 <script src="/js/dep-graph.js"></script>

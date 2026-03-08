@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"changkun.de/wallfacer/internal/store"
 )
@@ -108,6 +109,158 @@ func TestHealth_TasksByStatusCounts(t *testing.T) {
 
 	if got := resp.TasksByStatus["backlog"]; got != 2 {
 		t.Errorf("expected 2 backlog tasks, got %d", got)
+	}
+}
+
+// --- GetSpanStats tests ---
+
+// TestGetSpanStats_EmptyStore verifies the response shape when no tasks exist.
+func TestGetSpanStats_EmptyStore(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/debug/spans", nil)
+	w := httptest.NewRecorder()
+	h.GetSpanStats(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp spanStatsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.TasksScanned != 0 {
+		t.Errorf("expected tasks_scanned=0, got %d", resp.TasksScanned)
+	}
+	if resp.SpansTotal != 0 {
+		t.Errorf("expected spans_total=0, got %d", resp.SpansTotal)
+	}
+	if resp.Phases == nil {
+		t.Error("expected phases to be a non-nil map")
+	}
+	if len(resp.Phases) != 0 {
+		t.Errorf("expected empty phases map, got %d entries", len(resp.Phases))
+	}
+}
+
+// TestGetSpanStats_KnownSpanPairs seeds a task with deterministic span events
+// and verifies the computed statistics.
+func TestGetSpanStats_KnownSpanPairs(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "test", 15, false, "", store.TaskKindTask)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert three agent_turn spans with fixed durations by sleeping between events.
+	// We sleep at least 10ms per span so DurationMs is reliably > 0.
+	for i := 0; i < 3; i++ {
+		h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{
+			Phase: "agent_turn",
+			Label: "agent_turn_" + string(rune('1'+i)),
+		})
+		time.Sleep(10 * time.Millisecond)
+		h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{
+			Phase: "agent_turn",
+			Label: "agent_turn_" + string(rune('1'+i)),
+		})
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/debug/spans", nil)
+	w := httptest.NewRecorder()
+	h.GetSpanStats(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp spanStatsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if resp.TasksScanned != 1 {
+		t.Errorf("expected tasks_scanned=1, got %d", resp.TasksScanned)
+	}
+	if resp.SpansTotal != 3 {
+		t.Errorf("expected spans_total=3, got %d", resp.SpansTotal)
+	}
+
+	ps, ok := resp.Phases["agent_turn"]
+	if !ok {
+		t.Fatal("expected 'agent_turn' phase in response")
+	}
+	if ps.Count != 3 {
+		t.Errorf("expected count=3, got %d", ps.Count)
+	}
+	if ps.MinMs < 0 {
+		t.Errorf("expected min_ms >= 0, got %d", ps.MinMs)
+	}
+	if ps.MaxMs < ps.MinMs {
+		t.Errorf("expected max_ms >= min_ms, got max=%d min=%d", ps.MaxMs, ps.MinMs)
+	}
+	if ps.P50Ms < ps.MinMs || ps.P50Ms > ps.MaxMs {
+		t.Errorf("expected p50_ms in [min, max], got p50=%d min=%d max=%d", ps.P50Ms, ps.MinMs, ps.MaxMs)
+	}
+}
+
+// TestGetSpanStats_IncludesArchived verifies that archived tasks are counted.
+func TestGetSpanStats_IncludesArchived(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "archived task", 15, false, "", store.TaskKindTask)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{
+		Phase: "worktree_setup",
+		Label: "worktree_setup",
+	})
+	time.Sleep(5 * time.Millisecond)
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{
+		Phase: "worktree_setup",
+		Label: "worktree_setup",
+	})
+
+	// Archive the task.
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, "done"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetTaskArchived(ctx, task.ID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/debug/spans", nil)
+	w := httptest.NewRecorder()
+	h.GetSpanStats(w, req)
+
+	var resp spanStatsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if resp.TasksScanned != 1 {
+		t.Errorf("expected tasks_scanned=1 (archived task included), got %d", resp.TasksScanned)
+	}
+	if resp.SpansTotal != 1 {
+		t.Errorf("expected spans_total=1, got %d", resp.SpansTotal)
+	}
+	if _, ok := resp.Phases["worktree_setup"]; !ok {
+		t.Error("expected 'worktree_setup' phase from archived task")
+	}
+}
+
+// TestGetSpanStats_PercentileIndexSingleElement verifies that with N=1
+// all percentiles resolve to the single value.
+func TestGetSpanStats_PercentileIndexSingleElement(t *testing.T) {
+	cases := []int{50, 95, 99}
+	for _, pct := range cases {
+		idx := percentileIndex(1, pct)
+		if idx != 0 {
+			t.Errorf("percentileIndex(1, %d) = %d; want 0", pct, idx)
+		}
 	}
 }
 
