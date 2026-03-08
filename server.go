@@ -5,6 +5,7 @@ import (
 	"embed"
 	"flag"
 	"fmt"
+	"html/template"
 	fsLib "io/fs"
 	"net"
 	"net/http"
@@ -218,7 +219,26 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 
 	// Static files (task board UI).
 	uiFS, _ := fsLib.Sub(uiFiles, "ui")
-	mux.Handle("GET /", http.FileServer(http.FS(uiFS)))
+	indexTemplates, err := template.New("index.html").ParseFS(uiFS, "index.html", "partials/*.html")
+	if err != nil {
+		logger.Fatal(logger.Main, "parse ui templates", "error", err)
+	}
+	serveIndex := func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := indexTemplates.ExecuteTemplate(w, "index.html", nil); err != nil {
+			logger.Main.Error("render index", "error", err)
+			http.Error(w, "failed to render index", http.StatusInternalServerError)
+		}
+	}
+	mux.HandleFunc("GET /", serveIndex)
+
+	// Static asset directories should still be served from the embedded filesystem.
+	mux.Handle("GET /css/", http.FileServer(http.FS(uiFS)))
+	mux.Handle("GET /js/", http.FileServer(http.FS(uiFS)))
 
 	// Operational health check (goroutine count, task counts, uptime).
 	mux.HandleFunc("GET /api/debug/health", h.Health)
