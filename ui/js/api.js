@@ -46,12 +46,21 @@ function _handleInitialHash() {
 
 function startTasksStream() {
   if (tasksSource) tasksSource.close();
-  const url = showArchived ? '/api/tasks/stream?include_archived=true' : '/api/tasks/stream';
+
+  // Build the stream URL. On reconnect, pass the last received event ID so
+  // the server can replay only missed deltas instead of sending a full snapshot.
+  let url = showArchived ? '/api/tasks/stream?include_archived=true' : '/api/tasks/stream';
+  if (lastTasksEventId !== null) {
+    const sep = url.includes('?') ? '&' : '?';
+    url += sep + 'last_event_id=' + encodeURIComponent(lastTasksEventId);
+  }
   tasksSource = new EventSource(url);
 
   // Initial full snapshot — replace the local tasks array and re-render.
+  // Also received when the server cannot replay (gap too old).
   tasksSource.addEventListener('snapshot', function(e) {
     tasksRetryDelay = 1000;
+    if (e.lastEventId) lastTasksEventId = e.lastEventId;
     try {
       tasks = JSON.parse(e.data);
       scheduleRender();
@@ -62,8 +71,10 @@ function startTasksStream() {
   });
 
   // Single-task update — find by ID and replace in-place (or append if new).
+  // Received both from live stream and delta replay on reconnect.
   tasksSource.addEventListener('task-updated', function(e) {
     tasksRetryDelay = 1000;
+    if (e.lastEventId) lastTasksEventId = e.lastEventId;
     try {
       const task = JSON.parse(e.data);
       // If the task is archived and we're not showing archived tasks, treat as deleted.
@@ -90,8 +101,10 @@ function startTasksStream() {
   });
 
   // Single-task deletion — remove from local array.
+  // Received both from live stream and delta replay on reconnect.
   tasksSource.addEventListener('task-deleted', function(e) {
     tasksRetryDelay = 1000;
+    if (e.lastEventId) lastTasksEventId = e.lastEventId;
     try {
       const { id } = JSON.parse(e.data);
       const idx = tasks.findIndex(t => t.id === id);

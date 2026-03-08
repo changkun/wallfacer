@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"changkun.de/wallfacer/internal/logger"
 	"github.com/google/uuid"
@@ -22,8 +23,18 @@ type Store struct {
 	events  map[uuid.UUID][]TaskEvent
 	nextSeq map[uuid.UUID]int
 
+	// deltaSeq is a monotonically increasing counter stamped on every TaskDelta.
+	// It is incremented inside notify, which is always called while s.mu is
+	// write-locked, so reads under s.mu.RLock() yield a consistent snapshot.
+	deltaSeq atomic.Int64
+
+	// replayBuf holds the most recent replayBufMax SequencedDeltas so that
+	// reconnecting SSE clients can catch up without a full snapshot.
+	replayMu  sync.RWMutex
+	replayBuf []SequencedDelta
+
 	subMu       sync.Mutex
-	subscribers map[int]chan TaskDelta
+	subscribers map[int]chan SequencedDelta
 	nextSubID   int
 }
 
@@ -34,7 +45,7 @@ func NewStore(dir string) (*Store, error) {
 		tasks:       make(map[uuid.UUID]*Task),
 		events:      make(map[uuid.UUID][]TaskEvent),
 		nextSeq:     make(map[uuid.UUID]int),
-		subscribers: make(map[int]chan TaskDelta),
+		subscribers: make(map[int]chan SequencedDelta),
 	}
 
 	if err := os.MkdirAll(dir, 0755); err != nil {

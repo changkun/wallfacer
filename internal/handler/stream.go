@@ -19,9 +19,18 @@ import (
 
 // StreamTasks streams task changes as SSE with typed events.
 //
-// On connection an initial "snapshot" event is sent containing the full task list
-// (filtered by ?include_archived). Subsequent events are per-task deltas:
+// On first connect (no last_event_id) an initial "snapshot" event is sent
+// containing the full task list (filtered by ?include_archived) with an SSE
+// id: field set to the current delta sequence number.
 //
+// On reconnect the client passes the last received sequence via the
+// ?last_event_id=<seq> query parameter or the Last-Event-ID HTTP header.
+// If the store's replay buffer covers the gap, only missed delta events are
+// replayed. If the gap is too old the handler falls back to a full snapshot.
+//
+// Every SSE event carries an "id:" field so browsers can resume automatically.
+//
+//	event: snapshot      — full task list (data: []Task JSON)
 //	event: task-updated  — a single task was created or mutated (data: Task JSON)
 //	event: task-deleted  — a task was deleted (data: {"id":"<uuid>"})
 func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
@@ -37,25 +46,67 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
+	// Subscribe BEFORE reading any state so we cannot miss events between the
+	// snapshot/replay phase and the live loop.
 	subID, ch := h.store.Subscribe()
 	defer h.store.Unsubscribe(subID)
 
-	// Send the initial full snapshot so the client can bootstrap its local state.
-	tasks, err := h.store.ListTasks(r.Context(), includeArchived)
-	if err != nil {
-		return
+	// replayUpTo is the highest sequence number already written to the client.
+	// Live channel items with Seq <= replayUpTo are skipped to avoid duplicates.
+	var replayUpTo int64 = -1
+
+	// Try delta replay when the client provides a previous event ID.
+	lastEventIDStr := r.URL.Query().Get("last_event_id")
+	if lastEventIDStr == "" {
+		lastEventIDStr = r.Header.Get("Last-Event-ID")
 	}
-	if tasks == nil {
-		tasks = []store.Task{}
+
+	didReplay := false
+	if lastEventIDStr != "" {
+		if seq, err := strconv.ParseInt(lastEventIDStr, 10, 64); err == nil {
+			deltas, tooOld := h.store.DeltasSince(seq)
+			if !tooOld {
+				// Replay missed deltas; the client already has a consistent
+				// base state so no snapshot is required.
+				for _, d := range deltas {
+					payload, encErr := marshalDeltaPayload(d.TaskDelta)
+					if encErr != nil {
+						continue
+					}
+					eventType := deltaEventType(d.TaskDelta)
+					if _, werr := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", d.Seq, eventType, payload); werr != nil {
+						return
+					}
+					replayUpTo = d.Seq
+				}
+				flusher.Flush()
+				didReplay = true
+			}
+			// If tooOld == true, fall through to the full snapshot below.
+		}
 	}
-	snapshot, err := json.Marshal(tasks)
-	if err != nil {
-		return
+
+	if !didReplay {
+		// Send the initial full snapshot so the client can bootstrap its local
+		// state. ListTasksAndSeq reads both the task list and the current
+		// sequence under the same read lock to guarantee consistency.
+		tasks, currentSeq, err := h.store.ListTasksAndSeq(r.Context(), includeArchived)
+		if err != nil {
+			return
+		}
+		if tasks == nil {
+			tasks = []store.Task{}
+		}
+		snapshot, err := json.Marshal(tasks)
+		if err != nil {
+			return
+		}
+		replayUpTo = currentSeq
+		if _, err := fmt.Fprintf(w, "id: %d\nevent: snapshot\ndata: %s\n\n", currentSeq, snapshot); err != nil {
+			return
+		}
+		flusher.Flush()
 	}
-	if _, err := fmt.Fprintf(w, "event: snapshot\ndata: %s\n\n", snapshot); err != nil {
-		return
-	}
-	flusher.Flush()
 
 	for {
 		select {
@@ -65,24 +116,37 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			var eventType string
-			var payload []byte
-			if delta.Deleted {
-				eventType = "task-deleted"
-				payload, err = json.Marshal(map[string]string{"id": delta.Task.ID.String()})
-			} else {
-				eventType = "task-updated"
-				payload, err = json.Marshal(delta.Task)
+			// Skip deltas already covered by the replay or snapshot phase.
+			if delta.Seq <= replayUpTo {
+				continue
 			}
+			payload, err := marshalDeltaPayload(delta.TaskDelta)
 			if err != nil {
 				continue
 			}
-			if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", eventType, payload); err != nil {
+			eventType := deltaEventType(delta.TaskDelta)
+			if _, err := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", delta.Seq, eventType, payload); err != nil {
 				return
 			}
 			flusher.Flush()
 		}
 	}
+}
+
+// deltaEventType returns the SSE event name for a TaskDelta.
+func deltaEventType(d store.TaskDelta) string {
+	if d.Deleted {
+		return "task-deleted"
+	}
+	return "task-updated"
+}
+
+// marshalDeltaPayload encodes the SSE data payload for a TaskDelta.
+func marshalDeltaPayload(d store.TaskDelta) ([]byte, error) {
+	if d.Deleted {
+		return json.Marshal(map[string]string{"id": d.Task.ID.String()})
+	}
+	return json.Marshal(d.Task)
 }
 
 // StreamLogs streams live container logs for an in-progress task, or serves

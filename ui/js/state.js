@@ -20,6 +20,10 @@ let showArchived = localStorage.getItem('wallfacer-show-archived') === 'true';
 // Tasks SSE state
 let tasksSource = null;
 let tasksRetryDelay = 1000;
+// lastTasksEventId holds the SSE id: value from the most recently received
+// task stream event. Passed as ?last_event_id=<id> on reconnect to enable
+// delta replay instead of a full snapshot.
+let lastTasksEventId = null;
 
 // Git SSE state
 let gitStatuses = [];

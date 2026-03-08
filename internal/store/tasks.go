@@ -48,6 +48,36 @@ func (s *Store) ListTasks(_ context.Context, includeArchived bool) ([]Task, erro
 	return tasks, nil
 }
 
+// ListTasksAndSeq returns all tasks (same as ListTasks) together with the
+// current delta sequence number, both read under the same s.mu.RLock() so
+// the snapshot and the sequence ID are guaranteed to be consistent.
+// Callers use the returned seq as the SSE "id:" field on the snapshot event;
+// reconnecting clients replay only deltas with Seq > seq.
+func (s *Store) ListTasksAndSeq(_ context.Context, includeArchived bool) ([]Task, int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	tasks := make([]Task, 0, len(s.tasks))
+	for _, t := range s.tasks {
+		if !includeArchived && t.Archived {
+			continue
+		}
+		cp := *t
+		if t.CurrentRefinement != nil {
+			jobCopy := *t.CurrentRefinement
+			cp.CurrentRefinement = &jobCopy
+		}
+		tasks = append(tasks, cp)
+	}
+	sort.Slice(tasks, func(i, j int) bool {
+		if tasks[i].Position != tasks[j].Position {
+			return tasks[i].Position < tasks[j].Position
+		}
+		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
+	})
+	return tasks, s.deltaSeq.Load(), nil
+}
+
 // GetTask returns a deep copy of the task with the given ID.
 // Pointer fields (CurrentRefinement) are copied so callers cannot
 // accidentally mutate shared store state.

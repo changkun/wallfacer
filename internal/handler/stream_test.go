@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -341,3 +342,286 @@ type flushRecorder struct {
 }
 
 func (f *flushRecorder) Flush() {}
+
+// --- SSE id: field and delta replay tests ---
+
+// TestStreamTasks_SnapshotCarriesID verifies that the snapshot event includes
+// an "id:" field with a numeric sequence number.
+func TestStreamTasks_SnapshotCarriesID(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	h.store.CreateTask(ctx, "task1", 15, false, "", "")
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamTasks(w, req)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	// The SSE output must contain an "id:" line before the snapshot event.
+	if !strings.Contains(body, "id:") {
+		t.Errorf("expected 'id:' field in SSE output, got:\n%s", body)
+	}
+	if !strings.Contains(body, "event: snapshot") {
+		t.Errorf("expected 'event: snapshot' in output, got:\n%s", body)
+	}
+}
+
+// TestStreamTasks_DeltaCarriesID verifies that task-updated events include an "id:" field.
+func TestStreamTasks_DeltaCarriesID(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "id test", 15, false, "", "")
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamTasks(w, req)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	// Count lines starting with "id:" — one for snapshot, one for the delta.
+	idCount := 0
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "id:") {
+			idCount++
+		}
+	}
+	if idCount < 2 {
+		t.Errorf("expected at least 2 'id:' fields (snapshot + delta), got %d in:\n%s", idCount, body)
+	}
+}
+
+// TestStreamTasks_MonotonicIDs verifies that id: values increase monotonically
+// across the snapshot and subsequent delta events.
+func TestStreamTasks_MonotonicIDs(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "mono", 15, false, "", "")
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamTasks(w, req)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	// Use two valid transitions to generate two delta events after the snapshot.
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	time.Sleep(30 * time.Millisecond)
+	cancel()
+	<-done
+
+	// Extract all id: values and verify they are strictly increasing.
+	var ids []int64
+	for _, line := range strings.Split(w.Body.String(), "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "id:") {
+			continue
+		}
+		valStr := strings.TrimSpace(strings.TrimPrefix(line, "id:"))
+		var val int64
+		if _, err := fmt.Sscanf(valStr, "%d", &val); err != nil {
+			t.Errorf("non-numeric id: %q", valStr)
+			continue
+		}
+		ids = append(ids, val)
+	}
+	if len(ids) < 2 {
+		t.Fatalf("expected at least 2 id: values, got %d in:\n%s", len(ids), w.Body.String())
+	}
+	for i := 1; i < len(ids); i++ {
+		if ids[i] <= ids[i-1] {
+			t.Errorf("id[%d]=%d is not greater than id[%d]=%d", i, ids[i], i-1, ids[i-1])
+		}
+	}
+}
+
+// TestStreamTasks_ReplaySuccess verifies that a client reconnecting with a valid
+// last_event_id receives only the missed deltas, not a full snapshot.
+func TestStreamTasks_ReplaySuccess(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "replay me", 15, false, "", "")
+
+	// First connection: get a snapshot and record the last sequence ID.
+	reqCtx1, cancel1 := context.WithCancel(context.Background())
+	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx1)
+	w1 := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+	done1 := make(chan struct{})
+	go func() {
+		defer close(done1)
+		h.StreamTasks(w1, req1)
+	}()
+	time.Sleep(20 * time.Millisecond)
+
+	// Trigger a mutation while still connected so the delta goes into the replay buffer.
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	time.Sleep(20 * time.Millisecond)
+	cancel1()
+	<-done1
+
+	// Extract the last id: field from the first response.
+	var lastID string
+	for _, line := range strings.Split(w1.Body.String(), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "id:") {
+			lastID = strings.TrimSpace(strings.TrimPrefix(line, "id:"))
+		}
+	}
+	if lastID == "" {
+		t.Fatal("could not find last id: field in first connection")
+	}
+
+	// Trigger another mutation while disconnected — this will be in the replay buffer.
+	// in_progress → waiting is a valid transition.
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	// Second connection: reconnect with last_event_id — should get only the delta, no snapshot.
+	reqCtx2, cancel2 := context.WithCancel(context.Background())
+	req2 := httptest.NewRequest(http.MethodGet, "/api/tasks/stream?last_event_id="+lastID, nil).WithContext(reqCtx2)
+	w2 := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+	done2 := make(chan struct{})
+	go func() {
+		defer close(done2)
+		h.StreamTasks(w2, req2)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel2()
+	<-done2
+
+	body2 := w2.Body.String()
+	// Should NOT receive a snapshot (because replay succeeded).
+	if strings.Contains(body2, "event: snapshot") {
+		t.Errorf("expected no snapshot on replay, got:\n%s", body2)
+	}
+	// Should receive the missed task-updated event.
+	if !strings.Contains(body2, "event: task-updated") {
+		t.Errorf("expected task-updated replay event, got:\n%s", body2)
+	}
+	// The replayed delta should reference the task.
+	if !strings.Contains(body2, task.ID.String()) {
+		t.Errorf("expected task ID %s in replayed delta, got:\n%s", task.ID, body2)
+	}
+}
+
+// TestStreamTasks_GapFallbackToSnapshot verifies that when the client's
+// last_event_id is too old for the replay buffer, a full snapshot is sent.
+func TestStreamTasks_GapFallbackToSnapshot(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	h.store.CreateTask(ctx, "gap test", 15, false, "", "")
+
+	// Reconnect with a very old sequence ID that will never be in the buffer.
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream?last_event_id=-1", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamTasks(w, req)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	// last_event_id=-1 is a valid int64 but seq values start at 1, so
+	// DeltasSince(-1) with oldest=1 → oldest(1) > seq+1(0) → tooOld=true
+	// → fall back to snapshot.
+	if !strings.Contains(body, "event: snapshot") {
+		t.Errorf("expected snapshot on gap fallback, got:\n%s", body)
+	}
+}
+
+// TestStreamTasks_NoLastEventID_AlwaysSnapshot verifies that a fresh connection
+// (no last_event_id) always receives a snapshot.
+func TestStreamTasks_NoLastEventID_AlwaysSnapshot(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	h.store.CreateTask(ctx, "fresh", 15, false, "", "")
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamTasks(w, req)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	if !strings.Contains(w.Body.String(), "event: snapshot") {
+		t.Errorf("expected snapshot for fresh connection, got:\n%s", w.Body.String())
+	}
+}
+
+// TestStreamTasks_ReplayViaLastEventIDHeader verifies that the Last-Event-ID
+// HTTP header (sent automatically by the browser's native EventSource on
+// reconnect) is also honoured.
+func TestStreamTasks_ReplayViaLastEventIDHeader(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "header replay", 15, false, "", "")
+
+	// Trigger a mutation so the replay buffer has at least one entry.
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	// Record the current seq (after the mutation).
+	seqBefore := h.store.LatestDeltaSeq()
+
+	// Trigger another mutation that the client will have "missed".
+	// in_progress → waiting is a valid transition.
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	// Reconnect using the Last-Event-ID header (as a native EventSource would).
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
+	req.Header.Set("Last-Event-ID", fmt.Sprintf("%d", seqBefore))
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamTasks(w, req)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	if strings.Contains(body, "event: snapshot") {
+		t.Errorf("expected no snapshot when replaying via Last-Event-ID header, got:\n%s", body)
+	}
+	if !strings.Contains(body, "event: task-updated") {
+		t.Errorf("expected replayed task-updated event, got:\n%s", body)
+	}
+}
