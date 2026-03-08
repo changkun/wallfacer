@@ -325,11 +325,50 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 
 // extractIdeas finds a JSON array in the agent's text output and parses it
 // into a slice of IdeateResult. It is tolerant of surrounding prose by
-// scanning for the outermost '[' … ']' pair.
+// scanning for the first '[' and then counting bracket depth to find its
+// matching ']', which avoids capturing stray brackets in trailing prose.
 func extractIdeas(text string) ([]IdeateResult, error) {
 	start := strings.Index(text, "[")
-	end := strings.LastIndex(text, "]")
-	if start == -1 || end == -1 || end <= start {
+	if start == -1 {
+		return nil, fmt.Errorf("no JSON array found in agent output")
+	}
+
+	// Walk forward from the opening '[' counting bracket depth to find
+	// the matching ']'. This is safe for JSON because brackets inside
+	// strings are always escaped or paired, and we only care about
+	// finding the correct closing bracket for the top-level array.
+	depth := 0
+	end := -1
+	inString := false
+	escaped := false
+	for i := start; i < len(text); i++ {
+		ch := text[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if ch == '\\' && inString {
+			escaped = true
+			continue
+		}
+		if ch == '"' {
+			inString = !inString
+			continue
+		}
+		if inString {
+			continue
+		}
+		if ch == '[' {
+			depth++
+		} else if ch == ']' {
+			depth--
+			if depth == 0 {
+				end = i
+				break
+			}
+		}
+	}
+	if end == -1 {
 		return nil, fmt.Errorf("no JSON array found in agent output")
 	}
 
