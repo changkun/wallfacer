@@ -10,8 +10,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
+	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -409,4 +411,87 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		sessionID = *bestBacklog.SessionID
 	}
 	h.runner.RunBackground(bestBacklog.ID, bestBacklog.Prompt, sessionID, false)
+}
+
+// waitingSyncInterval is how often the watcher polls for waiting tasks that
+// have fallen behind the default branch.
+const waitingSyncInterval = 30 * time.Second
+
+// StartWaitingSyncWatcher starts a background goroutine that periodically
+// checks all waiting tasks and automatically syncs any whose worktrees have
+// fallen behind the default branch.
+func (h *Handler) StartWaitingSyncWatcher(ctx context.Context) {
+	ticker := time.NewTicker(waitingSyncInterval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				h.checkAndSyncWaitingTasks(ctx)
+			}
+		}
+	}()
+}
+
+// checkAndSyncWaitingTasks inspects every waiting task that has worktrees. If
+// any worktree is behind the default branch it automatically transitions the
+// task to in_progress and triggers SyncWorktrees, exactly as if the user had
+// clicked the "Sync" button.
+func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		return
+	}
+
+	for i := range tasks {
+		t := &tasks[i]
+		if t.Status != store.TaskStatusWaiting || len(t.WorktreePaths) == 0 {
+			continue
+		}
+
+		behind := false
+		for repoPath, worktreePath := range t.WorktreePaths {
+			n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+			if err != nil {
+				logger.Handler.Warn("auto-sync: check commits behind",
+					"task", t.ID, "repo", repoPath, "error", err)
+				continue
+			}
+			if n > 0 {
+				behind = true
+				break
+			}
+		}
+
+		if !behind {
+			continue
+		}
+
+		logger.Handler.Info("auto-sync: waiting task behind default branch, syncing",
+			"task", t.ID)
+
+		if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusInProgress); err != nil {
+			logger.Handler.Error("auto-sync: update task status", "task", t.ID, "error", err)
+			continue
+		}
+		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+			"from": string(store.TaskStatusWaiting),
+			"to":   string(store.TaskStatusInProgress),
+		})
+		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+			"result": "Auto-syncing: worktree is behind the default branch.",
+		})
+
+		sessionID := ""
+		if t.SessionID != nil {
+			sessionID = *t.SessionID
+		}
+		h.diffCache.invalidate(t.ID)
+		taskID := t.ID
+		h.runner.SyncWorktreesBackground(taskID, sessionID, store.TaskStatusWaiting, func() {
+			h.diffCache.invalidate(taskID)
+		})
+	}
 }

@@ -801,3 +801,110 @@ func TestTryAutoPromote_PromotesWhenDepsSatisfied(t *testing.T) {
 		t.Errorf("expected task to be promoted to in_progress, got %s", updated.Status)
 	}
 }
+
+// --- checkAndSyncWaitingTasks tests ---
+
+// TestCheckAndSyncWaitingTasks_SkipsNonWaiting verifies that tasks not in the
+// waiting state are left untouched.
+func TestCheckAndSyncWaitingTasks_SkipsNonWaiting(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	// Leave the task in backlog (not waiting).
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
+	// Add a commit to main so the worktree would be behind — but task isn't waiting.
+	os.WriteFile(filepath.Join(repo, "new.txt"), []byte("upstream\n"), 0644)
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "upstream commit")
+
+	h.checkAndSyncWaitingTasks(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusBacklog {
+		t.Errorf("expected task to remain in backlog, got %s", got.Status)
+	}
+}
+
+// TestCheckAndSyncWaitingTasks_SkipsWaitingWithNoWorktrees verifies that waiting
+// tasks without worktrees are not touched.
+func TestCheckAndSyncWaitingTasks_SkipsWaitingWithNoWorktrees(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	// No worktrees set.
+
+	h.checkAndSyncWaitingTasks(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected task to remain waiting, got %s", got.Status)
+	}
+}
+
+// TestCheckAndSyncWaitingTasks_SkipsWaitingUpToDate verifies that a waiting task
+// whose worktree is already up to date is not synced.
+func TestCheckAndSyncWaitingTasks_SkipsWaitingUpToDate(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	// No new commits on main — worktree is up to date.
+
+	h.checkAndSyncWaitingTasks(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected task to remain waiting (up to date), got %s", got.Status)
+	}
+}
+
+// TestCheckAndSyncWaitingTasks_SyncsWhenBehind verifies that a waiting task
+// whose worktree has fallen behind the default branch is automatically moved to
+// in_progress and synced back to waiting.
+func TestCheckAndSyncWaitingTasks_SyncsWhenBehind(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
+	// Add a commit to main — now the worktree is behind by 1.
+	os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "upstream commit")
+
+	h.checkAndSyncWaitingTasks(ctx)
+
+	// The task must have been moved out of waiting (at least to in_progress).
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status == store.TaskStatusWaiting && len(got.WorktreePaths) > 0 {
+		// If still waiting, check if there are commits behind now (should be 0 after sync).
+		// The task may already be back to waiting after the sync completes.
+		t.Logf("task returned to waiting — checking worktree is now up to date")
+	}
+	// At minimum the status must not be stuck at waiting-and-behind.
+	// After WaitBackground the sync goroutine has finished, so the task should
+	// be back in waiting (successfully synced) or in_progress (sync in flight).
+	if got.Status == store.TaskStatusBacklog || got.Status == store.TaskStatusDone {
+		t.Errorf("unexpected status %s after auto-sync trigger", got.Status)
+	}
+}

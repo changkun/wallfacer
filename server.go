@@ -136,6 +136,10 @@ func runServer(configDir string, args []string) {
 	// task completes, automatically enqueues the next one.
 	h.StartIdeationWatcher(ctx)
 
+	// Start the waiting-sync watcher: periodically checks waiting tasks and
+	// automatically syncs any whose worktrees have fallen behind the default branch.
+	h.StartWaitingSyncWatcher(ctx)
+
 	mux := buildMux(h, r)
 
 	host, _, _ := net.SplitHostPort(*addr)
