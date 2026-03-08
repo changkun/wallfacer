@@ -286,7 +286,6 @@ async function applyRefinement() {
       body: JSON.stringify({ prompt: newPrompt }),
     });
 
-    closeModal();
     fetchTasks();
   } catch (e) {
     showAlert('Error applying refinement: ' + e.message);
