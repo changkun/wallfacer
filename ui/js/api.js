@@ -98,34 +98,31 @@ function toggleShowArchived() {
 
 // --- Autopilot ---
 
-// Available model list from server config.
-let availableModels = [];
-let defaultModel = '';
+// Available sandbox list from server config.
+let availableSandboxes = [];
+let defaultSandbox = '';
 
-function modelDisplayName(id) {
+function sandboxDisplayName(id) {
   if (!id) return 'Default';
-  // e.g. "claude-sonnet-4-6-20250514" → "sonnet-4-6"
-  var m = id.match(/^claude-(.+)-\d{8}$/);
-  if (m) return m[1];
-  // e.g. "bedrock/claude-sonnet-4.6" → "sonnet-4.6"
-  m = id.match(/(?:^|\/)+claude-(.+)$/);
-  if (m) return m[1];
-  return id;
+  if (id === 'claude') return 'Claude';
+  if (id === 'codex') return 'Codex';
+  return id.charAt(0).toUpperCase() + id.slice(1);
 }
 
-function populateModelSelects() {
+function populateSandboxSelects() {
   var selects = [
-    document.getElementById('new-model'),
-    document.getElementById('modal-edit-model'),
+    document.getElementById('new-sandbox'),
+    document.getElementById('modal-edit-sandbox'),
   ];
   for (var sel of selects) {
     if (!sel) continue;
     var current = sel.value;
-    sel.innerHTML = '<option value="">Default' + (defaultModel ? ' (' + modelDisplayName(defaultModel) + ')' : '') + '</option>';
-    for (var m of availableModels) {
+    sel.innerHTML = '<option value="">Default' + (defaultSandbox ? ' (' + sandboxDisplayName(defaultSandbox) + ')' : '') + '</option>';
+    for (var s of availableSandboxes) {
+      if (!s) continue;
       var opt = document.createElement('option');
-      opt.value = m;
-      opt.textContent = modelDisplayName(m);
+      opt.value = s;
+      opt.textContent = sandboxDisplayName(s);
       sel.appendChild(opt);
     }
     sel.value = current;
@@ -144,19 +141,9 @@ async function fetchConfig() {
     autosubmit = !!cfg.autosubmit;
     var asToggle = document.getElementById('autosubmit-toggle');
     if (asToggle) asToggle.checked = autosubmit;
-    availableModels = cfg.models || [];
-    defaultModel = cfg.default_model || '';
-    populateModelSelects();
-    // Also populate the settings datalist for the default model input.
-    var datalist = document.getElementById('env-model-list');
-    if (datalist) {
-      datalist.innerHTML = '';
-      for (var m of availableModels) {
-        var opt = document.createElement('option');
-        opt.value = m;
-        datalist.appendChild(opt);
-      }
-    }
+    availableSandboxes = Array.isArray(cfg.sandboxes) ? cfg.sandboxes : [];
+    defaultSandbox = cfg.default_sandbox || '';
+    populateSandboxSelects();
     // Sync ideation toggle and spinner state.
     if (typeof updateIdeationConfig === 'function') updateIdeationConfig(cfg);
   } catch (e) {

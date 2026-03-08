@@ -143,8 +143,8 @@ async function createTask() {
   try {
     const timeout = parseInt(document.getElementById('new-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
     const mount_worktrees = document.getElementById('new-mount-worktrees').checked;
-    const model = document.getElementById('new-model').value;
-    const newTask = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, model }) });
+    const sandbox = document.getElementById('new-sandbox').value;
+    const newTask = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox }) });
     const dependsOn = getDepPickerValues('new-depends-on-picker');
     if (dependsOn.length > 0 && newTask && newTask.id) {
       await api('/api/tasks/' + newTask.id, { method: 'PATCH', body: JSON.stringify({ depends_on: dependsOn }) });
@@ -166,6 +166,10 @@ function showNewTaskForm() {
   textarea.value = draft;
   textarea.style.height = draft ? textarea.scrollHeight + 'px' : '';
   textarea.focus();
+  const sandboxSelect = document.getElementById('new-sandbox');
+  if (sandboxSelect) {
+    sandboxSelect.value = defaultSandbox || '';
+  }
   var depsRow = document.getElementById('new-depends-on-row');
   populateDependsOnPicker('new-depends-on-picker', null, []);
   if (depsRow) depsRow.style.display = tasks.length > 0 ? '' : 'none';
@@ -178,7 +182,10 @@ function hideNewTaskForm() {
   textarea.value = '';
   textarea.style.height = '';
   document.getElementById('new-mount-worktrees').checked = false;
-  document.getElementById('new-model').value = '';
+  const sandboxSelect = document.getElementById('new-sandbox');
+  if (sandboxSelect) {
+    sandboxSelect.value = defaultSandbox || '';
+  }
   var depPicker = document.getElementById('new-depends-on-picker');
   if (depPicker) {
     depPicker.querySelector('.dep-picker-list').innerHTML = '';
@@ -321,9 +328,9 @@ function scheduleBacklogSave() {
     if (!prompt) return;
     const timeout = parseInt(document.getElementById('modal-edit-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
     const mount_worktrees = document.getElementById('modal-edit-mount-worktrees').checked;
-    const model = document.getElementById('modal-edit-model').value;
+    const sandbox = document.getElementById('modal-edit-sandbox').value;
     const depends_on = getDepPickerValues('modal-edit-depends-on-picker');
-    const patchBody = { prompt, timeout, mount_worktrees, model, depends_on };
+    const patchBody = { prompt, timeout, mount_worktrees, sandbox, depends_on };
     try {
       await api(`/api/tasks/${currentTaskId}`, {
         method: 'PATCH',

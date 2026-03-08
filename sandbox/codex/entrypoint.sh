@@ -6,7 +6,7 @@
 # Codex CLI expects: [--model <val>] <prompt>
 #
 # Model priority:
-#   1. --model CLI arg (wallfacer per-task override or WALLFACER_DEFAULT_MODEL)
+#   1. --model CLI arg (wallfacer per-task override or CLAUDE_DEFAULT_MODEL)
 #   2. CODEX_DEFAULT_MODEL environment variable
 #
 # After codex runs, wrap the output in a Claude Code-compatible JSON envelope

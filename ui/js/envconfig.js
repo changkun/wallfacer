@@ -113,53 +113,173 @@ async function saveAutoPush() {
 
 // --- API Configuration (env file editor) ---
 
+function buildSaveEnvPayload() {
+  const oauthRaw = document.getElementById('env-oauth-token').value.trim();
+  const apiKeyRaw = document.getElementById('env-api-key').value.trim();
+  const claudeBaseURL = document.getElementById('env-claude-base-url').value.trim();
+  const openAIAPIKeyRaw = document.getElementById('env-openai-api-key').value.trim();
+  const openAIBaseURL = document.getElementById('env-openai-base-url').value.trim();
+  const defaultModel = document.getElementById('env-default-model').value.trim();
+  const titleModel = document.getElementById('env-title-model').value.trim();
+  const codexDefaultModel = document.getElementById('env-codex-default-model').value.trim();
+  const codexTitleModel = document.getElementById('env-codex-title-model').value.trim();
+
+  const body = {};
+  if (oauthRaw) body.oauth_token = oauthRaw;
+  if (apiKeyRaw) body.api_key = apiKeyRaw;
+  body.base_url = claudeBaseURL; // empty = clear
+  if (openAIAPIKeyRaw) body.openai_api_key = openAIAPIKeyRaw;
+  body.openai_base_url = openAIBaseURL; // empty = clear
+  body.default_model = defaultModel; // empty = clear
+  body.title_model = titleModel; // empty = clear
+  body.codex_default_model = codexDefaultModel;
+  body.codex_title_model = codexTitleModel;
+
+  return body;
+}
+
+function buildSandboxTestPayload(sandbox) {
+  const rawPayload = buildSaveEnvPayload();
+  const testPayload = { sandbox: sandbox };
+  if (sandbox === 'claude') {
+    testPayload.base_url = rawPayload.base_url;
+    testPayload.default_model = rawPayload.default_model;
+    testPayload.title_model = rawPayload.title_model;
+    if (rawPayload.oauth_token) testPayload.oauth_token = rawPayload.oauth_token;
+    if (rawPayload.api_key) testPayload.api_key = rawPayload.api_key;
+  } else {
+    testPayload.openai_base_url = rawPayload.openai_base_url;
+    testPayload.codex_default_model = rawPayload.codex_default_model;
+    testPayload.codex_title_model = rawPayload.codex_title_model;
+    if (rawPayload.openai_api_key) testPayload.openai_api_key = rawPayload.openai_api_key;
+  }
+  return testPayload;
+}
+
+function summarizeSandboxTestResult(resp) {
+  if (!resp) return 'No response';
+  const normalized = (resp.last_test_result || '').toUpperCase();
+  if (normalized === 'PASS') return 'PASS';
+  if (normalized === 'FAIL') return 'FAIL';
+
+  if (resp.status === 'failed' && (resp.result || resp.stop_reason)) {
+    return (resp.result || resp.stop_reason || '').slice(0, 120);
+  }
+  if (resp.status === 'done' || resp.status === 'waiting') {
+    return 'Test completed';
+  }
+  return `status ${resp.status}`;
+}
+
+async function testSandboxConfig(sandbox) {
+  const statusEl = document.getElementById(sandbox === 'claude' ? 'env-claude-test-status' : 'env-codex-test-status');
+  const payload = buildSandboxTestPayload(sandbox);
+  statusEl.textContent = 'Testing…';
+
+  try {
+    const resp = await api('/api/env/test', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    statusEl.textContent = summarizeSandboxTestResult(resp);
+    setTimeout(() => {
+      if (statusEl.textContent.startsWith('status failed') || statusEl.textContent.includes('FAIL') || statusEl.textContent.startsWith('No response')) return;
+      statusEl.textContent = '';
+    }, 6000);
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+    setTimeout(() => {
+      statusEl.textContent = '';
+    }, 6000);
+  }
+}
+
 async function showEnvConfigEditor(event) {
   if (event) event.stopPropagation();
   closeSettings();
 
-  let cfg = { oauth_token: '', api_key: '', base_url: '', default_model: '', title_model: '' };
+  const modal = document.getElementById('env-config-modal');
+  if (!modal) {
+    console.error('Sandbox configuration modal not found in DOM.');
+    return;
+  }
+
+  const safeSetValue = (id, fn) => {
+    const el = document.getElementById(id);
+    if (!el) {
+      console.error(`Missing sandbox config field: ${id}`);
+      return false;
+    }
+    fn(el);
+    return true;
+  };
+
+  safeSetValue('env-oauth-token', (el) => { el.value = ''; });
+  safeSetValue('env-oauth-token', (el) => { el.placeholder = '(not set)'; });
+  safeSetValue('env-api-key', (el) => { el.value = ''; });
+  safeSetValue('env-api-key', (el) => { el.placeholder = '(not set)'; });
+  safeSetValue('env-claude-base-url', (el) => { el.value = ''; });
+  safeSetValue('env-openai-api-key', (el) => { el.value = ''; });
+  safeSetValue('env-openai-api-key', (el) => { el.placeholder = '(not set)'; });
+  safeSetValue('env-openai-base-url', (el) => { el.value = ''; });
+  safeSetValue('env-default-model', (el) => { el.value = ''; });
+  safeSetValue('env-title-model', (el) => { el.value = ''; });
+  safeSetValue('env-codex-default-model', (el) => { el.value = ''; });
+  safeSetValue('env-codex-title-model', (el) => { el.value = ''; });
+  safeSetValue('env-config-status', (el) => { el.textContent = ''; });
+  safeSetValue('env-claude-test-status', (el) => { el.textContent = ''; });
+  safeSetValue('env-codex-test-status', (el) => { el.textContent = ''; });
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  modal.style.display = 'flex';
+
+  let cfg = {
+    oauth_token: '',
+    api_key: '',
+    base_url: '',
+    openai_api_key: '',
+    openai_base_url: '',
+    default_model: '',
+    title_model: '',
+    codex_default_model: '',
+    codex_title_model: '',
+  };
   try {
     cfg = await api('/api/env');
   } catch (e) {
+    safeSetValue('env-config-status', (el) => { el.textContent = 'Failed to load configuration.'; });
     console.error('Failed to load env config:', e);
   }
 
   // Populate fields — tokens show masked value as placeholder only.
-  document.getElementById('env-oauth-token').value = '';
-  document.getElementById('env-oauth-token').placeholder = cfg.oauth_token || '(not set)';
-  document.getElementById('env-api-key').value = '';
-  document.getElementById('env-api-key').placeholder = cfg.api_key || '(not set)';
-  document.getElementById('env-base-url').value = cfg.base_url || '';
-  document.getElementById('env-default-model').value = cfg.default_model || '';
-  document.getElementById('env-title-model').value = cfg.title_model || '';
-  document.getElementById('env-config-status').textContent = '';
-
-  const modal = document.getElementById('env-config-modal');
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
+  safeSetValue('env-oauth-token', (el) => { el.placeholder = cfg.oauth_token || '(not set)'; });
+  safeSetValue('env-api-key', (el) => { el.placeholder = cfg.api_key || '(not set)'; });
+  safeSetValue('env-claude-base-url', (el) => { el.value = cfg.base_url || ''; });
+  safeSetValue('env-openai-api-key', (el) => { el.placeholder = cfg.openai_api_key || '(not set)'; });
+  safeSetValue('env-openai-base-url', (el) => { el.value = cfg.openai_base_url || ''; });
+  safeSetValue('env-default-model', (el) => { el.value = cfg.default_model || ''; });
+  safeSetValue('env-title-model', (el) => { el.value = cfg.title_model || ''; });
+  safeSetValue('env-codex-default-model', (el) => { el.value = cfg.codex_default_model || ''; });
+  safeSetValue('env-codex-title-model', (el) => { el.value = cfg.codex_title_model || ''; });
+  safeSetValue('env-config-status', (el) => {
+    if (el.textContent === 'Failed to load configuration.') return;
+    el.textContent = '';
+  });
+  safeSetValue('env-claude-test-status', (el) => { el.textContent = ''; });
+  safeSetValue('env-codex-test-status', (el) => { el.textContent = ''; });
 }
 
 function closeEnvConfigEditor() {
   const modal = document.getElementById('env-config-modal');
+  if (!modal) return;
   modal.classList.add('hidden');
   modal.classList.remove('flex');
+  modal.style.display = '';
 }
 
 async function saveEnvConfig() {
-  const oauthRaw = document.getElementById('env-oauth-token').value.trim();
-  const apiKeyRaw = document.getElementById('env-api-key').value.trim();
-  const baseURL = document.getElementById('env-base-url').value.trim();
-  const defaultModel = document.getElementById('env-default-model').value.trim();
-  const titleModel = document.getElementById('env-title-model').value.trim();
-
-  // Build the payload — only include token fields when the user typed something
-  // so the server doesn't treat empty as "no change" vs "clear".
-  const body = {};
-  if (oauthRaw) body.oauth_token = oauthRaw;
-  if (apiKeyRaw) body.api_key = apiKeyRaw;
-  body.base_url = baseURL;            // empty = clear
-  body.default_model = defaultModel;  // empty = clear
-  body.title_model = titleModel;      // empty = clear
+  const body = buildSaveEnvPayload();
 
   const statusEl = document.getElementById('env-config-status');
   statusEl.textContent = 'Saving…';
@@ -169,6 +289,7 @@ async function saveEnvConfig() {
     // Clear token inputs after saving so they don't linger in the DOM.
     document.getElementById('env-oauth-token').value = '';
     document.getElementById('env-api-key').value = '';
+    document.getElementById('env-openai-api-key').value = '';
     // Refresh placeholders.
     setTimeout(() => showEnvConfigEditor(null), 600);
   } catch (e) {

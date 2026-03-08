@@ -163,9 +163,9 @@
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">API Configuration</div>
+        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Sandbox Configuration</div>
         <button onclick="closeSettings();showEnvConfigEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Token, base URL, and model for the agent.</div>
+        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Configure sandbox credentials, endpoints, and defaults by provider.</div>
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
@@ -271,7 +271,7 @@
   <div class="modal-card" style="max-width: 520px; width: 100%;">
     <div class="p-6">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">API Configuration</h3>
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Sandbox Configuration</h3>
         <button onclick="closeEnvConfigEditor()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
       </div>
 
@@ -280,34 +280,80 @@
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 14px;">
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">OAuth Token (CLAUDE_CODE_OAUTH_TOKEN)</label>
-          <input id="env-oauth-token" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">From <code style="font-family:monospace;">claude setup-token</code> (takes precedence if both are set). Leave blank to keep the current value.</div>
+        <div style="border:1px solid var(--border); border-radius:8px; padding:12px;">
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px;">Claude</label>
+
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">OAuth Token (CLAUDE_CODE_OAUTH_TOKEN)</label>
+              <input id="env-oauth-token" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">From <code style="font-family:monospace;">claude setup-token</code> (takes precedence if both are set). Leave blank to keep the current value.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">API Key (ANTHROPIC_API_KEY)</label>
+              <input id="env-api-key" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Direct API key. If both are set, the OAuth token takes precedence. Leave blank to keep the current value.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Base URL (ANTHROPIC_BASE_URL)</label>
+              <input id="env-claude-base-url" type="url" class="field" style="font-family:monospace; font-size:12px;" placeholder="https://api.anthropic.com" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Custom API endpoint. Clear to use the provider default.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Default Model (CLAUDE_DEFAULT_MODEL)</label>
+              <input id="env-default-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. claude-sonnet-4.6" autocomplete="off" list="env-model-list">
+              <datalist id="env-model-list"></datalist>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Default model for Claude tasks. Clear to use the container default.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Title Model (CLAUDE_TITLE_MODEL)</label>
+              <input id="env-title-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. claude-haiku-4.5" autocomplete="off" list="env-model-list">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Model for auto-generating task titles. Falls back to the default model.</div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+              <button onclick="testSandboxConfig('claude')" type="button" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Test</button>
+              <span id="env-claude-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em;"></span>
+            </div>
+          </div>
         </div>
 
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">API Key (ANTHROPIC_API_KEY)</label>
-          <input id="env-api-key" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Direct API key. If both are set, the OAuth token takes precedence. Leave blank to keep the current value.</div>
-        </div>
+        <div style="border:1px solid var(--border); border-radius:8px; padding:12px;">
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px;">Codex</label>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">API Key (OPENAI_API_KEY)</label>
+              <input id="env-openai-api-key" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">OpenAI API key for Codex tasks. Leave blank to keep the current value.</div>
+            </div>
 
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Base URL (ANTHROPIC_BASE_URL)</label>
-          <input id="env-base-url" type="url" class="field" style="font-family:monospace; font-size:12px;" placeholder="https://api.anthropic.com" autocomplete="off">
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Custom API endpoint. Clear to use the provider default.</div>
-        </div>
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Base URL (OPENAI_BASE_URL)</label>
+              <input id="env-openai-base-url" type="url" class="field" style="font-family:monospace; font-size:12px;" placeholder="https://api.openai.com/v1" autocomplete="off">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Optional OpenAI-compatible endpoint. Clear to use the provider default.</div>
+            </div>
 
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Default Model (WALLFACER_DEFAULT_MODEL)</label>
-          <input id="env-default-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. bedrock/claude-sonnet-4.6" autocomplete="off" list="env-model-list">
-          <datalist id="env-model-list"></datalist>
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Default model for tasks. Clear to use the agent default.</div>
-        </div>
-        <div>
-          <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Title Model (WALLFACER_TITLE_MODEL)</label>
-          <input id="env-title-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. bedrock/claude-haiku-4.5" autocomplete="off" list="env-model-list">
-          <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Model for auto-generating task titles. Falls back to the default model.</div>
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Default Model (CODEX_DEFAULT_MODEL)</label>
+              <input id="env-codex-default-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. gpt-5-codex" autocomplete="off" list="env-model-list">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Default model for Codex tasks.</div>
+            </div>
+
+            <div>
+              <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Title Model (CODEX_TITLE_MODEL)</label>
+              <input id="env-codex-title-model" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. gpt-5-codex" autocomplete="off" list="env-model-list">
+              <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Model for auto-generating task titles. Falls back to Codex default model.</div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+              <button onclick="testSandboxConfig('codex')" type="button" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Test</button>
+              <span id="env-codex-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em;"></span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -514,7 +560,7 @@
             <button onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
           </div>
           <div class="flex items-center gap-1.5" style="min-width:0;">
-            <select id="new-model" class="select" title="Model">
+            <select id="new-sandbox" class="select" title="Sandbox">
               <option value="">Default</option>
             </select>
             <select id="new-timeout" class="select" title="Timeout">
@@ -633,8 +679,8 @@
           <div id="modal-backlog-settings" class="hidden mb-4">
             <h3 class="section-title">Settings</h3>
             <div class="flex items-center gap-2 flex-wrap">
-              <label for="modal-edit-model" class="text-xs text-v-muted">Model</label>
-              <select id="modal-edit-model" class="select" onchange="scheduleBacklogSave()">
+              <label for="modal-edit-sandbox" class="text-xs text-v-muted">Sandbox</label>
+              <select id="modal-edit-sandbox" class="select" onchange="scheduleBacklogSave()">
                 <option value="">Default</option>
               </select>
               <label for="modal-edit-timeout" class="text-xs text-v-muted">Timeout</label>
