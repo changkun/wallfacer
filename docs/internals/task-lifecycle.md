@@ -7,7 +7,7 @@ Tasks progress through a well-defined set of states. Every transition is recorde
 ```
 BACKLOG ──drag / autopilot──→ IN_PROGRESS ──end_turn──────────────────→ DONE
    │                               │                                        │
-   │                               ├──max_tokens / pause_turn──→ (loop)     └──drag──→ ARCHIVED
+   │                               ├──max_tokens / pause_turn──→ (loop)     └──set archived=true──→ (Archived column)
    │                               │
    │                               ├──empty stop_reason──→ WAITING ──feedback──→ IN_PROGRESS
    │                               │                              ──mark done──→ COMMITTING → DONE
@@ -23,6 +23,7 @@ BACKLOG ──drag / autopilot──→ IN_PROGRESS ──end_turn────�
    │                                                               ──cancel──→ CANCELLED
    │
    └──cancel──→ CANCELLED ──retry──→ BACKLOG
+                        └──set archived=true──→ (Archived column)
 ```
 
 ## States
@@ -36,7 +37,8 @@ BACKLOG ──drag / autopilot──→ IN_PROGRESS ──end_turn────�
 | `done` | Completed; changes committed and merged |
 | `failed` | Container error, Claude error, or timeout |
 | `cancelled` | Explicitly cancelled; sandbox cleaned up, history preserved |
-| `archived` | Done task moved off the active board |
+
+**Note:** `archived` is a boolean flag (`Archived bool`) on the task, not a separate state. Tasks in `done` or `cancelled` state can have `Archived = true`, which moves them to the Archived column in the UI. The state machine has exactly 7 states (`backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`).
 
 ## Turn Loop
 
@@ -91,38 +93,44 @@ When a task is created, a background goroutine (`runner.GenerateTitle`) launches
 
 ## Prompt Refinement
 
-Before running a task, users can chat with an AI assistant to iteratively improve the prompt. Only `backlog` tasks can be refined.
+Before running a task, users can have an AI agent analyse the codebase and produce a detailed implementation spec (the refined prompt). Only `backlog` tasks can be refined.
 
 ```
 POST /api/tasks/{id}/refine
-  body: { message: string, conversation: [{role, content}] }
+  body: { user_instructions? }   // optional additional guidance
   ↓
-  On first call (empty conversation): primes with the task prompt and asks an
-  opening clarifying question.
-  On subsequent calls: appends the user message and continues the conversation.
-  ↓
-  Returns: { message: string, refined_prompt?: string }
-  When Claude has gathered enough information it outputs "REFINED PROMPT: ..."
-  which is extracted and returned separately for the UI to show an apply button.
+  Sets CurrentRefinement.Status = "running".
+  Launches a sandbox container in the background.
+  Returns 202 Accepted immediately.
+
+GET /api/tasks/{id}/refine/logs  (SSE)
+  Streams container output in real time.
+
+Container finishes:
+  CurrentRefinement.Status = "done", Result = spec text.
+  — or —
+  CurrentRefinement.Status = "failed", Error = failure message.
 
 POST /api/tasks/{id}/refine/apply
-  body: { prompt: string, conversation: [{role, content}] }
+  body: { prompt: string }
   ↓
   Saves the refined prompt as the new task prompt.
   Moves the old prompt to PromptHistory.
-  Persists the full conversation as a RefinementSession on the task.
+  Persists a RefinementSession (recording sandbox result and applied prompt).
+  Clears CurrentRefinement.
   Triggers background title regeneration.
+
+POST /api/tasks/{id}/refine/dismiss
+  ↓
+  Clears CurrentRefinement without changing the prompt.
+
+DELETE /api/tasks/{id}/refine
+  ↓
+  Kills the running refinement container.
+  Sets CurrentRefinement.Status = "failed".
 ```
 
-The refinement assistant calls the Anthropic Messages API directly (not via a container). It reuses whichever credential is already configured in `~/.wallfacer/.env` — no separate API token is needed:
-
-| Credential set | Endpoint used |
-|---|---|
-| `CLAUDE_CODE_OAUTH_TOKEN` | `api.claude.ai/api/messages` |
-| `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` | `api.anthropic.com/v1/messages` |
-| `ANTHROPIC_BASE_URL` set | `/v1/messages` at the custom URL |
-
-It uses `CLAUDE_DEFAULT_MODEL` (falling back to `claude-haiku-4-5`) and a 1,024-token response budget.
+Both `RefineSessions []RefinementSession` (past history) and `CurrentRefinement *RefinementJob` (present job) live on the Task struct. `RefineSessions` grows over time as each refinement is applied; `CurrentRefinement` is replaced on each new run and cleared on dismiss.
 
 ## Test Verification
 
@@ -170,6 +178,8 @@ PUT /api/config { "autopilot": true }
 
 Concurrency limit is read from `WALLFACER_MAX_PARALLEL` in the env file (default: 5). Autopilot is off by default and does not persist across server restarts.
 
+Tasks whose `DependsOn` list contains any task not yet in `done` status are skipped by the auto-promoter even when the in-progress count is below `WALLFACER_MAX_PARALLEL`.
+
 ## Board Context
 
 Each container receives a read-only `board.json` at `/workspace/.tasks/board.json` containing a manifest of all non-archived tasks. The current task is marked `"is_self": true`. This gives agents cross-task awareness to avoid conflicting changes with sibling tasks. The manifest is refreshed before every turn.
@@ -182,25 +192,37 @@ Defined in `internal/store/models.go`:
 
 **Task**
 ```
-ID               string               // UUID
-Title            string               // auto-generated short title
-Prompt           string               // current task description
-PromptHistory    []string             // previous prompt versions (before refinements)
-RefineSessions   []RefinementSession  // history of prompt refinement chat sessions
-Status           string               // current state
-SessionID        string               // agent session ID (persisted across turns)
-StopReason       string               // last stop_reason from Claude
-Result           string               // last result text from Claude
-Turns            int                  // number of completed turns
-Timeout          int                  // per-turn timeout in minutes
-FreshStart       bool                 // skip --resume on next run
-MountWorktrees   bool                 // enable sibling worktree mounts + board context
-Model            string               // per-task model override
-Usage            TaskUsage            // accumulated token counts and cost
-WorktreePaths    map[string]string    // repo path → worktree path
-BranchName       string               // task branch name (e.g. task/a1b2c3d4)
-CommitHashes     map[string]string    // repo path → commit hash after merge
-BaseCommitHashes map[string]string    // repo path → base commit hash at branch creation
+ID                 uuid.UUID            // UUID
+Title              string               // auto-generated short title
+Prompt             string               // current task description (short card label)
+PromptHistory      []string             // previous prompt versions (before refinements)
+RefineSessions     []RefinementSession  // history of completed sandbox refinement sessions
+CurrentRefinement  *RefinementJob       // active or recently completed sandbox refinement job
+Status             TaskStatus           // current state
+Archived           bool                 // true when moved to archived view (done/cancelled tasks only)
+SessionID          *string              // agent session ID (persisted across turns)
+FreshStart         bool                 // skip --resume on next run
+StopReason         *string              // last stop_reason from Claude
+Result             *string              // last result text from Claude
+Turns              int                  // number of completed turns
+Timeout            int                  // per-turn timeout in minutes
+Usage              TaskUsage            // accumulated token counts and cost (all activities)
+UsageBreakdown     map[string]TaskUsage // token/cost per sub-agent activity key
+Sandbox            string               // container image override for this task
+SandboxByActivity  map[string]string    // per-activity image overrides (e.g. "testing" → "wallfacer-codex:latest")
+Model              string               // deprecated: retained for migration compatibility; use SandboxByActivity
+Position           int                  // sort order within column
+CreatedAt          time.Time
+UpdatedAt          time.Time
+MountWorktrees     bool                 // enable sibling worktree mounts + board context
+WorktreePaths      map[string]string    // repo path → worktree path
+BranchName         string               // task branch name (e.g. task/a1b2c3d4)
+CommitHashes       map[string]string    // repo path → commit hash after merge
+BaseCommitHashes   map[string]string    // repo path → base commit hash at branch creation
+Kind               TaskKind             // "" or "idea-agent" (TaskKindIdeaAgent)
+Tags               []string             // labels for categorisation
+ExecutionPrompt    string               // overrides Prompt when invoking the sandbox agent; keeps Prompt as the short card label
+DependsOn          []string             // UUIDs of prerequisite tasks; blocks autopilot promotion until all are done
 
 // Test verification
 IsTestRun        bool   // true while a test agent is running on this task
@@ -208,27 +230,61 @@ LastTestResult   string // "pass", "fail", "unknown" (tested but ambiguous), or 
 TestRunStartTurn int    // turn count when the test run started (boundary between impl and test turns)
 ```
 
-**RefinementSession** (one chat-based refinement interaction)
+**RefinementSession** (one completed sandbox refinement interaction, stored in history)
 ```
 ID           string               // UUID
 CreatedAt    time.Time
 StartPrompt  string               // prompt text at the start of this session
-Messages     []RefinementMessage  // full conversation
-ResultPrompt string               // applied prompt (empty if discarded)
+Result       string               // raw spec produced by the sandbox agent
+ResultPrompt string               // prompt the user applied (may differ from Result if edited)
+Messages     []RefinementMessage  // kept for backward compatibility with older chat-based sessions
 ```
 
-**RefinementMessage**
+**RefinementMessage** (legacy; used in older chat-based sessions)
 ```
 Role      string    // "user" or "assistant"
 Content   string
 CreatedAt time.Time
 ```
 
+**RefinementJob** (tracks the active or most-recently-completed sandbox refinement run)
+```
+ID        string    // UUID
+CreatedAt time.Time
+Status    string    // "running" | "done" | "failed"
+Result    string    // refined prompt/spec text (populated when Status = "done")
+Error     string    // error message (populated when Status = "failed")
+```
+
+**TaskOversight** (aggregated high-level summary of agent execution)
+```
+Status       OversightStatus  // "pending" | "generating" | "ready" | "failed"
+GeneratedAt  time.Time
+Error        string
+Phases       []OversightPhase
+```
+
+**OversightPhase** (one logical grouping of related agent activities)
+```
+Timestamp  time.Time
+Title      string
+Summary    string
+ToolsUsed  []string
+Commands   []string
+Actions    []string
+```
+
+**SpanData** (attached to span_start / span_end trace events)
+```
+Phase  string  // e.g. "worktree_setup", "agent_turn", "container_run", "commit"
+Label  string  // differentiates multiple spans of the same phase
+```
+
 **TaskEvent** (append-only trace log)
 ```
 ID        int64
 TaskID    uuid.UUID
-EventType EventType // state_change | output | feedback | error | system
+EventType EventType // state_change | output | feedback | error | system | span_start | span_end
 Data      json.RawMessage
 CreatedAt time.Time
 ```
@@ -242,6 +298,18 @@ CacheCreationInputTokens int
 CostUSD                  float64
 ```
 
+**EventType values**
+
+| Value | Description |
+|---|---|
+| `state_change` | Task moved to a new state |
+| `output` | Agent turn output text |
+| `feedback` | User-submitted feedback message |
+| `error` | Error during execution |
+| `system` | Server-inserted note (e.g. crash recovery message, pipeline progress) |
+| `span_start` | Start of a named execution phase (data: SpanData) |
+| `span_end` | End of a named execution phase (data: SpanData) |
+
 ## Persistence
 
 Each task owns a directory under `data/<uuid>/`:
@@ -253,10 +321,12 @@ data/<uuid>/
 │   ├── 0001.json      # first event
 │   ├── 0002.json      # second event
 │   └── ...            # append-only
-└── outputs/
-    ├── turn-0001.json        # raw agent JSON output
-    ├── turn-0001.stderr.txt  # stderr (if non-empty)
-    └── ...
+├── outputs/
+│   ├── turn-0001.json        # raw agent JSON output
+│   ├── turn-0001.stderr.txt  # stderr (if non-empty)
+│   └── ...
+└── oversights/
+    └── <oversight-id>.json   # generated oversight summary
 ```
 
 All writes are atomic (temp file + `os.Rename`). On startup, `task.json` files are loaded into memory. See [Architecture](architecture.md#design-choices) for the persistence design rationale.
@@ -276,3 +346,21 @@ The task may have produced useful partial output. Moving to `waiting` lets the u
 
 **Monitor goroutine** (`monitorContainerUntilStopped`):
 When a container is found still running after a restart, a background goroutine polls `podman/docker ps` every 5 seconds. Once the container stops it moves the task from `in_progress` to `waiting` with an explanatory output event. If the task was already transitioned by another path (e.g. cancelled by the user) the goroutine exits cleanly.
+
+## Oversight Generation
+
+When a task transitions to `waiting`, `done`, or `failed`, the server launches a background goroutine to generate an oversight summary. The summary is also regenerated periodically if `WALLFACER_OVERSIGHT_INTERVAL` is set to a positive number of minutes.
+
+The generator reads the task's trace events, passes them to the Claude API with a summarisation prompt, and writes the result as a `TaskOversight` (`status`: `pending` → `generating` → `ready` | `failed`). The result is persisted in `data/<uuid>/oversights/<id>.json`.
+
+The UI shows the oversight in the Oversight tab (logical phases with tools/commands used) and as an interactive flamegraph Timeline.
+
+`POST /api/tasks/generate-oversight` can be used to retroactively generate oversight for tasks that completed before this feature existed.
+
+## Ideation / Brainstorm Agent
+
+The ideation feature creates a task with `Kind = "idea-agent"`. The agent runs in a sandbox container, reads the configured workspaces, and calls the wallfacer API to create backlog tasks.
+
+- Each created task gets relevant `Tags` and an `ExecutionPrompt` (full instructions) separate from `Prompt` (the short card label).
+- Triggered via `POST /api/ideate`; cancelled via `DELETE /api/ideate`.
+- `GET /api/ideate` returns current ideation session state (task ID, status, created task count).

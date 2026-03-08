@@ -89,8 +89,10 @@ git merge --ff-only <task-branch>
 ```
 git worktree remove --force   ← remove worktree directory
 git branch -D task/<uuid8>    ← delete task branch
-rm -rf data/<uuid>            ← remove task output files
+rm -rf ~/.wallfacer/worktrees/<uuid>/   ← remove task worktree directory
 ```
+
+Note: `data/<uuid>/` (task record, traces, outputs, oversights) is **preserved** after cleanup so execution history remains accessible in the UI.
 
 Cleanup is idempotent and safe to call multiple times (errors are logged, not fatal).
 

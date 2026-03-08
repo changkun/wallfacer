@@ -25,8 +25,14 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 | `POST /api/tasks/{id}/resume` | Resume failed task, same session → launch `runner.Run` goroutine |
 | `POST /api/tasks/{id}/sync` | Rebase task worktrees onto latest default branch (waiting/failed only) |
 | `POST /api/tasks/{id}/test` | Start test verification agent on a waiting task; records pass/fail verdict |
-| `POST /api/tasks/{id}/refine` | Single chat turn in a refinement session (backlog tasks only) |
-| `POST /api/tasks/{id}/refine/apply` | Apply refined prompt; persists conversation as `RefinementSession` |
+| `POST /api/tasks/{id}/refine` | Launch sandbox refinement container for a backlog task |
+| `DELETE /api/tasks/{id}/refine` | Cancel active sandbox refinement container |
+| `GET /api/tasks/{id}/refine/logs` | SSE: stream refinement container logs |
+| `POST /api/tasks/{id}/refine/apply` | Apply refined prompt; persists result as `RefinementSession` |
+| `POST /api/tasks/{id}/refine/dismiss` | Discard refinement result without applying |
+| `GET /api/tasks/{id}/oversight` | Get aggregated oversight summary for a task |
+| `GET /api/tasks/{id}/oversight/test` | Get test-run oversight summary |
+| `GET /api/tasks/{id}/spans` | Get span timing data for a task |
 | `POST /api/tasks/{id}/archive` | Move done or cancelled task to archived |
 | `POST /api/tasks/{id}/unarchive` | Restore archived task |
 | `POST /api/tasks/archive-done` | Archive all done and cancelled tasks in one operation |
@@ -36,6 +42,7 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 | `GET /api/tasks/{id}/outputs/{filename}` | Serve raw turn output file |
 | `GET /api/tasks/{id}/logs` | SSE: stream live container logs (`podman/docker logs -f`) |
 | `POST /api/tasks/generate-titles` | Trigger background title generation for untitled tasks |
+| `POST /api/tasks/generate-oversight` | Generate oversight summaries for tasks missing them |
 | `GET /api/containers` | List all wallfacer sandbox containers (running and stopped) |
 | `GET /api/git/status` | Current branch / remote status for all workspaces |
 | `GET /api/git/stream` | SSE: poll git status every few seconds |
@@ -45,6 +52,14 @@ All state changes flow through `handler.go`. The handler never blocks — long-r
 | `GET /api/git/branches` | List local branches for a workspace (`?workspace=<path>`) |
 | `POST /api/git/checkout` | Switch the active branch for a workspace |
 | `POST /api/git/create-branch` | Create a new branch and check it out |
+| `GET /api/ideate` | Get current ideation session state |
+| `POST /api/ideate` | Launch brainstorm/ideation agent |
+| `DELETE /api/ideate` | Cancel running ideation agent |
+| `GET /api/usage` | Aggregate usage statistics across all tasks |
+| `GET /api/files` | File listing for @ mention autocomplete |
+| `POST /api/env/test` | Validate sandbox credentials via test container |
+| `GET /api/debug/health` | Health check |
+| `GET /api/debug/spans` | Aggregate span timing statistics |
 
 ### Triggering Task Execution
 
@@ -170,6 +185,8 @@ TaskUsage {
 
 Usage is displayed on task cards and aggregated in the Done column header. It persists in `task.json` across server restarts.
 
+In addition to the aggregate `TaskUsage`, each task records a `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `testing`, `refinement`, `title`, `oversight`, `commit_message`, `idea_agent`. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
+
 ## Multi-Workspace Support
 
 Multiple workspace paths can be passed at startup (see [Architecture — Configuration](architecture.md#configuration)). For each workspace:
@@ -249,32 +266,91 @@ StartAutoPromoter():
 
 `WALLFACER_MAX_PARALLEL` defaults to 5. The lock ensures two simultaneous state changes cannot both promote tasks, which would exceed the limit. Autopilot state is toggled via `PUT /api/config {"autopilot": true/false}` and does not persist across restarts.
 
-## Refinement Chat Flow
+## Refinement Flow
 
-`POST /api/tasks/{id}/refine` runs a direct API call (not a container) to help improve task prompts:
+`POST /api/tasks/{id}/refine` launches a sandbox container to analyse the codebase and produce a detailed implementation spec:
 
 ```
-client sends: { message, conversation }
+POST /api/tasks/{id}/refine
+  body: { user_instructions? }   // optional additional instructions
   ↓
-server reads credentials from env file
+  Sets CurrentRefinement.Status = "running".
+  Launches sandbox container in background (runner.RunRefinementBackground).
+  Returns immediately with 202 Accepted.
   ↓
-builds Claude Messages API request with refineSystemPrompt + conversation history
-  on first call: primes with task prompt as first user message
-  on subsequent calls: appends user message to conversation
+GET /api/tasks/{id}/refine/logs  (SSE)
+  Client streams container output in real time.
   ↓
-calls Anthropic Messages API (api.claude.ai for OAuth, api.anthropic.com for API keys)
-  ↓
-parses response for "REFINED PROMPT:" marker
-  if found: strips marker, returns both the assistant message and refined_prompt
-  otherwise: returns assistant message only
-  ↓
-client displays response, shows Apply button when refined_prompt is present
+Container finishes:
+  CurrentRefinement.Status = "done", Result = refined prompt/spec text.
+  — or —
+  CurrentRefinement.Status = "failed", Error = failure message.
 
 POST /api/tasks/{id}/refine/apply
-  body: { prompt, conversation }
+  body: { prompt }
   ↓
-  saves conversation as RefinementSession on the task
-  moves old prompt to PromptHistory
-  sets task.Prompt = new prompt
-  triggers background title regeneration
+  Saves a RefinementSession (recording the sandbox result and the applied prompt).
+  Moves current Prompt to PromptHistory.
+  Sets task.Prompt = refined prompt.
+  Clears CurrentRefinement.
+  Triggers background title regeneration.
+
+POST /api/tasks/{id}/refine/dismiss
+  ↓
+  Clears CurrentRefinement without changing the prompt.
+
+DELETE /api/tasks/{id}/refine
+  ↓
+  Kills the running refinement container.
+  Sets CurrentRefinement.Status = "failed".
 ```
+
+## Oversight Generation Flow
+
+Oversight is generated asynchronously whenever a task transitions to `waiting`, `done`, or `failed`. It is also regenerated periodically during execution if `WALLFACER_OVERSIGHT_INTERVAL > 0` (minutes).
+
+`POST /api/tasks/generate-oversight` triggers generation for tasks that are missing summaries.
+
+```
+Task reaches waiting/done/failed
+  ↓
+background goroutine: runner.GenerateOversight(taskID)
+  ↓
+TaskOversight.Status → "generating"
+reads trace events from traces/NNNN.json
+sends to Claude (via configured credentials) with a summarisation prompt
+  ↓
+response parsed into []OversightPhase (logical groupings of work)
+  ↓
+TaskOversight.Status → "ready"
+stored in oversights/<id>.json
+```
+
+Served by:
+- `GET /api/tasks/{id}/oversight` — implementation run summary
+- `GET /api/tasks/{id}/oversight/test` — test-run summary (if a test was run)
+
+The UI renders phases in the Oversight tab and as an interactive flamegraph Timeline.
+
+## Ideation / Brainstorm Agent Flow
+
+```
+POST /api/ideate
+  ↓
+  Creates a special task with Kind = "idea-agent".
+  Launches a sandbox container that:
+    - Reads workspace directory contents
+    - Analyses code structure and identifies opportunities
+    - Creates backlog tasks via the wallfacer API, each tagged appropriately
+  Container runs to completion; created tasks appear on the board.
+
+GET /api/ideate  — returns current ideation session state (task ID, status, created task count)
+DELETE /api/ideate  — kills running ideation container, marks task cancelled
+```
+
+## Span Instrumentation
+
+Key execution phases are instrumented with `span_start` / `span_end` trace events. Each span carries a `SpanData` payload with a `Phase` (e.g. `worktree_setup`, `agent_turn`, `container_run`, `commit`) and an optional `Label` to differentiate multiple spans of the same phase.
+
+- `GET /api/tasks/{id}/spans` — returns all span events for a task, useful for profiling turn latency
+- `GET /api/debug/spans` — aggregate span timing statistics across all tasks

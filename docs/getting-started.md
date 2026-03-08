@@ -39,6 +39,14 @@ This builds both the Claude (`wallfacer:latest`) and OpenAI Codex (`wallfacer-co
 make build-claude
 ```
 
+To run all tests (backend and frontend):
+
+```bash
+make test           # Run all tests (backend + frontend)
+make test-backend   # Run Go unit tests (go test ./...)
+make test-frontend  # Run frontend JS unit tests (npm test)
+```
+
 Building takes a few minutes the first time. Confirm the image exists afterward:
 
 ```bash
@@ -124,6 +132,7 @@ All configuration lives in `~/.wallfacer/.env`. The server re-reads this file be
 | `CLAUDE_DEFAULT_MODEL` | no | Default model passed to task containers; omit to use the Claude Code default |
 | `CLAUDE_TITLE_MODEL` | no | Model for background title generation; falls back to `CLAUDE_DEFAULT_MODEL` |
 | `WALLFACER_MAX_PARALLEL` | no | Maximum number of tasks that run concurrently in autopilot mode (default: 5) |
+| `WALLFACER_OVERSIGHT_INTERVAL` | no | Minutes between periodic oversight generation while a task runs (0 = only at completion, default: 0) |
 
 ### OpenAI Codex Variables (Optional)
 
@@ -162,6 +171,15 @@ The container runtime defaults to auto-detection: Wallfacer checks `/opt/podman/
 ```
 
 Prints all recognized configuration variables and whether they are set, with credential values masked.
+
+### Attaching to a Running Task Container
+
+```bash
+./wallfacer exec <task-id-prefix>           # Attach an interactive shell to a running task container
+./wallfacer exec <task-id-prefix> -- bash   # Explicit shell
+```
+
+The task ID prefix is the first few characters of the task UUID (shown on the card or in the detail panel).
 
 ## Next Steps
 

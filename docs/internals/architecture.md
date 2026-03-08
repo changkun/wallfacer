@@ -47,25 +47,46 @@ wallfacer/
 │   ├── handler/         # HTTP API handlers (one file per concern)
 │   │   ├── config.go        # GET/PUT /api/config (autopilot toggle)
 │   │   ├── containers.go    # GET /api/containers
-│   │   ├── env.go           # GET/PUT /api/env
+│   │   ├── debug.go         # GET /api/debug/health and /api/debug/spans
+│   │   ├── diffcache.go     # In-memory diff result cache
+│   │   ├── env.go           # GET/PUT /api/env, POST /api/env/test
 │   │   ├── execute.go       # Task lifecycle actions (feedback, done, cancel, resume, sync, archive, test)
-│   │   ├── git.go           # Git status, push, sync, branches, checkout, create-branch, rebase-on-main
+│   │   ├── files.go         # GET /api/files (@ mention autocomplete)
+│   │   ├── git.go           # Git status, push, sync, branches, checkout, rebase-on-main
+│   │   ├── handler.go       # Handler struct, middleware, shared helpers
+│   │   ├── ideate.go        # GET/POST/DELETE /api/ideate (brainstorm agent)
 │   │   ├── instructions.go  # GET/PUT /api/instructions, POST reinit
-│   │   ├── refine.go        # POST /api/tasks/{id}/refine and /refine/apply (prompt refinement chat)
-│   │   ├── stream.go        # SSE endpoints (task stream, git stream, container logs)
-│   │   └── tasks.go         # Task CRUD, title generation, autopilot promoter
+│   │   ├── oversight.go     # GET /api/tasks/{id}/oversight and /oversight/test
+│   │   ├── refine.go        # POST/DELETE /api/tasks/{id}/refine, logs, apply, dismiss
+│   │   ├── spans.go         # GET /api/tasks/{id}/spans, GET /api/debug/spans
+│   │   ├── stream.go        # SSE endpoints (task stream, git stream, container logs, refine logs)
+│   │   ├── tasks.go         # Task CRUD, title/oversight generation, autopilot promoter
+│   │   └── usage.go         # GET /api/usage (aggregate usage statistics)
 │   ├── instructions/    # Workspace CLAUDE.md management
 │   ├── logger/          # Structured logging (pretty-print + JSON)
 │   ├── runner/          # Container orchestration, task execution, commit pipeline
 │   │   ├── board.go         # Board context (board.json) generation for cross-task awareness
-│   │   ├── commit.go        # Commit pipeline: Claude commit, rebase, merge, cleanup
-│   │   ├── container.go     # Container argument building, execution, output parsing
-│   │   ├── execute.go       # Main task execution loop, worktree sync
+│   │   ├── commit.go        # Commit pipeline: host-side stage/commit, rebase, merge, cleanup
+│   │   ├── container.go     # Container argument building, execution via os/exec, NDJSON parsing
+│   │   ├── execute.go       # Main task execution loop, turn handling, stop_reason dispatch
+│   │   ├── ideate.go        # Brainstorm agent orchestration
+│   │   ├── oversight.go     # Oversight summary generation
+│   │   ├── parse.go         # Output parsing utilities
+│   │   ├── recovery.go      # Crash recovery: reconcile in_progress/committing tasks on startup
+│   │   ├── refine.go        # Sandbox-based prompt refinement orchestration
 │   │   ├── runner.go        # Runner struct, config, container listing (Podman + Docker)
 │   │   ├── snapshot.go      # Pre-run workspace snapshot for diff baselines
-│   │   ├── title.go         # Background title generation via Claude
+│   │   ├── title.go         # Background title generation
+│   │   ├── util.go          # Shared helpers
 │   │   └── worktree.go      # Worktree setup and cleanup
 │   └── store/           # Per-task directory persistence, data models, event sourcing
+│       ├── models.go        # Domain types: Task, TaskStatus, TaskOversight, SpanData, RefinementJob, …
+│       ├── store.go         # Store struct, in-memory map, sync.RWMutex, Init, Load
+│       ├── tasks.go         # Task CRUD and validated status transitions
+│       ├── events.go        # Append-only trace event management
+│       ├── io.go            # Atomic file I/O helpers (SaveTurnOutput, etc.)
+│       ├── oversight.go     # Oversight persistence helpers
+│       └── subscribe.go     # Change notification channels (buffered, coalesced for SSE)
 │
 ├── ui/
 │   ├── index.html       # 5-column Kanban board layout
@@ -73,21 +94,35 @@ wallfacer/
 │   │   ├── styles.css       # Custom component styles
 │   │   └── tailwind.css     # Tailwind CSS build
 │   └── js/
-│       ├── state.js         # Global state management
-│       ├── api.js           # HTTP client & SSE stream setup
-│       ├── tasks.js         # Task CRUD operations
-│       ├── render.js        # Board rendering & DOM updates
-│       ├── modal.js         # Task detail modal (diff view, events, logs)
-│       ├── git.js           # Git status display & branch switcher
-│       ├── dnd.js           # Drag-and-drop (Sortable.js)
-│       ├── events.js        # Event timeline rendering
-│       ├── envconfig.js     # API configuration editor (token, base URL, model)
-│       ├── containers.js    # Container monitoring UI
-│       ├── instructions.js  # CLAUDE.md editor
-│       ├── markdown.js      # Markdown rendering (Marked.js)
-│       ├── refine.js        # Prompt refinement chat UI
-│       ├── theme.js         # Dark/light theme toggle
-│       └── utils.js         # Shared utility functions
+│       ├── api.js               # HTTP client & SSE stream setup
+│       ├── containers.js        # Container monitoring UI
+│       ├── dep-graph.js         # Task dependency graph visualisation
+│       ├── dnd.js               # Drag-and-drop (Sortable.js wrapper)
+│       ├── envconfig.js         # API configuration editor
+│       ├── events.js            # Event timeline rendering
+│       ├── git.js               # Git status display & branch switcher
+│       ├── ideate.js            # Ideation trigger and result display
+│       ├── instructions.js      # CLAUDE.md editor modal
+│       ├── markdown.js          # Markdown rendering (Marked.js)
+│       ├── mention.js           # @ mention autocomplete for file references
+│       ├── modal.js             # Task detail modal (top-level, tab routing)
+│       ├── modal-ansi.js        # ANSI escape sequences → HTML
+│       ├── modal-core.js        # Modal open/close infrastructure
+│       ├── modal-diff.js        # Diff viewer (collapsible per-file)
+│       ├── modal-flamegraph.js  # Flamegraph timeline visualisation
+│       ├── modal-logs.js        # Live log streaming (oversight/pretty/raw modes)
+│       ├── modal-ndjson.js      # NDJSON parsing and display
+│       ├── modal-oversight.js   # Oversight summary rendering (phases, tools, commands)
+│       ├── modal-results.js     # Results panel layout
+│       ├── refine.js            # Prompt refinement UI
+│       ├── render.js            # Board rendering & DOM updates
+│       ├── search.js            # Task search/filter
+│       ├── span-stats.js        # Span timing debug view
+│       ├── state.js             # Global state management
+│       ├── tasks.js             # Task CRUD operations
+│       ├── theme.js             # Dark/light theme toggle
+│       ├── usage-stats.js       # Token/cost breakdown by activity
+│       └── utils.js             # Shared utility functions (escapeHtml, dateFormat, …)
 │
 ├── sandbox/
 │   ├── claude/
@@ -121,6 +156,7 @@ wallfacer/
 
 - `wallfacer run [flags] [workspace ...]` — Start the Kanban server
 - `wallfacer env` — Show configuration and env file status
+- `wallfacer exec <task-id-prefix> [-- command...]` — Attach to a running task container by UUID prefix; runs an interactive shell if no command is given
 
 Running `wallfacer` with no arguments prints help.
 
@@ -158,6 +194,7 @@ At least one authentication variable must be set (Claude or Codex):
 | `CLAUDE_DEFAULT_MODEL` | no | Default model passed as `--model` to task containers; omit to use the Claude Code default |
 | `CLAUDE_TITLE_MODEL` | no | Model used for background title generation; falls back to `CLAUDE_DEFAULT_MODEL` if unset |
 | `WALLFACER_MAX_PARALLEL` | no | Maximum number of concurrently running tasks when autopilot is enabled (default: 5) |
+| `WALLFACER_OVERSIGHT_INTERVAL` | no | Minutes between periodic oversight generation while a task runs (0 = only at completion, default: 0) |
 
 When both `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY` are set, the OAuth token takes precedence. This is Claude Code CLI behavior — wallfacer simply passes both variables through to the container via `--env-file`.
 

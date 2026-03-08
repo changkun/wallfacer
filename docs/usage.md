@@ -10,17 +10,21 @@ Wallfacer presents a five-column Kanban board. Every task card moves through the
 | **In Progress** | Container running; agent executing |
 | **Waiting** | Agent paused, awaiting your feedback |
 | **Done** | Completed; changes committed to your repo |
-| **Archived** | Done or cancelled tasks moved off the active board |
+| **Archived** | Done or cancelled tasks moved off the active board (tasks with `archived=true`) |
 
 ## Creating Tasks
 
-Click **+ New Task** in the toolbar, enter a description of what you want the agent to do, and click **Add**. The card appears in Backlog with an auto-generated short title.
+Click **+ New Task** in the toolbar, enter a description of what you want the agent to do, and click **Add**. The card appears in Backlog with an auto-generated short title. Each task card has a model/sandbox selector so you can override the default container image for that task.
 
 ### Refining Prompts
 
-For complex tasks, sharpen the prompt before running it. Click the refine icon on a Backlog card to open a chat panel. An AI assistant asks clarifying questions and iteratively improves the prompt. When it proposes a refined version, click **Apply** to replace the task prompt with the improved version.
+For complex tasks, sharpen the prompt before running it. Click the refine icon on a Backlog card to launch a sandbox agent that analyses your codebase and produces a detailed implementation spec. Stream the agent's output in real time. When it finishes, click **Apply** to replace the task prompt with the refined version, or **Dismiss** to discard it.
 
 Prompt refinement is only available for Backlog tasks.
+
+## Ideation
+
+Click the **Ideate** button (lightbulb icon) in the toolbar to launch the brainstorm agent. The agent analyses your workspace, identifies opportunities, and automatically creates backlog cards for each idea. Each generated card is tagged so you can identify and filter it. Cards created by ideation have a short display title (`Prompt`) and a more detailed `ExecutionPrompt` passed to the container at runtime. Cancel a running ideation session by clicking the button again.
 
 ## Running Tasks
 
@@ -35,12 +39,17 @@ Drag a card from **Backlog** to **In Progress**. Wallfacer:
 Click a card to open the detail panel, which shows:
 
 - Live log output as the agent works
-- Token usage and estimated cost
+- Token usage and estimated cost (broken down by sub-agent activity)
 - The git diff of the agent's changes so far
+- **Oversight tab** — a high-level summary of what the agent did, organised into phases (e.g. "Reading codebase", "Implementing feature", "Running tests"). Each phase lists tools used, commands run, and key actions. The **Timeline** tab renders the same data as an interactive flamegraph.
 
 ### Autopilot
 
 Enable **Autopilot** from the toolbar to automatically promote Backlog tasks to In Progress as capacity becomes available. The concurrency limit defaults to 5 and is controlled by `WALLFACER_MAX_PARALLEL` in your env file. Autopilot is off by default and resets to off on server restart.
+
+### Task Dependencies
+
+Tasks can declare other tasks as prerequisites (`DependsOn`). Autopilot will not promote a task to In Progress until all of its dependencies have reached Done. The dependency graph panel visualises these relationships.
 
 ## Handling Waiting Tasks
 
@@ -116,12 +125,15 @@ Open **Settings** (gear icon) to access:
 - **API Configuration** — credential, base URL, model selection, concurrency limit; changes take effect on the next task run without restarting
 - **Workspace Instructions** — the `CLAUDE.md` content for each workspace
 
+**WALLFACER_OVERSIGHT_INTERVAL** controls how often (in minutes) the server generates intermediate oversight summaries while a task is running. Set to `0` (default) to generate only when the task completes.
+
 ## Keyboard Shortcuts and Tips
 
 - Click any card to open its detail panel (diff, events, logs)
 - The log stream in the detail panel updates in real time via Server-Sent Events
 - Multiple tasks can run simultaneously; each operates on its own isolated branch and container
 - Completed containers are automatically removed (`--rm`); no cleanup needed
+- Use the search bar to filter visible cards by title, prompt text, or tag
 
 ## Common Workflows
 
