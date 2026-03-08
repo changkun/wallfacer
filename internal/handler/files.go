@@ -2,9 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 // maxFileListSize caps the total number of files returned to keep responses fast.
@@ -29,6 +26,7 @@ var skipDirs = map[string]bool{
 // Hidden directories and common generated/dependency directories are skipped.
 // Paths are prefixed with the workspace base name (matching the /workspace/<name>/
 // mount path inside containers), making them directly usable in task prompts.
+// Results are served from a per-workspace cache; see fileIndex for invalidation policy.
 func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
 	workspaces := h.runner.Workspaces()
 	files := make([]string, 0, 256)
@@ -37,29 +35,12 @@ func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
 		if len(files) >= maxFileListSize {
 			break
 		}
-		base := filepath.Base(ws)
-		_ = filepath.Walk(ws, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return nil
-			}
-			if info.IsDir() {
-				name := info.Name()
-				// Skip hidden dirs and known generated/dependency dirs.
-				if strings.HasPrefix(name, ".") || skipDirs[name] {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if len(files) >= maxFileListSize {
-				return filepath.SkipAll
-			}
-			rel, relErr := filepath.Rel(ws, path)
-			if relErr != nil {
-				return nil
-			}
-			files = append(files, filepath.ToSlash(filepath.Join(base, rel)))
-			return nil
-		})
+		wsFiles := h.fileIndex.Files(ws)
+		remaining := maxFileListSize - len(files)
+		if len(wsFiles) > remaining {
+			wsFiles = wsFiles[:remaining]
+		}
+		files = append(files, wsFiles...)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"files": files})
