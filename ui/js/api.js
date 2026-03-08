@@ -13,6 +13,33 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
+// --- Deep-link hash handling ---
+
+// Called once after the first SSE snapshot. Checks window.location.hash for
+// a task ID (and optional tab name) and opens the corresponding modal.
+// Format: #<uuid> or #<uuid>/<tabName>
+function _handleInitialHash() {
+  if (_hashHandled) return;
+  _hashHandled = true;
+  const match = location.hash.match(/^#([0-9a-f-]{36})(?:\/([\w-]+))?$/);
+  if (!match) return;
+  const taskId = match[1];
+  const tabName = match[2] || null;
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+  openModal(taskId).then(function() {
+    if (tabName) {
+      const rightTabs = ['implementation', 'testing', 'changes', 'spans', 'timeline'];
+      const leftTabs = ['implementation', 'testing'];
+      if (rightTabs.includes(tabName)) {
+        setRightTab(tabName);
+      } else if (leftTabs.includes(tabName)) {
+        setLeftTab(tabName);
+      }
+    }
+  });
+}
+
 // --- Tasks SSE stream ---
 
 function startTasksStream() {
@@ -26,6 +53,7 @@ function startTasksStream() {
     try {
       tasks = JSON.parse(e.data);
       scheduleRender();
+      _handleInitialHash();
     } catch (err) {
       console.error('tasks SSE snapshot parse error:', err);
     }

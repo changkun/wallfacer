@@ -49,3 +49,6 @@ let timelineRefreshTimer = null;
 
 // Search / filter state
 let filterQuery = '';
+
+// Deep-link hash handling: true once the initial URL hash has been processed.
+let _hashHandled = false;

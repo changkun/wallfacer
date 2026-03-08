@@ -94,6 +94,12 @@ function makeLogsContext() {
     renderOversightInLogs: () => {},
     renderTestOversightInTestLogs: () => {},
     escapeHtml: (s) => String(s ?? ''),
+    // Timeline helpers called by setRightTab
+    _stopTimelineRefresh: () => {},
+    _startTimelineRefresh: () => {},
+    renderTimeline: () => {},
+    loadFlamegraph: () => {},
+    history: { replaceState: () => {} },
   });
 
   loadScript('modal-logs.js', ctx);

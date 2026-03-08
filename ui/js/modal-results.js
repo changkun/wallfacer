@@ -54,6 +54,9 @@ function setLeftTab(tab) {
     if (btn) btn.classList.toggle('active', active);
     if (panel) panel.classList.toggle('hidden', !active);
   });
+  if (typeof currentTaskId !== 'undefined' && currentTaskId) {
+    history.replaceState(null, '', '#' + currentTaskId + '/' + tab);
+  }
 }
 
 // --- Timeline Gantt chart ---
