@@ -418,6 +418,9 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	if task.SessionID != nil {
 		sessionID = *task.SessionID
 	}
-	h.runner.SyncWorktreesBackground(id, sessionID, oldStatus)
+	h.diffCache.invalidate(id)
+	h.runner.SyncWorktreesBackground(id, sessionID, oldStatus, func() {
+		h.diffCache.invalidate(id)
+	})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "syncing"})
 }

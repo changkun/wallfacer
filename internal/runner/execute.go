@@ -404,12 +404,19 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 		stashed := gitutil.StashIfDirty(worktreePath)
 
 		var rebaseErr error
+		conflictDetected := false
 		for attempt := 1; attempt <= maxRebaseRetries; attempt++ {
 			rebaseErr = gitutil.RebaseOntoDefault(repoPath, worktreePath)
 			if rebaseErr == nil {
 				break
 			}
-			if attempt == maxRebaseRetries || !isConflictError(rebaseErr) {
+			if !isConflictError(rebaseErr) {
+				// Non-conflict git error (e.g. invalid ref, detached HEAD):
+				// bail out immediately without retrying.
+				break
+			}
+			conflictDetected = true
+			if attempt == maxRebaseRetries {
 				break
 			}
 			logger.Runner.Warn("sync rebase conflict, invoking resolver",
@@ -429,12 +436,18 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 		}
 
 		if rebaseErr != nil {
-			// Auto-resolution exhausted: keep the task in_progress and hand
-			// off to the agent so it can resolve the conflict interactively.
-			// The rebase was aborted by RebaseOntoDefault, so the worktree is
-			// clean on the task branch — Claude can inspect the upstream diff
-			// and update the code accordingly.
 			statusSet = true
+			if !conflictDetected {
+				// Non-conflict git error: fail the task so the user can see
+				// what went wrong (e.g. invalid ref, detached HEAD).
+				r.failSync(bgCtx, taskID, sessionID, task.Turns,
+					fmt.Sprintf("rebase in %s: %v", filepath.Base(worktreePath), rebaseErr))
+				return
+			}
+			// Conflict (or failed conflict resolution): keep the task
+			// in_progress and hand off to the agent so it can resolve
+			// interactively. The rebase was aborted by RebaseOntoDefault, so
+			// the worktree is clean on the task branch.
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 				"result": fmt.Sprintf(
 					"Sync conflict in %s could not be automatically resolved — "+

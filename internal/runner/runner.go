@@ -264,11 +264,15 @@ func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resum
 
 // SyncWorktreesBackground launches SyncWorktrees in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
-func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus) {
+// The optional onDone callback is called after SyncWorktrees returns.
+func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus, onDone ...func()) {
 	r.backgroundWg.Add(1)
 	go func() {
 		defer r.backgroundWg.Done()
 		r.SyncWorktrees(taskID, sessionID, prevStatus)
+		for _, fn := range onDone {
+			fn()
+		}
 	}()
 }
 
