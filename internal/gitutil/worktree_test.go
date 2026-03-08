@@ -19,12 +19,22 @@ func TestCreateWorktree(t *testing.T) {
 		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "new-branch") })
 	})
 
-	t.Run("stale branch is force-deleted then recreated", func(t *testing.T) {
+	t.Run("existing branch is reused without deleting commits", func(t *testing.T) {
 		repo := setupRepo(t)
-		gitRun(t, repo, "branch", "stale")
+		gitRun(t, repo, "checkout", "-b", "stale")
+		writeFile(t, filepath.Join(repo, "stale.txt"), "keep me\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "stale commit")
+		staleHead := gitRun(t, repo, "rev-parse", "HEAD")
+		gitRun(t, repo, "checkout", "main")
+
 		wtDir := filepath.Join(t.TempDir(), "wt")
 		if err := CreateWorktree(repo, wtDir, "stale"); err != nil {
 			t.Fatalf("CreateWorktree with stale branch failed: %v", err)
+		}
+		wtHead := gitRun(t, wtDir, "rev-parse", "HEAD")
+		if wtHead != staleHead {
+			t.Fatalf("expected existing branch head %q, got %q", staleHead, wtHead)
 		}
 		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "stale") })
 	})

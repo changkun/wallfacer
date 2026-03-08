@@ -24,20 +24,11 @@ func CreateWorktree(repoPath, worktreePath, branchName string) error {
 		"git", "-C", repoPath,
 		"worktree", "add", "-b", branchName, worktreePath, "HEAD",
 	).CombinedOutput()
-	if err != nil && strings.Contains(string(out), "already exists") {
-		// A stale branch was left behind by a previous failed cleanup. Force-delete
-		// the orphaned branch and retry so the task can start fresh from HEAD.
-		exec.Command("git", "-C", repoPath, "branch", "-D", branchName).Run()
-		out, err = exec.Command(
-			"git", "-C", repoPath,
-			"worktree", "add", "-b", branchName, worktreePath, "HEAD",
-		).CombinedOutput()
-	}
 	if err != nil {
 		// Branch may already exist when the worktree directory was deleted but the
 		// git branch survived (e.g. server restart). The stale worktree entry in
-		// .git/worktrees/ also triggers "missing but already registered". Both
-		// cases are resolved by checking out the existing branch with --force.
+		// .git/worktrees/ also triggers "missing but already registered". Reattach
+		// the existing branch with --force so in-progress commits are preserved.
 		if strings.Contains(string(out), "already exists") ||
 			strings.Contains(string(out), "already registered worktree") {
 			out2, err2 := exec.Command(
