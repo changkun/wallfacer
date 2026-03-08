@@ -447,7 +447,7 @@ func (r *Runner) rebaseAndMergeOne(
 			"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d)...", repoPath, attempt),
 		})
 
-		if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID); resolveErr != nil {
+		if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch); resolveErr != nil {
 			return fmt.Errorf("conflict resolution failed: %w", resolveErr)
 		}
 	}
@@ -478,25 +478,35 @@ func isConflictError(err error) bool {
 }
 
 // resolveConflicts runs a Claude container session to resolve rebase conflicts.
+// The rebase has already been aborted by RebaseOntoDefault, so the worktree is
+// on the task branch in a clean state. The agent must start the rebase itself,
+// resolve any conflicts, and complete the rebase with `git rebase --continue`.
 func (r *Runner) resolveConflicts(
 	ctx context.Context,
 	taskID uuid.UUID,
 	repoPath, worktreePath string,
 	sessionID string,
+	defBranch string,
 ) error {
 	basename := filepath.Base(worktreePath)
 	containerPath := "/workspace/" + basename
 
 	prompt := fmt.Sprintf(
-		"There are git rebase conflicts in %s that need to be resolved. "+
-			"Run `git status` to see which files are conflicted. "+
-			"For each conflicted file: read the file, understand both sides of the conflict, "+
-			"resolve it by keeping the correct implementation while incorporating upstream changes, "+
-			"then run `git add <file>` to mark it resolved. "+
-			"Once ALL conflicts are resolved, run `git rebase --continue`. "+
+		"The task branch in %s needs to be rebased onto '%s', but there are conflicts. "+
+			"The previous rebase attempt was aborted, so the worktree is currently clean on the task branch. "+
+			"Please resolve the conflicts by following these steps:\n"+
+			"1. Run `git rebase %s` to start the rebase\n"+
+			"2. When conflicts appear, run `git status` to see which files are conflicted\n"+
+			"3. For each conflicted file: read it carefully, understand both sides of the "+
+			"conflict markers (<<<<<<< HEAD through ======= is the task branch side; "+
+			"======= through >>>>>>> is the upstream side), then edit the file to produce "+
+			"the correct merged result\n"+
+			"4. Run `git add <file>` to mark each file resolved\n"+
+			"5. Run `git rebase --continue` to proceed to the next commit\n"+
+			"6. Repeat steps 2–5 if more conflicts appear\n"+
 			"Do NOT run `git commit` manually — only resolve conflicts and continue the rebase. "+
 			"Report what conflicts you found and how you resolved each one.",
-		containerPath,
+		containerPath, defBranch, defBranch,
 	)
 
 	// Mount only the conflicted worktree for this targeted fix.

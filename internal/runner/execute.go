@@ -436,7 +436,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 				"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d/%d)...",
 					filepath.Base(repoPath), attempt, maxRebaseRetries),
 			})
-			if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID); resolveErr != nil {
+			if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch); resolveErr != nil {
 				rebaseErr = fmt.Errorf("conflict resolution failed: %w", resolveErr)
 				break
 			}
