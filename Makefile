@@ -10,7 +10,7 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary build-claude build-codex server run shell clean ui-css test test-backend test-frontend
+.PHONY: build build-binary build-claude build-codex server run shell clean ui-css test test-backend test-frontend commit-seq push-once
 
 # Build the wallfacer binary and both sandbox images.
 build: build-binary build-claude build-codex
@@ -90,3 +90,25 @@ test-frontend:
 # Remove sandbox images
 clean:
 	-$(PODMAN) rmi $(IMAGE) $(GHCR_IMAGE) $(CODEX_IMAGE) $(GHCR_CODEX_IMAGE)
+
+# Create one sequential commit with style-checked message + required body.
+# Usage:
+#   git add <files>
+#   make commit-seq MSG="internal/handler: fix sandbox gating" DESC="Validate codex readiness before allowing task creation."
+commit-seq:
+ifndef MSG
+	$(error MSG is required. Example: MSG="internal/runner: fix fallback logic")
+endif
+ifndef DESC
+	$(error DESC is required. Example: DESC="Explain what changed and why.")
+endif
+	./scripts/commit-seq.sh "$(MSG)" "$(DESC)"
+
+# Push once after all sequential commits are created.
+# Usage:
+#   make push-once
+#   make push-once REMOTE=origin BRANCH=main
+REMOTE ?= origin
+BRANCH ?= $(shell git branch --show-current)
+push-once:
+	./scripts/push-once.sh "$(REMOTE)" "$(BRANCH)"
