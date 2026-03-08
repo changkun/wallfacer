@@ -374,7 +374,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		if t.Status == store.TaskStatusInProgress {
 			inProgressCount++
 		}
-		if t.Status == store.TaskStatusBacklog && !t.HasTag("idea-agent") {
+		if t.Status == store.TaskStatusBacklog && t.Kind != store.TaskKindIdeaAgent {
 			satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
 			if err != nil || !satisfied {
 				continue // skip: dependencies not yet done
