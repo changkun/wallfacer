@@ -41,7 +41,7 @@
     var container = document.getElementById('modal-flamegraph-container');
     if (!container) return;
 
-    container.innerHTML = '<span style="color:var(--text-muted,#888);font-size:12px;">Loading spans\u2026</span>';
+    container.innerHTML = '<span style="color:var(--text-muted,#888);font-size:12px;">Loading\u2026</span>';
 
     fetch('/api/tasks/' + taskId + '/spans')
       .then(function(res) { return res.json(); })
@@ -111,7 +111,8 @@
           var top = AXIS_H + a.lane * (LANE_H + LANE_GAP);
           var hue = labelHue(span.rawLabel);
           var color = 'hsl(' + hue + ',55%,52%)';
-          var tooltip = escapeHtml(span.rawLabel) + ' — ' + escapeHtml(formatMs(span.durationMs));
+          var startOffset = formatMs(span.startMs - globalStartMs);
+          var tooltip = escapeHtml(span.rawLabel) + ' | start: ' + escapeHtml(startOffset) + ' | dur: ' + escapeHtml(formatMs(span.durationMs));
           return '<div title="' + tooltip + '" style="' +
             'position:absolute;' +
             'left:' + left + '%;' +
@@ -129,6 +130,37 @@
             '</span></div>';
         }).join('');
 
+        // Build detail table sorted by duration descending
+        var sortedByDuration = spans.slice().sort(function(a, b) { return b.durationMs - a.durationMs; });
+        var rowsHtml = sortedByDuration.map(function(span) {
+          var startOffset = formatMs(span.startMs - globalStartMs);
+          var pct = total > 0 ? ((span.durationMs / total) * 100).toFixed(1) : '0.0';
+          var hue = labelHue(span.rawLabel);
+          var swatch = '<span style="display:inline-block;width:8px;height:8px;border-radius:2px;' +
+            'background:hsl(' + hue + ',55%,52%);margin-right:4px;flex-shrink:0;"></span>';
+          var parts = span.rawLabel.split(':');
+          var phase = escapeHtml(parts[0]);
+          var label = escapeHtml(parts.slice(1).join(':'));
+          return '<tr style="border-bottom:1px solid var(--border,#333);">' +
+            '<td style="padding:3px 6px;white-space:nowrap;">' + swatch + phase + '</td>' +
+            '<td style="padding:3px 6px;color:var(--text-muted,#888);white-space:nowrap;">' + label + '</td>' +
+            '<td style="padding:3px 6px;text-align:right;white-space:nowrap;">' + startOffset + '</td>' +
+            '<td style="padding:3px 6px;text-align:right;white-space:nowrap;">' + escapeHtml(formatMs(span.durationMs)) + '</td>' +
+            '<td style="padding:3px 6px;text-align:right;white-space:nowrap;color:var(--text-muted,#888);">' + pct + '%</td>' +
+            '</tr>';
+        }).join('');
+
+        var tableHtml = '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:12px;">' +
+          '<thead><tr style="border-bottom:1px solid var(--border,#333);color:var(--text-muted,#888);">' +
+          '<th style="padding:3px 6px;text-align:left;font-weight:500;">Phase</th>' +
+          '<th style="padding:3px 6px;text-align:left;font-weight:500;">Label</th>' +
+          '<th style="padding:3px 6px;text-align:right;font-weight:500;">Start</th>' +
+          '<th style="padding:3px 6px;text-align:right;font-weight:500;">Duration</th>' +
+          '<th style="padding:3px 6px;text-align:right;font-weight:500;">%</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rowsHtml + '</tbody>' +
+          '</table>';
+
         container.innerHTML =
           '<div style="position:relative;width:100%;height:' + totalH + 'px;' +
           'margin-bottom:8px;">' +
@@ -137,7 +169,8 @@
           axisHtml +
           '</div>' +
           blocksHtml +
-          '</div>';
+          '</div>' +
+          tableHtml;
       });
   }
 

@@ -182,7 +182,7 @@ describe('loadFlamegraph', () => {
 
     ctx.loadFlamegraph('task-1');
     // The loading message is set synchronously before the fetch call
-    expect(container.innerHTML).toContain('Loading spans');
+    expect(container.innerHTML).toContain('Loading');
   });
 
   it('shows no-data message for empty array response', async () => {
