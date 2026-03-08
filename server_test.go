@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"changkun.de/wallfacer/internal/handler"
+	"changkun.de/wallfacer/internal/metrics"
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 )
@@ -34,9 +35,10 @@ func TestStatusResponseWriter_WriteHeaderAndFlush(t *testing.T) {
 }
 
 func TestLoggingMiddleware_LogsForApiAndUiRoutes(t *testing.T) {
+	reg := metrics.NewRegistry()
 	apiHandler := loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-	}))
+	}), reg)
 	apiRR := httptest.NewRecorder()
 	apiReq := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	apiHandler.ServeHTTP(apiRR, apiReq)
@@ -48,7 +50,7 @@ func TestLoggingMiddleware_LogsForApiAndUiRoutes(t *testing.T) {
 	uiReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
-	})).ServeHTTP(uiRR, uiReq)
+	}), reg).ServeHTTP(uiRR, uiReq)
 	if uiRR.Code != http.StatusOK {
 		t.Fatalf("expected UI middleware to preserve default status, got %d", uiRR.Code)
 	}
@@ -78,7 +80,8 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		Workspaces:   workdir,
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir})
-	mux := buildMux(h, r)
+	reg = metrics.NewRegistry()
+	mux := buildMux(h, r, reg)
 
 	paths := []struct {
 		method string
