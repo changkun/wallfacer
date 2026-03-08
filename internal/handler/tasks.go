@@ -495,3 +495,105 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		})
 	}
 }
+
+// autoTestInterval is how often the auto-tester polls for eligible waiting tasks
+// in addition to reacting to store change notifications.
+const autoTestInterval = 30 * time.Second
+
+// StartAutoTester subscribes to store change notifications and automatically
+// triggers the test agent for waiting tasks that are untested and not behind
+// the default branch tip.
+func (h *Handler) StartAutoTester(ctx context.Context) {
+	subID, ch := h.store.Subscribe()
+	ticker := time.NewTicker(autoTestInterval)
+	go func() {
+		defer h.store.Unsubscribe(subID)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ch:
+				h.tryAutoTest(ctx)
+			case <-ticker.C:
+				h.tryAutoTest(ctx)
+			}
+		}
+	}()
+}
+
+// tryAutoTest scans all waiting tasks and triggers the test agent for any
+// that are untested (LastTestResult == "") and whose worktrees are not behind
+// the default branch. Does nothing when auto-test is disabled.
+func (h *Handler) tryAutoTest(ctx context.Context) {
+	if !h.AutotestEnabled() {
+		return
+	}
+
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		return
+	}
+
+	for i := range tasks {
+		t := &tasks[i]
+		if t.Status != store.TaskStatusWaiting {
+			continue
+		}
+		// Skip tasks that already have a test result or are currently being tested.
+		if t.LastTestResult != "" || t.IsTestRun {
+			continue
+		}
+
+		// Skip tasks with no worktrees (nothing to test yet).
+		if len(t.WorktreePaths) == 0 {
+			continue
+		}
+
+		// Only trigger if the worktree is up to date with the default branch.
+		behind := false
+		for repoPath, worktreePath := range t.WorktreePaths {
+			n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+			if err != nil {
+				logger.Handler.Warn("auto-test: check commits behind",
+					"task", t.ID, "repo", repoPath, "error", err)
+				behind = true // treat errors conservatively
+				break
+			}
+			if n > 0 {
+				behind = true
+				break
+			}
+		}
+		if behind {
+			continue
+		}
+
+		logger.Handler.Info("auto-test: triggering test agent for waiting task", "task", t.ID)
+
+		implResult := ""
+		if t.Result != nil {
+			implResult = *t.Result
+		}
+		diff := generateWorktreeDiff(t.WorktreePaths)
+		testPrompt := buildTestPrompt(t.Prompt, "", implResult, diff)
+
+		if err := h.store.UpdateTaskTestRun(ctx, t.ID, true, ""); err != nil {
+			logger.Handler.Error("auto-test: update test run flag", "task", t.ID, "error", err)
+			continue
+		}
+		if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusInProgress); err != nil {
+			logger.Handler.Error("auto-test: update task status", "task", t.ID, "error", err)
+			continue
+		}
+		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+			"from": string(store.TaskStatusWaiting),
+			"to":   string(store.TaskStatusInProgress),
+		})
+		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+			"result": "Auto-test: triggering test verification agent.",
+		})
+
+		h.runner.RunBackground(t.ID, testPrompt, "", false)
+	}
+}

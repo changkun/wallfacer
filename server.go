@@ -138,6 +138,10 @@ func runServer(configDir string, args []string) {
 	// automatically syncs any whose worktrees have fallen behind the default branch.
 	h.StartWaitingSyncWatcher(ctx)
 
+	// Start the auto-tester: triggers the test agent for waiting tasks that are
+	// untested and not behind the default branch tip, when auto-test is enabled.
+	h.StartAutoTester(ctx)
+
 	mux := buildMux(h, r)
 
 	host, _, _ := net.SplitHostPort(*addr)

@@ -23,6 +23,9 @@ type Handler struct {
 	autopilotMu sync.RWMutex
 	autopilot   bool
 
+	autotestMu sync.RWMutex
+	autotest   bool
+
 	diffCache *diffCache
 
 	// ideationEnabled controls whether brainstorm auto-repeat is active.
@@ -64,6 +67,20 @@ func (h *Handler) SetAutopilot(enabled bool) {
 	h.autopilotMu.Lock()
 	h.autopilot = enabled
 	h.autopilotMu.Unlock()
+}
+
+// AutotestEnabled returns whether auto-test mode is active.
+func (h *Handler) AutotestEnabled() bool {
+	h.autotestMu.RLock()
+	defer h.autotestMu.RUnlock()
+	return h.autotest
+}
+
+// SetAutotest enables or disables auto-test mode.
+func (h *Handler) SetAutotest(enabled bool) {
+	h.autotestMu.Lock()
+	h.autotest = enabled
+	h.autotestMu.Unlock()
 }
 
 // IdeationEnabled returns whether brainstorm auto-repeat is active.
