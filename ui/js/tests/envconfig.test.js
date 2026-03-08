@@ -1,0 +1,159 @@
+/**
+ * Tests for settings helpers in envconfig.js.
+ */
+import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import vm from 'vm';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const jsDir = join(__dirname, '..');
+
+function makeInput(value = '') {
+  return { value, placeholder: '', textContent: '' };
+}
+
+function makeContext(overrides = {}) {
+  const elements = new Map(overrides.elements || []);
+  const ctx = {
+    console,
+    Date,
+    Math,
+    setTimeout: () => 0,
+    collectSandboxByActivity: () => ({ implementation: 'codex', testing: 'claude' }),
+    setInterval: () => 0,
+    document: {
+      getElementById: (id) => elements.get(id) || null,
+      querySelector: () => null,
+      querySelectorAll: () => ({ forEach: () => {} }),
+      documentElement: { setAttribute: () => {} },
+      readyState: 'complete',
+      addEventListener: () => {},
+    },
+    ...overrides,
+  };
+  return vm.createContext(ctx);
+}
+
+function loadScript(ctx, filename) {
+  const code = readFileSync(join(jsDir, filename), 'utf8');
+  vm.runInContext(code, ctx);
+  return ctx;
+}
+
+describe('buildSaveEnvPayload', () => {
+  it('omits token values when blank and preserves clear-to-empty model fields', () => {
+    const ctx = makeContext({
+      elements: [
+        ['env-oauth-token', makeInput('token-a')],
+        ['env-api-key', makeInput('api-b')],
+        ['env-claude-base-url', makeInput('')],
+        ['env-openai-api-key', makeInput('')],
+        ['env-openai-base-url', makeInput('')],
+        ['env-default-model', makeInput('')],
+        ['env-title-model', makeInput('title')],
+        ['env-codex-default-model', makeInput('codex-default')],
+        ['env-codex-title-model', makeInput('')],
+        ['env-default-sandbox', makeInput('codex')],
+      ],
+    });
+    loadScript(ctx, 'envconfig.js');
+
+    const body = ctx.buildSaveEnvPayload();
+    expect(body).toMatchObject({
+      oauth_token: 'token-a',
+      api_key: 'api-b',
+      base_url: '',
+      title_model: 'title',
+      default_sandbox: 'codex',
+      sandbox_by_activity: { implementation: 'codex', testing: 'claude' },
+      codex_default_model: 'codex-default',
+      codex_title_model: '',
+    });
+    expect(body.openai_api_key).toBeUndefined();
+    expect(body).not.toHaveProperty('openai_api_key');
+    expect(body.openai_base_url).toBe('');
+    expect(body.default_model).toBe('');
+  });
+});
+
+describe('buildSandboxTestPayload', () => {
+  it('keeps claude fields for Claude-specific checks', () => {
+    const ctx = makeContext({
+      elements: [
+        ['env-oauth-token', makeInput('token-a')],
+        ['env-api-key', makeInput('')],
+        ['env-claude-base-url', makeInput('https://claude')],
+        ['env-openai-api-key', makeInput('')],
+        ['env-openai-base-url', makeInput('')],
+        ['env-default-model', makeInput('claude-model')],
+        ['env-title-model', makeInput('claude-title')],
+        ['env-codex-default-model', makeInput('')],
+        ['env-codex-title-model', makeInput('')],
+        ['env-default-sandbox', makeInput('claude')],
+      ],
+      collectSandboxByActivity: () => ({ implementation: 'claude' }),
+    });
+    loadScript(ctx, 'envconfig.js');
+
+    const payload = ctx.buildSandboxTestPayload('claude');
+    expect(payload).toMatchObject({
+      sandbox: 'claude',
+      default_sandbox: 'claude',
+      sandbox_by_activity: { implementation: 'claude' },
+      base_url: 'https://claude',
+      default_model: 'claude-model',
+      title_model: 'claude-title',
+      oauth_token: 'token-a',
+    });
+    expect(payload).not.toHaveProperty('openai_base_url');
+    expect(payload).not.toHaveProperty('openai_api_key');
+  });
+
+  it('keeps OpenAI fields for Codex-specific checks', () => {
+    const ctx = makeContext({
+      elements: [
+        ['env-oauth-token', makeInput('')],
+        ['env-api-key', makeInput('')],
+        ['env-claude-base-url', makeInput('')],
+        ['env-openai-api-key', makeInput('openai')],
+        ['env-openai-base-url', makeInput('https://openai')],
+        ['env-default-model', makeInput('')],
+        ['env-title-model', makeInput('')],
+        ['env-codex-default-model', makeInput('codex-default')],
+        ['env-codex-title-model', makeInput('codex-title')],
+        ['env-default-sandbox', makeInput('codex')],
+      ],
+      collectSandboxByActivity: () => ({ testing: 'codex' }),
+    });
+    loadScript(ctx, 'envconfig.js');
+
+    const payload = ctx.buildSandboxTestPayload('codex');
+    expect(payload).toMatchObject({
+      sandbox: 'codex',
+      default_sandbox: 'codex',
+      sandbox_by_activity: { testing: 'codex' },
+      openai_base_url: 'https://openai',
+      codex_default_model: 'codex-default',
+      codex_title_model: 'codex-title',
+      openai_api_key: 'openai',
+    });
+    expect(payload).not.toHaveProperty('default_model');
+    expect(payload).not.toHaveProperty('oauth_token');
+  });
+});
+
+describe('summarizeSandboxTestResult', () => {
+  it('normalizes pass/fail and status responses', () => {
+    const ctx = makeContext();
+    loadScript(ctx, 'envconfig.js');
+
+    expect(ctx.summarizeSandboxTestResult(null)).toBe('No response');
+    expect(ctx.summarizeSandboxTestResult({ last_test_result: 'pass' })).toBe('PASS');
+    expect(ctx.summarizeSandboxTestResult({ last_test_result: 'FAIL' })).toBe('FAIL');
+    expect(ctx.summarizeSandboxTestResult({ status: 'done' })).toBe('Test completed');
+    expect(ctx.summarizeSandboxTestResult({ status: 'failed', result: 'Syntax error' })).toBe('Syntax error');
+    expect(ctx.summarizeSandboxTestResult({ status: 'running' })).toBe('status running');
+  });
+});
