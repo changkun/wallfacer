@@ -296,6 +296,37 @@ func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
 	}
 }
 
+func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
+	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
+	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	runner := NewRunner(s, RunnerConfig{
+		Command:          "podman",
+		SandboxImage:     "wallfacer:latest",
+		InstructionsPath: instructionsFile,
+	})
+	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
+
+	found := false
+	for _, a := range args {
+		if a == "wallfacer-codex:latest" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("codex sandbox should use codex image; got args: %v", args)
+	}
+}
+
 func TestHostCodexAuthStatus_Valid(t *testing.T) {
 	codexAuthDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(codexAuthDir, "auth.json"), []byte(`{"auth_mode":"chatgpt","tokens":{"access_token":"header.payload.sig","refresh_token":"rt"}}`), 0600); err != nil {

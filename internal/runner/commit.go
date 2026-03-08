@@ -280,7 +280,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	if hostPath := r.hostCodexAuthPath(); strings.EqualFold(strings.TrimSpace(sandbox), "codex") && hostPath != "" {
 		args = append(args, "-v", hostPath+":/home/codex/.codex:z,ro")
 	}
-	args = append(args, r.sandboxImage)
+	args = append(args, r.sandboxImageForSandbox(sandbox))
 
 	commitPrompt := "Write a git commit message for the following task and file changes.\n" +
 		"Rules:\n" +

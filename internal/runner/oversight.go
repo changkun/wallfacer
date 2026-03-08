@@ -531,7 +531,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 	spec := ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
-		Image:   r.sandboxImage,
+		Image:   r.sandboxImageForSandbox(sandbox),
 	}
 	if r.envFile != "" {
 		spec.EnvFile = r.envFile
