@@ -95,10 +95,22 @@ func TestIsConflictErrorWrappedErrConflict(t *testing.T) {
 }
 
 func TestIsConflictErrorDirectString(t *testing.T) {
-	// isConflictError checks if the error message contains ErrConflict.Error().
+	// A plain string error that happens to contain "rebase conflict" is NOT
+	// a conflict error unless it actually wraps ErrConflict via %w.
 	err := fmt.Errorf("rebase conflict occurred")
+	if isConflictError(err) {
+		t.Fatal("plain string error should not be detected as a conflict error without wrapping ErrConflict")
+	}
+}
+
+func TestIsConflictErrorConflictError(t *testing.T) {
+	// *ConflictError wraps ErrConflict via Unwrap() and must be detected.
+	err := &gitutil.ConflictError{
+		WorktreePath:    "/tmp/wt",
+		ConflictedFiles: []string{"foo.go"},
+	}
 	if !isConflictError(err) {
-		t.Fatal("error containing 'rebase conflict' should be detected")
+		t.Fatal("*ConflictError should be detected as a conflict error")
 	}
 }
 

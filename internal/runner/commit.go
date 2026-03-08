@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -370,6 +371,17 @@ func (r *Runner) rebaseAndMergeOne(
 			break
 		}
 
+		// Emit a structured event with conflicted file paths for observability.
+		var ce *gitutil.ConflictError
+		if errors.As(rebaseErr, &ce) && len(ce.ConflictedFiles) > 0 {
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]any{
+				"error":            ce.Error(),
+				"phase":            "rebase",
+				"conflicted_files": ce.ConflictedFiles,
+				"worktree":         ce.WorktreePath,
+			})
+		}
+
 		if attempt == maxRebaseRetries {
 			return fmt.Errorf(
 				"rebase failed after %d attempts in %s: %w",
@@ -414,7 +426,7 @@ func (r *Runner) rebaseAndMergeOne(
 
 // isConflictError reports whether err wraps ErrConflict.
 func isConflictError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), gitutil.ErrConflict.Error())
+	return errors.Is(err, gitutil.ErrConflict)
 }
 
 // resolveConflicts runs a Claude container session to resolve rebase conflicts.

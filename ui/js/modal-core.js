@@ -340,7 +340,15 @@ async function openModal(id) {
       } else if (e.event_type === 'system') {
         detail = escapeHtml(data.result || '');
       } else if (e.event_type === 'error') {
-        detail = escapeHtml(data.error);
+        if (data.phase === 'rebase' && Array.isArray(data.conflicted_files) && data.conflicted_files.length > 0) {
+          detail = '<div style="border-left:3px solid #ef4444;padding:8px 10px;margin:4px 0;">' +
+            '<div style="font-weight:600;color:#ef4444;margin-bottom:4px;">Rebase conflict</div>' +
+            '<ul style="margin:0;padding-left:16px;font-size:12px;font-family:monospace;">' +
+            data.conflicted_files.map(f => '<li>' + escapeHtml(f) + '</li>').join('') +
+            '</ul></div>';
+        } else {
+          detail = escapeHtml(data.error);
+        }
       }
       const typeClasses = {
         state_change: 'ev-state',

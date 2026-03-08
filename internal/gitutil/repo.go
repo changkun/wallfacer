@@ -4,11 +4,39 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
 // ErrConflict is returned by RebaseOntoDefault when a merge conflict is detected.
 var ErrConflict = errors.New("rebase conflict")
+
+// ConflictError is returned by RebaseOntoDefault when a merge conflict is detected.
+// It wraps ErrConflict and carries the list of conflicted file paths.
+type ConflictError struct {
+	WorktreePath    string
+	ConflictedFiles []string
+	RawOutput       string
+}
+
+func (e *ConflictError) Error() string {
+	return fmt.Sprintf("rebase conflict in %s: %d file(s) conflicted", e.WorktreePath, len(e.ConflictedFiles))
+}
+
+func (e *ConflictError) Unwrap() error { return ErrConflict }
+
+var conflictFileRe = regexp.MustCompile(`CONFLICT \([^)]+\): (?:Merge conflict in|content conflict in) (.+)$`)
+
+// parseConflictedFiles extracts conflicted file paths from git rebase output.
+func parseConflictedFiles(output string) []string {
+	var files []string
+	for _, line := range strings.Split(output, "\n") {
+		if m := conflictFileRe.FindStringSubmatch(strings.TrimSpace(line)); m != nil {
+			files = append(files, m[1])
+		}
+	}
+	return files
+}
 
 // IsGitRepo reports whether path is inside a git repository.
 func IsGitRepo(path string) bool {
