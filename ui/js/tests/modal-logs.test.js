@@ -63,6 +63,7 @@ function makeLogsContext() {
     fetch: () => Promise.reject(new Error('not mocked')),
     setTimeout: () => {},
     clearTimeout: () => {},
+    requestAnimationFrame: (cb) => { cb(); },
     NodeFilter: { SHOW_TEXT: 4 },
     document: {
       getElementById: (id) => {
