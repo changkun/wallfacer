@@ -351,12 +351,59 @@ describe('computePhaseRegions', () => {
     expect(r1[0].hue).toBe(r2[0].hue);
   });
 
-  it('skips phase with invalid timestamp', () => {
+  it('single invalid timestamp falls back to even distribution (full width)', () => {
+    // 'not-a-date' → NaN → no valid timestamps → evenly distribute 1 phase
     const result = vm.runInContext(
       `_flamegraph.computePhaseRegions([{timestamp: 'not-a-date', title: 'A', summary: ''}], 0, 1000)`,
       ctx
     );
-    expect(result.length).toBe(0);
+    expect(result.length).toBe(1);
+    expect(result[0].startMs).toBe(0);
+    expect(result[0].endMs).toBe(1000);
+    expect(result[0].title).toBe('A');
+  });
+
+  it('Go zero-value timestamp ("0001-01-01T00:00:00Z") is treated as invalid', () => {
+    // When ALL phases carry the Go zero-value (very negative ms), the function
+    // should distribute them evenly rather than collapsing all but the last.
+    const result = vm.runInContext(
+      `_flamegraph.computePhaseRegions([
+        {timestamp: "0001-01-01T00:00:00Z", title: "Phase A", summary: ""},
+        {timestamp: "0001-01-01T00:00:00Z", title: "Phase B", summary: ""},
+        {timestamp: "0001-01-01T00:00:00Z", title: "Phase C", summary: ""}
+      ], 0, 3000)`,
+      ctx
+    );
+    // All three phases should be visible with equal widths.
+    expect(result.length).toBe(3);
+    expect(result[0].startMs).toBe(0);
+    expect(result[0].endMs).toBe(1000);
+    expect(result[1].startMs).toBe(1000);
+    expect(result[1].endMs).toBe(2000);
+    expect(result[2].startMs).toBe(2000);
+    expect(result[2].endMs).toBe(3000);
+  });
+
+  it('mix of valid and invalid timestamps: only valid phases are rendered', () => {
+    const ts0 = new Date(200).toISOString();
+    const ts2 = new Date(700).toISOString();
+    // Phase 1 has a Go zero-value timestamp (invalid), phases 0 and 2 are valid.
+    const result = vm.runInContext(
+      `_flamegraph.computePhaseRegions([
+        {timestamp: ${JSON.stringify(ts0)}, title: "A", summary: ""},
+        {timestamp: "0001-01-01T00:00:00Z", title: "B", summary: ""},
+        {timestamp: ${JSON.stringify(ts2)}, title: "C", summary: ""}
+      ], 0, 1000)`,
+      ctx
+    );
+    // Only phases A and C have valid timestamps and should be rendered.
+    expect(result.length).toBe(2);
+    expect(result[0].title).toBe('A');
+    expect(result[0].startMs).toBe(200);
+    expect(result[0].endMs).toBe(700);
+    expect(result[1].title).toBe('C');
+    expect(result[1].startMs).toBe(700);
+    expect(result[1].endMs).toBe(1000);
   });
 });
 

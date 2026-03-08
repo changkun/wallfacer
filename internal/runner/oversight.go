@@ -268,16 +268,28 @@ func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID, fromTur
 	return activities, nil
 }
 
-// buildTurnTimestamps maps turn number → timestamp by scanning output events.
-// Each output event corresponds to one turn, so the Nth output event → turn N.
+// buildTurnTimestamps maps turn number → timestamp by scanning span_start
+// events for the "agent_turn" phase. Using span_start times (when the
+// container began) rather than output event times (when the container
+// finished) ensures that phase timestamps align with span.StartedAt in the
+// flamegraph, preventing the first span of each phase from being
+// misattributed to the preceding phase.
 func buildTurnTimestamps(events []store.TaskEvent) map[int]time.Time {
 	result := make(map[int]time.Time)
 	turn := 0
 	for _, e := range events {
-		if e.EventType == store.EventTypeOutput {
-			turn++
-			result[turn] = e.CreatedAt
+		if e.EventType != store.EventTypeSpanStart {
+			continue
 		}
+		var data store.SpanData
+		if err := json.Unmarshal(e.Data, &data); err != nil {
+			continue
+		}
+		if data.Phase != "agent_turn" {
+			continue
+		}
+		turn++
+		result[turn] = e.CreatedAt
 	}
 	return result
 }
@@ -588,7 +600,37 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 	if err != nil {
 		return nil, fmt.Errorf("parse oversight JSON: %w (raw: %s)", err, truncate(output.Result, 400))
 	}
+	phases = fillMissingPhaseTimestamps(phases, activities)
 	return phases, nil
+}
+
+// fillMissingPhaseTimestamps assigns proportional timestamps to oversight
+// phases when all of them have zero (missing) timestamps. This happens when
+// the LLM returns empty strings for the timestamp field.  Phases are
+// distributed evenly across the available turn timestamps: phase i is anchored
+// to the first turn in its proportional slice of the activity log.
+//
+// If any phase already carries a non-zero timestamp the slice is returned
+// unchanged so that valid partial data is never discarded.
+func fillMissingPhaseTimestamps(phases []store.OversightPhase, activities []turnActivity) []store.OversightPhase {
+	if len(phases) == 0 || len(activities) == 0 {
+		return phases
+	}
+	// Only intervene when every timestamp is zero.
+	for _, p := range phases {
+		if !p.Timestamp.IsZero() {
+			return phases
+		}
+	}
+	numPhases := len(phases)
+	numTurns := len(activities)
+	for i := range phases {
+		turnIdx := i * numTurns / numPhases
+		if turnIdx < numTurns && !activities[turnIdx].Timestamp.IsZero() {
+			phases[i].Timestamp = activities[turnIdx].Timestamp
+		}
+	}
+	return phases
 }
 
 // parseOversightResult extracts structured phases from Claude's text response.

@@ -42,15 +42,58 @@
   // Each region covers [phase[i].timestamp, phase[i+1].timestamp), with
   // the last region extending to globalEndMs. Regions are clamped to
   // [globalStartMs, globalEndMs] and zero-width regions are skipped.
+  //
+  // When phase timestamps are missing or invalid (Go zero-value time.Time
+  // serialises to "0001-01-01T00:00:00Z" which gives a large negative number
+  // in JS — not NaN — so the old isNaN guard missed it), the function falls
+  // back to distributing phases evenly across the timeline so that all phases
+  // remain visible rather than collapsing into a single full-width last block.
   function computePhaseRegions(phases, globalStartMs, globalEndMs) {
     if (!phases || phases.length === 0) return [];
+
+    // Parse timestamps: null = invalid.
+    // A Go zero-value time.Time ("0001-01-01T00:00:00Z") produces a large
+    // negative getTime() value, so we treat any ms < 0 (or NaN) as invalid.
+    var rawStarts = phases.map(function(p) {
+      var ms = p.timestamp ? new Date(p.timestamp).getTime() : NaN;
+      return (!isNaN(ms) && ms >= 0) ? ms : null;
+    });
+
+    var validCount = rawStarts.filter(function(ms) { return ms !== null; }).length;
+
+    if (validCount === 0) {
+      // No valid timestamps at all (e.g. Claude returned empty strings and the
+      // backend stored zero-value times): distribute phases evenly so every
+      // phase is visible with a proportional width.
+      var regions = [];
+      var total = globalEndMs - globalStartMs;
+      for (var i = 0; i < phases.length; i++) {
+        var sMs = Math.round(globalStartMs + (i / phases.length) * total);
+        var eMs = i + 1 < phases.length
+          ? Math.round(globalStartMs + ((i + 1) / phases.length) * total)
+          : globalEndMs;
+        if (sMs >= eMs) continue;
+        regions.push({
+          startMs: sMs,
+          endMs: eMs,
+          title: phases[i].title || '',
+          summary: phases[i].summary || '',
+          hue: labelHue(phases[i].title || ''),
+        });
+      }
+      return regions;
+    }
+
+    // At least some valid timestamps: render phases that have valid timestamps,
+    // using the next valid timestamp (or globalEndMs) as the region end.
     var regions = [];
     for (var i = 0; i < phases.length; i++) {
-      var startMs = new Date(phases[i].timestamp).getTime();
-      if (isNaN(startMs)) continue;
-      var endMs = i + 1 < phases.length
-        ? new Date(phases[i + 1].timestamp).getTime()
-        : globalEndMs;
+      if (rawStarts[i] === null) continue; // skip phases without valid timestamp
+      var startMs = rawStarts[i];
+      var endMs = globalEndMs;
+      for (var j = i + 1; j < phases.length; j++) {
+        if (rawStarts[j] !== null) { endMs = rawStarts[j]; break; }
+      }
       if (isNaN(endMs)) endMs = globalEndMs;
       // clamp to global bounds
       if (startMs < globalStartMs) startMs = globalStartMs;

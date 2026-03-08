@@ -109,16 +109,21 @@ func TestBuildTurnTimestampsEmpty(t *testing.T) {
 	}
 }
 
-// TestBuildTurnTimestampsCountsOutputEvents verifies that each output event
-// maps to consecutive turn numbers.
-func TestBuildTurnTimestampsCountsOutputEvents(t *testing.T) {
+// TestBuildTurnTimestampsCountsAgentTurnSpanStarts verifies that each
+// span_start event for the "agent_turn" phase maps to consecutive turn
+// numbers, and that their timestamps represent container start times.
+func TestBuildTurnTimestampsCountsAgentTurnSpanStarts(t *testing.T) {
 	t1 := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 	t2 := time.Date(2024, 1, 15, 10, 5, 0, 0, time.UTC)
+
+	span1, _ := json.Marshal(store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
+	span2, _ := json.Marshal(store.SpanData{Phase: "agent_turn", Label: "agent_turn_2"})
 	events := []store.TaskEvent{
 		{EventType: store.EventTypeStateChange, CreatedAt: t1.Add(-1 * time.Second)},
-		{EventType: store.EventTypeOutput, CreatedAt: t1},
+		{EventType: store.EventTypeSpanStart, Data: span1, CreatedAt: t1},
 		{EventType: store.EventTypeSystem, CreatedAt: t1.Add(30 * time.Second)},
-		{EventType: store.EventTypeOutput, CreatedAt: t2},
+		{EventType: store.EventTypeOutput, CreatedAt: t1.Add(60 * time.Second)}, // output events are ignored
+		{EventType: store.EventTypeSpanStart, Data: span2, CreatedAt: t2},
 	}
 	ts := buildTurnTimestamps(events)
 	if len(ts) != 2 {
@@ -129,6 +134,93 @@ func TestBuildTurnTimestampsCountsOutputEvents(t *testing.T) {
 	}
 	if !ts[2].Equal(t2) {
 		t.Fatalf("turn 2 timestamp: expected %v, got %v", t2, ts[2])
+	}
+}
+
+// TestBuildTurnTimestampsIgnoresNonAgentTurnPhases verifies that span_start
+// events for other phases (e.g. "worktree_setup", "commit") are not counted.
+func TestBuildTurnTimestampsIgnoresNonAgentTurnPhases(t *testing.T) {
+	t1 := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	t2 := time.Date(2024, 1, 15, 10, 5, 0, 0, time.UTC)
+
+	worktreeSpan, _ := json.Marshal(store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
+	agentSpan, _ := json.Marshal(store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
+	commitSpan, _ := json.Marshal(store.SpanData{Phase: "commit", Label: "commit"})
+	events := []store.TaskEvent{
+		{EventType: store.EventTypeSpanStart, Data: worktreeSpan, CreatedAt: t1.Add(-5 * time.Second)}, // not counted
+		{EventType: store.EventTypeSpanStart, Data: agentSpan, CreatedAt: t1},                          // counted: turn 1
+		{EventType: store.EventTypeOutput, CreatedAt: t1.Add(30 * time.Second)},                        // ignored
+		{EventType: store.EventTypeSpanStart, Data: commitSpan, CreatedAt: t2},                         // not counted
+	}
+	ts := buildTurnTimestamps(events)
+	if len(ts) != 1 {
+		t.Fatalf("expected 1 turn timestamp, got %d: %v", len(ts), ts)
+	}
+	if !ts[1].Equal(t1) {
+		t.Fatalf("turn 1 timestamp: expected %v, got %v", t1, ts[1])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// fillMissingPhaseTimestamps
+// ---------------------------------------------------------------------------
+
+// TestFillMissingPhaseTimestampsAllZero verifies that when every phase has a
+// zero timestamp, proportional timestamps from the activity log are assigned.
+func TestFillMissingPhaseTimestampsAllZero(t *testing.T) {
+	t1 := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	t2 := time.Date(2024, 1, 15, 10, 5, 0, 0, time.UTC)
+	activities := []turnActivity{
+		{Turn: 1, Timestamp: t1},
+		{Turn: 2, Timestamp: t2},
+	}
+	phases := []store.OversightPhase{
+		{Title: "Phase A"}, // zero timestamp
+		{Title: "Phase B"}, // zero timestamp
+	}
+	result := fillMissingPhaseTimestamps(phases, activities)
+	if result[0].Timestamp.IsZero() {
+		t.Fatal("phase A should have received a timestamp")
+	}
+	if result[1].Timestamp.IsZero() {
+		t.Fatal("phase B should have received a timestamp")
+	}
+	// Phase A anchors to turn 0 (first turn), phase B to turn 1.
+	if !result[0].Timestamp.Equal(t1) {
+		t.Fatalf("phase A timestamp: expected %v, got %v", t1, result[0].Timestamp)
+	}
+	if !result[1].Timestamp.Equal(t2) {
+		t.Fatalf("phase B timestamp: expected %v, got %v", t2, result[1].Timestamp)
+	}
+}
+
+// TestFillMissingPhaseTimestampsPartialValid verifies that when at least one
+// phase has a non-zero timestamp the slice is returned unchanged.
+func TestFillMissingPhaseTimestampsPartialValid(t *testing.T) {
+	t0 := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	t1 := time.Date(2024, 1, 15, 10, 3, 0, 0, time.UTC)
+	activities := []turnActivity{{Turn: 1, Timestamp: t0}, {Turn: 2, Timestamp: t1}}
+	phases := []store.OversightPhase{
+		{Title: "Phase A", Timestamp: t0}, // already set
+		{Title: "Phase B"},                // zero timestamp
+	}
+	result := fillMissingPhaseTimestamps(phases, activities)
+	// Phase B should remain zero — partial valid means we trust the provided data.
+	if !result[0].Timestamp.Equal(t0) {
+		t.Fatalf("phase A timestamp should be unchanged: %v", result[0].Timestamp)
+	}
+	if !result[1].Timestamp.IsZero() {
+		t.Fatalf("phase B should remain zero when partial valid, got %v", result[1].Timestamp)
+	}
+}
+
+// TestFillMissingPhaseTimestampsEmptyActivities verifies that an empty
+// activities slice leaves phases unchanged.
+func TestFillMissingPhaseTimestampsEmptyActivities(t *testing.T) {
+	phases := []store.OversightPhase{{Title: "Phase A"}}
+	result := fillMissingPhaseTimestamps(phases, nil)
+	if !result[0].Timestamp.IsZero() {
+		t.Fatalf("expected zero timestamp with no activities, got %v", result[0].Timestamp)
 	}
 }
 
