@@ -51,8 +51,8 @@ func TestAreDependenciesSatisfied_AllDone(t *testing.T) {
 	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
 	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
 	c, _ := s.CreateTask(bg(), "c", 15, false, "", "")
-	s.UpdateTaskStatus(bg(), a.ID, TaskStatusDone)
-	s.UpdateTaskStatus(bg(), b.ID, TaskStatusDone)
+	s.ForceUpdateTaskStatus(bg(), a.ID, TaskStatusDone)
+	s.ForceUpdateTaskStatus(bg(), b.ID, TaskStatusDone)
 	s.UpdateTaskDependsOn(bg(), c.ID, []string{a.ID.String(), b.ID.String()})
 
 	ok, err := s.AreDependenciesSatisfied(bg(), c.ID)
@@ -71,7 +71,7 @@ func TestAreDependenciesSatisfied_OneNotDone(t *testing.T) {
 	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
 	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
 	c, _ := s.CreateTask(bg(), "c", 15, false, "", "")
-	s.UpdateTaskStatus(bg(), a.ID, TaskStatusDone)
+	s.ForceUpdateTaskStatus(bg(), a.ID, TaskStatusDone)
 	s.UpdateTaskStatus(bg(), b.ID, TaskStatusInProgress)
 	s.UpdateTaskDependsOn(bg(), c.ID, []string{a.ID.String(), b.ID.String()})
 
@@ -125,7 +125,7 @@ func TestAreDependenciesSatisfied_ArchivedDone(t *testing.T) {
 	s := newTestStore(t)
 	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
 	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
-	s.UpdateTaskStatus(bg(), a.ID, TaskStatusDone)
+	s.ForceUpdateTaskStatus(bg(), a.ID, TaskStatusDone)
 	s.SetTaskArchived(bg(), a.ID, true)
 	s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
 

@@ -245,7 +245,7 @@ func TestRefineApply_NotBacklog(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
 	body := `{"prompt": "new prompt"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))

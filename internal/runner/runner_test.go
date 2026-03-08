@@ -513,7 +513,7 @@ func TestCommitPipelineBasic(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -577,7 +577,7 @@ func TestCommitPipelineDivergedBranch(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -635,7 +635,7 @@ func TestCommitPipelineNoChanges(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -700,7 +700,7 @@ func TestCompleteTaskE2E(t *testing.T) {
 	}
 
 	// Step 5: User clicks "Mark as Done" — this triggers Commit.
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -749,7 +749,7 @@ func TestCommitOnTopOfLatestMain(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -819,7 +819,7 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, taskA.ID, wtA, brA); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, taskA.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, taskA.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -830,7 +830,7 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, taskB.ID, wtB, brB); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, taskB.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, taskB.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -905,7 +905,7 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, wtPaths, brName); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -965,7 +965,7 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, taskA.ID, wtA, brA); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, taskA.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, taskA.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -976,7 +976,7 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, taskB.ID, wtB, brB); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, taskB.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, taskB.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1135,7 +1135,7 @@ func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 	commitOnBranch := gitRun(t, wt, "rev-parse", "HEAD")
 
 	// Task goes to waiting; worktree directory is still on disk at this point.
-	if err := s.UpdateTaskStatus(ctx, task.ID, "waiting"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1280,7 +1280,7 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, taskA.ID, wtA, brA); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, taskA.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, taskA.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1291,7 +1291,7 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, taskB.ID, wtB, brB); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, taskB.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, taskB.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1364,7 +1364,7 @@ func TestConcurrentCompleteTaskCommitErrorPropagated(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, wtPaths, brName); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1427,7 +1427,7 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1541,7 +1541,7 @@ func TestCommitPipelineNoChangesStoresBaseHash(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 

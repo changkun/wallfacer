@@ -70,7 +70,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			})
 			return
 		}
-		r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+		r.store.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 			"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusDone),
 		})
@@ -287,6 +287,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 					"result": "Test verification complete: " + strings.ToUpper(verdict),
 				})
 			} else {
+				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+					"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusCommitting),
+				})
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
 				commitErr := r.commit(ctx, taskID, sessionID, turns, worktreePaths, branchName)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "commit"})
@@ -296,12 +300,12 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 						"error": "commit failed: " + commitErr.Error(),
 					})
 					r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-						"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
+						"from": string(store.TaskStatusCommitting), "to": string(store.TaskStatusFailed),
 					})
 				} else {
 					r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
 					r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-						"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusDone),
+						"from": string(store.TaskStatusCommitting), "to": string(store.TaskStatusDone),
 					})
 					r.GenerateOversightBackground(taskID)
 				}

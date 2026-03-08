@@ -49,6 +49,9 @@ func TestIdeationTaskTransitionsToDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "", "", false)
 
 	updated, err := s.GetTask(ctx, task.ID)
@@ -77,6 +80,9 @@ func TestIdeationTaskCreatesChildTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "", "", false)
 
 	allTasks, err := s.ListTasks(ctx, false)
@@ -121,6 +127,9 @@ func TestIdeationTaskTagsChildTasksWithCategory(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "", "", false)
 
 	allTasks, err := s.ListTasks(ctx, false)
@@ -175,6 +184,9 @@ func TestIdeationTaskSavesTurnOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "", "", false)
 
 	// The turn output file must exist after the task completes.
@@ -211,6 +223,9 @@ func TestIdeationTaskRecordsTurns(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "", "", false)
 
 	updated, err := s.GetTask(ctx, task.ID)
@@ -240,6 +255,9 @@ func TestIdeationTaskEmitsOutputEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "", "", false)
 
 	events, err := s.GetEvents(ctx, task.ID)
@@ -280,6 +298,9 @@ func TestIdeationTaskOversightGeneratedAfterDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "", "", false)
 	// Wait for the background oversight goroutine to finish.
 	r.WaitBackground()
@@ -314,6 +335,9 @@ func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "", "", false)
 
 	updated, err := s.GetTask(ctx, task.ID)
@@ -453,6 +477,9 @@ func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, brainstormTask.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(brainstormTask.ID, "", "", false)
 
 	updated, err := s.GetTask(ctx, brainstormTask.ID)
@@ -491,7 +518,7 @@ func TestIdeationTaskExcludesDoneAndFailedFromContext(t *testing.T) {
 	if err := s.UpdateTaskTitle(ctx, doneTask.ID, "Completed feature"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, doneTask.ID, store.TaskStatusDone); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, doneTask.ID, store.TaskStatusDone); err != nil {
 		t.Fatal(err)
 	}
 
@@ -502,7 +529,7 @@ func TestIdeationTaskExcludesDoneAndFailedFromContext(t *testing.T) {
 	if err := s.UpdateTaskTitle(ctx, failedTask.ID, "Failed feature"); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, failedTask.ID, store.TaskStatusFailed); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, failedTask.ID, store.TaskStatusFailed); err != nil {
 		t.Fatal(err)
 	}
 
@@ -511,6 +538,9 @@ func TestIdeationTaskExcludesDoneAndFailedFromContext(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, brainstormTask.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(brainstormTask.ID, "", "", false)
 
 	updated, err := s.GetTask(ctx, brainstormTask.ID)
@@ -539,6 +569,9 @@ func TestIdeationTaskContainerErrorTransitionsToFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "", "", false)
 
 	updated, err := s.GetTask(ctx, task.ID)

@@ -2,6 +2,7 @@
 package store
 
 import (
+	"errors"
 	"os"
 	"sync"
 	"testing"
@@ -112,7 +113,7 @@ func TestCreateTask_PersistsToDisk(t *testing.T) {
 func TestCreateTask_PositionOnlyCountsBacklog(t *testing.T) {
 	s := newTestStore(t)
 	t1, _ := s.CreateTask(bg(), "a", 5, false, "", "")
-	s.UpdateTaskStatus(bg(), t1.ID, TaskStatusDone)
+	s.ForceUpdateTaskStatus(bg(), t1.ID, TaskStatusDone)
 	t2, _ := s.CreateTask(bg(), "b", 5, false, "", "")
 	// No backlog tasks exist, so maxPos = -1 and t2 gets position 0.
 	if t2.Position != 0 {
@@ -274,6 +275,91 @@ func TestUpdateTaskStatus_NotFound(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.UpdateTaskStatus(bg(), uuid.New(), TaskStatusDone); err == nil {
 		t.Error("expected error for unknown task")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ValidateTransition / state machine enforcement
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestValidateTransition_ValidTransitions(t *testing.T) {
+	for from, tos := range allowedTransitions {
+		for _, to := range tos {
+			if err := ValidateTransition(from, to); err != nil {
+				t.Errorf("ValidateTransition(%q, %q) = %v, want nil", from, to, err)
+			}
+		}
+	}
+}
+
+func TestValidateTransition_InvalidTransitions(t *testing.T) {
+	cases := []struct{ from, to TaskStatus }{
+		{TaskStatusDone, TaskStatusInProgress},
+		{TaskStatusCommitting, TaskStatusBacklog},
+		{TaskStatusBacklog, TaskStatusDone},
+		{TaskStatusBacklog, TaskStatusFailed},
+		{TaskStatusDone, TaskStatusWaiting},
+		{TaskStatusCancelled, TaskStatusInProgress},
+	}
+	for _, tc := range cases {
+		err := ValidateTransition(tc.from, tc.to)
+		if err == nil {
+			t.Errorf("ValidateTransition(%q, %q) = nil, want error", tc.from, tc.to)
+			continue
+		}
+		if !errors.Is(err, ErrInvalidTransition) {
+			t.Errorf("error = %v, want wrapping ErrInvalidTransition", err)
+		}
+	}
+}
+
+func TestUpdateTaskStatus_RejectsInvalidTransition(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+
+	err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusDone)
+	if err == nil {
+		t.Fatal("expected error for invalid transition backlog → done")
+	}
+	if !errors.Is(err, ErrInvalidTransition) {
+		t.Errorf("error = %v, want ErrInvalidTransition", err)
+	}
+}
+
+func TestUpdateTaskStatus_AllowsValidTransitions(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+
+	// backlog → in_progress → waiting → in_progress → committing → done
+	steps := []TaskStatus{
+		TaskStatusInProgress,
+		TaskStatusWaiting,
+		TaskStatusInProgress,
+		TaskStatusCommitting,
+		TaskStatusDone,
+	}
+	for _, next := range steps {
+		if err := s.UpdateTaskStatus(bg(), task.ID, next); err != nil {
+			t.Fatalf("UpdateTaskStatus(→%q): %v", next, err)
+		}
+		got, _ := s.GetTask(bg(), task.ID)
+		if got.Status != next {
+			t.Errorf("after transition to %q: status = %q", next, got.Status)
+		}
+	}
+}
+
+func TestForceUpdateTaskStatus_BypassesValidation(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+
+	// backlog → done is invalid per the state machine
+	if err := s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.Status != TaskStatusDone {
+		t.Errorf("Status = %q, want 'done'", got.Status)
 	}
 }
 
@@ -569,7 +655,7 @@ func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
 func TestResetTaskForRetry_PreservesMountWorktrees(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "mount retry", 5, true, "", "")
-	s.UpdateTaskStatus(bg(), task.ID, TaskStatusDone)
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "retry prompt", true); err != nil {
 		t.Fatalf("ResetTaskForRetry: %v", err)
@@ -588,7 +674,7 @@ func TestResetTaskForRetry_PreservesMountWorktrees(t *testing.T) {
 func TestResetTaskForRetry(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "original prompt", 5, false, "", "")
-	s.UpdateTaskStatus(bg(), task.ID, TaskStatusDone)
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)
 	s.UpdateTaskResult(bg(), task.ID, "some result", "sess", "end_turn", 2)
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "new prompt", true); err != nil {
@@ -702,7 +788,7 @@ func TestSetTaskArchived_NotFound(t *testing.T) {
 func TestResumeTask_SetsInProgress(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
-	s.UpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
 
 	if err := s.ResumeTask(bg(), task.ID, nil); err != nil {
 		t.Fatalf("ResumeTask: %v", err)
@@ -855,7 +941,7 @@ func TestConcurrentUpdateStatus(t *testing.T) {
 		wg.Add(1)
 		go func(st TaskStatus) {
 			defer wg.Done()
-			s.UpdateTaskStatus(bg(), task.ID, st)
+			s.ForceUpdateTaskStatus(bg(), task.ID, st)
 		}(status)
 	}
 	wg.Wait()

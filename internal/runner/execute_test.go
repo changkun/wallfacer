@@ -121,6 +121,9 @@ func TestRunEndTurnTransitionsToDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "do the task", "", false)
 
 	updated, err := s.GetTask(ctx, task.ID)
@@ -145,6 +148,9 @@ func TestRunWaitingTransitionsToWaiting(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "some prompt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -166,6 +172,9 @@ func TestRunIsErrorTransitionsToFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "do something", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -187,6 +196,9 @@ func TestRunContainerErrorTransitionsToFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "prompt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -209,6 +221,9 @@ func TestRunMaxTokensAutoContinues(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "prompt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -243,6 +258,9 @@ func TestRunWorktreeSetupFailureTransitionsToFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "prompt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -264,6 +282,9 @@ func TestRunEndTurnRecordsResult(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "do the task", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -300,7 +321,7 @@ func TestSyncWorktreesAlreadyUpToDate(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, wt, br); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "waiting"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -334,7 +355,7 @@ func TestSyncWorktreesBehindMain(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, wt, br); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "waiting"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -383,7 +404,7 @@ func TestSyncWorktreesNonGitWorkspaceSkipped(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, wt, br); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "waiting"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -407,7 +428,7 @@ func TestSyncWorktreesNoWorktreePaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "waiting"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -502,6 +523,9 @@ func TestRunWithPreexistingWorktrees(t *testing.T) {
 	}
 
 	// Run should detect existing worktrees and skip re-creation.
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "continue task", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -536,6 +560,9 @@ func TestRunUsageAccumulation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "task prompt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -567,6 +594,9 @@ func TestRunCostMultiTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "prompt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -612,6 +642,9 @@ func TestRunCostResumedFromWaiting(t *testing.T) {
 	}
 
 	// First Run: goes to waiting.
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "prompt", "", false)
 	waiting, _ := s.GetTask(ctx, task.ID)
 	if waiting.Status != "waiting" {
@@ -619,6 +652,9 @@ func TestRunCostResumedFromWaiting(t *testing.T) {
 	}
 
 	// Second Run (feedback resume): goes to done.
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "continue", *waiting.SessionID, false)
 	// Wait for all background goroutines (done oversight) to finish so the
 	// cost totals are deterministic before we read the final values.
@@ -683,7 +719,7 @@ func TestSyncWorktreesPrevStatusRestored(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, wt, br); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "failed"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
 		t.Fatal(err)
 	}
 
@@ -713,6 +749,9 @@ func TestRunWaitingFeedbackDonePreservesChanges(t *testing.T) {
 	}
 
 	// First Run: produces waitingOutput → task goes to "waiting".
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "do the task", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -731,6 +770,9 @@ func TestRunWaitingFeedbackDonePreservesChanges(t *testing.T) {
 	}
 
 	// Second Run (feedback resume): produces endTurnOutput → commit pipeline → done.
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "continue", *updated.SessionID, false)
 
 	final, _ := s.GetTask(ctx, task.ID)
@@ -793,6 +835,9 @@ func TestRunTestRunPreservesImplementationResult(t *testing.T) {
 	}
 
 	// Phase 1: implementation run → task goes to "waiting".
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "implement the feature", "", false)
 
 	afterImpl, _ := s.GetTask(ctx, task.ID)
@@ -860,6 +905,9 @@ func TestRunTestRunUnknownVerdictWhenNoMarker(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "implement the feature", "", false)
 
 	// Mark as test run and run the test agent.
@@ -909,6 +957,9 @@ func TestRunTestRunDefaultStopReasonSetsUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "implement the feature", "", false)
 
 	// Mark as test run and run the test agent.
@@ -957,6 +1008,9 @@ func TestRunTestRunMultiTurnContinuesWithTestSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "implement the feature", "", false)
 
 	// Mark as test run and run the test agent.
@@ -1003,6 +1057,9 @@ func TestRunOversightTerminalBeforeWaiting(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "some prompt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
@@ -1040,6 +1097,9 @@ func TestRunTestRunOversightTerminalBeforeWaiting(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "implement feature", "", false)
 
 	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
@@ -1094,6 +1154,9 @@ func TestRunTestRunDefaultStopReasonTestOversightTerminal(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "implement feature", "", false)
 
 	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
@@ -1144,7 +1207,7 @@ func TestSyncWorktreesBehindMainDirtyWorktree(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, wt, br); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "waiting"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1221,7 +1284,7 @@ func TestSyncWorktreesConflictHandedOffToAgent(t *testing.T) {
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "main: modify README")
 
-	if err := s.UpdateTaskStatus(ctx, task.ID, "waiting"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatal(err)
 	}
 

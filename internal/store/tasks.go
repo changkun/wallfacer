@@ -164,8 +164,33 @@ func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// UpdateTaskStatus sets a task's status field.
+// UpdateTaskStatus sets a task's status field, enforcing the state machine.
+// Returns ErrInvalidTransition if the requested transition is not allowed.
 func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskStatus) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	if err := ValidateTransition(t.Status, status); err != nil {
+		return err
+	}
+	t.Status = status
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
+}
+
+// ForceUpdateTaskStatus sets a task's status field without validating the
+// transition. Use this only for server recovery paths that must succeed
+// regardless of current state, and for test fixtures that need arbitrary
+// initial states. Prefer UpdateTaskStatus for all normal code paths.
+func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskStatus) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

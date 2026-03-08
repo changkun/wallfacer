@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"changkun.de/wallfacer/internal/store"
 )
 
 // ---------------------------------------------------------------------------
@@ -179,7 +181,7 @@ func TestCommitPipelineNonGitWorkspace(t *testing.T) {
 	if err := s.UpdateTaskWorktrees(ctx, task.ID, wt, br); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, "committing"); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
 		t.Fatal(err)
 	}
 
@@ -229,6 +231,9 @@ func TestRunEndToEndNonGitWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
 	r.Run(task.ID, "modify init.txt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)

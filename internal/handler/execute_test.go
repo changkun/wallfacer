@@ -20,7 +20,7 @@ func createWaitingTask(t *testing.T, h *Handler, prompt string) uuid.UUID {
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}
-	if err := h.store.UpdateTaskStatus(context.Background(), task.ID, "waiting"); err != nil {
+	if err := h.store.ForceUpdateTaskStatus(context.Background(), task.ID, store.TaskStatusWaiting); err != nil {
 		t.Fatalf("set waiting: %v", err)
 	}
 	return task.ID

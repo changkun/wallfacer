@@ -71,7 +71,7 @@ func TestListTasks_ExcludesArchivedByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 	h.store.SetTaskArchived(ctx, task.ID, true)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
@@ -93,7 +93,7 @@ func TestListTasks_IncludeArchived(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 	h.store.SetTaskArchived(ctx, task.ID, true)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks?include_archived=true", nil)
@@ -254,7 +254,7 @@ func TestUpdateTask_RetryFromDone(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
 	body := `{"status": "backlog"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
@@ -276,7 +276,7 @@ func TestUpdateTask_RetryFromFailed(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
 
 	body := `{"status": "backlog"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
@@ -298,7 +298,7 @@ func TestUpdateTask_RetryWithNewPrompt(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTask(ctx, "old prompt", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
 
 	body := `{"status": "backlog", "prompt": "new retry prompt"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
@@ -788,7 +788,7 @@ func TestTryAutoPromote_PromotesWhenDepsSatisfied(t *testing.T) {
 
 	ctx := context.Background()
 	dep, _ := h.store.CreateTask(ctx, "dep", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, dep.ID, store.TaskStatusDone)
+	h.store.ForceUpdateTaskStatus(ctx, dep.ID, store.TaskStatusDone)
 
 	task, _ := h.store.CreateTask(ctx, "task", 15, false, "", "")
 	h.store.UpdateTaskDependsOn(ctx, task.ID, []string{dep.ID.String()})
@@ -840,7 +840,7 @@ func TestCheckAndSyncWaitingTasks_SkipsWaitingWithNoWorktrees(t *testing.T) {
 	ctx := context.Background()
 
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	// No worktrees set.
 
 	h.checkAndSyncWaitingTasks(ctx)
@@ -862,7 +862,7 @@ func TestCheckAndSyncWaitingTasks_SkipsWaitingUpToDate(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	// No new commits on main — worktree is up to date.
 
@@ -886,7 +886,7 @@ func TestCheckAndSyncWaitingTasks_SyncsWhenBehind(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
 	// Add a commit to main — now the worktree is behind by 1.
@@ -923,7 +923,7 @@ func TestTryAutoTest_DisabledNoOp(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
 	// autotest is disabled by default.
@@ -968,7 +968,7 @@ func TestTryAutoTest_SkipsAlreadyTested(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	// Simulate a previous test run that passed.
 	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
@@ -992,7 +992,7 @@ func TestTryAutoTest_SkipsCurrentlyTesting(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	// Mark the task as currently running a test.
 	h.store.UpdateTaskTestRun(ctx, task.ID, true, "")
@@ -1012,7 +1012,7 @@ func TestTryAutoTest_SkipsNoWorktrees(t *testing.T) {
 	ctx := context.Background()
 
 	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	// No worktrees set.
 
 	h.tryAutoTest(ctx)
@@ -1035,7 +1035,7 @@ func TestTryAutoTest_SkipsBehindTip(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
 	// Add a commit to main so the worktree is behind by 1.
@@ -1063,7 +1063,7 @@ func TestTryAutoTest_TriggersForEligibleTask(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	// No new commits — worktree is up to date.
 
@@ -1122,7 +1122,7 @@ func TestTryAutoSubmit_DisabledNoOp(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
 
@@ -1169,7 +1169,7 @@ func TestTryAutoSubmit_SkipsNotVerified(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "unverified task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	// LastTestResult is "" (not tested).
 
@@ -1192,7 +1192,7 @@ func TestTryAutoSubmit_SkipsFailedVerification(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "failed test task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	h.store.UpdateTaskTestRun(ctx, task.ID, false, "fail")
 
@@ -1215,7 +1215,7 @@ func TestTryAutoSubmit_SkipsCurrentlyTesting(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	// IsTestRun=true means the test agent is currently running.
 	h.store.UpdateTaskTestRun(ctx, task.ID, true, "pass")
@@ -1240,7 +1240,7 @@ func TestTryAutoSubmit_SkipsBehindTip(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
 
@@ -1269,7 +1269,7 @@ func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
 	// No session ID — task goes directly to done.

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -200,7 +201,11 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			h.diffCache.invalidate(id)
 		} else {
 			if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				if errors.Is(err, store.ErrInvalidTransition) {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+				} else {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
 				return
 			}
 			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{

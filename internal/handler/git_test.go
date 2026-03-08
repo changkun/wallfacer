@@ -559,7 +559,7 @@ func TestDiffCacheImmutable(t *testing.T) {
 
 			task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
 			h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
-			h.store.UpdateTaskStatus(ctx, task.ID, status)
+			h.store.ForceUpdateTaskStatus(ctx, task.ID, status)
 
 			req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
 			w := httptest.NewRecorder()
@@ -590,7 +590,7 @@ func TestDiffCacheImmutable(t *testing.T) {
 
 		task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
 		h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
-		h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+		h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 		h.store.SetTaskArchived(ctx, task.ID, true)
 
 		req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
@@ -643,8 +643,8 @@ func TestDiffCacheInvalidation(t *testing.T) {
 		t.Errorf("before invalidation: expected 304, got %d", w2.Code)
 	}
 
-	// PATCH a status change (backlog → waiting) — this must invalidate the cache.
-	patchBody := `{"status": "waiting"}`
+	// PATCH a status change (backlog → in_progress) — this must invalidate the cache.
+	patchBody := `{"status": "in_progress"}`
 	patchReq := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(patchBody))
 	patchW := httptest.NewRecorder()
 	h.UpdateTask(patchW, patchReq, task.ID)

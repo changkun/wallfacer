@@ -73,7 +73,9 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 
 	if task.SessionID != nil && *task.SessionID != "" {
 		// Transition to "committing" while auto-commit runs in the background.
-		if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusCommitting); err != nil {
+		// Use ForceUpdateTaskStatus since waiting → committing is a legitimate
+		// user-initiated flow not in the automated state machine.
+		if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusCommitting); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -143,7 +145,9 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	// Persist the cancelled status BEFORE cleaning up worktrees.
-	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusCancelled); err != nil {
+	// Use ForceUpdateTaskStatus to handle transitions not in the normal state
+	// machine (e.g. backlog → cancelled for tasks that never started).
+	if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusCancelled); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -405,7 +409,9 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	}
 
 	oldStatus := task.Status
-	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
+	// Use ForceUpdateTaskStatus to handle failed → in_progress which is a
+	// valid operational flow not in the automated state machine.
+	if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

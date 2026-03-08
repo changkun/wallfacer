@@ -103,7 +103,7 @@ func TestRecoverOrphanedTasks(t *testing.T) {
 				t.Fatal(err)
 			}
 			if tc.initialStatus != store.TaskStatusBacklog {
-				if err := s.UpdateTaskStatus(ctx, task.ID, tc.initialStatus); err != nil {
+				if err := s.ForceUpdateTaskStatus(ctx, task.ID, tc.initialStatus); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -183,8 +183,8 @@ func TestRecoverOrphanedTasks_CommittingGitCheck(t *testing.T) {
 			t.Fatalf("UpdateTaskWorktrees: %v", err)
 		}
 		// Set status last so UpdatedAt reflects the committing transition.
-		if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
-			t.Fatalf("UpdateTaskStatus: %v", err)
+		if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting); err != nil {
+			t.Fatalf("ForceUpdateTaskStatus: %v", err)
 		}
 		updated, err := s.GetTask(ctx, task.ID)
 		if err != nil {

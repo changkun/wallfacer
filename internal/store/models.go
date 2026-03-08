@@ -2,6 +2,8 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -93,6 +95,34 @@ const (
 	TaskStatusFailed     TaskStatus = "failed"
 	TaskStatusCancelled  TaskStatus = "cancelled"
 )
+
+// ErrInvalidTransition is returned by UpdateTaskStatus when the requested
+// status change is not permitted by the task state machine.
+var ErrInvalidTransition = errors.New("invalid transition")
+
+// allowedTransitions encodes the complete task state machine. Only transitions
+// present in this map are accepted by UpdateTaskStatus; all others are rejected.
+var allowedTransitions = map[TaskStatus][]TaskStatus{
+	TaskStatusBacklog:    {TaskStatusInProgress},
+	TaskStatusInProgress: {TaskStatusCommitting, TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled},
+	TaskStatusCommitting: {TaskStatusDone, TaskStatusFailed},
+	TaskStatusWaiting:    {TaskStatusInProgress, TaskStatusDone, TaskStatusCancelled},
+	TaskStatusFailed:     {TaskStatusBacklog, TaskStatusCancelled},
+	TaskStatusDone:       {TaskStatusCancelled},
+	TaskStatusCancelled:  {TaskStatusBacklog},
+}
+
+// ValidateTransition returns nil if transitioning from `from` to `to` is
+// permitted by the task state machine, or a descriptive error wrapping
+// ErrInvalidTransition if it is not.
+func ValidateTransition(from, to TaskStatus) error {
+	for _, allowed := range allowedTransitions[from] {
+		if allowed == to {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s → %s", ErrInvalidTransition, from, to)
+}
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {

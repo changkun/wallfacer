@@ -51,10 +51,14 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 
 	for _, t := range tasks {
 		switch t.Status {
-		case "committing":
+		case store.TaskStatusCommitting:
 			// Check whether a commit landed after the last recorded state change.
 			// If so, the commit pipeline completed just before the crash and the
 			// task should be promoted to done rather than failed.
+			//
+			// ForceUpdateTaskStatus is used here because a crash may leave a task in an
+			// unexpected state. Recovery must always complete regardless of the normal
+			// allowed transitions.
 			recovered := false
 			for repoPath := range t.WorktreePaths {
 				hash, _, commitTS, err := gitutil.BranchTipCommit(repoPath, t.BranchName)
@@ -66,7 +70,7 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 					recovered = true
 					logger.Recovery.Warn("task was committing at startup; commit found after UpdatedAt, auto-recovering to done",
 						"task", t.ID, "repo", repoPath, "commit", hash, "recovered", true)
-					s.UpdateTaskStatus(ctx, t.ID, store.TaskStatusDone)
+					s.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone)
 					s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
 						"result": "server restarted after commit completed; auto-recovered to done",
 					})
@@ -79,7 +83,7 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 			if !recovered {
 				logger.Recovery.Warn("task was committing at startup, marking as failed",
 					"task", t.ID, "recovered", false)
-				s.UpdateTaskStatus(ctx, t.ID, store.TaskStatusFailed)
+				s.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusFailed)
 				s.InsertEvent(ctx, t.ID, store.EventTypeError, map[string]string{
 					"error": "server restarted during commit",
 				})
@@ -88,7 +92,7 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 				})
 			}
 
-		case "in_progress":
+		case store.TaskStatusInProgress:
 			if runningContainers[t.ID.String()] {
 				// Container is still active — leave the task in_progress and
 				// monitor it; move to waiting once the container stops.
@@ -101,9 +105,13 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 			} else {
 				// Container is gone — move to waiting so the user can review
 				// partial results and decide whether to continue or finish.
+				//
+				// ForceUpdateTaskStatus is used here because a crash may leave a task in an
+				// unexpected state. Recovery must always complete regardless of the normal
+				// allowed transitions.
 				logger.Recovery.Warn("task container gone after restart, moving to waiting",
 					"task", t.ID)
-				s.UpdateTaskStatus(ctx, t.ID, "waiting")
+				s.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusWaiting)
 				s.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
 					"result": "Server restarted while task was running. Container is no longer active — please review the output and decide whether to continue or mark as done.",
 				})
@@ -137,11 +145,14 @@ func monitorContainerUntilStopped(ctx context.Context, s *store.Store, lister Co
 		if getErr != nil || cur == nil {
 			return
 		}
-		if cur.Status != "in_progress" {
+		if cur.Status != store.TaskStatusInProgress {
 			// Task was already transitioned by another path (e.g. cancelled).
 			return
 		}
-		s.UpdateTaskStatus(storeCtx, taskID, "waiting")
+		// ForceUpdateTaskStatus is used here because a crash may leave a task in an
+		// unexpected state. Recovery must always complete regardless of the normal
+		// allowed transitions.
+		s.ForceUpdateTaskStatus(storeCtx, taskID, store.TaskStatusWaiting)
 		s.InsertEvent(storeCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Container has stopped. Please review the output and decide whether to continue or mark as done.",
 		})

@@ -33,7 +33,7 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 	// Put tasks in different statuses.
 	s.UpdateTaskStatus(ctx, t1.ID, "in_progress")
 	s.UpdateTaskResult(ctx, t1.ID, "working", "sess-secret", "max_tokens", 2)
-	s.UpdateTaskStatus(ctx, t2.ID, "done")
+	s.ForceUpdateTaskStatus(ctx, t2.ID, "done")
 	// t3 stays in backlog.
 
 	data, err := r.generateBoardContext(t2.ID, false)
@@ -180,7 +180,7 @@ func TestBuildSiblingMounts(t *testing.T) {
 	t3, _ := s.CreateTask(ctx, "backlog task", 5, false, "", "")
 
 	// Set t2 to waiting with worktree paths.
-	s.UpdateTaskStatus(ctx, t2.ID, "waiting")
+	s.ForceUpdateTaskStatus(ctx, t2.ID, "waiting")
 	wtDir := t.TempDir()
 	s.UpdateTaskWorktrees(ctx, t2.ID, map[string]string{"/myrepo": wtDir}, "task/"+t2.ID.String()[:8])
 
@@ -286,7 +286,7 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		s.UpdateTaskStatus(ctx, task.ID, "done")
+		s.ForceUpdateTaskStatus(ctx, task.ID, "done")
 		s.UpdateTaskResult(ctx, task.ID, longResult, "sess", "end_turn", 3)
 	}
 

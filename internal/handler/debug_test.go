@@ -225,7 +225,7 @@ func TestGetSpanStats_IncludesArchived(t *testing.T) {
 	})
 
 	// Archive the task.
-	if err := h.store.UpdateTaskStatus(ctx, task.ID, "done"); err != nil {
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.store.SetTaskArchived(ctx, task.ID, true); err != nil {
