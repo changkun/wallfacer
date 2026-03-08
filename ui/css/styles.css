@@ -1348,19 +1348,7 @@ pre.result-entry-body {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
 }
-.refine-history-toggle {
-  cursor: pointer;
-  list-style: none;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  padding: 2px 0;
-}
-.refine-history-toggle::-webkit-details-marker { display: none; }
 .refine-history-list {
-  margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
