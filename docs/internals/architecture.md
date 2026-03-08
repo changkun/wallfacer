@@ -1,228 +1,280 @@
 # Architecture
 
-Wallfacer is a work management board that dispatches autonomous agents to isolated sandbox containers. Users create tasks on a web board; dragging a card from Backlog to In Progress triggers autonomous agent execution in an isolated git worktree, with auto-merge back to the main branch on completion.
+Wallfacer is a host-native Go service that coordinates autonomous coding agents running in ephemeral containers, with per-task git worktree isolation and a web task board for human oversight.
 
 ## System Overview
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Browser (Vanilla JS + Tailwind + Sortable.js)              │
-│  5-column task board — SSE for live updates                 │
-└────────────────────────┬────────────────────────────────────┘
-                         │ HTTP / SSE
-┌────────────────────────▼────────────────────────────────────┐
-│  Go Server (native on host)                                 │
-│  main.go · handler.go · runner.go · store.go · git.go      │
-└──────┬──────────────────────────────────────┬───────────────┘
-       │ os/exec (podman/docker)              │ git commands
-┌──────▼──────────────┐              ┌────────▼──────────────┐
-│  Sandbox Container  │              │  Git Worktrees        │
-│  Ubuntu 24.04       │              │  ~/.wallfacer/        │
-│  Claude Code CLI    │◄────mount────│  worktrees/<uuid>/    │
-└─────────────────────┘              └───────────────────────┘
-```
-
-The Go server runs natively on the host and persists tasks to per-task directories. It launches ephemeral sandbox containers via `podman run` (or `docker run`). Each task gets its own git worktree so multiple tasks can run concurrently without interfering.
-
-## Technology Stack
-
-**Backend** — Go 1.25, stdlib `net/http` (no framework), `os/exec` for containers, `sync.RWMutex` for concurrency, `github.com/google/uuid` for task IDs.
-
-**Frontend** — Vanilla JavaScript, Tailwind CSS, Sortable.js, Marked.js. `EventSource` (SSE) for live updates, `localStorage` for theme preferences.
-
-**Infrastructure** — Podman or Docker as container runtime. Bring-your-own sandbox image; built-in images for Claude Code and OpenAI Codex. Git worktrees for per-task isolation.
-
-**Persistence** — Filesystem only, no database. `~/.wallfacer/data/<uuid>/` per task. Atomic writes via temp file + `os.Rename`.
-
-## Project Structure
-
-```
-wallfacer/
-├── main.go              # CLI dispatch, container runtime detection, server init, browser launch
-├── server.go            # HTTP server setup, mux construction, route registration
-│
-├── internal/
-│   ├── envconfig/       # .env file parsing and atomic update helpers
-│   ├── gitutil/         # Git operations: repo queries, worktree lifecycle, rebase/merge, status
-│   ├── handler/         # HTTP API handlers (one file per concern)
-│   │   ├── config.go        # GET/PUT /api/config (autopilot toggle)
-│   │   ├── containers.go    # GET /api/containers
-│   │   ├── debug.go         # GET /api/debug/health and /api/debug/spans
-│   │   ├── diffcache.go     # In-memory diff result cache
-│   │   ├── env.go           # GET/PUT /api/env, POST /api/env/test
-│   │   ├── execute.go       # Task lifecycle actions (feedback, done, cancel, resume, sync, archive, test)
-│   │   ├── files.go         # GET /api/files (@ mention autocomplete)
-│   │   ├── git.go           # Git status, push, sync, branches, checkout, rebase-on-main
-│   │   ├── handler.go       # Handler struct, middleware, shared helpers
-│   │   ├── ideate.go        # GET/POST/DELETE /api/ideate (brainstorm agent)
-│   │   ├── instructions.go  # GET/PUT /api/instructions, POST reinit
-│   │   ├── oversight.go     # GET /api/tasks/{id}/oversight and /oversight/test
-│   │   ├── refine.go        # POST/DELETE /api/tasks/{id}/refine, logs, apply, dismiss
-│   │   ├── spans.go         # GET /api/tasks/{id}/spans, GET /api/debug/spans
-│   │   ├── stream.go        # SSE endpoints (task stream, git stream, container logs, refine logs)
-│   │   ├── tasks.go         # Task CRUD, title/oversight generation, autopilot promoter
-│   │   └── usage.go         # GET /api/usage (aggregate usage statistics)
-│   ├── instructions/    # Workspace CLAUDE.md management
-│   ├── logger/          # Structured logging (pretty-print + JSON)
-│   ├── runner/          # Container orchestration, task execution, commit pipeline
-│   │   ├── board.go         # Board context (board.json) generation for cross-task awareness
-│   │   ├── commit.go        # Commit pipeline: host-side stage/commit, rebase, merge, cleanup
-│   │   ├── container.go     # Container argument building, execution via os/exec, NDJSON parsing
-│   │   ├── execute.go       # Main task execution loop, turn handling, stop_reason dispatch
-│   │   ├── ideate.go        # Brainstorm agent orchestration
-│   │   ├── oversight.go     # Oversight summary generation
-│   │   ├── parse.go         # Output parsing utilities
-│   │   ├── recovery.go      # Crash recovery: reconcile in_progress/committing tasks on startup
-│   │   ├── refine.go        # Sandbox-based prompt refinement orchestration
-│   │   ├── runner.go        # Runner struct, config, container listing (Podman + Docker)
-│   │   ├── snapshot.go      # Pre-run workspace snapshot for diff baselines
-│   │   ├── title.go         # Background title generation
-│   │   ├── util.go          # Shared helpers
-│   │   └── worktree.go      # Worktree setup and cleanup
-│   └── store/           # Per-task directory persistence, data models, event sourcing
-│       ├── models.go        # Domain types: Task, TaskStatus, TaskOversight, SpanData, RefinementJob, …
-│       ├── store.go         # Store struct, in-memory map, sync.RWMutex, Init, Load
-│       ├── tasks.go         # Task CRUD and validated status transitions
-│       ├── events.go        # Append-only trace event management
-│       ├── io.go            # Atomic file I/O helpers (SaveTurnOutput, etc.)
-│       ├── oversight.go     # Oversight persistence helpers
-│       └── subscribe.go     # Change notification channels (buffered, coalesced for SSE)
-│
-├── ui/
-│   ├── index.html       # 5-column task board layout
-│   ├── css/
-│   │   ├── styles.css       # Custom component styles
-│   │   └── tailwind.css     # Tailwind CSS build
-│   └── js/
-│       ├── api.js               # HTTP client & SSE stream setup
-│       ├── containers.js        # Container monitoring UI
-│       ├── dep-graph.js         # Task dependency graph visualisation
-│       ├── dnd.js               # Drag-and-drop (Sortable.js wrapper)
-│       ├── envconfig.js         # API configuration editor
-│       ├── events.js            # Event timeline rendering
-│       ├── git.js               # Git status display & branch switcher
-│       ├── ideate.js            # Ideation trigger and result display
-│       ├── instructions.js      # CLAUDE.md editor modal
-│       ├── markdown.js          # Markdown rendering (Marked.js)
-│       ├── mention.js           # @ mention autocomplete for file references
-│       ├── modal.js             # Task detail modal (top-level, tab routing)
-│       ├── modal-ansi.js        # ANSI escape sequences → HTML
-│       ├── modal-core.js        # Modal open/close infrastructure
-│       ├── modal-diff.js        # Diff viewer (collapsible per-file)
-│       ├── modal-flamegraph.js  # Flamegraph timeline visualisation
-│       ├── modal-logs.js        # Live log streaming (oversight/pretty/raw modes)
-│       ├── modal-ndjson.js      # NDJSON parsing and display
-│       ├── modal-oversight.js   # Oversight summary rendering (phases, tools, commands)
-│       ├── modal-results.js     # Results panel layout
-│       ├── refine.js            # Prompt refinement UI
-│       ├── render.js            # Board rendering & DOM updates
-│       ├── search.js            # Task search/filter
-│       ├── span-stats.js        # Span timing debug view
-│       ├── state.js             # Global state management
-│       ├── tasks.js             # Task CRUD operations
-│       ├── theme.js             # Dark/light theme toggle
-│       ├── usage-stats.js       # Token/cost breakdown by activity
-│       └── utils.js             # Shared utility functions (escapeHtml, dateFormat, …)
-│
-├── sandbox/
-│   ├── claude/
-│   │   ├── Dockerfile   # Ubuntu 24.04 + Go + Node + Python + Claude Code
-│   │   └── entrypoint.sh# Git config setup, Claude Code launcher
-│   └── codex/
-│       ├── Dockerfile   # Ubuntu 24.04 + Go + Node + Python + OpenAI Codex
-│       └── entrypoint.sh# Codex full-auto launcher
-│
-├── Makefile             # build, server, run, shell, clean targets
-├── go.mod, go.sum
-└── docs/                # Documentation
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ Browser UI (Vanilla JS + Tailwind + Sortable.js)                  │
+│ - Task board and modals                                            │
+│ - SSE streams: task deltas, logs, git status                      │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ HTTP / SSE
+┌──────────────────────────────▼──────────────────────────────────────┐
+│ Go Server (main.go + server.go + internal/*)                       │
+│ - REST handlers + background automation loops                       │
+│ - Store-backed task state machine + event timeline                  │
+│ - Runner orchestration (containers, worktrees, commit pipeline)     │
+└───────────────┬───────────────────────────────┬─────────────────────┘
+                │ os/exec container runtime     │ git CLI on host
+┌───────────────▼───────────────┐   ┌───────────▼────────────────────┐
+│ Sandbox Containers             │   │ Per-task Git Worktrees         │
+│ - Claude / Codex images        │   │ ~/.wallfacer/worktrees/...     │
+│ - Activity-routed execution    │   │ task/<id> branches             │
+└───────────────────────────────┘   └────────────────────────────────┘
 ```
 
-## Design Choices
+## Core Design Principles
 
-| Choice | Rationale |
-|---|---|
-| Git worktrees per task | Full isolation; concurrent tasks don't interfere; agent sees a clean branch |
-| Goroutines, no queue | Simplicity; Go's scheduler handles parallelism; tasks are long-running and IO-bound |
-| Filesystem persistence, no DB | Zero dependencies; atomic rename is crash-safe; human-readable for debugging |
-| SSE, not WebSocket | Simpler server-side; one-directional push is all the UI needs |
-| Ephemeral containers | No state leaks between tasks; each run starts clean |
-| Event sourcing (traces/) | Full audit trail; enables crash recovery and replay |
-| Board context (`board.json`) | Cross-task awareness; agents can see sibling tasks to avoid conflicts |
-| Auto-detect container runtime | Supports both Podman and Docker transparently |
+- Filesystem-first persistence (no database dependency).
+- Strong task isolation (container + branch/worktree per task).
+- Explicit, validated task state transitions.
+- High operator visibility (SSE, traces, spans, oversight, usage stats).
+- Automation with guardrails (autopilot, autotest, autosubmit, dependency checks).
 
-## Configuration
+## Runtime Architecture
 
-### CLI Subcommands
+### CLI entrypoints
 
-- `wallfacer run [flags] [workspace ...]` — Start the task board server
-- `wallfacer env` — Show configuration and env file status
-- `wallfacer exec <task-id-prefix> [-- command...]` — Attach to a running task container by UUID prefix; runs an interactive shell if no command is given
+- `wallfacer run [flags] [workspace ...]`
+- `wallfacer env`
+- `wallfacer exec <task-id-prefix> [-- command...]`
 
-Running `wallfacer` with no arguments prints help.
+`run` initializes config/env, scopes data by workspace set, ensures workspace instructions, recovers orphaned tasks, starts automation watchers, and serves HTTP.
 
-### Flags for `wallfacer run`
+### Startup flow (`runServer`)
 
-All flags have env var fallbacks:
+1. Parse flags and resolve workspace absolute paths.
+2. Scope data dir by workspace key: `DATA_DIR/<instructions.Key(workspaces)>`.
+3. Load store from disk (`task.json`, `traces/*.json`).
+4. Ensure `~/.wallfacer/worktrees` exists.
+5. Ensure workspace instructions file in `~/.wallfacer/instructions/<key>.md`.
+6. Resolve/pull sandbox image (`ensureImage` with local fallback).
+7. Build runner + handler.
+8. Prune stale worktrees and recover orphaned tasks.
+9. Start background watchers:
+   - auto-promoter
+   - ideation watcher
+   - waiting-sync watcher
+   - auto-tester
+   - auto-submitter
+10. Serve HTTP routes and embedded UI.
+11. On shutdown: graceful HTTP drain, wait for tracked runner background jobs.
 
-| Flag | Env Var | Default | Description |
-|------|---------|---------|-------------|
-| `-addr` | `ADDR` | `:8080` | Listen address |
-| `-data` | `DATA_DIR` | `~/.wallfacer/data` | Data directory |
-| `-container` | `CONTAINER_CMD` | auto-detected | Container runtime command (podman or docker) |
-| `-image` | `SANDBOX_IMAGE` | `wallfacer:latest` | Sandbox container image |
-| `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file passed to containers |
-| `-no-browser` | — | `false` | Do not open browser on start |
+## Main Components
 
-Positional arguments after flags are workspace directories to mount (defaults to current directory).
+### `internal/store` (state + persistence)
 
-The `-container` flag defaults to auto-detection: it checks `/opt/podman/bin/podman` first, then `podman` on `$PATH`, then `docker` on `$PATH`. Override with `CONTAINER_CMD` env var or `-container` flag to use a specific runtime.
+- In-memory maps guarded by `sync.RWMutex`.
+- Per-task persistence:
+  - `task.json` (task state)
+  - `outputs/turn-*.json` + optional stderr sidecar
+  - `traces/0001.json...` (append-only event timeline)
+  - `oversight.json`, `oversight-test.json`
+- Atomic writes via temp-file + rename.
+- Task state machine enforced via transition table (`TaskStatus`).
+- Pub/sub channel for live task deltas (used by SSE and automation triggers).
 
-### Environment File
+### `internal/runner` (orchestration engine)
 
-`~/.wallfacer/.env` is passed into every sandbox container via `--env-file`. The server also parses it to extract model overrides and gateway credentials.
+- Creates and cleans task worktrees (`task/<uuid8>` branches).
+- Builds container invocations via `ContainerSpec`.
+- Routes sandbox/model by activity:
+  - implementation
+  - testing
+  - refinement
+  - title
+  - oversight
+  - commit_message
+  - idea_agent
+- Executes turn loop, handles stop reasons, accumulates usage/cost.
+- Commit pipeline:
+  - host-side `git add/commit`
+  - rebase/merge with conflict handling
+  - optional auto-push (`WALLFACER_AUTO_PUSH*`)
+  - cleanup worktrees
+- Background generation:
+  - titles
+  - oversight summaries
+  - periodic oversight while running
+- Tracks background goroutines for safe shutdown.
 
-At least one authentication variable must be set (Claude or Codex):
+### `internal/handler` (HTTP + automation control plane)
 
-**Claude Code sandbox**
+- REST API for tasks, execution, git, env, config, files, instructions.
+- SSE endpoints for task deltas, logs, git status.
+- In-process automation toggles:
+  - `autopilot`
+  - `autotest`
+  - `autosubmit`
+  - `ideation` (+ interval scheduling)
+- Diff cache and API-oriented data shaping.
+- SSRF-hardening for user-provided gateway base URLs.
 
-| Variable | Required | Description |
-|---|---|---|
-| `CLAUDE_CODE_OAUTH_TOKEN` | one of these two | OAuth token from `claude setup-token` (Claude Pro/Max) |
-| `ANTHROPIC_API_KEY` | one of these two | Direct API key from console.anthropic.com |
-| `ANTHROPIC_AUTH_TOKEN` | no | Bearer token for LLM gateway proxy authentication |
-| `ANTHROPIC_BASE_URL` | no | Custom API endpoint; defaults to `https://api.anthropic.com`. When set, the server queries `{base_url}/v1/models` to populate the model selection dropdown |
-| `CLAUDE_DEFAULT_MODEL` | no | Default model passed as `--model` to task containers; omit to use the Claude Code default |
-| `CLAUDE_TITLE_MODEL` | no | Model used for background title generation; falls back to `CLAUDE_DEFAULT_MODEL` if unset |
-| `WALLFACER_MAX_PARALLEL` | no | Maximum number of concurrently running tasks when autopilot is enabled (default: 5) |
-| `WALLFACER_OVERSIGHT_INTERVAL` | no | Minutes between periodic oversight generation while a task runs (0 = only at completion, default: 0) |
+### `internal/envconfig`
 
-When both `CLAUDE_CODE_OAUTH_TOKEN` and `ANTHROPIC_API_KEY` are set, the OAuth token takes precedence. This is Claude Code CLI behavior — wallfacer simply passes both variables through to the container via `--env-file`.
+- Parses and updates `.env` while preserving unknown keys/comments.
+- Supports sandbox routing config and operational settings.
+- Used by runner and handlers at runtime (no restart required for most settings).
 
-**OpenAI Codex sandbox** (optional; requires building `wallfacer-codex` image)
+### `ui/` frontend
 
-| Variable | Required | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | yes (for Codex) | OpenAI API key |
-| `OPENAI_BASE_URL` | no | Custom OpenAI-compatible API base URL (default: `https://api.openai.com/v1`) |
-| `CODEX_DEFAULT_MODEL` | no | Default model for Codex tasks (e.g. `codex-mini-latest`) |
-| `CODEX_TITLE_MODEL` | no | Model for auto-generating task titles; falls back to `CODEX_DEFAULT_MODEL` |
+- Vanilla JS modules, no framework runtime.
+- Drag-and-drop task board, modal detail views, timeline/flamegraph, oversight, diff, usage, sandbox monitor.
+- SSE-driven updates with snapshot + typed delta events.
+- Frontend tests under `ui/js/tests` with Vitest.
 
-All variables can be edited at runtime from **Settings → API Configuration** in the web UI. Changes take effect on the next task run without restarting the server.
+## Task Execution Lifecycle (Implementation Task)
 
-`wallfacer env` reports the status of all configuration variables.
+1. Task created in `backlog`.
+2. Transition to `in_progress` (manual drag or autopilot).
+3. Runner ensures worktrees and board context (`/workspace/.tasks/board.json`).
+4. Runner launches container for each turn.
+5. Per-turn artifacts saved:
+   - output files
+   - timeline events
+   - usage aggregation
+6. Stop reason handling:
+   - `max_tokens` / `pause_turn`: auto-continue turn loop.
+   - `end_turn`: move to `committing`, run commit pipeline, then `done` or `failed`.
+   - other/empty stop reason: move to `waiting` for human feedback.
+7. Oversight generation:
+   - sync for waiting path
+   - background for done path
+   - optional periodic while task is running.
 
-## Server Initialization
+### Test run lifecycle
 
-`main.go` → `runServer`:
+- Triggered from waiting via `/api/tasks/{id}/test`.
+- Same task moves back to `in_progress` with `IsTestRun=true`.
+- Returns to `waiting` with `LastTestResult` = `pass` / `fail` / `unknown`.
+- Generates dedicated test oversight (`oversight-test.json`).
 
-```
-parse CLI flags / env vars
-→ load tasks from data/<uuid>/task.json into memory
-→ create worktreesDir (~/.wallfacer/worktrees/)
-→ pruneOrphanedWorktrees()   (removes stale worktree dirs + runs `git worktree prune`)
-→ recover crashed tasks      (in_progress / committing → failed or waiting)
-→ start auto-promoter goroutine (watches store; promotes backlog tasks when autopilot enabled)
-→ register HTTP routes
-→ start listener on :8080
-→ open browser (unless -no-browser)
-```
+## Background Automation Loops
+
+- Auto-promoter:
+  - respects `WALLFACER_MAX_PARALLEL` (default 5)
+  - skips idea-agent tasks
+  - enforces dependency readiness (`DependsOn` all done)
+- Auto-tester:
+  - runs tests for eligible waiting tasks when enabled
+- Auto-submitter:
+  - promotes verified waiting tasks to done when conflict-free and up-to-date
+- Waiting-sync watcher:
+  - auto-syncs waiting tasks behind default branch
+- Ideation watcher:
+  - schedules/enqueues idea-agent tasks based on enable flag + interval
+
+## API Surface (High-Level)
+
+Core groups in `buildMux`:
+
+- UI/static:
+  - `GET /`
+- Debug:
+  - `GET /api/debug/health`
+  - `GET /api/debug/spans`
+- Config/env/instructions:
+  - `GET/PUT /api/config`
+  - `GET/PUT /api/env`
+  - `POST /api/env/test`
+  - `GET/PUT /api/instructions`
+  - `POST /api/instructions/reinit`
+- Tasks:
+  - CRUD: `GET/POST/PATCH/DELETE /api/tasks...`
+  - execution actions: feedback, done, cancel, resume, sync, test
+  - refinement: start/cancel/logs/apply/dismiss
+  - oversight/spans/diff/events/logs/outputs
+  - archive/unarchive + archive-all
+  - generation helpers: missing titles/oversight
+- Streams:
+  - `GET /api/tasks/stream`
+  - `GET /api/git/stream`
+  - `GET /api/tasks/{id}/logs`
+  - `GET /api/tasks/{id}/refine/logs`
+- Git workspace ops:
+  - status/push/sync/rebase/branches/checkout/create-branch
+- Ops/observability:
+  - `GET /api/containers`
+  - `GET /api/files`
+  - `GET /api/usage`
+  - ideation status/trigger/cancel
+
+See `docs/internals/orchestration.md` for endpoint-level behavior.
+
+## Data Model Highlights
+
+- `TaskStatus`: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`
+- `TaskKind`: regular task or `idea-agent`
+- `archived` is a flag (not a status)
+- Optional per-activity sandbox overrides on each task
+- `DependsOn` DAG support for gated autopromotion
+
+## Concurrency and Synchronization
+
+- `Store.mu`: task/event map integrity.
+- `promoteMu`: serialize autopromote decisions.
+- `Runner.worktreeMu`: serialize filesystem worktree operations.
+- Per-repo mutex map for rebase/merge serialization.
+- Per-task oversight mutex map to avoid concurrent summary races.
+- `trackedWg` for lifecycle-safe background jobs.
+
+## Recovery and Fault Tolerance
+
+On startup, `RecoverOrphanedTasks` reconciles interrupted work:
+
+- `committing` tasks:
+  - if commit landed after last task update -> recover to `done`
+  - else -> mark `failed`
+- `in_progress` tasks:
+  - container still running -> keep running and monitor
+  - container gone -> move to `waiting` for operator decision
+
+## Security and Hardening
+
+- Base URL validation rejects unsafe hosts/schemes for gateway endpoints.
+- DNS + dial-time SSRF checks block private/loopback/link-local targets.
+- Output file serving guards against path traversal.
+- Task/container correlation uses labels (`wallfacer.task.id`) for safer lookup.
+
+## Configuration Model
+
+### Runtime flags
+
+- `-addr`
+- `-data`
+- `-container`
+- `-image`
+- `-env-file`
+- `-no-browser`
+- `-log-format`
+
+### Important env keys
+
+- Auth/models:
+  - `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`
+  - `OPENAI_API_KEY`, `OPENAI_BASE_URL`
+  - `CLAUDE_DEFAULT_MODEL`, `CLAUDE_TITLE_MODEL`
+  - `CODEX_DEFAULT_MODEL`, `CODEX_TITLE_MODEL`
+- Ops:
+  - `WALLFACER_MAX_PARALLEL`
+  - `WALLFACER_OVERSIGHT_INTERVAL`
+  - `WALLFACER_AUTO_PUSH`
+  - `WALLFACER_AUTO_PUSH_THRESHOLD`
+- Sandbox routing:
+  - `WALLFACER_DEFAULT_SANDBOX`
+  - `WALLFACER_SANDBOX_IMPLEMENTATION`
+  - `WALLFACER_SANDBOX_TESTING`
+  - `WALLFACER_SANDBOX_REFINEMENT`
+  - `WALLFACER_SANDBOX_TITLE`
+  - `WALLFACER_SANDBOX_OVERSIGHT`
+  - `WALLFACER_SANDBOX_COMMIT_MESSAGE`
+  - `WALLFACER_SANDBOX_IDEA_AGENT`
+
+For setup and operator-facing behavior, see:
+
+- `docs/getting-started.md`
+- `docs/usage.md`
+- `docs/internals/task-lifecycle.md`
+- `docs/internals/orchestration.md`
