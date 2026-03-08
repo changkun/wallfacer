@@ -93,7 +93,7 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 		return
 	}
 	cur.CurrentRefinement.Status = "done"
-	cur.CurrentRefinement.Result = output.Result
+	cur.CurrentRefinement.Result = cleanRefinementResult(output.Result)
 	r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
 
 	logger.Runner.Info("refinement complete", "task", taskID)
@@ -243,4 +243,20 @@ func (r *Runner) runRefinementContainer(
 	}
 
 	return output, stdout.Bytes(), stderr.Bytes(), nil
+}
+
+// cleanRefinementResult strips any agent preamble (internal monologue,
+// separator lines) that appears before the actual spec content.
+// It looks for the first top-level markdown heading ("# ") and returns
+// everything from that point; if none is found, the original text is returned.
+func cleanRefinementResult(result string) string {
+	// Check if the result starts directly with a heading.
+	if strings.HasPrefix(result, "# ") {
+		return result
+	}
+	// Find the first occurrence of a top-level heading on its own line.
+	if idx := strings.Index(result, "\n# "); idx != -1 {
+		return strings.TrimSpace(result[idx:])
+	}
+	return result
 }
