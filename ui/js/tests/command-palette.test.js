@@ -99,6 +99,7 @@ function createElement(overrides = {}) {
 }
 
 function makeContext(extra = {}) {
+  const storage = new Map();
   const elements = new Map(extra.elements || []);
   const body = createElement({ tagName: 'BODY' });
   const ctx = {
@@ -125,8 +126,23 @@ function makeContext(extra = {}) {
     window: {
       addEventListener: () => {},
     },
+    localStorage: {
+      getItem(key) {
+        return storage.has(key) ? storage.get(key) : null;
+      },
+      setItem(key, value) {
+        storage.set(key, String(value));
+      },
+      removeItem(key) {
+        storage.delete(key);
+      },
+      clear() {
+        storage.clear();
+      },
+    },
     ...extra,
   };
+  ctx.window.localStorage = ctx.localStorage;
   return vm.createContext(ctx);
 }
 
@@ -175,7 +191,7 @@ describe('commandPaletteMatchTask', () => {
     };
     expect(ctx.commandPaletteMatchTask(task, 'search').matched).toBe(true);
     expect(ctx.commandPaletteMatchTask(task, '1111').matched).toBe(true);
-    expect(ctx.commandPaletteMatchTask(task, 'missing').matched).toBe(false);
+    expect(ctx.commandPaletteMatchTask(task, 'missing')).toBeNull();
   });
 
   it('searches local tasks with ranking', () => {
@@ -204,16 +220,17 @@ describe('command-palette key navigation', () => {
         ],
       },
     ]);
+    const state = () => ctx.window.__wallfacerTestState.commandPalette();
 
-    expect(ctx._commandPaletteActiveIndex).toBe(0);
+    expect(state().activeIndex).toBe(0);
     ctx.commandPaletteMoveDown();
-    expect(ctx._commandPaletteActiveIndex).toBe(1);
+    expect(state().activeIndex).toBe(1);
     ctx.commandPaletteMoveDown();
-    expect(ctx._commandPaletteActiveIndex).toBe(2);
+    expect(state().activeIndex).toBe(2);
     ctx.commandPaletteMoveDown();
-    expect(ctx._commandPaletteActiveIndex).toBe(0);
+    expect(state().activeIndex).toBe(0);
     ctx.commandPaletteMoveUp();
-    expect(ctx._commandPaletteActiveIndex).toBe(2);
+    expect(state().activeIndex).toBe(2);
   });
 });
 
@@ -317,12 +334,13 @@ describe('command-palette remote search', () => {
 
     ctx._commandPaletteServerSeq = 1;
     await ctx._searchRemote('@task', 1);
+    const state = ctx.window.__wallfacerTestState.commandPalette();
 
-    const taskRows = ctx._commandPaletteRows.filter((row) => row.type === 'task');
+    const taskRows = state.rows.filter((row) => row.type === 'task');
     expect(taskRows).toHaveLength(1);
     expect(taskRows[0].id).toBe('r1');
-    expect(ctx._commandPaletteTaskRows[0].title).toBe('Remote task');
-    expect(ctx._commandPaletteRows.some((row) => row.id === 'action-open-task:Open task')).toBe(true);
+    expect(state.taskRows[0].title).toBe('Remote task');
+    expect(state.rows.some((row) => row.id === 'action-open-task:Open task')).toBe(true);
     expect(fetch).toHaveBeenCalledWith('/api/tasks/search?q=' + encodeURIComponent('task'));
 
     await taskRows[0].execute();

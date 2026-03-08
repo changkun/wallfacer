@@ -9,6 +9,14 @@ let _commandPaletteActiveTaskId = '';
 let _commandPaletteServerTimer = null;
 let _commandPaletteServerSeq = 0;
 
+if (typeof globalThis === 'object') {
+	Object.defineProperty(globalThis, '_commandPaletteServerSeq', {
+		configurable: true,
+		get: function() { return _commandPaletteServerSeq; },
+		set: function(value) { _commandPaletteServerSeq = value; },
+	});
+}
+
 function _getPaletteElements() {
   return {
     root: document.getElementById('command-palette'),
@@ -537,7 +545,7 @@ function _searchRemote(query, seq) {
       '</div>';
   }
 
-  fetch('/api/tasks/search?q=' + encodeURIComponent(trimmed))
+  return fetch('/api/tasks/search?q=' + encodeURIComponent(trimmed))
     .then(function(resp) { return resp.ok ? resp.json() : Promise.reject(resp.status); })
     .then(function(results) {
       if (seq !== _commandPaletteServerSeq) return;
@@ -713,3 +721,14 @@ function commandPaletteHandlePaletteInput() {
     });
   }
 })();
+
+if (typeof window !== 'undefined') {
+  window.__wallfacerTestState = window.__wallfacerTestState || {};
+  window.__wallfacerTestState.commandPalette = function() {
+    return {
+      activeIndex: _commandPaletteActiveIndex,
+      rows: _commandPaletteRows,
+      taskRows: _commandPaletteTaskRows,
+    };
+  };
+}
