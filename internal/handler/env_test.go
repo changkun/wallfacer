@@ -208,6 +208,61 @@ func TestUpdateEnvConfig_OversightIntervalRoundTrip(t *testing.T) {
 	}
 }
 
+func TestUpdateEnvConfig_CodexModelRoundTrip(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	if err := validateBaseURL("https://api.openai.com/v1"); err != nil {
+		if strings.Contains(err.Error(), "cannot resolve") {
+			t.Skipf("skipping: DNS resolution unavailable (%v)", err)
+		}
+		t.Fatalf("validateBaseURL(%q) unexpected error: %v", "https://api.openai.com/v1", err)
+	}
+
+	body := map[string]string{
+		"default_model":       "claude-opus-4-1",
+		"title_model":         "claude-haiku-4-5",
+		"openai_api_key":      "sk-openai-test",
+		"openai_base_url":     "https://api.openai.com/v1",
+		"codex_default_model": "codex-mini-latest",
+		"codex_title_model":   "codex-title-test",
+	}
+	raw, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(string(raw)))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/env", nil)
+	w2 := httptest.NewRecorder()
+	h.GetEnvConfig(w2, req2)
+
+	var resp envConfigResponse
+	if err := json.NewDecoder(w2.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.DefaultModel != "claude-opus-4-1" {
+		t.Errorf("DefaultModel = %q; want claude-opus-4-1", resp.DefaultModel)
+	}
+	if resp.TitleModel != "claude-haiku-4-5" {
+		t.Errorf("TitleModel = %q; want claude-haiku-4-5", resp.TitleModel)
+	}
+	if resp.CodexDefaultModel != "codex-mini-latest" {
+		t.Errorf("CodexDefaultModel = %q; want codex-mini-latest", resp.CodexDefaultModel)
+	}
+	if resp.CodexTitleModel != "codex-title-test" {
+		t.Errorf("CodexTitleModel = %q; want codex-title-test", resp.CodexTitleModel)
+	}
+	if resp.OpenAIAPIKey != "***********" {
+		t.Errorf("OpenAIAPIKey = %q; want masked value", resp.OpenAIAPIKey)
+	}
+	if resp.OpenAIBaseURL != "https://api.openai.com/v1" {
+		t.Errorf("OpenAIBaseURL = %q; want https://api.openai.com/v1", resp.OpenAIBaseURL)
+	}
+}
+
 // TestUpdateEnvConfig_OversightIntervalClamped verifies that values outside
 // [0, 120] are clamped before writing to the env file.
 func TestUpdateEnvConfig_OversightIntervalClamped(t *testing.T) {
@@ -281,5 +336,75 @@ func TestUpdateEnvConfig_ValidHTTPSBaseURL_AcceptedAndStored(t *testing.T) {
 	}
 	if resp.BaseURL != validURL {
 		t.Errorf("stored base_url: want %q, got %q", validURL, resp.BaseURL)
+	}
+}
+
+func TestTestSandbox_InvalidSandboxRejected(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	body := map[string]string{"sandbox": "llama"}
+	raw, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/env/test", strings.NewReader(string(raw)))
+	w := httptest.NewRecorder()
+	h.TestSandbox(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestTestSandbox_InvalidBaseURLRejected(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	body := map[string]string{
+		"sandbox":  "claude",
+		"base_url": "http://localhost",
+	}
+	raw, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/env/test", strings.NewReader(string(raw)))
+	w := httptest.NewRecorder()
+	h.TestSandbox(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestTestSandbox_PersistsTaskAfterRun(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	body := map[string]interface{}{
+		"sandbox": "claude",
+		"timeout": 1,
+	}
+	raw, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/env/test", strings.NewReader(string(raw)))
+	w := httptest.NewRecorder()
+	h.TestSandbox(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp sandboxTestResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.TaskID == "" {
+		t.Fatalf("expected task_id in response")
+	}
+
+	tasks, err := h.store.ListTasks(context.Background(), false)
+	if err != nil {
+		t.Fatalf("ListTasks failed: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected one task remaining after test run, got %d", len(tasks))
+	}
+	if tasks[0].ID.String() != resp.TaskID {
+		t.Fatalf("remaining task id mismatch: got %q, want %q", tasks[0].ID, resp.TaskID)
+	}
+	if tasks[0].Status == store.TaskStatusBacklog || tasks[0].Archived {
+		t.Fatalf("expected completed test task, got status=%q archived=%v", tasks[0].Status, tasks[0].Archived)
 	}
 }

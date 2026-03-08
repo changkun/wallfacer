@@ -179,6 +179,7 @@ func TestUpdateConfig_SetsIdeationInterval(t *testing.T) {
 
 func TestUpdateConfig_IdeationIntervalClampedToZero(t *testing.T) {
 	h := newTestHandler(t)
+	h.SetIdeation(false)
 
 	body := `{"ideation_interval": -5}`
 	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))

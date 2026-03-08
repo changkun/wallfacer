@@ -125,15 +125,15 @@ func runEnvCheck(configDir string) {
 	} else {
 		fmt.Printf("[ ] ANTHROPIC_BASE_URL not set (using default)\n")
 	}
-	if v := vals["WALLFACER_DEFAULT_MODEL"]; v != "" {
-		fmt.Printf("[ok] WALLFACER_DEFAULT_MODEL = %s\n", v)
+	if v := vals["CLAUDE_DEFAULT_MODEL"]; v != "" {
+		fmt.Printf("[ok] CLAUDE_DEFAULT_MODEL = %s\n", v)
 	} else {
-		fmt.Printf("[ ] WALLFACER_DEFAULT_MODEL not set (using Claude Code default)\n")
+		fmt.Printf("[ ] CLAUDE_DEFAULT_MODEL not set (using Claude Code default)\n")
 	}
-	if v := vals["WALLFACER_TITLE_MODEL"]; v != "" {
-		fmt.Printf("[ok] WALLFACER_TITLE_MODEL = %s\n", v)
+	if v := vals["CLAUDE_TITLE_MODEL"]; v != "" {
+		fmt.Printf("[ok] CLAUDE_TITLE_MODEL = %s\n", v)
 	} else {
-		fmt.Printf("[ ] WALLFACER_TITLE_MODEL not set (falls back to default model)\n")
+		fmt.Printf("[ ] CLAUDE_TITLE_MODEL not set (falls back to default model)\n")
 	}
 
 	// --- OpenAI Codex sandbox ---
@@ -210,9 +210,9 @@ func initConfigDir(configDir, envFile string) {
 			"# Optional: custom Anthropic-compatible API base URL.\n" +
 			"# ANTHROPIC_BASE_URL=https://api.anthropic.com\n\n" +
 			"# Optional: default model for Claude tasks.\n" +
-			"# WALLFACER_DEFAULT_MODEL=\n\n" +
+			"# CLAUDE_DEFAULT_MODEL=\n\n" +
 			"# Optional: model for auto-generating task titles (falls back to default model).\n" +
-			"# WALLFACER_TITLE_MODEL=\n\n" +
+			"# CLAUDE_TITLE_MODEL=\n\n" +
 			"# =============================================================================\n" +
 			"# OpenAI Codex sandbox (use with wallfacer-codex image)\n" +
 			"# =============================================================================\n\n" +
@@ -270,4 +270,3 @@ func openBrowser(url string) {
 	}
 	exec.Command(cmd, url).Start()
 }
-

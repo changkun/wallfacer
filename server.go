@@ -236,6 +236,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/ideate", h.CancelIdeation)
 	mux.HandleFunc("GET /api/env", h.GetEnvConfig)
 	mux.HandleFunc("PUT /api/env", h.UpdateEnvConfig)
+	mux.HandleFunc("POST /api/env/test", h.TestSandbox)
 	mux.HandleFunc("GET /api/instructions", h.GetInstructions)
 	mux.HandleFunc("PUT /api/instructions", h.UpdateInstructions)
 	mux.HandleFunc("POST /api/instructions/reinit", h.ReinitInstructions)

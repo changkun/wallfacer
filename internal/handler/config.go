@@ -4,16 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
-	"sort"
-	"strings"
 	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/instructions"
-	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 )
 
@@ -48,55 +44,28 @@ func ssrfHardenedTransport() *http.Transport {
 		},
 	}
 }
+func availableSandboxes(cfg envconfig.Config) []string {
+	var sandboxes []string
+	if cfg.DefaultModel != "" {
+		sandboxes = append(sandboxes, "claude")
+	}
+	if cfg.CodexDefaultModel != "" {
+		sandboxes = append(sandboxes, "codex")
+	}
+	if len(sandboxes) == 0 {
+		sandboxes = append(sandboxes, "claude")
+	}
+	return sandboxes
+}
 
-// fetchModelsFromGateway queries the LLM gateway's /v1/models endpoint
-// and returns the list of available model IDs.
-func fetchModelsFromGateway(baseURL, authToken, apiKey string) ([]string, error) {
-	url := strings.TrimRight(baseURL, "/") + "/v1/models"
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
+func defaultSandbox(cfg envconfig.Config) string {
+	if cfg.DefaultModel != "" {
+		return "claude"
 	}
-	if authToken != "" {
-		req.Header.Set("Authorization", "Bearer "+authToken)
-	} else if apiKey != "" {
-		req.Header.Set("x-api-key", apiKey)
+	if cfg.CodexDefaultModel != "" {
+		return "codex"
 	}
-
-	client := &http.Client{
-		Timeout:   5 * time.Second,
-		Transport: ssrfHardenedTransport(),
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// OpenAI-compatible /v1/models response format.
-	var result struct {
-		Data []struct {
-			ID string `json:"id"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
-	}
-
-	var models []string
-	for _, m := range result.Data {
-		if m.ID != "" {
-			models = append(models, m.ID)
-		}
-	}
-	sort.Strings(models)
-	return models, nil
+	return "claude"
 }
 
 // ideationRunning returns true if any idea-agent task is currently in_progress.
@@ -115,33 +84,34 @@ func (h *Handler) ideationRunning(ctx context.Context) bool {
 
 // GetConfig returns the server configuration (workspaces, instructions path).
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
-	// Read the current default model from the env file.
 	defaultModel := ""
-	var models []string
+	defaultSandboxName := ""
+	var sandboxes []string
 	if h.envFile != "" {
 		if cfg, err := envconfig.Parse(h.envFile); err == nil {
 			defaultModel = cfg.DefaultModel
-			// Fetch available models from the gateway if a base URL is configured.
-			if cfg.BaseURL != "" {
-				if fetched, err := fetchModelsFromGateway(cfg.BaseURL, cfg.AuthToken, cfg.APIKey); err != nil {
-					logger.Handler.Warn("failed to fetch models from gateway", "url", cfg.BaseURL, "error", err)
-				} else if len(fetched) > 0 {
-					models = fetched
-				}
-			}
+			sandboxes = availableSandboxes(cfg)
+			defaultSandboxName = defaultSandbox(cfg)
 		}
+	}
+	if len(sandboxes) == 0 {
+		sandboxes = []string{"claude"}
+	}
+	if defaultSandboxName == "" {
+		defaultSandboxName = sandboxes[0]
 	}
 
 	resp := map[string]any{
 		"workspaces":        h.runner.Workspaces(),
 		"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
+		"sandboxes":         sandboxes,
+		"default_sandbox":   defaultSandboxName,
 		"autopilot":         h.AutopilotEnabled(),
 		"autotest":          h.AutotestEnabled(),
 		"autosubmit":        h.AutosubmitEnabled(),
 		"ideation":          h.IdeationEnabled(),
 		"ideation_running":  h.ideationRunning(r.Context()),
 		"ideation_interval": int(h.IdeationInterval().Minutes()),
-		"models":            models,
 		"default_model":     defaultModel,
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {

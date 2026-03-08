@@ -7,10 +7,13 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
+	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/envconfig"
+	"changkun.de/wallfacer/internal/store"
 )
 
 // privateIPNets lists networks blocked for SSRF prevention: RFC 1918 private
@@ -92,12 +95,40 @@ type envConfigResponse struct {
 	OAuthToken        string `json:"oauth_token"`         // masked
 	APIKey            string `json:"api_key"`              // masked
 	BaseURL           string `json:"base_url"`
+	OpenAIAPIKey      string `json:"openai_api_key"`      // masked
+	OpenAIBaseURL     string `json:"openai_base_url"`
 	DefaultModel      string `json:"default_model"`
 	TitleModel        string `json:"title_model"`
+	CodexDefaultModel string `json:"codex_default_model"`
+	CodexTitleModel   string `json:"codex_title_model"`
 	MaxParallelTasks  int    `json:"max_parallel_tasks"`
 	OversightInterval int    `json:"oversight_interval"`
 	AutoPushEnabled   bool   `json:"auto_push_enabled"`
 	AutoPushThreshold int    `json:"auto_push_threshold"`
+}
+
+type sandboxTestResponse struct {
+	TaskID         string `json:"task_id"`
+	Sandbox        string `json:"sandbox"`
+	Status         string `json:"status"`
+	LastTestResult string `json:"last_test_result,omitempty"`
+	Result         string `json:"result,omitempty"`
+	StopReason     string `json:"stop_reason,omitempty"`
+}
+
+type sandboxTestRequest struct {
+	Sandbox           *string `json:"sandbox"`
+	Timeout           *int    `json:"timeout"`
+	Prompt            *string `json:"prompt"`
+	OAuthToken        *string `json:"oauth_token"`
+	APIKey            *string `json:"api_key"`
+	BaseURL           *string `json:"base_url"`
+	OpenAIAPIKey      *string `json:"openai_api_key"`
+	OpenAIBaseURL     *string `json:"openai_base_url"`
+	DefaultModel      *string `json:"default_model"`
+	TitleModel        *string `json:"title_model"`
+	CodexDefaultModel *string `json:"codex_default_model"`
+	CodexTitleModel   *string `json:"codex_title_model"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -119,13 +150,191 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		OAuthToken:        envconfig.MaskToken(cfg.OAuthToken),
 		APIKey:            envconfig.MaskToken(cfg.APIKey),
 		BaseURL:           cfg.BaseURL,
+		OpenAIAPIKey:      envconfig.MaskToken(cfg.OpenAIAPIKey),
+		OpenAIBaseURL:     cfg.OpenAIBaseURL,
 		DefaultModel:      cfg.DefaultModel,
 		TitleModel:        cfg.TitleModel,
+		CodexDefaultModel: cfg.CodexDefaultModel,
+		CodexTitleModel:   cfg.CodexTitleModel,
 		MaxParallelTasks:  maxParallel,
 		OversightInterval: cfg.OversightInterval,
 		AutoPushEnabled:   cfg.AutoPushEnabled,
 		AutoPushThreshold: autoPushThreshold,
 	})
+}
+
+// TestSandbox spins up a sandbox with the provided (or saved) credentials and
+// model settings and runs a smoke-check prompt.
+//
+// This is used by the settings modal "Test" button for each sandbox block.
+func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
+	var req sandboxTestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	sandbox := "claude"
+	if req.Sandbox != nil {
+		sandbox = strings.ToLower(strings.TrimSpace(*req.Sandbox))
+	}
+	switch sandbox {
+	case "", "claude", "codex":
+	default:
+		http.Error(w, "invalid sandbox: use claude or codex", http.StatusBadRequest)
+		return
+	}
+	if sandbox == "" {
+		sandbox = "claude"
+	}
+
+	// Preserve existing token handling behavior (empty string means no change).
+	if req.OAuthToken != nil && *req.OAuthToken == "" {
+		req.OAuthToken = nil
+	}
+	if req.APIKey != nil && *req.APIKey == "" {
+		req.APIKey = nil
+	}
+	if req.OpenAIAPIKey != nil && *req.OpenAIAPIKey == "" {
+		req.OpenAIAPIKey = nil
+	}
+
+	// Validate base URLs (same checks as regular env updates).
+	if req.BaseURL != nil && *req.BaseURL != "" {
+		if err := validateBaseURL(*req.BaseURL); err != nil {
+			http.Error(w, "invalid base_url: "+err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+	}
+	if req.OpenAIBaseURL != nil && *req.OpenAIBaseURL != "" {
+		if err := validateBaseURL(*req.OpenAIBaseURL); err != nil {
+			http.Error(w, "invalid openai_base_url: "+err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+	}
+
+	tempEnvFile, err := h.buildTestEnvFile(&req)
+	if err != nil {
+		http.Error(w, "failed to prepare test env: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer os.Remove(tempEnvFile)
+
+	timeout := 3
+	if req.Timeout != nil {
+		timeout = *req.Timeout
+	}
+
+	prompt := "You are a smoke-check for sandbox connectivity and auth. Reply with PASS."
+	if req.Prompt != nil && strings.TrimSpace(*req.Prompt) != "" {
+		prompt = strings.TrimSpace(*req.Prompt)
+	}
+
+	task, err := h.store.CreateTask(r.Context(), prompt, timeout, false, "", "")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := h.store.UpdateTaskSandbox(r.Context(), task.ID, sandbox); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := h.store.UpdateTaskStatus(r.Context(), task.ID, store.TaskStatusInProgress); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := h.store.UpdateTaskTestRun(r.Context(), task.ID, true, ""); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	probeRunner := runner.NewRunner(h.store, runner.RunnerConfig{
+		Command:          h.runner.Command(),
+		SandboxImage:     h.runner.SandboxImage(),
+		EnvFile:          tempEnvFile,
+		Workspaces:       strings.Join(h.workspaces, " "),
+		WorktreesDir:     h.runner.WorktreesDir(),
+		InstructionsPath:  h.runner.InstructionsPath(),
+	})
+	probeRunner.Run(task.ID, prompt, "", false)
+
+	updated, err := h.store.GetTask(r.Context(), task.ID)
+	if err != nil {
+		http.Error(w, "failed to read sandbox test result: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Keep test tasks visible for auditability and quick re-test.
+	// In the happy path a sandbox connectivity test that returns a PASS
+	// is represented as a terminal done task; failures keep their natural
+	// terminal state from the runner.
+	if updated.Status == store.TaskStatusWaiting && updated.LastTestResult == "pass" {
+		if err := h.store.UpdateTaskStatus(r.Context(), task.ID, store.TaskStatusDone); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		updated.Status = store.TaskStatusDone
+		updated, err = h.store.GetTask(r.Context(), task.ID)
+		if err != nil {
+			http.Error(w, "failed to read sandbox test result: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	resp := sandboxTestResponse{
+		TaskID:         updated.ID.String(),
+		Sandbox:        sandbox,
+		Status:         string(updated.Status),
+		LastTestResult: updated.LastTestResult,
+	}
+	if updated.Result != nil {
+		resp.Result = *updated.Result
+	}
+	if updated.StopReason != nil {
+		resp.StopReason = *updated.StopReason
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
+	tempFile, err := os.CreateTemp("", "wallfacer-env-test-")
+	if err != nil {
+		return "", err
+	}
+	defer tempFile.Close()
+
+	if h.envFile != "" {
+		raw, err := os.ReadFile(h.envFile)
+		if err != nil && !os.IsNotExist(err) {
+			return "", err
+		}
+		if err == nil {
+			if _, err := tempFile.Write(raw); err != nil {
+				return "", err
+			}
+		}
+	}
+
+	if err := envconfig.Update(
+		tempFile.Name(),
+		req.OAuthToken,
+		req.APIKey,
+		req.BaseURL,
+		req.OpenAIAPIKey,
+		req.OpenAIBaseURL,
+		req.DefaultModel,
+		req.TitleModel,
+		req.CodexDefaultModel,
+		req.CodexTitleModel,
+		nil,
+		nil,
+		nil,
+		nil,
+	); err != nil {
+		return "", err
+	}
+
+	return tempFile.Name(), nil
 }
 
 // UpdateEnvConfig writes changes to the env file.
@@ -135,15 +344,19 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 //   - field present with a value          → update
 //   - field present with ""               → clear (for non-secret fields)
 //
-// For the two token fields (oauth_token, api_key), an empty value is treated
+// For token fields (oauth_token, api_key, openai_api_key), an empty value is treated
 // as "no change" to prevent accidental token deletion.
 func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		OAuthToken        *string `json:"oauth_token"`
 		APIKey            *string `json:"api_key"`
 		BaseURL           *string `json:"base_url"`
+		OpenAIAPIKey      *string `json:"openai_api_key"`
+		OpenAIBaseURL     *string `json:"openai_base_url"`
 		DefaultModel      *string `json:"default_model"`
 		TitleModel        *string `json:"title_model"`
+		CodexDefaultModel *string `json:"codex_default_model"`
+		CodexTitleModel   *string `json:"codex_title_model"`
 		MaxParallelTasks  *int    `json:"max_parallel_tasks"`
 		OversightInterval *int    `json:"oversight_interval"`
 		AutoPushEnabled   *bool   `json:"auto_push_enabled"`
@@ -160,6 +373,9 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.APIKey != nil && *req.APIKey == "" {
 		req.APIKey = nil
+	}
+	if req.OpenAIAPIKey != nil && *req.OpenAIAPIKey == "" {
+		req.OpenAIAPIKey = nil
 	}
 
 	// Convert max_parallel_tasks int to string for the env file.
@@ -217,8 +433,29 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if req.OpenAIBaseURL != nil && *req.OpenAIBaseURL != "" {
+		if err := validateBaseURL(*req.OpenAIBaseURL); err != nil {
+			http.Error(w, "invalid openai_base_url: "+err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+	}
 
-	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.DefaultModel, req.TitleModel, maxParallel, oversightInterval, autoPush, autoPushThreshold); err != nil {
+	if err := envconfig.Update(
+		h.envFile,
+		req.OAuthToken,
+		req.APIKey,
+		req.BaseURL,
+		req.OpenAIAPIKey,
+		req.OpenAIBaseURL,
+		req.DefaultModel,
+		req.TitleModel,
+		req.CodexDefaultModel,
+		req.CodexTitleModel,
+		maxParallel,
+		oversightInterval,
+		autoPush,
+		autoPushThreshold,
+	); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
