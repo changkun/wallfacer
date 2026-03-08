@@ -64,6 +64,10 @@ type RefinementJob struct {
 	Status    string    `json:"status"` // "running", "done", "failed"
 	Result    string    `json:"result,omitempty"`
 	Error     string    `json:"error,omitempty"`
+	// source indicates who created the job. "runner" jobs originate from the
+	// UI-triggered refinement flow and may be briefly treated as in-flight while
+	// async startup/failure races settle.
+	Source string `json:"source,omitempty"`
 }
 
 // TaskKind identifies the execution mode for a task.

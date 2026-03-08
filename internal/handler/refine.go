@@ -41,6 +41,7 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		ID:        uuid.New().String(),
 		CreatedAt: time.Now(),
 		Status:    "running",
+		Source:    "runner",
 	}
 	if err := h.store.StartRefinementJobIfIdle(r.Context(), id, job); err != nil {
 		if errors.Is(err, store.ErrRefinementAlreadyRunning) {

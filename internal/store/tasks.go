@@ -19,6 +19,8 @@ import (
 // refinement job is already in "running" state for the given task.
 var ErrRefinementAlreadyRunning = errors.New("refinement already running")
 
+const refinementRecentCompleteWindow = 500 * time.Millisecond
+
 // ListTasks returns all tasks sorted by position then creation time.
 // Archived tasks are excluded unless includeArchived is true.
 func (s *Store) ListTasks(_ context.Context, includeArchived bool) ([]Task, error) {
@@ -672,7 +674,9 @@ func (s *Store) UpdateRefinementJob(_ context.Context, id uuid.UUID, job *Refine
 // StartRefinementJobIfIdle atomically checks that no refinement is currently
 // running for the task and, if so, persists the new job. Returns
 // ErrRefinementAlreadyRunning without modifying the store when the existing
-// CurrentRefinement.Status == "running".
+// CurrentRefinement.Status == "running". If the existing job completed very
+// recently and recorded an error or output, it is also treated as still
+// in-flight to avoid concurrent duplicate starts during fast failure races.
 func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *RefinementJob) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -681,8 +685,17 @@ func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *R
 	if !ok {
 		return fmt.Errorf("task not found: %s", id)
 	}
-	if t.CurrentRefinement != nil && t.CurrentRefinement.Status == "running" {
-		return ErrRefinementAlreadyRunning
+	if t.CurrentRefinement != nil {
+		status := t.CurrentRefinement.Status
+		if status == "running" {
+			return ErrRefinementAlreadyRunning
+		}
+		if t.CurrentRefinement.Source == "runner" && (status == "failed" || status == "done") {
+			elapsed := time.Since(t.CurrentRefinement.CreatedAt)
+			if elapsed >= 0 && elapsed < refinementRecentCompleteWindow && (t.CurrentRefinement.Error != "" || t.CurrentRefinement.Result != "") {
+				return ErrRefinementAlreadyRunning
+			}
+		}
 	}
 	jobCopy := *job
 	t.CurrentRefinement = &jobCopy
