@@ -342,7 +342,7 @@ function updateCard(card, t, rank) {
     : t.status === 'waiting'
     ? `<span class="badge badge-test-none" title="Not yet verified">unverified</span>`
     : '';
-  const sandbox = t.sandbox || 'default';
+  const implSandbox = (t.sandbox_by_activity && t.sandbox_by_activity.implementation) || t.sandbox || 'default';
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
@@ -354,7 +354,7 @@ function updateCard(card, t, rank) {
         ${testResultBadge}
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="text-[10px] text-v-muted" title="Sandbox: ${escapeHtml(sandbox)}">${escapeHtml(sandboxDisplayName(sandbox))}</span>
+        <span class="text-[10px] text-v-muted" title="Implementation sandbox: ${escapeHtml(implSandbox)}">${escapeHtml(sandboxDisplayName(implSandbox))}</span>
         ${t.mount_worktrees ? '<span class="text-[10px] text-v-muted" title="Sibling worktrees mounted">worktrees</span>' : ''}
         <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>
         <span class="text-[10px] text-v-muted">${timeAgo(t.created_at)}</span>

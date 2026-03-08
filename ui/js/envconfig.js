@@ -123,6 +123,8 @@ function buildSaveEnvPayload() {
   const titleModel = document.getElementById('env-title-model').value.trim();
   const codexDefaultModel = document.getElementById('env-codex-default-model').value.trim();
   const codexTitleModel = document.getElementById('env-codex-title-model').value.trim();
+  const defaultSandbox = document.getElementById('env-default-sandbox').value.trim();
+  const sandboxByActivity = collectSandboxByActivity('env-sandbox-');
 
   const body = {};
   if (oauthRaw) body.oauth_token = oauthRaw;
@@ -134,13 +136,19 @@ function buildSaveEnvPayload() {
   body.title_model = titleModel; // empty = clear
   body.codex_default_model = codexDefaultModel;
   body.codex_title_model = codexTitleModel;
+  body.default_sandbox = defaultSandbox;
+  body.sandbox_by_activity = sandboxByActivity;
 
   return body;
 }
 
 function buildSandboxTestPayload(sandbox) {
   const rawPayload = buildSaveEnvPayload();
-  const testPayload = { sandbox: sandbox };
+  const testPayload = {
+    sandbox: sandbox,
+    default_sandbox: rawPayload.default_sandbox || '',
+    sandbox_by_activity: rawPayload.sandbox_by_activity || {},
+  };
   if (sandbox === 'claude') {
     testPayload.base_url = rawPayload.base_url;
     testPayload.default_model = rawPayload.default_model;
@@ -226,6 +234,7 @@ async function showEnvConfigEditor(event) {
   safeSetValue('env-title-model', (el) => { el.value = ''; });
   safeSetValue('env-codex-default-model', (el) => { el.value = ''; });
   safeSetValue('env-codex-title-model', (el) => { el.value = ''; });
+  safeSetValue('env-default-sandbox', (el) => { el.value = ''; });
   safeSetValue('env-config-status', (el) => { el.textContent = ''; });
   safeSetValue('env-claude-test-status', (el) => { el.textContent = ''; });
   safeSetValue('env-codex-test-status', (el) => { el.textContent = ''; });
@@ -244,6 +253,8 @@ async function showEnvConfigEditor(event) {
     title_model: '',
     codex_default_model: '',
     codex_title_model: '',
+    default_sandbox: '',
+    sandbox_by_activity: {},
   };
   try {
     cfg = await api('/api/env');
@@ -262,6 +273,8 @@ async function showEnvConfigEditor(event) {
   safeSetValue('env-title-model', (el) => { el.value = cfg.title_model || ''; });
   safeSetValue('env-codex-default-model', (el) => { el.value = cfg.codex_default_model || ''; });
   safeSetValue('env-codex-title-model', (el) => { el.value = cfg.codex_title_model || ''; });
+  safeSetValue('env-default-sandbox', (el) => { el.value = cfg.default_sandbox || ''; });
+  applySandboxByActivity('env-sandbox-', cfg.sandbox_by_activity || {});
   safeSetValue('env-config-status', (el) => {
     if (el.textContent === 'Failed to load configuration.') return;
     el.textContent = '';

@@ -101,6 +101,8 @@ function toggleShowArchived() {
 // Available sandbox list from server config.
 let availableSandboxes = [];
 let defaultSandbox = '';
+let defaultSandboxByActivity = {};
+const SANDBOX_ACTIVITY_KEYS = ['implementation', 'testing', 'refinement', 'title', 'oversight', 'commit_message', 'idea_agent'];
 
 function sandboxDisplayName(id) {
   if (!id) return 'Default';
@@ -110,14 +112,26 @@ function sandboxDisplayName(id) {
 }
 
 function populateSandboxSelects() {
-  var selects = [
-    document.getElementById('new-sandbox'),
-    document.getElementById('modal-edit-sandbox'),
-  ];
+  var selects = Array.from(document.querySelectorAll('select[data-sandbox-select]'));
   for (var sel of selects) {
     if (!sel) continue;
     var current = sel.value;
-    sel.innerHTML = '<option value="">Default' + (defaultSandbox ? ' (' + sandboxDisplayName(defaultSandbox) + ')' : '') + '</option>';
+    var defaultText = sel.dataset.defaultText || 'Default';
+    var includeDefault = sel.dataset.defaultOption !== 'false';
+    sel.innerHTML = '';
+    if (includeDefault) {
+      var effectiveDefault = sel.dataset.defaultSandbox || '';
+      if (!effectiveDefault) {
+        var matched = SANDBOX_ACTIVITY_KEYS.find(function(key) { return sel.id.endsWith('-' + key); });
+        if (matched) {
+          effectiveDefault = defaultSandboxByActivity[matched] || defaultSandbox || '';
+        } else {
+          effectiveDefault = defaultSandbox || '';
+        }
+      }
+      var suffix = effectiveDefault ? ' (' + sandboxDisplayName(effectiveDefault) + ')' : '';
+      sel.innerHTML = '<option value="">' + defaultText + suffix + '</option>';
+    }
     for (var s of availableSandboxes) {
       if (!s) continue;
       var opt = document.createElement('option');
@@ -127,6 +141,26 @@ function populateSandboxSelects() {
     }
     sel.value = current;
   }
+}
+
+function collectSandboxByActivity(prefix) {
+  var out = {};
+  SANDBOX_ACTIVITY_KEYS.forEach(function(key) {
+    var el = document.getElementById(prefix + key);
+    if (!el) return;
+    var value = (el.value || '').trim();
+    if (value) out[key] = value;
+  });
+  return out;
+}
+
+function applySandboxByActivity(prefix, values) {
+  var data = values || {};
+  SANDBOX_ACTIVITY_KEYS.forEach(function(key) {
+    var el = document.getElementById(prefix + key);
+    if (!el) return;
+    el.value = data[key] || '';
+  });
 }
 
 async function fetchConfig() {
@@ -143,6 +177,7 @@ async function fetchConfig() {
     if (asToggle) asToggle.checked = autosubmit;
     availableSandboxes = Array.isArray(cfg.sandboxes) ? cfg.sandboxes : [];
     defaultSandbox = cfg.default_sandbox || '';
+    defaultSandboxByActivity = cfg.activity_sandboxes || {};
     populateSandboxSelects();
     // Sync ideation toggle and spinner state.
     if (typeof updateIdeationConfig === 'function') updateIdeationConfig(cfg);
