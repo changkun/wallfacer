@@ -7,6 +7,12 @@ async function openModal(id) {
 
   document.getElementById('modal-badge').className = `badge badge-${task.status}`;
   document.getElementById('modal-badge').textContent = task.status === 'in_progress' ? 'in progress' : task.status;
+  document.getElementById('modal-tags').innerHTML = (task.tags && task.tags.length > 0)
+    ? task.tags.map(tag => {
+        const cls = BRAINSTORM_CATEGORIES.has(tag) ? 'badge badge-category' : `badge badge-${tag.replace(/[^a-z0-9]/g, '-')}`;
+        return `<span class="${cls}" title="Tag: ${escapeHtml(tag)}">${escapeHtml(tag)}</span>`;
+      }).join('')
+    : '';
   document.getElementById('modal-time').textContent = new Date(task.created_at).toLocaleString();
   document.getElementById('modal-id').textContent = `ID: ${task.id}`;
 
