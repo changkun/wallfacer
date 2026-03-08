@@ -202,10 +202,11 @@ function render() {
     for (let i = 0; i < visibleItems.length; i++) {
       const t = visibleItems[i];
       let card = existing.get(t.id);
+      const rank = status === 'backlog' ? i : undefined;
       if (!card) {
-        card = createCard(t);
+        card = createCard(t, rank);
       } else {
-        updateCard(card, t);
+        updateCard(card, t, rank);
       }
       if (el.children[i] !== card) {
         el.insertBefore(card, el.children[i] || null);
@@ -253,13 +254,13 @@ function render() {
   else if (typeof hideDependencyGraph === 'function') hideDependencyGraph();
 }
 
-function createCard(t) {
+function createCard(t, rank) {
   const card = document.createElement('div');
   card.className = 'card';
   card.dataset.id = t.id;
   card.dataset.taskId = t.id;
   card.onclick = () => openModal(t.id);
-  updateCard(card, t);
+  updateCard(card, t, rank);
   return card;
 }
 
@@ -289,7 +290,7 @@ function buildCardActions(t) {
   return `<div class="card-actions">${parts.join('')}</div>`;
 }
 
-function updateCard(card, t) {
+function updateCard(card, t, rank) {
   const isIdeaAgent = t.kind === 'idea-agent';
   const isArchived = !!t.archived;
   const isTestRun = !!t.is_test_run && t.status === 'in_progress';
@@ -315,7 +316,8 @@ function updateCard(card, t) {
   } else {
     card.classList.remove('card-cancelled-done');
   }
-  const priorityBadge = t.status === 'backlog' ? `<span class="badge badge-priority" title="Priority #${t.position + 1}">#${t.position + 1}</span>` : '';
+  const displayRank = rank !== undefined ? rank + 1 : t.position + 1;
+  const priorityBadge = t.status === 'backlog' ? `<span class="badge badge-priority" title="Priority #${displayRank}">#${displayRank}</span>` : '';
   const isBlocked = t.status === 'backlog' && areDepsBlocked(t);
   const blockedBadge = isBlocked
     ? `<span class="badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">\uD83D\uDD12</span>`

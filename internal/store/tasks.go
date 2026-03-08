@@ -64,11 +64,19 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	maxPos := -1
+	minPos := 0
+	hasBacklog := false
 	for _, t := range s.tasks {
-		if t.Status == TaskStatusBacklog && t.Position > maxPos {
-			maxPos = t.Position
+		if t.Status == TaskStatusBacklog {
+			if !hasBacklog || t.Position < minPos {
+				minPos = t.Position
+				hasBacklog = true
+			}
 		}
+	}
+	newPosition := 0
+	if hasBacklog {
+		newPosition = minPos - 1
 	}
 
 	timeout = clampTimeout(timeout)
@@ -84,7 +92,7 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 		Model:          model,
 		Kind:           kind,
 		Tags:           tags,
-		Position:       maxPos + 1,
+		Position:       newPosition,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

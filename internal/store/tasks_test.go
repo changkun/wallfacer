@@ -69,11 +69,12 @@ func TestCreateTask_PositionIncrements(t *testing.T) {
 	t1, _ := s.CreateTask(bg(), "first", 5, false, "", "")
 	t2, _ := s.CreateTask(bg(), "second", 5, false, "", "")
 	t3, _ := s.CreateTask(bg(), "third", 5, false, "", "")
-	if t2.Position != t1.Position+1 {
-		t.Errorf("t2.Position = %d, want %d", t2.Position, t1.Position+1)
+	// Each newer task should have a strictly lower position so it sorts to the top.
+	if t2.Position >= t1.Position {
+		t.Errorf("t2.Position = %d should be less than t1.Position = %d", t2.Position, t1.Position)
 	}
-	if t3.Position != t2.Position+1 {
-		t.Errorf("t3.Position = %d, want %d", t3.Position, t2.Position+1)
+	if t3.Position >= t2.Position {
+		t.Errorf("t3.Position = %d should be less than t2.Position = %d", t3.Position, t2.Position)
 	}
 }
 
