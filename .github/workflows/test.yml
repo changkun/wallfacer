@@ -9,8 +9,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -48,33 +46,8 @@ jobs:
           name: go-coverage
           path: coverage.out
 
-      - name: Update Coverage Badge JSON
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          mkdir -p .github/badges
-          total="${{ steps.coverage.outputs.total }}"
-          color="red"
-          awk "BEGIN {exit !($total >= 80)}" && color="brightgreen" || true
-          awk "BEGIN {exit !($total >= 65 && $total < 80)}" && color="yellow" || true
-          awk "BEGIN {exit !($total >= 50 && $total < 65)}" && color="orange" || true
-          cat > .github/badges/coverage.json <<EOF
-          {
-            "schemaVersion": 1,
-            "label": "coverage",
-            "message": "${total}%",
-            "color": "${color}"
-          }
-          EOF
-
-      - name: Commit Coverage Badge
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          if git diff --quiet -- .github/badges/coverage.json; then
-            echo "No coverage badge changes"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/badges/coverage.json
-          git commit -m "ci: update coverage badge [skip ci]"
-          git push
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
