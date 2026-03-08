@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +13,15 @@ import (
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
+)
+
+var (
+	// verdictLabelPattern detects explicit labeled verdict lines such as:
+	// "Result: PASS", "Verdict: FAILED", "Status - Pass", etc.
+	verdictLabelPattern = regexp.MustCompile(`(?i)\b(?:RESULT|VERDICT|STATUS|OUTCOME|CONCLUSION|SUMMARY)\s*[:\-]?\s*(PASS|PASSED|PASSING|FAIL|FAILED|FAILURE|FAILS)\b`)
+	// negatedPassPattern catches explicit negative-pass language near a verdict token.
+	// This is treated as a failure to avoid false positives like "NO PASS".
+	negatedPassPattern = regexp.MustCompile(`(?i)\b(?:NO|NOT)\s+PASS(?:ED|ING)?\b`)
 )
 
 // Run is the main task execution loop. It sets up worktrees, runs the agent
@@ -565,22 +575,67 @@ func parseTestVerdict(result string) string {
 	}
 
 	// Scan lines from the end, stripping trailing punctuation, and check
-	// whether the line ends with the verdict word. Stop at the first
-	// non-empty line to avoid false positives from mid-text occurrences.
+	// whether the line contains an explicit labeled verdict or ends with a
+	// verdict word. Check a small tail window so trailing status text does not
+	// hide a valid verdict.
 	lines := strings.Split(upper, "\n")
+	const maxTailLines = 6
+	seen := 0
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimRight(strings.TrimSpace(lines[i]), ".*!?:;,-")
 		if line == "" {
 			continue
 		}
+
+		seen++
+		if seen > maxTailLines {
+			break
+		}
+
+		if verdict := parseTestVerdictFromLine(line); verdict != "" {
+			return verdict
+		}
+
+		// Legacy compatibility with the older "ends-with PASS/FAIL" logic.
 		if strings.HasSuffix(line, "PASS") {
 			return "pass"
 		}
 		if strings.HasSuffix(line, "FAIL") {
 			return "fail"
 		}
-		break
 	}
 
 	return ""
+}
+
+func parseTestVerdictFromLine(line string) string {
+	if m := verdictLabelPattern.FindStringSubmatch(line); m != nil {
+		return verdictTokenToValue(m[1])
+	}
+
+	words := strings.FieldsFunc(line, func(r rune) bool {
+		return (r < 'A' || r > 'Z') && (r < '0' || r > '9')
+	})
+	if len(words) == 0 {
+		return ""
+	}
+
+	// Check negation before default token matching.
+	if negatedPassPattern.MatchString(line) {
+		return "fail"
+	}
+
+	last := words[len(words)-1]
+	return verdictTokenToValue(last)
+}
+
+func verdictTokenToValue(token string) string {
+	switch strings.ToUpper(token) {
+	case "PASS", "PASSED", "PASSING":
+		return "pass"
+	case "FAIL", "FAILS", "FAILED", "FAILURE", "FAILURES":
+		return "fail"
+	default:
+		return ""
+	}
 }
