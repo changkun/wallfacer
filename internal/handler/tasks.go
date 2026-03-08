@@ -60,7 +60,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if task.Kind != store.TaskKindIdeaAgent {
-		go h.runner.GenerateTitle(task.ID, task.Prompt)
+		h.runner.GenerateTitleBackground(task.ID, task.Prompt)
 	}
 
 	writeJSON(w, http.StatusCreated, task)
@@ -274,7 +274,7 @@ func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) 
 	taskIDs := make([]string, len(untitled))
 	for i, t := range untitled {
 		taskIDs[i] = t.ID.String()
-		go h.runner.GenerateTitle(t.ID, t.Prompt)
+		h.runner.GenerateTitleBackground(t.ID, t.Prompt)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{

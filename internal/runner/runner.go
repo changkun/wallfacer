@@ -4,13 +4,67 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
+
+// trackedWg is a sync.WaitGroup that also records the label of each
+// outstanding goroutine so that Shutdown can report what it is waiting for.
+type trackedWg struct {
+	mu      sync.Mutex
+	pending map[string]int
+	wg      sync.WaitGroup
+}
+
+// Add increments the wait group counter and records label as pending.
+func (t *trackedWg) Add(label string) {
+	t.mu.Lock()
+	if t.pending == nil {
+		t.pending = make(map[string]int)
+	}
+	t.pending[label]++
+	t.mu.Unlock()
+	t.wg.Add(1)
+}
+
+// Done decrements the wait group counter and removes label from pending.
+func (t *trackedWg) Done(label string) {
+	t.mu.Lock()
+	t.pending[label]--
+	if t.pending[label] <= 0 {
+		delete(t.pending, label)
+	}
+	t.mu.Unlock()
+	t.wg.Done()
+}
+
+// Wait blocks until all tracked goroutines have called Done.
+func (t *trackedWg) Wait() {
+	t.wg.Wait()
+}
+
+// Pending returns a sorted slice of labels (with counts >1 shown as "label×N")
+// for all goroutines that have not yet called Done.
+func (t *trackedWg) Pending() []string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	result := make([]string, 0, len(t.pending))
+	for label, count := range t.pending {
+		if count == 1 {
+			result = append(result, label)
+		} else {
+			result = append(result, fmt.Sprintf("%s×%d", label, count))
+		}
+	}
+	sort.Strings(result)
+	return result
+}
 
 // ContainerInfo represents a single sandbox container returned by ListContainers.
 type ContainerInfo struct {
@@ -229,7 +283,7 @@ type Runner struct {
 	containerNames       sync.Map       // taskID (string) → container name (string)
 	refineContainerNames sync.Map       // taskID (string) → refinement container name (string)
 	ideateContainerName  sync.Map       // key "current" → ideation container name (string)
-	backgroundWg         sync.WaitGroup // tracks fire-and-forget background goroutines
+	backgroundWg         trackedWg // tracks fire-and-forget background goroutines
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -247,7 +301,24 @@ func (r *Runner) WaitBackground() {
 // In-progress task containers are intentionally left running; they continue
 // to completion independently and will be recovered on the next server start.
 func (r *Runner) Shutdown() {
-	r.backgroundWg.Wait()
+	done := make(chan struct{})
+	go func() {
+		r.backgroundWg.Wait()
+		close(done)
+	}()
+
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			if pending := r.backgroundWg.Pending(); len(pending) > 0 {
+				logger.Main.Info("shutdown waiting for background goroutines", "pending", strings.Join(pending, ", "))
+			}
+		}
+	}
 }
 
 // RunBackground launches Run in a background goroutine tracked by backgroundWg.
@@ -255,20 +326,27 @@ func (r *Runner) Shutdown() {
 // so that WaitBackground can drain all outstanding work — particularly useful
 // in tests to prevent cleanup races with temp-dir removal.
 func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
-	r.backgroundWg.Add(1)
+	label := "run:" + taskID.String()[:8]
+	r.backgroundWg.Add(label)
 	go func() {
-		defer r.backgroundWg.Done()
+		defer r.backgroundWg.Done(label)
 		r.Run(taskID, prompt, sessionID, resumedFromWaiting)
 	}()
 }
 
 // SyncWorktreesBackground launches SyncWorktrees in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
+<<<<<<< Updated upstream
 // The optional onDone callback is called after SyncWorktrees returns.
 func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus, onDone ...func()) {
 	r.backgroundWg.Add(1)
+=======
+func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus) {
+	label := "sync:" + taskID.String()[:8]
+	r.backgroundWg.Add(label)
+>>>>>>> Stashed changes
 	go func() {
-		defer r.backgroundWg.Done()
+		defer r.backgroundWg.Done(label)
 		r.SyncWorktrees(taskID, sessionID, prevStatus)
 		for _, fn := range onDone {
 			fn()
@@ -279,10 +357,33 @@ func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, pre
 // RunRefinementBackground launches RunRefinement in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 func (r *Runner) RunRefinementBackground(taskID uuid.UUID, userInstructions string) {
-	r.backgroundWg.Add(1)
+	label := "refine:" + taskID.String()[:8]
+	r.backgroundWg.Add(label)
 	go func() {
-		defer r.backgroundWg.Done()
+		defer r.backgroundWg.Done(label)
 		r.RunRefinement(taskID, userInstructions)
+	}()
+}
+
+// GenerateOversightBackground launches GenerateOversight in a background goroutine
+// tracked by backgroundWg so that WaitBackground can drain it before cleanup.
+func (r *Runner) GenerateOversightBackground(taskID uuid.UUID) {
+	label := "oversight:" + taskID.String()[:8]
+	r.backgroundWg.Add(label)
+	go func() {
+		defer r.backgroundWg.Done(label)
+		r.GenerateOversight(taskID)
+	}()
+}
+
+// GenerateTitleBackground launches GenerateTitle in a background goroutine
+// tracked by backgroundWg so that WaitBackground can drain it before cleanup.
+func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
+	label := "title:" + taskID.String()[:8]
+	r.backgroundWg.Add(label)
+	go func() {
+		defer r.backgroundWg.Done(label)
+		r.GenerateTitle(taskID, prompt)
 	}()
 }
 

@@ -1488,9 +1488,9 @@ func TestRunnerShutdownWaitsForBackground(t *testing.T) {
 
 	// Directly manipulate backgroundWg to simulate an in-flight background
 	// goroutine (e.g. oversight generation) without launching a real container.
-	r.backgroundWg.Add(1)
+	r.backgroundWg.Add("test:goroutine")
 	go func() {
-		defer r.backgroundWg.Done()
+		defer r.backgroundWg.Done("test:goroutine")
 		close(started)
 		<-finish // hold until test releases it
 	}()
