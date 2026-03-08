@@ -16,7 +16,7 @@ function makeContext(extra = {}) {
 
 function loadScript(filename, ctx) {
   const code = readFileSync(join(jsDir, filename), 'utf8');
-  vm.runInContext(code, ctx);
+  vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;
 }
 

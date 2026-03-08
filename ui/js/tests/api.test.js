@@ -55,7 +55,7 @@ function makeContext(overrides = {}) {
 
 function loadScript(ctx, filename) {
   const code = readFileSync(join(jsDir, filename), 'utf8');
-  vm.runInContext(code, ctx);
+  vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;
 }
 

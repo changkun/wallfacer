@@ -83,7 +83,7 @@ function makeContext(elementMap = {}) {
 
   // Load the script under test into the isolated context.
   const code = readFileSync(join(jsDir, 'dep-graph.js'), 'utf8');
-  vm.runInContext(code, ctx);
+  vm.runInContext(code, ctx, { filename: join(jsDir, 'dep-graph.js') });
 
   return { ctx, appendedToBody };
 }
@@ -199,7 +199,7 @@ describe('hideDependencyGraph', () => {
     });
 
     const code = readFileSync(join(jsDir, 'dep-graph.js'), 'utf8');
-    vm.runInContext(code, ctx);
+    vm.runInContext(code, ctx, { filename: join(jsDir, 'dep-graph.js') });
 
     ctx.hideDependencyGraph();
     expect(removed).toBe(true);
