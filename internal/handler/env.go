@@ -301,6 +301,10 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	if updated.StopReason != nil {
 		resp.StopReason = *updated.StopReason
 	}
+
+	passed := strings.EqualFold(updated.LastTestResult, "pass") &&
+		(updated.Status == store.TaskStatusDone || updated.Status == store.TaskStatusWaiting)
+	h.setSandboxTestPassed(sandbox, passed)
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -522,6 +526,10 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Any env update may affect sandbox connectivity/model settings; require
+	// a fresh sandbox test before allowing codex tasks again.
+	h.setSandboxTestPassed("codex", false)
 	if err := envconfig.UpdateSandboxSettings(
 		h.envFile,
 		req.DefaultSandbox,

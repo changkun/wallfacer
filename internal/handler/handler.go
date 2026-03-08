@@ -41,6 +41,9 @@ type Handler struct {
 	ideationInterval time.Duration
 	ideationNextRun  time.Time
 	ideationTimer    *time.Timer
+
+	sandboxTestMu     sync.RWMutex
+	sandboxTestPassed map[string]bool
 }
 
 // NewHandler constructs a Handler with the given dependencies.
@@ -55,7 +58,25 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		startTime:        time.Now(),
 		ideationEnabled:  true,
 		ideationInterval: 60 * time.Minute,
+		sandboxTestPassed: map[string]bool{
+			"claude": false,
+			"codex":  false,
+		},
 	}
+}
+
+func (h *Handler) setSandboxTestPassed(sandbox string, passed bool) {
+	s := normalizeSandbox(sandbox)
+	h.sandboxTestMu.Lock()
+	h.sandboxTestPassed[s] = passed
+	h.sandboxTestMu.Unlock()
+}
+
+func (h *Handler) sandboxTestPassedState(sandbox string) bool {
+	s := normalizeSandbox(sandbox)
+	h.sandboxTestMu.RLock()
+	defer h.sandboxTestMu.RUnlock()
+	return h.sandboxTestPassed[s]
 }
 
 // AutopilotEnabled returns whether autopilot mode is active.
