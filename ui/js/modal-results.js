@@ -47,21 +47,13 @@ function toggleResultEntryRaw(entryId) {
 const _copyIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 
 function setLeftTab(tab) {
-  ['implementation', 'testing', 'timeline'].forEach(function(t) {
+  ['implementation', 'testing'].forEach(function(t) {
     const btn = document.getElementById('left-tab-' + t);
     const panel = document.getElementById('left-panel-' + t);
     const active = t === tab;
     if (btn) btn.classList.toggle('active', active);
     if (panel) panel.classList.toggle('hidden', !active);
   });
-  if (tab === 'timeline') {
-    if (typeof currentTaskId !== 'undefined' && currentTaskId) {
-      renderTimeline(currentTaskId);
-      _startTimelineRefresh(currentTaskId);
-    }
-  } else {
-    _stopTimelineRefresh();
-  }
 }
 
 // --- Timeline Gantt chart ---
@@ -346,7 +338,7 @@ function renderResultsFromEvents(results, opts) {
   const listEl = document.getElementById(listId);
   if (!results || results.length === 0) {
     if (tabBtn) tabBtn.classList.add('hidden');
-    const anyVisible = ['implementation', 'testing', 'timeline'].some(function(t) {
+    const anyVisible = ['implementation', 'testing'].some(function(t) {
       const btn = document.getElementById('left-tab-' + t);
       return btn && !btn.classList.contains('hidden');
     });

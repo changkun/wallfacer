@@ -754,16 +754,12 @@
             <div class="left-panel-tabs">
               <button id="left-tab-implementation" onclick="setLeftTab('implementation')" class="left-tab active">Implementation</button>
               <button id="left-tab-testing" onclick="setLeftTab('testing')" class="left-tab hidden">Testing</button>
-              <button id="left-tab-timeline" onclick="setLeftTab('timeline')" class="left-tab hidden">Timeline</button>
             </div>
             <div id="left-panel-implementation">
               <div id="modal-results-list"></div>
             </div>
             <div id="left-panel-testing" class="hidden">
               <div id="modal-test-results-list"></div>
-            </div>
-            <div id="left-panel-timeline" class="hidden">
-              <div id="modal-timeline-chart"></div>
             </div>
           </div>
 
@@ -853,6 +849,7 @@
             <button id="right-tab-testing" onclick="setRightTab('testing')" class="right-tab hidden">Testing</button>
             <button id="right-tab-changes" onclick="setRightTab('changes')" class="right-tab hidden">Changes</button>
             <button id="right-tab-spans" onclick="setRightTab('spans')" class="right-tab hidden">Flamegraph</button>
+            <button id="right-tab-timeline" onclick="setRightTab('timeline')" class="right-tab hidden">Timeline</button>
           </div>
           <div id="right-panel-implementation">
             <div id="modal-logs-section" class="mb-4">
@@ -890,6 +887,9 @@
           </div>
           <div id="right-panel-spans" class="hidden">
             <div id="modal-flamegraph-container" style="padding:8px;"></div>
+          </div>
+          <div id="right-panel-timeline" class="hidden">
+            <div id="modal-timeline-chart" style="padding:8px;"></div>
           </div>
         </div>
 

@@ -83,7 +83,7 @@ function onLogSearchInput(value) {
 }
 
 function setRightTab(tab) {
-  ['implementation', 'testing', 'changes', 'spans'].forEach(function(t) {
+  ['implementation', 'testing', 'changes', 'spans', 'timeline'].forEach(function(t) {
     const btn = document.getElementById('right-tab-' + t);
     const panel = document.getElementById('right-panel-' + t);
     const active = t === tab;
@@ -92,6 +92,14 @@ function setRightTab(tab) {
   });
   if (tab === 'spans' && typeof loadFlamegraph !== 'undefined' && typeof currentTaskId !== 'undefined' && currentTaskId) {
     loadFlamegraph(currentTaskId);
+  }
+  if (tab === 'timeline') {
+    if (typeof currentTaskId !== 'undefined' && currentTaskId) {
+      renderTimeline(currentTaskId);
+      _startTimelineRefresh(currentTaskId);
+    }
+  } else {
+    _stopTimelineRefresh();
   }
 }
 

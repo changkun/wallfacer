@@ -70,8 +70,6 @@ async function openModal(id) {
 
   // Reset left panel tabs; content populated below once events load
   document.getElementById('left-tab-testing').classList.add('hidden');
-  const timelineTab = document.getElementById('left-tab-timeline');
-  if (timelineTab) timelineTab.classList.add('hidden');
   setLeftTab('implementation');
   if (task.result) {
     renderResultsFromEvents([task.result]);
@@ -164,17 +162,6 @@ async function openModal(id) {
     modalBody.style.display = 'flex';
     modalBody.style.gap = '0';
 
-    // Show Timeline tab for tasks with at least one turn (span data may exist).
-    const timelineTabBtn = document.getElementById('left-tab-timeline');
-    if (timelineTabBtn) {
-      if (task.turns > 0) {
-        timelineTabBtn.classList.remove('hidden');
-        document.getElementById('modal-summary-section').classList.remove('hidden');
-      } else {
-        timelineTabBtn.classList.add('hidden');
-      }
-    }
-
     // Reset log search state for this task
     logSearchQuery = '';
     const _searchInput = document.getElementById('log-search-input');
@@ -182,10 +169,14 @@ async function openModal(id) {
     const _searchCount = document.getElementById('log-search-count');
     if (_searchCount) _searchCount.textContent = '';
 
-    // Show Spans tab for tasks with at least one turn.
+    // Show Spans and Timeline tabs for tasks with at least one turn.
     const spansTabBtn = document.getElementById('right-tab-spans');
     if (spansTabBtn) {
       spansTabBtn.classList.toggle('hidden', !(task.turns > 0));
+    }
+    const timelineTabBtn = document.getElementById('right-tab-timeline');
+    if (timelineTabBtn) {
+      timelineTabBtn.classList.toggle('hidden', !(task.turns > 0));
     }
 
     // Start log streaming; show Testing tab when test data exists
@@ -410,6 +401,8 @@ function closeModal() {
   if (tlChart) { tlChart.innerHTML = ''; delete tlChart.dataset.loaded; }
   const spansTabBtn = document.getElementById('right-tab-spans');
   if (spansTabBtn) spansTabBtn.classList.add('hidden');
+  const timelineTabBtn = document.getElementById('right-tab-timeline');
+  if (timelineTabBtn) timelineTabBtn.classList.add('hidden');
   resetRefinePanel();
   document.getElementById('modal-backlog-right').classList.add('hidden');
   document.getElementById('modal-backlog-settings').classList.add('hidden');
