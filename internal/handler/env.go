@@ -89,13 +89,15 @@ func validateBaseURL(u string) error {
 // envConfigResponse is the JSON representation of the env config sent to the UI.
 // Sensitive tokens are masked so they are never exposed in full over HTTP.
 type envConfigResponse struct {
-	OAuthToken        string `json:"oauth_token"`        // masked
-	APIKey            string `json:"api_key"`             // masked
+	OAuthToken        string `json:"oauth_token"`         // masked
+	APIKey            string `json:"api_key"`              // masked
 	BaseURL           string `json:"base_url"`
 	DefaultModel      string `json:"default_model"`
 	TitleModel        string `json:"title_model"`
 	MaxParallelTasks  int    `json:"max_parallel_tasks"`
 	OversightInterval int    `json:"oversight_interval"`
+	AutoPushEnabled   bool   `json:"auto_push_enabled"`
+	AutoPushThreshold int    `json:"auto_push_threshold"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -109,6 +111,10 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 	if maxParallel <= 0 {
 		maxParallel = defaultMaxConcurrentTasks
 	}
+	autoPushThreshold := cfg.AutoPushThreshold
+	if autoPushThreshold <= 0 {
+		autoPushThreshold = 1
+	}
 	writeJSON(w, http.StatusOK, envConfigResponse{
 		OAuthToken:        envconfig.MaskToken(cfg.OAuthToken),
 		APIKey:            envconfig.MaskToken(cfg.APIKey),
@@ -117,6 +123,8 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		TitleModel:        cfg.TitleModel,
 		MaxParallelTasks:  maxParallel,
 		OversightInterval: cfg.OversightInterval,
+		AutoPushEnabled:   cfg.AutoPushEnabled,
+		AutoPushThreshold: autoPushThreshold,
 	})
 }
 
@@ -138,6 +146,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		TitleModel        *string `json:"title_model"`
 		MaxParallelTasks  *int    `json:"max_parallel_tasks"`
 		OversightInterval *int    `json:"oversight_interval"`
+		AutoPushEnabled   *bool   `json:"auto_push_enabled"`
+		AutoPushThreshold *int    `json:"auto_push_threshold"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -178,6 +188,28 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		oversightInterval = &s
 	}
 
+	// Convert auto_push_enabled bool to string for the env file.
+	var autoPush *string
+	if req.AutoPushEnabled != nil {
+		v := "false"
+		if *req.AutoPushEnabled {
+			v = "true"
+		}
+		autoPush = &v
+	}
+
+	// Convert auto_push_threshold int to string for the env file.
+	// Clamp to [1, ∞): minimum threshold is 1 commit ahead.
+	var autoPushThreshold *string
+	if req.AutoPushThreshold != nil {
+		v := *req.AutoPushThreshold
+		if v < 1 {
+			v = 1
+		}
+		s := fmt.Sprintf("%d", v)
+		autoPushThreshold = &s
+	}
+
 	// Validate the base URL if provided to prevent SSRF.
 	if req.BaseURL != nil && *req.BaseURL != "" {
 		if err := validateBaseURL(*req.BaseURL); err != nil {
@@ -186,7 +218,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.DefaultModel, req.TitleModel, maxParallel, oversightInterval); err != nil {
+	if err := envconfig.Update(h.envFile, req.OAuthToken, req.APIKey, req.BaseURL, req.DefaultModel, req.TitleModel, maxParallel, oversightInterval, autoPush, autoPushThreshold); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

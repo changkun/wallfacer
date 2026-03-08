@@ -50,4 +50,5 @@ startGitStream();
 startTasksStream();
 loadMaxParallel();
 loadOversightInterval();
+loadAutoPush();
 fetchConfig();

@@ -35,6 +35,7 @@ function openSettings() {
   modal.style.display = 'flex';
   loadMaxParallel();
   loadOversightInterval();
+  loadAutoPush();
 }
 
 function closeSettings() {

@@ -11,14 +11,16 @@ import (
 
 // Config holds the known configuration values from the .env file.
 type Config struct {
-	OAuthToken       string // CLAUDE_CODE_OAUTH_TOKEN
-	APIKey           string // ANTHROPIC_API_KEY
-	AuthToken        string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
-	BaseURL          string // ANTHROPIC_BASE_URL
-	DefaultModel     string // WALLFACER_DEFAULT_MODEL
-	TitleModel       string // WALLFACER_TITLE_MODEL
-	MaxParallelTasks  int // WALLFACER_MAX_PARALLEL (0 means use default)
-	OversightInterval int // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
+	OAuthToken        string // CLAUDE_CODE_OAUTH_TOKEN
+	APIKey            string // ANTHROPIC_API_KEY
+	AuthToken         string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
+	BaseURL           string // ANTHROPIC_BASE_URL
+	DefaultModel      string // WALLFACER_DEFAULT_MODEL
+	TitleModel        string // WALLFACER_TITLE_MODEL
+	MaxParallelTasks  int    // WALLFACER_MAX_PARALLEL (0 means use default)
+	OversightInterval int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
+	AutoPushEnabled   bool   // WALLFACER_AUTO_PUSH ("true"/"false")
+	AutoPushThreshold int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
 
 	// OpenAI Codex sandbox fields.
 	OpenAIAPIKey      string // OPENAI_API_KEY
@@ -36,6 +38,8 @@ var knownKeys = []string{
 	"WALLFACER_TITLE_MODEL",
 	"WALLFACER_MAX_PARALLEL",
 	"WALLFACER_OVERSIGHT_INTERVAL",
+	"WALLFACER_AUTO_PUSH",
+	"WALLFACER_AUTO_PUSH_THRESHOLD",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -78,6 +82,12 @@ func Parse(path string) (Config, error) {
 			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 				cfg.OversightInterval = n
 			}
+		case "WALLFACER_AUTO_PUSH":
+			cfg.AutoPushEnabled = v == "true"
+		case "WALLFACER_AUTO_PUSH_THRESHOLD":
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				cfg.AutoPushThreshold = n
+			}
 		case "OPENAI_API_KEY":
 			cfg.OpenAIAPIKey = v
 		case "OPENAI_BASE_URL":
@@ -100,20 +110,22 @@ func Parse(path string) (Config, error) {
 //
 // Keys not already present in the file are appended when non-empty.
 // Comments and unrecognized keys are preserved verbatim.
-func Update(path string, oauthToken, apiKey, baseURL, defaultModel, titleModel, maxParallel, oversightInterval *string) error {
+func Update(path string, oauthToken, apiKey, baseURL, defaultModel, titleModel, maxParallel, oversightInterval, autoPush, autoPushThreshold *string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read env file: %w", err)
 	}
 
 	updates := map[string]*string{
-		"CLAUDE_CODE_OAUTH_TOKEN":      oauthToken,
-		"ANTHROPIC_API_KEY":            apiKey,
-		"ANTHROPIC_BASE_URL":           baseURL,
-		"WALLFACER_DEFAULT_MODEL":      defaultModel,
-		"WALLFACER_TITLE_MODEL":        titleModel,
-		"WALLFACER_MAX_PARALLEL":       maxParallel,
-		"WALLFACER_OVERSIGHT_INTERVAL": oversightInterval,
+		"CLAUDE_CODE_OAUTH_TOKEN":       oauthToken,
+		"ANTHROPIC_API_KEY":             apiKey,
+		"ANTHROPIC_BASE_URL":            baseURL,
+		"WALLFACER_DEFAULT_MODEL":       defaultModel,
+		"WALLFACER_TITLE_MODEL":         titleModel,
+		"WALLFACER_MAX_PARALLEL":        maxParallel,
+		"WALLFACER_OVERSIGHT_INTERVAL":  oversightInterval,
+		"WALLFACER_AUTO_PUSH":           autoPush,
+		"WALLFACER_AUTO_PUSH_THRESHOLD": autoPushThreshold,
 	}
 
 	lines := strings.Split(string(raw), "\n")

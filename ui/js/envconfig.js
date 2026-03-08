@@ -65,6 +65,52 @@ async function saveOversightInterval() {
   }
 }
 
+// --- Auto Push Setting ---
+
+async function loadAutoPush() {
+  try {
+    const cfg = await api('/api/env');
+    const checkbox = document.getElementById('auto-push-enabled');
+    const thresholdInput = document.getElementById('auto-push-threshold');
+    const thresholdRow = document.getElementById('auto-push-threshold-row');
+    if (checkbox) {
+      checkbox.checked = !!cfg.auto_push_enabled;
+      if (thresholdRow) thresholdRow.style.display = cfg.auto_push_enabled ? 'flex' : 'none';
+    }
+    if (thresholdInput && cfg.auto_push_threshold) {
+      thresholdInput.value = cfg.auto_push_threshold;
+    }
+  } catch (e) {
+    console.error('Failed to load auto-push setting:', e);
+  }
+}
+
+async function saveAutoPush() {
+  const checkbox = document.getElementById('auto-push-enabled');
+  const thresholdInput = document.getElementById('auto-push-threshold');
+  const thresholdRow = document.getElementById('auto-push-threshold-row');
+  const statusEl = document.getElementById('auto-push-status');
+
+  const enabled = checkbox ? checkbox.checked : false;
+  if (thresholdRow) thresholdRow.style.display = enabled ? 'flex' : 'none';
+
+  let threshold = parseInt(thresholdInput ? thresholdInput.value : '1', 10);
+  if (isNaN(threshold) || threshold < 1) threshold = 1;
+  if (thresholdInput) thresholdInput.value = threshold;
+
+  statusEl.textContent = 'Saving…';
+  try {
+    await api('/api/env', {
+      method: 'PUT',
+      body: JSON.stringify({ auto_push_enabled: enabled, auto_push_threshold: threshold }),
+    });
+    statusEl.textContent = 'Saved.';
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+}
+
 // --- API Configuration (env file editor) ---
 
 async function showEnvConfigEditor(event) {

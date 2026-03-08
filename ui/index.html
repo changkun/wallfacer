@@ -134,6 +134,25 @@
       </div>
 
       <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Auto Push</div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted);">
+            <input type="checkbox" id="auto-push-enabled" onchange="saveAutoPush()">
+            Enable
+          </label>
+          <span id="auto-push-status" style="font-size: 11px; color: var(--text-muted);"></span>
+        </div>
+        <div id="auto-push-threshold-row" style="display: none; margin-top: 8px; align-items: center; gap: 8px;">
+          <span style="font-size: 12px; color: var(--text-muted);">Push when</span>
+          <input type="number" id="auto-push-threshold" min="1" value="1"
+                 class="field" style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center;"
+                 onchange="saveAutoPush()">
+          <span style="font-size: 12px; color: var(--text-muted);">commit(s) ahead</span>
+        </div>
+        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Automatically push after the commit pipeline when the workspace is at least N commits ahead of upstream.</div>
+      </div>
+
+      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">API Configuration</div>
         <button onclick="closeSettings();showEnvConfigEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Token, base URL, and model for the agent.</div>
