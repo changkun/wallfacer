@@ -418,6 +418,6 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	if task.SessionID != nil {
 		sessionID = *task.SessionID
 	}
-	go h.runner.SyncWorktrees(id, sessionID, oldStatus)
+	h.runner.SyncWorktreesBackground(id, sessionID, oldStatus)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "syncing"})
 }
