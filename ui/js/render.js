@@ -1,3 +1,20 @@
+// Brainstorm category values — must mirror ideaCategoryPool in internal/runner/ideate.go.
+// Tags matching these strings are rendered with the badge-category style so
+// that category of a brainstorm-generated task card is visually distinct.
+const BRAINSTORM_CATEGORIES = new Set([
+  'product feature',
+  'frontend / UX',
+  'backend / API',
+  'performance optimization',
+  'code quality / refactoring',
+  'test coverage',
+  'developer experience',
+  'security hardening',
+  'observability / debugging',
+  'infrastructure / ops',
+  'data model / storage',
+]);
+
 // --- Dependency badge helpers ---
 
 function areDepsBlocked(t) {
@@ -320,7 +337,10 @@ function updateCard(card, t) {
         ${t.mount_worktrees ? '<span class="text-[10px] text-v-muted" title="Sibling worktrees mounted">worktrees</span>' : ''}
         <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>
         <span class="text-[10px] text-v-muted">${timeAgo(t.created_at)}</span>
-        ${t.tags && t.tags.length > 0 ? t.tags.map(tag => `<span class="badge badge-${tag.replace(/[^a-z0-9]/g, '-')}" title="Tag: ${escapeHtml(tag)}">${escapeHtml(tag)}</span>`).join('') : ''}
+        ${t.tags && t.tags.length > 0 ? t.tags.map(tag => {
+          const cls = BRAINSTORM_CATEGORIES.has(tag) ? 'badge badge-category' : `badge badge-${tag.replace(/[^a-z0-9]/g, '-')}`;
+          return `<span class="${cls}" title="Tag: ${escapeHtml(tag)}">${escapeHtml(tag)}</span>`;
+        }).join('') : ''}
       </div>
     </div>
     ${t.status === 'backlog' && t.session_id ? `<div class="flex items-center gap-1.5 mb-1" onclick="event.stopPropagation()">

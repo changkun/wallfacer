@@ -286,7 +286,11 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// Create a backlog task for each proposed idea.
 	var titles []string
 	for _, idea := range ideas {
-		newTask, createErr := r.store.CreateTask(bgCtx, idea.Prompt, 60, false, "", store.TaskKindTask, "idea-agent")
+		tags := []string{"idea-agent"}
+		if idea.Category != "" {
+			tags = append(tags, idea.Category)
+		}
+		newTask, createErr := r.store.CreateTask(bgCtx, idea.Prompt, 60, false, "", store.TaskKindTask, tags...)
 		if createErr != nil {
 			logger.Runner.Warn("ideation task: create idea task", "task", taskID, "error", createErr)
 			continue

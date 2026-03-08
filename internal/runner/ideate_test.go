@@ -103,6 +103,61 @@ func TestIdeationTaskCreatesChildTasks(t *testing.T) {
 	}
 }
 
+// TestIdeationTaskTagsChildTasksWithCategory verifies that each child task
+// created by the brainstorm agent is tagged with the idea's category so the
+// category is visible on the task card in the UI.
+func TestIdeationTaskTagsChildTasksWithCategory(t *testing.T) {
+	ideas := []IdeateResult{
+		{Title: "Add tests", Category: "test coverage", Prompt: "Write unit tests for all handlers."},
+		{Title: "Improve docs", Category: "developer experience", Prompt: "Update the README with usage examples."},
+		{Title: "Refactor auth", Category: "code quality / refactoring", Prompt: "Move auth logic to a dedicated package."},
+	}
+	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
+	s, r := setupRunnerWithCmd(t, nil, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "", "", false)
+
+	allTasks, err := s.ListTasks(ctx, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Build a map from child task title → tags for assertions.
+	childByTitle := make(map[string][]string)
+	for _, tsk := range allTasks {
+		if tsk.ID == task.ID {
+			continue
+		}
+		if tsk.HasTag("idea-agent") {
+			childByTitle[tsk.Title] = tsk.Tags
+		}
+	}
+
+	for _, idea := range ideas {
+		tags, ok := childByTitle[idea.Title]
+		if !ok {
+			t.Errorf("child task %q not found", idea.Title)
+			continue
+		}
+		found := false
+		for _, tag := range tags {
+			if tag == idea.Category {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("child task %q missing category tag %q; got tags: %v", idea.Title, idea.Category, tags)
+		}
+	}
+}
+
 // TestIdeationTaskSavesTurnOutput verifies that the raw container output is
 // persisted as turn-0001.json so it can be inspected and used for oversight.
 func TestIdeationTaskSavesTurnOutput(t *testing.T) {
