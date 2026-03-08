@@ -380,6 +380,7 @@ function closeModal() {
     testLogsAbort.abort();
     testLogsAbort = null;
   }
+  _stopTimelineRefresh();
   rawLogBuffer = '';
   testRawLogBuffer = '';
   oversightData = null;
@@ -387,6 +388,8 @@ function closeModal() {
   logsMode = 'oversight';
   document.getElementById('modal-logs').innerHTML = '';
   document.getElementById('modal-test-logs').innerHTML = '';
+  var tlChart = document.getElementById('modal-timeline-chart');
+  if (tlChart) { tlChart.innerHTML = ''; delete tlChart.dataset.loaded; }
   resetRefinePanel();
   document.getElementById('modal-backlog-right').classList.add('hidden');
   document.getElementById('modal-backlog-settings').classList.add('hidden');

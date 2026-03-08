@@ -39,5 +39,8 @@ let refineLogsMode = 'pretty';
 // Debounce timer for backlog prompt auto-save
 let editDebounce = null;
 
+// Timeline auto-refresh timer (setInterval ID or null)
+let timelineRefreshTimer = null;
+
 // Search / filter state
 let filterQuery = '';

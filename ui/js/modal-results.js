@@ -54,90 +54,270 @@ function setLeftTab(tab) {
     if (btn) btn.classList.toggle('active', active);
     if (panel) panel.classList.toggle('hidden', !active);
   });
-  if (tab === 'timeline' && typeof currentTaskId !== 'undefined' && currentTaskId) {
-    renderTimeline(currentTaskId);
+  if (tab === 'timeline') {
+    if (typeof currentTaskId !== 'undefined' && currentTaskId) {
+      renderTimeline(currentTaskId);
+      _startTimelineRefresh(currentTaskId);
+    }
+  } else {
+    _stopTimelineRefresh();
   }
 }
 
-// Phase color map for the timeline bar chart.
+// --- Timeline Gantt chart ---
+
+// Phase colors per spec: worktree_setup → muted blue, agent_turn → accent, commit → green.
 var _phaseColors = {
-  worktree_setup: '#3fb950',
-  agent_turn:     '#79c0ff',
-  container_run:  '#d2a8ff',
-  commit:         '#d97757',
+  worktree_setup: '#5e81ac',
+  agent_turn:     'var(--accent)',
+  commit:         '#3fb950',
+  container_run:  '#9e6ec7',
 };
 
 function _phaseColor(phase) {
-  return _phaseColors[phase] || '#6e7681';
+  return _phaseColors[phase] || 'var(--text-muted)';
 }
 
-// renderTimeline fetches span data for taskId and renders a proportional
-// horizontal bar chart into #modal-timeline-chart using CSS flexbox.
+// Inject keyframe + tooltip CSS once into <head>.
+function _ensureTimelineStyles() {
+  if (document.getElementById('tl-css')) return;
+  var s = document.createElement('style');
+  s.id = 'tl-css';
+  s.textContent =
+    '@keyframes tl-stripe{0%{background-position:0 0}100%{background-position:22.6px 0}}' +
+    '.tl-bar{cursor:default;transition:opacity .12s}.tl-bar:hover{opacity:.75}' +
+    '#tl-tip{position:fixed;z-index:9999;pointer-events:none;' +
+      'background:var(--bg-card);border:1px solid var(--border);' +
+      'border-radius:6px;padding:6px 10px;font-size:11px;line-height:1.65;' +
+      'white-space:pre;box-shadow:0 2px 10px rgba(0,0,0,.28);display:none;' +
+      'color:var(--text-primary,#cdd6f4);}';
+  document.head.appendChild(s);
+  var tip = document.createElement('div');
+  tip.id = 'tl-tip';
+  document.body.appendChild(tip);
+}
+
+// Attach mousemove/leave listeners to .tl-bar elements inside container.
+function _attachTimelineTips(container) {
+  var tip = document.getElementById('tl-tip');
+  if (!tip) return;
+  container.querySelectorAll('.tl-bar[data-tip]').forEach(function(bar) {
+    bar.addEventListener('mousemove', function(e) {
+      tip.textContent = bar.dataset.tip;
+      tip.style.display = 'block';
+      var tx = e.clientX + 12;
+      var ty = e.clientY - tip.offsetHeight - 6;
+      if (ty < 4) ty = e.clientY + 16;
+      tip.style.left = tx + 'px';
+      tip.style.top = ty + 'px';
+    });
+    bar.addEventListener('mouseleave', function() {
+      tip.style.display = 'none';
+    });
+  });
+}
+
+// Format a millisecond duration as human-readable string.
+function _fmtMs(ms) {
+  if (ms < 1000) return ms + 'ms';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  var m = Math.floor(ms / 60000);
+  var s = Math.round((ms % 60000) / 1000);
+  return m + 'm\u202f' + s + 's';
+}
+
+// True when a span has no valid end time (Go zero time or missing).
+function _spanIsOpen(span) {
+  if (!span.ended_at) return true;
+  var ms = new Date(span.ended_at).getTime();
+  return isNaN(ms) || ms <= 0; // pre-epoch = Go zero time (0001-01-01)
+}
+
+// Build the HTML for the Gantt chart from a spans array.
+function _buildTimelineHtml(spans) {
+  if (!spans || spans.length === 0) {
+    return '<div style="padding:12px 0;font-size:12px;color:var(--text-muted);">No timing data yet.</div>';
+  }
+
+  var LABEL_W = 130; // px for label column
+  var ROW_H   = 24;  // px per row
+  var TICK_MS = 30000; // x-axis tick every 30 s
+  var now = Date.now();
+
+  // Time bounds
+  var t0 = Infinity;
+  spans.forEach(function(s) {
+    var ts = new Date(s.started_at).getTime();
+    if (ts < t0) t0 = ts;
+  });
+  var tEnd = t0;
+  spans.forEach(function(s) {
+    var te = _spanIsOpen(s) ? now : new Date(s.ended_at).getTime();
+    if (te > tEnd) tEnd = te;
+  });
+  var totalMs = Math.max(tEnd - t0, 1000);
+
+  function pct(ms) { return Math.min((ms / totalMs) * 100, 100); }
+
+  // X-axis tick marks and grid lines
+  var ticksHtml = '';
+  for (var tickMs = 0; tickMs <= totalMs + TICK_MS / 2; tickMs += TICK_MS) {
+    var x = pct(tickMs);
+    var lbl = tickMs === 0 ? '0s' : (tickMs / 1000) + 's';
+    ticksHtml +=
+      '<div style="position:absolute;left:' + x + '%;transform:translateX(-50%);bottom:2px;' +
+        'font-size:10px;color:var(--text-muted);white-space:nowrap;user-select:none;">' + lbl + '</div>' +
+      '<div style="position:absolute;left:' + x + '%;top:0;bottom:0;' +
+        'border-left:1px dashed var(--border);opacity:.45;pointer-events:none;"></div>';
+  }
+
+  // Span rows
+  var rowsHtml = '';
+  spans.forEach(function(span) {
+    var ts   = new Date(span.started_at).getTime();
+    var open = _spanIsOpen(span);
+    var te   = open ? now : new Date(span.ended_at).getTime();
+    var dur  = te - ts;
+
+    var left  = pct(ts - t0);
+    var width = Math.max(pct(dur), 0.5);
+    var color = _phaseColor(span.phase);
+    var durStr   = _fmtMs(dur);
+    var relStart = '+' + _fmtMs(ts - t0);
+    var absStart = new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+
+    // Tooltip text (newlines preserved via white-space:pre on the tooltip div)
+    var tipText =
+      'Phase:    ' + span.phase + '\n' +
+      'Label:    ' + span.label + '\n' +
+      'Start:    ' + relStart + ' (' + absStart + ')\n' +
+      'Duration: ' + durStr + (open ? ' (running\u2026)' : '');
+
+    var barLabel = span.label + ' \xb7 ' + durStr + (open ? '\u2026' : '');
+
+    var barStyle =
+      'position:absolute;left:' + left + '%;width:' + width + '%;height:16px;top:4px;' +
+      'border-radius:3px;overflow:hidden;display:flex;align-items:center;' +
+      'padding:0 4px;box-sizing:border-box;';
+    if (open) {
+      // Striped animated bar for unclosed (running) spans
+      barStyle +=
+        'background-color:' + color + ';' +
+        'background-image:repeating-linear-gradient(45deg,transparent,transparent 8px,' +
+          'rgba(255,255,255,.18) 8px,rgba(255,255,255,.18) 16px);' +
+        'background-size:22.6px 22.6px;animation:tl-stripe .6s linear infinite;';
+    } else {
+      barStyle += 'background:' + color + ';';
+    }
+
+    rowsHtml +=
+      '<div style="display:flex;align-items:center;height:' + ROW_H + 'px;">' +
+        '<div style="width:' + LABEL_W + 'px;flex-shrink:0;font-size:11px;color:var(--text-muted);' +
+          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+          'padding-right:6px;text-align:right;" title="' + escapeHtml(span.label) + '">' +
+          escapeHtml(span.label) +
+        '</div>' +
+        '<div style="flex:1;position:relative;height:' + ROW_H + 'px;">' +
+          '<div class="tl-bar" data-tip="' + escapeHtml(tipText) + '" style="' + barStyle + '">' +
+            '<span style="font-size:10px;color:#fff;text-shadow:0 0 3px rgba(0,0,0,.55);' +
+              'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">' +
+              escapeHtml(barLabel) +
+            '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  });
+
+  // Phase legend (unique phases present)
+  var seenPhases = {};
+  var legendHtml = '';
+  spans.forEach(function(s) {
+    if (!seenPhases[s.phase]) {
+      seenPhases[s.phase] = true;
+      legendHtml +=
+        '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;' +
+          'color:var(--text-muted);margin-right:10px;">' +
+          '<span style="width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block;' +
+            'background:' + _phaseColor(s.phase) + ';"></span>' +
+          escapeHtml(s.phase) +
+        '</span>';
+    }
+  });
+
+  return (
+    '<div style="overflow-x:auto;padding:8px 0;">' +
+      '<div style="min-width:500px;">' +
+        // X-axis header row
+        '<div style="display:flex;margin-bottom:4px;">' +
+          '<div style="width:' + LABEL_W + 'px;flex-shrink:0;"></div>' +
+          '<div style="flex:1;position:relative;height:22px;">' + ticksHtml + '</div>' +
+        '</div>' +
+        // Span rows
+        rowsHtml +
+        // Legend
+        (legendHtml
+          ? '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px;">' +
+              legendHtml +
+            '</div>'
+          : '') +
+      '</div>' +
+    '</div>'
+  );
+}
+
+// Start a 5-second polling loop to refresh the timeline while the task runs.
+function _startTimelineRefresh(taskId) {
+  _stopTimelineRefresh();
+  if (typeof tasks === 'undefined' || typeof timelineRefreshTimer === 'undefined') return;
+  var task = tasks.find(function(t) { return t.id === taskId; });
+  if (!task || (task.status !== 'in_progress' && task.status !== 'committing')) return;
+  timelineRefreshTimer = setInterval(function() {
+    if (!currentTaskId || currentTaskId !== taskId) {
+      _stopTimelineRefresh();
+      return;
+    }
+    var t = tasks.find(function(tt) { return tt.id === taskId; });
+    if (!t || (t.status !== 'in_progress' && t.status !== 'committing')) {
+      _stopTimelineRefresh();
+      renderTimeline(taskId); // one final refresh to show completed spans
+      return;
+    }
+    renderTimeline(taskId);
+  }, 5000);
+}
+
+// Stop any active timeline auto-refresh.
+function _stopTimelineRefresh() {
+  if (typeof timelineRefreshTimer !== 'undefined' && timelineRefreshTimer) {
+    clearInterval(timelineRefreshTimer);
+    timelineRefreshTimer = null;
+  }
+}
+
+// Fetch spans and render the Gantt chart into #modal-timeline-chart.
 function renderTimeline(taskId) {
   var el = document.getElementById('modal-timeline-chart');
   if (!el) return;
-  el.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0;">Loading timeline\u2026</div>';
+  // Only show loading placeholder on first load (avoid flicker on refresh)
+  if (!el.dataset.loaded) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Loading timeline\u2026</div>';
+  }
+  _ensureTimelineStyles();
 
   fetch('/api/tasks/' + taskId + '/spans')
     .then(function(res) { return res.json(); })
     .then(function(spans) {
-      if (!spans || spans.length === 0) {
-        el.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0;">No timing data available.</div>';
-        return;
-      }
-
-      // Compute total elapsed from first start to last end for proportional sizing.
-      var minStart = new Date(spans[0].started_at).getTime();
-      var maxEnd = 0;
-      spans.forEach(function(s) {
-        var end = new Date(s.ended_at).getTime();
-        if (end > maxEnd) maxEnd = end;
-      });
-      var totalMs = maxEnd - minStart || 1;
-
-      var rows = spans.map(function(s) {
-        var startMs = new Date(s.started_at).getTime() - minStart;
-        var leftPct = (startMs / totalMs * 100).toFixed(2);
-        var widthPct = Math.max((s.duration_ms / totalMs * 100), 0.5).toFixed(2);
-        var color = _phaseColor(s.phase);
-        var durLabel = s.duration_ms >= 1000
-          ? (s.duration_ms / 1000).toFixed(1) + 's'
-          : s.duration_ms + 'ms';
-        var tooltip = escapeHtml(s.label + ': ' + s.duration_ms + 'ms');
-        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
-          '<div style="width:110px;font-size:11px;color:var(--text-secondary);text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(s.label) + '">' + escapeHtml(s.label) + '</div>' +
-          '<div style="flex:1;position:relative;height:14px;background:var(--bg-card);border-radius:2px;">' +
-            '<div style="position:absolute;left:' + leftPct + '%;width:' + widthPct + '%;height:100%;background:' + color + ';border-radius:2px;" title="' + tooltip + '"></div>' +
-          '</div>' +
-          '<div style="width:44px;font-size:11px;color:var(--text-secondary);text-align:right;flex-shrink:0;font-family:monospace;">' + escapeHtml(durLabel) + '</div>' +
-        '</div>';
-      }).join('');
-
-      // Build legend from unique phases present.
-      var seen = {};
-      var legendItems = [];
-      spans.forEach(function(s) {
-        if (!seen[s.phase]) {
-          seen[s.phase] = true;
-          legendItems.push(
-            '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-secondary);margin-right:10px;">' +
-            '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + _phaseColor(s.phase) + ';flex-shrink:0;"></span>' +
-            escapeHtml(s.phase) + '</span>'
-          );
-        }
-      });
-
+      if (currentTaskId !== taskId) return;
       var el2 = document.getElementById('modal-timeline-chart');
       if (!el2) return;
-      el2.innerHTML =
-        '<div style="padding:8px 0;">' +
-          '<div style="margin-bottom:8px;">' + rows + '</div>' +
-          '<div style="border-top:1px solid var(--border);padding-top:6px;">' + legendItems.join('') + '</div>' +
-        '</div>';
+      el2.dataset.loaded = '1';
+      el2.innerHTML = _buildTimelineHtml(spans);
+      _attachTimelineTips(el2);
     })
     .catch(function() {
+      if (currentTaskId !== taskId) return;
       var el2 = document.getElementById('modal-timeline-chart');
-      if (el2) el2.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);padding:8px 0;">Failed to load timeline.</div>';
+      if (el2) el2.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Failed to load timeline.</div>';
     });
 }
 
