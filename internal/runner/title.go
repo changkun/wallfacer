@@ -45,7 +45,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	if hostPath := r.hostCodexAuthPath(); strings.EqualFold(strings.TrimSpace(sandbox), "codex") && hostPath != "" {
 		args = append(args, "-v", hostPath+":/home/codex/.codex:z,ro")
 	}
-	args = append(args, r.sandboxImage)
+	args = append(args, r.sandboxImageForSandbox(sandbox))
 
 	titlePrompt := "Respond with ONLY a 2-5 word title that captures the main goal of the following task. " +
 		"No punctuation, no quotes, no explanation — just the title.\n\nTask:\n" + prompt

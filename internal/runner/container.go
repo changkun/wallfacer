@@ -83,7 +83,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 	spec := ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
-		Image:   r.sandboxImage,
+		Image:   r.sandboxImageForSandbox(sandbox),
 	}
 
 	// Label the container with task metadata so the monitor can correlate
@@ -242,6 +242,41 @@ func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sandbox string) []V
 		})
 	}
 	return volumes
+}
+
+func (r *Runner) sandboxImageForSandbox(sandbox string) string {
+	if !strings.EqualFold(strings.TrimSpace(sandbox), "codex") {
+		return strings.TrimSpace(r.sandboxImage)
+	}
+	baseImage := strings.TrimSpace(r.sandboxImage)
+	if baseImage == "" {
+		return "wallfacer-codex:latest"
+	}
+	low := strings.ToLower(baseImage)
+	if strings.Contains(low, "wallfacer-codex") {
+		return baseImage
+	}
+	registry := baseImage
+	digest := ""
+	if at := strings.Index(registry, "@"); at != -1 {
+		digest = registry[at:]
+		registry = registry[:at]
+	}
+	tag := ""
+	if at := strings.LastIndex(registry, ":"); at != -1 {
+		tag = registry[at:]
+		registry = registry[:at]
+	}
+	prefix := ""
+	repoName := registry
+	if idx := strings.LastIndex(repoName, "/"); idx != -1 {
+		prefix = repoName[:idx+1]
+		repoName = repoName[idx+1:]
+	}
+	if repoName != "wallfacer" {
+		return baseImage
+	}
+	return prefix + "wallfacer-codex" + tag + digest
 }
 
 // modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file (if configured).

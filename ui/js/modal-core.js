@@ -45,7 +45,13 @@ async function openModal(id) {
     document.getElementById('modal-edit-timeout').value = String(task.timeout || 60);
     document.getElementById('modal-edit-mount-worktrees').checked = !!task.mount_worktrees;
     document.getElementById('modal-edit-sandbox').value = task.sandbox || '';
+    if (typeof bindTaskSandboxInheritance === 'function') {
+      bindTaskSandboxInheritance('modal-edit-sandbox', 'modal-edit-sandbox-');
+    }
     applySandboxByActivity('modal-edit-sandbox-', task.sandbox_by_activity || {});
+    if (typeof setActivityOverrideDefaultSandbox === 'function') {
+      setActivityOverrideDefaultSandbox('modal-edit-sandbox-', task.sandbox || '');
+    }
     populateDependsOnPicker('modal-edit-depends-on-picker', task.id, task.depends_on || []);
     const resumeRow = document.getElementById('modal-edit-resume-row');
     if (task.session_id) {

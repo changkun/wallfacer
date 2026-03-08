@@ -1,5 +1,27 @@
 const DEFAULT_TASK_TIMEOUT = 60; // minutes
 
+function setActivityOverrideDefaultSandbox(prefix, sandbox) {
+  SANDBOX_ACTIVITY_KEYS.forEach(function(key) {
+    var el = document.getElementById(prefix + key);
+    if (!el) return;
+    if (sandbox) {
+      el.dataset.defaultSandbox = sandbox;
+    } else {
+      delete el.dataset.defaultSandbox;
+    }
+  });
+  populateSandboxSelects();
+}
+
+function bindTaskSandboxInheritance(selectId, prefix) {
+  var el = document.getElementById(selectId);
+  if (!el || el.dataset.inheritanceBound === 'true') return;
+  el.dataset.inheritanceBound = 'true';
+  el.addEventListener('change', function() {
+    setActivityOverrideDefaultSandbox(prefix, (el.value || '').trim());
+  });
+}
+
 // --- Dependency picker helpers ---
 
 /**
@@ -168,10 +190,15 @@ function showNewTaskForm() {
   textarea.style.height = draft ? textarea.scrollHeight + 'px' : '';
   textarea.focus();
   const sandboxSelect = document.getElementById('new-sandbox');
+  bindTaskSandboxInheritance('new-sandbox', 'new-sandbox-');
   if (sandboxSelect) {
     sandboxSelect.value = defaultSandbox || '';
   }
-  applySandboxByActivity('new-sandbox-', defaultSandboxByActivity || {});
+  // Do not prefill per-activity overrides on new tasks. Empty values inherit
+  // from task default sandbox, preventing stale global overrides (e.g. claude)
+  // from shadowing an explicit task sandbox (e.g. codex).
+  applySandboxByActivity('new-sandbox-', {});
+  setActivityOverrideDefaultSandbox('new-sandbox-', (sandboxSelect && sandboxSelect.value) ? sandboxSelect.value : '');
   var depsRow = document.getElementById('new-depends-on-row');
   populateDependsOnPicker('new-depends-on-picker', null, []);
   if (depsRow) depsRow.style.display = tasks.length > 0 ? '' : 'none';
@@ -189,6 +216,7 @@ function hideNewTaskForm() {
     sandboxSelect.value = defaultSandbox || '';
   }
   applySandboxByActivity('new-sandbox-', {});
+  setActivityOverrideDefaultSandbox('new-sandbox-', (sandboxSelect && sandboxSelect.value) ? sandboxSelect.value : '');
   var depPicker = document.getElementById('new-depends-on-picker');
   if (depPicker) {
     depPicker.querySelector('.dep-picker-list').innerHTML = '';

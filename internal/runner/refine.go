@@ -146,7 +146,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 	spec := ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
-		Image:   r.sandboxImage,
+		Image:   r.sandboxImageForSandbox(sandbox),
 	}
 
 	if taskID != "" {

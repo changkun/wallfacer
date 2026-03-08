@@ -148,46 +148,70 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 			sandbox = r.sandboxForTaskActivity(task, activityIdeaAgent)
 		}
 	}
-	args := r.buildIdeationContainerArgs(containerName, prompt, sandbox)
+	runWithSandbox := func(selectedSandbox string) (*agentOutput, []byte, []byte, error) {
+		args := r.buildIdeationContainerArgs(containerName, prompt, selectedSandbox)
+		cmd := exec.CommandContext(ctx, r.command, args...)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
 
-	cmd := exec.CommandContext(ctx, r.command, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+		logger.Runner.Debug("ideate exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
+		runErr := cmd.Run()
 
-	logger.Runner.Debug("ideate exec", "cmd", r.command, "args", strings.Join(args, " "))
-	runErr := cmd.Run()
-
-	if ctx.Err() != nil {
-		exec.Command(r.command, "kill", containerName).Run()
-		exec.Command(r.command, "rm", "-f", containerName).Run()
-		return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("ideation container terminated: %w", ctx.Err())
-	}
-
-	raw := strings.TrimSpace(stdout.String())
-	if raw == "" {
-		if runErr != nil {
-			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited %d: stderr=%s", exitErr.ExitCode(), stderr.String())
-			}
-			return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+		if ctx.Err() != nil {
+			exec.Command(r.command, "kill", containerName).Run()
+			exec.Command(r.command, "rm", "-f", containerName).Run()
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("ideation container terminated: %w", ctx.Err())
 		}
-		return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from ideation container")
+
+		raw := strings.TrimSpace(stdout.String())
+		if raw == "" {
+			if runErr != nil {
+				if exitErr, ok := runErr.(*exec.ExitError); ok {
+					return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited %d: stderr=%s", exitErr.ExitCode(), stderr.String())
+				}
+				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+			}
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from ideation container")
+		}
+
+		output, parseErr := parseOutput(raw)
+		if parseErr != nil {
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("parse ideation output: %w", parseErr)
+		}
+		if output == nil || output.Result == "" {
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("no result in ideation output")
+		}
+		return output, stdout.Bytes(), stderr.Bytes(), nil
 	}
 
-	output, parseErr := parseOutput(raw)
-	if parseErr != nil {
-		return nil, nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("parse ideation output: %w", parseErr)
+	output, rawStdout, rawStderr, err := runWithSandbox(sandbox)
+	if err != nil {
+		if strings.EqualFold(sandbox, "claude") && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
+			logger.Runner.Warn("ideation: claude token limit hit; retrying with codex", "task", taskID)
+			output, rawStdout, rawStderr, err = runWithSandbox("codex")
+		}
+		if err != nil {
+			return nil, nil, rawStdout, rawStderr, err
+		}
 	}
-	if output == nil || output.Result == "" {
-		return nil, output, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("no result in ideation output")
+
+	if strings.EqualFold(sandbox, "claude") && output != nil && output.IsError &&
+		isLikelyTokenLimitError(output.Result, output.Subtype) {
+		logger.Runner.Warn("ideation: claude output reported token limit; retrying with codex", "task", taskID)
+		retryOutput, retryStdout, retryStderr, retryErr := runWithSandbox("codex")
+		if retryErr == nil {
+			output = retryOutput
+			rawStdout = retryStdout
+			rawStderr = retryStderr
+		}
 	}
 
 	ideas, err := extractIdeas(output.Result)
 	if err != nil {
-		return nil, output, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("extract ideas: %w (result: %s)", err, truncate(output.Result, 300))
+		return nil, output, rawStdout, rawStderr, fmt.Errorf("extract ideas: %w (result: %s)", err, truncate(output.Result, 300))
 	}
-	return ideas, output, stdout.Bytes(), stderr.Bytes(), nil
+	return ideas, output, rawStdout, rawStderr, nil
 }
 
 // buildIdeationContainerArgs builds the container run arguments for the
@@ -237,7 +261,7 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt, sandbox strin
 	if len(basenames) == 1 {
 		workdir = "/workspace/" + basenames[0]
 	}
-	args = append(args, "-w", workdir, r.sandboxImage)
+	args = append(args, "-w", workdir, r.sandboxImageForSandbox(sandbox))
 	args = append(args, "-p", prompt, "--verbose", "--output-format", "stream-json")
 	if m := r.modelFromEnvForSandbox(sandbox); m != "" {
 		args = append(args, "--model", m)
