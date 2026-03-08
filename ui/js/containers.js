@@ -132,7 +132,7 @@ function renderContainers(containers) {
     tr.innerHTML = [
       '<td style="padding:8px 10px;font-family:monospace;color:var(--text-secondary);white-space:nowrap;">' + escapeHtml(shortID) + '</td>',
       '<td style="padding:8px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + taskCell + '</td>',
-      '<td style="padding:8px 10px;font-family:monospace;color:var(--text-secondary);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(c.image || '') + '">' + escapeHtml(c.image || '—') + '</td>',
+      '<td style="padding:8px 10px;font-family:monospace;color:var(--text-secondary);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(c.name || '') + '">' + escapeHtml(c.name || '—') + '</td>',
       '<td style="padding:8px 10px;white-space:nowrap;"><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:' + stateColor + ';flex-shrink:0;"></span>' + escapeHtml(stateLabel) + '</span></td>',
       '<td style="padding:8px 10px;color:var(--text-secondary);white-space:nowrap;">' + escapeHtml(c.status || '—') + '</td>',
       '<td style="padding:8px 10px;color:var(--text-secondary);white-space:nowrap;">' + createdStr + '</td>',
