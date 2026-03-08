@@ -1,0 +1,519 @@
+{
+  "generated_from": "internal/apicontract/routes.go",
+  "route_count": 56,
+  "routes": [
+    {
+      "method": "GET",
+      "pattern": "/api/debug/health",
+      "name": "Health",
+      "description": "Operational health check: goroutine count, task counts, uptime.",
+      "tags": [
+        "debug"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/debug/spans",
+      "name": "GetSpanStats",
+      "description": "Aggregate span timing statistics across all tasks.",
+      "tags": [
+        "debug"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/debug/runtime",
+      "name": "GetRuntimeStatus",
+      "description": "Live server internals: pending goroutines, memory, task states, containers.",
+      "tags": [
+        "debug"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/containers",
+      "name": "GetContainers",
+      "description": "List running sandbox containers.",
+      "tags": [
+        "containers"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/files",
+      "name": "GetFiles",
+      "description": "File listing for @ mention autocomplete.",
+      "tags": [
+        "files"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/config",
+      "name": "GetConfig",
+      "description": "Get server configuration (workspaces, autopilot flags, sandbox list).",
+      "tags": [
+        "config"
+      ]
+    },
+    {
+      "method": "PUT",
+      "pattern": "/api/config",
+      "name": "UpdateConfig",
+      "description": "Update server configuration (autopilot, autotest, autosubmit, sandbox assignments).",
+      "tags": [
+        "config"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/ideate",
+      "name": "GetIdeationStatus",
+      "description": "Get brainstorm/ideation agent status.",
+      "tags": [
+        "ideate"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/ideate",
+      "name": "TriggerIdeation",
+      "description": "Trigger the ideation agent to generate new task ideas.",
+      "tags": [
+        "ideate"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/ideate",
+      "name": "CancelIdeation",
+      "description": "Cancel an in-progress ideation run.",
+      "tags": [
+        "ideate"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/env",
+      "name": "GetEnvConfig",
+      "description": "Get environment configuration (tokens masked).",
+      "tags": [
+        "env"
+      ]
+    },
+    {
+      "method": "PUT",
+      "pattern": "/api/env",
+      "name": "UpdateEnvConfig",
+      "description": "Update environment file; omitted/empty token fields are preserved.",
+      "tags": [
+        "env"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/env/test",
+      "name": "TestSandbox",
+      "description": "Test sandbox configuration by running a lightweight probe task.",
+      "tags": [
+        "env"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/instructions",
+      "name": "GetInstructions",
+      "description": "Get the workspace CLAUDE.md content.",
+      "tags": [
+        "instructions"
+      ]
+    },
+    {
+      "method": "PUT",
+      "pattern": "/api/instructions",
+      "name": "UpdateInstructions",
+      "description": "Save the workspace CLAUDE.md.",
+      "tags": [
+        "instructions"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/instructions/reinit",
+      "name": "ReinitInstructions",
+      "description": "Rebuild workspace CLAUDE.md from default template and repo files.",
+      "tags": [
+        "instructions"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/git/status",
+      "name": "GitStatus",
+      "description": "Git status for all mounted workspaces.",
+      "tags": [
+        "git"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/git/stream",
+      "name": "GitStatusStream",
+      "description": "SSE stream of git status updates for all workspaces.",
+      "tags": [
+        "git",
+        "sse"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/git/push",
+      "name": "GitPush",
+      "description": "Push a workspace to its remote.",
+      "tags": [
+        "git"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/git/sync",
+      "name": "GitSyncWorkspace",
+      "description": "Fetch and rebase a workspace onto its upstream branch.",
+      "tags": [
+        "git"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/git/rebase-on-main",
+      "name": "GitRebaseOnMain",
+      "description": "Fetch origin/\u003cmain\u003e and rebase the current branch on top.",
+      "tags": [
+        "git"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/git/branches",
+      "name": "GitBranches",
+      "description": "List branches for a workspace.",
+      "tags": [
+        "git"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/git/checkout",
+      "name": "GitCheckout",
+      "description": "Switch a workspace to a different branch.",
+      "tags": [
+        "git"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/git/create-branch",
+      "name": "GitCreateBranch",
+      "description": "Create and check out a new branch in a workspace.",
+      "tags": [
+        "git"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/usage",
+      "name": "GetUsageStats",
+      "description": "Aggregated token and cost usage statistics.",
+      "tags": [
+        "stats"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/stats",
+      "name": "GetStats",
+      "description": "Task status statistics.",
+      "tags": [
+        "stats"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks",
+      "name": "ListTasks",
+      "description": "List all tasks (optionally including archived).",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/stream",
+      "name": "StreamTasks",
+      "description": "SSE stream: full snapshot then incremental task-updated/task-deleted events.",
+      "tags": [
+        "tasks",
+        "sse"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks",
+      "name": "CreateTask",
+      "description": "Create a new task in the backlog.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/generate-titles",
+      "name": "GenerateMissingTitles",
+      "description": "Bulk-generate titles for tasks that lack one.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/generate-oversight",
+      "name": "GenerateMissingOversight",
+      "description": "Bulk-generate oversight summaries for eligible tasks.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/search",
+      "name": "SearchTasks",
+      "description": "Search tasks by keyword.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/archive-done",
+      "name": "ArchiveAllDone",
+      "description": "Archive all tasks in the done state.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "pattern": "/api/tasks/{id}",
+      "name": "UpdateTask",
+      "description": "Update task fields: status, prompt, timeout, sandbox, dependencies, fresh_start.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/tasks/{id}",
+      "name": "DeleteTask",
+      "description": "Permanently delete a task and its data.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/events",
+      "name": "GetEvents",
+      "description": "Task event timeline (state changes, outputs, feedback, errors).",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/feedback",
+      "name": "SubmitFeedback",
+      "description": "Submit a feedback message to a waiting task.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/done",
+      "name": "CompleteTask",
+      "description": "Mark a waiting task as done and trigger commit-and-push.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/cancel",
+      "name": "CancelTask",
+      "description": "Cancel a task: kill container and discard worktrees.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/resume",
+      "name": "ResumeTask",
+      "description": "Resume a failed task using its existing session.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/archive",
+      "name": "ArchiveTask",
+      "description": "Move a done task to the archived state.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/unarchive",
+      "name": "UnarchiveTask",
+      "description": "Restore an archived task to the done state.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/sync",
+      "name": "SyncTask",
+      "description": "Rebase task worktrees onto the latest default branch.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/test",
+      "name": "TestTask",
+      "description": "Trigger the test agent for a task.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/diff",
+      "name": "TaskDiff",
+      "description": "Git diff of task worktrees versus the default branch.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/logs",
+      "name": "StreamLogs",
+      "description": "SSE stream of live container logs for a running task.",
+      "tags": [
+        "tasks",
+        "sse"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/outputs/{filename}",
+      "name": "ServeOutput",
+      "description": "Raw Claude Code output file for a single agent turn.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/turn-usage",
+      "name": "GetTurnUsage",
+      "description": "Per-turn token usage breakdown for a task.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/spans",
+      "name": "GetTaskSpans",
+      "description": "Span timing statistics for a task.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/oversight",
+      "name": "GetOversight",
+      "description": "Oversight summary for a completed task.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/oversight/test",
+      "name": "GetTestOversight",
+      "description": "Test oversight summary for a task.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/refine",
+      "name": "StartRefinement",
+      "description": "Start the refinement sandbox agent for a backlog task.",
+      "tags": [
+        "tasks",
+        "refine"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/tasks/{id}/refine",
+      "name": "CancelRefinement",
+      "description": "Cancel an in-progress refinement agent.",
+      "tags": [
+        "tasks",
+        "refine"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/{id}/refine/logs",
+      "name": "StreamRefineLogs",
+      "description": "Stream live logs from the refinement agent.",
+      "tags": [
+        "tasks",
+        "refine",
+        "sse"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/refine/apply",
+      "name": "RefineApply",
+      "description": "Apply the refined prompt as the new task prompt.",
+      "tags": [
+        "tasks",
+        "refine"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/refine/dismiss",
+      "name": "RefineDismiss",
+      "description": "Dismiss the refinement result without applying it.",
+      "tags": [
+        "tasks",
+        "refine"
+      ]
+    }
+  ]
+}

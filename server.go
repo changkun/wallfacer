@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"changkun.de/wallfacer/internal/apicontract"
 	"changkun.de/wallfacer/internal/handler"
 	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/logger"
@@ -269,6 +270,12 @@ func runServer(configDir string, args []string) {
 }
 
 // buildMux constructs the HTTP request router.
+//
+// All API routes are registered from apicontract.Routes (the single source of
+// truth). The handlers map below pairs each route Name with its http.HandlerFunc,
+// applying per-route middleware (e.g. UUID parsing via withID) at map
+// construction time. A startup panic is triggered if a route in the contract
+// has no corresponding handler entry, preventing silent drift.
 func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http.ServeMux {
 	mux := http.NewServeMux()
 
@@ -291,60 +298,12 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 	}
 	mux.HandleFunc("GET /", serveIndex)
 
-	// Static asset directories should still be served from the embedded filesystem.
+	// Static asset directories served from the embedded filesystem.
 	mux.Handle("GET /css/", http.FileServer(http.FS(uiFS)))
 	mux.Handle("GET /js/", http.FileServer(http.FS(uiFS)))
 
-	// Operational health check (goroutine count, task counts, uptime).
-	mux.HandleFunc("GET /api/debug/health", h.Health)
-	// Aggregate span timing statistics across all tasks.
-	mux.HandleFunc("GET /api/debug/spans", h.GetSpanStats)
-	// Live server internals: pending goroutines, memory, task states, containers.
-	mux.HandleFunc("GET /api/debug/runtime", h.GetRuntimeStatus)
-
-	// Container monitoring.
-	mux.HandleFunc("GET /api/containers", h.GetContainers)
-
-	// File listing for @ mention autocomplete.
-	mux.HandleFunc("GET /api/files", h.GetFiles)
-
-	// Configuration & instructions.
-	mux.HandleFunc("GET /api/config", h.GetConfig)
-	mux.HandleFunc("PUT /api/config", h.UpdateConfig)
-
-	// Brainstorm / ideation agent.
-	mux.HandleFunc("GET /api/ideate", h.GetIdeationStatus)
-	mux.HandleFunc("POST /api/ideate", h.TriggerIdeation)
-	mux.HandleFunc("DELETE /api/ideate", h.CancelIdeation)
-	mux.HandleFunc("GET /api/env", h.GetEnvConfig)
-	mux.HandleFunc("PUT /api/env", h.UpdateEnvConfig)
-	mux.HandleFunc("POST /api/env/test", h.TestSandbox)
-	mux.HandleFunc("GET /api/instructions", h.GetInstructions)
-	mux.HandleFunc("PUT /api/instructions", h.UpdateInstructions)
-	mux.HandleFunc("POST /api/instructions/reinit", h.ReinitInstructions)
-
-	// Git workspace operations.
-	mux.HandleFunc("GET /api/git/status", h.GitStatus)
-	mux.HandleFunc("GET /api/git/stream", h.GitStatusStream)
-	mux.HandleFunc("POST /api/git/push", h.GitPush)
-	mux.HandleFunc("POST /api/git/sync", h.GitSyncWorkspace)
-	mux.HandleFunc("POST /api/git/rebase-on-main", h.GitRebaseOnMain)
-	mux.HandleFunc("GET /api/git/branches", h.GitBranches)
-	mux.HandleFunc("POST /api/git/checkout", h.GitCheckout)
-	mux.HandleFunc("POST /api/git/create-branch", h.GitCreateBranch)
-
-	mux.HandleFunc("GET /api/usage", h.GetUsageStats)
-	mux.HandleFunc("GET /api/stats", h.GetStats)
-
-	// Task collection.
-	mux.HandleFunc("GET /api/tasks", h.ListTasks)
-	mux.HandleFunc("GET /api/tasks/stream", h.StreamTasks)
-	mux.HandleFunc("POST /api/tasks", h.CreateTask)
-	mux.HandleFunc("POST /api/tasks/generate-titles", h.GenerateMissingTitles)
-	mux.HandleFunc("POST /api/tasks/generate-oversight", h.GenerateMissingOversight)
-	mux.HandleFunc("GET /api/tasks/search", h.SearchTasks)
-
-	// Task instance routes (require UUID parsing).
+	// withID wraps a handler that needs a parsed task UUID from the {id} path
+	// segment, converting the UUID-accepting signature to http.HandlerFunc.
 	withID := func(fn func(http.ResponseWriter, *http.Request, uuid.UUID)) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			id, err := uuid.Parse(r.PathValue("id"))
@@ -356,39 +315,117 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		}
 	}
 
-	mux.HandleFunc("PATCH /api/tasks/{id}", withID(h.UpdateTask))
-	mux.HandleFunc("DELETE /api/tasks/{id}", withID(h.DeleteTask))
-	mux.HandleFunc("GET /api/tasks/{id}/events", withID(h.GetEvents))
-	mux.HandleFunc("POST /api/tasks/{id}/feedback", withID(h.SubmitFeedback))
-	mux.HandleFunc("POST /api/tasks/{id}/done", withID(h.CompleteTask))
-	mux.HandleFunc("POST /api/tasks/{id}/cancel", withID(h.CancelTask))
-	mux.HandleFunc("POST /api/tasks/{id}/resume", withID(h.ResumeTask))
-	mux.HandleFunc("POST /api/tasks/archive-done", h.ArchiveAllDone)
-	mux.HandleFunc("POST /api/tasks/{id}/archive", withID(h.ArchiveTask))
-	mux.HandleFunc("POST /api/tasks/{id}/unarchive", withID(h.UnarchiveTask))
-	mux.HandleFunc("POST /api/tasks/{id}/sync", withID(h.SyncTask))
-	mux.HandleFunc("POST /api/tasks/{id}/test", withID(h.TestTask))
-	mux.HandleFunc("POST /api/tasks/{id}/refine", withID(h.StartRefinement))
-	mux.HandleFunc("DELETE /api/tasks/{id}/refine", withID(h.CancelRefinement))
-	mux.HandleFunc("GET /api/tasks/{id}/refine/logs", withID(h.StreamRefineLogs))
-	mux.HandleFunc("POST /api/tasks/{id}/refine/apply", withID(h.RefineApply))
-	mux.HandleFunc("POST /api/tasks/{id}/refine/dismiss", withID(h.RefineDismiss))
-	mux.HandleFunc("GET /api/tasks/{id}/oversight", withID(h.GetOversight))
-	mux.HandleFunc("GET /api/tasks/{id}/oversight/test", withID(h.GetTestOversight))
-	mux.HandleFunc("GET /api/tasks/{id}/spans", withID(h.GetTaskSpans))
-	mux.HandleFunc("GET /api/tasks/{id}/turn-usage", h.GetTurnUsage)
-	mux.HandleFunc("GET /api/tasks/{id}/diff", withID(h.TaskDiff))
-	mux.HandleFunc("GET /api/tasks/{id}/logs", withID(h.StreamLogs))
-	mux.HandleFunc("GET /api/tasks/{id}/outputs/{filename}", func(w http.ResponseWriter, r *http.Request) {
-		id, err := uuid.Parse(r.PathValue("id"))
-		if err != nil {
-			http.Error(w, "invalid task id", http.StatusBadRequest)
-			return
-		}
-		h.ServeOutput(w, r, id, r.PathValue("filename"))
-	})
+	// handlers maps each Route.Name from apicontract.Routes to its handler.
+	// All per-route middleware (UUID parsing, extra path values) is applied here
+	// so the registration loop below stays trivial.
+	handlers := map[string]http.HandlerFunc{
+		// Debug & monitoring.
+		"Health":          h.Health,
+		"GetSpanStats":    h.GetSpanStats,
+		"GetRuntimeStatus": h.GetRuntimeStatus,
 
-	// Prometheus metrics endpoint.
+		// Container monitoring.
+		"GetContainers": h.GetContainers,
+
+		// File listing.
+		"GetFiles": h.GetFiles,
+
+		// Server configuration.
+		"GetConfig":    h.GetConfig,
+		"UpdateConfig": h.UpdateConfig,
+
+		// Ideation agent.
+		"GetIdeationStatus": h.GetIdeationStatus,
+		"TriggerIdeation":   h.TriggerIdeation,
+		"CancelIdeation":    h.CancelIdeation,
+
+		// Environment configuration.
+		"GetEnvConfig":    h.GetEnvConfig,
+		"UpdateEnvConfig": h.UpdateEnvConfig,
+		"TestSandbox":     h.TestSandbox,
+
+		// Workspace instructions.
+		"GetInstructions":    h.GetInstructions,
+		"UpdateInstructions": h.UpdateInstructions,
+		"ReinitInstructions": h.ReinitInstructions,
+
+		// Git workspace operations.
+		"GitStatus":        h.GitStatus,
+		"GitStatusStream":  h.GitStatusStream,
+		"GitPush":          h.GitPush,
+		"GitSyncWorkspace": h.GitSyncWorkspace,
+		"GitRebaseOnMain":  h.GitRebaseOnMain,
+		"GitBranches":      h.GitBranches,
+		"GitCheckout":      h.GitCheckout,
+		"GitCreateBranch":  h.GitCreateBranch,
+
+		// Usage & statistics.
+		"GetUsageStats": h.GetUsageStats,
+		"GetStats":      h.GetStats,
+
+		// Task collection (no {id}).
+		"ListTasks":                h.ListTasks,
+		"StreamTasks":              h.StreamTasks,
+		"CreateTask":               h.CreateTask,
+		"GenerateMissingTitles":    h.GenerateMissingTitles,
+		"GenerateMissingOversight": h.GenerateMissingOversight,
+		"SearchTasks":              h.SearchTasks,
+		"ArchiveAllDone":           h.ArchiveAllDone,
+
+		// Task instance operations (UUID extracted via withID).
+		"UpdateTask":    withID(h.UpdateTask),
+		"DeleteTask":    withID(h.DeleteTask),
+		"GetEvents":     withID(h.GetEvents),
+		"SubmitFeedback": withID(h.SubmitFeedback),
+		"CompleteTask":  withID(h.CompleteTask),
+		"CancelTask":    withID(h.CancelTask),
+		"ResumeTask":    withID(h.ResumeTask),
+		"ArchiveTask":   withID(h.ArchiveTask),
+		"UnarchiveTask": withID(h.UnarchiveTask),
+		"SyncTask":      withID(h.SyncTask),
+		"TestTask":      withID(h.TestTask),
+		"TaskDiff":      withID(h.TaskDiff),
+		"StreamLogs":    withID(h.StreamLogs),
+
+		// GetTurnUsage reads {id} internally (not via withID).
+		"GetTurnUsage": h.GetTurnUsage,
+
+		// ServeOutput needs both {id} (UUID) and {filename} path values.
+		"ServeOutput": func(w http.ResponseWriter, r *http.Request) {
+			id, err := uuid.Parse(r.PathValue("id"))
+			if err != nil {
+				http.Error(w, "invalid task id", http.StatusBadRequest)
+				return
+			}
+			h.ServeOutput(w, r, id, r.PathValue("filename"))
+		},
+
+		// Task span / oversight analytics.
+		"GetTaskSpans":     withID(h.GetTaskSpans),
+		"GetOversight":     withID(h.GetOversight),
+		"GetTestOversight": withID(h.GetTestOversight),
+
+		// Refinement agent.
+		"StartRefinement":  withID(h.StartRefinement),
+		"CancelRefinement": withID(h.CancelRefinement),
+		"StreamRefineLogs": withID(h.StreamRefineLogs),
+		"RefineApply":      withID(h.RefineApply),
+		"RefineDismiss":    withID(h.RefineDismiss),
+	}
+
+	// Register all routes from the contract. A missing handler entry panics at
+	// startup, making it impossible to deploy with a route in the contract but
+	// no handler wired up.
+	for _, route := range apicontract.Routes {
+		fn, ok := handlers[route.Name]
+		if !ok {
+			panic(fmt.Sprintf("buildMux: no handler registered for contract route %q (%s %s)",
+				route.Name, route.Method, route.Pattern))
+		}
+		mux.HandleFunc(route.FullPattern(), fn)
+	}
+
+	// Prometheus metrics endpoint (not an API route; excluded from the contract).
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 		reg.WritePrometheus(w)

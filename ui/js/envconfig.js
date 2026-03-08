@@ -2,7 +2,7 @@
 
 async function loadMaxParallel() {
   try {
-    const cfg = await api('/api/env');
+    const cfg = await api(Routes.env.get());
     const input = document.getElementById('max-parallel-input');
     if (cfg.max_parallel_tasks) {
       maxParallelTasks = cfg.max_parallel_tasks;
@@ -26,7 +26,7 @@ async function saveMaxParallel() {
 
   statusEl.textContent = 'Saving…';
   try {
-    await api('/api/env', { method: 'PUT', body: JSON.stringify({ max_parallel_tasks: value }) });
+    await api(Routes.env.update(), { method: 'PUT', body: JSON.stringify({ max_parallel_tasks: value }) });
     maxParallelTasks = value;
     updateInProgressCount();
     statusEl.textContent = 'Saved.';
@@ -40,7 +40,7 @@ async function saveMaxParallel() {
 
 async function loadOversightInterval() {
   try {
-    const cfg = await api('/api/env');
+    const cfg = await api(Routes.env.get());
     const input = document.getElementById('oversight-interval-input');
     if (input) input.value = cfg.oversight_interval ?? 0;
   } catch (e) {
@@ -57,7 +57,7 @@ async function saveOversightInterval() {
   input.value = value;
   statusEl.textContent = 'Saving…';
   try {
-    await api('/api/env', { method: 'PUT', body: JSON.stringify({ oversight_interval: value }) });
+    await api(Routes.env.update(), { method: 'PUT', body: JSON.stringify({ oversight_interval: value }) });
     statusEl.textContent = 'Saved.';
     setTimeout(() => { statusEl.textContent = ''; }, 2000);
   } catch (e) {
@@ -69,7 +69,7 @@ async function saveOversightInterval() {
 
 async function loadAutoPush() {
   try {
-    const cfg = await api('/api/env');
+    const cfg = await api(Routes.env.get());
     const checkbox = document.getElementById('auto-push-enabled');
     const thresholdInput = document.getElementById('auto-push-threshold');
     const thresholdRow = document.getElementById('auto-push-threshold-row');
@@ -100,7 +100,7 @@ async function saveAutoPush() {
 
   statusEl.textContent = 'Saving…';
   try {
-    await api('/api/env', {
+    await api(Routes.env.update(), {
       method: 'PUT',
       body: JSON.stringify({ auto_push_enabled: enabled, auto_push_threshold: threshold }),
     });
@@ -185,7 +185,7 @@ async function testSandboxConfig(sandbox) {
   statusEl.textContent = 'Testing…';
 
   try {
-    const resp = await api('/api/env/test', {
+    const resp = await api(Routes.env.test(), {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -257,7 +257,7 @@ async function showEnvConfigEditor(event) {
     sandbox_by_activity: {},
   };
   try {
-    cfg = await api('/api/env');
+    cfg = await api(Routes.env.get());
   } catch (e) {
     safeSetValue('env-config-status', (el) => { el.textContent = 'Failed to load configuration.'; });
     console.error('Failed to load env config:', e);
@@ -297,7 +297,7 @@ async function saveEnvConfig() {
   const statusEl = document.getElementById('env-config-status');
   statusEl.textContent = 'Saving…';
   try {
-    await api('/api/env', { method: 'PUT', body: JSON.stringify(body) });
+    await api(Routes.env.update(), { method: 'PUT', body: JSON.stringify(body) });
     statusEl.textContent = 'Saved.';
     // Clear token inputs after saving so they don't linger in the DOM.
     document.getElementById('env-oauth-token').value = '';

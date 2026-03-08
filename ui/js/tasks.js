@@ -167,10 +167,10 @@ async function createTask() {
     const mount_worktrees = document.getElementById('new-mount-worktrees').checked;
     const sandbox = document.getElementById('new-sandbox').value;
     const sandbox_by_activity = collectSandboxByActivity('new-sandbox-');
-    const newTask = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity }) });
+    const newTask = await api(Routes.tasks.create(), { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity }) });
     const dependsOn = getDepPickerValues('new-depends-on-picker');
     if (dependsOn.length > 0 && newTask && newTask.id) {
-      await api('/api/tasks/' + newTask.id, { method: 'PATCH', body: JSON.stringify({ depends_on: dependsOn }) });
+      await api(task(newTask.id).update(), { method: 'PATCH', body: JSON.stringify({ depends_on: dependsOn }) });
     }
     localStorage.removeItem('wallfacer-new-task-draft');
     hideNewTaskForm();
@@ -230,7 +230,7 @@ function hideNewTaskForm() {
 
 async function updateTaskStatus(id, status) {
   try {
-    await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    await api(task(id).update(), { method: 'PATCH', body: JSON.stringify({ status }) });
     fetchTasks();
   } catch (e) {
     showAlert('Error updating task: ' + e.message);
@@ -239,7 +239,7 @@ async function updateTaskStatus(id, status) {
 
 async function toggleFreshStart(id, freshStart) {
   try {
-    await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ fresh_start: freshStart }) });
+    await api(task(id).update(), { method: 'PATCH', body: JSON.stringify({ fresh_start: freshStart }) });
   } catch (e) {
     showAlert('Error updating task: ' + e.message);
   }
@@ -249,7 +249,7 @@ async function toggleFreshStart(id, freshStart) {
 
 async function deleteTask(id) {
   try {
-    await api(`/api/tasks/${id}`, { method: 'DELETE' });
+    await api(task(id).delete(), { method: 'DELETE' });
     fetchTasks();
   } catch (e) {
     showAlert('Error deleting task: ' + e.message);
@@ -270,7 +270,7 @@ async function submitFeedback() {
   const message = textarea.value.trim();
   if (!message || !currentTaskId) return;
   try {
-    await api(`/api/tasks/${currentTaskId}/feedback`, {
+    await api(task(currentTaskId).feedback(), {
       method: 'POST',
       body: JSON.stringify({ message }),
     });
@@ -285,7 +285,7 @@ async function submitFeedback() {
 async function completeTask() {
   if (!currentTaskId) return;
   try {
-    await api(`/api/tasks/${currentTaskId}/done`, { method: 'POST' });
+    await api(task(currentTaskId).done(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -305,7 +305,7 @@ async function retryTask() {
     if (retryResumeRow && !retryResumeRow.classList.contains('hidden')) {
       body.fresh_start = !document.getElementById('modal-retry-resume').checked;
     }
-    await api(`/api/tasks/${currentTaskId}`, {
+    await api(task(currentTaskId).update(), {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
@@ -321,7 +321,7 @@ async function resumeTask() {
   try {
     const timeoutEl = document.getElementById('modal-resume-timeout');
     const timeout = timeoutEl ? parseInt(timeoutEl.value, 10) || DEFAULT_TASK_TIMEOUT : DEFAULT_TASK_TIMEOUT;
-    await api(`/api/tasks/${currentTaskId}/resume`, {
+    await api(task(currentTaskId).resume(), {
       method: 'POST',
       body: JSON.stringify({ timeout }),
     });
@@ -338,7 +338,7 @@ async function saveResumeOption(resume) {
   if (!currentTaskId) return;
   const statusEl = document.getElementById('modal-edit-status');
   try {
-    await api(`/api/tasks/${currentTaskId}`, {
+    await api(task(currentTaskId).update(), {
       method: 'PATCH',
       body: JSON.stringify({ fresh_start: !resume }),
     });
@@ -364,7 +364,7 @@ function scheduleBacklogSave() {
     const depends_on = getDepPickerValues('modal-edit-depends-on-picker');
     const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on };
     try {
-      await api(`/api/tasks/${currentTaskId}`, {
+      await api(task(currentTaskId).update(), {
         method: 'PATCH',
         body: JSON.stringify(patchBody),
       });
@@ -388,7 +388,7 @@ document.getElementById('modal-edit-timeout').addEventListener('change', schedul
 async function startTask() {
   if (!currentTaskId) return;
   try {
-    await api(`/api/tasks/${currentTaskId}`, { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) });
+    await api(task(currentTaskId).update(), { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -402,7 +402,7 @@ async function cancelTask() {
   if (!currentTaskId) return;
   if (!confirm('Cancel this task? The sandbox will be cleaned up and all prepared changes discarded. History and logs will be preserved.')) return;
   try {
-    await api(`/api/tasks/${currentTaskId}/cancel`, { method: 'POST' });
+    await api(task(currentTaskId).cancel(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -414,7 +414,7 @@ async function cancelTask() {
 
 async function archiveAllDone() {
   try {
-    const result = await api('/api/tasks/archive-done', { method: 'POST' });
+    const result = await api(Routes.tasks.archiveDone(), { method: 'POST' });
     fetchTasks();
   } catch (e) {
     showAlert('Error archiving tasks: ' + e.message);
@@ -424,7 +424,7 @@ async function archiveAllDone() {
 async function archiveTask() {
   if (!currentTaskId) return;
   try {
-    await api(`/api/tasks/${currentTaskId}/archive`, { method: 'POST' });
+    await api(task(currentTaskId).archive(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -435,7 +435,7 @@ async function archiveTask() {
 async function unarchiveTask() {
   if (!currentTaskId) return;
   try {
-    await api(`/api/tasks/${currentTaskId}/unarchive`, { method: 'POST' });
+    await api(task(currentTaskId).unarchive(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -447,7 +447,7 @@ async function unarchiveTask() {
 
 async function quickDoneTask(id) {
   try {
-    await api(`/api/tasks/${id}/done`, { method: 'POST' });
+    await api(task(id).done(), { method: 'POST' });
     fetchTasks();
   } catch (e) {
     showAlert('Error completing task: ' + e.message);
@@ -456,7 +456,7 @@ async function quickDoneTask(id) {
 
 async function quickResumeTask(id, timeout) {
   try {
-    await api(`/api/tasks/${id}/resume`, { method: 'POST', body: JSON.stringify({ timeout }) });
+    await api(task(id).resume(), { method: 'POST', body: JSON.stringify({ timeout }) });
     fetchTasks();
   } catch (e) {
     showAlert('Error resuming task: ' + e.message);
@@ -465,7 +465,7 @@ async function quickResumeTask(id, timeout) {
 
 async function quickRetryTask(id) {
   try {
-    await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'backlog' }) });
+    await api(task(id).update(), { method: 'PATCH', body: JSON.stringify({ status: 'backlog' }) });
     fetchTasks();
   } catch (e) {
     showAlert('Error retrying task: ' + e.message);
@@ -486,7 +486,7 @@ async function runTestTask() {
   if (!currentTaskId) return;
   const criteria = document.getElementById('modal-test-criteria').value.trim();
   try {
-    const res = await api(`/api/tasks/${currentTaskId}/test`, {
+    const res = await api(task(currentTaskId).test(), {
       method: 'POST',
       body: JSON.stringify({ criteria }),
     });
@@ -499,7 +499,7 @@ async function runTestTask() {
 
 async function quickTestTask(id) {
   try {
-    await api(`/api/tasks/${id}/test`, {
+    await api(task(id).test(), {
       method: 'POST',
       body: JSON.stringify({ criteria: '' }),
     });
@@ -513,7 +513,7 @@ async function quickTestTask(id) {
 
 async function syncTask(id) {
   try {
-    await api(`/api/tasks/${id}/sync`, { method: 'POST' });
+    await api(task(id).sync(), { method: 'POST' });
     diffCache.delete(id);
   } catch (e) {
     showAlert('Error syncing task: ' + e.message);
@@ -535,7 +535,7 @@ async function generateMissingTitles() {
 
   try {
     const params = new URLSearchParams({ limit });
-    const res = await api(`/api/tasks/generate-titles?${params}`, { method: 'POST' });
+    const res = await api(Routes.tasks.generateTitles() + '?' + params, { method: 'POST' });
     const { queued, total_without_title, task_ids } = res;
 
     if (queued === 0) {
@@ -573,8 +573,8 @@ async function generateMissingTitles() {
 
     interval = setInterval(() => {
       for (const id of [...pending]) {
-        const task = tasks.find(t => t.id === id);
-        if (task && task.title) {
+        const t = tasks.find(t => t.id === id);
+        if (t && t.title) {
           pending.delete(id);
           succeeded++;
         }
@@ -620,7 +620,7 @@ async function generateMissingOversight() {
 
   try {
     const params = new URLSearchParams({ limit });
-    const res = await api(`/api/tasks/generate-oversight?${params}`, { method: 'POST' });
+    const res = await api(Routes.tasks.generateOversight() + '?' + params, { method: 'POST' });
     const { queued, total_without_oversight, task_ids } = res;
 
     if (queued === 0) {
@@ -667,7 +667,7 @@ async function generateMissingOversight() {
       }
 
       const checks = [...pending].map(id =>
-        api(`/api/tasks/${id}/oversight`).then(o => ({ id, status: o.status })).catch(() => ({ id, status: 'error' }))
+        api(task(id).oversight()).then(o => ({ id, status: o.status })).catch(() => ({ id, status: 'error' }))
       );
       const results = await Promise.all(checks);
       for (const { id, status } of results) {

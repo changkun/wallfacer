@@ -49,7 +49,9 @@ function startTasksStream() {
 
   // Build the stream URL. On reconnect, pass the last received event ID so
   // the server can replay only missed deltas instead of sending a full snapshot.
-  let url = showArchived ? '/api/tasks/stream?include_archived=true' : '/api/tasks/stream';
+  let url = showArchived
+    ? Routes.tasks.stream() + '?include_archived=true'
+    : Routes.tasks.stream();
   if (lastTasksEventId !== null) {
     const sep = url.includes('?') ? '&' : '?';
     url += sep + 'last_event_id=' + encodeURIComponent(lastTasksEventId);
@@ -128,7 +130,9 @@ function startTasksStream() {
 }
 
 async function fetchTasks() {
-  const url = showArchived ? '/api/tasks?include_archived=true' : '/api/tasks';
+  const url = showArchived
+    ? Routes.tasks.list() + '?include_archived=true'
+    : Routes.tasks.list();
   tasks = await api(url);
   scheduleRender();
 }
@@ -218,7 +222,7 @@ function applySandboxByActivity(prefix, values) {
 
 async function fetchConfig() {
   try {
-    var cfg = await api('/api/config');
+    var cfg = await api(Routes.config.get());
     autopilot = !!cfg.autopilot;
     var toggle = document.getElementById('autopilot-toggle');
     if (toggle) toggle.checked = autopilot;
@@ -245,7 +249,7 @@ async function toggleAutopilot() {
   var toggle = document.getElementById('autopilot-toggle');
   var enabled = toggle ? toggle.checked : !autopilot;
   try {
-    var res = await api('/api/config', { method: 'PUT', body: JSON.stringify({ autopilot: enabled }) });
+    var res = await api(Routes.config.update(), { method: 'PUT', body: JSON.stringify({ autopilot: enabled }) });
     autopilot = !!res.autopilot;
     if (toggle) toggle.checked = autopilot;
   } catch (e) {
@@ -259,7 +263,7 @@ async function toggleAutotest() {
   var toggle = document.getElementById('autotest-toggle');
   var enabled = toggle ? toggle.checked : !autotest;
   try {
-    var res = await api('/api/config', { method: 'PUT', body: JSON.stringify({ autotest: enabled }) });
+    var res = await api(Routes.config.update(), { method: 'PUT', body: JSON.stringify({ autotest: enabled }) });
     autotest = !!res.autotest;
     if (toggle) toggle.checked = autotest;
   } catch (e) {
@@ -273,7 +277,7 @@ async function toggleAutosubmit() {
   var toggle = document.getElementById('autosubmit-toggle');
   var enabled = toggle ? toggle.checked : !autosubmit;
   try {
-    var res = await api('/api/config', { method: 'PUT', body: JSON.stringify({ autosubmit: enabled }) });
+    var res = await api(Routes.config.update(), { method: 'PUT', body: JSON.stringify({ autosubmit: enabled }) });
     autosubmit = !!res.autosubmit;
     if (toggle) toggle.checked = autosubmit;
   } catch (e) {

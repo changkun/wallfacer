@@ -10,7 +10,7 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary build-claude build-codex server run shell clean ui-css test test-backend test-frontend commit-seq push-once
+.PHONY: build build-binary build-claude build-codex server run shell clean ui-css api-contract test test-backend test-frontend commit-seq push-once
 
 # Build the wallfacer binary and both sandbox images.
 build: build-binary build-claude build-codex
@@ -69,6 +69,12 @@ shell:
 		-w /workspace \
 		--entrypoint /bin/bash \
 		$(IMAGE)
+
+# Regenerate derived API artifacts from the contract definition.
+# Run this after editing internal/apicontract/routes.go.
+# Staleness is enforced automatically by the tests in internal/apicontract/generate_test.go.
+api-contract:
+	go run scripts/gen-api-contract.go
 
 # Regenerate the static Tailwind CSS from UI sources (requires Node.js + network).
 # Run this after adding new Tailwind utility classes to ui/index.html or ui/js/*.js.

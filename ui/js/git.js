@@ -2,7 +2,7 @@
 
 function startGitStream() {
   if (gitStatusSource) gitStatusSource.close();
-  gitStatusSource = new EventSource('/api/git/stream');
+  gitStatusSource = new EventSource(Routes.git.stream());
   gitStatusSource.onmessage = function(e) {
     gitRetryDelay = 1000;
     try {
@@ -114,7 +114,7 @@ function closeBranchDropdownOnClick(e) {
 
 async function loadBranchesForDropdown(dropdown, idx, ws) {
   try {
-    const data = await api('/api/git/branches?workspace=' + encodeURIComponent(ws.path));
+    const data = await api(Routes.git.branches() + '?workspace=' + encodeURIComponent(ws.path));
     const current = data.current || ws.branch;
     const branches = data.branches || [];
 
@@ -194,7 +194,7 @@ async function selectBranch(item) {
   item.style.opacity = '0.5';
   item.style.pointerEvents = 'none';
   try {
-    await api('/api/git/checkout', { method: 'POST', body: JSON.stringify({ workspace: ws.path, branch: branch }) });
+    await api(Routes.git.checkout(), { method: 'POST', body: JSON.stringify({ workspace: ws.path, branch: branch }) });
     closeBranchDropdown();
     document.removeEventListener('click', closeBranchDropdownOnClick);
   } catch (e) {
@@ -213,7 +213,7 @@ async function createNewBranch(btn) {
   btn.style.opacity = '0.5';
   btn.style.pointerEvents = 'none';
   try {
-    await api('/api/git/create-branch', { method: 'POST', body: JSON.stringify({ workspace: ws.path, branch: branch }) });
+    await api(Routes.git.createBranch(), { method: 'POST', body: JSON.stringify({ workspace: ws.path, branch: branch }) });
     closeBranchDropdown();
     document.removeEventListener('click', closeBranchDropdownOnClick);
   } catch (e) {
@@ -230,7 +230,7 @@ async function pushWorkspace(btn) {
   btn.disabled = true;
   btn.textContent = '...';
   try {
-    await api('/api/git/push', { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
+    await api(Routes.git.push(), { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
   } catch (e) {
     showAlert('Push failed: ' + e.message + (e.message.includes('non-fast-forward') ? '\n\nTip: Use Sync to rebase onto upstream first.' : ''));
     btn.disabled = false;
@@ -245,7 +245,7 @@ async function syncWorkspace(btn) {
   btn.disabled = true;
   btn.textContent = '...';
   try {
-    await api('/api/git/sync', { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
+    await api(Routes.git.sync(), { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
     // Status stream will update behind_count automatically.
   } catch (e) {
     if (e.message && e.message.includes('rebase conflict')) {
@@ -266,7 +266,7 @@ async function rebaseOnMain(btn) {
   btn.disabled = true;
   btn.textContent = '...';
   try {
-    await api('/api/git/rebase-on-main', { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
+    await api(Routes.git.rebaseOnMain(), { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
     // Status stream will pick up the updated state.
   } catch (e) {
     if (e.message && e.message.includes('rebase conflict')) {

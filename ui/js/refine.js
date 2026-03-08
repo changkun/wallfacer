@@ -101,8 +101,8 @@ async function startRefinement() {
   if (!currentTaskId) return;
 
   // If refinement is already running, ignore the click.
-  const task = tasks.find(t => t.id === currentTaskId);
-  if (task && task.current_refinement && task.current_refinement.status === 'running') return;
+  const currentTask = tasks.find(t => t.id === currentTaskId);
+  if (currentTask && currentTask.current_refinement && currentTask.current_refinement.status === 'running') return;
 
   refineTaskId = currentTaskId;
 
@@ -119,7 +119,7 @@ async function startRefinement() {
 
   try {
     const userInstructions = document.getElementById('refine-user-instructions')?.value.trim() || '';
-    await api(`/api/tasks/${currentTaskId}/refine`, {
+    await api(task(currentTaskId).refine(), {
       method: 'POST',
       body: JSON.stringify({ user_instructions: userInstructions }),
     });
@@ -137,7 +137,7 @@ async function cancelRefinement() {
   if (!refineTaskId) return;
   stopRefineLogStream();
   try {
-    await api(`/api/tasks/${refineTaskId}/refine`, { method: 'DELETE' });
+    await api(task(refineTaskId).refine(), { method: 'DELETE' });
   } catch (e) {
     // Ignore — SSE will reflect the updated state.
   }
@@ -187,7 +187,7 @@ function setRefineLogsMode(mode) {
   renderRefineLogs();
 }
 
-// startRefineLogStream opens a streaming fetch to /api/tasks/{id}/refine/logs
+// startRefineLogStream opens a streaming fetch to the refine/logs endpoint
 // and accumulates chunks into refineRawLogBuffer for pretty/raw rendering.
 function startRefineLogStream(taskId) {
   if (refineLogsAbort) return; // already streaming
@@ -195,7 +195,7 @@ function startRefineLogStream(taskId) {
 
   const decoder = new TextDecoder();
 
-  fetch(`/api/tasks/${taskId}/refine/logs`, { signal: refineLogsAbort.signal })
+  fetch(task(taskId).refineLogs(), { signal: refineLogsAbort.signal })
     .then(async resp => {
       if (resp.status === 204) {
         // Container already done.
@@ -271,7 +271,7 @@ function resetRefinePanel() {
 async function dismissRefinement() {
   if (!currentTaskId) return;
   try {
-    await api(`/api/tasks/${currentTaskId}/refine/dismiss`, { method: 'POST' });
+    await api(task(currentTaskId).refineDismiss(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -295,12 +295,12 @@ async function applyRefinement() {
     const sandboxByActivity = collectSandboxByActivity('modal-edit-sandbox-');
     const timeout = parseInt(document.getElementById('modal-edit-timeout')?.value, 10) || DEFAULT_TASK_TIMEOUT;
     const mountWorktrees = document.getElementById('modal-edit-mount-worktrees')?.checked || false;
-    await api(`/api/tasks/${currentTaskId}`, {
+    await api(task(currentTaskId).update(), {
       method: 'PATCH',
       body: JSON.stringify({ sandbox, sandbox_by_activity: sandboxByActivity, timeout, mount_worktrees: mountWorktrees }),
     });
 
-    await api(`/api/tasks/${currentTaskId}/refine/apply`, {
+    await api(task(currentTaskId).refineApply(), {
       method: 'POST',
       body: JSON.stringify({ prompt: newPrompt }),
     });
@@ -352,9 +352,9 @@ function renderRefineHistory(task) {
 
 // revertToHistoryPrompt loads a previous session's applied prompt into the result textarea.
 function revertToHistoryPrompt(sessionIndex) {
-  const task = tasks.find(t => t.id === currentTaskId);
-  if (!task || !task.refine_sessions) return;
-  const session = task.refine_sessions[sessionIndex];
+  const currentTask = tasks.find(t => t.id === currentTaskId);
+  if (!currentTask || !currentTask.refine_sessions) return;
+  const session = currentTask.refine_sessions[sessionIndex];
   if (!session || !session.result_prompt) return;
 
   const resultTA = document.getElementById('refine-result-prompt');
