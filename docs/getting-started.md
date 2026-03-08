@@ -1,12 +1,13 @@
 # Getting Started
 
-This guide walks through installing Wallfacer, connecting it to a Claude credential, and running your first task.
+This guide walks through installing Wallfacer, connecting it to credentials, and running your first task.
 
 ## Prerequisites
 
 - **Go 1.25+** — [go.dev](https://go.dev/)
 - **Podman** or **Docker** — Wallfacer auto-detects whichever is available
 - **A Claude credential** — either a Claude Pro/Max OAuth token or an Anthropic API key (see below)
+- **Optional Codex credential** — either host Codex auth cache (`~/.codex/auth.json`) or `OPENAI_API_KEY`
 - **Git** — the projects you mount must be git repositories
 
 ## Step 1 — Get a Claude Credential
@@ -83,6 +84,15 @@ You only need to set one of the two credential variables. When both are set, the
 
 > You can also set credentials directly from the web UI under **Settings → API Configuration** — no file editing required.
 
+### Optional: Enable Codex Sandbox
+
+Wallfacer supports two Codex auth modes:
+
+1. **Host auth cache (recommended)**  
+   If `~/.codex/auth.json` exists on your host machine, Wallfacer validates it at startup and enables Codex automatically.
+2. **API key fallback**  
+   Set `OPENAI_API_KEY` in `~/.wallfacer/.env` (or in **Settings → API Configuration**) and run **Test (Codex)** once.
+
 ## Step 5 — Start Wallfacer
 
 Pass the directories of the projects you want to work on:
@@ -136,14 +146,16 @@ All configuration lives in `~/.wallfacer/.env`. The server re-reads this file be
 
 ### OpenAI Codex Variables (Optional)
 
-Requires building the Codex image (`make build-codex`) and selecting the `wallfacer-codex` image per task.
+Requires building the Codex image (`make build-codex`) and selecting Codex as task sandbox.
 
 | Variable | Required | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | yes (for Codex) | OpenAI API key |
+| `OPENAI_API_KEY` | no* | OpenAI API key. Not required when valid host auth cache exists at `~/.codex/auth.json` |
 | `OPENAI_BASE_URL` | no | Custom OpenAI-compatible base URL (default: `https://api.openai.com/v1`) |
 | `CODEX_DEFAULT_MODEL` | no | Default model for Codex tasks (e.g. `codex-mini-latest`) |
 | `CODEX_TITLE_MODEL` | no | Title generation model; falls back to `CODEX_DEFAULT_MODEL` |
+
+\* If host auth cache is unavailable or invalid, `OPENAI_API_KEY` + successful **Test (Codex)** is required.
 
 ### Server Flags
 

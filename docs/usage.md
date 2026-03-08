@@ -125,6 +125,10 @@ Open **Settings** (gear icon) to access:
 - **API Configuration** — credential, base URL, model selection, concurrency limit; changes take effect on the next task run without restarting
 - **Workspace Instructions** — the `AGENTS.md` content for each workspace
 
+Codex availability rules:
+- If host Codex auth cache exists and is valid at `~/.codex/auth.json`, Codex is available automatically.
+- Otherwise configure `OPENAI_API_KEY` and run **Test (Codex)** once in API Configuration.
+
 **WALLFACER_OVERSIGHT_INTERVAL** controls how often (in minutes) the server generates intermediate oversight summaries while a task is running. Set to `0` (default) to generate only when the task completes.
 
 ## Keyboard Shortcuts and Tips
