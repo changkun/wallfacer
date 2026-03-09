@@ -162,13 +162,50 @@ describe('width calculation', () => {
     expect(width).toBe('0.50');
   });
 
-  it('span at 50% of total produces 50.00% width', () => {
-    const total = 1000;
-    const durationMs = 500;
-    const width = Math.max(durationMs / total * 100, 0.5).toFixed(2);
-    expect(width).toBe('50.00');
+    it('span at 50% of total produces 50.00% width', () => {
+      const total = 1000;
+      const durationMs = 500;
+      const width = Math.max(durationMs / total * 100, 0.5).toFixed(2);
+      expect(width).toBe('50.00');
+    });
   });
-});
+
+  describe('formatMs', () => {
+    let ctx;
+    beforeAll(() => {
+      ctx = makeFlameContext().ctx;
+    });
+
+    it('formats < 1s values in ms', () => {
+      const result = vm.runInContext('_flamegraph.formatMs(500)', ctx);
+      expect(result).toBe('500ms');
+    });
+
+    it('formats < 60s values in seconds', () => {
+      const result = vm.runInContext('_flamegraph.formatMs(15000)', ctx);
+      expect(result).toBe('15.0s');
+    });
+
+    it('uses seconds at exactly 60s', () => {
+      const result = vm.runInContext('_flamegraph.formatMs(60000)', ctx);
+      expect(result).toBe('60.0s');
+    });
+
+    it('formats > 60s and <= 60m values in minutes', () => {
+      const result = vm.runInContext('_flamegraph.formatMs(61000)', ctx);
+      expect(result).toBe('1.0min');
+    });
+
+    it('uses minutes at exactly 60m', () => {
+      const result = vm.runInContext('_flamegraph.formatMs(3600000)', ctx);
+      expect(result).toBe('60.0min');
+    });
+
+    it('formats > 60m values in hours', () => {
+      const result = vm.runInContext('_flamegraph.formatMs(3600001)', ctx);
+      expect(result).toBe('1.0h');
+    });
+  });
 
 // ---------------------------------------------------------------------------
 // loadFlamegraph — async behaviour with mocked fetch

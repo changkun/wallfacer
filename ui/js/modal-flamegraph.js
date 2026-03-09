@@ -35,6 +35,8 @@
 
   function formatMs(ms) {
     if (ms < 1000) return ms.toFixed(0) + 'ms';
+    if (ms > 60000 && ms <= 3600000) return (ms / 60000).toFixed(1) + 'min';
+    if (ms > 3600000) return (ms / 3600000).toFixed(1) + 'h';
     return (ms / 1000).toFixed(1) + 's';
   }
 
@@ -475,5 +477,14 @@
 
   window.loadFlamegraph = loadFlamegraph;
   // Expose internals for testing
-  window._flamegraph = { labelHue: labelHue, assignLanes: assignLanes, computePhaseRegions: computePhaseRegions, findPhaseForSpan: findPhaseForSpan, buildCostChart: buildCostChart, spanActivity: spanActivity, ACTIVITY_LABELS: ACTIVITY_LABELS };
+  window._flamegraph = {
+    labelHue: labelHue,
+    formatMs: formatMs,
+    assignLanes: assignLanes,
+    computePhaseRegions: computePhaseRegions,
+    findPhaseForSpan: findPhaseForSpan,
+    buildCostChart: buildCostChart,
+    spanActivity: spanActivity,
+    ACTIVITY_LABELS: ACTIVITY_LABELS,
+  };
 })();
