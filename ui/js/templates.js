@@ -196,6 +196,19 @@ async function openTemplatesManager() {
   await _refreshTemplatesList();
 }
 
+function openTemplatesManagerFromSettings(event) {
+  if (event && typeof event.preventDefault === 'function') {
+    event.preventDefault();
+  }
+  closeSettings();
+  openTemplatesManager().catch(function(err) {
+    if (window.alert) {
+      alert('Failed to open Templates: ' + (err && err.message ? err.message : 'Unknown error'));
+    }
+    console.error('Failed to open templates manager:', err);
+  });
+}
+
 function closeTemplatesManager() {
   var modal = document.getElementById('templates-manager-modal');
   if (!modal) return;
