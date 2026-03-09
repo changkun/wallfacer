@@ -237,6 +237,9 @@ async function fetchConfig() {
     defaultSandboxByActivity = cfg.activity_sandboxes || {};
     sandboxUsable = cfg.sandbox_usable || {};
     sandboxReasons = cfg.sandbox_reasons || {};
+    if (typeof setBrainstormCategories === 'function') {
+      setBrainstormCategories(cfg.ideation_categories || []);
+    }
     populateSandboxSelects();
     // Sync ideation toggle and spinner state.
     if (typeof updateIdeationConfig === 'function') updateIdeationConfig(cfg);

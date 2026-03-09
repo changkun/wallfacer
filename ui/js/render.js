@@ -1,19 +1,18 @@
-// Brainstorm category values — must mirror ideaCategoryPool in internal/runner/ideate.go.
-// Tags matching these strings are rendered with the badge-category style so
-// that category of a brainstorm-generated task card is visually distinct.
-const BRAINSTORM_CATEGORIES = new Set([
-  'product feature',
-  'frontend / UX',
-  'backend / API',
-  'performance optimization',
-  'code quality / refactoring',
-  'test coverage',
-  'developer experience',
-  'security hardening',
-  'observability / debugging',
-  'infrastructure / ops',
-  'data model / storage',
-]);
+// Brainstorm category values are loaded from /api/config (backend authoritative
+// source) so new categories can be added without frontend code changes.
+var BRAINSTORM_CATEGORIES = new Set();
+
+function setBrainstormCategories(values) {
+  BRAINSTORM_CATEGORIES = new Set(
+    Array.isArray(values)
+      ? values.filter(function (value) {
+          return typeof value === 'string' && value.trim() !== '';
+        }).map(function (value) {
+          return value.trim();
+        })
+      : [],
+  );
+}
 
 // --- Dependency badge helpers ---
 

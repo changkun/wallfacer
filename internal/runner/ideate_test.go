@@ -629,12 +629,20 @@ func TestExtractIdeasRejectsPromptEqualsTitle(t *testing.T) {
 		{"title": "Execution Environment Provenance","category": "observability / debugging","prompt": "Execution Environment Provenance"},
 		{"title": "Scheduled Task Auto-Promotion",  "category": "product feature",          "prompt": "Scheduled Task Auto-Promotion"}
 	]`
-	ideas, err := extractIdeas(raw)
+	ideas, rejections, err := extractIdeas(raw)
 	if err == nil {
 		t.Fatalf("expected error when all prompts equal their titles, got %d ideas", len(ideas))
 	}
 	if len(ideas) != 0 {
 		t.Errorf("expected 0 ideas, got %d", len(ideas))
+	}
+	if len(rejections) != 3 {
+		t.Fatalf("expected 3 rejections, got %d", len(rejections))
+	}
+	for _, r := range rejections {
+		if r.Reason != ideaRejectDegenerateTitle {
+			t.Errorf("expected reason %q, got %q", ideaRejectDegenerateTitle, r.Reason)
+		}
 	}
 }
 
@@ -646,7 +654,7 @@ func TestExtractIdeasPartiallyRejectsPromptEqualsTitle(t *testing.T) {
 		{"title": "Fix bug",    "category": "backend / API", "prompt": "Reproduce and fix the nil-pointer in handler/tasks.go:82 by adding a guard before the dereference."},
 		{"title": "Refactor auth","category": "code quality","prompt": "Refactor auth"}
 	]`
-	ideas, err := extractIdeas(raw)
+	ideas, rejections, err := extractIdeas(raw)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -656,6 +664,58 @@ func TestExtractIdeasPartiallyRejectsPromptEqualsTitle(t *testing.T) {
 	if ideas[0].Title != "Fix bug" {
 		t.Errorf("expected surviving idea to be 'Fix bug', got %q", ideas[0].Title)
 	}
+	if len(rejections) != 2 {
+		t.Fatalf("expected 2 rejections, got %d", len(rejections))
+	}
+	if rejections[0].Reason != ideaRejectDegenerateTitle {
+		t.Errorf("expected first rejection reason %q, got %q", ideaRejectDegenerateTitle, rejections[0].Reason)
+	}
+	if rejections[1].Reason != ideaRejectDegenerateTitle {
+		t.Errorf("expected second rejection reason %q, got %q", ideaRejectDegenerateTitle, rejections[1].Reason)
+	}
+}
+
+func TestExtractIdeasReturnsRejectionReasonsAndScores(t *testing.T) {
+	raw := `[
+		{"title": "Low impact", "category": "code quality", "prompt": "Improve lint rules", "impact_score": 40},
+		{"title": "", "category": "test coverage", "prompt": "Write missing tests"},
+		{"title": "Duplicate", "category": "backend / API", "prompt": "Refactor service", "impact_score": 90},
+		{"title": "Duplicate", "category": "backend / API", "prompt": "Rework request validation", "impact_score": 95}
+	]`
+	ideas, rejections, err := extractIdeas(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ideas) != 1 {
+		t.Fatalf("expected 1 valid idea, got %d", len(ideas))
+	}
+	if ideas[0].Title != "Duplicate" {
+		t.Fatalf("expected surviving idea to be 'Duplicate', got %q", ideas[0].Title)
+	}
+	if len(rejections) != 3 {
+		t.Fatalf("expected 3 rejections, got %d", len(rejections))
+	}
+
+	seen := map[string]int{}
+	lowImpactScore := -1
+	for _, rej := range rejections {
+		seen[rej.Reason]++
+		if rej.Reason == ideaRejectLowImpact {
+			lowImpactScore = rej.Score
+		}
+	}
+	if seen[ideaRejectLowImpact] != 1 {
+		t.Fatalf("expected 1 low-impact rejection, got %d", seen[ideaRejectLowImpact])
+	}
+	if seen[ideaRejectEmptyFields] != 1 {
+		t.Fatalf("expected 1 empty-field rejection, got %d", seen[ideaRejectEmptyFields])
+	}
+	if seen[ideaRejectDuplicateTitle] != 1 {
+		t.Fatalf("expected 1 duplicate-title rejection, got %d", seen[ideaRejectDuplicateTitle])
+	}
+	if lowImpactScore != 40 {
+		t.Fatalf("expected low-impact score 40, got %d", lowImpactScore)
+	}
 }
 
 func TestExtractIdeasFromRunOutputFallsBackToPreviousNDJSONResult(t *testing.T) {
@@ -664,7 +724,7 @@ func TestExtractIdeasFromRunOutputFallsBackToPreviousNDJSONResult(t *testing.T) 
 		`{"result":"The background exploration is complete and confirms all three findings. The output JSON was already delivered above.","session_id":"ideate-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.002}`,
 	}, "\n")
 
-	ideas, err := extractIdeasFromRunOutput("", []byte(stream), nil)
+	ideas, _, err := extractIdeasFromRunOutput("", []byte(stream), nil)
 	if err != nil {
 		t.Fatalf("expected fallback to parse ideas from NDJSON stream, got: %v", err)
 	}
@@ -678,7 +738,7 @@ func TestExtractIdeasFromRunOutputFallsBackToPreviousNDJSONResult(t *testing.T) 
 
 func TestExtractIdeasFromRunOutputReturnsErrorWhenNoArrayFound(t *testing.T) {
 	stream := `{"result":"The background exploration is complete and no actions are needed.","session_id":"ideate-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.002}`
-	_, err := extractIdeasFromRunOutput("The background exploration is complete and no actions are needed.", []byte(stream), nil)
+	_, _, err := extractIdeasFromRunOutput("The background exploration is complete and no actions are needed.", []byte(stream), nil)
 	if err == nil {
 		t.Fatal("expected parse error when output contains no JSON array")
 	}
