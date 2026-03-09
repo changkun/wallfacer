@@ -71,23 +71,14 @@ jobs:
           name: go-coverage
           path: coverage.out
 
-      - name: Upload Coverage to Codecov (with token)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.CODECOV_TOKEN != ''
+      - name: Upload Coverage to Codecov
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: codecov/codecov-action@v5
         with:
           files: |
             coverage.out
             coverage-js/lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-      - name: Upload Coverage to Codecov (tokenless fallback)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.CODECOV_TOKEN == ''
-        uses: codecov/codecov-action@v5
-        with:
-          files: |
-            coverage.out
-            coverage-js/lcov.info
           fail_ci_if_error: false
 
       - name: Upload JS Coverage Artifact
