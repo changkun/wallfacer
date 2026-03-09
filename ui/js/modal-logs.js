@@ -163,6 +163,10 @@ function startLogStream(id, seq) {
       oversightData = data;
       oversightFetching = false;
       if (data.status === 'ready') {
+        if (data.phase_count != null) {
+          cardOversightCache.set(id, { phase_count: data.phase_count, phases: data.phases || [] });
+          scheduleRender();
+        }
         logsMode = 'oversight';
         renderLogs();
       }
@@ -189,6 +193,10 @@ function startImplLogFetch(id, seq) {
       oversightData = data;
       oversightFetching = false;
       if (data.status === 'ready') {
+        if (data.phase_count != null) {
+          cardOversightCache.set(id, { phase_count: data.phase_count, phases: data.phases || [] });
+          scheduleRender();
+        }
         logsMode = 'oversight';
         renderLogs();
       }

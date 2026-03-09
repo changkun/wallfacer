@@ -32,6 +32,10 @@ function renderOversightInLogs() {
           if (_modalState.seq !== seq) return;
           oversightData = data;
           oversightFetching = false;
+          if (data && data.status === 'ready' && data.phase_count != null) {
+            cardOversightCache.set(id, { phase_count: data.phase_count, phases: data.phases || [] });
+            scheduleRender();
+          }
           if (logsMode === 'oversight') renderLogs();
         })
         .catch(function(err) {
