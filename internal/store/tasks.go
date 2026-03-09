@@ -182,6 +182,7 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 	s.tasks[task.ID] = task
 	s.events[task.ID] = nil
 	s.nextSeq[task.ID] = 1
+	s.searchIndex[task.ID] = buildIndexEntry(task, "")
 	s.notify(task, false)
 
 	ret := *task
@@ -232,6 +233,7 @@ func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
 	delete(s.tasks, id)
 	delete(s.events, id)
 	delete(s.nextSeq, id)
+	delete(s.searchIndex, id)
 	s.notify(t, true)
 	return nil
 }
@@ -331,6 +333,10 @@ func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) e
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
+	}
+	if entry, ok := s.searchIndex[id]; ok {
+		entry.title = strings.ToLower(title)
+		s.searchIndex[id] = entry
 	}
 	s.notify(t, false)
 	return nil
@@ -536,6 +542,12 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
+	}
+	if prompt != nil {
+		if entry, ok := s.searchIndex[id]; ok {
+			entry.prompt = strings.ToLower(*prompt)
+			s.searchIndex[id] = entry
+		}
 	}
 	s.notify(t, false)
 	return nil
@@ -852,6 +864,10 @@ func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt strin
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	if entry, ok := s.searchIndex[id]; ok {
+		entry.prompt = strings.ToLower(newPrompt)
+		s.searchIndex[id] = entry
+	}
 	s.notify(t, false)
 	return nil
 }
@@ -882,26 +898,35 @@ const snippetPadding = 60
 // tags (joined), and oversight summary text. Search order favours the cheapest
 // fields first. Each task produces at most one result (first matching field).
 // Results are capped at maxSearchResults. Archived tasks are included.
+//
+// All matching is done against the in-memory search index (pre-lowercased text
+// built at startup and kept in sync with mutations), so no per-query disk I/O
+// is required.
 func (s *Store) SearchTasks(_ context.Context, query string) ([]TaskSearchResult, error) {
 	q := strings.ToLower(query)
 
-	// Snapshot task pointers under RLock; oversight reads happen outside the lock.
+	// Snapshot task pointers and their index entries together under a single
+	// RLock. No disk I/O occurs after the lock is released.
 	s.mu.RLock()
-	snapshot := make([]*Task, 0, len(s.tasks))
-	for _, t := range s.tasks {
+	type candidate struct {
+		task  *Task
+		entry indexedTaskText
+	}
+	candidates := make([]candidate, 0, len(s.tasks))
+	for id, t := range s.tasks {
 		cp := *t
-		snapshot = append(snapshot, &cp)
+		candidates = append(candidates, candidate{task: &cp, entry: s.searchIndex[id]})
 	}
 	s.mu.RUnlock()
 
 	results := make([]TaskSearchResult, 0)
-	for _, t := range snapshot {
+	for _, c := range candidates {
 		if len(results) >= maxSearchResults {
 			break
 		}
-		if field, snippet, ok := matchTask(t, q, s); ok {
+		if field, snippet, ok := matchTask(c.task, c.entry, q); ok {
 			results = append(results, TaskSearchResult{
-				Task:         t,
+				Task:         c.task,
 				MatchedField: field,
 				Snippet:      snippet,
 			})
@@ -910,23 +935,23 @@ func (s *Store) SearchTasks(_ context.Context, query string) ([]TaskSearchResult
 	return results, nil
 }
 
-// matchTask checks each field in cheapest-first order. Returns (field, snippet, true)
-// on the first match, or ("", "", false) if nothing matches.
-func matchTask(t *Task, q string, s *Store) (field, snippet string, ok bool) {
-	if idx := strings.Index(strings.ToLower(t.Title), q); idx != -1 {
+// matchTask checks each field in cheapest-first order using pre-lowercased index
+// entries. Returns (field, snippet, true) on the first match, or ("", "", false).
+// Snippet text is taken from the original (non-lowercased) task fields so that
+// the UI output is unchanged.
+func matchTask(t *Task, entry indexedTaskText, q string) (field, snippet string, ok bool) {
+	if idx := strings.Index(entry.title, q); idx != -1 {
 		return "title", buildSnippet(t.Title, idx, len(q)), true
 	}
-	if idx := strings.Index(strings.ToLower(t.Prompt), q); idx != -1 {
+	if idx := strings.Index(entry.prompt, q); idx != -1 {
 		return "prompt", buildSnippet(t.Prompt, idx, len(q)), true
 	}
-	joined := strings.Join(t.Tags, " ")
-	if idx := strings.Index(strings.ToLower(joined), q); idx != -1 {
-		return "tags", buildSnippet(joined, idx, len(q)), true
+	if idx := strings.Index(entry.tags, q); idx != -1 {
+		return "tags", buildSnippet(strings.Join(t.Tags, " "), idx, len(q)), true
 	}
-	// Oversight is the most expensive check (disk read) — always last.
-	if text, err := s.LoadOversightText(t.ID); err == nil && text != "" {
-		if idx := strings.Index(strings.ToLower(text), q); idx != -1 {
-			return "oversight", buildSnippet(text, idx, len(q)), true
+	if entry.oversight != "" {
+		if idx := strings.Index(entry.oversight, q); idx != -1 {
+			return "oversight", buildSnippet(entry.oversightRaw, idx, len(q)), true
 		}
 	}
 	return "", "", false

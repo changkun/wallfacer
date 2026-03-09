@@ -20,9 +20,39 @@ func (s *Store) testOversightPath(taskID uuid.UUID) string {
 	return filepath.Join(s.dir, taskID.String(), "oversight-test.json")
 }
 
-// SaveOversight atomically writes the oversight summary for a task.
+// oversightText concatenates all phase titles and summaries from an oversight
+// object into a single space-separated string suitable for indexing or search.
+func oversightText(o TaskOversight) string {
+	var sb strings.Builder
+	for _, phase := range o.Phases {
+		if phase.Title != "" {
+			sb.WriteString(phase.Title)
+			sb.WriteByte(' ')
+		}
+		if phase.Summary != "" {
+			sb.WriteString(phase.Summary)
+			sb.WriteByte(' ')
+		}
+	}
+	return strings.TrimSpace(sb.String())
+}
+
+// SaveOversight atomically writes the oversight summary for a task and updates
+// the in-memory search index so that subsequent SearchTasks calls reflect the
+// new text without a disk read.
 func (s *Store) SaveOversight(taskID uuid.UUID, oversight TaskOversight) error {
-	return atomicWriteJSON(s.oversightPath(taskID), oversight)
+	if err := atomicWriteJSON(s.oversightPath(taskID), oversight); err != nil {
+		return err
+	}
+	raw := oversightText(oversight)
+	s.mu.Lock()
+	if entry, ok := s.searchIndex[taskID]; ok {
+		entry.oversight = strings.ToLower(raw)
+		entry.oversightRaw = raw
+		s.searchIndex[taskID] = entry
+	}
+	s.mu.Unlock()
+	return nil
 }
 
 // GetOversight reads the oversight summary for a task.
@@ -63,18 +93,7 @@ func (s *Store) LoadOversightText(taskID uuid.UUID) (string, error) {
 	if err := json.Unmarshal(data, &o); err != nil {
 		return "", err
 	}
-	var sb strings.Builder
-	for _, phase := range o.Phases {
-		if phase.Title != "" {
-			sb.WriteString(phase.Title)
-			sb.WriteByte(' ')
-		}
-		if phase.Summary != "" {
-			sb.WriteString(phase.Summary)
-			sb.WriteByte(' ')
-		}
-	}
-	return strings.TrimSpace(sb.String()), nil
+	return oversightText(o), nil
 }
 
 // GetTestOversight reads the test-agent oversight summary for a task.

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,8 +72,10 @@ func TestSearchTasks_MatchTags(t *testing.T) {
 	}
 
 	// Inject tags directly since CreateTask varargs are not exposed through handler.
+	// Also update the search index so SearchTasks picks up the change.
 	s.mu.Lock()
 	s.tasks[task.ID].Tags = []string{"frontend", "search-unique-tag"}
+	s.searchIndex[task.ID] = buildIndexEntry(s.tasks[task.ID], s.searchIndex[task.ID].oversightRaw)
 	s.mu.Unlock()
 
 	results, err := s.SearchTasks(bg(), "search-unique-tag")
@@ -414,3 +417,344 @@ func TestBuildSnippet_NoEllipsis(t *testing.T) {
 	}
 }
 
+// --- Index consistency tests ---
+
+// TestSearchIndex_UpdateTaskTitle verifies the search index is updated when a
+// task's title changes via UpdateTaskTitle.
+func TestSearchIndex_UpdateTaskTitle(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "some prompt", 60, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Title is initially empty; searching for "new-title-xyz" should return nothing.
+	results, err := s.SearchTasks(bg(), "new-title-xyz")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results before title update, got %d", len(results))
+	}
+
+	if err := s.UpdateTaskTitle(bg(), task.ID, "new-title-xyz"); err != nil {
+		t.Fatalf("UpdateTaskTitle: %v", err)
+	}
+
+	results, err = s.SearchTasks(bg(), "new-title-xyz")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result after title update, got %d", len(results))
+	}
+	if results[0].MatchedField != "title" {
+		t.Errorf("expected matched_field=title, got %q", results[0].MatchedField)
+	}
+}
+
+// TestSearchIndex_UpdateTaskBacklog verifies the search index is updated when a
+// task's prompt changes via UpdateTaskBacklog.
+func TestSearchIndex_UpdateTaskBacklog(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "original prompt content", 60, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	newPrompt := "completely-different-backlog-prompt"
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil); err != nil {
+		t.Fatalf("UpdateTaskBacklog: %v", err)
+	}
+
+	// Old prompt must not match.
+	results, err := s.SearchTasks(bg(), "original prompt content")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results for old prompt, got %d", len(results))
+	}
+
+	// New prompt must match.
+	results, err = s.SearchTasks(bg(), "completely-different-backlog-prompt")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result for new prompt, got %d", len(results))
+	}
+	if results[0].MatchedField != "prompt" {
+		t.Errorf("expected matched_field=prompt, got %q", results[0].MatchedField)
+	}
+}
+
+// TestSearchIndex_ApplyRefinement verifies the search index is updated when a
+// task's prompt changes via ApplyRefinement.
+func TestSearchIndex_ApplyRefinement(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "pre-refinement-prompt", 60, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	session := RefinementSession{}
+	if err := s.ApplyRefinement(bg(), task.ID, "post-refinement-prompt", session); err != nil {
+		t.Fatalf("ApplyRefinement: %v", err)
+	}
+
+	// Old prompt must not match.
+	results, err := s.SearchTasks(bg(), "pre-refinement-prompt")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results for old prompt, got %d", len(results))
+	}
+
+	// New prompt must match.
+	results, err = s.SearchTasks(bg(), "post-refinement-prompt")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result for refined prompt, got %d", len(results))
+	}
+	if results[0].MatchedField != "prompt" {
+		t.Errorf("expected matched_field=prompt, got %q", results[0].MatchedField)
+	}
+}
+
+// TestSearchIndex_SaveOversight verifies the search index is updated when
+// oversight is saved via SaveOversight without requiring a store restart.
+func TestSearchIndex_SaveOversight(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "ordinary prompt", 60, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Before saving oversight, the needle must not match.
+	results, err := s.SearchTasks(bg(), "live-oversight-needle")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results before SaveOversight, got %d", len(results))
+	}
+
+	oversight := TaskOversight{
+		Status:      OversightStatusReady,
+		GeneratedAt: time.Now(),
+		Phases: []OversightPhase{
+			{Title: "Phase A", Summary: "live-oversight-needle present here"},
+		},
+	}
+	if err := s.SaveOversight(task.ID, oversight); err != nil {
+		t.Fatalf("SaveOversight: %v", err)
+	}
+
+	// After saving, SearchTasks must find it without a store restart.
+	results, err = s.SearchTasks(bg(), "live-oversight-needle")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result after SaveOversight, got %d", len(results))
+	}
+	if results[0].MatchedField != "oversight" {
+		t.Errorf("expected matched_field=oversight, got %q", results[0].MatchedField)
+	}
+}
+
+// TestSearchIndex_LoadAll verifies that the search index is populated from disk
+// (including oversight) when a Store is opened against an existing data directory.
+func TestSearchIndex_LoadAll(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create a store, populate a task with oversight, then close it.
+	s1, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	task, err := s1.CreateTask(bg(), "loadall-prompt", 60, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	oversight := TaskOversight{
+		Status:      OversightStatusReady,
+		GeneratedAt: time.Now(),
+		Phases: []OversightPhase{
+			{Title: "Boot Phase", Summary: "loadall-oversight-needle here"},
+		},
+	}
+	if err := s1.SaveOversight(task.ID, oversight); err != nil {
+		t.Fatalf("SaveOversight: %v", err)
+	}
+
+	// Open a second Store against the same directory to simulate a server restart.
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore (second): %v", err)
+	}
+
+	results, err := s2.SearchTasks(bg(), "loadall-oversight-needle")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result after reload, got %d", len(results))
+	}
+	if results[0].MatchedField != "oversight" {
+		t.Errorf("expected matched_field=oversight, got %q", results[0].MatchedField)
+	}
+}
+
+// TestSearchIndex_DeleteTask verifies that deleting a task removes its entry
+// from the search index.
+func TestSearchIndex_DeleteTask(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "delete-me-needle", 60, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Confirm it's searchable before deletion.
+	results, err := s.SearchTasks(bg(), "delete-me-needle")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result before delete, got %d", len(results))
+	}
+
+	if err := s.DeleteTask(bg(), task.ID); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+
+	results, err = s.SearchTasks(bg(), "delete-me-needle")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("expected 0 results after delete, got %d", len(results))
+	}
+
+	// Verify the index entry was removed from the map.
+	s.mu.RLock()
+	_, inIndex := s.searchIndex[task.ID]
+	s.mu.RUnlock()
+	if inIndex {
+		t.Error("search index entry should have been removed on DeleteTask")
+	}
+}
+
+// --- Benchmarks ---
+
+// BenchmarkSearchTasks_Indexed measures SearchTasks using the in-memory index.
+// Run with: go test -bench=BenchmarkSearchTasks -benchmem ./internal/store/
+func BenchmarkSearchTasks_Indexed(b *testing.B) {
+	s, err := NewStore(b.TempDir())
+	if err != nil {
+		b.Fatalf("NewStore: %v", err)
+	}
+
+	// Create 200 tasks, half with oversight, to simulate a loaded board.
+	for i := 0; i < 200; i++ {
+		task, err := s.CreateTask(bg(), fmt.Sprintf("benchmark task prompt number %d with various keywords", i), 60, false, "", TaskKindTask)
+		if err != nil {
+			b.Fatalf("CreateTask: %v", err)
+		}
+		if i%2 == 0 {
+			oversight := TaskOversight{
+				Status:      OversightStatusReady,
+				GeneratedAt: time.Now(),
+				Phases: []OversightPhase{
+					{Title: fmt.Sprintf("Phase %d", i), Summary: fmt.Sprintf("oversight summary for task %d with searchable content", i)},
+				},
+			}
+			if err := s.SaveOversight(task.ID, oversight); err != nil {
+				b.Fatalf("SaveOversight: %v", err)
+			}
+		}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := s.SearchTasks(bg(), "keywords"); err != nil {
+			b.Fatalf("SearchTasks: %v", err)
+		}
+	}
+}
+
+// BenchmarkSearchTasks_OversightDisk measures the old search path that reads
+// oversight.json from disk for every candidate on every query. It bypasses the
+// index to serve as a regression baseline. Run alongside BenchmarkSearchTasks_Indexed.
+func BenchmarkSearchTasks_OversightDisk(b *testing.B) {
+	s, err := NewStore(b.TempDir())
+	if err != nil {
+		b.Fatalf("NewStore: %v", err)
+	}
+
+	// Same setup as the indexed benchmark.
+	for i := 0; i < 200; i++ {
+		task, err := s.CreateTask(bg(), fmt.Sprintf("benchmark task prompt number %d with various keywords", i), 60, false, "", TaskKindTask)
+		if err != nil {
+			b.Fatalf("CreateTask: %v", err)
+		}
+		if i%2 == 0 {
+			oversight := TaskOversight{
+				Status:      OversightStatusReady,
+				GeneratedAt: time.Now(),
+				Phases: []OversightPhase{
+					{Title: fmt.Sprintf("Phase %d", i), Summary: fmt.Sprintf("oversight summary for task %d with searchable content", i)},
+				},
+			}
+			if err := s.SaveOversight(task.ID, oversight); err != nil {
+				b.Fatalf("SaveOversight: %v", err)
+			}
+		}
+	}
+
+	// oldMatchTask simulates the pre-index search path with per-query disk reads.
+	oldMatchTask := func(t *Task) (field, snippet string, ok bool) {
+		q := strings.ToLower("keywords")
+		if idx := strings.Index(strings.ToLower(t.Title), q); idx != -1 {
+			return "title", buildSnippet(t.Title, idx, len(q)), true
+		}
+		if idx := strings.Index(strings.ToLower(t.Prompt), q); idx != -1 {
+			return "prompt", buildSnippet(t.Prompt, idx, len(q)), true
+		}
+		joined := strings.Join(t.Tags, " ")
+		if idx := strings.Index(strings.ToLower(joined), q); idx != -1 {
+			return "tags", buildSnippet(joined, idx, len(q)), true
+		}
+		if text, err := s.LoadOversightText(t.ID); err == nil && text != "" {
+			if idx := strings.Index(strings.ToLower(text), q); idx != -1 {
+				return "oversight", buildSnippet(text, idx, len(q)), true
+			}
+		}
+		return "", "", false
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.mu.RLock()
+		snapshot := make([]*Task, 0, len(s.tasks))
+		for _, t := range s.tasks {
+			cp := *t
+			snapshot = append(snapshot, &cp)
+		}
+		s.mu.RUnlock()
+
+		results := make([]TaskSearchResult, 0)
+		for _, t := range snapshot {
+			if len(results) >= maxSearchResults {
+				break
+			}
+			if field, snippet, ok := oldMatchTask(t); ok {
+				results = append(results, TaskSearchResult{Task: t, MatchedField: field, Snippet: snippet})
+			}
+		}
+	}
+}
