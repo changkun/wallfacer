@@ -1,15 +1,24 @@
 // --- Modal lifecycle ---
 
+// Modal lifecycle state — all mutable modal globals live here.
+const _modalState = {
+  seq: 0,
+  taskId: null,
+  abort: null,
+};
+
+function getOpenModalTaskId() { return _modalState.taskId; }
+
 function _isActiveModalLoad(seq, taskId) {
-  return typeof modalLoadSeq !== 'undefined' && modalLoadSeq === seq && currentTaskId === taskId;
+  return _modalState.seq === seq && _modalState.taskId === taskId;
 }
 
 function _beginModalLoad(taskId) {
-  if (typeof modalAbort !== 'undefined' && modalAbort) modalAbort.abort();
-  modalLoadSeq = (typeof modalLoadSeq === 'number' ? modalLoadSeq + 1 : 1);
-  modalAbort = new AbortController();
-  currentTaskId = taskId;
-  return { seq: modalLoadSeq, signal: modalAbort.signal };
+  if (_modalState.abort) _modalState.abort.abort();
+  _modalState.seq += 1;
+  _modalState.abort = new AbortController();
+  _modalState.taskId = taskId;
+  return { seq: _modalState.seq, signal: _modalState.abort.signal };
 }
 
 function _renderModalLoadingPlaceholders() {
@@ -518,7 +527,7 @@ async function openModal(id) {
       try {
         const next = await api(
           `/api/tasks/${taskId}/events?limit=${_EVENTS_LIMIT}&types=${_EVENTS_TYPES}&after=${afterCursor}`,
-          { signal: modalAbort ? modalAbort.signal : undefined }
+          { signal: _modalState.abort ? _modalState.abort.signal : undefined }
         );
         if (!_isActiveModalLoad(loadSeq, taskId)) return;
         btn.remove();
@@ -597,11 +606,8 @@ async function openModal(id) {
 }
 
 function closeModal() {
-  if (typeof modalAbort !== 'undefined' && modalAbort) {
-    modalAbort.abort();
-    modalAbort = null;
-  }
-  modalLoadSeq = (typeof modalLoadSeq === 'number' ? modalLoadSeq + 1 : 1);
+  if (_modalState.abort) { _modalState.abort.abort(); _modalState.abort = null; }
+  _modalState.seq += 1;
   if (logsAbort) {
     logsAbort.abort();
     logsAbort = null;
@@ -633,7 +639,7 @@ function closeModal() {
   document.getElementById('modal-backlog-right').classList.add('hidden');
   document.getElementById('modal-backlog-settings').classList.add('hidden');
   document.getElementById('modal-backlog-edit').classList.add('hidden');
-  currentTaskId = null;
+  _modalState.taskId = null;
   document.querySelector('#modal .modal-card').classList.remove('modal-wide');
   const modalBody = document.getElementById('modal-body');
   modalBody.style.display = '';

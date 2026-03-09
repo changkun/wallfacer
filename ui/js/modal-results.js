@@ -54,8 +54,8 @@ function setLeftTab(tab) {
     if (btn) btn.classList.toggle('active', active);
     if (panel) panel.classList.toggle('hidden', !active);
   });
-  if (typeof currentTaskId !== 'undefined' && currentTaskId) {
-    history.replaceState(null, '', '#' + currentTaskId + '/' + tab);
+  if (getOpenModalTaskId()) {
+    history.replaceState(null, '', '#' + getOpenModalTaskId() + '/' + tab);
   }
 }
 
@@ -444,7 +444,7 @@ function _stopTimelineRefresh() {
 
 // Fetch spans and render the Gantt chart into #modal-timeline-chart.
 function renderTimeline(taskId) {
-  var seq = typeof modalLoadSeq === 'number' ? modalLoadSeq : null;
+  var seq = _modalState.seq;
   var el = document.getElementById('modal-timeline-chart');
   if (!el) return;
   // Only show loading placeholder on first load (avoid flicker on refresh)
@@ -453,14 +453,14 @@ function renderTimeline(taskId) {
   }
   _ensureTimelineStyles();
 
-  var signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+  var signal = _modalState.abort ? _modalState.abort.signal : undefined;
   var req = (typeof api === 'function')
     ? api('/api/tasks/' + taskId + '/spans', { signal: signal })
     : fetch('/api/tasks/' + taskId + '/spans', { signal: signal }).then(function(res) { return res.json(); });
   req
     .then(function(spans) {
-      if (currentTaskId !== taskId) return;
-      if (seq !== null && typeof modalLoadSeq === 'number' && modalLoadSeq !== seq) return;
+      if (getOpenModalTaskId() !== taskId) return;
+      if (_modalState.seq !== seq) return;
       var el2 = document.getElementById('modal-timeline-chart');
       if (!el2) return;
       el2.dataset.loaded = '1';
@@ -469,8 +469,8 @@ function renderTimeline(taskId) {
     })
     .catch(function(err) {
       if (err && err.name === 'AbortError') return;
-      if (currentTaskId !== taskId) return;
-      if (seq !== null && typeof modalLoadSeq === 'number' && modalLoadSeq !== seq) return;
+      if (getOpenModalTaskId() !== taskId) return;
+      if (_modalState.seq !== seq) return;
       var el2 = document.getElementById('modal-timeline-chart');
       if (el2) el2.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:8px 0;">Failed to load timeline.</div>';
     });

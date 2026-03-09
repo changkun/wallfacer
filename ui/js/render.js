@@ -308,8 +308,8 @@ function render() {
 
   // If the modal is open for a backlog task, refresh its refinement panel
   // so live sandbox status updates are reflected without reopening the modal.
-  if (currentTaskId) {
-    const openTask = getRenderableTasks().find(t => t.id === currentTaskId);
+  if (getOpenModalTaskId()) {
+    const openTask = getRenderableTasks().find(t => t.id === getOpenModalTaskId());
     if (openTask && openTask.status === 'backlog') {
       updateRefineUI(openTask);
       renderRefineHistory(openTask);

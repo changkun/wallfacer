@@ -1,8 +1,5 @@
 // --- Global state ---
 let tasks = [];
-let currentTaskId = null;
-let modalLoadSeq = 0;
-let modalAbort = null;
 let logsAbort = null;
 let rawLogBuffer = '';
 // logsMode: 'pretty' | 'raw' | 'oversight'

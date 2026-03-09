@@ -98,13 +98,13 @@ function showRefineIdle(startBtn, cancelBtn, running, resultSec, errorSec) {
 
 // startRefinement is called by the "Start" button.
 async function startRefinement() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
 
   // If refinement is already running, ignore the click.
-  const currentTask = tasks.find(t => t.id === currentTaskId);
+  const currentTask = tasks.find(t => t.id === getOpenModalTaskId());
   if (currentTask && currentTask.current_refinement && currentTask.current_refinement.status === 'running') return;
 
-  refineTaskId = currentTaskId;
+  refineTaskId = getOpenModalTaskId();
 
   // Clear prior log output and reset mode.
   refineRawLogBuffer = '';
@@ -119,7 +119,7 @@ async function startRefinement() {
 
   try {
     const userInstructions = document.getElementById('refine-user-instructions')?.value.trim() || '';
-    await api(task(currentTaskId).refine(), {
+    await api(task(getOpenModalTaskId()).refine(), {
       method: 'POST',
       body: JSON.stringify({ user_instructions: userInstructions }),
     });
@@ -269,9 +269,9 @@ function resetRefinePanel() {
 // dismissRefinement clears the refinement result without applying it, allowing
 // the task to be started with the original prompt.
 async function dismissRefinement() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   try {
-    await api(task(currentTaskId).refineDismiss(), { method: 'POST' });
+    await api(task(getOpenModalTaskId()).refineDismiss(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -281,7 +281,7 @@ async function dismissRefinement() {
 
 // applyRefinement POSTs the (possibly edited) spec as the new task prompt.
 async function applyRefinement() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   const resultTA = document.getElementById('refine-result-prompt');
   const newPrompt = resultTA ? resultTA.value.trim() : '';
   if (!newPrompt) {
@@ -295,18 +295,18 @@ async function applyRefinement() {
     const sandboxByActivity = collectSandboxByActivity('modal-edit-sandbox-');
     const timeout = parseInt(document.getElementById('modal-edit-timeout')?.value, 10) || DEFAULT_TASK_TIMEOUT;
     const mountWorktrees = document.getElementById('modal-edit-mount-worktrees')?.checked || false;
-    await api(task(currentTaskId).update(), {
+    await api(task(getOpenModalTaskId()).update(), {
       method: 'PATCH',
       body: JSON.stringify({ sandbox, sandbox_by_activity: sandboxByActivity, timeout, mount_worktrees: mountWorktrees }),
     });
 
-    await api(task(currentTaskId).refineApply(), {
+    await api(task(getOpenModalTaskId()).refineApply(), {
       method: 'POST',
       body: JSON.stringify({ prompt: newPrompt }),
     });
 
     await fetchTasks();
-    openModal(currentTaskId);
+    openModal(getOpenModalTaskId());
   } catch (e) {
     showAlert('Error applying refinement: ' + e.message);
   }
@@ -352,7 +352,7 @@ function renderRefineHistory(task) {
 
 // revertToHistoryPrompt loads a previous session's applied prompt into the result textarea.
 function revertToHistoryPrompt(sessionIndex) {
-  const currentTask = tasks.find(t => t.id === currentTaskId);
+  const currentTask = tasks.find(t => t.id === getOpenModalTaskId());
   if (!currentTask || !currentTask.refine_sessions) return;
   const session = currentTask.refine_sessions[sessionIndex];
   if (!session || !session.result_prompt) return;

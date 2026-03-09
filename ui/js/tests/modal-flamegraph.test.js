@@ -33,6 +33,7 @@ function makeFlameContext(fetchImpl) {
   const elements = { 'modal-flamegraph-container': container };
 
   const ctx = makeContext({
+    _modalState: { seq: 0, taskId: null, abort: null },
     document: {
       getElementById: (id) => elements[id] || null,
     },
@@ -42,6 +43,7 @@ function makeFlameContext(fetchImpl) {
   });
   // wire window to ctx so IIFE's window.loadFlamegraph assignment works
   ctx.window = ctx;
+  ctx.getOpenModalTaskId = function() { return ctx._modalState.taskId; };
 
   loadScript('time-map.js', ctx);
   loadScript('modal-flamegraph.js', ctx);

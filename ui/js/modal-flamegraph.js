@@ -300,8 +300,8 @@
   function loadFlamegraph(taskId) {
     var container = document.getElementById('modal-flamegraph-container');
     if (!container) return;
-    var seq = typeof modalLoadSeq === 'number' ? modalLoadSeq : null;
-    var signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+    var seq = _modalState.seq;
+    var signal = _modalState.abort ? _modalState.abort.signal : undefined;
 
     container.innerHTML = '<span style="color:var(--text-muted,#888);font-size:12px;">Loading\u2026</span>';
 
@@ -320,8 +320,8 @@
       fetchJson(oversightUrl).catch(function() { return null; }),
       fetchJson(turnUsageUrl).catch(function() { return []; }),
     ]).then(function(results) {
-      if (typeof currentTaskId !== 'undefined' && currentTaskId !== null && currentTaskId !== taskId) return;
-      if (seq !== null && typeof modalLoadSeq === 'number' && modalLoadSeq !== seq) return;
+      if (getOpenModalTaskId() !== null && getOpenModalTaskId() !== taskId) return;
+      if (_modalState.seq !== seq) return;
       var records = results[0];
       var oversightData = results[1];
       var turnUsages = results[2] || [];
