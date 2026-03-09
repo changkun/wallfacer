@@ -44,8 +44,11 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil && ctx.Err() == nil {
-		logger.Runner.Warn("title generation failed", "task", taskID, "error", err,
+	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityTitle})
+	runErr := cmd.Run()
+	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityTitle})
+	if runErr != nil && ctx.Err() == nil {
+		logger.Runner.Warn("title generation failed", "task", taskID, "error", runErr,
 			"stderr", truncate(stderr.String(), 200))
 		return
 	}

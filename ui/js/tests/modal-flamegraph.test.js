@@ -581,3 +581,245 @@ describe('loadFlamegraph oversight integration', () => {
     expect(container.innerHTML).toContain('&mdash;');
   });
 });
+
+// ---------------------------------------------------------------------------
+// spanActivity
+// ---------------------------------------------------------------------------
+describe('spanActivity', () => {
+  let ctx;
+  beforeAll(() => {
+    ctx = makeFlameContext().ctx;
+  });
+
+  it('returns "implementation" for agent_turn:implementation_N', () => {
+    const result = vm.runInContext('_flamegraph.spanActivity("agent_turn:implementation_3")', ctx);
+    expect(result).toBe('implementation');
+  });
+
+  it('returns "testing" for agent_turn:test_N', () => {
+    const result = vm.runInContext('_flamegraph.spanActivity("agent_turn:test_2")', ctx);
+    expect(result).toBe('testing');
+  });
+
+  it('returns "implementation" for legacy agent_turn:agent_turn_N', () => {
+    const result = vm.runInContext('_flamegraph.spanActivity("agent_turn:agent_turn_1")', ctx);
+    expect(result).toBe('implementation');
+  });
+
+  it('returns the label for container_run:* spans', () => {
+    const activities = ['implementation', 'testing', 'title', 'oversight', 'commit_message', 'idea_agent', 'refinement'];
+    activities.forEach((act) => {
+      const result = vm.runInContext(`_flamegraph.spanActivity("container_run:${act}")`, ctx);
+      expect(result).toBe(act);
+    });
+  });
+
+  it('returns "refinement" for refinement phase', () => {
+    const result = vm.runInContext('_flamegraph.spanActivity("refinement:refinement")', ctx);
+    expect(result).toBe('refinement');
+  });
+
+  it('returns empty string for worktree_setup', () => {
+    const result = vm.runInContext('_flamegraph.spanActivity("worktree_setup:worktree_setup")', ctx);
+    expect(result).toBe('');
+  });
+
+  it('returns empty string for commit phase', () => {
+    const result = vm.runInContext('_flamegraph.spanActivity("commit:commit")', ctx);
+    expect(result).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ACTIVITY_LABELS
+// ---------------------------------------------------------------------------
+describe('ACTIVITY_LABELS', () => {
+  let ctx;
+  beforeAll(() => {
+    ctx = makeFlameContext().ctx;
+  });
+
+  it('has entries for all SandboxActivity constants', () => {
+    const required = [
+      'implementation', 'testing', 'refinement', 'title',
+      'oversight', 'commit_message', 'idea_agent',
+    ];
+    required.forEach((key) => {
+      const label = vm.runInContext(`_flamegraph.ACTIVITY_LABELS[${JSON.stringify(key)}]`, ctx);
+      expect(label).toBeTruthy();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildCostChart — all-activities timestamp-based positioning
+// ---------------------------------------------------------------------------
+describe('buildCostChart (timestamp-based)', () => {
+  let ctx;
+  beforeAll(() => {
+    ctx = makeFlameContext().ctx;
+  });
+
+  const globalStartMs = 1000000;
+  const total = 10000; // 10 seconds
+
+  function ts(offsetMs) {
+    return new Date(globalStartMs + offsetMs).toISOString();
+  }
+
+  it('returns empty string for empty turnUsages', () => {
+    const result = vm.runInContext(
+      `_flamegraph.buildCostChart([], [], ${globalStartMs}, ${total})`,
+      ctx
+    );
+    expect(result).toBe('');
+  });
+
+  it('returns empty string when all cost_usd are zero', () => {
+    const usages = JSON.stringify([
+      { sub_agent: 'implementation', cost_usd: 0, timestamp: ts(1000) },
+    ]);
+    const result = vm.runInContext(
+      `_flamegraph.buildCostChart(${usages}, [], ${globalStartMs}, ${total})`,
+      ctx
+    );
+    expect(result).toBe('');
+  });
+
+  it('renders polyline for implementation turns', () => {
+    const usages = JSON.stringify([
+      { sub_agent: 'implementation', cost_usd: 0.01, timestamp: ts(2000) },
+      { sub_agent: 'implementation', cost_usd: 0.02, timestamp: ts(5000) },
+    ]);
+    const result = vm.runInContext(
+      `_flamegraph.buildCostChart(${usages}, [], ${globalStartMs}, ${total})`,
+      ctx
+    );
+    expect(result).toContain('polyline');
+    expect(result).toContain('$0.0300');
+  });
+
+  it('renders all activities: title, oversight, commit_message, idea_agent', () => {
+    const usages = JSON.stringify([
+      { sub_agent: 'title',          cost_usd: 0.001, timestamp: ts(500)  },
+      { sub_agent: 'oversight',      cost_usd: 0.005, timestamp: ts(8000) },
+      { sub_agent: 'commit_message', cost_usd: 0.002, timestamp: ts(9000) },
+      { sub_agent: 'idea_agent',     cost_usd: 0.003, timestamp: ts(3000) },
+    ]);
+    const result = vm.runInContext(
+      `_flamegraph.buildCostChart(${usages}, [], ${globalStartMs}, ${total})`,
+      ctx
+    );
+    expect(result).toContain('polyline');
+    // Total = 0.001 + 0.005 + 0.002 + 0.003 = 0.0110
+    expect(result).toContain('$0.0110');
+  });
+
+  it('positions points by timestamp within global range', () => {
+    // Single turn at midpoint (50%) should produce an xPct near 50.
+    const usages = JSON.stringify([
+      { sub_agent: 'implementation', cost_usd: 0.01, timestamp: ts(5000) },
+    ]);
+    const result = vm.runInContext(
+      `_flamegraph.buildCostChart(${usages}, [], ${globalStartMs}, ${total})`,
+      ctx
+    );
+    // The polyline points should include "50.000%"
+    expect(result).toContain('50.000%');
+  });
+
+  it('renders colored dot markers for each activity', () => {
+    const usages = JSON.stringify([
+      { sub_agent: 'implementation', cost_usd: 0.01, timestamp: ts(2000) },
+      { sub_agent: 'oversight',      cost_usd: 0.01, timestamp: ts(8000) },
+    ]);
+    const result = vm.runInContext(
+      `_flamegraph.buildCostChart(${usages}, [], ${globalStartMs}, ${total})`,
+      ctx
+    );
+    // Should contain SVG circle elements for each data point
+    expect(result).toContain('<circle');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// loadFlamegraph — Activity column integration
+// ---------------------------------------------------------------------------
+describe('loadFlamegraph Activity column', () => {
+  const now = 2000000;
+
+  function makeDispatchFetch(spansResp) {
+    return (url) => {
+      if (url.includes('/oversight')) {
+        return Promise.resolve({ json: () => Promise.resolve(null) });
+      }
+      if (url.includes('/turn-usage')) {
+        return Promise.resolve({ json: () => Promise.resolve([]) });
+      }
+      return Promise.resolve({ json: () => Promise.resolve(spansResp) });
+    };
+  }
+
+  it('shows Activity column header in detail table', async () => {
+    const spans = [
+      {
+        phase: 'container_run', label: 'implementation',
+        started_at: new Date(now).toISOString(),
+        ended_at: new Date(now + 1000).toISOString(),
+        duration_ms: 1000,
+      },
+    ];
+    const { ctx, container } = makeFlameContext(makeDispatchFetch(spans));
+    ctx.loadFlamegraph('task-1');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(container.innerHTML).toContain('Activity');
+  });
+
+  it('shows activity label for container_run:title span', async () => {
+    const spans = [
+      {
+        phase: 'container_run', label: 'title',
+        started_at: new Date(now).toISOString(),
+        ended_at: new Date(now + 500).toISOString(),
+        duration_ms: 500,
+      },
+    ];
+    const { ctx, container } = makeFlameContext(makeDispatchFetch(spans));
+    ctx.loadFlamegraph('task-1');
+    await new Promise((r) => setTimeout(r, 0));
+    // ACTIVITY_LABELS['title'] = 'Title'
+    expect(container.innerHTML).toContain('Title');
+  });
+
+  it('shows activity label for container_run:idea_agent span', async () => {
+    const spans = [
+      {
+        phase: 'container_run', label: 'idea_agent',
+        started_at: new Date(now).toISOString(),
+        ended_at: new Date(now + 800).toISOString(),
+        duration_ms: 800,
+      },
+    ];
+    const { ctx, container } = makeFlameContext(makeDispatchFetch(spans));
+    ctx.loadFlamegraph('task-1');
+    await new Promise((r) => setTimeout(r, 0));
+    // ACTIVITY_LABELS['idea_agent'] = 'Idea Agent'
+    expect(container.innerHTML).toContain('Idea Agent');
+  });
+
+  it('shows dash for worktree_setup span (no activity)', async () => {
+    const spans = [
+      {
+        phase: 'worktree_setup', label: 'worktree_setup',
+        started_at: new Date(now).toISOString(),
+        ended_at: new Date(now + 200).toISOString(),
+        duration_ms: 200,
+      },
+    ];
+    const { ctx, container } = makeFlameContext(makeDispatchFetch(spans));
+    ctx.loadFlamegraph('task-1');
+    await new Promise((r) => setTimeout(r, 0));
+    // Activity cell should show dash for worktree_setup
+    expect(container.innerHTML).toContain('&mdash;');
+  });
+});

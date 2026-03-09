@@ -293,8 +293,11 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil && ctx.Err() == nil {
-		logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err,
+	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityCommitMessage})
+	runErr := cmd.Run()
+	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityCommitMessage})
+	if runErr != nil && ctx.Err() == nil {
+		logger.Runner.Warn("commit message generation failed", "task", taskID, "error", runErr,
 			"stderr", truncate(stderr.String(), 200))
 		return fallback
 	}
@@ -317,6 +320,30 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	if msg == "" {
 		logger.Runner.Warn("commit message generation: blank result", "task", taskID)
 		return fallback
+	}
+
+	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
+		sandboxName := sandbox
+		r.store.AccumulateSubAgentUsage(context.Background(), taskID, store.SandboxActivityCommitMessage, store.TaskUsage{
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+		})
+		if appErr := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+			Turn:                 1,
+			Timestamp:            time.Now().UTC(),
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+			Sandbox:              sandboxName,
+			SubAgent:             store.SandboxActivityCommitMessage,
+		}); appErr != nil {
+			logger.Runner.Warn("commit message: append turn usage failed", "task", taskID, "error", appErr)
+		}
 	}
 
 	return msg
