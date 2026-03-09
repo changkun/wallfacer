@@ -827,3 +827,45 @@ func TestGitSyncWorkspace_RejectsUnknownFields(t *testing.T) {
 		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// TestCollectWorkspaceStatuses_EmptySlice verifies that an empty input returns
+// an empty slice without panicking.
+func TestCollectWorkspaceStatuses_EmptySlice(t *testing.T) {
+	results := collectWorkspaceStatuses([]string{})
+	if len(results) != 0 {
+		t.Errorf("expected empty slice, got len=%d", len(results))
+	}
+}
+
+// TestCollectWorkspaceStatuses_NonGitDir verifies that a plain directory (not a
+// git repo) results in IsGitRepo=false and the slice length equals the input.
+func TestCollectWorkspaceStatuses_NonGitDir(t *testing.T) {
+	dir := t.TempDir() // plain directory, no git init
+	results := collectWorkspaceStatuses([]string{dir})
+	if len(results) != 1 {
+		t.Fatalf("expected slice of length 1, got %d", len(results))
+	}
+	if results[0].IsGitRepo {
+		t.Error("expected IsGitRepo=false for a non-git directory")
+	}
+}
+
+// BenchmarkCollectWorkspaceStatuses measures parallel git status collection
+// across 5 bare git repos to quantify the parallel speedup.
+func BenchmarkCollectWorkspaceStatuses(b *testing.B) {
+	const n = 5
+	dirs := make([]string, n)
+	for i := range dirs {
+		dir := b.TempDir()
+		cmd := exec.Command("git", "init", dir)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			b.Fatalf("git init: %v\n%s", err, out)
+		}
+		dirs[i] = dir
+	}
+
+	b.ResetTimer()
+	for range b.N {
+		collectWorkspaceStatuses(dirs)
+	}
+}

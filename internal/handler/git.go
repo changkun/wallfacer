@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"changkun.de/wallfacer/internal/gitutil"
@@ -17,14 +18,28 @@ import (
 	"github.com/google/uuid"
 )
 
+// collectWorkspaceStatuses fetches git status for all workspaces concurrently,
+// capping parallelism at 4 to avoid overwhelming the system with git subprocesses.
+func collectWorkspaceStatuses(workspaces []string) []gitutil.WorkspaceGitStatus {
+	results := make([]gitutil.WorkspaceGitStatus, len(workspaces))
+	sem := make(chan struct{}, 4) // cap concurrency at 4 git processes
+	var wg sync.WaitGroup
+	for i, ws := range workspaces {
+		wg.Add(1)
+		go func(idx int, path string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[idx] = gitutil.WorkspaceStatus(path)
+		}(i, ws)
+	}
+	wg.Wait()
+	return results
+}
+
 // GitStatus returns git status for every configured workspace.
 func (h *Handler) GitStatus(w http.ResponseWriter, r *http.Request) {
-	workspaces := h.runner.Workspaces()
-	statuses := make([]gitutil.WorkspaceGitStatus, 0, len(workspaces))
-	for _, ws := range workspaces {
-		statuses = append(statuses, gitutil.WorkspaceStatus(ws))
-	}
-	writeJSON(w, http.StatusOK, statuses)
+	writeJSON(w, http.StatusOK, collectWorkspaceStatuses(h.runner.Workspaces()))
 }
 
 // GitStatusStream streams git status for all workspaces as SSE (5-second poll).
@@ -40,12 +55,7 @@ func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 
 	collect := func() []gitutil.WorkspaceGitStatus {
-		workspaces := h.runner.Workspaces()
-		statuses := make([]gitutil.WorkspaceGitStatus, 0, len(workspaces))
-		for _, ws := range workspaces {
-			statuses = append(statuses, gitutil.WorkspaceStatus(ws))
-		}
-		return statuses
+		return collectWorkspaceStatuses(h.runner.Workspaces())
 	}
 
 	send := func(statuses []gitutil.WorkspaceGitStatus) bool {
