@@ -28,6 +28,24 @@ func TestIsConflictOutput(t *testing.T) {
 	}
 }
 
+func TestIsRebaseNeedsMergeOutput(t *testing.T) {
+	cases := []struct {
+		in   string
+		want bool
+	}{
+		{"You have not concluded your merge (MERGE_HEAD exists). Please, commit your changes before you can rebase.", true},
+		{"Another rebase-apply is in progress.", true},
+		{"Cannot rebase: You have uncommitted changes.", false},
+		{"Could not apply commit", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := IsRebaseNeedsMergeOutput(c.in); got != c.want {
+			t.Errorf("IsRebaseNeedsMergeOutput(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}
+
 func TestMergeBase(t *testing.T) {
 	t.Run("returns correct ancestor for diverged branches", func(t *testing.T) {
 		repo := setupRepo(t)
