@@ -182,7 +182,50 @@ describe('attachMentionAutocomplete', () => {
     vi.useFakeTimers();
   });
 
-  it('opens dropdown with ranked matches and inserts selected file', async () => {
+  it('auto-selects first match so Enter/Tab completes without arrow navigation', async () => {
+    const textarea = createElement({
+      selectionStart: 5,
+      value: '@main',
+    });
+    const nodes = [
+      ['new-prompt', textarea],
+      ['modal-edit-prompt', null],
+      ['modal-retry-prompt', null],
+    ];
+    const api = vi.fn().mockResolvedValue({
+      // 'lib/main_test.go' scores higher (basename match), 'src/main/app.go' is path-only.
+      files: ['src/main/app.go', 'README.md', 'lib/main_test.go'],
+    });
+    const ctx = makeContext({ elements: nodes, api });
+    loadScript(ctx, 'mention.js');
+    ctx.attachMentionAutocomplete(textarea);
+
+    const inputHandler = textarea._listeners.input[0];
+    const keyHandler = textarea._listeners.keydown;
+    const blurHandler = textarea._listeners.blur[0];
+
+    await inputHandler();
+    await Promise.resolve();
+    const dropdown = ctx.document.body._children.find((n) => n.classList.contains('mention-dropdown'));
+    expect(dropdown).toBeTruthy();
+
+    // First item should be auto-selected (has mention-item-selected class).
+    const selectedItems = dropdown._children.filter(
+      (item) => item.className && item.className.includes('mention-item-selected'),
+    );
+    expect(selectedItems).toHaveLength(1);
+
+    // Enter without any ArrowDown should complete with the top-ranked file.
+    keyHandler[0]({ key: 'Enter', preventDefault: () => {} });
+    await Promise.resolve();
+    expect(textarea.value).toBe('@lib/main_test.go');
+
+    blurHandler({ type: 'blur' });
+    vi.advanceTimersByTime(150);
+    expect(ctx.document.body._children.includes(dropdown)).toBe(false);
+  });
+
+  it('ArrowDown navigates past the auto-selected first item', async () => {
     const textarea = createElement({
       selectionStart: 5,
       value: '@main',
@@ -201,22 +244,15 @@ describe('attachMentionAutocomplete', () => {
 
     const inputHandler = textarea._listeners.input[0];
     const keyHandler = textarea._listeners.keydown;
-    const blurHandler = textarea._listeners.blur[0];
 
     await inputHandler();
     await Promise.resolve();
-    const dropdown = ctx.document.body._children.find((n) => n.classList.contains('mention-dropdown'));
-    expect(dropdown).toBeTruthy();
-    expect(dropdown._children.some((item) => item.className && item.className.includes('mention-item'))).toBe(true);
 
+    // ArrowDown moves from auto-selected 0 to 1.
     keyHandler[0]({ key: 'ArrowDown', preventDefault: () => {} });
-    keyHandler[0]({ key: 'Enter', preventDefault: () => {} });
+    keyHandler[0]({ key: 'Tab', preventDefault: () => {} });
     await Promise.resolve();
-    expect(textarea.value.startsWith('@')).toBe(true);
-    expect(dropdown.className).toContain('mention-dropdown');
-
-    blurHandler({ type: 'blur' });
-    vi.advanceTimersByTime(150);
-    expect(ctx.document.body._children.includes(dropdown)).toBe(false);
+    // Second-ranked match is the path-only match.
+    expect(textarea.value).toBe('@src/main/app.go');
   });
 });

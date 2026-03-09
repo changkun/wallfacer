@@ -110,6 +110,9 @@ function attachMentionAutocomplete(textarea) {
     }
 
     currentMatches = matches;
+    // Auto-select first item when dropdown opens; clamp when result count shrinks.
+    if (selectedIndex < 0) selectedIndex = 0;
+    selectedIndex = Math.min(selectedIndex, matches.length - 1);
     matches.forEach((file, i) => {
       const item = document.createElement('div');
       item.className = 'mention-item' + (i === selectedIndex ? ' mention-item-selected' : '');
