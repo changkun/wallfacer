@@ -354,6 +354,9 @@ function _cardFingerprint(t, rank) {
     JSON.stringify(t.worktree_paths || {}), displayRank,
     filterQuery,
     (cardOversightCache.get(t.id) || {}).phase_count ?? '',
+    t.max_cost_usd || 0,
+    (t.usage && t.usage.cost_usd) || 0,
+    t.max_input_tokens || 0,
   ].join('\x00');
 }
 
@@ -460,6 +463,12 @@ function updateCard(card, t, rank) {
     ` : ''}
     ${showDiff ? `<div class="diff-block" data-diff><span style="color:var(--text-muted)">loading diff\u2026</span></div>` : ''}
     ${showOversight ? `<details class="card-oversight" onclick="event.stopPropagation()"><summary class="card-oversight-summary">${ocSummary}</summary><div class="card-oversight-body"></div></details>` : ''}
+    ${(t.max_cost_usd > 0 && (t.status === 'in_progress' || t.status === 'waiting')) ? (() => {
+      const spent = (t.usage && t.usage.cost_usd) || 0;
+      const pct = Math.min(100, (spent / t.max_cost_usd) * 100);
+      const color = pct >= 90 ? 'var(--red,#ef4444)' : pct >= 70 ? 'var(--yellow,#f59e0b)' : 'var(--green,#22c55e)';
+      return `<div style="margin-top:4px;height:3px;border-radius:2px;background:var(--border);overflow:hidden;" title="Cost: $${spent.toFixed(4)} of $${t.max_cost_usd.toFixed(2)} budget"><div style="height:100%;width:${pct}%;background:${color};transition:width 0.3s;"></div></div>`;
+    })() : ''}
     ${buildCardActions(t)}
   `;
   if (showOversight) {

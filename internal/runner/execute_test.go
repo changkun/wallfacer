@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1324,5 +1325,119 @@ func TestSyncWorktreesConflictHandedOffToAgent(t *testing.T) {
 	updated, _ := s.GetTask(ctx, task.ID)
 	if updated.Status != "waiting" {
 		t.Fatalf("expected status=waiting after conflict handoff to agent, got %q", updated.Status)
+	}
+}
+
+// TestRunBudgetCostExceededTransitionsToWaiting verifies that when a task's
+// accumulated cost exceeds MaxCostUSD after a turn, the runner transitions it
+// to "waiting" and inserts a system event with budget_exceeded:true.
+func TestRunBudgetCostExceededTransitionsToWaiting(t *testing.T) {
+	repo := setupTestRepo(t)
+	// endTurnOutput reports total_cost_usd=0.001; set MaxCostUSD=0.0005 so
+	// a single turn already exceeds the budget.
+	cmd := fakeCmdScript(t, endTurnOutput, 0)
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Budget cost exceeded test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set a tiny cost budget that will be exceeded by the first turn.
+	maxCost := 0.0005
+	if err := s.UpdateTaskBudget(ctx, task.ID, &maxCost, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	updated2, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated2.Status != "waiting" {
+		t.Fatalf("expected status=waiting when cost budget exceeded, got %q", updated2.Status)
+	}
+
+	// Verify a system event with budget_exceeded:true was inserted.
+	events, err := s.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundBudgetEvent := false
+	for _, ev := range events {
+		if ev.EventType == "system" {
+			var data map[string]any
+			if jsonErr := json.Unmarshal(ev.Data, &data); jsonErr == nil {
+				if exceeded, ok := data["budget_exceeded"]; ok && exceeded == true {
+					foundBudgetEvent = true
+					break
+				}
+			}
+		}
+	}
+	if !foundBudgetEvent {
+		t.Fatal("expected a system event with budget_exceeded:true when cost budget is exceeded")
+	}
+}
+
+// TestRunBudgetTokensExceededTransitionsToWaiting verifies that when a task's
+// accumulated input tokens exceed MaxInputTokens after a turn, the runner
+// transitions it to "waiting" with the correct system event.
+func TestRunBudgetTokensExceededTransitionsToWaiting(t *testing.T) {
+	repo := setupTestRepo(t)
+	// Use a usage output that reports non-zero input tokens.
+	usageOutput := `{"result":"done","session_id":"s1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001,"usage":{"input_tokens":100,"output_tokens":50}}`
+	cmd := fakeCmdScript(t, usageOutput, 0)
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Budget tokens exceeded test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set a tiny token budget (1 token) that will be exceeded by any real turn.
+	maxTokens := 1
+	if err := s.UpdateTaskBudget(ctx, task.ID, nil, &maxTokens); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	updated2, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated2.Status != "waiting" {
+		t.Fatalf("expected status=waiting when token budget exceeded, got %q", updated2.Status)
+	}
+
+	// Verify a system event with budget_exceeded:true was inserted.
+	events, err := s.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundBudgetEvent := false
+	for _, ev := range events {
+		if ev.EventType == "system" {
+			var data map[string]any
+			if jsonErr := json.Unmarshal(ev.Data, &data); jsonErr == nil {
+				if exceeded, ok := data["budget_exceeded"]; ok && exceeded == true {
+					foundBudgetEvent = true
+					break
+				}
+			}
+		}
+	}
+	if !foundBudgetEvent {
+		t.Fatal("expected a system event with budget_exceeded:true when token budget is exceeded")
 	}
 }

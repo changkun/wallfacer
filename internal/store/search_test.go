@@ -463,7 +463,7 @@ func TestSearchIndex_UpdateTaskBacklog(t *testing.T) {
 	}
 
 	newPrompt := "completely-different-backlog-prompt"
-	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 

@@ -167,7 +167,9 @@ async function createTask() {
     const mount_worktrees = document.getElementById('new-mount-worktrees').checked;
     const sandbox = document.getElementById('new-sandbox').value;
     const sandbox_by_activity = collectSandboxByActivity('new-sandbox-');
-    const newTask = await api(Routes.tasks.create(), { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity }) });
+    const max_cost_usd = parseFloat(document.getElementById('new-max-cost-usd').value) || 0;
+    const max_input_tokens = parseInt(document.getElementById('new-max-input-tokens').value, 10) || 0;
+    const newTask = await api(Routes.tasks.create(), { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, max_cost_usd, max_input_tokens }) });
     const dependsOn = getDepPickerValues('new-depends-on-picker');
     if (dependsOn.length > 0 && newTask && newTask.id) {
       await api(task(newTask.id).update(), { method: 'PATCH', body: JSON.stringify({ depends_on: dependsOn }) });
@@ -217,6 +219,10 @@ function hideNewTaskForm() {
   }
   applySandboxByActivity('new-sandbox-', {});
   setActivityOverrideDefaultSandbox('new-sandbox-', (sandboxSelect && sandboxSelect.value) ? sandboxSelect.value : '');
+  const maxCostEl = document.getElementById('new-max-cost-usd');
+  if (maxCostEl) maxCostEl.value = '';
+  const maxTokensEl = document.getElementById('new-max-input-tokens');
+  if (maxTokensEl) maxTokensEl.value = '';
   var depPicker = document.getElementById('new-depends-on-picker');
   if (depPicker) {
     depPicker.querySelector('.dep-picker-list').innerHTML = '';
@@ -363,7 +369,11 @@ function scheduleBacklogSave() {
     const sandbox = document.getElementById('modal-edit-sandbox').value;
     const sandbox_by_activity = collectSandboxByActivity('modal-edit-sandbox-');
     const depends_on = getDepPickerValues('modal-edit-depends-on-picker');
-    const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on };
+    const maxCostEl = document.getElementById('modal-edit-max-cost-usd');
+    const maxTokensEl = document.getElementById('modal-edit-max-input-tokens');
+    const max_cost_usd = maxCostEl ? (parseFloat(maxCostEl.value) || 0) : undefined;
+    const max_input_tokens = maxTokensEl ? (parseInt(maxTokensEl.value, 10) || 0) : undefined;
+    const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on, max_cost_usd, max_input_tokens };
     try {
       await api(task(currentTaskId).update(), {
         method: 'PATCH',
@@ -408,6 +418,42 @@ async function cancelTask() {
     fetchTasks();
   } catch (e) {
     showAlert('Error cancelling task: ' + e.message);
+  }
+}
+
+// --- Budget limit raise (waiting tasks) ---
+
+// openRaiseLimitInline: shows a small inline form for adjusting budget limits
+// on a task that was paused due to a budget guardrail.
+async function openRaiseLimitInline() {
+  if (!currentTaskId) return;
+  const task = tasks.find(t => t.id === currentTaskId);
+  if (!task) return;
+  const banner = document.getElementById('modal-budget-exceeded-banner');
+  if (!banner) return;
+
+  const newCost = prompt(
+    'New cost limit in USD (0 = unlimited):\nCurrent limit: ' + (task.max_cost_usd > 0 ? '$' + task.max_cost_usd.toFixed(2) : 'none'),
+    task.max_cost_usd > 0 ? String(task.max_cost_usd) : ''
+  );
+  if (newCost === null) return; // cancelled
+  const newTokens = prompt(
+    'New input token limit (0 = unlimited):\nCurrent limit: ' + (task.max_input_tokens > 0 ? task.max_input_tokens.toLocaleString() : 'none'),
+    task.max_input_tokens > 0 ? String(task.max_input_tokens) : ''
+  );
+  if (newTokens === null) return; // cancelled
+
+  try {
+    await api(Routes.tasks.update(currentTaskId), {
+      method: 'PATCH',
+      body: JSON.stringify({
+        max_cost_usd: parseFloat(newCost) || 0,
+        max_input_tokens: parseInt(newTokens, 10) || 0,
+      }),
+    });
+    fetchTasks();
+  } catch (e) {
+    showAlert('Error updating budget: ' + e.message);
   }
 }
 
