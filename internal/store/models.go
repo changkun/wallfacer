@@ -223,6 +223,24 @@ func (t *Task) HasTag(tag string) bool {
 	return false
 }
 
+// TaskSummary is an immutable snapshot written exactly once when a task
+// transitions to TaskStatusDone. It captures the final cost, usage breakdown,
+// and key metadata so that analytics endpoints can avoid re-reading the full
+// task.json for completed tasks.
+type TaskSummary struct {
+	TaskID          uuid.UUID            `json:"task_id"`
+	Title           string               `json:"title"`
+	Status          TaskStatus           `json:"status"`
+	CompletedAt     time.Time            `json:"completed_at"`
+	CreatedAt       time.Time            `json:"created_at"`
+	DurationSeconds float64              `json:"duration_seconds"`
+	TotalTurns      int                  `json:"total_turns"`
+	TotalCostUSD    float64              `json:"total_cost_usd"`
+	ByActivity      map[string]TaskUsage `json:"by_activity"`
+	TestResult      string               `json:"test_result"`
+	PhaseCount      int                  `json:"phase_count"`
+}
+
 // TaskSearchResult wraps a Task with search match metadata.
 type TaskSearchResult struct {
 	*Task

@@ -39,6 +39,22 @@ func (h *Handler) SearchTasks(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, results)
 }
 
+// ListSummaries returns all immutable task summaries (one per completed task).
+// Unlike ListTasks, it reads summary.json files directly without loading the
+// full task.json, making it efficient for cost dashboards and analytics.
+// Tasks that completed before summary.json was introduced are omitted.
+func (h *Handler) ListSummaries(w http.ResponseWriter, r *http.Request) {
+	summaries, err := h.store.ListSummaries()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if summaries == nil {
+		summaries = []store.TaskSummary{}
+	}
+	writeJSON(w, http.StatusOK, summaries)
+}
+
 // ListTasks returns all tasks, optionally including archived ones.
 func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	includeArchived := r.URL.Query().Get("include_archived") == "true"

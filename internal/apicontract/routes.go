@@ -251,6 +251,12 @@ var Routes = []Route{
 		Description: "Archive all tasks in the done state.",
 		Tags:        []string{"tasks"},
 	},
+	{
+		Method: "GET", Pattern: "/api/tasks/summaries", Name: "ListSummaries",
+		JSName:      "summaries",
+		Description: "List immutable task summaries for completed tasks (cost dashboard, no full task.json read).",
+		Tags:        []string{"tasks", "stats"},
+	},
 
 	// --- Task instance operations (require {id}) ---
 

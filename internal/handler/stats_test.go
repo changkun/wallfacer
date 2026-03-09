@@ -8,6 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
+// noSummary is a loadSummary stub that always returns (nil, nil), simulating
+// the backward-compatible behaviour when no summary.json exists.
+func noSummary(_ uuid.UUID) (*store.TaskSummary, error) { return nil, nil }
+
 func TestAggregateStats(t *testing.T) {
 	now := time.Now().UTC()
 
@@ -89,7 +93,7 @@ func TestAggregateStats(t *testing.T) {
 		},
 	}
 
-	resp := aggregateStats(tasks)
+	resp := aggregateStats(tasks, noSummary)
 
 	// --- TotalCostUSD ---
 	wantTotal := 0.10 + 0.04 + 0.20 + 0.01 + 0.005
@@ -229,5 +233,93 @@ func TestAggregateStats(t *testing.T) {
 	// Task 1 is created today — its cost should appear in DailyUsage[29].
 	if diff := resp.DailyUsage[29].CostUSD - 0.10; diff > 1e-9 || diff < -1e-9 {
 		t.Errorf("DailyUsage[29].CostUSD = %v, want 0.10 (task 1 today)", resp.DailyUsage[29].CostUSD)
+	}
+}
+
+// TestAggregateStats_SummaryFallback verifies that aggregateStats uses a
+// summary's ByActivity and TotalCostUSD for done tasks when a summary is
+// available, while still accumulating live data for non-done tasks.
+func TestAggregateStats_SummaryFallback(t *testing.T) {
+	now := time.Now().UTC()
+
+	doneID := uuid.New()
+	inProgID := uuid.New()
+
+	tasks := []store.Task{
+		{
+			ID:        doneID,
+			Title:     "Done task",
+			Status:    store.TaskStatusDone,
+			CreatedAt: now,
+			Usage: store.TaskUsage{
+				InputTokens:  1000,
+				OutputTokens: 500,
+				CostUSD:      0.10, // will be overridden by summary
+			},
+			UsageBreakdown: map[string]store.TaskUsage{
+				"implementation": {InputTokens: 1000, OutputTokens: 500, CostUSD: 0.10},
+			},
+		},
+		{
+			ID:        inProgID,
+			Title:     "In-progress task",
+			Status:    store.TaskStatusInProgress,
+			CreatedAt: now,
+			Usage: store.TaskUsage{
+				InputTokens:  200,
+				OutputTokens: 100,
+				CostUSD:      0.05,
+			},
+			UsageBreakdown: map[string]store.TaskUsage{
+				"implementation": {InputTokens: 200, OutputTokens: 100, CostUSD: 0.05},
+			},
+		},
+	}
+
+	// Summary for the done task with different ByActivity (e.g. after re-calc).
+	summaryByActivity := map[string]store.TaskUsage{
+		"implementation": {InputTokens: 800, OutputTokens: 400, CostUSD: 0.08},
+		"oversight":      {InputTokens: 200, OutputTokens: 100, CostUSD: 0.02},
+	}
+	summaryTotalCost := 0.10 // same total, different breakdown
+
+	loadSummary := func(id uuid.UUID) (*store.TaskSummary, error) {
+		if id == doneID {
+			return &store.TaskSummary{
+				TaskID:       doneID,
+				Status:       store.TaskStatusDone,
+				TotalCostUSD: summaryTotalCost,
+				ByActivity:   summaryByActivity,
+			}, nil
+		}
+		return nil, nil // no summary for in-progress task
+	}
+
+	resp := aggregateStats(tasks, loadSummary)
+
+	// Total cost: summary's 0.10 + in-prog's 0.05 = 0.15
+	wantTotal := 0.15
+	if diff := resp.TotalCostUSD - wantTotal; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("TotalCostUSD = %v, want %v", resp.TotalCostUSD, wantTotal)
+	}
+
+	// ByActivity should reflect the summary's breakdown for the done task
+	// plus the live breakdown for the in-progress task.
+	// implementation: summary 0.08 + in-prog 0.05 = 0.13
+	wantImplCost := 0.08 + 0.05
+	implStat := resp.ByActivity["implementation"]
+	if diff := implStat.CostUSD - wantImplCost; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByActivity[implementation].CostUSD = %v, want %v", implStat.CostUSD, wantImplCost)
+	}
+	// oversight: 0.02 (from summary only)
+	oversightStat := resp.ByActivity["oversight"]
+	if diff := oversightStat.CostUSD - 0.02; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByActivity[oversight].CostUSD = %v, want 0.02", oversightStat.CostUSD)
+	}
+
+	// In-progress token totals still come from live task.Usage.
+	wantInputTokens := 1000 + 200 // done task.Usage.InputTokens + in-prog.Usage.InputTokens
+	if resp.TotalInputTokens != wantInputTokens {
+		t.Errorf("TotalInputTokens = %d, want %d", resp.TotalInputTokens, wantInputTokens)
 	}
 }

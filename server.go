@@ -376,6 +376,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"GenerateMissingOversight": h.GenerateMissingOversight,
 		"SearchTasks":              h.SearchTasks,
 		"ArchiveAllDone":           h.ArchiveAllDone,
+		"ListSummaries":            h.ListSummaries,
 
 		// Task instance operations (UUID extracted via withID).
 		"UpdateTask":    withID(h.UpdateTask),
