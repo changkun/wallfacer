@@ -125,7 +125,6 @@ function renderTestResultsFromEvents(results) {
     tabId: 'left-tab-testing',
     listId: 'modal-test-results-list',
     entryPrefix: 'test-result-entry-',
-    autoSwitch: results && results.length > 0,
   });
 }
 
