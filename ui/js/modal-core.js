@@ -236,6 +236,39 @@ async function openModal(id) {
     usageSection.classList.add('hidden');
   }
 
+  // Execution environment provenance section
+  const envSection = document.getElementById('modal-environment-section');
+  if (envSection) {
+    const envData = task.environment;
+    if (envData) {
+      const envList = document.getElementById('modal-environment-list');
+      if (envList) {
+        function _envRow(label, valueHtml) {
+          return '<dt style="color:var(--text-muted);white-space:nowrap;">' + label + '</dt>' +
+                 '<dd style="margin:0;color:var(--text-secondary);">' + valueHtml + '</dd>';
+        }
+        const digestShort = envData.container_digest ? escapeHtml(envData.container_digest.slice(0, 12)) : '';
+        const containerVal = envData.container_image
+          ? escapeHtml(envData.container_image) + (digestShort ? ' <code style="font-size:10px;font-family:monospace;">' + digestShort + '</code>' : '')
+          : '<em style="color:var(--text-muted);">(unknown)</em>';
+        const instrShort = envData.instructions_hash ? envData.instructions_hash.slice(0, 12) : '';
+        const apiEndpoint = envData.api_base_url ? escapeHtml(envData.api_base_url) : '<em style="color:var(--text-muted);">(default)</em>';
+        const recordedStr = envData.recorded_at ? escapeHtml(timeAgo(envData.recorded_at)) : '';
+        const rows = [
+          _envRow('Model', escapeHtml(envData.model_name || '(unknown)')),
+          _envRow('Container', containerVal),
+          instrShort ? _envRow('Instructions SHA-256', '<code style="font-size:10px;font-family:monospace;">' + escapeHtml(instrShort) + '</code>') : '',
+          _envRow('API endpoint', apiEndpoint),
+          recordedStr ? _envRow('Recorded', recordedStr) : '',
+        ].filter(Boolean);
+        envList.innerHTML = rows.join('');
+      }
+      envSection.classList.remove('hidden');
+    } else {
+      envSection.classList.add('hidden');
+    }
+  }
+
   const feedbackSection = document.getElementById('modal-feedback-section');
   feedbackSection.classList.toggle('hidden', task.status !== 'waiting');
   // Reset test sub-section each time the modal opens.

@@ -20,6 +20,18 @@ type TaskUsage struct {
 	CostUSD              float64 `json:"cost_usd"`
 }
 
+// ExecutionEnvironment captures the runtime environment used for a task execution.
+// It is recorded once at the start of Run() and stored alongside the task for
+// reproducibility auditing and debugging when results differ between runs.
+type ExecutionEnvironment struct {
+	ContainerImage   string    `json:"container_image"`   // e.g. "wallfacer-sandbox"
+	ContainerDigest  string    `json:"container_digest"`  // sha256 of image, empty if unavailable
+	ModelName        string    `json:"model_name"`        // e.g. "claude-opus-4-6"
+	APIBaseURL       string    `json:"api_base_url"`      // empty string = default Anthropic endpoint
+	InstructionsHash string    `json:"instructions_hash"` // sha256 hex of CLAUDE.md at run start
+	RecordedAt       time.Time `json:"recorded_at"`
+}
+
 // TurnUsageRecord captures token consumption and stop reason for a single agent turn.
 type TurnUsageRecord struct {
 	Turn                 int       `json:"turn"`
@@ -198,7 +210,9 @@ type Task struct {
 	// UsageBreakdown tracks token/cost per sub-agent activity (e.g. "implementation",
 	// "test", "title", "oversight", "oversight-test", "refinement").
 	UsageBreakdown map[string]TaskUsage `json:"usage_breakdown,omitempty"`
-	Position       int                  `json:"position"`
+	// Environment records the runtime environment captured at the start of execution.
+	Environment *ExecutionEnvironment `json:"environment,omitempty"`
+	Position    int                   `json:"position"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 

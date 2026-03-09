@@ -40,11 +40,11 @@ func fakeStatefulCmd(t *testing.T, outputs []string) string {
 		t.Fatal(err)
 	}
 
-	// The script skips "rm" and "kill" subcommands and uses a counter to
-	// select the output file on each real invocation.
+	// The script skips "rm", "kill", and "inspect" subcommands and uses a counter
+	// to select the output file on each real "run" invocation.
 	script := fmt.Sprintf(`#!/bin/sh
 case "$1" in
-  rm|kill) exit 0 ;;
+  rm|kill|inspect|ps) exit 0 ;;
 esac
 count=$(cat %s 2>/dev/null || echo 0)
 outfile=%s/out${count}.txt

@@ -1322,6 +1322,9 @@ func TestUpdateTaskScheduledAt_NotFound(t *testing.T) {
 	future := time.Now().Add(time.Hour)
 	if err := s.UpdateTaskScheduledAt(bg(), uuid.New(), &future); err == nil {
 		t.Error("expected error for unknown task")
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Soft-delete / restore / purge
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1498,5 +1501,111 @@ func TestStorePersistsTombstone(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("tombstoned task not found in ListDeletedTasks after reload")	}
+		t.Error("tombstoned task not found in ListDeletedTasks after reload")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UpdateTaskEnvironment
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestUpdateTaskEnvironment_RoundTrip(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "env test", 60, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	recorded := time.Date(2026, 3, 9, 12, 0, 0, 0, time.UTC)
+	env := ExecutionEnvironment{
+		ContainerImage:   "wallfacer-sandbox:latest",
+		ContainerDigest:  "sha256:abc123def456",
+		ModelName:        "claude-opus-4-6",
+		APIBaseURL:       "https://api.example.com",
+		InstructionsHash: "deadbeef01234567deadbeef01234567deadbeef01234567deadbeef01234567",
+		RecordedAt:       recorded,
+	}
+
+	if err := s.UpdateTaskEnvironment(bg(), task.ID, env); err != nil {
+		t.Fatalf("UpdateTaskEnvironment: %v", err)
+	}
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+
+	if got.Environment == nil {
+		t.Fatal("Environment should not be nil after UpdateTaskEnvironment")
+	}
+	if got.Environment.ContainerImage != env.ContainerImage {
+		t.Errorf("ContainerImage = %q, want %q", got.Environment.ContainerImage, env.ContainerImage)
+	}
+	if got.Environment.ContainerDigest != env.ContainerDigest {
+		t.Errorf("ContainerDigest = %q, want %q", got.Environment.ContainerDigest, env.ContainerDigest)
+	}
+	if got.Environment.ModelName != env.ModelName {
+		t.Errorf("ModelName = %q, want %q", got.Environment.ModelName, env.ModelName)
+	}
+	if got.Environment.APIBaseURL != env.APIBaseURL {
+		t.Errorf("APIBaseURL = %q, want %q", got.Environment.APIBaseURL, env.APIBaseURL)
+	}
+	if got.Environment.InstructionsHash != env.InstructionsHash {
+		t.Errorf("InstructionsHash = %q, want %q", got.Environment.InstructionsHash, env.InstructionsHash)
+	}
+	if !got.Environment.RecordedAt.Equal(env.RecordedAt) {
+		t.Errorf("RecordedAt = %v, want %v", got.Environment.RecordedAt, env.RecordedAt)
+	}
+}
+
+func TestUpdateTaskEnvironment_PersistsAcrossLoad(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	task, err := s.CreateTask(bg(), "persist test", 60, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	env := ExecutionEnvironment{
+		ContainerImage: "wallfacer:test",
+		ModelName:      "claude-sonnet-4",
+		RecordedAt:     time.Now().Truncate(time.Second),
+	}
+	if err := s.UpdateTaskEnvironment(bg(), task.ID, env); err != nil {
+		t.Fatalf("UpdateTaskEnvironment: %v", err)
+	}
+	s.Close()
+
+	// Reload from disk.
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore (reload): %v", err)
+	}
+	defer s2.Close()
+
+	got, err := s2.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after reload: %v", err)
+	}
+	if got.Environment == nil {
+		t.Fatal("Environment should not be nil after reload")
+	}
+	if got.Environment.ContainerImage != env.ContainerImage {
+		t.Errorf("ContainerImage = %q, want %q after reload", got.Environment.ContainerImage, env.ContainerImage)
+	}
+	if got.Environment.ModelName != env.ModelName {
+		t.Errorf("ModelName = %q, want %q after reload", got.Environment.ModelName, env.ModelName)
+	}
+}
+
+func TestUpdateTaskEnvironment_NotFound(t *testing.T) {
+	s := newTestStore(t)
+	err := s.UpdateTaskEnvironment(bg(), uuid.New(), ExecutionEnvironment{})
+	if err == nil {
+		t.Error("expected error for unknown task ID")
+	}
 }
