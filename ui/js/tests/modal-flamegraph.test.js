@@ -860,3 +860,217 @@ describe('loadFlamegraph Activity column', () => {
     expect(container.innerHTML).toContain('&mdash;');
   });
 });
+
+// ---------------------------------------------------------------------------
+// mergeIntervals
+// ---------------------------------------------------------------------------
+describe('mergeIntervals', () => {
+  let ctx;
+  beforeAll(() => {
+    ctx = makeFlameContext().ctx;
+  });
+
+  it('returns [] for empty input', () => {
+    const result = vm.runInContext('_flamegraph.mergeIntervals([])', ctx);
+    expect(result).toEqual([]);
+  });
+
+  it('returns single interval unchanged', () => {
+    const result = vm.runInContext(
+      '_flamegraph.mergeIntervals([{start: 10, end: 50}])',
+      ctx
+    );
+    expect(result).toEqual([{ start: 10, end: 50 }]);
+  });
+
+  it('merges overlapping intervals', () => {
+    const result = vm.runInContext(
+      '_flamegraph.mergeIntervals([{start: 0, end: 100}, {start: 50, end: 150}])',
+      ctx
+    );
+    expect(result).toEqual([{ start: 0, end: 150 }]);
+  });
+
+  it('keeps non-overlapping intervals separate', () => {
+    const result = vm.runInContext(
+      '_flamegraph.mergeIntervals([{start: 0, end: 100}, {start: 200, end: 300}])',
+      ctx
+    );
+    expect(result).toEqual([{ start: 0, end: 100 }, { start: 200, end: 300 }]);
+  });
+
+  it('merges adjacent intervals (touching boundaries)', () => {
+    const result = vm.runInContext(
+      '_flamegraph.mergeIntervals([{start: 0, end: 100}, {start: 100, end: 200}])',
+      ctx
+    );
+    expect(result).toEqual([{ start: 0, end: 200 }]);
+  });
+
+  it('sorts unsorted input before merging', () => {
+    const result = vm.runInContext(
+      '_flamegraph.mergeIntervals([{start: 200, end: 300}, {start: 0, end: 100}])',
+      ctx
+    );
+    expect(result).toEqual([{ start: 0, end: 100 }, { start: 200, end: 300 }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildTimeMap
+// ---------------------------------------------------------------------------
+describe('buildTimeMap', () => {
+  let ctx;
+  beforeAll(() => {
+    ctx = makeFlameContext().ctx;
+  });
+
+  it('returns linear mapping for empty spans', () => {
+    const result = vm.runInContext(
+      '_flamegraph.buildTimeMap([], 0, 1000)',
+      ctx
+    );
+    expect(result.compressed).toBe(false);
+    expect(result.toPercent(500)).toBeCloseTo(50, 1);
+  });
+
+  it('returns linear mapping when no large gaps exist', () => {
+    // Gap of 20ms is tiny relative to 980ms active time (< 10% threshold)
+    const result = vm.runInContext(`
+      _flamegraph.buildTimeMap([
+        {startMs: 0, endMs: 490, durationMs: 490},
+        {startMs: 510, endMs: 1000, durationMs: 490}
+      ], 0, 1000)
+    `, ctx);
+    expect(result.compressed).toBe(false);
+  });
+
+  it('compresses large idle gaps', () => {
+    const result = vm.runInContext(`
+      _flamegraph.buildTimeMap([
+        {startMs: 0, endMs: 100, durationMs: 100},
+        {startMs: 900, endMs: 1000, durationMs: 100}
+      ], 0, 1000)
+    `, ctx);
+    expect(result.compressed).toBe(true);
+    var pctBefore = result.toPercent(100);
+    var pctAfter = result.toPercent(900);
+    expect(pctAfter - pctBefore).toBeLessThan(20);
+  });
+
+  it('toPercent maps correctly at boundaries', () => {
+    const result = vm.runInContext(`
+      _flamegraph.buildTimeMap([
+        {startMs: 0, endMs: 100, durationMs: 100},
+        {startMs: 900, endMs: 1000, durationMs: 100}
+      ], 0, 1000)
+    `, ctx);
+    expect(result.toPercent(0)).toBeCloseTo(0, 1);
+    expect(result.toPercent(1000)).toBeCloseTo(100, 1);
+  });
+
+  it('fromPercent is inverse of toPercent', () => {
+    const result = vm.runInContext(`
+      _flamegraph.buildTimeMap([
+        {startMs: 0, endMs: 100, durationMs: 100},
+        {startMs: 900, endMs: 1000, durationMs: 100}
+      ], 0, 1000)
+    `, ctx);
+    for (const ms of [0, 50, 100, 950, 1000]) {
+      var pct = result.toPercent(ms);
+      var roundTrip = result.fromPercent(pct);
+      expect(roundTrip).toBeCloseTo(ms, 0);
+    }
+  });
+
+  it('preserves ordering: later time maps to higher percent', () => {
+    const result = vm.runInContext(`
+      _flamegraph.buildTimeMap([
+        {startMs: 0, endMs: 100, durationMs: 100},
+        {startMs: 900, endMs: 1000, durationMs: 100}
+      ], 0, 1000)
+    `, ctx);
+    var prev = -1;
+    for (const ms of [0, 50, 100, 500, 900, 950, 1000]) {
+      var pct = result.toPercent(ms);
+      expect(pct).toBeGreaterThanOrEqual(prev);
+      prev = pct;
+    }
+  });
+
+  it('does not compress gaps smaller than threshold', () => {
+    const result = vm.runInContext(`
+      _flamegraph.buildTimeMap([
+        {startMs: 0, endMs: 500, durationMs: 500},
+        {startMs: 520, endMs: 1000, durationMs: 480}
+      ], 0, 1000)
+    `, ctx);
+    expect(result.compressed).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computePhaseRegions — quality check for poorly distributed timestamps
+// ---------------------------------------------------------------------------
+describe('computePhaseRegions quality check', () => {
+  let ctx;
+  beforeAll(() => {
+    ctx = makeFlameContext().ctx;
+  });
+
+  it('redistributes evenly when one phase covers > 80% and 3+ phases exist', () => {
+    const ts0 = new Date(0).toISOString();
+    const ts1 = new Date(950).toISOString();
+    const ts2 = new Date(970).toISOString();
+    const ts3 = new Date(990).toISOString();
+    const result = vm.runInContext(`
+      _flamegraph.computePhaseRegions([
+        {timestamp: ${JSON.stringify(ts0)}, title: "Phase A", summary: ""},
+        {timestamp: ${JSON.stringify(ts1)}, title: "Phase B", summary: ""},
+        {timestamp: ${JSON.stringify(ts2)}, title: "Phase C", summary: ""},
+        {timestamp: ${JSON.stringify(ts3)}, title: "Phase D", summary: ""}
+      ], 0, 1000)
+    `, ctx);
+    expect(result.length).toBe(4);
+    result.forEach(function(r) {
+      var dur = r.endMs - r.startMs;
+      expect(dur).toBeCloseTo(250, -1);
+    });
+    expect(result[0].title).toBe('Phase A');
+    expect(result[3].title).toBe('Phase D');
+  });
+
+  it('keeps timestamp-based layout when phases are well distributed', () => {
+    const ts0 = new Date(0).toISOString();
+    const ts1 = new Date(250).toISOString();
+    const ts2 = new Date(500).toISOString();
+    const ts3 = new Date(750).toISOString();
+    const result = vm.runInContext(`
+      _flamegraph.computePhaseRegions([
+        {timestamp: ${JSON.stringify(ts0)}, title: "Phase A", summary: ""},
+        {timestamp: ${JSON.stringify(ts1)}, title: "Phase B", summary: ""},
+        {timestamp: ${JSON.stringify(ts2)}, title: "Phase C", summary: ""},
+        {timestamp: ${JSON.stringify(ts3)}, title: "Phase D", summary: ""}
+      ], 0, 1000)
+    `, ctx);
+    expect(result.length).toBe(4);
+    expect(result[0].startMs).toBe(0);
+    expect(result[0].endMs).toBe(250);
+    expect(result[1].startMs).toBe(250);
+    expect(result[1].endMs).toBe(500);
+  });
+
+  it('does not redistribute when only 2 phases (even if one dominates)', () => {
+    const ts0 = new Date(0).toISOString();
+    const ts1 = new Date(950).toISOString();
+    const result = vm.runInContext(`
+      _flamegraph.computePhaseRegions([
+        {timestamp: ${JSON.stringify(ts0)}, title: "Phase A", summary: ""},
+        {timestamp: ${JSON.stringify(ts1)}, title: "Phase B", summary: ""}
+      ], 0, 1000)
+    `, ctx);
+    expect(result.length).toBe(2);
+    expect(result[0].startMs).toBe(0);
+    expect(result[0].endMs).toBe(950);
+  });
+});

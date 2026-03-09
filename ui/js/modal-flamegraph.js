@@ -33,6 +33,136 @@
     });
   }
 
+  // Merge overlapping/adjacent intervals. Input: [{start, end}].
+  function mergeIntervals(intervals) {
+    if (intervals.length === 0) return [];
+    var sorted = intervals.slice().sort(function(a, b) { return a.start - b.start; });
+    var merged = [{ start: sorted[0].start, end: sorted[0].end }];
+    for (var i = 1; i < sorted.length; i++) {
+      var last = merged[merged.length - 1];
+      if (sorted[i].start <= last.end) {
+        if (sorted[i].end > last.end) last.end = sorted[i].end;
+      } else {
+        merged.push({ start: sorted[i].start, end: sorted[i].end });
+      }
+    }
+    return merged;
+  }
+
+  // Build a time mapping that compresses idle gaps between activity spans.
+  // Returns { toPercent(ms), fromPercent(pct), segments, compressed }.
+  // When no gap exceeds the threshold, returns a linear mapping (compressed=false).
+  function buildTimeMap(spans, globalStartMs, globalEndMs) {
+    var totalReal = globalEndMs - globalStartMs;
+    var linearTo = function(ms) {
+      return totalReal > 0 ? Math.max(0, Math.min(100, (ms - globalStartMs) / totalReal * 100)) : 0;
+    };
+    var linearFrom = function(pct) {
+      return globalStartMs + (pct / 100) * totalReal;
+    };
+    var linearMap = { toPercent: linearTo, fromPercent: linearFrom, segments: [], compressed: false };
+
+    if (totalReal <= 0 || !spans || spans.length === 0) return linearMap;
+
+    // Build merged activity intervals
+    var intervals = [];
+    spans.forEach(function(s) {
+      if (s.endMs > s.startMs) intervals.push({ start: s.startMs, end: s.endMs });
+    });
+    if (intervals.length === 0) return linearMap;
+    var merged = mergeIntervals(intervals);
+
+    // Build segments: alternating active and gap
+    var segments = [];
+    if (merged[0].start > globalStartMs) {
+      segments.push({ start: globalStartMs, end: merged[0].start, isGap: true });
+    }
+    for (var i = 0; i < merged.length; i++) {
+      segments.push({ start: merged[i].start, end: merged[i].end, isGap: false });
+      if (i + 1 < merged.length && merged[i].end < merged[i + 1].start) {
+        segments.push({ start: merged[i].end, end: merged[i + 1].start, isGap: true });
+      }
+    }
+    if (merged[merged.length - 1].end < globalEndMs) {
+      segments.push({ start: merged[merged.length - 1].end, end: globalEndMs, isGap: true });
+    }
+
+    // Compute total active time
+    var totalActive = 0;
+    segments.forEach(function(seg) {
+      if (!seg.isGap) totalActive += seg.end - seg.start;
+    });
+    if (totalActive <= 0) return linearMap;
+
+    // Compress gaps longer than 10% of total active time
+    var gapThreshold = totalActive * 0.1;
+    var compressedWeight = totalActive * 0.03;
+    var anyCompressed = false;
+
+    segments.forEach(function(seg) {
+      var dur = seg.end - seg.start;
+      if (seg.isGap && dur > gapThreshold) {
+        seg.visualWeight = compressedWeight;
+        seg.compressed = true;
+        anyCompressed = true;
+      } else {
+        seg.visualWeight = dur;
+        seg.compressed = false;
+      }
+    });
+
+    if (!anyCompressed) return linearMap;
+
+    // Compute cumulative visual positions
+    var totalVisual = 0;
+    segments.forEach(function(seg) { totalVisual += seg.visualWeight; });
+    if (totalVisual <= 0) return linearMap;
+
+    var cumul = 0;
+    segments.forEach(function(seg) {
+      seg.visualStart = cumul;
+      cumul += seg.visualWeight;
+      seg.visualEnd = cumul;
+    });
+
+    function toPercent(ms) {
+      if (ms <= globalStartMs) return 0;
+      if (ms >= globalEndMs) return 100;
+      for (var i = 0; i < segments.length; i++) {
+        var seg = segments[i];
+        if (ms >= seg.start && (ms < seg.end || (i === segments.length - 1 && ms <= seg.end))) {
+          var realDur = seg.end - seg.start;
+          var frac = realDur > 0 ? (ms - seg.start) / realDur : 0;
+          return Math.min(100, (seg.visualStart + frac * seg.visualWeight) / totalVisual * 100);
+        }
+      }
+      return 100;
+    }
+
+    function fromPercent(pct) {
+      if (pct <= 0) return globalStartMs;
+      if (pct >= 100) return globalEndMs;
+      var target = pct / 100 * totalVisual;
+      for (var i = 0; i < segments.length; i++) {
+        var seg = segments[i];
+        if (target >= seg.visualStart && (target < seg.visualEnd || (i === segments.length - 1 && target <= seg.visualEnd))) {
+          var segVisual = seg.visualEnd - seg.visualStart;
+          var frac = segVisual > 0 ? (target - seg.visualStart) / segVisual : 0;
+          return seg.start + frac * (seg.end - seg.start);
+        }
+      }
+      return globalEndMs;
+    }
+
+    return {
+      toPercent: toPercent,
+      fromPercent: fromPercent,
+      segments: segments,
+      compressed: true,
+      totalVisual: totalVisual,
+    };
+  }
+
   function formatMs(ms) {
     if (ms < 1000) return ms.toFixed(0) + 'ms';
     if (ms > 60000 && ms <= 3600000) return (ms / 60000).toFixed(1) + 'min';
@@ -160,6 +290,39 @@
         hue: labelHue(phases[i].title || ''),
       });
     }
+
+    // Quality check: if one phase covers > 80% of the timeline while 3+
+    // phases exist, the timestamps are poorly distributed (e.g. the LLM
+    // generated oversight timestamps that don't reflect the actual execution
+    // timeline). Fall back to even distribution so all phases are visible.
+    if (regions.length >= 3) {
+      var timelineRange = globalEndMs - globalStartMs;
+      if (timelineRange > 0) {
+        var maxDur = 0;
+        regions.forEach(function(r) {
+          var d = r.endMs - r.startMs;
+          if (d > maxDur) maxDur = d;
+        });
+        if (maxDur / timelineRange > 0.8) {
+          regions = [];
+          for (var k = 0; k < phases.length; k++) {
+            var evStart = Math.round(globalStartMs + (k / phases.length) * timelineRange);
+            var evEnd = k + 1 < phases.length
+              ? Math.round(globalStartMs + ((k + 1) / phases.length) * timelineRange)
+              : globalEndMs;
+            if (evStart >= evEnd) continue;
+            regions.push({
+              startMs: evStart,
+              endMs: evEnd,
+              title: phases[k].title || '',
+              summary: phases[k].summary || '',
+              hue: labelHue(phases[k].title || ''),
+            });
+          }
+        }
+      }
+    }
+
     return regions;
   }
 
@@ -191,7 +354,7 @@
   // Build a cumulative cost SVG polyline from all turn-usage records,
   // positioned by their recorded timestamp within [globalStartMs, globalEndMs].
   // Returns an HTML string (SVG element) or empty string if there is no data.
-  function buildCostChart(turnUsages, spans, globalStartMs, total) {
+  function buildCostChart(turnUsages, spans, globalStartMs, total, toPercentFn) {
     if (!turnUsages || turnUsages.length === 0) return '';
 
     // Sort by timestamp ascending.
@@ -209,7 +372,7 @@
       if (cost <= 0) return;
       cumCost += cost;
       var ts = u.timestamp ? new Date(u.timestamp).getTime() : null;
-      var xPct = (ts !== null && total > 0) ? Math.min(100, Math.max(0, (ts - globalStartMs) / total * 100)) : null;
+      var xPct = (ts !== null) ? (toPercentFn ? toPercentFn(ts) : (total > 0 ? Math.min(100, Math.max(0, (ts - globalStartMs) / total * 100)) : null)) : null;
       if (xPct !== null) {
         points.push({ xPct: xPct, cost: cumCost, activity: u.sub_agent || '' });
       }
@@ -330,6 +493,9 @@
       var numLanes = 0;
       assigned.forEach(function(a) { if (a.lane >= numLanes) numLanes = a.lane + 1; });
 
+      // Build time map (compresses idle gaps between activity)
+      var timeMap = buildTimeMap(spans, globalStartMs, globalEndMs);
+
       // Compute oversight phase regions (if oversight data is ready)
       var phaseRegions = [];
       if (oversightData && oversightData.status === 'ready' &&
@@ -341,25 +507,60 @@
       var totalH = AXIS_H + phaseOffset + numLanes * (LANE_H + LANE_GAP);
 
       // Build time axis ticks
-      var tickFractions = [0, 0.25, 0.5, 0.75, 1];
-      var axisHtml = tickFractions.map(function(f) {
-        var pct = (f * 100).toFixed(2);
-        var ms = f * total;
-        var label = formatMs(ms);
-        var align = f === 0 ? 'left' : f === 1 ? 'right' : 'center';
-        var transform = f === 0 ? '' : f === 1 ? 'translateX(-100%)' : 'translateX(-50%)';
-        return '<span style="position:absolute;left:' + pct + '%;font-size:10px;' +
-          'color:var(--text-muted,#888);transform:' + transform + ';' +
-          'text-align:' + align + ';white-space:nowrap;">' +
-          escapeHtml(label) + '</span>';
-      }).join('');
+      var axisHtml = '';
+      if (timeMap.compressed) {
+        // Compressed mode: tick labels show real elapsed time at each visual position
+        var tickFractions = [0, 0.25, 0.5, 0.75, 1];
+        axisHtml = tickFractions.map(function(f) {
+          var pct = (f * 100).toFixed(2);
+          var realMs = timeMap.fromPercent(f * 100) - globalStartMs;
+          var label = formatMs(realMs);
+          var align = f === 0 ? 'left' : f === 1 ? 'right' : 'center';
+          var transform = f === 0 ? '' : f === 1 ? 'translateX(-100%)' : 'translateX(-50%)';
+          return '<span style="position:absolute;left:' + pct + '%;font-size:10px;' +
+            'color:var(--text-muted,#888);transform:' + transform + ';' +
+            'text-align:' + align + ';white-space:nowrap;">' +
+            escapeHtml(label) + '</span>';
+        }).join('');
+
+        // Add hatched break indicators for compressed gaps
+        timeMap.segments.forEach(function(seg) {
+          if (!seg.compressed) return;
+          var gapLeft = timeMap.toPercent(seg.start);
+          var gapRight = timeMap.toPercent(seg.end);
+          var gapWidth = gapRight - gapLeft;
+          if (gapWidth < 0.1) return;
+          var gapDur = formatMs(seg.end - seg.start);
+          axisHtml += '<div title="Idle: ' + escapeHtml(gapDur) + '" style="' +
+            'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
+            'top:0;height:' + (AXIS_H - 1) + 'px;' +
+            'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border,#444) 3px,var(--border,#444) 4px);' +
+            'opacity:0.4;pointer-events:none;"></div>';
+        });
+      } else {
+        // Linear mode (unchanged)
+        var tickFractions = [0, 0.25, 0.5, 0.75, 1];
+        axisHtml = tickFractions.map(function(f) {
+          var pct = (f * 100).toFixed(2);
+          var ms = f * total;
+          var label = formatMs(ms);
+          var align = f === 0 ? 'left' : f === 1 ? 'right' : 'center';
+          var transform = f === 0 ? '' : f === 1 ? 'translateX(-100%)' : 'translateX(-50%)';
+          return '<span style="position:absolute;left:' + pct + '%;font-size:10px;' +
+            'color:var(--text-muted,#888);transform:' + transform + ';' +
+            'text-align:' + align + ';white-space:nowrap;">' +
+            escapeHtml(label) + '</span>';
+        }).join('');
+      }
 
       // Build phase band HTML (empty string when no phases)
       var phaseBandHtml = '';
       if (phaseRegions.length > 0) {
         phaseBandHtml = phaseRegions.map(function(r) {
-          var left = ((r.startMs - globalStartMs) / total * 100).toFixed(2);
-          var width = Math.max((r.endMs - r.startMs) / total * 100, 0.5).toFixed(2);
+          var leftPct = timeMap.toPercent(r.startMs);
+          var rightPct = timeMap.toPercent(r.endMs);
+          var left = leftPct.toFixed(2);
+          var width = Math.max(rightPct - leftPct, 0.5).toFixed(2);
           var top = AXIS_H + 2;
           var height = PHASE_H - 4;
           var bg = 'hsl(' + r.hue + ',30%,30%)';
@@ -383,11 +584,13 @@
         }).join('');
       }
 
-      // Build span blocks
+      // Build span blocks (using compressed time mapping)
       var blocksHtml = assigned.map(function(a) {
         var span = a.span;
-        var left = ((span.startMs - globalStartMs) / total * 100).toFixed(2);
-        var width = Math.max(span.durationMs / total * 100, 0.5).toFixed(2);
+        var leftPct = timeMap.toPercent(span.startMs);
+        var rightPct = timeMap.toPercent(span.endMs);
+        var left = leftPct.toFixed(2);
+        var width = Math.max(rightPct - leftPct, 0.5).toFixed(2);
         var top = AXIS_H + phaseOffset + a.lane * (LANE_H + LANE_GAP);
         var hue = labelHue(span.rawLabel);
         var color = 'hsl(' + hue + ',55%,52%)';
@@ -414,6 +617,26 @@
           span.label +
           '</span></div>';
       }).join('');
+
+      // Add gap indicators in the span area for compressed gaps
+      var gapIndicatorsHtml = '';
+      if (timeMap.compressed) {
+        var bodyTop = AXIS_H + phaseOffset;
+        var bodyH = numLanes * (LANE_H + LANE_GAP);
+        timeMap.segments.forEach(function(seg) {
+          if (!seg.compressed) return;
+          var gapLeft = timeMap.toPercent(seg.start);
+          var gapRight = timeMap.toPercent(seg.end);
+          var gapWidth = gapRight - gapLeft;
+          if (gapWidth < 0.1) return;
+          var gapDur = formatMs(seg.end - seg.start);
+          gapIndicatorsHtml += '<div title="Idle: ' + escapeHtml(gapDur) + '" style="' +
+            'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
+            'top:' + bodyTop + 'px;height:' + bodyH + 'px;' +
+            'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border,#444) 3px,var(--border,#444) 4px);' +
+            'opacity:0.2;pointer-events:none;"></div>';
+        });
+      }
 
       // Build detail table sorted by duration descending
       var sortedByDuration = spans.slice().sort(function(a, b) { return b.durationMs - a.durationMs; });
@@ -458,7 +681,7 @@
         '<tbody>' + rowsHtml + '</tbody>' +
         '</table>';
 
-      var costChartHtml = buildCostChart(turnUsages, spans, globalStartMs, total);
+      var costChartHtml = buildCostChart(turnUsages, spans, globalStartMs, total, timeMap.toPercent);
 
       container.innerHTML =
         '<div style="position:relative;width:100%;height:' + totalH + 'px;' +
@@ -469,6 +692,7 @@
         '</div>' +
         phaseBandHtml +
         blocksHtml +
+        gapIndicatorsHtml +
         '</div>' +
         costChartHtml +
         tableHtml;
@@ -481,6 +705,8 @@
     labelHue: labelHue,
     formatMs: formatMs,
     assignLanes: assignLanes,
+    mergeIntervals: mergeIntervals,
+    buildTimeMap: buildTimeMap,
     computePhaseRegions: computePhaseRegions,
     findPhaseForSpan: findPhaseForSpan,
     buildCostChart: buildCostChart,
