@@ -271,6 +271,77 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 	return &ret, nil
 }
 
+// CreateForkedTask creates a new backlog task pre-populated with the source's
+// sandbox preference and ForkedFrom reference. The caller is responsible for
+// calling runner.Fork to set up worktrees before starting the task.
+func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt string, timeout int) (*Task, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	source, ok := s.tasks[sourceID]
+	if !ok {
+		return nil, fmt.Errorf("source task %s not found", sourceID)
+	}
+
+	// Compute top-of-backlog position (same logic as CreateTask).
+	minPos := 0
+	hasBacklog := false
+	for _, t := range s.tasks {
+		if t.Status == TaskStatusBacklog {
+			if !hasBacklog || t.Position < minPos {
+				minPos = t.Position
+				hasBacklog = true
+			}
+		}
+	}
+	newPosition := 0
+	if hasBacklog {
+		newPosition = minPos - 1
+	}
+
+	timeout = clampTimeout(timeout)
+	id := uuid.New()
+	fid := sourceID // copy for pointer
+	now := time.Now()
+	task := &Task{
+		SchemaVersion: CurrentTaskSchemaVersion,
+		ID:            id,
+		Prompt:        prompt,
+		Status:        TaskStatusBacklog,
+		Timeout:       timeout,
+		Sandbox:       source.Sandbox,
+		ForkedFrom:    &fid,
+		Position:      newPosition,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	if len(source.SandboxByActivity) > 0 {
+		sba := make(map[string]string, len(source.SandboxByActivity))
+		for k, v := range source.SandboxByActivity {
+			sba[k] = v
+		}
+		task.SandboxByActivity = sba
+	}
+
+	taskDir := filepath.Join(s.dir, id.String())
+	tracesDir := filepath.Join(taskDir, "traces")
+	if err := os.MkdirAll(tracesDir, 0755); err != nil {
+		return nil, err
+	}
+	if err := s.saveTask(id, task); err != nil {
+		return nil, err
+	}
+	s.tasks[id] = task
+	s.events[id] = nil
+	s.nextSeq[id] = 1
+	s.searchIndex[id] = buildIndexEntry(task, "")
+	s.notify(task, false)
+
+	ret := *task
+	return &ret, nil
+}
+
 func normalizeSandboxByActivity(input map[string]string) map[string]string {
 	if len(input) == 0 {
 		return nil

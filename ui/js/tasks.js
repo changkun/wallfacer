@@ -573,6 +573,16 @@ async function syncTask(id) {
   }
 }
 
+async function forkTask(taskId, prompt, timeout) {
+  const resp = await fetch(`/api/tasks/${taskId}/fork`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, timeout }),
+  });
+  if (!resp.ok) throw new Error(await resp.text());
+  return resp.json();
+}
+
 // --- Bulk title generation for tasks without a title ---
 
 async function generateMissingTitles() {

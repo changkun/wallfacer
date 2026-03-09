@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1607,5 +1608,81 @@ func TestUpdateTaskEnvironment_NotFound(t *testing.T) {
 	err := s.UpdateTaskEnvironment(bg(), uuid.New(), ExecutionEnvironment{})
 	if err == nil {
 		t.Error("expected error for unknown task ID")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CreateForkedTask
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestCreateForkedTask_SetsForkedFrom(t *testing.T) {
+	s := newTestStore(t)
+	source, _ := s.CreateTask(bg(), "source prompt", 30, false, "", "")
+	forked, err := s.CreateForkedTask(bg(), source.ID, "fork prompt", 20)
+	if err != nil {
+		t.Fatalf("CreateForkedTask: %v", err)
+	}
+	if forked.ForkedFrom == nil {
+		t.Fatal("expected ForkedFrom to be set")
+	}
+	if *forked.ForkedFrom != source.ID {
+		t.Errorf("ForkedFrom = %s, want %s", forked.ForkedFrom, source.ID)
+	}
+	if forked.Status != TaskStatusBacklog {
+		t.Errorf("Status = %s, want backlog", forked.Status)
+	}
+	if forked.Timeout != 20 {
+		t.Errorf("Timeout = %d, want 20", forked.Timeout)
+	}
+}
+
+func TestCreateForkedTask_CopiesSandbox(t *testing.T) {
+	s := newTestStore(t)
+	source, _ := s.CreateTask(bg(), "source", 30, false, "", "")
+	s.UpdateTaskSandbox(bg(), source.ID, "codex")
+	forked, err := s.CreateForkedTask(bg(), source.ID, "fork", 30)
+	if err != nil {
+		t.Fatalf("CreateForkedTask: %v", err)
+	}
+	if forked.Sandbox != "codex" {
+		t.Errorf("Sandbox = %q, want 'codex'", forked.Sandbox)
+	}
+}
+
+func TestCreateForkedTask_SourceNotFound(t *testing.T) {
+	s := newTestStore(t)
+	_, err := s.CreateForkedTask(bg(), uuid.New(), "fork", 30)
+	if err == nil {
+		t.Fatal("expected error for missing source task")
+	}
+}
+
+func TestCreateForkedTask_PersistsToDisk(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := NewStore(dir)
+	source, _ := s.CreateTask(bg(), "source", 30, false, "", "")
+	forked, _ := s.CreateForkedTask(bg(), source.ID, "fork", 30)
+
+	s2, _ := NewStore(dir)
+	loaded, err := s2.GetTask(bg(), forked.ID)
+	if err != nil {
+		t.Fatalf("GetTask after reload: %v", err)
+	}
+	if loaded.ForkedFrom == nil || *loaded.ForkedFrom != source.ID {
+		t.Error("ForkedFrom not persisted correctly")
+	}
+}
+
+func TestCreateForkedTask_JSONSerializesForkedFrom(t *testing.T) {
+	s := newTestStore(t)
+	source, _ := s.CreateTask(bg(), "source", 30, false, "", "")
+	forked, _ := s.CreateForkedTask(bg(), source.ID, "fork", 30)
+
+	data, err := json.Marshal(forked)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(data), source.ID.String()) {
+		t.Errorf("JSON does not contain source ID %s: %s", source.ID, data)
 	}
 }

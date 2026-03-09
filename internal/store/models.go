@@ -252,6 +252,9 @@ type Task struct {
 	// be auto-promoted from backlog. Nil means "run as soon as there is
 	// capacity" (the existing default behaviour).
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
+
+	// ForkedFrom is the UUID of the source task this task was branched from, if any.
+	ForkedFrom *uuid.UUID `json:"forked_from,omitempty"`
 }
 
 // HasTag reports whether the task has the given tag.
