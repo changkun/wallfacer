@@ -290,7 +290,7 @@ let defaultSandbox = '';
 let defaultSandboxByActivity = {};
 let sandboxUsable = {};
 let sandboxReasons = {};
-const SANDBOX_ACTIVITY_KEYS = ['implementation', 'testing', 'refinement', 'title', 'oversight', 'commit_message', 'idea_agent'];
+let SANDBOX_ACTIVITY_KEYS = ['implementation', 'testing', 'refinement', 'title', 'oversight', 'commit_message', 'idea_agent'];
 
 function sandboxDisplayName(id) {
   if (!id) return 'Default';
@@ -390,6 +390,9 @@ async function fetchConfig() {
     defaultSandboxByActivity = cfg.activity_sandboxes || {};
     sandboxUsable = cfg.sandbox_usable || {};
     sandboxReasons = cfg.sandbox_reasons || {};
+    if (Array.isArray(cfg.sandbox_activities) && cfg.sandbox_activities.length > 0) {
+      SANDBOX_ACTIVITY_KEYS = cfg.sandbox_activities;
+    }
     if (typeof setBrainstormCategories === 'function') {
       setBrainstormCategories(cfg.ideation_categories || []);
     }
