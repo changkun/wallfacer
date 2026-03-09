@@ -1,12 +1,8 @@
 /**
- * Tests for the collapsible oversight accordion on task cards (render.js).
+ * Tests for buildPhaseListHTML (oversight-shared.js).
  *
- * Verifies that:
- *  - done/failed cards get a <details class="card-oversight"> injected only when cached
- *  - cached oversight renders "N phases" in the summary
- *  - opening the accordion for the first time fetches oversight and renders phases
- *  - subsequent toggles use the in-memory cache (no extra fetch)
- *  - buildPhaseListHTML (oversight-shared.js) renders phase titles and summaries
+ * The card-level oversight accordion was removed from the kanban overview;
+ * oversight is only accessible from the task detail modal.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
@@ -176,11 +172,6 @@ function makeRenderContext({ fetchImpl } = {}) {
   return { ctx, cardEl, detailsEl, bodyEl, summaryEl };
 }
 
-// Flush all pending microtasks (enough for a fetch().then().then() chain).
-function flushPromises() {
-  return new Promise((r) => setTimeout(r, 0));
-}
-
 // ---------------------------------------------------------------------------
 // buildPhaseListHTML (oversight-shared.js)
 // ---------------------------------------------------------------------------
@@ -230,247 +221,18 @@ describe('buildPhaseListHTML', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Card accordion injection
+// Card oversight no longer shown in kanban overview (only in modal)
 // ---------------------------------------------------------------------------
-describe('card oversight accordion — HTML injection', () => {
-  it('injects <details class="card-oversight"> for a done task', () => {
+describe('kanban card — no card-oversight element', () => {
+  it('does not inject card-oversight for a done task', () => {
     const { ctx, cardEl } = makeRenderContext();
-    vm.runInContext(
-      `cardOversightCache.set('test-id', { phase_count: 2, phases: [] });`,
-      ctx,
-    );
     ctx.createCard(makeTask({ status: 'done' }));
-    expect(cardEl.innerHTML).toContain('card-oversight');
-    expect(cardEl.innerHTML).toContain('<details');
+    expect(cardEl.innerHTML).not.toContain('card-oversight');
   });
 
-  it('injects oversight accordion for a failed task', () => {
+  it('does not inject card-oversight for a failed task', () => {
     const { ctx, cardEl } = makeRenderContext();
-    vm.runInContext(
-      `cardOversightCache.set('test-id', { phase_count: 1, phases: [] });`,
-      ctx,
-    );
     ctx.createCard(makeTask({ status: 'failed' }));
-    expect(cardEl.innerHTML).toContain('card-oversight');
-  });
-
-  it('does NOT inject oversight accordion for a waiting task', () => {
-    const { ctx, cardEl } = makeRenderContext();
-    ctx.createCard(makeTask({ status: 'waiting' }));
     expect(cardEl.innerHTML).not.toContain('card-oversight');
-  });
-
-  it('does NOT inject oversight accordion for a backlog task', () => {
-    const { ctx, cardEl } = makeRenderContext();
-    ctx.createCard(makeTask({ status: 'backlog' }));
-    expect(cardEl.innerHTML).not.toContain('card-oversight');
-  });
-
-  it('does NOT inject oversight accordion for an archived done task', () => {
-    const { ctx, cardEl } = makeRenderContext();
-    ctx.createCard(makeTask({ status: 'done', archived: true }));
-    expect(cardEl.innerHTML).not.toContain('card-oversight');
-  });
-
-  it('does NOT inject oversight accordion for zero-turn tasks', () => {
-    const { ctx, cardEl } = makeRenderContext();
-    ctx.createCard(makeTask({ status: 'done', turns: 0 }));
-    expect(cardEl.innerHTML).not.toContain('card-oversight');
-  });
-
-  it('does NOT inject oversight accordion for a cached-missing done task', () => {
-    const { ctx, cardEl } = makeRenderContext();
-    ctx.createCard(makeTask({ status: 'done' }));
-    expect(cardEl.innerHTML).not.toContain('card-oversight');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Summary line — phase count display
-// ---------------------------------------------------------------------------
-describe('card oversight accordion — summary text', () => {
-  it('does not render the summary when cache entry is missing', () => {
-    const { ctx, cardEl } = makeRenderContext();
-    ctx.createCard(makeTask({ status: 'done' }));
-    expect(cardEl.innerHTML).not.toContain('card-oversight');
-  });
-
-  it('shows cached phase count in summary when cache is pre-populated', () => {
-    const { ctx, cardEl } = makeRenderContext();
-    // Pre-populate the cache before creating the card.
-    vm.runInContext(
-      `cardOversightCache.set('test-id', { phase_count: 3, phases: [] });`,
-      ctx,
-    );
-    ctx.createCard(makeTask({ status: 'done' }));
-    expect(cardEl.innerHTML).toContain('3 phases');
-  });
-
-  it('shows "2 phases" when cache has phase_count 2', () => {
-    const { ctx, cardEl } = makeRenderContext();
-    vm.runInContext(
-      `cardOversightCache.set('test-id', { phase_count: 2, phases: [{ title: 'A', summary: '' }] });`,
-      ctx,
-    );
-    ctx.createCard(makeTask({ status: 'done' }));
-    expect(cardEl.innerHTML).toContain('2 phases');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Toggle event — lazy fetch and phase rendering
-// ---------------------------------------------------------------------------
-describe('card oversight accordion — toggle fetch', () => {
-  it('fetches oversight on first open and renders both phase titles', async () => {
-    const { ctx, cardEl, detailsEl, bodyEl } = makeRenderContext();
-    vm.runInContext(`cardOversightCache.set('test-id', { phase_count: 0 });`, ctx);
-    ctx.createCard(makeTask({ status: 'done' }));
-
-    expect(cardEl.innerHTML).toContain('card-oversight');
-    // Simulate opening the accordion.
-    detailsEl.open = true;
-    detailsEl._fire('toggle');
-    await flushPromises();
-
-    expect(bodyEl.innerHTML).toContain('Phase Alpha');
-    expect(bodyEl.innerHTML).toContain('Phase Beta');
-  });
-
-  it('updates the summary textContent to "N phases" after successful fetch', async () => {
-    const { ctx, cardEl, detailsEl, summaryEl } = makeRenderContext();
-    vm.runInContext(`cardOversightCache.set('test-id', { phase_count: 0 });`, ctx);
-    ctx.createCard(makeTask({ status: 'done' }));
-
-    detailsEl.open = true;
-    detailsEl._fire('toggle');
-    await flushPromises();
-
-    expect(summaryEl.textContent).toBe('2 phases');
-  });
-
-  it('stores fetched data in cardOversightCache', async () => {
-    const { ctx, detailsEl } = makeRenderContext();
-    vm.runInContext(`cardOversightCache.set('test-id', { phase_count: 0 });`, ctx);
-    ctx.createCard(makeTask({ status: 'done' }));
-
-    detailsEl.open = true;
-    detailsEl._fire('toggle');
-    await flushPromises();
-
-    const cached = vm.runInContext(`cardOversightCache.get('test-id')`, ctx);
-    expect(cached).toBeDefined();
-    expect(cached.phase_count).toBe(2);
-    expect(cached.phases).toHaveLength(2);
-  });
-
-  it('does not fetch again on second toggle (data-loaded guard)', async () => {
-    let fetchCount = 0;
-    const fetchImpl = () => {
-      fetchCount++;
-      return Promise.resolve({
-        json: () => Promise.resolve({
-          status: 'ready',
-          phase_count: 1,
-          phases: [{ title: 'Only Phase', summary: '' }],
-        }),
-      });
-    };
-    const { ctx, detailsEl } = makeRenderContext({ fetchImpl });
-    ctx.fetch = fetchImpl;
-    vm.runInContext(`cardOversightCache.set('test-id', { phase_count: 0 });`, ctx);
-    ctx.createCard(makeTask({ status: 'done' }));
-
-    // First toggle
-    detailsEl.open = true;
-    detailsEl._fire('toggle');
-    await flushPromises();
-
-    // Second toggle — data-loaded is already set, no re-fetch
-    detailsEl._fire('toggle');
-    await flushPromises();
-
-    expect(fetchCount).toBe(1);
-  });
-
-  it('does not fetch when details is closed (open=false)', async () => {
-    let fetchCount = 0;
-    const fetchImpl = () => { fetchCount++; return Promise.resolve({ json: () => Promise.resolve({ status: 'ready', phase_count: 0, phases: [] }) }); };
-    const { ctx, detailsEl } = makeRenderContext({ fetchImpl });
-    ctx.fetch = fetchImpl;
-    vm.runInContext(`cardOversightCache.set('test-id', { phase_count: 0 });`, ctx);
-    ctx.createCard(makeTask({ status: 'done' }));
-
-    detailsEl.open = false;
-    detailsEl._fire('toggle');
-    await flushPromises();
-
-    expect(fetchCount).toBe(0);
-  });
-
-  it('renders from cache on toggle when phases are already cached', async () => {
-    const { ctx, cardEl, detailsEl, bodyEl } = makeRenderContext();
-    // Pre-populate cache with phases.
-    vm.runInContext(
-      `cardOversightCache.set('test-id', { phase_count: 1, phases: [{ title: 'Cached Phase', summary: 'From cache' }] });`,
-      ctx,
-    );
-    ctx.createCard(makeTask({ status: 'done' }));
-
-    detailsEl.open = true;
-    detailsEl._fire('toggle');
-    await flushPromises();
-
-    expect(bodyEl.innerHTML).toContain('Cached Phase');
-  });
-
-  it('shows error message when fetch fails', async () => {
-    const fetchImpl = () => Promise.reject(new Error('network error'));
-    const { ctx, detailsEl, bodyEl } = makeRenderContext({ fetchImpl });
-    ctx.fetch = fetchImpl;
-    vm.runInContext(`cardOversightCache.set('test-id', { phase_count: 0 });`, ctx);
-    ctx.createCard(makeTask({ status: 'done' }));
-
-    detailsEl.open = true;
-    detailsEl._fire('toggle');
-    await flushPromises();
-
-    expect(bodyEl.innerHTML).toContain('oversight-error');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Fingerprint includes cached phase_count so cards re-render when ready
-// ---------------------------------------------------------------------------
-describe('_cardFingerprint includes oversight phase_count', () => {
-  it('fingerprint changes after phase_count is cached', () => {
-    const { ctx } = makeRenderContext();
-    const task = makeTask({ status: 'done' });
-
-    const fp1 = vm.runInContext(
-      `_cardFingerprint(${JSON.stringify(task)}, undefined)`,
-      ctx,
-    );
-
-    vm.runInContext(
-      `cardOversightCache.set('test-id', { phase_count: 4, phases: [] });`,
-      ctx,
-    );
-
-    const fp2 = vm.runInContext(
-      `_cardFingerprint(${JSON.stringify(task)}, undefined)`,
-      ctx,
-    );
-
-    expect(fp1).not.toBe(fp2);
-  });
-
-  it('fingerprint is stable when cache does not change', () => {
-    const { ctx } = makeRenderContext();
-    const task = makeTask({ status: 'done' });
-
-    const fp1 = vm.runInContext(`_cardFingerprint(${JSON.stringify(task)}, undefined)`, ctx);
-    const fp2 = vm.runInContext(`_cardFingerprint(${JSON.stringify(task)}, undefined)`, ctx);
-
-    expect(fp1).toBe(fp2);
   });
 });
