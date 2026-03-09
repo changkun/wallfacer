@@ -149,5 +149,7 @@ function relativeTime(ms) {
 // Close modal on backdrop click.
 (function() {
   var modal = document.getElementById('container-monitor-modal');
-  bindModalBackdropClose(modal, closeContainerMonitor);
+  if (typeof bindModalBackdropClose === 'function') {
+    bindModalBackdropClose(modal, closeContainerMonitor);
+  }
 })();

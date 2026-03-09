@@ -74,6 +74,9 @@ function openSettings() {
   loadMaxParallel();
   loadOversightInterval();
   loadAutoPush();
+  if (typeof showEnvConfigEditor === 'function') {
+    showEnvConfigEditor(null);
+  }
 }
 
 function closeSettings() {

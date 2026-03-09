@@ -220,9 +220,23 @@ function applySandboxByActivity(prefix, values) {
   });
 }
 
+function configGetRoute() {
+  if (typeof Routes !== 'undefined' && Routes.config && typeof Routes.config.get === 'function') {
+    return Routes.config.get();
+  }
+  return '/api/config';
+}
+
+function configUpdateRoute() {
+  if (typeof Routes !== 'undefined' && Routes.config && typeof Routes.config.update === 'function') {
+    return Routes.config.update();
+  }
+  return '/api/config';
+}
+
 async function fetchConfig() {
   try {
-    var cfg = await api(Routes.config.get());
+    var cfg = await api(configGetRoute());
     autopilot = !!cfg.autopilot;
     var toggle = document.getElementById('autopilot-toggle');
     if (toggle) toggle.checked = autopilot;
@@ -252,7 +266,7 @@ async function toggleAutopilot() {
   var toggle = document.getElementById('autopilot-toggle');
   var enabled = toggle ? toggle.checked : !autopilot;
   try {
-    var res = await api(Routes.config.update(), { method: 'PUT', body: JSON.stringify({ autopilot: enabled }) });
+    var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autopilot: enabled }) });
     autopilot = !!res.autopilot;
     if (toggle) toggle.checked = autopilot;
   } catch (e) {
@@ -266,7 +280,7 @@ async function toggleAutotest() {
   var toggle = document.getElementById('autotest-toggle');
   var enabled = toggle ? toggle.checked : !autotest;
   try {
-    var res = await api(Routes.config.update(), { method: 'PUT', body: JSON.stringify({ autotest: enabled }) });
+    var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autotest: enabled }) });
     autotest = !!res.autotest;
     if (toggle) toggle.checked = autotest;
   } catch (e) {
@@ -280,7 +294,7 @@ async function toggleAutosubmit() {
   var toggle = document.getElementById('autosubmit-toggle');
   var enabled = toggle ? toggle.checked : !autosubmit;
   try {
-    var res = await api(Routes.config.update(), { method: 'PUT', body: JSON.stringify({ autosubmit: enabled }) });
+    var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autosubmit: enabled }) });
     autosubmit = !!res.autosubmit;
     if (toggle) toggle.checked = autosubmit;
   } catch (e) {

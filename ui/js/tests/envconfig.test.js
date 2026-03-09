@@ -157,3 +157,133 @@ describe('summarizeSandboxTestResult', () => {
     expect(ctx.summarizeSandboxTestResult({ status: 'running' })).toBe('status running');
   });
 });
+
+describe('loadEnvConfig', () => {
+  it('loads environment data into settings fields and refreshes sandbox selectors', async () => {
+    const oauthTokenEl = makeInput('');
+    const apiKeyEl = makeInput('');
+    const openaiApiKeyEl = makeInput('');
+    const claudeBaseUrlEl = makeInput('');
+    const openaiBaseUrlEl = makeInput('');
+    const defaultModelEl = makeInput('');
+    const titleModelEl = makeInput('');
+    const codexDefaultModelEl = makeInput('');
+    const codexTitleModelEl = makeInput('');
+    const defaultSandboxEl = makeInput('');
+    const statusEl = makeInput('');
+    const implementationEl = { value: '' };
+    const testingEl = { value: '' };
+    const codexTestStatusEl = makeInput('');
+    const claudeTestStatusEl = makeInput('');
+
+    const applySandboxByActivity = vi.fn();
+    const populateSandboxSelects = vi.fn();
+    const api = vi.fn().mockResolvedValue({
+      oauth_token: 'token-from-server',
+      api_key: 'anthropic-api-key',
+      base_url: 'https://api.anthropic.com',
+      openai_api_key: 'openai-key',
+      openai_base_url: 'https://api.openai.com/v1',
+      default_model: 'claude-model',
+      title_model: 'claude-title',
+      codex_default_model: 'codex-default',
+      codex_title_model: 'codex-title',
+      default_sandbox: 'codex',
+      sandbox_by_activity: { implementation: 'claude', testing: 'codex' },
+    });
+
+    const ctx = makeContext({
+      elements: [
+        ['env-oauth-token', oauthTokenEl],
+        ['env-api-key', apiKeyEl],
+        ['env-openai-api-key', openaiApiKeyEl],
+        ['env-claude-base-url', claudeBaseUrlEl],
+        ['env-openai-base-url', openaiBaseUrlEl],
+        ['env-default-model', defaultModelEl],
+        ['env-title-model', titleModelEl],
+        ['env-codex-default-model', codexDefaultModelEl],
+        ['env-codex-title-model', codexTitleModelEl],
+        ['env-default-sandbox', defaultSandboxEl],
+        ['env-config-status', statusEl],
+        ['env-sandbox-implementation', implementationEl],
+        ['env-sandbox-testing', testingEl],
+        ['env-claude-test-status', claudeTestStatusEl],
+        ['env-codex-test-status', codexTestStatusEl],
+      ],
+      applySandboxByActivity,
+      populateSandboxSelects,
+      api,
+      Routes: {
+        env: {
+          get: () => '/api/env',
+          test: '/api/env/test',
+          update: '/api/env',
+        },
+      },
+    });
+
+    loadScript(ctx, 'envconfig.js');
+    await ctx.loadEnvConfig();
+
+    expect(api).toHaveBeenCalledWith('/api/env');
+    expect(oauthTokenEl.value).toBe('');
+    expect(oauthTokenEl.placeholder).toBe('token-from-server');
+    expect(apiKeyEl.placeholder).toBe('anthropic-api-key');
+    expect(openaiApiKeyEl.placeholder).toBe('openai-key');
+    expect(claudeBaseUrlEl.value).toBe('https://api.anthropic.com');
+    expect(openaiBaseUrlEl.value).toBe('https://api.openai.com/v1');
+    expect(defaultModelEl.value).toBe('claude-model');
+    expect(titleModelEl.value).toBe('claude-title');
+    expect(codexDefaultModelEl.value).toBe('codex-default');
+    expect(codexTitleModelEl.value).toBe('codex-title');
+    expect(defaultSandboxEl.value).toBe('codex');
+    expect(statusEl.textContent).toBe('');
+    expect(claudeTestStatusEl.textContent).toBe('');
+    expect(codexTestStatusEl.textContent).toBe('');
+    expect(applySandboxByActivity).toHaveBeenCalledWith('env-sandbox-', {
+      implementation: 'claude',
+      testing: 'codex',
+    });
+    expect(populateSandboxSelects).toHaveBeenCalled();
+  });
+
+  it('shows a load error but keeps blank config when env fetch fails', async () => {
+    const statusEl = makeInput('');
+    const oauthTokenEl = makeInput('manual-entry');
+    const api = vi.fn().mockRejectedValue(new Error('network error'));
+
+    const ctx = makeContext({
+      elements: [
+        ['env-oauth-token', oauthTokenEl],
+        ['env-api-key', makeInput('')],
+        ['env-openai-api-key', makeInput('')],
+        ['env-claude-base-url', makeInput('')],
+        ['env-openai-base-url', makeInput('')],
+        ['env-default-model', makeInput('')],
+        ['env-title-model', makeInput('')],
+        ['env-codex-default-model', makeInput('')],
+        ['env-codex-title-model', makeInput('')],
+        ['env-default-sandbox', makeInput('')],
+        ['env-config-status', statusEl],
+        ['env-claude-test-status', makeInput('')],
+        ['env-codex-test-status', makeInput('')],
+      ],
+      api,
+      applySandboxByActivity: vi.fn(),
+      Routes: {
+        env: {
+          get: () => '/api/env',
+          test: '/api/env/test',
+          update: '/api/env',
+        },
+      },
+    });
+
+    loadScript(ctx, 'envconfig.js');
+    await ctx.loadEnvConfig();
+
+    expect(statusEl.textContent).toBe('Failed to load configuration.');
+    expect(oauthTokenEl.value).toBe('');
+    expect(oauthTokenEl.placeholder).toBe('(not set)');
+  });
+});
