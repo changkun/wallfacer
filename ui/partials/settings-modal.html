@@ -11,6 +11,7 @@
         <div class="settings-tab-list" role="tablist" aria-label="Settings tabs">
           <button id="settings-tab-appearance" type="button" class="settings-tab active" role="tab" aria-selected="true" data-settings-tab="appearance">Appearance</button>
           <button id="settings-tab-execution" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="execution">Execution</button>
+          <button id="settings-tab-sandbox" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="sandbox">Sandbox</button>
           <button id="settings-tab-workspace" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="workspace">Workspace</button>
           <button id="settings-tab-insights" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="insights">Insights</button>
           <button id="settings-tab-about" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="about">About</button>
@@ -104,7 +105,7 @@
         </div>
       </div>
 
-      <div class="settings-tab-content" data-settings-tab="workspace">
+      <div class="settings-tab-content" data-settings-tab="sandbox">
         <div class="settings-card">
           <div class="settings-card-head">
             <h4>Sandbox Configuration</h4>
@@ -217,7 +218,9 @@
             <span id="env-config-status" style="font-size: 12px; color: var(--text-muted); margin-left: auto;"></span>
           </div>
         </div>
+      </div>
 
+      <div class="settings-tab-content" data-settings-tab="workspace">
         <div class="settings-section">
           <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">AGENTS.md</div>
           <button onclick="closeSettings();showInstructionsEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
@@ -226,7 +229,7 @@
 
         <div class="settings-section">
           <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Prompt Templates</div>
-          <button onclick="openTemplatesManagerFromSettings(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Manage</button>
+          <button type="button" onclick="openTemplatesManagerFromSettings(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Manage</button>
           <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Save and reuse named prompt fragments when creating tasks.</div>
         </div>
       </div>

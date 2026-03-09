@@ -14,6 +14,40 @@ function setBrainstormCategories(values) {
   );
 }
 
+function renderTaskTagBadge(tag) {
+  if (!tag) return '';
+  const rawTag = String(tag).trim();
+  if (!rawTag) return '';
+
+  const lower = rawTag.toLowerCase();
+  if (BRAINSTORM_CATEGORIES.has(rawTag)) {
+    return `<span class="badge badge-category" title="Tag: ${escapeHtml(rawTag)}">${escapeHtml(rawTag)}</span>`;
+  }
+
+  if (lower === 'idea-agent') {
+    return `<span class="badge badge-idea-agent" title="Tag: ${escapeHtml(rawTag)}">${escapeHtml(rawTag)}</span>`;
+  }
+
+  if (lower.startsWith('priority:')) {
+    const priorityValue = rawTag.slice('priority:'.length).trim();
+    const text = `priority ${priorityValue}`;
+    return `<span class="badge badge-priority" title="Tag: ${escapeHtml(rawTag)}">${escapeHtml(text)}</span>`;
+  }
+
+  if (lower.startsWith('impact:')) {
+    const impactValue = rawTag.slice('impact:'.length).trim();
+    const text = `impact ${impactValue}`;
+    return `<span class="badge badge-impact" title="Tag: ${escapeHtml(rawTag)}">${escapeHtml(text)}</span>`;
+  }
+
+  return `<span class="badge badge-tag" title="Tag: ${escapeHtml(rawTag)}">${escapeHtml(rawTag)}</span>`;
+}
+
+function renderTaskTagBadges(tags) {
+  if (!Array.isArray(tags) || tags.length === 0) return '';
+  return tags.map(renderTaskTagBadge).join('');
+}
+
 // --- Dependency badge helpers ---
 
 function areDepsBlocked(t) {
@@ -437,10 +471,7 @@ function updateCard(card, t, rank) {
         ${t.mount_worktrees ? '<span class="text-[10px] text-v-muted" title="Sibling worktrees mounted">worktrees</span>' : ''}
         <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>
         <span class="text-[10px] text-v-muted">${timeAgo(t.created_at)}</span>
-        ${t.tags && t.tags.length > 0 ? t.tags.map(tag => {
-          const cls = BRAINSTORM_CATEGORIES.has(tag) ? 'badge badge-category' : `badge badge-${tag.replace(/[^a-z0-9]/g, '-')}`;
-          return `<span class="${cls}" title="Tag: ${escapeHtml(tag)}">${escapeHtml(tag)}</span>`;
-        }).join('') : ''}
+        ${renderTaskTagBadges(t.tags)}
       </div>
     </div>
     ${t.status === 'backlog' && t.session_id ? `<div class="flex items-center gap-1.5 mb-1" onclick="event.stopPropagation()">

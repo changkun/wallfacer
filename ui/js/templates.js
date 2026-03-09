@@ -197,10 +197,19 @@ async function openTemplatesManager() {
 }
 
 function openTemplatesManagerFromSettings(event) {
-  if (event && typeof event.preventDefault === 'function') {
-    event.preventDefault();
+  var activeEvent = event || (typeof window !== 'undefined' ? window.event : null);
+
+  if (activeEvent && typeof activeEvent.preventDefault === 'function') {
+    activeEvent.preventDefault();
   }
-  closeSettings();
+  if (activeEvent && typeof activeEvent.stopPropagation === 'function') {
+    activeEvent.stopPropagation();
+  }
+
+  if (typeof closeSettings === 'function') {
+    closeSettings();
+  }
+
   openTemplatesManager().catch(function(err) {
     if (window.alert) {
       alert('Failed to open Templates: ' + (err && err.message ? err.message : 'Unknown error'));
