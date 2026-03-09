@@ -88,14 +88,14 @@ function makeContext(overrides = {}) {
   return vm.createContext(ctx);
 }
 
-function makeSettingsTabs(tabNames = ['appearance', 'execution', 'workspace', 'insights', 'about']) {
+function makeSettingsTabs(tabNames = ['appearance', 'execution', 'sandbox', 'workspace', 'insights', 'about']) {
   return tabNames.map((name) => createElement({
     getAttribute: (attr) => attr === 'data-settings-tab' ? name : null,
     classList: createClassList(),
   }));
 }
 
-function makeSettingsPanels(tabNames = ['appearance', 'execution', 'workspace', 'insights', 'about']) {
+function makeSettingsPanels(tabNames = ['appearance', 'execution', 'sandbox', 'workspace', 'insights', 'about']) {
   return tabNames.map((name) => createElement({
     getAttribute: (attr) => attr === 'data-settings-tab' ? name : null,
     classList: createClassList(),
@@ -232,8 +232,8 @@ describe('theme helpers', () => {
 
     expect(switched).toBe(true);
     expect(tabButtons[0].classList.contains('active')).toBe(false);
-    expect(tabButtons[2].classList.contains('active')).toBe(true);
-    expect(tabPanels[2].classList.contains('active')).toBe(true);
+    expect(tabButtons[3].classList.contains('active')).toBe(true);
+    expect(tabPanels[3].classList.contains('active')).toBe(true);
     expect(tabPanels[0].classList.contains('active')).toBe(false);
   });
 

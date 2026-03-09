@@ -119,4 +119,26 @@ describe('openTemplatesManagerFromSettings', () => {
     const loggedError = ctx.console.error.mock.calls[0][1];
     expect(String(loggedError && loggedError.message || loggedError)).toBe('network down');
   });
+
+  it('opens templates manager even when closeSettings is unavailable', async () => {
+    const settingsModal = createElement({ id: 'settings-modal' });
+    const calls = [];
+    const ctx = makeContext({
+      elements: [['settings-modal', settingsModal]],
+      alert: vi.fn(),
+    });
+    loadScript(ctx, 'templates.js');
+    vm.runInContext(
+      `openTemplatesManager = function() {
+         calls.push('open');
+         return Promise.resolve();
+       };`,
+      Object.assign(ctx, { calls }),
+    );
+
+    ctx.openTemplatesManagerFromSettings();
+    await Promise.resolve();
+
+    expect(calls).toEqual(['open']);
+  });
 });
