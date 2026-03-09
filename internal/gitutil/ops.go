@@ -16,11 +16,16 @@ func RebaseOntoDefault(repoPath, worktreePath string) error {
 	if err != nil {
 		return err
 	}
+
+	if conflictErr := recoverRebaseState(worktreePath); conflictErr != nil {
+		return conflictErr
+	}
+
 	out, err := exec.Command("git", "-C", worktreePath, "rebase", defBranch).CombinedOutput()
 	if err != nil {
 		// Abort so the repo is not stuck mid-rebase.
 		exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run()
-		if IsConflictOutput(string(out)) {
+		if IsConflictOutput(string(out)) || IsRebaseNeedsMergeOutput(string(out)) {
 			return &ConflictError{
 				WorktreePath:    worktreePath,
 				ConflictedFiles: parseConflictedFiles(string(out)),
@@ -30,6 +35,69 @@ func RebaseOntoDefault(repoPath, worktreePath string) error {
 		return fmt.Errorf("git rebase in %s: %w\n%s", worktreePath, err, out)
 	}
 	return nil
+}
+
+// recoverRebaseState aborts any stale merge/rebase state before retrying.
+// It only fails when Git metadata is corrupted or a cleanly recoverable state
+// cannot be restored; common non-rebase states are ignored.
+func recoverRebaseState(worktreePath string) error {
+	inRebaseOrMerge, err := hasRebaseOrMergeState(worktreePath)
+	if err != nil {
+		return fmt.Errorf("check stale rebase state in %s: %w", worktreePath, err)
+	}
+	if !inRebaseOrMerge {
+		return nil
+	}
+
+	// Clear stale merge/rebase metadata so the next attempt starts clean.
+	_ = exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run()
+	_ = exec.Command("git", "-C", worktreePath, "merge", "--abort").Run()
+
+	if err := clearConflictedPaths(worktreePath); err != nil {
+		return fmt.Errorf("clear stale rebase state in %s: %w", worktreePath, err)
+	}
+
+	if hasConflicts, statusErr := HasConflicts(worktreePath); statusErr == nil {
+		if hasConflicts {
+			return &ConflictError{
+				WorktreePath: worktreePath,
+				RawOutput:    "pre-rebase cleanup still reports unmerged files",
+			}
+		}
+	}
+
+	return nil
+}
+
+// hasRebaseOrMergeState checks whether Git currently has leftover rebase or
+// merge state under .git/rebase-apply, .git/rebase-merge, or .git/MERGE_HEAD.
+func hasRebaseOrMergeState(worktreePath string) (bool, error) {
+	if _, err := exec.Command("git", "-C", worktreePath, "rev-parse", "--verify", "-q", "REBASE_HEAD").Output(); err == nil {
+		return true, nil
+	}
+	if _, err := exec.Command("git", "-C", worktreePath, "rev-parse", "--verify", "-q", "MERGE_HEAD").Output(); err == nil {
+		return true, nil
+	}
+	if _, err := exec.Command("git", "-C", worktreePath, "rev-parse", "--verify", "-q", "CHERRY_PICK_HEAD").Output(); err == nil {
+		return true, nil
+	}
+	return false, nil
+}
+
+// clearConflictedPaths removes unmerged markers introduced by stale conflict
+// states while preserving tracked content. This is a no-op when nothing is
+// blocked.
+func clearConflictedPaths(worktreePath string) error {
+	if err := exec.Command("git", "-C", worktreePath, "reset", "--merge").Run(); err == nil {
+		return nil
+	}
+	if err := exec.Command("git", "-C", worktreePath, "restore", "--staged", "--worktree", "--source=HEAD", "--", ".").Run(); err == nil {
+		return nil
+	}
+	if err := exec.Command("git", "-C", worktreePath, "reset", "--hard", "HEAD").Run(); err == nil {
+		return nil
+	}
+	return fmt.Errorf("git clean failed in %s: clear conflicted state", worktreePath)
 }
 
 // FFMerge fast-forward merges branchName into the default branch of repoPath.

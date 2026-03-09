@@ -38,6 +38,21 @@ func parseConflictedFiles(output string) []string {
 	return files
 }
 
+// IsRebaseNeedsMergeOutput reports if git output likely indicates the repo is
+// stuck in or blocked by an active/previous rebase or merge state.
+func IsRebaseNeedsMergeOutput(s string) bool {
+	ls := strings.ToLower(s)
+	return strings.Contains(ls, "needs merge") ||
+		strings.Contains(ls, "you have not concluded your merge") ||
+		strings.Contains(ls, "please commit your changes before you can rebase") ||
+		strings.Contains(ls, "could not rebase") ||
+		strings.Contains(ls, "unable to rebase") ||
+		strings.Contains(ls, "rebase in progress") ||
+		strings.Contains(ls, "another rebase-apply") ||
+		strings.Contains(ls, "resolve your current index first") ||
+		strings.Contains(ls, "merge in progress")
+}
+
 // IsGitRepo reports whether path is inside a git repository.
 func IsGitRepo(path string) bool {
 	return exec.Command("git", "-C", path, "rev-parse", "--git-dir").Run() == nil
