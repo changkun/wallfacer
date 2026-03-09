@@ -31,6 +31,7 @@ function createElement(overrides = {}) {
     style: {},
     setAttribute: vi.fn(),
     className: '',
+    addEventListener: vi.fn(),
     ...overrides,
   };
 }
@@ -65,6 +66,8 @@ function makeContext(overrides = {}) {
       documentElement: createElement(),
       querySelectorAll: (selector) => {
         if (selector === '#theme-switch button') return elements.get('theme-buttons') || [];
+        if (selector === '.settings-tab') return elements.get('settings-tabs') || [];
+        if (selector === '.settings-tab-content') return elements.get('settings-tab-panels') || [];
         return [];
       },
       getElementById: (id) => elements.get(id) || null,
@@ -83,6 +86,20 @@ function makeContext(overrides = {}) {
   };
 
   return vm.createContext(ctx);
+}
+
+function makeSettingsTabs(tabNames = ['appearance', 'execution', 'workspace', 'insights', 'about']) {
+  return tabNames.map((name) => createElement({
+    getAttribute: (attr) => attr === 'data-settings-tab' ? name : null,
+    classList: createClassList(),
+  }));
+}
+
+function makeSettingsPanels(tabNames = ['appearance', 'execution', 'workspace', 'insights', 'about']) {
+  return tabNames.map((name) => createElement({
+    getAttribute: (attr) => attr === 'data-settings-tab' ? name : null,
+    classList: createClassList(),
+  }));
 }
 
 function loadScript(ctx, filename) {
@@ -188,5 +205,52 @@ describe('theme helpers', () => {
 
     expect(modal.classList.contains('hidden')).toBe(true);
     expect(modal.style.display).toBe('');
+  });
+
+  it('initializes settings tabs and applies active state by tab name', () => {
+    const tabButtons = makeSettingsTabs();
+    const tabPanels = makeSettingsPanels();
+    const ctx = makeContext({
+      elements: [
+        ['theme-buttons', [createButton('auto'), createButton('light'), createButton('dark')]],
+        ['settings-tabs', tabButtons],
+        ['settings-tab-panels', tabPanels],
+        ['settings-modal', createElement({})],
+      ],
+      loadMaxParallel: vi.fn(),
+      loadOversightInterval: vi.fn(),
+      loadAutoPush: vi.fn(),
+    });
+    loadScript(ctx, 'theme.js');
+
+    ctx.initSettingsTabs();
+    const switched = ctx.setSettingsTab('workspace');
+
+    expect(switched).toBe(true);
+    expect(tabButtons[0].classList.contains('active')).toBe(false);
+    expect(tabButtons[2].classList.contains('active')).toBe(true);
+    expect(tabPanels[2].classList.contains('active')).toBe(true);
+    expect(tabPanels[0].classList.contains('active')).toBe(false);
+  });
+
+  it('registers click handlers when initializing settings tabs', () => {
+    const tabButtons = makeSettingsTabs(['appearance', 'execution']);
+    const ctx = makeContext({
+      elements: [
+        ['theme-buttons', [createButton('auto'), createButton('light'), createButton('dark')]],
+        ['settings-tabs', tabButtons],
+        ['settings-tab-panels', makeSettingsPanels(['appearance', 'execution'])],
+        ['settings-modal', createElement({})],
+      ],
+      loadMaxParallel: vi.fn(),
+      loadOversightInterval: vi.fn(),
+      loadAutoPush: vi.fn(),
+    });
+    loadScript(ctx, 'theme.js');
+
+    ctx.initSettingsTabs();
+
+    expect(tabButtons[0].addEventListener).toHaveBeenCalledWith('click', expect.any(Function));
+    expect(tabButtons[1].addEventListener).toHaveBeenCalledWith('click', expect.any(Function));
   });
 });

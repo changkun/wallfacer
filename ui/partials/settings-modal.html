@@ -7,14 +7,16 @@
         <button onclick="closeSettings()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
       </div>
 
-      <div class="settings-tab-list" role="tablist" aria-label="Settings tabs">
-        <button id="settings-tab-appearance" type="button" class="settings-tab active" role="tab" aria-selected="true" data-settings-tab="appearance">Appearance</button>
-        <button id="settings-tab-execution" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="execution">Execution</button>
-        <button id="settings-tab-workspace" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="workspace">Workspace</button>
-        <button id="settings-tab-insights" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="insights">Insights</button>
-        <button id="settings-tab-about" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="about">About</button>
-      </div>
+      <div class="settings-layout">
+        <div class="settings-tab-list" role="tablist" aria-label="Settings tabs">
+          <button id="settings-tab-appearance" type="button" class="settings-tab active" role="tab" aria-selected="true" data-settings-tab="appearance">Appearance</button>
+          <button id="settings-tab-execution" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="execution">Execution</button>
+          <button id="settings-tab-workspace" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="workspace">Workspace</button>
+          <button id="settings-tab-insights" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="insights">Insights</button>
+          <button id="settings-tab-about" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="about">About</button>
+        </div>
 
+        <div class="settings-tab-content-wrap">
       <div class="settings-tab-content active" data-settings-tab="appearance">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Theme</div>
         <div class="theme-switch" id="theme-switch">
@@ -177,9 +179,10 @@
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
             MIT License &middot; Copyright &copy; 2026 <a href="https://changkun.de" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; transition: color 0.15s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='inherit'">Changkun Ou</a>
+            </div>
           </div>
         </div>
+        </div>
       </div>
-    </div>
   </div>
 </div>
