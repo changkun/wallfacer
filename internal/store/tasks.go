@@ -155,6 +155,7 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 
 	now := time.Now()
 	task := &Task{
+		SchemaVersion:  CurrentTaskSchemaVersion,
 		ID:             uuid.New(),
 		Prompt:         prompt,
 		Status:         TaskStatusBacklog,

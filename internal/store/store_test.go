@@ -3,10 +3,14 @@
 package store
 
 import (
+	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -290,5 +294,264 @@ func TestListSummaries_ReturnsOnlyDoneTasks(t *testing.T) {
 	}
 	if len(summaries) > 0 && summaries[0].TaskID != done.ID {
 		t.Errorf("summary TaskID = %v, want %v", summaries[0].TaskID, done.ID)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Schema migration tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestMigrateTaskJSON_LegacyNoSchemaVersion verifies that a task.json written
+// before schema versioning was introduced gets all missing fields defaulted and
+// SchemaVersion stamped.
+func TestMigrateTaskJSON_LegacyNoSchemaVersion(t *testing.T) {
+	id := uuid.New()
+	raw := []byte(fmt.Sprintf(`{"id":%q,"prompt":"legacy task"}`, id.String()))
+	modTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	task, changed, err := migrateTaskJSON(raw, modTime)
+	if err != nil {
+		t.Fatalf("migrateTaskJSON: %v", err)
+	}
+	if !changed {
+		t.Error("expected changed=true for legacy JSON missing defaults")
+	}
+	if task.Status != TaskStatusBacklog {
+		t.Errorf("Status = %q, want %q", task.Status, TaskStatusBacklog)
+	}
+	if task.Timeout != 60 {
+		t.Errorf("Timeout = %d, want 60 (default)", task.Timeout)
+	}
+	if !task.CreatedAt.Equal(modTime) {
+		t.Errorf("CreatedAt = %v, want %v (file mod time)", task.CreatedAt, modTime)
+	}
+	if !task.UpdatedAt.Equal(modTime) {
+		t.Errorf("UpdatedAt = %v, want %v (file mod time)", task.UpdatedAt, modTime)
+	}
+	if task.SchemaVersion != CurrentTaskSchemaVersion {
+		t.Errorf("SchemaVersion = %d, want %d", task.SchemaVersion, CurrentTaskSchemaVersion)
+	}
+}
+
+// TestMigrateTaskJSON_AlreadyCurrent verifies that a fully-populated current
+// task.json is not marked as changed.
+func TestMigrateTaskJSON_AlreadyCurrent(t *testing.T) {
+	id := uuid.New()
+	now := time.Now().UTC().Truncate(time.Second)
+	raw := []byte(fmt.Sprintf(`{
+		"schema_version": %d,
+		"id": %q,
+		"prompt": "current task",
+		"status": "backlog",
+		"timeout": 30,
+		"created_at": %q,
+		"updated_at": %q
+	}`, CurrentTaskSchemaVersion, id.String(), now.Format(time.RFC3339), now.Format(time.RFC3339)))
+
+	_, changed, err := migrateTaskJSON(raw, time.Now())
+	if err != nil {
+		t.Fatalf("migrateTaskJSON: %v", err)
+	}
+	if changed {
+		t.Error("expected changed=false for already-current task JSON")
+	}
+}
+
+// TestMigrateTaskJSON_CanonicalizeDependsOn verifies that DependsOn entries
+// are trimmed, UUID-validated, deduplicated, and sorted.
+func TestMigrateTaskJSON_CanonicalizeDependsOn(t *testing.T) {
+	id1 := uuid.New()
+	id2 := uuid.New()
+	// Ensure id1 < id2 in canonical string form for predictable sort assertion.
+	if id1.String() > id2.String() {
+		id1, id2 = id2, id1
+	}
+
+	// Include: whitespace padding, duplicate (id1 repeated), invalid UUID, and
+	// uppercase variant of id2 that should round-trip to lowercase.
+	raw := []byte(fmt.Sprintf(`{
+		"schema_version": %d,
+		"id": "11111111-1111-1111-1111-111111111111",
+		"prompt": "p",
+		"status": "backlog",
+		"timeout": 30,
+		"created_at": "2024-01-01T00:00:00Z",
+		"updated_at": "2024-01-01T00:00:00Z",
+		"depends_on": [" %s ", "%s", "not-a-uuid", "%s"]
+	}`,
+		CurrentTaskSchemaVersion,
+		id1.String(), id2.String(),
+		id1.String(), // duplicate
+	))
+
+	task, changed, err := migrateTaskJSON(raw, time.Now())
+	if err != nil {
+		t.Fatalf("migrateTaskJSON: %v", err)
+	}
+	if !changed {
+		t.Error("expected changed=true for DependsOn requiring canonicalization")
+	}
+
+	want := []string{id1.String(), id2.String()}
+	sort.Strings(want)
+	if !stringSliceEqual(task.DependsOn, want) {
+		t.Errorf("DependsOn = %v, want %v", task.DependsOn, want)
+	}
+}
+
+// TestMigrateTaskJSON_InvalidDependsOnDropped verifies that a DependsOn list
+// containing only invalid UUIDs results in nil (keeping JSON clean).
+func TestMigrateTaskJSON_InvalidDependsOnDropped(t *testing.T) {
+	now := "2024-01-01T00:00:00Z"
+	raw := []byte(fmt.Sprintf(`{
+		"schema_version": %d,
+		"id": "22222222-2222-2222-2222-222222222222",
+		"prompt": "p",
+		"status": "backlog",
+		"timeout": 30,
+		"created_at": %q,
+		"updated_at": %q,
+		"depends_on": ["not-a-uuid", "also-not", ""]
+	}`, CurrentTaskSchemaVersion, now, now))
+
+	task, changed, err := migrateTaskJSON(raw, time.Now())
+	if err != nil {
+		t.Fatalf("migrateTaskJSON: %v", err)
+	}
+	if !changed {
+		t.Error("expected changed=true when invalid DependsOn entries are dropped")
+	}
+	if task.DependsOn != nil {
+		t.Errorf("DependsOn = %v, want nil after dropping all invalid entries", task.DependsOn)
+	}
+}
+
+// TestLoadAll_MigratesLegacyJSON is an integration test that writes a legacy
+// task.json (no schema_version, no status, no timeout, no timestamps) directly
+// to disk, loads it via NewStore, and asserts that:
+//  1. The in-memory task has all defaults applied.
+//  2. The on-disk task.json is re-written with the current schema version.
+func TestLoadAll_MigratesLegacyJSON(t *testing.T) {
+	dir := t.TempDir()
+	id := uuid.New()
+	taskDir := filepath.Join(dir, id.String())
+	if err := os.MkdirAll(filepath.Join(taskDir, "traces"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	legacy := fmt.Sprintf(`{"id":%q,"prompt":"legacy prompt"}`, id.String())
+	taskFile := filepath.Join(taskDir, "task.json")
+	if err := os.WriteFile(taskFile, []byte(legacy), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	task, err := s.GetTask(bg(), id)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if task.Status != TaskStatusBacklog {
+		t.Errorf("Status = %q, want %q", task.Status, TaskStatusBacklog)
+	}
+	if task.Timeout != 60 {
+		t.Errorf("Timeout = %d, want 60", task.Timeout)
+	}
+	if task.SchemaVersion != CurrentTaskSchemaVersion {
+		t.Errorf("in-memory SchemaVersion = %d, want %d", task.SchemaVersion, CurrentTaskSchemaVersion)
+	}
+	if task.CreatedAt.IsZero() {
+		t.Error("CreatedAt is zero after migration")
+	}
+
+	// Verify the migrated task.json was persisted back to disk.
+	raw, err := os.ReadFile(taskFile)
+	if err != nil {
+		t.Fatalf("read migrated task.json: %v", err)
+	}
+	var persisted Task
+	if err := json.Unmarshal(raw, &persisted); err != nil {
+		t.Fatalf("unmarshal persisted task.json: %v", err)
+	}
+	if persisted.SchemaVersion != CurrentTaskSchemaVersion {
+		t.Errorf("persisted SchemaVersion = %d, want %d", persisted.SchemaVersion, CurrentTaskSchemaVersion)
+	}
+	if persisted.Status != TaskStatusBacklog {
+		t.Errorf("persisted Status = %q, want %q", persisted.Status, TaskStatusBacklog)
+	}
+}
+
+// TestCreateTask_StampsSchemaVersion verifies that newly created tasks have
+// SchemaVersion = CurrentTaskSchemaVersion both in memory and on disk.
+func TestCreateTask_StampsSchemaVersion(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "versioned task", 10, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if task.SchemaVersion != CurrentTaskSchemaVersion {
+		t.Errorf("in-memory SchemaVersion = %d, want %d", task.SchemaVersion, CurrentTaskSchemaVersion)
+	}
+
+	// Reload and check on-disk value.
+	raw, err := os.ReadFile(filepath.Join(s.dir, task.ID.String(), "task.json"))
+	if err != nil {
+		t.Fatalf("read task.json: %v", err)
+	}
+	var persisted Task
+	if err := json.Unmarshal(raw, &persisted); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if persisted.SchemaVersion != CurrentTaskSchemaVersion {
+		t.Errorf("persisted SchemaVersion = %d, want %d", persisted.SchemaVersion, CurrentTaskSchemaVersion)
+	}
+}
+
+// TestMutationMethods_StampSchemaVersion verifies that any mutation method
+// (UpdateTaskTitle used as a representative) re-stamps the schema version so
+// that even tasks loaded without migration get their version corrected on the
+// next write.
+func TestMutationMethods_StampSchemaVersion(t *testing.T) {
+	dir := t.TempDir()
+	id := uuid.New()
+	taskDir := filepath.Join(dir, id.String())
+	if err := os.MkdirAll(filepath.Join(taskDir, "traces"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write a task with schema_version=0 (legacy).
+	legacy := fmt.Sprintf(`{"schema_version":0,"id":%q,"prompt":"p","status":"backlog","timeout":30,"created_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z"}`, id.String())
+	taskFile := filepath.Join(taskDir, "task.json")
+	if err := os.WriteFile(taskFile, []byte(legacy), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	// After loading, schema version is already migrated to current.
+	// Perform a mutation to confirm the version stays current.
+	if err := s.UpdateTaskTitle(bg(), id, "Updated Title"); err != nil {
+		t.Fatalf("UpdateTaskTitle: %v", err)
+	}
+
+	raw, err := os.ReadFile(taskFile)
+	if err != nil {
+		t.Fatalf("read task.json: %v", err)
+	}
+	var persisted Task
+	if err := json.Unmarshal(raw, &persisted); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if persisted.SchemaVersion != CurrentTaskSchemaVersion {
+		t.Errorf("SchemaVersion after mutation = %d, want %d", persisted.SchemaVersion, CurrentTaskSchemaVersion)
+	}
+	if persisted.Title != "Updated Title" {
+		t.Errorf("Title = %q, want 'Updated Title'", persisted.Title)
 	}
 }

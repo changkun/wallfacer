@@ -12,7 +12,10 @@ import (
 
 // saveTask atomically writes a task's metadata to its task.json file.
 // Must be called with s.mu held for writing.
+// It stamps SchemaVersion = CurrentTaskSchemaVersion on every write so that
+// all on-disk files are always at the current schema version.
 func (s *Store) saveTask(id uuid.UUID, task *Task) error {
+	task.SchemaVersion = CurrentTaskSchemaVersion
 	path := filepath.Join(s.dir, id.String(), "task.json")
 	return atomicWriteJSON(path, task)
 }
