@@ -25,9 +25,8 @@ func TestBuildRefinementPromptIncludesTaskAgeAndValidityDecision(t *testing.T) {
 		"Current date: 2026-03-08",
 		"Task age: 45 days",
 		"Backlog status at refinement start: backlog",
-		"## Backlog Validity Decision",
-		"Validity Decision: [KEEP | REWRITE | CLOSE]",
-		"partially completed already, duplicated by another task, or no longer applicable",
+		"## Backlog Outcome",
+		"Outcome: [KEEP | REWRITE | CLOSE]",
 		"<user_instructions>\npreserve backward compatibility\n</user_instructions>",
 	} {
 		if !strings.Contains(prompt, want) {
