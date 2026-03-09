@@ -382,9 +382,9 @@ function updateCard(card, t, rank) {
   }
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
   const showDiff = !!(t.worktree_paths && Object.keys(t.worktree_paths).length > 0);
-  const showOversight = (t.status === 'done' || t.status === 'failed') && !isArchived && hasExecutionTrail(t);
   const ocCached = cardOversightCache.get(t.id);
-  const ocSummary = ocCached ? `${ocCached.phase_count} phases` : 'Generating\u2026';
+  const showOversight = (t.status === 'done' || t.status === 'failed') && !isArchived && hasExecutionTrail(t) && !!ocCached;
+  const ocSummary = ocCached && ocCached.phase_count != null ? `${ocCached.phase_count} phases` : '';
   card.style.opacity = isArchived ? '0.55' : '';
   // Failed tasks in the waiting column get a red left border to distinguish them.
   if (t.status === 'failed') {
