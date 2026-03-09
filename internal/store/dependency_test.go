@@ -108,7 +108,7 @@ func TestAreDependenciesSatisfied_DeletedDep(t *testing.T) {
 	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
 	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
 	s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
-	s.DeleteTask(bg(), a.ID)
+	s.DeleteTask(bg(), a.ID, "")
 
 	ok, err := s.AreDependenciesSatisfied(bg(), b.ID)
 	if err != nil {

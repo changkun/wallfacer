@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 62,
+  "route_count": 63,
   "routes": [
     {
       "method": "GET",
@@ -357,6 +357,15 @@
       ]
     },
     {
+      "method": "GET",
+      "pattern": "/api/tasks/deleted",
+      "name": "ListDeletedTasks",
+      "description": "List soft-deleted (tombstoned) tasks that are within the retention window.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
       "method": "PATCH",
       "pattern": "/api/tasks/{id}",
       "name": "UpdateTask",
@@ -415,6 +424,15 @@
       "pattern": "/api/tasks/{id}/resume",
       "name": "ResumeTask",
       "description": "Resume a failed task using its existing session.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/tasks/{id}/restore",
+      "name": "RestoreTask",
+      "description": "Restore a soft-deleted task by removing its tombstone.",
       "tags": [
         "tasks"
       ]

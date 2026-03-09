@@ -52,7 +52,7 @@ func TestSubscribe_DeleteSendsDeletedDelta(t *testing.T) {
 	id, ch := s.Subscribe()
 	defer s.Unsubscribe(id)
 
-	s.DeleteTask(bg(), task.ID)
+	s.DeleteTask(bg(), task.ID, "")
 
 	select {
 	case delta := <-ch:

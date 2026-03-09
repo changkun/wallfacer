@@ -44,6 +44,7 @@ type Store struct {
 	mu      sync.RWMutex
 	dir     string
 	tasks   map[uuid.UUID]*Task
+	deleted map[uuid.UUID]*Task // tombstoned tasks (soft-deleted, not yet purged)
 	events  map[uuid.UUID][]TaskEvent
 	nextSeq map[uuid.UUID]int
 
@@ -72,6 +73,7 @@ func NewStore(dir string) (*Store, error) {
 	s := &Store{
 		dir:         dir,
 		tasks:       make(map[uuid.UUID]*Task),
+		deleted:     make(map[uuid.UUID]*Task),
 		events:      make(map[uuid.UUID][]TaskEvent),
 		nextSeq:     make(map[uuid.UUID]int),
 		searchIndex: make(map[uuid.UUID]indexedTaskText),
@@ -134,6 +136,21 @@ func (s *Store) loadAll() error {
 			logger.Store.Warn("skipping task", "name", entry.Name(), "error", err)
 			continue
 		}
+
+		// Check for a tombstone marker; if present this task is soft-deleted.
+		tombPath := filepath.Join(s.dir, entry.Name(), "tombstone.json")
+		if tombRaw, err := os.ReadFile(tombPath); err == nil {
+			var tomb Tombstone
+			if jsonUnmarshal(tombRaw, &tomb) == nil {
+				s.deleted[id] = &task
+				// Load events so deleted tasks' history remains accessible.
+				if err := s.loadEvents(id, entry.Name()); err != nil {
+					return err
+				}
+				continue
+			}
+		}
+
 		s.tasks[id] = &task
 
 		// Persist the migrated task back to disk so future loads skip migration.

@@ -95,6 +95,13 @@ func runServer(configDir string, args []string) {
 	defer s.Close()
 	logger.Main.Info("store loaded", "path", scopedDataDir)
 
+	// Purge tombstoned tasks older than the retention period.
+	tombstoneRetentionDays := 7
+	if v, err := strconv.Atoi(os.Getenv("WALLFACER_TOMBSTONE_RETENTION_DAYS")); err == nil && v > 0 {
+		tombstoneRetentionDays = v
+	}
+	s.PurgeExpiredTombstones(tombstoneRetentionDays)
+
 	worktreesDir := filepath.Join(configDir, "worktrees")
 	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
 		logger.Fatal(logger.Main, "create worktrees dir", "error", err)
@@ -397,6 +404,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"SearchTasks":              h.SearchTasks,
 		"ArchiveAllDone":           h.ArchiveAllDone,
 		"ListSummaries":            h.ListSummaries,
+		"ListDeletedTasks":         h.ListDeletedTasks,
 
 		// Task instance operations (UUID extracted via withID).
 		"UpdateTask":    withID(h.UpdateTask),
@@ -406,6 +414,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"CompleteTask":  withID(h.CompleteTask),
 		"CancelTask":    withID(h.CancelTask),
 		"ResumeTask":    withID(h.ResumeTask),
+		"RestoreTask":   withID(h.RestoreTask),
 		"ArchiveTask":   withID(h.ArchiveTask),
 		"UnarchiveTask": withID(h.UnarchiveTask),
 		"SyncTask":      withID(h.SyncTask),

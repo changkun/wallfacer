@@ -322,7 +322,7 @@ func TestStreamTasks_DeleteEmitsTaskDeleted(t *testing.T) {
 	}()
 
 	time.Sleep(20 * time.Millisecond)
-	h.store.DeleteTask(ctx, task.ID)
+	h.store.DeleteTask(ctx, task.ID, "")
 	time.Sleep(20 * time.Millisecond)
 	cancel()
 	<-done

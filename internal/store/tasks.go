@@ -297,8 +297,11 @@ func normalizeSandboxByActivity(input map[string]string) map[string]string {
 	return out
 }
 
-// DeleteTask removes a task and all its on-disk data.
-func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
+// DeleteTask soft-deletes a task by writing a tombstone.json marker.
+// The task directory is retained on disk; the task is moved from s.tasks to
+// s.deleted so it no longer appears in ListTasks but can be restored.
+// reason is optional human-readable context for why the task was deleted.
+func (s *Store) DeleteTask(_ context.Context, id uuid.UUID, reason string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -306,18 +309,110 @@ func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
 	if !ok {
 		return fmt.Errorf("task not found: %s", id)
 	}
+	tomb := Tombstone{DeletedAt: time.Now(), Reason: reason}
+	tombPath := filepath.Join(s.dir, id.String(), "tombstone.json")
+	if err := atomicWriteJSON(tombPath, tomb); err != nil {
+		return fmt.Errorf("write tombstone: %w", err)
+	}
+	delete(s.tasks, id)
+	delete(s.searchIndex, id)
+	s.deleted[id] = t
+	s.notify(t, true) // task-deleted delta — SSE clients work unchanged
+	return nil
+}
 
+// ListDeletedTasks returns all soft-deleted (tombstoned) tasks sorted by UpdatedAt DESC.
+func (s *Store) ListDeletedTasks(_ context.Context) ([]Task, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]Task, 0, len(s.deleted))
+	for _, t := range s.deleted {
+		cp := *t
+		out = append(out, cp)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].UpdatedAt.After(out[j].UpdatedAt)
+	})
+	return out, nil
+}
+
+// RestoreTask removes the tombstone from a soft-deleted task, moving it back
+// into the active task map so it reappears in ListTasks.
+func (s *Store) RestoreTask(_ context.Context, id uuid.UUID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.deleted[id]
+	if !ok {
+		return fmt.Errorf("deleted task not found: %s", id)
+	}
+	tombPath := filepath.Join(s.dir, id.String(), "tombstone.json")
+	if err := os.Remove(tombPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove tombstone: %w", err)
+	}
+	delete(s.deleted, id)
+	s.tasks[id] = t
+	oversightRaw, _ := s.LoadOversightText(id)
+	s.searchIndex[id] = buildIndexEntry(t, oversightRaw)
+	s.notify(t, false)
+	return nil
+}
+
+// PurgeTask permanently removes a tombstoned task's directory and all in-memory
+// state. It can only be called on tasks already in s.deleted.
+func (s *Store) PurgeTask(_ context.Context, id uuid.UUID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.purgeTaskLocked(id)
+}
+
+// purgeTaskLocked is the internal implementation of PurgeTask, called while
+// s.mu is already held for writing. It is shared between PurgeTask and
+// PurgeExpiredTombstones to avoid re-locking.
+func (s *Store) purgeTaskLocked(id uuid.UUID) error {
+	if _, ok := s.deleted[id]; !ok {
+		return fmt.Errorf("no tombstoned task: %s", id)
+	}
 	taskDir := filepath.Join(s.dir, id.String())
 	if err := os.RemoveAll(taskDir); err != nil {
-		return fmt.Errorf("remove task dir: %w", err)
+		return fmt.Errorf("purge task dir: %w", err)
 	}
-
-	delete(s.tasks, id)
+	delete(s.deleted, id)
 	delete(s.events, id)
 	delete(s.nextSeq, id)
-	delete(s.searchIndex, id)
-	s.notify(t, true)
 	return nil
+}
+
+// PurgeExpiredTombstones permanently removes all tombstoned tasks whose
+// tombstone was written more than retentionDays days ago. It reads each
+// tombstone file from disk to get the authoritative DeletedAt time, so that
+// manually back-dated files are handled correctly. Errors for individual tasks
+// are logged and skipped so a single bad file does not block the whole sweep.
+func (s *Store) PurgeExpiredTombstones(retentionDays int) {
+	threshold := time.Now().AddDate(0, 0, -retentionDays)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for id := range s.deleted {
+		tombPath := filepath.Join(s.dir, id.String(), "tombstone.json")
+		raw, err := os.ReadFile(tombPath)
+		if err != nil {
+			logger.Store.Warn("purge: read tombstone", "task", id, "error", err)
+			continue
+		}
+		var tomb Tombstone
+		if err := jsonUnmarshal(raw, &tomb); err != nil {
+			logger.Store.Warn("purge: parse tombstone", "task", id, "error", err)
+			continue
+		}
+		if tomb.DeletedAt.Before(threshold) {
+			if err := s.purgeTaskLocked(id); err != nil {
+				logger.Store.Warn("purge: remove task", "task", id, "error", err)
+			} else {
+				logger.Store.Info("purged expired tombstone", "task", id, "deleted_at", tomb.DeletedAt)
+			}
+		}
+	}
 }
 
 // UpdateTaskStatus sets a task's status field, enforcing the state machine.

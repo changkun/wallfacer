@@ -269,7 +269,7 @@ async function deleteTask(id) {
 
 function deleteCurrentTask() {
   if (!getOpenModalTaskId()) return;
-  if (!confirm('Delete this task?')) return;
+  if (!confirm('This task will be recoverable for 7 days. Delete anyway?')) return;
   deleteTask(getOpenModalTaskId());
   closeModal();
 }

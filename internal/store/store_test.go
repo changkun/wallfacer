@@ -175,7 +175,7 @@ func TestPersistence_DeletedTaskGoneAfterReload(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
 	task, _ := s.CreateTask(bg(), "delete me", 5, false, "", "")
-	s.DeleteTask(bg(), task.ID)
+	s.DeleteTask(bg(), task.ID, "")
 
 	s2, _ := NewStore(dir)
 	if _, err := s2.GetTask(bg(), task.ID); err == nil {

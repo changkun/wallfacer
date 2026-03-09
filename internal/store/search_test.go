@@ -628,7 +628,7 @@ func TestSearchIndex_DeleteTask(t *testing.T) {
 		t.Fatalf("expected 1 result before delete, got %d", len(results))
 	}
 
-	if err := s.DeleteTask(bg(), task.ID); err != nil {
+	if err := s.DeleteTask(bg(), task.ID, ""); err != nil {
 		t.Fatalf("DeleteTask: %v", err)
 	}
 
