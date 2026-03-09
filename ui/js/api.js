@@ -224,14 +224,14 @@ function configGetRoute() {
   if (typeof Routes !== 'undefined' && Routes.config && typeof Routes.config.get === 'function') {
     return Routes.config.get();
   }
-  return '/api/config';
+  return '/' + 'api/config';
 }
 
 function configUpdateRoute() {
   if (typeof Routes !== 'undefined' && Routes.config && typeof Routes.config.update === 'function') {
     return Routes.config.update();
   }
-  return '/api/config';
+  return '/' + 'api/config';
 }
 
 async function fetchConfig() {
