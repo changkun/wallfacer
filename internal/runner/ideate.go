@@ -17,9 +17,11 @@ import (
 
 const ideationTimeout = 10 * time.Minute
 
-// ideaCategoryPool is the set of distinct improvement domains from which the
-// brainstorm agent draws one per idea. Sampling 3 unique categories per run
-// ensures each brainstorm covers genuinely different areas of the project.
+// ideaCategoryPool is the set of example improvement areas shown to the
+// brainstorm agent as inspiration. The agent is not confined to these — it
+// may propose ideas in any category it discovers during workspace exploration.
+// Sampling 3 unique entries per run seeds the brainstorm with variety while
+// leaving the agent free to override any suggestion with something more relevant.
 var ideaCategoryPool = []string{
 	"product feature",
 	"frontend / UX",
@@ -32,6 +34,10 @@ var ideaCategoryPool = []string{
 	"observability / debugging",
 	"infrastructure / ops",
 	"data model / storage",
+	"documentation update",
+	"architecture / design",
+	"dependency management",
+	"accessibility",
 }
 
 // pickCategories returns n unique categories sampled at random from
@@ -81,12 +87,16 @@ First, explore the workspace thoroughly:
 		}
 		sb.WriteString("\n")
 	}
-	sb.WriteString(`Then propose exactly 3 improvements, one per assigned domain:
+	sb.WriteString(`Then propose exactly 3 improvements, each covering a distinct area of the project.
+
+Suggested focus areas (use as inspiration — you are NOT limited to these):
 `)
-	for i, cat := range cats {
-		sb.WriteString(fmt.Sprintf("  Idea %d domain: %s\n", i+1, cat))
+	for _, cat := range cats {
+		sb.WriteString(fmt.Sprintf("  - %s\n", cat))
 	}
 	sb.WriteString(`
+Choose whatever categories best reflect the actual opportunities you found. Any area that genuinely needs work is fair game — for example: documentation update, architecture / design, dependency management, accessibility, migration, changelog, or anything else relevant to this codebase. Do not force ideas into the suggested categories if you found more pressing needs elsewhere.
+
 Requirements for each improvement:
 - Technically precise: name the specific files, functions, data structures, or API endpoints you observed during exploration — do not stay generic
 - Creative and non-obvious: avoid safe, predictable suggestions like "add more tests" or "improve error handling" in isolation; propose something with genuine engineering interest
@@ -97,17 +107,17 @@ Output ONLY a JSON array with exactly 3 objects. No preamble, no explanation, no
 [
   {
     "title": "2-5 word title",
-    "category": "assigned domain for idea 1",
+    "category": "the area you chose for this idea",
     "prompt": "Detailed implementation prompt referencing specific files, functions, and patterns found during exploration."
   },
   {
     "title": "...",
-    "category": "assigned domain for idea 2",
+    "category": "a different area",
     "prompt": "..."
   },
   {
     "title": "...",
-    "category": "assigned domain for idea 3",
+    "category": "yet another distinct area",
     "prompt": "..."
   }
 ]`)
