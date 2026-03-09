@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"changkun.de/wallfacer/internal/logger"
 	"github.com/google/uuid"
@@ -90,12 +91,28 @@ func (s *Store) loadAll() error {
 			logger.Store.Warn("skipping task", "name", entry.Name(), "error", err)
 			continue
 		}
-		var task Task
-		if err := jsonUnmarshal(raw, &task); err != nil {
+
+		// Determine file mod time for defaulting missing timestamps.
+		var modTime time.Time
+		if fi, err := os.Stat(taskPath); err == nil {
+			modTime = fi.ModTime()
+		} else {
+			modTime = time.Now()
+		}
+
+		task, changed, err := migrateTaskJSON(raw, modTime)
+		if err != nil {
 			logger.Store.Warn("skipping task", "name", entry.Name(), "error", err)
 			continue
 		}
 		s.tasks[id] = &task
+
+		// Persist the migrated task back to disk so future loads skip migration.
+		if changed {
+			if err := s.saveTask(id, &task); err != nil {
+				logger.Store.Warn("failed to persist migrated task", "name", entry.Name(), "error", err)
+			}
+		}
 
 		if err := s.loadEvents(id, entry.Name()); err != nil {
 			return err

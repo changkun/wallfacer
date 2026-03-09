@@ -154,8 +154,15 @@ func (s TaskStatus) AllowedTransitions() []TaskStatus {
 	return allowedTransitions[s]
 }
 
+// CurrentTaskSchemaVersion is the on-disk schema version for task.json.
+// Increment this constant whenever a new migration step is added to
+// migrateTaskJSON so that already-migrated files are not re-written on
+// every startup.
+const CurrentTaskSchemaVersion = 1
+
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
+	SchemaVersion  int                 `json:"schema_version"`
 	ID             uuid.UUID           `json:"id"`
 	Title          string              `json:"title,omitempty"`
 	Prompt         string              `json:"prompt"`
