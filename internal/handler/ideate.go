@@ -100,38 +100,32 @@ func (h *Handler) scheduleIdeation(ctx context.Context) {
 	logger.Handler.Info("ideation: next run scheduled", "at", nextRun.Format(time.RFC3339))
 }
 
-const ideaAgentPrompt = "Analyzes the workspace and proposes 3 actionable improvements."
-
 // createIdeaAgentTask creates a new idea-agent task card and immediately
 // promotes it to in_progress, starting the runner. Returns nil if creation
 // or promotion fails.
 func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
-	task, err := h.store.CreateTask(ctx, ideaAgentPrompt, ideaAgentDefaultTimeout, false, "", store.TaskKindIdeaAgent)
+	tasks, err := h.store.ListTasks(ctx, false)
 	if err != nil {
-		logger.Handler.Warn("ideation: create idea-agent task", "error", err)
+		logger.Handler.Warn("ideation: list tasks for execution prompt", "error", err)
 		return nil
 	}
 
-	// Populate the execution prompt immediately so the UI can render the full,
-	// synthesized ideation prompt on the idea-agent card from the start.
-	tasks, err := h.store.ListTasks(ctx, false)
-	if err == nil {
-		activeTasks := make([]store.Task, 0, len(tasks))
-		for _, t := range tasks {
-			if t.Kind == store.TaskKindIdeaAgent {
-				continue
-			}
-			switch t.Status {
-			case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
-				activeTasks = append(activeTasks, t)
-			}
+	activeTasks := make([]store.Task, 0, len(tasks))
+	for _, t := range tasks {
+		if t.Kind == store.TaskKindIdeaAgent {
+			continue
 		}
-		ideationPrompt := h.runner.BuildIdeationPrompt(activeTasks)
-		if err := h.store.UpdateTaskExecutionPrompt(ctx, task.ID, ideationPrompt); err != nil {
-			logger.Handler.Warn("ideation: set execution prompt", "task", task.ID, "error", err)
+		switch t.Status {
+		case store.TaskStatusBacklog, store.TaskStatusInProgress, store.TaskStatusWaiting:
+			activeTasks = append(activeTasks, t)
 		}
-	} else {
-		logger.Handler.Warn("ideation: list tasks for execution prompt", "error", err)
+	}
+
+	ideaPrompt := h.runner.BuildIdeationPrompt(activeTasks)
+	task, err := h.store.CreateTask(ctx, ideaPrompt, ideaAgentDefaultTimeout, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		logger.Handler.Warn("ideation: create idea-agent task", "error", err)
+		return nil
 	}
 
 	// Set the title immediately so the card always shows the date/time.
