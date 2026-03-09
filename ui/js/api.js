@@ -239,7 +239,6 @@ function startTasksStream() {
       }
       const archivedIdx = archivedTasks.findIndex(t => t.id === id);
       if (archivedIdx >= 0) archivedTasks.splice(archivedIdx, 1);
-      invalidateDiffBehindCounts(id);
       scheduleRender();
     } catch (err) {
       console.error('tasks SSE task-deleted parse error:', err);

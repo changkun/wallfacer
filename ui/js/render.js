@@ -117,6 +117,7 @@ function updateInProgressCount() {
   updateMaxParallelTag();
 }
 
+const BEHIND_TTL_MS = 5 * 60 * 1000; // 5 minutes — how long a behind-count stays fresh without an explicit invalidation
 const diffCache = new Map(); // taskId -> {diff: string, behindCounts, updatedAt, behindFetchedAt} | 'loading'
 const cardOversightCache = new Map(); // taskId -> {phase_count, phases}
 
@@ -168,9 +169,13 @@ function renderDiffInto(el, diff) {
 async function fetchDiff(card, taskId, updatedAt) {
   const cached = diffCache.get(taskId);
   if (cached === 'loading') return;
-  // Cache is valid if the task hasn't changed AND behind-counts were freshly checked.
-  // behindFetchedAt is zeroed by invalidateDiffBehindCounts() whenever any task changes.
-  if (cached && cached.updatedAt === updatedAt && cached.behindFetchedAt) {
+  // Cache is valid if the task hasn't changed AND behind-counts are still fresh.
+  // behindFetchedAt is zeroed by invalidateDiffBehindCounts() for the specific changed task,
+  // or expires naturally after BEHIND_TTL_MS so that a slowly-advancing default branch
+  // is eventually reflected without requiring an explicit invalidation event.
+  if (cached && cached.updatedAt === updatedAt &&
+      cached.behindFetchedAt &&
+      (Date.now() - cached.behindFetchedAt) < BEHIND_TTL_MS) {
     const diffEl = card.querySelector('[data-diff]');
     if (diffEl) applyDiffToCard(diffEl, cached.diff, cached.behindCounts, taskId);
     return;

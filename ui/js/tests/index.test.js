@@ -5,7 +5,7 @@
  * dependency on a real browser DOM.  Only the minimal browser globals that
  * each script needs at module-evaluation time are provided.
  */
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -389,5 +389,87 @@ describe('populateDependsOnPicker status ordering', () => {
       return badge.className.replace('badge badge-', '');
     });
     expect(statuses).toEqual(['in_progress', 'waiting', 'backlog', 'done']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 9 – invalidateDiffBehindCounts and fetchDiff TTL (render.js)
+// Verifies that:
+//   (a) invalidateDiffBehindCounts(taskId) only zeroes the specified entry;
+//   (b) invalidateDiffBehindCounts() with no arg zeroes every entry;
+//   (c) fetchDiff skips the network when the cached behind-count is fresh;
+//   (d) fetchDiff re-fetches when the behind-count has expired (> BEHIND_TTL_MS old).
+// ---------------------------------------------------------------------------
+describe('invalidateDiffBehindCounts and fetchDiff TTL', () => {
+  let ctx;
+  let apiCalls;
+
+  beforeEach(() => {
+    apiCalls = [];
+    ctx = makeContext({
+      // Provide a stub api() that records paths and returns minimal diff data.
+      api: async (path) => { apiCalls.push(path); return { diff: 'stub', behind_counts: {} }; },
+      // render.js uses escapeHtml inside applyDiffToCard; provide a stub so
+      // loading the script doesn't throw if any path exercises it.
+      escapeHtml: (s) => String(s ?? ''),
+      requestAnimationFrame: (fn) => { fn(); },
+    });
+    loadScript('state.js', ctx);
+    loadScript('render.js', ctx);
+    // Start each test with an empty cache.
+    vm.runInContext('diffCache.clear();', ctx);
+  });
+
+  it('invalidateDiffBehindCounts(taskId) zeroes only the named entry', () => {
+    vm.runInContext(`
+      diffCache.set('task-a', { diff: '', behindCounts: {}, updatedAt: 'ts1', behindFetchedAt: 12345 });
+      diffCache.set('task-b', { diff: '', behindCounts: {}, updatedAt: 'ts2', behindFetchedAt: 67890 });
+    `, ctx);
+
+    ctx.invalidateDiffBehindCounts('task-a');
+
+    const a = vm.runInContext('diffCache.get("task-a").behindFetchedAt', ctx);
+    const b = vm.runInContext('diffCache.get("task-b").behindFetchedAt', ctx);
+    expect(a).toBe(0);
+    expect(b).toBe(67890);
+  });
+
+  it('invalidateDiffBehindCounts() with no argument zeroes every cached entry', () => {
+    vm.runInContext(`
+      diffCache.set('task-a', { diff: '', behindCounts: {}, updatedAt: 'ts1', behindFetchedAt: 11111 });
+      diffCache.set('task-b', { diff: '', behindCounts: {}, updatedAt: 'ts2', behindFetchedAt: 22222 });
+    `, ctx);
+
+    ctx.invalidateDiffBehindCounts();
+
+    const a = vm.runInContext('diffCache.get("task-a").behindFetchedAt', ctx);
+    const b = vm.runInContext('diffCache.get("task-b").behindFetchedAt', ctx);
+    expect(a).toBe(0);
+    expect(b).toBe(0);
+  });
+
+  it('fetchDiff skips the network request when cached entry is fresh', async () => {
+    // Seed the cache with a timestamp that is well within BEHIND_TTL_MS.
+    vm.runInContext(`
+      diffCache.set('task-x', { diff: 'cached', behindCounts: {}, updatedAt: 'ts-x', behindFetchedAt: Date.now() });
+    `, ctx);
+    const card = { querySelector: () => null };
+
+    await ctx.fetchDiff(card, 'task-x', 'ts-x');
+
+    expect(apiCalls).toHaveLength(0);
+  });
+
+  it('fetchDiff re-fetches when the behind-count has aged past BEHIND_TTL_MS', async () => {
+    // Seed the cache with a behindFetchedAt that is one millisecond beyond the TTL.
+    vm.runInContext(`
+      diffCache.set('task-y', { diff: 'old', behindCounts: {}, updatedAt: 'ts-y', behindFetchedAt: Date.now() - BEHIND_TTL_MS - 1 });
+    `, ctx);
+    const card = { querySelector: () => null };
+
+    await ctx.fetchDiff(card, 'task-y', 'ts-y');
+
+    expect(apiCalls).toHaveLength(1);
+    expect(apiCalls[0]).toContain('task-y');
   });
 });
