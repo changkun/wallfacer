@@ -234,6 +234,7 @@ async function updateTaskStatus(id, status) {
     fetchTasks();
   } catch (e) {
     showAlert('Error updating task: ' + e.message);
+    fetchTasks();
   }
 }
 

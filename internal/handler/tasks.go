@@ -249,6 +249,25 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			})
 			h.diffCache.invalidate(id)
 		} else {
+			// Enforce concurrency limit for manual backlog → in_progress transitions.
+			if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog && !task.IsTestRun {
+				allTasks, err := h.store.ListTasks(r.Context(), false)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				regularInProgress := 0
+				for i := range allTasks {
+					if allTasks[i].Status == store.TaskStatusInProgress && !allTasks[i].IsTestRun {
+						regularInProgress++
+					}
+				}
+				if regularInProgress >= h.maxConcurrentTasks() {
+					http.Error(w, fmt.Sprintf("max concurrent tasks (%d) reached", h.maxConcurrentTasks()), http.StatusConflict)
+					return
+				}
+			}
+
 			if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
 				if errors.Is(err, store.ErrInvalidTransition) {
 					http.Error(w, err.Error(), http.StatusBadRequest)
