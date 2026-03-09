@@ -1,14 +1,14 @@
 // --- Container Monitor ---
 
 var containerMonitorInterval = null;
+var containerMonitorStateCtrl;
 
 function showContainerMonitor(e) {
   if (e) e.stopPropagation();
   closeSettings();
 
   var modal = document.getElementById('container-monitor-modal');
-  modal.classList.remove('hidden');
-  modal.style.display = 'flex';
+  openModalPanel(modal);
 
   // Show loading, hide others.
   setContainerMonitorState('loading');
@@ -20,8 +20,7 @@ function showContainerMonitor(e) {
 
 function closeContainerMonitor() {
   var modal = document.getElementById('container-monitor-modal');
-  modal.classList.add('hidden');
-  modal.style.display = '';
+  closeModalPanel(modal);
   if (containerMonitorInterval) {
     clearInterval(containerMonitorInterval);
     containerMonitorInterval = null;
@@ -34,37 +33,20 @@ function refreshContainerMonitor() {
 }
 
 function setContainerMonitorState(state) {
-  var loading = document.getElementById('container-monitor-loading');
-  var error   = document.getElementById('container-monitor-error');
-  var empty   = document.getElementById('container-monitor-empty');
-  var table   = document.getElementById('container-monitor-table-wrap');
-
-  loading.style.display = state === 'loading' ? 'flex' : 'none';
-  error.classList.toggle('hidden', state !== 'error');
-  empty.classList.toggle('hidden', state !== 'empty');
-  table.classList.toggle('hidden', state !== 'table');
+  if (!containerMonitorStateCtrl) {
+    containerMonitorStateCtrl = createModalStateController({
+      loadingEl: document.getElementById('container-monitor-loading'),
+      errorEl: document.getElementById('container-monitor-error'),
+      emptyEl: document.getElementById('container-monitor-empty'),
+      contentEl: document.getElementById('container-monitor-table-wrap'),
+      contentState: 'table'
+    });
+  }
+  return containerMonitorStateCtrl(state);
 }
 
 function fetchContainers() {
-  fetch('/api/containers')
-    .then(function(res) {
-      return res.json().then(function(data) {
-        return { ok: res.ok, data: data };
-      });
-    })
-    .then(function(result) {
-      if (!result.ok) {
-        document.getElementById('container-monitor-error').textContent =
-          result.data.error || 'Unknown error';
-        setContainerMonitorState('error');
-        return;
-      }
-      renderContainers(result.data);
-    })
-    .catch(function(err) {
-      document.getElementById('container-monitor-error').textContent = String(err);
-      setContainerMonitorState('error');
-    });
+  loadJsonEndpoint('/api/containers', renderContainers, setContainerMonitorState);
 }
 
 function renderContainers(containers) {
@@ -86,10 +68,7 @@ function renderContainers(containers) {
   tbody.innerHTML = '';
 
   containers.forEach(function(c) {
-    var tr = document.createElement('tr');
-    tr.style.cssText = 'border-bottom: 1px solid var(--border); transition: background 0.1s;';
-    tr.addEventListener('mouseenter', function() { tr.style.background = 'var(--bg-raised)'; });
-    tr.addEventListener('mouseleave', function() { tr.style.background = ''; });
+    var tr = createHoverRow([]);
 
     var shortID = c.id ? c.id.substring(0, 12) : '—';
     var stateColor = containerStateColor(c.state);
@@ -168,6 +147,7 @@ function relativeTime(ms) {
 }
 
 // Close modal on backdrop click.
-document.getElementById('container-monitor-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeContainerMonitor();
-});
+(function() {
+  var modal = document.getElementById('container-monitor-modal');
+  bindModalBackdropClose(modal, closeContainerMonitor);
+})();
