@@ -78,6 +78,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Sandbox           string            `json:"sandbox"`
 		SandboxByActivity map[string]string `json:"sandbox_by_activity"`
 		Kind              store.TaskKind    `json:"kind"`
+		MaxCostUSD        float64           `json:"max_cost_usd"`
+		MaxInputTokens    int               `json:"max_input_tokens"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -109,7 +111,13 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if req.Sandbox != "" || req.SandboxByActivity != nil {
+	if req.MaxCostUSD > 0 || req.MaxInputTokens > 0 {
+		if err := h.store.UpdateTaskBudget(r.Context(), task.ID, &req.MaxCostUSD, &req.MaxInputTokens); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	if req.Sandbox != "" || req.SandboxByActivity != nil || req.MaxCostUSD > 0 || req.MaxInputTokens > 0 {
 		task, err = h.store.GetTask(r.Context(), task.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -141,6 +149,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Sandbox           *string            `json:"sandbox"`
 		SandboxByActivity *map[string]string `json:"sandbox_by_activity"`
 		DependsOn         *[]string          `json:"depends_on"`
+		MaxCostUSD        *float64           `json:"max_cost_usd"`
+		MaxInputTokens    *int               `json:"max_input_tokens"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -152,8 +162,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, timeout, fresh_start, mount_worktrees, and sandbox for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil) {
+	// Allow editing prompt, timeout, fresh_start, mount_worktrees, sandbox, and budget for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil) {
 		sandbox := task.Sandbox
 		if req.Sandbox != nil {
 			sandbox = *req.Sandbox
@@ -166,7 +176,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if err := h.store.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees, req.SandboxByActivity); err != nil {
+		if err := h.store.UpdateTaskBacklog(r.Context(), id, req.Prompt, req.Timeout, req.FreshStart, req.MountWorktrees, req.SandboxByActivity, req.MaxCostUSD, req.MaxInputTokens); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -175,6 +185,14 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+		}
+	}
+
+	// Allow raising budget limits for waiting tasks (so users can continue a paused task).
+	if task.Status == store.TaskStatusWaiting && (req.MaxCostUSD != nil || req.MaxInputTokens != nil) {
+		if err := h.store.UpdateTaskBudget(r.Context(), id, req.MaxCostUSD, req.MaxInputTokens); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 

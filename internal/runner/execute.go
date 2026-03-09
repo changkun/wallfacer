@@ -308,6 +308,35 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			logger.Runner.Warn("append turn usage", "task", task.ID, "error", err)
 		}
 
+		// Budget guardrail: pause the task when accumulated spend exceeds user-set limits.
+		if currentTask, gErr := r.store.GetTask(bgCtx, taskID); gErr == nil {
+			u := currentTask.Usage
+			totalInputTokens := u.InputTokens + u.CacheReadInputTokens + u.CacheCreationTokens
+			budgetExceeded := (currentTask.MaxCostUSD > 0 && u.CostUSD >= currentTask.MaxCostUSD) ||
+				(currentTask.MaxInputTokens > 0 && totalInputTokens >= currentTask.MaxInputTokens)
+			if budgetExceeded {
+				var reason string
+				if currentTask.MaxCostUSD > 0 && u.CostUSD >= currentTask.MaxCostUSD {
+					reason = fmt.Sprintf("cost budget exceeded: $%.4f of $%.4f", u.CostUSD, currentTask.MaxCostUSD)
+				} else {
+					reason = fmt.Sprintf("token budget exceeded: %d of %d input tokens", totalInputTokens, currentTask.MaxInputTokens)
+				}
+				statusSet = true
+				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+					"from":    string(store.TaskStatusInProgress),
+					"to":      string(store.TaskStatusWaiting),
+					"trigger": store.TriggerSystem,
+				})
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]any{
+					"message":         reason,
+					"budget_exceeded": true,
+				})
+				r.GenerateOversightBackground(taskID)
+				return
+			}
+		}
+
 		if output.IsError {
 			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)

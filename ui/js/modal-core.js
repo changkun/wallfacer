@@ -84,6 +84,10 @@ async function openModal(id) {
     document.getElementById('modal-edit-timeout').value = String(task.timeout || 60);
     document.getElementById('modal-edit-mount-worktrees').checked = !!task.mount_worktrees;
     document.getElementById('modal-edit-sandbox').value = task.sandbox || '';
+    const editMaxCostEl = document.getElementById('modal-edit-max-cost-usd');
+    if (editMaxCostEl) editMaxCostEl.value = task.max_cost_usd > 0 ? String(task.max_cost_usd) : '';
+    const editMaxTokensEl = document.getElementById('modal-edit-max-input-tokens');
+    if (editMaxTokensEl) editMaxTokensEl.value = task.max_input_tokens > 0 ? String(task.max_input_tokens) : '';
     if (typeof bindTaskSandboxInheritance === 'function') {
       bindTaskSandboxInheritance('modal-edit-sandbox', 'modal-edit-sandbox-');
     }
@@ -137,6 +141,24 @@ async function openModal(id) {
     document.getElementById('modal-usage-cache-creation').textContent = u.cache_creation_input_tokens.toLocaleString();
     document.getElementById('modal-usage-cost').textContent = '$' + u.cost_usd.toFixed(4);
     usageSection.classList.remove('hidden');
+
+    // Budget row: show current vs limit when a budget is configured.
+    const budgetWrap = document.getElementById('modal-usage-budget-wrap');
+    const budgetEl = document.getElementById('modal-usage-budget');
+    if (budgetWrap && budgetEl && (task.max_cost_usd > 0 || task.max_input_tokens > 0)) {
+      const parts = [];
+      if (task.max_cost_usd > 0) {
+        parts.push('$' + (u.cost_usd || 0).toFixed(4) + ' / $' + task.max_cost_usd.toFixed(2));
+      }
+      if (task.max_input_tokens > 0) {
+        const totalIn = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+        parts.push(totalIn.toLocaleString() + ' / ' + task.max_input_tokens.toLocaleString() + ' tokens');
+      }
+      budgetEl.textContent = parts.join(' · ');
+      budgetWrap.classList.remove('hidden');
+    } else if (budgetWrap) {
+      budgetWrap.classList.add('hidden');
+    }
 
     // Per-sub-agent breakdown
     const breakdownEl = document.getElementById('modal-usage-breakdown');
@@ -545,6 +567,22 @@ async function openModal(id) {
 
     if (page.has_more) {
       _appendEventsLoadMore(container, id, page.next_after, seq);
+    }
+
+    // Budget-exceeded banner: show when the most recent system event has budget_exceeded:true
+    // and the task is currently waiting.
+    const budgetBanner = document.getElementById('modal-budget-exceeded-banner');
+    if (budgetBanner) {
+      const systemEvents = events.filter(e => e.event_type === 'system');
+      const lastSystem = systemEvents[systemEvents.length - 1];
+      const isBudgetExceeded = task.status === 'waiting' && lastSystem && lastSystem.data && lastSystem.data.budget_exceeded;
+      if (isBudgetExceeded) {
+        budgetBanner.classList.remove('hidden');
+        const bannerMsg = document.getElementById('modal-budget-exceeded-msg');
+        if (bannerMsg) bannerMsg.textContent = lastSystem.data.message || 'Budget limit reached';
+      } else {
+        budgetBanner.classList.add('hidden');
+      }
     }
   } catch (e) {
     if (e && e.name === 'AbortError') return;

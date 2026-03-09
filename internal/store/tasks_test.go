@@ -727,7 +727,7 @@ func TestUpdateTaskBacklog_UpdatesPrompt(t *testing.T) {
 	task, _ := s.CreateTask(bg(), "original", 5, false, "", "")
 	newPrompt := "updated prompt"
 
-	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -741,7 +741,7 @@ func TestUpdateTaskBacklog_UpdatesTimeout(t *testing.T) {
 	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
 	newTimeout := 30
 
-	s.UpdateTaskBacklog(bg(), task.ID, nil, &newTimeout, nil, nil, nil)
+	s.UpdateTaskBacklog(bg(), task.ID, nil, &newTimeout, nil, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 30 {
@@ -754,7 +754,7 @@ func TestUpdateTaskBacklog_ClampsTimeout(t *testing.T) {
 	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
 	big := 9999
 
-	s.UpdateTaskBacklog(bg(), task.ID, nil, &big, nil, nil, nil)
+	s.UpdateTaskBacklog(bg(), task.ID, nil, &big, nil, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 1440 {
@@ -767,7 +767,7 @@ func TestUpdateTaskBacklog_UpdatesFreshStart(t *testing.T) {
 	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
 	fresh := true
 
-	s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fresh, nil, nil)
+	s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fresh, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.FreshStart {
@@ -779,7 +779,7 @@ func TestUpdateTaskBacklog_NilFieldsAreNoOps(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "original", 5, false, "", "")
 
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog with all nils: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -790,7 +790,7 @@ func TestUpdateTaskBacklog_NilFieldsAreNoOps(t *testing.T) {
 
 func TestUpdateTaskBacklog_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.UpdateTaskBacklog(bg(), uuid.New(), nil, nil, nil, nil, nil); err == nil {
+	if err := s.UpdateTaskBacklog(bg(), uuid.New(), nil, nil, nil, nil, nil, nil, nil); err == nil {
 		t.Error("expected error for unknown task")
 	}
 }
@@ -821,7 +821,7 @@ func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
 
 	// Enable mount_worktrees.
 	enable := true
-	s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &enable, nil)
+	s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &enable, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.MountWorktrees {
@@ -830,7 +830,7 @@ func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
 
 	// Disable mount_worktrees.
 	disable := false
-	s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &disable, nil)
+	s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &disable, nil, nil, nil)
 
 	got, _ = s.GetTask(bg(), task.ID)
 	if got.MountWorktrees {

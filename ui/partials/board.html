@@ -38,6 +38,15 @@
           <label for="new-mount-worktrees" class="text-xs text-v-muted" style="cursor:pointer;">Mount sibling worktrees (read-only)</label>
         </div>
         <details class="mt-2">
+          <summary class="text-xs text-v-muted" style="cursor:pointer;">Budget limits (optional)</summary>
+          <div class="mt-2 flex items-center gap-2 flex-wrap">
+            <label class="text-xs text-v-muted" style="white-space:nowrap;">Cost limit (USD)</label>
+            <input type="number" id="new-max-cost-usd" min="0" step="0.01" placeholder="0 = unlimited" class="field text-xs" style="width:120px;">
+            <label class="text-xs text-v-muted" style="white-space:nowrap;">Input token limit</label>
+            <input type="number" id="new-max-input-tokens" min="0" step="1000" placeholder="0 = unlimited" class="field text-xs" style="width:140px;">
+          </div>
+        </details>
+        <details class="mt-2">
           <summary class="text-xs text-v-muted" style="cursor:pointer;">Advanced: per-activity sandbox overrides</summary>
           <div class="mt-2" style="border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px;">
             <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Implementation</span><select id="new-sandbox-implementation" class="select text-xs" title="Implementation sandbox" data-sandbox-select="true"></select></div>

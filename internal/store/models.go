@@ -190,6 +190,8 @@ type Task struct {
 	StopReason     *string              `json:"stop_reason"`
 	Turns          int                  `json:"turns"`
 	Timeout        int                  `json:"timeout"`
+	MaxCostUSD     float64              `json:"max_cost_usd,omitempty"`    // 0 = unlimited
+	MaxInputTokens int                  `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
 	Usage          TaskUsage            `json:"usage"`
 	Sandbox        string               `json:"sandbox,omitempty"`
 	SandboxByActivity map[string]string `json:"sandbox_by_activity,omitempty"`

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 )
@@ -146,5 +147,49 @@ func TestTask_HasTag(t *testing.T) {
 	}
 	if task.HasTag("frontend") {
 		t.Error("expected HasTag to return false for missing tag")
+	}
+}
+
+// TestTaskBudgetFieldsRoundTrip verifies that MaxCostUSD and MaxInputTokens
+// survive JSON marshal→unmarshal with correct values, and that zero values are
+// omitted (omitempty) for backwards compatibility with existing task files.
+func TestTaskBudgetFieldsRoundTrip(t *testing.T) {
+	original := Task{
+		MaxCostUSD:     1.5,
+		MaxInputTokens: 50000,
+	}
+
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+
+	var decoded Task
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+
+	if decoded.MaxCostUSD != 1.5 {
+		t.Errorf("MaxCostUSD = %f, want 1.5", decoded.MaxCostUSD)
+	}
+	if decoded.MaxInputTokens != 50000 {
+		t.Errorf("MaxInputTokens = %d, want 50000", decoded.MaxInputTokens)
+	}
+
+	// Zero values should be omitted (omitempty).
+	zero := Task{}
+	zeroData, err := json.Marshal(zero)
+	if err != nil {
+		t.Fatalf("json.Marshal zero: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(zeroData, &m); err != nil {
+		t.Fatalf("json.Unmarshal zero: %v", err)
+	}
+	if _, ok := m["max_cost_usd"]; ok {
+		t.Error("max_cost_usd should be omitted from JSON when zero (omitempty)")
+	}
+	if _, ok := m["max_input_tokens"]; ok {
+		t.Error("max_input_tokens should be omitted from JSON when zero (omitempty)")
 	}
 }

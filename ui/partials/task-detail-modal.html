@@ -72,6 +72,15 @@
               <label for="modal-edit-mount-worktrees" class="text-xs text-v-secondary" style="cursor:pointer;">Mount sibling worktrees (read-only)</label>
             </div>
             <details class="mt-2">
+              <summary class="text-xs text-v-muted" style="cursor:pointer;">Budget limits (optional)</summary>
+              <div class="mt-2 flex items-center gap-2 flex-wrap">
+                <label for="modal-edit-max-cost-usd" class="text-xs text-v-muted" style="white-space:nowrap;">Cost limit (USD)</label>
+                <input type="number" id="modal-edit-max-cost-usd" min="0" step="0.01" placeholder="0 = unlimited" class="field text-xs" style="width:120px;" onchange="scheduleBacklogSave()">
+                <label for="modal-edit-max-input-tokens" class="text-xs text-v-muted" style="white-space:nowrap;">Input token limit</label>
+                <input type="number" id="modal-edit-max-input-tokens" min="0" step="1000" placeholder="0 = unlimited" class="field text-xs" style="width:140px;" onchange="scheduleBacklogSave()">
+              </div>
+            </details>
+            <details class="mt-2">
               <summary class="text-xs text-v-muted" style="cursor:pointer;">Advanced: per-activity sandbox overrides</summary>
               <div class="mt-2" style="border:1px solid var(--border);border-radius:8px;padding:8px;display:grid;gap:6px;">
                 <div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Implementation</span><select id="modal-edit-sandbox-implementation" class="select text-xs" onchange="scheduleBacklogSave()" data-sandbox-select="true"></select></div>
@@ -153,6 +162,10 @@
               <div class="flex justify-between"><span class="usage-label">Cache creation</span><span id="modal-usage-cache-creation" class="usage-value"></span></div>
               <div class="flex justify-between" style="grid-column: span 2; padding-top: 4px; border-top: 1px solid var(--border); margin-top: 4px;"><span class="usage-label">Total cost</span><span id="modal-usage-cost" class="usage-value"></span></div>
             </div>
+            <!-- Budget row: shown when a budget is configured -->
+            <div id="modal-usage-budget-wrap" class="hidden" style="margin-top: 8px; padding: 6px 8px; border-radius: 6px; background: var(--bg-secondary, rgba(0,0,0,0.04)); font-size: 12px;">
+              <span class="usage-label" style="margin-right: 8px;">Budget</span><span id="modal-usage-budget" class="usage-value"></span>
+            </div>
             <!-- Per-sub-agent breakdown (shown when breakdown data is available) -->
             <div id="modal-usage-breakdown" class="hidden" style="margin-top: 8px;">
               <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Breakdown</div>
@@ -160,6 +173,16 @@
             </div>
           </div>
 
+          <!-- Budget-exceeded banner (shown when task is waiting due to budget limit) -->
+          <div id="modal-budget-exceeded-banner" class="hidden mb-4" style="padding:10px 14px;border-radius:8px;background:#fef3c7;border:1px solid #f59e0b;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+              <div>
+                <span style="font-size:13px;font-weight:600;color:#92400e;">&#9888; Budget limit reached</span>
+                <div id="modal-budget-exceeded-msg" style="font-size:12px;color:#78350f;margin-top:2px;"></div>
+              </div>
+              <button onclick="openRaiseLimitInline()" class="btn" style="font-size:12px;padding:4px 10px;background:#f59e0b;color:#fff;border:none;">Raise limit</button>
+            </div>
+          </div>
           <!-- Feedback form for waiting tasks -->
           <div id="modal-feedback-section" class="hidden mb-4">
             <h3 class="section-title">Provide Feedback</h3>

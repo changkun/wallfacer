@@ -515,8 +515,8 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 	return true, nil
 }
 
-// UpdateTaskBacklog edits prompt, timeout, fresh_start, and mount_worktrees for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[string]string) error {
+// UpdateTaskBacklog edits prompt, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[string]string, maxCostUSD *float64, maxInputTokens *int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -539,6 +539,20 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 	if sandboxByActivity != nil {
 		t.SandboxByActivity = normalizeSandboxByActivity(*sandboxByActivity)
 	}
+	if maxCostUSD != nil {
+		v := *maxCostUSD
+		if v < 0 {
+			v = 0
+		}
+		t.MaxCostUSD = v
+	}
+	if maxInputTokens != nil {
+		v := *maxInputTokens
+		if v < 0 {
+			v = 0
+		}
+		t.MaxInputTokens = v
+	}
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
@@ -548,6 +562,39 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 			entry.prompt = strings.ToLower(*prompt)
 			s.searchIndex[id] = entry
 		}
+	}
+	s.notify(t, false)
+	return nil
+}
+
+// UpdateTaskBudget updates the max_cost_usd and max_input_tokens guardrails on
+// a task. Unlike UpdateTaskBacklog it is not gated on status, so it can be
+// called for waiting tasks to "raise the limit" from the UI.
+func (s *Store) UpdateTaskBudget(_ context.Context, id uuid.UUID, maxCostUSD *float64, maxInputTokens *int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	if maxCostUSD != nil {
+		v := *maxCostUSD
+		if v < 0 {
+			v = 0
+		}
+		t.MaxCostUSD = v
+	}
+	if maxInputTokens != nil {
+		v := *maxInputTokens
+		if v < 0 {
+			v = 0
+		}
+		t.MaxInputTokens = v
+	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
 	}
 	s.notify(t, false)
 	return nil
