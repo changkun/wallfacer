@@ -35,7 +35,8 @@ func TestIsRebaseNeedsMergeOutput(t *testing.T) {
 	}{
 		{"You have not concluded your merge (MERGE_HEAD exists). Please, commit your changes before you can rebase.", true},
 		{"Another rebase-apply is in progress.", true},
-		{"Cannot rebase: You have uncommitted changes.", false},
+		{"Cannot rebase: You have uncommitted changes.", true},
+		{"error: cannot rebase: You have unstaged changes.\nerror: Please commit or stash them.", true},
 		{"Could not apply commit", false},
 		{"", false},
 	}
