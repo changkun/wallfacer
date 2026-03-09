@@ -202,16 +202,12 @@ async function testSandboxConfig(sandbox) {
   }
 }
 
-async function showEnvConfigEditor(event) {
+function showEnvConfigEditor(event) {
   if (event) event.stopPropagation();
-  closeSettings();
+  return loadEnvConfig();
+}
 
-  const modal = document.getElementById('env-config-modal');
-  if (!modal) {
-    console.error('Sandbox configuration modal not found in DOM.');
-    return;
-  }
-
+async function loadEnvConfig() {
   const safeSetValue = (id, fn) => {
     const el = document.getElementById(id);
     if (!el) {
@@ -238,10 +234,6 @@ async function showEnvConfigEditor(event) {
   safeSetValue('env-config-status', (el) => { el.textContent = ''; });
   safeSetValue('env-claude-test-status', (el) => { el.textContent = ''; });
   safeSetValue('env-codex-test-status', (el) => { el.textContent = ''; });
-
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-  modal.style.display = 'flex';
 
   let cfg = {
     oauth_token: '',
@@ -279,16 +271,16 @@ async function showEnvConfigEditor(event) {
     if (el.textContent === 'Failed to load configuration.') return;
     el.textContent = '';
   });
+  if (typeof populateSandboxSelects === 'function') {
+    populateSandboxSelects();
+  }
   safeSetValue('env-claude-test-status', (el) => { el.textContent = ''; });
   safeSetValue('env-codex-test-status', (el) => { el.textContent = ''; });
 }
 
 function closeEnvConfigEditor() {
-  const modal = document.getElementById('env-config-modal');
-  if (!modal) return;
-  modal.classList.add('hidden');
-  modal.classList.remove('flex');
-  modal.style.display = '';
+  const statusEl = document.getElementById('env-config-status');
+  if (statusEl) statusEl.textContent = '';
 }
 
 async function saveEnvConfig() {

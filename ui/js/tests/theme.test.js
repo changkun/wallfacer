@@ -182,11 +182,13 @@ describe('theme helpers', () => {
 
   it('opens and closes settings modal while loading config', () => {
     const modal = createElement({ classList: createClassList(), style: {} });
+    const showEnvConfigEditor = vi.fn().mockResolvedValue();
     const ctx = makeContext({
       elements: [
         ['theme-buttons', [createButton('auto'), createButton('light'), createButton('dark')]],
         ['settings-modal', modal],
       ],
+      showEnvConfigEditor,
       loadMaxParallel: vi.fn(),
       loadOversightInterval: vi.fn(),
       loadAutoPush: vi.fn(),
@@ -200,6 +202,8 @@ describe('theme helpers', () => {
     expect(ctx.loadMaxParallel).toHaveBeenCalledTimes(1);
     expect(ctx.loadOversightInterval).toHaveBeenCalledTimes(1);
     expect(ctx.loadAutoPush).toHaveBeenCalledTimes(1);
+    expect(showEnvConfigEditor).toHaveBeenCalledTimes(1);
+    expect(showEnvConfigEditor).toHaveBeenCalledWith(null);
 
     ctx.closeSettings();
 
