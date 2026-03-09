@@ -86,6 +86,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	resp := map[string]any{
 		"workspaces":          h.runner.Workspaces(),
 		"instructions_path":   instructions.FilePath(h.configDir, h.workspaces),
+		"sandbox_activities":  store.SandboxActivities,
 		"sandboxes":           []string{"claude", "codex"},
 		"default_sandbox":     "claude",
 		"sandbox_usable":      map[string]bool{"claude": true, "codex": true},

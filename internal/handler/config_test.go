@@ -209,6 +209,51 @@ func TestGetConfig_ReportsCodexUsableWithHostAuth(t *testing.T) {
 	}
 }
 
+func TestGetConfig_SandboxActivities(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	raw, ok := resp["sandbox_activities"].([]any)
+	if !ok {
+		t.Fatalf("expected sandbox_activities to be an array, got %T (%v)", resp["sandbox_activities"], resp["sandbox_activities"])
+	}
+
+	// Must contain at least the seven canonical entries.
+	want := store.SandboxActivities
+	if len(raw) < len(want) {
+		t.Fatalf("expected at least %d sandbox_activities, got %d: %v", len(want), len(raw), raw)
+	}
+
+	got := make([]string, 0, len(raw))
+	for _, v := range raw {
+		s, ok := v.(string)
+		if !ok {
+			t.Fatalf("sandbox_activities entry is not a string: %T (%v)", v, v)
+		}
+		got = append(got, s)
+	}
+
+	// Value must exactly equal store.SandboxActivities.
+	for i, key := range want {
+		if !slices.Contains(got, key) {
+			t.Errorf("sandbox_activities[%d] = %q not found in response %v", i, key, got)
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("expected sandbox_activities length %d, got %d: %v", len(want), len(got), got)
+	}
+}
+
 // --- UpdateConfig ---
 
 func TestUpdateConfig_InvalidJSON(t *testing.T) {
