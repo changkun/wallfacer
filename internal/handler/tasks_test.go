@@ -2055,13 +2055,16 @@ func TestUpdateTask_RejectsUnknownFields(t *testing.T) {
 // goroutine would never arrive and the test would time out.
 func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
-	_ = envPath
 	h.SetAutopilot(true)
 	ctx := context.Background()
 
 	// Limit to 1 concurrent task so the second goroutine's Phase 2 is a no-op.
-	setMax := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"max_parallel_tasks":1}`))
-	h.UpdateEnvConfig(httptest.NewRecorder(), setMax)
+	// Write directly to the env file instead of going through UpdateEnvConfig,
+	// which spawns a goroutine that would race with the testPhase1Done field
+	// assignment below.
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
 
 	// Create two distinct backlog tasks.
 	_, err := h.store.CreateTask(ctx, "concurrent task one", 30, false, "", store.TaskKindTask)
