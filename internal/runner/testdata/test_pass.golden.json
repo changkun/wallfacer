@@ -1,0 +1,16 @@
+{
+  "output": {
+    "result": "All tests passed (42 tests, 0 failures).",
+    "session_id": "sess-jkl012",
+    "stop_reason": "end_turn",
+    "subtype": "success",
+    "is_error": false,
+    "total_cost_usd": 0.012,
+    "usage": {
+      "input_tokens": 768,
+      "output_tokens": 192,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0
+    }
+  }
+}

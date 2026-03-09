@@ -1,0 +1,16 @@
+{
+  "output": {
+    "result": "Tests failed: 3 failures out of 42 tests. Check output above for details.",
+    "session_id": "sess-mno345",
+    "stop_reason": "end_turn",
+    "subtype": "success",
+    "is_error": false,
+    "total_cost_usd": 0.011,
+    "usage": {
+      "input_tokens": 700,
+      "output_tokens": 175,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0
+    }
+  }
+}

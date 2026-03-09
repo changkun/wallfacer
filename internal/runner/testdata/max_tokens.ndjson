@@ -1,0 +1,3 @@
+{"session_id":"sess-def456","type":"system","subtype":"init"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Working on the task..."}]}}
+{"result":"","session_id":"sess-def456","stop_reason":"max_tokens","subtype":"","is_error":false,"total_cost_usd":0.025,"usage":{"input_tokens":4096,"output_tokens":4096,"cache_read_input_tokens":512,"cache_creation_input_tokens":0}}

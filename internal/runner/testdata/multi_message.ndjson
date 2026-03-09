@@ -1,0 +1,6 @@
+{"session_id":"sess-pqr678","type":"system","subtype":"init"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Starting analysis..."}]}}
+{"type":"tool_use","id":"tool-1","name":"bash","input":{"command":"ls -la"}}
+{"type":"tool_result","tool_use_id":"tool-1","content":"file1.go\nfile2.go\n"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"I can see two files."}]}}
+{"result":"Analysis complete. Found 2 Go source files.","session_id":"sess-pqr678","stop_reason":"end_turn","subtype":"success","is_error":false,"total_cost_usd":0.02,"usage":{"input_tokens":1500,"output_tokens":300,"cache_read_input_tokens":200,"cache_creation_input_tokens":0}}

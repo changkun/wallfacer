@@ -1,0 +1,3 @@
+{"session_id":"sess-stu901","type":"system","subtype":"init"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Working..."}]}}
+{"session_id":"sess-stu901","type":"heartbeat"}

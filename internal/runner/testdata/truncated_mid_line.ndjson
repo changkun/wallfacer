@@ -1,0 +1,4 @@
+{"session_id":"sess-ghi789","type":"system","subtype":"init"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Processing..."}]}}
+{"result":"Work completed before kill.","session_id":"sess-ghi789","stop_reason":"end_turn","subtype":"success","is_error":false,"total_cost_usd":0.008,"usage":{"input_tokens":512,"output_tokens":128,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}
+{"type":"assistant","content":"this json is truncated and was never
