@@ -108,6 +108,8 @@ var Routes = {
     search: function() { return "/api/tasks/search"; },
     // POST /api/tasks/archive-done
     archiveDone: function() { return "/api/tasks/archive-done"; },
+    // GET /api/tasks/summaries
+    summaries: function() { return "/api/tasks/summaries"; },
 
     // task(id) returns an object with path-builder methods for
     // all task-instance endpoints. Use the top-level task() alias.

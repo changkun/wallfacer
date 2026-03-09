@@ -12,8 +12,40 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"changkun.de/wallfacer/internal/logger"
 	"github.com/google/uuid"
 )
+
+// ListSummaries returns all task summaries found in data/*/summary.json.
+// It walks the data directory and reads each summary file independently,
+// without loading the full task.json. Tasks that completed before summary.json
+// was introduced will simply have no entry in the returned slice.
+func (s *Store) ListSummaries() ([]TaskSummary, error) {
+	entries, err := os.ReadDir(filepath.Join(s.dir))
+	if err != nil {
+		return nil, fmt.Errorf("read data dir: %w", err)
+	}
+
+	var summaries []TaskSummary
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		id, err := uuid.Parse(entry.Name())
+		if err != nil {
+			continue // skip non-UUID directories
+		}
+		summary, err := s.LoadSummary(id)
+		if err != nil {
+			logger.Store.Warn("failed to load summary", "id", id, "error", err)
+			continue
+		}
+		if summary != nil {
+			summaries = append(summaries, *summary)
+		}
+	}
+	return summaries, nil
+}
 
 // ErrRefinementAlreadyRunning is returned by StartRefinementJobIfIdle when a
 // refinement job is already in "running" state for the given task.
@@ -205,6 +237,9 @@ func (s *Store) DeleteTask(_ context.Context, id uuid.UUID) error {
 
 // UpdateTaskStatus sets a task's status field, enforcing the state machine.
 // Returns ErrInvalidTransition if the requested transition is not allowed.
+// When transitioning to TaskStatusDone, a summary.json is written atomically
+// before subscribers are notified, so the file is always present by the time
+// any observer sees the done state.
 func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskStatus) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -221,8 +256,44 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	if status == TaskStatusDone {
+		s.buildAndSaveSummary(*t)
+	}
 	s.notify(t, false)
 	return nil
+}
+
+// buildAndSaveSummary constructs a TaskSummary from the in-memory task and
+// persists it to data/<uuid>/summary.json atomically. It is called while
+// s.mu is held for writing so the file is present before any subscriber is
+// notified of the done transition. GetOversight reads directly from disk and
+// does not acquire s.mu, so it is safe to call here.
+func (s *Store) buildAndSaveSummary(task Task) {
+	oversight, _ := s.GetOversight(task.ID)
+	phaseCount := 0
+	if oversight != nil {
+		phaseCount = len(oversight.Phases)
+	}
+
+	duration := task.UpdatedAt.Sub(task.CreatedAt).Seconds()
+
+	summary := TaskSummary{
+		TaskID:          task.ID,
+		Title:           task.Title,
+		Status:          task.Status,
+		CompletedAt:     task.UpdatedAt,
+		CreatedAt:       task.CreatedAt,
+		DurationSeconds: duration,
+		TotalTurns:      task.Turns,
+		TotalCostUSD:    task.Usage.CostUSD,
+		ByActivity:      task.UsageBreakdown,
+		TestResult:      task.LastTestResult,
+		PhaseCount:      phaseCount,
+	}
+
+	if err := s.SaveSummary(task.ID, summary); err != nil {
+		logger.Store.Warn("failed to save task summary", "task", task.ID, "error", err)
+	}
 }
 
 // ForceUpdateTaskStatus sets a task's status field without validating the

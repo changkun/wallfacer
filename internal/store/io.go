@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,6 +37,34 @@ func (s *Store) SaveTurnOutput(taskID uuid.UUID, turn int, stdout, stderr []byte
 	}
 
 	return nil
+}
+
+// summaryPath returns the filesystem path for a task's summary.json file.
+func (s *Store) summaryPath(id uuid.UUID) string {
+	return filepath.Join(s.dir, id.String(), "summary.json")
+}
+
+// SaveSummary atomically writes the immutable task summary for a completed task.
+func (s *Store) SaveSummary(id uuid.UUID, summary TaskSummary) error {
+	return atomicWriteJSON(s.summaryPath(id), summary)
+}
+
+// LoadSummary reads the task summary for a completed task.
+// Returns (nil, nil) when no summary file exists (task completed before this
+// feature was introduced, or task is not in done status).
+func (s *Store) LoadSummary(id uuid.UUID) (*TaskSummary, error) {
+	data, err := os.ReadFile(s.summaryPath(id))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var summary TaskSummary
+	if err := json.Unmarshal(data, &summary); err != nil {
+		return nil, err
+	}
+	return &summary, nil
 }
 
 // atomicWriteJSON marshals v to JSON and writes it atomically via temp+rename.

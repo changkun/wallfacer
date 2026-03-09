@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/store"
+	"github.com/google/uuid"
 )
 
 // StatsResponse is the JSON body returned by GET /api/stats.
@@ -45,7 +46,13 @@ type DayStat struct {
 
 // aggregateStats computes a StatsResponse from the provided tasks.
 // Extracted as a pure function for testability.
-func aggregateStats(tasks []store.Task) StatsResponse {
+//
+// loadSummary is an optional function that loads a TaskSummary for a given task
+// ID. When non-nil and a summary exists for a done task, the summary's
+// ByActivity and TotalCostUSD are used in place of the live task fields,
+// keeping the hot path for completed tasks out of task.json. Pass nil to
+// always use the live Task struct (backward-compatible fallback, used in tests).
+func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.TaskSummary, error)) StatsResponse {
 	resp := StatsResponse{
 		ByStatus:   make(map[string]UsageStat),
 		ByActivity: make(map[string]UsageStat),
@@ -55,6 +62,15 @@ func aggregateStats(tasks []store.Task) StatsResponse {
 
 	for _, t := range tasks {
 		u := t.Usage
+		breakdown := t.UsageBreakdown
+
+		// For immutable done tasks, prefer the cached summary when available.
+		if t.Status == store.TaskStatusDone && loadSummary != nil {
+			if summary, err := loadSummary(t.ID); err == nil && summary != nil {
+				u.CostUSD = summary.TotalCostUSD
+				breakdown = summary.ByActivity
+			}
+		}
 
 		// Global totals.
 		resp.TotalCostUSD += u.CostUSD
@@ -71,7 +87,7 @@ func aggregateStats(tasks []store.Task) StatsResponse {
 		resp.ByStatus[statusKey] = s
 
 		// ByActivity buckets from per-task breakdown.
-		for activity, au := range t.UsageBreakdown {
+		for activity, au := range breakdown {
 			a := resp.ByActivity[activity]
 			a.CostUSD += au.CostUSD
 			a.InputTokens += au.InputTokens
@@ -138,5 +154,5 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, aggregateStats(tasks))
+	writeJSON(w, http.StatusOK, aggregateStats(tasks, h.store.LoadSummary))
 }

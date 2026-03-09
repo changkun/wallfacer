@@ -3,6 +3,7 @@
 package store
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -175,5 +176,119 @@ func TestPersistence_DeletedTaskGoneAfterReload(t *testing.T) {
 	s2, _ := NewStore(dir)
 	if _, err := s2.GetTask(bg(), task.ID); err == nil {
 		t.Error("expected task to be absent after delete + reload")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TaskSummary tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+// transitionToDone moves a task through the valid state machine path to done:
+// backlog → in_progress → committing → done.
+func transitionToDone(t *testing.T, s *Store, id uuid.UUID) {
+	t.Helper()
+	for _, status := range []TaskStatus{TaskStatusInProgress, TaskStatusCommitting, TaskStatusDone} {
+		if err := s.UpdateTaskStatus(bg(), id, status); err != nil {
+			t.Fatalf("UpdateTaskStatus(%s): %v", status, err)
+		}
+	}
+}
+
+// TestSummary_WrittenOnDoneTransition verifies that a summary.json is created
+// with correct fields when a task transitions to done.
+func TestSummary_WrittenOnDoneTransition(t *testing.T) {
+	s := newTestStore(t)
+
+	task, _ := s.CreateTask(bg(), "summary test", 10, false, "", "")
+	s.UpdateTaskTitle(bg(), task.ID, "Summary Test")
+	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
+		TaskUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.42})
+	s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
+	s.UpdateTaskTurns(bg(), task.ID, 3)
+
+	transitionToDone(t, s, task.ID)
+
+	summary, err := s.LoadSummary(task.ID)
+	if err != nil {
+		t.Fatalf("LoadSummary: %v", err)
+	}
+	if summary == nil {
+		t.Fatal("LoadSummary returned nil for a done task")
+	}
+
+	if summary.TaskID != task.ID {
+		t.Errorf("TaskID = %v, want %v", summary.TaskID, task.ID)
+	}
+	if summary.Title != "Summary Test" {
+		t.Errorf("Title = %q, want 'Summary Test'", summary.Title)
+	}
+	if summary.Status != TaskStatusDone {
+		t.Errorf("Status = %q, want 'done'", summary.Status)
+	}
+	if summary.TotalTurns != 3 {
+		t.Errorf("TotalTurns = %d, want 3", summary.TotalTurns)
+	}
+	if math.Abs(summary.TotalCostUSD-0.42) > 1e-9 {
+		t.Errorf("TotalCostUSD = %v, want 0.42", summary.TotalCostUSD)
+	}
+	if summary.TestResult != "pass" {
+		t.Errorf("TestResult = %q, want 'pass'", summary.TestResult)
+	}
+	implUsage, ok := summary.ByActivity[SandboxActivityImplementation]
+	if !ok {
+		t.Error("ByActivity missing 'implementation'")
+	} else if implUsage.InputTokens != 100 {
+		t.Errorf("ByActivity[implementation].InputTokens = %d, want 100", implUsage.InputTokens)
+	}
+	if summary.DurationSeconds < 0 {
+		t.Errorf("DurationSeconds = %v, expected non-negative", summary.DurationSeconds)
+	}
+}
+
+// TestSummary_NotWrittenOnFailedTransition verifies that no summary.json is
+// created when a task transitions to failed (only done triggers summary).
+func TestSummary_NotWrittenOnFailedTransition(t *testing.T) {
+	s := newTestStore(t)
+
+	task, _ := s.CreateTask(bg(), "will fail", 10, false, "", "")
+	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus(in_progress): %v", err)
+	}
+	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusFailed); err != nil {
+		t.Fatalf("UpdateTaskStatus(failed): %v", err)
+	}
+
+	summary, err := s.LoadSummary(task.ID)
+	if err != nil {
+		t.Fatalf("LoadSummary: %v", err)
+	}
+	if summary != nil {
+		t.Errorf("LoadSummary returned non-nil for a failed task, want nil")
+	}
+}
+
+// TestListSummaries_ReturnsOnlyDoneTasks verifies that ListSummaries returns
+// entries for done tasks and skips tasks in other states.
+func TestListSummaries_ReturnsOnlyDoneTasks(t *testing.T) {
+	s := newTestStore(t)
+
+	// Create one done task and one in-progress task.
+	done, _ := s.CreateTask(bg(), "done task", 10, false, "", "")
+	transitionToDone(t, s, done.ID)
+
+	inProg, _ := s.CreateTask(bg(), "in progress task", 10, false, "", "")
+	if err := s.UpdateTaskStatus(bg(), inProg.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+
+	summaries, err := s.ListSummaries()
+	if err != nil {
+		t.Fatalf("ListSummaries: %v", err)
+	}
+	if len(summaries) != 1 {
+		t.Errorf("ListSummaries returned %d summaries, want 1", len(summaries))
+	}
+	if len(summaries) > 0 && summaries[0].TaskID != done.ID {
+		t.Errorf("summary TaskID = %v, want %v", summaries[0].TaskID, done.ID)
 	}
 }

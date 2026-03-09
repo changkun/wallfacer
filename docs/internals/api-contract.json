@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 56,
+  "route_count": 57,
   "routes": [
     {
       "method": "GET",
@@ -299,6 +299,16 @@
       "description": "Archive all tasks in the done state.",
       "tags": [
         "tasks"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/tasks/summaries",
+      "name": "ListSummaries",
+      "description": "List immutable task summaries for completed tasks (cost dashboard, no full task.json read).",
+      "tags": [
+        "tasks",
+        "stats"
       ]
     },
     {
