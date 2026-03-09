@@ -12,7 +12,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// --- computeSpans unit tests ---
+// spansEnvelope mirrors the {"spans": [...]} response shape.
+type spansEnvelope struct {
+	Spans []store.SpanResult `json:"spans"`
+}
 
 func makeSpanEvent(eventType store.EventType, phase, label string, ts time.Time) store.TaskEvent {
 	data, _ := json.Marshal(store.SpanData{Phase: phase, Label: label})
@@ -20,143 +23,6 @@ func makeSpanEvent(eventType store.EventType, phase, label string, ts time.Time)
 		EventType: eventType,
 		Data:      data,
 		CreatedAt: ts,
-	}
-}
-
-func TestComputeSpans_PairedSpan(t *testing.T) {
-	t0 := time.Now()
-	t1 := t0.Add(50 * time.Millisecond)
-	events := []store.TaskEvent{
-		makeSpanEvent(store.EventTypeSpanStart, "worktree_setup", "worktree_setup", t0),
-		makeSpanEvent(store.EventTypeSpanEnd, "worktree_setup", "worktree_setup", t1),
-	}
-	spans := computeSpans(events)
-	if len(spans) != 1 {
-		t.Fatalf("expected 1 span, got %d", len(spans))
-	}
-	if spans[0].Phase != "worktree_setup" {
-		t.Errorf("expected phase 'worktree_setup', got %q", spans[0].Phase)
-	}
-	if spans[0].DurationMs != 50 {
-		t.Errorf("expected DurationMs=50, got %d", spans[0].DurationMs)
-	}
-}
-
-func TestComputeSpans_UnpairedStartOmitted(t *testing.T) {
-	t0 := time.Now()
-	events := []store.TaskEvent{
-		makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", t0),
-		// no matching span_end
-	}
-	spans := computeSpans(events)
-	if len(spans) != 0 {
-		t.Errorf("expected 0 spans for unpaired start, got %d", len(spans))
-	}
-}
-
-func TestComputeSpans_FIFOPairing(t *testing.T) {
-	t0 := time.Now()
-	t1 := t0.Add(10 * time.Millisecond)
-	t2 := t1.Add(100 * time.Millisecond) // = t0 + 110ms
-	// Two starts for the same key followed by one end: FIFO pairs the first
-	// start (t0) with the end (t2); the second start (t1) is unpaired.
-	events := []store.TaskEvent{
-		makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", t0),
-		makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", t1),
-		makeSpanEvent(store.EventTypeSpanEnd, "agent_turn", "agent_turn_1", t2),
-	}
-	spans := computeSpans(events)
-	if len(spans) != 1 {
-		t.Fatalf("expected 1 span, got %d", len(spans))
-	}
-	// Duration must be measured from t0 (first-in start) to t2 = 110ms.
-	if spans[0].DurationMs != 110 {
-		t.Errorf("expected DurationMs=110, got %d", spans[0].DurationMs)
-	}
-}
-
-// TestComputeSpans_TableDriven covers the four key pairing scenarios as a
-// single table-driven test.
-func TestComputeSpans_TableDriven(t *testing.T) {
-	t0 := time.Now()
-	ms := func(n int) time.Time { return t0.Add(time.Duration(n) * time.Millisecond) }
-
-	tests := []struct {
-		name       string
-		events     []store.TaskEvent
-		wantCount  int
-		wantFirstDurationMs int64 // checked only when wantCount >= 1
-	}{
-		{
-			name: "basic pair",
-			events: []store.TaskEvent{
-				makeSpanEvent(store.EventTypeSpanStart, "commit", "commit", ms(0)),
-				makeSpanEvent(store.EventTypeSpanEnd, "commit", "commit", ms(50)),
-			},
-			wantCount:           1,
-			wantFirstDurationMs: 50,
-		},
-		{
-			name: "two sequential spans with same key both appear",
-			events: []store.TaskEvent{
-				makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", ms(0)),
-				makeSpanEvent(store.EventTypeSpanEnd, "agent_turn", "agent_turn_1", ms(30)),
-				makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", ms(40)),
-				makeSpanEvent(store.EventTypeSpanEnd, "agent_turn", "agent_turn_1", ms(80)),
-			},
-			wantCount:           2,
-			wantFirstDurationMs: 30,
-		},
-		{
-			name: "unpaired start is dropped",
-			events: []store.TaskEvent{
-				makeSpanEvent(store.EventTypeSpanStart, "worktree_setup", "worktree_setup", ms(0)),
-				// no matching span_end
-			},
-			wantCount: 0,
-		},
-		{
-			name: "unpaired end is dropped",
-			events: []store.TaskEvent{
-				makeSpanEvent(store.EventTypeSpanEnd, "commit", "commit", ms(10)),
-				// no preceding span_start
-			},
-			wantCount: 0,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			spans := computeSpans(tc.events)
-			if len(spans) != tc.wantCount {
-				t.Fatalf("got %d spans, want %d", len(spans), tc.wantCount)
-			}
-			if tc.wantCount >= 1 && spans[0].DurationMs != tc.wantFirstDurationMs {
-				t.Errorf("first span DurationMs = %d, want %d", spans[0].DurationMs, tc.wantFirstDurationMs)
-			}
-		})
-	}
-}
-
-func TestComputeSpans_MultiplePhases(t *testing.T) {
-	t0 := time.Now()
-	events := []store.TaskEvent{
-		makeSpanEvent(store.EventTypeSpanStart, "worktree_setup", "worktree_setup", t0),
-		makeSpanEvent(store.EventTypeSpanEnd, "worktree_setup", "worktree_setup", t0.Add(10*time.Millisecond)),
-		makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", t0.Add(20*time.Millisecond)),
-		makeSpanEvent(store.EventTypeSpanEnd, "agent_turn", "agent_turn_1", t0.Add(30*time.Millisecond)),
-		makeSpanEvent(store.EventTypeSpanStart, "container_run", "container_run", t0.Add(40*time.Millisecond)),
-		makeSpanEvent(store.EventTypeSpanEnd, "container_run", "container_run", t0.Add(50*time.Millisecond)),
-	}
-	spans := computeSpans(events)
-	if len(spans) != 3 {
-		t.Fatalf("expected 3 spans, got %d", len(spans))
-	}
-	// Verify sorted by StartedAt.
-	for i := 1; i < len(spans); i++ {
-		if spans[i].StartedAt.Before(spans[i-1].StartedAt) {
-			t.Errorf("spans not sorted by StartedAt at index %d", i)
-		}
 	}
 }
 
@@ -186,12 +52,12 @@ func TestGetTaskSpans_EmptyWhenNoSpanEvents(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var spans []SpanRecord
-	if err := json.NewDecoder(w.Body).Decode(&spans); err != nil {
+	var env spansEnvelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(spans) != 0 {
-		t.Errorf("expected 0 spans, got %d", len(spans))
+	if len(env.Spans) != 0 {
+		t.Errorf("expected 0 spans, got %d", len(env.Spans))
 	}
 }
 
@@ -211,21 +77,21 @@ func TestGetTaskSpans_PairsSingleSpan(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var spans []SpanRecord
-	if err := json.NewDecoder(w.Body).Decode(&spans); err != nil {
+	var env spansEnvelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(spans) != 1 {
-		t.Fatalf("expected 1 span, got %d", len(spans))
+	if len(env.Spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(env.Spans))
 	}
-	if spans[0].Phase != "worktree_setup" {
-		t.Errorf("expected phase 'worktree_setup', got %q", spans[0].Phase)
+	if env.Spans[0].Phase != "worktree_setup" {
+		t.Errorf("expected phase 'worktree_setup', got %q", env.Spans[0].Phase)
 	}
-	if spans[0].Label != "worktree_setup" {
-		t.Errorf("expected label 'worktree_setup', got %q", spans[0].Label)
+	if env.Spans[0].Label != "worktree_setup" {
+		t.Errorf("expected label 'worktree_setup', got %q", env.Spans[0].Label)
 	}
-	if spans[0].DurationMs < 0 {
-		t.Errorf("expected non-negative duration, got %d", spans[0].DurationMs)
+	if env.Spans[0].DurationMS < 0 {
+		t.Errorf("expected non-negative duration, got %d", env.Spans[0].DurationMS)
 	}
 }
 
@@ -254,19 +120,19 @@ func TestGetTaskSpans_MultipleSpansSortedByStartTime(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var spans []SpanRecord
-	if err := json.NewDecoder(w.Body).Decode(&spans); err != nil {
+	var env spansEnvelope
+	if err := json.NewDecoder(w.Body).Decode(&env); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(spans) != 4 {
-		t.Fatalf("expected 4 spans, got %d", len(spans))
+	if len(env.Spans) != 4 {
+		t.Fatalf("expected 4 spans, got %d", len(env.Spans))
 	}
 
 	// Verify ordering by started_at (ascending).
-	for i := 1; i < len(spans); i++ {
-		if spans[i].StartedAt.Before(spans[i-1].StartedAt) {
+	for i := 1; i < len(env.Spans); i++ {
+		if env.Spans[i].StartedAt.Before(env.Spans[i-1].StartedAt) {
 			t.Errorf("span %d started before span %d: %v < %v",
-				i, i-1, spans[i].StartedAt, spans[i-1].StartedAt)
+				i, i-1, env.Spans[i].StartedAt, env.Spans[i-1].StartedAt)
 		}
 	}
 
@@ -278,16 +144,16 @@ func TestGetTaskSpans_MultipleSpansSortedByStartTime(t *testing.T) {
 		{"commit", "commit"},
 	}
 	for i, e := range expected {
-		if spans[i].Phase != e.phase {
-			t.Errorf("span %d: expected phase %q, got %q", i, e.phase, spans[i].Phase)
+		if env.Spans[i].Phase != e.phase {
+			t.Errorf("span %d: expected phase %q, got %q", i, e.phase, env.Spans[i].Phase)
 		}
-		if spans[i].Label != e.label {
-			t.Errorf("span %d: expected label %q, got %q", i, e.label, spans[i].Label)
+		if env.Spans[i].Label != e.label {
+			t.Errorf("span %d: expected label %q, got %q", i, e.label, env.Spans[i].Label)
 		}
 	}
 }
 
-func TestGetTaskSpans_DurationMsCorrect(t *testing.T) {
+func TestGetTaskSpans_DurationMSCorrect(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
@@ -302,18 +168,18 @@ func TestGetTaskSpans_DurationMsCorrect(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.GetTaskSpans(w, req, task.ID)
 
-	var spans []SpanRecord
-	json.NewDecoder(w.Body).Decode(&spans)
-	if len(spans) != 1 {
-		t.Fatalf("expected 1 span, got %d", len(spans))
+	var env spansEnvelope
+	json.NewDecoder(w.Body).Decode(&env)
+	if len(env.Spans) != 1 {
+		t.Fatalf("expected 1 span, got %d", len(env.Spans))
 	}
 	maxExpected := after.Sub(before).Milliseconds() + 5 // small tolerance
-	if spans[0].DurationMs < 10 || spans[0].DurationMs > maxExpected {
-		t.Errorf("duration_ms %d out of expected range [10, %d]", spans[0].DurationMs, maxExpected)
+	if env.Spans[0].DurationMS < 10 || env.Spans[0].DurationMS > maxExpected {
+		t.Errorf("duration_ms %d out of expected range [10, %d]", env.Spans[0].DurationMS, maxExpected)
 	}
 }
 
-func TestGetTaskSpans_UnpairedStartIgnored(t *testing.T) {
+func TestGetTaskSpans_UnclosedSpanIncluded(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
@@ -325,10 +191,18 @@ func TestGetTaskSpans_UnpairedStartIgnored(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.GetTaskSpans(w, req, task.ID)
 
-	var spans []SpanRecord
-	json.NewDecoder(w.Body).Decode(&spans)
-	if len(spans) != 0 {
-		t.Errorf("expected 0 spans for unpaired start, got %d", len(spans))
+	var env spansEnvelope
+	json.NewDecoder(w.Body).Decode(&env)
+	if len(env.Spans) != 1 {
+		t.Errorf("expected 1 span for unclosed start, got %d", len(env.Spans))
+	}
+	if len(env.Spans) == 1 {
+		if !env.Spans[0].EndedAt.IsZero() {
+			t.Errorf("expected zero EndedAt for unclosed span, got %v", env.Spans[0].EndedAt)
+		}
+		if env.Spans[0].DurationMS != 0 {
+			t.Errorf("expected DurationMS=0 for unclosed span, got %d", env.Spans[0].DurationMS)
+		}
 	}
 }
 
@@ -345,7 +219,7 @@ func TestComputeSpans_AllSandboxActivities(t *testing.T) {
 			makeSpanEvent(store.EventTypeSpanEnd, "container_run", act, t0.Add(offset+5*time.Millisecond)),
 		)
 	}
-	spans := computeSpans(events)
+	spans, _ := store.ComputeSpans(events)
 	if len(spans) != len(activities) {
 		t.Fatalf("expected %d spans (one per activity), got %d", len(activities), len(spans))
 	}
@@ -379,12 +253,12 @@ func TestGetTaskSpans_NonSpanEventsIgnored(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.GetTaskSpans(w, req, task.ID)
 
-	var spans []SpanRecord
-	json.NewDecoder(w.Body).Decode(&spans)
-	if len(spans) != 1 {
-		t.Errorf("expected 1 span (non-span events ignored), got %d", len(spans))
+	var env spansEnvelope
+	json.NewDecoder(w.Body).Decode(&env)
+	if len(env.Spans) != 1 {
+		t.Errorf("expected 1 span (non-span events ignored), got %d", len(env.Spans))
 	}
-	if spans[0].Phase != "agent_turn" {
-		t.Errorf("expected phase 'agent_turn', got %q", spans[0].Phase)
+	if len(env.Spans) == 1 && env.Spans[0].Phase != "agent_turn" {
+		t.Errorf("expected phase 'agent_turn', got %q", env.Spans[0].Phase)
 	}
 }

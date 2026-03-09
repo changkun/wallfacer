@@ -300,13 +300,14 @@
     }
 
     Promise.all([
-      fetchJson(spansUrl).catch(function() { return []; }),
+      fetchJson(spansUrl).catch(function() { return {spans: []}; }),
       fetchJson(oversightUrl).catch(function() { return null; }),
       fetchJson(turnUsageUrl).catch(function() { return []; }),
     ]).then(function(results) {
       if (getOpenModalTaskId() !== null && getOpenModalTaskId() !== taskId) return;
       if (_modalState.seq !== seq) return;
-      var records = results[0];
+      var spansData = results[0];
+      var records = (spansData && Array.isArray(spansData.spans)) ? spansData.spans : [];
       var oversightData = results[1];
       var turnUsages = results[2] || [];
 

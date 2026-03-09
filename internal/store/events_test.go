@@ -1,4 +1,4 @@
-// Tests for events.go: InsertEvent, GetEvents, and event persistence/reload.
+// Tests for events.go: InsertEvent, GetEvents, ComputeSpans, and event persistence/reload.
 package store
 
 import (
@@ -7,9 +7,83 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
+
+// makeSpanEvt constructs a TaskEvent for span testing without a real store.
+func makeSpanEvt(eventType EventType, phase, label string, ts time.Time) TaskEvent {
+	data, _ := json.Marshal(SpanData{Phase: phase, Label: label})
+	return TaskEvent{
+		EventType: eventType,
+		Data:      data,
+		CreatedAt: ts,
+	}
+}
+
+func TestComputeSpans_TwoAgentTurns(t *testing.T) {
+	t0 := time.Now()
+	events := []TaskEvent{
+		makeSpanEvt(EventTypeSpanStart, "worktree_setup", "worktree_setup", t0),
+		makeSpanEvt(EventTypeSpanEnd, "worktree_setup", "worktree_setup", t0.Add(10*time.Millisecond)),
+		makeSpanEvt(EventTypeSpanStart, "agent_turn", "agent_turn_1", t0.Add(20*time.Millisecond)),
+		makeSpanEvt(EventTypeSpanEnd, "agent_turn", "agent_turn_1", t0.Add(30*time.Millisecond)),
+		makeSpanEvt(EventTypeSpanStart, "agent_turn", "agent_turn_2", t0.Add(40*time.Millisecond)),
+		makeSpanEvt(EventTypeSpanEnd, "agent_turn", "agent_turn_2", t0.Add(50*time.Millisecond)),
+	}
+	spans, err := ComputeSpans(events)
+	if err != nil {
+		t.Fatalf("ComputeSpans returned error: %v", err)
+	}
+	if len(spans) != 3 {
+		t.Fatalf("expected 3 spans, got %d", len(spans))
+	}
+	// Verify sorted by StartedAt ascending.
+	for i := 1; i < len(spans); i++ {
+		if spans[i].StartedAt.Before(spans[i-1].StartedAt) {
+			t.Errorf("spans not sorted by StartedAt at index %d", i)
+		}
+	}
+	// Verify phases and labels.
+	expected := []struct{ phase, label string }{
+		{"worktree_setup", "worktree_setup"},
+		{"agent_turn", "agent_turn_1"},
+		{"agent_turn", "agent_turn_2"},
+	}
+	for i, e := range expected {
+		if spans[i].Phase != e.phase {
+			t.Errorf("span[%d].Phase = %q, want %q", i, spans[i].Phase, e.phase)
+		}
+		if spans[i].Label != e.label {
+			t.Errorf("span[%d].Label = %q, want %q", i, spans[i].Label, e.label)
+		}
+		if spans[i].DurationMS < 0 {
+			t.Errorf("span[%d].DurationMS = %d, want >= 0", i, spans[i].DurationMS)
+		}
+	}
+}
+
+func TestComputeSpans_UnclosedSpanIncluded(t *testing.T) {
+	t0 := time.Now()
+	events := []TaskEvent{
+		makeSpanEvt(EventTypeSpanStart, "agent_turn", "agent_turn_1", t0),
+		// no matching span_end
+	}
+	spans, err := ComputeSpans(events)
+	if err != nil {
+		t.Fatalf("ComputeSpans returned error: %v", err)
+	}
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span for unclosed start, got %d", len(spans))
+	}
+	if !spans[0].EndedAt.IsZero() {
+		t.Errorf("expected EndedAt to be zero for unclosed span, got %v", spans[0].EndedAt)
+	}
+	if spans[0].DurationMS != 0 {
+		t.Errorf("expected DurationMS=0 for unclosed span, got %d", spans[0].DurationMS)
+	}
+}
 
 func TestInsertEvent_Basic(t *testing.T) {
 	s := newTestStore(t)

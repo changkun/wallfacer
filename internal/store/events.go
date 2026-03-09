@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -119,6 +120,71 @@ func (s *Store) GetEventsPage(_ context.Context, taskID uuid.UUID, afterID int64
 		HasMore:       hasMore,
 		TotalFiltered: total,
 	}, nil
+}
+
+// SpanResult holds the paired timing data for a single execution span.
+// EndedAt is zero and DurationMS is 0 for unclosed spans (no matching span_end).
+type SpanResult struct {
+	Phase      string    `json:"phase"`
+	Label      string    `json:"label"`
+	StartedAt  time.Time `json:"started_at"`
+	EndedAt    time.Time `json:"ended_at"`
+	DurationMS int64     `json:"duration_ms"`
+}
+
+// ComputeSpans pairs span_start/span_end events from the provided slice and
+// returns a []SpanResult sorted by StartedAt. Unclosed spans are included
+// with a zero EndedAt and DurationMS=0. When a phase+label key has multiple
+// span_start events before a span_end, the most recent start wins.
+func ComputeSpans(events []TaskEvent) ([]SpanResult, error) {
+	type spanKey struct {
+		phase string
+		label string
+	}
+	startTimes := make(map[spanKey]time.Time)
+	var spans []SpanResult
+
+	for _, ev := range events {
+		if ev.EventType != EventTypeSpanStart && ev.EventType != EventTypeSpanEnd {
+			continue
+		}
+		var data SpanData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		key := spanKey{phase: data.Phase, label: data.Label}
+		if ev.EventType == EventTypeSpanStart {
+			startTimes[key] = ev.CreatedAt
+		} else {
+			if startedAt, ok := startTimes[key]; ok {
+				spans = append(spans, SpanResult{
+					Phase:      data.Phase,
+					Label:      data.Label,
+					StartedAt:  startedAt,
+					EndedAt:    ev.CreatedAt,
+					DurationMS: ev.CreatedAt.Sub(startedAt).Milliseconds(),
+				})
+				delete(startTimes, key)
+			}
+		}
+	}
+
+	// Include unclosed spans (span_start with no matching span_end).
+	for key, startedAt := range startTimes {
+		spans = append(spans, SpanResult{
+			Phase:      key.phase,
+			Label:      key.label,
+			StartedAt:  startedAt,
+			EndedAt:    time.Time{},
+			DurationMS: 0,
+		})
+	}
+
+	sort.Slice(spans, func(i, j int) bool {
+		return spans[i].StartedAt.Before(spans[j].StartedAt)
+	})
+
+	return spans, nil
 }
 
 // saveEvent writes a single event to the task's traces directory.
