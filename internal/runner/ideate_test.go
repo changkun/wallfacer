@@ -658,6 +658,32 @@ func TestExtractIdeasPartiallyRejectsPromptEqualsTitle(t *testing.T) {
 	}
 }
 
+func TestExtractIdeasFromRunOutputFallsBackToPreviousNDJSONResult(t *testing.T) {
+	stream := strings.Join([]string{
+		`{"result":"[{\"title\":\"Add tests\",\"category\":\"test quality\",\"prompt\":\"Write unit tests for all handlers.\"}]","session_id":"ideate-sess","stop_reason":"","is_error":false,"total_cost_usd":0.002}`,
+		`{"result":"The background exploration is complete and confirms all three findings. The output JSON was already delivered above.","session_id":"ideate-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.002}`,
+	}, "\n")
+
+	ideas, err := extractIdeasFromRunOutput("", []byte(stream), nil)
+	if err != nil {
+		t.Fatalf("expected fallback to parse ideas from NDJSON stream, got: %v", err)
+	}
+	if len(ideas) != 1 {
+		t.Fatalf("expected 1 idea from fallback output, got %d", len(ideas))
+	}
+	if ideas[0].Title != "Add tests" {
+		t.Fatalf("expected fallback idea to be 'Add tests', got %q", ideas[0].Title)
+	}
+}
+
+func TestExtractIdeasFromRunOutputReturnsErrorWhenNoArrayFound(t *testing.T) {
+	stream := `{"result":"The background exploration is complete and no actions are needed.","session_id":"ideate-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.002}`
+	_, err := extractIdeasFromRunOutput("The background exploration is complete and no actions are needed.", []byte(stream), nil)
+	if err == nil {
+		t.Fatal("expected parse error when output contains no JSON array")
+	}
+}
+
 // TestIdeationTaskFailsWhenAllPromptsEqualTitles verifies that when the
 // brainstorm agent returns JSON where every prompt equals its title, the
 // idea-agent task transitions to "failed" rather than silently creating tasks

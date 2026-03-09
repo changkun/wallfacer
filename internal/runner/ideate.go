@@ -216,7 +216,13 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 
 	ideas, err := extractIdeas(output.Result)
 	if err != nil {
-		return nil, output, rawStdout, rawStderr, fmt.Errorf("extract ideas: %w (result: %s)", err, truncate(output.Result, 300))
+		recovered, recoverErr := extractIdeasFromRunOutput(output.Result, rawStdout, rawStderr)
+		if recoverErr == nil {
+			ideas = recovered
+			err = nil
+		} else {
+			return nil, output, rawStdout, rawStderr, fmt.Errorf("extract ideas: %w (result: %s)", err, truncate(output.Result, 300))
+		}
 	}
 	return ideas, output, rawStdout, rawStderr, nil
 }
@@ -690,9 +696,37 @@ func isIdeaDuplicateTitle(added map[string]struct{}, title string) bool {
 // scanning for the first '[' and then counting bracket depth to find its
 // matching ']', which avoids capturing stray brackets in trailing prose.
 func extractIdeas(text string) ([]IdeateResult, error) {
+	candidates := extractJSONArrayLikeCandidates(text)
+	var parseErr error
+	for _, candidate := range candidates {
+		ideas, err := parseIdeaJSONArray(candidate)
+		if err == nil {
+			return ideas, nil
+		}
+		parseErr = err
+	}
+	if parseErr != nil {
+		return nil, parseErr
+	}
+	return nil, fmt.Errorf("no JSON array found in agent output")
+}
+
+func extractJSONArrayLikeCandidates(text string) []string {
+	candidates := make([]string, 0, 2)
+	if text == "" {
+		return candidates
+	}
+	// Accept JSON arrays embedded in prose (old behavior) and in fenced code
+	// blocks (newer model variants sometimes wrap payloads in ```json).
+	candidates = append(candidates, text)
+	candidates = append(candidates, findJSONCodeBlock(text)...)
+	return candidates
+}
+
+func parseIdeaJSONArray(text string) ([]IdeateResult, error) {
 	start := strings.Index(text, "[")
 	if start == -1 {
-		return nil, fmt.Errorf("no JSON array found in agent output")
+		return nil, fmt.Errorf("no JSON array found in candidate output")
 	}
 
 	// Walk forward from the opening '[' counting bracket depth to find
@@ -731,7 +765,7 @@ func extractIdeas(text string) ([]IdeateResult, error) {
 		}
 	}
 	if end == -1 {
-		return nil, fmt.Errorf("no JSON array found in agent output")
+		return nil, fmt.Errorf("no JSON array found in candidate output")
 	}
 
 	var results []IdeateResult
@@ -780,4 +814,80 @@ func extractIdeas(text string) ([]IdeateResult, error) {
 		return nil, fmt.Errorf("no valid ideas in parsed output (all entries were malformed or had prompt equal to title)")
 	}
 	return valid, nil
+}
+
+func findJSONCodeBlock(text string) []string {
+	var blocks []string
+	offset := 0
+	for {
+		start := strings.Index(text[offset:], "```")
+		if start == -1 {
+			return blocks
+		}
+		start += offset
+		rest := text[start+3:]
+		restOffset := strings.Index(rest, "\n")
+		if restOffset == -1 {
+			return blocks
+		}
+		firstLine := strings.TrimSpace(rest[:restOffset])
+		// Some prompts use raw fences without language tag.
+		contentStart := start + 3 + restOffset + 1
+		end := strings.Index(text[contentStart:], "```")
+		if end == -1 {
+			return blocks
+		}
+		content := strings.TrimSpace(text[contentStart : contentStart+end])
+		if firstLine == "" || strings.EqualFold(firstLine, "json") {
+			blocks = append(blocks, content)
+		}
+		offset = contentStart + end + 3
+	}
+}
+
+func extractIdeasFromRunOutput(result string, rawStdout, rawStderr []byte) ([]IdeateResult, error) {
+	// Prefer the final parsed result if it already contains ideas.
+	if ideas, err := extractIdeas(result); err == nil {
+		return ideas, nil
+	}
+
+	text := strings.TrimSpace(string(rawStdout) + "\n" + string(rawStderr))
+	if text == "" {
+		return nil, fmt.Errorf("no JSON array found in agent output")
+	}
+
+	var fallback []IdeateResult
+	var fallbackErr error
+	lines := strings.Split(text, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var output agentOutput
+		if err := json.Unmarshal([]byte(line), &output); err != nil {
+			continue
+		}
+		if strings.TrimSpace(output.Result) == "" {
+			continue
+		}
+		ideas, err := extractIdeas(output.Result)
+		if err != nil {
+			fallbackErr = err
+			continue
+		}
+		if output.StopReason != "" {
+			return ideas, nil
+		}
+		if fallback == nil {
+			fallback = ideas
+		}
+	}
+	if fallback != nil {
+		return fallback, nil
+	}
+	if fallbackErr != nil {
+		return nil, fallbackErr
+	}
+	return nil, fmt.Errorf("no JSON array found in agent output")
 }
