@@ -8,6 +8,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// oversightResponse wraps TaskOversight with a precomputed phase_count field
+// so the card accordion can show the count without counting phases client-side.
+type oversightResponse struct {
+	store.TaskOversight
+	PhaseCount int `json:"phase_count"`
+}
+
 // GetOversight returns the aggregated oversight summary for a task.
 // The summary is generated asynchronously when the task transitions to waiting
 // or done; this endpoint returns the current state (pending/generating/ready/failed).
@@ -23,7 +30,10 @@ func (h *Handler) GetOversight(w http.ResponseWriter, r *http.Request, id uuid.U
 		return
 	}
 
-	writeJSON(w, http.StatusOK, oversight)
+	writeJSON(w, http.StatusOK, oversightResponse{
+		TaskOversight: *oversight,
+		PhaseCount:    len(oversight.Phases),
+	})
 }
 
 // GetTestOversight returns the test-agent oversight summary for a task.

@@ -30,6 +30,9 @@ function makeOversightContext() {
     renderLogs: () => {},
     renderTestLogs: () => {},
   });
+  // oversight-shared.js must be loaded first because modal-oversight.js
+  // delegates to buildPhaseListHTML defined there.
+  loadScript('oversight-shared.js', ctx);
   loadScript('modal-oversight.js', ctx);
   return ctx;
 }

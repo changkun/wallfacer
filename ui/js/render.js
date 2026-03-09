@@ -61,6 +61,7 @@ function updateInProgressCount() {
 }
 
 const diffCache = new Map(); // taskId -> {diff: string, behindCounts, updatedAt, behindFetchedAt} | 'loading'
+const cardOversightCache = new Map(); // taskId -> {phase_count, phases}
 
 function isTestCard(task) {
   return task.status === 'waiting' && !!task.last_test_result && task.test_run_start_turn > 0;
@@ -349,6 +350,7 @@ function _cardFingerprint(t, rank) {
     t.current_refinement ? t.current_refinement.status : '',
     JSON.stringify(t.worktree_paths || {}), displayRank,
     filterQuery,
+    (cardOversightCache.get(t.id) || {}).phase_count ?? '',
   ].join('\x00');
 }
 
@@ -376,6 +378,9 @@ function updateCard(card, t, rank) {
   }
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
   const showDiff = (t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
+  const showOversight = (t.status === 'done' || t.status === 'failed') && !isArchived;
+  const ocCached = cardOversightCache.get(t.id);
+  const ocSummary = ocCached ? `${ocCached.phase_count} phases` : 'Generating\u2026';
   card.style.opacity = isArchived ? '0.55' : '';
   // Failed tasks in the waiting column get a red left border to distinguish them.
   if (t.status === 'failed') {
@@ -451,6 +456,35 @@ function updateCard(card, t, rank) {
     <div class="text-xs text-v-secondary mt-1 card-prose overflow-hidden" style="max-height:3.2em;">${_cachedMarkdown(t.result)}</div>
     ` : ''}
     ${showDiff ? `<div class="diff-block" data-diff><span style="color:var(--text-muted)">loading diff\u2026</span></div>` : ''}
+    ${showOversight ? `<details class="card-oversight" onclick="event.stopPropagation()"><summary class="card-oversight-summary">${ocSummary}</summary><div class="card-oversight-body"></div></details>` : ''}
     ${buildCardActions(t)}
   `;
+  if (showOversight) {
+    const details = card.querySelector('.card-oversight');
+    if (details) {
+      details.addEventListener('toggle', function() {
+        if (!details.open || details.dataset.loaded) return;
+        details.dataset.loaded = '1';
+        const cached = cardOversightCache.get(t.id);
+        if (cached && cached.phases) {
+          const body = details.querySelector('.card-oversight-body');
+          if (body) body.innerHTML = buildPhaseListHTML(cached.phases);
+          return;
+        }
+        fetch(`/api/tasks/${t.id}/oversight`)
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            cardOversightCache.set(t.id, { phase_count: data.phase_count, phases: data.phases });
+            const body = details.querySelector('.card-oversight-body');
+            if (body) body.innerHTML = buildPhaseListHTML(data.phases);
+            const summary = details.querySelector('.card-oversight-summary');
+            if (summary) summary.textContent = data.phase_count + ' phases';
+          })
+          .catch(function() {
+            const body = details.querySelector('.card-oversight-body');
+            if (body) body.innerHTML = '<div class="oversight-error">Failed to load oversight.</div>';
+          });
+      });
+    }
+  }
 }
