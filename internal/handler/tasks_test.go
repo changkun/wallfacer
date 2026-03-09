@@ -1781,6 +1781,31 @@ func TestTryAutoSubmit_SkipsNotVerified(t *testing.T) {
 	}
 }
 
+// TestTryAutoSubmit_SubmitsUnknownVerdict verifies that a waiting task with
+// LastTestResult=="unknown" (test ran but no explicit verdict) is auto-submitted
+// when it is up to date and conflict-free.
+func TestTryAutoSubmit_SubmitsUnknownVerdict(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "unknown verdict task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "unknown")
+
+	h.tryAutoSubmit(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusDone {
+		t.Errorf("expected unknown-verdict task to be auto-submitted to done, got %s", got.Status)
+	}
+}
+
 // TestTryAutoSubmit_SkipsFailedVerification verifies tasks with LastTestResult=="fail" are not submitted.
 func TestTryAutoSubmit_SkipsFailedVerification(t *testing.T) {
 	h := newTestHandler(t)

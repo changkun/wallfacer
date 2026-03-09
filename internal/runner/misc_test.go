@@ -1012,6 +1012,26 @@ func TestParseTestVerdict(t *testing.T) {
 		{"outcome FAILURE", "Outcome: FAILURE", "fail"},
 		{"PASS with emoji", "All checks complete. PASS ✅", "pass"},
 		{"negated pass is fail", "NOT PASS: still missing one case", "fail"},
+		// Content-level inference: Mocha/Jest "N passing" style.
+		{"mocha N passing", "  5 passing (23ms)", "pass"},
+		{"mocha N passing with text", "Running suite\n  5 passing (100ms)\n  2 pending", "pass"},
+		{"mocha N passing N failing returns fail", "  5 passing\n  1 failing", "fail"},
+		// Content-level inference: "all tests passed" phrases.
+		{"all tests passed", "All tests passed", "pass"},
+		{"all N tests passed", "All 10 tests passed successfully.", "pass"},
+		{"all checks passed", "All checks passed", "pass"},
+		// Content-level inference: Go test "ok  package" at line start.
+		{"go test ok", "ok  github.com/foo/bar\t0.003s", "pass"},
+		{"go test ok multiline", "--- PASS: TestFoo (0.00s)\nok  github.com/foo/bar  0.003s", "pass"},
+		// Content-level inference: Maven/Gradle BUILD SUCCESS.
+		{"maven build success", "[INFO] BUILD SUCCESS", "pass"},
+		// Content-level inference: pytest/rspec "N passed".
+		{"pytest N passed", "5 passed in 0.23s", "pass"},
+		{"pytest N tests passed", "10 tests passed in 1.2s", "pass"},
+		{"rspec N examples passed", "5 examples, 3 passed", "pass"},
+		// Content-level inference: mixed pass/fail correctly returns fail.
+		{"mixed N passed N failed", "5 passed, 1 failed", "fail"},
+		{"mixed passed and failed text", "10 tests passed\n2 tests failed", "fail"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
