@@ -72,12 +72,12 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 // CreateTask creates a new task in backlog status.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Prompt         string           `json:"prompt"`
-		Timeout        int              `json:"timeout"`
-		MountWorktrees bool             `json:"mount_worktrees"`
-		Sandbox        string           `json:"sandbox"`
+		Prompt            string            `json:"prompt"`
+		Timeout           int               `json:"timeout"`
+		MountWorktrees    bool              `json:"mount_worktrees"`
+		Sandbox           string            `json:"sandbox"`
 		SandboxByActivity map[string]string `json:"sandbox_by_activity"`
-		Kind           store.TaskKind   `json:"kind"`
+		Kind              store.TaskKind    `json:"kind"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -131,15 +131,15 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 // UpdateTask handles PATCH requests: status transitions, position, prompt, etc.
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	var req struct {
-		Status         *store.TaskStatus `json:"status"`
-		Position       *int              `json:"position"`
-		Prompt         *string           `json:"prompt"`
-		Timeout        *int              `json:"timeout"`
-		FreshStart     *bool             `json:"fresh_start"`
-		MountWorktrees *bool             `json:"mount_worktrees"`
-		Sandbox        *string           `json:"sandbox"`
+		Status            *store.TaskStatus  `json:"status"`
+		Position          *int               `json:"position"`
+		Prompt            *string            `json:"prompt"`
+		Timeout           *int               `json:"timeout"`
+		FreshStart        *bool              `json:"fresh_start"`
+		MountWorktrees    *bool              `json:"mount_worktrees"`
+		Sandbox           *string            `json:"sandbox"`
 		SandboxByActivity *map[string]string `json:"sandbox_by_activity"`
-		DependsOn      *[]string         `json:"depends_on"`
+		DependsOn         *[]string          `json:"depends_on"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -251,44 +251,116 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		} else {
 			// Enforce concurrency limit for manual backlog → in_progress transitions.
 			if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog && !task.IsTestRun {
-				allTasks, err := h.store.ListTasks(r.Context(), false)
+				promoteMu.Lock()
+				regularInProgress, err := h.countRegularInProgress(r.Context())
+				if err != nil {
+					promoteMu.Unlock()
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				if regularInProgress >= h.maxConcurrentTasks() {
+					promoteMu.Unlock()
+					http.Error(w, fmt.Sprintf("max concurrent tasks (%d) reached", h.maxConcurrentTasks()), http.StatusConflict)
+					return
+				}
+
+				if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
+					promoteMu.Unlock()
+					if errors.Is(err, store.ErrInvalidTransition) {
+						http.Error(w, err.Error(), http.StatusBadRequest)
+					} else {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+					}
+					return
+				}
+				promoteMu.Unlock()
+
+				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
+					"from": string(oldStatus),
+					"to":   string(newStatus),
+				})
+				h.diffCache.invalidate(id)
+
+				if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
+					sessionID := ""
+					if !task.FreshStart && task.SessionID != nil {
+						sessionID = *task.SessionID
+					}
+					h.runner.RunBackground(id, task.Prompt, sessionID, false)
+				}
+				updated, err := h.store.GetTask(r.Context(), id)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				regularInProgress := 0
-				for i := range allTasks {
-					if allTasks[i].Status == store.TaskStatusInProgress && !allTasks[i].IsTestRun {
-						regularInProgress++
-					}
+				writeJSON(w, http.StatusOK, updated)
+				return
+			}
+
+			// Also block any direct in_progress transition that is not marked as
+			// a test run. This protects API callers that PATCH waiting/failed →
+			// in_progress from bypassing the concurrency limit.
+			if newStatus == store.TaskStatusInProgress && !task.IsTestRun {
+				promoteMu.Lock()
+				regularInProgress, err := h.countRegularInProgress(r.Context())
+				if err != nil {
+					promoteMu.Unlock()
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
 				}
 				if regularInProgress >= h.maxConcurrentTasks() {
+					promoteMu.Unlock()
 					http.Error(w, fmt.Sprintf("max concurrent tasks (%d) reached", h.maxConcurrentTasks()), http.StatusConflict)
 					return
 				}
-			}
 
-			if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
-				if errors.Is(err, store.ErrInvalidTransition) {
-					http.Error(w, err.Error(), http.StatusBadRequest)
-				} else {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+				if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
+					promoteMu.Unlock()
+					if errors.Is(err, store.ErrInvalidTransition) {
+						http.Error(w, err.Error(), http.StatusBadRequest)
+					} else {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+					}
+					return
 				}
+
+				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
+					"from": string(oldStatus),
+					"to":   string(newStatus),
+				})
+				h.diffCache.invalidate(id)
+				promoteMu.Unlock()
+
+				updated, err := h.store.GetTask(r.Context(), id)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				writeJSON(w, http.StatusOK, updated)
 				return
 			}
-			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-				"from": string(oldStatus),
-				"to":   string(newStatus),
-			})
-			h.diffCache.invalidate(id)
+		}
 
-			if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
-				sessionID := ""
-				if !task.FreshStart && task.SessionID != nil {
-					sessionID = *task.SessionID
-				}
-				h.runner.RunBackground(id, task.Prompt, sessionID, false)
+		if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
+			if errors.Is(err, store.ErrInvalidTransition) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+			} else {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
+			return
+		}
+		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
+			"from": string(oldStatus),
+			"to":   string(newStatus),
+		})
+		h.diffCache.invalidate(id)
+
+		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
+			sessionID := ""
+			if !task.FreshStart && task.SessionID != nil {
+				sessionID = *task.SessionID
+			}
+			h.runner.RunBackground(id, task.Prompt, sessionID, false)
 		}
 	}
 
@@ -527,6 +599,24 @@ func (h *Handler) maxTestConcurrentTasks() int {
 	return cfg.MaxTestParallelTasks
 }
 
+func (h *Handler) countRegularInProgress(ctx context.Context) (int, error) {
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		return 0, err
+	}
+	return countRegularInProgress(tasks), nil
+}
+
+func countRegularInProgress(tasks []store.Task) int {
+	count := 0
+	for i := range tasks {
+		if tasks[i].Status == store.TaskStatusInProgress && !tasks[i].IsTestRun {
+			count++
+		}
+	}
+	return count
+}
+
 // promoteMu serialises auto-promotion so two simultaneous state changes
 // cannot both promote a task, exceeding the concurrency limit.
 var promoteMu sync.Mutex
@@ -597,13 +687,10 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		return
 	}
 
-	regularInProgress := 0
+	regularInProgress := countRegularInProgress(tasks)
 	var bestBacklog *store.Task
 	for i := range tasks {
 		t := &tasks[i]
-		if t.Status == store.TaskStatusInProgress && !t.IsTestRun {
-			regularInProgress++
-		}
 		if t.Status == store.TaskStatusBacklog && t.Kind != store.TaskKindIdeaAgent {
 			satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
 			if err != nil || !satisfied {
@@ -672,6 +759,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 	if err != nil {
 		return
 	}
+	maxTasks := h.maxConcurrentTasks()
 
 	for i := range tasks {
 		t := &tasks[i]
@@ -700,10 +788,27 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		logger.Handler.Info("auto-sync: waiting task behind default branch, syncing",
 			"task", t.ID)
 
+		promoteMu.Lock()
+		regularInProgress, err := h.countRegularInProgress(ctx)
+		if err != nil {
+			promoteMu.Unlock()
+			logger.Handler.Error("auto-sync: failed to count in-progress tasks", "error", err)
+			continue
+		}
+
+		if regularInProgress >= maxTasks {
+			promoteMu.Unlock()
+			logger.Handler.Info("auto-sync: regular in-progress limit reached, deferring sync",
+				"task", t.ID, "count", regularInProgress, "max", maxTasks)
+			continue
+		}
+
 		if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusInProgress); err != nil {
+			promoteMu.Unlock()
 			logger.Handler.Error("auto-sync: update task status", "task", t.ID, "error", err)
 			continue
 		}
+		regularInProgress++
 		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
 			"from": string(store.TaskStatusWaiting),
 			"to":   string(store.TaskStatusInProgress),
@@ -718,6 +823,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		}
 		h.diffCache.invalidate(t.ID)
 		taskID := t.ID
+		promoteMu.Unlock()
 		h.runner.SyncWorktreesBackground(taskID, sessionID, store.TaskStatusWaiting, func() {
 			h.diffCache.invalidate(taskID)
 		})

@@ -36,10 +36,25 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		return
 	}
 
-	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
+	promoteMu.Lock()
+	regularInProgress, err := h.countRegularInProgress(r.Context())
+	if err != nil {
+		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if regularInProgress >= h.maxConcurrentTasks() {
+		promoteMu.Unlock()
+		http.Error(w, "max concurrent tasks reached", http.StatusConflict)
+		return
+	}
+
+	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
+		promoteMu.Unlock()
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	promoteMu.Unlock()
 
 	h.store.InsertEvent(r.Context(), id, store.EventTypeFeedback, map[string]string{
 		"message": req.Message,
@@ -185,10 +200,25 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	if err := h.store.ResumeTask(r.Context(), id, req.Timeout); err != nil {
+	promoteMu.Lock()
+	regularInProgress, err := h.countRegularInProgress(r.Context())
+	if err != nil {
+		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if regularInProgress >= h.maxConcurrentTasks() {
+		promoteMu.Unlock()
+		http.Error(w, "max concurrent tasks reached", http.StatusConflict)
+		return
+	}
+
+	if err := h.store.ResumeTask(r.Context(), id, req.Timeout); err != nil {
+		promoteMu.Unlock()
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	promoteMu.Unlock()
 
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 		"from": string(store.TaskStatusFailed),
@@ -381,10 +411,25 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	oldStatus := task.Status
 	// Use ForceUpdateTaskStatus to handle failed → in_progress which is a
 	// valid operational flow not in the automated state machine.
-	if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
+	promoteMu.Lock()
+	regularInProgress, err := h.countRegularInProgress(r.Context())
+	if err != nil {
+		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if regularInProgress >= h.maxConcurrentTasks() {
+		promoteMu.Unlock()
+		http.Error(w, "max concurrent tasks reached", http.StatusConflict)
+		return
+	}
+
+	if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
+		promoteMu.Unlock()
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	promoteMu.Unlock()
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 		"from": string(oldStatus),
 		"to":   string(store.TaskStatusInProgress),
