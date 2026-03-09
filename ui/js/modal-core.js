@@ -434,7 +434,22 @@ async function openModal(id) {
     let detail = '';
     const data = e.data || {};
     if (e.event_type === 'state_change') {
-      detail = `${data.from || '(new)'} → ${data.to}`;
+      const triggerColors = {
+        user:         'background:#3b82f6;color:#fff',
+        auto_promote: 'background:#22c55e;color:#fff',
+        feedback:     'background:#a855f7;color:#fff',
+        auto_test:    'background:#14b8a6;color:#fff',
+        auto_submit:  'background:#10b981;color:#fff',
+        sync:         'background:#f97316;color:#fff',
+        recovery:     'background:#f59e0b;color:#fff',
+        system:       'background:#6b7280;color:#fff',
+      };
+      const trigger = data.trigger || '';
+      const badgeStyle = triggerColors[trigger];
+      const badge = badgeStyle
+        ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;${badgeStyle};margin-left:4px;">${trigger}</span>`
+        : '';
+      detail = `${data.from || '(new)'} → ${data.to}${badge}`;
     } else if (e.event_type === 'feedback') {
       detail = `"${escapeHtml(data.message)}"`;
     } else if (e.event_type === 'output') {

@@ -310,6 +310,18 @@ const (
 	EventTypeSpanEnd     EventType = "span_end"
 )
 
+// Trigger constants identify what caused a state_change event.
+const (
+	TriggerUser        = "user"
+	TriggerAutoPromote = "auto_promote"
+	TriggerAutoTest    = "auto_test"
+	TriggerAutoSubmit  = "auto_submit"
+	TriggerFeedback    = "feedback"
+	TriggerSync        = "sync"
+	TriggerRecovery    = "recovery"
+	TriggerSystem      = "system"
+)
+
 // SpanData holds metadata for a span_start or span_end event.
 // Phase identifies the execution phase (e.g. "worktree_setup", "agent_turn",
 // "container_run", "commit"). Label allows differentiating multiple spans of

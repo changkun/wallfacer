@@ -41,8 +41,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if !statusSet {
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusInProgress),
-				"to":   string(store.TaskStatusFailed),
+				"from":    string(store.TaskStatusInProgress),
+				"to":      string(store.TaskStatusFailed),
+				"trigger": store.TriggerSystem,
 			})
 		}
 	}()
@@ -83,12 +84,14 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": runErr.Error()})
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
+				"trigger": store.TriggerSystem,
 			})
 			return
 		}
 		r.store.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 			"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusDone),
+			"trigger": store.TriggerSystem,
 		})
 		r.GenerateOversightBackground(taskID)
 		return
@@ -140,7 +143,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", task.Turns)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
+				"from":    string(store.TaskStatusInProgress),
+				"to":      string(store.TaskStatusFailed),
+				"trigger": store.TriggerSystem,
 			})
 			return
 		}
@@ -247,7 +252,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", turns)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
+				"from":    string(store.TaskStatusInProgress),
+				"to":      string(store.TaskStatusFailed),
+				"trigger": store.TriggerSystem,
 			})
 			return
 		}
@@ -305,7 +312,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusFailed),
+				"from":    string(store.TaskStatusInProgress),
+				"to":      string(store.TaskStatusFailed),
+				"trigger": store.TriggerSystem,
 			})
 			return
 		}
@@ -325,7 +334,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				r.GenerateTestOversight(taskID, task.TestRunStartTurn)
 				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-					"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusWaiting),
+					"from":    string(store.TaskStatusInProgress),
+					"to":      string(store.TaskStatusWaiting),
+					"trigger": store.TriggerSystem,
 				})
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 					"result": "Test verification complete: " + strings.ToUpper(verdict),
@@ -333,7 +344,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			} else {
 				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-					"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusCommitting),
+					"from":    string(store.TaskStatusInProgress),
+					"to":      string(store.TaskStatusCommitting),
+					"trigger": store.TriggerSystem,
 				})
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
 				commitErr := r.commit(ctx, taskID, sessionID, turns, worktreePaths, branchName)
@@ -344,12 +357,16 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 						"error": "commit failed: " + commitErr.Error(),
 					})
 					r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-						"from": string(store.TaskStatusCommitting), "to": string(store.TaskStatusFailed),
+						"from":    string(store.TaskStatusCommitting),
+						"to":      string(store.TaskStatusFailed),
+						"trigger": store.TriggerSystem,
 					})
 				} else {
 					r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
 					r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-						"from": string(store.TaskStatusCommitting), "to": string(store.TaskStatusDone),
+						"from":    string(store.TaskStatusCommitting),
+						"to":      string(store.TaskStatusDone),
+						"trigger": store.TriggerSystem,
 					})
 					r.GenerateOversightBackground(taskID)
 				}
@@ -393,7 +410,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			}
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusWaiting),
+				"from":    string(store.TaskStatusInProgress),
+				"to":      string(store.TaskStatusWaiting),
+				"trigger": store.TriggerSystem,
 			})
 			return
 		}
@@ -416,8 +435,9 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 		if !statusSet {
 			r.store.UpdateTaskStatus(bgCtx, taskID, prevStatus)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusInProgress),
-				"to":   string(prevStatus),
+				"from":    string(store.TaskStatusInProgress),
+				"to":      string(prevStatus),
+				"trigger": store.TriggerSystem,
 			})
 		}
 	}()
@@ -545,8 +565,9 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 	statusSet = true
 	r.store.UpdateTaskStatus(bgCtx, taskID, prevStatus)
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-		"from": string(store.TaskStatusInProgress),
-		"to":   string(prevStatus),
+		"from":    string(store.TaskStatusInProgress),
+		"to":      string(prevStatus),
+		"trigger": store.TriggerSystem,
 	})
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Sync complete. Worktrees are up to date with the default branch.",
@@ -560,8 +581,9 @@ func (r *Runner) failSync(ctx context.Context, taskID uuid.UUID, sessionID strin
 	r.store.InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{"error": msg})
 	r.store.UpdateTaskStatus(ctx, taskID, store.TaskStatusFailed)
 	r.store.InsertEvent(ctx, taskID, store.EventTypeStateChange, map[string]string{
-		"from": string(store.TaskStatusInProgress),
-		"to":   string(store.TaskStatusFailed),
+		"from":    string(store.TaskStatusInProgress),
+		"to":      string(store.TaskStatusFailed),
+		"trigger": store.TriggerSystem,
 	})
 	r.store.UpdateTaskResult(ctx, taskID, "Sync failed: "+msg, sessionID, "sync_failed", turns)
 }

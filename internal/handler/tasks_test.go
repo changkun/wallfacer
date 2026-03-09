@@ -1796,3 +1796,96 @@ func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
 		t.Errorf("expected eligible task to be moved to done, got %s", got.Status)
 	}
 }
+
+// --- Trigger attribution tests ---
+
+// TestTryAutoPromote_EventHasAutoPromoteTrigger verifies that the state_change
+// event emitted by tryAutoPromote contains "trigger": "auto_promote".
+func TestTryAutoPromote_EventHasAutoPromoteTrigger(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	h.autopilotMu.Lock()
+	h.autopilot = true
+	h.autopilotMu.Unlock()
+
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "task to promote", 15, false, "", "")
+
+	h.tryAutoPromote(ctx)
+
+	// The task should now be in_progress.
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusInProgress {
+		t.Fatalf("expected task to be promoted to in_progress, got %s", got.Status)
+	}
+
+	// Find the state_change event that records backlog → in_progress.
+	events, err := h.store.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	var found bool
+	for _, ev := range events {
+		if ev.EventType != store.EventTypeStateChange {
+			continue
+		}
+		var data map[string]string
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		if data["from"] == string(store.TaskStatusBacklog) && data["to"] == string(store.TaskStatusInProgress) {
+			found = true
+			if data["trigger"] != store.TriggerAutoPromote {
+				t.Errorf("expected trigger=%q, got %q", store.TriggerAutoPromote, data["trigger"])
+			}
+		}
+	}
+	if !found {
+		t.Error("expected a state_change event from backlog → in_progress, none found")
+	}
+}
+
+// TestSubmitFeedback_EventHasFeedbackTrigger verifies that the state_change
+// event emitted by SubmitFeedback contains "trigger": "feedback".
+func TestSubmitFeedback_EventHasFeedbackTrigger(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	body := `{"message": "please continue"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/feedback", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.SubmitFeedback(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Find the state_change event that records waiting → in_progress.
+	events, err := h.store.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	var found bool
+	for _, ev := range events {
+		if ev.EventType != store.EventTypeStateChange {
+			continue
+		}
+		var data map[string]string
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		if data["from"] == string(store.TaskStatusWaiting) && data["to"] == string(store.TaskStatusInProgress) {
+			found = true
+			if data["trigger"] != store.TriggerFeedback {
+				t.Errorf("expected trigger=%q, got %q", store.TriggerFeedback, data["trigger"])
+			}
+		}
+	}
+	if !found {
+		t.Error("expected a state_change event from waiting → in_progress, none found")
+	}
+}
