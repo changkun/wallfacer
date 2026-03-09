@@ -7,7 +7,6 @@ import (
 
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/prompts"
 )
 
 // ideaAgentDefaultTimeout is the default timeout (minutes) for idea-agent task cards.
@@ -101,8 +100,7 @@ func (h *Handler) scheduleIdeation(ctx context.Context) {
 	logger.Handler.Info("ideation: next run scheduled", "at", nextRun.Format(time.RFC3339))
 }
 
-// ideaAgentPrompt is the user-visible prompt shown on idea-agent task cards.
-var ideaAgentPrompt = prompts.IdeaAgent()
+const ideaAgentPrompt = "Analyzes the workspace and proposes 3 actionable improvements."
 
 // createIdeaAgentTask creates a new idea-agent task card and immediately
 // promotes it to in_progress, starting the runner. Returns nil if creation

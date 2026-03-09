@@ -119,8 +119,3 @@ type TestData struct {
 func TestVerification(d TestData) string {
 	return render("test.tmpl", d)
 }
-
-// IdeaAgent returns the static description shown on idea-agent task cards.
-func IdeaAgent() string {
-	return render("idea_agent.tmpl", nil)
-}
