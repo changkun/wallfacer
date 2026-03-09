@@ -546,6 +546,24 @@ function updateCard(card, t, rank) {
     })() : ''}
     ${buildCardActions(t)}
   `;
+
+  // Fork ancestry badge — rendered after innerHTML is set.
+  if (t.forked_from) {
+    const badge = document.createElement('div');
+    badge.className = 'text-[10px] text-v-muted mt-1';
+    const shortParent = t.forked_from.substring(0, 8);
+    badge.textContent = '\u2442 ' + shortParent;  // ⑂ fork symbol
+    badge.title = 'Forked from task ' + shortParent;
+    badge.style.cursor = 'pointer';
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const allTasks = [...tasks, ...(Array.isArray(archivedTasks) ? archivedTasks : [])];
+      const parent = allTasks.find(p => p.id === t.forked_from);
+      if (parent) openModal(parent.id);
+    });
+    card.appendChild(badge);
+  }
+
   if (showOversight) {
     const details = card.querySelector('.card-oversight');
     if (details) {

@@ -70,6 +70,24 @@ async function openModal(id) {
   document.getElementById('modal-time').textContent = new Date(task.created_at).toLocaleString();
   document.getElementById('modal-id').textContent = `ID: ${task.id}`;
 
+  // Remove any previously injected fork-info element to avoid duplicates.
+  document.getElementById('modal-fork-info')?.remove();
+  if (task.forked_from) {
+    const allTasks = [...tasks, ...(Array.isArray(archivedTasks) ? archivedTasks : [])];
+    const parent = allTasks.find(t => t.id === task.forked_from);
+    const label = parent
+      ? (parent.title || parent.prompt.slice(0, 40))
+      : task.forked_from.substring(0, 8);
+    const forkInfo = document.createElement('div');
+    forkInfo.id = 'modal-fork-info';
+    forkInfo.className = 'text-sm text-v-secondary mt-1';
+    forkInfo.innerHTML = `Forked from: <span class="cursor-pointer underline" title="Open source task">${escapeHtml(label)}</span>`;
+    forkInfo.querySelector('span').addEventListener('click', () => {
+      if (parent) openModal(parent.id);
+    });
+    document.getElementById('modal-id').after(forkInfo);
+  }
+
   const backlogRight = document.getElementById('modal-backlog-right');
   const backlogSettings = document.getElementById('modal-backlog-settings');
   const backlogEdit = document.getElementById('modal-backlog-edit');
@@ -416,6 +434,14 @@ async function openModal(id) {
     retryResumeRow.classList.add('hidden');
   }
 
+  // Fork section (done/waiting/failed tasks that have worktrees)
+  const forkSection = document.getElementById('modal-fork-section');
+  if (forkSection) {
+    const forkEligible = ['done', 'waiting', 'failed'].includes(task.status) &&
+      task.worktree_paths && Object.keys(task.worktree_paths).length > 0;
+    forkSection.classList.toggle('hidden', !forkEligible);
+  }
+
   // Archive/Unarchive section (done or cancelled tasks)
   const archiveSection = document.getElementById('modal-archive-section');
   const unarchiveSection = document.getElementById('modal-unarchive-section');
@@ -691,4 +717,21 @@ function closeModal() {
   document.getElementById('modal').classList.add('hidden');
   document.getElementById('modal').classList.remove('flex');
   history.replaceState(null, '', location.pathname + location.search);
+}
+
+// openForkModal prompts for a new prompt and forks the currently open task.
+async function openForkModal() {
+  const taskId = _modalState.taskId;
+  if (!taskId) return;
+  const allTasks = [...tasks, ...(Array.isArray(archivedTasks) ? archivedTasks : [])];
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) return;
+  const prompt = window.prompt('Enter the prompt for the forked task:', task.prompt);
+  if (prompt === null || prompt.trim() === '') return;
+  try {
+    await forkTask(task.id, prompt.trim(), task.timeout);
+    closeModal();
+  } catch (e) {
+    alert('Fork failed: ' + e.message);
+  }
 }

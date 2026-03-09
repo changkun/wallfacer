@@ -421,6 +421,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"UnarchiveTask": withID(h.UnarchiveTask),
 		"SyncTask":      withID(h.SyncTask),
 		"TestTask":      withID(h.TestTask),
+		"ForkTask":      withID(h.ForkTask),
 		"TaskDiff":      withID(h.TaskDiff),
 		"StreamLogs":    withID(h.StreamLogs),
 

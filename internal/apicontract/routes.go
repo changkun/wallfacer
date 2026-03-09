@@ -371,6 +371,11 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 	{
+		Method: "POST", Pattern: "/api/tasks/{id}/fork", Name: "ForkTask",
+		Description: "Create a new backlog task branched from the source task's current worktree state.",
+		Tags:        []string{"tasks"},
+	},
+	{
 		Method: "GET", Pattern: "/api/tasks/{id}/diff", Name: "TaskDiff",
 		Description: "Git diff of task worktrees versus the default branch.",
 		Tags:        []string{"tasks"},
