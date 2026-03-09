@@ -56,6 +56,18 @@ type RefinementSession struct {
 	ResultPrompt string              `json:"result_prompt,omitempty"`
 }
 
+// RetryRecord captures the execution outcome of one task lifecycle before it
+// is reset for a retry. Appended to Task.RetryHistory by ResetTaskForRetry.
+type RetryRecord struct {
+	RetiredAt time.Time  `json:"retired_at"`
+	Prompt    string     `json:"prompt"`
+	Status    TaskStatus `json:"status"`
+	Result    string     `json:"result,omitempty"`    // truncated to 2000 chars
+	SessionID string     `json:"session_id,omitempty"`
+	Turns     int        `json:"turns"`
+	CostUSD   float64    `json:"cost_usd"`
+}
+
 // RefinementJob tracks the state of an active or recently completed
 // sandbox refinement run for a backlog task.
 type RefinementJob struct {
@@ -167,6 +179,7 @@ type Task struct {
 	Title          string              `json:"title,omitempty"`
 	Prompt         string              `json:"prompt"`
 	PromptHistory  []string            `json:"prompt_history,omitempty"`
+	RetryHistory   []RetryRecord       `json:"retry_history,omitempty"`
 	RefineSessions     []RefinementSession `json:"refine_sessions,omitempty"`
 	CurrentRefinement  *RefinementJob      `json:"current_refinement,omitempty"`
 	Status         TaskStatus           `json:"status"`

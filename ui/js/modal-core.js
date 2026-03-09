@@ -365,6 +365,46 @@ async function openModal(id) {
     historySection.classList.add('hidden');
   }
 
+  // Retry history
+  const retryHistorySection = document.getElementById('modal-retry-history-section');
+  if (task.retry_history && task.retry_history.length > 0) {
+    retryHistorySection.classList.remove('hidden');
+    const retryHistoryList = document.getElementById('modal-retry-history-list');
+    retryHistoryList.innerHTML = task.retry_history.map(function(rec, i) {
+      const attemptNum = i + 1;
+      const retiredAgo = timeAgo(rec.retired_at);
+      const costStr = rec.cost_usd ? '$' + rec.cost_usd.toFixed(4) : '$0.0000';
+      const detailId = 'retry-history-detail-' + i;
+      const promptSnippet = rec.prompt ? escapeHtml(rec.prompt) : '<em class="text-v-muted">no prompt</em>';
+      const resultSnippet = rec.result ? escapeHtml(rec.result) : '<em class="text-v-muted">no result</em>';
+      return (
+        '<div style="border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' +
+            '<span style="font-weight:600;color:var(--text-muted);font-size:11px;">Attempt #' + attemptNum + '</span>' +
+            '<span class="badge badge-' + escapeHtml(rec.status) + '">' + escapeHtml(rec.status) + '</span>' +
+            '<span style="color:var(--text-muted);font-size:11px;" title="' + escapeHtml(rec.retired_at) + '">' + escapeHtml(retiredAgo) + '</span>' +
+            '<span style="color:var(--text-muted);font-size:11px;">' + rec.turns + ' turn' + (rec.turns !== 1 ? 's' : '') + ' \xb7 ' + costStr + '</span>' +
+            '<button onclick="document.getElementById(\'' + detailId + '\').classList.toggle(\'hidden\')" class="btn-icon" style="margin-left:auto;">Show</button>' +
+          '</div>' +
+          '<div id="' + detailId + '" class="hidden" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">' +
+            '<div style="margin-bottom:6px;">' +
+              '<span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Prompt</span>' +
+              '<pre class="code-block text-xs" style="margin-top:4px;white-space:pre-wrap;">' + promptSnippet + '</pre>' +
+            '</div>' +
+            (rec.result
+              ? '<div>' +
+                  '<span style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">Result</span>' +
+                  '<pre class="code-block text-xs" style="margin-top:4px;white-space:pre-wrap;">' + resultSnippet + '</pre>' +
+                '</div>'
+              : '') +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+  } else {
+    retryHistorySection.classList.add('hidden');
+  }
+
   // Load events
   const _EVENTS_TYPES = 'state_change,output,feedback,error,system';
   const _EVENTS_LIMIT = 200;
