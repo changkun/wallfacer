@@ -36,7 +36,7 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 	s.ForceUpdateTaskStatus(ctx, t2.ID, "done")
 	// t3 stays in backlog.
 
-	data, err := r.generateBoardContext(t2.ID, false)
+	data, err := r.generateBoardContext(context.Background(), t2.ID, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 func TestGenerateBoardContext_Empty(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 
-	data, err := r.generateBoardContext([16]byte{}, false)
+	data, err := r.generateBoardContext(context.Background(), [16]byte{}, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestPrepareBoardContext(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dir, err := r.prepareBoardContext(task.ID, false)
+	dir, err := r.prepareBoardContext(context.Background(), task.ID, false)
 	if err != nil {
 		t.Fatalf("prepareBoardContext: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestBuildSiblingMounts(t *testing.T) {
 	// t3 stays in backlog (no worktrees).
 	_ = t3
 
-	mounts := r.buildSiblingMounts(t1.ID)
+	mounts := r.buildSiblingMounts(context.Background(), t1.ID)
 	if mounts == nil {
 		t.Fatal("expected non-nil sibling mounts")
 	}
@@ -239,7 +239,7 @@ func TestGenerateBoardContext_AllStatuses(t *testing.T) {
 		idByStatus[st] = task.ID.String()
 	}
 
-	data, err := r.generateBoardContext([16]byte{}, false)
+	data, err := r.generateBoardContext(context.Background(), [16]byte{}, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -297,7 +297,7 @@ func TestGenerateBoardContext_WorktreeMountPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, err := r.generateBoardContext(self.ID, true)
+	data, err := r.generateBoardContext(context.Background(), self.ID, true)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -345,7 +345,7 @@ func TestGenerateBoardContext_ArchivedTaskExcluded(t *testing.T) {
 		t.Fatalf("SetTaskArchived: %v", err)
 	}
 
-	data, err := r.generateBoardContext([16]byte{}, false)
+	data, err := r.generateBoardContext(context.Background(), [16]byte{}, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}
@@ -456,7 +456,7 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 	s.UpdateTaskStatus(ctx, selfTask.ID, "in_progress")
 	s.UpdateTaskResult(ctx, selfTask.ID, longResult, "sess-self", "max_tokens", 7)
 
-	data, err := r.generateBoardContext(selfTask.ID, false)
+	data, err := r.generateBoardContext(context.Background(), selfTask.ID, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
 	}

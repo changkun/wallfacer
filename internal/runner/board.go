@@ -76,8 +76,8 @@ func canMountWorktree(status store.TaskStatus, worktreePaths map[string]string) 
 //     listing the five largest contributors so operators can investigate.
 //
 // It strips SessionID, marks is_self, and computes worktree_mount paths.
-func (r *Runner) generateBoardContext(selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, error) {
-	tasks, err := r.store.ListTasks(context.TODO(), false)
+func (r *Runner) generateBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, error) {
+	tasks, err := r.store.ListTasks(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -185,8 +185,8 @@ func logBoardManifestSizeWarning(tasks []BoardTask, totalBytes int) {
 
 // prepareBoardContext writes board.json to a temp directory and returns the
 // directory path. The caller must defer os.RemoveAll(dir).
-func (r *Runner) prepareBoardContext(selfTaskID uuid.UUID, mountWorktrees bool) (string, error) {
-	data, err := r.generateBoardContext(selfTaskID, mountWorktrees)
+func (r *Runner) prepareBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (string, error) {
+	data, err := r.generateBoardContext(ctx, selfTaskID, mountWorktrees)
 	if err != nil {
 		return "", err
 	}
@@ -207,8 +207,8 @@ func (r *Runner) prepareBoardContext(selfTaskID uuid.UUID, mountWorktrees bool) 
 // buildSiblingMounts returns shortID → (repoPath → worktreePath) for
 // eligible sibling tasks. Only tasks whose worktrees can be safely mounted
 // read-only are included.
-func (r *Runner) buildSiblingMounts(selfTaskID uuid.UUID) map[string]map[string]string {
-	tasks, err := r.store.ListTasks(context.TODO(), false)
+func (r *Runner) buildSiblingMounts(ctx context.Context, selfTaskID uuid.UUID) map[string]map[string]string {
+	tasks, err := r.store.ListTasks(ctx, false)
 	if err != nil {
 		logger.Runner.Warn("buildSiblingMounts: list tasks", "error", err)
 		return nil
