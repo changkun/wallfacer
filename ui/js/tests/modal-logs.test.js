@@ -77,8 +77,8 @@ function makeLogsContext() {
       },
     },
     // Runtime dependencies from other modules
+    _modalState: { seq: 0, taskId: null, abort: null },
     tasks: [],
-    currentTaskId: null,
     logsAbort: null,
     testLogsAbort: null,
     rawLogBuffer: '',
@@ -102,6 +102,7 @@ function makeLogsContext() {
     history: { replaceState: () => {} },
   });
 
+  ctx.getOpenModalTaskId = function() { return ctx._modalState.taskId; };
   loadScript('modal-logs.js', ctx);
   return { ctx, elements };
 }

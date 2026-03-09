@@ -23,7 +23,7 @@ function scheduleTestLogRender() {
 }
 
 function _isCurrentModalSeq(seq) {
-  return typeof seq !== 'number' || (typeof modalLoadSeq === 'number' && modalLoadSeq === seq);
+  return typeof seq !== 'number' || _modalState.seq === seq;
 }
 
 function _modalApiJson(url, signal) {
@@ -128,19 +128,19 @@ function setRightTab(tab) {
     if (btn) btn.classList.toggle('active', active);
     if (panel) panel.classList.toggle('hidden', !active);
   });
-  if (tab === 'spans' && typeof loadFlamegraph !== 'undefined' && typeof currentTaskId !== 'undefined' && currentTaskId) {
-    loadFlamegraph(currentTaskId);
+  if (tab === 'spans' && typeof loadFlamegraph !== 'undefined' && getOpenModalTaskId()) {
+    loadFlamegraph(getOpenModalTaskId());
   }
   if (tab === 'timeline') {
-    if (typeof currentTaskId !== 'undefined' && currentTaskId) {
-      renderTimeline(currentTaskId);
-      _startTimelineRefresh(currentTaskId);
+    if (getOpenModalTaskId()) {
+      renderTimeline(getOpenModalTaskId());
+      _startTimelineRefresh(getOpenModalTaskId());
     }
   } else {
     _stopTimelineRefresh();
   }
-  if (typeof currentTaskId !== 'undefined' && currentTaskId) {
-    history.replaceState(null, '', '#' + currentTaskId + '/' + tab);
+  if (getOpenModalTaskId()) {
+    history.replaceState(null, '', '#' + getOpenModalTaskId() + '/' + tab);
   }
 }
 
@@ -155,10 +155,10 @@ function startLogStream(id, seq) {
   // Pre-fetch oversight to decide the default view: switch to oversight only if
   // a ready summary already exists.
   oversightFetching = true;
-  var signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+  var signal = _modalState.abort ? _modalState.abort.signal : undefined;
   _modalApiJson('/api/tasks/' + id + '/oversight', signal)
     .then(function(data) {
-      if (currentTaskId !== id) return;
+      if (getOpenModalTaskId() !== id) return;
       if (!_isCurrentModalSeq(seq)) return;
       oversightData = data;
       oversightFetching = false;
@@ -181,10 +181,10 @@ function startImplLogFetch(id, seq) {
   oversightData = null;
   // Pre-fetch oversight to decide default view.
   oversightFetching = true;
-  var signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+  var signal = _modalState.abort ? _modalState.abort.signal : undefined;
   _modalApiJson('/api/tasks/' + id + '/oversight', signal)
     .then(function(data) {
-      if (currentTaskId !== id) return;
+      if (getOpenModalTaskId() !== id) return;
       if (!_isCurrentModalSeq(seq)) return;
       oversightData = data;
       oversightFetching = false;
@@ -206,7 +206,7 @@ function startImplLogFetch(id, seq) {
       const reader = res.body.getReader();
       function read() {
         reader.read().then(({ done, value }) => {
-          if (currentTaskId !== id) return;
+          if (getOpenModalTaskId() !== id) return;
           if (!_isCurrentModalSeq(seq)) return;
           if (done) { renderLogs(); return; }
           rawLogBuffer += decoder.decode(value, { stream: true });
@@ -259,10 +259,10 @@ function startTestLogStream(id, seq) {
   testOversightData = null;
   // Pre-fetch test oversight to decide default view.
   testOversightFetching = true;
-  var signal = (typeof modalAbort !== 'undefined' && modalAbort) ? modalAbort.signal : undefined;
+  var signal = _modalState.abort ? _modalState.abort.signal : undefined;
   _modalApiJson('/api/tasks/' + id + '/oversight/test', signal)
     .then(function(data) {
-      if (currentTaskId !== id) return;
+      if (getOpenModalTaskId() !== id) return;
       if (!_isCurrentModalSeq(seq)) return;
       testOversightData = data;
       testOversightFetching = false;
@@ -279,7 +279,7 @@ function startTestLogStream(id, seq) {
 }
 
 function _fetchTestLogs(id, retryDelay, seq) {
-  if (currentTaskId !== id) return;
+  if (getOpenModalTaskId() !== id) return;
   if (!_isCurrentModalSeq(seq)) return;
   if (testLogsAbort) testLogsAbort.abort();
   testLogsAbort = new AbortController();
@@ -296,7 +296,7 @@ function _fetchTestLogs(id, retryDelay, seq) {
   const url = isRunning ? `/api/tasks/${id}/logs?raw=true` : `/api/tasks/${id}/logs?phase=test`;
 
   function reconnect() {
-    if (currentTaskId !== id) return;
+    if (getOpenModalTaskId() !== id) return;
     if (!_isCurrentModalSeq(seq)) return;
     const task = tasks.find(t => t.id === id);
     if (!task || (task.status !== 'in_progress' && task.status !== 'committing')) return;
@@ -310,7 +310,7 @@ function _fetchTestLogs(id, retryDelay, seq) {
       const reader = res.body.getReader();
       function read() {
         reader.read().then(({ done, value }) => {
-          if (currentTaskId !== id) return;
+          if (getOpenModalTaskId() !== id) return;
           if (!_isCurrentModalSeq(seq)) return;
           if (done) { reconnect(); return; }
           testRawLogBuffer += decoder.decode(value, { stream: true });
@@ -330,7 +330,7 @@ function _fetchLogs(id, retryDelay, seq) {
   // Guard: if the modal was closed or switched to a different task since this
   // call was scheduled (e.g. by a reconnect setTimeout), bail out so we don't
   // hijack the log stream or mix logs from a stale task into the buffer.
-  if (currentTaskId !== id) return;
+  if (getOpenModalTaskId() !== id) return;
   if (!_isCurrentModalSeq(seq)) return;
   if (logsAbort) logsAbort.abort();
   logsAbort = new AbortController();
@@ -344,7 +344,7 @@ function _fetchLogs(id, retryDelay, seq) {
 
   function reconnect() {
     // Only reconnect if this task modal is still open and task is running.
-    if (currentTaskId !== id) return;
+    if (getOpenModalTaskId() !== id) return;
     if (!_isCurrentModalSeq(seq)) return;
     const task = tasks.find(t => t.id === id);
     if (!task || (task.status !== 'in_progress' && task.status !== 'committing')) return;
@@ -358,7 +358,7 @@ function _fetchLogs(id, retryDelay, seq) {
       const reader = res.body.getReader();
       function read() {
         reader.read().then(({ done, value }) => {
-          if (currentTaskId !== id) return;
+          if (getOpenModalTaskId() !== id) return;
           if (!_isCurrentModalSeq(seq)) return;
           if (done) { reconnect(); return; }
           rawLogBuffer += decoder.decode(value, { stream: true });

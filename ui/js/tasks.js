@@ -264,9 +264,9 @@ async function deleteTask(id) {
 }
 
 function deleteCurrentTask() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   if (!confirm('Delete this task?')) return;
-  deleteTask(currentTaskId);
+  deleteTask(getOpenModalTaskId());
   closeModal();
 }
 
@@ -275,9 +275,9 @@ function deleteCurrentTask() {
 async function submitFeedback() {
   const textarea = document.getElementById('modal-feedback');
   const message = textarea.value.trim();
-  if (!message || !currentTaskId) return;
+  if (!message || !getOpenModalTaskId()) return;
   try {
-    await api(task(currentTaskId).feedback(), {
+    await api(task(getOpenModalTaskId()).feedback(), {
       method: 'POST',
       body: JSON.stringify({ message }),
     });
@@ -290,9 +290,9 @@ async function submitFeedback() {
 }
 
 async function completeTask() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   try {
-    await api(task(currentTaskId).done(), { method: 'POST' });
+    await api(task(getOpenModalTaskId()).done(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -305,14 +305,14 @@ async function completeTask() {
 async function retryTask() {
   const textarea = document.getElementById('modal-retry-prompt');
   const prompt = textarea.value.trim();
-  if (!prompt || !currentTaskId) return;
+  if (!prompt || !getOpenModalTaskId()) return;
   try {
     const body = { status: 'backlog', prompt };
     const retryResumeRow = document.getElementById('modal-retry-resume-row');
     if (retryResumeRow && !retryResumeRow.classList.contains('hidden')) {
       body.fresh_start = !document.getElementById('modal-retry-resume').checked;
     }
-    await api(task(currentTaskId).update(), {
+    await api(task(getOpenModalTaskId()).update(), {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
@@ -324,11 +324,11 @@ async function retryTask() {
 }
 
 async function resumeTask() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   try {
     const timeoutEl = document.getElementById('modal-resume-timeout');
     const timeout = timeoutEl ? parseInt(timeoutEl.value, 10) || DEFAULT_TASK_TIMEOUT : DEFAULT_TASK_TIMEOUT;
-    await api(task(currentTaskId).resume(), {
+    await api(task(getOpenModalTaskId()).resume(), {
       method: 'POST',
       body: JSON.stringify({ timeout }),
     });
@@ -342,10 +342,10 @@ async function resumeTask() {
 // --- Backlog editing ---
 
 async function saveResumeOption(resume) {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   const statusEl = document.getElementById('modal-edit-status');
   try {
-    await api(task(currentTaskId).update(), {
+    await api(task(getOpenModalTaskId()).update(), {
       method: 'PATCH',
       body: JSON.stringify({ fresh_start: !resume }),
     });
@@ -361,7 +361,7 @@ function scheduleBacklogSave() {
   statusEl.textContent = '';
   clearTimeout(editDebounce);
   editDebounce = setTimeout(async () => {
-    if (!currentTaskId) return;
+    if (!getOpenModalTaskId()) return;
     const prompt = document.getElementById('modal-edit-prompt').value.trim();
     if (!prompt) return;
     const timeout = parseInt(document.getElementById('modal-edit-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
@@ -375,7 +375,7 @@ function scheduleBacklogSave() {
     const max_input_tokens = maxTokensEl ? (parseInt(maxTokensEl.value, 10) || 0) : undefined;
     const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on, max_cost_usd, max_input_tokens };
     try {
-      await api(task(currentTaskId).update(), {
+      await api(task(getOpenModalTaskId()).update(), {
         method: 'PATCH',
         body: JSON.stringify(patchBody),
       });
@@ -397,9 +397,9 @@ document.getElementById('modal-edit-timeout').addEventListener('change', schedul
 // --- Start (backlog → in_progress) ---
 
 async function startTask() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   try {
-    await api(task(currentTaskId).update(), { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) });
+    await api(task(getOpenModalTaskId()).update(), { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -410,10 +410,10 @@ async function startTask() {
 // --- Cancel ---
 
 async function cancelTask() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   if (!confirm('Cancel this task? The sandbox will be cleaned up and all prepared changes discarded. History and logs will be preserved.')) return;
   try {
-    await api(task(currentTaskId).cancel(), { method: 'POST' });
+    await api(task(getOpenModalTaskId()).cancel(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -426,8 +426,8 @@ async function cancelTask() {
 // openRaiseLimitInline: shows a small inline form for adjusting budget limits
 // on a task that was paused due to a budget guardrail.
 async function openRaiseLimitInline() {
-  if (!currentTaskId) return;
-  const task = tasks.find(t => t.id === currentTaskId);
+  if (!getOpenModalTaskId()) return;
+  const task = tasks.find(t => t.id === getOpenModalTaskId());
   if (!task) return;
   const banner = document.getElementById('modal-budget-exceeded-banner');
   if (!banner) return;
@@ -444,7 +444,7 @@ async function openRaiseLimitInline() {
   if (newTokens === null) return; // cancelled
 
   try {
-    await api(Routes.tasks.update(currentTaskId), {
+    await api(Routes.tasks.update(getOpenModalTaskId()), {
       method: 'PATCH',
       body: JSON.stringify({
         max_cost_usd: parseFloat(newCost) || 0,
@@ -469,9 +469,9 @@ async function archiveAllDone() {
 }
 
 async function archiveTask() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   try {
-    await api(task(currentTaskId).archive(), { method: 'POST' });
+    await api(task(getOpenModalTaskId()).archive(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -480,9 +480,9 @@ async function archiveTask() {
 }
 
 async function unarchiveTask() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   try {
-    await api(task(currentTaskId).unarchive(), { method: 'POST' });
+    await api(task(getOpenModalTaskId()).unarchive(), { method: 'POST' });
     closeModal();
     fetchTasks();
   } catch (e) {
@@ -530,10 +530,10 @@ function toggleTestSection() {
 }
 
 async function runTestTask() {
-  if (!currentTaskId) return;
+  if (!getOpenModalTaskId()) return;
   const criteria = document.getElementById('modal-test-criteria').value.trim();
   try {
-    const res = await api(task(currentTaskId).test(), {
+    const res = await api(task(getOpenModalTaskId()).test(), {
       method: 'POST',
       body: JSON.stringify({ criteria }),
     });

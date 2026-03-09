@@ -90,9 +90,6 @@ function makeModalContext() {
     Date,
     Promise,
     tasks: [task],
-    currentTaskId: null,
-    modalLoadSeq: 0,
-    modalAbort: null,
     logsAbort: null,
     testLogsAbort: null,
     rawLogBuffer: '',
@@ -218,7 +215,7 @@ function makeLogsContextForHash() {
     console,
     Math,
     Date,
-    currentTaskId: TASK_ID,
+    _modalState: { seq: 0, taskId: TASK_ID, abort: null },
     logsAbort: null,
     testLogsAbort: null,
     rawLogBuffer: '',
@@ -256,6 +253,7 @@ function makeLogsContextForHash() {
     requestAnimationFrame: () => {},
   });
 
+  ctx.getOpenModalTaskId = function() { return ctx._modalState.taskId; };
   loadScript('modal-logs.js', ctx);
   return { ctx, elements, replaceStateCalls };
 }
@@ -278,7 +276,7 @@ describe('setRightTab hash update', () => {
 
   it('does not update hash when currentTaskId is null', () => {
     const { ctx, replaceStateCalls } = makeLogsContextForHash();
-    vm.runInContext('currentTaskId = null', ctx);
+    vm.runInContext('_modalState.taskId = null', ctx);
     ctx.setRightTab('implementation');
     expect(replaceStateCalls).toHaveLength(0);
   });
@@ -301,7 +299,7 @@ function makeResultsContextForHash() {
     console,
     Math,
     Date,
-    currentTaskId: TASK_ID,
+    _modalState: { seq: 0, taskId: TASK_ID, abort: null },
     history: {
       replaceState(_state, _title, url) { replaceStateCalls.push(url); },
     },
@@ -320,6 +318,7 @@ function makeResultsContextForHash() {
     requestAnimationFrame: () => {},
   });
 
+  ctx.getOpenModalTaskId = function() { return ctx._modalState.taskId; };
   loadScript('modal-results.js', ctx);
   return { ctx, elements, replaceStateCalls };
 }
@@ -333,7 +332,7 @@ describe('setLeftTab hash update', () => {
 
   it('does not update hash when currentTaskId is null', () => {
     const { ctx, replaceStateCalls } = makeResultsContextForHash();
-    vm.runInContext('currentTaskId = null', ctx);
+    vm.runInContext('_modalState.taskId = null', ctx);
     ctx.setLeftTab('implementation');
     expect(replaceStateCalls).toHaveLength(0);
   });
