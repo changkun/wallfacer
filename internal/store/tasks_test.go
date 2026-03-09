@@ -2,8 +2,10 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -215,43 +217,50 @@ func TestDeleteTask_Basic(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "delete me", 5, false, "", "")
 
-	if err := s.DeleteTask(bg(), task.ID); err != nil {
+	if err := s.DeleteTask(bg(), task.ID, ""); err != nil {
 		t.Fatalf("DeleteTask: %v", err)
 	}
+	// Soft-deleted task is no longer accessible via GetTask.
 	if _, err := s.GetTask(bg(), task.ID); err == nil {
-		t.Error("expected task-not-found error after delete")
+		t.Error("expected task-not-found error after soft delete")
 	}
 }
 
-func TestDeleteTask_RemovesDiskData(t *testing.T) {
+func TestDeleteTask_RetainsDiskData(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
 	task, _ := s.CreateTask(bg(), "delete me", 5, false, "", "")
 	taskDir := dir + "/" + task.ID.String()
 
-	s.DeleteTask(bg(), task.ID)
+	s.DeleteTask(bg(), task.ID, "")
 
-	if _, err := os.Stat(taskDir); !os.IsNotExist(err) {
-		t.Errorf("task directory still exists after delete, stat err: %v", err)
+	// Soft delete keeps the directory on disk.
+	if _, err := os.Stat(taskDir); os.IsNotExist(err) {
+		t.Error("task directory was removed by soft delete; expected it to be retained")
+	}
+	// tombstone.json must be present.
+	if _, err := os.Stat(filepath.Join(taskDir, "tombstone.json")); os.IsNotExist(err) {
+		t.Error("tombstone.json not created by soft delete")
 	}
 }
 
 func TestDeleteTask_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.DeleteTask(bg(), uuid.New()); err == nil {
+	if err := s.DeleteTask(bg(), uuid.New(), ""); err == nil {
 		t.Error("expected error deleting unknown task")
 	}
 }
 
-func TestDeleteTask_RemovesFromEvents(t *testing.T) {
+func TestDeleteTask_PreservesEvents(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
 	s.InsertEvent(bg(), task.ID, "state_change", "test")
-	s.DeleteTask(bg(), task.ID)
+	s.DeleteTask(bg(), task.ID, "")
 
+	// Events must remain accessible for tombstoned tasks.
 	events, _ := s.GetEvents(bg(), task.ID)
-	if len(events) != 0 {
-		t.Errorf("expected 0 events after delete, got %d", len(events))
+	if len(events) == 0 {
+		t.Error("expected events to be preserved after soft delete")
 	}
 }
 
@@ -1313,5 +1322,181 @@ func TestUpdateTaskScheduledAt_NotFound(t *testing.T) {
 	future := time.Now().Add(time.Hour)
 	if err := s.UpdateTaskScheduledAt(bg(), uuid.New(), &future); err == nil {
 		t.Error("expected error for unknown task")
+// ─────────────────────────────────────────────────────────────────────────────
+// Soft-delete / restore / purge
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestSoftDelete(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "soft delete me", 5, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
 	}
+
+	if err := s.DeleteTask(bg(), task.ID, "test reason"); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+
+	// Must not appear in ListTasks.
+	tasks, _ := s.ListTasks(bg(), true)
+	for _, tsk := range tasks {
+		if tsk.ID == task.ID {
+			t.Error("soft-deleted task still appears in ListTasks")
+		}
+	}
+
+	// Must appear in ListDeletedTasks.
+	deleted, err := s.ListDeletedTasks(bg())
+	if err != nil {
+		t.Fatalf("ListDeletedTasks: %v", err)
+	}
+	found := false
+	for _, tsk := range deleted {
+		if tsk.ID == task.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("soft-deleted task not found in ListDeletedTasks")
+	}
+
+	// tombstone.json must exist on disk.
+	tombPath := filepath.Join(s.dir, task.ID.String(), "tombstone.json")
+	if _, err := os.Stat(tombPath); os.IsNotExist(err) {
+		t.Error("tombstone.json not written to disk")
+	}
+}
+
+func TestRestoreRoundtrip(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "restore me", 5, false, "", "")
+
+	if err := s.DeleteTask(bg(), task.ID, ""); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+	if err := s.RestoreTask(bg(), task.ID); err != nil {
+		t.Fatalf("RestoreTask: %v", err)
+	}
+
+	// Must be back in ListTasks.
+	tasks, _ := s.ListTasks(bg(), true)
+	found := false
+	for _, tsk := range tasks {
+		if tsk.ID == task.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("restored task not found in ListTasks")
+	}
+
+	// Must not be in ListDeletedTasks.
+	deleted, _ := s.ListDeletedTasks(bg())
+	for _, tsk := range deleted {
+		if tsk.ID == task.ID {
+			t.Error("restored task still appears in ListDeletedTasks")
+		}
+	}
+
+	// tombstone.json must be gone.
+	tombPath := filepath.Join(s.dir, task.ID.String(), "tombstone.json")
+	if _, err := os.Stat(tombPath); !os.IsNotExist(err) {
+		t.Error("tombstone.json still present after restore")
+	}
+}
+
+func TestPurgeExpired(t *testing.T) {
+	s := newTestStore(t)
+
+	// Create two tasks and soft-delete them.
+	old, _ := s.CreateTask(bg(), "old task", 5, false, "", "")
+	recent, _ := s.CreateTask(bg(), "recent task", 5, false, "", "")
+
+	if err := s.DeleteTask(bg(), old.ID, ""); err != nil {
+		t.Fatalf("DeleteTask old: %v", err)
+	}
+	if err := s.DeleteTask(bg(), recent.ID, ""); err != nil {
+		t.Fatalf("DeleteTask recent: %v", err)
+	}
+
+	// Back-date the old tombstone to 8 days ago.
+	oldTombPath := filepath.Join(s.dir, old.ID.String(), "tombstone.json")
+	oldTomb := Tombstone{DeletedAt: time.Now().AddDate(0, 0, -8), Reason: "old"}
+	raw, _ := json.Marshal(oldTomb)
+	if err := os.WriteFile(oldTombPath, raw, 0644); err != nil {
+		t.Fatalf("patch old tombstone: %v", err)
+	}
+
+	// Back-date the recent tombstone to 3 days ago.
+	recentTombPath := filepath.Join(s.dir, recent.ID.String(), "tombstone.json")
+	recentTomb := Tombstone{DeletedAt: time.Now().AddDate(0, 0, -3), Reason: "recent"}
+	raw, _ = json.Marshal(recentTomb)
+	if err := os.WriteFile(recentTombPath, raw, 0644); err != nil {
+		t.Fatalf("patch recent tombstone: %v", err)
+	}
+
+	s.PurgeExpiredTombstones(7)
+
+	// Old task's directory must be gone.
+	if _, err := os.Stat(filepath.Join(s.dir, old.ID.String())); !os.IsNotExist(err) {
+		t.Error("old task directory not removed by PurgeExpiredTombstones")
+	}
+
+	// Recent task must still exist (not yet expired).
+	if _, err := os.Stat(filepath.Join(s.dir, recent.ID.String())); os.IsNotExist(err) {
+		t.Error("recent task directory was incorrectly purged")
+	}
+
+	// Recent task must still be in ListDeletedTasks.
+	deleted, _ := s.ListDeletedTasks(bg())
+	foundRecent := false
+	for _, tsk := range deleted {
+		if tsk.ID == old.ID {
+			t.Error("purged task still appears in ListDeletedTasks")
+		}
+		if tsk.ID == recent.ID {
+			foundRecent = true
+		}
+	}
+	if !foundRecent {
+		t.Error("non-expired task missing from ListDeletedTasks after purge")
+	}
+}
+
+func TestStorePersistsTombstone(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	task, _ := s.CreateTask(bg(), "tombstone persist", 5, false, "", "")
+	if err := s.DeleteTask(bg(), task.ID, "persistence test"); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+
+	// Reload the store from the same directory.
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore reload: %v", err)
+	}
+
+	// Task must not be in active tasks.
+	if _, err := s2.GetTask(bg(), task.ID); err == nil {
+		t.Error("tombstoned task appears active after store reload")
+	}
+
+	// Task must be in deleted map.
+	deleted, err := s2.ListDeletedTasks(bg())
+	if err != nil {
+		t.Fatalf("ListDeletedTasks after reload: %v", err)
+	}
+	found := false
+	for _, tsk := range deleted {
+		if tsk.ID == task.ID {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("tombstoned task not found in ListDeletedTasks after reload")	}
 }

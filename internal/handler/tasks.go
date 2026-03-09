@@ -686,12 +686,42 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	writeJSON(w, http.StatusOK, updated)
 }
 
-// DeleteTask removes a task and its data.
+// DeleteTask soft-deletes a task by writing a tombstone. The task data is
+// retained on disk for the configured retention period so it can be restored.
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	// reason is optional; an empty or absent body is fine.
+	if !decodeOptionalJSONBody(w, r, &req) {
+		return
+	}
 	if task, err := h.store.GetTask(r.Context(), id); err == nil && len(task.WorktreePaths) > 0 {
 		h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
 	}
-	if err := h.store.DeleteTask(r.Context(), id); err != nil {
+	if err := h.store.DeleteTask(r.Context(), id, req.Reason); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ListDeletedTasks returns all soft-deleted (tombstoned) tasks.
+func (h *Handler) ListDeletedTasks(w http.ResponseWriter, r *http.Request) {
+	tasks, err := h.store.ListDeletedTasks(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if tasks == nil {
+		tasks = []store.Task{}
+	}
+	writeJSON(w, http.StatusOK, tasks)
+}
+
+// RestoreTask removes the tombstone from a soft-deleted task, making it active again.
+func (h *Handler) RestoreTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	if err := h.store.RestoreTask(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

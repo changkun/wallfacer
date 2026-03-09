@@ -250,6 +250,14 @@ func (t *Task) HasTag(tag string) bool {
 	return false
 }
 
+// Tombstone records when and why a task was soft-deleted.
+// A tombstone.json file in the task directory marks the task as deleted but
+// retains all data on disk until the retention period expires.
+type Tombstone struct {
+	DeletedAt time.Time `json:"deleted_at"`
+	Reason    string    `json:"reason,omitempty"`
+}
+
 // TaskSummary is an immutable snapshot written exactly once when a task
 // transitions to TaskStatusDone. It captures the final cost, usage breakdown,
 // and key metadata so that analytics endpoints can avoid re-reading the full

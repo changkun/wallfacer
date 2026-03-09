@@ -289,6 +289,12 @@ var Routes = []Route{
 		Description: "List immutable task summaries for completed tasks (cost dashboard, no full task.json read).",
 		Tags:        []string{"tasks", "stats"},
 	},
+	{
+		Method: "GET", Pattern: "/api/tasks/deleted", Name: "ListDeletedTasks",
+		JSName:      "listDeleted",
+		Description: "List soft-deleted (tombstoned) tasks that are within the retention window.",
+		Tags:        []string{"tasks"},
+	},
 
 	// --- Task instance operations (require {id}) ---
 
@@ -327,6 +333,11 @@ var Routes = []Route{
 	{
 		Method: "POST", Pattern: "/api/tasks/{id}/resume", Name: "ResumeTask",
 		Description: "Resume a failed task using its existing session.",
+		Tags:        []string{"tasks"},
+	},
+	{
+		Method: "POST", Pattern: "/api/tasks/{id}/restore", Name: "RestoreTask",
+		Description: "Restore a soft-deleted task by removing its tombstone.",
 		Tags:        []string{"tasks"},
 	},
 	{
