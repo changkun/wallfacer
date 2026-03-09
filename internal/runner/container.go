@@ -183,6 +183,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 		spec.Cmd = append(spec.Cmd, "--resume", sessionID)
 	}
 
+	spec.Network = r.resolvedContainerNetwork()
 	return spec.Build()
 }
 

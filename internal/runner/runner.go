@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -275,6 +276,7 @@ type RunnerConfig struct {
 	WorktreesDir     string
 	InstructionsPath string
 	CodexAuthPath    string // host path to codex auth cache directory (default: ~/.codex)
+	ContainerNetwork string // --network value for task containers (empty = read from env file, fallback "host")
 }
 
 // Runner orchestrates agent container execution for tasks.
@@ -288,8 +290,9 @@ type Runner struct {
 	worktreesDir     string
 	instructionsPath string
 	codexAuthPath    string
-	worktreeMu       sync.Mutex         // serializes all worktree filesystem operations on worktreesDir
-	repoMu           sync.Map           // per-repo *sync.Mutex for serializing rebase+merge
+	containerNetwork string         // --network override; empty = read from env file
+	worktreeMu       sync.Mutex     // serializes all worktree filesystem operations on worktreesDir
+	repoMu           sync.Map       // per-repo *sync.Mutex for serializing rebase+merge
 	taskContainers   *containerRegistry // taskID → container name
 	refineContainers *containerRegistry // taskID → refinement container name
 	ideateContainer  *containerRegistry // singleton: ideation container name
@@ -429,10 +432,25 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		worktreesDir:     cfg.WorktreesDir,
 		instructionsPath: cfg.InstructionsPath,
 		codexAuthPath:    strings.TrimSpace(cfg.CodexAuthPath),
+		containerNetwork: cfg.ContainerNetwork,
 		taskContainers:   &containerRegistry{},
 		refineContainers: &containerRegistry{},
 		ideateContainer:  &containerRegistry{},
 	}
+}
+
+// resolvedContainerNetwork returns the --network value to use for task containers.
+// Priority: explicit RunnerConfig value > WALLFACER_CONTAINER_NETWORK from env file > "host".
+func (r *Runner) resolvedContainerNetwork() string {
+	if r.containerNetwork != "" {
+		return r.containerNetwork
+	}
+	if r.envFile != "" {
+		if cfg, err := envconfig.Parse(r.envFile); err == nil && cfg.ContainerNetwork != "" {
+			return cfg.ContainerNetwork
+		}
+	}
+	return "host"
 }
 
 // Command returns the container runtime binary path (podman/docker).

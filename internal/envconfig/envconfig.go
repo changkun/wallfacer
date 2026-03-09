@@ -38,6 +38,8 @@ type Config struct {
 	OversightSandbox      string // WALLFACER_SANDBOX_OVERSIGHT
 	CommitMessageSandbox  string // WALLFACER_SANDBOX_COMMIT_MESSAGE
 	IdeaAgentSandbox      string // WALLFACER_SANDBOX_IDEA_AGENT
+
+	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -65,6 +67,7 @@ var knownKeys = []string{
 	"WALLFACER_SANDBOX_OVERSIGHT",
 	"WALLFACER_SANDBOX_COMMIT_MESSAGE",
 	"WALLFACER_SANDBOX_IDEA_AGENT",
+	"WALLFACER_CONTAINER_NETWORK",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -139,6 +142,8 @@ func Parse(path string) (Config, error) {
 			cfg.CommitMessageSandbox = strings.ToLower(strings.TrimSpace(v))
 		case "WALLFACER_SANDBOX_IDEA_AGENT":
 			cfg.IdeaAgentSandbox = strings.ToLower(strings.TrimSpace(v))
+		case "WALLFACER_CONTAINER_NETWORK":
+			cfg.ContainerNetwork = v
 		}
 	}
 	return cfg, nil
@@ -260,7 +265,8 @@ func Update(
 	oversightInterval,
 	archivedTasksPerPage,
 	autoPush,
-	autoPushThreshold *string,
+	autoPushThreshold,
+	containerNetwork *string,
 ) error {
 	updates := map[string]*string{
 		"CLAUDE_CODE_OAUTH_TOKEN":           oauthToken,
@@ -278,6 +284,7 @@ func Update(
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": archivedTasksPerPage,
 		"WALLFACER_AUTO_PUSH":               autoPush,
 		"WALLFACER_AUTO_PUSH_THRESHOLD":     autoPushThreshold,
+		"WALLFACER_CONTAINER_NETWORK":       containerNetwork,
 	}
 	return updateFile(path, updates)
 }

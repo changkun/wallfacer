@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/apicontract"
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/handler"
 	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/logger"
@@ -112,6 +113,14 @@ func runServer(configDir string, args []string) {
 		codexAuthPath = filepath.Join(home, ".codex")
 	}
 
+	// Read initial ContainerNetwork from env file (if present) so the runner
+	// starts with the configured network policy without waiting for the first
+	// container launch to re-read the file.
+	containerNetwork := ""
+	if cfg, err := envconfig.Parse(*envFile); err == nil {
+		containerNetwork = cfg.ContainerNetwork
+	}
+
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:          *containerCmd,
 		SandboxImage:     resolvedImage,
@@ -120,6 +129,7 @@ func runServer(configDir string, args []string) {
 		WorktreesDir:     worktreesDir,
 		InstructionsPath: instructionsPath,
 		CodexAuthPath:    codexAuthPath,
+		ContainerNetwork: containerNetwork,
 	})
 
 	r.PruneOrphanedWorktrees(s)

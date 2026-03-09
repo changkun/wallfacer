@@ -21,13 +21,22 @@ type ContainerSpec struct {
 	Volumes    []VolumeMount     // -v mounts (insertion order preserved)
 	WorkDir    string            // -w workdir (omitted when empty)
 	ExtraFlags []string          // inserted between last -v/-w and image
-	Cmd        []string          // appended after image
+	// Network controls the --network flag passed to the container runtime.
+	// Valid values:
+	//   "host"        — (default) unrestricted; required if the agent needs
+	//                   internet access to call the Anthropic API through the host
+	//   "none"        — complete isolation, for air-gapped local-only workspaces
+	//   "slirp4netns" — Podman user-mode networking: allows outbound connections
+	//                   but blocks inbound connections and host loopback access
+	// An empty string falls back to "host" for backward compatibility.
+	Network string   // --network (defaults to "host" when empty)
+	Cmd     []string // appended after image
 }
 
 // Build returns the complete argument slice starting with "run".
 // Flag order:
 //
-//	run --rm --network=host --name <Name>
+//	run --rm --network=<Network|host> --name <Name>
 //	[--label key=val ...]   (sorted)
 //	[--env-file <EnvFile>]
 //	[-e KEY=VAL ...]        (sorted)
@@ -37,7 +46,11 @@ type ContainerSpec struct {
 //	<Image>
 //	[<Cmd> ...]
 func (s ContainerSpec) Build() []string {
-	args := []string{"run", "--rm", "--network=host", "--name", s.Name}
+	network := s.Network
+	if network == "" {
+		network = "host"
+	}
+	args := []string{"run", "--rm", "--network=" + network, "--name", s.Name}
 
 	if len(s.Labels) > 0 {
 		keys := make([]string, 0, len(s.Labels))
