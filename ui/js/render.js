@@ -225,8 +225,8 @@ function render() {
       if (el.children[i] !== card) {
         el.insertBefore(card, el.children[i] || null);
       }
-      // Load diff for waiting/failed/done tasks that have worktrees
-      if ((t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
+      // Load diff for any task that has worktrees
+      if (t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
         fetchDiff(card, t.id, t.updated_at);
       }
     }
@@ -381,7 +381,7 @@ function updateCard(card, t, rank) {
     card.classList.remove('card-idea-agent');
   }
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
-  const showDiff = (t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
+  const showDiff = !!(t.worktree_paths && Object.keys(t.worktree_paths).length > 0);
   const showOversight = (t.status === 'done' || t.status === 'failed') && !isArchived && hasExecutionTrail(t);
   const ocCached = cardOversightCache.get(t.id);
   const ocSummary = ocCached ? `${ocCached.phase_count} phases` : 'Generating\u2026';

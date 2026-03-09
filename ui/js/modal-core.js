@@ -244,9 +244,9 @@ async function openModal(id) {
       startLogStream(id, seq);
     }
 
-    // Changes tab: show for committing/waiting/failed/done tasks with worktrees
+    // Changes tab: show for any non-backlog task that has worktrees
     const changesTab = document.getElementById('right-tab-changes');
-    if ((task.status === 'committing' || task.status === 'failed' || task.status === 'done' || task.status === 'waiting') && hasWorktrees) {
+    if (hasWorktrees) {
       if (changesTab) changesTab.classList.remove('hidden');
       const filesEl = document.getElementById('modal-diff-files');
       const behindEl = document.getElementById('modal-diff-behind');
