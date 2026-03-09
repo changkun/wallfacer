@@ -47,6 +47,11 @@ type Handler struct {
 
 	sandboxTestMu     sync.RWMutex
 	sandboxTestPassed map[string]bool
+
+	// testPhase1Done is called by tryAutoPromote after Phase 1 completes and
+	// before Phase 2 begins. It is nil in production; tests set it to
+	// coordinate goroutine timing and verify Phase 1 runs concurrently.
+	testPhase1Done func()
 }
 
 // NewHandler constructs a Handler with the given dependencies.

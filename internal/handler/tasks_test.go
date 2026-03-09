@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -2042,5 +2044,89 @@ func TestUpdateTask_RejectsUnknownFields(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestTryAutoPromote_ConcurrentPhase1DoesNotBlock verifies that two goroutines
+// calling tryAutoPromote concurrently can both complete Phase 1 (the unlocked
+// store scan) without blocking each other. A rendezvous barrier installed via
+// testPhase1Done ensures both goroutines reach the Phase 1/Phase 2 boundary
+// simultaneously; if Phase 1 were still serialised by promoteMu the second
+// goroutine would never arrive and the test would time out.
+func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	_ = envPath
+	h.SetAutopilot(true)
+	ctx := context.Background()
+
+	// Limit to 1 concurrent task so the second goroutine's Phase 2 is a no-op.
+	setMax := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(`{"max_parallel_tasks":1}`))
+	h.UpdateEnvConfig(httptest.NewRecorder(), setMax)
+
+	// Create two distinct backlog tasks.
+	_, err := h.store.CreateTask(ctx, "concurrent task one", 30, false, "", store.TaskKindTask)
+	if err != nil {
+		t.Fatalf("create task one: %v", err)
+	}
+	_, err = h.store.CreateTask(ctx, "concurrent task two", 30, false, "", store.TaskKindTask)
+	if err != nil {
+		t.Fatalf("create task two: %v", err)
+	}
+
+	// phase1Done receives a token when each goroutine finishes Phase 1.
+	// gate is closed once both tokens arrive, releasing both goroutines to Phase 2.
+	phase1Done := make(chan struct{}, 2)
+	gate := make(chan struct{})
+
+	h.testPhase1Done = func() {
+		// Signal that this goroutine completed Phase 1.
+		phase1Done <- struct{}{}
+		// Wait until both goroutines have completed Phase 1 before proceeding to
+		// Phase 2. If Phase 1 were serialised (old design), the goroutine holding
+		// promoteMu would block here forever because the second goroutine could
+		// not enter Phase 1 until the lock was released.
+		<-gate
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); h.tryAutoPromote(ctx) }()
+	go func() { defer wg.Done(); h.tryAutoPromote(ctx) }()
+
+	// Collect both Phase 1 completion signals within the timeout.
+	timeout := time.NewTimer(5 * time.Second)
+	defer timeout.Stop()
+	for i := 0; i < 2; i++ {
+		select {
+		case <-phase1Done:
+			// Goroutine i+1 completed Phase 1 concurrently — good.
+		case <-timeout.C:
+			// Only one goroutine reached Phase 1 within the timeout, which means
+			// Phase 1 is being serialised: the second goroutine was blocked by
+			// the first (the old single-phase design).
+			t.Errorf("goroutine %d of 2 did not complete Phase 1 within timeout — Phase 1 appears serialised", i+1)
+			close(gate) // unblock whatever is waiting so wg.Wait() can finish
+			wg.Wait()
+			return
+		}
+	}
+
+	// Both goroutines completed Phase 1 concurrently. Open the gate for Phase 2.
+	close(gate)
+	wg.Wait()
+
+	// With max_concurrent=1 exactly one task should have been promoted.
+	tasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		t.Fatalf("list tasks: %v", err)
+	}
+	inProgress := 0
+	for _, task := range tasks {
+		if task.Status == store.TaskStatusInProgress {
+			inProgress++
+		}
+	}
+	if inProgress != 1 {
+		t.Errorf("expected exactly 1 task in_progress after concurrent promotion, got %d", inProgress)
 	}
 }

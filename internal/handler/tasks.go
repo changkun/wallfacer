@@ -341,44 +341,20 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		} else {
 			// Enforce concurrency limit for manual backlog → in_progress transitions.
 			if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog && !task.IsTestRun {
-				promoteMu.Lock()
-				regularInProgress, err := h.countRegularInProgress(r.Context())
-				if err != nil {
-					promoteMu.Unlock()
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+				if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
 					return
 				}
-				if regularInProgress >= h.maxConcurrentTasks() {
-					promoteMu.Unlock()
-					http.Error(w, fmt.Sprintf("max concurrent tasks (%d) reached", h.maxConcurrentTasks()), http.StatusConflict)
-					return
-				}
-
-				if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
-					promoteMu.Unlock()
-					if errors.Is(err, store.ErrInvalidTransition) {
-						http.Error(w, err.Error(), http.StatusBadRequest)
-					} else {
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-					}
-					return
-				}
-				promoteMu.Unlock()
-
 				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 					"from":    string(oldStatus),
 					"to":      string(newStatus),
 					"trigger": store.TriggerUser,
 				})
 				h.diffCache.invalidate(id)
-
-				if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {
-					sessionID := ""
-					if !task.FreshStart && task.SessionID != nil {
-						sessionID = *task.SessionID
-					}
-					h.runner.RunBackground(id, task.Prompt, sessionID, false)
+				sessionID := ""
+				if !task.FreshStart && task.SessionID != nil {
+					sessionID = *task.SessionID
 				}
+				h.runner.RunBackground(id, task.Prompt, sessionID, false)
 				updated, err := h.store.GetTask(r.Context(), id)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -392,37 +368,15 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			// a test run. This protects API callers that PATCH waiting/failed →
 			// in_progress from bypassing the concurrency limit.
 			if newStatus == store.TaskStatusInProgress && !task.IsTestRun {
-				promoteMu.Lock()
-				regularInProgress, err := h.countRegularInProgress(r.Context())
-				if err != nil {
-					promoteMu.Unlock()
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+				if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
 					return
 				}
-				if regularInProgress >= h.maxConcurrentTasks() {
-					promoteMu.Unlock()
-					http.Error(w, fmt.Sprintf("max concurrent tasks (%d) reached", h.maxConcurrentTasks()), http.StatusConflict)
-					return
-				}
-
-				if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
-					promoteMu.Unlock()
-					if errors.Is(err, store.ErrInvalidTransition) {
-						http.Error(w, err.Error(), http.StatusBadRequest)
-					} else {
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-					}
-					return
-				}
-
 				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
 					"from":    string(oldStatus),
 					"to":      string(newStatus),
 					"trigger": store.TriggerUser,
 				})
 				h.diffCache.invalidate(id)
-				promoteMu.Unlock()
-
 				updated, err := h.store.GetTask(r.Context(), id)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -712,6 +666,34 @@ func countRegularInProgress(tasks []store.Task) int {
 	return count
 }
 
+// checkConcurrencyAndUpdateStatus acquires promoteMu, enforces the regular
+// in-progress concurrency limit, and calls store.UpdateTaskStatus. It writes
+// the appropriate HTTP error response and returns false on any failure;
+// on success it returns true with the mutex already released.
+func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.ResponseWriter, id uuid.UUID, oldStatus, newStatus store.TaskStatus) bool {
+	promoteMu.Lock()
+	defer promoteMu.Unlock()
+
+	regularInProgress, err := h.countRegularInProgress(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return false
+	}
+	if regularInProgress >= h.maxConcurrentTasks() {
+		http.Error(w, fmt.Sprintf("max concurrent tasks (%d) reached", h.maxConcurrentTasks()), http.StatusConflict)
+		return false
+	}
+	if err := h.store.UpdateTaskStatus(ctx, id, newStatus); err != nil {
+		if errors.Is(err, store.ErrInvalidTransition) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return false
+	}
+	return true
+}
+
 // promoteMu serialises auto-promotion so two simultaneous state changes
 // cannot both promote a task, exceeding the concurrency limit.
 var promoteMu sync.Mutex
@@ -769,20 +751,30 @@ func taskReachable(taskList []store.Task, start, target uuid.UUID) bool {
 // tryAutoPromote checks if there is capacity to run more tasks and promotes
 // the highest-priority (lowest position) backlog task if so.
 // When autopilot is disabled, no promotion happens.
+//
+// Concurrency design mirrors tryAutoTest's two-phase approach:
+//
+// Phase 1 (no lock): call store.ListTasks, compute the regular in-progress
+// count, and find the best backlog candidate. AreDependenciesSatisfied may do
+// disk I/O here; we must not hold promoteMu during these potentially slow
+// operations so that a concurrent tryAutoPromote call (or tryAutoTest) can
+// proceed in parallel.
+//
+// Phase 2 (under promoteMu): re-count to pick up any state changes that
+// happened during Phase 1, re-check capacity, then promote.
 func (h *Handler) tryAutoPromote(ctx context.Context) {
 	if !h.AutopilotEnabled() {
 		return
 	}
 
-	promoteMu.Lock()
-	defer promoteMu.Unlock()
-
+	// Phase 1 (no lock): build candidate and count without holding promoteMu.
 	tasks, err := h.store.ListTasks(ctx, false)
 	if err != nil {
 		return
 	}
 
 	regularInProgress := countRegularInProgress(tasks)
+	maxTasks := h.maxConcurrentTasks()
 	var bestBacklog *store.Task
 	for i := range tasks {
 		t := &tasks[i]
@@ -798,8 +790,24 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		}
 	}
 
-	maxTasks := h.maxConcurrentTasks()
 	if regularInProgress >= maxTasks || bestBacklog == nil {
+		return
+	}
+
+	if h.testPhase1Done != nil {
+		h.testPhase1Done()
+	}
+
+	// Phase 2 (under promoteMu): re-verify capacity with a fresh count and promote.
+	promoteMu.Lock()
+	defer promoteMu.Unlock()
+
+	// Re-read in-progress count; state may have changed during Phase 1 I/O.
+	freshTasks, err := h.store.ListTasks(ctx, false)
+	if err != nil {
+		return
+	}
+	if countRegularInProgress(freshTasks) >= maxTasks {
 		return
 	}
 
