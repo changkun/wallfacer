@@ -379,6 +379,14 @@ var Routes = []Route{
 		Tags:        []string{"tasks"},
 	},
 
+	// --- Admin operations ---
+
+	{
+		Method: "POST", Pattern: "/api/admin/rebuild-index", Name: "RebuildIndex",
+		Description: "Rebuild the in-memory search index from disk; returns the number of repaired entries.",
+		Tags:        []string{"admin"},
+	},
+
 	// --- Refinement agent ---
 
 	{

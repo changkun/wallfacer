@@ -145,7 +145,11 @@ func (s *Store) loadAll() error {
 
 		// Build search index entry. Oversight read errors are non-fatal;
 		// the task remains indexed without oversight text.
-		oversightRaw, _ := s.LoadOversightText(id)
+		oversightRaw, oversightErr := s.LoadOversightText(id)
+		if oversightErr != nil && !os.IsNotExist(oversightErr) {
+			logger.Store.Warn("startup: failed to load oversight for search index",
+				"task", id, "error", oversightErr)
+		}
 		s.searchIndex[id] = buildIndexEntry(&task, oversightRaw)
 
 		if err := s.loadEvents(id, entry.Name()); err != nil {

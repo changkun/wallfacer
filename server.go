@@ -334,6 +334,9 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 	// All per-route middleware (UUID parsing, extra path values) is applied here
 	// so the registration loop below stays trivial.
 	handlers := map[string]http.HandlerFunc{
+		// Admin operations.
+		"RebuildIndex": h.RebuildIndex,
+
 		// Debug & monitoring.
 		"Health":          h.Health,
 		"GetSpanStats":    h.GetSpanStats,
