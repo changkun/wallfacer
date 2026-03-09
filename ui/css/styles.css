@@ -300,6 +300,9 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   border-radius: 12px;
   padding: 10px 12px;
 }
+details.settings-card > summary::-webkit-details-marker { display: none; }
+details.settings-card > summary { list-style: none; }
+details.settings-card[open] > summary svg { transform: rotate(180deg); }
 .settings-card:first-of-type {
   margin-top: 0;
 }
