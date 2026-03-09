@@ -345,9 +345,11 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"RebuildIndex": h.RebuildIndex,
 
 		// Debug & monitoring.
-		"Health":          h.Health,
-		"GetSpanStats":    h.GetSpanStats,
+		"Health":           h.Health,
+		"GetSpanStats":     h.GetSpanStats,
 		"GetRuntimeStatus": h.GetRuntimeStatus,
+		"BoardManifest":    h.BoardManifest,
+		"TaskBoardManifest": withID(h.TaskBoardManifest),
 
 		// Container monitoring.
 		"GetContainers": h.GetContainers,

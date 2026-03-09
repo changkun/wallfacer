@@ -1,11 +1,15 @@
 package handler
 
 import (
+	"encoding/json"
 	"math"
 	"net/http"
 	"runtime"
 	"sort"
 	"time"
+
+	"changkun.de/wallfacer/internal/runner"
+	"github.com/google/uuid"
 )
 
 // containerSummary is a compact representation of a running container for the
@@ -59,6 +63,54 @@ func percentileIndex(n, pct int) int {
 		idx = n - 1
 	}
 	return idx
+}
+
+// boardManifestResponse is the JSON envelope returned by the board manifest endpoints.
+type boardManifestResponse struct {
+	Manifest  *runner.BoardManifest `json:"manifest"`
+	SizeBytes int                   `json:"size_bytes"`
+	SizeWarn  bool                  `json:"size_warn"` // true when indented JSON exceeds 64 KB
+}
+
+// BoardManifest returns the board manifest as it would appear to a newly-started
+// task: no self-task, no worktree mounts. Useful for debugging the board state
+// without spinning up a container.
+func (h *Handler) BoardManifest(w http.ResponseWriter, r *http.Request) {
+	manifest, err := h.runner.GenerateBoardManifest(r.Context(), uuid.Nil, false)
+	if err != nil {
+		http.Error(w, "failed to generate board manifest: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	b, _ := json.MarshalIndent(manifest, "", "  ")
+	const maxBytes = 64 * 1024
+	writeJSON(w, http.StatusOK, boardManifestResponse{
+		Manifest:  manifest,
+		SizeBytes: len(b),
+		SizeWarn:  len(b) > maxBytes,
+	})
+}
+
+// TaskBoardManifest returns the board manifest as it would appear to the
+// specified task: is_self=true for that task's entry, MountWorktrees matching
+// the task's setting.
+func (h *Handler) TaskBoardManifest(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
+	task, err := h.store.GetTask(r.Context(), id)
+	if err != nil || task == nil {
+		http.Error(w, "task not found", http.StatusNotFound)
+		return
+	}
+	manifest, err := h.runner.GenerateBoardManifest(r.Context(), id, task.MountWorktrees)
+	if err != nil {
+		http.Error(w, "failed to generate board manifest: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	b, _ := json.MarshalIndent(manifest, "", "  ")
+	const maxBytes = 64 * 1024
+	writeJSON(w, http.StatusOK, boardManifestResponse{
+		Manifest:  manifest,
+		SizeBytes: len(b),
+		SizeWarn:  len(b) > maxBytes,
+	})
 }
 
 // GetSpanStats aggregates span timing data across all tasks (including archived)

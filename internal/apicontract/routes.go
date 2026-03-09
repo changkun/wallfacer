@@ -59,6 +59,16 @@ var Routes = []Route{
 		Description: "Live server internals: pending goroutines, memory, task states, containers.",
 		Tags:        []string{"debug"},
 	},
+	{
+		Method: "GET", Pattern: "/api/debug/board", Name: "BoardManifest",
+		Description: "Board manifest as seen by a hypothetical new task (no self-task, no worktree mounts).",
+		Tags:        []string{"debug"},
+	},
+	{
+		Method: "GET", Pattern: "/api/tasks/{id}/board", Name: "TaskBoardManifest",
+		Description: "Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied).",
+		Tags:        []string{"tasks", "debug"},
+	},
 
 	// --- Container monitoring ---
 

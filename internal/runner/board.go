@@ -63,20 +63,10 @@ func canMountWorktree(status store.TaskStatus, worktreePaths map[string]string) 
 	}
 }
 
-// generateBoardContext serializes all non-archived tasks into board.json bytes.
-//
-// Size-limiting design (see WriteBoardManifest for rationale):
-//   - The self-task entry receives its full Prompt and Result so the running
-//     agent always has its own complete context.
-//   - Sibling task entries have Prompt truncated to 500 characters and Result
-//     truncated to 1000 characters (with a trailing "..." when cut), and their
-//     Turns counter is reset to 0 because only summary fields (status, result,
-//     branch) matter for cross-task awareness.
-//   - After marshalling, if the manifest exceeds 64 KB a warning is logged
-//     listing the five largest contributors so operators can investigate.
-//
-// It strips SessionID, marks is_self, and computes worktree_mount paths.
-func (r *Runner) generateBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, error) {
+// GenerateBoardManifest builds the board manifest for selfTaskID.
+// Pass uuid.Nil when there is no self-task (e.g. the debug endpoint).
+// Pass mountWorktrees=false when worktree paths are not needed.
+func (r *Runner) GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (*BoardManifest, error) {
 	tasks, err := r.store.ListTasks(ctx, false)
 	if err != nil {
 		return nil, err
@@ -133,10 +123,30 @@ func (r *Runner) generateBoardContext(ctx context.Context, selfTaskID uuid.UUID,
 		})
 	}
 
-	manifest := BoardManifest{
+	return &BoardManifest{
 		GeneratedAt: time.Now(),
 		SelfTaskID:  selfTaskID.String(),
 		Tasks:       boardTasks,
+	}, nil
+}
+
+// generateBoardContext serializes all non-archived tasks into board.json bytes.
+//
+// Size-limiting design (see WriteBoardManifest for rationale):
+//   - The self-task entry receives its full Prompt and Result so the running
+//     agent always has its own complete context.
+//   - Sibling task entries have Prompt truncated to 500 characters and Result
+//     truncated to 1000 characters (with a trailing "..." when cut), and their
+//     Turns counter is reset to 0 because only summary fields (status, result,
+//     branch) matter for cross-task awareness.
+//   - After marshalling, if the manifest exceeds 64 KB a warning is logged
+//     listing the five largest contributors so operators can investigate.
+//
+// It strips SessionID, marks is_self, and computes worktree_mount paths.
+func (r *Runner) generateBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, error) {
+	manifest, err := r.GenerateBoardManifest(ctx, selfTaskID, mountWorktrees)
+	if err != nil {
+		return nil, err
 	}
 
 	jsonBytes, err := json.MarshalIndent(manifest, "", "  ")
@@ -148,7 +158,7 @@ func (r *Runner) generateBoardContext(ctx context.Context, selfTaskID uuid.UUID,
 	// operators are notified before token costs become significant.
 	const maxManifestBytes = 64 * 1024
 	if len(jsonBytes) > maxManifestBytes {
-		logBoardManifestSizeWarning(boardTasks, len(jsonBytes))
+		logBoardManifestSizeWarning(manifest.Tasks, len(jsonBytes))
 	}
 
 	return jsonBytes, nil

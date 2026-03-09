@@ -18,6 +18,8 @@ var Routes = {
     spans: function() { return "/api/debug/spans"; },
     // GET /api/debug/runtime
     runtime: function() { return "/api/debug/runtime"; },
+    // GET /api/debug/board
+    board: function() { return "/api/debug/board"; },
   },
 
   containers: {
@@ -135,6 +137,8 @@ var Routes = {
     // all task-instance endpoints. Use the top-level task() alias.
     task: function(id) {
       return {
+        // GET /api/tasks/{id}/board
+        board: function() { return "/api/tasks/" + id + "/board"; },
         // PATCH /api/tasks/{id}
         update: function() { return "/api/tasks/" + id; },
         // DELETE /api/tasks/{id}
