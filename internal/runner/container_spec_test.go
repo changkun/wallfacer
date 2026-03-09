@@ -14,6 +14,39 @@ func TestContainerSpecBasicRoundTrip(t *testing.T) {
 	}
 }
 
+// TestContainerSpecNetworkNone asserts that Network="none" produces --network=none.
+func TestContainerSpecNetworkNone(t *testing.T) {
+	spec := ContainerSpec{Name: "c", Image: "img", Network: "none"}
+	got := spec.Build()
+	if !containsConsecutiveSingle(got, "--network=none") {
+		t.Errorf("expected --network=none in args; got %v", got)
+	}
+	for _, a := range got {
+		if a == "--network=host" {
+			t.Errorf("unexpected --network=host when Network=none; got %v", got)
+		}
+	}
+}
+
+// TestContainerSpecNetworkEmptyFallback asserts that an empty Network falls back to --network=host.
+func TestContainerSpecNetworkEmptyFallback(t *testing.T) {
+	spec := ContainerSpec{Name: "c", Image: "img", Network: ""}
+	got := spec.Build()
+	if !containsConsecutiveSingle(got, "--network=host") {
+		t.Errorf("expected --network=host fallback when Network is empty; got %v", got)
+	}
+}
+
+// containsConsecutiveSingle returns true if args contains the exact token s.
+func containsConsecutiveSingle(args []string, s string) bool {
+	for _, a := range args {
+		if a == s {
+			return true
+		}
+	}
+	return false
+}
+
 func TestContainerSpecEmptyEnvProducesNoFlags(t *testing.T) {
 	for _, env := range []map[string]string{nil, {}} {
 		spec := ContainerSpec{Name: "n", Image: "img", Env: env}

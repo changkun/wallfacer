@@ -111,6 +111,7 @@ type envConfigResponse struct {
 	ArchivedTasksPerPage int               `json:"archived_tasks_per_page"`
 	AutoPushEnabled      bool              `json:"auto_push_enabled"`
 	AutoPushThreshold    int               `json:"auto_push_threshold"`
+	ContainerNetwork     string            `json:"container_network"`
 }
 
 type sandboxTestResponse struct {
@@ -180,6 +181,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ArchivedTasksPerPage: archivedTasksPerPage,
 		AutoPushEnabled:      cfg.AutoPushEnabled,
 		AutoPushThreshold:    autoPushThreshold,
+		ContainerNetwork:     cfg.ContainerNetwork,
 	})
 }
 
@@ -356,6 +358,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		nil,
 		nil,
 		nil,
+		nil,
 	); err != nil {
 		return "", err
 	}
@@ -444,6 +447,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ArchivedTasksPerPage *int              `json:"archived_tasks_per_page"`
 		AutoPushEnabled      *bool             `json:"auto_push_enabled"`
 		AutoPushThreshold    *int              `json:"auto_push_threshold"`
+		ContainerNetwork     *string           `json:"container_network"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -562,6 +566,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		archivedTasksPerPage,
 		autoPush,
 		autoPushThreshold,
+		req.ContainerNetwork,
 	); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
