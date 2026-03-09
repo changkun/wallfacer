@@ -380,7 +380,7 @@ func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 		if tt.ExecutionPrompt == "" {
 			t.Errorf("idea task %q has empty ExecutionPrompt; full implementation text must be stored there", tt.Title)
 		}
-		if strings.Contains(tt.Prompt, "domain:") {
+		if strings.Contains(tt.Prompt, "Suggested focus areas") {
 			t.Errorf("idea task %q Prompt should not contain full ideation text; got: %q", tt.Title, tt.Prompt[:min(len(tt.Prompt), 200)])
 		}
 	}
@@ -394,14 +394,15 @@ func min(a, b int) int {
 }
 
 // TestBuildIdeationPromptNoExistingTasks verifies that when there are no active
-// tasks the prompt does not include the "Existing active tasks" section.
+// tasks the prompt does not include the "Existing active tasks" section, and
+// that it still contains suggested focus areas for the agent.
 func TestBuildIdeationPromptNoExistingTasks(t *testing.T) {
 	prompt := buildIdeationPrompt(nil)
 	if strings.Contains(prompt, "Existing active tasks") {
 		t.Fatal("prompt should not mention existing tasks when none are provided")
 	}
-	if !strings.Contains(prompt, "domain:") {
-		t.Fatal("prompt must still include domain assignments")
+	if !strings.Contains(prompt, "Suggested focus areas") {
+		t.Fatal("prompt must still include suggested focus areas")
 	}
 }
 
