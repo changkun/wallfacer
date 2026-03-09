@@ -404,11 +404,20 @@
           var gapWidth = gapRight - gapLeft;
           if (gapWidth < 0.1) return;
           var gapDur = formatMs(seg.end - seg.start);
-          axisHtml += '<div title="Idle: ' + escapeHtml(gapDur) + '" style="' +
+          var gapStartLabel = formatMs(seg.start - globalStartMs);
+          var gapEndLabel = formatMs(seg.end - globalStartMs);
+          var tipText = 'Idle ' + gapDur + '\n' + gapStartLabel + ' \u2192 ' + gapEndLabel;
+          axisHtml += '<div title="' + escapeHtml(tipText) + '" style="' +
             'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
             'top:0;height:' + (AXIS_H - 1) + 'px;' +
             'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border,#444) 3px,var(--border,#444) 4px);' +
             'opacity:0.4;pointer-events:none;"></div>';
+          // Visible gap duration label centered in the axis gap
+          axisHtml += '<span style="position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
+            'top:1px;font-size:8px;color:var(--text-muted,#888);text-align:center;' +
+            'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;' +
+            'line-height:' + (AXIS_H - 2) + 'px;">' +
+            escapeHtml(gapDur) + '</span>';
         });
       } else {
         // Linear mode (unchanged)
@@ -503,7 +512,10 @@
           var gapWidth = gapRight - gapLeft;
           if (gapWidth < 0.1) return;
           var gapDur = formatMs(seg.end - seg.start);
-          gapIndicatorsHtml += '<div title="Idle: ' + escapeHtml(gapDur) + '" style="' +
+          var gapStartLabel = formatMs(seg.start - globalStartMs);
+          var gapEndLabel = formatMs(seg.end - globalStartMs);
+          var tipText = 'Idle ' + gapDur + '\n' + gapStartLabel + ' \u2192 ' + gapEndLabel;
+          gapIndicatorsHtml += '<div title="' + escapeHtml(tipText) + '" style="' +
             'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
             'top:' + bodyTop + 'px;height:' + bodyH + 'px;' +
             'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border,#444) 3px,var(--border,#444) 4px);' +

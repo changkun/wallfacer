@@ -219,7 +219,7 @@ function _buildTimelineHtml(spans) {
         '<div style="position:absolute;left:' + x.toFixed(2) + '%;top:0;bottom:0;' +
           'border-left:1px dashed var(--border);opacity:.45;pointer-events:none;"></div>';
     });
-    // Add hatched break indicators for compressed gaps
+    // Add hatched break indicators for compressed gaps with duration labels
     timeMap.segments.forEach(function(seg) {
       if (!seg.compressed) return;
       var gapLeft = timeMap.toPercent(seg.start);
@@ -227,12 +227,19 @@ function _buildTimelineHtml(spans) {
       var gapWidth = gapRight - gapLeft;
       if (gapWidth < 0.1) return;
       var gapDur = _fmtMs(seg.end - seg.start);
+      var gapStartLabel = _fmtMs(seg.start - t0);
+      var gapEndLabel = _fmtMs(seg.end - t0);
+      var tipText = 'Idle ' + gapDur + '\n' + gapStartLabel + ' \u2192 ' + gapEndLabel;
       ticksHtml +=
-        '<div title="Idle: ' + escapeHtml(gapDur) + '" style="' +
+        '<div title="' + escapeHtml(tipText) + '" style="' +
           'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
           'top:0;bottom:0;' +
           'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border) 3px,var(--border) 4px);' +
-          'opacity:0.3;pointer-events:none;"></div>';
+          'opacity:0.3;pointer-events:none;"></div>' +
+        '<span style="position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
+          'bottom:2px;font-size:8px;color:var(--text-muted);text-align:center;' +
+          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">' +
+          escapeHtml(gapDur) + '</span>';
     });
   } else {
     for (var tickMs = 0; tickMs <= totalMs + TICK_MS / 2; tickMs += TICK_MS) {
