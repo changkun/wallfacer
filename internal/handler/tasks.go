@@ -248,6 +248,14 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				"to":   string(store.TaskStatusBacklog),
 			})
 			h.diffCache.invalidate(id)
+
+			updated, err := h.store.GetTask(r.Context(), id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, updated)
+			return
 		} else {
 			// Enforce concurrency limit for manual backlog → in_progress transitions.
 			if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog && !task.IsTestRun {
