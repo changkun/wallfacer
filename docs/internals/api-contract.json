@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 61,
+  "route_count": 62,
   "routes": [
     {
       "method": "GET",
@@ -508,6 +508,15 @@
       "description": "Test oversight summary for a task.",
       "tags": [
         "tasks"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/admin/rebuild-index",
+      "name": "RebuildIndex",
+      "description": "Rebuild the in-memory search index from disk; returns the number of repaired entries.",
+      "tags": [
+        "admin"
       ]
     },
     {

@@ -104,6 +104,11 @@ var Routes = {
     get: function() { return "/api/stats"; },
   },
 
+  admin: {
+    // POST /api/admin/rebuild-index
+    rebuildIndex: function() { return "/api/admin/rebuild-index"; },
+  },
+
   tasks: {
     // GET /api/tasks
     list: function() { return "/api/tasks"; },
