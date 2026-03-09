@@ -58,6 +58,68 @@ func (h *Handler) ListSummaries(w http.ResponseWriter, r *http.Request) {
 // ListTasks returns all tasks, optionally including archived ones.
 func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	includeArchived := r.URL.Query().Get("include_archived") == "true"
+	pageSizeRaw := strings.TrimSpace(r.URL.Query().Get("archived_page_size"))
+	if pageSizeRaw != "" {
+		if !includeArchived {
+			http.Error(w, "include_archived=true is required with archived_page_size", http.StatusBadRequest)
+			return
+		}
+		pageSize, err := strconv.Atoi(pageSizeRaw)
+		if err != nil {
+			http.Error(w, "invalid archived_page_size", http.StatusBadRequest)
+			return
+		}
+		if pageSize < 1 {
+			pageSize = 1
+		}
+		if pageSize > 200 {
+			pageSize = 200
+		}
+		var beforeID *uuid.UUID
+		beforeRaw := strings.TrimSpace(r.URL.Query().Get("archived_before"))
+		if beforeRaw != "" {
+			parsed, err := uuid.Parse(beforeRaw)
+			if err != nil {
+				http.Error(w, "invalid archived_before", http.StatusBadRequest)
+				return
+			}
+			beforeID = &parsed
+		}
+		var afterID *uuid.UUID
+		afterRaw := strings.TrimSpace(r.URL.Query().Get("archived_after"))
+		if afterRaw != "" {
+			parsed, err := uuid.Parse(afterRaw)
+			if err != nil {
+				http.Error(w, "invalid archived_after", http.StatusBadRequest)
+				return
+			}
+			afterID = &parsed
+		}
+		page, total, hasMoreBefore, hasMoreAfter, err := h.store.ListArchivedTasksPage(r.Context(), pageSize, beforeID, afterID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		resp := struct {
+			Tasks         []store.Task `json:"tasks"`
+			TotalArchived int          `json:"total_archived"`
+			HasMoreBefore bool         `json:"has_more_before"`
+			HasMoreAfter  bool         `json:"has_more_after"`
+			BeforeCursor  string       `json:"before_cursor,omitempty"`
+			AfterCursor   string       `json:"after_cursor,omitempty"`
+		}{
+			Tasks:         page,
+			TotalArchived: total,
+			HasMoreBefore: hasMoreBefore,
+			HasMoreAfter:  hasMoreAfter,
+		}
+		if len(page) > 0 {
+			resp.AfterCursor = page[0].ID.String()
+			resp.BeforeCursor = page[len(page)-1].ID.String()
+		}
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
 	tasks, err := h.store.ListTasks(r.Context(), includeArchived)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

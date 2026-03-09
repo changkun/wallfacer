@@ -73,6 +73,7 @@ function openSettings() {
   setSettingsTab('appearance');
   loadMaxParallel();
   loadOversightInterval();
+  loadArchivedTasksPerPage();
   loadAutoPush();
   if (typeof showEnvConfigEditor === 'function') {
     showEnvConfigEditor(null);

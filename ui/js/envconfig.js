@@ -65,6 +65,42 @@ async function saveOversightInterval() {
   }
 }
 
+// --- Archived Tasks Pagination Setting ---
+
+async function loadArchivedTasksPerPage() {
+  try {
+    const cfg = await api(Routes.env.get());
+    const input = document.getElementById('archived-page-size-input');
+    const value = parseInt(cfg.archived_tasks_per_page, 10);
+    archivedTasksPageSize = Number.isFinite(value) && value > 0 ? value : 20;
+    if (input) input.value = archivedTasksPageSize;
+  } catch (e) {
+    console.error('Failed to load archived tasks page size setting:', e);
+  }
+}
+
+async function saveArchivedTasksPerPage() {
+  const input = document.getElementById('archived-page-size-input');
+  const statusEl = document.getElementById('archived-page-size-status');
+  let value = parseInt(input.value, 10);
+  if (isNaN(value) || value < 1) value = 1;
+  if (value > 200) value = 200;
+  input.value = value;
+
+  statusEl.textContent = 'Saving…';
+  try {
+    await api(Routes.env.update(), { method: 'PUT', body: JSON.stringify({ archived_tasks_per_page: value }) });
+    archivedTasksPageSize = value;
+    statusEl.textContent = 'Saved.';
+    if (showArchived && typeof loadArchivedTasksPage === 'function') {
+      await loadArchivedTasksPage('initial');
+    }
+    setTimeout(() => { statusEl.textContent = ''; }, 2000);
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+}
+
 // --- Auto Push Setting ---
 
 async function loadAutoPush() {

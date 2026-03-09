@@ -64,12 +64,7 @@ func (s *Store) ListTasks(_ context.Context, includeArchived bool) ([]Task, erro
 		if !includeArchived && t.Archived {
 			continue
 		}
-		cp := *t
-		if t.CurrentRefinement != nil {
-			jobCopy := *t.CurrentRefinement
-			cp.CurrentRefinement = &jobCopy
-		}
-		tasks = append(tasks, cp)
+		tasks = append(tasks, cloneTask(t))
 	}
 	sort.Slice(tasks, func(i, j int) bool {
 		if tasks[i].Position != tasks[j].Position {
@@ -94,12 +89,7 @@ func (s *Store) ListTasksAndSeq(_ context.Context, includeArchived bool) ([]Task
 		if !includeArchived && t.Archived {
 			continue
 		}
-		cp := *t
-		if t.CurrentRefinement != nil {
-			jobCopy := *t.CurrentRefinement
-			cp.CurrentRefinement = &jobCopy
-		}
-		tasks = append(tasks, cp)
+		tasks = append(tasks, cloneTask(t))
 	}
 	sort.Slice(tasks, func(i, j int) bool {
 		if tasks[i].Position != tasks[j].Position {
@@ -108,6 +98,98 @@ func (s *Store) ListTasksAndSeq(_ context.Context, includeArchived bool) ([]Task
 		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
 	})
 	return tasks, s.deltaSeq.Load(), nil
+}
+
+// ListArchivedTasksPage returns a single page of archived tasks ordered by
+// UpdatedAt DESC (newest first), with deterministic ID tie-breaking.
+//
+// Paging semantics:
+//   - beforeID: return older tasks after the referenced archived task.
+//   - afterID:  return newer tasks before the referenced archived task.
+//   - both nil: return the first page (newest archived tasks).
+func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID, afterID *uuid.UUID) ([]Task, int, bool, bool, error) {
+	if pageSize < 1 {
+		pageSize = 1
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if beforeID != nil && afterID != nil {
+		return nil, 0, false, false, fmt.Errorf("before and after cursors are mutually exclusive")
+	}
+
+	archived := make([]Task, 0)
+	for _, t := range s.tasks {
+		if !t.Archived {
+			continue
+		}
+		archived = append(archived, cloneTask(t))
+	}
+	sort.Slice(archived, func(i, j int) bool {
+		if archived[i].UpdatedAt.Equal(archived[j].UpdatedAt) {
+			return archived[i].ID.String() > archived[j].ID.String()
+		}
+		return archived[i].UpdatedAt.After(archived[j].UpdatedAt)
+	})
+
+	total := len(archived)
+	if total == 0 {
+		return []Task{}, 0, false, false, nil
+	}
+
+	start, end := 0, min(pageSize, total)
+	switch {
+	case beforeID != nil:
+		idx := -1
+		for i := range archived {
+			if archived[i].ID == *beforeID {
+				idx = i
+				break
+			}
+		}
+		if idx == -1 {
+			return nil, total, false, false, fmt.Errorf("before cursor task not found")
+		}
+		start = idx + 1
+		if start > total {
+			start = total
+		}
+		end = min(start+pageSize, total)
+	case afterID != nil:
+		idx := -1
+		for i := range archived {
+			if archived[i].ID == *afterID {
+				idx = i
+				break
+			}
+		}
+		if idx == -1 {
+			return nil, total, false, false, fmt.Errorf("after cursor task not found")
+		}
+		end = idx
+		if end < 0 {
+			end = 0
+		}
+		start = max(0, end-pageSize)
+	}
+
+	page := make([]Task, 0, max(0, end-start))
+	if start < end {
+		page = append(page, archived[start:end]...)
+	}
+	hasMoreAfter := start > 0
+	hasMoreBefore := end < total
+	return page, total, hasMoreBefore, hasMoreAfter, nil
+}
+
+func cloneTask(t *Task) Task {
+	cp := *t
+	if t.CurrentRefinement != nil {
+		jobCopy := *t.CurrentRefinement
+		cp.CurrentRefinement = &jobCopy
+	}
+	return cp
 }
 
 // GetTask returns a deep copy of the task with the given ID.
