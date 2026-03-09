@@ -249,7 +249,7 @@ function _buildTimelineHtml(spans) {
     }
   }
 
-  // Pre-build per-row gap overlay HTML (hatched stripes + labels inside bar area)
+  // Pre-build per-row gap stripe HTML (no label — labels go in overlay)
   var rowGapHtml = '';
   if (timeMap.compressed) {
     timeMap.segments.forEach(function(seg) {
@@ -267,14 +267,7 @@ function _buildTimelineHtml(spans) {
           'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
           'top:0;bottom:0;' +
           'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border) 3px,var(--border) 4px);' +
-          'opacity:0.15;pointer-events:none;"></div>' +
-        '<span title="' + escapeHtml(tipText) + '" style="' +
-          'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
-          'top:0;bottom:0;display:flex;align-items:center;justify-content:center;' +
-          'font-size:8px;color:var(--text-muted);' +
-          'overflow:hidden;white-space:nowrap;pointer-events:none;' +
-          'writing-mode:vertical-rl;text-orientation:mixed;">' +
-          escapeHtml(gapDur) + '</span>';
+          'opacity:0.15;pointer-events:none;"></div>';
     });
   }
 
@@ -365,6 +358,32 @@ function _buildTimelineHtml(spans) {
     }
   });
 
+  // Build gap label overlay (single set of labels spanning the full rows area)
+  var gapLabelOverlay = '';
+  if (timeMap.compressed) {
+    var rowsH = spans.length * ROW_H;
+    timeMap.segments.forEach(function(seg) {
+      if (!seg.compressed) return;
+      var gapLeft = timeMap.toPercent(seg.start);
+      var gapRight = timeMap.toPercent(seg.end);
+      var gapWidth = gapRight - gapLeft;
+      if (gapWidth < 0.1) return;
+      var gapDur = _fmtMs(seg.end - seg.start);
+      var gapStartLabel = _fmtMs(seg.start - t0);
+      var gapEndLabel = _fmtMs(seg.end - t0);
+      var tipText = 'Idle ' + gapDur + '\n' + gapStartLabel + ' \u2192 ' + gapEndLabel;
+      gapLabelOverlay +=
+        '<span title="' + escapeHtml(tipText) + '" style="' +
+          'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
+          'top:0;height:' + rowsH + 'px;' +
+          'display:flex;align-items:center;justify-content:center;' +
+          'font-size:8px;color:var(--text-muted);' +
+          'overflow:hidden;white-space:nowrap;pointer-events:none;' +
+          'writing-mode:vertical-rl;text-orientation:mixed;">' +
+          escapeHtml(gapDur) + '</span>';
+    });
+  }
+
   return (
     '<div style="overflow-x:auto;padding:8px 0;">' +
       '<div style="min-width:500px;">' +
@@ -373,8 +392,16 @@ function _buildTimelineHtml(spans) {
           '<div style="width:' + LABEL_W + 'px;flex-shrink:0;"></div>' +
           '<div style="flex:1;position:relative;height:22px;">' + ticksHtml + '</div>' +
         '</div>' +
-        // Span rows
-        rowsHtml +
+        // Span rows with gap label overlay
+        '<div style="position:relative;">' +
+          rowsHtml +
+          // Gap labels overlay (offset by LABEL_W to align with bar area)
+          (gapLabelOverlay
+            ? '<div style="position:absolute;top:0;left:' + LABEL_W + 'px;right:0;bottom:0;pointer-events:none;">' +
+                gapLabelOverlay +
+              '</div>'
+            : '') +
+        '</div>' +
         // Legend
         (legendHtml
           ? '<div style="border-top:1px solid var(--border);padding-top:6px;margin-top:6px;">' +
