@@ -40,7 +40,10 @@ async function openModal(id) {
 
   const modalLoad = _beginModalLoad(id);
   const seq = modalLoad.seq;
-  const task = tasks.find(t => t.id === id);
+  const task =
+    (typeof findTaskById === 'function' ? findTaskById(id) : null) ||
+    tasks.find(t => t.id === id) ||
+    (Array.isArray(archivedTasks) ? archivedTasks.find(t => t.id === id) : null);
   if (!task) return;
   _renderModalLoadingPlaceholders();
   document.getElementById('modal').classList.remove('hidden');
