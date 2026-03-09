@@ -42,14 +42,36 @@ func parseConflictedFiles(output string) []string {
 // stuck in or blocked by an active/previous rebase or merge state.
 func IsRebaseNeedsMergeOutput(s string) bool {
 	ls := strings.ToLower(s)
+	return isRebaseBlockedByConflictOrState(ls) ||
+		isRebaseBlockedByConflictOrDirtyIndex(ls)
+}
+
+// isRebaseBlockedByConflictOrDirtyIndex reports outputs where git blocks a rebase
+// because the worktree/index is not clean enough for a safe rebase start.
+func isRebaseBlockedByConflictOrDirtyIndex(ls string) bool {
+	if strings.Contains(ls, "cannot rebase") {
+		return strings.Contains(ls, "needs merge") ||
+			strings.Contains(ls, "unstaged changes") ||
+			strings.Contains(ls, "uncommitted changes") ||
+			strings.Contains(ls, "commit your changes before you can rebase") ||
+			strings.Contains(ls, "please commit or stash") ||
+			strings.Contains(ls, "index contains uncommitted changes") ||
+			strings.Contains(ls, "index contains unstaged changes") ||
+			strings.Contains(ls, "resolve your current index first")
+	}
+
+	return false
+}
+
+// isRebaseBlockedByConflictOrState reports explicit states that indicate an
+// interrupted merge/rebase flow requiring manual recovery.
+func isRebaseBlockedByConflictOrState(ls string) bool {
 	return strings.Contains(ls, "needs merge") ||
 		strings.Contains(ls, "you have not concluded your merge") ||
-		strings.Contains(ls, "please commit your changes before you can rebase") ||
 		strings.Contains(ls, "could not rebase") ||
 		strings.Contains(ls, "unable to rebase") ||
 		strings.Contains(ls, "rebase in progress") ||
 		strings.Contains(ls, "another rebase-apply") ||
-		strings.Contains(ls, "resolve your current index first") ||
 		strings.Contains(ls, "merge in progress")
 }
 
