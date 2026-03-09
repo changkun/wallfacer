@@ -15,6 +15,7 @@ import (
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
@@ -621,36 +622,6 @@ func normalizeCodexCommand(command string) string {
 	return rest
 }
 
-const oversightPrompt = `You are analyzing the execution trace of an AI coding agent. Your job is to produce a high-level structured summary that helps a human quickly understand what the agent did.
-
-Given the following pre-processed activity log (one section per agent turn):
-
-%s
-
-Produce a JSON response (raw JSON only — no markdown, no code fences, no explanation) with this exact structure:
-{
-  "phases": [
-    {
-      "timestamp": "<ISO-8601 datetime of when this phase started, or empty string if unknown>",
-      "title": "<Short title, 4-7 words max>",
-      "summary": "<1-2 sentence description of what the agent accomplished in this phase>",
-      "tools_used": ["<unique tool names used>"],
-      "commands": ["<verbatim Bash commands from TOOL: Bash(...) entries in this phase; omit field if none>"],
-      "actions": ["<3-7 specific notable actions: what was read, written, searched, run, etc.>"]
-    }
-  ]
-}
-
-Rules:
-- Group related turns into logical phases (typically 2-6 phases total)
-- Each phase should represent a coherent step (e.g. exploration, planning, implementation, testing, cleanup)
-- Use the timestamp of the first turn in each phase
-- Keep titles short and action-oriented (e.g. "Explored codebase structure", "Implemented auth handler")
-- Keep summaries informative but concise
-- List specific filenames or commands in actions where relevant
-- In commands, copy each Bash command verbatim from the TOOL: Bash(...) entries (the text inside the parentheses). Include all of them, do not summarize or deduplicate.
-- Omit the commands field entirely (or use an empty array) if no Bash tool calls appear in the phase
-- Omit phases with no meaningful activity`
 
 // formatActivityLog renders the pre-processed activities as a human-readable text block for the prompt.
 func formatActivityLog(activities []turnActivity) string {
@@ -708,7 +679,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 		log = log[:maxLogBytes] + "\n[...truncated...]"
 	}
 
-	prompt := fmt.Sprintf(oversightPrompt, log)
+	prompt := prompts.Oversight(log)
 
 	runCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()

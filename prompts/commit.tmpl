@@ -1,0 +1,19 @@
+Write a git commit message for the following task and file changes.
+Rules:
+- Subject line format: <primary-path>: <short imperative description>
+  where <primary-path> is the common directory or file prefix of the changed files
+  (e.g. 'content/posts', 'Makefile', 'internal/runner', 'ui/js')
+- Subject line: max 72 characters, no trailing period
+- After the subject line, add a blank line followed by a description body
+- The body should briefly explain WHAT was changed and WHY (2-4 lines)
+- Wrap body lines at 72 characters
+- Output ONLY the raw commit message text, no markdown, no code fences, no explanation
+- Match the style and tone of the recent commit history shown below
+
+Task:
+{{.Prompt}}
+
+Changed files:
+{{.DiffStat}}{{if .RecentLog}}
+Recent commits (for style reference):
+{{.RecentLog}}{{end}}

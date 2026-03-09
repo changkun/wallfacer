@@ -14,6 +14,7 @@ import (
 	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
@@ -270,22 +271,11 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 
 	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
 
-	commitPrompt := "Write a git commit message for the following task and file changes.\n" +
-		"Rules:\n" +
-		"- Subject line format: <primary-path>: <short imperative description>\n" +
-		"  where <primary-path> is the common directory or file prefix of the changed files\n" +
-		"  (e.g. 'content/posts', 'Makefile', 'internal/runner', 'ui/js')\n" +
-		"- Subject line: max 72 characters, no trailing period\n" +
-		"- After the subject line, add a blank line followed by a description body\n" +
-		"- The body should briefly explain WHAT was changed and WHY (2-4 lines)\n" +
-		"- Wrap body lines at 72 characters\n" +
-		"- Output ONLY the raw commit message text, no markdown, no code fences, no explanation\n" +
-		"- Match the style and tone of the recent commit history shown below\n\n" +
-		"Task:\n" + prompt + "\n\n" +
-		"Changed files:\n" + diffStat
-	if recentLog != "" {
-		commitPrompt += "\nRecent commits (for style reference):\n" + recentLog
-	}
+	commitPrompt := prompts.CommitMessage(prompts.CommitData{
+		Prompt:    prompt,
+		DiffStat:  diffStat,
+		RecentLog: recentLog,
+	})
 	spec.Cmd = buildAgentCmd(commitPrompt, model)
 
 	cmd := exec.CommandContext(ctx, r.command, spec.Build()...)
@@ -518,23 +508,10 @@ func (r *Runner) resolveConflicts(
 	basename := filepath.Base(worktreePath)
 	containerPath := "/workspace/" + basename
 
-	prompt := fmt.Sprintf(
-		"The task branch in %s needs to be rebased onto '%s', but there are conflicts. "+
-			"The previous rebase attempt was aborted, so the worktree is currently clean on the task branch. "+
-			"Please resolve the conflicts by following these steps:\n"+
-			"1. Run `git rebase %s` to start the rebase\n"+
-			"2. When conflicts appear, run `git status` to see which files are conflicted\n"+
-			"3. For each conflicted file: read it carefully, understand both sides of the "+
-			"conflict markers (<<<<<<< HEAD through ======= is the task branch side; "+
-			"======= through >>>>>>> is the upstream side), then edit the file to produce "+
-			"the correct merged result\n"+
-			"4. Run `git add <file>` to mark each file resolved\n"+
-			"5. Run `git rebase --continue` to proceed to the next commit\n"+
-			"6. Repeat steps 2–5 if more conflicts appear\n"+
-			"Do NOT run `git commit` manually — only resolve conflicts and continue the rebase. "+
-			"Report what conflicts you found and how you resolved each one.",
-		containerPath, defBranch, defBranch,
-	)
+	prompt := prompts.ConflictResolution(prompts.ConflictData{
+		ContainerPath: containerPath,
+		DefaultBranch: defBranch,
+	})
 
 	// Mount only the conflicted worktree for this targeted fix.
 	override := map[string]string{repoPath: worktreePath}

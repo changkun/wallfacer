@@ -15,6 +15,7 @@ import (
 
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
@@ -84,105 +85,31 @@ func buildIdeationPrompt(existingTasks []store.Task, contexts ...ideationContext
 	}
 
 	cats := pickCategories(3)
-	var sb strings.Builder
-	sb.WriteString(`You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 improvements — each from a different assigned domain.
 
-First, explore the workspace thoroughly:
-- Read README files, AGENTS.md (or legacy CLAUDE.md), go.mod, package.json, or similar project manifests
-- Scan the main source directories and read key source files to understand current patterns and pain points
-- Review recent git history (git log --oneline -20) to see what has changed recently
-- Identify concrete opportunities, rough edges, and gaps in the code
-
-`)
-
-	if len(signals.FailureSignals) > 0 {
-		sb.WriteString("Objective failure signals (highest priority):\n")
-		for _, item := range signals.FailureSignals {
-			sb.WriteString("  - " + item + "\n")
+	var tasks []prompts.IdeationTask
+	for _, t := range existingTasks {
+		title := t.Title
+		if title == "" {
+			title = "(untitled)"
 		}
-		sb.WriteString("\n")
-	}
-
-	if len(signals.ChurnSignals) > 0 {
-		sb.WriteString("Recent-file churn hotspots (prioritize these):\n")
-		for _, item := range signals.ChurnSignals {
-			sb.WriteString("  - " + item + "\n")
+		p := strings.TrimSpace(t.Prompt)
+		if len(p) > 120 {
+			p = p[:120] + "..."
 		}
-		sb.WriteString("\n")
+		tasks = append(tasks, prompts.IdeationTask{
+			Title:  title,
+			Status: string(t.Status),
+			Prompt: p,
+		})
 	}
 
-	if len(signals.TodoSignals) > 0 {
-		sb.WriteString("TODO/FIXME concentration hotspots:\n")
-		for _, item := range signals.TodoSignals {
-			sb.WriteString("  - " + item + "\n")
-		}
-		sb.WriteString("\n")
-	}
-
-	if len(existingTasks) > 0 {
-		sb.WriteString("The following tasks are already queued or actively being worked on. Do NOT propose ideas that duplicate or directly conflict with any of them. If a proposed idea is closely related to an existing task, you MUST reference it explicitly in the prompt field with a note such as: \"Note: This is related to the existing task '[title]' (status: [status]).\"\n\nExisting active tasks:\n")
-		for i, t := range existingTasks {
-			title := t.Title
-			if title == "" {
-				title = "(untitled)"
-			}
-			prompt := strings.TrimSpace(t.Prompt)
-			if len(prompt) > 120 {
-				prompt = prompt[:120] + "..."
-			}
-			sb.WriteString(fmt.Sprintf("%d. [%s] (status: %s) — %s\n", i+1, title, string(t.Status), prompt))
-		}
-		sb.WriteString("\n")
-	}
-	sb.WriteString(`Then propose exactly 3 improvements, each covering a distinct area of the project.
-
-Suggested focus areas (use as inspiration — you are NOT limited to these):
-`)
-	for _, cat := range cats {
-		sb.WriteString(fmt.Sprintf("  - %s\n", cat))
-	}
-	sb.WriteString(`
-Choose whatever categories best reflect the actual opportunities you found. Any area that genuinely needs work is fair game — for example: documentation update, architecture / design, dependency management, accessibility, migration, changelog, or anything else relevant to this codebase. Do not force ideas into the suggested categories if you found more pressing needs elsewhere.
-
-Requirements for each improvement:
-- Prioritize the objective signals above and generate the highest-impact suggestions first.
-- Include an objective impact estimate and confidence level so the runner can make backlog decisions.
-- Technically precise: name the specific files, functions, data structures, or API endpoints you observed during exploration — do not stay generic
-- Creative and non-obvious: avoid safe, predictable suggestions like "add more tests" or "improve error handling" in isolation; propose something with genuine engineering interest
-- Actionable end-to-end: write a prompt detailed enough for an AI coding agent to implement the full change without asking follow-up questions
-- Non-duplicating: do not propose ideas that overlap or conflict with the existing active tasks listed above
-
-Output ONLY a JSON array with exactly 3 objects. No preamble, no explanation, no markdown — just the JSON array:
-[
-  {
-    "title": "2-5 word title",
-    "category": "the area you chose for this idea",
-    "priority": "high | medium | low",
-    "impact_score": 0-100,
-    "scope": "specific files/subsystems this idea touches",
-    "rationale": "why this is higher impact than alternatives",
-    "prompt": "Detailed implementation prompt referencing specific files, functions, and patterns found during exploration."
-  },
-  {
-    "title": "...",
-    "category": "a different area",
-    "priority": "high | medium | low",
-    "impact_score": 0-100,
-    "scope": "...",
-    "rationale": "...",
-    "prompt": "..."
-  },
-  {
-    "title": "...",
-    "category": "yet another distinct area",
-    "priority": "high | medium | low",
-    "impact_score": 0-100,
-    "scope": "...",
-    "rationale": "...",
-    "prompt": "..."
-  }
-]`)
-	return sb.String()
+	return prompts.Ideation(prompts.IdeationData{
+		ExistingTasks:  tasks,
+		Categories:     cats,
+		FailureSignals: signals.FailureSignals,
+		ChurnSignals:   signals.ChurnSignals,
+		TodoSignals:    signals.TodoSignals,
+	})
 }
 
 // IdeateResult holds a single idea proposed by the brainstorm agent.

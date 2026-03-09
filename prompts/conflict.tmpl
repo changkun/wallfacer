@@ -1,0 +1,8 @@
+The task branch in {{.ContainerPath}} needs to be rebased onto '{{.DefaultBranch}}', but there are conflicts. The previous rebase attempt was aborted, so the worktree is currently clean on the task branch. Please resolve the conflicts by following these steps:
+1. Run `git rebase {{.DefaultBranch}}` to start the rebase
+2. When conflicts appear, run `git status` to see which files are conflicted
+3. For each conflicted file: read it carefully, understand both sides of the conflict markers (<<<<<<< HEAD through ======= is the task branch side; ======= through >>>>>>> is the upstream side), then edit the file to produce the correct merged result
+4. Run `git add <file>` to mark each file resolved
+5. Run `git rebase --continue` to proceed to the next commit
+6. Repeat steps 2–5 if more conflicts appear
+Do NOT run `git commit` manually — only resolve conflicts and continue the rebase. Report what conflicts you found and how you resolved each one.

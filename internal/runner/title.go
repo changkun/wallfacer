@@ -9,6 +9,7 @@ import (
 
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
@@ -35,8 +36,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 
 	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
 
-	titlePrompt := "Respond with ONLY a 2-5 word title that captures the main goal of the following task. " +
-		"No punctuation, no quotes, no explanation — just the title.\n\nTask:\n" + prompt
+	titlePrompt := prompts.Title(prompt)
 	spec.Cmd = buildAgentCmd(titlePrompt, model)
 
 	cmd := exec.CommandContext(ctx, r.command, spec.Build()...)

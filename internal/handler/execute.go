@@ -9,6 +9,7 @@ import (
 
 	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
@@ -315,41 +316,12 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 // implResult is the implementation agent's self-reported summary (may be empty).
 // diff is a git diff of the changes made (may be empty).
 func buildTestPrompt(originalPrompt, criteria, implResult, diff string) string {
-	var b strings.Builder
-	b.WriteString("You are a test verification agent. Your job is to verify that the implementation meets the specified requirements.\n\n")
-	b.WriteString("## Original Task\n\n")
-	b.WriteString(originalPrompt)
-	b.WriteString("\n\n")
-	if strings.TrimSpace(criteria) != "" {
-		b.WriteString("## Acceptance Criteria\n\n")
-		b.WriteString(criteria)
-		b.WriteString("\n\n")
-	}
-	if strings.TrimSpace(implResult) != "" {
-		b.WriteString("## Implementation Summary\n\n")
-		b.WriteString("The implementation agent reported:\n\n")
-		b.WriteString(strings.TrimSpace(implResult))
-		b.WriteString("\n\n")
-	}
-	if strings.TrimSpace(diff) != "" {
-		b.WriteString("## Changes Made\n\n")
-		b.WriteString("```diff\n")
-		b.WriteString(strings.TrimSpace(diff))
-		b.WriteString("\n```\n\n")
-	}
-	b.WriteString("## Instructions\n\n")
-	b.WriteString("You are running directly in the task's own workspace — the code changes are already present.\n")
-	if strings.TrimSpace(diff) != "" {
-		b.WriteString("1. The diff above shows exactly what was changed — focus your verification on those files.\n")
-	} else {
-		b.WriteString("1. Examine the code to understand what was implemented.\n")
-	}
-	b.WriteString("2. Run any available tests (unit tests, integration tests, linters, build checks, etc.).\n")
-	b.WriteString("3. Verify the implementation satisfies every requirement listed above.\n")
-	b.WriteString("4. End your response with your verdict on its own line: **PASS** if all requirements are met, or **FAIL** if any are not.\n\n")
-	b.WriteString("IMPORTANT: Your final line must be exactly **PASS** or **FAIL** (bold, all caps). This is required for automated verdict detection.\n\n")
-	b.WriteString("Be thorough but focused. Do not modify any code. If tests fail or requirements are unmet, describe exactly what is missing or broken.")
-	return b.String()
+	return prompts.TestVerification(prompts.TestData{
+		OriginalPrompt: originalPrompt,
+		Criteria:       strings.TrimSpace(criteria),
+		ImplResult:     strings.TrimSpace(implResult),
+		Diff:           strings.TrimSpace(diff),
+	})
 }
 
 // maxDiffBytes is the maximum number of bytes to include from the git diff in
