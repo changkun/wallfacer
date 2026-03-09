@@ -94,6 +94,44 @@
     return '';
   }
 
+  // Fall back to even distribution when a single phase spans more than this
+  // fraction of the total timeline. Empirically, LLM-generated oversight
+  // timestamps sometimes cluster all activity into one phase; 0.8 ensures
+  // the fallback triggers before the display becomes unusably skewed.
+  var PHASE_SKEW_THRESHOLD = 0.8;
+
+  function distributeEvenlyAcrossTimeline(phases, startMs, endMs) {
+    var total = endMs - startMs;
+    var regions = [];
+    for (var i = 0; i < phases.length; i++) {
+      var sMs = Math.round(startMs + (i / phases.length) * total);
+      var eMs = i + 1 < phases.length
+        ? Math.round(startMs + ((i + 1) / phases.length) * total)
+        : endMs;
+      if (sMs >= eMs) continue;
+      regions.push({
+        startMs: sMs,
+        endMs: eMs,
+        title: phases[i].title || '',
+        summary: phases[i].summary || '',
+        hue: labelHue(phases[i].title || ''),
+      });
+    }
+    return regions;
+  }
+
+  function phaseTimestampsAreSkewed(regions, globalStartMs, globalEndMs) {
+    if (regions.length < 3) return false;
+    var range = globalEndMs - globalStartMs;
+    if (range <= 0) return false;
+    var maxDur = 0;
+    regions.forEach(function(r) {
+      var d = r.endMs - r.startMs;
+      if (d > maxDur) maxDur = d;
+    });
+    return maxDur / range > PHASE_SKEW_THRESHOLD;
+  }
+
   // Convert OversightPhase[] into rendering-ready region objects.
   // Each region covers [phase[i].timestamp, phase[i+1].timestamp), with
   // the last region extending to globalEndMs. Regions are clamped to
@@ -116,86 +154,32 @@
     });
 
     var validCount = rawStarts.filter(function(ms) { return ms !== null; }).length;
-
     if (validCount === 0) {
-      // No valid timestamps at all (e.g. Claude returned empty strings and the
-      // backend stored zero-value times): distribute phases evenly so every
-      // phase is visible with a proportional width.
-      var regions = [];
-      var total = globalEndMs - globalStartMs;
-      for (var i = 0; i < phases.length; i++) {
-        var sMs = Math.round(globalStartMs + (i / phases.length) * total);
-        var eMs = i + 1 < phases.length
-          ? Math.round(globalStartMs + ((i + 1) / phases.length) * total)
-          : globalEndMs;
-        if (sMs >= eMs) continue;
-        regions.push({
-          startMs: sMs,
-          endMs: eMs,
-          title: phases[i].title || '',
-          summary: phases[i].summary || '',
-          hue: labelHue(phases[i].title || ''),
-        });
-      }
-      return regions;
+      return distributeEvenlyAcrossTimeline(phases, globalStartMs, globalEndMs);
     }
 
-    // At least some valid timestamps: render phases that have valid timestamps,
-    // using the next valid timestamp (or globalEndMs) as the region end.
     var regions = [];
     for (var i = 0; i < phases.length; i++) {
-      if (rawStarts[i] === null) continue; // skip phases without valid timestamp
+      if (rawStarts[i] === null) continue;
       var startMs = rawStarts[i];
       var endMs = globalEndMs;
       for (var j = i + 1; j < phases.length; j++) {
         if (rawStarts[j] !== null) { endMs = rawStarts[j]; break; }
       }
       if (isNaN(endMs)) endMs = globalEndMs;
-      // clamp to global bounds
       if (startMs < globalStartMs) startMs = globalStartMs;
       if (endMs > globalEndMs) endMs = globalEndMs;
-      if (startMs >= endMs) continue; // skip zero-width regions
+      if (startMs >= endMs) continue;
       regions.push({
-        startMs: startMs,
-        endMs: endMs,
-        title: phases[i].title || '',
-        summary: phases[i].summary || '',
+        startMs: startMs, endMs: endMs,
+        title: phases[i].title || '', summary: phases[i].summary || '',
         hue: labelHue(phases[i].title || ''),
       });
     }
 
-    // Quality check: if one phase covers > 80% of the timeline while 3+
-    // phases exist, the timestamps are poorly distributed (e.g. the LLM
-    // generated oversight timestamps that don't reflect the actual execution
-    // timeline). Fall back to even distribution so all phases are visible.
-    if (regions.length >= 3) {
-      var timelineRange = globalEndMs - globalStartMs;
-      if (timelineRange > 0) {
-        var maxDur = 0;
-        regions.forEach(function(r) {
-          var d = r.endMs - r.startMs;
-          if (d > maxDur) maxDur = d;
-        });
-        if (maxDur / timelineRange > 0.8) {
-          regions = [];
-          for (var k = 0; k < phases.length; k++) {
-            var evStart = Math.round(globalStartMs + (k / phases.length) * timelineRange);
-            var evEnd = k + 1 < phases.length
-              ? Math.round(globalStartMs + ((k + 1) / phases.length) * timelineRange)
-              : globalEndMs;
-            if (evStart >= evEnd) continue;
-            regions.push({
-              startMs: evStart,
-              endMs: evEnd,
-              title: phases[k].title || '',
-              summary: phases[k].summary || '',
-              hue: labelHue(phases[k].title || ''),
-            });
-          }
-        }
-      }
+    if (phaseTimestampsAreSkewed(regions, globalStartMs, globalEndMs)) {
+      return distributeEvenlyAcrossTimeline(phases, globalStartMs, globalEndMs);
     }
-
     return regions;
   }
 
