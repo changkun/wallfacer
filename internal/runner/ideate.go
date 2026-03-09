@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"math"
 	"fmt"
 	"math/rand"
 	"os/exec"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +19,20 @@ import (
 )
 
 const ideationTimeout = 10 * time.Minute
+const (
+	maxIdeationIdeas            = 3
+	minIdeationImpactScore      = 60
+	defaultIdeationImpactScore  = 60
+	maxIdeationChurnSignals     = 6
+	maxIdeationTodoSignals      = 6
+	workspaceIdeationCommandTTL = 2 * time.Second
+)
+
+type ideationContext struct {
+	FailureSignals []string
+	ChurnSignals   []string
+	TodoSignals    []string
+}
 
 // ideaCategoryPool is the set of example improvement areas shown to the
 // brainstorm agent as inspiration. The agent is not confined to these — it
@@ -60,7 +77,12 @@ func pickCategories(n int) []string {
 // brainstorm run surfaces improvements from different areas of the project.
 // existingTasks lists tasks currently in backlog, in_progress, or waiting state
 // so the agent can avoid proposing duplicates or conflicting ideas.
-func buildIdeationPrompt(existingTasks []store.Task) string {
+func buildIdeationPrompt(existingTasks []store.Task, contexts ...ideationContext) string {
+	var signals ideationContext
+	if len(contexts) > 0 {
+		signals = contexts[0]
+	}
+
 	cats := pickCategories(3)
 	var sb strings.Builder
 	sb.WriteString(`You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 improvements — each from a different assigned domain.
@@ -72,6 +94,31 @@ First, explore the workspace thoroughly:
 - Identify concrete opportunities, rough edges, and gaps in the code
 
 `)
+
+	if len(signals.FailureSignals) > 0 {
+		sb.WriteString("Objective failure signals (highest priority):\n")
+		for _, item := range signals.FailureSignals {
+			sb.WriteString("  - " + item + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(signals.ChurnSignals) > 0 {
+		sb.WriteString("Recent-file churn hotspots (prioritize these):\n")
+		for _, item := range signals.ChurnSignals {
+			sb.WriteString("  - " + item + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(signals.TodoSignals) > 0 {
+		sb.WriteString("TODO/FIXME concentration hotspots:\n")
+		for _, item := range signals.TodoSignals {
+			sb.WriteString("  - " + item + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
 	if len(existingTasks) > 0 {
 		sb.WriteString("The following tasks are already queued or actively being worked on. Do NOT propose ideas that duplicate or directly conflict with any of them. If a proposed idea is closely related to an existing task, you MUST reference it explicitly in the prompt field with a note such as: \"Note: This is related to the existing task '[title]' (status: [status]).\"\n\nExisting active tasks:\n")
 		for i, t := range existingTasks {
@@ -98,6 +145,8 @@ Suggested focus areas (use as inspiration — you are NOT limited to these):
 Choose whatever categories best reflect the actual opportunities you found. Any area that genuinely needs work is fair game — for example: documentation update, architecture / design, dependency management, accessibility, migration, changelog, or anything else relevant to this codebase. Do not force ideas into the suggested categories if you found more pressing needs elsewhere.
 
 Requirements for each improvement:
+- Prioritize the objective signals above and generate the highest-impact suggestions first.
+- Include an objective impact estimate and confidence level so the runner can make backlog decisions.
 - Technically precise: name the specific files, functions, data structures, or API endpoints you observed during exploration — do not stay generic
 - Creative and non-obvious: avoid safe, predictable suggestions like "add more tests" or "improve error handling" in isolation; propose something with genuine engineering interest
 - Actionable end-to-end: write a prompt detailed enough for an AI coding agent to implement the full change without asking follow-up questions
@@ -108,16 +157,28 @@ Output ONLY a JSON array with exactly 3 objects. No preamble, no explanation, no
   {
     "title": "2-5 word title",
     "category": "the area you chose for this idea",
+    "priority": "high | medium | low",
+    "impact_score": 0-100,
+    "scope": "specific files/subsystems this idea touches",
+    "rationale": "why this is higher impact than alternatives",
     "prompt": "Detailed implementation prompt referencing specific files, functions, and patterns found during exploration."
   },
   {
     "title": "...",
     "category": "a different area",
+    "priority": "high | medium | low",
+    "impact_score": 0-100,
+    "scope": "...",
+    "rationale": "...",
     "prompt": "..."
   },
   {
     "title": "...",
     "category": "yet another distinct area",
+    "priority": "high | medium | low",
+    "impact_score": 0-100,
+    "scope": "...",
+    "rationale": "...",
     "prompt": "..."
   }
 ]`)
@@ -126,9 +187,13 @@ Output ONLY a JSON array with exactly 3 objects. No preamble, no explanation, no
 
 // IdeateResult holds a single idea proposed by the brainstorm agent.
 type IdeateResult struct {
-	Title    string `json:"title"`
-	Category string `json:"category"`
-	Prompt   string `json:"prompt"`
+	Title       string `json:"title"`
+	Category    string `json:"category"`
+	Priority    string `json:"priority"`
+	ImpactScore int    `json:"impact_score"`
+	Scope       string `json:"scope"`
+	Rationale   string `json:"rationale"`
+	Prompt      string `json:"prompt"`
 }
 
 // RunIdeation runs a lightweight read-only container to analyse the workspaces
@@ -226,7 +291,7 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 // BuildIdeationPrompt exposes the ideation prompt construction used by the
 // idea-agent runner for testability and for handler-side task bootstrap.
 func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
-	return buildIdeationPrompt(existingTasks)
+	return buildIdeationPrompt(existingTasks, r.collectIdeationContext())
 }
 
 // buildIdeationContainerArgs builds the container run arguments for the
@@ -298,7 +363,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// Generate the full ideation prompt (with randomly-picked domains).
 	// Persist it as ExecutionPrompt so the UI can display the exact prompt
 	// that was used while keeping Prompt semantics unchanged.
-	ideationPrompt := buildIdeationPrompt(activeTasks)
+	ideationPrompt := buildIdeationPrompt(activeTasks, r.collectIdeationContextFromTasks(allTasks))
 	if err := r.store.UpdateTaskExecutionPrompt(bgCtx, taskID, ideationPrompt); err != nil {
 		logger.Runner.Warn("ideation task: set execution prompt on brainstorm card", "task", taskID, "error", err)
 	}
@@ -355,10 +420,18 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// ExecutionPrompt is also set so the sandbox uses the full details
 	// even if the Prompt field is later edited.
 	var titles []string
+	var summary []string
 	for _, idea := range ideas {
-		tags := []string{"idea-agent"}
+		tags := make([]string, 0, 4)
+		tags = append(tags, "idea-agent")
 		if idea.Category != "" {
 			tags = append(tags, idea.Category)
+		}
+		if idea.Priority != "" {
+			tags = append(tags, "priority:"+idea.Priority)
+		}
+		if idea.ImpactScore > 0 {
+			tags = append(tags, "impact:"+strconv.Itoa(idea.ImpactScore))
 		}
 		// Use the full implementation prompt as the card prompt.
 		cardPrompt := idea.Prompt
@@ -382,8 +455,14 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		if err := r.store.UpdateTaskExecutionPrompt(bgCtx, newTask.ID, idea.Prompt); err != nil {
 			logger.Runner.Warn("ideation task: set execution prompt", "task", newTask.ID, "error", err)
 		}
+		label := fmt.Sprintf("[%s %d] %s", idea.Priority, idea.ImpactScore, idea.Title)
+		if idea.Priority == "" {
+			label = idea.Title
+		}
+		titles = append(titles, idea.Title)
+		summary = append(summary, label)
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
-			"result": fmt.Sprintf("Created idea task: %s", idea.Title),
+			"result": fmt.Sprintf("Created idea task: %s", label),
 		})
 	}
 
@@ -392,15 +471,267 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// Pass turns=1 to preserve the turn count set by the earlier UpdateTaskResult call.
 	if len(titles) > 0 {
 		var sb strings.Builder
-		for _, title := range titles {
+		for _, summaryLine := range summary {
 			sb.WriteString("- ")
-			sb.WriteString(title)
+			sb.WriteString(summaryLine)
 			sb.WriteString("\n")
 		}
 		r.store.UpdateTaskResult(bgCtx, taskID, strings.TrimSpace(sb.String()), "", "", 1)
+	} else {
+		r.store.UpdateTaskResult(bgCtx, taskID, "No idea reached the minimum impact threshold.", "", "", 1)
 	}
 
 	return nil
+}
+
+// collectIdeationContext returns workspace and task-derived signals for prompt
+// construction so ideation suggestions can be prioritized by objective urgency.
+func (r *Runner) collectIdeationContext() ideationContext {
+	tasks, err := r.store.ListTasks(context.Background(), false)
+	if err != nil {
+		return r.collectIdeationContextFromTasks(nil)
+	}
+	return r.collectIdeationContextFromTasks(tasks)
+}
+
+func (r *Runner) collectIdeationContextFromTasks(tasks []store.Task) ideationContext {
+	ctx := ideationContext{
+		FailureSignals: collectIdeationFailureSignals(tasks),
+		ChurnSignals:   r.collectWorkspaceChurnSignals(),
+		TodoSignals:    r.collectWorkspaceTodoSignals(),
+	}
+	return ctx
+}
+
+func collectIdeationFailureSignals(tasks []store.Task) []string {
+	type failureSignal struct {
+		label string
+	}
+	signals := make([]failureSignal, 0, len(tasks))
+	seen := map[string]struct{}{}
+	for _, task := range tasks {
+		if task.Kind == store.TaskKindIdeaAgent {
+			continue
+		}
+		isFail := strings.EqualFold(task.LastTestResult, "fail") || task.Status == store.TaskStatusFailed
+		if !isFail {
+			continue
+		}
+
+		title := strings.TrimSpace(task.Title)
+		if title == "" {
+			title = strings.TrimSpace(task.Prompt)
+		}
+		if title == "" {
+			title = "(untitled)"
+		}
+		if _, ok := seen[title]; ok {
+			continue
+		}
+		seen[title] = struct{}{}
+		reason := "failed"
+		if strings.EqualFold(task.LastTestResult, "fail") {
+			reason = "last test result: fail"
+		}
+		signals = append(signals, failureSignal{label: fmt.Sprintf("%s (%s)", title, reason)})
+		if len(signals) >= maxIdeationIdeas {
+			break
+		}
+	}
+	result := make([]string, 0, len(signals))
+	for _, s := range signals {
+		result = append(result, s.label)
+	}
+	return result
+}
+
+func (r *Runner) collectWorkspaceChurnSignals() []string {
+	var signals []string
+	for _, workspace := range r.workspacesForRunner() {
+		sig := r.collectWorkspaceChurnSignalsForWorkspace(workspace)
+		signals = append(signals, sig...)
+	}
+	if len(signals) <= maxIdeationChurnSignals {
+		return signals
+	}
+	return signals[:maxIdeationChurnSignals]
+}
+
+func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(workspace string) []string {
+	raw, err := r.runWorkspaceGitCommand(workspace, "log", "--name-only", "--pretty=format:", "-n", "30")
+	if err != nil {
+		return nil
+	}
+	s := strings.TrimSpace(string(raw))
+	if s == "" {
+		return nil
+	}
+	counts := make(map[string]int)
+	for _, line := range strings.Split(s, "\n") {
+		file := strings.TrimSpace(line)
+		if file == "" {
+			continue
+		}
+		counts[file]++
+	}
+	type item struct {
+		path  string
+		count int
+	}
+	var list []item
+	for path, count := range counts {
+		list = append(list, item{path, count})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].count == list[j].count {
+			return list[i].path < list[j].path
+		}
+		return list[i].count > list[j].count
+	})
+	maxItems := int(math.Min(float64(maxIdeationChurnSignals), float64(len(list))))
+	out := make([]string, 0, maxItems)
+	for i := 0; i < maxItems; i++ {
+		out = append(out, fmt.Sprintf("%s (%d commits)", list[i].path, list[i].count))
+	}
+	return out
+}
+
+func (r *Runner) collectWorkspaceTodoSignals() []string {
+	var signals []string
+	for _, workspace := range r.workspacesForRunner() {
+		sig := r.collectWorkspaceTodoSignalsForWorkspace(workspace)
+		signals = append(signals, sig...)
+	}
+	if len(signals) <= maxIdeationTodoSignals {
+		return signals
+	}
+	return signals[:maxIdeationTodoSignals]
+}
+
+func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(workspace string) []string {
+	raw, err := r.runWorkspaceGitCommand(workspace, "grep", "-n", "-E", "TODO|FIXME|XXX", "--", ".")
+	if err != nil {
+		return nil
+	}
+	counts := make(map[string]int)
+	for _, line := range strings.Split(string(raw), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		before, _, found := strings.Cut(trimmed, ":")
+		if !found || before == "" {
+			continue
+		}
+		counts[before]++
+	}
+	type item struct {
+		path  string
+		count int
+	}
+	var list []item
+	for path, count := range counts {
+		list = append(list, item{path, count})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].count == list[j].count {
+			return list[i].path < list[j].path
+		}
+		return list[i].count > list[j].count
+	})
+	maxItems := int(math.Min(float64(maxIdeationTodoSignals), float64(len(list))))
+	out := make([]string, 0, maxItems)
+	for i := 0; i < maxItems; i++ {
+		out = append(out, fmt.Sprintf("%s (%d markers)", list[i].path, list[i].count))
+	}
+	return out
+}
+
+func (r *Runner) runWorkspaceGitCommand(workspace string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), workspaceIdeationCommandTTL)
+	defer cancel()
+	command := exec.CommandContext(ctx, "git", append([]string{"-C", workspace}, args...)...)
+	return command.Output()
+}
+
+func (r *Runner) workspacesForRunner() []string {
+	var ws []string
+	for _, raw := range strings.Fields(r.workspaces) {
+		clean := strings.TrimSpace(raw)
+		if clean == "" {
+			continue
+		}
+		ws = append(ws, clean)
+	}
+	return ws
+}
+
+func normalizeIdeationPriority(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "high", "p1", "critical", "urgent":
+		return "high"
+	case "medium", "med", "p2", "moderate":
+		return "medium"
+	case "low", "p3", "minor", "trivial":
+		return "low"
+	default:
+		return ""
+	}
+}
+
+func normalizeIdeationImpact(idea *IdeateResult) {
+	idea.Priority = normalizeIdeationPriority(idea.Priority)
+	if idea.ImpactScore < 0 {
+		idea.ImpactScore = 0
+	}
+	if idea.ImpactScore > 100 {
+		idea.ImpactScore = 100
+	}
+	if idea.ImpactScore == 0 {
+		switch idea.Priority {
+	case "high":
+			idea.ImpactScore = 85
+		case "medium":
+			idea.ImpactScore = 60
+		case "low":
+			idea.ImpactScore = 35
+		default:
+			idea.ImpactScore = defaultIdeationImpactScore
+		}
+	}
+	if idea.Priority == "" {
+		switch {
+		case idea.ImpactScore >= 80:
+			idea.Priority = "high"
+		case idea.ImpactScore >= 65:
+			idea.Priority = "medium"
+		default:
+			idea.Priority = "low"
+		}
+	}
+	idea.Scope = strings.TrimSpace(idea.Scope)
+	idea.Rationale = strings.TrimSpace(idea.Rationale)
+	idea.Category = strings.TrimSpace(idea.Category)
+	if idea.Title == "" {
+		idea.Title = strings.TrimSpace(idea.Title)
+	}
+	if idea.Prompt == "" {
+		idea.Prompt = strings.TrimSpace(idea.Prompt)
+	}
+}
+
+func isIdeaDuplicateTitle(added map[string]struct{}, title string) bool {
+	current := strings.ToLower(strings.TrimSpace(title))
+	if current == "" {
+		return true
+	}
+	for existing := range added {
+		if existing == current || strings.Contains(existing, current) || strings.Contains(current, existing) {
+			return true
+		}
+	}
+	added[current] = struct{}{}
+	return false
 }
 
 // extractIdeas finds a JSON array in the agent's text output and parses it
@@ -457,12 +788,13 @@ func extractIdeas(text string) ([]IdeateResult, error) {
 		return nil, fmt.Errorf("unmarshal ideas: %w", err)
 	}
 
-	// Filter out any malformed entries.
+	// Normalize schema and filter out malformed entries.
 	// An idea where prompt equals the title is a degenerate output: the agent
 	// copied the title into the prompt field instead of writing an implementation
 	// spec. Reject these so runIdeationTask fails loudly rather than silently
 	// creating tasks with no actionable implementation details.
 	var valid []IdeateResult
+	seen := map[string]struct{}{}
 	for _, r := range results {
 		title := strings.TrimSpace(r.Title)
 		prompt := strings.TrimSpace(r.Prompt)
@@ -472,7 +804,26 @@ func extractIdeas(text string) ([]IdeateResult, error) {
 		if strings.EqualFold(title, prompt) {
 			continue // prompt is just the title — not a useful implementation spec
 		}
-		valid = append(valid, r)
+		idea := r
+		normalizeIdeationImpact(&idea)
+		idea.Title = title
+		idea.Prompt = prompt
+		if idea.ImpactScore < minIdeationImpactScore {
+			continue
+		}
+		if isIdeaDuplicateTitle(seen, idea.Title) {
+			continue
+		}
+		valid = append(valid, idea)
+	}
+	sort.Slice(valid, func(i, j int) bool {
+		if valid[i].ImpactScore == valid[j].ImpactScore {
+			return valid[i].Title < valid[j].Title
+		}
+		return valid[i].ImpactScore > valid[j].ImpactScore
+	})
+	if len(valid) > maxIdeationIdeas {
+		valid = valid[:maxIdeationIdeas]
 	}
 	if len(valid) == 0 {
 		return nil, fmt.Errorf("no valid ideas in parsed output (all entries were malformed or had prompt equal to title)")
