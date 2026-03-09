@@ -1,9 +1,9 @@
 // --- Task refinement via sandbox agent ---
 //
 // Flow:
-//   1. User clicks "Start Refinement" → POST /api/tasks/{id}/refine
+//   1. User clicks "Start Refinement" → call the task refine action for the task id.
 //   2. Sandbox agent runs read-only, produces a spec
-//   3. Live logs stream via GET /api/tasks/{id}/refine/logs
+//   3. Live logs stream while the refine job is running.
 //   4. On completion, result appears in an editable textarea
 //   5. User optionally edits and clicks "Apply as Prompt"
 
