@@ -204,10 +204,26 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 }
 
 /* Settings modal tabs */
+.settings-modal-card {
+  height: min(95vh, 760px);
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
+}
+.settings-modal-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
 .settings-layout {
   display: flex;
   gap: 16px;
   align-items: flex-start;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 .settings-tab-list {
   display: flex;
@@ -219,11 +235,20 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   padding-right: 16px;
   padding-bottom: 0;
   overflow-y: auto;
-  max-height: calc(95vh - 150px);
+  max-height: 100%;
 }
 .settings-tab-content-wrap {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.settings-tab-content.active {
+  display: block;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 .settings-tab-list::-webkit-scrollbar {
   display: none;
