@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -187,19 +189,45 @@ func (h *Handler) cancelIdeationTimerLocked() {
 	}
 }
 
+// decodeJSONBody decodes the JSON request body into v. It rejects unknown
+// fields and trailing tokens after the first JSON object, writing a 400
+// response on any error.
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, v any) bool {
-	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return false
+	}
+	if dec.More() {
+		http.Error(w, "invalid JSON: unexpected trailing content", http.StatusBadRequest)
 		return false
 	}
 	return true
 }
 
-func decodeOptionalJSONBody(r *http.Request, v any) {
+// decodeOptionalJSONBody decodes the JSON request body into v when a body is
+// present. An absent or empty body is silently accepted and leaves v
+// unchanged. When a body is present the same strict rules apply as
+// decodeJSONBody: unknown fields and trailing tokens are rejected with a 400.
+func decodeOptionalJSONBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	if r == nil || r.Body == nil {
-		return
+		return true
 	}
-	_ = json.NewDecoder(r.Body).Decode(v) //nolint:errcheck
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		if errors.Is(err, io.EOF) {
+			return true // empty body — treat as no body provided
+		}
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return false
+	}
+	if dec.More() {
+		http.Error(w, "invalid JSON: unexpected trailing content", http.StatusBadRequest)
+		return false
+	}
+	return true
 }
 
 // writeJSON serialises v as JSON and writes it with the given HTTP status code.

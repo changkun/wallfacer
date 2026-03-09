@@ -179,3 +179,18 @@ func TestReinitInstructions_ContentType(t *testing.T) {
 		t.Errorf("expected application/json, got %q", ct)
 	}
 }
+
+// --- strict JSON decoding ---
+
+// TestUpdateInstructions_RejectsUnknownFields verifies that unknown JSON keys return 400.
+func TestUpdateInstructions_RejectsUnknownFields(t *testing.T) {
+	h, _ := newTestHandlerWithInstructions(t)
+	body := `{"content": "# hello", "unknown_field": true}`
+	req := httptest.NewRequest(http.MethodPut, "/api/instructions", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateInstructions(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
+	}
+}

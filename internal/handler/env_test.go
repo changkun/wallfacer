@@ -477,3 +477,32 @@ func TestTestSandbox_PersistsTaskAfterRun(t *testing.T) {
 		t.Fatalf("expected completed test task, got status=%q archived=%v", tasks[0].Status, tasks[0].Archived)
 	}
 }
+
+// --- strict JSON decoding ---
+
+// TestUpdateEnvConfig_RejectsUnknownFields verifies that unknown JSON keys return 400.
+func TestUpdateEnvConfig_RejectsUnknownFields(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	body := `{"api_key": "test-key", "unknown_field": true}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateEnvConfig_RejectsTrailingContent verifies that trailing data after
+// the JSON object returns 400.
+func TestUpdateEnvConfig_RejectsTrailingContent(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	body := `{"api_key": "test-key"} garbage`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for trailing content, got %d: %s", w.Code, w.Body.String())
+	}
+}

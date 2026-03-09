@@ -478,3 +478,40 @@ func TestStartRefinementJobIfIdle_AtomicGuard(t *testing.T) {
 		t.Errorf("expected exactly 1 ErrRefinementAlreadyRunning, got %d", alreadyRunningCount)
 	}
 }
+
+// --- strict JSON decoding (optional body) ---
+
+// TestStartRefinement_RejectsUnknownFieldsInBody verifies that an optional body
+// with unknown JSON keys is rejected with 400.
+func TestStartRefinement_RejectsUnknownFieldsInBody(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+
+	body := `{"user_instructions": "be careful", "unknown_field": true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.StartRefinement(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown fields in optional body, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestStartRefinement_AcceptsEmptyBody verifies that an absent body is still valid.
+func TestStartRefinement_AcceptsEmptyBody(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+
+	// No body — must not return 400 from the decode step.
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
+	w := httptest.NewRecorder()
+	h.StartRefinement(w, req, task.ID)
+
+	// The handler may return non-200 for other reasons (e.g. runner not running),
+	// but it must not fail because the body was absent.
+	if w.Code == http.StatusBadRequest {
+		t.Errorf("unexpected 400 for empty body: %s", w.Body.String())
+	}
+}

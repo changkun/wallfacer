@@ -786,3 +786,44 @@ func TestTaskDiffIsolationConcurrent(t *testing.T) {
 		t.Error("task B diff should not contain only-a.txt")
 	}
 }
+
+// --- strict JSON decoding ---
+
+// TestGitPush_RejectsUnknownFields verifies that unknown JSON keys return 400.
+func TestGitPush_RejectsUnknownFields(t *testing.T) {
+	h := newTestHandler(t)
+	body := `{"workspace": "/some/path", "unknown_field": true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/push", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitPush(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestGitCheckout_RejectsUnknownFields verifies that unknown JSON keys return 400.
+func TestGitCheckout_RejectsUnknownFields(t *testing.T) {
+	h := newTestHandler(t)
+	body := `{"workspace": "/some/path", "branch": "main", "unknown_field": true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitCheckout(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestGitSyncWorkspace_RejectsUnknownFields verifies that unknown JSON keys return 400.
+func TestGitSyncWorkspace_RejectsUnknownFields(t *testing.T) {
+	h := newTestHandler(t)
+	body := `{"workspace": "/some/path", "unknown_field": true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/sync", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitSyncWorkspace(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
+	}
+}

@@ -1889,3 +1889,48 @@ func TestSubmitFeedback_EventHasFeedbackTrigger(t *testing.T) {
 		t.Error("expected a state_change event from waiting → in_progress, none found")
 	}
 }
+
+// --- strict JSON decoding ---
+
+// TestCreateTask_RejectsUnknownFields verifies that unknown JSON keys return 400.
+func TestCreateTask_RejectsUnknownFields(t *testing.T) {
+	h := newTestHandler(t)
+	body := `{"prompt": "build a thing", "unknown_field": true}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestCreateTask_RejectsTrailingContent verifies that trailing data after the
+// JSON object returns 400.
+func TestCreateTask_RejectsTrailingContent(t *testing.T) {
+	h := newTestHandler(t)
+	body := `{"prompt": "build a thing"} extra garbage`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for trailing content, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateTask_RejectsUnknownFields verifies that unknown JSON keys return 400.
+func TestUpdateTask_RejectsUnknownFields(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+
+	body := `{"position": 0, "sneaky_field": "value"}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
+	}
+}

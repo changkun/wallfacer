@@ -673,3 +673,32 @@ func newTestHandlerWithWorkspacesFromRepo(t *testing.T, repo string) (*Handler, 
 	t.Cleanup(r.WaitBackground)
 	return NewHandler(s, r, configDir, []string{repo}), repo
 }
+
+// --- strict JSON decoding ---
+
+// TestUpdateConfig_RejectsUnknownFields verifies that unknown JSON keys return 400.
+func TestUpdateConfig_RejectsUnknownFields(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	body := `{"autopilot": true, "unknown_field": "surprise"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateConfig(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateConfig_RejectsTrailingContent verifies that trailing data after
+// the JSON object returns 400.
+func TestUpdateConfig_RejectsTrailingContent(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	body := `{"autopilot": true} trailing`
+	req := httptest.NewRequest(http.MethodPut, "/api/config", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateConfig(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for trailing content, got %d: %s", w.Code, w.Body.String())
+	}
+}
