@@ -82,6 +82,53 @@ func defaultSandbox(cfg envconfig.Config) string {
 	return "claude"
 }
 
+func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
+	resp := map[string]any{
+		"workspaces":         h.runner.Workspaces(),
+		"instructions_path":  instructions.FilePath(h.configDir, h.workspaces),
+		"sandboxes":          []string{"claude", "codex"},
+		"default_sandbox":    "claude",
+		"sandbox_usable":     map[string]bool{"claude": true, "codex": true},
+		"sandbox_reasons":    map[string]string{},
+		"activity_sandboxes": map[string]string{},
+		"autopilot":          h.AutopilotEnabled(),
+		"autotest":           h.AutotestEnabled(),
+		"autosubmit":         h.AutosubmitEnabled(),
+		"ideation":           h.IdeationEnabled(),
+		"ideation_running":   h.ideationRunning(ctx),
+		"ideation_interval":  int(h.IdeationInterval().Minutes()),
+		"default_model":      "",
+	}
+	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
+		resp["ideation_next_run"] = nextRun
+	}
+	if cfg == nil {
+		return resp
+	}
+
+	sandboxes := availableSandboxes(*cfg)
+	sandboxUsable := map[string]bool{
+		"claude": true,
+		"codex":  true,
+	}
+	sandboxReasons := map[string]string{}
+	for _, sbox := range sandboxes {
+		ok, reason := h.sandboxUsable(sbox)
+		sandboxUsable[sbox] = ok
+		if reason != "" {
+			sandboxReasons[sbox] = reason
+		}
+	}
+
+	resp["sandboxes"] = sandboxes
+	resp["default_sandbox"] = defaultSandbox(*cfg)
+	resp["sandbox_usable"] = sandboxUsable
+	resp["sandbox_reasons"] = sandboxReasons
+	resp["activity_sandboxes"] = cfg.SandboxByActivity()
+	resp["default_model"] = cfg.DefaultModel
+	return resp
+}
+
 // ideationRunning returns true if any idea-agent task is currently in_progress.
 func (h *Handler) ideationRunning(ctx context.Context) bool {
 	tasks, err := h.store.ListTasks(ctx, false)
@@ -98,82 +145,13 @@ func (h *Handler) ideationRunning(ctx context.Context) bool {
 
 // GetConfig returns the server configuration (workspaces, instructions path).
 func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
-	defaultModel := ""
-	defaultSandboxName := ""
-	var sandboxes []string
+	var cfg *envconfig.Config
 	if h.envFile != "" {
-		if cfg, err := envconfig.Parse(h.envFile); err == nil {
-			defaultModel = cfg.DefaultModel
-			sandboxes = availableSandboxes(cfg)
-			defaultSandboxName = defaultSandbox(cfg)
-			sandboxUsable := map[string]bool{}
-			sandboxReasons := map[string]string{}
-			for _, sbox := range sandboxes {
-				ok, reason := h.sandboxUsable(sbox)
-				sandboxUsable[sbox] = ok
-				if reason != "" {
-					sandboxReasons[sbox] = reason
-				}
-			}
-			resp := map[string]any{
-				"workspaces":         h.runner.Workspaces(),
-				"instructions_path":  instructions.FilePath(h.configDir, h.workspaces),
-				"sandboxes":          sandboxes,
-				"default_sandbox":    defaultSandboxName,
-				"sandbox_usable":     sandboxUsable,
-				"sandbox_reasons":    sandboxReasons,
-				"activity_sandboxes": cfg.SandboxByActivity(),
-				"autopilot":          h.AutopilotEnabled(),
-				"autotest":           h.AutotestEnabled(),
-				"autosubmit":         h.AutosubmitEnabled(),
-				"ideation":           h.IdeationEnabled(),
-				"ideation_running":   h.ideationRunning(r.Context()),
-				"ideation_interval":  int(h.IdeationInterval().Minutes()),
-				"default_model":      defaultModel,
-			}
-			if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
-				resp["ideation_next_run"] = nextRun
-			}
-			writeJSON(w, http.StatusOK, resp)
-			return
+		if parsed, err := envconfig.Parse(h.envFile); err == nil {
+			cfg = &parsed
 		}
 	}
-	if len(sandboxes) == 0 {
-		sandboxes = []string{"claude", "codex"}
-	}
-	if defaultSandboxName == "" {
-		defaultSandboxName = sandboxes[0]
-	}
-
-	resp := map[string]any{
-		"workspaces":        h.runner.Workspaces(),
-		"instructions_path": instructions.FilePath(h.configDir, h.workspaces),
-		"sandboxes":         sandboxes,
-		"default_sandbox":   defaultSandboxName,
-		"sandbox_usable": map[string]bool{
-			"claude": true,
-			"codex":  true,
-		},
-		"sandbox_reasons":    map[string]string{},
-		"activity_sandboxes": map[string]string{},
-		"autopilot":          h.AutopilotEnabled(),
-		"autotest":           h.AutotestEnabled(),
-		"autosubmit":         h.AutosubmitEnabled(),
-		"ideation":           h.IdeationEnabled(),
-		"ideation_running":   h.ideationRunning(r.Context()),
-		"ideation_interval":  int(h.IdeationInterval().Minutes()),
-		"default_model":      defaultModel,
-	}
-	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
-		resp["ideation_next_run"] = nextRun
-	}
-	if ok, reason := h.sandboxUsable("codex"); !ok {
-		resp["sandbox_usable"].(map[string]bool)["codex"] = false
-		if reason != "" {
-			resp["sandbox_reasons"].(map[string]string)["codex"] = reason
-		}
-	}
-	writeJSON(w, http.StatusOK, resp)
+	writeJSON(w, http.StatusOK, h.buildConfigResponse(r.Context(), cfg))
 }
 
 // UpdateConfig handles PUT /api/config to update server-level settings.
@@ -188,27 +166,18 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSONBody(w, r, &req) {
 		return
 	}
-	if req.Autopilot != nil {
-		h.SetAutopilot(*req.Autopilot)
+	applyBoolToggle := func(reqVal *bool, set func(bool), enabled func() bool, onEnable func(context.Context)) {
+		if reqVal == nil {
+			return
+		}
+		set(*reqVal)
+		if enabled() {
+			go onEnable(r.Context())
+		}
 	}
-	// Re-trigger auto-promotion in case autopilot was just enabled.
-	if h.AutopilotEnabled() {
-		go h.tryAutoPromote(r.Context())
-	}
-	if req.Autotest != nil {
-		h.SetAutotest(*req.Autotest)
-	}
-	// Re-trigger auto-test scan in case autotest was just enabled.
-	if h.AutotestEnabled() {
-		go h.tryAutoTest(r.Context())
-	}
-	if req.Autosubmit != nil {
-		h.SetAutosubmit(*req.Autosubmit)
-	}
-	// Re-trigger auto-submit scan in case autosubmit was just enabled.
-	if h.AutosubmitEnabled() {
-		go h.tryAutoSubmit(r.Context())
-	}
+	applyBoolToggle(req.Autopilot, h.SetAutopilot, h.AutopilotEnabled, h.tryAutoPromote)
+	applyBoolToggle(req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
+	applyBoolToggle(req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
 	if req.IdeationInterval != nil {
 		mins := *req.IdeationInterval
 		if mins < 0 {
