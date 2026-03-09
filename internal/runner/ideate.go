@@ -826,13 +826,21 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 			}
 		}
 	}
-	if end == -1 {
-		return nil, nil, fmt.Errorf("no JSON array found in candidate output")
-	}
-
 	var results []IdeateResult
-	if err := json.Unmarshal([]byte(text[start:end+1]), &results); err != nil {
-		return nil, nil, fmt.Errorf("unmarshal ideas: %w", err)
+	if end == -1 {
+		repaired := repairTruncatedJSONArray(text, start)
+		if repaired == "" {
+			return nil, nil, fmt.Errorf("no JSON array found in candidate output")
+		}
+		logger.Runner.Warn("ideation: JSON array truncated; attempting partial recovery",
+			"recovered_bytes", len(repaired))
+		if err := json.Unmarshal([]byte(repaired), &results); err != nil {
+			return nil, nil, fmt.Errorf("no JSON array found and partial recovery failed: %w", err)
+		}
+	} else {
+		if err := json.Unmarshal([]byte(text[start:end+1]), &results); err != nil {
+			return nil, nil, fmt.Errorf("unmarshal ideas: %w", err)
+		}
 	}
 
 	// Normalize schema and filter out malformed entries.
@@ -895,6 +903,54 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 		return nil, rejections, fmt.Errorf("no valid ideas in parsed output (all entries were malformed or had prompt equal to title)")
 	}
 	return valid, rejections, nil
+}
+
+// repairTruncatedJSONArray attempts to recover a valid JSON array from text
+// that was cut off before the closing ']'. It scans forward from start
+// tracking bracket depth and string state, recording every position where a
+// complete top-level JSON object ends (i.e., a '}' that returns depth to 1
+// while inside the outer array), then closes the array and returns the
+// repaired string. Returns "" if no complete object is found.
+func repairTruncatedJSONArray(text string, start int) string {
+	// Walk forward tracking depth and string state, recording every position
+	// where we return to depth==1 after a '}' (meaning one object just closed).
+	depth := 0
+	inString := false
+	escaped := false
+	lastObjEnd := -1
+	for i := start; i < len(text); i++ {
+		ch := text[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if ch == '\\' && inString {
+			escaped = true
+			continue
+		}
+		if ch == '"' {
+			inString = !inString
+			continue
+		}
+		if inString {
+			continue
+		}
+		switch ch {
+		case '[', '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 1 {
+				lastObjEnd = i // closed an object inside the array
+			}
+		case ']':
+			depth--
+		}
+	}
+	if lastObjEnd == -1 {
+		return ""
+	}
+	return text[start:lastObjEnd+1] + "]"
 }
 
 func findJSONCodeBlock(text string) []string {

@@ -819,3 +819,126 @@ func TestIdeationTaskContainerErrorTransitionsToFailed(t *testing.T) {
 		t.Fatalf("expected status=failed on container error, got %q", updated.Status)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// repairTruncatedJSONArray
+// ---------------------------------------------------------------------------
+
+func TestRepairTruncatedJSONArray(t *testing.T) {
+	// A minimal valid JSON object (field names match IdeateResult for clarity,
+	// but the repair function is purely string-based and does not parse).
+	objA := `{"title":"Add tests","category":"quality","prompt":"Write unit tests for all handlers.","impact_score":70}`
+
+	tests := []struct {
+		name  string
+		text  string
+		start int
+		want  string // empty string means "no result expected"
+	}{
+		{
+			name:  "complete valid array returns equivalent array",
+			text:  "[" + objA + "]",
+			start: 0,
+			want:  "[" + objA + "]",
+		},
+		{
+			name:  "truncated after first complete object returns single-element array",
+			text:  "[" + objA + ",",
+			start: 0,
+			want:  "[" + objA + "]",
+		},
+		{
+			name:  "truncated mid-second object returns first object only",
+			text:  "[" + objA + `,{"title":"Fix bug","prompt":"Fix the nil-pointer`,
+			start: 0,
+			want:  "[" + objA + "]",
+		},
+		{
+			name:  "string field containing braces tracks depth correctly",
+			text:  `[{"title":"use {braces}","category":"quality","prompt":"Implement {feature} properly.","impact_score":70},{"title":"B"`,
+			start: 0,
+			want:  `[{"title":"use {braces}","category":"quality","prompt":"Implement {feature} properly.","impact_score":70}]`,
+		},
+		{
+			name:  "no complete objects returns empty string",
+			text:  `[{"title":"A","prompt":"Do`,
+			start: 0,
+			want:  "",
+		},
+		{
+			name:  "object with nested sub-object tracks depth correctly",
+			text:  `[{"title":"Foo","details":{"key":"val"},"category":"quality","prompt":"Implementation details.","impact_score":70}]`,
+			start: 0,
+			want:  `[{"title":"Foo","details":{"key":"val"},"category":"quality","prompt":"Implementation details.","impact_score":70}]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := repairTruncatedJSONArray(tt.text, tt.start)
+			if got != tt.want {
+				t.Errorf("repairTruncatedJSONArray(%q, %d)\n got  %q\n want %q",
+					tt.text, tt.start, got, tt.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// parseIdeaJSONArray
+// ---------------------------------------------------------------------------
+
+func TestParseIdeaJSONArray(t *testing.T) {
+	// A valid JSON object whose fields pass all normalization filters.
+	validObj := `{"title":"Add tests","category":"quality","prompt":"Write unit tests for all handlers.","impact_score":70}`
+	validArray := "[" + validObj + "]"
+
+	t.Run("input wrapped in json fence parsed correctly", func(t *testing.T) {
+		fenced := "```json\n" + validArray + "\n```"
+		results, _, err := parseIdeaJSONArray(fenced)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Title != "Add tests" {
+			t.Errorf("expected title %q, got %q", "Add tests", results[0].Title)
+		}
+	})
+
+	t.Run("input with text before and after array", func(t *testing.T) {
+		wrapped := "Here are the ideas: " + validArray + " That's all."
+		results, _, err := parseIdeaJSONArray(wrapped)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].Title != "Add tests" {
+			t.Errorf("expected title %q, got %q", "Add tests", results[0].Title)
+		}
+	})
+
+	t.Run("truncated input triggers partial recovery and returns non-empty slice", func(t *testing.T) {
+		truncated := "[" + validObj // no closing ]
+		results, _, err := parseIdeaJSONArray(truncated)
+		if err != nil {
+			t.Fatalf("unexpected error from partial recovery: %v", err)
+		}
+		if len(results) == 0 {
+			t.Fatal("expected non-empty results from partial recovery")
+		}
+		if results[0].Title != "Add tests" {
+			t.Errorf("expected title %q, got %q", "Add tests", results[0].Title)
+		}
+	})
+
+	t.Run("empty string returns error", func(t *testing.T) {
+		_, _, err := parseIdeaJSONArray("")
+		if err == nil {
+			t.Fatal("expected error for empty string input")
+		}
+	})
+}
