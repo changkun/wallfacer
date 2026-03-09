@@ -169,7 +169,9 @@ async function createTask() {
     const sandbox_by_activity = collectSandboxByActivity('new-sandbox-');
     const max_cost_usd = parseFloat(document.getElementById('new-max-cost-usd').value) || 0;
     const max_input_tokens = parseInt(document.getElementById('new-max-input-tokens').value, 10) || 0;
-    const newTask = await api(Routes.tasks.create(), { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, max_cost_usd, max_input_tokens }) });
+    const scheduledAtEl = document.getElementById('new-scheduled-at');
+    const scheduled_at = scheduledAtEl && scheduledAtEl.value ? new Date(scheduledAtEl.value).toISOString() : undefined;
+    const newTask = await api(Routes.tasks.create(), { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, max_cost_usd, max_input_tokens, scheduled_at }) });
     const dependsOn = getDepPickerValues('new-depends-on-picker');
     if (dependsOn.length > 0 && newTask && newTask.id) {
       await api(task(newTask.id).update(), { method: 'PATCH', body: JSON.stringify({ depends_on: dependsOn }) });
@@ -223,6 +225,8 @@ function hideNewTaskForm() {
   if (maxCostEl) maxCostEl.value = '';
   const maxTokensEl = document.getElementById('new-max-input-tokens');
   if (maxTokensEl) maxTokensEl.value = '';
+  const scheduledAtEl = document.getElementById('new-scheduled-at');
+  if (scheduledAtEl) scheduledAtEl.value = '';
   var depPicker = document.getElementById('new-depends-on-picker');
   if (depPicker) {
     depPicker.querySelector('.dep-picker-list').innerHTML = '';
@@ -373,7 +377,9 @@ function scheduleBacklogSave() {
     const maxTokensEl = document.getElementById('modal-edit-max-input-tokens');
     const max_cost_usd = maxCostEl ? (parseFloat(maxCostEl.value) || 0) : undefined;
     const max_input_tokens = maxTokensEl ? (parseInt(maxTokensEl.value, 10) || 0) : undefined;
-    const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on, max_cost_usd, max_input_tokens };
+    const scheduledAtEl = document.getElementById('modal-edit-scheduled-at');
+    const scheduled_at = scheduledAtEl ? (scheduledAtEl.value ? new Date(scheduledAtEl.value).toISOString() : null) : undefined;
+    const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on, max_cost_usd, max_input_tokens, scheduled_at };
     try {
       await api(task(getOpenModalTaskId()).update(), {
         method: 'PATCH',

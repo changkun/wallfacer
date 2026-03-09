@@ -48,6 +48,21 @@ function renderTaskTagBadges(tags) {
   return tags.map(renderTaskTagBadge).join('');
 }
 
+// formatRelativeTime returns a short human-readable relative time string for a
+// future Date, e.g. "in 3h", "in 45m", "in 2d". Returns '' for past dates.
+function formatRelativeTime(date) {
+  const diffMs = date - Date.now();
+  if (diffMs <= 0) return '';
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return 'in ' + diffSec + 's';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return 'in ' + diffMin + 'm';
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return 'in ' + diffHr + 'h';
+  const diffDays = Math.floor(diffHr / 24);
+  return 'in ' + diffDays + 'd';
+}
+
 function getRenderableTasks() {
   if (showArchived && Array.isArray(archivedTasks) && archivedTasks.length > 0) {
     return tasks.concat(archivedTasks);
@@ -410,6 +425,7 @@ function _cardFingerprint(t, rank) {
     t.max_cost_usd || 0,
     (t.usage && t.usage.cost_usd) || 0,
     t.max_input_tokens || 0,
+    t.scheduled_at || '',
   ].join('\x00');
 }
 
@@ -459,6 +475,9 @@ function updateCard(card, t, rank) {
   const blockedBadge = isBlocked
     ? `<span class="badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">\uD83D\uDD12</span>`
     : '';
+  const scheduledBadge = (t.status === 'backlog' && t.scheduled_at && new Date(t.scheduled_at) > new Date())
+    ? `<span class="badge badge-scheduled" title="Scheduled: ${escapeHtml(new Date(t.scheduled_at).toLocaleString())}">\u23F0 ${escapeHtml(formatRelativeTime(new Date(t.scheduled_at)))}</span>`
+    : '';
   const refineJobStatus = t.status === 'backlog' && t.current_refinement && t.current_refinement.status;
   const refinementBadge = refineJobStatus === 'running'
     ? `<span class="badge badge-refining" title="Refinement in progress \u2014 start disabled">refining\u2026</span>`
@@ -480,6 +499,7 @@ function updateCard(card, t, rank) {
       <div class="flex items-center gap-1.5">
         ${priorityBadge}
         ${blockedBadge}
+        ${scheduledBadge}
         <span class="badge ${badgeClass}">${statusLabel}</span>
         ${showSpinner ? '<span class="spinner"></span>' : ''}
         ${refinementBadge}

@@ -546,6 +546,30 @@ func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int
 	return nil
 }
 
+// UpdateTaskScheduledAt sets or clears the scheduled start time for a task.
+// Pass nil to clear the schedule (task will be eligible for immediate promotion).
+func (s *Store) UpdateTaskScheduledAt(_ context.Context, id uuid.UUID, scheduledAt *time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	if scheduledAt == nil {
+		t.ScheduledAt = nil
+	} else {
+		ts := *scheduledAt
+		t.ScheduledAt = &ts
+	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
+}
+
 // UpdateTaskDependsOn sets the list of task UUID strings that must all reach
 // TaskStatusDone before this task is auto-promoted. An empty or nil slice clears
 // all dependencies.

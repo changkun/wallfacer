@@ -63,6 +63,10 @@
                 <option value="1440">24 hours</option>
               </select>
             </div>
+            <div style="display:flex;flex-direction:column;gap:3px;margin-top:8px;">
+              <label for="modal-edit-scheduled-at" class="text-xs text-v-muted">Schedule start (optional)</label>
+              <input type="datetime-local" id="modal-edit-scheduled-at" class="field text-xs" style="width:100%;" title="Leave empty to run immediately" onchange="scheduleBacklogSave()">
+            </div>
             <div id="modal-edit-resume-row" class="hidden flex items-center gap-2 mt-2">
               <input type="checkbox" id="modal-edit-resume" onchange="saveResumeOption(this.checked)" style="cursor:pointer;accent-color:var(--accent);">
               <label for="modal-edit-resume" class="text-xs text-v-secondary" style="cursor:pointer;">Resume previous session</label>

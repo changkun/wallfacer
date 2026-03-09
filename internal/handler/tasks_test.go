@@ -2348,3 +2348,159 @@ func TestBatchCreateTasks_EmptyBatch(t *testing.T) {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ScheduledAt — tryAutoPromote integration tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestTryAutoPromote_SkipsFutureScheduledTask verifies that a backlog task
+// with a ScheduledAt in the future is not promoted, but is promoted once the
+// scheduled time has passed.
+func TestTryAutoPromote_SkipsFutureScheduledTask(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	h.autopilotMu.Lock()
+	h.autopilot = true
+	h.autopilotMu.Unlock()
+
+	ctx := context.Background()
+
+	// Create the only backlog task and schedule it 1 hour in the future.
+	task, _ := h.store.CreateTask(ctx, "scheduled task", 15, false, "", "")
+	future := time.Now().Add(1 * time.Hour)
+	if err := h.store.UpdateTaskScheduledAt(ctx, task.ID, &future); err != nil {
+		t.Fatalf("UpdateTaskScheduledAt: %v", err)
+	}
+
+	h.tryAutoPromote(ctx)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != store.TaskStatusBacklog {
+		t.Errorf("expected task to remain in backlog (future schedule), got %s", got.Status)
+	}
+}
+
+// TestTryAutoPromote_PromotesPastScheduledTask verifies that a backlog task
+// with a ScheduledAt in the past IS promoted normally.
+func TestTryAutoPromote_PromotesPastScheduledTask(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	h.autopilotMu.Lock()
+	h.autopilot = true
+	h.autopilotMu.Unlock()
+
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "past scheduled task", 15, false, "", "")
+	past := time.Now().Add(-1 * time.Hour)
+	if err := h.store.UpdateTaskScheduledAt(ctx, task.ID, &past); err != nil {
+		t.Fatalf("UpdateTaskScheduledAt: %v", err)
+	}
+
+	h.tryAutoPromote(ctx)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != store.TaskStatusInProgress {
+		t.Errorf("expected task to be promoted (past schedule), got %s", got.Status)
+	}
+}
+
+// TestTryAutoPromote_SkipsFutureButPromotesUnscheduled verifies that when a
+// future-scheduled task and an unscheduled task both exist in the backlog, only
+// the unscheduled one is promoted.
+func TestTryAutoPromote_SkipsFutureButPromotesUnscheduled(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	h.autopilotMu.Lock()
+	h.autopilot = true
+	h.autopilotMu.Unlock()
+
+	ctx := context.Background()
+
+	// Future-scheduled task at lower position (higher priority by default).
+	scheduled, _ := h.store.CreateTask(ctx, "future scheduled", 15, false, "", "")
+	h.store.UpdateTaskPosition(ctx, scheduled.ID, 0)
+	future := time.Now().Add(1 * time.Hour)
+	if err := h.store.UpdateTaskScheduledAt(ctx, scheduled.ID, &future); err != nil {
+		t.Fatalf("UpdateTaskScheduledAt: %v", err)
+	}
+
+	// Unscheduled task at higher position (lower priority).
+	unscheduled, _ := h.store.CreateTask(ctx, "unscheduled", 15, false, "", "")
+	h.store.UpdateTaskPosition(ctx, unscheduled.ID, 1)
+
+	h.tryAutoPromote(ctx)
+
+	scheduledGot, _ := h.store.GetTask(ctx, scheduled.ID)
+	unscheduledGot, _ := h.store.GetTask(ctx, unscheduled.ID)
+
+	if scheduledGot.Status != store.TaskStatusBacklog {
+		t.Errorf("future-scheduled task should remain backlog, got %s", scheduledGot.Status)
+	}
+	if unscheduledGot.Status != store.TaskStatusInProgress {
+		t.Errorf("unscheduled task should be promoted, got %s", unscheduledGot.Status)
+	}
+}
+
+// TestUpdateTask_SetScheduledAt verifies that PATCH /api/tasks/{id} with a
+// future scheduled_at stores it correctly.
+func TestUpdateTask_SetScheduledAt(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "sched test", 15, false, "", "")
+
+	future := time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second)
+	body, _ := json.Marshal(map[string]interface{}{
+		"scheduled_at": future.Format(time.RFC3339),
+	})
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(string(body)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ScheduledAt == nil {
+		t.Fatal("expected ScheduledAt to be set after PATCH")
+	}
+	if !got.ScheduledAt.Equal(future) {
+		t.Errorf("ScheduledAt = %v, want %v", got.ScheduledAt, future)
+	}
+}
+
+// TestUpdateTask_ClearScheduledAt verifies that PATCH with scheduled_at: null
+// clears the schedule.
+func TestUpdateTask_ClearScheduledAt(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "sched clear", 15, false, "", "")
+	future := time.Now().Add(2 * time.Hour)
+	h.store.UpdateTaskScheduledAt(ctx, task.ID, &future)
+
+	body := `{"scheduled_at":null}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ScheduledAt != nil {
+		t.Errorf("expected ScheduledAt to be cleared, got %v", got.ScheduledAt)
+	}
+}

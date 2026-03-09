@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -1250,5 +1251,67 @@ func TestConcurrentUpdateStatus(t *testing.T) {
 	}
 	if got.ID != task.ID {
 		t.Error("task ID changed unexpectedly")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UpdateTaskScheduledAt
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestUpdateTaskScheduledAt_SetAndClear(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+
+	future := time.Now().Add(2 * time.Hour)
+	if err := s.UpdateTaskScheduledAt(bg(), task.ID, &future); err != nil {
+		t.Fatalf("UpdateTaskScheduledAt set: %v", err)
+	}
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.ScheduledAt == nil {
+		t.Fatal("expected ScheduledAt to be set, got nil")
+	}
+	if !got.ScheduledAt.Equal(future) {
+		t.Errorf("ScheduledAt = %v, want %v", got.ScheduledAt, future)
+	}
+
+	// Clear it.
+	if err := s.UpdateTaskScheduledAt(bg(), task.ID, nil); err != nil {
+		t.Fatalf("UpdateTaskScheduledAt clear: %v", err)
+	}
+	got, _ = s.GetTask(bg(), task.ID)
+	if got.ScheduledAt != nil {
+		t.Errorf("expected ScheduledAt to be nil after clear, got %v", got.ScheduledAt)
+	}
+}
+
+func TestUpdateTaskScheduledAt_PersistsAndLoads(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := NewStore(dir)
+
+	task, _ := s.CreateTask(bg(), "persist-scheduled", 5, false, "", "")
+	future := time.Now().Add(3 * time.Hour).Truncate(time.Second)
+	if err := s.UpdateTaskScheduledAt(bg(), task.ID, &future); err != nil {
+		t.Fatalf("UpdateTaskScheduledAt: %v", err)
+	}
+
+	// Reload from disk.
+	s2, _ := NewStore(dir)
+	got, err := s2.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after reload: %v", err)
+	}
+	if got.ScheduledAt == nil {
+		t.Fatal("expected ScheduledAt to survive disk round-trip, got nil")
+	}
+	if !got.ScheduledAt.Equal(future) {
+		t.Errorf("ScheduledAt after reload = %v, want %v", got.ScheduledAt, future)
+	}
+}
+
+func TestUpdateTaskScheduledAt_NotFound(t *testing.T) {
+	s := newTestStore(t)
+	future := time.Now().Add(time.Hour)
+	if err := s.UpdateTaskScheduledAt(bg(), uuid.New(), &future); err == nil {
+		t.Error("expected error for unknown task")
 	}
 }

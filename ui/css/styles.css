@@ -118,6 +118,8 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .badge-test-none { background: #eae8e4; color: #888078; }
 .badge-blocked { background: #fef3c7; color: #92400e; border: 1px solid #92400e40; }
 [data-theme="dark"] .badge-blocked { background: #2a1a00; color: #d97316; border: 1px solid #d9731640; }
+.badge-scheduled { background: #eff6ff; color: #1d4ed8; border: 1px solid #1d4ed840; }
+[data-theme="dark"] .badge-scheduled { background: #0e1a35; color: #60a5fa; border: 1px solid #60a5fa40; }
 [data-theme="dark"] .badge-backlog { background: #2a2820; color: #7a7770; }
 [data-theme="dark"] .badge-in_progress { background: #1a2d42; color: #6da0dc; }
 [data-theme="dark"] .badge-waiting { background: #352a10; color: #d4a030; }

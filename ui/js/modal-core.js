@@ -108,6 +108,17 @@ async function openModal(id) {
       setActivityOverrideDefaultSandbox('modal-edit-sandbox-', task.sandbox || '');
     }
     populateDependsOnPicker('modal-edit-depends-on-picker', task.id, task.depends_on || []);
+    const editScheduledAtEl = document.getElementById('modal-edit-scheduled-at');
+    if (editScheduledAtEl) {
+      if (task.scheduled_at) {
+        // Convert ISO string to datetime-local format (YYYY-MM-DDTHH:MM)
+        const d = new Date(task.scheduled_at);
+        const pad = n => String(n).padStart(2, '0');
+        editScheduledAtEl.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      } else {
+        editScheduledAtEl.value = '';
+      }
+    }
     const resumeRow = document.getElementById('modal-edit-resume-row');
     if (task.session_id) {
       resumeRow.classList.remove('hidden');

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -142,6 +143,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Kind              store.TaskKind    `json:"kind"`
 		MaxCostUSD        float64           `json:"max_cost_usd"`
 		MaxInputTokens    int               `json:"max_input_tokens"`
+		ScheduledAt       *time.Time        `json:"scheduled_at,omitempty"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -161,6 +163,12 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.ScheduledAt != nil && time.Now().Before(*req.ScheduledAt) {
+		if err := h.store.UpdateTaskScheduledAt(r.Context(), task.ID, req.ScheduledAt); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 	if req.Sandbox != "" {
 		if err := h.store.UpdateTaskSandbox(r.Context(), task.ID, req.Sandbox); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -179,7 +187,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if req.Sandbox != "" || req.SandboxByActivity != nil || req.MaxCostUSD > 0 || req.MaxInputTokens > 0 {
+	if req.ScheduledAt != nil || req.Sandbox != "" || req.SandboxByActivity != nil || req.MaxCostUSD > 0 || req.MaxInputTokens > 0 {
 		task, err = h.store.GetTask(r.Context(), task.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -447,6 +455,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		DependsOn         *[]string          `json:"depends_on"`
 		MaxCostUSD        *float64           `json:"max_cost_usd"`
 		MaxInputTokens    *int               `json:"max_input_tokens"`
+		// ScheduledAt uses json.RawMessage so we can distinguish "absent" (nil)
+		// from explicitly-sent "null" (clear the schedule) or a valid time (set it).
+		ScheduledAt json.RawMessage `json:"scheduled_at"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -481,6 +492,28 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+		}
+	}
+
+	// Allow setting/clearing scheduled_at for backlog tasks.
+	// req.ScheduledAt is nil when the field was absent from the JSON body (no-op).
+	// When present it is either "null" (clear) or an ISO 8601 timestamp (set).
+	if task.Status == store.TaskStatusBacklog && len(req.ScheduledAt) > 0 {
+		var scheduledAt *time.Time
+		// "null" clears the schedule; any other value is parsed as a time.
+		if string(req.ScheduledAt) != "null" {
+			var t time.Time
+			if err := json.Unmarshal(req.ScheduledAt, &t); err != nil {
+				http.Error(w, "invalid scheduled_at: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			if !t.IsZero() {
+				scheduledAt = &t
+			}
+		}
+		if err := h.store.UpdateTaskScheduledAt(r.Context(), id, scheduledAt); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -934,16 +967,22 @@ var promoteMu sync.Mutex
 
 // StartAutoPromoter subscribes to store change notifications and automatically
 // promotes backlog tasks to in_progress when there are fewer than
-// maxConcurrentTasks running.
+// maxConcurrentTasks running. A supplementary 60-second ticker fires
+// periodically so that scheduled tasks are promoted even when no other
+// state change occurs.
 func (h *Handler) StartAutoPromoter(ctx context.Context) {
 	subID, ch := h.store.Subscribe()
+	ticker := time.NewTicker(60 * time.Second)
 	go func() {
 		defer h.store.Unsubscribe(subID)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ch:
+				h.tryAutoPromote(ctx)
+			case <-ticker.C:
 				h.tryAutoPromote(ctx)
 			}
 		}
@@ -1013,6 +1052,10 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 	for i := range tasks {
 		t := &tasks[i]
 		if t.Status == store.TaskStatusBacklog && t.Kind != store.TaskKindIdeaAgent {
+			// Skip tasks that have a future scheduled start time.
+			if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
+				continue
+			}
 			satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
 			if err != nil || !satisfied {
 				continue // skip: dependencies not yet done
