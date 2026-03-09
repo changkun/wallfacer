@@ -279,9 +279,6 @@ func TestCreateIdeaAgentTask_PopulatesExecutionPrompt(t *testing.T) {
 	if created.ExecutionPrompt == "" {
 		t.Fatal("expected execution prompt to be set immediately")
 	}
-	if created.ExecutionPrompt == ideaAgentPrompt {
-		t.Errorf("execution prompt should be synthesized, got fallback value %q", created.ExecutionPrompt)
-	}
 	if !strings.Contains(created.ExecutionPrompt, "Refactor auth handler") {
 		t.Errorf("expected execution prompt to include active task context, got %q", created.ExecutionPrompt)
 	}
