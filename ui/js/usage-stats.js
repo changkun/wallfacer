@@ -75,8 +75,13 @@
 
   function usageRow(label, usage, isBold) {
     var totalTokens = (usage.input_tokens || 0) + (usage.output_tokens || 0);
+    var labelCell = (typeof label === 'string') ? { text: label } : label;
     return createHoverRow([
-      { text: label, style: 'padding:6px 10px;' + (isBold ? 'font-weight:600;' : '') },
+      {
+        style: 'padding:6px 10px;' + (isBold ? 'font-weight:600;' : ''),
+        text: labelCell.text,
+        html: labelCell.html
+      },
       { text: fmtTokens(usage.input_tokens), style: 'padding:6px 10px;text-align:right;color:var(--text-muted);' },
       { text: fmtTokens(usage.output_tokens), style: 'padding:6px 10px;text-align:right;color:var(--text-muted);' },
       { text: fmtTokens(totalTokens || 0), style: 'padding:6px 10px;text-align:right;color:var(--text-muted);' },
@@ -111,9 +116,9 @@
       appendNoDataRow(byStatusTbody, 5, 'No data');
     } else {
       statusKeys.forEach(function (status) {
-        byStatusTbody.appendChild(usageRow(statusBadge(status), byStatus[status], false));
+        byStatusTbody.appendChild(usageRow({ html: statusBadge(status) }, byStatus[status], false));
       });
-      byStatusTbody.appendChild(usageRow('<strong>Total</strong>', total, true));
+      byStatusTbody.appendChild(usageRow({ html: '<strong>Total</strong>' }, total, true));
     }
 
     // By-Sub-Agent table.
@@ -125,7 +130,7 @@
       agentKeys.forEach(function (key) {
         bySubAgentTbody.appendChild(usageRow(agentLabel(key), bySubAgent[key], false));
       });
-      bySubAgentTbody.appendChild(usageRow('<strong>Total</strong>', total, true));
+      bySubAgentTbody.appendChild(usageRow({ html: '<strong>Total</strong>' }, total, true));
     }
 
     setState('content');
