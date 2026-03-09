@@ -1094,8 +1094,9 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 const autoSubmitInterval = 30 * time.Second
 
 // StartAutoSubmitter subscribes to store change notifications and automatically
-// moves waiting tasks to done when they are verified (LastTestResult == "pass"),
-// not behind the default branch tip, and have no unresolved worktree conflicts.
+// moves waiting tasks to done when they are verified (LastTestResult == "pass"
+// or "unknown"), not behind the default branch tip, and have no unresolved
+// worktree conflicts.
 func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 	subID, ch := h.store.Subscribe()
 	ticker := time.NewTicker(autoSubmitInterval)
@@ -1116,9 +1117,9 @@ func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 }
 
 // tryAutoSubmit scans all waiting tasks and moves any that are verified
-// (LastTestResult == "pass"), not behind the default branch, and free of
-// worktree conflicts directly to done (via the commit pipeline if a session
-// exists). Does nothing when auto-submit is disabled.
+// (LastTestResult == "pass" or "unknown"), not behind the default branch, and
+// free of worktree conflicts directly to done (via the commit pipeline if a
+// session exists). Does nothing when auto-submit is disabled.
 func (h *Handler) tryAutoSubmit(ctx context.Context) {
 	if !h.AutosubmitEnabled() {
 		return
@@ -1134,8 +1135,10 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 		if t.Status != store.TaskStatusWaiting {
 			continue
 		}
-		// Only submit tasks that have passed test verification.
-		if t.LastTestResult != "pass" {
+		// Submit tasks that passed verification, or where the test ran but
+		// produced no clear verdict ("unknown"). Tasks that haven't been
+		// tested at all (LastTestResult == "") or explicitly failed are skipped.
+		if t.LastTestResult != "pass" && t.LastTestResult != "unknown" {
 			continue
 		}
 		// Skip while the test agent is still running.
@@ -1174,8 +1177,12 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 		}
 
 		logger.Handler.Info("auto-submit: completing verified waiting task", "task", t.ID)
+		autoSubmitMsg := "Auto-submit: task verified with passing tests, up to date, and no conflicts."
+		if t.LastTestResult == "unknown" {
+			autoSubmitMsg = "Auto-submit: task completed (test ran but no explicit verdict), up to date, and no conflicts."
+		}
 		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
-			"result": "Auto-submit: task verified with passing tests, up to date, and no conflicts.",
+			"result": autoSubmitMsg,
 		})
 
 		if t.SessionID != nil && *t.SessionID != "" {

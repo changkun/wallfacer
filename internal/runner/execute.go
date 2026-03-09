@@ -22,6 +22,23 @@ var (
 	// negatedPassPattern catches explicit negative-pass language near a verdict token.
 	// This is treated as a failure to avoid false positives like "NO PASS".
 	negatedPassPattern = regexp.MustCompile(`(?i)\b(?:NO|NOT)\s+PASS(?:ED|ING)?\b`)
+
+	// Content-level pass inference patterns for common test runner output formats
+	// that don't use the explicit PASS/FAIL vocabulary.
+
+	// xPassingPattern matches Mocha/Jest style: "5 passing", "5 passing (23ms)".
+	xPassingPattern = regexp.MustCompile(`(?i)\b\d+\s+passing\b`)
+	// allPassedPattern matches "all tests passed", "all 5 checks passed", etc.
+	allPassedPattern = regexp.MustCompile(`(?i)\ball\s+(?:\d+\s+)?(?:tests?|checks?|specs?|examples?)\s+pass(?:ed)?\b`)
+	// goTestOKPattern matches Go's "ok  github.com/foo/bar  0.003s" at line start.
+	goTestOKPattern = regexp.MustCompile(`(?im)^ok\s+\S`)
+	// buildSuccessPattern matches Maven/Gradle "BUILD SUCCESS".
+	buildSuccessPattern = regexp.MustCompile(`(?i)\bBUILD\s+SUCCESS\b`)
+	// nPassedPattern matches "5 passed", "5 tests passed", "5 examples passed" (pytest, rspec, etc.).
+	nPassedPattern = regexp.MustCompile(`(?i)\b\d+\s+(?:tests?\s+|specs?\s+|examples?\s+)?passed\b`)
+	// failureInContentPattern detects non-zero failure counts used to guard
+	// against false-positive pass inference in mixed output like "5 passed, 1 failed".
+	failureInContentPattern = regexp.MustCompile(`(?i)\b[1-9]\d*\s+(?:tests?\s+)?(?:failed|failures?|failing)\b`)
 )
 
 // Run is the main task execution loop. It sets up worktrees, runs the agent
@@ -666,6 +683,44 @@ func parseTestVerdict(result string) string {
 		}
 	}
 
+	// Broader content scan for common test runner passing summaries when
+	// neither explicit markers nor tail-line heuristics found a verdict.
+	if v := inferPassFromContent(result); v != "" {
+		return v
+	}
+
+	return ""
+}
+
+// inferPassFromContent scans the full test output for common test runner
+// success patterns that don't use the explicit PASS/FAIL vocabulary.
+// Returns "pass" if a passing pattern is found and no non-zero failure count
+// is detected, otherwise "".
+func inferPassFromContent(result string) string {
+	// If a non-zero number of failures is mentioned, don't infer pass.
+	if failureInContentPattern.MatchString(result) {
+		return ""
+	}
+	// "N passing" — Mocha/Jest style.
+	if xPassingPattern.MatchString(result) {
+		return "pass"
+	}
+	// "all tests passed", "all 5 checks passed", etc.
+	if allPassedPattern.MatchString(result) {
+		return "pass"
+	}
+	// Go test: "ok  github.com/..." at start of line.
+	if goTestOKPattern.MatchString(result) {
+		return "pass"
+	}
+	// Maven/Gradle: "BUILD SUCCESS".
+	if buildSuccessPattern.MatchString(result) {
+		return "pass"
+	}
+	// Pytest/RSpec: "N passed", "N tests passed", "N examples passed".
+	if nPassedPattern.MatchString(result) {
+		return "pass"
+	}
 	return ""
 }
 
@@ -694,7 +749,7 @@ func verdictTokenToValue(token string) string {
 	switch strings.ToUpper(token) {
 	case "PASS", "PASSED", "PASSING":
 		return "pass"
-	case "FAIL", "FAILS", "FAILED", "FAILURE", "FAILURES":
+	case "FAIL", "FAILS", "FAILED", "FAILING", "FAILURE", "FAILURES":
 		return "fail"
 	default:
 		return ""
