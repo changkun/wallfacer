@@ -1,110 +1,118 @@
 <!-- Settings Modal -->
 <div id="settings-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4" onclick="if(event.target===this)closeSettings()">
-  <div class="modal-card" style="max-width: 640px; width: 100%;">
+  <div class="modal-card" style="max-width: 840px; width: 100%;">
     <div class="p-6">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
         <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Settings</h3>
         <button onclick="closeSettings()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
       </div>
 
-      <div>
+      <div class="settings-tab-list" role="tablist" aria-label="Settings tabs">
+        <button id="settings-tab-appearance" type="button" class="settings-tab active" role="tab" aria-selected="true" data-settings-tab="appearance">Appearance</button>
+        <button id="settings-tab-execution" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="execution">Execution</button>
+        <button id="settings-tab-workspace" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="workspace">Workspace</button>
+        <button id="settings-tab-insights" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="insights">Insights</button>
+        <button id="settings-tab-about" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="about">About</button>
+      </div>
+
+      <div class="settings-tab-content active" data-settings-tab="appearance">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Theme</div>
         <div class="theme-switch" id="theme-switch">
           <button data-mode="light" onclick="setTheme('light')">Light</button>
           <button data-mode="dark" onclick="setTheme('dark')">Dark</button>
           <button data-mode="auto" onclick="setTheme('auto')">Auto</button>
         </div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Done Column</div>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-secondary);">
+            <input type="checkbox" id="show-archived-toggle" onchange="toggleShowArchived()" style="cursor: pointer; accent-color: var(--accent);">
+            Show archived tasks
+          </label>
+        </div>
       </div>
 
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Done Column</div>
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-secondary);">
-          <input type="checkbox" id="show-archived-toggle" onchange="toggleShowArchived()" style="cursor: pointer; accent-color: var(--accent);">
-          Show archived tasks
-        </label>
-      </div>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+      <div class="settings-tab-content" data-settings-tab="execution">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Parallel Tasks</div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <input type="number" id="max-parallel-input" min="1" max="20" value="5" class="field" style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center;" onchange="saveMaxParallel()">
           <span id="max-parallel-status" style="font-size: 11px; color: var(--text-muted);"></span>
         </div>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Max tasks running concurrently in the In Progress column.</div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Oversight Interval</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="number" id="oversight-interval-input" min="0" max="120" value="0"
+                   class="field" style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center;"
+                   onchange="saveOversightInterval()">
+            <span style="font-size: 12px; color: var(--text-muted);">min</span>
+            <span id="oversight-interval-status" style="font-size: 11px; color: var(--text-muted);"></span>
+          </div>
+          <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Generate oversight summaries every N minutes while a task runs. 0 = only at task completion.</div>
+        </div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Auto Push</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted);">
+              <input type="checkbox" id="auto-push-enabled" onchange="saveAutoPush()">
+              Enable
+            </label>
+            <span id="auto-push-status" style="font-size: 11px; color: var(--text-muted);"></span>
+          </div>
+          <div id="auto-push-threshold-row" style="display: none; margin-top: 8px; align-items: center; gap: 8px;">
+            <span style="font-size: 12px; color: var(--text-muted);">Push when</span>
+            <input type="number" id="auto-push-threshold" min="1" value="1"
+                   class="field" style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center;"
+                   onchange="saveAutoPush()">
+            <span style="font-size: 12px; color: var(--text-muted);">commit(s) ahead</span>
+          </div>
+          <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Automatically push after the commit pipeline when the workspace is at least N commits ahead of upstream.</div>
+        </div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Brainstorm</div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted);">
+              <input type="checkbox" id="ideation-toggle" onchange="toggleIdeation()" style="cursor: pointer; accent-color: var(--accent);">
+              Enable
+            </label>
+            <select id="ideation-interval" onchange="updateIdeationInterval(this.value)" title="How often to run brainstorm" style="font-size:12px;color:var(--text-secondary);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:2px 6px;cursor:pointer;">
+              <option value="0">immediately</option>
+              <option value="15">every 15 min</option>
+              <option value="30">every 30 min</option>
+              <option value="60">every 1h</option>
+              <option value="120">every 2h</option>
+              <option value="240">every 4h</option>
+              <option value="480">every 8h</option>
+              <option value="1440">every 24h</option>
+            </select>
+            <button onclick="event.preventDefault();triggerIdeation()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Run now</button>
+          </div>
+          <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">The brainstorm agent analyses repositories and proposes tasks at the configured interval. Tasks are tagged <em>idea-agent</em>.</div>
+        </div>
       </div>
 
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Oversight Interval</div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <input type="number" id="oversight-interval-input" min="0" max="120" value="0"
-                 class="field" style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center;"
-                 onchange="saveOversightInterval()">
-          <span style="font-size: 12px; color: var(--text-muted);">min</span>
-          <span id="oversight-interval-status" style="font-size: 11px; color: var(--text-muted);"></span>
-        </div>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Generate oversight summaries every N minutes while a task runs. 0 = only at task completion.</div>
-      </div>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Auto Push</div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted);">
-            <input type="checkbox" id="auto-push-enabled" onchange="saveAutoPush()">
-            Enable
-          </label>
-          <span id="auto-push-status" style="font-size: 11px; color: var(--text-muted);"></span>
-        </div>
-        <div id="auto-push-threshold-row" style="display: none; margin-top: 8px; align-items: center; gap: 8px;">
-          <span style="font-size: 12px; color: var(--text-muted);">Push when</span>
-          <input type="number" id="auto-push-threshold" min="1" value="1"
-                 class="field" style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center;"
-                 onchange="saveAutoPush()">
-          <span style="font-size: 12px; color: var(--text-muted);">commit(s) ahead</span>
-        </div>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Automatically push after the commit pipeline when the workspace is at least N commits ahead of upstream.</div>
-      </div>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Brainstorm</div>
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted);">
-            <input type="checkbox" id="ideation-toggle" onchange="toggleIdeation()" style="cursor: pointer; accent-color: var(--accent);">
-            Enable
-          </label>
-          <select id="ideation-interval" onchange="updateIdeationInterval(this.value)" title="How often to run brainstorm" style="font-size:12px;color:var(--text-secondary);background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:2px 6px;cursor:pointer;">
-            <option value="0">immediately</option>
-            <option value="15">every 15 min</option>
-            <option value="30">every 30 min</option>
-            <option value="60">every 1h</option>
-            <option value="120">every 2h</option>
-            <option value="240">every 4h</option>
-            <option value="480">every 8h</option>
-            <option value="1440">every 24h</option>
-          </select>
-          <button onclick="event.preventDefault();triggerIdeation()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Run now</button>
-        </div>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">The brainstorm agent analyses repositories and proposes tasks at the configured interval. Tasks are tagged <em>idea-agent</em>.</div>
-      </div>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+      <div class="settings-tab-content" data-settings-tab="workspace">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Sandbox Configuration</div>
         <button onclick="closeSettings();showEnvConfigEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Configure sandbox credentials, endpoints, and defaults by provider.</div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">AGENTS.md</div>
+          <button onclick="closeSettings();showInstructionsEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
+          <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Workspace instructions for the agent.</div>
+        </div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Prompt Templates</div>
+          <button onclick="closeSettings();openTemplatesManager()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Manage</button>
+          <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Save and reuse named prompt fragments when creating tasks.</div>
+        </div>
       </div>
 
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">AGENTS.md</div>
-        <button onclick="closeSettings();showInstructionsEditor(event)" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Edit</button>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Workspace instructions for the agent.</div>
-      </div>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Prompt Templates</div>
-        <button onclick="closeSettings();openTemplatesManager()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Manage</button>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Save and reuse named prompt fragments when creating tasks.</div>
-      </div>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+      <div class="settings-tab-content" data-settings-tab="insights">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Task Titles</div>
         <div style="display: flex; gap: 6px; align-items: center;">
           <select id="generate-titles-limit" class="select" style="font-size: 12px; padding: 3px 6px; height: auto;" title="Max tasks to generate titles for">
@@ -117,36 +125,36 @@
           <button onclick="generateMissingTitles()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Generate Missing</button>
         </div>
         <div id="generate-titles-status" style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em;"></div>
-      </div>
 
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Trace Oversight</div>
-        <div style="display: flex; gap: 6px; align-items: center;">
-          <select id="generate-oversight-limit" class="select" style="font-size: 12px; padding: 3px 6px; height: auto;" title="Max tasks to generate oversight for">
-            <option value="5">5 tasks</option>
-            <option value="10" selected>10 tasks</option>
-            <option value="25">25 tasks</option>
-            <option value="50">50 tasks</option>
-            <option value="0">All</option>
-          </select>
-          <button onclick="generateMissingOversight()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Generate Missing</button>
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Trace Oversight</div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <select id="generate-oversight-limit" class="select" style="font-size: 12px; padding: 3px 6px; height: auto;" title="Max tasks to generate oversight for">
+              <option value="5">5 tasks</option>
+              <option value="10" selected>10 tasks</option>
+              <option value="25">25 tasks</option>
+              <option value="50">50 tasks</option>
+              <option value="0">All</option>
+            </select>
+            <button onclick="generateMissingOversight()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Generate Missing</button>
+          </div>
+          <div id="generate-oversight-status" style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em;"></div>
         </div>
-        <div id="generate-oversight-status" style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em;"></div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Usage Statistics</div>
+          <button onclick="closeSettings();showUsageStats()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">View Usage</button>
+          <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Token consumption and cost broken down by task status and sub-agent.</div>
+        </div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Execution Timing</div>
+          <button onclick="closeSettings();showSpanStats()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">View Timing</button>
+          <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Per-phase latency (median, 95th, 99th percentile) aggregated across all tasks.</div>
+        </div>
       </div>
 
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Usage Statistics</div>
-        <button onclick="closeSettings();showUsageStats()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">View Usage</button>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Token consumption and cost broken down by task status and sub-agent.</div>
-      </div>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Execution Timing</div>
-        <button onclick="closeSettings();showSpanStats()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">View Timing</button>
-        <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Per-phase latency (median, 95th, 99th percentile) aggregated across all tasks.</div>
-      </div>
-
-      <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px;">
+      <div class="settings-tab-content" data-settings-tab="about">
         <div style="margin-bottom: 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">About</div>
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
           <div style="width: 32px; height: 32px; border-radius: 7px; background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -175,4 +183,3 @@
     </div>
   </div>
 </div>
-

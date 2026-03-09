@@ -28,11 +28,49 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', fun
 });
 
 // --- Settings modal ---
+var settingsTabsInitialized = false;
+
+function setSettingsTab(tabName) {
+  var tabButtons = document.querySelectorAll('.settings-tab');
+  var tabPanels = document.querySelectorAll('.settings-tab-content');
+  var didSetActive = false;
+
+  tabButtons.forEach(function(btn) {
+    var isActive = btn.getAttribute('data-settings-tab') === tabName;
+    btn.classList.toggle('active', isActive);
+    if (btn.setAttribute) btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    if (isActive) didSetActive = true;
+  });
+
+  tabPanels.forEach(function(panel) {
+    var isActive = panel.getAttribute('data-settings-tab') === tabName;
+    panel.classList.toggle('active', isActive);
+    if (isActive) didSetActive = true;
+  });
+
+  return didSetActive;
+}
+
+function initSettingsTabs() {
+  if (settingsTabsInitialized) return;
+  var tabButtons = document.querySelectorAll('.settings-tab');
+  if (!tabButtons || tabButtons.length === 0) return;
+
+  tabButtons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var tabName = btn.getAttribute('data-settings-tab');
+      if (tabName) setSettingsTab(tabName);
+    });
+  });
+  settingsTabsInitialized = true;
+}
 
 function openSettings() {
   var modal = document.getElementById('settings-modal');
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
+  initSettingsTabs();
+  setSettingsTab('appearance');
   loadMaxParallel();
   loadOversightInterval();
   loadAutoPush();
