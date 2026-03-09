@@ -232,6 +232,10 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 [data-theme="dark"] .ev-system { color: #a090c0; }
 [data-theme="dark"] .ev-feedback { color: #d4a030; }
 [data-theme="dark"] .ev-error { color: #d46868; }
+.ev-stderr-label { color: #a07020; }
+.ev-stderr-link { color: #a07020; text-decoration: underline; }
+[data-theme="dark"] .ev-stderr-label { color: #d4a030; }
+[data-theme="dark"] .ev-stderr-link { color: #d4a030; text-decoration: underline; }
 
 /* --- Form elements --- */
 .field {

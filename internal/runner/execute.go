@@ -204,6 +204,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if saveErr := r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
 			logger.Runner.Error("save turn output", "task", taskID, "turn", turns, "error", saveErr)
 		}
+		if len(rawStderr) > 0 {
+			stderrFile := fmt.Sprintf("turn-%04d.stderr.txt", turns)
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+				"stderr_file": stderrFile,
+				"turn":        fmt.Sprintf("%d", turns),
+			})
+		}
 		if err != nil {
 			// Try to salvage session_id from partial output so the task
 			// can be resumed even when the container fails (e.g. timeout).

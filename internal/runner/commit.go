@@ -524,6 +524,13 @@ func (r *Runner) resolveConflicts(
 		turns = task.Turns + 1
 	}
 	r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr)
+	if len(rawStderr) > 0 {
+		stderrFile := fmt.Sprintf("turn-%04d.stderr.txt", turns)
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+			"stderr_file": stderrFile,
+			"turn":        fmt.Sprintf("%d", turns),
+		})
+	}
 
 	if err != nil {
 		return fmt.Errorf("conflict resolver container: %w", err)

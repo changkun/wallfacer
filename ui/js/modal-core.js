@@ -442,7 +442,12 @@ async function openModal(id) {
       const humanReason = stopReasonLabels[rawReason] || rawReason;
       detail = `stop: ${humanReason}`;
     } else if (e.event_type === 'system') {
-      detail = escapeHtml(data.result || '');
+      if (data.stderr_file) {
+        const turnNum = data.turn || '?';
+        detail = `<span class="ev-stderr-label">&#9888; stderr (turn ${escapeHtml(String(turnNum))})</span> <a href="/api/tasks/${id}/outputs/${escapeHtml(data.stderr_file)}" target="_blank" class="ev-stderr-link">[view]</a>`;
+      } else {
+        detail = escapeHtml(data.result || '');
+      }
     } else if (e.event_type === 'error') {
       if (data.phase === 'rebase' && Array.isArray(data.conflicted_files) && data.conflicted_files.length > 0) {
         detail = '<div style="border-left:3px solid #ef4444;padding:8px 10px;margin:4px 0;">' +
