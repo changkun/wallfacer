@@ -127,6 +127,7 @@ describe('theme helpers', () => {
       matchDarkMode: true,
       loadMaxParallel: vi.fn(),
       loadOversightInterval: vi.fn(),
+      loadArchivedTasksPerPage: vi.fn(),
       loadAutoPush: vi.fn(),
     });
     loadScript(ctx, 'theme.js');
@@ -191,6 +192,7 @@ describe('theme helpers', () => {
       showEnvConfigEditor,
       loadMaxParallel: vi.fn(),
       loadOversightInterval: vi.fn(),
+      loadArchivedTasksPerPage: vi.fn(),
       loadAutoPush: vi.fn(),
     });
     loadScript(ctx, 'theme.js');
@@ -201,6 +203,7 @@ describe('theme helpers', () => {
     expect(modal.style.display).toBe('flex');
     expect(ctx.loadMaxParallel).toHaveBeenCalledTimes(1);
     expect(ctx.loadOversightInterval).toHaveBeenCalledTimes(1);
+    expect(ctx.loadArchivedTasksPerPage).toHaveBeenCalledTimes(1);
     expect(ctx.loadAutoPush).toHaveBeenCalledTimes(1);
     expect(showEnvConfigEditor).toHaveBeenCalledTimes(1);
     expect(showEnvConfigEditor).toHaveBeenCalledWith(null);
@@ -223,6 +226,7 @@ describe('theme helpers', () => {
       ],
       loadMaxParallel: vi.fn(),
       loadOversightInterval: vi.fn(),
+      loadArchivedTasksPerPage: vi.fn(),
       loadAutoPush: vi.fn(),
     });
     loadScript(ctx, 'theme.js');
@@ -248,6 +252,7 @@ describe('theme helpers', () => {
       ],
       loadMaxParallel: vi.fn(),
       loadOversightInterval: vi.fn(),
+      loadArchivedTasksPerPage: vi.fn(),
       loadAutoPush: vi.fn(),
     });
     loadScript(ctx, 'theme.js');

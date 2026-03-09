@@ -48,20 +48,29 @@ function renderTaskTagBadges(tags) {
   return tags.map(renderTaskTagBadge).join('');
 }
 
+function getRenderableTasks() {
+  if (showArchived && Array.isArray(archivedTasks) && archivedTasks.length > 0) {
+    return tasks.concat(archivedTasks);
+  }
+  return tasks;
+}
+
 // --- Dependency badge helpers ---
 
 function areDepsBlocked(t) {
   if (!t.depends_on || t.depends_on.length === 0) return false;
+  const allTasks = getRenderableTasks();
   return t.depends_on.some(function(depId) {
-    var dep = tasks.find(function(d) { return d.id === depId; });
+    var dep = allTasks.find(function(d) { return d.id === depId; });
     return !dep || dep.status !== 'done';
   });
 }
 
 function getBlockingTaskNames(t) {
   if (!t.depends_on) return '';
+  const allTasks = getRenderableTasks();
   return t.depends_on.map(function(id) {
-    var dep = tasks.find(function(d) { return d.id === id; });
+    var dep = allTasks.find(function(d) { return d.id === id; });
     if (!dep) return id.slice(0, 8) + '\u2026';
     return dep.title || (dep.prompt.length > 30 ? dep.prompt.slice(0, 30) + '\u2026' : dep.prompt);
   }).join(', ');
@@ -202,6 +211,16 @@ function render() {
   // Cancelled tasks are visually distinguished by a purple left border on the card.
   columns.done = columns.done.concat(columns.cancelled);
   delete columns.cancelled;
+  if (showArchived && Array.isArray(archivedTasks) && archivedTasks.length > 0) {
+    const seenDone = new Set(columns.done.map(function(t) { return t.id; }));
+    for (const archivedTask of archivedTasks) {
+      if ((archivedTask.status !== 'done' && archivedTask.status !== 'cancelled') || seenDone.has(archivedTask.id)) {
+        continue;
+      }
+      columns.done.push(archivedTask);
+      seenDone.add(archivedTask.id);
+    }
+  }
 
   for (const [status, items] of Object.entries(columns)) {
     const el = document.getElementById(`col-${status}`);
@@ -290,14 +309,14 @@ function render() {
   // If the modal is open for a backlog task, refresh its refinement panel
   // so live sandbox status updates are reflected without reopening the modal.
   if (currentTaskId) {
-    const openTask = tasks.find(t => t.id === currentTaskId);
+    const openTask = getRenderableTasks().find(t => t.id === currentTaskId);
     if (openTask && openTask.status === 'backlog') {
       updateRefineUI(openTask);
       renderRefineHistory(openTask);
     }
   }
 
-  if (window.depGraphEnabled && typeof renderDependencyGraph === 'function') renderDependencyGraph(tasks);
+  if (window.depGraphEnabled && typeof renderDependencyGraph === 'function') renderDependencyGraph(getRenderableTasks());
   else if (typeof hideDependencyGraph === 'function') hideDependencyGraph();
 }
 

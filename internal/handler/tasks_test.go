@@ -108,6 +108,91 @@ func TestListTasks_IncludeArchived(t *testing.T) {
 	}
 }
 
+func TestListTasks_ArchivedPaged(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	archivedIDs := make([]uuid.UUID, 0, 5)
+	for i := 0; i < 5; i++ {
+		task, err := h.store.CreateTask(ctx, fmt.Sprintf("archived %d", i), 15, false, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+		h.store.SetTaskArchived(ctx, task.ID, true)
+		archivedIDs = append(archivedIDs, task.ID)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks?include_archived=true&archived_page_size=2", nil)
+	w := httptest.NewRecorder()
+	h.ListTasks(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var page1 struct {
+		Tasks         []store.Task `json:"tasks"`
+		TotalArchived int          `json:"total_archived"`
+		HasMoreBefore bool         `json:"has_more_before"`
+		HasMoreAfter  bool         `json:"has_more_after"`
+		BeforeCursor  string       `json:"before_cursor"`
+		AfterCursor   string       `json:"after_cursor"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&page1); err != nil {
+		t.Fatalf("decode page1: %v", err)
+	}
+	if page1.TotalArchived != 5 {
+		t.Fatalf("expected total_archived=5, got %d", page1.TotalArchived)
+	}
+	if len(page1.Tasks) != 2 {
+		t.Fatalf("expected 2 tasks in first page, got %d", len(page1.Tasks))
+	}
+	if !page1.HasMoreBefore {
+		t.Fatal("expected has_more_before=true on first page")
+	}
+	if page1.HasMoreAfter {
+		t.Fatal("expected has_more_after=false on first page")
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/tasks?include_archived=true&archived_page_size=2&archived_before="+page1.BeforeCursor, nil)
+	w2 := httptest.NewRecorder()
+	h.ListTasks(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w2.Code, w2.Body.String())
+	}
+	var page2 struct {
+		Tasks         []store.Task `json:"tasks"`
+		TotalArchived int          `json:"total_archived"`
+		HasMoreBefore bool         `json:"has_more_before"`
+		HasMoreAfter  bool         `json:"has_more_after"`
+	}
+	if err := json.NewDecoder(w2.Body).Decode(&page2); err != nil {
+		t.Fatalf("decode page2: %v", err)
+	}
+	if len(page2.Tasks) != 2 {
+		t.Fatalf("expected 2 tasks in second page, got %d", len(page2.Tasks))
+	}
+	if !page2.HasMoreAfter {
+		t.Fatal("expected has_more_after=true for page loaded with archived_before")
+	}
+	for _, t1 := range page1.Tasks {
+		for _, t2 := range page2.Tasks {
+			if t1.ID == t2.ID {
+				t.Fatalf("task %s appeared in both pages", t1.ID)
+			}
+		}
+	}
+	_ = archivedIDs
+}
+
+func TestListTasks_ArchivedPagedRejectsInvalidCursor(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks?include_archived=true&archived_page_size=5&archived_before=not-a-uuid", nil)
+	w := httptest.NewRecorder()
+	h.ListTasks(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
 // TestCreateTask_RejectsEmptyPrompt verifies that an empty prompt returns 400.
 func TestCreateTask_RejectsEmptyPrompt(t *testing.T) {
 	h := newTestHandler(t)

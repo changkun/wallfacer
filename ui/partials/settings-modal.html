@@ -52,6 +52,18 @@
         <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Max tasks running concurrently in the In Progress column.</div>
 
         <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Archived Tasks</div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="number" id="archived-page-size-input" min="1" max="200" value="20"
+                   class="field" style="width: 60px; font-size: 12px; padding: 3px 6px; text-align: center;"
+                   onchange="saveArchivedTasksPerPage()">
+            <span style="font-size: 12px; color: var(--text-muted);">per page</span>
+            <span id="archived-page-size-status" style="font-size: 11px; color: var(--text-muted);"></span>
+          </div>
+          <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">When archived tasks are visible, load this many items per scroll page.</div>
+        </div>
+
+        <div class="settings-section">
           <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Oversight Interval</div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <input type="number" id="oversight-interval-input" min="0" max="120" value="0"

@@ -321,6 +321,65 @@ func TestUpdateEnvConfig_OversightIntervalClamped(t *testing.T) {
 	}
 }
 
+func TestUpdateEnvConfig_ArchivedTasksPerPageRoundTrip(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	body := `{"archived_tasks_per_page": 33}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/env", nil)
+	w2 := httptest.NewRecorder()
+	h.GetEnvConfig(w2, req2)
+
+	var resp envConfigResponse
+	if err := json.NewDecoder(w2.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.ArchivedTasksPerPage != 33 {
+		t.Errorf("archived_tasks_per_page: want 33, got %d", resp.ArchivedTasksPerPage)
+	}
+}
+
+func TestUpdateEnvConfig_ArchivedTasksPerPageClamped(t *testing.T) {
+	tests := []struct {
+		name  string
+		input int
+		want  int
+	}{
+		{"minimum clamp", 0, 1},
+		{"maximum clamp", 999, 200},
+		{"valid", 25, 25},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h, _ := newTestHandlerWithEnv(t)
+			body, _ := json.Marshal(map[string]int{"archived_tasks_per_page": tc.input})
+			req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(string(body)))
+			w := httptest.NewRecorder()
+			h.UpdateEnvConfig(w, req)
+			if w.Code != http.StatusNoContent {
+				t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+			}
+
+			req2 := httptest.NewRequest(http.MethodGet, "/api/env", nil)
+			w2 := httptest.NewRecorder()
+			h.GetEnvConfig(w2, req2)
+			var resp envConfigResponse
+			if err := json.NewDecoder(w2.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if resp.ArchivedTasksPerPage != tc.want {
+				t.Errorf("archived_tasks_per_page: want %d, got %d", tc.want, resp.ArchivedTasksPerPage)
+			}
+		})
+	}
+}
+
 // TestUpdateEnvConfig_ValidHTTPSBaseURL_AcceptedAndStored verifies that a
 // valid HTTPS URL with a public hostname is accepted (HTTP 204) and persisted.
 // This test requires external DNS resolution and is skipped in offline environments.

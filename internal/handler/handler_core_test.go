@@ -141,6 +141,22 @@ func TestGetEnvConfig_DefaultMaxParallel(t *testing.T) {
 	}
 }
 
+func TestGetEnvConfig_DefaultArchivedTasksPerPage(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/env", nil)
+	w := httptest.NewRecorder()
+	h.GetEnvConfig(w, req)
+
+	var resp envConfigResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.ArchivedTasksPerPage != defaultArchivedTasksPerPage {
+		t.Errorf("expected default archived_tasks_per_page %d, got %d", defaultArchivedTasksPerPage, resp.ArchivedTasksPerPage)
+	}
+}
+
 // TestUpdateEnvConfig_InvalidJSON returns 400 for bad JSON.
 func TestUpdateEnvConfig_InvalidJSON(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)

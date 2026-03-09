@@ -132,6 +132,18 @@ describe('_handleInitialHash', () => {
     await ctx._handleInitialHash();
     expect(ctx.openModal).not.toHaveBeenCalled();
   });
+
+  it('opens modal when task exists in archived window', async () => {
+    const ctx = makeContext({
+      location: { hash: '#22222222-2222-2222-2222-222222222222' },
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+    vm.runInContext('tasks = []; archivedTasks = [{ id: "22222222-2222-2222-2222-222222222222", title: "Archived task" }]; _hashHandled = false;', ctx);
+
+    await ctx._handleInitialHash();
+    expect(ctx.openModal).toHaveBeenCalledWith('22222222-2222-2222-2222-222222222222');
+  });
 });
 
 describe('fetchConfig', () => {

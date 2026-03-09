@@ -80,7 +80,7 @@ CLAUDE_DEFAULT_MODEL=claude-sonnet-4-0 # this is a model`
 	}
 	if cfg.DefaultModel != "claude-sonnet-4-0" {
 		t.Errorf("DefaultModel = %q; want claude-sonnet-4-0", cfg.DefaultModel)
- 	}
+	}
 }
 
 func TestParseEmpty(t *testing.T) {
@@ -100,7 +100,7 @@ func TestUpdateExistingKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=old-token\nANTHROPIC_BASE_URL=https://old.example.com\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), nil, nil, ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), nil, nil, ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func TestUpdateNilSkips(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// nil pointer → leave unchanged.
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -142,7 +142,7 @@ func TestUpdateClearsField(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// Empty string pointer → clear the field.
-	if err := envconfig.Update(path, nil, nil, ptr(""), nil, nil, ptr(""), nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr(""), nil, nil, ptr(""), nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -162,7 +162,7 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, ptr("claude-sonnet-4-5"), ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, ptr("claude-sonnet-4-5"), ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -182,7 +182,7 @@ func TestUpdatePreservesComments(t *testing.T) {
 	content := "# Auth token\nCLAUDE_CODE_OAUTH_TOKEN=tok\n# end\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -288,6 +288,30 @@ func TestParseOversightIntervalAbsent(t *testing.T) {
 	}
 }
 
+func TestParseArchivedTasksPerPage(t *testing.T) {
+	content := "WALLFACER_ARCHIVED_TASKS_PER_PAGE=30\n"
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.ArchivedTasksPerPage != 30 {
+		t.Errorf("ArchivedTasksPerPage = %d; want 30", cfg.ArchivedTasksPerPage)
+	}
+}
+
+func TestParseArchivedTasksPerPageAbsent(t *testing.T) {
+	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
+	path := writeEnvFile(t, content)
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.ArchivedTasksPerPage != 0 {
+		t.Errorf("ArchivedTasksPerPage = %d; want 0 when absent", cfg.ArchivedTasksPerPage)
+	}
+}
+
 func TestParseMaxTestParallelTasks(t *testing.T) {
 	content := "WALLFACER_MAX_TEST_PARALLEL=3\n"
 	path := writeEnvFile(t, content)
@@ -318,7 +342,7 @@ func TestUpdateMaxTestParallelTasks(t *testing.T) {
 
 	v := "4"
 	// maxTestParallel is at position 11 (after maxParallel at 10).
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -336,7 +360,7 @@ func TestUpdateOversightInterval(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	v := "15"
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -346,6 +370,24 @@ func TestUpdateOversightInterval(t *testing.T) {
 	}
 	if cfg.OversightInterval != 15 {
 		t.Errorf("OversightInterval = %d; want 15", cfg.OversightInterval)
+	}
+}
+
+func TestUpdateArchivedTasksPerPage(t *testing.T) {
+	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
+	path := writeEnvFile(t, content)
+
+	v := "40"
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse after update: %v", err)
+	}
+	if cfg.ArchivedTasksPerPage != 40 {
+		t.Errorf("ArchivedTasksPerPage = %d; want 40", cfg.ArchivedTasksPerPage)
 	}
 }
 
@@ -389,7 +431,7 @@ func TestUpdateAutoPush(t *testing.T) {
 
 	enabled := "true"
 	threshold := "5"
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &enabled, &threshold); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &enabled, &threshold); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 

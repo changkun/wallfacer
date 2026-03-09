@@ -11,17 +11,18 @@ import (
 
 // Config holds the known configuration values from the .env file.
 type Config struct {
-	OAuthToken        string // CLAUDE_CODE_OAUTH_TOKEN
-	APIKey            string // ANTHROPIC_API_KEY
-	AuthToken         string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
-	BaseURL           string // ANTHROPIC_BASE_URL
-	DefaultModel      string // CLAUDE_DEFAULT_MODEL
-	TitleModel        string // CLAUDE_TITLE_MODEL
-	MaxParallelTasks     int // WALLFACER_MAX_PARALLEL (0 means use default)
-	MaxTestParallelTasks int // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
-	OversightInterval    int // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
-	AutoPushEnabled   bool   // WALLFACER_AUTO_PUSH ("true"/"false")
-	AutoPushThreshold int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
+	OAuthToken           string // CLAUDE_CODE_OAUTH_TOKEN
+	APIKey               string // ANTHROPIC_API_KEY
+	AuthToken            string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
+	BaseURL              string // ANTHROPIC_BASE_URL
+	DefaultModel         string // CLAUDE_DEFAULT_MODEL
+	TitleModel           string // CLAUDE_TITLE_MODEL
+	MaxParallelTasks     int    // WALLFACER_MAX_PARALLEL (0 means use default)
+	MaxTestParallelTasks int    // WALLFACER_MAX_TEST_PARALLEL (0 means use default)
+	OversightInterval    int    // WALLFACER_OVERSIGHT_INTERVAL in minutes (0 = disabled)
+	ArchivedTasksPerPage int    // WALLFACER_ARCHIVED_TASKS_PER_PAGE (0 means use default)
+	AutoPushEnabled      bool   // WALLFACER_AUTO_PUSH ("true"/"false")
+	AutoPushThreshold    int    // WALLFACER_AUTO_PUSH_THRESHOLD (0 means use default of 1)
 
 	// OpenAI Codex sandbox fields.
 	OpenAIAPIKey      string // OPENAI_API_KEY
@@ -29,14 +30,14 @@ type Config struct {
 	CodexDefaultModel string // CODEX_DEFAULT_MODEL
 	CodexTitleModel   string // CODEX_TITLE_MODEL
 
-	DefaultSandbox                string // WALLFACER_DEFAULT_SANDBOX
-	ImplementationSandbox         string // WALLFACER_SANDBOX_IMPLEMENTATION
-	TestingSandbox                string // WALLFACER_SANDBOX_TESTING
-	RefinementSandbox             string // WALLFACER_SANDBOX_REFINEMENT
-	TitleSandbox                  string // WALLFACER_SANDBOX_TITLE
-	OversightSandbox              string // WALLFACER_SANDBOX_OVERSIGHT
-	CommitMessageSandbox          string // WALLFACER_SANDBOX_COMMIT_MESSAGE
-	IdeaAgentSandbox              string // WALLFACER_SANDBOX_IDEA_AGENT
+	DefaultSandbox        string // WALLFACER_DEFAULT_SANDBOX
+	ImplementationSandbox string // WALLFACER_SANDBOX_IMPLEMENTATION
+	TestingSandbox        string // WALLFACER_SANDBOX_TESTING
+	RefinementSandbox     string // WALLFACER_SANDBOX_REFINEMENT
+	TitleSandbox          string // WALLFACER_SANDBOX_TITLE
+	OversightSandbox      string // WALLFACER_SANDBOX_OVERSIGHT
+	CommitMessageSandbox  string // WALLFACER_SANDBOX_COMMIT_MESSAGE
+	IdeaAgentSandbox      string // WALLFACER_SANDBOX_IDEA_AGENT
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -53,6 +54,7 @@ var knownKeys = []string{
 	"WALLFACER_MAX_PARALLEL",
 	"WALLFACER_MAX_TEST_PARALLEL",
 	"WALLFACER_OVERSIGHT_INTERVAL",
+	"WALLFACER_ARCHIVED_TASKS_PER_PAGE",
 	"WALLFACER_AUTO_PUSH",
 	"WALLFACER_AUTO_PUSH_THRESHOLD",
 	"WALLFACER_DEFAULT_SANDBOX",
@@ -102,6 +104,10 @@ func Parse(path string) (Config, error) {
 		case "WALLFACER_OVERSIGHT_INTERVAL":
 			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 				cfg.OversightInterval = n
+			}
+		case "WALLFACER_ARCHIVED_TASKS_PER_PAGE":
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				cfg.ArchivedTasksPerPage = n
 			}
 		case "WALLFACER_AUTO_PUSH":
 			cfg.AutoPushEnabled = v == "true"
@@ -252,24 +258,26 @@ func Update(
 	maxParallel,
 	maxTestParallel,
 	oversightInterval,
+	archivedTasksPerPage,
 	autoPush,
 	autoPushThreshold *string,
 ) error {
 	updates := map[string]*string{
-		"CLAUDE_CODE_OAUTH_TOKEN":        oauthToken,
-		"ANTHROPIC_API_KEY":              apiKey,
-		"ANTHROPIC_BASE_URL":             baseURL,
-		"OPENAI_API_KEY":                 openAIAPIKey,
-		"OPENAI_BASE_URL":                openAIBaseURL,
-		"CLAUDE_DEFAULT_MODEL":           defaultModel,
-		"CLAUDE_TITLE_MODEL":             titleModel,
-		"CODEX_DEFAULT_MODEL":            codexDefaultModel,
-		"CODEX_TITLE_MODEL":              codexTitleModel,
-		"WALLFACER_MAX_PARALLEL":         maxParallel,
-		"WALLFACER_MAX_TEST_PARALLEL":    maxTestParallel,
-		"WALLFACER_OVERSIGHT_INTERVAL":   oversightInterval,
-		"WALLFACER_AUTO_PUSH":            autoPush,
-		"WALLFACER_AUTO_PUSH_THRESHOLD":  autoPushThreshold,
+		"CLAUDE_CODE_OAUTH_TOKEN":           oauthToken,
+		"ANTHROPIC_API_KEY":                 apiKey,
+		"ANTHROPIC_BASE_URL":                baseURL,
+		"OPENAI_API_KEY":                    openAIAPIKey,
+		"OPENAI_BASE_URL":                   openAIBaseURL,
+		"CLAUDE_DEFAULT_MODEL":              defaultModel,
+		"CLAUDE_TITLE_MODEL":                titleModel,
+		"CODEX_DEFAULT_MODEL":               codexDefaultModel,
+		"CODEX_TITLE_MODEL":                 codexTitleModel,
+		"WALLFACER_MAX_PARALLEL":            maxParallel,
+		"WALLFACER_MAX_TEST_PARALLEL":       maxTestParallel,
+		"WALLFACER_OVERSIGHT_INTERVAL":      oversightInterval,
+		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": archivedTasksPerPage,
+		"WALLFACER_AUTO_PUSH":               autoPush,
+		"WALLFACER_AUTO_PUSH_THRESHOLD":     autoPushThreshold,
 	}
 	return updateFile(path, updates)
 }
@@ -327,14 +335,14 @@ func UpdateSandboxSettings(path string, defaultSandbox *string, sandboxByActivit
 	}
 
 	updates := map[string]*string{
-		"WALLFACER_DEFAULT_SANDBOX":         defaultSandbox,
-		"WALLFACER_SANDBOX_IMPLEMENTATION":  impl,
-		"WALLFACER_SANDBOX_TESTING":         test,
-		"WALLFACER_SANDBOX_REFINEMENT":      refine,
-		"WALLFACER_SANDBOX_TITLE":           title,
-		"WALLFACER_SANDBOX_OVERSIGHT":       oversight,
-		"WALLFACER_SANDBOX_COMMIT_MESSAGE":  commit,
-		"WALLFACER_SANDBOX_IDEA_AGENT":      idea,
+		"WALLFACER_DEFAULT_SANDBOX":        defaultSandbox,
+		"WALLFACER_SANDBOX_IMPLEMENTATION": impl,
+		"WALLFACER_SANDBOX_TESTING":        test,
+		"WALLFACER_SANDBOX_REFINEMENT":     refine,
+		"WALLFACER_SANDBOX_TITLE":          title,
+		"WALLFACER_SANDBOX_OVERSIGHT":      oversight,
+		"WALLFACER_SANDBOX_COMMIT_MESSAGE": commit,
+		"WALLFACER_SANDBOX_IDEA_AGENT":     idea,
 	}
 	return updateRawWithUpdates(path, raw, updates)
 }

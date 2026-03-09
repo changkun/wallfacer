@@ -16,6 +16,13 @@ let testRawLogBuffer = '';
 // testLogsMode: 'pretty' | 'raw' | 'oversight'
 let testLogsMode = 'pretty';
 let showArchived = localStorage.getItem('wallfacer-show-archived') === 'true';
+let archivedTasks = [];
+let archivedTasksPageSize = 20;
+let archivedHasMoreBefore = false;
+let archivedHasMoreAfter = false;
+let archivedLoadingBefore = false;
+let archivedLoadingAfter = false;
+let archivedScrollHandlerBound = false;
 
 // Tasks SSE state
 let tasksSource = null;

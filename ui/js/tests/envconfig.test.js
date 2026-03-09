@@ -287,3 +287,59 @@ describe('loadEnvConfig', () => {
     expect(oauthTokenEl.placeholder).toBe('(not set)');
   });
 });
+
+describe('archived tasks page size setting', () => {
+  it('loads archived_tasks_per_page into input and global state', async () => {
+    const input = makeInput('');
+    const api = vi.fn().mockResolvedValue({ archived_tasks_per_page: 42 });
+    const ctx = makeContext({
+      elements: [['archived-page-size-input', input]],
+      api,
+      Routes: {
+        env: {
+          get: () => '/api/env',
+          update: () => '/api/env',
+        },
+      },
+      archivedTasksPageSize: 0,
+    });
+    loadScript(ctx, 'envconfig.js');
+
+    await ctx.loadArchivedTasksPerPage();
+    expect(api).toHaveBeenCalledWith('/api/env');
+    expect(input.value).toBe(42);
+    expect(vm.runInContext('archivedTasksPageSize', ctx)).toBe(42);
+  });
+
+  it('saves archived_tasks_per_page with clamping', async () => {
+    const input = makeInput('999');
+    const status = makeInput('');
+    const api = vi.fn().mockResolvedValue(null);
+    const loadArchivedTasksPage = vi.fn().mockResolvedValue(undefined);
+    const ctx = makeContext({
+      elements: [
+        ['archived-page-size-input', input],
+        ['archived-page-size-status', status],
+      ],
+      api,
+      showArchived: true,
+      loadArchivedTasksPage,
+      Routes: {
+        env: {
+          get: () => '/api/env',
+          update: () => '/api/env',
+        },
+      },
+    });
+    loadScript(ctx, 'envconfig.js');
+
+    await ctx.saveArchivedTasksPerPage();
+    expect(input.value).toBe(200);
+    expect(api).toHaveBeenCalledWith('/api/env', {
+      method: 'PUT',
+      body: JSON.stringify({ archived_tasks_per_page: 200 }),
+    });
+    expect(vm.runInContext('archivedTasksPageSize', ctx)).toBe(200);
+    expect(loadArchivedTasksPage).toHaveBeenCalledWith('initial');
+  });
+});

@@ -27,7 +27,7 @@ function _handleInitialHash() {
   if (!match) return;
   const taskId = match[1];
   const tabName = match[2] || null;
-  const task = tasks.find(t => t.id === taskId);
+  const task = tasks.find(t => t.id === taskId) || archivedTasks.find(t => t.id === taskId);
   if (!task) return;
   openModal(taskId).then(function() {
     if (tabName) {
@@ -44,14 +44,120 @@ function _handleInitialHash() {
 
 // --- Tasks SSE stream ---
 
+function sortArchivedByUpdatedDesc(items) {
+  return items.sort(function(a, b) {
+    const ad = new Date(a.updated_at).getTime();
+    const bd = new Date(b.updated_at).getTime();
+    if (bd !== ad) return bd - ad;
+    if (a.id === b.id) return 0;
+    return a.id > b.id ? -1 : 1;
+  });
+}
+
+function resetArchivedWindow(shouldRender) {
+  archivedTasks = [];
+  archivedHasMoreBefore = false;
+  archivedHasMoreAfter = false;
+  archivedLoadingBefore = false;
+  archivedLoadingAfter = false;
+  if (shouldRender) scheduleRender();
+}
+
+function trimArchivedWindow(direction) {
+  const pageSize = Math.max(1, archivedTasksPageSize || 20);
+  const maxItems = pageSize * 3;
+  if (archivedTasks.length <= maxItems) return;
+  const overflow = archivedTasks.length - maxItems;
+  if (direction === 'before') {
+    archivedTasks = archivedTasks.slice(overflow);
+    archivedHasMoreAfter = true;
+    return;
+  }
+  archivedTasks = archivedTasks.slice(0, maxItems);
+  archivedHasMoreBefore = true;
+}
+
+async function loadArchivedTasksPage(direction) {
+  if (!showArchived) return;
+  const dir = direction || 'initial';
+  if (dir === 'before') {
+    if (!archivedHasMoreBefore || archivedLoadingBefore || archivedTasks.length === 0) return;
+    archivedLoadingBefore = true;
+  } else if (dir === 'after') {
+    if (!archivedHasMoreAfter || archivedLoadingAfter || archivedTasks.length === 0) return;
+    archivedLoadingAfter = true;
+  } else if (archivedLoadingBefore || archivedLoadingAfter) {
+    return;
+  }
+
+  const pageSize = Math.max(1, archivedTasksPageSize || 20);
+  let url = Routes.tasks.list() + '?include_archived=true&archived_page_size=' + encodeURIComponent(pageSize);
+  if (dir === 'before' && archivedTasks.length > 0) {
+    url += '&archived_before=' + encodeURIComponent(archivedTasks[archivedTasks.length - 1].id);
+  }
+  if (dir === 'after' && archivedTasks.length > 0) {
+    url += '&archived_after=' + encodeURIComponent(archivedTasks[0].id);
+  }
+
+  try {
+    const resp = await api(url);
+    const page = Array.isArray(resp.tasks) ? resp.tasks : [];
+
+    if (dir === 'initial') {
+      archivedTasks = page;
+    } else if (page.length > 0) {
+      const seen = new Set(archivedTasks.map(function(t) { return t.id; }));
+      const additions = page.filter(function(t) { return !seen.has(t.id); });
+      if (dir === 'before') {
+        archivedTasks = archivedTasks.concat(additions);
+      } else {
+        archivedTasks = additions.concat(archivedTasks);
+      }
+      sortArchivedByUpdatedDesc(archivedTasks);
+      trimArchivedWindow(dir);
+    }
+
+    archivedHasMoreBefore = !!resp.has_more_before;
+    archivedHasMoreAfter = !!resp.has_more_after;
+    scheduleRender();
+  } catch (e) {
+    console.error('loadArchivedTasksPage:', e);
+  } finally {
+    if (dir === 'before') archivedLoadingBefore = false;
+    if (dir === 'after') archivedLoadingAfter = false;
+  }
+}
+
+function onDoneColumnScroll() {
+  if (!showArchived) return;
+  const col = document.getElementById('col-done');
+  if (!col) return;
+  const nearTop = col.scrollTop <= 80;
+  const nearBottom = col.scrollTop + col.clientHeight >= col.scrollHeight - 160;
+  if (nearBottom) {
+    loadArchivedTasksPage('before');
+    return;
+  }
+  if (nearTop) {
+    loadArchivedTasksPage('after');
+  }
+}
+
+function ensureArchivedScrollBinding() {
+  if (archivedScrollHandlerBound) return;
+  const col = document.getElementById('col-done');
+  if (!col) return;
+  col.addEventListener('scroll', onDoneColumnScroll);
+  archivedScrollHandlerBound = true;
+}
+
 function startTasksStream() {
   if (tasksSource) tasksSource.close();
+  ensureArchivedScrollBinding();
 
   // Build the stream URL. On reconnect, pass the last received event ID so
   // the server can replay only missed deltas instead of sending a full snapshot.
-  let url = showArchived
-    ? Routes.tasks.stream() + '?include_archived=true'
-    : Routes.tasks.stream();
+  let url = Routes.tasks.stream();
   if (lastTasksEventId !== null) {
     const sep = url.includes('?') ? '&' : '?';
     url += sep + 'last_event_id=' + encodeURIComponent(lastTasksEventId);
@@ -65,6 +171,11 @@ function startTasksStream() {
     if (e.lastEventId) lastTasksEventId = e.lastEventId;
     try {
       tasks = JSON.parse(e.data);
+      if (showArchived) {
+        loadArchivedTasksPage('initial');
+      } else {
+        resetArchivedWindow(false);
+      }
       scheduleRender();
       _handleInitialHash();
     } catch (err) {
@@ -80,15 +191,32 @@ function startTasksStream() {
     try {
       const task = JSON.parse(e.data);
       // If the task is archived and we're not showing archived tasks, treat as deleted.
-      if (task.archived && !showArchived) {
+      if (task.archived) {
         const idx = tasks.findIndex(t => t.id === task.id);
         if (idx >= 0) {
           tasks.splice(idx, 1);
+        }
+        const archivedIdx = archivedTasks.findIndex(t => t.id === task.id);
+        if (showArchived) {
+          if (archivedIdx >= 0) {
+            archivedTasks[archivedIdx] = task;
+          } else {
+            archivedTasks.unshift(task);
+            sortArchivedByUpdatedDesc(archivedTasks);
+            trimArchivedWindow('after');
+          }
+          scheduleRender();
+        } else if (archivedIdx >= 0) {
+          archivedTasks.splice(archivedIdx, 1);
+        }
+        if (!showArchived) {
           invalidateDiffBehindCounts(task.id);
           scheduleRender();
         }
         return;
       }
+      const archivedIdx = archivedTasks.findIndex(t => t.id === task.id);
+      if (archivedIdx >= 0) archivedTasks.splice(archivedIdx, 1);
       const idx = tasks.findIndex(t => t.id === task.id);
       if (idx >= 0) {
         tasks[idx] = task;
@@ -112,9 +240,11 @@ function startTasksStream() {
       const idx = tasks.findIndex(t => t.id === id);
       if (idx >= 0) {
         tasks.splice(idx, 1);
-        invalidateDiffBehindCounts(id);
-        scheduleRender();
       }
+      const archivedIdx = archivedTasks.findIndex(t => t.id === id);
+      if (archivedIdx >= 0) archivedTasks.splice(archivedIdx, 1);
+      invalidateDiffBehindCounts(id);
+      scheduleRender();
     } catch (err) {
       console.error('tasks SSE task-deleted parse error:', err);
     }
@@ -130,16 +260,25 @@ function startTasksStream() {
 }
 
 async function fetchTasks() {
-  const url = showArchived
-    ? Routes.tasks.list() + '?include_archived=true'
-    : Routes.tasks.list();
-  tasks = await api(url);
+  ensureArchivedScrollBinding();
+  tasks = await api(Routes.tasks.list());
+  tasks = tasks.filter(function(t) { return !t.archived; });
+  if (showArchived) {
+    await loadArchivedTasksPage('initial');
+  } else {
+    resetArchivedWindow(false);
+  }
   scheduleRender();
 }
 
 function toggleShowArchived() {
   showArchived = document.getElementById('show-archived-toggle').checked;
   localStorage.setItem('wallfacer-show-archived', showArchived ? 'true' : 'false');
+  if (showArchived) {
+    loadArchivedTasksPage('initial');
+  } else {
+    resetArchivedWindow(true);
+  }
   startTasksStream();
 }
 
