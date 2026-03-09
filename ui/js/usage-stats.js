@@ -3,6 +3,7 @@
 (function () {
   var modal, loadingEl, errorEl, emptyEl, contentEl;
   var summaryEl, byStatusTbody, bySubAgentTbody, periodSelect;
+  var setState;
 
   function init() {
     modal           = document.getElementById('usage-stats-modal');
@@ -15,33 +16,21 @@
     bySubAgentTbody = document.getElementById('usage-stats-by-sub-agent-tbody');
     periodSelect    = document.getElementById('usage-stats-period');
 
-    modal.addEventListener('click', function (e) {
-      if (e.target === modal) closeUsageStats();
-    });
+    bindModalBackdropClose(modal, closeUsageStats);
 
     periodSelect.addEventListener('change', fetchStats);
-  }
-
-  function setState(state, msg) {
-    loadingEl.style.display = state === 'loading' ? 'flex' : 'none';
-    errorEl.classList.toggle('hidden',   state !== 'error');
-    emptyEl.classList.toggle('hidden',   state !== 'empty');
-    contentEl.classList.toggle('hidden', state !== 'content');
-    if (state === 'error') errorEl.textContent = msg || 'Unknown error';
+    setState = createModalStateController({
+      loadingEl: loadingEl,
+      errorEl: errorEl,
+      emptyEl: emptyEl,
+      contentEl: contentEl,
+      contentState: 'content'
+    });
   }
 
   function fetchStats() {
-    setState('loading');
     var days = periodSelect ? periodSelect.value : '7';
-    fetch('/api/usage?days=' + encodeURIComponent(days))
-      .then(function (res) {
-        return res.json().then(function (data) { return { ok: res.ok, data: data }; });
-      })
-      .then(function (result) {
-        if (!result.ok) { setState('error', result.data.error || JSON.stringify(result.data)); return; }
-        renderStats(result.data);
-      })
-      .catch(function (err) { setState('error', String(err)); });
+    loadJsonEndpoint('/api/usage?days=' + encodeURIComponent(days), renderStats, setState);
   }
 
   // Status badge colours (mirrors existing badge-* CSS classes via inline style).
@@ -85,18 +74,14 @@
   }
 
   function usageRow(label, usage, isBold) {
-    var tr = document.createElement('tr');
-    tr.style.cssText = 'border-bottom: 1px solid var(--border); transition: background 0.1s;';
-    tr.addEventListener('mouseenter', function () { tr.style.background = 'var(--bg-raised)'; });
-    tr.addEventListener('mouseleave', function () { tr.style.background = ''; });
     var totalTokens = (usage.input_tokens || 0) + (usage.output_tokens || 0);
-    tr.innerHTML =
-      '<td style="padding:6px 10px;' + (isBold ? 'font-weight:600;' : '') + '">' + label + '</td>' +
-      '<td style="padding:6px 10px;text-align:right;color:var(--text-muted);">' + fmtTokens(usage.input_tokens) + '</td>' +
-      '<td style="padding:6px 10px;text-align:right;color:var(--text-muted);">' + fmtTokens(usage.output_tokens) + '</td>' +
-      '<td style="padding:6px 10px;text-align:right;color:var(--text-muted);">' + fmtTokens(totalTokens || 0) + '</td>' +
-      '<td style="padding:6px 10px;text-align:right;font-weight:600;color:var(--accent);">' + fmtCost(usage.cost_usd) + '</td>';
-    return tr;
+    return createHoverRow([
+      { text: label, style: 'padding:6px 10px;' + (isBold ? 'font-weight:600;' : '') },
+      { text: fmtTokens(usage.input_tokens), style: 'padding:6px 10px;text-align:right;color:var(--text-muted);' },
+      { text: fmtTokens(usage.output_tokens), style: 'padding:6px 10px;text-align:right;color:var(--text-muted);' },
+      { text: fmtTokens(totalTokens || 0), style: 'padding:6px 10px;text-align:right;color:var(--text-muted);' },
+      { text: fmtCost(usage.cost_usd), style: 'padding:6px 10px;text-align:right;font-weight:600;color:var(--accent);' }
+    ]);
   }
 
   function renderStats(data) {
@@ -123,9 +108,7 @@
     byStatusTbody.innerHTML = '';
     var statusKeys = Object.keys(byStatus).sort();
     if (statusKeys.length === 0) {
-      var emptyRow = document.createElement('tr');
-      emptyRow.innerHTML = '<td colspan="5" style="padding:12px 10px;text-align:center;color:var(--text-muted);font-size:12px;">No data</td>';
-      byStatusTbody.appendChild(emptyRow);
+      appendNoDataRow(byStatusTbody, 5, 'No data');
     } else {
       statusKeys.forEach(function (status) {
         byStatusTbody.appendChild(usageRow(statusBadge(status), byStatus[status], false));
@@ -137,9 +120,7 @@
     bySubAgentTbody.innerHTML = '';
     var agentKeys = Object.keys(bySubAgent).sort();
     if (agentKeys.length === 0) {
-      var emptyRow2 = document.createElement('tr');
-      emptyRow2.innerHTML = '<td colspan="5" style="padding:12px 10px;text-align:center;color:var(--text-muted);font-size:12px;">No data</td>';
-      bySubAgentTbody.appendChild(emptyRow2);
+      appendNoDataRow(bySubAgentTbody, 5, 'No data');
     } else {
       agentKeys.forEach(function (key) {
         bySubAgentTbody.appendChild(usageRow(agentLabel(key), bySubAgent[key], false));
@@ -151,14 +132,12 @@
   }
 
   window.showUsageStats = function () {
-    modal.classList.remove('hidden');
-    modal.style.display = 'flex';
+    openModalPanel(modal);
     fetchStats();
   };
 
   window.closeUsageStats = function () {
-    modal.classList.add('hidden');
-    modal.style.display = '';
+    closeModalPanel(modal);
   };
 
   document.addEventListener('DOMContentLoaded', init);

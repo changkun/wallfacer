@@ -2,6 +2,7 @@
 
 (function () {
   var modal, loadingEl, errorEl, emptyEl, contentEl, summaryEl, tbody;
+  var setState;
 
   // Human-readable metadata for known execution phases.
   var PHASE_INFO = {
@@ -62,30 +63,18 @@
     summaryEl = document.getElementById('span-stats-summary');
     tbody     = document.getElementById('span-stats-tbody');
 
-    modal.addEventListener('click', function (e) {
-      if (e.target === modal) closeSpanStats();
+    bindModalBackdropClose(modal, closeSpanStats);
+    setState = createModalStateController({
+      loadingEl: loadingEl,
+      errorEl: errorEl,
+      emptyEl: emptyEl,
+      contentEl: contentEl,
+      contentState: 'table'
     });
   }
 
-  function setState(state, msg) {
-    loadingEl.style.display = state === 'loading' ? 'flex' : 'none';
-    errorEl.classList.toggle('hidden',   state !== 'error');
-    emptyEl.classList.toggle('hidden',   state !== 'empty');
-    contentEl.classList.toggle('hidden', state !== 'table');
-    if (state === 'error') errorEl.textContent = msg || 'Unknown error';
-  }
-
   function fetchStats() {
-    setState('loading');
-    fetch('/api/debug/spans')
-      .then(function (res) {
-        return res.json().then(function (data) { return { ok: res.ok, data: data }; });
-      })
-      .then(function (result) {
-        if (!result.ok) { setState('error', result.data.error || JSON.stringify(result.data)); return; }
-        renderStats(result.data);
-      })
-      .catch(function (err) { setState('error', String(err)); });
+    loadJsonEndpoint('/api/debug/spans', renderStats, setState);
   }
 
   function renderStats(data) {
@@ -108,25 +97,17 @@
     tbody.innerHTML = '';
     keys.forEach(function (phase) {
       var s = phases[phase];
-      var tr = document.createElement('tr');
-      tr.style.cssText = 'border-bottom:1px solid var(--border);transition:background 0.1s;';
-      tr.addEventListener('mouseenter', function () { tr.style.background = 'var(--bg-raised)'; });
-      tr.addEventListener('mouseleave', function () { tr.style.background = ''; });
+      var tr = createHoverRow([
+        { html: '<div style="font-weight:500;font-size:12px;">' + escapeHtml(phaseLabel(phase)) + '</div>' +
+               '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + escapeHtml(phaseDesc(phase)) + '</div>' },
+        { text: s.count, style: 'padding:8px 10px;text-align:right;color:var(--text-muted);font-size:12px;' },
+        { text: fmtMs(s.min_ms), style: 'padding:8px 10px;text-align:right;color:var(--text-muted);font-size:12px;' },
+        { html: '<div style="font-weight:600;">' + fmtMs(s.p50_ms) + '</div>' + barHtml(s.p50_ms, globalMaxMs), style: 'padding:8px 10px;text-align:right;font-size:12px;' },
+        { text: fmtMs(s.p95_ms), style: 'padding:8px 10px;text-align:right;font-size:12px;font-weight:500;' + colorStyleForMs(s.p95_ms) },
+        { text: fmtMs(s.p99_ms), style: 'padding:8px 10px;text-align:right;font-size:12px;' + colorStyleForMs(s.p99_ms) },
+        { text: fmtMs(s.max_ms), style: 'padding:8px 10px;text-align:right;color:var(--text-muted);font-size:12px;' }
+      ]);
 
-      tr.innerHTML =
-        '<td style="padding:8px 10px;">' +
-          '<div style="font-weight:500;font-size:12px;">' + escapeHtml(phaseLabel(phase)) + '</div>' +
-          '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + escapeHtml(phaseDesc(phase)) + '</div>' +
-        '</td>' +
-        '<td style="padding:8px 10px;text-align:right;color:var(--text-muted);font-size:12px;">' + s.count + '</td>' +
-        '<td style="padding:8px 10px;text-align:right;color:var(--text-muted);font-size:12px;">' + fmtMs(s.min_ms) + '</td>' +
-        '<td style="padding:8px 10px;text-align:right;font-size:12px;">' +
-          '<div style="font-weight:600;">' + fmtMs(s.p50_ms) + '</div>' +
-          barHtml(s.p50_ms, globalMaxMs) +
-        '</td>' +
-        '<td style="padding:8px 10px;text-align:right;font-size:12px;font-weight:500;' + colorStyleForMs(s.p95_ms) + '">' + fmtMs(s.p95_ms) + '</td>' +
-        '<td style="padding:8px 10px;text-align:right;font-size:12px;' + colorStyleForMs(s.p99_ms) + '">' + fmtMs(s.p99_ms) + '</td>' +
-        '<td style="padding:8px 10px;text-align:right;color:var(--text-muted);font-size:12px;">' + fmtMs(s.max_ms) + '</td>';
       tbody.appendChild(tr);
     });
     setState('table');
@@ -139,14 +120,12 @@
   }
 
   window.showSpanStats = function () {
-    modal.classList.remove('hidden');
-    modal.style.display = 'flex';
+    openModalPanel(modal);
     fetchStats();
   };
 
   window.closeSpanStats = function () {
-    modal.classList.add('hidden');
-    modal.style.display = '';
+    closeModalPanel(modal);
   };
 
   document.addEventListener('DOMContentLoaded', init);

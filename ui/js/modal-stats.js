@@ -2,42 +2,27 @@
 
 (function () {
   var modal, loadingEl, errorEl, contentEl;
+  var setState;
 
   function init() {
     modal     = document.getElementById('stats-modal');
     loadingEl = document.getElementById('stats-loading');
     errorEl   = document.getElementById('stats-error');
     contentEl = document.getElementById('stats-content');
-
-    modal.addEventListener('click', function (e) {
-      if (e.target === modal) closeStatsModal();
+    bindModalBackdropClose(modal, closeStatsModal);
+    setState = createModalStateController({
+      loadingEl: loadingEl,
+      errorEl: errorEl,
+      contentEl: contentEl,
+      contentState: 'content'
     });
-  }
-
-  function setState(state, msg) {
-    loadingEl.style.display = state === 'loading' ? 'flex' : 'none';
-    errorEl.classList.toggle('hidden', state !== 'error');
-    contentEl.classList.toggle('hidden', state !== 'content');
-    if (state === 'error') errorEl.textContent = msg || 'Unknown error';
   }
 
   function fmt(n) { return (n || 0).toLocaleString(); }
   function fmtCost(c) { return '$' + (c || 0).toFixed(4); }
 
   function fetchAndRender() {
-    setState('loading');
-    fetch('/api/stats')
-      .then(function (res) {
-        return res.json().then(function (data) { return { ok: res.ok, data: data }; });
-      })
-      .then(function (result) {
-        if (!result.ok) {
-          setState('error', result.data.error || JSON.stringify(result.data));
-          return;
-        }
-        renderStats(result.data);
-      })
-      .catch(function (err) { setState('error', String(err)); });
+    loadJsonEndpoint('/api/stats', renderStats, setState);
   }
 
   function renderSummary(data) {
@@ -64,25 +49,7 @@
   }
 
   function appendRows(tbodyId, rows) {
-    var tbody = document.getElementById(tbodyId);
-    tbody.innerHTML = '';
-    rows.forEach(function (row) {
-      var tr = document.createElement('tr');
-      tr.style.cssText = 'border-bottom: 1px solid var(--border); transition: background 0.1s;';
-      tr.addEventListener('mouseenter', function () { tr.style.background = 'var(--bg-raised)'; });
-      tr.addEventListener('mouseleave', function () { tr.style.background = ''; });
-      row.forEach(function (cell) {
-        var td = document.createElement('td');
-        td.style.cssText = cell.style || 'padding:6px 10px;';
-        if (cell.html != null) {
-          td.innerHTML = cell.html;
-        } else {
-          td.textContent = cell.text != null ? cell.text : '';
-        }
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-    });
+    appendRowsToTbody(tbodyId, rows);
   }
 
   function renderByStatus(data) {
@@ -196,14 +163,12 @@
   }
 
   window.openStatsModal = function () {
-    modal.classList.remove('hidden');
-    modal.style.display = 'flex';
+    openModalPanel(modal);
     fetchAndRender();
   };
 
   window.closeStatsModal = function () {
-    modal.classList.add('hidden');
-    modal.style.display = '';
+    closeModalPanel(modal);
   };
 
   document.addEventListener('DOMContentLoaded', init);

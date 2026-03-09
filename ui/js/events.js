@@ -8,19 +8,15 @@ document.getElementById('modal').addEventListener('click', (e) => {
 // Close modal on Escape key
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    const alertModal = document.getElementById('alert-modal');
-    if (!alertModal.classList.contains('hidden')) { closeAlert(); return; }
-    const statsModal = document.getElementById('stats-modal');
-    if (statsModal && !statsModal.classList.contains('hidden') && typeof closeStatsModal === 'function') { closeStatsModal(); return; }
-    const usageStatsModal = document.getElementById('usage-stats-modal');
-    if (usageStatsModal && !usageStatsModal.classList.contains('hidden') && typeof closeUsageStats === 'function') { closeUsageStats(); return; }
-    const containerModal = document.getElementById('container-monitor-modal');
-    if (!containerModal.classList.contains('hidden')) { closeContainerMonitor(); return; }
-    const instructionsModal = document.getElementById('instructions-modal');
-    if (instructionsModal && !instructionsModal.classList.contains('hidden')) { closeInstructionsEditor(); return; }
-    const settingsModal = document.getElementById('settings-modal');
-    if (settingsModal && !settingsModal.classList.contains('hidden')) { closeSettings(); return; }
-    closeModal();
+    if (closeFirstVisibleModal([
+      { id: 'alert-modal', close: closeAlert },
+      { id: 'stats-modal', close: closeStatsModal },
+      { id: 'usage-stats-modal', close: closeUsageStats },
+      { id: 'container-monitor-modal', close: closeContainerMonitor },
+      { id: 'instructions-modal', close: closeInstructionsEditor },
+      { id: 'settings-modal', close: closeSettings },
+      { id: 'modal', close: closeModal },
+    ])) return;
   }
 });
 
