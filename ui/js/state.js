@@ -15,10 +15,13 @@ let testLogsMode = 'pretty';
 let showArchived = localStorage.getItem('wallfacer-show-archived') === 'true';
 let archivedTasks = [];
 let archivedTasksPageSize = 20;
-let archivedHasMoreBefore = false;
-let archivedHasMoreAfter = false;
-let archivedLoadingBefore = false;
-let archivedLoadingAfter = false;
+var archivedPage = {
+  // Invariant: at most one direction loads at a time.
+  // 'idle' | 'loading-before' | 'loading-after'
+  loadState: 'idle',
+  hasMoreBefore: false,
+  hasMoreAfter: false,
+};
 let archivedScrollHandlerBound = false;
 
 // Tasks SSE state

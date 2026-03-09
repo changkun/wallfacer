@@ -56,10 +56,7 @@ function sortArchivedByUpdatedDesc(items) {
 
 function resetArchivedWindow(shouldRender) {
   archivedTasks = [];
-  archivedHasMoreBefore = false;
-  archivedHasMoreAfter = false;
-  archivedLoadingBefore = false;
-  archivedLoadingAfter = false;
+  archivedPage = { loadState: 'idle', hasMoreBefore: false, hasMoreAfter: false };
   if (shouldRender) scheduleRender();
 }
 
@@ -70,24 +67,24 @@ function trimArchivedWindow(direction) {
   const overflow = archivedTasks.length - maxItems;
   if (direction === 'before') {
     archivedTasks = archivedTasks.slice(overflow);
-    archivedHasMoreAfter = true;
+    archivedPage.hasMoreAfter = true;
     return;
   }
   archivedTasks = archivedTasks.slice(0, maxItems);
-  archivedHasMoreBefore = true;
+  archivedPage.hasMoreBefore = true;
 }
 
 async function loadArchivedTasksPage(direction) {
   if (!showArchived) return;
   const dir = direction || 'initial';
   if (dir === 'before') {
-    if (!archivedHasMoreBefore || archivedLoadingBefore || archivedTasks.length === 0) return;
-    archivedLoadingBefore = true;
+    if (!archivedPage.hasMoreBefore || archivedPage.loadState !== 'idle' || archivedTasks.length === 0) return;
+    archivedPage.loadState = 'loading-before';
   } else if (dir === 'after') {
-    if (!archivedHasMoreAfter || archivedLoadingAfter || archivedTasks.length === 0) return;
-    archivedLoadingAfter = true;
-  } else if (archivedLoadingBefore || archivedLoadingAfter) {
-    return;
+    if (!archivedPage.hasMoreAfter || archivedPage.loadState !== 'idle' || archivedTasks.length === 0) return;
+    archivedPage.loadState = 'loading-after';
+  } else { // 'initial'
+    if (archivedPage.loadState !== 'idle') return;
   }
 
   const pageSize = Math.max(1, archivedTasksPageSize || 20);
@@ -117,14 +114,13 @@ async function loadArchivedTasksPage(direction) {
       trimArchivedWindow(dir);
     }
 
-    archivedHasMoreBefore = !!resp.has_more_before;
-    archivedHasMoreAfter = !!resp.has_more_after;
+    archivedPage.hasMoreBefore = !!resp.has_more_before;
+    archivedPage.hasMoreAfter  = !!resp.has_more_after;
     scheduleRender();
   } catch (e) {
     console.error('loadArchivedTasksPage:', e);
   } finally {
-    if (dir === 'before') archivedLoadingBefore = false;
-    if (dir === 'after') archivedLoadingAfter = false;
+    archivedPage.loadState = 'idle';
   }
 }
 
