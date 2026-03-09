@@ -181,6 +181,14 @@ function _buildTimelineHtml(spans) {
   });
   var totalMs = Math.max(tEnd - t0, 1000);
 
+  // Build time map for gap compression
+  var tmSpans = spans.map(function(s) {
+    var ts = new Date(s.started_at).getTime();
+    var te = _spanIsOpen(s) ? now : new Date(s.ended_at).getTime();
+    return { startMs: ts, endMs: te };
+  });
+  var timeMap = buildTimeMap(tmSpans, t0, tEnd);
+
   // Pick a tick interval that keeps at most ~8 ticks so labels don't overlap.
   var niceIntervals = [1000, 2000, 5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000, 1800000, 3600000];
   var TICK_MS = niceIntervals[niceIntervals.length - 1];
@@ -196,18 +204,46 @@ function _buildTimelineHtml(spans) {
     return s === 0 ? m + 'm' : m + 'm' + s + 's';
   }
 
-  function pct(ms) { return Math.min((ms / totalMs) * 100, 100); }
-
   // X-axis tick marks and grid lines
   var ticksHtml = '';
-  for (var tickMs = 0; tickMs <= totalMs + TICK_MS / 2; tickMs += TICK_MS) {
-    var x = pct(tickMs);
-    var lbl = fmtTickLabel(tickMs);
-    ticksHtml +=
-      '<div style="position:absolute;left:' + x + '%;transform:translateX(-50%);bottom:2px;' +
-        'font-size:10px;color:var(--text-muted);white-space:nowrap;user-select:none;">' + lbl + '</div>' +
-      '<div style="position:absolute;left:' + x + '%;top:0;bottom:0;' +
-        'border-left:1px dashed var(--border);opacity:.45;pointer-events:none;"></div>';
+  if (timeMap.compressed) {
+    // Compressed mode: place ticks at visual positions, label with real time
+    var tickFracs = [0, 0.25, 0.5, 0.75, 1];
+    tickFracs.forEach(function(f) {
+      var x = (f * 100);
+      var realMs = timeMap.fromPercent(f * 100) - t0;
+      var lbl = fmtTickLabel(Math.round(realMs));
+      ticksHtml +=
+        '<div style="position:absolute;left:' + x.toFixed(2) + '%;transform:translateX(-50%);bottom:2px;' +
+          'font-size:10px;color:var(--text-muted);white-space:nowrap;user-select:none;">' + lbl + '</div>' +
+        '<div style="position:absolute;left:' + x.toFixed(2) + '%;top:0;bottom:0;' +
+          'border-left:1px dashed var(--border);opacity:.45;pointer-events:none;"></div>';
+    });
+    // Add hatched break indicators for compressed gaps
+    timeMap.segments.forEach(function(seg) {
+      if (!seg.compressed) return;
+      var gapLeft = timeMap.toPercent(seg.start);
+      var gapRight = timeMap.toPercent(seg.end);
+      var gapWidth = gapRight - gapLeft;
+      if (gapWidth < 0.1) return;
+      var gapDur = _fmtMs(seg.end - seg.start);
+      ticksHtml +=
+        '<div title="Idle: ' + escapeHtml(gapDur) + '" style="' +
+          'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
+          'top:0;bottom:0;' +
+          'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border) 3px,var(--border) 4px);' +
+          'opacity:0.3;pointer-events:none;"></div>';
+    });
+  } else {
+    for (var tickMs = 0; tickMs <= totalMs + TICK_MS / 2; tickMs += TICK_MS) {
+      var x = Math.min((tickMs / totalMs) * 100, 100);
+      var lbl = fmtTickLabel(tickMs);
+      ticksHtml +=
+        '<div style="position:absolute;left:' + x + '%;transform:translateX(-50%);bottom:2px;' +
+          'font-size:10px;color:var(--text-muted);white-space:nowrap;user-select:none;">' + lbl + '</div>' +
+        '<div style="position:absolute;left:' + x + '%;top:0;bottom:0;' +
+          'border-left:1px dashed var(--border);opacity:.45;pointer-events:none;"></div>';
+    }
   }
 
   // Span rows
@@ -218,8 +254,10 @@ function _buildTimelineHtml(spans) {
     var te   = open ? now : new Date(span.ended_at).getTime();
     var dur  = te - ts;
 
-    var left  = pct(ts - t0);
-    var width = Math.max(pct(dur), 0.5);
+    var leftPct  = timeMap.toPercent(ts);
+    var rightPct = timeMap.toPercent(te);
+    var left  = leftPct;
+    var width = Math.max(rightPct - leftPct, 0.5);
     var color = _phaseColor(span.phase);
     var durStr   = _fmtMs(dur);
     var relStart = '+' + _fmtMs(ts - t0);
