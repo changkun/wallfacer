@@ -811,8 +811,12 @@ func fillMissingPhaseTimestamps(phases []store.OversightPhase, activities []turn
 // Claude is asked to produce raw JSON but may occasionally wrap it in markdown;
 // we strip fences and try multiple JSON extraction strategies.
 func parseOversightResult(result string) ([]store.OversightPhase, error) {
-	// Strip markdown code fences if present.
 	result = strings.TrimSpace(result)
+	if result == "" {
+		return []store.OversightPhase{}, nil
+	}
+
+	// Strip markdown code fences if present.
 	if idx := strings.Index(result, "```"); idx != -1 {
 		// Find the content between the first ``` and last ```.
 		start := strings.Index(result, "\n")

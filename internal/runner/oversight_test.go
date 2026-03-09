@@ -524,11 +524,22 @@ func TestParseOversightResultEmptyPhases(t *testing.T) {
 	}
 }
 
+func TestParseOversightResultEmptyText(t *testing.T) {
+	phases, err := parseOversightResult("   ")
+	if err != nil {
+		t.Fatalf("unexpected error for whitespace result: %v", err)
+	}
+	if len(phases) != 0 {
+		t.Fatalf("expected 0 phases for empty output, got %d", len(phases))
+	}
+}
+
 // ---------------------------------------------------------------------------
 // GenerateOversight — integration (uses fake container)
 // ---------------------------------------------------------------------------
 
 const oversightOutput = `{"result":"{\"phases\":[{\"timestamp\":\"2024-01-15T10:00:00Z\",\"title\":\"Explored codebase\",\"summary\":\"Read key files\",\"tools_used\":[\"Read\"],\"actions\":[\"Read main.go\"]}]}","session_id":"s1","stop_reason":"end_turn","is_error":false}`
+const oversightOutputEmptyResult = `{"result":"","session_id":"s1","stop_reason":"end_turn","is_error":false}`
 
 // TestGenerateOversightSuccess verifies that GenerateOversight saves a ready
 // oversight when the container succeeds and produces valid structured JSON.
@@ -602,6 +613,44 @@ func TestGenerateOversightContainerError(t *testing.T) {
 	}
 	if oversight.Error == "" {
 		t.Fatal("expected non-empty error message")
+	}
+}
+
+// TestGenerateOversightEmptyResult verifies that a successful container run with
+// an empty structured result is treated as an empty summary instead of failure.
+func TestGenerateOversightEmptyResult(t *testing.T) {
+	cmd := fakeCmdScript(t, oversightOutputEmptyResult, 0)
+	s, r := setupRunnerWithCmd(t, nil, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Task with empty oversight result", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outputsDir := s.OutputsDir(task.ID)
+	if err := os.MkdirAll(outputsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	turnData := `{"type":"assistant","message":{"content":[{"type":"text","text":"working on task"}]}}`
+	if err := os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(turnData), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	r.GenerateOversight(task.ID)
+
+	oversight, err := s.GetOversight(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error reading oversight: %v", err)
+	}
+	if oversight.Status != store.OversightStatusReady {
+		t.Fatalf("expected status=ready, got %q", oversight.Status)
+	}
+	if len(oversight.Phases) != 0 {
+		t.Fatalf("expected 0 phases for empty result, got %d", len(oversight.Phases))
+	}
+	if oversight.Error != "" {
+		t.Fatalf("expected empty error field, got %q", oversight.Error)
 	}
 }
 
