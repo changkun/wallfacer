@@ -250,4 +250,33 @@ describe('modal open race safety', () => {
     expect(elements['modal-diff-files'].innerHTML).toContain('diff-from-task-2');
     expect(elements['modal-diff-files'].innerHTML).not.toContain('diff-from-task-1');
   });
+
+  it('opens modal for tasks present only in archived window', async () => {
+    const { ctx, elements } = makeRaceContext();
+    vm.runInContext(
+      `tasks = []; archivedTasks = [{
+        id: 'archived-1',
+        status: 'done',
+        prompt: 'archived prompt',
+        created_at: '${new Date().toISOString()}',
+        title: 'Archived',
+        tags: [],
+        usage: null,
+        usage_breakdown: null,
+        worktree_paths: { repo: '/tmp/repo' },
+        prompt_history: [],
+        session_id: null,
+        turns: 1,
+        is_test_run: false,
+        last_test_result: null,
+        test_run_start_turn: 0,
+        archived: true,
+        result: null
+      }];`,
+      ctx,
+    );
+
+    await vm.runInContext("openModal('archived-1')", ctx);
+    expect(elements['modal-id'].textContent).toBe('ID: archived-1');
+  });
 });
