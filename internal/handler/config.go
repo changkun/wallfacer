@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -186,8 +185,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Ideation         *bool `json:"ideation"`
 		IdeationInterval *int  `json:"ideation_interval"` // minutes; 0 = run immediately on completion
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.Autopilot != nil {

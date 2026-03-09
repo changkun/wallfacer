@@ -90,8 +90,7 @@ func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Workspace string `json:"workspace"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -116,8 +115,7 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Workspace string `json:"workspace"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -154,8 +152,7 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Workspace string `json:"workspace"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -387,8 +384,7 @@ func (h *Handler) GitCheckout(w http.ResponseWriter, r *http.Request) {
 		Workspace string `json:"workspace"`
 		Branch    string `json:"branch"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -431,8 +427,7 @@ func (h *Handler) GitCreateBranch(w http.ResponseWriter, r *http.Request) {
 		Workspace string `json:"workspace"`
 		Branch    string `json:"branch"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 

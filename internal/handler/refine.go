@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -34,7 +33,7 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 	var req StartRefinementRequest
 	if r.ContentLength > 0 {
 		// Body is optional; ignore decode errors (empty or malformed body → no instructions).
-		json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+		decodeOptionalJSONBody(r, &req)
 	}
 
 	job := &store.RefinementJob{
@@ -148,8 +147,7 @@ func (h *Handler) RefineApply(w http.ResponseWriter, r *http.Request, id uuid.UU
 	}
 
 	var req RefineApplyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if strings.TrimSpace(req.Prompt) == "" {

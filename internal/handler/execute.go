@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"os/exec"
 	"path/filepath"
@@ -18,8 +17,7 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	var req struct {
 		Message string `json:"message"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if strings.TrimSpace(req.Message) == "" {
@@ -170,7 +168,7 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Timeout *int `json:"timeout"`
 	}
 	// Body is optional — ignore parse errors for backward compatibility.
-	json.NewDecoder(r.Body).Decode(&req)
+	decodeOptionalJSONBody(r, &req)
 
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
@@ -262,7 +260,7 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		Criteria string `json:"criteria"`
 	}
 	// Body is optional — ignore decode errors.
-	json.NewDecoder(r.Body).Decode(&req)
+	decodeOptionalJSONBody(r, &req)
 
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {

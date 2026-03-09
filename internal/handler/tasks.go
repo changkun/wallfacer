@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -64,8 +63,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		SandboxByActivity map[string]string `json:"sandbox_by_activity"`
 		Kind           store.TaskKind   `json:"kind"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if strings.TrimSpace(req.Prompt) == "" && req.Kind != store.TaskKindIdeaAgent {
@@ -127,8 +125,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		SandboxByActivity *map[string]string `json:"sandbox_by_activity"`
 		DependsOn      *[]string         `json:"depends_on"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 

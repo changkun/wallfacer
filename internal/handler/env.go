@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -183,8 +182,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 // This is used by the settings modal "Test" button for each sandbox block.
 func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	var req sandboxTestRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
@@ -438,8 +436,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		AutoPushEnabled   *bool             `json:"auto_push_enabled"`
 		AutoPushThreshold *int              `json:"auto_push_threshold"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 

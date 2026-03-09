@@ -187,6 +187,21 @@ func (h *Handler) cancelIdeationTimerLocked() {
 	}
 }
 
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, v any) bool {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
+func decodeOptionalJSONBody(r *http.Request, v any) {
+	if r == nil || r.Body == nil {
+		return
+	}
+	_ = json.NewDecoder(r.Body).Decode(v) //nolint:errcheck
+}
+
 // writeJSON serialises v as JSON and writes it with the given HTTP status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
