@@ -2130,3 +2130,221 @@ func TestTryAutoPromote_ConcurrentPhase1DoesNotBlock(t *testing.T) {
 		t.Errorf("expected exactly 1 task in_progress after concurrent promotion, got %d", inProgress)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// BatchCreateTasks tests
+// ---------------------------------------------------------------------------
+
+// batchBody is a helper that marshals v to JSON and returns the body bytes.
+func batchBody(t *testing.T, v any) *strings.Reader {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return strings.NewReader(string(b))
+}
+
+// TestBatchCreateTasks_HappyPath creates 3 tasks A→B→C (chain) and verifies
+// correct dependency wiring and ref_to_id mapping.
+func TestBatchCreateTasks_HappyPath(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := batchBody(t, map[string]any{
+		"tasks": []map[string]any{
+			{"ref": "a", "prompt": "task A", "timeout": 10},
+			{"ref": "b", "prompt": "task B", "timeout": 10, "depends_on_refs": []string{"a"}},
+			{"ref": "c", "prompt": "task C", "timeout": 10, "depends_on_refs": []string{"b"}},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Tasks    []store.Task      `json:"tasks"`
+		RefToID  map[string]string `json:"ref_to_id"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if len(resp.Tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(resp.Tasks))
+	}
+	if len(resp.RefToID) != 3 {
+		t.Fatalf("expected 3 entries in ref_to_id, got %d", len(resp.RefToID))
+	}
+
+	idA := resp.RefToID["a"]
+	idB := resp.RefToID["b"]
+	idC := resp.RefToID["c"]
+
+	if idA == "" || idB == "" || idC == "" {
+		t.Fatalf("missing ref_to_id entries: %v", resp.RefToID)
+	}
+
+	// Tasks should be returned in input order.
+	if resp.Tasks[0].ID.String() != idA {
+		t.Errorf("tasks[0] should be A, got %s", resp.Tasks[0].ID)
+	}
+	if resp.Tasks[1].ID.String() != idB {
+		t.Errorf("tasks[1] should be B, got %s", resp.Tasks[1].ID)
+	}
+	if resp.Tasks[2].ID.String() != idC {
+		t.Errorf("tasks[2] should be C, got %s", resp.Tasks[2].ID)
+	}
+
+	ctx := context.Background()
+
+	// Verify task B depends on A.
+	taskB, err := h.store.GetTask(ctx, uuid.MustParse(idB))
+	if err != nil {
+		t.Fatalf("get B: %v", err)
+	}
+	if len(taskB.DependsOn) != 1 || taskB.DependsOn[0] != idA {
+		t.Errorf("task B DependsOn = %v, want [%s]", taskB.DependsOn, idA)
+	}
+
+	// Verify task C depends on B.
+	taskC, err := h.store.GetTask(ctx, uuid.MustParse(idC))
+	if err != nil {
+		t.Fatalf("get C: %v", err)
+	}
+	if len(taskC.DependsOn) != 1 || taskC.DependsOn[0] != idB {
+		t.Errorf("task C DependsOn = %v, want [%s]", taskC.DependsOn, idB)
+	}
+}
+
+// TestBatchCreateTasks_CycleDetection verifies 422 when A depends on B and B depends on A.
+func TestBatchCreateTasks_CycleDetection(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := batchBody(t, map[string]any{
+		"tasks": []map[string]any{
+			{"ref": "a", "prompt": "task A", "depends_on_refs": []string{"b"}},
+			{"ref": "b", "prompt": "task B", "depends_on_refs": []string{"a"}},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp["error"] != "cycle detected" {
+		t.Errorf("expected 'cycle detected' error, got %v", resp["error"])
+	}
+}
+
+// TestBatchCreateTasks_DuplicateRef verifies 400 when two tasks share the same ref.
+func TestBatchCreateTasks_DuplicateRef(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := batchBody(t, map[string]any{
+		"tasks": []map[string]any{
+			{"ref": "foo", "prompt": "task 1"},
+			{"ref": "foo", "prompt": "task 2"},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBatchCreateTasks_UnknownRef verifies 400 when depends_on_refs contains
+// a ref that is neither a known batch ref nor a valid UUID.
+func TestBatchCreateTasks_UnknownRef(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := batchBody(t, map[string]any{
+		"tasks": []map[string]any{
+			{"ref": "a", "prompt": "task A", "depends_on_refs": []string{"nonexistent"}},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestBatchCreateTasks_CrossBatchDep verifies that a valid existing task UUID
+// in depends_on_refs is wired correctly into the created task's DependsOn.
+func TestBatchCreateTasks_CrossBatchDep(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	// Pre-create an existing task to be referenced by UUID.
+	existing, err := h.store.CreateTask(ctx, "existing task", 10, false, "", "")
+	if err != nil {
+		t.Fatalf("create existing: %v", err)
+	}
+
+	body := batchBody(t, map[string]any{
+		"tasks": []map[string]any{
+			{
+				"ref":             "new",
+				"prompt":          "new task",
+				"depends_on_refs": []string{existing.ID.String()},
+			},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Tasks   []store.Task      `json:"tasks"`
+		RefToID map[string]string `json:"ref_to_id"`
+	}
+	json.NewDecoder(w.Body).Decode(&resp)
+
+	newID := resp.RefToID["new"]
+	newTask, err := h.store.GetTask(ctx, uuid.MustParse(newID))
+	if err != nil {
+		t.Fatalf("get new task: %v", err)
+	}
+
+	if len(newTask.DependsOn) != 1 || newTask.DependsOn[0] != existing.ID.String() {
+		t.Errorf("DependsOn = %v, want [%s]", newTask.DependsOn, existing.ID)
+	}
+}
+
+// TestBatchCreateTasks_EmptyBatch verifies 400 for an empty tasks array.
+func TestBatchCreateTasks_EmptyBatch(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := batchBody(t, map[string]any{"tasks": []any{}})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", body)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}

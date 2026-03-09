@@ -303,6 +303,15 @@
     },
     {
       "method": "POST",
+      "pattern": "/api/tasks/batch",
+      "name": "BatchCreateTasks",
+      "description": "Create multiple tasks atomically with symbolic dependency wiring.",
+      "tags": [
+        "tasks"
+      ]
+    },
+    {
+      "method": "POST",
       "pattern": "/api/tasks/generate-titles",
       "name": "GenerateMissingTitles",
       "description": "Bulk-generate titles for tasks that lack one.",

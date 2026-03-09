@@ -391,6 +391,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"ListTasks":                h.ListTasks,
 		"StreamTasks":              h.StreamTasks,
 		"CreateTask":               h.CreateTask,
+		"BatchCreateTasks":         h.BatchCreateTasks,
 		"GenerateMissingTitles":    h.GenerateMissingTitles,
 		"GenerateMissingOversight": h.GenerateMissingOversight,
 		"SearchTasks":              h.SearchTasks,

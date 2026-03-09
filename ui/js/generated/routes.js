@@ -116,6 +116,8 @@ var Routes = {
     stream: function() { return "/api/tasks/stream"; },
     // POST /api/tasks
     create: function() { return "/api/tasks"; },
+    // POST /api/tasks/batch
+    batchCreate: function() { return "/api/tasks/batch"; },
     // POST /api/tasks/generate-titles
     generateTitles: function() { return "/api/tasks/generate-titles"; },
     // POST /api/tasks/generate-oversight
