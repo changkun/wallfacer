@@ -31,9 +31,9 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 	}
 
 	var req StartRefinementRequest
-	if r.ContentLength > 0 {
-		// Body is optional; ignore decode errors (empty or malformed body → no instructions).
-		decodeOptionalJSONBody(r, &req)
+	// Body is optional — empty body is accepted; present body is decoded strictly.
+	if !decodeOptionalJSONBody(w, r, &req) {
+		return
 	}
 
 	job := &store.RefinementJob{

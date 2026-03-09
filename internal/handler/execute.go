@@ -189,8 +189,10 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	var req struct {
 		Timeout *int `json:"timeout"`
 	}
-	// Body is optional — ignore parse errors for backward compatibility.
-	decodeOptionalJSONBody(r, &req)
+	// Body is optional — empty body is accepted; present body is decoded strictly.
+	if !decodeOptionalJSONBody(w, r, &req) {
+		return
+	}
 
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
@@ -300,8 +302,10 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	var req struct {
 		Criteria string `json:"criteria"`
 	}
-	// Body is optional — ignore decode errors.
-	decodeOptionalJSONBody(r, &req)
+	// Body is optional — empty body is accepted; present body is decoded strictly.
+	if !decodeOptionalJSONBody(w, r, &req) {
+		return
+	}
 
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
