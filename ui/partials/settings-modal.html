@@ -16,19 +16,27 @@
           <button id="settings-tab-about" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="about">About</button>
         </div>
 
-        <div class="settings-tab-content-wrap">
+      <div class="settings-tab-content-wrap">
       <div class="settings-tab-content active" data-settings-tab="appearance">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Theme</div>
-        <div class="theme-switch" id="theme-switch">
-          <button data-mode="light" onclick="setTheme('light')">Light</button>
-          <button data-mode="dark" onclick="setTheme('dark')">Dark</button>
-          <button data-mode="auto" onclick="setTheme('auto')">Auto</button>
+        <div class="settings-card">
+          <div class="settings-card-head">
+            <h4>Theme</h4>
+            <p>Choose the interface color mode for the current session.</p>
+          </div>
+          <div class="theme-switch settings-theme-switch" id="theme-switch" role="group" aria-label="Theme mode">
+            <button data-mode="light" onclick="setTheme('light')">Light</button>
+            <button data-mode="dark" onclick="setTheme('dark')">Dark</button>
+            <button data-mode="auto" onclick="setTheme('auto')">Auto</button>
+          </div>
         </div>
 
-        <div class="settings-section">
-          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Done Column</div>
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-secondary);">
-            <input type="checkbox" id="show-archived-toggle" onchange="toggleShowArchived()" style="cursor: pointer; accent-color: var(--accent);">
+        <div class="settings-card">
+          <div class="settings-card-head">
+            <h4>Done Column</h4>
+            <p>Toggle visibility of archived completed tasks on the board.</p>
+          </div>
+          <label class="settings-toggle">
+            <input type="checkbox" id="show-archived-toggle" onchange="toggleShowArchived()">
             Show archived tasks
           </label>
         </div>
