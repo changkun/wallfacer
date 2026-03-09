@@ -67,6 +67,10 @@ function isTestCard(task) {
   return task.status === 'waiting' && !!task.last_test_result && task.test_run_start_turn > 0;
 }
 
+function hasExecutionTrail(t) {
+  return (t.turns || 0) > 0 || !!t.result || !!t.stop_reason;
+}
+
 // Invalidate cached behind-counts so that the next render re-checks how many
 // commits a waiting card is behind.  When taskId is provided only that entry is
 // invalidated; otherwise every entry is reset (used on full snapshots).
@@ -378,7 +382,7 @@ function updateCard(card, t, rank) {
   }
   const showSpinner = t.status === 'in_progress' || t.status === 'committing';
   const showDiff = (t.status === 'waiting' || t.status === 'failed' || t.status === 'done') && t.worktree_paths && Object.keys(t.worktree_paths).length > 0;
-  const showOversight = (t.status === 'done' || t.status === 'failed') && !isArchived;
+  const showOversight = (t.status === 'done' || t.status === 'failed') && !isArchived && hasExecutionTrail(t);
   const ocCached = cardOversightCache.get(t.id);
   const ocSummary = ocCached ? `${ocCached.phase_count} phases` : 'Generating\u2026';
   card.style.opacity = isArchived ? '0.55' : '';

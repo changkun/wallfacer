@@ -263,6 +263,12 @@ describe('card oversight accordion — HTML injection', () => {
     ctx.createCard(makeTask({ status: 'done', archived: true }));
     expect(cardEl.innerHTML).not.toContain('card-oversight');
   });
+
+  it('does NOT inject oversight accordion for zero-turn tasks', () => {
+    const { ctx, cardEl } = makeRenderContext();
+    ctx.createCard(makeTask({ status: 'done', turns: 0 }));
+    expect(cardEl.innerHTML).not.toContain('card-oversight');
+  });
 });
 
 // ---------------------------------------------------------------------------
