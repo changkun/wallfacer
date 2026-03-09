@@ -118,7 +118,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange, map[string]string{
-		"to": string(store.TaskStatusBacklog),
+		"to":      string(store.TaskStatusBacklog),
+		"trigger": store.TriggerUser,
 	})
 
 	if task.Kind != store.TaskKindIdeaAgent {
@@ -244,8 +245,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				return
 			}
 			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-				"from": string(oldStatus),
-				"to":   string(store.TaskStatusBacklog),
+				"from":    string(oldStatus),
+				"to":      string(store.TaskStatusBacklog),
+				"trigger": store.TriggerUser,
 			})
 			h.diffCache.invalidate(id)
 
@@ -284,8 +286,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				promoteMu.Unlock()
 
 				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-					"from": string(oldStatus),
-					"to":   string(newStatus),
+					"from":    string(oldStatus),
+					"to":      string(newStatus),
+					"trigger": store.TriggerUser,
 				})
 				h.diffCache.invalidate(id)
 
@@ -333,8 +336,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				}
 
 				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-					"from": string(oldStatus),
-					"to":   string(newStatus),
+					"from":    string(oldStatus),
+					"to":      string(newStatus),
+					"trigger": store.TriggerUser,
 				})
 				h.diffCache.invalidate(id)
 				promoteMu.Unlock()
@@ -358,8 +362,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			return
 		}
 		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-			"from": string(oldStatus),
-			"to":   string(newStatus),
+			"from":    string(oldStatus),
+			"to":      string(newStatus),
+			"trigger": store.TriggerUser,
 		})
 		h.diffCache.invalidate(id)
 
@@ -727,8 +732,9 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		return
 	}
 	h.store.InsertEvent(ctx, bestBacklog.ID, store.EventTypeStateChange, map[string]string{
-		"from": string(store.TaskStatusBacklog),
-		"to":   string(store.TaskStatusInProgress),
+		"from":    string(store.TaskStatusBacklog),
+		"to":      string(store.TaskStatusInProgress),
+		"trigger": store.TriggerAutoPromote,
 	})
 
 	sessionID := ""
@@ -820,8 +826,9 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		}
 		regularInProgress++
 		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-			"from": string(store.TaskStatusWaiting),
-			"to":   string(store.TaskStatusInProgress),
+			"from":    string(store.TaskStatusWaiting),
+			"to":      string(store.TaskStatusInProgress),
+			"trigger": store.TriggerSync,
 		})
 		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
 			"result": "Auto-syncing: worktree is behind the default branch.",
@@ -989,8 +996,9 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 			continue
 		}
 		h.store.InsertEvent(ctx, c.task.ID, store.EventTypeStateChange, map[string]string{
-			"from": string(store.TaskStatusWaiting),
-			"to":   string(store.TaskStatusInProgress),
+			"from":    string(store.TaskStatusWaiting),
+			"to":      string(store.TaskStatusInProgress),
+			"trigger": store.TriggerAutoTest,
 		})
 		h.store.InsertEvent(ctx, c.task.ID, store.EventTypeSystem, map[string]string{
 			"result": "Auto-test: triggering test verification agent.",
@@ -1096,8 +1104,9 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				continue
 			}
 			h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusWaiting),
-				"to":   string(store.TaskStatusCommitting),
+				"from":    string(store.TaskStatusWaiting),
+				"to":      string(store.TaskStatusCommitting),
+				"trigger": store.TriggerAutoSubmit,
 			})
 			sessionID := *t.SessionID
 			taskID := t.ID
@@ -1109,15 +1118,17 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						"error": "auto-submit: commit failed: " + err.Error(),
 					})
 					h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-						"from": string(store.TaskStatusCommitting),
-						"to":   string(store.TaskStatusFailed),
+						"from":    string(store.TaskStatusCommitting),
+						"to":      string(store.TaskStatusFailed),
+						"trigger": store.TriggerAutoSubmit,
 					})
 					return
 				}
 				h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
 				h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-					"from": string(store.TaskStatusCommitting),
-					"to":   string(store.TaskStatusDone),
+					"from":    string(store.TaskStatusCommitting),
+					"to":      string(store.TaskStatusDone),
+					"trigger": store.TriggerAutoSubmit,
 				})
 			}()
 		} else {
@@ -1127,8 +1138,9 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				continue
 			}
 			h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusWaiting),
-				"to":   string(store.TaskStatusDone),
+				"from":    string(store.TaskStatusWaiting),
+				"to":      string(store.TaskStatusDone),
+				"trigger": store.TriggerAutoSubmit,
 			})
 		}
 	}

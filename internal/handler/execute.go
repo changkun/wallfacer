@@ -60,8 +60,9 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		"message": req.Message,
 	})
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": string(store.TaskStatusWaiting),
-		"to":   string(store.TaskStatusInProgress),
+		"from":    string(store.TaskStatusWaiting),
+		"to":      string(store.TaskStatusInProgress),
+		"trigger": store.TriggerFeedback,
 	})
 
 	sessionID := ""
@@ -94,8 +95,9 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 			return
 		}
 		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-			"from": string(store.TaskStatusWaiting),
-			"to":   string(store.TaskStatusCommitting),
+			"from":    string(store.TaskStatusWaiting),
+			"to":      string(store.TaskStatusCommitting),
+			"trigger": store.TriggerUser,
 		})
 		sessionID := *task.SessionID
 		go func() {
@@ -106,15 +108,17 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 					"error": "commit failed: " + err.Error(),
 				})
 				h.store.InsertEvent(bgCtx, id, store.EventTypeStateChange, map[string]string{
-					"from": string(store.TaskStatusCommitting),
-					"to":   string(store.TaskStatusFailed),
+					"from":    string(store.TaskStatusCommitting),
+					"to":      string(store.TaskStatusFailed),
+					"trigger": store.TriggerUser,
 				})
 				return
 			}
 			h.store.UpdateTaskStatus(bgCtx, id, store.TaskStatusDone)
 			h.store.InsertEvent(bgCtx, id, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusCommitting),
-				"to":   string(store.TaskStatusDone),
+				"from":    string(store.TaskStatusCommitting),
+				"to":      string(store.TaskStatusDone),
+				"trigger": store.TriggerUser,
 			})
 		}()
 	} else {
@@ -124,8 +128,9 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 			return
 		}
 		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-			"from": string(store.TaskStatusWaiting),
-			"to":   string(store.TaskStatusDone),
+			"from":    string(store.TaskStatusWaiting),
+			"to":      string(store.TaskStatusDone),
+			"trigger": store.TriggerUser,
 		})
 	}
 
@@ -167,8 +172,9 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": string(oldStatus),
-		"to":   string(store.TaskStatusCancelled),
+		"from":    string(oldStatus),
+		"to":      string(store.TaskStatusCancelled),
+		"trigger": store.TriggerUser,
 	})
 
 	if len(task.WorktreePaths) > 0 {
@@ -221,8 +227,9 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	promoteMu.Unlock()
 
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": string(store.TaskStatusFailed),
-		"to":   string(store.TaskStatusInProgress),
+		"from":    string(store.TaskStatusFailed),
+		"to":      string(store.TaskStatusInProgress),
+		"trigger": store.TriggerUser,
 	})
 
 	h.runner.RunBackground(id, "continue", *task.SessionID, false)
@@ -239,7 +246,8 @@ func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, id := range archived {
 		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-			"to": "archived",
+			"to":      "archived",
+			"trigger": store.TriggerUser,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"archived": len(archived)})
@@ -261,7 +269,8 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		return
 	}
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"to": "archived",
+		"to":      "archived",
+		"trigger": store.TriggerUser,
 	})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "archived"})
 }
@@ -277,7 +286,8 @@ func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.
 		return
 	}
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"to": "unarchived",
+		"to":      "unarchived",
+		"trigger": store.TriggerUser,
 	})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unarchived"})
 }
@@ -328,8 +338,9 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": string(store.TaskStatusWaiting),
-		"to":   string(store.TaskStatusInProgress),
+		"from":    string(store.TaskStatusWaiting),
+		"to":      string(store.TaskStatusInProgress),
+		"trigger": store.TriggerUser,
 	})
 	h.store.InsertEvent(r.Context(), id, store.EventTypeSystem, map[string]string{
 		"result":      "Test verification started",
@@ -431,8 +442,9 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	}
 	promoteMu.Unlock()
 	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-		"from": string(oldStatus),
-		"to":   string(store.TaskStatusInProgress),
+		"from":    string(oldStatus),
+		"to":      string(store.TaskStatusInProgress),
+		"trigger": store.TriggerUser,
 	})
 
 	sessionID := ""

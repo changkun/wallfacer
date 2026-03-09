@@ -506,13 +506,27 @@ async function openModal(id) {
       feedback: 'ev-feedback',
       error: 'ev-error',
     };
+    const _triggerColors = {
+      user:         'background:#3b82f6;color:#fff',
+      auto_promote: 'background:#22c55e;color:#fff',
+      feedback:     'background:#a855f7;color:#fff',
+      auto_test:    'background:#14b8a6;color:#fff',
+      auto_submit:  'background:#10b981;color:#fff',
+      sync:         'background:#f97316;color:#fff',
+      recovery:     'background:#f59e0b;color:#fff',
+      system:       'background:#6b7280;color:#fff',
+    };
+    function _triggerBadge(trigger) {
+      const style = _triggerColors[trigger || ''];
+      return style ? `<span style="font-size:10px;padding:1px 5px;border-radius:3px;${style};margin-left:4px;">${trigger}</span>` : '';
+    }
     const container = document.getElementById('modal-events');
     container.innerHTML = events.map(e => {
       const time = new Date(e.created_at).toLocaleTimeString();
       let detail = '';
       const data = e.data || {};
       if (e.event_type === 'state_change') {
-        detail = `${data.from || '(new)'} → ${data.to}`;
+        detail = `${data.from || '(new)'} → ${data.to}${_triggerBadge(data.trigger || '')}`;
       } else if (e.event_type === 'feedback') {
         detail = `"${escapeHtml(data.message)}"`;
       } else if (e.event_type === 'output') {
@@ -547,7 +561,7 @@ async function openModal(id) {
               const time = new Date(e.created_at).toLocaleTimeString();
               let detail = '';
               const data = e.data || {};
-              if (e.event_type === 'state_change') detail = `${data.from || '(new)'} → ${data.to}`;
+              if (e.event_type === 'state_change') detail = `${data.from || '(new)'} → ${data.to}${_triggerBadge(data.trigger || '')}`;
               else if (e.event_type === 'feedback') detail = `"${escapeHtml(data.message)}"`;
               else if (e.event_type === 'output') detail = `stop_reason: ${data.stop_reason || '(none)'}`;
               else if (e.event_type === 'system') detail = escapeHtml(data.result || '');
