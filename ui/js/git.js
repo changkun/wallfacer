@@ -21,6 +21,29 @@ function startGitStream() {
   };
 }
 
+function remoteUrlToHttps(url) {
+  if (!url) return null;
+  url = url.trim();
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url.replace(/\.git$/, '');
+  }
+  // git@github.com:user/repo.git
+  const sshMatch = url.match(/^git@([^:]+):(.+?)(?:\.git)?$/);
+  if (sshMatch) return 'https://' + sshMatch[1] + '/' + sshMatch[2];
+  // ssh://git@github.com/user/repo.git
+  const sshProtoMatch = url.match(/^ssh:\/\/(?:[^@]+@)?([^/]+)\/(.+?)(?:\.git)?$/);
+  if (sshProtoMatch) return 'https://' + sshProtoMatch[1] + '/' + sshProtoMatch[2];
+  return null;
+}
+
+async function openWorkspaceFolder(path) {
+  try {
+    await api(Routes.git.openFolder(), { method: 'POST', body: JSON.stringify({ path: path }) });
+  } catch (e) {
+    showAlert('Failed to open folder: ' + e.message);
+  }
+}
+
 function renderWorkspaces() {
   const el = document.getElementById('workspace-list');
   if (!gitStatuses || gitStatuses.length === 0) return;
@@ -30,8 +53,13 @@ function renderWorkspaces() {
     document.title = 'Wallfacer \u2014 ' + names.join(', ');
   }
   el.innerHTML = gitStatuses.map((ws, i) => {
+    const httpsUrl = remoteUrlToHttps(ws.remote_url);
+    const nameEl = httpsUrl
+      ? `<a href="${escapeHtml(httpsUrl)}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;" title="Open ${escapeHtml(httpsUrl)}">${escapeHtml(ws.name)}</a>`
+      : `<button onclick="openWorkspaceFolder(${JSON.stringify(ws.path)})" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;font:inherit;" title="Open in file manager">${escapeHtml(ws.name)}</button>`;
+
     if (!ws.is_git_repo || !ws.has_remote) {
-      return `<span title="${escapeHtml(ws.path)}" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border);">${escapeHtml(ws.name)}</span>`;
+      return `<span title="${escapeHtml(ws.path)}" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border);">${nameEl}</span>`;
     }
     const branchBtn = ws.branch
       ? ` <button class="branch-switcher-btn" data-ws-idx="${i}" onclick="toggleBranchDropdown(this, event)" title="Switch branch">`
@@ -55,7 +83,7 @@ function renderWorkspaces() {
     const rebaseMainBtn = (ws.branch && ws.main_branch && ws.branch !== ws.main_branch)
       ? `<button data-ws-idx="${i}" onclick="rebaseOnMain(this)" style="background:#7c3aed;color:#fff;border:none;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:500;cursor:pointer;line-height:17px;" title="Fetch origin/${escapeHtml(ws.main_branch)} and rebase current branch on top">${ws.behind_main_count > 0 ? ws.behind_main_count + '↓ ' : ''}Rebase on ${escapeHtml(ws.main_branch)}</button>`
       : '';
-    return `<span title="${escapeHtml(ws.path)}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 6px 2px 8px;border-radius:4px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);position:relative;">${escapeHtml(ws.name)}${branchBtn}${behindBadge}${aheadBadge}${syncBtn}${pushBtn}${rebaseMainBtn}</span>`;
+    return `<span title="${escapeHtml(ws.path)}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 6px 2px 8px;border-radius:4px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);position:relative;">${nameEl}${branchBtn}${behindBadge}${aheadBadge}${syncBtn}${pushBtn}${rebaseMainBtn}</span>`;
   }).join('');
 }
 

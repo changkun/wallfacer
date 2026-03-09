@@ -45,6 +45,36 @@ func TestWorkspaceStatus(t *testing.T) {
 		if s.AheadCount != 0 || s.BehindCount != 0 {
 			t.Errorf("ahead=%d behind=%d, want 0 0", s.AheadCount, s.BehindCount)
 		}
+		if s.RemoteURL != origin {
+			t.Errorf("RemoteURL = %q, want %q", s.RemoteURL, origin)
+		}
+	})
+
+	t.Run("git repo with origin but no tracking branch has RemoteURL", func(t *testing.T) {
+		origin := t.TempDir()
+		gitRun(t, origin, "init", "--bare", "-b", "main")
+		repo := setupRepo(t)
+		gitRun(t, repo, "remote", "add", "origin", origin)
+		// Do not push — no tracking branch set up.
+
+		s := WorkspaceStatus(repo)
+		if !s.IsGitRepo {
+			t.Fatal("IsGitRepo = false, want true")
+		}
+		if s.HasRemote {
+			t.Error("HasRemote = true, want false (no tracking branch)")
+		}
+		if s.RemoteURL != origin {
+			t.Errorf("RemoteURL = %q, want %q", s.RemoteURL, origin)
+		}
+	})
+
+	t.Run("git repo without any remote has empty RemoteURL", func(t *testing.T) {
+		repo := setupRepo(t)
+		s := WorkspaceStatus(repo)
+		if s.RemoteURL != "" {
+			t.Errorf("RemoteURL = %q, want empty", s.RemoteURL)
+		}
 	})
 
 	t.Run("git repo ahead of remote", func(t *testing.T) {

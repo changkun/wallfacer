@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -462,6 +463,36 @@ func (h *Handler) GitCreateBranch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"branch": req.Branch})
+}
+
+// OpenFolder opens a workspace directory in the OS file manager (Finder on macOS, xdg-open on Linux).
+func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path string `json:"path"`
+	}
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+
+	if !h.isAllowedWorkspace(req.Path) {
+		http.Error(w, "workspace not configured", http.StatusBadRequest)
+		return
+	}
+
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.CommandContext(r.Context(), "open", req.Path)
+	default:
+		cmd = exec.CommandContext(r.Context(), "xdg-open", req.Path)
+	}
+
+	if err := cmd.Run(); err != nil {
+		http.Error(w, "failed to open folder: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // isAllowedWorkspace checks that the workspace path is one the server was started with.

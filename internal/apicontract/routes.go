@@ -217,6 +217,11 @@ var Routes = []Route{
 		Description: "Create and check out a new branch in a workspace.",
 		Tags:        []string{"git"},
 	},
+	{
+		Method: "POST", Pattern: "/api/git/open-folder", Name: "OpenFolder",
+		Description: "Open a workspace directory in the OS file manager.",
+		Tags:        []string{"git"},
+	},
 
 	// --- Usage & statistics ---
 

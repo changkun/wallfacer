@@ -13,6 +13,7 @@ type WorkspaceGitStatus struct {
 	Name             string `json:"name"`
 	IsGitRepo        bool   `json:"is_git_repo"`
 	Branch           string `json:"branch,omitempty"`
+	RemoteURL        string `json:"remote_url,omitempty"`
 	HasRemote        bool   `json:"has_remote"`
 	AheadCount       int    `json:"ahead_count"`
 	BehindCount      int    `json:"behind_count"`
@@ -34,6 +35,10 @@ func WorkspaceStatus(path string) WorkspaceGitStatus {
 
 	if out, err := exec.Command("git", "-C", path, "branch", "--show-current").Output(); err == nil {
 		s.Branch = strings.TrimSpace(string(out))
+	}
+
+	if out, err := exec.Command("git", "-C", path, "remote", "get-url", "origin").Output(); err == nil {
+		s.RemoteURL = strings.TrimSpace(string(out))
 	}
 
 	// Does it have a remote tracking branch?

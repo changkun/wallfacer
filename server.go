@@ -368,6 +368,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"GitBranches":      h.GitBranches,
 		"GitCheckout":      h.GitCheckout,
 		"GitCreateBranch":  h.GitCreateBranch,
+		"OpenFolder":       h.OpenFolder,
 
 		// Usage & statistics.
 		"GetUsageStats": h.GetUsageStats,

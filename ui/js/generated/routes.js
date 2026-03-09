@@ -90,6 +90,8 @@ var Routes = {
     checkout: function() { return "/api/git/checkout"; },
     // POST /api/git/create-branch
     createBranch: function() { return "/api/git/create-branch"; },
+    // POST /api/git/open-folder
+    openFolder: function() { return "/api/git/open-folder"; },
   },
 
   usage: {

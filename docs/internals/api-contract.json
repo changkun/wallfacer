@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 60,
+  "route_count": 61,
   "routes": [
     {
       "method": "GET",
@@ -242,6 +242,15 @@
       "pattern": "/api/git/create-branch",
       "name": "GitCreateBranch",
       "description": "Create and check out a new branch in a workspace.",
+      "tags": [
+        "git"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/git/open-folder",
+      "name": "OpenFolder",
+      "description": "Open a workspace directory in the OS file manager.",
       "tags": [
         "git"
       ]
