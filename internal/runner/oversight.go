@@ -756,8 +756,11 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil && runCtx.Err() == nil {
-		return nil, fmt.Errorf("container: %w (stderr: %s)", err, truncate(stderr.String(), 300))
+	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: agent})
+	runErr := cmd.Run()
+	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: agent})
+	if runErr != nil && runCtx.Err() == nil {
+		return nil, fmt.Errorf("container: %w (stderr: %s)", runErr, truncate(stderr.String(), 300))
 	}
 
 	raw := strings.TrimSpace(stdout.String())

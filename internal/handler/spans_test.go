@@ -268,6 +268,38 @@ func TestGetTaskSpans_UnpairedStartIgnored(t *testing.T) {
 	}
 }
 
+// TestComputeSpans_AllSandboxActivities verifies that container_run spans for
+// all SandboxActivity constants are correctly paired and returned.
+func TestComputeSpans_AllSandboxActivities(t *testing.T) {
+	t0 := time.Now()
+	activities := store.SandboxActivities
+	var events []store.TaskEvent
+	for i, act := range activities {
+		offset := time.Duration(i*10) * time.Millisecond
+		events = append(events,
+			makeSpanEvent(store.EventTypeSpanStart, "container_run", act, t0.Add(offset)),
+			makeSpanEvent(store.EventTypeSpanEnd, "container_run", act, t0.Add(offset+5*time.Millisecond)),
+		)
+	}
+	spans := computeSpans(events)
+	if len(spans) != len(activities) {
+		t.Fatalf("expected %d spans (one per activity), got %d", len(activities), len(spans))
+	}
+	// Verify each activity has a matching span.
+	found := make(map[string]bool)
+	for _, s := range spans {
+		if s.Phase != "container_run" {
+			t.Errorf("expected phase 'container_run', got %q", s.Phase)
+		}
+		found[s.Label] = true
+	}
+	for _, act := range activities {
+		if !found[act] {
+			t.Errorf("no span found for activity %q", act)
+		}
+	}
+}
+
 func TestGetTaskSpans_NonSpanEventsIgnored(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()

@@ -54,12 +54,13 @@
       var actMap = {
         'implementation':  'Container (Impl.)',
         'test':            'Container (Test)',
-        'commit_message':  'Container (Commit)',
+        'testing':         'Container (Test)',
+        'commit_message':  'Container (Commit Msg)',
         'oversight':       'Container (Oversight)',
         'oversight_test':  'Container (Oversight-Test)',
         'refinement':      'Container (Refine)',
         'title':           'Container (Title)',
-        'idea_agent':      'Container (Ideas)',
+        'idea_agent':      'Container (Idea Agent)',
         'container_run':   'Container', // legacy
       };
       return actMap[label] || ('Container (' + label + ')');
@@ -68,6 +69,24 @@
     if (phase === 'commit') return 'Commit & Push';
     if (phase === 'refinement') return 'Refinement';
     return label || phase;
+  }
+
+  // Derive a short activity name from a span's raw phase:label key.
+  // Used for the Activity column in the detail table.
+  function spanActivity(rawLabel) {
+    var idx = rawLabel.indexOf(':');
+    var phase = idx >= 0 ? rawLabel.slice(0, idx) : rawLabel;
+    var label = idx >= 0 ? rawLabel.slice(idx + 1) : '';
+    var m;
+    if (phase === 'agent_turn') {
+      if ((m = label.match(/^implementation_\d+$/))) return 'implementation';
+      if ((m = label.match(/^test_\d+$/))) return 'testing';
+      if ((m = label.match(/^agent_turn_\d+$/))) return 'implementation'; // legacy
+      return '';
+    }
+    if (phase === 'container_run') return label || '';
+    if (phase === 'refinement') return 'refinement';
+    return '';
   }
 
   // Convert OversightPhase[] into rendering-ready region objects.
@@ -154,35 +173,43 @@
     return null;
   }
 
-  // Build a cumulative cost SVG polyline from turn-usage records, aligned to agent_turn_N spans.
+  // Activity display names for the cost chart legend and detail table.
+  var ACTIVITY_LABELS = {
+    'implementation': 'Impl.',
+    'test':           'Test',
+    'testing':        'Test',
+    'refinement':     'Refine',
+    'title':          'Title',
+    'oversight':      'Oversight',
+    'oversight_test': 'Oversight-Test',
+    'commit_message': 'Commit Msg',
+    'idea_agent':     'Idea Agent',
+  };
+
+  // Build a cumulative cost SVG polyline from all turn-usage records,
+  // positioned by their recorded timestamp within [globalStartMs, globalEndMs].
   // Returns an HTML string (SVG element) or empty string if there is no data.
   function buildCostChart(turnUsages, spans, globalStartMs, total) {
-    // Only include implementation/test turns (not sub-agent overhead).
-    var implTurns = turnUsages.filter(function(u) {
-      return u.sub_agent === 'implementation' || u.sub_agent === 'test';
-    });
-    if (implTurns.length === 0) return '';
+    if (!turnUsages || turnUsages.length === 0) return '';
 
-    // Build turn number → span end X-position mapping from agent_turn spans.
-    // Supports both new-style labels (implementation_N, test_N) and legacy (agent_turn_N).
-    var turnXPct = {};
-    spans.forEach(function(span) {
-      var m = span.rawLabel.match(/^agent_turn:(?:implementation_|test_|agent_turn_)(\d+)$/);
-      if (m) {
-        var turnNum = parseInt(m[1], 10);
-        var xPct = total > 0 ? ((span.endMs - globalStartMs) / total * 100) : 0;
-        turnXPct[turnNum] = xPct;
-      }
+    // Sort by timestamp ascending.
+    var sorted = turnUsages.slice().sort(function(a, b) {
+      var ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      var tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return ta - tb;
     });
 
-    // Compute cumulative cost points (start at 0).
+    // Compute cumulative cost points anchored at their timestamp.
     var cumCost = 0;
-    var points = [{ xPct: 0, cost: 0 }];
-    implTurns.forEach(function(u) {
-      cumCost += (u.cost_usd || 0);
-      var xPct = turnXPct[u.turn];
-      if (xPct !== undefined) {
-        points.push({ xPct: xPct, cost: cumCost });
+    var points = [{ xPct: 0, cost: 0, activity: '' }];
+    sorted.forEach(function(u) {
+      var cost = u.cost_usd || 0;
+      if (cost <= 0) return;
+      cumCost += cost;
+      var ts = u.timestamp ? new Date(u.timestamp).getTime() : null;
+      var xPct = (ts !== null && total > 0) ? Math.min(100, Math.max(0, (ts - globalStartMs) / total * 100)) : null;
+      if (xPct !== null) {
+        points.push({ xPct: xPct, cost: cumCost, activity: u.sub_agent || '' });
       }
     });
     if (points.length < 2) return '';
@@ -205,11 +232,24 @@
     var lastX = lastPt.xPct.toFixed(3) + '%';
     var lastY = padding.toFixed(1);
 
+    // Build per-activity dot markers on the polyline.
+    var dotsHtml = '';
+    points.slice(1).forEach(function(p) {
+      var hue = labelHue(p.activity);
+      var cx = p.xPct.toFixed(3) + '%';
+      var cy = (padding + innerH * (1 - p.cost / maxCost)).toFixed(1);
+      var actLabel = ACTIVITY_LABELS[p.activity] || p.activity;
+      dotsHtml += '<circle cx="' + escapeHtml(cx) + '" cy="' + cy + '" r="3" ' +
+        'fill="hsl(' + hue + ',55%,55%)" ' +
+        'title="' + escapeHtml(actLabel + ': $' + p.cost.toFixed(4)) + '"/>';
+    });
+
     return '<div style="position:relative;width:100%;height:' + chartH + 'px;margin-top:4px;" ' +
-      'title="Cumulative cost across turns (impl/test only). Total: ' + escapeHtml(totalLabel) + '">' +
+      'title="Cumulative cost across all activities. Total: ' + escapeHtml(totalLabel) + '">' +
       '<svg width="100%" height="' + chartH + '" style="display:block;overflow:visible;">' +
       '<polyline points="' + escapeHtml(polyPoints) + '" ' +
       'fill="none" stroke="hsl(200,60%,55%)" stroke-width="1.5" stroke-linejoin="round"/>' +
+      dotsHtml +
       '<text x="' + escapeHtml(lastX) + '" y="' + lastY + '" ' +
       'font-size="9" fill="hsl(200,60%,65%)" text-anchor="end" dy="-2">' +
       escapeHtml(totalLabel) + '</text>' +
@@ -385,8 +425,18 @@
         var oversightCell = rowPhaseMatch
           ? '<td style="padding:3px 6px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(rowPhaseMatch.title) + '">' + escapeHtml(rowPhaseMatch.title) + '</td>'
           : '<td style="padding:3px 6px;color:var(--text-muted,#888);">&mdash;</td>';
+        var activity = spanActivity(span.rawLabel);
+        var activityDisplay = activity ? (ACTIVITY_LABELS[activity] || activity) : '';
+        var activityHue = activity ? labelHue(activity) : 0;
+        var activityCell = activityDisplay
+          ? '<td style="padding:3px 6px;white-space:nowrap;">' +
+            '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;' +
+            'background:hsl(' + activityHue + ',55%,52%);margin-right:4px;vertical-align:middle;"></span>' +
+            escapeHtml(activityDisplay) + '</td>'
+          : '<td style="padding:3px 6px;color:var(--text-muted,#888);">&mdash;</td>';
         return '<tr style="border-bottom:1px solid var(--border,#333);" title="' + escapeHtml(span.rawLabel) + '">' +
           '<td style="padding:3px 6px;white-space:nowrap;">' + swatch + escapeHtml(span.label) + '</td>' +
+          activityCell +
           oversightCell +
           '<td style="padding:3px 6px;text-align:right;white-space:nowrap;">' + startOffset + '</td>' +
           '<td style="padding:3px 6px;text-align:right;white-space:nowrap;">' + escapeHtml(formatMs(span.durationMs)) + '</td>' +
@@ -397,6 +447,7 @@
       var tableHtml = '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:12px;">' +
         '<thead><tr style="border-bottom:1px solid var(--border,#333);color:var(--text-muted,#888);">' +
         '<th style="padding:3px 6px;text-align:left;font-weight:500;">Span</th>' +
+        '<th style="padding:3px 6px;text-align:left;font-weight:500;">Activity</th>' +
         '<th style="padding:3px 6px;text-align:left;font-weight:500;">Oversight Phase</th>' +
         '<th style="padding:3px 6px;text-align:right;font-weight:500;">Start</th>' +
         '<th style="padding:3px 6px;text-align:right;font-weight:500;">Duration</th>' +
@@ -424,5 +475,5 @@
 
   window.loadFlamegraph = loadFlamegraph;
   // Expose internals for testing
-  window._flamegraph = { labelHue: labelHue, assignLanes: assignLanes, computePhaseRegions: computePhaseRegions, findPhaseForSpan: findPhaseForSpan, buildCostChart: buildCostChart };
+  window._flamegraph = { labelHue: labelHue, assignLanes: assignLanes, computePhaseRegions: computePhaseRegions, findPhaseForSpan: findPhaseForSpan, buildCostChart: buildCostChart, spanActivity: spanActivity, ACTIVITY_LABELS: ACTIVITY_LABELS };
 })();

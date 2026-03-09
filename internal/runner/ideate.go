@@ -230,7 +230,13 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 		cmd.Stderr = &stderr
 
 		logger.Runner.Debug("ideate exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
+		if taskID != uuid.Nil {
+			r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityIdeaAgent})
+		}
 		runErr := cmd.Run()
+		if taskID != uuid.Nil {
+			r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityIdeaAgent})
+		}
 
 		if ctx.Err() != nil {
 			exec.Command(r.command, "kill", containerName).Run()
@@ -392,13 +398,25 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 			"session_id":  sessionID,
 		})
 		r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, 1)
-		r.store.AccumulateSubAgentUsage(bgCtx, taskID, "ideation", store.TaskUsage{
+		r.store.AccumulateSubAgentUsage(bgCtx, taskID, store.SandboxActivityIdeaAgent, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 		})
+		if appErr := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+			Turn:                 1,
+			Timestamp:            time.Now().UTC(),
+			InputTokens:          output.Usage.InputTokens,
+			OutputTokens:         output.Usage.OutputTokens,
+			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
+			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
+			CostUSD:              output.TotalCostUSD,
+			SubAgent:             store.SandboxActivityIdeaAgent,
+		}); appErr != nil {
+			logger.Runner.Warn("ideation: append turn usage failed", "task", taskID, "error", appErr)
+		}
 	} else {
 		// No parsed output (e.g. container error before producing JSON); still
 		// increment Turns so the trace file is indexed if stdout was non-empty.
