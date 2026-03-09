@@ -185,7 +185,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// consumption, so we accumulate them directly without delta subtraction.
 
 	// Prepare board context (board.json manifest of all tasks).
-	boardDir, boardErr := r.prepareBoardContext(taskID, task.MountWorktrees)
+	boardDir, boardErr := r.prepareBoardContext(ctx, taskID, task.MountWorktrees)
 	if boardErr != nil {
 		logger.Runner.Warn("board context failed", "task", taskID, "error", boardErr)
 	}
@@ -198,7 +198,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Build sibling worktree mounts if opted in.
 	var siblingMounts map[string]map[string]string
 	if task.MountWorktrees {
-		siblingMounts = r.buildSiblingMounts(taskID)
+		siblingMounts = r.buildSiblingMounts(ctx, taskID)
 	}
 
 	for {
@@ -207,7 +207,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 		// Refresh board.json before each turn so it reflects latest state.
 		if boardDir != "" {
-			if data, err := r.generateBoardContext(taskID, task.MountWorktrees); err == nil {
+			bctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			if data, err := r.generateBoardContext(bctx, taskID, task.MountWorktrees); err == nil {
 				os.WriteFile(filepath.Join(boardDir, "board.json"), data, 0644)
 			}
 		}
