@@ -62,7 +62,8 @@ echo $((count+1)) > %s
 
 // setupRunnerWithCmd creates a Store and Runner for testing with a custom
 // container command. Useful when tests need to control container output.
-func setupRunnerWithCmd(t *testing.T, workspaces []string, cmd string) (*store.Store, *Runner) {
+// Accepts testing.TB so it can be used from both *testing.T and *testing.B.
+func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.Store, *Runner) {
 	t.Helper()
 	// Use /dev/shm (tmpfs) when available to avoid ENOTEMPTY from overlayfs in
 	// container sandboxes. Heavy create/rename activity on overlayfs can cause
@@ -90,10 +91,15 @@ func setupRunnerWithCmd(t *testing.T, workspaces []string, cmd string) (*store.S
 		Workspaces:   strings.Join(workspaces, " "),
 		WorktreesDir: worktreesDir,
 	})
-	// Wait for background goroutines (oversight generation) before temp dir
-	// cleanup runs. Registered last so it executes first in LIFO cleanup order,
-	// before any t.TempDir() cleanup removes the store's data directory.
+	// Cleanups are called in LIFO order. Register WaitBackground first so it
+	// runs second; register the subscription shutdown second so it runs first,
+	// ensuring the board-cache-invalidator goroutine has exited cleanly (and
+	// unsubscribed from the store) before the store is closed.
 	t.Cleanup(r.WaitBackground)
+	t.Cleanup(func() {
+		close(r.shutdownCh)
+		r.boardSubscriptionWg.Wait()
+	})
 	return s, r
 }
 

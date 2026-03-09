@@ -192,10 +192,18 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Each container invocation's values represent only that invocation's
 	// consumption, so we accumulate them directly without delta subtraction.
 
-	// Prepare board context (board.json manifest of all tasks).
-	boardDir, boardErr := r.prepareBoardContext(ctx, taskID, task.MountWorktrees)
+	// Prepare board context and sibling mounts in a single fused call.
+	var siblingMounts map[string]map[string]string
+	boardJSON, siblingMounts, boardErr := r.generateBoardContextAndMounts(taskID, task.MountWorktrees)
 	if boardErr != nil {
 		logger.Runner.Warn("board context failed", "task", taskID, "error", boardErr)
+	}
+	var boardDir string
+	if boardJSON != nil {
+		boardDir, boardErr = writeBoardDir(boardJSON)
+		if boardErr != nil {
+			logger.Runner.Warn("board context write failed", "task", taskID, "error", boardErr)
+		}
 	}
 	defer func() {
 		if boardDir != "" {
@@ -203,22 +211,15 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 	}()
 
-	// Build sibling worktree mounts if opted in.
-	var siblingMounts map[string]map[string]string
-	if task.MountWorktrees {
-		siblingMounts = r.buildSiblingMounts(ctx, taskID)
-	}
-
 	for {
 		turns++
 		logger.Runner.Info("turn", "task", taskID, "turn", turns, "session", sessionID, "timeout", timeout)
 
-		// Refresh board.json before each turn so it reflects latest state.
+		// Refresh board.json and sibling mounts before each turn so they reflect latest state.
 		if boardDir != "" {
-			bctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
-			if data, err := r.generateBoardContext(bctx, taskID, task.MountWorktrees); err == nil {
+			if data, mounts, err := r.generateBoardContextAndMounts(taskID, task.MountWorktrees); err == nil {
 				os.WriteFile(filepath.Join(boardDir, "board.json"), data, 0644)
+				siblingMounts = mounts
 			}
 		}
 

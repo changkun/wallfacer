@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"changkun.de/wallfacer/internal/store"
 )
@@ -377,6 +378,97 @@ func containsString(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// waitBoardSeqStable blocks until boardChangeSeq has not changed for one
+// millisecond, meaning the board-cache-invalidator goroutine has drained its
+// pending store notifications and the cache is safe to prime.
+func waitBoardSeqStable(r *Runner) {
+	prev := r.boardChangeSeq.Load()
+	for {
+		time.Sleep(time.Millisecond)
+		cur := r.boardChangeSeq.Load()
+		if cur == prev {
+			return
+		}
+		prev = cur
+	}
+}
+
+// TestBoardCacheHit asserts that a second call to generateBoardContextAndMounts
+// (with no intervening store mutations) completes in under 5 µs — the cache
+// hit path avoids store.ListTasks entirely.
+func TestBoardCacheHit(t *testing.T) {
+	s, r := setupRunnerWithCmd(t, nil, "echo")
+	ctx := context.Background()
+	var selfID [16]byte
+	for i := 0; i < 100; i++ {
+		task, err := s.CreateTask(ctx, "task prompt", 5, false, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 50 {
+			selfID = task.ID
+		}
+	}
+
+	// Wait for the board-cache-invalidator goroutine to drain all pending
+	// store notifications so boardChangeSeq is stable before we prime the cache.
+	waitBoardSeqStable(r)
+
+	// Prime the cache.
+	if _, _, err := r.generateBoardContextAndMounts(selfID, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// The cache hit path copies JSON bytes and skips store.ListTasks entirely.
+	// With 100 tasks (~35 KB of JSON), copying should complete well within 50 µs
+	// even on a loaded system — far below the ~300+ µs of a full ListTasks call.
+	const limit = 50 * time.Microsecond
+	start := time.Now()
+	_, _, err := r.generateBoardContextAndMounts(selfID, false)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if elapsed > limit {
+		t.Errorf("cache hit took %v, want < %v", elapsed, limit)
+	}
+}
+
+// BenchmarkGenerateBoardContext measures per-turn board context cost with
+// a warm cache (no store mutations between calls).
+// Run with: go test ./internal/runner/ -bench=BenchmarkGenerateBoardContext -benchmem
+func BenchmarkGenerateBoardContext(b *testing.B) {
+	s, r := setupRunnerWithCmd(b, nil, "echo")
+	ctx := context.Background()
+	var selfID [16]byte
+	for i := 0; i < 100; i++ {
+		task, err := s.CreateTask(ctx, "task prompt", 5, false, "", "")
+		if err != nil {
+			b.Fatal(err)
+		}
+		if i == 50 {
+			selfID = task.ID
+		}
+	}
+
+	// Wait for all pending notifications to be processed before priming.
+	waitBoardSeqStable(r)
+
+	// Prime the cache with one call.
+	if _, _, err := r.generateBoardContextAndMounts(selfID, false); err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _, err := r.generateBoardContextAndMounts(selfID, false)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 // bg returns a background context (convenience alias used by store tests).

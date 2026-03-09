@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
@@ -290,9 +291,9 @@ type Runner struct {
 	worktreesDir     string
 	instructionsPath string
 	codexAuthPath    string
-	containerNetwork string         // --network override; empty = read from env file
-	worktreeMu       sync.Mutex     // serializes all worktree filesystem operations on worktreesDir
-	repoMu           sync.Map       // per-repo *sync.Mutex for serializing rebase+merge
+	containerNetwork string            // --network override; empty = read from env file
+	worktreeMu       sync.Mutex        // serializes all worktree filesystem operations on worktreesDir
+	repoMu           sync.Map          // per-repo *sync.Mutex for serializing rebase+merge
 	taskContainers   *containerRegistry // taskID → container name
 	refineContainers *containerRegistry // taskID → refinement container name
 	ideateContainer  *containerRegistry // singleton: ideation container name
@@ -300,6 +301,19 @@ type Runner struct {
 	backgroundWg     trackedWg          // tracks fire-and-forget background goroutines
 	stopReasonMu     sync.RWMutex
 	onStopReason     func(taskID uuid.UUID, stopReason string)
+
+	// Board context cache: avoids redundant store.ListTasks calls on every turn
+	// when no task has changed since the last generation.
+	boardCache struct {
+		mu         sync.Mutex
+		seq        uint64
+		selfTaskID uuid.UUID
+		json       []byte
+		mounts     map[string]map[string]string
+	}
+	boardChangeSeq     atomic.Uint64  // incremented on every store notification
+	shutdownCh         chan struct{}   // closed by Shutdown to stop the subscription goroutine
+	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -339,7 +353,12 @@ func (r *Runner) notifyStopReason(taskID uuid.UUID, stopReason string) {
 // fire-and-forget work finishes before the process exits.
 // In-progress task containers are intentionally left running; they continue
 // to completion independently and will be recovered on the next server start.
+// must be called at most once.
 func (r *Runner) Shutdown() {
+	// Signal the board-cache-invalidator goroutine to exit and wait for it.
+	close(r.shutdownCh)
+	r.boardSubscriptionWg.Wait()
+
 	done := make(chan struct{})
 	go func() {
 		r.backgroundWg.Wait()
@@ -423,7 +442,7 @@ func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
 
 // NewRunner constructs a Runner from the given store and config.
 func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
-	return &Runner{
+	r := &Runner{
 		store:            s,
 		command:          cfg.Command,
 		sandboxImage:     cfg.SandboxImage,
@@ -436,7 +455,34 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		taskContainers:   &containerRegistry{},
 		refineContainers: &containerRegistry{},
 		ideateContainer:  &containerRegistry{},
+		shutdownCh:       make(chan struct{}),
 	}
+
+	// Subscribe to store changes to drive the board-context cache invalidation.
+	// Each store mutation increments boardChangeSeq so generateBoardContextAndMounts
+	// knows when a cached result is stale.
+	// Tracked by boardSubscriptionWg (not backgroundWg) so that WaitBackground()
+	// remains unaffected — tests often call WaitBackground() directly in the test
+	// body before cleanup has a chance to close shutdownCh.
+	// Guard against nil store (some tests construct a Runner without a store).
+	if s != nil {
+		subID, subCh := s.Subscribe()
+		r.boardSubscriptionWg.Add(1)
+		go func() {
+			defer r.boardSubscriptionWg.Done()
+			defer s.Unsubscribe(subID)
+			for {
+				select {
+				case <-subCh:
+					r.boardChangeSeq.Add(1)
+				case <-r.shutdownCh:
+					return
+				}
+			}
+		}()
+	}
+
+	return r
 }
 
 // resolvedContainerNetwork returns the --network value to use for task containers.

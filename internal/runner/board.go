@@ -63,16 +63,38 @@ func canMountWorktree(status store.TaskStatus, worktreePaths map[string]string) 
 	}
 }
 
-// GenerateBoardManifest builds the board manifest for selfTaskID.
-// Pass uuid.Nil when there is no self-task (e.g. the debug endpoint).
-// Pass mountWorktrees=false when worktree paths are not needed.
-func (r *Runner) GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (*BoardManifest, error) {
-	tasks, err := r.store.ListTasks(ctx, false)
+// generateBoardContextAndMounts is the fused board-context generator.
+// It produces both the board.json bytes and the sibling-mount map in a single
+// store.ListTasks call. Results are cached by (boardChangeSeq, selfTaskID) so
+// that per-turn calls cost nearly nothing when no task has changed.
+//
+// Size-limiting design:
+//   - The self-task entry receives its full Prompt and Result.
+//   - Sibling task entries have Prompt truncated to 500 chars and Result to 1000.
+//   - After marshalling, if the manifest exceeds 64 KB a warning is logged.
+func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, map[string]map[string]string, error) {
+	// Cache check: if no store mutation has occurred since we last generated
+	// the board context for this task, return the cached result.
+	currentSeq := r.boardChangeSeq.Load()
+	r.boardCache.mu.Lock()
+	if r.boardCache.json != nil &&
+		r.boardCache.seq == currentSeq &&
+		r.boardCache.selfTaskID == selfTaskID {
+		jsonCopy := make([]byte, len(r.boardCache.json))
+		copy(jsonCopy, r.boardCache.json)
+		mountsCopy := deepCopyMounts(r.boardCache.mounts)
+		r.boardCache.mu.Unlock()
+		return jsonCopy, mountsCopy, nil
+	}
+	r.boardCache.mu.Unlock()
+
+	tasks, err := r.store.ListTasks(context.Background(), false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	boardTasks := make([]BoardTask, 0, len(tasks))
+	mounts := make(map[string]map[string]string)
 	for _, t := range tasks {
 		isSelf := t.ID == selfTaskID
 		shortID := t.ID.String()[:8]
@@ -87,6 +109,9 @@ func (r *Runner) GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID
 				worktreeMount = &p
 				break // just indicate the mount root; multiple repos follow the same pattern
 			}
+			// Record host-side mount paths for sibling worktrees.
+			mounts[shortID] = make(map[string]string, len(t.WorktreePaths))
+			maps.Copy(mounts[shortID], t.WorktreePaths)
 		}
 
 		prompt := t.Prompt
@@ -123,45 +148,77 @@ func (r *Runner) GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID
 		})
 	}
 
-	return &BoardManifest{
+	if len(mounts) == 0 {
+		mounts = nil
+	}
+
+	manifest := BoardManifest{
 		GeneratedAt: time.Now(),
 		SelfTaskID:  selfTaskID.String(),
 		Tasks:       boardTasks,
-	}, nil
-}
-
-// generateBoardContext serializes all non-archived tasks into board.json bytes.
-//
-// Size-limiting design (see WriteBoardManifest for rationale):
-//   - The self-task entry receives its full Prompt and Result so the running
-//     agent always has its own complete context.
-//   - Sibling task entries have Prompt truncated to 500 characters and Result
-//     truncated to 1000 characters (with a trailing "..." when cut), and their
-//     Turns counter is reset to 0 because only summary fields (status, result,
-//     branch) matter for cross-task awareness.
-//   - After marshalling, if the manifest exceeds 64 KB a warning is logged
-//     listing the five largest contributors so operators can investigate.
-//
-// It strips SessionID, marks is_self, and computes worktree_mount paths.
-func (r *Runner) generateBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, error) {
-	manifest, err := r.GenerateBoardManifest(ctx, selfTaskID, mountWorktrees)
-	if err != nil {
-		return nil, err
 	}
 
 	jsonBytes, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Manifest size guard: warn when the file would exceed 64 KB so that
 	// operators are notified before token costs become significant.
 	const maxManifestBytes = 64 * 1024
 	if len(jsonBytes) > maxManifestBytes {
-		logBoardManifestSizeWarning(manifest.Tasks, len(jsonBytes))
+		logBoardManifestSizeWarning(boardTasks, len(jsonBytes))
 	}
 
-	return jsonBytes, nil
+	// Store in cache (caller gets a deep copy of mounts).
+	r.boardCache.mu.Lock()
+	r.boardCache.seq = currentSeq
+	r.boardCache.selfTaskID = selfTaskID
+	r.boardCache.json = jsonBytes
+	r.boardCache.mounts = mounts
+	r.boardCache.mu.Unlock()
+
+	return jsonBytes, deepCopyMounts(mounts), nil
+}
+
+// deepCopyMounts returns a deep copy of a shortID → (repoPath → worktreePath) map.
+func deepCopyMounts(m map[string]map[string]string) map[string]map[string]string {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]map[string]string, len(m))
+	for k, v := range m {
+		inner := make(map[string]string, len(v))
+		maps.Copy(inner, v)
+		out[k] = inner
+	}
+	return out
+}
+
+// GenerateBoardManifest builds the board manifest for selfTaskID.
+// Pass uuid.Nil when there is no self-task (e.g. the debug endpoint).
+// Pass mountWorktrees=false when worktree paths are not needed.
+// Benefits from the same cache as generateBoardContextAndMounts.
+func (r *Runner) GenerateBoardManifest(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (*BoardManifest, error) {
+	_ = ctx // context not forwarded; generateBoardContextAndMounts uses background context internally
+	jsonBytes, _, err := r.generateBoardContextAndMounts(selfTaskID, mountWorktrees)
+	if err != nil {
+		return nil, err
+	}
+	var m BoardManifest
+	if err := json.Unmarshal(jsonBytes, &m); err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// generateBoardContext serializes all non-archived tasks into board.json bytes.
+// It is a thin wrapper around generateBoardContextAndMounts that discards the
+// sibling-mount map. Kept for backward compatibility with tests.
+func (r *Runner) generateBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) ([]byte, error) {
+	_ = ctx // context not forwarded; generateBoardContextAndMounts uses background context internally
+	data, _, err := r.generateBoardContextAndMounts(selfTaskID, mountWorktrees)
+	return data, err
 }
 
 // logBoardManifestSizeWarning logs a warning that board.json has grown large,
@@ -193,51 +250,41 @@ func logBoardManifestSizeWarning(tasks []BoardTask, totalBytes int) {
 	logger.Runner.Warn("board manifest is large", args...)
 }
 
-// prepareBoardContext writes board.json to a temp directory and returns the
+// writeBoardDir writes board.json to a new temp directory and returns the
 // directory path. The caller must defer os.RemoveAll(dir).
-func (r *Runner) prepareBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (string, error) {
-	data, err := r.generateBoardContext(ctx, selfTaskID, mountWorktrees)
-	if err != nil {
-		return "", err
-	}
-
+func writeBoardDir(data []byte) (string, error) {
 	dir, err := os.MkdirTemp("", "wallfacer-board-*")
 	if err != nil {
 		return "", err
 	}
-
 	if err := os.WriteFile(filepath.Join(dir, "board.json"), data, 0644); err != nil {
 		os.RemoveAll(dir)
 		return "", err
 	}
-
 	return dir, nil
+}
+
+// prepareBoardContext writes board.json to a temp directory and returns the
+// directory path. The caller must defer os.RemoveAll(dir).
+func (r *Runner) prepareBoardContext(ctx context.Context, selfTaskID uuid.UUID, mountWorktrees bool) (string, error) {
+	_ = ctx // context not forwarded; generateBoardContextAndMounts uses background context internally
+	data, _, err := r.generateBoardContextAndMounts(selfTaskID, mountWorktrees)
+	if err != nil {
+		return "", err
+	}
+	return writeBoardDir(data)
 }
 
 // buildSiblingMounts returns shortID → (repoPath → worktreePath) for
 // eligible sibling tasks. Only tasks whose worktrees can be safely mounted
 // read-only are included.
+// It is a thin wrapper around generateBoardContextAndMounts that discards the
+// board JSON. Kept for backward compatibility with tests.
 func (r *Runner) buildSiblingMounts(ctx context.Context, selfTaskID uuid.UUID) map[string]map[string]string {
-	tasks, err := r.store.ListTasks(ctx, false)
+	_ = ctx // context not forwarded; generateBoardContextAndMounts uses background context internally
+	_, mounts, err := r.generateBoardContextAndMounts(selfTaskID, true)
 	if err != nil {
 		logger.Runner.Warn("buildSiblingMounts: list tasks", "error", err)
-		return nil
-	}
-
-	mounts := make(map[string]map[string]string)
-	for _, t := range tasks {
-		if t.ID == selfTaskID {
-			continue
-		}
-		if !canMountWorktree(t.Status, t.WorktreePaths) || len(t.WorktreePaths) == 0 {
-			continue
-		}
-		shortID := t.ID.String()[:8]
-		mounts[shortID] = make(map[string]string, len(t.WorktreePaths))
-		maps.Copy(mounts[shortID], t.WorktreePaths)
-	}
-
-	if len(mounts) == 0 {
 		return nil
 	}
 	return mounts

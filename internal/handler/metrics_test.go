@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -227,6 +228,10 @@ func TestMetricsGauge_TasksTotal(t *testing.T) {
 func TestMetricsGauge_SubscriberCount(t *testing.T) {
 	h := newTestHandler(t)
 
+	// The runner holds one internal board-cache subscription; capture the
+	// baseline so the test remains correct regardless of runner internals.
+	baseline := h.store.SubscriberCount()
+
 	subID, _ := h.store.Subscribe()
 	defer h.store.Unsubscribe(subID)
 
@@ -239,7 +244,8 @@ func TestMetricsGauge_SubscriberCount(t *testing.T) {
 	reg.WritePrometheus(&sb)
 	body := sb.String()
 
-	if !strings.Contains(body, "wallfacer_store_subscribers 1") {
-		t.Errorf("expected subscriber count 1; got:\n%s", body)
+	want := fmt.Sprintf("wallfacer_store_subscribers %d", baseline+1)
+	if !strings.Contains(body, want) {
+		t.Errorf("expected %q; got:\n%s", want, body)
 	}
 }
