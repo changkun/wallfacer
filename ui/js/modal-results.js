@@ -458,12 +458,13 @@ function renderTimeline(taskId) {
     ? api('/api/tasks/' + taskId + '/spans', { signal: signal })
     : fetch('/api/tasks/' + taskId + '/spans', { signal: signal }).then(function(res) { return res.json(); });
   req
-    .then(function(spans) {
+    .then(function(data) {
       if (getOpenModalTaskId() !== taskId) return;
       if (_modalState.seq !== seq) return;
       var el2 = document.getElementById('modal-timeline-chart');
       if (!el2) return;
       el2.dataset.loaded = '1';
+      var spans = (data && Array.isArray(data.spans)) ? data.spans : [];
       el2.innerHTML = _buildTimelineHtml(spans);
       _attachTimelineTips(el2);
     })

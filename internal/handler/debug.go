@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/runner"
+	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -143,8 +144,9 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		for _, sr := range computeSpans(events) {
-			durations[sr.Phase] = append(durations[sr.Phase], sr.DurationMs)
+		spans, _ := store.ComputeSpans(events)
+		for _, sr := range spans {
+			durations[sr.Phase] = append(durations[sr.Phase], sr.DurationMS)
 			spansTotal++
 		}
 	}

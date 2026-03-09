@@ -227,7 +227,7 @@ describe('loadFlamegraph', () => {
 
   it('shows no-data message for empty array response', async () => {
     const { ctx, container } = makeFlameContext(
-      () => Promise.resolve({ json: () => Promise.resolve([]) })
+      () => Promise.resolve({ json: () => Promise.resolve({spans: []}) })
     );
 
     ctx.loadFlamegraph('task-1');
@@ -276,7 +276,12 @@ describe('loadFlamegraph', () => {
     ];
 
     const { ctx, container } = makeFlameContext(
-      () => Promise.resolve({ json: () => Promise.resolve(spans) })
+      (url) => {
+        if (typeof url === 'string' && url.includes('/turn-usage')) {
+          return Promise.resolve({ json: () => Promise.resolve([]) });
+        }
+        return Promise.resolve({ json: () => Promise.resolve({spans: spans}) });
+      }
     );
 
     ctx.loadFlamegraph('task-1');
@@ -292,7 +297,7 @@ describe('loadFlamegraph', () => {
   it('returns early without error when container is absent', async () => {
     const ctx = makeContext({
       document: { getElementById: () => null },
-      fetch: () => Promise.resolve({ json: () => Promise.resolve([]) }),
+      fetch: () => Promise.resolve({ json: () => Promise.resolve({spans: []}) }),
       escapeHtml: (s) => String(s ?? ''),
       window: {},
     });
@@ -552,7 +557,10 @@ describe('loadFlamegraph oversight integration', () => {
       if (typeof url === 'string' && url.includes('/oversight')) {
         return Promise.resolve({ json: () => Promise.resolve(oversightResp) });
       }
-      return Promise.resolve({ json: () => Promise.resolve(spansResp) });
+      if (typeof url === 'string' && url.includes('/turn-usage')) {
+        return Promise.resolve({ json: () => Promise.resolve([]) });
+      }
+      return Promise.resolve({ json: () => Promise.resolve({spans: spansResp}) });
     };
   }
 
@@ -581,7 +589,10 @@ describe('loadFlamegraph oversight integration', () => {
       if (typeof url === 'string' && url.includes('/oversight')) {
         return Promise.reject(new Error('network error'));
       }
-      return Promise.resolve({ json: () => Promise.resolve(spansFixture) });
+      if (typeof url === 'string' && url.includes('/turn-usage')) {
+        return Promise.resolve({ json: () => Promise.resolve([]) });
+      }
+      return Promise.resolve({ json: () => Promise.resolve({spans: spansFixture}) });
     };
     const { ctx, container } = makeFlameContext(fetch);
     ctx.loadFlamegraph('task-1');
@@ -797,7 +808,7 @@ describe('loadFlamegraph Activity column', () => {
       if (url.includes('/turn-usage')) {
         return Promise.resolve({ json: () => Promise.resolve([]) });
       }
-      return Promise.resolve({ json: () => Promise.resolve(spansResp) });
+      return Promise.resolve({ json: () => Promise.resolve({spans: spansResp}) });
     };
   }
 
