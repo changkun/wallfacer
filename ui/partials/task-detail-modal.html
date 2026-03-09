@@ -181,6 +181,14 @@
             </div>
           </div>
 
+          <!-- Execution environment provenance (shown when task.environment is present) -->
+          <div id="modal-environment-section" class="hidden mb-4">
+            <details>
+              <summary class="text-sm font-medium text-v-muted" style="cursor:pointer;">Environment</summary>
+              <dl id="modal-environment-list" class="mt-2" style="display:grid;grid-template-columns:max-content 1fr;gap:3px 12px;font-size:12px;"></dl>
+            </details>
+          </div>
+
           <!-- Budget-exceeded banner (shown when task is waiting due to budget limit) -->
           <div id="modal-budget-exceeded-banner" class="hidden mb-4" style="padding:10px 14px;border-radius:8px;background:#fef3c7;border:1px solid #f59e0b;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">

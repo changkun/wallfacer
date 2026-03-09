@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -72,6 +73,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	if err != nil {
 		logger.Runner.Error("get task", "task", taskID, "error", err)
 		return // defer moves to "failed"
+	}
+
+	// Record the execution environment for reproducibility auditing.
+	execEnv := r.captureExecutionEnvironment(*task)
+	if err := r.store.UpdateTaskEnvironment(bgCtx, taskID, execEnv); err != nil {
+		slog.Warn("failed to record execution environment", "task", taskID, "err", err)
+		// non-fatal: continue execution
 	}
 
 	// Idea-tagged tasks store a short title in Prompt for card display and the

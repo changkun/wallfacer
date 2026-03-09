@@ -838,6 +838,25 @@ func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sandbox strin
 	return nil
 }
 
+// UpdateTaskEnvironment records the execution environment captured at the start of Run().
+// The environment is written atomically alongside the task and broadcast to SSE subscribers.
+func (s *Store) UpdateTaskEnvironment(_ context.Context, id uuid.UUID, env ExecutionEnvironment) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.Environment = &env
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
+}
+
 // ResetTaskForRetry moves a done/failed/cancelled task back to backlog with a fresh state.
 // freshStart controls whether the task will start a new Claude session (true) or resume the
 // previous one (false, the default) when moved to in_progress.
