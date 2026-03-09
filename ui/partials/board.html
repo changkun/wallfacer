@@ -9,6 +9,9 @@
       <button id="new-task-btn" onclick="showNewTaskForm()" class="btn-dashed mb-2">+ New Task</button>
       <div id="new-task-form" class="hidden mb-2">
         <textarea id="new-prompt" rows="6" placeholder="Describe your task (Markdown supported)..." class="field"></textarea>
+        <div class="flex items-center mt-1">
+          <button type="button" onclick="openTemplatesPicker(function(body){var ta=document.getElementById('new-prompt');ta.value=body;ta.focus();})" class="btn-icon" style="font-size:11px;padding:2px 8px;" title="Insert a saved prompt template">Templates</button>
+        </div>
         <div class="flex items-center justify-between mt-2">
           <div class="flex items-center gap-1">
             <button onclick="createTask()" class="btn btn-accent">Save</button>

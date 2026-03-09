@@ -354,6 +354,11 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"UpdateInstructions": h.UpdateInstructions,
 		"ReinitInstructions": h.ReinitInstructions,
 
+		// Prompt templates.
+		"ListTemplates":   h.ListTemplates,
+		"CreateTemplate":  h.CreateTemplate,
+		"DeleteTemplate":  h.DeleteTemplate,
+
 		// Git workspace operations.
 		"GitStatus":        h.GitStatus,
 		"GitStatusStream":  h.GitStatusStream,

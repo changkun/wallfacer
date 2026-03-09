@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 57,
+  "route_count": 60,
   "routes": [
     {
       "method": "GET",
@@ -144,6 +144,33 @@
       "description": "Rebuild workspace CLAUDE.md from default template and repo files.",
       "tags": [
         "instructions"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/templates",
+      "name": "ListTemplates",
+      "description": "List all prompt templates sorted by created_at descending.",
+      "tags": [
+        "templates"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/templates",
+      "name": "CreateTemplate",
+      "description": "Create a new named prompt template.",
+      "tags": [
+        "templates"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/templates/{id}",
+      "name": "DeleteTemplate",
+      "description": "Delete a prompt template by ID.",
+      "tags": [
+        "templates"
       ]
     },
     {

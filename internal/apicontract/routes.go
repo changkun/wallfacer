@@ -154,6 +154,27 @@ var Routes = []Route{
 		Tags:        []string{"instructions"},
 	},
 
+	// --- Prompt templates ---
+
+	{
+		Method: "GET", Pattern: "/api/templates", Name: "ListTemplates",
+		JSName:      "list",
+		Description: "List all prompt templates sorted by created_at descending.",
+		Tags:        []string{"templates"},
+	},
+	{
+		Method: "POST", Pattern: "/api/templates", Name: "CreateTemplate",
+		JSName:      "create",
+		Description: "Create a new named prompt template.",
+		Tags:        []string{"templates"},
+	},
+	{
+		Method: "DELETE", Pattern: "/api/templates/{id}", Name: "DeleteTemplate",
+		JSName:      "delete",
+		Description: "Delete a prompt template by ID.",
+		Tags:        []string{"templates"},
+	},
+
 	// --- Git workspace operations ---
 
 	{

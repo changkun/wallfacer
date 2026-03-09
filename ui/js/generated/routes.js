@@ -64,6 +64,15 @@ var Routes = {
     reinit: function() { return "/api/instructions/reinit"; },
   },
 
+  templates: {
+    // GET /api/templates
+    list: function() { return "/api/templates"; },
+    // POST /api/templates
+    create: function() { return "/api/templates"; },
+    // DELETE /api/templates/{id}
+    delete: function() { return "/api/templates/{id}"; },
+  },
+
   git: {
     // GET /api/git/status
     status: function() { return "/api/git/status"; },
