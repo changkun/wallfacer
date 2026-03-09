@@ -527,6 +527,8 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UU
 
 	if strings.HasSuffix(filename, ".json") {
 		w.Header().Set("Content-Type", "application/json")
+	} else if strings.HasSuffix(filename, ".stderr.txt") {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	} else {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}

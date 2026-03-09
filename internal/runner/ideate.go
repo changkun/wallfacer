@@ -313,6 +313,12 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		if saveErr := r.store.SaveTurnOutput(taskID, 1, rawStdout, rawStderr); saveErr != nil {
 			logger.Runner.Warn("ideation: save turn output", "task", taskID, "error", saveErr)
 		}
+		if len(rawStderr) > 0 {
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+				"stderr_file": "turn-0001.stderr.txt",
+				"turn":        "1",
+			})
+		}
 	}
 
 	// Emit an output event and persist the agent result so the task card shows
