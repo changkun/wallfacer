@@ -412,12 +412,6 @@
             'top:0;height:' + (AXIS_H - 1) + 'px;' +
             'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border,#444) 3px,var(--border,#444) 4px);' +
             'opacity:0.4;pointer-events:none;"></div>';
-          // Visible gap duration label centered in the axis gap
-          axisHtml += '<span style="position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
-            'top:1px;font-size:8px;color:var(--text-muted,#888);text-align:center;' +
-            'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;' +
-            'line-height:' + (AXIS_H - 2) + 'px;">' +
-            escapeHtml(gapDur) + '</span>';
         });
       } else {
         // Linear mode (unchanged)
@@ -520,6 +514,15 @@
             'top:' + bodyTop + 'px;height:' + bodyH + 'px;' +
             'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border,#444) 3px,var(--border,#444) 4px);' +
             'opacity:0.2;pointer-events:none;"></div>';
+          // Gap duration label inside the body area
+          gapIndicatorsHtml += '<span title="' + escapeHtml(tipText) + '" style="' +
+            'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
+            'top:' + bodyTop + 'px;height:' + bodyH + 'px;' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'font-size:8px;color:var(--text-muted,#888);' +
+            'overflow:hidden;white-space:nowrap;pointer-events:none;' +
+            'writing-mode:vertical-rl;text-orientation:mixed;">' +
+            escapeHtml(gapDur) + '</span>';
         });
       }
 

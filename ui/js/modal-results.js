@@ -219,7 +219,7 @@ function _buildTimelineHtml(spans) {
         '<div style="position:absolute;left:' + x.toFixed(2) + '%;top:0;bottom:0;' +
           'border-left:1px dashed var(--border);opacity:.45;pointer-events:none;"></div>';
     });
-    // Add hatched break indicators for compressed gaps with duration labels
+    // Add hatched break indicators for compressed gaps (axis only, no label here)
     timeMap.segments.forEach(function(seg) {
       if (!seg.compressed) return;
       var gapLeft = timeMap.toPercent(seg.start);
@@ -235,11 +235,7 @@ function _buildTimelineHtml(spans) {
           'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
           'top:0;bottom:0;' +
           'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border) 3px,var(--border) 4px);' +
-          'opacity:0.3;pointer-events:none;"></div>' +
-        '<span style="position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
-          'bottom:2px;font-size:8px;color:var(--text-muted);text-align:center;' +
-          'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;">' +
-          escapeHtml(gapDur) + '</span>';
+          'opacity:0.3;pointer-events:none;"></div>';
     });
   } else {
     for (var tickMs = 0; tickMs <= totalMs + TICK_MS / 2; tickMs += TICK_MS) {
@@ -251,6 +247,35 @@ function _buildTimelineHtml(spans) {
         '<div style="position:absolute;left:' + x + '%;top:0;bottom:0;' +
           'border-left:1px dashed var(--border);opacity:.45;pointer-events:none;"></div>';
     }
+  }
+
+  // Pre-build per-row gap overlay HTML (hatched stripes + labels inside bar area)
+  var rowGapHtml = '';
+  if (timeMap.compressed) {
+    timeMap.segments.forEach(function(seg) {
+      if (!seg.compressed) return;
+      var gapLeft = timeMap.toPercent(seg.start);
+      var gapRight = timeMap.toPercent(seg.end);
+      var gapWidth = gapRight - gapLeft;
+      if (gapWidth < 0.1) return;
+      var gapDur = _fmtMs(seg.end - seg.start);
+      var gapStartLabel = _fmtMs(seg.start - t0);
+      var gapEndLabel = _fmtMs(seg.end - t0);
+      var tipText = 'Idle ' + gapDur + '\n' + gapStartLabel + ' \u2192 ' + gapEndLabel;
+      rowGapHtml +=
+        '<div title="' + escapeHtml(tipText) + '" style="' +
+          'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
+          'top:0;bottom:0;' +
+          'background:repeating-linear-gradient(120deg,transparent,transparent 3px,var(--border) 3px,var(--border) 4px);' +
+          'opacity:0.15;pointer-events:none;"></div>' +
+        '<span title="' + escapeHtml(tipText) + '" style="' +
+          'position:absolute;left:' + gapLeft.toFixed(2) + '%;width:' + gapWidth.toFixed(2) + '%;' +
+          'top:0;bottom:0;display:flex;align-items:center;justify-content:center;' +
+          'font-size:8px;color:var(--text-muted);' +
+          'overflow:hidden;white-space:nowrap;pointer-events:none;' +
+          'writing-mode:vertical-rl;text-orientation:mixed;">' +
+          escapeHtml(gapDur) + '</span>';
+    });
   }
 
   // Span rows
@@ -305,6 +330,7 @@ function _buildTimelineHtml(spans) {
           escapeHtml(humanLabel) +
         '</div>' +
         '<div style="flex:1;position:relative;height:' + ROW_H + 'px;">' +
+          rowGapHtml +
           '<div class="tl-bar" data-tip="' + escapeHtml(tipText) + '" style="' + barStyle + '">' +
             '<span style="font-size:10px;color:#fff;text-shadow:0 0 3px rgba(0,0,0,.55);' +
               'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;pointer-events:none;">' +
