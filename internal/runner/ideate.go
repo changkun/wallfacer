@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"math"
 	"fmt"
+	"math"
 	"math/rand"
 	"os/exec"
 	"sort"
@@ -56,6 +56,14 @@ var ideaCategoryPool = []string{
 	"architecture / design",
 	"dependency management",
 	"accessibility",
+}
+
+// IdeationCategories returns the full inspiration pool used when generating
+// brainstorm prompts.
+func (r *Runner) IdeationCategories() []string {
+	result := make([]string, len(ideaCategoryPool))
+	copy(result, ideaCategoryPool)
+	return result
 }
 
 // pickCategories returns n unique categories sampled at random from
@@ -131,7 +139,7 @@ type IdeateResult struct {
 // KillContainer(taskID) and log streaming work through the standard task paths.
 // prompt is the full ideation prompt to send to the container; callers should
 // generate it with buildIdeationPrompt() and persist it before calling here.
-func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, *agentOutput, []byte, []byte, error) {
+func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt string) ([]IdeateResult, []ideaRejection, *agentOutput, []byte, []byte, error) {
 	containerName := fmt.Sprintf("wallfacer-ideate-%d", time.Now().UnixNano()/1e6)
 
 	if taskID != uuid.Nil {
@@ -199,7 +207,7 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 			output, rawStdout, rawStderr, err = runWithSandbox("codex")
 		}
 		if err != nil {
-			return nil, nil, rawStdout, rawStderr, err
+			return nil, nil, nil, rawStdout, rawStderr, err
 		}
 	}
 
@@ -214,17 +222,18 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 		}
 	}
 
-	ideas, err := extractIdeas(output.Result)
+	ideas, rejections, err := extractIdeas(output.Result)
 	if err != nil {
-		recovered, recoverErr := extractIdeasFromRunOutput(output.Result, rawStdout, rawStderr)
+		recovered, recoveredRejections, recoverErr := extractIdeasFromRunOutput(output.Result, rawStdout, rawStderr)
 		if recoverErr == nil {
 			ideas = recovered
+			rejections = recoveredRejections
 			err = nil
 		} else {
-			return nil, output, rawStdout, rawStderr, fmt.Errorf("extract ideas: %w (result: %s)", err, truncate(output.Result, 300))
+			return nil, nil, output, rawStdout, rawStderr, fmt.Errorf("extract ideas: %w (result: %s)", err, truncate(output.Result, 300))
 		}
 	}
-	return ideas, output, rawStdout, rawStderr, nil
+	return ideas, rejections, output, rawStdout, rawStderr, nil
 }
 
 // BuildIdeationPrompt exposes the ideation prompt construction used by the
@@ -299,19 +308,22 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		}
 	}
 
-	// Generate the full ideation prompt (with randomly-picked domains).
-	// Persist it as ExecutionPrompt so the UI can display the exact prompt
-	// that was used while keeping Prompt semantics unchanged.
-	ideationPrompt := buildIdeationPrompt(activeTasks, r.collectIdeationContextFromTasks(allTasks))
-	if err := r.store.UpdateTaskExecutionPrompt(bgCtx, taskID, ideationPrompt); err != nil {
-		logger.Runner.Warn("ideation task: set execution prompt on brainstorm card", "task", taskID, "error", err)
+	// Generate the ideation prompt (prefer the prebuilt execution prompt stored on
+	// the idea-agent card for consistency).
+	ideationPrompt := strings.TrimSpace(task.ExecutionPrompt)
+	if ideationPrompt == "" {
+		ideationPrompt = buildIdeationPrompt(activeTasks, r.collectIdeationContextFromTasks(allTasks))
+		if err := r.store.UpdateTaskExecutionPrompt(bgCtx, taskID, ideationPrompt); err != nil {
+			logger.Runner.Warn("ideation task: set execution prompt on brainstorm card", "task", taskID, "error", err)
+		}
 	}
 
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Starting brainstorm agent — exploring workspaces to propose ideas...",
 	})
 
-	ideas, output, rawStdout, rawStderr, err := r.RunIdeation(ctx, taskID, ideationPrompt)
+	ideas, rejections, output, rawStdout, rawStderr, err := r.RunIdeation(ctx, taskID, ideationPrompt)
+	r.emitIdeationRejectionEvents(bgCtx, taskID, rejections)
 
 	// Always persist the raw container output as turn 1 so that the trace and
 	// oversight features work the same as for regular implementation tasks.
@@ -646,7 +658,7 @@ func normalizeIdeationImpact(idea *IdeateResult) {
 	}
 	if idea.ImpactScore == 0 {
 		switch idea.Priority {
-	case "high":
+		case "high":
 			idea.ImpactScore = 85
 		case "medium":
 			idea.ImpactScore = 60
@@ -691,24 +703,74 @@ func isIdeaDuplicateTitle(added map[string]struct{}, title string) bool {
 	return false
 }
 
+type ideaRejection struct {
+	Title  string
+	Reason string
+	Score  int
+}
+
+const (
+	ideaRejectEmptyFields     = "empty_fields"
+	ideaRejectDegenerateTitle = "degenerate_prompt"
+	ideaRejectLowImpact       = "below_threshold"
+	ideaRejectDuplicateTitle  = "duplicate_title"
+)
+
+func (r *Runner) emitIdeationRejectionEvents(ctx context.Context, taskID uuid.UUID, rejections []ideaRejection) {
+	if len(rejections) == 0 {
+		return
+	}
+
+	for _, rejection := range rejections {
+		label := strings.TrimSpace(rejection.Title)
+		if label == "" {
+			label = "(untitled)"
+		}
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+			"result": fmt.Sprintf("Idea filtered (%s): %q (score: %d)", rejection.Reason, label, rejection.Score),
+		})
+	}
+
+	logger.Runner.Debug("ideation: idea filtering summary",
+		"task", taskID,
+		"rejections", len(rejections),
+		"below_threshold", countIdeaRejections(rejections, ideaRejectLowImpact),
+		"duplicate_title", countIdeaRejections(rejections, ideaRejectDuplicateTitle),
+		"degenerate_prompt", countIdeaRejections(rejections, ideaRejectDegenerateTitle),
+		"empty_fields", countIdeaRejections(rejections, ideaRejectEmptyFields),
+	)
+}
+
+func countIdeaRejections(rejections []ideaRejection, reason string) int {
+	total := 0
+	for _, rejection := range rejections {
+		if rejection.Reason == reason {
+			total++
+		}
+	}
+	return total
+}
+
 // extractIdeas finds a JSON array in the agent's text output and parses it
 // into a slice of IdeateResult. It is tolerant of surrounding prose by
 // scanning for the first '[' and then counting bracket depth to find its
 // matching ']', which avoids capturing stray brackets in trailing prose.
-func extractIdeas(text string) ([]IdeateResult, error) {
+func extractIdeas(text string) ([]IdeateResult, []ideaRejection, error) {
 	candidates := extractJSONArrayLikeCandidates(text)
 	var parseErr error
+	var parseRejections []ideaRejection
 	for _, candidate := range candidates {
-		ideas, err := parseIdeaJSONArray(candidate)
+		ideas, rejections, err := parseIdeaJSONArray(candidate)
 		if err == nil {
-			return ideas, nil
+			return ideas, rejections, nil
 		}
 		parseErr = err
+		parseRejections = rejections
 	}
 	if parseErr != nil {
-		return nil, parseErr
+		return nil, parseRejections, parseErr
 	}
-	return nil, fmt.Errorf("no JSON array found in agent output")
+	return nil, nil, fmt.Errorf("no JSON array found in agent output")
 }
 
 func extractJSONArrayLikeCandidates(text string) []string {
@@ -723,10 +785,10 @@ func extractJSONArrayLikeCandidates(text string) []string {
 	return candidates
 }
 
-func parseIdeaJSONArray(text string) ([]IdeateResult, error) {
+func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 	start := strings.Index(text, "[")
 	if start == -1 {
-		return nil, fmt.Errorf("no JSON array found in candidate output")
+		return nil, nil, fmt.Errorf("no JSON array found in candidate output")
 	}
 
 	// Walk forward from the opening '[' counting bracket depth to find
@@ -765,12 +827,12 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, error) {
 		}
 	}
 	if end == -1 {
-		return nil, fmt.Errorf("no JSON array found in candidate output")
+		return nil, nil, fmt.Errorf("no JSON array found in candidate output")
 	}
 
 	var results []IdeateResult
 	if err := json.Unmarshal([]byte(text[start:end+1]), &results); err != nil {
-		return nil, fmt.Errorf("unmarshal ideas: %w", err)
+		return nil, nil, fmt.Errorf("unmarshal ideas: %w", err)
 	}
 
 	// Normalize schema and filter out malformed entries.
@@ -779,14 +841,23 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, error) {
 	// spec. Reject these so runIdeationTask fails loudly rather than silently
 	// creating tasks with no actionable implementation details.
 	var valid []IdeateResult
+	var rejections []ideaRejection
 	seen := map[string]struct{}{}
 	for _, r := range results {
 		title := strings.TrimSpace(r.Title)
 		prompt := strings.TrimSpace(r.Prompt)
 		if title == "" || prompt == "" {
+			rejections = append(rejections, ideaRejection{
+				Title:  title,
+				Reason: ideaRejectEmptyFields,
+			})
 			continue
 		}
 		if strings.EqualFold(title, prompt) {
+			rejections = append(rejections, ideaRejection{
+				Title:  title,
+				Reason: ideaRejectDegenerateTitle,
+			})
 			continue // prompt is just the title — not a useful implementation spec
 		}
 		idea := r
@@ -794,9 +865,19 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, error) {
 		idea.Title = title
 		idea.Prompt = prompt
 		if idea.ImpactScore < minIdeationImpactScore {
+			rejections = append(rejections, ideaRejection{
+				Title:  title,
+				Score:  idea.ImpactScore,
+				Reason: ideaRejectLowImpact,
+			})
 			continue
 		}
 		if isIdeaDuplicateTitle(seen, idea.Title) {
+			rejections = append(rejections, ideaRejection{
+				Title:  title,
+				Score:  idea.ImpactScore,
+				Reason: ideaRejectDuplicateTitle,
+			})
 			continue
 		}
 		valid = append(valid, idea)
@@ -811,9 +892,9 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, error) {
 		valid = valid[:maxIdeationIdeas]
 	}
 	if len(valid) == 0 {
-		return nil, fmt.Errorf("no valid ideas in parsed output (all entries were malformed or had prompt equal to title)")
+		return nil, rejections, fmt.Errorf("no valid ideas in parsed output (all entries were malformed or had prompt equal to title)")
 	}
-	return valid, nil
+	return valid, rejections, nil
 }
 
 func findJSONCodeBlock(text string) []string {
@@ -845,19 +926,21 @@ func findJSONCodeBlock(text string) []string {
 	}
 }
 
-func extractIdeasFromRunOutput(result string, rawStdout, rawStderr []byte) ([]IdeateResult, error) {
+func extractIdeasFromRunOutput(result string, rawStdout, rawStderr []byte) ([]IdeateResult, []ideaRejection, error) {
 	// Prefer the final parsed result if it already contains ideas.
-	if ideas, err := extractIdeas(result); err == nil {
-		return ideas, nil
+	if ideas, rejections, err := extractIdeas(result); err == nil {
+		return ideas, rejections, nil
 	}
 
 	text := strings.TrimSpace(string(rawStdout) + "\n" + string(rawStderr))
 	if text == "" {
-		return nil, fmt.Errorf("no JSON array found in agent output")
+		return nil, nil, fmt.Errorf("no JSON array found in agent output")
 	}
 
 	var fallback []IdeateResult
+	var fallbackRejections []ideaRejection
 	var fallbackErr error
+	var candidateRejections []ideaRejection
 	lines := strings.Split(text, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -871,23 +954,26 @@ func extractIdeasFromRunOutput(result string, rawStdout, rawStderr []byte) ([]Id
 		if strings.TrimSpace(output.Result) == "" {
 			continue
 		}
-		ideas, err := extractIdeas(output.Result)
+		ideas, rejections, err := extractIdeas(output.Result)
 		if err != nil {
 			fallbackErr = err
+			candidateRejections = append(candidateRejections, rejections...)
 			continue
 		}
 		if output.StopReason != "" {
-			return ideas, nil
+			candidateRejections = append(candidateRejections, rejections...)
+			return ideas, candidateRejections, nil
 		}
 		if fallback == nil {
 			fallback = ideas
+			fallbackRejections = rejections
 		}
 	}
 	if fallback != nil {
-		return fallback, nil
+		return fallback, append(fallbackRejections, candidateRejections...), nil
 	}
 	if fallbackErr != nil {
-		return nil, fallbackErr
+		return nil, candidateRejections, fallbackErr
 	}
-	return nil, fmt.Errorf("no JSON array found in agent output")
+	return nil, nil, fmt.Errorf("no JSON array found in agent output")
 }

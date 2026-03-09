@@ -91,6 +91,37 @@ func TestGetConfig_ReturnsInstructionsPath(t *testing.T) {
 	}
 }
 
+func TestGetConfig_ExposesIdeationCategories(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	var resp map[string]any
+	json.NewDecoder(w.Body).Decode(&resp)
+	cats, ok := resp["ideation_categories"].([]any)
+	if !ok {
+		t.Fatalf("expected ideation_categories to be an array, got %T", resp["ideation_categories"])
+	}
+	need := map[string]struct{}{
+		"accessibility":         {},
+		"documentation update":  {},
+		"architecture / design": {},
+		"dependency management": {},
+	}
+	found := map[string]bool{}
+	for _, c := range cats {
+		if s, ok := c.(string); ok {
+			found[s] = true
+		}
+	}
+	for k := range need {
+		if !found[k] {
+			t.Fatalf("expected ideation_categories to include %q, got %v", k, cats)
+		}
+	}
+}
+
 func TestGetConfig_AlwaysIncludesCodexSandbox(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 

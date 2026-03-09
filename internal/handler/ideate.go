@@ -127,6 +127,9 @@ func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
 		logger.Handler.Warn("ideation: create idea-agent task", "error", err)
 		return nil
 	}
+	if err := h.store.UpdateTaskExecutionPrompt(ctx, task.ID, ideaPrompt); err != nil {
+		logger.Handler.Warn("ideation: persist idea-agent execution prompt", "task", task.ID, "error", err)
+	}
 
 	// Set the title immediately so the card always shows the date/time.
 	title := "Brainstorm " + time.Now().Format("Jan 2, 2006 15:04")

@@ -84,20 +84,21 @@ func defaultSandbox(cfg envconfig.Config) string {
 
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
 	resp := map[string]any{
-		"workspaces":         h.runner.Workspaces(),
-		"instructions_path":  instructions.FilePath(h.configDir, h.workspaces),
-		"sandboxes":          []string{"claude", "codex"},
-		"default_sandbox":    "claude",
-		"sandbox_usable":     map[string]bool{"claude": true, "codex": true},
-		"sandbox_reasons":    map[string]string{},
-		"activity_sandboxes": map[string]string{},
-		"autopilot":          h.AutopilotEnabled(),
-		"autotest":           h.AutotestEnabled(),
-		"autosubmit":         h.AutosubmitEnabled(),
-		"ideation":           h.IdeationEnabled(),
-		"ideation_running":   h.ideationRunning(ctx),
-		"ideation_interval":  int(h.IdeationInterval().Minutes()),
-		"default_model":      "",
+		"workspaces":          h.runner.Workspaces(),
+		"instructions_path":   instructions.FilePath(h.configDir, h.workspaces),
+		"sandboxes":           []string{"claude", "codex"},
+		"default_sandbox":     "claude",
+		"sandbox_usable":      map[string]bool{"claude": true, "codex": true},
+		"sandbox_reasons":     map[string]string{},
+		"activity_sandboxes":  map[string]string{},
+		"autopilot":           h.AutopilotEnabled(),
+		"autotest":            h.AutotestEnabled(),
+		"autosubmit":          h.AutosubmitEnabled(),
+		"ideation":            h.IdeationEnabled(),
+		"ideation_running":    h.ideationRunning(ctx),
+		"ideation_interval":   int(h.IdeationInterval().Minutes()),
+		"ideation_categories": h.runner.IdeationCategories(),
+		"default_model":       "",
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun
@@ -198,12 +199,13 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	resp := map[string]any{
-		"autopilot":         h.AutopilotEnabled(),
-		"autotest":          h.AutotestEnabled(),
-		"autosubmit":        h.AutosubmitEnabled(),
-		"ideation":          h.IdeationEnabled(),
-		"ideation_running":  h.ideationRunning(r.Context()),
-		"ideation_interval": int(h.IdeationInterval().Minutes()),
+		"autopilot":           h.AutopilotEnabled(),
+		"autotest":            h.AutotestEnabled(),
+		"autosubmit":          h.AutosubmitEnabled(),
+		"ideation":            h.IdeationEnabled(),
+		"ideation_running":    h.ideationRunning(r.Context()),
+		"ideation_interval":   int(h.IdeationInterval().Minutes()),
+		"ideation_categories": h.runner.IdeationCategories(),
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun
