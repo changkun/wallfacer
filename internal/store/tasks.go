@@ -590,6 +590,27 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 		return fmt.Errorf("task not found: %s", id)
 	}
 
+	result := ""
+	if t.Result != nil {
+		result = *t.Result
+		if len(result) > 2000 {
+			result = result[:2000] + "..."
+		}
+	}
+	sessionID := ""
+	if t.SessionID != nil {
+		sessionID = *t.SessionID
+	}
+	t.RetryHistory = append(t.RetryHistory, RetryRecord{
+		RetiredAt: time.Now(),
+		Prompt:    t.Prompt,
+		Status:    t.Status,
+		Result:    result,
+		SessionID: sessionID,
+		Turns:     t.Turns,
+		CostUSD:   t.Usage.CostUSD,
+	})
+
 	t.PromptHistory = append(t.PromptHistory, t.Prompt)
 	t.Prompt = newPrompt
 	t.FreshStart = freshStart

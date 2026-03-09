@@ -939,6 +939,118 @@ func TestResetTaskForRetry_NotFound(t *testing.T) {
 	}
 }
 
+func TestResetTaskForRetryAccumulatesHistory(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	// Step 1: Create task, force to failed, set result and usage.
+	task, _ := s.CreateTask(bg(), "first prompt", 5, false, "", "")
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
+	s.UpdateTaskResult(bg(), task.ID, "first result", "sess-1", "end_turn", 3)
+	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
+		TaskUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.42})
+
+	// First retry: snapshot pre-reset state.
+	if err := s.ResetTaskForRetry(bg(), task.ID, "second prompt", false); err != nil {
+		t.Fatalf("ResetTaskForRetry (1st): %v", err)
+	}
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if len(got.RetryHistory) != 1 {
+		t.Fatalf("RetryHistory length after 1st retry = %d, want 1", len(got.RetryHistory))
+	}
+	rec1 := got.RetryHistory[0]
+	if rec1.Prompt != "first prompt" {
+		t.Errorf("RetryHistory[0].Prompt = %q, want 'first prompt'", rec1.Prompt)
+	}
+	if rec1.Status != TaskStatusFailed {
+		t.Errorf("RetryHistory[0].Status = %q, want 'failed'", rec1.Status)
+	}
+	if rec1.Result != "first result" {
+		t.Errorf("RetryHistory[0].Result = %q, want 'first result'", rec1.Result)
+	}
+	if rec1.SessionID != "sess-1" {
+		t.Errorf("RetryHistory[0].SessionID = %q, want 'sess-1'", rec1.SessionID)
+	}
+	if rec1.Turns != 3 {
+		t.Errorf("RetryHistory[0].Turns = %d, want 3", rec1.Turns)
+	}
+	if rec1.CostUSD != 0.42 {
+		t.Errorf("RetryHistory[0].CostUSD = %f, want 0.42", rec1.CostUSD)
+	}
+	if rec1.RetiredAt.IsZero() {
+		t.Error("RetryHistory[0].RetiredAt should not be zero")
+	}
+
+	// Step 3: Force to failed again with different values; second retry.
+	// AccumulateSubAgentUsage is cumulative: adding 0.57 on top of the existing
+	// 0.42 gives a running total of 0.99, which is what the RetryRecord captures.
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
+	s.UpdateTaskResult(bg(), task.ID, "second result", "sess-2", "end_turn", 7)
+	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
+		TaskUsage{InputTokens: 200, OutputTokens: 100, CostUSD: 0.57})
+
+	if err := s.ResetTaskForRetry(bg(), task.ID, "third prompt", true); err != nil {
+		t.Fatalf("ResetTaskForRetry (2nd): %v", err)
+	}
+
+	got, _ = s.GetTask(bg(), task.ID)
+	if len(got.RetryHistory) != 2 {
+		t.Fatalf("RetryHistory length after 2nd retry = %d, want 2", len(got.RetryHistory))
+	}
+	rec2 := got.RetryHistory[1]
+	if rec2.Prompt != "second prompt" {
+		t.Errorf("RetryHistory[1].Prompt = %q, want 'second prompt'", rec2.Prompt)
+	}
+	if rec2.Result != "second result" {
+		t.Errorf("RetryHistory[1].Result = %q, want 'second result'", rec2.Result)
+	}
+	if rec2.SessionID != "sess-2" {
+		t.Errorf("RetryHistory[1].SessionID = %q, want 'sess-2'", rec2.SessionID)
+	}
+	if rec2.Turns != 7 {
+		t.Errorf("RetryHistory[1].Turns = %d, want 7", rec2.Turns)
+	}
+	const wantCostUSD2 = 0.99 // 0.42 (1st run) + 0.57 (2nd run) = 0.99 accumulated total
+	if rec2.CostUSD != wantCostUSD2 {
+		t.Errorf("RetryHistory[1].CostUSD = %f, want %f", rec2.CostUSD, wantCostUSD2)
+	}
+	// FIFO order: first record is still the earliest attempt.
+	if got.RetryHistory[0].Prompt != "first prompt" {
+		t.Errorf("FIFO order broken: RetryHistory[0].Prompt = %q, want 'first prompt'", got.RetryHistory[0].Prompt)
+	}
+
+	// Step 4: Verify PromptHistory is still populated (backward compat).
+	if len(got.PromptHistory) != 2 {
+		t.Fatalf("PromptHistory length = %d, want 2 (backward compat)", len(got.PromptHistory))
+	}
+	if got.PromptHistory[0] != "first prompt" || got.PromptHistory[1] != "second prompt" {
+		t.Errorf("PromptHistory = %v, want ['first prompt', 'second prompt']", got.PromptHistory)
+	}
+
+	// Step 5: Reload store from disk and verify RetryHistory survived round-trip.
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore (reload): %v", err)
+	}
+	reloaded, err := s2.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after reload: %v", err)
+	}
+	if len(reloaded.RetryHistory) != 2 {
+		t.Fatalf("RetryHistory length after reload = %d, want 2", len(reloaded.RetryHistory))
+	}
+	if reloaded.RetryHistory[0].Prompt != "first prompt" {
+		t.Errorf("reloaded RetryHistory[0].Prompt = %q, want 'first prompt'", reloaded.RetryHistory[0].Prompt)
+	}
+	if reloaded.RetryHistory[1].CostUSD != wantCostUSD2 {
+		t.Errorf("reloaded RetryHistory[1].CostUSD = %f, want %f", reloaded.RetryHistory[1].CostUSD, wantCostUSD2)
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SetTaskArchived
 // ─────────────────────────────────────────────────────────────────────────────
