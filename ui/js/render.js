@@ -140,8 +140,11 @@ function getBlockingTaskNames(t) {
   const allTasks = getRenderableTasks();
   return t.depends_on.map(function(id) {
     var dep = allTasks.find(function(d) { return d.id === id; });
+    if (dep && dep.status === 'done') return null;
     if (!dep) return id.slice(0, 8) + '\u2026';
     return dep.title || (dep.prompt.length > 30 ? dep.prompt.slice(0, 30) + '\u2026' : dep.prompt);
+  }).filter(function(name) {
+    return !!name;
   }).join(', ');
 }
 
@@ -284,24 +287,21 @@ const diffCache = new Map(); // taskId -> {diff: string, behindCounts, updatedAt
 const cardOversightCache = new Map(); // taskId -> {phase_count, phases}
 
 function isTestCard(task) {
-  return task.status === 'waiting' && !!task.last_test_result && task.test_run_start_turn > 0;
+  return !!task.last_test_result && task.test_run_start_turn > 0;
 }
 
 function hasExecutionTrail(t) {
   return (t.turns || 0) > 0 || !!t.result || !!t.stop_reason;
 }
 
-// Invalidate cached behind-counts so that the next render re-checks how many
-// commits a waiting card is behind.  When taskId is provided only that entry is
-// invalidated; otherwise every entry is reset (used on full snapshots).
+// Invalidate cached diff/behind-count state so that the next render re-fetches
+// data. When taskId is provided only that entry is evicted; otherwise the full
+// cache is cleared (used on full snapshots).
 function invalidateDiffBehindCounts(taskId) {
   if (taskId) {
-    const cached = diffCache.get(taskId);
-    if (cached && cached !== 'loading') cached.behindFetchedAt = 0;
+    diffCache.delete(taskId);
   } else {
-    for (const [, cached] of diffCache) {
-      if (cached && cached !== 'loading') cached.behindFetchedAt = 0;
-    }
+    diffCache.clear();
   }
 }
 
@@ -332,9 +332,9 @@ async function fetchDiff(card, taskId, updatedAt) {
   const cached = diffCache.get(taskId);
   if (cached === 'loading') return;
   // Cache is valid if the task hasn't changed AND behind-counts are still fresh.
-  // behindFetchedAt is zeroed by invalidateDiffBehindCounts() for the specific changed task,
-  // or expires naturally after BEHIND_TTL_MS so that a slowly-advancing default branch
-  // is eventually reflected without requiring an explicit invalidation event.
+  // invalidateDiffBehindCounts() evicts stale entries explicitly for changed tasks,
+  // and BEHIND_TTL_MS provides a fallback refresh window for slowly advancing
+  // default branches.
   if (cached && cached.updatedAt === updatedAt &&
       cached.behindFetchedAt &&
       (Date.now() - cached.behindFetchedAt) < BEHIND_TTL_MS) {
@@ -744,4 +744,17 @@ card.style.opacity = isArchived ? '0.55' : '';
 
   _bindCardKeyboardNavigation(card, t);
 
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    areDepsBlocked,
+    getBlockingTaskNames,
+    isTestCard,
+    invalidateDiffBehindCounts,
+    BEHIND_TTL_MS,
+    diffCache,
+    cardOversightCache,
+    fetchDiff,
+  };
 }
