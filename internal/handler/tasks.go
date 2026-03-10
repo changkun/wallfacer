@@ -1514,10 +1514,14 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 		if t.Status != store.TaskStatusWaiting {
 			continue
 		}
-		// Submit tasks that passed verification, or where the test ran but
-		// produced no clear verdict ("unknown"). Tasks that haven't been
-		// tested at all (LastTestResult == "") or explicitly failed are skipped.
-		if t.LastTestResult != "pass" && t.LastTestResult != "unknown" {
+		// Determine eligibility:
+		// (a) Passed verification or ambiguous verdict ("pass"/"unknown").
+		// (b) Naturally completed (stop_reason="end_turn") and not yet tested,
+		//     but only when auto-test is off — otherwise let auto-test run first.
+		// Tasks that explicitly failed testing are never auto-submitted.
+		tested := t.LastTestResult == "pass" || t.LastTestResult == "unknown"
+		naturallyComplete := t.StopReason != nil && *t.StopReason == "end_turn" && t.LastTestResult == "" && !h.AutotestEnabled()
+		if !tested && !naturallyComplete {
 			continue
 		}
 		// Skip while the test agent is still running.
@@ -1559,6 +1563,8 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 		autoSubmitMsg := "Auto-submit: task verified with passing tests, up to date, and no conflicts."
 		if t.LastTestResult == "unknown" {
 			autoSubmitMsg = "Auto-submit: task completed (test ran but no explicit verdict), up to date, and no conflicts."
+		} else if naturallyComplete {
+			autoSubmitMsg = "Auto-submit: task naturally completed, up to date, and no conflicts."
 		}
 		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
 			"result": autoSubmitMsg,

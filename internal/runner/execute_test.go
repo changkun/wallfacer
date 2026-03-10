@@ -137,8 +137,8 @@ func TestRunEndTurnTransitionsToDone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Status != "done" {
-		t.Fatalf("expected status=done, got %q", updated.Status)
+	if updated.Status != "waiting" {
+		t.Fatalf("expected status=waiting (pending review), got %q", updated.Status)
 	}
 }
 
@@ -234,8 +234,8 @@ func TestRunMaxTokensAutoContinues(t *testing.T) {
 	r.Run(task.ID, "prompt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
-	if updated.Status != "done" {
-		t.Fatalf("expected status=done after max_tokens+end_turn, got %q", updated.Status)
+	if updated.Status != "waiting" {
+		t.Fatalf("expected status=waiting after max_tokens+end_turn, got %q", updated.Status)
 	}
 	if updated.Turns < 2 {
 		t.Fatalf("expected at least 2 turns after auto-continue, got %d", updated.Turns)
@@ -686,20 +686,20 @@ func TestRunCostResumedFromWaiting(t *testing.T) {
 		t.Fatalf("expected waiting, got %q", waiting.Status)
 	}
 
-	// Second Run (feedback resume): goes to done.
+	// Second Run (feedback resume): goes to waiting (pending review).
 	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatal(err)
 	}
 	r.Run(task.ID, "continue", *waiting.SessionID, false)
-	// Wait for all background goroutines (done oversight) to finish so the
+	// Wait for all background goroutines (oversight) to finish so the
 	// cost totals are deterministic before we read the final values.
 	r.WaitBackground()
 	final, _ := s.GetTask(ctx, task.ID)
-	if final.Status != "done" {
-		t.Fatalf("expected done, got %q", final.Status)
+	if final.Status != "waiting" {
+		t.Fatalf("expected waiting, got %q", final.Status)
 	}
 
-	// Total cost: 0.03 (impl1) + 0.04 (oversight-waiting) + 0.04 (impl2) + 0.04 (oversight-done) = 0.15.
+	// Total cost: 0.03 (impl1) + 0.04 (oversight-waiting) + 0.04 (impl2) + 0.04 (oversight-waiting2) = 0.15.
 	if final.Usage.CostUSD < 0.149 || final.Usage.CostUSD > 0.151 {
 		t.Errorf("CostUSD = %f, want ~0.15", final.Usage.CostUSD)
 	}
@@ -726,7 +726,7 @@ func TestRunCostResumedFromWaiting(t *testing.T) {
 	if ov, ok := bd["oversight"]; !ok {
 		t.Error("missing oversight breakdown")
 	} else {
-		// Waiting oversight (0.04) + done oversight (0.04) = 0.08.
+		// Waiting oversight (0.04) + waiting oversight2 (0.04) = 0.08.
 		if ov.CostUSD < 0.079 || ov.CostUSD > 0.081 {
 			t.Errorf("oversight CostUSD = %f, want ~0.08", ov.CostUSD)
 		}
@@ -804,47 +804,25 @@ func TestRunWaitingFeedbackDonePreservesChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Second Run (feedback resume): produces endTurnOutput → commit pipeline → done.
+	// Second Run (feedback resume): produces endTurnOutput → task goes to waiting
+	// (pending review) instead of directly committing. Changes remain in the worktree.
 	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatal(err)
 	}
 	r.Run(task.ID, "continue", *updated.SessionID, false)
 
 	final, _ := s.GetTask(ctx, task.ID)
-	if final.Status != "done" {
-		t.Fatalf("expected status=done after second run, got %q", final.Status)
+	if final.Status != "waiting" {
+		t.Fatalf("expected status=waiting after second run, got %q", final.Status)
 	}
 
-	// Verify the file exists on the default branch after merge.
-	if _, err := os.Stat(filepath.Join(repo, "task-output.txt")); err != nil {
-		t.Fatal("task-output.txt should exist on default branch after commit pipeline:", err)
+	// Verify the file still exists in the worktree (changes preserved for review).
+	if _, err := os.Stat(filepath.Join(wt, "task-output.txt")); err != nil {
+		t.Fatal("task-output.txt should still exist in worktree:", err)
 	}
-	content, _ := os.ReadFile(filepath.Join(repo, "task-output.txt"))
+	content, _ := os.ReadFile(filepath.Join(wt, "task-output.txt"))
 	if string(content) != "task result\n" {
 		t.Fatalf("unexpected content: %q", content)
-	}
-
-	// Verify CommitHashes and BaseCommitHashes are stored.
-	if len(final.CommitHashes) == 0 {
-		t.Error("CommitHashes should be populated after commit pipeline")
-	}
-	if len(final.BaseCommitHashes) == 0 {
-		t.Error("BaseCommitHashes should be populated after commit pipeline")
-	}
-	if final.BaseCommitHashes[repo] == "" {
-		t.Error("BaseCommitHashes should contain a hash for the repo")
-	}
-	if final.CommitHashes[repo] == "" {
-		t.Error("CommitHashes should contain a hash for the repo")
-	}
-	// Base and commit hashes should differ (task added a commit).
-	if final.BaseCommitHashes[repo] == final.CommitHashes[repo] {
-		t.Error("BaseCommitHashes and CommitHashes should differ (task made changes)")
-	}
-
-	// Verify worktrees are cleaned up.
-	if _, err := os.Stat(wt); !os.IsNotExist(err) {
-		t.Fatal("worktree should have been cleaned up after commit pipeline")
 	}
 }
 
