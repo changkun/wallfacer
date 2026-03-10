@@ -62,6 +62,7 @@ let timelineRefreshTimer = null;
 
 // Search / filter state
 let filterQuery = '';
+let backlogSortMode = localStorage.getItem('wallfacer-backlog-sort-mode') === 'impact' ? 'impact' : 'manual';
 
 // Deep-link hash handling: true once the initial URL hash has been processed.
 let _hashHandled = false;

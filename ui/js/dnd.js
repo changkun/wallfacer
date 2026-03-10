@@ -1,16 +1,29 @@
 // --- Drag and Drop ---
 
+let backlogSortable = null;
+
+function currentBacklogSortMode() {
+  return typeof backlogSortMode === 'string' ? backlogSortMode : 'manual';
+}
+
+function syncBacklogSortableMode() {
+  if (!backlogSortable || typeof backlogSortable.option !== 'function') return;
+  backlogSortable.option('sort', currentBacklogSortMode() !== 'impact');
+}
+
 function initSortable() {
   const backlog = document.getElementById('col-backlog');
   const inProgress = document.getElementById('col-in_progress');
 
   // Backlog: can reorder (sort) and drag out to In Progress
-  Sortable.create(backlog, {
+  backlogSortable = Sortable.create(backlog, {
     group: { name: 'taskboard', pull: true, put: false },
     animation: 150,
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
+    sort: currentBacklogSortMode() !== 'impact',
     onSort: function() {
+      if (currentBacklogSortMode() === 'impact') return;
       // Persist new position order after drag-reorder within backlog.
       const cards = backlog.querySelectorAll('.card[data-id]');
       cards.forEach((card, idx) => {
@@ -55,4 +68,6 @@ function initSortable() {
     animation: 150,
     sort: false,
   });
+
+  syncBacklogSortableMode();
 }

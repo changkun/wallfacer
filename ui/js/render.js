@@ -70,6 +70,60 @@ function getRenderableTasks() {
   return tasks;
 }
 
+function getTaskImpactScore(task) {
+  if (!task || typeof task !== 'object') return null;
+  if (typeof task.impact_score === 'number' && Number.isFinite(task.impact_score)) {
+    return task.impact_score;
+  }
+  const tags = Array.isArray(task.tags) ? task.tags : [];
+  for (const tag of tags) {
+    if (typeof tag !== 'string') continue;
+    const trimmed = tag.trim();
+    if (!trimmed.toLowerCase().startsWith('impact:')) continue;
+    const value = Number.parseInt(trimmed.slice('impact:'.length).trim(), 10);
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function sortBacklogTasks(items) {
+  if (backlogSortMode !== 'impact') {
+    items.sort((a, b) => a.position - b.position);
+    return items;
+  }
+  items.sort((a, b) => {
+    const impactA = getTaskImpactScore(a);
+    const impactB = getTaskImpactScore(b);
+    const hasImpactA = impactA !== null;
+    const hasImpactB = impactB !== null;
+    if (hasImpactA && hasImpactB && impactA !== impactB) return impactB - impactA;
+    if (hasImpactA !== hasImpactB) return hasImpactA ? -1 : 1;
+    return a.position - b.position;
+  });
+  return items;
+}
+
+function updateBacklogSortButton() {
+  const button = document.getElementById('backlog-sort-btn');
+  if (!button) return;
+  const impactSort = backlogSortMode === 'impact';
+  button.textContent = impactSort ? 'Sort: Impact' : 'Sort: Manual';
+  button.setAttribute('aria-pressed', impactSort ? 'true' : 'false');
+  button.classList.toggle('active', impactSort);
+}
+
+function setBacklogSortMode(mode) {
+  backlogSortMode = mode === 'impact' ? 'impact' : 'manual';
+  localStorage.setItem('wallfacer-backlog-sort-mode', backlogSortMode);
+  updateBacklogSortButton();
+  if (typeof syncBacklogSortableMode === 'function') syncBacklogSortableMode();
+}
+
+function toggleBacklogSort() {
+  setBacklogSortMode(backlogSortMode === 'impact' ? 'manual' : 'impact');
+  render();
+}
+
 // --- Dependency badge helpers ---
 
 function areDepsBlocked(t) {
@@ -322,6 +376,7 @@ function applyDiffToCard(el, diff, behindCounts, taskId) {
 function render() {
   // Sync ideation spinner from live task list (no polling needed).
   if (typeof updateIdeationFromTasks === 'function') updateIdeationFromTasks(tasks);
+  updateBacklogSortButton();
 
   const columns = { backlog: [], in_progress: [], waiting: [], committing: [], done: [], failed: [], cancelled: [] };
   for (const t of tasks) {
@@ -358,7 +413,7 @@ function render() {
     // Backlog: sort by position ascending (priority order).
     // Other columns: sort by last updated descending.
     if (status === 'backlog') {
-      items.sort((a, b) => a.position - b.position);
+      sortBacklogTasks(items);
     } else {
       items.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
     }

@@ -26,6 +26,14 @@
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-backlog">Backlog</h2>
       <span id="count-backlog" class="text-xs text-v-muted">0</span>
+      <button
+        id="backlog-sort-btn"
+        type="button"
+        class="btn-icon"
+        style="margin-left:auto;font-size:11px;padding:2px 8px;"
+        onclick="toggleBacklogSort()"
+        title="Toggle backlog sorting between manual priority and idea impact score"
+      >Sort: Manual</button>
     </div>
     <div class="column col-bg flex flex-col">
       <button id="new-task-btn" onclick="showNewTaskForm()" class="btn-dashed mb-2">+ New Task</button>

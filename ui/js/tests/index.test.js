@@ -248,6 +248,43 @@ describe('updateMaxParallelTag', () => {
   });
 });
 
+describe('backlog impact sorting helpers', () => {
+  let ctx;
+
+  beforeAll(() => {
+    ctx = makeContext();
+    loadScript('state.js', ctx);
+    loadScript('render.js', ctx);
+  });
+
+  it('reads impact score from idea-agent tags', () => {
+    expect(ctx.getTaskImpactScore({ tags: ['idea-agent', 'impact:87'] })).toBe(87);
+    expect(ctx.getTaskImpactScore({ tags: ['impact: not-a-number'] })).toBe(null);
+  });
+
+  it('sorts scored backlog tasks by impact descending and keeps manual fallback order', () => {
+    const tasks = [
+      { id: 'manual', position: 0, tags: [] },
+      { id: 'low', position: 2, tags: ['impact:40'] },
+      { id: 'high', position: 1, tags: ['idea-agent', 'impact:90'] },
+      { id: 'none', position: 3, tags: ['idea-agent'] },
+    ];
+    vm.runInContext(`backlogSortMode = 'impact';`, ctx);
+    const sorted = ctx.sortBacklogTasks(tasks.slice()).map((task) => task.id);
+    expect(sorted).toEqual(['high', 'low', 'manual', 'none']);
+  });
+
+  it('falls back to saved manual priority order when impact sort is disabled', () => {
+    const tasks = [
+      { id: 'b', position: 1, tags: ['impact:90'] },
+      { id: 'a', position: 0, tags: ['impact:20'] },
+    ];
+    vm.runInContext(`backlogSortMode = 'manual';`, ctx);
+    const sorted = ctx.sortBacklogTasks(tasks.slice()).map((task) => task.id);
+    expect(sorted).toEqual(['a', 'b']);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Test 7 – buildCardActions: Start button disabled during refinement (render.js)
 // Verifies that the Start button on backlog cards is disabled when a refinement

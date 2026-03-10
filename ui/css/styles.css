@@ -850,6 +850,16 @@ pre { white-space: pre-wrap; word-break: break-word; }
   display: inline-flex; align-items: center; gap: 3px; line-height: 1.6;
 }
 .btn-icon:hover { color: var(--text); border-color: var(--text-muted); }
+.btn-icon.active {
+  color: var(--text);
+  border-color: #c6a7fb;
+  background: linear-gradient(180deg, #f4eeff 0%, #eadfff 100%);
+}
+[data-theme="dark"] .btn-icon.active {
+  border-color: #4b3c74;
+  background: linear-gradient(180deg, #2b2345 0%, #211638 100%);
+  color: #ccb0ff;
+}
 
 /* --- Markdown prose (modal detail view) --- */
 .prose-content { font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
