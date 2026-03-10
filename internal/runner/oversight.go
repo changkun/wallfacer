@@ -698,22 +698,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 	}
 	model = r.titleModelFromEnvForSandbox(sandbox)
 
-	spec := ContainerSpec{
-		Runtime: r.command,
-		Name:    containerName,
-		Image:   r.sandboxImageForSandbox(sandbox),
-	}
-	if r.envFile != "" {
-		spec.EnvFile = r.envFile
-	}
-	if model != "" {
-		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
-	}
-	spec.Volumes = append(spec.Volumes, VolumeMount{
-		Host:      "claude-config",
-		Container: "/home/claude/.claude",
-	})
-	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
+	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
 	// Note: oversight agent uses no workspace mounts, no instructions mount,
 	// no -w workdir, and the Cmd order is --output-format before --verbose.
 	spec.Cmd = []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}

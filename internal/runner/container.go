@@ -279,6 +279,7 @@ func (r *Runner) buildBaseContainerSpec(containerName, model, sandbox string) Co
 		Container: "/home/claude/.claude",
 	})
 	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
+	spec.Network = r.resolvedContainerNetwork()
 	return spec
 }
 
