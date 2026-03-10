@@ -291,7 +291,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	// is represented as a terminal done task; failures keep their natural
 	// terminal state from the runner.
 	if updated.Status == store.TaskStatusWaiting && updated.LastTestResult == "pass" {
-		if err := h.store.UpdateTaskStatus(r.Context(), task.ID, store.TaskStatusDone); err != nil {
+		if err := h.store.ForceUpdateTaskStatus(r.Context(), task.ID, store.TaskStatusDone); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

@@ -1604,8 +1604,9 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				})
 			}()
 		} else {
-			// No session — move directly to done.
-			if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
+			// No session — move directly to done (bypasses state machine
+			// since waiting→done is deliberately blocked to protect the commit pipeline).
+			if err := h.store.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
 				logger.Handler.Error("auto-submit: update task status to done", "task", t.ID, "error", err)
 				continue
 			}

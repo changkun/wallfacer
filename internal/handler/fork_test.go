@@ -31,7 +31,7 @@ func TestForkTask_RejectsEmptyPrompt(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	task, _ := h.store.CreateTask(ctx, "source", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
 	body := `{"prompt":"  "}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/fork",
