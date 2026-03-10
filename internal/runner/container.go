@@ -35,6 +35,10 @@ type agentOutput struct {
 	IsError      bool       `json:"is_error"`
 	TotalCostUSD float64    `json:"total_cost_usd"`
 	Usage        agentUsage `json:"usage"`
+
+	// ActualSandbox is set by runContainer (not parsed from JSON) to record
+	// which sandbox actually executed this turn, including fallback scenarios.
+	ActualSandbox string `json:"-"`
 }
 
 const (
@@ -526,6 +530,7 @@ func (r *Runner) runContainer(
 			}
 		}
 
+		output.ActualSandbox = selectedSandbox
 		return output, stdout.Bytes(), stderr.Bytes(), nil
 	}
 
@@ -534,6 +539,9 @@ func (r *Runner) runContainer(
 		if strings.EqualFold(sandbox, "claude") && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
 			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
 				"task", taskID, "activity", activity)
+			r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+				"result": "Sandbox fallback: claude → codex (token/rate limit hit)",
+			})
 			return runWithSandbox("codex")
 		}
 		return nil, rawStdout, rawStderr, err
@@ -543,6 +551,9 @@ func (r *Runner) runContainer(
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID, "activity", activity)
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+			"result": "Sandbox fallback: claude → codex (token/rate limit in output)",
+		})
 		return runWithSandbox("codex")
 	}
 

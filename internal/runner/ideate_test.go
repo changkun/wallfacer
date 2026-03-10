@@ -58,8 +58,8 @@ func TestIdeationTaskTransitionsToDone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Status != store.TaskStatusDone {
-		t.Fatalf("expected status=done, got %q", updated.Status)
+	if updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected status=waiting, got %q", updated.Status)
 	}
 }
 

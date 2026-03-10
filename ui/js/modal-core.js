@@ -335,7 +335,9 @@ async function openModal(id) {
         const instrShort = envData.instructions_hash ? envData.instructions_hash.slice(0, 12) : '';
         const apiEndpoint = envData.api_base_url ? escapeHtml(envData.api_base_url) : '<em style="color:var(--text-muted);">(default)</em>';
         const recordedStr = envData.recorded_at ? escapeHtml(timeAgo(envData.recorded_at)) : '';
+        const sandboxVal = envData.sandbox ? escapeHtml(envData.sandbox) : '<em style="color:var(--text-muted);">(default)</em>';
         const rows = [
+          _envRow('Sandbox', sandboxVal),
           _envRow('Model', escapeHtml(envData.model_name || '(unknown)')),
           _envRow('Container', containerVal),
           instrShort ? _envRow('Instructions SHA-256', '<code style="font-size:10px;font-family:monospace;">' + escapeHtml(instrShort) + '</code>') : '',

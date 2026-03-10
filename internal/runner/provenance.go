@@ -31,6 +31,9 @@ func (r *Runner) captureExecutionEnvironment(task store.Task) store.ExecutionEnv
 		env.ModelName = task.Model
 	}
 
+	// Sandbox: record the configured sandbox for this task.
+	env.Sandbox = r.sandboxForTaskActivity(&task, activityImplementation)
+
 	// Container image: resolve using the same logic as the container runner.
 	env.ContainerImage = r.sandboxImageForSandbox(task.Sandbox)
 

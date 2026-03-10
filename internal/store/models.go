@@ -31,6 +31,7 @@ type ExecutionEnvironment struct {
 	ModelName        string    `json:"model_name"`        // e.g. "claude-opus-4-6"
 	APIBaseURL       string    `json:"api_base_url"`      // empty string = default Anthropic endpoint
 	InstructionsHash string    `json:"instructions_hash"` // sha256 hex of CLAUDE.md at run start
+	Sandbox          string    `json:"sandbox"`           // configured sandbox: "claude", "codex", etc.
 	RecordedAt       time.Time `json:"recorded_at"`
 }
 
@@ -148,7 +149,7 @@ var ErrInvalidTransition = errors.New("invalid transition")
 // present in this map are accepted by UpdateTaskStatus; all others are rejected.
 var allowedTransitions = map[TaskStatus][]TaskStatus{
 	TaskStatusBacklog:    {TaskStatusInProgress},
-	TaskStatusInProgress: {TaskStatusCommitting, TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled},
+	TaskStatusInProgress: {TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled},
 	TaskStatusCommitting: {TaskStatusDone, TaskStatusFailed},
 	TaskStatusWaiting:    {TaskStatusInProgress, TaskStatusCommitting, TaskStatusDone, TaskStatusCancelled},
 	TaskStatusFailed:     {TaskStatusBacklog, TaskStatusCancelled},
