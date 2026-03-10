@@ -30,7 +30,6 @@ func TestValidateTransition(t *testing.T) {
 		{TaskStatusCommitting, TaskStatusFailed},
 		{TaskStatusWaiting, TaskStatusInProgress},
 		{TaskStatusWaiting, TaskStatusCommitting},
-		{TaskStatusWaiting, TaskStatusDone},
 		{TaskStatusWaiting, TaskStatusCancelled},
 		{TaskStatusFailed, TaskStatusBacklog},
 		{TaskStatusFailed, TaskStatusCancelled},
@@ -61,6 +60,7 @@ func TestValidateTransition(t *testing.T) {
 		{TaskStatusBacklog, TaskStatusCancelled},
 		{TaskStatusInProgress, TaskStatusCommitting},
 		{TaskStatusInProgress, TaskStatusDone},
+		{TaskStatusWaiting, TaskStatusDone},
 		{TaskStatusCommitting, TaskStatusBacklog},
 		{TaskStatusDone, TaskStatusBacklog},
 		{TaskStatusCancelled, TaskStatusDone},
@@ -81,7 +81,7 @@ func TestTaskStatus_CanTransitionTo(t *testing.T) {
 	}{
 		{TaskStatusBacklog, TaskStatusInProgress},
 		{TaskStatusInProgress, TaskStatusWaiting},
-		{TaskStatusWaiting, TaskStatusDone},
+		{TaskStatusWaiting, TaskStatusCommitting},
 		{TaskStatusFailed, TaskStatusBacklog},
 		{TaskStatusCancelled, TaskStatusBacklog},
 	}
@@ -107,7 +107,7 @@ func TestTaskStatus_AllowedTransitions(t *testing.T) {
 		{TaskStatusBacklog, []TaskStatus{TaskStatusInProgress}},
 		{TaskStatusInProgress, []TaskStatus{TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled}},
 		{TaskStatusCommitting, []TaskStatus{TaskStatusDone, TaskStatusFailed}},
-		{TaskStatusWaiting, []TaskStatus{TaskStatusInProgress, TaskStatusCommitting, TaskStatusDone, TaskStatusCancelled}},
+		{TaskStatusWaiting, []TaskStatus{TaskStatusInProgress, TaskStatusCommitting, TaskStatusCancelled}},
 		{TaskStatusFailed, []TaskStatus{TaskStatusBacklog, TaskStatusCancelled}},
 		{TaskStatusDone, []TaskStatus{TaskStatusCancelled}},
 		{TaskStatusCancelled, []TaskStatus{TaskStatusBacklog}},

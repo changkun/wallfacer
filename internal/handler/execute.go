@@ -128,8 +128,9 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 			})
 		}()
 	} else {
-		// No session to commit — go directly to done.
-		if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusDone); err != nil {
+		// No session to commit — go directly to done (bypasses state machine
+		// since waiting→done is deliberately blocked to protect the commit pipeline).
+		if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusDone); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

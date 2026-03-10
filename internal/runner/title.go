@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -26,44 +27,80 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		return
 	}
 	sandbox := r.sandboxForTaskActivity(task, activityTitle)
-	model := r.titleModelFromEnvForSandbox(sandbox)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	containerName := "wallfacer-title-" + taskID.String()[:8]
-	exec.Command(r.command, "rm", "-f", containerName).Run()
-
-	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
-
 	titlePrompt := prompts.Title(prompt)
-	spec.Cmd = buildAgentCmd(titlePrompt, model)
 
-	cmd := exec.CommandContext(ctx, r.command, spec.Build()...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	// runWithSandbox executes the title container with the given sandbox,
+	// returning the parsed output (or nil) and any error.
+	type titleResult struct {
+		output *agentOutput
+		err    error
+	}
+	runWithSandbox := func(sb string) titleResult {
+		mdl := r.titleModelFromEnvForSandbox(sb)
+		containerName := "wallfacer-title-" + taskID.String()[:8]
+		exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityTitle})
-	runErr := cmd.Run()
-	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityTitle})
-	if runErr != nil && ctx.Err() == nil {
-		logger.Runner.Warn("title generation failed", "task", taskID, "error", runErr,
-			"stderr", truncate(stderr.String(), 200))
-		return
+		spec := r.buildBaseContainerSpec(containerName, mdl, sb)
+		spec.Cmd = buildAgentCmd(titlePrompt, mdl)
+
+		cmd := exec.CommandContext(ctx, r.command, spec.Build()...)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityTitle})
+		runErr := cmd.Run()
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityTitle})
+
+		if runErr != nil && ctx.Err() == nil {
+			return titleResult{err: fmt.Errorf("%w: stderr=%s", runErr, truncate(stderr.String(), 200))}
+		}
+
+		raw := strings.TrimSpace(stdout.String())
+		if raw == "" {
+			return titleResult{err: fmt.Errorf("empty output")}
+		}
+
+		parsed, parseErr := parseOutput(raw)
+		if parseErr != nil {
+			return titleResult{err: fmt.Errorf("parse failure: raw=%s", truncate(raw, 200))}
+		}
+		return titleResult{output: parsed}
 	}
 
-	raw := strings.TrimSpace(stdout.String())
-	if raw == "" {
-		logger.Runner.Warn("title generation: empty output", "task", taskID)
-		return
+	res := runWithSandbox(sandbox)
+
+	// Fallback: if the claude sandbox hit a rate/token limit, retry with codex.
+	if strings.EqualFold(sandbox, "claude") && res.err != nil &&
+		isLikelyTokenLimitError(res.err.Error()) {
+		logger.Runner.Warn("title generation: claude sandbox token limit hit; retrying with codex",
+			"task", taskID)
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+			"result": "Sandbox fallback: claude → codex (token/rate limit hit during title generation)",
+		})
+		sandbox = "codex"
+		res = runWithSandbox("codex")
+	}
+	if strings.EqualFold(sandbox, "claude") && res.output != nil && res.output.IsError &&
+		isLikelyTokenLimitError(res.output.Result, res.output.Subtype) {
+		logger.Runner.Warn("title generation: claude sandbox reported token limit in output; retrying with codex",
+			"task", taskID)
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+			"result": "Sandbox fallback: claude → codex (token/rate limit in title output)",
+		})
+		sandbox = "codex"
+		res = runWithSandbox("codex")
 	}
 
-	output, err := parseOutput(raw)
-	if err != nil {
-		logger.Runner.Warn("title generation: parse failure", "task", taskID, "raw", truncate(raw, 200))
+	if res.err != nil {
+		logger.Runner.Warn("title generation failed", "task", taskID, "error", res.err)
 		return
 	}
+	output := res.output
 
 	title := strings.TrimSpace(output.Result)
 	title = strings.Trim(title, `"'`)
