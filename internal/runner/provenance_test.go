@@ -108,6 +108,27 @@ func TestCaptureExecutionEnvironment_ContainerImage(t *testing.T) {
 	}
 }
 
+// TestCaptureExecutionEnvironment_Sandbox verifies that the Sandbox field is
+// resolved via sandboxForTaskActivity (defaulting to "claude").
+func TestCaptureExecutionEnvironment_Sandbox(t *testing.T) {
+	r := NewRunner(nil, RunnerConfig{
+		Command:      "echo",
+		SandboxImage: "wallfacer:latest",
+	})
+
+	// No sandbox set → defaults to "claude".
+	env := r.captureExecutionEnvironment(store.Task{})
+	if env.Sandbox != "claude" {
+		t.Errorf("Sandbox = %q, want %q", env.Sandbox, "claude")
+	}
+
+	// Explicit sandbox.
+	env = r.captureExecutionEnvironment(store.Task{Sandbox: "codex"})
+	if env.Sandbox != "codex" {
+		t.Errorf("Sandbox = %q, want %q", env.Sandbox, "codex")
+	}
+}
+
 // TestCaptureExecutionEnvironment_TaskModelOverride verifies that a per-task
 // Model field overrides the envconfig default.
 func TestCaptureExecutionEnvironment_TaskModelOverride(t *testing.T) {

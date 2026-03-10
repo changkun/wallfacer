@@ -113,12 +113,15 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			})
 			return
 		}
-		r.store.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+		r.GenerateOversightBackground(taskID)
+		r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-			"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusDone),
+			"from": string(store.TaskStatusInProgress), "to": string(store.TaskStatusWaiting),
 			"trigger": store.TriggerSystem,
 		})
-		r.GenerateOversightBackground(taskID)
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			"result": "Ideation complete — awaiting review.",
+		})
 		return
 	}
 
@@ -330,7 +333,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 			StopReason:           output.StopReason,
-			Sandbox:              task.Sandbox,
+			Sandbox:              output.ActualSandbox,
 			SubAgent:             subAgent,
 		}); err != nil {
 			logger.Runner.Warn("append turn usage", "task", task.ID, "error", err)
