@@ -59,6 +59,19 @@ function loadScript(ctx, filename) {
   return ctx;
 }
 
+function task(id, fields = {}) {
+  return {
+    id,
+    title: fields.title || id,
+    status: fields.status || 'backlog',
+    archived: !!fields.archived,
+    updated_at: fields.updated_at || '2026-03-10T00:00:00Z',
+    position: fields.position || 0,
+    prompt: fields.prompt || '',
+    ...fields,
+  };
+}
+
 describe('sandbox helpers', () => {
   it('formats sandbox labels consistently', () => {
     const ctx = makeContext();
@@ -207,5 +220,194 @@ describe('toggleAutopilot', () => {
     await ctx.toggleAutopilot();
     expect(ctx.showAlert).toHaveBeenCalled();
     expect(toggle.checked).toBe(false);
+  });
+});
+
+describe('task stream reducers', () => {
+  it('moves an archived update from active tasks into archived tasks after a snapshot', () => {
+    const ctx = makeContext();
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    const snapshot = ctx.applyTasksSnapshot({
+      tasks: [],
+      archivedTasks: [],
+      archivedPage: { loadState: 'idle', hasMoreBefore: false, hasMoreAfter: false },
+    }, [task('task-1', { updated_at: '2026-03-10T10:00:00Z' })]);
+    const reduced = ctx.applyTaskUpdated(snapshot, task('task-1', {
+      archived: true,
+      updated_at: '2026-03-10T11:00:00Z',
+    }), { showArchived: true, pageSize: 20 });
+
+    expect(reduced.state.tasks).toEqual([]);
+    expect(reduced.state.archivedTasks.map((t) => t.id)).toEqual(['task-1']);
+  });
+
+  it('removes an unarchived task from archivedTasks and restores it to active tasks', () => {
+    const ctx = makeContext();
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    const reduced = ctx.applyTaskUpdated({
+      tasks: [],
+      archivedTasks: [task('task-1', { archived: true, updated_at: '2026-03-10T11:00:00Z' })],
+      archivedPage: { loadState: 'idle', hasMoreBefore: false, hasMoreAfter: false },
+    }, task('task-1', {
+      archived: false,
+      status: 'done',
+      updated_at: '2026-03-10T12:00:00Z',
+    }), { showArchived: true, pageSize: 20 });
+
+    expect(reduced.state.tasks.map((t) => t.id)).toEqual(['task-1']);
+    expect(reduced.state.archivedTasks).toEqual([]);
+  });
+
+  it('merges duplicate archived pages without duplicating IDs and keeps archived sort deterministic', () => {
+    const ctx = makeContext();
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    const initial = ctx.mergeArchivedTasksPage({
+      tasks: [],
+      archivedTasks: [
+        task('b', { archived: true, updated_at: '2026-03-10T10:00:00Z' }),
+        task('a', { archived: true, updated_at: '2026-03-10T10:00:00Z' }),
+      ],
+      archivedPage: { loadState: 'idle', hasMoreBefore: false, hasMoreAfter: false },
+    }, {
+      tasks: [
+        task('c', { archived: true, updated_at: '2026-03-10T09:00:00Z' }),
+        task('a', { archived: true, updated_at: '2026-03-10T10:00:00Z' }),
+      ],
+      has_more_before: true,
+      has_more_after: false,
+    }, 'before', 20);
+
+    expect(initial.archivedTasks.map((t) => t.id)).toEqual(['b', 'a', 'c']);
+
+    const duplicateMerge = ctx.mergeArchivedTasksPage(initial, {
+      tasks: [
+        task('c', { archived: true, updated_at: '2026-03-10T09:00:00Z' }),
+        task('a', { archived: true, updated_at: '2026-03-10T10:00:00Z' }),
+      ],
+      has_more_before: true,
+      has_more_after: false,
+    }, 'before', 20);
+
+    expect(duplicateMerge.archivedTasks.map((t) => t.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('trims the archived window beyond pageSize * 3 and preserves pagination invariants', () => {
+    const ctx = makeContext();
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    const archivedTasks = [];
+    for (let i = 0; i < 7; i += 1) {
+      archivedTasks.push(task(`task-${i}`, {
+        archived: true,
+        updated_at: `2026-03-10T0${6 - i}:00:00Z`,
+      }));
+    }
+    const trimmedAfter = ctx.trimArchivedWindowState({
+      tasks: [],
+      archivedTasks,
+      archivedPage: { loadState: 'idle', hasMoreBefore: false, hasMoreAfter: false },
+    }, 'after', 2);
+
+    expect(trimmedAfter.archivedTasks.map((t) => t.id)).toEqual(['task-0', 'task-1', 'task-2', 'task-3', 'task-4', 'task-5']);
+    expect(trimmedAfter.archivedPage.hasMoreBefore).toBe(true);
+    expect(trimmedAfter.archivedPage.hasMoreAfter).toBe(false);
+
+    const trimmedBefore = ctx.trimArchivedWindowState({
+      tasks: [],
+      archivedTasks,
+      archivedPage: { loadState: 'idle', hasMoreBefore: false, hasMoreAfter: false },
+    }, 'before', 2);
+
+    expect(trimmedBefore.archivedTasks.map((t) => t.id)).toEqual(['task-1', 'task-2', 'task-3', 'task-4', 'task-5', 'task-6']);
+    expect(trimmedBefore.archivedPage.hasMoreAfter).toBe(true);
+    expect(trimmedBefore.archivedPage.hasMoreBefore).toBe(false);
+  });
+
+  it('removes deleted tasks from both active and archived arrays', () => {
+    const ctx = makeContext();
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    const next = ctx.applyTaskDeleted({
+      tasks: [task('task-1'), task('task-2')],
+      archivedTasks: [task('task-2', { archived: true }), task('task-3', { archived: true })],
+      archivedPage: { loadState: 'idle', hasMoreBefore: false, hasMoreAfter: false },
+    }, { id: 'task-2' });
+
+    expect(next.tasks.map((t) => t.id)).toEqual(['task-1']);
+    expect(next.archivedTasks.map((t) => t.id)).toEqual(['task-3']);
+  });
+});
+
+describe('startTasksStream', () => {
+  it('reconnects with lastTasksEventId preserved in the next stream URL', () => {
+    const instances = [];
+    class MockEventSource {
+      constructor(url) {
+        this.url = url;
+        this.readyState = 1;
+        this.listeners = {};
+        instances.push(this);
+      }
+      addEventListener(type, handler) {
+        this.listeners[type] = handler;
+      }
+      close() {
+        this.closed = true;
+      }
+    }
+    MockEventSource.CLOSED = 2;
+
+    const scheduled = [];
+    const ctx = makeContext({
+      EventSource: MockEventSource,
+      Routes: {
+        tasks: {
+          stream: () => '/api/tasks/stream',
+        },
+      },
+      document: {
+        getElementById: () => null,
+        querySelectorAll: () => [],
+        querySelector: () => null,
+        addEventListener: () => {},
+        documentElement: { setAttribute: () => {} },
+        readyState: 'complete',
+      },
+      setTimeout: vi.fn((fn, delay) => {
+        scheduled.push({ fn, delay });
+        return 1;
+      }),
+      scheduleRender: vi.fn(),
+      invalidateDiffBehindCounts: vi.fn(),
+      announceBoardStatus: vi.fn(),
+      getTaskAccessibleTitle: vi.fn(() => 'Task'),
+      formatTaskStatusLabel: vi.fn(() => 'Done'),
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    ctx.startTasksStream();
+    expect(instances[0].url).toBe('/api/tasks/stream');
+
+    instances[0].listeners.snapshot({
+      data: JSON.stringify([task('task-1')]),
+      lastEventId: 'evt-1',
+    });
+    expect(vm.runInContext('lastTasksEventId', ctx)).toBe('evt-1');
+
+    instances[0].readyState = MockEventSource.CLOSED;
+    instances[0].onerror();
+    expect(scheduled).toHaveLength(1);
+
+    scheduled[0].fn();
+    expect(instances[1].url).toBe('/api/tasks/stream?last_event_id=evt-1');
   });
 });
