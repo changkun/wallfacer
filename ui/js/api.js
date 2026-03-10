@@ -222,6 +222,9 @@ function startTasksStream() {
       } else {
         tasks.push(task);
       }
+      if (typeof cardOversightCache !== 'undefined' && cardOversightCache && typeof cardOversightCache.delete === 'function') {
+        cardOversightCache.delete(task.id);
+      }
       if (previousTask && previousTask.status !== task.status) {
         announceBoardStatus(`Task "${getTaskAccessibleTitle(task)}" is now ${formatTaskStatusLabel(task.status)}`);
       }
