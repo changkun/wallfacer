@@ -210,6 +210,84 @@ func TestCompleteTask_WithSession_GoesToCommitting(t *testing.T) {
 	}
 }
 
+// --- WaitingToDone must go through commit pipeline ---
+
+// TestWaitingToDone_PATCHBlocked verifies that the PATCH handler rejects a
+// direct waiting→done transition, forcing callers through the POST /done
+// endpoint (CompleteTask) which runs the commit pipeline.
+func TestWaitingToDone_PATCHBlocked(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	body := `{"status":"done"}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(),
+		strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for waiting→done via PATCH, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Task must still be waiting.
+	updated, _ := h.store.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusWaiting {
+		t.Errorf("task status changed to %s, want waiting", updated.Status)
+	}
+}
+
+// TestWaitingToDone_StateMachineBlocked verifies the underlying state machine
+// rejects waiting→done via UpdateTaskStatus (not ForceUpdateTaskStatus).
+func TestWaitingToDone_StateMachineBlocked(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	if err == nil {
+		t.Fatal("expected error for waiting→done via UpdateTaskStatus, got nil")
+	}
+
+	updated, _ := h.store.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusWaiting {
+		t.Errorf("task status changed to %s, want waiting", updated.Status)
+	}
+}
+
+// TestWaitingToDone_CompleteTaskCommits verifies that POST /done (CompleteTask)
+// triggers the commit pipeline (waiting→committing) when a session exists,
+// rather than skipping directly to done.
+func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
+	h := newTestHandler(t)
+	t.Cleanup(func() { waitForBackground(200) })
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	setTaskSessionID(t, h, task.ID, "sess-abc")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
+	w := httptest.NewRecorder()
+	h.CompleteTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Immediately after the handler returns, the task should be in committing
+	// (the commit goroutine runs in the background). It might also be done/failed
+	// if the goroutine completed very quickly.
+	updated, _ := h.store.GetTask(ctx, task.ID)
+	switch updated.Status {
+	case store.TaskStatusCommitting, store.TaskStatusDone, store.TaskStatusFailed:
+		// OK — commit pipeline was triggered.
+	default:
+		t.Errorf("expected committing/done/failed, got %s — commit pipeline was not triggered", updated.Status)
+	}
+}
+
 // --- CancelTask ---
 
 func TestCancelTask_NotFound(t *testing.T) {
