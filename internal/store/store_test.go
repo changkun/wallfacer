@@ -188,10 +188,10 @@ func TestPersistence_DeletedTaskGoneAfterReload(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // transitionToDone moves a task through the valid state machine path to done:
-// backlog → in_progress → committing → done.
+// backlog → in_progress → waiting → committing → done.
 func transitionToDone(t *testing.T, s *Store, id uuid.UUID) {
 	t.Helper()
-	for _, status := range []TaskStatus{TaskStatusInProgress, TaskStatusCommitting, TaskStatusDone} {
+	for _, status := range []TaskStatus{TaskStatusInProgress, TaskStatusWaiting, TaskStatusCommitting, TaskStatusDone} {
 		if err := s.UpdateTaskStatus(bg(), id, status); err != nil {
 			t.Fatalf("UpdateTaskStatus(%s): %v", status, err)
 		}

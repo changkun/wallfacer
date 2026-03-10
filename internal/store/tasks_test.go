@@ -421,11 +421,12 @@ func TestUpdateTaskStatus_AllowsValidTransitions(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
 
-	// backlog → in_progress → waiting → in_progress → committing → done
+	// backlog → in_progress → waiting → in_progress → waiting → committing → done
 	steps := []TaskStatus{
 		TaskStatusInProgress,
 		TaskStatusWaiting,
 		TaskStatusInProgress,
+		TaskStatusWaiting,
 		TaskStatusCommitting,
 		TaskStatusDone,
 	}
