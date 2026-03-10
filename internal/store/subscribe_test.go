@@ -186,6 +186,75 @@ func TestNotify_DeltaContainsCorrectTask(t *testing.T) {
 	}
 }
 
+func TestSubscribe_DeltaPayloadIsIsolatedFromStoreAndReplay(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "hello", 5, false, "", "")
+
+	s.mu.Lock()
+	want := setTaskCloneFixture(t, s.tasks[task.ID])
+	s.mu.Unlock()
+
+	id, ch := s.Subscribe()
+	defer s.Unsubscribe(id)
+
+	s.mu.RLock()
+	s.notify(s.tasks[task.ID], false)
+	s.mu.RUnlock()
+
+	var first SequencedDelta
+	select {
+	case first = <-ch:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for first delta")
+	}
+	if first.Task == nil {
+		t.Fatal("expected task payload in first delta")
+	}
+
+	mutateTaskCloneForIsolation(first.Task)
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after delta mutation: %v", err)
+	}
+	assertTaskMatchesSnapshot(t, got, want)
+
+	replayed, tooOld := s.DeltasSince(first.Seq - 1)
+	if tooOld {
+		t.Fatal("unexpected replay gap")
+	}
+	if len(replayed) != 1 {
+		t.Fatalf("expected 1 replayed delta, got %d", len(replayed))
+	}
+	assertTaskMatchesSnapshot(t, replayed[0].Task, want)
+
+	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+
+	var second SequencedDelta
+	select {
+	case second = <-ch:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for second delta")
+	}
+	if second.Task == nil {
+		t.Fatal("expected task payload in second delta")
+	}
+	if second.Task.Status != TaskStatusInProgress {
+		t.Fatalf("second delta status = %q, want %q", second.Task.Status, TaskStatusInProgress)
+	}
+	if second.Task.PromptHistory[0] != want.PromptHistory[0] {
+		t.Fatalf("second delta prompt history = %q, want %q", second.Task.PromptHistory[0], want.PromptHistory[0])
+	}
+	if second.Task.RefineSessions[0].Messages[0].Content != want.RefineSessions[0].Messages[0].Content {
+		t.Fatalf("second delta refinement message = %q, want %q", second.Task.RefineSessions[0].Messages[0].Content, want.RefineSessions[0].Messages[0].Content)
+	}
+	if second.Task.WorktreePaths["/repo"] != want.WorktreePaths["/repo"] {
+		t.Fatalf("second delta worktree path = %q, want %q", second.Task.WorktreePaths["/repo"], want.WorktreePaths["/repo"])
+	}
+}
+
 // --- Replay buffer and sequence ID tests ---
 
 // TestNotify_StampsMonotonicSeq verifies that each delta emitted by notify gets

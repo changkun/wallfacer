@@ -14,7 +14,7 @@ type SequencedDelta struct {
 
 // TaskDelta carries the payload for a single task change notification.
 // Deleted is true when the task was removed; Task.ID holds the affected task's ID.
-// For non-delete events, Task is a deep copy of the mutated task.
+// For non-delete events, Task is a standalone clone of the mutated task.
 type TaskDelta struct {
 	Task    *Task
 	Deleted bool
@@ -85,7 +85,7 @@ func (s *Store) notify(task *Task, deleted bool) {
 
 	// Append to bounded replay buffer; trim oldest entries when over capacity.
 	s.replayMu.Lock()
-	s.replayBuf = append(s.replayBuf, sd)
+	s.replayBuf = append(s.replayBuf, cloneSequencedDelta(sd))
 	if len(s.replayBuf) > replayBufMax {
 		s.replayBuf = s.replayBuf[len(s.replayBuf)-replayBufMax:]
 	}
@@ -96,7 +96,7 @@ func (s *Store) notify(task *Task, deleted bool) {
 	defer s.subMu.Unlock()
 	for _, ch := range s.subscribers {
 		select {
-		case ch <- sd:
+		case ch <- cloneSequencedDelta(sd):
 		default:
 		}
 	}
@@ -146,18 +146,24 @@ func (s *Store) DeltasSince(seq int64) ([]SequencedDelta, bool) {
 		return nil, false
 	}
 
-	// Return a copy so the caller can use it after unlocking.
+	// Return a deep copy so callers can safely mutate replayed payloads.
 	result := make([]SequencedDelta, len(s.replayBuf)-lo)
-	copy(result, s.replayBuf[lo:])
+	for i := range result {
+		result[i] = cloneSequencedDelta(s.replayBuf[lo+i])
+	}
 	return result, false
 }
 
-// copyTask returns a shallow copy of t with pointer fields deep-copied.
+// copyTask returns a standalone clone of t.
 func copyTask(t *Task) *Task {
-	cp := *t
-	if t.CurrentRefinement != nil {
-		jobCopy := *t.CurrentRefinement
-		cp.CurrentRefinement = &jobCopy
-	}
+	cp := deepCloneTask(t)
 	return &cp
+}
+
+func cloneSequencedDelta(sd SequencedDelta) SequencedDelta {
+	clone := sd
+	if sd.Task != nil {
+		clone.Task = copyTask(sd.Task)
+	}
+	return clone
 }

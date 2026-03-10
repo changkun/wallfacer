@@ -184,17 +184,11 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 }
 
 func cloneTask(t *Task) Task {
-	cp := *t
-	if t.CurrentRefinement != nil {
-		jobCopy := *t.CurrentRefinement
-		cp.CurrentRefinement = &jobCopy
-	}
-	return cp
+	return deepCloneTask(t)
 }
 
-// GetTask returns a deep copy of the task with the given ID.
-// Pointer fields (CurrentRefinement) are copied so callers cannot
-// accidentally mutate shared store state.
+// GetTask returns a full copy of the task with the given ID so callers cannot
+// mutate shared store state after the store lock is released.
 func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -203,11 +197,7 @@ func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 	if !ok {
 		return nil, fmt.Errorf("task not found: %s", id)
 	}
-	cp := *t
-	if t.CurrentRefinement != nil {
-		jobCopy := *t.CurrentRefinement
-		cp.CurrentRefinement = &jobCopy
-	}
+	cp := deepCloneTask(t)
 	return &cp, nil
 }
 
@@ -398,8 +388,7 @@ func (s *Store) ListDeletedTasks(_ context.Context) ([]Task, error) {
 	defer s.mu.RUnlock()
 	out := make([]Task, 0, len(s.deleted))
 	for _, t := range s.deleted {
-		cp := *t
-		out = append(out, cp)
+		out = append(out, deepCloneTask(t))
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].UpdatedAt.After(out[j].UpdatedAt)
