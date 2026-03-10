@@ -554,20 +554,28 @@ func isLikelyTokenLimitError(parts ...string) bool {
 	if joined == "" {
 		return false
 	}
-	needles := []string{
-		"token limit",
-		"rate limit",
-		"quota",
-		"insufficient credits",
-		"credit balance is too low",
-		"exceeded your current quota",
-		"too many tokens",
-		"maximum context length",
-		"context length",
-		"prompt is too long",
+	// Each entry is a group of keywords that must ALL appear in the text.
+	// This is more resilient to phrasing variations than exact substring matching.
+	keywordGroups := [][]string{
+		{"hit", "limit"},
+		{"rate", "limit"},
+		{"token", "limit"},
+		{"too many", "token"},
+		{"quota"},
+		{"insufficient", "credit"},
+		{"credit", "too low"},
+		{"context", "length"},
+		{"prompt", "too long"},
 	}
-	for _, n := range needles {
-		if strings.Contains(joined, n) {
+	for _, group := range keywordGroups {
+		match := true
+		for _, kw := range group {
+			if !strings.Contains(joined, kw) {
+				match = false
+				break
+			}
+		}
+		if match {
 			return true
 		}
 	}
