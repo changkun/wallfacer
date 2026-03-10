@@ -122,10 +122,6 @@ function setupContext(fetchImpl) {
     return element;
   };
 
-  const panel = register('trash-bin-panel', createElement('div'));
-  panel.classList.add('hidden');
-  register('trash-bin-btn', createElement('button'));
-  register('trash-bin-close-btn', createElement('button'));
   register('trash-bin-error', createElement('div'));
   elements.get('trash-bin-error').classList.add('hidden');
   register('trash-bin-error-message', createElement('span'));
@@ -222,7 +218,7 @@ describe('trash-bin', () => {
     });
     const { ctx, elements } = setupContext(fetch);
 
-    await ctx.openTrashBin();
+    await ctx.loadDeletedTasks();
 
     const rows = elements.get('trash-bin-list').children;
     expect(rows).toHaveLength(2);
@@ -257,7 +253,7 @@ describe('trash-bin', () => {
       });
     const { ctx, elements } = setupContext(fetch);
 
-    await ctx.openTrashBin();
+    await ctx.loadDeletedTasks();
 
     const row = elements.get('trash-bin-list').children[0];
     const restoreButton = row.children[1];
@@ -284,7 +280,7 @@ describe('trash-bin', () => {
     });
     const { ctx, elements } = setupContext(fetch);
 
-    await ctx.openTrashBin();
+    await ctx.loadDeletedTasks();
 
     expect(elements.get('trash-bin-empty').classList.contains('hidden')).toBe(false);
     expect(elements.get('trash-bin-list').children).toHaveLength(0);

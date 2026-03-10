@@ -1,6 +1,5 @@
 const TRASH_BIN_RETENTION_DAYS = 7;
 
-let _trashBinInitialized = false;
 let _trashBinRestoreTimers = [];
 
 function getTrashBinTitle(task) {
@@ -62,29 +61,6 @@ function showTrashBinError(message) {
 function showTrashBinEmpty(show) {
   var empty = document.getElementById('trash-bin-empty');
   if (empty) empty.classList.toggle('hidden', !show);
-}
-
-function closeTrashBin() {
-  var panel = document.getElementById('trash-bin-panel');
-  var button = document.getElementById('trash-bin-btn');
-  if (panel) panel.classList.add('hidden');
-  if (button) button.setAttribute('aria-expanded', 'false');
-}
-
-function openTrashBin() {
-  var panel = document.getElementById('trash-bin-panel');
-  var button = document.getElementById('trash-bin-btn');
-  if (panel) panel.classList.remove('hidden');
-  if (button) button.setAttribute('aria-expanded', 'true');
-  return loadDeletedTasks();
-}
-
-function toggleTrashBin() {
-  var panel = document.getElementById('trash-bin-panel');
-  if (!panel) return Promise.resolve();
-  if (panel.classList.contains('hidden')) return openTrashBin();
-  closeTrashBin();
-  return Promise.resolve();
 }
 
 function showTrashBinToast(message) {
@@ -192,23 +168,7 @@ async function restoreDeletedTask(id, row, button, title) {
 }
 
 function initTrashBin() {
-  if (_trashBinInitialized) return;
-  _trashBinInitialized = true;
-
-  var button = document.getElementById('trash-bin-btn');
-  var closeButton = document.getElementById('trash-bin-close-btn');
   var dismissButton = document.getElementById('trash-bin-error-dismiss');
-
-  if (button) {
-    button.addEventListener('click', function() {
-      toggleTrashBin();
-    });
-  }
-  if (closeButton) {
-    closeButton.addEventListener('click', function() {
-      closeTrashBin();
-    });
-  }
   if (dismissButton) {
     dismissButton.addEventListener('click', function() {
       clearTrashBinError();

@@ -174,55 +174,9 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* --- Trash Bin --- */
-.trash-bin-panel {
-  position: fixed;
-  top: 84px;
-  right: 24px;
-  width: min(480px, calc(100vw - 32px));
-  max-height: calc(100vh - 120px);
-  z-index: 40;
-}
-.trash-bin-panel__card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.trash-bin-panel__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px 12px;
-  border-bottom: 1px solid var(--border);
-}
-.trash-bin-panel__title {
-  font-size: 16px;
-  font-weight: 600;
-}
-.trash-bin-panel__subtitle {
-  margin: 4px 0 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.trash-bin-panel__close {
-  border: none;
-  background: none;
-  color: var(--text-muted);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-}
-.trash-bin-panel__close:hover {
-  color: var(--text-secondary);
-}
+/* --- Trash Bin (inside settings modal) --- */
 .trash-bin-banner {
-  margin: 12px 16px 0;
+  margin: 0 0 12px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid #e4b6b6;
@@ -254,20 +208,20 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 24px 18px;
+  padding: 24px 0;
   color: var(--text-muted);
   font-size: 13px;
 }
 .trash-bin-list {
   overflow-y: auto;
-  max-height: calc(100vh - 240px);
+  max-height: 360px;
 }
 .trash-bin-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 18px;
+  padding: 10px 0;
   border-top: 1px solid var(--border);
 }
 .trash-bin-row:first-child {
@@ -318,7 +272,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 45;
+  z-index: 55;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 999px;

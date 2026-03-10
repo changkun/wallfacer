@@ -48,6 +48,10 @@ function setSettingsTab(tabName) {
     if (isActive) didSetActive = true;
   });
 
+  if (tabName === 'trash' && typeof loadDeletedTasks === 'function') {
+    loadDeletedTasks();
+  }
+
   return didSetActive;
 }
 

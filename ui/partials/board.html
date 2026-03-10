@@ -1,25 +1,4 @@
 <!-- Board -->
-<div id="trash-bin-panel" class="trash-bin-panel hidden" role="dialog" aria-modal="false" aria-labelledby="trash-bin-title">
-  <div class="trash-bin-panel__card">
-    <div class="trash-bin-panel__header">
-      <div>
-        <h2 id="trash-bin-title" class="trash-bin-panel__title">Trash</h2>
-        <p class="trash-bin-panel__subtitle">Soft-deleted tasks remain recoverable for 7 days.</p>
-      </div>
-      <button id="trash-bin-close-btn" type="button" class="trash-bin-panel__close" aria-label="Close trash bin">&times;</button>
-    </div>
-    <div id="trash-bin-error" class="trash-bin-banner hidden" role="alert">
-      <span id="trash-bin-error-message"></span>
-      <button id="trash-bin-error-dismiss" type="button" class="trash-bin-banner__dismiss" aria-label="Dismiss trash error">&times;</button>
-    </div>
-    <div id="trash-bin-loading" class="trash-bin-loading hidden">
-      <span class="spinner" aria-hidden="true"></span>
-      <span>Loading deleted tasks...</span>
-    </div>
-    <div id="trash-bin-empty" class="trash-bin-empty hidden">Trash is empty</div>
-    <div id="trash-bin-list" class="trash-bin-list" role="list"></div>
-  </div>
-</div>
 <div id="trash-bin-toast" class="trash-bin-toast hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <main class="board-grid flex-1 min-h-0" id="board" tabindex="-1">
   <div class="flex flex-col min-h-0" id="col-wrapper-backlog" role="region" aria-label="Backlog column">
