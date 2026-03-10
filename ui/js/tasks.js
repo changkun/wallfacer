@@ -240,7 +240,11 @@ function hideNewTaskForm() {
 
 async function updateTaskStatus(id, status) {
   try {
+    const currentTask = (typeof findTaskById === 'function' ? findTaskById(id) : null) ||
+      tasks.find(function(t) { return t.id === id; }) ||
+      archivedTasks.find(function(t) { return t.id === id; });
     await api(task(id).update(), { method: 'PATCH', body: JSON.stringify({ status }) });
+    if (currentTask) announceBoardStatus(`Task "${getTaskAccessibleTitle(currentTask)}" moved to ${formatTaskStatusLabel(status)}`);
     fetchTasks();
   } catch (e) {
     showAlert('Error updating task: ' + e.message);
@@ -500,7 +504,11 @@ async function unarchiveTask() {
 
 async function quickDoneTask(id) {
   try {
+    const currentTask = (typeof findTaskById === 'function' ? findTaskById(id) : null) ||
+      tasks.find(function(t) { return t.id === id; }) ||
+      archivedTasks.find(function(t) { return t.id === id; });
     await api(task(id).done(), { method: 'POST' });
+    if (currentTask) announceBoardStatus(`Task "${getTaskAccessibleTitle(currentTask)}" moved to done`);
     fetchTasks();
   } catch (e) {
     showAlert('Error completing task: ' + e.message);

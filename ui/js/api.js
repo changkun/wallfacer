@@ -186,6 +186,9 @@ function startTasksStream() {
     if (e.lastEventId) lastTasksEventId = e.lastEventId;
     try {
       const task = JSON.parse(e.data);
+      const previousTask = tasks.find(function(t) { return t.id === task.id; }) ||
+        archivedTasks.find(function(t) { return t.id === task.id; }) ||
+        null;
       // If the task is archived and we're not showing archived tasks, treat as deleted.
       if (task.archived) {
         const idx = tasks.findIndex(t => t.id === task.id);
@@ -218,6 +221,9 @@ function startTasksStream() {
         tasks[idx] = task;
       } else {
         tasks.push(task);
+      }
+      if (previousTask && previousTask.status !== task.status) {
+        announceBoardStatus(`Task "${getTaskAccessibleTitle(task)}" is now ${formatTaskStatusLabel(task.status)}`);
       }
       invalidateDiffBehindCounts(task.id);
       scheduleRender();

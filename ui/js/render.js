@@ -91,6 +91,114 @@ function getBlockingTaskNames(t) {
   }).join(', ');
 }
 
+function focusFirstCardInColumn(status) {
+  const list = document.getElementById('col-' + status);
+  if (!list) return;
+  const firstCard = list.querySelector('[role="listitem"]');
+  if (firstCard && typeof firstCard.focus === 'function') firstCard.focus();
+}
+
+function _nextListItem(node) {
+  let current = node ? node.nextElementSibling : null;
+  while (current) {
+    if (current.getAttribute && current.getAttribute('role') === 'listitem') return current;
+    current = current.nextElementSibling;
+  }
+  return null;
+}
+
+function _previousListItem(node) {
+  let current = node ? node.previousElementSibling : null;
+  while (current) {
+    if (current.getAttribute && current.getAttribute('role') === 'listitem') return current;
+    current = current.previousElementSibling;
+  }
+  return null;
+}
+
+function _firstListItem(list) {
+  return list ? list.querySelector('[role="listitem"]') : null;
+}
+
+function _lastListItem(list) {
+  if (!list) return null;
+  const items = list.querySelectorAll('[role="listitem"]');
+  return items && items.length ? items[items.length - 1] : null;
+}
+
+function _findSiblingColumnCard(card, direction) {
+  const region = card && typeof card.closest === 'function' ? card.closest('[role="region"]') : null;
+  let sibling = region ? (direction < 0 ? region.previousElementSibling : region.nextElementSibling) : null;
+  while (sibling) {
+    if (sibling.getAttribute && sibling.getAttribute('role') === 'region') {
+      const list = sibling.querySelector('[role="list"]');
+      const target = direction < 0 ? _lastListItem(list) : _firstListItem(list);
+      if (target) return target;
+    }
+    sibling = direction < 0 ? sibling.previousElementSibling : sibling.nextElementSibling;
+  }
+  return null;
+}
+
+function _cardDescriptionId(taskId, kind) {
+  return 'card-' + taskId + '-' + kind;
+}
+
+function _bindCardKeyboardNavigation(card, t) {
+  if (card._keydownHandler) {
+    card.removeEventListener('keydown', card._keydownHandler);
+  }
+  card._keydownHandler = function(e) {
+    let target = null;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openModal(t.id);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      target = _previousListItem(card) || _lastListItem(card.parentElement);
+      if (target) target.focus();
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      target = _nextListItem(card) || _firstListItem(card.parentElement);
+      if (target) target.focus();
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      target = _findSiblingColumnCard(card, -1);
+      if (target) target.focus();
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      target = _findSiblingColumnCard(card, 1);
+      if (target) target.focus();
+      return;
+    }
+    if (e.key === 's' && t.status === 'backlog') {
+      e.preventDefault();
+      updateTaskStatus(t.id, 'in_progress');
+      return;
+    }
+    if (e.key === 'd' && t.status === 'waiting') {
+      e.preventDefault();
+      quickDoneTask(t.id);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      card.blur();
+      const board = document.getElementById('board');
+      if (board && typeof board.focus === 'function') board.focus();
+    }
+  };
+  card.addEventListener('keydown', card._keydownHandler);
+}
+
 // --- Board rendering ---
 
 function formatInProgressCount(count) {
@@ -245,6 +353,7 @@ function render() {
   for (const [status, items] of Object.entries(columns)) {
     const el = document.getElementById(`col-${status}`);
     if (!el) continue;
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'list');
 
     // Backlog: sort by position ascending (priority order).
     // Other columns: sort by last updated descending.
@@ -495,6 +604,8 @@ card.style.opacity = isArchived ? '0.55' : '';
     ? `<span class="badge badge-test-none" title="Not yet verified">unverified</span>`
     : '';
   const implSandbox = (t.sandbox_by_activity && t.sandbox_by_activity.implementation) || t.sandbox || 'default';
+  const cardTitle = getTaskAccessibleTitle(t);
+  const cardStatusLabel = formatTaskStatusLabel(statusLabel);
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
@@ -558,5 +669,24 @@ card.style.opacity = isArchived ? '0.55' : '';
     });
     card.appendChild(badge);
   }
+
+  card.tabIndex = 0;
+  card.setAttribute('role', 'listitem');
+  card.setAttribute('aria-label', `${cardTitle} — ${cardStatusLabel}`);
+
+  const promptEl = card.querySelector('.card-prose');
+  if (promptEl && !promptEl.id) promptEl.id = _cardDescriptionId(t.id, 'prompt');
+  const waitingResultEl = card.querySelector('.card-output-text');
+  if (waitingResultEl && !waitingResultEl.id) waitingResultEl.id = _cardDescriptionId(t.id, 'result');
+  const failedResultEl = card.querySelector('.card-error-text');
+  if (failedResultEl && !failedResultEl.id) failedResultEl.id = _cardDescriptionId(t.id, 'error');
+  const describedByEl = failedResultEl || waitingResultEl || promptEl;
+  if (describedByEl && describedByEl.id) {
+    card.setAttribute('aria-describedby', describedByEl.id);
+  } else {
+    card.removeAttribute('aria-describedby');
+  }
+
+  _bindCardKeyboardNavigation(card, t);
 
 }

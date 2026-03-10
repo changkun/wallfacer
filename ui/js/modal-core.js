@@ -6,8 +6,67 @@ const _modalState = {
   taskId: null,
   abort: null,
 };
+let _previousModalFocus = null;
+let _modalKeydownHandler = null;
 
 function getOpenModalTaskId() { return _modalState.taskId; }
+
+function _getModalFocusableElements(modal) {
+  if (!modal || typeof modal.querySelectorAll !== 'function') return [];
+  return Array.from(modal.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )).filter(function(el) {
+    return !!el && !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true';
+  });
+}
+
+function _attachModalFocusTrap(modal) {
+  if (!modal) return;
+  if (_modalKeydownHandler) {
+    modal.removeEventListener('keydown', _modalKeydownHandler);
+  }
+  _modalKeydownHandler = function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeModal();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const focusable = _getModalFocusableElements(modal);
+    if (!focusable.length) {
+      e.preventDefault();
+      modal.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+      return;
+    }
+    if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+  modal.addEventListener('keydown', _modalKeydownHandler);
+}
+
+function _detachModalFocusTrap(modal) {
+  if (!modal || !_modalKeydownHandler) return;
+  modal.removeEventListener('keydown', _modalKeydownHandler);
+  _modalKeydownHandler = null;
+}
+
+function _focusModalEntry(modal) {
+  if (!modal) return;
+  if (!modal.hasAttribute('tabindex')) modal.tabIndex = -1;
+  const focusable = _getModalFocusableElements(modal);
+  const target = focusable[0] || modal;
+  if (target && typeof target.focus === 'function') target.focus();
+}
 
 function _isActiveModalLoad(seq, taskId) {
   return _modalState.seq === seq && _modalState.taskId === taskId;
@@ -54,9 +113,13 @@ async function openModal(id) {
     tasks.find(t => t.id === id) ||
     (Array.isArray(archivedTasks) ? archivedTasks.find(t => t.id === id) : null);
   if (!task) return;
+  _previousModalFocus = document.activeElement || null;
   _renderModalLoadingPlaceholders();
-  document.getElementById('modal').classList.remove('hidden');
-  document.getElementById('modal').classList.add('flex');
+  const modalEl = document.getElementById('modal');
+  modalEl.classList.remove('hidden');
+  modalEl.classList.add('flex');
+  _attachModalFocusTrap(modalEl);
+  _focusModalEntry(modalEl);
   history.replaceState(null, '', '#' + id);
 
   document.getElementById('modal-badge').className = `badge badge-${task.status}`;
@@ -676,6 +739,7 @@ async function openModal(id) {
 }
 
 function closeModal() {
+  const modalEl = document.getElementById('modal');
   if (_modalState.abort) { _modalState.abort.abort(); _modalState.abort = null; }
   _modalState.seq += 1;
   if (logsAbort) {
@@ -714,9 +778,19 @@ function closeModal() {
   const modalBody = document.getElementById('modal-body');
   modalBody.style.display = '';
   modalBody.style.gap = '';
-  document.getElementById('modal').classList.add('hidden');
-  document.getElementById('modal').classList.remove('flex');
+  _detachModalFocusTrap(modalEl);
+  modalEl.classList.add('hidden');
+  modalEl.classList.remove('flex');
   history.replaceState(null, '', location.pathname + location.search);
+  const canRestoreFocus = _previousModalFocus && typeof _previousModalFocus.focus === 'function' && (
+    _previousModalFocus.isConnected ||
+    typeof document.contains !== 'function' ||
+    document.contains(_previousModalFocus)
+  );
+  if (canRestoreFocus) {
+    _previousModalFocus.focus();
+  }
+  _previousModalFocus = null;
 }
 
 // openForkModal prompts for a new prompt and forks the currently open task.
