@@ -182,11 +182,13 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   border: 1px solid #e4b6b6;
   background: #f8e6e6;
   color: #8c2020;
-  display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   font-size: 12px;
+}
+.trash-bin-banner:not(.hidden) {
+  display: flex;
 }
 [data-theme="dark"] .trash-bin-banner {
   background: #341414;
@@ -204,13 +206,16 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 }
 .trash-bin-loading,
 .trash-bin-empty {
-  display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   padding: 24px 0;
   color: var(--text-muted);
   font-size: 13px;
+}
+.trash-bin-loading:not(.hidden),
+.trash-bin-empty:not(.hidden) {
+  display: flex;
 }
 .trash-bin-list {
   overflow-y: auto;
