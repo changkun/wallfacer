@@ -237,7 +237,7 @@ func TestRunEndToEndNonGitWorkspace(t *testing.T) {
 	r.Run(task.ID, "modify init.txt", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
-	if updated.Status != "done" {
-		t.Fatalf("expected status=done, got %q", updated.Status)
+	if updated.Status != "waiting" {
+		t.Fatalf("expected status=waiting (pending review), got %q", updated.Status)
 	}
 }

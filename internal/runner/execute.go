@@ -399,34 +399,18 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 					"result": "Test verification complete: " + strings.ToUpper(verdict),
 				})
 			} else {
-				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
+				// Move to waiting for human review. Auto-submit (if enabled)
+				// will pick up the task and run the commit pipeline.
+				r.GenerateOversightBackground(taskID)
+				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 					"from":    string(store.TaskStatusInProgress),
-					"to":      string(store.TaskStatusCommitting),
+					"to":      string(store.TaskStatusWaiting),
 					"trigger": store.TriggerSystem,
 				})
-				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
-				commitErr := r.commit(ctx, taskID, sessionID, turns, worktreePaths, branchName)
-				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "commit"})
-				if commitErr != nil {
-					r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-					r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
-						"error": "commit failed: " + commitErr.Error(),
-					})
-					r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-						"from":    string(store.TaskStatusCommitting),
-						"to":      string(store.TaskStatusFailed),
-						"trigger": store.TriggerSystem,
-					})
-				} else {
-					r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
-					r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-						"from":    string(store.TaskStatusCommitting),
-						"to":      string(store.TaskStatusDone),
-						"trigger": store.TriggerSystem,
-					})
-					r.GenerateOversightBackground(taskID)
-				}
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+					"result": "Task complete — awaiting review.",
+				})
 			}
 			return
 
