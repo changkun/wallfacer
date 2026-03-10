@@ -119,6 +119,38 @@ func TestTestTask_StartsTestRunOnSameTask(t *testing.T) {
 	}
 }
 
+func TestSubmitFeedback_ClearsPreviousTestVerdict(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	taskID := createWaitingTask(t, h, "resume after feedback")
+
+	if err := h.store.UpdateTaskTestRun(ctx, taskID, false, "pass"); err != nil {
+		t.Fatalf("set previous test verdict: %v", err)
+	}
+
+	body := `{"message":"continue with the remaining work"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+taskID.String()+"/feedback", strings.NewReader(body))
+	req.SetPathValue("id", taskID.String())
+	w := httptest.NewRecorder()
+
+	h.SubmitFeedback(w, req, taskID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	task, err := h.store.GetTask(ctx, taskID)
+	if err != nil {
+		t.Fatalf("get task: %v", err)
+	}
+	if task.LastTestResult != "" {
+		t.Fatalf("expected previous test verdict to be cleared, got %q", task.LastTestResult)
+	}
+	if task.IsTestRun {
+		t.Fatal("expected task not to be marked as a test run after feedback resume")
+	}
+}
+
 func TestTestTask_IncludesCriteriaInTestPrompt(t *testing.T) {
 	h := newTestHandler(t)
 

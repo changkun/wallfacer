@@ -483,6 +483,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 // interactively; the task returns to prevStatus only after the agent finishes.
 func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus) {
 	bgCtx := context.Background()
+	testStateInvalidated := false
 
 	statusSet := false
 	defer func() {
@@ -598,6 +599,10 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 					filepath.Base(repoPath),
 				),
 			})
+			if !testStateInvalidated {
+				r.store.UpdateTaskTestRun(bgCtx, taskID, false, "")
+				testStateInvalidated = true
+			}
 			conflictPrompt := fmt.Sprintf(
 				"Syncing your worktree with the latest %s branch failed due to conflicting "+
 					"changes in %s. The rebase was aborted and the worktree is back to its "+
@@ -617,6 +622,10 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Successfully synced %s with %s.", filepath.Base(repoPath), defBranch),
 		})
+		if !testStateInvalidated {
+			r.store.UpdateTaskTestRun(bgCtx, taskID, false, "")
+			testStateInvalidated = true
+		}
 	}
 
 	statusSet = true

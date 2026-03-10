@@ -36,6 +36,12 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		return
 	}
 
+	// Any further implementation work invalidates prior test verification.
+	if err := h.store.UpdateTaskTestRun(r.Context(), id, false, ""); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	promoteMu.Lock()
 	regularInProgress, err := h.countRegularInProgress(r.Context())
 	if err != nil {

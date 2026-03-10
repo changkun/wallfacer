@@ -1447,3 +1447,46 @@ func TestRunBudgetTokensExceededTransitionsToWaiting(t *testing.T) {
 		t.Fatal("expected a system event with budget_exceeded:true when token budget is exceeded")
 	}
 }
+
+func TestSyncWorktrees_ClearsPreviousTestVerdictAfterSuccessfulSync(t *testing.T) {
+	repo := setupTestRepo(t)
+	cmd := fakeCmdScript(t, "", 0)
+	s, runner := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Sync clears stale test verdict", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskTestRun(ctx, task.ID, false, "pass"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "main: upstream change")
+
+	runner.SyncWorktrees(task.ID, "", "waiting")
+
+	updated, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != "waiting" {
+		t.Fatalf("expected status=waiting after sync, got %q", updated.Status)
+	}
+	if updated.LastTestResult != "" {
+		t.Fatalf("expected sync to clear stale test verdict, got %q", updated.LastTestResult)
+	}
+}
