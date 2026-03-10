@@ -8,7 +8,8 @@
 #   codex exec --full-auto [--model <val>] --output-last-message <file> <prompt>
 #
 # Then wrap the final assistant message in a Claude Code-compatible JSON envelope
-# so wallfacer can parse the result correctly.
+# so wallfacer can parse the result correctly while preserving usage metadata
+# from the Codex JSON event stream.
 
 PROMPT=""
 MODEL="${CODEX_DEFAULT_MODEL:-}"
@@ -54,6 +55,9 @@ set -e
 
 IS_ERROR="false"
 STOP_REASON="end_turn"
+SESSION_ID=""
+TOTAL_COST_USD="0"
+USAGE_JSON='{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}'
 
 OUTPUT=""
 if [ -s "$LAST_MSG_FILE" ]; then
@@ -75,7 +79,40 @@ if [ "$EXIT_CODE" -ne 0 ] && [ -z "$OUTPUT" ]; then
     IS_ERROR="true"
 fi
 
+# Recover usage/session metadata from the streamed Codex JSON events. Codex
+# emits token usage on turn.completed using cached_input_tokens rather than the
+# Claude-compatible cache_read_input_tokens field name expected by wallfacer.
+if [ -s "$STREAM_FILE" ]; then
+    STREAM_META=$(jq -Rsc '
+        [splits("\n") | select(length > 0) | (fromjson? // empty)] as $events |
+        ($events | map(select(.type == "turn.completed" and (.usage != null))) | last // {}) as $turn |
+        ($events | map(select((.session_id // "") != "")) | last // {}) as $session |
+        ($events | map(select((.stop_reason // "") != "")) | last // {}) as $stop |
+        ($events | map(select(.total_cost_usd? != null)) | last // {}) as $cost |
+        {
+            session_id: ($session.session_id // ""),
+            stop_reason: ($stop.stop_reason // "end_turn"),
+            total_cost_usd: ($cost.total_cost_usd // 0),
+            usage: {
+                input_tokens: ($turn.usage.input_tokens // 0),
+                output_tokens: ($turn.usage.output_tokens // 0),
+                cache_read_input_tokens: ($turn.usage.cache_read_input_tokens // $turn.usage.cached_input_tokens // 0),
+                cache_creation_input_tokens: ($turn.usage.cache_creation_input_tokens // 0)
+            }
+        }
+    ' "$STREAM_FILE" 2>/dev/null || true)
+
+    if [ -n "$STREAM_META" ]; then
+        SESSION_ID=$(printf '%s' "$STREAM_META" | jq -r '.session_id // ""')
+        STOP_REASON=$(printf '%s' "$STREAM_META" | jq -r '.stop_reason // "end_turn"')
+        TOTAL_COST_USD=$(printf '%s' "$STREAM_META" | jq -r '.total_cost_usd // 0')
+        USAGE_JSON=$(printf '%s' "$STREAM_META" | jq -c '.usage')
+    fi
+fi
+
 # Emit a Claude Code-compatible JSON result so wallfacer can parse it.
 ESCAPED_OUTPUT=$(printf '%s' "$OUTPUT" | jq -Rs .)
-printf '{"result":%s,"session_id":"","stop_reason":"%s","is_error":%s,"total_cost_usd":0,"usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}\n' \
-    "$ESCAPED_OUTPUT" "$STOP_REASON" "$IS_ERROR"
+ESCAPED_SESSION_ID=$(printf '%s' "$SESSION_ID" | jq -Rs .)
+ESCAPED_STOP_REASON=$(printf '%s' "$STOP_REASON" | jq -Rs .)
+printf '{"result":%s,"session_id":%s,"stop_reason":%s,"is_error":%s,"total_cost_usd":%s,"usage":%s}\n' \
+    "$ESCAPED_OUTPUT" "$ESCAPED_SESSION_ID" "$ESCAPED_STOP_REASON" "$IS_ERROR" "$TOTAL_COST_USD" "$USAGE_JSON"
