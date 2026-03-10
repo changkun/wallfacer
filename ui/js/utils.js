@@ -144,6 +144,24 @@ function taskDisplayPrompt(task) {
   return task ? task.prompt : '';
 }
 
+function getTaskAccessibleTitle(task) {
+  if (!task) return '';
+  if (task.title) return task.title;
+  if (task.prompt) return task.prompt.length > 60 ? task.prompt.slice(0, 60) + '\u2026' : task.prompt;
+  return task.id || '';
+}
+
+function formatTaskStatusLabel(status) {
+  return String(status || '').replace(/_/g, ' ');
+}
+
+function announceBoardStatus(message) {
+  var announcer = document.getElementById('board-announcer');
+  if (!announcer) return;
+  announcer.textContent = '';
+  announcer.textContent = message || '';
+}
+
 // --- Mobile column navigation ---
 
 function scrollToColumn(wrapperId) {

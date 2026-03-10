@@ -1,6 +1,6 @@
 <!-- Board -->
-<main class="board-grid flex-1 min-h-0" id="board">
-  <div class="flex flex-col min-h-0" id="col-wrapper-backlog">
+<main class="board-grid flex-1 min-h-0" id="board" tabindex="-1">
+  <div class="flex flex-col min-h-0" id="col-wrapper-backlog" role="region" aria-label="Backlog column">
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-backlog">Backlog</h2>
       <span id="count-backlog" class="text-xs text-v-muted">0</span>
@@ -93,33 +93,36 @@
           <button onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
         </div>
       </div>
-      <div id="col-backlog" class="space-y-2" data-status="backlog"></div>
+      <button type="button" onclick="focusFirstCardInColumn('backlog')" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Jump to Backlog column</button>
+      <div id="col-backlog" class="space-y-2" data-status="backlog" role="list"></div>
     </div>
   </div>
-  <div class="flex flex-col min-h-0" id="col-wrapper-in_progress">
+  <div class="flex flex-col min-h-0" id="col-wrapper-in_progress" role="region" aria-label="In Progress column">
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-progress">In Progress</h2>
       <span id="count-in_progress" class="text-xs text-v-muted">0</span>
       <span id="max-parallel-tag" class="max-parallel-tag hidden" title="Max parallel tasks"></span>
       <button onclick="showContainerMonitor(event)" title="Sandbox Monitor" style="margin-left:auto;background:none;border:none;padding:2px 4px;cursor:pointer;color:var(--text-muted);display:inline-flex;align-items:center;border-radius:4px;" onmouseover="this.style.color='var(--text-secondary)'" onmouseout="this.style.color='var(--text-muted)'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></button>
     </div>
-    <div id="col-in_progress" class="column col-bg space-y-2" data-status="in_progress"></div>
+    <button type="button" onclick="focusFirstCardInColumn('in_progress')" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Jump to In Progress column</button>
+    <div id="col-in_progress" class="column col-bg space-y-2" data-status="in_progress" role="list"></div>
   </div>
-  <div class="flex flex-col min-h-0" id="col-wrapper-waiting">
+  <div class="flex flex-col min-h-0" id="col-wrapper-waiting" role="region" aria-label="Waiting column">
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-waiting">Waiting</h2>
       <span id="count-waiting" class="text-xs text-v-muted">0</span>
     </div>
-    <div id="col-waiting" class="column col-bg space-y-2" data-status="waiting"></div>
+    <button type="button" onclick="focusFirstCardInColumn('waiting')" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Jump to Waiting column</button>
+    <div id="col-waiting" class="column col-bg space-y-2" data-status="waiting" role="list"></div>
   </div>
-  <div class="flex flex-col min-h-0" id="col-wrapper-done">
+  <div class="flex flex-col min-h-0" id="col-wrapper-done" role="region" aria-label="Done column">
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-done">Done</h2>
       <span id="count-done" class="text-xs text-v-muted">0</span>
       <span id="done-stats" class="text-[10px] text-v-muted hidden"></span>
       <button id="archive-all-btn" onclick="archiveAllDone()" class="hidden" style="margin-left: auto; background: none; border: none; padding: 0; cursor: pointer; font-size: 11px; color: var(--text-muted);" onmouseover="this.style.color='var(--text-secondary)'" onmouseout="this.style.color='var(--text-muted)'" title="Archive all done tasks">Archive all</button>
     </div>
-    <div id="col-done" class="column col-bg space-y-2" data-status="done"></div>
+    <button type="button" onclick="focusFirstCardInColumn('done')" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Jump to Done column</button>
+    <div id="col-done" class="column col-bg space-y-2" data-status="done" role="list"></div>
   </div>
 </main>
-
