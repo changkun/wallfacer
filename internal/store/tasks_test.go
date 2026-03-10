@@ -149,6 +149,27 @@ func TestGetTask_ReturnsCopy(t *testing.T) {
 	}
 }
 
+func TestGetTask_ReturnsDeepCloneForNestedFields(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "original", 5, false, "", "")
+
+	s.mu.Lock()
+	want := setTaskCloneFixture(t, s.tasks[task.ID])
+	s.mu.Unlock()
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	mutateTaskCloneForIsolation(got)
+
+	got2, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after mutation: %v", err)
+	}
+	assertTaskMatchesSnapshot(t, got2, want)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ListTasks
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,6 +229,65 @@ func TestListTasks_IncludesArchivedWhenRequested(t *testing.T) {
 	if len(all) != 1 {
 		t.Errorf("expected 1 archived task, got %d", len(all))
 	}
+}
+
+func TestListTasksAndSeq_ReturnsDeepCloneForNestedFields(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "listed", 5, false, "", "")
+
+	s.mu.Lock()
+	want := setTaskCloneFixture(t, s.tasks[task.ID])
+	s.mu.Unlock()
+
+	tasks, _, err := s.ListTasksAndSeq(bg(), false)
+	if err != nil {
+		t.Fatalf("ListTasksAndSeq: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	mutateTaskCloneForIsolation(&tasks[0])
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after list mutation: %v", err)
+	}
+	assertTaskMatchesSnapshot(t, got, want)
+}
+
+func TestListDeletedTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "deleted", 5, false, "", "")
+
+	s.mu.Lock()
+	_ = setTaskCloneFixture(t, s.tasks[task.ID])
+	s.mu.Unlock()
+
+	if err := s.DeleteTask(bg(), task.ID, "test"); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+
+	s.mu.RLock()
+	want := deepCloneTask(s.deleted[task.ID])
+	s.mu.RUnlock()
+
+	deleted, err := s.ListDeletedTasks(bg())
+	if err != nil {
+		t.Fatalf("ListDeletedTasks: %v", err)
+	}
+	if len(deleted) != 1 {
+		t.Fatalf("expected 1 deleted task, got %d", len(deleted))
+	}
+	mutateTaskCloneForIsolation(&deleted[0])
+
+	deleted2, err := s.ListDeletedTasks(bg())
+	if err != nil {
+		t.Fatalf("ListDeletedTasks after mutation: %v", err)
+	}
+	if len(deleted2) != 1 {
+		t.Fatalf("expected 1 deleted task on reread, got %d", len(deleted2))
+	}
+	assertTaskMatchesSnapshot(t, &deleted2[0], want)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -539,9 +619,9 @@ func TestUpdateTaskSandboxByActivity_NormalizesAndClears(t *testing.T) {
 
 	updates := map[string]string{
 		"implementation": "CLAUDE",
-		"Testing":       "Codex ",
-		"invalid":       "x",
-		"oversight":     "",
+		"Testing":        "Codex ",
+		"invalid":        "x",
+		"oversight":      "",
 	}
 
 	if err := s.UpdateTaskSandboxByActivity(bg(), task.ID, updates); err != nil {

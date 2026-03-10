@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,7 +51,7 @@ type TurnUsageRecord struct {
 // RefinementMessage is a single turn in a refinement chat session.
 // Kept for backward compatibility with older chat-based refinement sessions.
 type RefinementMessage struct {
-	Role      string    `json:"role"`       // "user" or "assistant"
+	Role      string    `json:"role"` // "user" or "assistant"
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -74,7 +76,7 @@ type RetryRecord struct {
 	RetiredAt time.Time  `json:"retired_at"`
 	Prompt    string     `json:"prompt"`
 	Status    TaskStatus `json:"status"`
-	Result    string     `json:"result,omitempty"`    // truncated to 2000 chars
+	Result    string     `json:"result,omitempty"` // truncated to 2000 chars
 	SessionID string     `json:"session_id,omitempty"`
 	Turns     int        `json:"turns"`
 	CostUSD   float64    `json:"cost_usd"`
@@ -186,35 +188,35 @@ const CurrentTaskSchemaVersion = 1
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
-	SchemaVersion  int                 `json:"schema_version"`
-	ID             uuid.UUID           `json:"id"`
-	Title          string              `json:"title,omitempty"`
-	Prompt         string              `json:"prompt"`
-	PromptHistory  []string            `json:"prompt_history,omitempty"`
-	RetryHistory   []RetryRecord       `json:"retry_history,omitempty"`
-	RefineSessions     []RefinementSession `json:"refine_sessions,omitempty"`
-	CurrentRefinement  *RefinementJob      `json:"current_refinement,omitempty"`
-	Status         TaskStatus           `json:"status"`
-	Archived       bool                 `json:"archived,omitempty"`
-	SessionID      *string              `json:"session_id"`
-	FreshStart     bool                 `json:"fresh_start,omitempty"`
-	Result         *string              `json:"result"`
-	StopReason     *string              `json:"stop_reason"`
-	Turns          int                  `json:"turns"`
-	Timeout        int                  `json:"timeout"`
-	MaxCostUSD     float64              `json:"max_cost_usd,omitempty"`    // 0 = unlimited
-	MaxInputTokens int                  `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
-	Usage          TaskUsage            `json:"usage"`
-	Sandbox        string               `json:"sandbox,omitempty"`
-	SandboxByActivity map[string]string `json:"sandbox_by_activity,omitempty"`
+	SchemaVersion     int                 `json:"schema_version"`
+	ID                uuid.UUID           `json:"id"`
+	Title             string              `json:"title,omitempty"`
+	Prompt            string              `json:"prompt"`
+	PromptHistory     []string            `json:"prompt_history,omitempty"`
+	RetryHistory      []RetryRecord       `json:"retry_history,omitempty"`
+	RefineSessions    []RefinementSession `json:"refine_sessions,omitempty"`
+	CurrentRefinement *RefinementJob      `json:"current_refinement,omitempty"`
+	Status            TaskStatus          `json:"status"`
+	Archived          bool                `json:"archived,omitempty"`
+	SessionID         *string             `json:"session_id"`
+	FreshStart        bool                `json:"fresh_start,omitempty"`
+	Result            *string             `json:"result"`
+	StopReason        *string             `json:"stop_reason"`
+	Turns             int                 `json:"turns"`
+	Timeout           int                 `json:"timeout"`
+	MaxCostUSD        float64             `json:"max_cost_usd,omitempty"`     // 0 = unlimited
+	MaxInputTokens    int                 `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
+	Usage             TaskUsage           `json:"usage"`
+	Sandbox           string              `json:"sandbox,omitempty"`
+	SandboxByActivity map[string]string   `json:"sandbox_by_activity,omitempty"`
 	// UsageBreakdown tracks token/cost per sub-agent activity (e.g. "implementation",
 	// "test", "title", "oversight", "oversight-test", "refinement").
 	UsageBreakdown map[string]TaskUsage `json:"usage_breakdown,omitempty"`
 	// Environment records the runtime environment captured at the start of execution.
 	Environment *ExecutionEnvironment `json:"environment,omitempty"`
 	Position    int                   `json:"position"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	CreatedAt   time.Time             `json:"created_at"`
+	UpdatedAt   time.Time             `json:"updated_at"`
 
 	// Worktree isolation fields (populated when task moves to in_progress).
 	WorktreePaths    map[string]string `json:"worktree_paths,omitempty"`     // host repoPath → worktree path
@@ -265,6 +267,70 @@ func (t *Task) HasTag(tag string) bool {
 		}
 	}
 	return false
+}
+
+// deepCloneTask returns a full copy of t, duplicating all slices, maps, and
+// pointer-bearing fields so callers can safely mutate the returned value.
+func deepCloneTask(t *Task) Task {
+	if t == nil {
+		return Task{}
+	}
+
+	cp := *t
+	cp.PromptHistory = slices.Clone(t.PromptHistory)
+	cp.RetryHistory = slices.Clone(t.RetryHistory)
+	cp.RefineSessions = cloneRefinementSessions(t.RefineSessions)
+	cp.Tags = slices.Clone(t.Tags)
+	cp.DependsOn = slices.Clone(t.DependsOn)
+	cp.SandboxByActivity = maps.Clone(t.SandboxByActivity)
+	cp.UsageBreakdown = maps.Clone(t.UsageBreakdown)
+	cp.WorktreePaths = maps.Clone(t.WorktreePaths)
+	cp.CommitHashes = maps.Clone(t.CommitHashes)
+	cp.BaseCommitHashes = maps.Clone(t.BaseCommitHashes)
+
+	if t.CurrentRefinement != nil {
+		jobCopy := *t.CurrentRefinement
+		cp.CurrentRefinement = &jobCopy
+	}
+	if t.SessionID != nil {
+		sessionID := *t.SessionID
+		cp.SessionID = &sessionID
+	}
+	if t.Result != nil {
+		result := *t.Result
+		cp.Result = &result
+	}
+	if t.StopReason != nil {
+		stopReason := *t.StopReason
+		cp.StopReason = &stopReason
+	}
+	if t.Environment != nil {
+		envCopy := *t.Environment
+		cp.Environment = &envCopy
+	}
+	if t.ScheduledAt != nil {
+		scheduledAt := *t.ScheduledAt
+		cp.ScheduledAt = &scheduledAt
+	}
+	if t.ForkedFrom != nil {
+		forkedFrom := *t.ForkedFrom
+		cp.ForkedFrom = &forkedFrom
+	}
+
+	return cp
+}
+
+func cloneRefinementSessions(src []RefinementSession) []RefinementSession {
+	if src == nil {
+		return nil
+	}
+
+	dst := make([]RefinementSession, len(src))
+	for i := range src {
+		dst[i] = src[i]
+		dst[i].Messages = slices.Clone(src[i].Messages)
+	}
+	return dst
 }
 
 // Tombstone records when and why a task was soft-deleted.
