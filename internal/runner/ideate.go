@@ -86,7 +86,7 @@ func pickCategories(n int) []string {
 // brainstorm run surfaces improvements from different areas of the project.
 // existingTasks lists tasks currently in backlog, in_progress, or waiting state
 // so the agent can avoid proposing duplicates or conflicting ideas.
-func buildIdeationPrompt(existingTasks []store.Task, contexts ...ideationContext) string {
+func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ideationContext) string {
 	var signals ideationContext
 	if len(contexts) > 0 {
 		signals = contexts[0]
@@ -111,7 +111,7 @@ func buildIdeationPrompt(existingTasks []store.Task, contexts ...ideationContext
 		})
 	}
 
-	return prompts.Ideation(prompts.IdeationData{
+	return r.promptsMgr.Ideation(prompts.IdeationData{
 		ExistingTasks:  tasks,
 		Categories:     cats,
 		FailureSignals: signals.FailureSignals,
@@ -239,7 +239,7 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 // BuildIdeationPrompt exposes the ideation prompt construction used by the
 // idea-agent runner for testability and for handler-side task bootstrap.
 func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
-	return buildIdeationPrompt(existingTasks, r.collectIdeationContext())
+	return r.buildIdeationPrompt(existingTasks, r.collectIdeationContext())
 }
 
 // buildIdeationContainerArgs builds the container run arguments for the
@@ -312,7 +312,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// the idea-agent card for consistency).
 	ideationPrompt := strings.TrimSpace(task.ExecutionPrompt)
 	if ideationPrompt == "" {
-		ideationPrompt = buildIdeationPrompt(activeTasks, r.collectIdeationContextFromTasks(allTasks))
+		ideationPrompt = r.buildIdeationPrompt(activeTasks, r.collectIdeationContextFromTasks(allTasks))
 		if err := r.store.UpdateTaskExecutionPrompt(bgCtx, taskID, ideationPrompt); err != nil {
 			logger.Runner.Warn("ideation task: set execution prompt on brainstorm card", "task", taskID, "error", err)
 		}

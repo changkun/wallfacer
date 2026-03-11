@@ -34,7 +34,7 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 		return
 	}
 
-	prompt := buildRefinementPrompt(task, userInstructions, time.Now())
+	prompt := r.buildRefinementPrompt(task, userInstructions, time.Now())
 
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "refinement", Label: "refinement"})
 	output, _, _, err := r.runRefinementContainer(ctx, taskID, prompt, "", r.sandboxForTaskActivity(task, activityRefinement))
@@ -64,13 +64,13 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	logger.Runner.Info("refinement complete", "task", taskID)
 }
 
-func buildRefinementPrompt(task *store.Task, userInstructions string, now time.Time) string {
+func (r *Runner) buildRefinementPrompt(task *store.Task, userInstructions string, now time.Time) string {
 	const dateLayout = "2006-01-02"
 	ageDays := int(now.Sub(task.CreatedAt).Hours() / 24)
 	if ageDays < 0 {
 		ageDays = 0
 	}
-	return prompts.Refinement(prompts.RefinementData{
+	return r.promptsMgr.Refinement(prompts.RefinementData{
 		CreatedAt:        task.CreatedAt.Format(dateLayout),
 		Today:            now.Format(dateLayout),
 		AgeDays:          ageDays,

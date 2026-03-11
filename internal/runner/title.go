@@ -10,7 +10,6 @@ import (
 
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
@@ -31,7 +30,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	titlePrompt := prompts.Title(prompt)
+	titlePrompt := r.promptsMgr.Title(prompt)
 
 	// runWithSandbox executes the title container with the given sandbox,
 	// returning the parsed output (or nil) and any error.

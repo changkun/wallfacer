@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 68,
+  "route_count": 72,
   "routes": [
     {
       "method": "GET",
@@ -163,6 +163,42 @@
       "description": "Rebuild workspace CLAUDE.md from default template and repo files.",
       "tags": [
         "instructions"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/system-prompts",
+      "name": "ListSystemPrompts",
+      "description": "List all 7 built-in system prompt templates with override status and content.",
+      "tags": [
+        "system-prompts"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/system-prompts/{name}",
+      "name": "GetSystemPrompt",
+      "description": "Get a single built-in system prompt template by name.",
+      "tags": [
+        "system-prompts"
+      ]
+    },
+    {
+      "method": "PUT",
+      "pattern": "/api/system-prompts/{name}",
+      "name": "UpdateSystemPrompt",
+      "description": "Write a user override for a built-in system prompt template; validates the template before writing.",
+      "tags": [
+        "system-prompts"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/system-prompts/{name}",
+      "name": "DeleteSystemPrompt",
+      "description": "Remove the user override for a built-in system prompt template, restoring the embedded default.",
+      "tags": [
+        "system-prompts"
       ]
     },
     {

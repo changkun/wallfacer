@@ -9,7 +9,14 @@ import (
 	"testing"
 
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/prompts"
 )
+
+// testRunnerForPrompts returns a minimal Runner suitable for prompt-rendering
+// tests that do not need a real store or container command.
+func testRunnerForPrompts() *Runner {
+	return &Runner{promptsMgr: prompts.Default}
+}
 
 // ideaOutput returns a stream-json result line whose "result" field contains
 // a JSON array of ideas. The brainstorm agent must output this exact format.
@@ -397,7 +404,7 @@ func min(a, b int) int {
 // tasks the prompt does not include the "Existing active tasks" section, and
 // that it still contains suggested focus areas for the agent.
 func TestBuildIdeationPromptNoExistingTasks(t *testing.T) {
-	prompt := buildIdeationPrompt(nil)
+	prompt := testRunnerForPrompts().buildIdeationPrompt(nil)
 	if strings.Contains(prompt, "Existing active tasks") {
 		t.Fatal("prompt should not mention existing tasks when none are provided")
 	}
@@ -414,7 +421,7 @@ func TestBuildIdeationPromptIncludesActiveTasks(t *testing.T) {
 		{Title: "Fix login bug", Status: store.TaskStatusInProgress, Prompt: "Resolve the authentication error on the login page."},
 		{Title: "Write API docs", Status: store.TaskStatusWaiting, Prompt: "Document all REST endpoints."},
 	}
-	prompt := buildIdeationPrompt(tasks)
+	prompt := testRunnerForPrompts().buildIdeationPrompt(tasks)
 
 	if !strings.Contains(prompt, "Existing active tasks") {
 		t.Fatal("prompt must include the 'Existing active tasks' section")
@@ -449,7 +456,7 @@ func TestBuildIdeationPromptTruncatesLongPrompts(t *testing.T) {
 	tasks := []store.Task{
 		{Title: "Long task", Status: store.TaskStatusBacklog, Prompt: longPrompt},
 	}
-	prompt := buildIdeationPrompt(tasks)
+	prompt := testRunnerForPrompts().buildIdeationPrompt(tasks)
 	if strings.Contains(prompt, longPrompt) {
 		t.Fatal("long prompt should be truncated in ideation context")
 	}
@@ -464,7 +471,7 @@ func TestBuildIdeationPromptUntitledTask(t *testing.T) {
 	tasks := []store.Task{
 		{Title: "", Status: store.TaskStatusBacklog, Prompt: "Some work."},
 	}
-	prompt := buildIdeationPrompt(tasks)
+	prompt := testRunnerForPrompts().buildIdeationPrompt(tasks)
 	if !strings.Contains(prompt, "(untitled)") {
 		t.Fatal("prompt must show '(untitled)' for tasks without a title")
 	}

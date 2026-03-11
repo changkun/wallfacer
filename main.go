@@ -70,6 +70,7 @@ func runEnvCheck(configDir string) {
 	fmt.Printf("Config directory:  %s\n", configDir)
 	fmt.Printf("Data directory:    %s\n", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")))
 	fmt.Printf("Env file:          %s\n", envFile)
+	fmt.Printf("Prompts dir:       %s\n", filepath.Join(configDir, "prompts"))
 	fmt.Printf("Container command: %s\n", envOrDefault("CONTAINER_CMD", detectContainerRuntime()))
 	fmt.Printf("Sandbox image:     %s\n", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage))
 	fmt.Println()
