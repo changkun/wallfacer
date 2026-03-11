@@ -344,7 +344,7 @@ async function fetchDiff(card, taskId, updatedAt) {
   }
   diffCache.set(taskId, 'loading');
   try {
-    const data = await api(`/api/tasks/${taskId}/diff`);
+    const data = await api(task(taskId).diff());
     const behindCounts = data.behind_counts || {};
     diffCache.set(taskId, { diff: data.diff, behindCounts, updatedAt, behindFetchedAt: Date.now() });
     const latestEl = card.querySelector('[data-diff]');

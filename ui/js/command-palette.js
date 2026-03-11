@@ -64,9 +64,13 @@ function _hasWorktree(task) {
 
 function _archiveTask(taskId) {
   if (!taskId || typeof api !== 'function') return Promise.resolve();
-  return api(`/api/tasks/${encodeURIComponent(taskId)}/archive`, { method: 'POST' })
+  return api(task(taskId).archive(), { method: 'POST' })
     .then(function() {
-      if (typeof fetchTasks === 'function') fetchTasks();
+      if (typeof waitForTaskDelta === 'function') {
+        waitForTaskDelta(taskId);
+      } else if (typeof fetchTasks === 'function') {
+        fetchTasks();
+      }
     })
     .catch(function(e) {
       if (typeof showAlert === 'function') {

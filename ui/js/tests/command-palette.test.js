@@ -172,6 +172,16 @@ function setupCommandPaletteContext(helpers = {}) {
       ['command-palette-results', results],
       ['command-palette-hint-keys', hint],
     ],
+    // Provide the task() route helper so _archiveTask can call task(id).archive().
+    task: (id) => ({
+      archive: () => `/api/tasks/${id}/archive`,
+      update: () => `/api/tasks/${id}`,
+      done: () => `/api/tasks/${id}/done`,
+      resume: () => `/api/tasks/${id}/resume`,
+      test: () => `/api/tasks/${id}/test`,
+    }),
+    // Provide waitForTaskDelta so _archiveTask's .then() doesn't error.
+    waitForTaskDelta: vi.fn(),
     ...helpers,
   });
 
@@ -276,6 +286,7 @@ describe('command-palette action wiring', () => {
     const fetchTasks = vi.fn();
     const showAlert = vi.fn();
 
+    const waitForTaskDelta = vi.fn();
     const ctx = setupCommandPaletteContext({
       updateTaskStatus,
       quickTestTask,
@@ -287,6 +298,7 @@ describe('command-palette action wiring', () => {
       setRightTab,
       api,
       fetchTasks,
+      waitForTaskDelta,
       showAlert,
     });
 
@@ -311,7 +323,9 @@ describe('command-palette action wiring', () => {
     const done = ctx.commandPaletteTaskActions({ id: 'd1', status: 'done' });
     await done.find((a) => a.id === 'archive-task').execute();
     expect(api).toHaveBeenCalledWith('/api/tasks/d1/archive', { method: 'POST' });
-    expect(fetchTasks).toHaveBeenCalled();
+    // _archiveTask now delegates to waitForTaskDelta rather than fetchTasks.
+    expect(waitForTaskDelta).toHaveBeenCalledWith('d1');
+    expect(fetchTasks).not.toHaveBeenCalled();
 
     const withModal = ctx.commandPaletteTaskActions({ id: 't1', status: 'done', turns: 2 });
     await withModal.find((a) => a.id === 'open-task-testing').execute();

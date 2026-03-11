@@ -350,6 +350,57 @@ async function fetchTasks() {
   scheduleRender();
 }
 
+/**
+ * waitForTaskDelta resolves once the SSE stream delivers a task-updated or
+ * task-deleted event for taskId, or falls back to fetchTasks() if the stream
+ * is absent or the event does not arrive within timeoutMs (default 2 000 ms).
+ * Used after mutations so the board refreshes from the live SSE event rather
+ * than a redundant HTTP round-trip.
+ */
+function waitForTaskDelta(taskId, timeoutMs) {
+  var ms = typeof timeoutMs === 'number' ? timeoutMs : 2000;
+  if (!tasksSource || tasksSource.readyState === EventSource.CLOSED) {
+    return fetchTasks();
+  }
+  return new Promise(function(resolve) {
+    var done = false;
+    var timer = null;
+
+    function finish(useFetch) {
+      if (done) return;
+      done = true;
+      if (timer !== null) { clearTimeout(timer); timer = null; }
+      if (tasksSource) {
+        tasksSource.removeEventListener('task-updated', onUpdated);
+        tasksSource.removeEventListener('task-deleted', onDeleted);
+      }
+      if (useFetch) {
+        fetchTasks().then(resolve, resolve);
+      } else {
+        resolve();
+      }
+    }
+
+    function onUpdated(e) {
+      try {
+        var t = JSON.parse(e.data);
+        if (t && t.id === taskId) finish(false);
+      } catch (_) {}
+    }
+
+    function onDeleted(e) {
+      try {
+        var payload = JSON.parse(e.data);
+        if (payload && payload.id === taskId) finish(false);
+      } catch (_) {}
+    }
+
+    tasksSource.addEventListener('task-updated', onUpdated);
+    tasksSource.addEventListener('task-deleted', onDeleted);
+    timer = setTimeout(function() { finish(true); }, ms);
+  });
+}
+
 function toggleShowArchived() {
   showArchived = document.getElementById('show-archived-toggle').checked;
   localStorage.setItem('wallfacer-show-archived', showArchived ? 'true' : 'false');

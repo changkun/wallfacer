@@ -178,7 +178,11 @@ async function createTask() {
     }
     localStorage.removeItem('wallfacer-new-task-draft');
     hideNewTaskForm();
-    fetchTasks();
+    if (newTask && newTask.id) {
+      waitForTaskDelta(newTask.id);
+    } else {
+      fetchTasks();
+    }
   } catch (e) {
     showAlert('Error creating task: ' + e.message);
   }
@@ -245,7 +249,7 @@ async function updateTaskStatus(id, status) {
       archivedTasks.find(function(t) { return t.id === id; });
     await api(task(id).update(), { method: 'PATCH', body: JSON.stringify({ status }) });
     if (currentTask) announceBoardStatus(`Task "${getTaskAccessibleTitle(currentTask)}" moved to ${formatTaskStatusLabel(status)}`);
-    fetchTasks();
+    waitForTaskDelta(id);
   } catch (e) {
     showAlert('Error updating task: ' + e.message);
     fetchTasks();
@@ -265,7 +269,7 @@ async function toggleFreshStart(id, freshStart) {
 async function deleteTask(id) {
   try {
     await api(task(id).delete(), { method: 'DELETE' });
-    fetchTasks();
+    waitForTaskDelta(id);
   } catch (e) {
     showAlert('Error deleting task: ' + e.message);
   }
@@ -284,14 +288,15 @@ async function submitFeedback() {
   const textarea = document.getElementById('modal-feedback');
   const message = textarea.value.trim();
   if (!message || !getOpenModalTaskId()) return;
+  const taskId = getOpenModalTaskId();
   try {
-    await api(task(getOpenModalTaskId()).feedback(), {
+    await api(task(taskId).feedback(), {
       method: 'POST',
       body: JSON.stringify({ message }),
     });
     textarea.value = '';
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error submitting feedback: ' + e.message);
   }
@@ -299,10 +304,11 @@ async function submitFeedback() {
 
 async function completeTask() {
   if (!getOpenModalTaskId()) return;
+  const taskId = getOpenModalTaskId();
   try {
-    await api(task(getOpenModalTaskId()).done(), { method: 'POST' });
+    await api(task(taskId).done(), { method: 'POST' });
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error completing task: ' + e.message);
   }
@@ -314,18 +320,19 @@ async function retryTask() {
   const textarea = document.getElementById('modal-retry-prompt');
   const prompt = textarea.value.trim();
   if (!prompt || !getOpenModalTaskId()) return;
+  const taskId = getOpenModalTaskId();
   try {
     const body = { status: 'backlog', prompt };
     const retryResumeRow = document.getElementById('modal-retry-resume-row');
     if (retryResumeRow && !retryResumeRow.classList.contains('hidden')) {
       body.fresh_start = !document.getElementById('modal-retry-resume').checked;
     }
-    await api(task(getOpenModalTaskId()).update(), {
+    await api(task(taskId).update(), {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error retrying task: ' + e.message);
   }
@@ -333,15 +340,16 @@ async function retryTask() {
 
 async function resumeTask() {
   if (!getOpenModalTaskId()) return;
+  const taskId = getOpenModalTaskId();
   try {
     const timeoutEl = document.getElementById('modal-resume-timeout');
     const timeout = timeoutEl ? parseInt(timeoutEl.value, 10) || DEFAULT_TASK_TIMEOUT : DEFAULT_TASK_TIMEOUT;
-    await api(task(getOpenModalTaskId()).resume(), {
+    await api(task(taskId).resume(), {
       method: 'POST',
       body: JSON.stringify({ timeout }),
     });
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error resuming task: ' + e.message);
   }
@@ -394,7 +402,7 @@ function scheduleBacklogSave() {
       // Update rendered prompt on the left panel.
       document.getElementById('modal-prompt-rendered').innerHTML = renderMarkdown(prompt);
       document.getElementById('modal-prompt').textContent = prompt;
-      fetchTasks();
+      waitForTaskDelta(getOpenModalTaskId());
     } catch (e) {
       statusEl.textContent = 'Save failed';
     }
@@ -408,10 +416,11 @@ document.getElementById('modal-edit-timeout').addEventListener('change', schedul
 
 async function startTask() {
   if (!getOpenModalTaskId()) return;
+  const taskId = getOpenModalTaskId();
   try {
-    await api(task(getOpenModalTaskId()).update(), { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) });
+    await api(task(taskId).update(), { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) });
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error starting task: ' + e.message);
   }
@@ -422,10 +431,11 @@ async function startTask() {
 async function cancelTask() {
   if (!getOpenModalTaskId()) return;
   if (!confirm('Cancel this task? The sandbox will be cleaned up and all prepared changes discarded. History and logs will be preserved.')) return;
+  const taskId = getOpenModalTaskId();
   try {
-    await api(task(getOpenModalTaskId()).cancel(), { method: 'POST' });
+    await api(task(taskId).cancel(), { method: 'POST' });
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error cancelling task: ' + e.message);
   }
@@ -437,31 +447,32 @@ async function cancelTask() {
 // on a task that was paused due to a budget guardrail.
 async function openRaiseLimitInline() {
   if (!getOpenModalTaskId()) return;
-  const task = tasks.find(t => t.id === getOpenModalTaskId());
-  if (!task) return;
+  const currentTask = tasks.find(t => t.id === getOpenModalTaskId());
+  if (!currentTask) return;
   const banner = document.getElementById('modal-budget-exceeded-banner');
   if (!banner) return;
 
   const newCost = prompt(
-    'New cost limit in USD (0 = unlimited):\nCurrent limit: ' + (task.max_cost_usd > 0 ? '$' + task.max_cost_usd.toFixed(2) : 'none'),
-    task.max_cost_usd > 0 ? String(task.max_cost_usd) : ''
+    'New cost limit in USD (0 = unlimited):\nCurrent limit: ' + (currentTask.max_cost_usd > 0 ? '$' + currentTask.max_cost_usd.toFixed(2) : 'none'),
+    currentTask.max_cost_usd > 0 ? String(currentTask.max_cost_usd) : ''
   );
   if (newCost === null) return; // cancelled
   const newTokens = prompt(
-    'New input token limit (0 = unlimited):\nCurrent limit: ' + (task.max_input_tokens > 0 ? task.max_input_tokens.toLocaleString() : 'none'),
-    task.max_input_tokens > 0 ? String(task.max_input_tokens) : ''
+    'New input token limit (0 = unlimited):\nCurrent limit: ' + (currentTask.max_input_tokens > 0 ? currentTask.max_input_tokens.toLocaleString() : 'none'),
+    currentTask.max_input_tokens > 0 ? String(currentTask.max_input_tokens) : ''
   );
   if (newTokens === null) return; // cancelled
 
+  const taskId = getOpenModalTaskId();
   try {
-    await api(Routes.tasks.update(getOpenModalTaskId()), {
+    await api(task(taskId).update(), {
       method: 'PATCH',
       body: JSON.stringify({
         max_cost_usd: parseFloat(newCost) || 0,
         max_input_tokens: parseInt(newTokens, 10) || 0,
       }),
     });
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error updating budget: ' + e.message);
   }
@@ -480,10 +491,11 @@ async function archiveAllDone() {
 
 async function archiveTask() {
   if (!getOpenModalTaskId()) return;
+  const taskId = getOpenModalTaskId();
   try {
-    await api(task(getOpenModalTaskId()).archive(), { method: 'POST' });
+    await api(task(taskId).archive(), { method: 'POST' });
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error archiving task: ' + e.message);
   }
@@ -491,10 +503,11 @@ async function archiveTask() {
 
 async function unarchiveTask() {
   if (!getOpenModalTaskId()) return;
+  const taskId = getOpenModalTaskId();
   try {
-    await api(task(getOpenModalTaskId()).unarchive(), { method: 'POST' });
+    await api(task(taskId).unarchive(), { method: 'POST' });
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error unarchiving task: ' + e.message);
   }
@@ -509,7 +522,7 @@ async function quickDoneTask(id) {
       archivedTasks.find(function(t) { return t.id === id; });
     await api(task(id).done(), { method: 'POST' });
     if (currentTask) announceBoardStatus(`Task "${getTaskAccessibleTitle(currentTask)}" moved to done`);
-    fetchTasks();
+    waitForTaskDelta(id);
   } catch (e) {
     showAlert('Error completing task: ' + e.message);
   }
@@ -518,7 +531,7 @@ async function quickDoneTask(id) {
 async function quickResumeTask(id, timeout) {
   try {
     await api(task(id).resume(), { method: 'POST', body: JSON.stringify({ timeout }) });
-    fetchTasks();
+    waitForTaskDelta(id);
   } catch (e) {
     showAlert('Error resuming task: ' + e.message);
   }
@@ -527,7 +540,7 @@ async function quickResumeTask(id, timeout) {
 async function quickRetryTask(id) {
   try {
     await api(task(id).update(), { method: 'PATCH', body: JSON.stringify({ status: 'backlog' }) });
-    fetchTasks();
+    waitForTaskDelta(id);
   } catch (e) {
     showAlert('Error retrying task: ' + e.message);
   }
@@ -545,14 +558,15 @@ function toggleTestSection() {
 
 async function runTestTask() {
   if (!getOpenModalTaskId()) return;
+  const taskId = getOpenModalTaskId();
   const criteria = document.getElementById('modal-test-criteria').value.trim();
   try {
-    const res = await api(task(getOpenModalTaskId()).test(), {
+    const res = await api(task(taskId).test(), {
       method: 'POST',
       body: JSON.stringify({ criteria }),
     });
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error starting test verification: ' + e.message);
   }
@@ -564,7 +578,7 @@ async function quickTestTask(id) {
       method: 'POST',
       body: JSON.stringify({ criteria: '' }),
     });
-    fetchTasks();
+    waitForTaskDelta(id);
   } catch (e) {
     showAlert('Error starting test verification: ' + e.message);
   }

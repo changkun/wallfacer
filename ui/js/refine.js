@@ -270,10 +270,11 @@ function resetRefinePanel() {
 // the task to be started with the original prompt.
 async function dismissRefinement() {
   if (!getOpenModalTaskId()) return;
+  const taskId = getOpenModalTaskId();
   try {
-    await api(task(getOpenModalTaskId()).refineDismiss(), { method: 'POST' });
+    await api(task(taskId).refineDismiss(), { method: 'POST' });
     closeModal();
-    fetchTasks();
+    waitForTaskDelta(taskId);
   } catch (e) {
     showAlert('Error dismissing refinement: ' + e.message);
   }
@@ -289,24 +290,25 @@ async function applyRefinement() {
     return;
   }
 
+  const taskId = getOpenModalTaskId();
   try {
     // Save settings changes (sandbox, timeout, mount_worktrees) alongside the apply.
     const sandbox = document.getElementById('modal-edit-sandbox')?.value || '';
     const sandboxByActivity = collectSandboxByActivity('modal-edit-sandbox-');
     const timeout = parseInt(document.getElementById('modal-edit-timeout')?.value, 10) || DEFAULT_TASK_TIMEOUT;
     const mountWorktrees = document.getElementById('modal-edit-mount-worktrees')?.checked || false;
-    await api(task(getOpenModalTaskId()).update(), {
+    await api(task(taskId).update(), {
       method: 'PATCH',
       body: JSON.stringify({ sandbox, sandbox_by_activity: sandboxByActivity, timeout, mount_worktrees: mountWorktrees }),
     });
 
-    await api(task(getOpenModalTaskId()).refineApply(), {
+    await api(task(taskId).refineApply(), {
       method: 'POST',
       body: JSON.stringify({ prompt: newPrompt }),
     });
 
-    await fetchTasks();
-    openModal(getOpenModalTaskId());
+    await waitForTaskDelta(taskId);
+    openModal(taskId);
   } catch (e) {
     showAlert('Error applying refinement: ' + e.message);
   }
