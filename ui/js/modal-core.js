@@ -177,6 +177,8 @@ async function openModal(id) {
     document.getElementById('modal-edit-timeout').value = String(task.timeout || 60);
     document.getElementById('modal-edit-mount-worktrees').checked = !!task.mount_worktrees;
     document.getElementById('modal-edit-sandbox').value = task.sandbox || '';
+    const editModelOverrideEl = document.getElementById('modal-edit-model-override');
+    if (editModelOverrideEl) editModelOverrideEl.value = task.model_override || '';
     const editMaxCostEl = document.getElementById('modal-edit-max-cost-usd');
     if (editMaxCostEl) editMaxCostEl.value = task.max_cost_usd > 0 ? String(task.max_cost_usd) : '';
     const editMaxTokensEl = document.getElementById('modal-edit-max-input-tokens');

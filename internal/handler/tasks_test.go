@@ -2507,3 +2507,92 @@ func TestUpdateTask_ClearScheduledAt(t *testing.T) {
 		t.Errorf("expected ScheduledAt to be cleared, got %v", got.ScheduledAt)
 	}
 }
+
+// TestUpdateTask_PatchModelOverride verifies that PATCH with {"model":"claude-haiku-4-5"}
+// persists ModelOverride on the task.
+func TestUpdateTask_PatchModelOverride(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test model override", 15, false, "", "")
+
+	body := `{"model":"claude-haiku-4-5"}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ModelOverride == nil {
+		t.Fatal("expected ModelOverride to be set, got nil")
+	}
+	if *got.ModelOverride != "claude-haiku-4-5" {
+		t.Errorf("expected ModelOverride 'claude-haiku-4-5', got %q", *got.ModelOverride)
+	}
+}
+
+// TestUpdateTask_PatchModelOverrideClear verifies that PATCH with {"model":""}
+// clears ModelOverride (sets to nil).
+func TestUpdateTask_PatchModelOverrideClear(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test model clear", 15, false, "", "")
+	// Pre-set a model override.
+	if err := h.store.UpdateTaskModelOverride(ctx, task.ID, "claude-opus-4-6"); err != nil {
+		t.Fatalf("pre-set model override: %v", err)
+	}
+
+	body := `{"model":""}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ModelOverride != nil {
+		t.Errorf("expected ModelOverride to be nil after clearing, got %q", *got.ModelOverride)
+	}
+}
+
+// TestListTasks_ModelOverrideSerialised verifies that a task with ModelOverride set
+// serialises model_override in the GET /api/tasks response.
+func TestListTasks_ModelOverrideSerialised(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test serialise model", 15, false, "", "")
+	if err := h.store.UpdateTaskModelOverride(ctx, task.ID, "claude-haiku-4-5"); err != nil {
+		t.Fatalf("set model override: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
+	w := httptest.NewRecorder()
+	h.ListTasks(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var tasks []store.Task
+	if err := json.NewDecoder(w.Body).Decode(&tasks); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].ModelOverride == nil {
+		t.Fatal("expected model_override to be set in response, got nil")
+	}
+	if *tasks[0].ModelOverride != "claude-haiku-4-5" {
+		t.Errorf("expected model_override 'claude-haiku-4-5', got %q", *tasks[0].ModelOverride)
+	}
+}

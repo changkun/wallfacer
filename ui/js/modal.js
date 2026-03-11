@@ -228,6 +228,8 @@ async function openModal(id) {
     document.getElementById('modal-edit-timeout').value = String(task.timeout || 60);
     document.getElementById('modal-edit-mount-worktrees').checked = !!task.mount_worktrees;
     document.getElementById('modal-edit-sandbox').value = task.sandbox || '';
+    const modalEditModelOverrideEl = document.getElementById('modal-edit-model-override');
+    if (modalEditModelOverrideEl) modalEditModelOverrideEl.value = task.model_override || '';
     const resumeRow = document.getElementById('modal-edit-resume-row');
     if (task.session_id) {
       resumeRow.classList.remove('hidden');

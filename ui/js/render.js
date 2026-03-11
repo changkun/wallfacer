@@ -673,6 +673,7 @@ card.style.opacity = isArchived ? '0.55' : '';
         ${testResultBadge}
       </div>
       <div class="flex items-center gap-1.5 card-meta-right">
+        ${t.model_override ? `<span class="text-[10px] text-v-muted" title="Model override: ${escapeHtml(t.model_override)}">&#9881; ${escapeHtml(t.model_override.length > 20 ? t.model_override.slice(0, 20) + '\u2026' : t.model_override)}</span>` : ''}
         <span class="text-[10px] text-v-muted" title="Implementation sandbox: ${escapeHtml(implSandbox)}">${escapeHtml(sandboxDisplayName(implSandbox))}</span>
         ${t.mount_worktrees ? '<span class="text-[10px] text-v-muted" title="Sibling worktrees mounted">worktrees</span>' : ''}
         <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>

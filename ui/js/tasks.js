@@ -391,7 +391,9 @@ function scheduleBacklogSave() {
     const max_input_tokens = maxTokensEl ? (parseInt(maxTokensEl.value, 10) || 0) : undefined;
     const scheduledAtEl = document.getElementById('modal-edit-scheduled-at');
     const scheduled_at = scheduledAtEl ? (scheduledAtEl.value ? new Date(scheduledAtEl.value).toISOString() : null) : undefined;
-    const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on, max_cost_usd, max_input_tokens, scheduled_at };
+    const modelOverrideEl = document.getElementById('modal-edit-model-override');
+    const model = modelOverrideEl ? modelOverrideEl.value.trim() : undefined;
+    const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on, max_cost_usd, max_input_tokens, scheduled_at, model };
     try {
       await api(task(getOpenModalTaskId()).update(), {
         method: 'PATCH',

@@ -64,6 +64,10 @@
               </select>
             </div>
             <div style="display:flex;flex-direction:column;gap:3px;margin-top:8px;">
+              <label for="modal-edit-model-override" class="text-xs text-v-muted">Model override (optional)</label>
+              <input type="text" id="modal-edit-model-override" class="field text-xs" style="width:100%;" placeholder="default from global config" onchange="scheduleBacklogSave()" oninput="scheduleBacklogSave()">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px;margin-top:8px;">
               <label for="modal-edit-scheduled-at" class="text-xs text-v-muted">Schedule start (optional)</label>
               <input type="datetime-local" id="modal-edit-scheduled-at" class="field text-xs" style="width:100%;" title="Leave empty to run immediately" onchange="scheduleBacklogSave()">
             </div>

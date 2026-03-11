@@ -898,6 +898,30 @@ func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sandbox strin
 	return nil
 }
 
+// UpdateTaskModelOverride sets or clears the per-task model override.
+// Passing a non-empty string sets the override; an empty string clears it (sets to nil).
+func (s *Store) UpdateTaskModelOverride(_ context.Context, id uuid.UUID, model string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	model = strings.TrimSpace(model)
+	if model == "" {
+		t.ModelOverride = nil
+	} else {
+		t.ModelOverride = &model
+	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
+}
+
 // UpdateTaskEnvironment records the execution environment captured at the start of Run().
 // The environment is written atomically alongside the task and broadcast to SSE subscribers.
 func (s *Store) UpdateTaskEnvironment(_ context.Context, id uuid.UUID, env ExecutionEnvironment) error {

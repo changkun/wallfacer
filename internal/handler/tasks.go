@@ -143,6 +143,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Kind              store.TaskKind    `json:"kind"`
 		MaxCostUSD        float64           `json:"max_cost_usd"`
 		MaxInputTokens    int               `json:"max_input_tokens"`
+		Model             string            `json:"model"`
 		ScheduledAt       *time.Time        `json:"scheduled_at,omitempty"`
 	}
 	if !decodeJSONBody(w, r, &req) {
@@ -187,7 +188,13 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if req.ScheduledAt != nil || req.Sandbox != "" || req.SandboxByActivity != nil || req.MaxCostUSD > 0 || req.MaxInputTokens > 0 {
+	if req.Model != "" {
+		if err := h.store.UpdateTaskModelOverride(r.Context(), task.ID, req.Model); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	if req.ScheduledAt != nil || req.Sandbox != "" || req.SandboxByActivity != nil || req.MaxCostUSD > 0 || req.MaxInputTokens > 0 || req.Model != "" {
 		task, err = h.store.GetTask(r.Context(), task.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -455,6 +462,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		DependsOn         *[]string          `json:"depends_on"`
 		MaxCostUSD        *float64           `json:"max_cost_usd"`
 		MaxInputTokens    *int               `json:"max_input_tokens"`
+		// Model sets the per-task model override; empty string clears it.
+		Model *string `json:"model"`
 		// ScheduledAt uses json.RawMessage so we can distinguish "absent" (nil)
 		// from explicitly-sent "null" (clear the schedule) or a valid time (set it).
 		ScheduledAt json.RawMessage `json:"scheduled_at"`
@@ -469,8 +478,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, timeout, fresh_start, mount_worktrees, sandbox, and budget for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil) {
+	// Allow editing prompt, timeout, fresh_start, mount_worktrees, sandbox, model, and budget for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil) {
 		sandbox := task.Sandbox
 		if req.Sandbox != nil {
 			sandbox = *req.Sandbox
@@ -489,6 +498,12 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		}
 		if req.Sandbox != nil {
 			if err := h.store.UpdateTaskSandbox(r.Context(), id, *req.Sandbox); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		if req.Model != nil {
+			if err := h.store.UpdateTaskModelOverride(r.Context(), id, *req.Model); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
