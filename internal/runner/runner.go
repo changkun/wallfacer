@@ -16,6 +16,7 @@ import (
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
@@ -280,6 +281,7 @@ type RunnerConfig struct {
 	ContainerNetwork string // --network value for task containers (empty = read from env file, fallback "host")
 	ContainerCPUs    string // --cpus value for task containers (empty = read from env file, no limit)
 	ContainerMemory  string // --memory value for task containers (empty = read from env file, no limit)
+	Prompts          *prompts.Manager // prompt template manager; nil = use prompts.Default
 }
 
 // Runner orchestrates agent container execution for tasks.
@@ -296,6 +298,7 @@ type Runner struct {
 	containerNetwork string            // --network override; empty = read from env file
 	containerCPUs    string            // --cpus override; empty = read from env file
 	containerMemory  string            // --memory override; empty = read from env file
+	promptsMgr       *prompts.Manager  // prompt template manager
 	worktreeMu       sync.Mutex        // serializes all worktree filesystem operations on worktreesDir
 	repoMu           sync.Map          // per-repo *sync.Mutex for serializing rebase+merge
 	taskContainers   *containerRegistry // taskID → container name
@@ -446,6 +449,10 @@ func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
 
 // NewRunner constructs a Runner from the given store and config.
 func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
+	mgr := cfg.Prompts
+	if mgr == nil {
+		mgr = prompts.Default
+	}
 	r := &Runner{
 		store:            s,
 		command:          cfg.Command,
@@ -458,6 +465,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		containerNetwork: cfg.ContainerNetwork,
 		containerCPUs:    cfg.ContainerCPUs,
 		containerMemory:  cfg.ContainerMemory,
+		promptsMgr:       mgr,
 		taskContainers:   &containerRegistry{},
 		refineContainers: &containerRegistry{},
 		ideateContainer:  &containerRegistry{},
@@ -551,6 +559,11 @@ func (r *Runner) WorktreesDir() string {
 // InstructionsPath returns the host path mounted as /workspace/AGENTS.md.
 func (r *Runner) InstructionsPath() string {
 	return r.instructionsPath
+}
+
+// Prompts returns the prompt template Manager used by this runner.
+func (r *Runner) Prompts() *prompts.Manager {
+	return r.promptsMgr
 }
 
 // SandboxImage returns the container image used for task execution.

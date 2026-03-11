@@ -66,6 +66,17 @@ var Routes = {
     reinit: function() { return "/api/instructions/reinit"; },
   },
 
+  system-prompts: {
+    // GET /api/system-prompts
+    list: function() { return "/api/system-prompts"; },
+    // GET /api/system-prompts/{name}
+    get: function() { return "/api/system-prompts/{name}"; },
+    // PUT /api/system-prompts/{name}
+    update: function() { return "/api/system-prompts/{name}"; },
+    // DELETE /api/system-prompts/{name}
+    delete: function() { return "/api/system-prompts/{name}"; },
+  },
+
   templates: {
     // GET /api/templates
     list: function() { return "/api/templates"; },

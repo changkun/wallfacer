@@ -164,6 +164,33 @@ var Routes = []Route{
 		Tags:        []string{"instructions"},
 	},
 
+	// --- System prompt templates (user-overridable built-in prompts) ---
+
+	{
+		Method: "GET", Pattern: "/api/system-prompts", Name: "ListSystemPrompts",
+		JSName:      "list",
+		Description: "List all 7 built-in system prompt templates with override status and content.",
+		Tags:        []string{"system-prompts"},
+	},
+	{
+		Method: "GET", Pattern: "/api/system-prompts/{name}", Name: "GetSystemPrompt",
+		JSName:      "get",
+		Description: "Get a single built-in system prompt template by name.",
+		Tags:        []string{"system-prompts"},
+	},
+	{
+		Method: "PUT", Pattern: "/api/system-prompts/{name}", Name: "UpdateSystemPrompt",
+		JSName:      "update",
+		Description: "Write a user override for a built-in system prompt template; validates the template before writing.",
+		Tags:        []string{"system-prompts"},
+	},
+	{
+		Method: "DELETE", Pattern: "/api/system-prompts/{name}", Name: "DeleteSystemPrompt",
+		JSName:      "delete",
+		Description: "Remove the user override for a built-in system prompt template, restoring the embedded default.",
+		Tags:        []string{"system-prompts"},
+	},
+
 	// --- Prompt templates ---
 
 	{

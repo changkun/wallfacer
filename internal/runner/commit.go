@@ -271,7 +271,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 
 	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
 
-	commitPrompt := prompts.CommitMessage(prompts.CommitData{
+	commitPrompt := r.promptsMgr.CommitMessage(prompts.CommitData{
 		Prompt:    prompt,
 		DiffStat:  diffStat,
 		RecentLog: recentLog,
@@ -508,7 +508,7 @@ func (r *Runner) resolveConflicts(
 	basename := filepath.Base(worktreePath)
 	containerPath := "/workspace/" + basename
 
-	prompt := prompts.ConflictResolution(prompts.ConflictData{
+	prompt := r.promptsMgr.ConflictResolution(prompts.ConflictData{
 		ContainerPath: containerPath,
 		DefaultBranch: defBranch,
 	})

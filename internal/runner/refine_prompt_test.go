@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/prompts"
 )
 
 func TestBuildRefinementPromptIncludesTaskAgeAndValidityDecision(t *testing.T) {
@@ -18,7 +19,8 @@ func TestBuildRefinementPromptIncludesTaskAgeAndValidityDecision(t *testing.T) {
 		CreatedAt: created,
 	}
 
-	prompt := buildRefinementPrompt(task, "preserve backward compatibility", now)
+	r := &Runner{promptsMgr: prompts.Default}
+	prompt := r.buildRefinementPrompt(task, "preserve backward compatibility", now)
 
 	for _, want := range []string{
 		"Task created: 2026-01-22",
@@ -43,7 +45,8 @@ func TestBuildRefinementPromptNoUserInstructionsBlockWhenEmpty(t *testing.T) {
 		CreatedAt: now,
 	}
 
-	prompt := buildRefinementPrompt(task, "   ", now)
+	r := &Runner{promptsMgr: prompts.Default}
+	prompt := r.buildRefinementPrompt(task, "   ", now)
 	if strings.Contains(prompt, "<user_instructions>") {
 		t.Fatalf("did not expect user instructions block for empty instructions\n--- prompt ---\n%s", prompt)
 	}

@@ -15,7 +15,6 @@ import (
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
@@ -679,7 +678,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 		log = log[:maxLogBytes] + "\n[...truncated...]"
 	}
 
-	prompt := prompts.Oversight(log)
+	prompt := r.promptsMgr.Oversight(log)
 
 	runCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()

@@ -26,6 +26,7 @@ import (
 	"changkun.de/wallfacer/internal/metrics"
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
@@ -132,6 +133,7 @@ func runServer(configDir string, args []string) {
 		containerMemory = cfg.ContainerMemory
 	}
 
+	promptsDir := filepath.Join(configDir, "prompts")
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:          *containerCmd,
 		SandboxImage:     resolvedImage,
@@ -143,6 +145,7 @@ func runServer(configDir string, args []string) {
 		ContainerNetwork: containerNetwork,
 		ContainerCPUs:    containerCPUs,
 		ContainerMemory:  containerMemory,
+		Prompts:          prompts.NewManager(promptsDir),
 	})
 
 	r.PruneOrphanedWorktrees(s)
@@ -383,6 +386,11 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"ReinitInstructions": h.ReinitInstructions,
 
 		// Prompt templates.
+		"ListSystemPrompts":  h.ListSystemPrompts,
+		"GetSystemPrompt":    h.GetSystemPrompt,
+		"UpdateSystemPrompt": h.UpdateSystemPrompt,
+		"DeleteSystemPrompt": h.DeleteSystemPrompt,
+
 		"ListTemplates":   h.ListTemplates,
 		"CreateTemplate":  h.CreateTemplate,
 		"DeleteTemplate":  h.DeleteTemplate,

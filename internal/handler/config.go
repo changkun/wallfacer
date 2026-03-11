@@ -83,9 +83,11 @@ func defaultSandbox(cfg envconfig.Config) string {
 }
 
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
+	promptsDir := h.runner.Prompts().PromptsDir()
 	resp := map[string]any{
 		"workspaces":          h.runner.Workspaces(),
 		"instructions_path":   instructions.FilePath(h.configDir, h.workspaces),
+		"prompts_dir":         promptsDir,
 		"sandbox_activities":  store.SandboxActivities,
 		"sandboxes":           []string{"claude", "codex"},
 		"default_sandbox":     "claude",
