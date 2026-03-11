@@ -40,6 +40,8 @@ type Config struct {
 	IdeaAgentSandbox      string // WALLFACER_SANDBOX_IDEA_AGENT
 
 	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
+	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
+	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -68,6 +70,8 @@ var knownKeys = []string{
 	"WALLFACER_SANDBOX_COMMIT_MESSAGE",
 	"WALLFACER_SANDBOX_IDEA_AGENT",
 	"WALLFACER_CONTAINER_NETWORK",
+	"WALLFACER_CONTAINER_CPUS",
+	"WALLFACER_CONTAINER_MEMORY",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -144,6 +148,10 @@ func Parse(path string) (Config, error) {
 			cfg.IdeaAgentSandbox = strings.ToLower(strings.TrimSpace(v))
 		case "WALLFACER_CONTAINER_NETWORK":
 			cfg.ContainerNetwork = v
+		case "WALLFACER_CONTAINER_CPUS":
+			cfg.ContainerCPUs = v
+		case "WALLFACER_CONTAINER_MEMORY":
+			cfg.ContainerMemory = v
 		}
 	}
 	return cfg, nil
@@ -266,7 +274,9 @@ func Update(
 	archivedTasksPerPage,
 	autoPush,
 	autoPushThreshold,
-	containerNetwork *string,
+	containerNetwork,
+	containerCPUs,
+	containerMemory *string,
 ) error {
 	updates := map[string]*string{
 		"CLAUDE_CODE_OAUTH_TOKEN":           oauthToken,
@@ -285,6 +295,8 @@ func Update(
 		"WALLFACER_AUTO_PUSH":               autoPush,
 		"WALLFACER_AUTO_PUSH_THRESHOLD":     autoPushThreshold,
 		"WALLFACER_CONTAINER_NETWORK":       containerNetwork,
+		"WALLFACER_CONTAINER_CPUS":          containerCPUs,
+		"WALLFACER_CONTAINER_MEMORY":        containerMemory,
 	}
 	return updateFile(path, updates)
 }

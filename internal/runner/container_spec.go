@@ -30,7 +30,10 @@ type ContainerSpec struct {
 	//                   but blocks inbound connections and host loopback access
 	// An empty string falls back to "host" for backward compatibility.
 	Network string   // --network (defaults to "host" when empty)
-	Cmd     []string // appended after image
+	// Resource limits — zero values mean no limit is passed to the runtime.
+	CPUs   string // e.g. "2.0" → --cpus 2.0
+	Memory string // e.g. "4g"  → --memory 4g
+	Cmd    []string // appended after image
 }
 
 // Build returns the complete argument slice starting with "run".
@@ -42,6 +45,8 @@ type ContainerSpec struct {
 //	[-e KEY=VAL ...]        (sorted)
 //	[-v HOST:CONTAINER[:OPTIONS] ...]
 //	[-w <WorkDir>]
+//	[--cpus <CPUs>]
+//	[--memory <Memory>]
 //	[<ExtraFlags> ...]
 //	<Image>
 //	[<Cmd> ...]
@@ -88,6 +93,13 @@ func (s ContainerSpec) Build() []string {
 
 	if s.WorkDir != "" {
 		args = append(args, "-w", s.WorkDir)
+	}
+
+	if s.CPUs != "" {
+		args = append(args, "--cpus", s.CPUs)
+	}
+	if s.Memory != "" {
+		args = append(args, "--memory", s.Memory)
 	}
 
 	args = append(args, s.ExtraFlags...)
