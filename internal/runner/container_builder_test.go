@@ -817,6 +817,161 @@ func TestTitleStyleInvocation(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// ContainerSpec CPU/memory resource limit flags
+// ---------------------------------------------------------------------------
+
+// TestContainerSpecCPUsAndMemoryFlags verifies that non-empty CPUs and Memory
+// fields emit --cpus and --memory flags, respectively.
+func TestContainerSpecCPUsAndMemoryFlags(t *testing.T) {
+	spec := ContainerSpec{
+		Name:   "test",
+		Image:  "img",
+		CPUs:   "1.5",
+		Memory: "2g",
+	}
+	args := spec.Build()
+
+	if !containsConsecutive(args, "--cpus", "1.5") {
+		t.Errorf("expected --cpus 1.5 in args; got %v", args)
+	}
+	if !containsConsecutive(args, "--memory", "2g") {
+		t.Errorf("expected --memory 2g in args; got %v", args)
+	}
+}
+
+// TestContainerSpecZeroCPUsAndMemoryNoFlags verifies that zero-value CPUs and
+// Memory fields produce no --cpus or --memory flags.
+func TestContainerSpecZeroCPUsAndMemoryNoFlags(t *testing.T) {
+	spec := ContainerSpec{Name: "test", Image: "img"}
+	args := spec.Build()
+
+	for i, a := range args {
+		if a == "--cpus" {
+			t.Errorf("unexpected --cpus flag at index %d; args: %v", i, args)
+		}
+		if a == "--memory" {
+			t.Errorf("unexpected --memory flag at index %d; args: %v", i, args)
+		}
+	}
+}
+
+// TestContainerSpecResourceFlagsBeforeExtraFlags verifies that --cpus and
+// --memory appear after -w and before ExtraFlags and the image.
+func TestContainerSpecResourceFlagsBeforeExtraFlags(t *testing.T) {
+	spec := ContainerSpec{
+		Name:       "test",
+		Image:      "img",
+		WorkDir:    "/work",
+		CPUs:       "2.0",
+		Memory:     "4g",
+		ExtraFlags: []string{"--security-opt", "no-new-privileges"},
+	}
+	args := spec.Build()
+
+	wIdx, cpusIdx, memIdx, secIdx, imgIdx := -1, -1, -1, -1, -1
+	for i, a := range args {
+		switch a {
+		case "-w":
+			wIdx = i
+		case "--cpus":
+			cpusIdx = i
+		case "--memory":
+			memIdx = i
+		case "--security-opt":
+			secIdx = i
+		case "img":
+			imgIdx = i
+		}
+	}
+	if cpusIdx == -1 || memIdx == -1 {
+		t.Fatalf("--cpus or --memory not found; args: %v", args)
+	}
+	if wIdx >= cpusIdx {
+		t.Errorf("-w (%d) should appear before --cpus (%d)", wIdx, cpusIdx)
+	}
+	if cpusIdx >= memIdx {
+		t.Errorf("--cpus (%d) should appear before --memory (%d)", cpusIdx, memIdx)
+	}
+	if memIdx >= secIdx {
+		t.Errorf("--memory (%d) should appear before ExtraFlags --security-opt (%d)", memIdx, secIdx)
+	}
+	if secIdx >= imgIdx {
+		t.Errorf("ExtraFlags --security-opt (%d) should appear before image (%d)", secIdx, imgIdx)
+	}
+}
+
+// TestBuildBaseContainerSpecPropagatesResourceLimits verifies that
+// buildBaseContainerSpec transfers ContainerCPUs and ContainerMemory from the
+// RunnerConfig to the returned ContainerSpec's Build() output.
+func TestBuildBaseContainerSpecPropagatesResourceLimits(t *testing.T) {
+	r := newRunnerForArgTest(t, RunnerConfig{
+		Command:         "podman",
+		SandboxImage:    "wallfacer:latest",
+		ContainerCPUs:   "1.5",
+		ContainerMemory: "2g",
+	})
+
+	spec := r.buildBaseContainerSpec("c-test", "", "claude")
+	args := spec.Build()
+
+	if !containsConsecutive(args, "--cpus", "1.5") {
+		t.Errorf("expected --cpus 1.5 propagated from RunnerConfig; args: %v", args)
+	}
+	if !containsConsecutive(args, "--memory", "2g") {
+		t.Errorf("expected --memory 2g propagated from RunnerConfig; args: %v", args)
+	}
+}
+
+// TestBuildBaseContainerSpecNoResourceLimitsWhenEmpty verifies that no
+// --cpus or --memory flags appear when the runner config has no resource limits.
+func TestBuildBaseContainerSpecNoResourceLimitsWhenEmpty(t *testing.T) {
+	r := newRunnerForArgTest(t, RunnerConfig{
+		Command:      "podman",
+		SandboxImage: "wallfacer:latest",
+	})
+
+	spec := r.buildBaseContainerSpec("c-test", "", "claude")
+	args := spec.Build()
+
+	for _, a := range args {
+		if a == "--cpus" {
+			t.Errorf("unexpected --cpus in args when ContainerCPUs is empty; args: %v", args)
+		}
+		if a == "--memory" {
+			t.Errorf("unexpected --memory in args when ContainerMemory is empty; args: %v", args)
+		}
+	}
+}
+
+// TestBuildBaseContainerSpecResourceLimitsFromEnvFile verifies that
+// buildBaseContainerSpec picks up CPU and memory limits from the env file
+// when no static RunnerConfig values are set.
+func TestBuildBaseContainerSpecResourceLimitsFromEnvFile(t *testing.T) {
+	envPath := strings.Join([]string{t.TempDir(), ".env"}, "/")
+	envContent := "WALLFACER_CONTAINER_CPUS=3.0\nWALLFACER_CONTAINER_MEMORY=8g\n"
+	if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	r := newRunnerForArgTest(t, RunnerConfig{
+		Command:      "podman",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envPath,
+		// ContainerCPUs and ContainerMemory intentionally left empty to test env-file fallback.
+	})
+
+	spec := r.buildBaseContainerSpec("c-test", "", "claude")
+	args := spec.Build()
+
+	if !containsConsecutive(args, "--cpus", "3.0") {
+		t.Errorf("expected --cpus 3.0 from env file; args: %v", args)
+	}
+	if !containsConsecutive(args, "--memory", "8g") {
+		t.Errorf("expected --memory 8g from env file; args: %v", args)
+	}
+}
+
 // TestBuildBaseContainerSpecParityWithBuildContainerArgsForSandbox verifies
 // that the base spec produced by buildBaseContainerSpec is a prefix-equivalent
 // of what buildContainerArgsForSandbox produces (same initial env/volume flags).

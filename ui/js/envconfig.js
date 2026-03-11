@@ -161,6 +161,8 @@ function buildSaveEnvPayload() {
   const codexTitleModel = document.getElementById('env-codex-title-model').value.trim();
   const defaultSandbox = document.getElementById('env-default-sandbox').value.trim();
   const sandboxByActivity = collectSandboxByActivity('env-sandbox-');
+  const containerCPUs = document.getElementById('env-container-cpus') ? document.getElementById('env-container-cpus').value.trim() : '';
+  const containerMemory = document.getElementById('env-container-memory') ? document.getElementById('env-container-memory').value.trim() : '';
 
   const body = {};
   if (oauthRaw) body.oauth_token = oauthRaw;
@@ -174,6 +176,8 @@ function buildSaveEnvPayload() {
   body.codex_title_model = codexTitleModel;
   body.default_sandbox = defaultSandbox;
   body.sandbox_by_activity = sandboxByActivity;
+  body.container_cpus = containerCPUs; // empty = clear
+  body.container_memory = containerMemory; // empty = clear
 
   return body;
 }
@@ -267,6 +271,8 @@ async function loadEnvConfig() {
   safeSetValue('env-codex-default-model', (el) => { el.value = ''; });
   safeSetValue('env-codex-title-model', (el) => { el.value = ''; });
   safeSetValue('env-default-sandbox', (el) => { el.value = ''; });
+  safeSetValue('env-container-cpus', (el) => { el.value = ''; });
+  safeSetValue('env-container-memory', (el) => { el.value = ''; });
   safeSetValue('env-config-status', (el) => { el.textContent = ''; });
   safeSetValue('env-claude-test-status', (el) => { el.textContent = ''; });
   safeSetValue('env-codex-test-status', (el) => { el.textContent = ''; });
@@ -303,6 +309,8 @@ async function loadEnvConfig() {
   safeSetValue('env-codex-title-model', (el) => { el.value = cfg.codex_title_model || ''; });
   safeSetValue('env-default-sandbox', (el) => { el.value = cfg.default_sandbox || ''; });
   applySandboxByActivity('env-sandbox-', cfg.sandbox_by_activity || {});
+  safeSetValue('env-container-cpus', (el) => { el.value = cfg.container_cpus || ''; });
+  safeSetValue('env-container-memory', (el) => { el.value = cfg.container_memory || ''; });
   safeSetValue('env-config-status', (el) => {
     if (el.textContent === 'Failed to load configuration.') return;
     el.textContent = '';

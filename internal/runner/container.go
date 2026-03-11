@@ -280,6 +280,8 @@ func (r *Runner) buildBaseContainerSpec(containerName, model, sandbox string) Co
 	})
 	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
 	spec.Network = r.resolvedContainerNetwork()
+	spec.CPUs = r.resolvedContainerCPUs()
+	spec.Memory = r.resolvedContainerMemory()
 	return spec
 }
 

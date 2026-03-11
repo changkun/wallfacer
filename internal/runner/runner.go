@@ -278,6 +278,8 @@ type RunnerConfig struct {
 	InstructionsPath string
 	CodexAuthPath    string // host path to codex auth cache directory (default: ~/.codex)
 	ContainerNetwork string // --network value for task containers (empty = read from env file, fallback "host")
+	ContainerCPUs    string // --cpus value for task containers (empty = read from env file, no limit)
+	ContainerMemory  string // --memory value for task containers (empty = read from env file, no limit)
 }
 
 // Runner orchestrates agent container execution for tasks.
@@ -292,6 +294,8 @@ type Runner struct {
 	instructionsPath string
 	codexAuthPath    string
 	containerNetwork string            // --network override; empty = read from env file
+	containerCPUs    string            // --cpus override; empty = read from env file
+	containerMemory  string            // --memory override; empty = read from env file
 	worktreeMu       sync.Mutex        // serializes all worktree filesystem operations on worktreesDir
 	repoMu           sync.Map          // per-repo *sync.Mutex for serializing rebase+merge
 	taskContainers   *containerRegistry // taskID → container name
@@ -452,6 +456,8 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		instructionsPath: cfg.InstructionsPath,
 		codexAuthPath:    strings.TrimSpace(cfg.CodexAuthPath),
 		containerNetwork: cfg.ContainerNetwork,
+		containerCPUs:    cfg.ContainerCPUs,
+		containerMemory:  cfg.ContainerMemory,
 		taskContainers:   &containerRegistry{},
 		refineContainers: &containerRegistry{},
 		ideateContainer:  &containerRegistry{},
@@ -497,6 +503,34 @@ func (r *Runner) resolvedContainerNetwork() string {
 		}
 	}
 	return "host"
+}
+
+// resolvedContainerCPUs returns the --cpus value to use for task containers.
+// Priority: explicit RunnerConfig value > WALLFACER_CONTAINER_CPUS from env file > "" (no limit).
+func (r *Runner) resolvedContainerCPUs() string {
+	if r.containerCPUs != "" {
+		return r.containerCPUs
+	}
+	if r.envFile != "" {
+		if cfg, err := envconfig.Parse(r.envFile); err == nil {
+			return cfg.ContainerCPUs
+		}
+	}
+	return ""
+}
+
+// resolvedContainerMemory returns the --memory value to use for task containers.
+// Priority: explicit RunnerConfig value > WALLFACER_CONTAINER_MEMORY from env file > "" (no limit).
+func (r *Runner) resolvedContainerMemory() string {
+	if r.containerMemory != "" {
+		return r.containerMemory
+	}
+	if r.envFile != "" {
+		if cfg, err := envconfig.Parse(r.envFile); err == nil {
+			return cfg.ContainerMemory
+		}
+	}
+	return ""
 }
 
 // Command returns the container runtime binary path (podman/docker).

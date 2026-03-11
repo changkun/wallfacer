@@ -112,6 +112,8 @@ type envConfigResponse struct {
 	AutoPushEnabled      bool              `json:"auto_push_enabled"`
 	AutoPushThreshold    int               `json:"auto_push_threshold"`
 	ContainerNetwork     string            `json:"container_network"`
+	ContainerCPUs        string            `json:"container_cpus"`
+	ContainerMemory      string            `json:"container_memory"`
 }
 
 type sandboxTestResponse struct {
@@ -182,6 +184,8 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		AutoPushEnabled:      cfg.AutoPushEnabled,
 		AutoPushThreshold:    autoPushThreshold,
 		ContainerNetwork:     cfg.ContainerNetwork,
+		ContainerCPUs:        cfg.ContainerCPUs,
+		ContainerMemory:      cfg.ContainerMemory,
 	})
 }
 
@@ -359,6 +363,8 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		nil,
 		nil,
 		nil,
+		nil,
+		nil,
 	); err != nil {
 		return "", err
 	}
@@ -448,6 +454,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		AutoPushEnabled      *bool             `json:"auto_push_enabled"`
 		AutoPushThreshold    *int              `json:"auto_push_threshold"`
 		ContainerNetwork     *string           `json:"container_network"`
+		ContainerCPUs        *string           `json:"container_cpus"`
+		ContainerMemory      *string           `json:"container_memory"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -567,6 +575,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		autoPush,
 		autoPushThreshold,
 		req.ContainerNetwork,
+		req.ContainerCPUs,
+		req.ContainerMemory,
 	); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return

@@ -120,12 +120,16 @@ func runServer(configDir string, args []string) {
 		codexAuthPath = filepath.Join(home, ".codex")
 	}
 
-	// Read initial ContainerNetwork from env file (if present) so the runner
-	// starts with the configured network policy without waiting for the first
+	// Read initial container settings from env file (if present) so the runner
+	// starts with the configured policies without waiting for the first
 	// container launch to re-read the file.
 	containerNetwork := ""
+	containerCPUs := ""
+	containerMemory := ""
 	if cfg, err := envconfig.Parse(*envFile); err == nil {
 		containerNetwork = cfg.ContainerNetwork
+		containerCPUs = cfg.ContainerCPUs
+		containerMemory = cfg.ContainerMemory
 	}
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
@@ -137,6 +141,8 @@ func runServer(configDir string, args []string) {
 		InstructionsPath: instructionsPath,
 		CodexAuthPath:    codexAuthPath,
 		ContainerNetwork: containerNetwork,
+		ContainerCPUs:    containerCPUs,
+		ContainerMemory:  containerMemory,
 	})
 
 	r.PruneOrphanedWorktrees(s)

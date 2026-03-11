@@ -223,6 +223,22 @@
                 </div>
               </div>
             </div>
+
+            <div style="border:1px solid var(--border); border-radius:8px; padding:12px;">
+              <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px;">Container Resource Limits</label>
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                  <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Container CPUs (WALLFACER_CONTAINER_CPUS)</label>
+                  <input id="env-container-cpus" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. 2.0 (leave empty for no limit)" autocomplete="off">
+                  <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Max CPU cores for each container (<code style="font-family:monospace;">--cpus</code>). Clear to remove the limit.</div>
+                </div>
+                <div>
+                  <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Container Memory (WALLFACER_CONTAINER_MEMORY)</label>
+                  <input id="env-container-memory" type="text" class="field" style="font-family:monospace; font-size:12px;" placeholder="e.g. 4g (leave empty for no limit)" autocomplete="off">
+                  <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Max memory for each container (<code style="font-family:monospace;">--memory</code>). Clear to remove the limit.</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px;">
