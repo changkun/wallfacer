@@ -225,7 +225,8 @@ type Task struct {
 	CommitHashes     map[string]string `json:"commit_hashes,omitempty"`      // host repoPath → commit hash after merge
 	BaseCommitHashes map[string]string `json:"base_commit_hashes,omitempty"` // host repoPath → defBranch HEAD before merge
 	MountWorktrees   bool              `json:"mount_worktrees,omitempty"`
-	Model            string            `json:"model,omitempty"` // deprecated: retained for migration compatibility
+	Model            string            `json:"model,omitempty"`          // deprecated: retained for migration compatibility
+	ModelOverride    *string           `json:"model_override,omitempty"` // per-task model override; nil means use global default
 
 	// Test verification fields.
 	IsTestRun        bool   `json:"is_test_run,omitempty"`         // true while the task is running as a test verifier
@@ -316,6 +317,10 @@ func deepCloneTask(t *Task) Task {
 	if t.ForkedFrom != nil {
 		forkedFrom := *t.ForkedFrom
 		cp.ForkedFrom = &forkedFrom
+	}
+	if t.ModelOverride != nil {
+		modelOverride := *t.ModelOverride
+		cp.ModelOverride = &modelOverride
 	}
 
 	return cp
