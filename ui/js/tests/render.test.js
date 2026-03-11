@@ -106,6 +106,13 @@ function createContext(options = {}) {
     highlightMatch: (text) => text || '',
     taskDisplayPrompt: (task) => (task ? task.prompt : ''),
     syncTask: vi.fn(),
+    task: (id) => ({
+      diff: () => `/api/tasks/${id}/diff`,
+      update: () => `/api/tasks/${id}`,
+      archive: () => `/api/tasks/${id}/archive`,
+      done: () => `/api/tasks/${id}/done`,
+      resume: () => `/api/tasks/${id}/resume`,
+    }),
     ...options,
   });
 
