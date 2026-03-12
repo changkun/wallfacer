@@ -122,7 +122,11 @@ func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
 	}
 
 	ideaPrompt := h.runner.BuildIdeationPrompt(activeTasks)
-	task, err := h.store.CreateTask(ctx, ideaPrompt, ideaAgentDefaultTimeout, false, "", store.TaskKindIdeaAgent)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+		Prompt:  ideaPrompt,
+		Timeout: ideaAgentDefaultTimeout,
+		Kind:    store.TaskKindIdeaAgent,
+	})
 	if err != nil {
 		logger.Handler.Warn("ideation: create idea-agent task", "error", err)
 		return nil

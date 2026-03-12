@@ -255,12 +255,12 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		prompt = strings.TrimSpace(*req.Prompt)
 	}
 
-	task, err := h.store.CreateTask(r.Context(), prompt, timeout, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
+		Prompt:  prompt,
+		Timeout: timeout,
+		Sandbox: sandbox,
+	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if err := h.store.UpdateTaskSandbox(r.Context(), task.ID, sandbox); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -158,48 +158,21 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := h.store.CreateTask(r.Context(), req.Prompt, req.Timeout, req.MountWorktrees, "", req.Kind)
+	task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
+		Prompt:            req.Prompt,
+		Timeout:           req.Timeout,
+		MountWorktrees:    req.MountWorktrees,
+		Kind:              req.Kind,
+		Sandbox:           req.Sandbox,
+		SandboxByActivity: req.SandboxByActivity,
+		MaxCostUSD:        req.MaxCostUSD,
+		MaxInputTokens:    req.MaxInputTokens,
+		ModelOverride:     req.Model,
+		ScheduledAt:       req.ScheduledAt,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-
-	if req.ScheduledAt != nil && time.Now().Before(*req.ScheduledAt) {
-		if err := h.store.UpdateTaskScheduledAt(r.Context(), task.ID, req.ScheduledAt); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	if req.Sandbox != "" {
-		if err := h.store.UpdateTaskSandbox(r.Context(), task.ID, req.Sandbox); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	if req.SandboxByActivity != nil {
-		if err := h.store.UpdateTaskSandboxByActivity(r.Context(), task.ID, req.SandboxByActivity); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	if req.MaxCostUSD > 0 || req.MaxInputTokens > 0 {
-		if err := h.store.UpdateTaskBudget(r.Context(), task.ID, &req.MaxCostUSD, &req.MaxInputTokens); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	if req.Model != "" {
-		if err := h.store.UpdateTaskModelOverride(r.Context(), task.ID, req.Model); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	if req.ScheduledAt != nil || req.Sandbox != "" || req.SandboxByActivity != nil || req.MaxCostUSD > 0 || req.MaxInputTokens > 0 || req.Model != "" {
-		task, err = h.store.GetTask(r.Context(), task.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 	}
 
 	h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange, map[string]string{
@@ -459,7 +432,8 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	for _, idx := range topoOrder {
 		t := req.Tasks[idx]
 
-		// Resolve depends_on_refs to UUID strings.
+		// Resolve depends_on_refs to UUID strings before the store call so the
+		// task is persisted in final form (no post-create UpdateTaskDependsOn).
 		depStrs := make([]string, 0, len(t.DependsOnRefs))
 		for _, dep := range t.DependsOnRefs {
 			if depID, ok := refToID[dep]; ok {
@@ -469,7 +443,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		task, err := h.store.CreateTaskWithOptions(r.Context(), store.CreateTaskOptions{
+		task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
 			ID:                preAssignedIDs[idx],
 			Prompt:            t.Prompt,
 			Timeout:           t.Timeout,

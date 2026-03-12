@@ -2713,8 +2713,8 @@ func TestBatchCreateTasks_SuccessABCTopologicalOrder(t *testing.T) {
 	}
 
 	var resp struct {
-		Tasks    []store.Task      `json:"tasks"`
-		RefToID  map[string]string `json:"ref_to_id"`
+		Tasks   []store.Task      `json:"tasks"`
+		RefToID map[string]string `json:"ref_to_id"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -2770,5 +2770,225 @@ func TestBatchCreateTasks_SuccessABCTopologicalOrder(t *testing.T) {
 	// All three tasks must be in the store.
 	if storeTaskCount(t, h) != 3 {
 		t.Errorf("expected 3 tasks in store, got %d", storeTaskCount(t, h))
+	}
+}
+
+// --- Atomic creation tests ---
+
+// TestCreateTask_ReturnsSandboxBudgetAndScheduleInBody verifies that the
+// 201 response body already contains sandbox, budget, and schedule fields
+// without requiring a subsequent fetch.
+func TestCreateTask_ReturnsSandboxBudgetAndScheduleInBody(t *testing.T) {
+	h := newTestHandler(t)
+	futureTime := time.Now().Add(2 * time.Hour).Truncate(time.Second).UTC()
+
+	body, _ := json.Marshal(map[string]any{
+		"prompt":           "atomic creation test",
+		"sandbox":          "claude",
+		"max_cost_usd":     5.5,
+		"max_input_tokens": 1000,
+		"scheduled_at":     futureTime,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(string(body)))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var task store.Task
+	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if task.Sandbox != "claude" {
+		t.Errorf("sandbox: want %q, got %q", "claude", task.Sandbox)
+	}
+	if task.MaxCostUSD != 5.5 {
+		t.Errorf("max_cost_usd: want 5.5, got %v", task.MaxCostUSD)
+	}
+	if task.MaxInputTokens != 1000 {
+		t.Errorf("max_input_tokens: want 1000, got %d", task.MaxInputTokens)
+	}
+	if task.ScheduledAt == nil {
+		t.Fatal("scheduled_at: expected non-nil in response")
+	}
+	if !task.ScheduledAt.Equal(futureTime) {
+		t.Errorf("scheduled_at: want %v, got %v", futureTime, *task.ScheduledAt)
+	}
+}
+
+// TestCreateTask_EmitsOnlyOneDelta verifies that creating a fully configured
+// task (sandbox + budget + schedule) emits exactly one SSE delta, not one per
+// post-create update call.
+func TestCreateTask_EmitsOnlyOneDelta(t *testing.T) {
+	h := newTestHandler(t)
+
+	subID, deltaCh := h.store.Subscribe()
+	defer h.store.Unsubscribe(subID)
+
+	futureTime := time.Now().Add(2 * time.Hour)
+	body, _ := json.Marshal(map[string]any{
+		"prompt":           "delta count test",
+		"sandbox":          "claude",
+		"max_cost_usd":     3.0,
+		"max_input_tokens": 500,
+		"scheduled_at":     futureTime,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(string(body)))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Drain the channel for a short window and count deltas.
+	count := 0
+	deadline := time.After(50 * time.Millisecond)
+drain:
+	for {
+		select {
+		case <-deltaCh:
+			count++
+		case <-deadline:
+			break drain
+		}
+	}
+
+	if count != 1 {
+		t.Errorf("expected exactly 1 SSE delta for task creation, got %d", count)
+	}
+}
+
+// TestBatchCreateTasks_ReturnsSandboxAndDeps verifies that batch-created tasks
+// already contain sandbox and dependency fields in the 201 response without
+// requiring a re-fetch.
+func TestBatchCreateTasks_ReturnsSandboxAndDeps(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := `{"tasks":[
+		{"ref":"A","prompt":"task A","sandbox":"claude"},
+		{"ref":"B","prompt":"task B","sandbox":"claude","depends_on_refs":["A"]}
+	]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Tasks   []store.Task      `json:"tasks"`
+		RefToID map[string]string `json:"ref_to_id"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(resp.Tasks))
+	}
+
+	// Both tasks must have sandbox set immediately.
+	for i, task := range resp.Tasks {
+		if task.Sandbox != "claude" {
+			t.Errorf("tasks[%d].sandbox: want %q, got %q", i, "claude", task.Sandbox)
+		}
+	}
+
+	// Task B must have A's UUID in DependsOn.
+	aID := resp.RefToID["A"]
+	var taskB *store.Task
+	for i := range resp.Tasks {
+		if resp.Tasks[i].Prompt == "task B" {
+			taskB = &resp.Tasks[i]
+			break
+		}
+	}
+	if taskB == nil {
+		t.Fatal("task B not found in response")
+	}
+	if len(taskB.DependsOn) != 1 {
+		t.Fatalf("task B DependsOn: want 1 entry, got %d", len(taskB.DependsOn))
+	}
+	if taskB.DependsOn[0] != aID {
+		t.Errorf("task B DependsOn[0]: want %q (A's ID), got %q", aID, taskB.DependsOn[0])
+	}
+}
+
+// TestBatchCreateTasks_EmitsOneDeltaPerTask verifies that each batch task
+// emits exactly one SSE delta.
+func TestBatchCreateTasks_EmitsOneDeltaPerTask(t *testing.T) {
+	h := newTestHandler(t)
+
+	subID, deltaCh := h.store.Subscribe()
+	defer h.store.Unsubscribe(subID)
+
+	body := `{"tasks":[
+		{"ref":"X","prompt":"task X","sandbox":"claude"},
+		{"ref":"Y","prompt":"task Y","depends_on_refs":["X"]}
+	]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	count := 0
+	deadline := time.After(50 * time.Millisecond)
+drain2:
+	for {
+		select {
+		case <-deltaCh:
+			count++
+		case <-deadline:
+			break drain2
+		}
+	}
+
+	// 2 tasks → exactly 2 creation deltas (no extra update deltas).
+	if count != 2 {
+		t.Errorf("expected exactly 2 SSE deltas for 2-task batch, got %d", count)
+	}
+}
+
+// TestCreateTask_ScheduledTaskNotAutoPromotedBeforeScheduledAt verifies that
+// a task's ScheduledAt is persisted atomically at creation time, so
+// tryAutoPromote cannot promote it before the schedule fires.
+func TestCreateTask_ScheduledTaskNotAutoPromotedBeforeScheduledAt(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+
+	futureTime := time.Now().Add(24 * time.Hour)
+	body, _ := json.Marshal(map[string]any{
+		"prompt":       "scheduled task",
+		"scheduled_at": futureTime,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(string(body)))
+	w := httptest.NewRecorder()
+	h.CreateTask(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var created store.Task
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("decode created: %v", err)
+	}
+	// ScheduledAt must be present in the response body immediately.
+	if created.ScheduledAt == nil {
+		t.Fatal("scheduled_at not set in create response — task could be auto-promoted immediately")
+	}
+
+	// Auto-promote must not advance the task to in_progress.
+	h.tryAutoPromote(context.Background())
+
+	got, err := h.store.GetTask(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusBacklog {
+		t.Errorf("scheduled task was auto-promoted before scheduled_at: status=%s", got.Status)
 	}
 }
