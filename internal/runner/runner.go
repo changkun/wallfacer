@@ -308,6 +308,7 @@ type Runner struct {
 	ideateContainer  *containerRegistry // singleton: ideation container name
 	oversightMu      sync.Map           // taskID (string) → *sync.Mutex for serializing oversight generation
 	containerCB      *CircuitBreaker    // circuit breaker for container launch operations
+	executor         ContainerExecutor  // abstracts container runtime calls for testing
 	backgroundWg     trackedWg          // tracks fire-and-forget background goroutines
 	stopReasonMu     sync.RWMutex
 	onStopReason     func(taskID uuid.UUID, stopReason string)
@@ -515,6 +516,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		}
 	}
 	r.containerCB = NewCircuitBreaker(cbThreshold, time.Duration(cbOpenSec)*time.Second)
+	r.executor = &osContainerExecutor{command: r.command}
 
 	// Subscribe to store changes to drive the board-context cache invalidation.
 	// Each store mutation increments boardChangeSeq so generateBoardContextAndMounts

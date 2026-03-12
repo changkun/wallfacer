@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -461,9 +460,6 @@ func (r *Runner) runContainer(
 	r.taskContainers.Set(taskID, containerName)
 	defer r.taskContainers.Delete(taskID)
 
-	// Remove any leftover container from a previous interrupted run.
-	exec.Command(r.command, "rm", "-f", containerName).Run()
-
 	sandbox := "claude"
 	if task, err := r.store.GetTask(context.Background(), taskID); err == nil {
 		sandbox = r.sandboxForTaskActivity(task, activity)
@@ -479,14 +475,9 @@ func (r *Runner) runContainer(
 
 		args := r.buildContainerArgsForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
 
-		cmd := exec.CommandContext(ctx, r.command, args...)
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-
 		logger.Runner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
 		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: activity})
-		runErr := cmd.Run()
+		rawStdout, rawStderr, runErr := r.executor.RunArgs(ctx, containerName, args)
 		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: activity})
 
 		// Detect container runtime failures (daemon/binary unavailable).
@@ -499,39 +490,38 @@ func (r *Runner) runContainer(
 		// If the context was cancelled or timed out, kill the container explicitly
 		// and return the context error rather than parsing potentially incomplete output.
 		if ctx.Err() != nil {
-			exec.Command(r.command, "kill", containerName).Run()
-			exec.Command(r.command, "rm", "-f", containerName).Run()
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container terminated: %w", ctx.Err())
+			r.executor.Kill(containerName)
+			return nil, rawStdout, rawStderr, fmt.Errorf("container terminated: %w", ctx.Err())
 		}
 
-		raw := strings.TrimSpace(stdout.String())
+		raw := strings.TrimSpace(string(rawStdout))
 		if raw == "" {
 			if runErr != nil {
 				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, stdout.Bytes(), stderr.Bytes(),
-						fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), stderr.String())
+					return nil, rawStdout, rawStderr,
+						fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), string(rawStderr))
 				}
-				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", runErr)
 			}
-			stderrStr := strings.TrimSpace(stderr.String())
+			stderrStr := strings.TrimSpace(string(rawStderr))
 			if stderrStr != "" {
-				return nil, stdout.Bytes(), stderr.Bytes(),
+				return nil, rawStdout, rawStderr,
 					fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
 			}
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
+			return nil, rawStdout, rawStderr, fmt.Errorf("empty output from container")
 		}
 
 		output, parseErr := parseOutput(raw)
 		if parseErr != nil {
 			if runErr != nil {
 				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, stdout.Bytes(), stderr.Bytes(),
+					return nil, rawStdout, rawStderr,
 						fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
-							exitErr.ExitCode(), stderr.String(), truncate(raw, 500))
+							exitErr.ExitCode(), string(rawStderr), truncate(raw, 500))
 				}
-				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", runErr)
 			}
-			return nil, stdout.Bytes(), stderr.Bytes(),
+			return nil, rawStdout, rawStderr,
 				fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
 		}
 
@@ -548,7 +538,7 @@ func (r *Runner) runContainer(
 		// Container runtime is healthy: close the circuit (or keep it closed).
 		r.containerCB.RecordSuccess()
 		output.ActualSandbox = selectedSandbox
-		return output, stdout.Bytes(), stderr.Bytes(), nil
+		return output, rawStdout, rawStderr, nil
 	}
 
 	output, rawStdout, rawStderr, err := runWithSandbox(sandbox)

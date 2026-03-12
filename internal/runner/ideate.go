@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -149,8 +148,6 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 	r.ideateContainer.SetSingleton(containerName)
 	defer r.ideateContainer.DeleteSingleton()
 
-	exec.Command(r.command, "rm", "-f", containerName).Run()
-
 	sandbox := "claude"
 	if taskID != uuid.Nil {
 		if task, err := r.store.GetTask(context.Background(), taskID); err == nil {
@@ -159,45 +156,40 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 	}
 	runWithSandbox := func(selectedSandbox string) (*agentOutput, []byte, []byte, error) {
 		args := r.buildIdeationContainerArgs(containerName, prompt, selectedSandbox)
-		cmd := exec.CommandContext(ctx, r.command, args...)
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
 
 		logger.Runner.Debug("ideate exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
 		if taskID != uuid.Nil {
 			r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityIdeaAgent})
 		}
-		runErr := cmd.Run()
+		rawStdout, rawStderr, runErr := r.executor.RunArgs(ctx, containerName, args)
 		if taskID != uuid.Nil {
 			r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityIdeaAgent})
 		}
 
 		if ctx.Err() != nil {
-			exec.Command(r.command, "kill", containerName).Run()
-			exec.Command(r.command, "rm", "-f", containerName).Run()
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("ideation container terminated: %w", ctx.Err())
+			r.executor.Kill(containerName)
+			return nil, rawStdout, rawStderr, fmt.Errorf("ideation container terminated: %w", ctx.Err())
 		}
 
-		raw := strings.TrimSpace(stdout.String())
+		raw := strings.TrimSpace(string(rawStdout))
 		if raw == "" {
 			if runErr != nil {
 				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("container exited %d: stderr=%s", exitErr.ExitCode(), stderr.String())
+					return nil, rawStdout, rawStderr, fmt.Errorf("container exited %d: stderr=%s", exitErr.ExitCode(), string(rawStderr))
 				}
-				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", runErr)
 			}
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from ideation container")
+			return nil, rawStdout, rawStderr, fmt.Errorf("empty output from ideation container")
 		}
 
 		output, parseErr := parseOutput(raw)
 		if parseErr != nil {
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("parse ideation output: %w", parseErr)
+			return nil, rawStdout, rawStderr, fmt.Errorf("parse ideation output: %w", parseErr)
 		}
 		if output == nil || output.Result == "" {
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("no result in ideation output")
+			return nil, rawStdout, rawStderr, fmt.Errorf("no result in ideation output")
 		}
-		return output, stdout.Bytes(), stderr.Bytes(), nil
+		return output, rawStdout, rawStderr, nil
 	}
 
 	output, rawStdout, rawStderr, err := runWithSandbox(sandbox)
