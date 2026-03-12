@@ -297,3 +297,36 @@ describe('render.js cardOversightCache', () => {
     expect(ctx.scheduleRender).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('render.js column aria-live attributes', () => {
+  let ctx;
+
+  beforeEach(() => {
+    ({ ctx } = loadRenderHarness());
+    ctx.tasks = [];
+    ctx.archivedTasks = [];
+  });
+
+  it('sets aria-live="polite" on rendered column containers', () => {
+    const attrs = {};
+    const mockEl = {
+      dataset: {},
+      children: [],
+      hasAttribute: (k) => k in attrs,
+      getAttribute: (k) => attrs[k] ?? null,
+      setAttribute: (k, v) => { attrs[k] = v; },
+      insertBefore: () => {},
+    };
+    ctx.document = {
+      getElementById: (id) => id === 'col-backlog' ? mockEl : null,
+      createElement: () => ({ innerHTML: '' }),
+      querySelectorAll: () => [],
+      addEventListener: () => {},
+      readyState: 'complete',
+    };
+    ctx.getOpenModalTaskId = () => null;
+    ctx.getRenderableTasks = () => [];
+    ctx.render();
+    expect(mockEl.getAttribute('aria-live')).toBe('polite');
+  });
+});

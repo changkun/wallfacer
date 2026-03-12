@@ -405,10 +405,14 @@ function render() {
     }
   }
 
+  const _colTitles = { backlog: 'Backlog', in_progress: 'In Progress', waiting: 'Waiting', done: 'Done' };
   for (const [status, items] of Object.entries(columns)) {
     const el = document.getElementById(`col-${status}`);
     if (!el) continue;
     if (!el.hasAttribute('role')) el.setAttribute('role', 'list');
+    if (!el.hasAttribute('aria-live')) el.setAttribute('aria-live', 'polite');
+    if (!el.hasAttribute('aria-relevant')) el.setAttribute('aria-relevant', 'additions removals');
+    if (!el.hasAttribute('aria-label')) el.setAttribute('aria-label', `${_colTitles[status] || status} tasks`);
 
     // Backlog: sort by position ascending (priority order).
     // Other columns: sort by last updated descending.
