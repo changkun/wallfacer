@@ -136,6 +136,35 @@
     });
   }
 
+  function renderByWorkspace(data) {
+    var byWorkspace = data.by_workspace || {};
+    var keys = Object.keys(byWorkspace);
+    var section = document.getElementById('stats-by-workspace-section');
+    if (!section) return;
+    if (keys.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+    // Sort by cost descending.
+    keys.sort(function (a, b) { return (byWorkspace[b].cost_usd || 0) - (byWorkspace[a].cost_usd || 0); });
+    var rows = keys.map(function (path) {
+      var w = byWorkspace[path];
+      // Use last path component as display label; full path in tooltip.
+      var parts = path.replace(/\\/g, '/').split('/');
+      var label = parts[parts.length - 1] || path;
+      return [
+        { html: '<span title="' + escapeHtml(path) + '" style="cursor:default;">' + escapeHtml(label) + '</span>',
+          style: 'padding:6px 10px;font-weight:500;' },
+        { text: fmt(w.count),          style: 'padding:6px 10px;text-align:right;color:var(--text-muted);' },
+        { text: fmt(w.input_tokens),   style: 'padding:6px 10px;text-align:right;color:var(--text-muted);' },
+        { text: fmt(w.output_tokens),  style: 'padding:6px 10px;text-align:right;color:var(--text-muted);' },
+        { text: fmtCost(w.cost_usd),   style: 'padding:6px 10px;text-align:right;font-weight:500;' }
+      ];
+    });
+    appendRows('stats-by-workspace-tbody', rows);
+    section.style.display = '';
+  }
+
   function renderTopTasks(data) {
     var tasks = data.top_tasks || [];
     var rows = tasks.map(function (t) {
@@ -157,6 +186,7 @@
     renderSummary(data);
     renderByStatus(data);
     renderByActivity(data);
+    renderByWorkspace(data);
     drawDailyChart(data.daily_usage || []);
     renderTopTasks(data);
     setState('content');

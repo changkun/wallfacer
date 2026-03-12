@@ -62,6 +62,25 @@
             </div>
           </div>
 
+          <!-- By Workspace table -->
+          <div id="stats-by-workspace-section" style="margin-bottom: 20px; display: none;">
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">By Workspace</div>
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border);">
+                    <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Workspace</th>
+                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Tasks</th>
+                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Input Tokens</th>
+                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Output Tokens</th>
+                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Cost USD</th>
+                  </tr>
+                </thead>
+                <tbody id="stats-by-workspace-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
           <!-- Top 10 Tasks by Cost -->
           <div>
             <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Top 10 Tasks by Cost</div>

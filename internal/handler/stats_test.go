@@ -236,6 +236,182 @@ func TestAggregateStats(t *testing.T) {
 	}
 }
 
+// TestAggregateStats_ByWorkspace verifies workspace-level cost and token bucketing.
+func TestAggregateStats_ByWorkspace(t *testing.T) {
+	now := time.Now().UTC()
+
+	repoA := "/home/user/project-a"
+	repoB := "/home/user/project-b"
+
+	tasks := []store.Task{
+		{
+			// Task with two worktree paths — contributes to both repoA and repoB.
+			ID:        uuid.New(),
+			Title:     "Task 1 — two repos",
+			Status:    store.TaskStatusDone,
+			CreatedAt: now,
+			Usage: store.TaskUsage{
+				InputTokens:          1000,
+				OutputTokens:         500,
+				CacheReadInputTokens: 100,
+				CacheCreationTokens:  50,
+				CostUSD:              0.10,
+			},
+			UsageBreakdown: map[string]store.TaskUsage{
+				"implementation": {InputTokens: 1000, OutputTokens: 500, CostUSD: 0.10},
+			},
+			WorktreePaths: map[string]string{
+				repoA: "/worktrees/a1",
+				repoB: "/worktrees/b1",
+			},
+		},
+		{
+			// Task with only repoA.
+			ID:        uuid.New(),
+			Title:     "Task 2 — repo-a only",
+			Status:    store.TaskStatusFailed,
+			CreatedAt: now,
+			Usage: store.TaskUsage{
+				InputTokens:          400,
+				OutputTokens:         200,
+				CacheReadInputTokens: 20,
+				CostUSD:              0.04,
+			},
+			UsageBreakdown: map[string]store.TaskUsage{
+				"implementation": {InputTokens: 400, OutputTokens: 200, CostUSD: 0.04},
+			},
+			WorktreePaths: map[string]string{
+				repoA: "/worktrees/a2",
+			},
+		},
+		{
+			// Task with empty WorktreePaths — excluded from ByWorkspace, counted in ByStatus.
+			ID:        uuid.New(),
+			Title:     "Task 3 — never ran",
+			Status:    store.TaskStatusCancelled,
+			CreatedAt: now,
+			Usage: store.TaskUsage{
+				InputTokens:  100,
+				OutputTokens: 50,
+				CostUSD:      0.01,
+			},
+			WorktreePaths: nil,
+		},
+	}
+
+	resp := aggregateStats(tasks, noSummary)
+
+	// --- ByWorkspace ---
+
+	if len(resp.ByWorkspace) != 2 {
+		t.Fatalf("ByWorkspace len = %d, want 2 (repoA and repoB)", len(resp.ByWorkspace))
+	}
+
+	// repoA: task1 + task2
+	wsA, ok := resp.ByWorkspace[repoA]
+	if !ok {
+		t.Fatalf("ByWorkspace missing %q", repoA)
+	}
+	if wsA.Count != 2 {
+		t.Errorf("ByWorkspace[repoA].Count = %d, want 2", wsA.Count)
+	}
+	wantACost := 0.10 + 0.04
+	if diff := wsA.CostUSD - wantACost; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByWorkspace[repoA].CostUSD = %v, want %v", wsA.CostUSD, wantACost)
+	}
+	if wsA.InputTokens != 1000+400 {
+		t.Errorf("ByWorkspace[repoA].InputTokens = %d, want %d", wsA.InputTokens, 1000+400)
+	}
+	if wsA.OutputTokens != 500+200 {
+		t.Errorf("ByWorkspace[repoA].OutputTokens = %d, want %d", wsA.OutputTokens, 500+200)
+	}
+	// CacheReadTokens: 100 (task1) + 20 (task2)
+	if wsA.CacheReadTokens != 100+20 {
+		t.Errorf("ByWorkspace[repoA].CacheReadTokens = %d, want %d", wsA.CacheReadTokens, 100+20)
+	}
+	// CacheCreationTokens: 50 (task1) + 0 (task2)
+	if wsA.CacheCreationTokens != 50 {
+		t.Errorf("ByWorkspace[repoA].CacheCreationTokens = %d, want 50", wsA.CacheCreationTokens)
+	}
+
+	// repoB: task1 only
+	wsB, ok := resp.ByWorkspace[repoB]
+	if !ok {
+		t.Fatalf("ByWorkspace missing %q", repoB)
+	}
+	if wsB.Count != 1 {
+		t.Errorf("ByWorkspace[repoB].Count = %d, want 1", wsB.Count)
+	}
+	if diff := wsB.CostUSD - 0.10; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByWorkspace[repoB].CostUSD = %v, want 0.10", wsB.CostUSD)
+	}
+
+	// --- Task 3 (no WorktreePaths) is excluded from ByWorkspace ---
+	// It should still appear in ByStatus[cancelled].
+	cancelled, ok := resp.ByStatus["cancelled"]
+	if !ok {
+		t.Fatal("ByStatus missing 'cancelled'")
+	}
+	if diff := cancelled.CostUSD - 0.01; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByStatus[cancelled].CostUSD = %v, want 0.01", cancelled.CostUSD)
+	}
+}
+
+// TestFilterTasksByWorkspace verifies the workspace query-param filter helper.
+func TestFilterTasksByWorkspace(t *testing.T) {
+	repoA := "/home/user/project-a"
+	repoB := "/home/user/project-b"
+
+	tasks := []store.Task{
+		{
+			ID: uuid.New(), Title: "Task A",
+			WorktreePaths: map[string]string{repoA: "/worktrees/a"},
+		},
+		{
+			ID: uuid.New(), Title: "Task B",
+			WorktreePaths: map[string]string{repoB: "/worktrees/b"},
+		},
+		{
+			ID:            uuid.New(), Title: "Task None",
+			WorktreePaths: nil,
+		},
+	}
+
+	tests := []struct {
+		name      string
+		workspace string
+		wantCount int
+		wantOK    bool
+	}{
+		{"empty filter returns all", "", 3, true},
+		{"filter by repoA", repoA, 1, true},
+		{"filter by repoB", repoB, 1, true},
+		{"filter by unknown path returns false", "/unknown/path", 0, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := filterTasksByWorkspace(tasks, tc.workspace)
+			if ok != tc.wantOK {
+				t.Errorf("filterTasksByWorkspace ok = %v, want %v", ok, tc.wantOK)
+			}
+			if len(got) != tc.wantCount {
+				t.Errorf("filterTasksByWorkspace count = %d, want %d", len(got), tc.wantCount)
+			}
+		})
+	}
+
+	// Verify aggregateStats on the filtered result contains only repoA.
+	filteredA, _ := filterTasksByWorkspace(tasks, repoA)
+	resp := aggregateStats(filteredA, noSummary)
+	if _, ok := resp.ByWorkspace[repoA]; !ok {
+		t.Errorf("after filtering by repoA, ByWorkspace should contain %q", repoA)
+	}
+	if _, ok := resp.ByWorkspace[repoB]; ok {
+		t.Errorf("after filtering by repoA, ByWorkspace should NOT contain %q", repoB)
+	}
+}
+
 // TestAggregateStats_SummaryFallback verifies that aggregateStats uses a
 // summary's ByActivity and TotalCostUSD for done tasks when a summary is
 // available, while still accumulating live data for non-done tasks.

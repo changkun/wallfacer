@@ -271,7 +271,7 @@ var Routes = []Route{
 	{
 		Method: "GET", Pattern: "/api/stats", Name: "GetStats",
 		JSName:      "get",
-		Description: "Task status statistics.",
+		Description: "Task status and workspace cost statistics. Optional ?workspace=<repo-root-path> restricts aggregation to tasks for that workspace (400 if no tasks match).",
 		Tags:        []string{"stats"},
 	},
 
