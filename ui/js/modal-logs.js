@@ -51,6 +51,41 @@ function _updateLogsTabs() {
   }
 }
 
+// _updateServerTruncationBanner shows or hides the server-side truncation
+// warning banner above the implementation log panel. The banner is shown when
+// rawLogBuffer contains a truncation_notice sentinel injected by the server
+// (see SaveTurnOutput in internal/store/io.go). It is dismissed per-session via
+// a close button and styled consistently with .diff-behind-warning.
+function _updateServerTruncationBanner() {
+  const section = document.getElementById('modal-logs-section');
+  const logsEl = document.getElementById('modal-logs');
+  if (!section || !logsEl) return;
+
+  const bannerId = 'server-truncation-notice';
+  const existing = document.getElementById(bannerId);
+
+  // Hide in oversight mode or when the buffer has no truncation sentinel.
+  if (logsMode === 'oversight' || rawLogBuffer.indexOf('"subtype":"truncation_notice"') < 0) {
+    if (existing) existing.style.display = 'none';
+    return;
+  }
+
+  // Banner already visible — nothing to do.
+  if (existing) {
+    existing.style.display = '';
+    return;
+  }
+
+  const banner = document.createElement('div');
+  banner.id = bannerId;
+  banner.className = 'diff-behind-warning';
+  banner.innerHTML =
+    '<span>&#9888; Turn output was truncated at the server (8 MB limit). Some tool calls may be missing.</span>' +
+    '<button onclick="var b=document.getElementById(\'server-truncation-notice\');if(b)b.style.display=\'none\';"' +
+    ' style="background:none;border:none;cursor:pointer;font-size:14px;padding:0 4px;" title="Dismiss">\u00d7</button>';
+  section.insertBefore(banner, logsEl);
+}
+
 function renderLogs() {
   const logsEl = document.getElementById('modal-logs');
   _updateLogsTabs();
@@ -136,6 +171,8 @@ function renderLogs() {
 
   _renderedLogMode = logsMode;
   _renderedLogQuery = logSearchQuery;
+
+  _updateServerTruncationBanner();
 
   if (!logSearchQuery && atBottom) {
     // Defer scroll-to-bottom so the browser can batch the layout triggered by

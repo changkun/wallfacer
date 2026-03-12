@@ -1,12 +1,15 @@
 package store
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"changkun.de/wallfacer/internal/logger"
 	"github.com/google/uuid"
 )
 
@@ -41,11 +44,54 @@ func (s *Store) saveTask(id uuid.UUID, task *Task) error {
 	return atomicWriteJSON(path, &pruned)
 }
 
+// truncateTurnData applies the per-turn output size budget to data. If
+// s.maxTurnOutputBytes > 0 and len(data) exceeds the limit, it scans backwards
+// from the limit to find the last newline so a JSON line is not split
+// mid-record, then appends a NDJSON truncation_notice sentinel and returns the
+// truncated slice together with the original length. Returns (data, 0) when no
+// truncation is needed.
+func (s *Store) truncateTurnData(data []byte) ([]byte, int) {
+	if s.maxTurnOutputBytes <= 0 || len(data) <= s.maxTurnOutputBytes {
+		return data, 0
+	}
+	originalLen := len(data)
+
+	// Find the last newline at or before the budget boundary so we do not split
+	// a NDJSON record in the middle.
+	cutoff := bytes.LastIndexByte(data[:s.maxTurnOutputBytes], '\n')
+	if cutoff < 0 {
+		// No newline within the budget; hard-cut at the limit.
+		cutoff = s.maxTurnOutputBytes
+	}
+
+	sentinel := fmt.Sprintf(
+		`{"type":"system","subtype":"truncation_notice","total_bytes":%d,"truncated_at":%d}`,
+		originalLen, cutoff,
+	)
+
+	result := make([]byte, 0, cutoff+1+len(sentinel)+1)
+	result = append(result, data[:cutoff]...)
+	result = append(result, '\n')
+	result = append(result, sentinel...)
+	result = append(result, '\n')
+	return result, originalLen
+}
+
 // SaveTurnOutput persists raw stdout/stderr for a given turn to the outputs directory.
 func (s *Store) SaveTurnOutput(taskID uuid.UUID, turn int, stdout, stderr []byte) error {
 	outputsDir := filepath.Join(s.dir, taskID.String(), "outputs")
 	if err := os.MkdirAll(outputsDir, 0755); err != nil {
 		return fmt.Errorf("create outputs dir: %w", err)
+	}
+
+	truncated := false
+
+	// Apply the server-side per-turn stdout size budget.
+	if truncatedStdout, originalLen := s.truncateTurnData(stdout); originalLen > 0 {
+		logger.Store.Warn("turn output truncated",
+			"task", taskID, "turn", turn, "original_bytes", originalLen)
+		stdout = truncatedStdout
+		truncated = true
 	}
 
 	name := fmt.Sprintf("turn-%04d.json", turn)
@@ -54,9 +100,24 @@ func (s *Store) SaveTurnOutput(taskID uuid.UUID, turn int, stdout, stderr []byte
 	}
 
 	if len(stderr) > 0 {
+		// Apply the server-side per-turn stderr size budget.
+		if truncatedStderr, originalLen := s.truncateTurnData(stderr); originalLen > 0 {
+			logger.Store.Warn("turn output truncated",
+				"task", taskID, "turn", turn, "original_bytes", originalLen)
+			stderr = truncatedStderr
+			truncated = true
+		}
+
 		stderrName := fmt.Sprintf("turn-%04d.stderr.txt", turn)
 		if err := os.WriteFile(filepath.Join(outputsDir, stderrName), stderr, 0644); err != nil {
 			return fmt.Errorf("write stderr: %w", err)
+		}
+	}
+
+	if truncated {
+		if err := s.MarkTurnTruncated(context.Background(), taskID, turn); err != nil {
+			logger.Store.Warn("failed to mark turn truncated",
+				"task", taskID, "turn", turn, "error", err)
 		}
 	}
 

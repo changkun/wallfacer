@@ -211,6 +211,12 @@ const (
 	DefaultPromptHistoryLimit  = 20
 )
 
+// DefaultMaxTurnOutputBytes is the default per-turn stdout/stderr output size
+// budget. Outputs exceeding this limit are truncated server-side and a sentinel
+// NDJSON line is appended so the UI can surface a warning. Set
+// WALLFACER_MAX_TURN_OUTPUT_BYTES=0 to disable the limit entirely.
+const DefaultMaxTurnOutputBytes = 8 * 1024 * 1024 // 8 MB
+
 // PayloadLimits holds the effective pruning limits for the three
 // unboundedly-growing task slice fields. Values are exposed via GET /api/config
 // so the UI can display "showing last N entries" contextual messages.
@@ -297,6 +303,11 @@ type Task struct {
 	// failure transition. Set automatically by the runner at every
 	// TaskStatusFailed transition. Empty when the task has not failed.
 	FailureCategory FailureCategory `json:"failure_category,omitempty"`
+
+	// TruncatedTurns records turn numbers whose stdout or stderr was truncated
+	// by the server-side WALLFACER_MAX_TURN_OUTPUT_BYTES budget. Set
+	// automatically by SaveTurnOutput when truncation occurs.
+	TruncatedTurns []int `json:"truncated_turns,omitempty"`
 }
 
 // HasTag reports whether the task has the given tag.
@@ -322,6 +333,7 @@ func deepCloneTask(t *Task) Task {
 	cp.RefineSessions = cloneRefinementSessions(t.RefineSessions)
 	cp.Tags = slices.Clone(t.Tags)
 	cp.DependsOn = slices.Clone(t.DependsOn)
+	cp.TruncatedTurns = slices.Clone(t.TruncatedTurns)
 	cp.SandboxByActivity = maps.Clone(t.SandboxByActivity)
 	cp.UsageBreakdown = maps.Clone(t.UsageBreakdown)
 	cp.WorktreePaths = maps.Clone(t.WorktreePaths)

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -941,9 +942,29 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UU
 	}
 
 	path := filepath.Join(h.store.OutputsDir(id), filename)
-	if _, err := os.Stat(path); err != nil {
+	fi, err := os.Stat(path)
+	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
+	}
+
+	// Detect server-side truncation by reading the last 256 bytes of the file.
+	// A truncation_notice sentinel is appended by SaveTurnOutput when the output
+	// exceeds the WALLFACER_MAX_TURN_OUTPUT_BYTES budget.
+	if fi.Size() > 0 {
+		tailSize := int64(256)
+		if fi.Size() < tailSize {
+			tailSize = fi.Size()
+		}
+		if f, ferr := os.Open(path); ferr == nil {
+			buf := make([]byte, tailSize)
+			if _, rerr := f.ReadAt(buf, fi.Size()-tailSize); rerr == nil {
+				if bytes.Contains(buf, []byte(`"truncation_notice"`)) {
+					w.Header().Set("X-Wallfacer-Truncated", "true")
+				}
+			}
+			f.Close()
+		}
 	}
 
 	if strings.HasSuffix(filename, ".json") {

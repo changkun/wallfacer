@@ -73,6 +73,10 @@ type Store struct {
 	retryHistoryLimit   int
 	refineSessionsLimit int
 	promptHistoryLimit  int
+
+	// maxTurnOutputBytes is the effective per-turn output size limit read from
+	// WALLFACER_MAX_TURN_OUTPUT_BYTES. 0 means unlimited.
+	maxTurnOutputBytes int
 }
 
 // readEnvInt reads an integer from an environment variable. If the variable is
@@ -99,6 +103,7 @@ func NewStore(dir string) (*Store, error) {
 		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", DefaultRetryHistoryLimit),
 		refineSessionsLimit: readEnvInt("WALLFACER_REFINE_SESSIONS_LIMIT", DefaultRefineSessionsLimit),
 		promptHistoryLimit:  readEnvInt("WALLFACER_PROMPT_HISTORY_LIMIT", DefaultPromptHistoryLimit),
+		maxTurnOutputBytes:  readEnvInt("WALLFACER_MAX_TURN_OUTPUT_BYTES", DefaultMaxTurnOutputBytes),
 	}
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
