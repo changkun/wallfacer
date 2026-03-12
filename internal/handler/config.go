@@ -102,6 +102,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"ideation_interval":   int(h.IdeationInterval().Minutes()),
 		"ideation_categories": h.runner.IdeationCategories(),
 		"default_model":       "",
+		"payload_limits":      h.store.GetPayloadLimits(),
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun

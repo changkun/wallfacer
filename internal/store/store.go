@@ -66,18 +66,39 @@ type Store struct {
 	subMu       sync.Mutex
 	subscribers map[int]chan SequencedDelta
 	nextSubID   int
+
+	// Payload pruning limits. A value of 0 disables pruning for that field.
+	// Configured at startup from environment variables with fallback to the
+	// Default* constants in models.go.
+	retryHistoryLimit   int
+	refineSessionsLimit int
+	promptHistoryLimit  int
+}
+
+// readEnvInt reads an integer from an environment variable. If the variable is
+// absent or cannot be parsed as an integer, defaultVal is returned.
+func readEnvInt(key string, defaultVal int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return defaultVal
 }
 
 // NewStore loads (or creates) a Store rooted at dir.
 func NewStore(dir string) (*Store, error) {
 	s := &Store{
-		dir:         dir,
-		tasks:       make(map[uuid.UUID]*Task),
-		deleted:     make(map[uuid.UUID]*Task),
-		events:      make(map[uuid.UUID][]TaskEvent),
-		nextSeq:     make(map[uuid.UUID]int),
-		searchIndex: make(map[uuid.UUID]indexedTaskText),
-		subscribers: make(map[int]chan SequencedDelta),
+		dir:                 dir,
+		tasks:               make(map[uuid.UUID]*Task),
+		deleted:             make(map[uuid.UUID]*Task),
+		events:              make(map[uuid.UUID][]TaskEvent),
+		nextSeq:             make(map[uuid.UUID]int),
+		searchIndex:         make(map[uuid.UUID]indexedTaskText),
+		subscribers:         make(map[int]chan SequencedDelta),
+		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", DefaultRetryHistoryLimit),
+		refineSessionsLimit: readEnvInt("WALLFACER_REFINE_SESSIONS_LIMIT", DefaultRefineSessionsLimit),
+		promptHistoryLimit:  readEnvInt("WALLFACER_PROMPT_HISTORY_LIMIT", DefaultPromptHistoryLimit),
 	}
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -93,6 +114,17 @@ func NewStore(dir string) (*Store, error) {
 
 // Close is a no-op placeholder for future resource cleanup.
 func (s *Store) Close() {}
+
+// GetPayloadLimits returns the effective pruning limits for the three
+// unboundedly-growing task slice fields. These are reported via GET /api/config
+// so the UI can display contextual "showing last N entries" messages.
+func (s *Store) GetPayloadLimits() PayloadLimits {
+	return PayloadLimits{
+		RetryHistory:   s.retryHistoryLimit,
+		RefineSessions: s.refineSessionsLimit,
+		PromptHistory:  s.promptHistoryLimit,
+	}
+}
 
 // OutputsDir returns the path to the outputs directory for a task.
 // Handlers use this to serve turn output files without accessing Store internals.
@@ -150,6 +182,11 @@ func (s *Store) loadAll() error {
 				continue
 			}
 		}
+
+		// Prune oversized slices on load so the in-memory task is bounded from
+		// the first read. This migrates existing large files written before the
+		// retention limits were introduced without requiring a schema bump.
+		s.pruneTaskPayload(&task)
 
 		s.tasks[id] = &task
 
