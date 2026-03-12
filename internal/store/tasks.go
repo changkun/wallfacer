@@ -16,6 +16,52 @@ import (
 	"github.com/google/uuid"
 )
 
+// ListTasksByStatus returns all tasks with the given status, sorted by
+// position then created_at. Only active (non-deleted) tasks are included.
+func (s *Store) ListTasksByStatus(_ context.Context, status TaskStatus) ([]Task, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	ids := s.tasksByStatus[status]
+	tasks := make([]Task, 0, len(ids))
+	for id := range ids {
+		t := s.tasks[id]
+		if t == nil {
+			continue // defensive: index and task map should always be in sync
+		}
+		tasks = append(tasks, cloneTask(t))
+	}
+	sort.Slice(tasks, func(i, j int) bool {
+		if tasks[i].Position != tasks[j].Position {
+			return tasks[i].Position < tasks[j].Position
+		}
+		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
+	})
+	return tasks, nil
+}
+
+// CountByStatus returns the number of active tasks with the given status in O(1).
+func (s *Store) CountByStatus(status TaskStatus) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.tasksByStatus[status])
+}
+
+// CountRegularInProgress returns the count of in-progress tasks that are not
+// test runs. This is O(k) where k is the number of in-progress tasks, not O(n)
+// over all tasks. Must not be called while s.mu is held.
+func (s *Store) CountRegularInProgress() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	count := 0
+	for id := range s.tasksByStatus[TaskStatusInProgress] {
+		if t := s.tasks[id]; t != nil && !t.IsTestRun {
+			count++
+		}
+	}
+	return count
+}
+
 // ListSummaries returns all task summaries found in data/*/summary.json.
 // It walks the data directory and reads each summary file independently,
 // without loading the full task.json. Tasks that completed before summary.json
@@ -326,6 +372,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	}
 
 	s.tasks[task.ID] = task
+	s.addToStatusIndex(task.Status, task.ID)
 	s.events[task.ID] = nil
 	s.nextSeq[task.ID] = 1
 	s.searchIndex[task.ID] = buildIndexEntry(task, "")
@@ -412,6 +459,7 @@ func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt s
 		return nil, err
 	}
 	s.tasks[id] = task
+	s.addToStatusIndex(task.Status, id)
 	s.events[id] = nil
 	s.nextSeq[id] = 1
 	s.searchIndex[id] = buildIndexEntry(task, "")
@@ -464,6 +512,7 @@ func (s *Store) DeleteTask(_ context.Context, id uuid.UUID, reason string) error
 	if err := atomicWriteJSON(tombPath, tomb); err != nil {
 		return fmt.Errorf("write tombstone: %w", err)
 	}
+	s.removeFromStatusIndex(t.Status, id)
 	delete(s.tasks, id)
 	delete(s.searchIndex, id)
 	s.deleted[id] = t
@@ -500,6 +549,7 @@ func (s *Store) RestoreTask(_ context.Context, id uuid.UUID) error {
 	}
 	delete(s.deleted, id)
 	s.tasks[id] = t
+	s.addToStatusIndex(t.Status, id)
 	oversightRaw, _ := s.LoadOversightText(id)
 	s.searchIndex[id] = buildIndexEntry(t, oversightRaw)
 	s.notify(t, false)
@@ -580,7 +630,9 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	if err := ValidateTransition(t.Status, status); err != nil {
 		return err
 	}
+	s.removeFromStatusIndex(t.Status, id)
 	t.Status = status
+	s.addToStatusIndex(t.Status, id)
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
@@ -641,7 +693,9 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	if !ok {
 		return fmt.Errorf("task not found: %s", id)
 	}
+	s.removeFromStatusIndex(t.Status, id)
 	t.Status = status
+	s.addToStatusIndex(t.Status, id)
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
@@ -1070,6 +1124,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 		CostUSD:   t.Usage.CostUSD,
 	})
 
+	oldStatus := t.Status
 	t.PromptHistory = append(t.PromptHistory, t.Prompt)
 	t.Prompt = newPrompt
 	t.FreshStart = freshStart
@@ -1084,6 +1139,8 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.IsTestRun = false
 	t.LastTestResult = ""
 	t.UpdatedAt = time.Now()
+	s.removeFromStatusIndex(oldStatus, id)
+	s.addToStatusIndex(t.Status, id)
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
@@ -1144,7 +1201,9 @@ func (s *Store) ResumeTask(_ context.Context, id uuid.UUID, timeout *int) error 
 		return fmt.Errorf("task not found: %s", id)
 	}
 
+	s.removeFromStatusIndex(t.Status, id)
 	t.Status = TaskStatusInProgress
+	s.addToStatusIndex(t.Status, id)
 	if timeout != nil {
 		t.Timeout = clampTimeout(*timeout)
 	}

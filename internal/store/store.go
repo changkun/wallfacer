@@ -48,6 +48,13 @@ type Store struct {
 	events  map[uuid.UUID][]TaskEvent
 	nextSeq map[uuid.UUID]int
 
+	// tasksByStatus is a secondary index from status → set of task IDs.
+	// It enables O(1) CountByStatus and O(k) ListTasksByStatus (where k is the
+	// count for that status) instead of O(n) full-map scans.
+	// Always accessed under s.mu (read or write lock). Inner maps are never nil
+	// after initialisation — use addToStatusIndex / removeFromStatusIndex.
+	tasksByStatus map[TaskStatus]map[uuid.UUID]struct{}
+
 	// searchIndex holds pre-lowercased text for fast in-memory search.
 	// Entries are created/updated in all task mutation methods and in
 	// SaveOversight. Guarded by mu.
@@ -98,6 +105,7 @@ func NewStore(dir string) (*Store, error) {
 		deleted:             make(map[uuid.UUID]*Task),
 		events:              make(map[uuid.UUID][]TaskEvent),
 		nextSeq:             make(map[uuid.UUID]int),
+		tasksByStatus:       make(map[TaskStatus]map[uuid.UUID]struct{}),
 		searchIndex:         make(map[uuid.UUID]indexedTaskText),
 		subscribers:         make(map[int]chan SequencedDelta),
 		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", DefaultRetryHistoryLimit),
@@ -114,11 +122,31 @@ func NewStore(dir string) (*Store, error) {
 		return nil, fmt.Errorf("load store: %w", err)
 	}
 
+	// Build the secondary status index from the tasks loaded above.
+	for id, t := range s.tasks {
+		s.addToStatusIndex(t.Status, id)
+	}
+
 	return s, nil
 }
 
 // Close is a no-op placeholder for future resource cleanup.
 func (s *Store) Close() {}
+
+// addToStatusIndex inserts id into tasksByStatus[status].
+// Must be called while s.mu is held for writing.
+func (s *Store) addToStatusIndex(status TaskStatus, id uuid.UUID) {
+	if s.tasksByStatus[status] == nil {
+		s.tasksByStatus[status] = make(map[uuid.UUID]struct{})
+	}
+	s.tasksByStatus[status][id] = struct{}{}
+}
+
+// removeFromStatusIndex removes id from tasksByStatus[status].
+// Must be called while s.mu is held for writing.
+func (s *Store) removeFromStatusIndex(status TaskStatus, id uuid.UUID) {
+	delete(s.tasksByStatus[status], id)
+}
 
 // GetPayloadLimits returns the effective pruning limits for the three
 // unboundedly-growing task slice fields. These are reported via GET /api/config

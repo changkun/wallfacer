@@ -641,3 +641,311 @@ func TestSetTaskFailureCategory(t *testing.T) {
 		t.Errorf("FailureCategory after reload = %q, want %q", reloaded.FailureCategory, FailureCategoryContainerCrash)
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Status-partitioned secondary index: ListTasksByStatus / CountByStatus
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestStatusIndex_CountsAndContents creates 50 tasks with a mix of statuses,
+// then asserts that CountByStatus and ListTasksByStatus return exactly the
+// expected counts and that every returned task carries the requested status.
+func TestStatusIndex_CountsAndContents(t *testing.T) {
+	s := newTestStore(t)
+
+	// Distribution: 20 backlog, 10 in_progress, 10 waiting, 5 done, 5 failed.
+	want := map[TaskStatus]int{
+		TaskStatusBacklog:    20,
+		TaskStatusInProgress: 10,
+		TaskStatusWaiting:    10,
+		TaskStatusDone:       5,
+		TaskStatusFailed:     5,
+	}
+
+	// Helper: advance a task through the state machine to reach target status.
+	advance := func(id uuid.UUID, target TaskStatus) {
+		t.Helper()
+		path := map[TaskStatus][]TaskStatus{
+			TaskStatusInProgress: {TaskStatusInProgress},
+			TaskStatusWaiting:    {TaskStatusInProgress, TaskStatusWaiting},
+			TaskStatusCommitting: {TaskStatusInProgress, TaskStatusWaiting, TaskStatusCommitting},
+			TaskStatusDone:       {TaskStatusInProgress, TaskStatusWaiting, TaskStatusCommitting, TaskStatusDone},
+			TaskStatusFailed:     {TaskStatusInProgress, TaskStatusFailed},
+		}
+		for _, st := range path[target] {
+			if err := s.UpdateTaskStatus(bg(), id, st); err != nil {
+				t.Fatalf("advance %s -> %s: %v", id, st, err)
+			}
+		}
+	}
+
+	totals := map[TaskStatus]int{}
+	for status, n := range want {
+		for i := 0; i < n; i++ {
+			task, err := s.CreateTask(bg(), fmt.Sprintf("task-%s-%d", status, i), 10, false, "", "")
+			if err != nil {
+				t.Fatalf("CreateTask: %v", err)
+			}
+			if status != TaskStatusBacklog {
+				advance(task.ID, status)
+			}
+			totals[status]++
+		}
+	}
+
+	// Verify CountByStatus for each status.
+	for status, wantCount := range want {
+		got := s.CountByStatus(status)
+		if got != wantCount {
+			t.Errorf("CountByStatus(%s) = %d, want %d", status, got, wantCount)
+		}
+	}
+
+	// Verify ListTasksByStatus: count and that every returned task has the right status.
+	for status, wantCount := range want {
+		tasks, err := s.ListTasksByStatus(bg(), status)
+		if err != nil {
+			t.Fatalf("ListTasksByStatus(%s): %v", status, err)
+		}
+		if len(tasks) != wantCount {
+			t.Errorf("ListTasksByStatus(%s) returned %d tasks, want %d", status, len(tasks), wantCount)
+		}
+		for _, task := range tasks {
+			if task.Status != status {
+				t.Errorf("ListTasksByStatus(%s): task %s has status %s", status, task.ID, task.Status)
+			}
+		}
+	}
+
+	// Unrepresented statuses must return zero.
+	if n := s.CountByStatus(TaskStatusCancelled); n != 0 {
+		t.Errorf("CountByStatus(cancelled) = %d, want 0", n)
+	}
+	tasks, err := s.ListTasksByStatus(bg(), TaskStatusCancelled)
+	if err != nil {
+		t.Fatalf("ListTasksByStatus(cancelled): %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Errorf("ListTasksByStatus(cancelled) = %d tasks, want 0", len(tasks))
+	}
+}
+
+// TestStatusIndex_UpdatedOnStatusChange verifies that the index is kept in
+// sync across UpdateTaskStatus transitions.
+func TestStatusIndex_UpdatedOnStatusChange(t *testing.T) {
+	s := newTestStore(t)
+
+	task, _ := s.CreateTask(bg(), "index sync test", 10, false, "", "")
+	if s.CountByStatus(TaskStatusBacklog) != 1 {
+		t.Fatalf("expected 1 backlog task after create")
+	}
+	if s.CountByStatus(TaskStatusInProgress) != 0 {
+		t.Fatalf("expected 0 in_progress tasks after create")
+	}
+
+	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+	if s.CountByStatus(TaskStatusBacklog) != 0 {
+		t.Errorf("backlog count should be 0 after promotion")
+	}
+	if s.CountByStatus(TaskStatusInProgress) != 1 {
+		t.Errorf("in_progress count should be 1 after promotion")
+	}
+}
+
+// TestStatusIndex_DeleteRemovesFromIndex verifies that deleting a task removes
+// it from the secondary index.
+func TestStatusIndex_DeleteRemovesFromIndex(t *testing.T) {
+	s := newTestStore(t)
+
+	task, _ := s.CreateTask(bg(), "to be deleted", 10, false, "", "")
+	if s.CountByStatus(TaskStatusBacklog) != 1 {
+		t.Fatalf("expected 1 backlog task")
+	}
+	if err := s.DeleteTask(bg(), task.ID, "test cleanup"); err != nil {
+		t.Fatalf("DeleteTask: %v", err)
+	}
+	if s.CountByStatus(TaskStatusBacklog) != 0 {
+		t.Errorf("backlog count should be 0 after delete")
+	}
+}
+
+// TestStatusIndex_ReloadRebuildsIndex verifies that reloading a store from
+// disk correctly repopulates the secondary index.
+func TestStatusIndex_ReloadRebuildsIndex(t *testing.T) {
+	dir := t.TempDir()
+	s1, _ := NewStore(dir)
+
+	t1, _ := s1.CreateTask(bg(), "backlog task", 10, false, "", "")
+	t2, _ := s1.CreateTask(bg(), "in_progress task", 10, false, "", "")
+	s1.UpdateTaskStatus(bg(), t2.ID, TaskStatusInProgress)
+	_ = t1
+
+	// Reload from disk.
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore reload: %v", err)
+	}
+
+	if got := s2.CountByStatus(TaskStatusBacklog); got != 1 {
+		t.Errorf("CountByStatus(backlog) after reload = %d, want 1", got)
+	}
+	if got := s2.CountByStatus(TaskStatusInProgress); got != 1 {
+		t.Errorf("CountByStatus(in_progress) after reload = %d, want 1", got)
+	}
+}
+
+// TestStatusIndex_SortedByPositionThenCreatedAt verifies that ListTasksByStatus
+// returns tasks in position-ascending, then created_at-ascending order.
+func TestStatusIndex_SortedByPositionThenCreatedAt(t *testing.T) {
+	s := newTestStore(t)
+
+	ids := make([]uuid.UUID, 3)
+	for i := range ids {
+		task, _ := s.CreateTask(bg(), fmt.Sprintf("task-%d", i), 10, false, "", "")
+		ids[i] = task.ID
+		// Give each task a distinct position: 10, 5, 0 (decreasing creation order
+		// so the index must sort them rather than return them in map iteration order).
+		s.UpdateTaskPosition(bg(), task.ID, (2-i)*5)
+	}
+
+	tasks, err := s.ListTasksByStatus(bg(), TaskStatusBacklog)
+	if err != nil {
+		t.Fatalf("ListTasksByStatus: %v", err)
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(tasks))
+	}
+	// Position 0, 5, 10 → created last, middle, first
+	if tasks[0].ID != ids[2] {
+		t.Errorf("tasks[0].ID = %v, want %v (position 0)", tasks[0].ID, ids[2])
+	}
+	if tasks[1].ID != ids[1] {
+		t.Errorf("tasks[1].ID = %v, want %v (position 5)", tasks[1].ID, ids[1])
+	}
+	if tasks[2].ID != ids[0] {
+		t.Errorf("tasks[2].ID = %v, want %v (position 10)", tasks[2].ID, ids[0])
+	}
+}
+
+// TestCountRegularInProgress verifies that CountRegularInProgress excludes
+// tasks flagged as test runs.
+func TestCountRegularInProgress(t *testing.T) {
+	s := newTestStore(t)
+
+	// One regular in-progress task.
+	t1, _ := s.CreateTask(bg(), "regular", 10, false, "", "")
+	s.UpdateTaskStatus(bg(), t1.ID, TaskStatusInProgress)
+
+	// One test-run in-progress task.
+	t2, _ := s.CreateTask(bg(), "test run", 10, false, "", "")
+	s.UpdateTaskStatus(bg(), t2.ID, TaskStatusInProgress)
+	s.UpdateTaskTestRun(bg(), t2.ID, true, "")
+
+	if got := s.CountRegularInProgress(); got != 1 {
+		t.Errorf("CountRegularInProgress() = %d, want 1", got)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Benchmarks: ListTasksByStatus vs ListTasks+filter
+// ─────────────────────────────────────────────────────────────────────────────
+
+// seedBenchmarkStore creates a store with n tasks divided evenly across
+// backlog, in_progress, waiting, done, and failed statuses.
+func seedBenchmarkStore(b *testing.B, n int) *Store {
+	b.Helper()
+	s, err := NewStore(b.TempDir())
+	if err != nil {
+		b.Fatalf("NewStore: %v", err)
+	}
+
+	statuses := []TaskStatus{
+		TaskStatusBacklog,
+		TaskStatusInProgress,
+		TaskStatusWaiting,
+		TaskStatusDone,
+		TaskStatusFailed,
+	}
+	paths := map[TaskStatus][]TaskStatus{
+		TaskStatusBacklog:    {},
+		TaskStatusInProgress: {TaskStatusInProgress},
+		TaskStatusWaiting:    {TaskStatusInProgress, TaskStatusWaiting},
+		TaskStatusDone:       {TaskStatusInProgress, TaskStatusWaiting, TaskStatusCommitting, TaskStatusDone},
+		TaskStatusFailed:     {TaskStatusInProgress, TaskStatusFailed},
+	}
+
+	for i := 0; i < n; i++ {
+		target := statuses[i%len(statuses)]
+		task, err := s.CreateTask(bg(), fmt.Sprintf("bench-task-%d", i), 10, false, "", "")
+		if err != nil {
+			b.Fatalf("CreateTask: %v", err)
+		}
+		for _, st := range paths[target] {
+			if err := s.UpdateTaskStatus(bg(), task.ID, st); err != nil {
+				b.Fatalf("advance to %s: %v", st, err)
+			}
+		}
+	}
+	return s
+}
+
+// BenchmarkListTasksByStatus measures the cost of fetching only waiting tasks
+// from the secondary index on a 200-task store.
+func BenchmarkListTasksByStatus(b *testing.B) {
+	s := seedBenchmarkStore(b, 200)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := s.ListTasksByStatus(bg(), TaskStatusWaiting); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkListTasksFilterWaiting measures the baseline cost of the old
+// ListTasks+filter pattern on the same 200-task store.
+func BenchmarkListTasksFilterWaiting(b *testing.B) {
+	s := seedBenchmarkStore(b, 200)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		all, err := s.ListTasks(bg(), false)
+		if err != nil {
+			b.Fatal(err)
+		}
+		result := all[:0]
+		for j := range all {
+			if all[j].Status == TaskStatusWaiting {
+				result = append(result, all[j])
+			}
+		}
+		_ = result
+	}
+}
+
+// BenchmarkCountByStatus measures the O(1) count path.
+func BenchmarkCountByStatus(b *testing.B) {
+	s := seedBenchmarkStore(b, 200)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = s.CountByStatus(TaskStatusWaiting)
+	}
+}
+
+// BenchmarkCountByStatusFullScan measures the old full-scan pattern.
+func BenchmarkCountByStatusFullScan(b *testing.B) {
+	s := seedBenchmarkStore(b, 200)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		all, err := s.ListTasks(bg(), false)
+		if err != nil {
+			b.Fatal(err)
+		}
+		count := 0
+		for j := range all {
+			if all[j].Status == TaskStatusWaiting {
+				count++
+			}
+		}
+		_ = count
+	}
+}
