@@ -472,6 +472,11 @@ func (r *Runner) runContainer(
 	}
 
 	runWithSandbox := func(selectedSandbox string) (*agentOutput, []byte, []byte, error) {
+		// Refuse to launch if the container runtime is known-unavailable.
+		if !r.containerCB.Allow() {
+			return nil, nil, nil, fmt.Errorf("container circuit breaker open: container runtime may be unavailable")
+		}
+
 		args := r.buildContainerArgsForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
 
 		cmd := exec.CommandContext(ctx, r.command, args...)
@@ -483,6 +488,13 @@ func (r *Runner) runContainer(
 		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: activity})
 		runErr := cmd.Run()
 		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: activity})
+
+		// Detect container runtime failures (daemon/binary unavailable).
+		// Only trip the breaker for runtime-level errors, not for Claude
+		// exiting non-zero (exit codes 1–124).
+		if runErr != nil && ctx.Err() == nil && isContainerRuntimeError(runErr) {
+			r.containerCB.RecordFailure()
+		}
 
 		// If the context was cancelled or timed out, kill the container explicitly
 		// and return the context error rather than parsing potentially incomplete output.
@@ -533,6 +545,8 @@ func (r *Runner) runContainer(
 			}
 		}
 
+		// Container runtime is healthy: close the circuit (or keep it closed).
+		r.containerCB.RecordSuccess()
 		output.ActualSandbox = selectedSandbox
 		return output, stdout.Bytes(), stderr.Bytes(), nil
 	}

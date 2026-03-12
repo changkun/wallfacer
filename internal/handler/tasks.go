@@ -1251,6 +1251,15 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		return
 	}
 
+	// Abort promotion when the container runtime is known-unavailable.
+	// Without this guard, slot openings caused by failures would trigger
+	// back-to-back promotions that all immediately fail, cascading across
+	// every backlog task.
+	if !h.runner.ContainerCircuitAllow() {
+		logger.Handler.Warn("auto-promote skipped: container circuit breaker open")
+		return
+	}
+
 	logger.Handler.Info("auto-promoting backlog task",
 		"task", bestBacklog.ID, "position", bestBacklog.Position,
 		"in_progress", regularInProgress)
