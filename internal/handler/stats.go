@@ -11,21 +11,25 @@ import (
 
 // StatsResponse is the JSON body returned by GET /api/stats.
 type StatsResponse struct {
-	TotalCostUSD      float64             `json:"total_cost_usd"`
-	TotalInputTokens  int                 `json:"total_input_tokens"`
-	TotalOutputTokens int                 `json:"total_output_tokens"`
-	TotalCacheTokens  int                 `json:"total_cache_tokens"`
+	TotalCostUSD      float64              `json:"total_cost_usd"`
+	TotalInputTokens  int                  `json:"total_input_tokens"`
+	TotalOutputTokens int                  `json:"total_output_tokens"`
+	TotalCacheTokens  int                  `json:"total_cache_tokens"`
 	ByStatus          map[string]UsageStat `json:"by_status"`
 	ByActivity        map[string]UsageStat `json:"by_activity"`
+	ByWorkspace       map[string]UsageStat `json:"by_workspace"`
 	TopTasks          []TaskCostEntry      `json:"top_tasks"`
 	DailyUsage        []DayStat            `json:"daily_usage"`
 }
 
 // UsageStat holds aggregated token/cost data for a single bucket.
 type UsageStat struct {
-	CostUSD      float64 `json:"cost_usd"`
-	InputTokens  int     `json:"input_tokens"`
-	OutputTokens int     `json:"output_tokens"`
+	CostUSD             float64 `json:"cost_usd"`
+	InputTokens         int     `json:"input_tokens"`
+	OutputTokens        int     `json:"output_tokens"`
+	CacheReadTokens     int     `json:"cache_read_tokens"`
+	CacheCreationTokens int     `json:"cache_creation_tokens"`
+	Count               int     `json:"count"`
 }
 
 // TaskCostEntry holds abbreviated task information for the top-cost list.
@@ -54,8 +58,9 @@ type DayStat struct {
 // always use the live Task struct (backward-compatible fallback, used in tests).
 func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.TaskSummary, error)) StatsResponse {
 	resp := StatsResponse{
-		ByStatus:   make(map[string]UsageStat),
-		ByActivity: make(map[string]UsageStat),
+		ByStatus:    make(map[string]UsageStat),
+		ByActivity:  make(map[string]UsageStat),
+		ByWorkspace: make(map[string]UsageStat),
 	}
 
 	dailyMap := make(map[string]*DayStat)
@@ -93,6 +98,19 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 			a.InputTokens += au.InputTokens
 			a.OutputTokens += au.OutputTokens
 			resp.ByActivity[activity] = a
+		}
+
+		// ByWorkspace buckets: one entry per repo root in WorktreePaths.
+		// Tasks that never ran (empty WorktreePaths) are excluded.
+		for repoPath := range t.WorktreePaths {
+			ws := resp.ByWorkspace[repoPath]
+			ws.CostUSD += u.CostUSD
+			ws.InputTokens += u.InputTokens
+			ws.OutputTokens += u.OutputTokens
+			ws.CacheReadTokens += t.Usage.CacheReadInputTokens
+			ws.CacheCreationTokens += t.Usage.CacheCreationTokens
+			ws.Count++
+			resp.ByWorkspace[repoPath] = ws
 		}
 
 		// Daily accumulation keyed by creation date.
@@ -146,13 +164,42 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 	return resp
 }
 
+// filterTasksByWorkspace returns the subset of tasks whose WorktreePaths map
+// contains ws as a key. When ws is empty the full slice is returned unchanged.
+// The second return value is false only when ws is non-empty but no tasks match,
+// which the caller should treat as a 400 Bad Request.
+func filterTasksByWorkspace(tasks []store.Task, ws string) ([]store.Task, bool) {
+	if ws == "" {
+		return tasks, true
+	}
+	var filtered []store.Task
+	for _, t := range tasks {
+		if _, ok := t.WorktreePaths[ws]; ok {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered, len(filtered) > 0
+}
+
 // GetStats aggregates token/cost data across all tasks (including archived)
 // and returns a rolled-up analytics summary.
+//
+// Optional query param: ?workspace=<repo-root-path> — restrict aggregation to
+// tasks that have that path as a WorktreePaths key. Returns 400 if the
+// workspace param is present but no tasks match it.
 func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 	tasks, err := h.store.ListTasks(r.Context(), true /* includeArchived */)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if ws := r.URL.Query().Get("workspace"); ws != "" {
+		var ok bool
+		tasks, ok = filterTasksByWorkspace(tasks, ws)
+		if !ok {
+			http.Error(w, "no tasks found for workspace: "+ws, http.StatusBadRequest)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, aggregateStats(tasks, h.store.LoadSummary))
 }

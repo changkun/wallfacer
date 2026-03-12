@@ -323,7 +323,7 @@
       "method": "GET",
       "pattern": "/api/stats",
       "name": "GetStats",
-      "description": "Task status statistics.",
+      "description": "Task status and workspace cost statistics. Optional ?workspace=\u003crepo-root-path\u003e restricts aggregation to tasks for that workspace (400 if no tasks match).",
       "tags": [
         "stats"
       ]
