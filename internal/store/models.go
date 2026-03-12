@@ -141,6 +141,19 @@ const (
 	TaskStatusCancelled  TaskStatus = "cancelled"
 )
 
+// FailureCategory identifies the root cause of a task failure.
+type FailureCategory string
+
+const (
+	FailureCategoryTimeout        FailureCategory = "timeout"
+	FailureCategoryBudget         FailureCategory = "budget_exceeded"
+	FailureCategoryWorktree       FailureCategory = "worktree_setup"
+	FailureCategoryContainerCrash FailureCategory = "container_crash"
+	FailureCategoryAgentError     FailureCategory = "agent_error"
+	FailureCategorySyncError      FailureCategory = "sync_error"
+	FailureCategoryUnknown        FailureCategory = "unknown"
+)
+
 // ErrInvalidTransition is returned by UpdateTaskStatus when the requested
 // status change is not permitted by the task state machine.
 var ErrInvalidTransition = errors.New("invalid transition")
@@ -279,6 +292,11 @@ type Task struct {
 
 	// ForkedFrom is the UUID of the source task this task was branched from, if any.
 	ForkedFrom *uuid.UUID `json:"forked_from,omitempty"`
+
+	// FailureCategory records the machine-readable root cause of the last
+	// failure transition. Set automatically by the runner at every
+	// TaskStatusFailed transition. Empty when the task has not failed.
+	FailureCategory FailureCategory `json:"failure_category,omitempty"`
 }
 
 // HasTag reports whether the task has the given tag.
@@ -383,6 +401,7 @@ type TaskSummary struct {
 	ByActivity      map[string]TaskUsage `json:"by_activity"`
 	TestResult      string               `json:"test_result"`
 	PhaseCount      int                  `json:"phase_count"`
+	FailureCategory FailureCategory      `json:"failure_category,omitempty"`
 }
 
 // TaskSearchResult wraps a Task with search match metadata.

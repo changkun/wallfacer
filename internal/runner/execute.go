@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -42,6 +43,40 @@ var (
 	failureInContentPattern = regexp.MustCompile(`(?i)\b[1-9]\d*\s+(?:tests?\s+)?(?:failed|failures?|failing)\b`)
 )
 
+// classifyFailure returns the machine-readable FailureCategory for a task
+// failure given the available error context. It is a pure function with no
+// side effects, intended to be called immediately before a TaskStatusFailed
+// transition so the category can be persisted alongside the status update.
+//
+// Priority order:
+//  1. Context deadline exceeded → timeout
+//  2. Result text contains "budget exceeded" → budget_exceeded
+//  3. isError flag set by agent → agent_error
+//  4. err message contains "empty output" or "exit status" → container_crash
+//  5. Default → unknown
+//
+// The worktree_setup and sync_error categories are not returned by this
+// function — they are set directly at their respective call sites where the
+// cause is unambiguous.
+func classifyFailure(err error, isError bool, result string) store.FailureCategory {
+	if err != nil && errors.Is(err, context.DeadlineExceeded) {
+		return store.FailureCategoryTimeout
+	}
+	if strings.Contains(result, "budget exceeded") {
+		return store.FailureCategoryBudget
+	}
+	if isError {
+		return store.FailureCategoryAgentError
+	}
+	if err != nil {
+		msg := err.Error()
+		if strings.Contains(msg, "empty output") || strings.Contains(msg, "exit status") {
+			return store.FailureCategoryContainerCrash
+		}
+	}
+	return store.FailureCategoryUnknown
+}
+
 // Run is the main task execution loop. It sets up worktrees, runs the agent
 // in a container, handles auto-continue turns, and transitions the task to the
 // appropriate terminal state (done/waiting/failed).
@@ -58,6 +93,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 		if !statusSet {
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			r.store.SetTaskFailureCategory(bgCtx, taskID, store.FailureCategoryUnknown)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from":    string(store.TaskStatusInProgress),
 				"to":      string(store.TaskStatusFailed),
@@ -105,6 +141,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				return
 			}
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			r.store.SetTaskFailureCategory(bgCtx, taskID, classifyFailure(runErr, false, ""))
 			r.store.UpdateTaskResult(bgCtx, taskID, runErr.Error(), "", "", 0)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": runErr.Error()})
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
@@ -174,6 +211,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			logger.Runner.Error("setup worktrees", "task", taskID, "error", err)
 			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			r.store.SetTaskFailureCategory(bgCtx, taskID, store.FailureCategoryWorktree)
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", task.Turns)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
@@ -286,6 +324,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			}
 			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			r.store.SetTaskFailureCategory(bgCtx, taskID, classifyFailure(err, false, ""))
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", turns)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
@@ -360,6 +399,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				}
 				statusSet = true
 				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
+				r.store.SetTaskFailureCategory(bgCtx, taskID, store.FailureCategoryBudget)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 					"from":    string(store.TaskStatusInProgress),
 					"to":      string(store.TaskStatusWaiting),
@@ -377,6 +417,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if output.IsError {
 			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			r.store.SetTaskFailureCategory(bgCtx, taskID, classifyFailure(nil, true, ""))
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from":    string(store.TaskStatusInProgress),
 				"to":      string(store.TaskStatusFailed),
@@ -639,6 +680,7 @@ func (r *Runner) failSync(ctx context.Context, taskID uuid.UUID, sessionID strin
 	logger.Runner.Error("sync failed", "task", taskID, "error", msg)
 	r.store.InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{"error": msg})
 	r.store.UpdateTaskStatus(ctx, taskID, store.TaskStatusFailed)
+	r.store.SetTaskFailureCategory(ctx, taskID, store.FailureCategorySyncError)
 	r.store.InsertEvent(ctx, taskID, store.EventTypeStateChange, map[string]string{
 		"from":    string(store.TaskStatusInProgress),
 		"to":      string(store.TaskStatusFailed),

@@ -555,3 +555,49 @@ func TestMutationMethods_StampSchemaVersion(t *testing.T) {
 		t.Errorf("Title = %q, want 'Updated Title'", persisted.Title)
 	}
 }
+
+// TestSetTaskFailureCategory verifies that SetTaskFailureCategory persists the
+// failure_category field and that it can be retrieved via GetTask.
+func TestSetTaskFailureCategory(t *testing.T) {
+	s := newTestStore(t)
+
+	task, err := s.CreateTask(bg(), "test failure category", 15, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Transition to in_progress so we can fail the task.
+	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus(in_progress): %v", err)
+	}
+	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusFailed); err != nil {
+		t.Fatalf("UpdateTaskStatus(failed): %v", err)
+	}
+
+	// Set the failure category.
+	if err := s.SetTaskFailureCategory(bg(), task.ID, FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+
+	// Reload via GetTask and assert the field is persisted.
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.FailureCategory != FailureCategoryContainerCrash {
+		t.Errorf("FailureCategory = %q, want %q", got.FailureCategory, FailureCategoryContainerCrash)
+	}
+
+	// Round-trip through JSON (simulate server restart): reload from disk.
+	s2, err := NewStore(s.dir)
+	if err != nil {
+		t.Fatalf("NewStore reload: %v", err)
+	}
+	reloaded, err := s2.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after reload: %v", err)
+	}
+	if reloaded.FailureCategory != FailureCategoryContainerCrash {
+		t.Errorf("FailureCategory after reload = %q, want %q", reloaded.FailureCategory, FailureCategoryContainerCrash)
+	}
+}

@@ -618,6 +618,7 @@ func (s *Store) buildAndSaveSummary(task Task) {
 		ByActivity:      task.UsageBreakdown,
 		TestResult:      task.LastTestResult,
 		PhaseCount:      phaseCount,
+		FailureCategory: task.FailureCategory,
 	}
 
 	if err := s.SaveSummary(task.ID, summary); err != nil {
@@ -1200,6 +1201,27 @@ func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun boo
 		// the implementation phase vs the test phase.
 		t.TestRunStartTurn = t.Turns
 	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
+}
+
+// SetTaskFailureCategory sets the failure_category field on a task.
+// It is called immediately after a TaskStatusFailed transition to record
+// the machine-readable root cause. The field is persisted atomically so
+// the UI can display and filter by it.
+func (s *Store) SetTaskFailureCategory(_ context.Context, id uuid.UUID, cat FailureCategory) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.FailureCategory = cat
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err

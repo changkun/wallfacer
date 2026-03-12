@@ -598,6 +598,7 @@ function _cardFingerprint(t, rank) {
     (t.usage && t.usage.cost_usd) || 0,
     t.max_input_tokens || 0,
     t.scheduled_at || '',
+    t.failure_category || '',
   ].join('\x00');
 }
 
@@ -662,6 +663,19 @@ card.style.opacity = isArchived ? '0.55' : '';
     : t.status === 'waiting'
     ? `<span class="badge badge-test-none" title="Not yet verified">unverified</span>`
     : '';
+  const _failureCategoryLabels = {
+    'timeout': 'Timeout',
+    'budget_exceeded': 'Budget',
+    'container_crash': 'Crash',
+    'agent_error': 'Agent Error',
+    'worktree_setup': 'Worktree',
+    'sync_error': 'Sync',
+    'unknown': '',
+  };
+  const _fcLabel = t.status === 'failed' && t.failure_category ? _failureCategoryLabels[t.failure_category] : '';
+  const failureCategoryBadge = _fcLabel
+    ? `<span class="badge badge-failure-category" title="Failure reason: ${escapeHtml(t.failure_category)}" style="font-family:monospace;font-size:9px;">${escapeHtml(_fcLabel)}</span>`
+    : '';
   const implSandbox = (t.sandbox_by_activity && t.sandbox_by_activity.implementation) || t.sandbox || 'default';
   const cardTitle = getTaskAccessibleTitle(t);
   const cardStatusLabel = formatTaskStatusLabel(statusLabel);
@@ -675,6 +689,7 @@ card.style.opacity = isArchived ? '0.55' : '';
         ${showSpinner ? '<span class="spinner"></span>' : ''}
         ${refinementBadge}
         ${testResultBadge}
+        ${failureCategoryBadge}
       </div>
       <div class="flex items-center gap-1.5 card-meta-right">
         ${t.model_override ? `<span class="text-[10px] text-v-muted" title="Model override: ${escapeHtml(t.model_override)}">&#9881; ${escapeHtml(t.model_override.length > 20 ? t.model_override.slice(0, 20) + '\u2026' : t.model_override)}</span>` : ''}
