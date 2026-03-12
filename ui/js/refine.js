@@ -314,6 +314,73 @@ async function applyRefinement() {
   }
 }
 
+// diffTextLines produces a line-level diff between `before` and `after` texts.
+// Returns an array of {op: 'eq'|'ins'|'del', text: string} objects in document order.
+// Uses a longest-common-subsequence backtrack — no external dependencies.
+function diffTextLines(before, after) {
+  const a = before.split('\n');
+  const b = after.split('\n');
+  const m = a.length, n = b.length;
+  // Build LCS DP table (O(m*n) — prompt-sized inputs are well within budget).
+  const dp = Array.from({length: m + 1}, () => new Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1] + 1
+        : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  // Backtrack from dp[m][n] to recover operations in reverse order.
+  const ops = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      ops.push({op: 'eq', text: a[i - 1]});
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      ops.push({op: 'ins', text: b[j - 1]});
+      j--;
+    } else {
+      ops.push({op: 'del', text: a[i - 1]});
+      i--;
+    }
+  }
+  return ops.reverse();
+}
+
+// renderTextDiff populates `container` with a visual line-level diff of before→after.
+// Uses the same diff-add / diff-del CSS classes as modal-diff.js for palette consistency.
+function renderTextDiff(container, before, after) {
+  const ops = diffTextLines(before, after);
+  const lines = ops.map(op => {
+    const prefix = op.op === 'ins' ? '+' : op.op === 'del' ? '-' : ' ';
+    const cls = op.op === 'ins' ? 'diff-line diff-add'
+              : op.op === 'del' ? 'diff-line diff-del'
+              : 'diff-line text-gray-400';
+    return `<span class="${cls}">${escapeHtml(prefix + op.text)}</span>`;
+  });
+  container.innerHTML = `<div class="font-mono text-xs whitespace-pre-wrap">${lines.join('\n')}</div>`;
+}
+
+// toggleRefineDiff shows or hides the inline diff for a refine history session card.
+// The diff is rendered lazily on first click; subsequent clicks only toggle visibility.
+function toggleRefineDiff(sessionIndex) {
+  const container = document.getElementById('refine-diff-' + sessionIndex);
+  const btn = document.getElementById('refine-diff-btn-' + sessionIndex);
+  if (!container) return;
+  if (!container.dataset.rendered) {
+    const currentTask = tasks.find(t => t.id === getOpenModalTaskId());
+    if (!currentTask || !currentTask.refine_sessions) return;
+    const session = currentTask.refine_sessions[sessionIndex];
+    if (!session || !session.start_prompt || !session.result_prompt) return;
+    renderTextDiff(container, session.start_prompt, session.result_prompt);
+    container.dataset.rendered = 'true';
+  }
+  const isHidden = container.classList.contains('hidden');
+  container.classList.toggle('hidden');
+  if (btn) btn.textContent = isHidden ? 'Hide diff' : 'Show diff';
+}
+
 // renderRefineHistory populates the history section from task.refine_sessions.
 function renderRefineHistory(task) {
   const section = document.getElementById('refine-history-section');
@@ -346,6 +413,8 @@ function renderRefineHistory(task) {
         <div class="text-xs text-v-muted" style="margin-top:8px;margin-bottom:4px;">Applied prompt:</div>
         <pre class="code-block text-xs" style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(resultPrompt)}</pre>
         <button class="btn btn-ghost text-xs" style="margin-top:6px;" onclick="revertToHistoryPrompt(${i})">Revert to this version</button>
+        <button id="refine-diff-btn-${i}" class="btn btn-ghost text-xs" style="margin-top:6px;margin-left:6px;" onclick="toggleRefineDiff(${i})">Show diff</button>
+        <div id="refine-diff-${i}" class="hidden" style="margin-top:8px;"></div>
         ` : ''}
       </div>
     </details>`;
