@@ -1446,6 +1446,22 @@ func buildSnippet(src string, idx, matchLen int) string {
 	return html.EscapeString(prefix + src[start:end] + suffix)
 }
 
+// MarkTurnTruncated appends turn to the task's TruncatedTurns list, recording
+// that the output file for that turn was truncated by the server-side size
+// budget. It is called by SaveTurnOutput when truncation occurs.
+func (s *Store) MarkTurnTruncated(_ context.Context, taskID uuid.UUID, turn int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	task, ok := s.tasks[taskID]
+	if !ok {
+		return fmt.Errorf("task %s not found", taskID)
+	}
+
+	task.TruncatedTurns = append(task.TruncatedTurns, turn)
+	return s.saveTask(taskID, task)
+}
+
 // clampTimeout ensures timeout stays in [1, 1440] minutes with a default of 60.
 func clampTimeout(v int) int {
 	if v <= 0 {
