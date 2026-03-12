@@ -2,6 +2,13 @@
 // renderLogs / renderTestLogs re-parse the entire buffer from scratch on every
 // call, so we must not call them on every incoming network chunk.  Instead we
 // batch pending updates and flush at most once per animation frame.
+
+// Cursor tracking for append-only log rendering.
+var _renderedLogLen = 0;    // byte offset into rawLogBuffer that has already been rendered
+var _renderedLogMode = '';  // last logsMode value rendered — full rebuild when this changes
+var _renderedLogQuery = ''; // last logSearchQuery rendered — full rebuild when this changes
+var MAX_LOG_LINES = 10000;  // cap to prevent browser OOM for runaway agents
+
 let _logRenderPending = false;
 function scheduleLogRender() {
   if (_logRenderPending) return;
@@ -55,7 +62,46 @@ function renderLogs() {
   // Capture scroll position before updating content so we know if the user was at the bottom.
   const atBottom = logsEl.scrollHeight - logsEl.scrollTop - logsEl.clientHeight < 80;
   const countEl = document.getElementById('log-search-count');
-  if (logsMode === 'pretty') {
+
+  const needsFullRebuild = (
+    logsMode !== _renderedLogMode ||
+    logSearchQuery !== _renderedLogQuery ||
+    rawLogBuffer.length < _renderedLogLen // buffer was reset (new stream)
+  );
+  if (needsFullRebuild) {
+    logsEl.innerHTML = '';
+    _renderedLogLen = 0;
+  }
+
+  if (!needsFullRebuild && logsMode === 'pretty' && !logSearchQuery) {
+    // Append-only path: only parse and insert data added since the last render.
+    const newChunk = rawLogBuffer.slice(_renderedLogLen);
+    if (!newChunk) return;
+    const html = renderPrettyLogs(newChunk);
+    const fragment = document.createRange().createContextualFragment(html);
+    logsEl.appendChild(fragment);
+    _renderedLogLen = rawLogBuffer.length;
+
+    // Apply line cap to prevent browser OOM for runaway agents.
+    const excess = logsEl.children.length - MAX_LOG_LINES;
+    if (excess > 0) {
+      for (let i = 0; i < excess; i++) {
+        logsEl.removeChild(logsEl.firstChild);
+      }
+      if (!logsEl.querySelector('.log-truncation-notice')) {
+        const notice = document.createElement('div');
+        notice.className = 'log-truncation-notice';
+        notice.innerHTML = 'Showing last 10,000 lines. <a href="#" id="log-dl">Download full log</a>';
+        if (notice.querySelector) {
+          const a = notice.querySelector('#log-dl');
+          if (a) a.addEventListener('click', function(e) { e.preventDefault(); _downloadFullLog(); });
+        }
+        logsEl.insertBefore(notice, logsEl.firstChild);
+      }
+    }
+    if (countEl) countEl.textContent = '';
+  } else if (logsMode === 'pretty') {
+    // Full-rebuild path for pretty mode (filter active or mode/query changed).
     if (logSearchQuery) {
       const query = logSearchQuery.toLowerCase();
       const allLines = rawLogBuffer.split('\n').filter(function(l) { return l.trim().length > 0; });
@@ -69,7 +115,9 @@ function renderLogs() {
       logsEl.innerHTML = renderPrettyLogs(rawLogBuffer);
       if (countEl) countEl.textContent = '';
     }
+    _renderedLogLen = rawLogBuffer.length;
   } else {
+    // Raw mode — always full rebuild (appending to a text node is not practical).
     const stripped = rawLogBuffer.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
     if (logSearchQuery) {
       const query = logSearchQuery.toLowerCase();
@@ -83,7 +131,12 @@ function renderLogs() {
       logsEl.textContent = stripped;
       if (countEl) countEl.textContent = '';
     }
+    _renderedLogLen = rawLogBuffer.length;
   }
+
+  _renderedLogMode = logsMode;
+  _renderedLogQuery = logSearchQuery;
+
   if (!logSearchQuery && atBottom) {
     // Defer scroll-to-bottom so the browser can batch the layout triggered by
     // the innerHTML/textContent write with the scroll update, avoiding a forced
@@ -207,6 +260,7 @@ function startImplLogFetch(id, seq) {
     });
   rawLogBuffer = '';
   document.getElementById('modal-logs').innerHTML = '';
+  _renderedLogLen = 0; _renderedLogMode = ''; _renderedLogQuery = '';
   const decoder = new TextDecoder();
   fetch(`/api/tasks/${id}/logs?phase=impl`, { signal: signal })
     .then(res => {
@@ -334,6 +388,12 @@ function _fetchTestLogs(id, retryDelay, seq) {
     });
 }
 
+function _downloadFullLog() {
+  var id = getOpenModalTaskId();
+  if (!id) return;
+  window.open('/api/tasks/' + id + '/logs?raw=true');
+}
+
 function _fetchLogs(id, retryDelay, seq) {
   // Guard: if the modal was closed or switched to a different task since this
   // call was scheduled (e.g. by a reconnect setTimeout), bail out so we don't
@@ -345,6 +405,7 @@ function _fetchLogs(id, retryDelay, seq) {
   if (!retryDelay) {
     rawLogBuffer = '';
     document.getElementById('modal-logs').innerHTML = '';
+    _renderedLogLen = 0; _renderedLogMode = ''; _renderedLogQuery = '';
   }
   const delay = retryDelay || 1000;
   const decoder = new TextDecoder();

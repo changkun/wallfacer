@@ -28,14 +28,55 @@ function makeLogsContext() {
   const elements = {};
 
   function makeEl(id) {
+    const children = [];
+    let _innerHTML = '';
+    let _textContent = '';
     const el = {
       id,
-      innerHTML: '',
-      textContent: '',
+      get innerHTML() { return _innerHTML; },
+      set innerHTML(v) {
+        _innerHTML = v;
+        // Rebuild children array from <div> tags in the HTML.
+        children.length = 0;
+        if (v) {
+          const matches = v.match(/<div\b[^>]*>/g) || [];
+          for (const m of matches) {
+            const cls = (m.match(/class="([^"]*)"/) || [])[1] || '';
+            children.push({ tagName: 'div', className: cls, style: {}, parentNode: el });
+          }
+        }
+      },
+      get textContent() { return _textContent; },
+      set textContent(v) { _textContent = v; },
       scrollHeight: 200,
       scrollTop: 200,
       clientHeight: 100,
       style: {},
+      get children() { return children; },
+      get firstChild() { return children[0] || null; },
+      appendChild(child) {
+        if (child && child._isFragment) {
+          for (const c of child._children) { c.parentNode = el; children.push(c); }
+        } else if (child != null) {
+          child.parentNode = el;
+          children.push(child);
+        }
+      },
+      removeChild(child) {
+        const idx = children.indexOf(child);
+        if (idx !== -1) children.splice(idx, 1);
+      },
+      insertBefore(newNode, refNode) {
+        const idx = children.indexOf(refNode);
+        if (idx !== -1) { children.splice(idx, 0, newNode); } else { children.unshift(newNode); }
+      },
+      querySelector(selector) {
+        if (selector.startsWith('.')) {
+          const cls = selector.slice(1);
+          return children.find(c => c.className && c.className.split(' ').includes(cls)) || null;
+        }
+        return null;
+      },
       classList: {
         _classes: new Set(),
         add(c) { this._classes.add(c); },
@@ -65,6 +106,7 @@ function makeLogsContext() {
     clearTimeout: () => {},
     requestAnimationFrame: (cb) => { cb(); },
     NodeFilter: { SHOW_TEXT: 4 },
+    window: { open: () => {} },
     document: {
       getElementById: (id) => {
         if (!elements[id]) makeEl(id);
@@ -72,9 +114,20 @@ function makeLogsContext() {
       },
       createTreeWalker: () => ({ nextNode: () => null }),
       createElement: (tag) => {
-        const el = { tagName: tag, innerHTML: '', style: {}, parentNode: null };
+        const el = { tagName: tag, innerHTML: '', style: {}, parentNode: null, className: '', children: [] };
         return el;
       },
+      createRange: () => ({
+        createContextualFragment(html) {
+          // Parse <div> elements from the HTML string to simulate a real fragment.
+          const matches = html.match(/<div\b[^>]*>/g) || [];
+          const frChildren = matches.map((m) => {
+            const cls = (m.match(/class="([^"]*)"/) || [])[1] || '';
+            return { tagName: 'div', className: cls, style: {}, parentNode: null };
+          });
+          return { _isFragment: true, _children: frChildren };
+        },
+      }),
     },
     // Runtime dependencies from other modules
     _modalState: { seq: 0, taskId: null, abort: null },
@@ -90,7 +143,8 @@ function makeLogsContext() {
     oversightFetching: false,
     testOversightData: null,
     testOversightFetching: false,
-    renderPrettyLogs: (buf) => `<div class="pretty">${buf}</div>`,
+    // Return one <div class="pretty"> per non-empty line so children can be counted.
+    renderPrettyLogs: (buf) => buf.split('\n').filter(l => l.trim()).map(l => `<div class="pretty">${l}</div>`).join(''),
     renderOversightInLogs: () => {},
     renderTestOversightInTestLogs: () => {},
     escapeHtml: (s) => String(s ?? ''),
@@ -366,5 +420,89 @@ describe('onLogSearchInput', () => {
     );
     ctx.onLogSearchInput('target');
     expect(elements['log-search-count'].textContent).toBe('3 / 5 lines');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderLogs — append-only path and line cap
+// ---------------------------------------------------------------------------
+describe('renderLogs append-only', () => {
+  let ctx, elements;
+  beforeEach(() => ({ ctx, elements } = makeLogsContext()));
+
+  it('appends incrementally and enforces MAX_LOG_LINES cap', () => {
+    const logsEl = elements['modal-logs'] || ctx.document.getElementById('modal-logs');
+
+    // Step 1: Feed 500 lines. First call triggers full-rebuild (cursor starts at '').
+    const lines500 = Array.from({ length: 500 }, (_, i) => 'line ' + i).join('\n');
+    vm.runInContext('rawLogBuffer = ' + JSON.stringify(lines500), ctx);
+    ctx.renderLogs();
+
+    expect(logsEl.children.length).toBe(500);
+    expect(vm.runInContext('_renderedLogLen', ctx)).toBe(lines500.length);
+
+    // Mark the first child so we can confirm it is not re-created on the next call.
+    logsEl.children[0]._sentinel = 'preserved';
+
+    // Step 2: Append 50 more lines. Second call must use the append-only path.
+    const extra50 = '\n' + Array.from({ length: 50 }, (_, i) => 'extra ' + i).join('\n');
+    vm.runInContext('rawLogBuffer += ' + JSON.stringify(extra50), ctx);
+    ctx.renderLogs();
+
+    expect(logsEl.children.length).toBe(550);
+    expect(vm.runInContext('_renderedLogLen', ctx)).toBe(lines500.length + extra50.length);
+    // The first child from step 1 must still be the same object — not re-created.
+    expect(logsEl.children[0]._sentinel).toBe('preserved');
+
+    // Step 3: Feed enough additional lines to exceed MAX_LOG_LINES (10 000).
+    // We already have 550 rendered; add 9 451 more to tip over the cap.
+    const overflow = '\n' + Array.from({ length: 9451 }, (_, i) => 'overflow ' + i).join('\n');
+    vm.runInContext('rawLogBuffer += ' + JSON.stringify(overflow), ctx);
+    ctx.renderLogs();
+
+    // Must be capped at MAX_LOG_LINES log lines + 1 truncation notice.
+    expect(logsEl.children.length).toBeLessThanOrEqual(10000 + 1);
+  });
+
+  it('does a full rebuild when the mode changes then switches back', () => {
+    const buf = Array.from({ length: 10 }, (_, i) => 'line ' + i).join('\n');
+    vm.runInContext('rawLogBuffer = ' + JSON.stringify(buf), ctx);
+    ctx.renderLogs(); // full rebuild (initial)
+
+    // Switch to raw mode — must trigger a rebuild.
+    ctx.setLogsMode('raw');
+    expect(elements['modal-logs'].textContent).toContain('line 0');
+
+    // Switch back to pretty — must trigger another full rebuild.
+    ctx.setLogsMode('pretty');
+    expect(elements['modal-logs'].children.length).toBe(10);
+  });
+
+  it('does a full rebuild when the search query changes', () => {
+    const buf = 'match one\nskip two\nmatch three';
+    vm.runInContext('rawLogBuffer = ' + JSON.stringify(buf), ctx);
+    ctx.renderLogs(); // full rebuild
+
+    // Activate a filter — renders only matching lines via innerHTML.
+    ctx.onLogSearchInput('match');
+    expect(elements['log-search-count'].textContent).toBe('2 / 3 lines');
+
+    // Clear the filter — full rebuild back to all lines.
+    ctx.onLogSearchInput('');
+    expect(elements['modal-logs'].children.length).toBe(3);
+  });
+
+  it('skips re-render when no new data has arrived', () => {
+    const buf = 'line a\nline b';
+    vm.runInContext('rawLogBuffer = ' + JSON.stringify(buf), ctx);
+    ctx.renderLogs(); // full rebuild
+
+    const lenAfterFirst = vm.runInContext('_renderedLogLen', ctx);
+    const childCount = elements['modal-logs'].children.length;
+
+    // Render again with identical buffer — append-only path, newChunk is empty.
+    ctx.renderLogs();
+    expect(elements['modal-logs'].children.length).toBe(childCount);
+    expect(vm.runInContext('_renderedLogLen', ctx)).toBe(lenAfterFirst);
   });
 });
