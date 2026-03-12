@@ -280,24 +280,10 @@ type TaskCreateOptions struct {
 // together, so no watcher or SSE subscriber can observe a partially-initialised
 // task.  notify is called exactly once.
 func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions) (*Task, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	minPos := 0
-	hasBacklog := false
-	for _, t := range s.tasks {
-		if t.Status == TaskStatusBacklog {
-			if !hasBacklog || t.Position < minPos {
-				minPos = t.Position
-				hasBacklog = true
-			}
-		}
-	}
-	newPosition := 0
-	if hasBacklog {
-		newPosition = minPos - 1
-	}
-
+	// Build the task struct from opts outside the lock.  Position is the only
+	// field that requires a locked scan of s.tasks; it is set inside the lock
+	// below.  All search-indexed fields (Prompt, Tags) are available from opts
+	// so buildIndexEntry can run before we take any lock.
 	id := opts.ID
 	if id == (uuid.UUID{}) {
 		id = uuid.New()
@@ -313,9 +299,9 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		Timeout:        clampTimeout(opts.Timeout),
 		MountWorktrees: opts.MountWorktrees,
 		Kind:           opts.Kind,
-		Position:       newPosition,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		// Position is set under the lock after scanning existing backlog tasks.
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
 	// Tags: deep-copy to protect store state from caller mutation.
@@ -361,10 +347,35 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		task.ModelOverride = &model
 	}
 
+	// Build the search index entry before acquiring the lock.  Position is not
+	// a search-indexed field, so the entry is fully accurate even though
+	// task.Position has not been set yet.
+	entry := buildIndexEntry(task, "")
+
+	// Create the task directory outside the lock; the directory name is derived
+	// from the UUID which is already fixed, so no race is possible.
 	taskDir := filepath.Join(s.dir, task.ID.String())
 	tracesDir := filepath.Join(taskDir, "traces")
 	if err := os.MkdirAll(tracesDir, 0755); err != nil {
 		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Compute top-of-backlog position under the lock.
+	minPos := 0
+	hasBacklog := false
+	for _, t := range s.tasks {
+		if t.Status == TaskStatusBacklog {
+			if !hasBacklog || t.Position < minPos {
+				minPos = t.Position
+				hasBacklog = true
+			}
+		}
+	}
+	if hasBacklog {
+		task.Position = minPos - 1
 	}
 
 	if err := s.saveTask(task.ID, task); err != nil {
@@ -375,7 +386,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	s.addToStatusIndex(task.Status, task.ID)
 	s.events[task.ID] = nil
 	s.nextSeq[task.ID] = 1
-	s.searchIndex[task.ID] = buildIndexEntry(task, "")
+	s.searchIndex[task.ID] = entry
 	s.notify(task, false)
 
 	ret := deepCloneTask(task)
@@ -401,13 +412,57 @@ func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, moun
 // sandbox preference and ForkedFrom reference. The caller is responsible for
 // calling runner.Fork to set up worktrees before starting the task.
 func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt string, timeout int) (*Task, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// Snapshot the source task's sandbox fields under a brief read lock so
+	// that the task struct and search index entry can be built outside the
+	// write lock, reducing the time the write lock is held.
+	s.mu.RLock()
 	source, ok := s.tasks[sourceID]
 	if !ok {
+		s.mu.RUnlock()
 		return nil, fmt.Errorf("source task %s not found", sourceID)
 	}
+	sandboxSnapshot := source.Sandbox
+	var sbaSnapshot map[string]string
+	if len(source.SandboxByActivity) > 0 {
+		sbaSnapshot = make(map[string]string, len(source.SandboxByActivity))
+		for k, v := range source.SandboxByActivity {
+			sbaSnapshot[k] = v
+		}
+	}
+	s.mu.RUnlock()
+
+	// Build the task struct outside any lock.  Position is set under the write
+	// lock below; it is not a search-indexed field.
+	timeout = clampTimeout(timeout)
+	id := uuid.New()
+	fid := sourceID // copy for pointer
+	now := time.Now()
+	task := &Task{
+		SchemaVersion:      CurrentTaskSchemaVersion,
+		ID:                 id,
+		Prompt:             prompt,
+		Status:             TaskStatusBacklog,
+		Timeout:            timeout,
+		Sandbox:            sandboxSnapshot,
+		SandboxByActivity:  sbaSnapshot,
+		ForkedFrom:         &fid,
+		// Position set under lock below.
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
+
+	// Build the search index entry before acquiring the write lock.
+	entry := buildIndexEntry(task, "")
+
+	// Create the task directory outside the lock.
+	taskDir := filepath.Join(s.dir, id.String())
+	tracesDir := filepath.Join(taskDir, "traces")
+	if err := os.MkdirAll(tracesDir, 0755); err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	// Compute top-of-backlog position (same logic as CreateTask).
 	minPos := 0
@@ -420,41 +475,10 @@ func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt s
 			}
 		}
 	}
-	newPosition := 0
 	if hasBacklog {
-		newPosition = minPos - 1
+		task.Position = minPos - 1
 	}
 
-	timeout = clampTimeout(timeout)
-	id := uuid.New()
-	fid := sourceID // copy for pointer
-	now := time.Now()
-	task := &Task{
-		SchemaVersion: CurrentTaskSchemaVersion,
-		ID:            id,
-		Prompt:        prompt,
-		Status:        TaskStatusBacklog,
-		Timeout:       timeout,
-		Sandbox:       source.Sandbox,
-		ForkedFrom:    &fid,
-		Position:      newPosition,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}
-
-	if len(source.SandboxByActivity) > 0 {
-		sba := make(map[string]string, len(source.SandboxByActivity))
-		for k, v := range source.SandboxByActivity {
-			sba[k] = v
-		}
-		task.SandboxByActivity = sba
-	}
-
-	taskDir := filepath.Join(s.dir, id.String())
-	tracesDir := filepath.Join(taskDir, "traces")
-	if err := os.MkdirAll(tracesDir, 0755); err != nil {
-		return nil, err
-	}
 	if err := s.saveTask(id, task); err != nil {
 		return nil, err
 	}
@@ -462,7 +486,7 @@ func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt s
 	s.addToStatusIndex(task.Status, id)
 	s.events[id] = nil
 	s.nextSeq[id] = 1
-	s.searchIndex[id] = buildIndexEntry(task, "")
+	s.searchIndex[id] = entry
 	s.notify(task, false)
 
 	ret := deepCloneTask(task)
@@ -537,10 +561,27 @@ func (s *Store) ListDeletedTasks(_ context.Context) ([]Task, error) {
 // RestoreTask removes the tombstone from a soft-deleted task, moving it back
 // into the active task map so it reappears in ListTasks.
 func (s *Store) RestoreTask(_ context.Context, id uuid.UUID) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// Snapshot the deleted task pointer under a brief read lock so the
+	// oversight disk read and buildIndexEntry can run outside the write lock.
+	s.mu.RLock()
 	t, ok := s.deleted[id]
 	if !ok {
+		s.mu.RUnlock()
+		return fmt.Errorf("deleted task not found: %s", id)
+	}
+	s.mu.RUnlock()
+
+	// Disk I/O and CPU work outside the write lock.
+	oversightRaw, _ := s.LoadOversightText(id)
+	entry := buildIndexEntry(t, oversightRaw)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Re-check under the write lock to guard against a concurrent Restore or
+	// Purge that may have removed the task from s.deleted between the read
+	// lock above and now.
+	if _, ok := s.deleted[id]; !ok {
 		return fmt.Errorf("deleted task not found: %s", id)
 	}
 	tombPath := filepath.Join(s.dir, id.String(), "tombstone.json")
@@ -550,8 +591,7 @@ func (s *Store) RestoreTask(_ context.Context, id uuid.UUID) error {
 	delete(s.deleted, id)
 	s.tasks[id] = t
 	s.addToStatusIndex(t.Status, id)
-	oversightRaw, _ := s.LoadOversightText(id)
-	s.searchIndex[id] = buildIndexEntry(t, oversightRaw)
+	s.searchIndex[id] = entry
 	s.notify(t, false)
 	return nil
 }
@@ -640,6 +680,8 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	if status == TaskStatusDone {
 		s.buildAndSaveSummary(*t)
 	}
+	// Search index not updated: status is not a search-indexed field
+	// (title, prompt, tags, oversight).
 	s.notify(t, false)
 	return nil
 }
@@ -703,12 +745,19 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	if status == TaskStatusDone {
 		s.buildAndSaveSummary(*t)
 	}
+	// Search index not updated: status is not a search-indexed field
+	// (title, prompt, tags, oversight).
 	s.notify(t, false)
 	return nil
 }
 
 // UpdateTaskTitle sets a task's display title.
 func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) error {
+	// Compute the lowercased title before acquiring the lock so that the
+	// strings.ToLower call (potentially non-trivial for long titles) does not
+	// extend the critical section.
+	loweredTitle := strings.ToLower(title)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -722,7 +771,7 @@ func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) e
 		return err
 	}
 	if entry, ok := s.searchIndex[id]; ok {
-		entry.title = strings.ToLower(title)
+		entry.title = loweredTitle
 		s.searchIndex[id] = entry
 	}
 	s.notify(t, false)
@@ -745,6 +794,8 @@ func (s *Store) UpdateTaskExecutionPrompt(_ context.Context, id uuid.UUID, execu
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: ExecutionPrompt is not a search-indexed field;
+	// the indexed prompt is the human-readable card label stored in Prompt.
 	s.notify(t, false)
 	return nil
 }
@@ -765,6 +816,7 @@ func (s *Store) UpdateTaskTurns(_ context.Context, id uuid.UUID, turns int) erro
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: turn count is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -786,6 +838,8 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: result, sessionID, stopReason, and turns are
+	// not search-indexed fields (title, prompt, tags, oversight).
 	s.notify(t, false)
 	return nil
 }
@@ -823,6 +877,7 @@ func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent s
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: token/cost usage is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -847,6 +902,7 @@ func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: board position is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -871,6 +927,7 @@ func (s *Store) UpdateTaskScheduledAt(_ context.Context, id uuid.UUID, scheduled
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: scheduled time is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -895,6 +952,7 @@ func (s *Store) UpdateTaskDependsOn(_ context.Context, id uuid.UUID, dependsOn [
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: dependency list is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -928,6 +986,13 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
 func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[string]string, maxCostUSD *float64, maxInputTokens *int) error {
+	// Compute the lowercased prompt before acquiring the lock so that
+	// strings.ToLower does not extend the critical section.
+	var loweredPrompt string
+	if prompt != nil {
+		loweredPrompt = strings.ToLower(*prompt)
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -970,7 +1035,7 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 	}
 	if prompt != nil {
 		if entry, ok := s.searchIndex[id]; ok {
-			entry.prompt = strings.ToLower(*prompt)
+			entry.prompt = loweredPrompt
 			s.searchIndex[id] = entry
 		}
 	}
@@ -1007,6 +1072,7 @@ func (s *Store) UpdateTaskBudget(_ context.Context, id uuid.UUID, maxCostUSD *fl
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: budget limits are not search-indexed fields.
 	s.notify(t, false)
 	return nil
 }
@@ -1026,6 +1092,7 @@ func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, san
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: sandbox selection is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -1044,6 +1111,7 @@ func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sandbox strin
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: sandbox selection is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -1068,6 +1136,7 @@ func (s *Store) UpdateTaskModelOverride(_ context.Context, id uuid.UUID, model s
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: model override is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -1087,6 +1156,7 @@ func (s *Store) UpdateTaskEnvironment(_ context.Context, id uuid.UUID, env Execu
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: execution environment is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -1144,6 +1214,9 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: although Prompt is reset to newPrompt, the
+	// index will be refreshed by UpdateTaskTitle when the title-generation
+	// runner fires at the start of the next run.
 	s.notify(t, false)
 	return nil
 }
@@ -1167,6 +1240,7 @@ func (s *Store) ArchiveAllDone(_ context.Context) ([]uuid.UUID, error) {
 		if err := s.saveTask(id, t); err != nil {
 			return archived, err
 		}
+		// Search index not updated: archived flag is not a search-indexed field.
 		archived = append(archived, id)
 		s.notify(t, false)
 	}
@@ -1187,6 +1261,7 @@ func (s *Store) SetTaskArchived(_ context.Context, id uuid.UUID, archived bool) 
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: archived flag is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -1211,6 +1286,7 @@ func (s *Store) ResumeTask(_ context.Context, id uuid.UUID, timeout *int) error 
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: status and timeout are not search-indexed fields.
 	s.notify(t, false)
 	return nil
 }
@@ -1230,6 +1306,7 @@ func (s *Store) UpdateTaskWorktrees(_ context.Context, id uuid.UUID, worktreePat
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: worktree paths and branch name are not search-indexed fields.
 	s.notify(t, false)
 	return nil
 }
@@ -1245,6 +1322,7 @@ func (s *Store) UpdateTaskCommitHashes(_ context.Context, id uuid.UUID, hashes m
 	}
 	t.CommitHashes = hashes
 	t.UpdatedAt = time.Now()
+	// Search index not updated: commit hashes are not search-indexed fields.
 	return s.saveTask(id, t)
 }
 
@@ -1270,6 +1348,7 @@ func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun boo
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: test-run state and result are not search-indexed fields.
 	s.notify(t, false)
 	return nil
 }
@@ -1291,6 +1370,7 @@ func (s *Store) SetTaskFailureCategory(_ context.Context, id uuid.UUID, cat Fail
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: failure category is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -1306,6 +1386,7 @@ func (s *Store) UpdateTaskBaseCommitHashes(_ context.Context, id uuid.UUID, hash
 	}
 	t.BaseCommitHashes = hashes
 	t.UpdatedAt = time.Now()
+	// Search index not updated: base commit hashes are not search-indexed fields.
 	return s.saveTask(id, t)
 }
 
@@ -1329,6 +1410,7 @@ func (s *Store) UpdateRefinementJob(_ context.Context, id uuid.UUID, job *Refine
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: refinement job state is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -1367,6 +1449,7 @@ func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *R
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: refinement job state is not a search-indexed field.
 	s.notify(t, false)
 	return nil
 }
@@ -1375,6 +1458,10 @@ func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *R
 // The current prompt is pushed into PromptHistory before being replaced.
 // The CurrentRefinement job is cleared after applying.
 func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt string, session RefinementSession) error {
+	// Compute the lowercased prompt before acquiring the lock so that
+	// strings.ToLower does not extend the critical section.
+	loweredPrompt := strings.ToLower(newPrompt)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -1392,7 +1479,7 @@ func (s *Store) ApplyRefinement(_ context.Context, id uuid.UUID, newPrompt strin
 		return err
 	}
 	if entry, ok := s.searchIndex[id]; ok {
-		entry.prompt = strings.ToLower(newPrompt)
+		entry.prompt = loweredPrompt
 		s.searchIndex[id] = entry
 	}
 	s.notify(t, false)
@@ -1414,6 +1501,8 @@ func (s *Store) DismissRefinement(_ context.Context, id uuid.UUID) error {
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
+	// Search index not updated: clearing the refinement job does not affect
+	// the prompt or any other search-indexed field.
 	s.notify(t, false)
 	return nil
 }

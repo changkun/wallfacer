@@ -221,6 +221,17 @@ func (s *Store) loadAll() error {
 		// retention limits were introduced without requiring a schema bump.
 		s.pruneTaskPayload(&task)
 
+		// Build search index entry before updating the in-memory maps.
+		// Oversight read errors are non-fatal; the task remains indexed without
+		// oversight text. Doing this before the map update keeps expensive disk
+		// I/O and strings.ToLower work outside any future lock scope.
+		oversightRaw, oversightErr := s.LoadOversightText(id)
+		if oversightErr != nil && !os.IsNotExist(oversightErr) {
+			logger.Store.Warn("startup: failed to load oversight for search index",
+				"task", id, "error", oversightErr)
+		}
+		indexEntry := buildIndexEntry(&task, oversightRaw)
+
 		s.tasks[id] = &task
 
 		// Persist the migrated task back to disk so future loads skip migration.
@@ -230,14 +241,7 @@ func (s *Store) loadAll() error {
 			}
 		}
 
-		// Build search index entry. Oversight read errors are non-fatal;
-		// the task remains indexed without oversight text.
-		oversightRaw, oversightErr := s.LoadOversightText(id)
-		if oversightErr != nil && !os.IsNotExist(oversightErr) {
-			logger.Store.Warn("startup: failed to load oversight for search index",
-				"task", id, "error", oversightErr)
-		}
-		s.searchIndex[id] = buildIndexEntry(&task, oversightRaw)
+		s.searchIndex[id] = indexEntry
 
 		if err := s.loadEvents(id, entry.Name()); err != nil {
 			return err
