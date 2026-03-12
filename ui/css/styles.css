@@ -93,13 +93,13 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 [data-theme="dark"] .card-action-test   { background: #1e1535; color: #a07fe0; border-color: #3a2860; }
 
 /* --- Badges --- */
-.badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; }
+.badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; border-left: 3px solid currentColor; padding-left: 5px; }
 .badge-backlog { background: #e4e0d8; color: #6b6560; }
 .badge-in_progress { background: #dceaf7; color: #2c5f98; }
-.badge-waiting { background: #f5e6ce; color: #7a5010; }
-.badge-committing { background: #f5e6ce; color: #7a5010; }
+.badge-waiting { background: #f5e6ce; color: #5c3a08; }
+.badge-committing { background: #f5e6ce; color: #5c3a08; }
 .badge-done { background: #d0ebdc; color: #1a6030; }
-.badge-failed { background: #f5d5d5; color: #8c2020; }
+.badge-failed { background: #f5d5d5; color: #6b1111; }
 .badge-archived { background: #e4e0d8; color: #6b6560; font-style: italic; }
 .badge-cancelled { background: #e8ddf5; color: #5a3d8a; }
 .badge-priority {
@@ -173,6 +173,13 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   animation: spin 0.8s linear infinite; display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-top-color: var(--accent);
+    opacity: 0.7;
+  }
+}
 
 /* --- Trash Bin (inside settings modal) --- */
 .trash-bin-banner {
@@ -1580,6 +1587,10 @@ pre.result-entry-body {
 @keyframes badge-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge-pulse,
+  .refine-typing-spinner { animation: none; }
 }
 
 /* --- Refine button on cards --- */
