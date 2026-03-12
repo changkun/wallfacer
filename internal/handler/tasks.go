@@ -216,23 +216,28 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 // batchTaskInput describes a single task in a BatchCreateTasks request.
 type batchTaskInput struct {
-	Ref            string         `json:"ref"`
-	Prompt         string         `json:"prompt"`
-	Timeout        int            `json:"timeout"`
-	Tags           []string       `json:"tags"`
-	Sandbox        string         `json:"sandbox"`
-	Kind           store.TaskKind `json:"kind"`
-	MountWorktrees bool           `json:"mount_worktrees"`
-	DependsOnRefs  []string       `json:"depends_on_refs"`
+	Ref               string            `json:"ref"`
+	Prompt            string            `json:"prompt"`
+	Timeout           int               `json:"timeout"`
+	Tags              []string          `json:"tags"`
+	Sandbox           string            `json:"sandbox"`
+	SandboxByActivity map[string]string `json:"sandbox_by_activity"`
+	Kind              store.TaskKind    `json:"kind"`
+	MountWorktrees    bool              `json:"mount_worktrees"`
+	DependsOnRefs     []string          `json:"depends_on_refs"`
 }
 
 type batchCreateRequest struct {
 	Tasks []batchTaskInput `json:"tasks"`
 }
 
-// BatchCreateTasks creates multiple tasks in a single request with dependency
-// wiring via symbolic ref names declared within the batch. Tasks are created in
-// topological order so dependencies always exist before their dependents.
+// BatchCreateTasks creates multiple tasks atomically with dependency wiring via
+// symbolic ref names declared within the batch. The handler runs a full preflight
+// validation phase before any persistence: duplicate refs, empty prompts, sandbox
+// validity, existence of external dependency UUIDs, self-dependencies, and cycle
+// detection against the combined graph of existing tasks plus proposed edges.
+// If validation fails the store is untouched and the handler returns 400 or 422.
+// On success it returns 201 Created with tasks (in input order) and ref_to_id.
 func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	var req batchCreateRequest
 	if !decodeJSONBody(w, r, &req) {
@@ -248,8 +253,14 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Step 1: Collect refs and validate uniqueness.
-	refToIdx := make(map[string]int, len(req.Tasks))
+	n := len(req.Tasks)
+
+	// =========================================================================
+	// PREFLIGHT VALIDATION — zero side effects; all checks run before any write
+	// =========================================================================
+
+	// 1. Collect refs and validate uniqueness.
+	refToIdx := make(map[string]int, n)
 	for i, t := range req.Tasks {
 		if t.Ref == "" {
 			continue
@@ -261,32 +272,59 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		refToIdx[t.Ref] = i
 	}
 
-	// Step 2: Validate each depends_on_refs entry is a known ref or a valid UUID.
+	// 2. Validate prompts.
 	for _, t := range req.Tasks {
+		if strings.TrimSpace(t.Prompt) == "" && t.Kind != store.TaskKindIdeaAgent {
+			ref := t.Ref
+			if ref == "" {
+				ref = "<unnamed>"
+			}
+			http.Error(w, fmt.Sprintf("ref %q: prompt is required", ref), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// 3. Validate sandboxes.
+	for i, t := range req.Tasks {
+		if err := h.validateRequestedSandboxes(t.Sandbox, t.SandboxByActivity); err != nil {
+			ref := t.Ref
+			if ref == "" {
+				ref = fmt.Sprintf("<index %d>", i)
+			}
+			http.Error(w, fmt.Sprintf("ref %q: %s", ref, err.Error()), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// 4. Validate each depends_on_refs entry is a known batch ref or a valid UUID syntax.
+	for i, t := range req.Tasks {
 		for _, dep := range t.DependsOnRefs {
 			if _, ok := refToIdx[dep]; !ok {
 				if _, err := uuid.Parse(dep); err != nil {
-					http.Error(w, fmt.Sprintf("unknown ref in depends_on_refs: %q", dep), http.StatusBadRequest)
+					ref := t.Ref
+					if ref == "" {
+						ref = fmt.Sprintf("<index %d>", i)
+					}
+					http.Error(w, fmt.Sprintf("ref %q: unknown ref in depends_on_refs: %q", ref, dep), http.StatusBadRequest)
 					return
 				}
 			}
 		}
 	}
 
-	// Step 3: Topological sort via Kahn's algorithm to detect cycles and order creation.
-	n := len(req.Tasks)
+	// 5. Topological sort on batch-internal edges (Kahn's algorithm) to detect
+	//    internal cycles and compute creation order.
 	inDegree := make([]int, n)
-	// adj[i] holds the indices of tasks that depend on task i (i.e. i must be created first).
-	adj := make([][]int, n)
+	// batchAdj[i] holds the indices of tasks that depend on task i.
+	batchAdj := make([][]int, n)
 	for i, t := range req.Tasks {
 		for _, dep := range t.DependsOnRefs {
 			if depIdx, ok := refToIdx[dep]; ok {
-				adj[depIdx] = append(adj[depIdx], i)
+				batchAdj[depIdx] = append(batchAdj[depIdx], i)
 				inDegree[i]++
 			}
 		}
 	}
-
 	queue := make([]int, 0, n)
 	for i := 0; i < n; i++ {
 		if inDegree[i] == 0 {
@@ -298,16 +336,14 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		curr := queue[0]
 		queue = queue[1:]
 		topoOrder = append(topoOrder, curr)
-		for _, next := range adj[curr] {
+		for _, next := range batchAdj[curr] {
 			inDegree[next]--
 			if inDegree[next] == 0 {
 				queue = append(queue, next)
 			}
 		}
 	}
-
 	if len(topoOrder) != n {
-		// Cycle detected — collect the refs of unprocessed nodes.
 		processed := make(map[int]bool, len(topoOrder))
 		for _, idx := range topoOrder {
 			processed[idx] = true
@@ -329,32 +365,96 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Step 4: Validate individual task fields.
-	for _, t := range req.Tasks {
-		if strings.TrimSpace(t.Prompt) == "" && t.Kind != store.TaskKindIdeaAgent {
-			ref := t.Ref
-			if ref == "" {
-				ref = "<unnamed>"
+	// 6. Pre-assign UUIDs so external-dep existence checks and full-graph cycle
+	//    detection can reason about the complete post-creation dependency graph.
+	preAssignedIDs := make([]uuid.UUID, n)
+	for i := range req.Tasks {
+		preAssignedIDs[i] = uuid.New()
+	}
+
+	// 7. Verify every external UUID dep actually exists in the store.
+	//    Self-deps via symbolic ref are already caught by Kahn's above (self-loop
+	//    leaves inDegree > 0). We also explicitly guard against a task listing its
+	//    own pre-assigned UUID, though callers cannot know it in practice.
+	for i, t := range req.Tasks {
+		for _, dep := range t.DependsOnRefs {
+			if _, ok := refToIdx[dep]; ok {
+				// Batch-internal ref — already validated by Kahn's.
+				if refToIdx[dep] == i {
+					// Self-dep through batch ref (redundant guard; Kahn's catches it).
+					ref := t.Ref
+					if ref == "" {
+						ref = fmt.Sprintf("<index %d>", i)
+					}
+					http.Error(w, fmt.Sprintf("ref %q: task cannot depend on itself", ref), http.StatusBadRequest)
+					return
+				}
+				continue
 			}
-			http.Error(w, fmt.Sprintf("ref %q: prompt is required", ref), http.StatusBadRequest)
-			return
+			// External UUID — verify it exists.
+			depID, _ := uuid.Parse(dep) // already confirmed parseable in step 4
+			if _, err := h.store.GetTask(r.Context(), depID); err != nil {
+				ref := t.Ref
+				if ref == "" {
+					ref = fmt.Sprintf("<index %d>", i)
+				}
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+					"error": fmt.Sprintf("ref %q: dependency task not found: %s", ref, dep),
+				})
+				return
+			}
 		}
 	}
 
-	// Step 5: Create tasks in topological order.
+	// 8. Full combined-graph cycle check: build an adjacency map that merges
+	//    existing task edges with the proposed batch edges (using pre-assigned
+	//    UUIDs) and confirm no new cycle is introduced.
+	//    Note: existing tasks cannot reference the freshly pre-assigned UUIDs, so
+	//    cycles through external deps are mathematically impossible here; this
+	//    check is defence-in-depth and guards against any future store changes.
+	allTasks, _ := h.store.ListTasks(r.Context(), true)
+	combinedAdj := make(map[uuid.UUID][]uuid.UUID, len(allTasks)+n)
+	for _, t := range allTasks {
+		for _, depStr := range t.DependsOn {
+			if depID, err := uuid.Parse(depStr); err == nil {
+				combinedAdj[t.ID] = append(combinedAdj[t.ID], depID)
+			}
+		}
+	}
+	for i, t := range req.Tasks {
+		myID := preAssignedIDs[i]
+		for _, dep := range t.DependsOnRefs {
+			var depID uuid.UUID
+			if depIdx, ok := refToIdx[dep]; ok {
+				depID = preAssignedIDs[depIdx]
+			} else {
+				depID, _ = uuid.Parse(dep)
+			}
+			combinedAdj[myID] = append(combinedAdj[myID], depID)
+		}
+	}
+	for i, t := range req.Tasks {
+		myID := preAssignedIDs[i]
+		for _, depID := range combinedAdj[myID] {
+			if taskReachableInAdj(combinedAdj, depID, myID) {
+				ref := t.Ref
+				if ref == "" {
+					ref = fmt.Sprintf("<index %d>", i)
+				}
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+					"error": fmt.Sprintf("ref %q: dependency would create a cycle", ref),
+				})
+				return
+			}
+		}
+	}
+
+	// =========================================================================
+	// PERSISTENCE — all validation passed; create tasks in topological order
+	// =========================================================================
+
 	// refToID maps each batch ref to its created UUID for dependency resolution.
 	refToID := make(map[string]uuid.UUID, n)
-	// inputOrderIDs tracks the created UUID for each input index for result ordering.
-	inputOrderIDs := make(map[int]uuid.UUID, n)
-
-	type itemResult struct {
-		Ref     string `json:"ref"`
-		ID      string `json:"id,omitempty"`
-		Error   string `json:"error,omitempty"`
-		Success bool   `json:"success"`
-	}
-	results := make([]itemResult, n)
-	var partialFailure bool
 
 	for _, idx := range topoOrder {
 		t := req.Tasks[idx]
@@ -363,43 +463,26 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		depStrs := make([]string, 0, len(t.DependsOnRefs))
 		for _, dep := range t.DependsOnRefs {
 			if depID, ok := refToID[dep]; ok {
-				// In-batch ref already created.
 				depStrs = append(depStrs, depID.String())
 			} else {
-				// External UUID — already validated in step 2.
 				depStrs = append(depStrs, dep)
 			}
 		}
 
-		task, err := h.store.CreateTask(r.Context(), t.Prompt, t.Timeout, t.MountWorktrees, "", t.Kind, t.Tags...)
+		task, err := h.store.CreateTaskWithOptions(r.Context(), store.CreateTaskOptions{
+			ID:                preAssignedIDs[idx],
+			Prompt:            t.Prompt,
+			Timeout:           t.Timeout,
+			Tags:              t.Tags,
+			MountWorktrees:    t.MountWorktrees,
+			Kind:              t.Kind,
+			Sandbox:           t.Sandbox,
+			SandboxByActivity: t.SandboxByActivity,
+			DependsOn:         depStrs,
+		})
 		if err != nil {
-			results[idx] = itemResult{Ref: t.Ref, Error: err.Error(), Success: false}
-			partialFailure = true
-			continue
-		}
-
-		if t.Sandbox != "" {
-			if err := h.store.UpdateTaskSandbox(r.Context(), task.ID, t.Sandbox); err != nil {
-				results[idx] = itemResult{Ref: t.Ref, ID: task.ID.String(), Error: err.Error(), Success: false}
-				partialFailure = true
-				inputOrderIDs[idx] = task.ID
-				if t.Ref != "" {
-					refToID[t.Ref] = task.ID
-				}
-				continue
-			}
-		}
-
-		if len(depStrs) > 0 {
-			if err := h.store.UpdateTaskDependsOn(r.Context(), task.ID, depStrs); err != nil {
-				results[idx] = itemResult{Ref: t.Ref, ID: task.ID.String(), Error: err.Error(), Success: false}
-				partialFailure = true
-				inputOrderIDs[idx] = task.ID
-				if t.Ref != "" {
-					refToID[t.Ref] = task.ID
-				}
-				continue
-			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange, map[string]string{
@@ -411,25 +494,15 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			h.runner.GenerateTitleBackground(task.ID, task.Prompt)
 		}
 
-		results[idx] = itemResult{Ref: t.Ref, ID: task.ID.String(), Success: true}
-		inputOrderIDs[idx] = task.ID
 		if t.Ref != "" {
 			refToID[t.Ref] = task.ID
 		}
 	}
 
-	if partialFailure {
-		writeJSON(w, http.StatusMultiStatus, map[string]any{
-			"results": results,
-		})
-		return
-	}
-
-	// Re-fetch all tasks in input order to pick up any applied changes (sandbox, deps).
+	// Return tasks in input order.
 	finalTasks := make([]store.Task, n)
-	for i := 0; i < n; i++ {
-		id := inputOrderIDs[i]
-		updated, err := h.store.GetTask(r.Context(), id)
+	for i := range req.Tasks {
+		updated, err := h.store.GetTask(r.Context(), preAssignedIDs[i])
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -443,8 +516,8 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"tasks":      finalTasks,
-		"ref_to_id":  refToIDStr,
+		"tasks":     finalTasks,
+		"ref_to_id": refToIDStr,
 	})
 }
 
@@ -1110,6 +1183,13 @@ func taskReachable(taskList []store.Task, start, target uuid.UUID) bool {
 			}
 		}
 	}
+	return taskReachableInAdj(adj, start, target)
+}
+
+// taskReachableInAdj reports whether target is reachable from start by following
+// edges in the provided adjacency map (task → its dependencies).
+// Used by BatchCreateTasks for full-graph cycle detection.
+func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) bool {
 	visited := make(map[uuid.UUID]bool)
 	var dfs func(uuid.UUID) bool
 	dfs = func(cur uuid.UUID) bool {

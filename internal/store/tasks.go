@@ -201,10 +201,25 @@ func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 	return &cp, nil
 }
 
-// CreateTask creates a new task in backlog status and persists it.
-// kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
-// Optional tags are attached to the task for categorisation (e.g. "idea-agent").
-func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountWorktrees bool, _ string, kind TaskKind, tags ...string) (*Task, error) {
+// CreateTaskOptions holds all fields that can be set when creating a new task.
+// If ID is the zero value, CreateTaskWithOptions generates a new UUID.
+type CreateTaskOptions struct {
+	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
+	ID                uuid.UUID
+	Prompt            string
+	Timeout           int
+	Tags              []string
+	MountWorktrees    bool
+	Kind              TaskKind
+	Sandbox           string
+	SandboxByActivity map[string]string
+	DependsOn         []string
+}
+
+// CreateTaskWithOptions creates a new backlog task with all provided fields
+// persisted in a single task.json write. It is the canonical constructor;
+// CreateTask delegates to it with a minimal option set.
+func (s *Store) CreateTaskWithOptions(_ context.Context, opts CreateTaskOptions) (*Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -223,22 +238,33 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 		newPosition = minPos - 1
 	}
 
-	timeout = clampTimeout(timeout)
+	id := opts.ID
+	if id == (uuid.UUID{}) {
+		id = uuid.New()
+	}
+
+	var depsCopy []string
+	if len(opts.DependsOn) > 0 {
+		depsCopy = append([]string{}, opts.DependsOn...)
+	}
 
 	now := time.Now()
 	task := &Task{
-		SchemaVersion:  CurrentTaskSchemaVersion,
-		ID:             uuid.New(),
-		Prompt:         prompt,
-		Status:         TaskStatusBacklog,
-		Turns:          0,
-		Timeout:        timeout,
-		MountWorktrees: mountWorktrees,
-		Kind:           kind,
-		Tags:           tags,
-		Position:       newPosition,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		SchemaVersion:     CurrentTaskSchemaVersion,
+		ID:                id,
+		Prompt:            opts.Prompt,
+		Status:            TaskStatusBacklog,
+		Turns:             0,
+		Timeout:           clampTimeout(opts.Timeout),
+		MountWorktrees:    opts.MountWorktrees,
+		Kind:              opts.Kind,
+		Tags:              opts.Tags,
+		Sandbox:           strings.TrimSpace(opts.Sandbox),
+		SandboxByActivity: normalizeSandboxByActivity(opts.SandboxByActivity),
+		DependsOn:         depsCopy,
+		Position:          newPosition,
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
 
 	taskDir := filepath.Join(s.dir, task.ID.String())
@@ -259,6 +285,19 @@ func (s *Store) CreateTask(_ context.Context, prompt string, timeout int, mountW
 
 	ret := *task
 	return &ret, nil
+}
+
+// CreateTask creates a new task in backlog status and persists it.
+// kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
+// Optional tags are attached to the task for categorisation (e.g. "idea-agent").
+func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, mountWorktrees bool, _ string, kind TaskKind, tags ...string) (*Task, error) {
+	return s.CreateTaskWithOptions(ctx, CreateTaskOptions{
+		Prompt:         prompt,
+		Timeout:        timeout,
+		MountWorktrees: mountWorktrees,
+		Kind:           kind,
+		Tags:           tags,
+	})
 }
 
 // CreateForkedTask creates a new backlog task pre-populated with the source's
