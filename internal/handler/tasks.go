@@ -1107,12 +1107,8 @@ func (h *Handler) maxTestConcurrentTasks() int {
 	return cfg.MaxTestParallelTasks
 }
 
-func (h *Handler) countRegularInProgress(ctx context.Context) (int, error) {
-	tasks, err := h.store.ListTasks(ctx, false)
-	if err != nil {
-		return 0, err
-	}
-	return countRegularInProgress(tasks), nil
+func (h *Handler) countRegularInProgress(_ context.Context) (int, error) {
+	return h.store.CountRegularInProgress(), nil
 }
 
 func countRegularInProgress(tasks []store.Task) int {
@@ -1240,33 +1236,39 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 	}
 
 	// Phase 1 (no lock): build candidate and count without holding promoteMu.
-	tasks, err := h.store.ListTasks(ctx, false)
+	regularInProgress := h.store.CountRegularInProgress()
+	maxTasks := h.maxConcurrentTasks()
+
+	if regularInProgress >= maxTasks {
+		return
+	}
+
+	backlogTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusBacklog)
 	if err != nil {
 		return
 	}
 
-	regularInProgress := countRegularInProgress(tasks)
-	maxTasks := h.maxConcurrentTasks()
 	var bestBacklog *store.Task
-	for i := range tasks {
-		t := &tasks[i]
-		if t.Status == store.TaskStatusBacklog && t.Kind != store.TaskKindIdeaAgent {
-			// Skip tasks that have a future scheduled start time.
-			if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
-				continue
-			}
-			satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
-			if err != nil || !satisfied {
-				continue // skip: dependencies not yet done
-			}
-			if bestBacklog == nil || t.Position < bestBacklog.Position {
-				cp := *t
-				bestBacklog = &cp
-			}
+	for i := range backlogTasks {
+		t := &backlogTasks[i]
+		if t.Kind == store.TaskKindIdeaAgent {
+			continue
+		}
+		// Skip tasks that have a future scheduled start time.
+		if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
+			continue
+		}
+		satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
+		if err != nil || !satisfied {
+			continue // skip: dependencies not yet done
+		}
+		if bestBacklog == nil || t.Position < bestBacklog.Position {
+			cp := *t
+			bestBacklog = &cp
 		}
 	}
 
-	if regularInProgress >= maxTasks || bestBacklog == nil {
+	if bestBacklog == nil {
 		return
 	}
 
@@ -1279,11 +1281,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 	defer promoteMu.Unlock()
 
 	// Re-read in-progress count; state may have changed during Phase 1 I/O.
-	freshTasks, err := h.store.ListTasks(ctx, false)
-	if err != nil {
-		return
-	}
-	if countRegularInProgress(freshTasks) >= maxTasks {
+	if h.store.CountRegularInProgress() >= maxTasks {
 		return
 	}
 
@@ -1344,7 +1342,7 @@ func (h *Handler) StartWaitingSyncWatcher(ctx context.Context) {
 // task to in_progress and triggers SyncWorktrees, exactly as if the user had
 // clicked the "Sync" button.
 func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
-	tasks, err := h.store.ListTasks(ctx, false)
+	tasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 	if err != nil {
 		return
 	}
@@ -1352,7 +1350,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 
 	for i := range tasks {
 		t := &tasks[i]
-		if t.Status != store.TaskStatusWaiting || len(t.WorktreePaths) == 0 {
+		if len(t.WorktreePaths) == 0 {
 			continue
 		}
 
@@ -1378,12 +1376,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			"task", t.ID)
 
 		promoteMu.Lock()
-		regularInProgress, err := h.countRegularInProgress(ctx)
-		if err != nil {
-			promoteMu.Unlock()
-			logger.Handler.Error("auto-sync: failed to count in-progress tasks", "error", err)
-			continue
-		}
+		regularInProgress := h.store.CountRegularInProgress()
 
 		if regularInProgress >= maxTasks {
 			promoteMu.Unlock()
@@ -1466,7 +1459,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 		return
 	}
 
-	tasks, err := h.store.ListTasks(ctx, false)
+	waitingTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 	if err != nil {
 		return
 	}
@@ -1475,11 +1468,8 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 	// Git I/O (CommitsBehind) happens here so we don't hold promoteMu
 	// during potentially slow filesystem operations.
 	var candidates []autoTestCandidate
-	for i := range tasks {
-		t := &tasks[i]
-		if t.Status != store.TaskStatusWaiting {
-			continue
-		}
+	for i := range waitingTasks {
+		t := &waitingTasks[i]
 		// Skip tasks that already have a test result or are currently being tested.
 		if t.LastTestResult != "" || t.IsTestRun {
 			continue
@@ -1528,17 +1518,22 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 	promoteMu.Lock()
 	defer promoteMu.Unlock()
 
-	// Re-read for a fresh in-progress count; state may have changed during
-	// the git checks above.
-	freshTasks, err := h.store.ListTasks(ctx, false)
+	// Re-read for a fresh snapshot; state may have changed during the git checks above.
+	freshWaiting, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 	if err != nil {
 		return
 	}
-	freshByID := make(map[uuid.UUID]store.Task, len(freshTasks))
-	testInProgress := 0
-	for _, t := range freshTasks {
+	freshByID := make(map[uuid.UUID]store.Task, len(freshWaiting))
+	for _, t := range freshWaiting {
 		freshByID[t.ID] = t
-		if t.Status == store.TaskStatusInProgress && t.IsTestRun {
+	}
+	freshInProgress, err := h.store.ListTasksByStatus(ctx, store.TaskStatusInProgress)
+	if err != nil {
+		return
+	}
+	testInProgress := 0
+	for _, t := range freshInProgress {
+		if t.IsTestRun {
 			testInProgress++
 		}
 	}
