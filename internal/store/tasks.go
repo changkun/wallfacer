@@ -201,25 +201,32 @@ func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 	return &cp, nil
 }
 
-// CreateTaskOptions holds all fields that can be set when creating a new task.
-// If ID is the zero value, CreateTaskWithOptions generates a new UUID.
-type CreateTaskOptions struct {
+// TaskCreateOptions contains all bootstrap-only fields for a new task.
+// Pass it to CreateTaskWithOptions to create a fully populated task in a
+// single atomic write, avoiding races between SSE subscribers and post-create
+// update calls.
+type TaskCreateOptions struct {
 	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
 	ID                uuid.UUID
 	Prompt            string
 	Timeout           int
-	Tags              []string
 	MountWorktrees    bool
 	Kind              TaskKind
+	Tags              []string
 	Sandbox           string
 	SandboxByActivity map[string]string
+	MaxCostUSD        float64
+	MaxInputTokens    int
+	ScheduledAt       *time.Time
 	DependsOn         []string
+	ModelOverride     string
 }
 
-// CreateTaskWithOptions creates a new backlog task with all provided fields
-// persisted in a single task.json write. It is the canonical constructor;
-// CreateTask delegates to it with a minimal option set.
-func (s *Store) CreateTaskWithOptions(_ context.Context, opts CreateTaskOptions) (*Task, error) {
+// CreateTaskWithOptions creates a new backlog task in a single atomic write.
+// All fields in opts are normalised (sandbox maps, budget clamps) and persisted
+// together, so no watcher or SSE subscriber can observe a partially-initialised
+// task.  notify is called exactly once.
+func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions) (*Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -243,28 +250,62 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts CreateTaskOptions)
 		id = uuid.New()
 	}
 
-	var depsCopy []string
-	if len(opts.DependsOn) > 0 {
-		depsCopy = append([]string{}, opts.DependsOn...)
-	}
-
 	now := time.Now()
 	task := &Task{
-		SchemaVersion:     CurrentTaskSchemaVersion,
-		ID:                id,
-		Prompt:            opts.Prompt,
-		Status:            TaskStatusBacklog,
-		Turns:             0,
-		Timeout:           clampTimeout(opts.Timeout),
-		MountWorktrees:    opts.MountWorktrees,
-		Kind:              opts.Kind,
-		Tags:              opts.Tags,
-		Sandbox:           strings.TrimSpace(opts.Sandbox),
-		SandboxByActivity: normalizeSandboxByActivity(opts.SandboxByActivity),
-		DependsOn:         depsCopy,
-		Position:          newPosition,
-		CreatedAt:         now,
-		UpdatedAt:         now,
+		SchemaVersion:  CurrentTaskSchemaVersion,
+		ID:             id,
+		Prompt:         opts.Prompt,
+		Status:         TaskStatusBacklog,
+		Turns:          0,
+		Timeout:        clampTimeout(opts.Timeout),
+		MountWorktrees: opts.MountWorktrees,
+		Kind:           opts.Kind,
+		Position:       newPosition,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+
+	// Tags: deep-copy to protect store state from caller mutation.
+	if len(opts.Tags) > 0 {
+		task.Tags = append([]string(nil), opts.Tags...)
+	}
+
+	// DependsOn: deep-copy.
+	if len(opts.DependsOn) > 0 {
+		task.DependsOn = append([]string(nil), opts.DependsOn...)
+	}
+
+	// Sandbox.
+	if opts.Sandbox != "" {
+		task.Sandbox = strings.TrimSpace(opts.Sandbox)
+	}
+
+	// SandboxByActivity: normalise (validates keys, strips invalid entries).
+	if len(opts.SandboxByActivity) > 0 {
+		task.SandboxByActivity = normalizeSandboxByActivity(opts.SandboxByActivity)
+	}
+
+	// Budget limits: clamp negatives to 0 (0 means unlimited).
+	if opts.MaxCostUSD < 0 {
+		task.MaxCostUSD = 0
+	} else {
+		task.MaxCostUSD = opts.MaxCostUSD
+	}
+	if opts.MaxInputTokens < 0 {
+		task.MaxInputTokens = 0
+	} else {
+		task.MaxInputTokens = opts.MaxInputTokens
+	}
+
+	// ScheduledAt: copy to avoid aliasing the caller's pointer.
+	if opts.ScheduledAt != nil {
+		ts := *opts.ScheduledAt
+		task.ScheduledAt = &ts
+	}
+
+	// ModelOverride: nil when empty so omitempty keeps JSON clean.
+	if model := strings.TrimSpace(opts.ModelOverride); model != "" {
+		task.ModelOverride = &model
 	}
 
 	taskDir := filepath.Join(s.dir, task.ID.String())
@@ -283,15 +324,17 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts CreateTaskOptions)
 	s.searchIndex[task.ID] = buildIndexEntry(task, "")
 	s.notify(task, false)
 
-	ret := *task
+	ret := deepCloneTask(task)
 	return &ret, nil
 }
 
 // CreateTask creates a new task in backlog status and persists it.
 // kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
-// Optional tags are attached to the task for categorisation (e.g. "idea-agent").
+// Optional tags are attached to the task for categorisation.
+//
+// Deprecated: prefer CreateTaskWithOptions for full initialization in one write.
 func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, mountWorktrees bool, _ string, kind TaskKind, tags ...string) (*Task, error) {
-	return s.CreateTaskWithOptions(ctx, CreateTaskOptions{
+	return s.CreateTaskWithOptions(ctx, TaskCreateOptions{
 		Prompt:         prompt,
 		Timeout:        timeout,
 		MountWorktrees: mountWorktrees,
