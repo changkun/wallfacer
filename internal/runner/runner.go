@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -321,6 +322,8 @@ type Runner struct {
 	boardChangeSeq     atomic.Uint64  // incremented on every store notification
 	shutdownCh         chan struct{}   // closed by Shutdown to stop the subscription goroutine
 	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -362,6 +365,7 @@ func (r *Runner) notifyStopReason(taskID uuid.UUID, stopReason string) {
 // to completion independently and will be recovered on the next server start.
 // must be called at most once.
 func (r *Runner) Shutdown() {
+	r.shutdownCancel()
 	// Signal the board-cache-invalidator goroutine to exit and wait for it.
 	close(r.shutdownCh)
 	r.boardSubscriptionWg.Wait()
@@ -471,6 +475,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		ideateContainer:  &containerRegistry{},
 		shutdownCh:       make(chan struct{}),
 	}
+	r.shutdownCtx, r.shutdownCancel = context.WithCancel(context.Background())
 
 	// Subscribe to store changes to drive the board-context cache invalidation.
 	// Each store mutation increments boardChangeSeq so generateBoardContextAndMounts

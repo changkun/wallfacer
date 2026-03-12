@@ -239,7 +239,7 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 // BuildIdeationPrompt exposes the ideation prompt construction used by the
 // idea-agent runner for testability and for handler-side task bootstrap.
 func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
-	return r.buildIdeationPrompt(existingTasks, r.collectIdeationContext())
+	return r.buildIdeationPrompt(existingTasks, r.collectIdeationContext(r.shutdownCtx))
 }
 
 // buildIdeationContainerArgs builds the container run arguments for the
@@ -284,7 +284,7 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt, sandbox strin
 // the idea-agent task to done. On failure it returns an error so Run() can
 // transition the task to failed.
 func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
-	bgCtx := context.Background()
+	bgCtx := r.shutdownCtx
 	taskID := task.ID
 
 	// Set a human-readable title on the idea-agent card.
@@ -312,7 +312,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// the idea-agent card for consistency).
 	ideationPrompt := strings.TrimSpace(task.ExecutionPrompt)
 	if ideationPrompt == "" {
-		ideationPrompt = r.buildIdeationPrompt(activeTasks, r.collectIdeationContextFromTasks(allTasks))
+		ideationPrompt = r.buildIdeationPrompt(activeTasks, r.collectIdeationContextFromTasks(bgCtx, allTasks))
 		if err := r.store.UpdateTaskExecutionPrompt(bgCtx, taskID, ideationPrompt); err != nil {
 			logger.Runner.Warn("ideation task: set execution prompt on brainstorm card", "task", taskID, "error", err)
 		}
@@ -455,21 +455,20 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 
 // collectIdeationContext returns workspace and task-derived signals for prompt
 // construction so ideation suggestions can be prioritized by objective urgency.
-func (r *Runner) collectIdeationContext() ideationContext {
-	tasks, err := r.store.ListTasks(context.Background(), false)
+func (r *Runner) collectIdeationContext(ctx context.Context) ideationContext {
+	tasks, err := r.store.ListTasks(ctx, false)
 	if err != nil {
-		return r.collectIdeationContextFromTasks(nil)
+		return r.collectIdeationContextFromTasks(ctx, nil)
 	}
-	return r.collectIdeationContextFromTasks(tasks)
+	return r.collectIdeationContextFromTasks(ctx, tasks)
 }
 
-func (r *Runner) collectIdeationContextFromTasks(tasks []store.Task) ideationContext {
-	ctx := ideationContext{
+func (r *Runner) collectIdeationContextFromTasks(ctx context.Context, tasks []store.Task) ideationContext {
+	return ideationContext{
 		FailureSignals: collectIdeationFailureSignals(tasks),
-		ChurnSignals:   r.collectWorkspaceChurnSignals(),
-		TodoSignals:    r.collectWorkspaceTodoSignals(),
+		ChurnSignals:   r.collectWorkspaceChurnSignals(ctx),
+		TodoSignals:    r.collectWorkspaceTodoSignals(ctx),
 	}
-	return ctx
 }
 
 func collectIdeationFailureSignals(tasks []store.Task) []string {
@@ -514,10 +513,10 @@ func collectIdeationFailureSignals(tasks []store.Task) []string {
 	return result
 }
 
-func (r *Runner) collectWorkspaceChurnSignals() []string {
+func (r *Runner) collectWorkspaceChurnSignals(ctx context.Context) []string {
 	var signals []string
 	for _, workspace := range r.workspacesForRunner() {
-		sig := r.collectWorkspaceChurnSignalsForWorkspace(workspace)
+		sig := r.collectWorkspaceChurnSignalsForWorkspace(ctx, workspace)
 		signals = append(signals, sig...)
 	}
 	if len(signals) <= maxIdeationChurnSignals {
@@ -526,8 +525,8 @@ func (r *Runner) collectWorkspaceChurnSignals() []string {
 	return signals[:maxIdeationChurnSignals]
 }
 
-func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(workspace string) []string {
-	raw, err := r.runWorkspaceGitCommand(workspace, "log", "--name-only", "--pretty=format:", "-n", "30")
+func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(ctx context.Context, workspace string) []string {
+	raw, err := r.runWorkspaceGitCommand(ctx, workspace, "log", "--name-only", "--pretty=format:", "-n", "30")
 	if err != nil {
 		return nil
 	}
@@ -565,10 +564,10 @@ func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(workspace string) []st
 	return out
 }
 
-func (r *Runner) collectWorkspaceTodoSignals() []string {
+func (r *Runner) collectWorkspaceTodoSignals(ctx context.Context) []string {
 	var signals []string
 	for _, workspace := range r.workspacesForRunner() {
-		sig := r.collectWorkspaceTodoSignalsForWorkspace(workspace)
+		sig := r.collectWorkspaceTodoSignalsForWorkspace(ctx, workspace)
 		signals = append(signals, sig...)
 	}
 	if len(signals) <= maxIdeationTodoSignals {
@@ -577,8 +576,8 @@ func (r *Runner) collectWorkspaceTodoSignals() []string {
 	return signals[:maxIdeationTodoSignals]
 }
 
-func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(workspace string) []string {
-	raw, err := r.runWorkspaceGitCommand(workspace, "grep", "-n", "-E", "TODO|FIXME|XXX", "--", ".")
+func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(ctx context.Context, workspace string) []string {
+	raw, err := r.runWorkspaceGitCommand(ctx, workspace, "grep", "-n", "-E", "TODO|FIXME|XXX", "--", ".")
 	if err != nil {
 		return nil
 	}
@@ -616,8 +615,8 @@ func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(workspace string) []str
 	return out
 }
 
-func (r *Runner) runWorkspaceGitCommand(workspace string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), workspaceIdeationCommandTTL)
+func (r *Runner) runWorkspaceGitCommand(parentCtx context.Context, workspace string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, workspaceIdeationCommandTTL)
 	defer cancel()
 	command := exec.CommandContext(ctx, "git", append([]string{"-C", workspace}, args...)...)
 	return command.Output()
