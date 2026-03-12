@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -306,6 +307,7 @@ type Runner struct {
 	refineContainers *containerRegistry // taskID → refinement container name
 	ideateContainer  *containerRegistry // singleton: ideation container name
 	oversightMu      sync.Map           // taskID (string) → *sync.Mutex for serializing oversight generation
+	containerCB      *CircuitBreaker    // circuit breaker for container launch operations
 	backgroundWg     trackedWg          // tracks fire-and-forget background goroutines
 	stopReasonMu     sync.RWMutex
 	onStopReason     func(taskID uuid.UUID, stopReason string)
@@ -324,6 +326,25 @@ type Runner struct {
 	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
 	shutdownCtx    context.Context
 	shutdownCancel context.CancelFunc
+}
+
+// ContainerCircuitAllow returns true when the container circuit breaker
+// permits a new launch. Use this in handlers before promoting a task to
+// in-progress to avoid firing launches that would immediately fail.
+func (r *Runner) ContainerCircuitAllow() bool {
+	return r.containerCB.Allow()
+}
+
+// ContainerCircuitState returns the human-readable state of the container
+// circuit breaker ("closed", "open", or "half-open").
+func (r *Runner) ContainerCircuitState() string {
+	return r.containerCB.State()
+}
+
+// ContainerCircuitFailures returns the current consecutive failure count of
+// the container circuit breaker.
+func (r *Runner) ContainerCircuitFailures() int {
+	return r.containerCB.Failures()
 }
 
 // WaitBackground blocks until all fire-and-forget background goroutines
@@ -476,6 +497,24 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		shutdownCh:       make(chan struct{}),
 	}
 	r.shutdownCtx, r.shutdownCancel = context.WithCancel(context.Background())
+
+	// Initialise container circuit breaker.
+	// Defaults: 5 consecutive failures trip the breaker; it stays open for
+	// 30 s before allowing a single probe (half-open).
+	// Both values can be overridden via environment variables.
+	cbThreshold := 5
+	cbOpenSec := 30
+	if v := os.Getenv("WALLFACER_CONTAINER_CB_THRESHOLD"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cbThreshold = n
+		}
+	}
+	if v := os.Getenv("WALLFACER_CONTAINER_CB_OPEN_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cbOpenSec = n
+		}
+	}
+	r.containerCB = NewCircuitBreaker(cbThreshold, time.Duration(cbOpenSec)*time.Second)
 
 	// Subscribe to store changes to drive the board-context cache invalidation.
 	// Each store mutation increments boardChangeSeq so generateBoardContextAndMounts

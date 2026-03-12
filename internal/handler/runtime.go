@@ -6,14 +6,22 @@ import (
 	"time"
 )
 
+// containerCircuitStatus is the JSON shape for the container circuit breaker
+// snapshot inside runtimeStatusResponse.
+type containerCircuitStatus struct {
+	State    string `json:"state"`
+	Failures int    `json:"failures"`
+}
+
 // runtimeStatusResponse is the JSON shape returned by GET /api/debug/runtime.
 type runtimeStatusResponse struct {
-	Goroutines       []string       `json:"goroutines"`
-	GoGoroutineCount int            `json:"go_goroutine_count"`
-	GoHeapAllocBytes uint64         `json:"go_heap_alloc_bytes"`
-	TaskStates       map[string]int `json:"task_states"`
-	ActiveContainers int            `json:"active_containers"`
-	Timestamp        time.Time      `json:"timestamp"`
+	Goroutines       []string               `json:"goroutines"`
+	GoGoroutineCount int                    `json:"go_goroutine_count"`
+	GoHeapAllocBytes uint64                 `json:"go_heap_alloc_bytes"`
+	TaskStates       map[string]int         `json:"task_states"`
+	ActiveContainers int                    `json:"active_containers"`
+	ContainerCircuit containerCircuitStatus `json:"container_circuit"`
+	Timestamp        time.Time              `json:"timestamp"`
 }
 
 // GetRuntimeStatus returns a live snapshot of server internals for operational
@@ -60,6 +68,10 @@ func (h *Handler) GetRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 		GoHeapAllocBytes: m.HeapAlloc,
 		TaskStates:       taskStates,
 		ActiveContainers: activeContainers,
-		Timestamp:        time.Now().UTC(),
+		ContainerCircuit: containerCircuitStatus{
+			State:    h.runner.ContainerCircuitState(),
+			Failures: h.runner.ContainerCircuitFailures(),
+		},
+		Timestamp: time.Now().UTC(),
 	})
 }
