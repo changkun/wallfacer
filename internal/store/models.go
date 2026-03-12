@@ -187,6 +187,26 @@ func (s TaskStatus) AllowedTransitions() []TaskStatus {
 // every startup.
 const CurrentTaskSchemaVersion = 1
 
+// DefaultRetryHistoryLimit, DefaultRefineSessionsLimit, and
+// DefaultPromptHistoryLimit cap the number of entries persisted for the three
+// unboundedly-growing task slice fields. Each limit can be overridden via the
+// corresponding WALLFACER_*_LIMIT environment variable. A value of 0 disables
+// pruning for that field.
+const (
+	DefaultRetryHistoryLimit   = 10
+	DefaultRefineSessionsLimit = 5
+	DefaultPromptHistoryLimit  = 20
+)
+
+// PayloadLimits holds the effective pruning limits for the three
+// unboundedly-growing task slice fields. Values are exposed via GET /api/config
+// so the UI can display "showing last N entries" contextual messages.
+type PayloadLimits struct {
+	RetryHistory   int `json:"retry_history"`
+	RefineSessions int `json:"refine_sessions"`
+	PromptHistory  int `json:"prompt_history"`
+}
+
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
 	SchemaVersion     int                 `json:"schema_version"`

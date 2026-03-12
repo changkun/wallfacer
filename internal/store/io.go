@@ -10,14 +10,35 @@ import (
 	"github.com/google/uuid"
 )
 
+// pruneTaskPayload trims the three unboundedly-growing slice fields on t to
+// their configured limits, retaining the most-recent (tail) entries. It
+// operates in-place and is a no-op when a limit is 0 or the slice is already
+// within bounds.
+func (s *Store) pruneTaskPayload(t *Task) {
+	if s.retryHistoryLimit > 0 && len(t.RetryHistory) > s.retryHistoryLimit {
+		t.RetryHistory = t.RetryHistory[len(t.RetryHistory)-s.retryHistoryLimit:]
+	}
+	if s.refineSessionsLimit > 0 && len(t.RefineSessions) > s.refineSessionsLimit {
+		t.RefineSessions = t.RefineSessions[len(t.RefineSessions)-s.refineSessionsLimit:]
+	}
+	if s.promptHistoryLimit > 0 && len(t.PromptHistory) > s.promptHistoryLimit {
+		t.PromptHistory = t.PromptHistory[len(t.PromptHistory)-s.promptHistoryLimit:]
+	}
+}
+
 // saveTask atomically writes a task's metadata to its task.json file.
 // Must be called with s.mu held for writing.
 // It stamps SchemaVersion = CurrentTaskSchemaVersion on every write so that
 // all on-disk files are always at the current schema version.
+// A shallow copy is taken before pruning so that the in-memory task pointer
+// retains full slice history for the current server lifetime; only the
+// persisted file is bounded.
 func (s *Store) saveTask(id uuid.UUID, task *Task) error {
 	task.SchemaVersion = CurrentTaskSchemaVersion
+	pruned := *task // shallow copy; in-memory slices are not modified
+	s.pruneTaskPayload(&pruned)
 	path := filepath.Join(s.dir, id.String(), "task.json")
-	return atomicWriteJSON(path, task)
+	return atomicWriteJSON(path, &pruned)
 }
 
 // SaveTurnOutput persists raw stdout/stderr for a given turn to the outputs directory.
