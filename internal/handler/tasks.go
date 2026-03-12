@@ -129,7 +129,22 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	if tasks == nil {
 		tasks = []store.Task{}
 	}
+	if q := r.URL.Query().Get("failure_category"); q != "" {
+		tasks = filterByFailureCategory(tasks, store.FailureCategory(q))
+	}
 	writeJSON(w, http.StatusOK, tasks)
+}
+
+// filterByFailureCategory returns only those tasks whose FailureCategory
+// matches cat. The input slice is not modified; a new slice is returned.
+func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []store.Task {
+	filtered := make([]store.Task, 0, len(tasks))
+	for _, t := range tasks {
+		if t.FailureCategory == cat {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
 }
 
 // CreateTask creates a new task in backlog status.
