@@ -148,7 +148,7 @@ func runServer(configDir string, args []string) {
 		Prompts:          prompts.NewManager(promptsDir),
 	})
 
-	r.PruneOrphanedWorktrees(s)
+	r.PruneUnknownWorktrees()
 
 	// Set up signal-based context so background workers stop on SIGTERM/Interrupt.
 	// Created before recovery so orphan monitors can be cancelled on shutdown.
@@ -156,6 +156,7 @@ func runServer(configDir string, args []string) {
 	defer stop()
 
 	runner.RecoverOrphanedTasks(ctx, s, r)
+	go r.StartWorktreeGC(ctx)
 
 	logger.Main.Info("workspaces", "paths", strings.Join(workspaces, ", "))
 

@@ -9,7 +9,6 @@ import (
 
 	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/logger"
-	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -94,10 +93,10 @@ func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 	}
 }
 
-// pruneOrphanedWorktrees scans worktreesDir for directories whose UUID does not
+// PruneUnknownWorktrees scans worktreesDir for directories whose UUID does not
 // match any known task, removes them, and runs `git worktree prune` on all
 // git workspaces to clean up stale internal references.
-func (r *Runner) PruneOrphanedWorktrees(s *store.Store) {
+func (r *Runner) PruneUnknownWorktrees() {
 	r.worktreeMu.Lock()
 	defer r.worktreeMu.Unlock()
 
@@ -110,7 +109,7 @@ func (r *Runner) PruneOrphanedWorktrees(s *store.Store) {
 	}
 
 	ctx := context.Background()
-	tasks, _ := s.ListTasks(ctx, true)
+	tasks, _ := r.store.ListTasks(ctx, true)
 	knownIDs := make(map[string]bool, len(tasks))
 	for _, t := range tasks {
 		knownIDs[t.ID.String()] = true
