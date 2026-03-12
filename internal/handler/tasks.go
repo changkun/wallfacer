@@ -1566,9 +1566,8 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 const autoSubmitInterval = 30 * time.Second
 
 // StartAutoSubmitter subscribes to store change notifications and automatically
-// moves waiting tasks to done when they are verified (LastTestResult == "pass"
-// or "unknown"), not behind the default branch tip, and have no unresolved
-// worktree conflicts.
+// moves waiting tasks to done when they are verified (LastTestResult == "pass"),
+// not behind the default branch tip, and have no unresolved worktree conflicts.
 func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 	subID, ch := h.store.Subscribe()
 	ticker := time.NewTicker(autoSubmitInterval)
@@ -1589,9 +1588,9 @@ func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 }
 
 // tryAutoSubmit scans all waiting tasks and moves any that are verified
-// (LastTestResult == "pass" or "unknown"), not behind the default branch, and
-// free of worktree conflicts directly to done (via the commit pipeline if a
-// session exists). Does nothing when auto-submit is disabled.
+// (LastTestResult == "pass"), not behind the default branch, and free of
+// worktree conflicts directly to done (via the commit pipeline if a session
+// exists). Does nothing when auto-submit is disabled.
 func (h *Handler) tryAutoSubmit(ctx context.Context) {
 	if !h.AutosubmitEnabled() {
 		return
@@ -1608,11 +1607,11 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 			continue
 		}
 		// Determine eligibility:
-		// (a) Passed verification or ambiguous verdict ("pass"/"unknown").
+		// (a) Passed verification ("pass").
 		// (b) Naturally completed (stop_reason="end_turn") and not yet tested,
 		//     but only when auto-test is off — otherwise let auto-test run first.
-		// Tasks that explicitly failed testing are never auto-submitted.
-		tested := t.LastTestResult == "pass" || t.LastTestResult == "unknown"
+		// Tasks that failed testing are never auto-submitted.
+		tested := t.LastTestResult == "pass"
 		naturallyComplete := t.StopReason != nil && *t.StopReason == "end_turn" && t.LastTestResult == "" && !h.AutotestEnabled()
 		if !tested && !naturallyComplete {
 			continue
@@ -1654,9 +1653,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 
 		logger.Handler.Info("auto-submit: completing verified waiting task", "task", t.ID)
 		autoSubmitMsg := "Auto-submit: task verified with passing tests, up to date, and no conflicts."
-		if t.LastTestResult == "unknown" {
-			autoSubmitMsg = "Auto-submit: task completed (test ran but no explicit verdict), up to date, and no conflicts."
-		} else if naturallyComplete {
+		if naturallyComplete {
 			autoSubmitMsg = "Auto-submit: task naturally completed, up to date, and no conflicts."
 		}
 		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{

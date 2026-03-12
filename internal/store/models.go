@@ -263,7 +263,7 @@ type Task struct {
 
 	// Test verification fields.
 	IsTestRun        bool   `json:"is_test_run,omitempty"`         // true while the task is running as a test verifier
-	LastTestResult   string `json:"last_test_result,omitempty"`    // "pass", "fail", "unknown" (tested, no clear verdict), or "" (not yet tested)
+	LastTestResult   string `json:"last_test_result,omitempty"`    // "pass", "fail", or "" (not yet tested)
 	TestRunStartTurn int    `json:"test_run_start_turn,omitempty"` // turn count when the test run started (implementation turn boundary)
 
 	// Kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).

@@ -897,11 +897,10 @@ func TestRunTestRunPreservesImplementationResult(t *testing.T) {
 	}
 }
 
-// TestRunTestRunUnknownVerdictWhenNoMarker verifies that when the test agent's
+// TestRunTestRunFailVerdictWhenNoMarker verifies that when the test agent's
 // output does not contain a recognizable PASS/FAIL marker, the verdict is stored
-// as "unknown" (not "") so the UI can distinguish "never tested" from "tested
-// but no clear verdict".
-func TestRunTestRunUnknownVerdictWhenNoMarker(t *testing.T) {
+// as "fail" (not "") so the task is not auto-submitted without explicit confirmation.
+func TestRunTestRunFailVerdictWhenNoMarker(t *testing.T) {
 	repo := setupTestRepo(t)
 
 	// Implementation agent: pauses at "waiting".
@@ -913,7 +912,7 @@ func TestRunTestRunUnknownVerdictWhenNoMarker(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Unknown verdict test", 5, false, "", "")
+	task, err := s.CreateTask(ctx, "No marker verdict test", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -937,22 +936,22 @@ func TestRunTestRunUnknownVerdictWhenNoMarker(t *testing.T) {
 	if afterTest.Status != "waiting" {
 		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
 	}
-	// No clear verdict → should be "unknown", not "".
-	if afterTest.LastTestResult != "unknown" {
-		t.Fatalf("expected last_test_result=unknown for ambiguous output, got %q", afterTest.LastTestResult)
+	// No clear verdict → should be "fail", not "".
+	if afterTest.LastTestResult != "fail" {
+		t.Fatalf("expected last_test_result=fail for ambiguous output, got %q", afterTest.LastTestResult)
 	}
 	if afterTest.IsTestRun {
 		t.Fatal("IsTestRun should be false after test completion")
 	}
 }
 
-// TestRunTestRunDefaultStopReasonSetsUnknown verifies that when the test
+// TestRunTestRunDefaultStopReasonSetsFail verifies that when the test
 // agent's container produces an empty stop_reason (the "default" case), the
 // task is still correctly transitioned to "waiting" with last_test_result set
-// to "unknown" — NOT left as "" ("unverified"). This covers the scenario where
-// The agent's --verbose flag appends extra JSON after the result message and
+// to "fail" — NOT left as "" ("unverified"). This covers the scenario where
+// the agent's --verbose flag appends extra JSON after the result message and
 // parseOutput ends up returning the wrong line.
-func TestRunTestRunDefaultStopReasonSetsUnknown(t *testing.T) {
+func TestRunTestRunDefaultStopReasonSetsFail(t *testing.T) {
 	repo := setupTestRepo(t)
 
 	// Implementation agent: pauses at "waiting" (empty stop_reason).
@@ -989,9 +988,9 @@ func TestRunTestRunDefaultStopReasonSetsUnknown(t *testing.T) {
 	if afterTest.Status != "waiting" {
 		t.Fatalf("expected status=waiting after test run, got %q", afterTest.Status)
 	}
-	// Must NOT be "" (unverified) — must be "unknown" to show "no verdict".
-	if afterTest.LastTestResult != "unknown" {
-		t.Fatalf("expected last_test_result=unknown for empty stop_reason, got %q", afterTest.LastTestResult)
+	// Must NOT be "" (unverified) — must be "fail" so the task is not auto-submitted.
+	if afterTest.LastTestResult != "fail" {
+		t.Fatalf("expected last_test_result=fail for empty stop_reason, got %q", afterTest.LastTestResult)
 	}
 	if afterTest.IsTestRun {
 		t.Fatal("IsTestRun should be false after test completion")

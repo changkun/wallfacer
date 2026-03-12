@@ -433,9 +433,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				// Test verification complete: don't commit, return to waiting with verdict.
 				verdict := parseTestVerdict(output.Result)
 				if verdict == "" {
-					// Test ran but no clear verdict detected; use "unknown" so the
-					// UI can distinguish "never tested" from "tested but ambiguous".
-					verdict = "unknown"
+					// No clear verdict detected; treat as fail so the task is not
+					// auto-submitted without explicit confirmation.
+					verdict = "fail"
 				}
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
 				r.GenerateTestOversight(taskID, task.TestRunStartTurn)
@@ -486,10 +486,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			statusSet = true
 			if isTestRun {
 				// Test run ended without an explicit stop_reason. Record
-				// "unknown" so the UI shows "no verdict" instead of "unverified".
+				// "fail" when no verdict is detected so the task is not auto-submitted.
 				verdict := parseTestVerdict(output.Result)
 				if verdict == "" {
-					verdict = "unknown"
+					verdict = "fail"
 				}
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
