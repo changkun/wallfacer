@@ -2596,3 +2596,179 @@ func TestListTasks_ModelOverrideSerialised(t *testing.T) {
 		t.Errorf("expected model_override 'claude-haiku-4-5', got %q", *tasks[0].ModelOverride)
 	}
 }
+
+// callBatchCreate is a test helper that posts a raw JSON body to BatchCreateTasks
+// and returns the response recorder.
+func callBatchCreate(t *testing.T, h *Handler, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/batch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.BatchCreateTasks(w, req)
+	return w
+}
+
+// storeTaskCount returns the number of tasks currently in the store.
+func storeTaskCount(t *testing.T, h *Handler) int {
+	t.Helper()
+	tasks, err := h.store.ListTasks(context.Background(), true)
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	return len(tasks)
+}
+
+// TestBatchCreateTasks_InvalidSandboxLeavesStoreEmpty verifies that an invalid
+// sandbox in any one item causes a 400 response with zero tasks persisted.
+func TestBatchCreateTasks_InvalidSandboxLeavesStoreEmpty(t *testing.T) {
+	// Use plain newTestHandler — no codex API key and no test passed, so
+	// "codex" is an invalid sandbox selection.
+	h := newTestHandler(t)
+
+	body := `{"tasks":[
+		{"ref":"A","prompt":"do A","sandbox":"claude"},
+		{"ref":"B","prompt":"do B","sandbox":"codex"}
+	]}`
+	w := callBatchCreate(t, h, body)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if storeTaskCount(t, h) != 0 {
+		t.Errorf("expected store to be empty after validation failure, got %d tasks", storeTaskCount(t, h))
+	}
+}
+
+// TestBatchCreateTasks_NonexistentExternalDepLeavesStoreEmpty verifies that a
+// depends_on_refs entry pointing to a UUID that does not exist in the store
+// causes a 422 response with zero tasks persisted.
+func TestBatchCreateTasks_NonexistentExternalDepLeavesStoreEmpty(t *testing.T) {
+	h := newTestHandler(t)
+
+	missingID := uuid.New().String()
+	body := fmt.Sprintf(`{"tasks":[
+		{"ref":"A","prompt":"do A","depends_on_refs":[%q]}
+	]}`, missingID)
+	w := callBatchCreate(t, h, body)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", w.Code, w.Body.String())
+	}
+	if storeTaskCount(t, h) != 0 {
+		t.Errorf("expected store to be empty after validation failure, got %d tasks", storeTaskCount(t, h))
+	}
+}
+
+// TestBatchCreateTasks_CycleWithExistingTaskRejected verifies that a batch where
+// proposed edges combined with existing task edges would create a cycle is
+// rejected with 422 and leaves the store unchanged.
+func TestBatchCreateTasks_CycleWithExistingTaskRejected(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	// Pre-create existing tasks: E1 depends on E2.
+	e2, err := h.store.CreateTask(ctx, "E2", 15, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e1, err := h.store.CreateTask(ctx, "E1", 15, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.UpdateTaskDependsOn(ctx, e1.ID, []string{e2.ID.String()}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Batch: create task B that depends on E1, and also create a "bridge" task
+	// to form a batch-internal cycle (B → A → B).
+	body := fmt.Sprintf(`{"tasks":[
+		{"ref":"A","prompt":"do A","depends_on_refs":["B"]},
+		{"ref":"B","prompt":"do B","depends_on_refs":["A",%q]}
+	]}`, e1.ID.String())
+	w := callBatchCreate(t, h, body)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for cycle, got %d: %s", w.Code, w.Body.String())
+	}
+	// Store should still only have E1 and E2.
+	if storeTaskCount(t, h) != 2 {
+		t.Errorf("expected 2 tasks in store (only existing ones), got %d", storeTaskCount(t, h))
+	}
+}
+
+// TestBatchCreateTasks_SuccessABCTopologicalOrder verifies that a batch of three
+// tasks with A→B→C dependency chain is accepted, all tasks are created, the
+// response is 201 with tasks in INPUT order, and dependency IDs are resolved.
+func TestBatchCreateTasks_SuccessABCTopologicalOrder(t *testing.T) {
+	h := newTestHandler(t)
+
+	body := `{"tasks":[
+		{"ref":"A","prompt":"do A","depends_on_refs":["B"]},
+		{"ref":"B","prompt":"do B","depends_on_refs":["C"]},
+		{"ref":"C","prompt":"do C"}
+	]}`
+	w := callBatchCreate(t, h, body)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Tasks    []store.Task      `json:"tasks"`
+		RefToID  map[string]string `json:"ref_to_id"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	// Tasks must come back in input order (A, B, C).
+	if len(resp.Tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(resp.Tasks))
+	}
+	if resp.Tasks[0].Prompt != "do A" {
+		t.Errorf("task[0] prompt: want %q, got %q", "do A", resp.Tasks[0].Prompt)
+	}
+	if resp.Tasks[1].Prompt != "do B" {
+		t.Errorf("task[1] prompt: want %q, got %q", "do B", resp.Tasks[1].Prompt)
+	}
+	if resp.Tasks[2].Prompt != "do C" {
+		t.Errorf("task[2] prompt: want %q, got %q", "do C", resp.Tasks[2].Prompt)
+	}
+
+	// Verify ref_to_id contains entries for all three refs.
+	for _, ref := range []string{"A", "B", "C"} {
+		if _, ok := resp.RefToID[ref]; !ok {
+			t.Errorf("ref_to_id missing key %q", ref)
+		}
+	}
+
+	// Verify dependency IDs are resolved correctly.
+	idA := resp.Tasks[0].ID.String()
+	idB := resp.Tasks[1].ID.String()
+	idC := resp.Tasks[2].ID.String()
+
+	if len(resp.Tasks[0].DependsOn) != 1 || resp.Tasks[0].DependsOn[0] != idB {
+		t.Errorf("task A should depend on B (%s), got %v", idB, resp.Tasks[0].DependsOn)
+	}
+	if len(resp.Tasks[1].DependsOn) != 1 || resp.Tasks[1].DependsOn[0] != idC {
+		t.Errorf("task B should depend on C (%s), got %v", idC, resp.Tasks[1].DependsOn)
+	}
+	if len(resp.Tasks[2].DependsOn) != 0 {
+		t.Errorf("task C should have no deps, got %v", resp.Tasks[2].DependsOn)
+	}
+
+	// ref_to_id values must match the returned task IDs.
+	if resp.RefToID["A"] != idA {
+		t.Errorf("ref_to_id[A]: want %s, got %s", idA, resp.RefToID["A"])
+	}
+	if resp.RefToID["B"] != idB {
+		t.Errorf("ref_to_id[B]: want %s, got %s", idB, resp.RefToID["B"])
+	}
+	if resp.RefToID["C"] != idC {
+		t.Errorf("ref_to_id[C]: want %s, got %s", idC, resp.RefToID["C"])
+	}
+
+	// All three tasks must be in the store.
+	if storeTaskCount(t, h) != 3 {
+		t.Errorf("expected 3 tasks in store, got %d", storeTaskCount(t, h))
+	}
+}
