@@ -621,6 +621,16 @@ pre { white-space: pre-wrap; word-break: break-word; }
 #log-search-bar + #modal-logs {
   border-radius: 0 0 8px 8px;
 }
+.log-truncation-notice {
+  position: sticky;
+  top: 0;
+  padding: 4px 8px;
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  z-index: 1;
+}
 
 /* --- Claude Code terminal style (pretty NDJSON) --- */
 .cc-block { margin: 2px 0; line-height: 1.5; }
