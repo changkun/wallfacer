@@ -9,14 +9,14 @@ import (
 )
 
 // TestWorktreeConcurrency verifies that concurrent calls to setupWorktrees,
-// CleanupWorktrees, and PruneOrphanedWorktrees do not cause data races, panics,
+// CleanupWorktrees, and PruneUnknownWorktrees do not cause data races, panics,
 // or spurious errors. Run with -race to catch unsynchronised accesses.
 func TestWorktreeConcurrency(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	// Pre-create a known task so PruneOrphanedWorktrees has something to
+	// Pre-create a known task so PruneUnknownWorktrees has something to
 	// preserve, making it do meaningful read+compare work during the race.
 	knownTask, err := s.CreateTask(ctx, "known task for concurrency test", 5, false, "", "")
 	if err != nil {
@@ -24,8 +24,8 @@ func TestWorktreeConcurrency(t *testing.T) {
 	}
 
 	const (
-		numSetup  = 5 // goroutines that set up then clean up worktrees
-		numPrune  = 5 // goroutines that call PruneOrphanedWorktrees
+		numSetup = 5 // goroutines that set up then clean up worktrees
+		numPrune = 5 // goroutines that call PruneUnknownWorktrees
 	)
 
 	var wg sync.WaitGroup
@@ -48,11 +48,11 @@ func TestWorktreeConcurrency(t *testing.T) {
 		}()
 	}
 
-	// goroutines: prune orphaned worktrees
+	// goroutines: prune unknown worktrees
 	for i := 0; i < numPrune; i++ {
 		go func() {
 			defer wg.Done()
-			runner.PruneOrphanedWorktrees(s)
+			runner.PruneUnknownWorktrees()
 		}()
 	}
 
@@ -60,7 +60,7 @@ func TestWorktreeConcurrency(t *testing.T) {
 
 	// The known task's directory should not have been pruned (it has no
 	// on-disk worktree dir, so there is nothing to remove — but the ID must
-	// still be in the store so PruneOrphanedWorktrees leaves it alone).
+	// still be in the store so PruneUnknownWorktrees leaves it alone).
 	_ = knownTask
 }
 
@@ -70,7 +70,7 @@ func TestWorktreeConcurrency(t *testing.T) {
 // MkdirAll / RemoveAll paths.
 func TestWorktreeConcurrencySetupAndPrune(t *testing.T) {
 	repo := setupTestRepo(t)
-	s, runner := setupTestRunner(t, []string{repo})
+	_, runner := setupTestRunner(t, []string{repo})
 
 	const iterations = 10
 
@@ -95,7 +95,7 @@ func TestWorktreeConcurrencySetupAndPrune(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < iterations; i++ {
-			runner.PruneOrphanedWorktrees(s)
+			runner.PruneUnknownWorktrees()
 		}
 	}()
 

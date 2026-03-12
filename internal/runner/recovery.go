@@ -127,6 +127,18 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 			}
 		}
 	}
+
+	// Startup worktree GC: remove any orphaned worktree directories whose
+	// tasks have reached a terminal state or no longer exist in the store.
+	if gcRunner, ok := lister.(*Runner); ok {
+		orphans, err := gcRunner.ScanOrphanedWorktrees(ctx)
+		if err != nil {
+			logger.Recovery.Warn("worktree GC scan failed", "error", err)
+		} else if len(orphans) > 0 {
+			removed := gcRunner.PruneOrphanedWorktrees(ctx, orphans)
+			logger.Recovery.Info("startup worktree GC complete", "scanned", len(orphans), "removed", removed)
+		}
+	}
 }
 
 // monitorContainerUntilStopped polls the container runtime until the container

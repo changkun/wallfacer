@@ -258,12 +258,12 @@ func TestCleanupWorktreesExported(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// PruneOrphanedWorktrees
+// PruneUnknownWorktrees
 // ---------------------------------------------------------------------------
 
-// TestPruneOrphanedWorktrees verifies that directories not matching any known
+// TestPruneUnknownWorktrees verifies that directories not matching any known
 // task UUID are removed, while known-task directories are preserved.
-func TestPruneOrphanedWorktrees(t *testing.T) {
+func TestPruneUnknownWorktrees(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
@@ -282,7 +282,7 @@ func TestPruneOrphanedWorktrees(t *testing.T) {
 		}
 	}
 
-	runner.PruneOrphanedWorktrees(s)
+	runner.PruneUnknownWorktrees()
 
 	if _, err := os.Stat(knownDir); err != nil {
 		t.Fatal("known task worktree dir should be preserved:", err)
@@ -292,24 +292,24 @@ func TestPruneOrphanedWorktrees(t *testing.T) {
 	}
 }
 
-// TestPruneOrphanedWorktreesMissingDir verifies PruneOrphanedWorktrees handles
+// TestPruneUnknownWorktreesMissingDir verifies PruneUnknownWorktrees handles
 // a missing worktrees directory gracefully (no panic).
-func TestPruneOrphanedWorktreesMissingDir(t *testing.T) {
-	s, runner := setupRunnerWithCmd(t, nil, "echo")
+func TestPruneUnknownWorktreesMissingDir(t *testing.T) {
+	_, runner := setupRunnerWithCmd(t, nil, "echo")
 	// Point worktreesDir to a path that doesn't exist.
 	runner.worktreesDir = filepath.Join(t.TempDir(), "nonexistent_worktrees")
 	// Should not panic.
-	runner.PruneOrphanedWorktrees(s)
+	runner.PruneUnknownWorktrees()
 }
 
-// TestPruneOrphanedWorktreesRunsGitWorktreePrune verifies that
-// PruneOrphanedWorktrees runs `git worktree prune` on git workspaces.
-func TestPruneOrphanedWorktreesRunsGitWorktreePrune(t *testing.T) {
+// TestPruneUnknownWorktreesRunsGitWorktreePrune verifies that
+// PruneUnknownWorktrees runs `git worktree prune` on git workspaces.
+func TestPruneUnknownWorktreesRunsGitWorktreePrune(t *testing.T) {
 	repo := setupTestRepo(t)
-	s, runner := setupTestRunner(t, []string{repo})
+	_, runner := setupTestRunner(t, []string{repo})
 
 	// Just verify it completes without panicking when the workspace is a git repo.
-	runner.PruneOrphanedWorktrees(s)
+	runner.PruneUnknownWorktrees()
 }
 
 // ---------------------------------------------------------------------------
