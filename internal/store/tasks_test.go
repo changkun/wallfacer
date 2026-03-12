@@ -231,6 +231,30 @@ func TestListTasks_IncludesArchivedWhenRequested(t *testing.T) {
 	}
 }
 
+func TestListTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "listed", 5, false, "", "")
+
+	s.mu.Lock()
+	want := setTaskCloneFixture(t, s.tasks[task.ID])
+	s.mu.Unlock()
+
+	tasks, err := s.ListTasks(bg(), false)
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	mutateTaskCloneForIsolation(&tasks[0])
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after ListTasks mutation: %v", err)
+	}
+	assertTaskMatchesSnapshot(t, got, want)
+}
+
 func TestListTasksAndSeq_ReturnsDeepCloneForNestedFields(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "listed", 5, false, "", "")

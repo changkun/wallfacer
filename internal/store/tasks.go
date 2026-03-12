@@ -183,12 +183,19 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 	return page, total, hasMoreBefore, hasMoreAfter, nil
 }
 
+// cloneTask returns a deep copy of t so that callers cannot accidentally
+// mutate store-owned state through shared slice/map/pointer fields.
+// It is the canonical outward-facing wrapper for deepCloneTask; all read
+// paths that expose Task values to callers must go through cloneTask or
+// deepCloneTask directly.
 func cloneTask(t *Task) Task {
 	return deepCloneTask(t)
 }
 
-// GetTask returns a full copy of the task with the given ID so callers cannot
-// mutate shared store state after the store lock is released.
+// GetTask returns a deep copy of the task with the given ID.  Every
+// mutable field (slices, maps, pointer-backed structs, and pointer-to-string
+// fields) is duplicated so that callers cannot mutate store-owned state
+// after the lock is released.
 func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -410,7 +417,7 @@ func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt s
 	s.searchIndex[id] = buildIndexEntry(task, "")
 	s.notify(task, false)
 
-	ret := *task
+	ret := deepCloneTask(task)
 	return &ret, nil
 }
 
@@ -1347,7 +1354,7 @@ func (s *Store) SearchTasks(_ context.Context, query string) ([]TaskSearchResult
 	}
 	candidates := make([]candidate, 0, len(s.tasks))
 	for id, t := range s.tasks {
-		cp := *t
+		cp := deepCloneTask(t)
 		candidates = append(candidates, candidate{task: &cp, entry: s.searchIndex[id]})
 	}
 	s.mu.RUnlock()
