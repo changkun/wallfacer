@@ -4,7 +4,8 @@
 // route definitions in internal/apicontract/routes.go.
 //
 // Generated files:
-//   - ui/js/generated/routes.js      — frontend path-builder helpers
+//   - ui/js/generated/routes.js        — frontend path-builder helpers
+//   - ui/js/generated/types.js         — JSDoc @typedef declarations for domain types
 //   - docs/internals/api-contract.json — machine-readable route catalogue
 //
 // Usage (from the repository root):
@@ -37,6 +38,17 @@ func main() {
 		log.Fatalf("write %s: %v", routesJSPath, err)
 	}
 	fmt.Printf("wrote %s (%d bytes)\n", routesJSPath, len(routesJS))
+
+	// Generate ui/js/generated/types.js
+	typesJS := apicontract.GenerateJSTypes()
+	typesJSPath := filepath.Join(root, "ui", "js", "generated", "types.js")
+	if err := os.MkdirAll(filepath.Dir(typesJSPath), 0o755); err != nil {
+		log.Fatalf("mkdir %s: %v", filepath.Dir(typesJSPath), err)
+	}
+	if err := os.WriteFile(typesJSPath, []byte(typesJS), 0o644); err != nil {
+		log.Fatalf("write %s: %v", typesJSPath, err)
+	}
+	fmt.Printf("wrote %s (%d bytes)\n", typesJSPath, len(typesJS))
 
 	// Generate docs/internals/api-contract.json
 	contractJSON, err := apicontract.GenerateContractJSON()

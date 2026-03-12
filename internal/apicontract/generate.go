@@ -7,6 +7,198 @@ import (
 	"strings"
 )
 
+// jsTypeDef describes a single JSDoc @typedef to emit.
+// When EnumValues is non-nil the type is emitted as a string-union typedef
+// (e.g. 'backlog'|'in_progress'|…); otherwise it is emitted as an Object
+// typedef with @property lines for each field.
+type jsTypeDef struct {
+	Name       string
+	Fields     []jsField
+	EnumValues []string // non-nil → emit as string-union, not Object
+	Comment    string
+}
+
+// jsField describes one @property line inside a JSDoc {Object} typedef.
+type jsField struct {
+	JSONName string
+	JSType   string
+	Nullable bool
+	Comment  string
+}
+
+// jsTypeRegistry is the hand-maintained ordered registry of domain types.
+// Entries are ordered alphabetically by Name for deterministic output.
+var jsTypeRegistry = []jsTypeDef{
+	{
+		Name:       "EventType",
+		Comment:    "Identifies the kind of event stored in a task's audit trail.",
+		EnumValues: []string{"state_change", "output", "feedback", "error", "system", "span_start", "span_end"},
+	},
+	{
+		Name:    "ExecutionEnvironment",
+		Comment: "Captures the runtime environment used for a task execution.",
+		Fields: []jsField{
+			{JSONName: "container_image", JSType: "string"},
+			{JSONName: "container_digest", JSType: "string"},
+			{JSONName: "model_name", JSType: "string"},
+			{JSONName: "api_base_url", JSType: "string"},
+			{JSONName: "instructions_hash", JSType: "string"},
+			{JSONName: "sandbox", JSType: "string"},
+			{JSONName: "recorded_at", JSType: "string", Comment: "ISO 8601 timestamp"},
+		},
+	},
+	{
+		Name:    "RefinementSession",
+		Comment: "Records a single sandbox-based refinement run.",
+		Fields: []jsField{
+			{JSONName: "id", JSType: "string"},
+			{JSONName: "created_at", JSType: "string", Comment: "ISO 8601 timestamp"},
+			{JSONName: "start_prompt", JSType: "string"},
+			{JSONName: "messages", JSType: "Array.<Object>"},
+			{JSONName: "result", JSType: "string"},
+			{JSONName: "result_prompt", JSType: "string"},
+		},
+	},
+	{
+		Name:    "Task",
+		Comment: "Core domain model: a unit of work executed by an agent.",
+		Fields: []jsField{
+			{JSONName: "schema_version", JSType: "number"},
+			{JSONName: "id", JSType: "string"},
+			{JSONName: "title", JSType: "string"},
+			{JSONName: "prompt", JSType: "string"},
+			{JSONName: "prompt_history", JSType: "Array.<string>"},
+			{JSONName: "retry_history", JSType: "Array.<Object>"},
+			{JSONName: "refine_sessions", JSType: "Array.<RefinementSession>"},
+			{JSONName: "current_refinement", JSType: "Object", Nullable: true},
+			{JSONName: "status", JSType: "TaskStatus"},
+			{JSONName: "archived", JSType: "boolean"},
+			{JSONName: "session_id", JSType: "string", Nullable: true},
+			{JSONName: "fresh_start", JSType: "boolean"},
+			{JSONName: "result", JSType: "string", Nullable: true},
+			{JSONName: "stop_reason", JSType: "string", Nullable: true},
+			{JSONName: "turns", JSType: "number"},
+			{JSONName: "timeout", JSType: "number"},
+			{JSONName: "max_cost_usd", JSType: "number"},
+			{JSONName: "max_input_tokens", JSType: "number"},
+			{JSONName: "usage", JSType: "TaskUsage"},
+			{JSONName: "sandbox", JSType: "string"},
+			{JSONName: "sandbox_by_activity", JSType: "Object.<string, string>"},
+			{JSONName: "usage_breakdown", JSType: "Object.<string, TaskUsage>"},
+			{JSONName: "environment", JSType: "ExecutionEnvironment", Nullable: true},
+			{JSONName: "position", JSType: "number"},
+			{JSONName: "created_at", JSType: "string", Comment: "ISO 8601 timestamp"},
+			{JSONName: "updated_at", JSType: "string", Comment: "ISO 8601 timestamp"},
+			{JSONName: "worktree_paths", JSType: "Object.<string, string>"},
+			{JSONName: "branch_name", JSType: "string"},
+			{JSONName: "commit_hashes", JSType: "Object.<string, string>"},
+			{JSONName: "base_commit_hashes", JSType: "Object.<string, string>"},
+			{JSONName: "mount_worktrees", JSType: "boolean"},
+			{JSONName: "model", JSType: "string"},
+			{JSONName: "model_override", JSType: "string", Nullable: true},
+			{JSONName: "is_test_run", JSType: "boolean"},
+			{JSONName: "last_test_result", JSType: "string"},
+			{JSONName: "test_run_start_turn", JSType: "number"},
+			{JSONName: "kind", JSType: "TaskKind"},
+			{JSONName: "tags", JSType: "Array.<string>"},
+			{JSONName: "execution_prompt", JSType: "string"},
+			{JSONName: "depends_on", JSType: "Array.<string>"},
+			{JSONName: "scheduled_at", JSType: "string", Nullable: true, Comment: "ISO 8601 timestamp"},
+			{JSONName: "forked_from", JSType: "string", Nullable: true},
+			{JSONName: "failure_category", JSType: "string"},
+			{JSONName: "truncated_turns", JSType: "Array.<number>"},
+		},
+	},
+	{
+		Name:    "TaskEvent",
+		Comment: "A single event in a task's audit trail (event sourcing).",
+		Fields: []jsField{
+			{JSONName: "id", JSType: "number"},
+			{JSONName: "task_id", JSType: "string"},
+			{JSONName: "event_type", JSType: "EventType"},
+			{JSONName: "data", JSType: "any"},
+			{JSONName: "created_at", JSType: "string", Comment: "ISO 8601 timestamp"},
+		},
+	},
+	{
+		Name:       "TaskKind",
+		Comment:    "Identifies the execution mode for a task.",
+		EnumValues: []string{"", "idea-agent"},
+	},
+	{
+		Name:       "TaskStatus",
+		Comment:    "Lifecycle state of a task.",
+		EnumValues: []string{"backlog", "in_progress", "waiting", "committing", "done", "failed", "cancelled", "archived"},
+	},
+	{
+		Name:    "TaskUsage",
+		Comment: "Token consumption and cost for a task across all turns.",
+		Fields: []jsField{
+			{JSONName: "input_tokens", JSType: "number"},
+			{JSONName: "output_tokens", JSType: "number"},
+			{JSONName: "cache_read_input_tokens", JSType: "number"},
+			{JSONName: "cache_creation_input_tokens", JSType: "number"},
+			{JSONName: "cost_usd", JSType: "number"},
+		},
+	},
+}
+
+// GenerateJSTypes returns the content for ui/js/generated/types.js.
+//
+// The emitted file contains only JSDoc @typedef declarations for the core Go
+// domain types defined in internal/store/models.go. It contains no executable
+// code — it is a type-only module for IDE tooling and documentation purposes.
+//
+// This function is deterministic: calling it twice produces identical output,
+// which enables the staleness test.
+func GenerateJSTypes() string {
+	var b bytes.Buffer
+
+	fmt.Fprint(&b, "// GENERATED — DO NOT EDIT MANUALLY.\n")
+	fmt.Fprint(&b, "// Regenerate with: make api-contract\n")
+	fmt.Fprint(&b, "// Source: internal/apicontract/routes.go, internal/store/models.go\n")
+
+	for _, td := range jsTypeRegistry {
+		fmt.Fprint(&b, "\n")
+		if len(td.EnumValues) > 0 {
+			// String-union typedef.
+			fmt.Fprint(&b, "/**\n")
+			if td.Comment != "" {
+				fmt.Fprintf(&b, " * %s\n", td.Comment)
+				fmt.Fprint(&b, " *\n")
+			}
+			parts := make([]string, len(td.EnumValues))
+			for i, v := range td.EnumValues {
+				parts[i] = "'" + v + "'"
+			}
+			fmt.Fprintf(&b, " * @typedef {%s} %s\n", strings.Join(parts, "|"), td.Name)
+			fmt.Fprint(&b, " */\n")
+		} else {
+			// Object typedef with @property lines.
+			fmt.Fprint(&b, "/**\n")
+			if td.Comment != "" {
+				fmt.Fprintf(&b, " * %s\n", td.Comment)
+				fmt.Fprint(&b, " *\n")
+			}
+			fmt.Fprintf(&b, " * @typedef {Object} %s\n", td.Name)
+			for _, f := range td.Fields {
+				jsType := f.JSType
+				if f.Nullable {
+					jsType = jsType + "|null"
+				}
+				if f.Comment != "" {
+					fmt.Fprintf(&b, " * @property {%s} %s - %s\n", jsType, f.JSONName, f.Comment)
+				} else {
+					fmt.Fprintf(&b, " * @property {%s} %s\n", jsType, f.JSONName)
+				}
+			}
+			fmt.Fprint(&b, " */\n")
+		}
+	}
+
+	return b.String()
+}
+
 // routeJSON is the JSON representation emitted to docs/internals/api-contract.json.
 type routeJSON struct {
 	Method      string   `json:"method"`
