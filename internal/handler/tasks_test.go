@@ -1885,7 +1885,8 @@ func TestTryAutoSubmit_SkipsBehindTip(t *testing.T) {
 }
 
 // TestTryAutoSubmit_SubmitsEligibleTaskNoSession verifies that a verified, up-to-date,
-// conflict-free waiting task with no session is moved directly to done.
+// conflict-free waiting task with no session is moved directly to done and
+// that a summary.json is written so the task appears in cost dashboards.
 func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAutosubmit(true)
@@ -1906,6 +1907,15 @@ func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
 	got, _ := h.store.GetTask(ctx, task.ID)
 	if got.Status != store.TaskStatusDone {
 		t.Errorf("expected eligible task to be moved to done, got %s", got.Status)
+	}
+
+	// summary.json must be present so the task shows up in ListSummaries / cost dashboards.
+	summary, err := h.store.LoadSummary(task.ID)
+	if err != nil {
+		t.Fatalf("LoadSummary: %v", err)
+	}
+	if summary == nil {
+		t.Error("summary.json not written for no-session auto-submitted task")
 	}
 }
 

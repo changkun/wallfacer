@@ -249,6 +249,46 @@ func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 	}
 }
 
+// TestSummary_WrittenOnForceDoneTransition verifies that ForceUpdateTaskStatus
+// also writes summary.json when transitioning to done, matching the behaviour
+// of UpdateTaskStatus. This covers the auto-submit and manual "Mark as Done"
+// no-session paths that bypass the normal state machine via ForceUpdateTaskStatus.
+func TestSummary_WrittenOnForceDoneTransition(t *testing.T) {
+	s := newTestStore(t)
+
+	task, _ := s.CreateTask(bg(), "force done task", 10, false, "", "")
+	s.UpdateTaskTitle(bg(), task.ID, "Force Done Task")
+	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
+		TaskUsage{InputTokens: 50, OutputTokens: 25, CostUSD: 0.21})
+	s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
+	s.UpdateTaskTurns(bg(), task.ID, 2)
+
+	// Skip straight to done via ForceUpdateTaskStatus (no state machine check).
+	if err := s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus(done): %v", err)
+	}
+
+	summary, err := s.LoadSummary(task.ID)
+	if err != nil {
+		t.Fatalf("LoadSummary: %v", err)
+	}
+	if summary == nil {
+		t.Fatal("LoadSummary returned nil after ForceUpdateTaskStatus to done")
+	}
+	if summary.TaskID != task.ID {
+		t.Errorf("TaskID = %v, want %v", summary.TaskID, task.ID)
+	}
+	if summary.Status != TaskStatusDone {
+		t.Errorf("Status = %q, want 'done'", summary.Status)
+	}
+	if summary.TotalTurns != 2 {
+		t.Errorf("TotalTurns = %d, want 2", summary.TotalTurns)
+	}
+	if summary.TestResult != "pass" {
+		t.Errorf("TestResult = %q, want 'pass'", summary.TestResult)
+	}
+}
+
 // TestSummary_NotWrittenOnFailedTransition verifies that no summary.json is
 // created when a task transitions to failed (only done triggers summary).
 func TestSummary_NotWrittenOnFailedTransition(t *testing.T) {
