@@ -1469,3 +1469,245 @@ func TestSyncWorktrees_ClearsPreviousTestVerdictAfterSuccessfulSync(t *testing.T
 		t.Fatalf("expected sync to clear stale test verdict, got %q", updated.LastTestResult)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Mock executor tests
+// ---------------------------------------------------------------------------
+
+// setupRunnerWithMockExecutor creates a Store and Runner whose container calls
+// are routed through the provided MockContainerExecutor instead of a real
+// container runtime. The runner still needs a real git workspace for worktree
+// setup; pass a repo returned by setupTestRepo(t) (or nil for idea-agent-only
+// tasks that skip worktree setup).
+func setupRunnerWithMockExecutor(t testing.TB, workspaces []string, mock *MockContainerExecutor) (*store.Store, *Runner) {
+	t.Helper()
+	s, r := setupRunnerWithCmd(t, workspaces, "true") // "true" for rm/kill calls, not used
+	r.executor = mock
+	return s, r
+}
+
+// TestMockMaxTokensAutoContinue verifies that stop_reason="max_tokens" on turn 1
+// triggers an auto-continue and the task completes after stop_reason="end_turn"
+// on turn 2. Two RunArgs calls must be recorded.
+func TestMockMaxTokensAutoContinue(t *testing.T) {
+	repo := setupTestRepo(t)
+	mock := &MockContainerExecutor{
+		responses: []ContainerResponse{
+			{Stdout: []byte(`{"result":"partial","session_id":"sess1","stop_reason":"max_tokens","is_error":false,"total_cost_usd":0.001}`)},
+			{Stdout: []byte(`{"result":"done","session_id":"sess1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
+		},
+	}
+	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "mock max_tokens test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected status=waiting after max_tokens+end_turn, got %q", updated.Status)
+	}
+	if updated.Turns < 2 {
+		t.Fatalf("expected at least 2 turns, got %d", updated.Turns)
+	}
+	calls := mock.RunArgsCalls()
+	if len(calls) != 2 {
+		t.Fatalf("expected exactly 2 RunArgs calls, got %d", len(calls))
+	}
+}
+
+// TestMockPauseTurnAutoContinue verifies that stop_reason="pause_turn" on turn 1
+// triggers an auto-continue, and the task completes after stop_reason="end_turn"
+// on turn 2.
+func TestMockPauseTurnAutoContinue(t *testing.T) {
+	repo := setupTestRepo(t)
+	mock := &MockContainerExecutor{
+		responses: []ContainerResponse{
+			{Stdout: []byte(`{"result":"paused","session_id":"sess2","stop_reason":"pause_turn","is_error":false,"total_cost_usd":0.001}`)},
+			{Stdout: []byte(`{"result":"done","session_id":"sess2","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
+		},
+	}
+	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "mock pause_turn test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected status=waiting after pause_turn+end_turn, got %q", updated.Status)
+	}
+	if updated.Turns < 2 {
+		t.Fatalf("expected at least 2 turns after pause_turn auto-continue, got %d", updated.Turns)
+	}
+	calls := mock.RunArgsCalls()
+	if len(calls) != 2 {
+		t.Fatalf("expected exactly 2 RunArgs calls, got %d", len(calls))
+	}
+}
+
+// TestMockIdeaAgentJSONParsing verifies that a valid JSON idea array returned
+// by the mock causes the idea-agent task to create child backlog tasks and
+// transition to waiting.
+func TestMockIdeaAgentJSONParsing(t *testing.T) {
+	ideas := []IdeateResult{
+		{Title: "Improve search", Prompt: "Add full-text search indexing to the tasks store."},
+		{Title: "Add metrics", Prompt: "Expose Prometheus metrics for task state transitions."},
+		{Title: "Refactor UI", Prompt: "Replace the inline styles with a Tailwind component library."},
+	}
+	ideasJSON := ideaOutput(ideas)
+
+	mock := &MockContainerExecutor{
+		responses: []ContainerResponse{
+			{Stdout: []byte(ideasJSON)},
+		},
+	}
+	s, r := setupRunnerWithMockExecutor(t, nil, mock)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "brainstorm via mock", 5, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "", "", false)
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected status=waiting after idea-agent run, got %q", updated.Status)
+	}
+
+	allTasks, _ := s.ListTasks(ctx, false)
+	var childTasks []store.Task
+	for _, tsk := range allTasks {
+		if tsk.ID == task.ID {
+			continue
+		}
+		if tsk.HasTag("idea-agent") {
+			childTasks = append(childTasks, tsk)
+		}
+	}
+	if len(childTasks) != len(ideas) {
+		t.Fatalf("expected %d child tasks, got %d", len(ideas), len(childTasks))
+	}
+}
+
+// TestMockDeferredPanicRecovery verifies that a panic inside RunArgs is caught
+// by Run()'s deferred recover and the task transitions to failed with
+// FailureCategoryUnknown.
+func TestMockDeferredPanicRecovery(t *testing.T) {
+	repo := setupTestRepo(t)
+	mock := &MockContainerExecutor{
+		responses: []ContainerResponse{
+			{Panic: true},
+		},
+	}
+	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "panic recovery test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusFailed {
+		t.Fatalf("expected status=failed after panic, got %q", updated.Status)
+	}
+	if updated.FailureCategory != store.FailureCategoryUnknown {
+		t.Fatalf("expected failure_category=unknown after panic, got %q", updated.FailureCategory)
+	}
+}
+
+// TestMockFailureCategoryContainerCrash verifies that empty stdout combined
+// with a non-zero exit error causes classifyFailure to return
+// FailureCategoryContainerCrash and the task to transition to failed.
+func TestMockFailureCategoryContainerCrash(t *testing.T) {
+	repo := setupTestRepo(t)
+	mock := &MockContainerExecutor{
+		responses: []ContainerResponse{
+			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
+		},
+	}
+	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "container crash test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusFailed {
+		t.Fatalf("expected status=failed on container crash, got %q", updated.Status)
+	}
+	if updated.FailureCategory != store.FailureCategoryContainerCrash {
+		t.Fatalf("expected failure_category=container_crash, got %q", updated.FailureCategory)
+	}
+}
+
+// TestMockSessionIDPassedToResume verifies that when turn 1 returns a
+// session_id the value is forwarded as --resume in the args of turn 2.
+func TestMockSessionIDPassedToResume(t *testing.T) {
+	repo := setupTestRepo(t)
+	const wantSession = "session-abc-123"
+	mock := &MockContainerExecutor{
+		responses: []ContainerResponse{
+			// Turn 1: max_tokens so the loop continues; session_id is captured.
+			{Stdout: []byte(`{"result":"partial","session_id":"` + wantSession + `","stop_reason":"max_tokens","is_error":false,"total_cost_usd":0.001}`)},
+			// Turn 2: end_turn to terminate the loop.
+			{Stdout: []byte(`{"result":"done","session_id":"` + wantSession + `","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
+		},
+	}
+	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "session id resume test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	calls := mock.RunArgsCalls()
+	if len(calls) != 2 {
+		t.Fatalf("expected 2 RunArgs calls, got %d", len(calls))
+	}
+
+	// Turn 2 args must contain "--resume" followed by the session ID.
+	args2 := calls[1].Args
+	foundResume := false
+	for i, a := range args2 {
+		if a == "--resume" && i+1 < len(args2) && args2[i+1] == wantSession {
+			foundResume = true
+			break
+		}
+	}
+	if !foundResume {
+		t.Fatalf("expected --resume %s in turn-2 args, got: %v", wantSession, args2)
+	}
+}

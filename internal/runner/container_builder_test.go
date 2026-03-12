@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1013,5 +1014,93 @@ func TestBuildBaseContainerSpecParityWithBuildContainerArgsForSandbox(t *testing
 	}
 	if !containsConsecutive(fullArgs, "-e", "CLAUDE_CODE_MODEL="+model) {
 		t.Errorf("full args missing -e CLAUDE_CODE_MODEL; args: %v", fullArgs)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// executor.RunArgs call-path: verify args received by the mock
+// ---------------------------------------------------------------------------
+
+// TestExecutorRunArgsClaudeSandbox verifies that runContainer passes the
+// expected container name and args (produced by buildContainerArgsForSandbox)
+// to executor.RunArgs for the default "claude" sandbox. This closes the loop
+// between the arg-builder and the executor abstraction.
+func TestExecutorRunArgsClaudeSandbox(t *testing.T) {
+	repo := setupTestRepo(t)
+	mock := &MockContainerExecutor{
+		responses: []ContainerResponse{
+			{Stdout: []byte(`{"result":"ok","session_id":"s1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
+		},
+	}
+	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "executor args claude test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	calls := mock.RunArgsCalls()
+	if len(calls) == 0 {
+		t.Fatal("expected at least one RunArgs call")
+	}
+
+	// Container name must follow the wallfacer-<slug>-<uuid8> convention.
+	if !strings.HasPrefix(calls[0].Name, "wallfacer-") {
+		t.Errorf("container name should start with 'wallfacer-', got %q", calls[0].Name)
+	}
+
+	// The args slice must include the sandbox image.
+	if !argsContainSubstring(calls[0].Args, "test:latest") {
+		t.Errorf("args missing sandbox image 'test:latest'; args: %v", calls[0].Args)
+	}
+
+	// The args slice must include the container name (passed via --name).
+	if !containsConsecutive(calls[0].Args, "--name", calls[0].Name) {
+		t.Errorf("args missing --name %s; args: %v", calls[0].Name, calls[0].Args)
+	}
+}
+
+// TestExecutorRunArgsCodexSandbox verifies that when the task sandbox is set to
+// "codex", the args forwarded to executor.RunArgs reference the wallfacer-codex
+// image (derived from the base wallfacer image name).
+func TestExecutorRunArgsCodexSandbox(t *testing.T) {
+	repo := setupTestRepo(t)
+	mock := &MockContainerExecutor{
+		responses: []ContainerResponse{
+			{Stdout: []byte(`{"result":"ok","session_id":"s1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
+		},
+	}
+	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	// Use a wallfacer-named image so sandboxImageForSandbox derives the codex variant.
+	r.sandboxImage = "wallfacer:latest"
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "executor args codex test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Force the task to use the codex sandbox by updating the sandbox field.
+	if err := s.UpdateTaskSandbox(ctx, task.ID, "codex"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	calls := mock.RunArgsCalls()
+	if len(calls) == 0 {
+		t.Fatal("expected at least one RunArgs call")
+	}
+
+	// sandboxImageForSandbox("codex") with base image "wallfacer:latest" produces
+	// "wallfacer-codex:latest".
+	if !argsContainSubstring(calls[0].Args, "wallfacer-codex") {
+		t.Errorf("expected wallfacer-codex image in args; args: %v", calls[0].Args)
 	}
 }
