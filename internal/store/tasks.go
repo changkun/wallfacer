@@ -630,6 +630,9 @@ func (s *Store) buildAndSaveSummary(task Task) {
 // transition. Use this only for server recovery paths that must succeed
 // regardless of current state, and for test fixtures that need arbitrary
 // initial states. Prefer UpdateTaskStatus for all normal code paths.
+//
+// Like UpdateTaskStatus, it writes summary.json atomically before notifying
+// subscribers when transitioning to TaskStatusDone.
 func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskStatus) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -642,6 +645,9 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
+	}
+	if status == TaskStatusDone {
+		s.buildAndSaveSummary(*t)
 	}
 	s.notify(t, false)
 	return nil
