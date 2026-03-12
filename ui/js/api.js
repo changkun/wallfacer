@@ -1,3 +1,12 @@
+/** @typedef {import('./generated/types.js').Task} Task */
+/** @typedef {import('./generated/types.js').TaskEvent} TaskEvent */
+/** @typedef {import('./generated/types.js').TaskStatus} TaskStatus */
+/** @typedef {import('./generated/types.js').TaskUsage} TaskUsage */
+/** @typedef {import('./generated/types.js').TaskKind} TaskKind */
+/** @typedef {import('./generated/types.js').EventType} EventType */
+/** @typedef {import('./generated/types.js').RefinementSession} RefinementSession */
+/** @typedef {import('./generated/types.js').ExecutionEnvironment} ExecutionEnvironment */
+
 // --- API client ---
 
 async function api(path, opts = {}) {
@@ -338,6 +347,10 @@ function startTasksStream() {
   };
 }
 
+/**
+ * Fetches the current non-archived task list from the server.
+ * @returns {Promise<Array.<Task>>}
+ */
 async function fetchTasks() {
   ensureArchivedScrollBinding();
   tasks = await api(Routes.tasks.list());

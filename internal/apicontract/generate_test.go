@@ -71,6 +71,35 @@ func TestGenerateRoutesJS_Deterministic(t *testing.T) {
 	}
 }
 
+// TestGeneratedTypesJS_NotStale fails if ui/js/generated/types.js does not
+// match what GenerateJSTypes() would produce from the current jsTypeRegistry.
+// Run "make api-contract" to regenerate.
+func TestGeneratedTypesJS_NotStale(t *testing.T) {
+	want := GenerateJSTypes()
+
+	path := filepath.Join(repoRoot(t), "ui", "js", "generated", "types.js")
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v\nRun 'make api-contract' to generate it.", path, err)
+	}
+
+	if string(got) != want {
+		t.Errorf("ui/js/generated/types.js is stale.\n"+
+			"Run 'make api-contract' to regenerate from internal/apicontract/generate.go.\n"+
+			"First differing byte found; want len=%d got len=%d", len(want), len(got))
+	}
+}
+
+// TestGenerateJSTypes_Deterministic verifies that calling GenerateJSTypes
+// twice yields identical output (no timestamps or non-deterministic content).
+func TestGenerateJSTypes_Deterministic(t *testing.T) {
+	a := GenerateJSTypes()
+	b := GenerateJSTypes()
+	if a != b {
+		t.Error("GenerateJSTypes is not deterministic: two calls produced different output")
+	}
+}
+
 // TestRoutes_NoDuplicateNames verifies that every Route.Name is unique.
 func TestRoutes_NoDuplicateNames(t *testing.T) {
 	seen := map[string]bool{}
