@@ -1639,6 +1639,37 @@ func TestRunnerShutdownWaitsForBackground(t *testing.T) {
 	}
 }
 
+// TestRunnerShutdownCancelsBackgroundCtx verifies that calling Shutdown cancels
+// shutdownCtx, which allows background goroutines that select on it to exit
+// promptly — without the test needing to manually unblock them.
+func TestRunnerShutdownCancelsBackgroundCtx(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+
+	// Register a background goroutine that blocks until shutdownCtx is cancelled.
+	r.backgroundWg.Add("test:shutdown-ctx")
+	go func() {
+		defer r.backgroundWg.Done("test:shutdown-ctx")
+		<-r.shutdownCtx.Done()
+	}()
+
+	shutdownDone := make(chan struct{})
+	go func() {
+		defer close(shutdownDone)
+		r.Shutdown()
+	}()
+
+	select {
+	case <-shutdownDone:
+		// success — Shutdown returned promptly after cancelling shutdownCtx
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Shutdown did not return within 500ms after cancelling shutdownCtx")
+	}
+
+	if err := r.shutdownCtx.Err(); err != context.Canceled {
+		t.Fatalf("expected shutdownCtx.Err() == context.Canceled, got %v", err)
+	}
+}
+
 // TestCommitPipelineNoChangesStoresBaseHash verifies that BaseCommitHashes is
 // populated even when the task has no commits to merge (early return path).
 func TestCommitPipelineNoChangesStoresBaseHash(t *testing.T) {

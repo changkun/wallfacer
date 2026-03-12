@@ -46,7 +46,7 @@ var (
 // in a container, handles auto-continue turns, and transitions the task to the
 // appropriate terminal state (done/waiting/failed).
 func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
-	bgCtx := context.Background()
+	bgCtx := r.shutdownCtx
 
 	// Guard: if this goroutine returns without explicitly setting the task
 	// status (panic, early error), move to "failed" so the task doesn't
@@ -475,7 +475,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 // in_progress and Run() is invoked so the agent can resolve them
 // interactively; the task returns to prevStatus only after the agent finishes.
 func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus) {
-	bgCtx := context.Background()
+	bgCtx := r.shutdownCtx
 	testStateInvalidated := false
 
 	statusSet := false
