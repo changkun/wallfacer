@@ -12,9 +12,12 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"text/template"
+
+	"changkun.de/wallfacer/internal/logger"
 )
 
 //go:embed *.tmpl
@@ -118,7 +121,13 @@ func (m *Manager) render(embeddedName string, data any) string {
 		if apiName, ok := embeddedToAPI[embeddedName]; ok {
 			overridePath := filepath.Join(m.userDir, apiName+".tmpl")
 			if content, err := os.ReadFile(overridePath); err == nil {
-				if out, execErr := executeOverride(embeddedName, content, data); execErr == nil {
+				out, execErr := executeOverride(embeddedName, content, data)
+				if execErr != nil {
+					logger.Prompts.Warn("prompt override execution failed, using default",
+						"name", apiName,
+						"error", execErr,
+					)
+				} else {
 					return out
 				}
 			}
@@ -212,6 +221,63 @@ func (m *Manager) DeleteOverride(apiName string) error {
 func ValidateTemplate(content string) error {
 	_, err := template.New("validate").Funcs(templateFuncMap()).Parse(content)
 	return err
+}
+
+// mockContextFor returns a fully initialized zero-valued context struct for
+// the given template API name. It is used by Validate to perform a dry-run
+// execution and catch field-access errors at write time.
+func mockContextFor(apiName string) (interface{}, bool) {
+	switch apiName {
+	case "refinement":
+		return RefinementData{
+			CreatedAt: "2024-01-01 00:00:00",
+			Today:     "2024-01-01",
+			Status:    "backlog",
+			Prompt:    "example prompt",
+		}, true
+	case "ideation":
+		return IdeationData{}, true
+	case "commit_message":
+		return CommitData{
+			Prompt:   "example prompt",
+			DiffStat: "1 file changed",
+		}, true
+	case "conflict_resolution":
+		return ConflictData{
+			ContainerPath: "/workspace/example",
+			DefaultBranch: "main",
+		}, true
+	case "test_verification":
+		return TestData{OriginalPrompt: "example prompt"}, true
+	case "oversight":
+		return struct{ ActivityLog string }{ActivityLog: "example activity log"}, true
+	case "title":
+		return struct{ Prompt string }{Prompt: "example task"}, true
+	default:
+		return nil, false
+	}
+}
+
+// Validate parses content as a Go template and performs a dry-run execution
+// against a representative mock context for the given API name. This catches
+// both syntax errors and field-access errors (e.g. referencing a field that
+// does not exist on the context struct) at write time.
+func (m *Manager) Validate(apiName, content string) error {
+	if _, ok := apiToEmbedded[apiName]; !ok {
+		return fmt.Errorf("unknown template name %q", apiName)
+	}
+	tmpl, err := template.New(apiName).Funcs(templateFuncMap()).Parse(content)
+	if err != nil {
+		return fmt.Errorf("template parse error: %w", err)
+	}
+	ctx, ok := mockContextFor(apiName)
+	if !ok {
+		return fmt.Errorf("unknown template name %q", apiName)
+	}
+	if err := tmpl.Execute(io.Discard, ctx); err != nil {
+		return fmt.Errorf("template execution error: %w", err)
+	}
+	return nil
 }
 
 // --- Data structs (unchanged public API) ---

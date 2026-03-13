@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"changkun.de/wallfacer/internal/runner"
@@ -147,6 +148,30 @@ func TestUpdateSystemPrompt_InvalidTemplate(t *testing.T) {
 
 	if w.Code != http.StatusUnprocessableEntity {
 		t.Errorf("status = %d, want 422", w.Code)
+	}
+}
+
+// TestUpdateSystemPrompt_ExecutionError verifies that a template which parses
+// successfully but fails at execution (e.g. references a non-existent field on
+// a typed struct context) is rejected with status 422 and the error body
+// contains "execution" so callers can distinguish it from a parse error.
+func TestUpdateSystemPrompt_ExecutionError(t *testing.T) {
+	h, _ := newTestHandlerWithPrompts(t)
+
+	// {{.FieldThatDoesNotExist}} parses fine but fails on execution against
+	// RefinementData which has no such field.
+	body, _ := json.Marshal(map[string]string{"content": "{{.FieldThatDoesNotExist}}"})
+	req := httptest.NewRequest(http.MethodPut, "/api/system-prompts/refinement", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetPathValue("name", "refinement")
+	w := httptest.NewRecorder()
+	h.UpdateSystemPrompt(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422; body: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "execution") {
+		t.Errorf("expected body to contain %q, got: %s", "execution", w.Body.String())
 	}
 }
 
