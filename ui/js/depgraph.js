@@ -16,13 +16,13 @@
   var V_GAP   = 16;
 
   var STATUS_COLORS = {
-    backlog:     '#4B5563',
-    in_progress: '#2563EB',
-    waiting:     '#D97706',
-    committing:  '#7C3AED',
-    done:        '#059669',
-    failed:      '#DC2626',
-    cancelled:   '#6B7280',
+    backlog:     '#6b6560',
+    in_progress: '#2c5f98',
+    waiting:     '#a07020',
+    committing:  '#5a3d8a',
+    done:        '#1a6030',
+    failed:      '#8c2020',
+    cancelled:   '#5a3d8a',
   };
 
   // Module-level fingerprint cache — avoids re-rendering unchanged graphs.
@@ -172,6 +172,10 @@
     var idToTask = new Map();
     subgraph.forEach(function (t) { idToTask.set(t.id, t); });
 
+    // Read theme colour for edges from CSS custom properties.
+    var computedStyle = getComputedStyle(document.documentElement);
+    var edgeColor = (computedStyle.getPropertyValue('--text-muted') || '#908c86').trim();
+
     // --- Edges ---
     subgraph.forEach(function (t) {
       if (!t.depends_on || t.depends_on.length === 0) return;
@@ -197,7 +201,7 @@
           ' ' + (x2 - cp) + ',' + y2 +
           ' ' + x2 + ',' + y2
         );
-        path.setAttribute('stroke', '#9CA3AF');
+        path.setAttribute('stroke', edgeColor);
         path.setAttribute('stroke-width', '1.5');
         path.setAttribute('fill', 'none');
         if (!satisfied) path.setAttribute('stroke-dasharray', '4 2');
@@ -237,7 +241,7 @@
       text.setAttribute('y', y + NODE_H / 2);
       text.setAttribute('dominant-baseline', 'middle');
       text.setAttribute('text-anchor', 'middle');
-      text.setAttribute('fill', '#ffffff');
+      text.setAttribute('fill', '#f0ede6');
       text.setAttribute('font-size', '12');
       text.textContent = truncated;
 
@@ -260,7 +264,7 @@
       label.setAttribute('x', maxX + NODE_W / 2);
       label.setAttribute('y', PAD - 8);
       label.setAttribute('text-anchor', 'middle');
-      label.setAttribute('fill', '#EF4444');
+      label.setAttribute('fill', '#8c2020');
       label.setAttribute('font-size', '11');
       label.textContent = '\u26a0 cycle';
       svg.appendChild(label);
@@ -284,10 +288,10 @@
     panel.style.cssText = [
       'display:block',
       'margin:16px 24px',
-      'border:1px solid var(--border, #374151)',
-      'border-radius:8px',
+      'border:1px solid var(--border)',
+      'border-radius:12px',
       'overflow:hidden',
-      'background:var(--surface, #1F2937)',
+      'background:var(--bg-raised)',
     ].join(';');
 
     // Header row
@@ -297,18 +301,18 @@
       'align-items:center',
       'justify-content:space-between',
       'padding:8px 16px',
-      'border-bottom:1px solid var(--border, #374151)',
+      'border-bottom:1px solid var(--border)',
     ].join(';');
 
     var titleEl = document.createElement('span');
-    titleEl.style.cssText = 'font-size:13px;font-weight:600;color:var(--text,#F9FAFB);';
+    titleEl.style.cssText = 'font-size:13px;font-weight:600;color:var(--text);';
     titleEl.textContent = 'Dependency Graph';
 
     var collapsed    = localStorage.getItem('depgraph-collapsed') === 'true';
     var collapseBtn  = document.createElement('button');
     collapseBtn.style.cssText =
       'background:none;border:none;cursor:pointer;font-size:12px;' +
-      'color:var(--text-muted,#9CA3AF);padding:2px 6px;';
+      'color:var(--text-muted);padding:2px 6px;';
     collapseBtn.textContent = collapsed ? '\u25bc' : '\u25b2';
 
     collapseBtn.addEventListener('click', function () {

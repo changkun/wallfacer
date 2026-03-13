@@ -91,6 +91,10 @@ function renderLogs() {
   _updateLogsTabs();
   logsEl.classList.toggle('oversight-mode', logsMode === 'oversight');
   if (logsMode === 'oversight') {
+    // Invalidate the render cursor so that switching back to pretty/raw
+    // triggers a full rebuild instead of the append-only fast path.
+    _renderedLogMode = 'oversight';
+    _renderedLogLen = 0;
     renderOversightInLogs();
     return;
   }
