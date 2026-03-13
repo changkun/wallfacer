@@ -12,6 +12,7 @@ import (
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/internal/workspacegroups"
 )
 
 // ssrfHardenedTransport returns an http.Transport that re-checks the resolved
@@ -97,9 +98,14 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	if s, ok := h.currentStore(); ok && s != nil {
 		payloadLimits = s.GetPayloadLimits()
 	}
+	groups, _ := workspacegroups.Load(h.configDir)
+	if len(workspaces) > 0 {
+		groups = workspacegroups.Normalize(append([]workspacegroups.Group{{Workspaces: workspaces}}, groups...))
+	}
 	resp := map[string]any{
 		"workspaces":              workspaces,
 		"workspace_browser_path":  workspaceBrowserPath,
+		"workspace_groups":        groups,
 		"instructions_path":       instructionsPath,
 		"prompts_dir":             promptsDir,
 		"sandbox_activities":      store.SandboxActivities,
@@ -185,9 +191,16 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Autosubmit       *bool `json:"autosubmit"`
 		Ideation         *bool `json:"ideation"`
 		IdeationInterval *int  `json:"ideation_interval"` // minutes; 0 = run immediately on completion
+		WorkspaceGroups  []workspacegroups.Group `json:"workspace_groups"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
+	}
+	if req.WorkspaceGroups != nil {
+		if err := workspacegroups.Save(h.configDir, req.WorkspaceGroups); err != nil {
+			http.Error(w, "save workspace groups: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	applyBoolToggle := func(reqVal *bool, set func(bool), enabled func() bool, onEnable func(context.Context)) {
 		if reqVal == nil {

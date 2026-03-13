@@ -11,6 +11,7 @@ import (
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/internal/workspacegroups"
 )
 
 type Snapshot struct {
@@ -138,6 +139,9 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 			return Snapshot{}, fmt.Errorf("ensure instructions: %w", err)
 		}
 		next.InstructionsPath = instructionsPath
+	}
+	if err := workspacegroups.Upsert(m.configDir, validated); err != nil {
+		return Snapshot{}, fmt.Errorf("persist workspace group: %w", err)
 	}
 	if m.envFile != "" {
 		encoded := envconfig.FormatWorkspaces(validated)

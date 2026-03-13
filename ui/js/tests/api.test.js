@@ -76,6 +76,7 @@ describe('sandbox helpers', () => {
   it('formats sandbox labels consistently', () => {
     const ctx = makeContext();
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'api.js');
     expect(ctx.sandboxDisplayName('')).toBe('Default');
     expect(ctx.sandboxDisplayName('claude')).toBe('Claude');
@@ -91,6 +92,7 @@ describe('sandbox helpers', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'api.js');
     const collected = ctx.collectSandboxByActivity('env-sandbox-');
     expect(collected).toEqual({ implementation: 'claude', testing: 'codex' });
@@ -123,6 +125,7 @@ describe('_handleInitialHash', () => {
       location: { hash: '' },
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'api.js');
 
     vm.runInContext('tasks = [{ id: "11111111-1111-1111-1111-111111111111", title: "Task" }]; _hashHandled = false;', ctx);
@@ -139,6 +142,7 @@ describe('_handleInitialHash', () => {
       location: { hash: '#not-a-uuid' },
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'api.js');
     ctx.tasks = [{ id: '11111111-1111-1111-1111-111111111111', title: 'Task' }];
 
@@ -151,6 +155,7 @@ describe('_handleInitialHash', () => {
       location: { hash: '#22222222-2222-2222-2222-222222222222' },
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'api.js');
     vm.runInContext('tasks = []; archivedTasks = [{ id: "22222222-2222-2222-2222-222222222222", title: "Archived task" }]; _hashHandled = false;', ctx);
 
@@ -167,6 +172,7 @@ describe('fetchConfig', () => {
       autosubmit: false,
       workspaces: ['/Users/test/repo'],
       workspace_browser_path: '/Users/test/repo',
+      workspace_groups: [{ workspaces: ['/Users/test/repo'] }],
       sandboxes: ['claude', 'codex'],
       default_sandbox: 'claude',
       activity_sandboxes: { implementation: 'codex' },
@@ -195,6 +201,7 @@ describe('fetchConfig', () => {
         ['autopilot-toggle', autopilotToggle],
         ['autotest-toggle', autotestToggle],
         ['autosubmit-toggle', autosubmitToggle],
+        ['settings-workspace-groups', { innerHTML: '' }],
       ],
       EventSource: MockEventSource,
       fetch,
@@ -218,6 +225,7 @@ describe('fetchConfig', () => {
       },
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'api.js');
     const populateSandboxByActivitySpy = vi.spyOn(ctx, 'populateSandboxSelects');
 
@@ -232,6 +240,7 @@ describe('fetchConfig', () => {
     expect(vm.runInContext('autotest', ctx)).toBe(true);
     expect(vm.runInContext('autosubmit', ctx)).toBe(false);
     expect(vm.runInContext('workspaceBrowserPath', ctx)).toBe('/Users/test/repo');
+    expect(vm.runInContext('workspaceGroups.length', ctx)).toBe(1);
   });
 
   it('prefers workspace_browser_path from config over an empty picker path', async () => {
@@ -309,6 +318,28 @@ describe('renderWorkspaceSelectionDraft', () => {
 
     expect(listEl.innerHTML).toContain('data-workspace-path="/Users/test/dev/repo"');
     expect(listEl.innerHTML).toContain('onclick="removeWorkspaceSelection(this.dataset.workspacePath)"');
+  });
+});
+
+describe('renderWorkspaceGroups', () => {
+  it('renders saved workspace groups in settings', () => {
+    const groupsEl = { innerHTML: '' };
+    const ctx = makeContext({
+      elements: [['settings-workspace-groups', groupsEl]],
+    });
+    loadScript(ctx, 'utils.js');
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    vm.runInContext(`
+      activeWorkspaces = ["/Users/test/repo-a", "/Users/test/repo-b"];
+      workspaceGroups = [{ workspaces: ["/Users/test/repo-a", "/Users/test/repo-b"] }];
+    `, ctx);
+    ctx.renderWorkspaceGroups();
+
+    expect(groupsEl.innerHTML).toContain('repo-a + repo-b');
+    expect(groupsEl.innerHTML).toContain('Current');
+    expect(groupsEl.innerHTML).toContain('Use');
   });
 });
 

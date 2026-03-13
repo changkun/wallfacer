@@ -37,6 +37,7 @@ let gitStatuses = [];
 let gitStatusSource = null;
 let gitRetryDelay = 1000;
 let activeWorkspaces = [];
+let workspaceGroups = [];
 let workspacePickerRequired = false;
 let workspaceBrowserPath = '';
 let workspaceBrowserEntries = [];

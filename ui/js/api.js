@@ -554,6 +554,7 @@ async function fetchConfig() {
   try {
     var cfg = await api(configGetRoute());
     activeWorkspaces = Array.isArray(cfg.workspaces) ? cfg.workspaces.slice() : [];
+    workspaceGroups = Array.isArray(cfg.workspace_groups) ? cfg.workspace_groups.slice() : [];
     workspaceBrowserPath = cfg.workspace_browser_path || activeWorkspaces[0] || workspaceBrowserPath || '';
     workspacePickerRequired = activeWorkspaces.length === 0;
     autopilot = !!cfg.autopilot;
@@ -578,6 +579,7 @@ async function fetchConfig() {
     }
     populateSandboxSelects();
     renderWorkspaceSelectionSummary();
+    renderWorkspaceGroups();
     if (workspacePickerRequired) {
       stopTasksStream();
       stopGitStream();
@@ -637,6 +639,44 @@ function renderWorkspaceSelectionSummary() {
   }
   el.innerHTML = activeWorkspaces.map(function(path) {
     return '<div style="font-family:monospace;font-size:11px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-elevated);">' + escapeHtml(path) + '</div>';
+  }).join('');
+}
+
+function workspaceGroupLabel(group) {
+  if (!group || !Array.isArray(group.workspaces) || !group.workspaces.length) return 'Empty group';
+  var names = group.workspaces.map(function(path) {
+    var clean = String(path || '').replace(/[\\/]+$/, '');
+    var parts = clean.split(/[\\/]/);
+    return parts[parts.length - 1] || clean;
+  });
+  return names.join(' + ');
+}
+
+function renderWorkspaceGroups() {
+  var el = document.getElementById('settings-workspace-groups');
+  if (!el) return;
+  if (!workspaceGroups.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:11px;">Saved workspace groups will appear here after you switch boards.</div>';
+    return;
+  }
+  el.innerHTML = workspaceGroups.map(function(group, index) {
+    var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
+    var active = JSON.stringify(paths) === JSON.stringify(activeWorkspaces);
+    return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-elevated);display:flex;flex-direction:column;gap:8px;">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+      '<div style="font-size:12px;font-weight:600;">' + escapeHtml(workspaceGroupLabel(group)) + (active ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Current</span>' : '') + '</div>' +
+      '<div style="display:flex;gap:6px;align-items:center;">' +
+      '<button type="button" class="btn-icon" style="font-size:11px;padding:3px 8px;" onclick="useWorkspaceGroup(' + index + ')">Use</button>' +
+      '<button type="button" class="btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="editWorkspaceGroup(' + index + ')">Edit</button>' +
+      '<button type="button" class="btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="deleteWorkspaceGroup(' + index + ')">Remove</button>' +
+      '</div>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;">' +
+      paths.map(function(path) {
+        return '<div style="font-family:monospace;font-size:11px;color:var(--text-muted);word-break:break-all;">' + escapeHtml(path) + '</div>';
+      }).join('') +
+      '</div>' +
+      '</div>';
   }).join('');
 }
 
@@ -791,6 +831,39 @@ function removeWorkspaceSelection(path) {
 function clearWorkspaceSelection() {
   workspaceSelectionDraft = [];
   renderWorkspaceSelectionDraft();
+}
+
+async function saveWorkspaceGroups() {
+  await api(configUpdateRoute(), {
+    method: 'PUT',
+    body: JSON.stringify({ workspace_groups: workspaceGroups.slice() }),
+  });
+}
+
+async function useWorkspaceGroup(index) {
+  var group = workspaceGroups[index];
+  if (!group || !Array.isArray(group.workspaces)) return;
+  workspaceSelectionDraft = group.workspaces.slice();
+  renderWorkspaceSelectionDraft();
+  await applyWorkspaceSelection();
+}
+
+function editWorkspaceGroup(index) {
+  var group = workspaceGroups[index];
+  if (!group || !Array.isArray(group.workspaces)) return;
+  workspaceSelectionDraft = group.workspaces.slice();
+  showWorkspacePicker(false);
+}
+
+async function deleteWorkspaceGroup(index) {
+  workspaceGroups = workspaceGroups.filter(function(_, i) { return i !== index; });
+  renderWorkspaceGroups();
+  try {
+    await saveWorkspaceGroups();
+  } catch (e) {
+    showAlert('Failed to update workspace groups: ' + e.message);
+    await fetchConfig();
+  }
 }
 
 async function applyWorkspaceSelection() {
