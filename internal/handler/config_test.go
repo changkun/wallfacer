@@ -66,6 +66,10 @@ func TestGetConfig_ReturnsWorkspaces(t *testing.T) {
 	if got, ok := resp["workspace_browser_path"].(string); !ok || got != ws {
 		t.Fatalf("expected workspace_browser_path %q, got %#v", ws, resp["workspace_browser_path"])
 	}
+	groups, ok := resp["workspace_groups"].([]any)
+	if !ok || len(groups) == 0 {
+		t.Fatalf("expected workspace_groups array, got %#v", resp["workspace_groups"])
+	}
 }
 
 func TestGetConfig_UsesCWDForWorkspaceBrowserPathWithoutWorkspaces(t *testing.T) {
@@ -88,6 +92,39 @@ func TestGetConfig_UsesCWDForWorkspaceBrowserPathWithoutWorkspaces(t *testing.T)
 	}
 	if got, ok := resp["workspace_browser_path"].(string); !ok || got != cwd {
 		t.Fatalf("expected workspace_browser_path %q, got %#v", cwd, resp["workspace_browser_path"])
+	}
+}
+
+func TestUpdateConfig_PersistsWorkspaceGroups(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	body := strings.NewReader(`{"workspace_groups":[{"workspaces":["` + ws + `","` + ws + `/../` + filepath.Base(ws) + `"]}]}`)
+	req := httptest.NewRequest(http.MethodPut, "/api/config", body)
+	w := httptest.NewRecorder()
+	h.UpdateConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	cfgReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	cfgW := httptest.NewRecorder()
+	h.GetConfig(cfgW, cfgReq)
+	var resp map[string]any
+	if err := json.NewDecoder(cfgW.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	groups, ok := resp["workspace_groups"].([]any)
+	if !ok || len(groups) != 1 {
+		t.Fatalf("expected 1 workspace group, got %#v", resp["workspace_groups"])
+	}
+	group, ok := groups[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected group object, got %#v", groups[0])
+	}
+	workspaces, ok := group["workspaces"].([]any)
+	if !ok || len(workspaces) != 1 || workspaces[0] != ws {
+		t.Fatalf("expected normalized workspace group [%q], got %#v", ws, group["workspaces"])
 	}
 }
 
