@@ -165,6 +165,11 @@ func (s *Store) OutputsDir(taskID uuid.UUID) string {
 	return filepath.Join(s.dir, taskID.String(), "outputs")
 }
 
+// DataDir returns the root data directory path for this store.
+func (s *Store) DataDir() string {
+	return s.dir
+}
+
 // loadAll scans the data directory and populates in-memory maps.
 func (s *Store) loadAll() error {
 	entries, err := os.ReadDir(s.dir)

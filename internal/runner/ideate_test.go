@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/prompts"
@@ -948,4 +949,171 @@ func TestParseIdeaJSONArray(t *testing.T) {
 			t.Fatal("expected error for empty string input")
 		}
 	})
+}
+
+// ---------------------------------------------------------------------------
+// IdeationHistory
+// ---------------------------------------------------------------------------
+
+// TestIdeationHistoryPersistence verifies that rejected entries written to a
+// temp dir are returned by RejectedTitles after reloading via LoadHistory.
+func TestIdeationHistoryPersistence(t *testing.T) {
+	dir := t.TempDir()
+	h, err := LoadHistory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	e1 := HistoryEntry{Title: "Alpha idea", Reason: "rejected_below_threshold"}
+	e2 := HistoryEntry{Title: "Beta idea", Reason: "rejected_duplicate_title"}
+	if err := h.Append(e1); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Append(e2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reload from disk.
+	h2, err := LoadHistory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	titles := h2.RejectedTitles()
+	if len(titles) != 2 {
+		t.Fatalf("expected 2 rejected titles, got %d: %v", len(titles), titles)
+	}
+	found := map[string]bool{"Alpha idea": false, "Beta idea": false}
+	for _, title := range titles {
+		found[title] = true
+	}
+	for title, ok := range found {
+		if !ok {
+			t.Errorf("expected title %q in RejectedTitles", title)
+		}
+	}
+}
+
+// TestIdeationHistoryTTLExpiry verifies that entries older than the TTL are
+// excluded from RejectedTitles after reloading.
+func TestIdeationHistoryTTLExpiry(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write an expired entry directly to the JSONL file.
+	expired := HistoryEntry{
+		Title:      "Old idea",
+		Reason:     "rejected_below_threshold",
+		RecordedAt: time.Now().Add(-(ideationHistoryTTL + time.Hour)),
+	}
+	fresh := HistoryEntry{
+		Title:      "Fresh idea",
+		Reason:     "rejected_duplicate_title",
+		RecordedAt: time.Now().Add(-time.Hour),
+	}
+
+	h, err := LoadHistory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Append(expired); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Append(fresh); err != nil {
+		t.Fatal(err)
+	}
+
+	h2, err := LoadHistory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	titles := h2.RejectedTitles()
+	for _, title := range titles {
+		if title == "Old idea" {
+			t.Error("expired entry should be excluded from RejectedTitles")
+		}
+	}
+	found := false
+	for _, title := range titles {
+		if title == "Fresh idea" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("fresh entry should be present in RejectedTitles")
+	}
+}
+
+// TestIdeationHistoryTruncatedFile verifies that a partial (truncated) JSON
+// line at the end of the file does not prevent LoadHistory from returning the
+// valid preceding entries.
+func TestIdeationHistoryTruncatedFile(t *testing.T) {
+	dir := t.TempDir()
+
+	h, err := LoadHistory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e1 := HistoryEntry{Title: "Good entry", Reason: "rejected_below_threshold"}
+	if err := h.Append(e1); err != nil {
+		t.Fatal(err)
+	}
+
+	// Append a truncated (malformed) JSON line directly to the file.
+	histPath := ideationHistoryPath(dir)
+	f, err := os.OpenFile(histPath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(`{"title":"truncated`); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	f.Close()
+
+	h2, err := LoadHistory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	titles := h2.RejectedTitles()
+	if len(titles) != 1 {
+		t.Fatalf("expected 1 valid entry after truncated line, got %d: %v", len(titles), titles)
+	}
+	if titles[0] != "Good entry" {
+		t.Errorf("expected 'Good entry', got %q", titles[0])
+	}
+}
+
+// TestBuildIdeationPromptIncludesRejectedTitles verifies that rejected titles
+// loaded from history appear verbatim in the rendered ideation prompt string.
+func TestBuildIdeationPromptIncludesRejectedTitles(t *testing.T) {
+	dir := t.TempDir()
+
+	// Pre-populate history with two rejected entries.
+	h, err := LoadHistory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Append(HistoryEntry{Title: "Rejected Alpha", Reason: "rejected_below_threshold"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Append(HistoryEntry{Title: "Rejected Beta", Reason: "rejected_duplicate_title"}); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := store.NewStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	r := &Runner{store: s, promptsMgr: prompts.Default}
+	prompt := r.buildIdeationPrompt(nil)
+
+	if !strings.Contains(prompt, "Rejected Alpha") {
+		t.Errorf("prompt should contain rejected title 'Rejected Alpha'; prompt excerpt: %q",
+			prompt[:min(len(prompt), 300)])
+	}
+	if !strings.Contains(prompt, "Rejected Beta") {
+		t.Errorf("prompt should contain rejected title 'Rejected Beta'; prompt excerpt: %q",
+			prompt[:min(len(prompt), 300)])
+	}
 }

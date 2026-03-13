@@ -242,6 +242,7 @@ type IdeationData struct {
 	FailureSignals []string // tasks that failed or had failing tests
 	ChurnSignals   []string // recently-modified hot files
 	TodoSignals    []string // files with high TODO/FIXME density
+	RejectedTitles []string // previously proposed but rejected idea titles (within TTL)
 }
 
 // CommitData holds template variables for the commit message prompt.

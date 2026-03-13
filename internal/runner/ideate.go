@@ -107,12 +107,22 @@ func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ide
 		})
 	}
 
+	var rejectedTitles []string
+	if r.store != nil {
+		if hist, err := LoadHistory(r.store.DataDir()); err == nil {
+			rejectedTitles = hist.RejectedTitles()
+		} else {
+			logger.Runner.Warn("buildIdeationPrompt: load history", "error", err)
+		}
+	}
+
 	return r.promptsMgr.Ideation(prompts.IdeationData{
 		ExistingTasks:  tasks,
 		Categories:     cats,
 		FailureSignals: signals.FailureSignals,
 		ChurnSignals:   signals.ChurnSignals,
 		TodoSignals:    signals.TodoSignals,
+		RejectedTitles: rejectedTitles,
 	})
 }
 
@@ -314,6 +324,28 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	ideas, rejections, output, rawStdout, rawStderr, err := r.RunIdeation(ctx, taskID, ideationPrompt)
 	r.emitIdeationRejectionEvents(bgCtx, taskID, rejections)
 
+	// Record rejected ideas to history so they are excluded from future prompts.
+	hist, histErr := LoadHistory(r.store.DataDir())
+	if histErr != nil {
+		logger.Runner.Warn("ideation task: load history for recording", "task", taskID, "error", histErr)
+		hist = nil
+	}
+	if hist != nil {
+		for _, rej := range rejections {
+			if rej.Title == "" {
+				continue
+			}
+			he := HistoryEntry{
+				Title:      rej.Title,
+				Reason:     "rejected_" + rej.Reason,
+				RecordedAt: time.Now().UTC(),
+			}
+			if appErr := hist.Append(he); appErr != nil {
+				logger.Runner.Warn("ideation task: append rejection to history", "title", rej.Title, "error", appErr)
+			}
+		}
+	}
+
 	// Always persist the raw container output as turn 1 so that the trace and
 	// oversight features work the same as for regular implementation tasks.
 	if len(rawStdout) > 0 {
@@ -400,6 +432,18 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		if createErr != nil {
 			logger.Runner.Warn("ideation task: create idea task", "task", taskID, "error", createErr)
 			continue
+		}
+		// Record accepted idea in history so it is not excluded from future prompts.
+		if hist != nil && idea.Title != "" {
+			he := HistoryEntry{
+				Title:      idea.Title,
+				Reason:     "accepted",
+				TaskID:     newTask.ID.String(),
+				RecordedAt: time.Now().UTC(),
+			}
+			if appErr := hist.Append(he); appErr != nil {
+				logger.Runner.Warn("ideation task: append accepted idea to history", "title", idea.Title, "error", appErr)
+			}
 		}
 		r.store.InsertEvent(bgCtx, newTask.ID, store.EventTypeStateChange, map[string]string{
 			"to": string(store.TaskStatusBacklog),
