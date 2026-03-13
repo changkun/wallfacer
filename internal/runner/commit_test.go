@@ -182,6 +182,19 @@ func TestGenerateCommitMessageNDJSON(t *testing.T) {
 	}
 }
 
+func TestGenerateCommitMessageFallsBackToCodexOnTokenLimit(t *testing.T) {
+	tokenLimit := `{"result":"rate limit exceeded: token limit reached","session_id":"abc","stop_reason":"end_turn","is_error":true,"total_cost_usd":0.001}`
+	cmd := fakeStatefulCmd(t, []string{tokenLimit, validStreamJSON})
+	runner := runnerWithCmd(t, cmd)
+
+	msg := runner.generateCommitMessage(uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
+
+	const want = "Add authentication endpoint"
+	if msg != want {
+		t.Fatalf("expected codex fallback message %q, got %q", want, msg)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // hostStageAndCommit integration tests
 // ---------------------------------------------------------------------------

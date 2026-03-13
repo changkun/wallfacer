@@ -691,41 +691,71 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 		logger.Runner.Warn("oversight: get task", "task", taskID, "error", err)
 	}
 	sandbox := "claude"
-	model := ""
 	if task != nil {
 		sandbox = r.sandboxForTaskActivity(task, activityOversight)
 	}
-	model = r.titleModelFromEnvForSandbox(sandbox)
+	runWithSandbox := func(selectedSandbox string) (*agentOutput, error) {
+		model := r.titleModelFromEnvForSandbox(selectedSandbox)
+		spec := r.buildBaseContainerSpec(containerName, model, selectedSandbox)
+		// Note: oversight agent uses no workspace mounts, no instructions mount,
+		// no -w workdir, and the Cmd order is --output-format before --verbose.
+		spec.Cmd = []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}
+		if model != "" {
+			spec.Cmd = append(spec.Cmd, "--model", model)
+		}
 
-	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
-	// Note: oversight agent uses no workspace mounts, no instructions mount,
-	// no -w workdir, and the Cmd order is --output-format before --verbose.
-	spec.Cmd = []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}
-	if model != "" {
-		spec.Cmd = append(spec.Cmd, "--model", model)
+		args := spec.Build()
+		cmd := exec.CommandContext(runCtx, r.command, args...)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: agent})
+		runErr := cmd.Run()
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: agent})
+		if runErr != nil && runCtx.Err() == nil {
+			return nil, fmt.Errorf("container: %w (stderr: %s)", runErr, truncate(stderr.String(), 300))
+		}
+
+		raw := strings.TrimSpace(stdout.String())
+		if raw == "" {
+			return nil, fmt.Errorf("empty output from oversight agent")
+		}
+
+		output, err := parseOutput(raw)
+		if err != nil {
+			return nil, fmt.Errorf("parse output: %w", err)
+		}
+		output.ActualSandbox = selectedSandbox
+		return output, nil
 	}
 
-	args := spec.Build()
-	cmd := exec.CommandContext(runCtx, r.command, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: agent})
-	runErr := cmd.Run()
-	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: agent})
-	if runErr != nil && runCtx.Err() == nil {
-		return nil, fmt.Errorf("container: %w (stderr: %s)", runErr, truncate(stderr.String(), 300))
-	}
-
-	raw := strings.TrimSpace(stdout.String())
-	if raw == "" {
-		return nil, fmt.Errorf("empty output from oversight agent")
-	}
-
-	output, err := parseOutput(raw)
+	initialSandbox := sandbox
+	output, err := runWithSandbox(initialSandbox)
 	if err != nil {
-		return nil, fmt.Errorf("parse output: %w", err)
+		if strings.EqualFold(initialSandbox, "claude") && isLikelyTokenLimitError(err.Error()) {
+			logger.Runner.Warn("oversight: claude token limit hit; retrying with codex", "task", taskID, "agent", agent)
+			r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+				"result": "Sandbox fallback: claude → codex (token/rate limit hit during oversight)",
+			})
+			output, err = runWithSandbox("codex")
+			sandbox = "codex"
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	if strings.EqualFold(initialSandbox, "claude") && output != nil && output.IsError &&
+		isLikelyTokenLimitError(output.Result, output.Subtype) {
+		logger.Runner.Warn("oversight: claude output reported token limit; retrying with codex", "task", taskID, "agent", agent)
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+			"result": "Sandbox fallback: claude → codex (token/rate limit in oversight output)",
+		})
+		output, err = runWithSandbox("codex")
+		sandbox = "codex"
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Accumulate token/cost usage for this oversight sub-agent.
@@ -747,7 +777,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
-			Sandbox:              sandbox,
+			Sandbox:              output.ActualSandbox,
 			SubAgent:             agent,
 		}); appErr != nil {
 			logger.Runner.Warn("oversight: append turn usage failed", "task", taskID, "agent", agent, "error", appErr)
