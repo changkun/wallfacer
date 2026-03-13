@@ -165,6 +165,7 @@ describe('fetchConfig', () => {
       autopilot: true,
       autotest: true,
       autosubmit: false,
+      workspaces: ['/Users/test/repo'],
       sandboxes: ['claude', 'codex'],
       default_sandbox: 'claude',
       activity_sandboxes: { implementation: 'codex' },
@@ -174,6 +175,14 @@ describe('fetchConfig', () => {
     const autopilotToggle = makeInput(false);
     const autotestToggle = makeInput(false);
     const autosubmitToggle = makeInput(false);
+    class MockEventSource {
+      constructor(url) {
+        this.url = url;
+        this.readyState = 1;
+      }
+      addEventListener() {}
+      close() {}
+    }
     const fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -186,7 +195,26 @@ describe('fetchConfig', () => {
         ['autotest-toggle', autotestToggle],
         ['autosubmit-toggle', autosubmitToggle],
       ],
+      EventSource: MockEventSource,
       fetch,
+      renderWorkspaces: vi.fn(),
+      startGitStream: vi.fn(),
+      startTasksStream: vi.fn(),
+      stopTasksStream: vi.fn(),
+      stopGitStream: vi.fn(),
+      resetBoardState: vi.fn(),
+      Routes: {
+        config: {
+          get: () => '/api/config',
+          update: () => '/api/config',
+        },
+        tasks: {
+          stream: () => '/api/tasks/stream',
+        },
+        git: {
+          stream: () => '/api/git/stream',
+        },
+      },
     });
     loadScript(ctx, 'state.js');
     loadScript(ctx, 'api.js');
@@ -202,6 +230,29 @@ describe('fetchConfig', () => {
     expect(vm.runInContext('autopilot', ctx)).toBe(true);
     expect(vm.runInContext('autotest', ctx)).toBe(true);
     expect(vm.runInContext('autosubmit', ctx)).toBe(false);
+  });
+});
+
+describe('showWorkspacePicker', () => {
+  it('refreshes the workspace browser every time the picker opens', () => {
+    const modal = { classList: { remove: vi.fn(), add: vi.fn() } };
+    const closeBtn = { style: {} };
+    const ctx = makeContext({
+      elements: [
+        ['workspace-picker', modal],
+        ['workspace-picker-close', closeBtn],
+      ],
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    const browseSpy = vi.spyOn(ctx, 'browseWorkspaces').mockImplementation(() => {});
+    vm.runInContext('workspaceBrowserPath = "/Users/test/dev"; activeWorkspaces = []; workspaceSelectionDraft = [];', ctx);
+
+    ctx.showWorkspacePicker(true);
+
+    expect(browseSpy).toHaveBeenCalledWith('/Users/test/dev');
+    expect(closeBtn.style.display).toBe('none');
   });
 });
 
@@ -393,6 +444,7 @@ describe('startTasksStream', () => {
     });
     loadScript(ctx, 'state.js');
     loadScript(ctx, 'api.js');
+    vm.runInContext('activeWorkspaces = ["/Users/test/repo"];', ctx);
 
     ctx.startTasksStream();
     expect(instances[0].url).toBe('/api/tasks/stream');
