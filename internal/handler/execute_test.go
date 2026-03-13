@@ -253,18 +253,18 @@ func TestBuildTestPrompt(t *testing.T) {
 		if !strings.Contains(p, fakeDiff) {
 			t.Error("prompt should contain the diff text")
 		}
-		if !strings.Contains(p, "focus your verification on those files") {
-			t.Error("prompt should tell agent to focus on the diff when diff is present")
+		if !strings.Contains(p, "restrict your review to those files") {
+			t.Error("prompt should tell agent to restrict review to changed files when diff is present")
 		}
 	})
 
-	t.Run("without diff uses generic examine instruction", func(t *testing.T) {
+	t.Run("without diff uses git diff fallback", func(t *testing.T) {
 		p := buildTestPrompt("build a widget", "", "", "")
 		if strings.Contains(p, "Changes Made") {
 			t.Error("prompt should not contain Changes Made section when diff is empty")
 		}
-		if !strings.Contains(p, "Examine the code") {
-			t.Error("prompt should fall back to generic examine instruction when no diff")
+		if !strings.Contains(p, "git diff") {
+			t.Error("prompt should fall back to git diff instruction when no diff provided")
 		}
 	})
 }
