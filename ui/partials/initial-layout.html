@@ -82,9 +82,31 @@
 
   <div class="app-header__secondary">
     <div class="header-toggle-strip" role="group" aria-label="Automation controls">
+      <label class="header-toggle-chip" for="ideation-header-toggle">
+        <span class="header-toggle-chip__meta">
+          <span class="header-toggle-chip__label">Ideate</span>
+          <span class="hint-trigger header-toggle-chip__hint">?<span class="hint-tooltip">When enabled, the brainstorm agent automatically generates new task ideas on a recurring schedule.</span></span>
+        </span>
+        <span class="header-toggle-chip__switch">
+          <input type="checkbox" id="ideation-header-toggle" onchange="toggleIdeationHeader()">
+          <span class="header-toggle-chip__track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <label class="header-toggle-chip" for="autorefine-toggle">
+        <span class="header-toggle-chip__meta">
+          <span class="header-toggle-chip__label">Refine</span>
+          <span class="hint-trigger header-toggle-chip__hint">?<span class="hint-tooltip">When enabled, the refinement agent is automatically triggered for backlog tasks that have not yet been refined.</span></span>
+        </span>
+        <span class="header-toggle-chip__switch">
+          <input type="checkbox" id="autorefine-toggle" onchange="toggleAutorefine()">
+          <span class="header-toggle-chip__track" aria-hidden="true"></span>
+        </span>
+      </label>
+
       <label class="header-toggle-chip" for="autopilot-toggle">
         <span class="header-toggle-chip__meta">
-          <span class="header-toggle-chip__label">Autopilot</span>
+          <span class="header-toggle-chip__label">Implement</span>
           <span class="hint-trigger header-toggle-chip__hint">?<span class="hint-tooltip">When enabled, backlog tasks are automatically moved to In Progress when there is available capacity. Tasks created by the brainstorm agent are not auto-promoted.</span></span>
         </span>
         <span class="header-toggle-chip__switch">
@@ -93,9 +115,20 @@
         </span>
       </label>
 
+      <label class="header-toggle-chip" for="autosync-toggle">
+        <span class="header-toggle-chip__meta">
+          <span class="header-toggle-chip__label">Tip-sync</span>
+          <span class="hint-trigger header-toggle-chip__hint">?<span class="hint-tooltip">When enabled, waiting tasks whose worktrees have fallen behind the default branch are automatically rebased. Conflicts are resolved by the conflict resolver agent; unresolvable conflicts are handed off to the main agent.</span></span>
+        </span>
+        <span class="header-toggle-chip__switch">
+          <input type="checkbox" id="autosync-toggle" onchange="toggleAutosync()">
+          <span class="header-toggle-chip__track" aria-hidden="true"></span>
+        </span>
+      </label>
+
       <label class="header-toggle-chip" for="autotest-toggle">
         <span class="header-toggle-chip__meta">
-          <span class="header-toggle-chip__label">Auto-test</span>
+          <span class="header-toggle-chip__label">Test</span>
           <span class="hint-trigger header-toggle-chip__hint">?<span class="hint-tooltip">When enabled, the test agent is automatically triggered for waiting tasks that have not yet been tested and whose worktree is up to date with the default branch.</span></span>
         </span>
         <span class="header-toggle-chip__switch">
@@ -106,11 +139,22 @@
 
       <label class="header-toggle-chip" for="autosubmit-toggle">
         <span class="header-toggle-chip__meta">
-          <span class="header-toggle-chip__label">Auto-submit</span>
+          <span class="header-toggle-chip__label">Submit</span>
           <span class="hint-trigger header-toggle-chip__hint">?<span class="hint-tooltip">When enabled, waiting tasks that have passed test verification, are up to date with the default branch, and have no worktree conflicts are automatically moved to done.</span></span>
         </span>
         <span class="header-toggle-chip__switch">
           <input type="checkbox" id="autosubmit-toggle" onchange="toggleAutosubmit()">
+          <span class="header-toggle-chip__track" aria-hidden="true"></span>
+        </span>
+      </label>
+
+      <label class="header-toggle-chip" for="autopush-toggle">
+        <span class="header-toggle-chip__meta">
+          <span class="header-toggle-chip__label">Push</span>
+          <span class="hint-trigger header-toggle-chip__hint">?<span class="hint-tooltip">When enabled, completed tasks are automatically pushed to the remote repository after committing.</span></span>
+        </span>
+        <span class="header-toggle-chip__switch">
+          <input type="checkbox" id="autopush-toggle" onchange="toggleAutopush()">
           <span class="header-toggle-chip__track" aria-hidden="true"></span>
         </span>
       </label>

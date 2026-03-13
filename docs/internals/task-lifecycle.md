@@ -4,29 +4,47 @@
 
 Tasks progress through a well-defined set of states. Every transition is recorded as an immutable event in `data/<uuid>/traces/`.
 
-```
-BACKLOG ──drag / autopilot──→ IN_PROGRESS ──end_turn──────────────────→ DONE
-   │                               │                                        │
-   │                               ├──max_tokens / pause_turn──→ (loop)     ├──set archived=true──→ (Archived column)
-   │                               │                                        └──cancel──→ CANCELLED
-   │                               ├──empty stop_reason──→ WAITING ──feedback──→ IN_PROGRESS
-   │                               │                              ──mark done──→ COMMITTING → DONE
-   │                               │                              ──test──────→ IN_PROGRESS (test run)
-   │                               │                              ──sync──────→ IN_PROGRESS (rebase) → WAITING
-   │                               │                              ──cancel────→ CANCELLED
-   │                               │                              ──fork──────→ new BACKLOG task
-   │                               │
-   │             IN_PROGRESS (test run) ──end_turn──→ WAITING (+ verdict recorded)
-   │                               │
-   │                               └──is_error / timeout / budget──→ FAILED ──resume──→ IN_PROGRESS (same session)
-   │                                                                        ──sync───→ IN_PROGRESS (rebase) → FAILED
-   │                                                                        ──retry───→ BACKLOG (fresh session)
-   │                                                                        ──cancel──→ CANCELLED
-   │                                                                        ──fork────→ new BACKLOG task
-   │                                                                        ──auto_retry──→ BACKLOG (if budget)
-   │
-   └──cancel──→ CANCELLED ──retry──→ BACKLOG
-                        └──set archived=true──→ (Archived column)
+```mermaid
+stateDiagram-v2
+    [*] --> backlog
+
+    backlog --> in_progress : drag / autopilot
+    backlog --> cancelled : cancel
+
+    in_progress --> in_progress : max_tokens / pause_turn (auto-continue)
+    in_progress --> committing : end_turn
+    in_progress --> waiting : empty stop_reason
+    in_progress --> failed : error / timeout / budget
+
+    committing --> done : commit success
+    committing --> failed : commit failure
+
+    waiting --> in_progress : feedback
+    waiting --> in_progress : test (IsTestRun)
+    waiting --> committing : mark done
+    waiting --> cancelled : cancel
+
+    failed --> in_progress : resume (same session)
+    failed --> backlog : retry / auto_retry
+    failed --> cancelled : cancel
+
+    done --> cancelled : cancel
+    cancelled --> backlog : retry
+
+    note right of waiting
+        fork: creates new backlog task
+        sync: rebase onto default branch
+    end note
+    note right of failed
+        fork: creates new backlog task
+        sync: rebase onto default branch
+    end note
+    note right of done
+        archived flag can be set
+    end note
+    note right of cancelled
+        archived flag can be set
+    end note
 ```
 
 ## States
@@ -146,39 +164,44 @@ When a task is created, a background goroutine (`runner.GenerateTitle`) launches
 
 Before running a task, users can have an AI agent analyse the codebase and produce a detailed implementation spec (the refined prompt). Only `backlog` tasks can be refined.
 
-```
-POST /api/tasks/{id}/refine
-  body: { user_instructions? }   // optional additional guidance
-  ↓
-  Sets CurrentRefinement.Status = "running".
-  Launches a sandbox container in the background.
-  Returns 202 Accepted immediately.
+```mermaid
+sequenceDiagram
+    participant User
+    participant Handler
+    participant Runner
+    participant Container
 
-GET /api/tasks/{id}/refine/logs  (SSE)
-  Streams container output in real time.
+    User->>Handler: POST /api/tasks/{id}/refine
+    Handler->>Runner: RunRefinementBackground()
+    Handler-->>User: 202 Accepted
 
-Container finishes:
-  CurrentRefinement.Status = "done", Result = spec text.
-  — or —
-  CurrentRefinement.Status = "failed", Error = failure message.
+    User->>Handler: GET /api/tasks/{id}/refine/logs (SSE)
+    Runner->>Container: Launch sandbox
+    Container-->>Handler: Stream output
+    Handler-->>User: SSE events
 
-POST /api/tasks/{id}/refine/apply
-  body: { prompt: string }
-  ↓
-  Saves the refined prompt as the new task prompt.
-  Moves the old prompt to PromptHistory.
-  Persists a RefinementSession (recording sandbox result and applied prompt).
-  Clears CurrentRefinement.
-  Triggers background title regeneration.
+    alt Container succeeds
+        Container-->>Runner: Result = spec text
+        Runner->>Runner: Status = "done"
+    else Container fails
+        Container-->>Runner: Error
+        Runner->>Runner: Status = "failed"
+    end
 
-POST /api/tasks/{id}/refine/dismiss
-  ↓
-  Clears CurrentRefinement without changing the prompt.
-
-DELETE /api/tasks/{id}/refine
-  ↓
-  Kills the running refinement container.
-  Sets CurrentRefinement.Status = "failed".
+    alt User applies
+        User->>Handler: POST /api/tasks/{id}/refine/apply
+        Handler->>Handler: Save RefinementSession
+        Handler->>Handler: Move Prompt to PromptHistory
+        Handler->>Handler: Set Prompt = refined prompt
+        Handler->>Runner: Trigger title regeneration
+    else User dismisses
+        User->>Handler: POST /api/tasks/{id}/refine/dismiss
+        Handler->>Handler: Clear CurrentRefinement
+    else User cancels
+        User->>Handler: DELETE /api/tasks/{id}/refine
+        Handler->>Container: Kill container
+        Handler->>Handler: Status = "failed"
+    end
 ```
 
 Both `RefineSessions []RefinementSession` (past history) and `CurrentRefinement *RefinementJob` (present job) live on the Task struct. `RefineSessions` grows over time as each refinement is applied (capped at `DefaultRefineSessionsLimit` = 5); `CurrentRefinement` is replaced on each new run and cleared on dismiss.
@@ -228,15 +251,17 @@ Forking is available from `waiting`, `failed`, or `done` tasks.
 
 When autopilot is enabled, the server automatically promotes backlog tasks to `in_progress` as capacity becomes available, without requiring the user to drag cards manually.
 
-```
-PUT /api/config { "autopilot": true }
-  ↓
-  StartAutoPromoter goroutine subscribes to store change notifications.
-  On each state change:
-    If autopilot enabled and in_progress count < WALLFACER_MAX_PARALLEL:
-      Pick the lowest-position backlog task.
-      Skip if task has unmet DependsOn or ScheduledAt in the future.
-      Promote it to in_progress and launch runner.Run.
+```mermaid
+flowchart TD
+    Enable["PUT /api/config\nautopilot: true"] --> Subscribe["StartAutoPromoter\nsubscribes to store changes"]
+    Subscribe --> Check{"On each state change:\nautopilot enabled?"}
+    Check -->|no| Skip[Skip]
+    Check -->|yes| Capacity{"in_progress count\n< MAX_PARALLEL?"}
+    Capacity -->|no| Skip
+    Capacity -->|yes| Pick["Pick lowest-position\nbacklog task"]
+    Pick --> Deps{"DependsOn met?\nScheduledAt reached?"}
+    Deps -->|no| Skip
+    Deps -->|yes| Promote["Promote to in_progress\nlaunch runner.Run"]
 ```
 
 Concurrency limit is read from `WALLFACER_MAX_PARALLEL` in the env file (default: 5). Autopilot is off by default and does not persist across server restarts.
@@ -475,7 +500,7 @@ data/<uuid>/
     └── <oversight-id>.json   # generated oversight summary
 ```
 
-All writes are atomic (temp file + `os.Rename`). On startup, `task.json` files are loaded into memory and migrated to `CurrentTaskSchemaVersion` if needed. See [Architecture](architecture.md#design-choices) for the persistence design rationale.
+All writes are atomic (temp file + `os.Rename`). On startup, `task.json` files are loaded into memory and migrated to `CurrentTaskSchemaVersion` if needed. See [Architecture](architecture.md#design-decisions) for the persistence design rationale.
 
 ### Soft Delete
 

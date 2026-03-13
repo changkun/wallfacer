@@ -190,16 +190,23 @@ When `MountWorktrees` is enabled on a task, eligible sibling worktrees (from tas
 
 Both task state and git status use the same SSE push pattern:
 
-```
-UI opens EventSource → GET /api/tasks/stream
-  handler registers subscriber channel
-  ↓
-any store.Write() call → notify() sends signal (non-blocking, coalesced)
-  ↓
-handler wakes, serialises full task list as JSON
-  sends: data: <json>\n\n
-  ↓
-UI receives event → re-renders board
+```mermaid
+sequenceDiagram
+    participant UI
+    participant Handler
+    participant Store
+
+    UI->>Handler: GET /api/tasks/stream (SSE)
+    Handler->>Handler: Register subscriber channel
+
+    Store->>Store: Write() mutates state
+    Store->>Handler: notify() (non-blocking, coalesced)
+    Handler->>Handler: Serialise full task list as JSON
+    Handler-->>UI: SSE: data: {json}
+
+    Note over Handler: Buffered channel (size 1)
+    Note over Handler: Duplicate signals dropped,
+    Note over Handler: subscriber gets latest state
 ```
 
 `notify()` uses a buffered channel of size 1. If a signal is already pending (UI hasn't drained yet), the new signal is dropped — the subscriber will still get the latest state on the next drain. This coalesces bursts of rapid state changes into a single UI update.
@@ -299,7 +306,7 @@ In addition to the aggregate `TaskUsage`, each task records:
 
 ## Multi-Workspace Support
 
-Multiple workspace paths can be passed at startup (see [Architecture — Configuration](architecture.md#configuration)) or switched at runtime via `PUT /api/workspaces`. For each workspace:
+Multiple workspace paths can be passed at startup or switched at runtime via `PUT /api/workspaces`. For each workspace:
 
 - Git status is polled independently and shown in the UI header
 - A separate worktree is created per task per workspace
@@ -311,18 +318,17 @@ Non-git directories are supported as plain mount targets (no worktree, no commit
 
 When `git rebase` fails during the commit pipeline:
 
-```
-rebase fails with conflict
-  ↓
-wallfacer invokes agent (same session ID) with conflict details
-  ↓
-agent resolves conflicts, stages files
-  ↓
-wallfacer runs `git rebase --continue`
-  ↓
-if still failing: repeat up to 3 times
-  ↓
-if all retries exhausted: mark task failed, clean up worktrees
+```mermaid
+flowchart TD
+    Rebase["git rebase default-branch"] --> Result{"Rebase\nsucceeded?"}
+    Result -->|yes| FFMerge["git merge --ff-only\ntask branch into default"]
+    Result -->|no| Invoke["Invoke agent\n(same session ID)\nwith conflict details"]
+    Invoke --> Resolve["Agent resolves conflicts\nand stages files"]
+    Resolve --> Continue["git rebase --continue"]
+    Continue --> Retry{"Still\nfailing?"}
+    Retry -->|"no (resolved)"| FFMerge
+    Retry -->|"yes (attempt < 3)"| Invoke
+    Retry -->|"yes (attempts exhausted)"| Failed["Mark task failed\nclean up worktrees"]
 ```
 
 Using the same session ID means the agent has full context of the original task when making conflict resolution decisions.
@@ -331,28 +337,19 @@ Using the same session ID means the agent has full context of the original task 
 
 `POST /api/tasks/{id}/test` runs a separate verification agent on a `waiting` task without committing:
 
-```
-waiting task + user clicks Test
-  ↓
-handler sets IsTestRun=true, clears LastTestResult
-  ↓
-task status: waiting → in_progress
-  ↓
-fresh container (no --resume) runs with a structured test prompt:
-  "Examine the code, run tests, verify requirements.
-   End your response with **PASS** or **FAIL**."
-  ↓
-runner loop (isTestRun=true):
-  - tracks turn count separately (TestRunStartTurn boundary)
-  - does NOT update the implementation sessionID or result
-  - handles max_tokens / pause_turn by resuming the test session (not impl session)
-  ↓
-on end_turn:
-  parseTestVerdict() extracts verdict from last line or **PASS**/**FAIL** markers
-  verdict: "pass" | "fail" | "unknown"
-  IsTestRun set back to false
-  LastTestResult = verdict
-  task status: in_progress → waiting (no commit pipeline)
+```mermaid
+flowchart TD
+    Click["User clicks Test\non waiting task"] --> Setup["Set IsTestRun=true\nclear LastTestResult"]
+    Setup --> Transition["waiting to in_progress"]
+    Transition --> Launch["Launch fresh container\n(no --resume, new session)\nwith test prompt"]
+    Launch --> Loop["Runner loop\n(isTestRun=true)"]
+    Loop --> StopReason{"stop_reason?"}
+    StopReason -->|"max_tokens / pause_turn"| Loop
+    StopReason -->|end_turn| Parse["parseTestVerdict()\nextract PASS / FAIL"]
+    Parse --> Record["IsTestRun = false\nLastTestResult = verdict\nin_progress to waiting\n(no commit pipeline)"]
+
+    Note1["TestRunStartTurn marks boundary\nbetween implementation and test output"]
+    style Note1 fill:none,stroke-dasharray: 5 5
 ```
 
 The UI splits the live output panel into "Implementation" and "Test" sections using `TestRunStartTurn` as the boundary.
@@ -361,19 +358,21 @@ The UI splits the live output panel into "Implementation" and "Test" sections us
 
 Autopilot automatically promotes backlog tasks without user drag-and-drop:
 
-```
-StartAutoPromoter():
-  subscribe to store change notifications (buffered channel, coalesced)
-  on each notification:
-    if autopilot disabled → skip
-    lock promoteMu (serialise concurrent notifications)
-    count in_progress tasks
-    if count < WALLFACER_MAX_PARALLEL and backlog not empty:
-      pick lowest-position backlog task
-      skip if DependsOn has unmet dependencies
-      skip if ScheduledAt is in the future
-      update status: backlog → in_progress
-      go runner.Run(task)
+```mermaid
+flowchart TD
+    Start["StartAutoPromoter()\nsubscribe to store changes"] --> Notify{"Notification\nreceived"}
+    Notify --> Enabled{"Autopilot\nenabled?"}
+    Enabled -->|no| Wait[Wait for next notification]
+    Enabled -->|yes| Lock["Lock promoteMu"]
+    Lock --> Count{"in_progress\n< MAX_PARALLEL?"}
+    Count -->|no| Unlock[Unlock]
+    Count -->|yes| Pick["Pick lowest-position\nbacklog task"]
+    Pick --> Deps{"DependsOn met?\nScheduledAt reached?"}
+    Deps -->|no| Unlock
+    Deps -->|yes| Promote["backlog to in_progress\ngo runner.Run(task)"]
+    Promote --> Unlock
+    Unlock --> Wait
+    Wait --> Notify
 ```
 
 `WALLFACER_MAX_PARALLEL` defaults to 5. The lock ensures two simultaneous state changes cannot both promote tasks, which would exceed the limit. Autopilot state is toggled via `PUT /api/config {"autopilot": true/false}` and does not persist across restarts.
@@ -382,39 +381,43 @@ StartAutoPromoter():
 
 `POST /api/tasks/{id}/refine` launches a sandbox container to analyse the codebase and produce a detailed implementation spec:
 
-```
-POST /api/tasks/{id}/refine
-  body: { user_instructions? }   // optional additional instructions
-  ↓
-  Sets CurrentRefinement.Status = "running".
-  Launches sandbox container in background (runner.RunRefinementBackground).
-  Returns immediately with 202 Accepted.
-  ↓
-GET /api/tasks/{id}/refine/logs  (SSE)
-  Client streams container output in real time.
-  ↓
-Container finishes:
-  CurrentRefinement.Status = "done", Result = refined prompt/spec text.
-  — or —
-  CurrentRefinement.Status = "failed", Error = failure message.
+```mermaid
+sequenceDiagram
+    participant User
+    participant Handler
+    participant Runner
+    participant Container
 
-POST /api/tasks/{id}/refine/apply
-  body: { prompt }
-  ↓
-  Saves a RefinementSession (recording the sandbox result and the applied prompt).
-  Moves current Prompt to PromptHistory.
-  Sets task.Prompt = refined prompt.
-  Clears CurrentRefinement.
-  Triggers background title regeneration.
+    User->>Handler: POST /api/tasks/{id}/refine
+    Handler->>Runner: RunRefinementBackground()
+    Handler-->>User: 202 Accepted
 
-POST /api/tasks/{id}/refine/dismiss
-  ↓
-  Clears CurrentRefinement without changing the prompt.
+    User->>Handler: GET /api/tasks/{id}/refine/logs (SSE)
+    Runner->>Container: Launch sandbox
+    Container-->>Handler: Stream output
+    Handler-->>User: SSE events
 
-DELETE /api/tasks/{id}/refine
-  ↓
-  Kills the running refinement container.
-  Sets CurrentRefinement.Status = "failed".
+    alt Container succeeds
+        Container-->>Runner: Result = refined spec
+        Runner->>Runner: Status = "done"
+    else Container fails
+        Container-->>Runner: Error
+        Runner->>Runner: Status = "failed"
+    end
+
+    alt User applies
+        User->>Handler: POST /refine/apply {prompt}
+        Handler->>Handler: Save RefinementSession
+        Handler->>Handler: Prompt to PromptHistory
+        Handler->>Handler: Set Prompt = refined
+        Handler->>Runner: Trigger title regeneration
+    else User dismisses
+        User->>Handler: POST /refine/dismiss
+        Handler->>Handler: Clear CurrentRefinement
+    else User cancels
+        User->>Handler: DELETE /refine
+        Handler->>Container: Kill container
+    end
 ```
 
 ## Oversight Generation Flow
@@ -423,19 +426,15 @@ Oversight is generated asynchronously whenever a task transitions to `waiting`, 
 
 `POST /api/tasks/generate-oversight` triggers generation for tasks that are missing summaries.
 
-```
-Task reaches waiting/done/failed
-  ↓
-background goroutine: runner.GenerateOversight(taskID)
-  ↓
-TaskOversight.Status → "generating"
-reads trace events from traces/NNNN.json
-sends to Claude (via configured credentials) with a summarisation prompt
-  ↓
-response parsed into []OversightPhase (logical groupings of work)
-  ↓
-TaskOversight.Status → "ready"
-stored in oversights/<id>.json
+```mermaid
+flowchart TD
+    Trigger["Task reaches\nwaiting / done / failed"] --> BG["Background goroutine:\nGenerateOversight(taskID)"]
+    BG --> Status1["TaskOversight.Status\n= generating"]
+    Status1 --> Read["Read trace events\nfrom traces/NNNN.json"]
+    Read --> Send["Send to Claude with\nsummarisation prompt"]
+    Send --> Parse["Parse response into\nOversightPhase list"]
+    Parse --> Status2["TaskOversight.Status\n= ready"]
+    Status2 --> Store["Store in\noversights/id.json"]
 ```
 
 Served by:
@@ -446,18 +445,16 @@ The UI renders phases in the Oversight tab and as an interactive flamegraph Time
 
 ## Ideation / Brainstorm Agent Flow
 
-```
-POST /api/ideate
-  ↓
-  Creates a special task with Kind = "idea-agent".
-  Launches a sandbox container that:
-    - Reads workspace directory contents
-    - Analyses code structure and identifies opportunities
-    - Creates backlog tasks via the wallfacer API, each tagged appropriately
-  Container runs to completion; created tasks appear on the board.
+```mermaid
+flowchart TD
+    Trigger["POST /api/ideate"] --> Create["Create task with\nKind = idea-agent"]
+    Create --> Launch["Launch sandbox container"]
+    Launch --> Analyse["Read workspace contents\nanalyse code structure"]
+    Analyse --> Generate["Create backlog tasks\nvia wallfacer API\n(each tagged)"]
+    Generate --> Done["Container completes\ntasks appear on board"]
 
-GET /api/ideate  — returns current ideation session state (task ID, status, created task count)
-DELETE /api/ideate  — kills running ideation container, marks task cancelled
+    Status["GET /api/ideate\nreturns session state"]
+    Cancel["DELETE /api/ideate\nkills container"]
 ```
 
 ## Webhook Notifications

@@ -4,11 +4,15 @@
 
 Every task gets its own git worktree. The agent operates in an isolated copy of each repository on a dedicated branch, leaving the main working tree untouched and allowing multiple tasks to run concurrently without interfering with each other.
 
-```
-Main repo (~/projects/myapp)          Task worktree
-  branch: main                          branch: task/a1b2c3d4
-  working tree: clean                   working tree: mounted into container
-                                        path: ~/.wallfacer/worktrees/<uuid>/myapp
+```mermaid
+graph LR
+    subgraph Main["Main repo (~/projects/myapp)"]
+        MB["branch: main\nworking tree: clean"]
+    end
+    subgraph Worktree["Task worktree (~/.wallfacer/worktrees/uuid/myapp)"]
+        TB["branch: task/a1b2c3d4\nmounted into container"]
+    end
+    Main -.->|"git worktree add"| Worktree
 ```
 
 ## Worktree Setup
@@ -17,15 +21,10 @@ Called by `setupWorktrees()` in `runner.go` when a task enters `in_progress`.
 
 For each configured workspace:
 
-```
-1. git rev-parse --git-dir
-       └─ verify the path is a git repository
-
-2. git worktree add -b task/<uuid8> \
-       ~/.wallfacer/worktrees/<task-uuid>/<repo-basename>
-       └─ creates a new branch and a new working tree simultaneously
-
-3. store worktree path + branch name on the Task struct
+```mermaid
+flowchart TD
+    A["git rev-parse --git-dir\nverify path is a git repo"] --> B["git worktree add -b task/uuid8\n~/.wallfacer/worktrees/task-uuid/repo-basename"]
+    B --> C["Store worktree path + branch name\non the Task struct"]
 ```
 
 Branch naming uses the first 8 characters of the task UUID: `task/a1b2c3d4`.
@@ -67,14 +66,17 @@ in each worktree. This happens inside the sandbox with the same user identity as
 
 ### Phase 2 — Rebase & Merge (host-side, `git.go`)
 
-```
-git rebase <default-branch>
-  └─ rebases task branch on top of the current default branch HEAD
-  └─ on conflict: retry up to 3 times, invoking Claude's conflict resolver each time
-
-git merge --ff-only <task-branch>
-  └─ fast-forward merges the rebased task branch into the default branch
-  └─ collect resulting commit hashes
+```mermaid
+flowchart TD
+    Rebase["git rebase default-branch"] --> Check{"Conflicts?"}
+    Check -->|no| Merge["git merge --ff-only task-branch\ninto default branch"]
+    Check -->|yes| Resolve["Invoke agent with conflict details\n(same session ID)"]
+    Resolve --> Continue["git rebase --continue"]
+    Continue --> Retry{"Still\nfailing?"}
+    Retry -->|"no"| Merge
+    Retry -->|"yes (< 3 attempts)"| Resolve
+    Retry -->|"yes (exhausted)"| Failed["Task marked failed"]
+    Merge --> Hashes["Collect resulting commit hashes"]
 ```
 
 `defaultBranch()` resolves the target branch by checking, in order:
@@ -121,21 +123,18 @@ This handles crashes where cleanup never ran.
 
 Tasks in `waiting` or `failed` status can be synced with the latest default branch via `POST /api/tasks/{id}/sync`. This rebases the task worktree onto the current default branch HEAD without merging, keeping the task's changes on top.
 
-```
-POST /api/tasks/{id}/sync
-  ↓
-task status → in_progress (temporarily)
-  ↓
-for each worktree:
-  git fetch origin
-  git rebase <default-branch>
-    └─ on conflict: invoke agent (same session) to resolve, up to 3 retries
-  ↓
-task status → previous status (waiting or failed)    [conflicts resolved]
-  ↓
-if rebase fails after retries:
-  agent (Run) invoked with conflict resolution prompt → task stays in_progress
-  └─ agent resolves conflict → task status → waiting (or done on end_turn)
+```mermaid
+flowchart TD
+    Sync["POST /api/tasks/{id}/sync"] --> InProgress["Task status\nto in_progress (temporarily)"]
+    InProgress --> Fetch["For each worktree:\ngit fetch origin"]
+    Fetch --> Rebase["git rebase default-branch"]
+    Rebase --> Result{"Rebase\nsucceeded?"}
+    Result -->|yes| Restore["Restore previous status\n(waiting or failed)"]
+    Result -->|no| Resolve["Invoke agent\n(same session)\nto resolve conflicts"]
+    Resolve --> Retry{"Resolved\nwithin 3 attempts?"}
+    Retry -->|yes| Restore
+    Retry -->|no| RunAgent["Invoke agent (Run)\nwith conflict prompt\ntask stays in_progress"]
+    RunAgent --> AgentResult["Agent resolves conflict\ntask to waiting or done"]
 ```
 
 This is useful when other tasks have merged changes to the default branch and you want the current task to pick them up before continuing.

@@ -111,12 +111,34 @@ function updateNextRunDisplay() {
   el.style.display = 'inline';
 }
 
-// _syncIdeationControls keeps the settings modal controls in sync with state.
+// _syncIdeationControls keeps the settings modal and header controls in sync with state.
 function _syncIdeationControls() {
   const toggle = document.getElementById('ideation-toggle');
   if (toggle) toggle.checked = ideation;
+  const headerToggle = document.getElementById('ideation-header-toggle');
+  if (headerToggle) headerToggle.checked = ideation;
   const sel = document.getElementById('ideation-interval');
   if (sel) sel.value = String(ideationInterval);
+}
+
+// toggleIdeationHeader is called by the header toggle chip.
+// It delegates to the existing toggleIdeation logic.
+async function toggleIdeationHeader() {
+  const headerToggle = document.getElementById('ideation-header-toggle');
+  const enabled = headerToggle ? headerToggle.checked : !ideation;
+  try {
+    const res = await api('/api/config', {
+      method: 'PUT',
+      body: JSON.stringify({ ideation: enabled }),
+    });
+    ideation = !!res.ideation;
+    ideationNextRun = res.ideation_next_run || null;
+    _syncIdeationControls();
+    updateNextRunDisplay();
+  } catch (e) {
+    showAlert('Error toggling brainstorm: ' + e.message);
+    if (headerToggle) headerToggle.checked = ideation;
+  }
 }
 
 // updateIdeationConfig updates local state from a config response object.

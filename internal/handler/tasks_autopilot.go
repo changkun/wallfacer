@@ -423,6 +423,10 @@ func (h *Handler) StartWaitingSyncWatcher(ctx context.Context) {
 // containers and therefore bypass the regular task capacity check. This ensures
 // waiting tasks stay up to date even when the board is running at full capacity.
 func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
+	if !h.AutosyncEnabled() {
+		return
+	}
+
 	tasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 	if err != nil {
 		return
@@ -845,4 +849,78 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 			return submitted, nil
 		},
 	})
+}
+
+// autoRefineInterval is how often the auto-refiner polls for backlog tasks.
+const autoRefineInterval = 30 * time.Second
+
+// StartAutoRefiner subscribes to store change notifications and automatically
+// triggers the refinement agent for backlog tasks that have not yet been refined.
+func (h *Handler) StartAutoRefiner(ctx context.Context) {
+	subID, ch := h.store.Subscribe()
+	ticker := time.NewTicker(autoRefineInterval)
+	go func() {
+		defer h.store.Unsubscribe(subID)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ch:
+				h.tryAutoRefine(ctx)
+			case <-ticker.C:
+				h.tryAutoRefine(ctx)
+			}
+		}
+	}()
+}
+
+// tryAutoRefine scans backlog tasks and triggers the refinement agent for any
+// that have not yet been refined and do not have a refinement currently running.
+// Does nothing when auto-refine is disabled.
+func (h *Handler) tryAutoRefine(ctx context.Context) {
+	if !h.AutorefineEnabled() {
+		return
+	}
+
+	backlogTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusBacklog)
+	if err != nil {
+		return
+	}
+
+	for i := range backlogTasks {
+		t := &backlogTasks[i]
+		// Skip idea-agent tasks — they are auto-generated stubs, not user tasks.
+		if t.Kind == store.TaskKindIdeaAgent {
+			continue
+		}
+		// Skip tasks that already have a completed or running refinement.
+		if t.CurrentRefinement != nil {
+			continue
+		}
+		if len(t.RefineSessions) > 0 {
+			continue
+		}
+
+		logger.Handler.Info("auto-refine: triggering refinement for backlog task", "task", t.ID)
+
+		job := &store.RefinementJob{
+			ID:        uuid.New().String(),
+			CreatedAt: time.Now(),
+			Status:    store.RefinementJobStatusRunning,
+			Source:    "auto",
+		}
+		if err := h.store.StartRefinementJobIfIdle(ctx, t.ID, job); err != nil {
+			continue // already running or race — skip silently
+		}
+
+		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+			"result": "Auto-refine: triggering refinement agent for backlog task.",
+		})
+		h.runner.RunRefinementBackground(t.ID, "")
+		h.incAutopilotAction("auto_refiner", "refined")
+
+		// Only trigger one per poll to avoid overwhelming the system.
+		return
+	}
 }

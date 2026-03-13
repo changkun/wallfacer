@@ -47,14 +47,13 @@ let workspaceSelectionDraft = [];
 let workspaceGroupSwitchingIndex = -1;
 let workspaceGroupSwitching = false;
 
-// Autopilot state
+// Automation toggle state
 let autopilot = false;
-
-// Auto-test state
+let autorefine = false;
 let autotest = false;
-
-// Auto-submit state
 let autosubmit = false;
+let autosync = false;
+let autopush = false;
 
 // Max parallel tasks (loaded from /api/env, 0 = not yet loaded)
 let maxParallelTasks = 0;
