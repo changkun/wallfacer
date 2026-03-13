@@ -69,12 +69,20 @@ func (h *Handler) UpdateSystemPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	mgr := h.runner.Prompts()
+	if err := mgr.Validate(name, req.Content); err != nil {
+		if isUnknownTemplateName(err) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
 	if err := mgr.WriteOverride(name, req.Content); err != nil {
 		if isUnknownTemplateName(err) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		// Template parse errors should return 422.
+		// Template parse errors and other write errors return 422.
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}

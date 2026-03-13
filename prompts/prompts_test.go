@@ -201,3 +201,71 @@ func TestPromptsDir_Empty(t *testing.T) {
 		t.Errorf("Default.PromptsDir() = %q, want empty", got)
 	}
 }
+
+// --- Validate ---
+
+// TestValidate_ParseError verifies that Validate returns an error for a
+// syntactically invalid template.
+func TestValidate_ParseError(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	err := mgr.Validate("refinement", "{{.Unclosed")
+	if err == nil {
+		t.Fatal("expected error for unclosed template action, got nil")
+	}
+	if !strings.Contains(err.Error(), "parse") {
+		t.Errorf("expected parse error, got: %v", err)
+	}
+}
+
+// TestValidate_ExecutionError verifies that Validate returns an error when the
+// template parses successfully but references a field that does not exist on
+// the typed context struct.
+func TestValidate_ExecutionError(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	// RefinementData has no field "FieldThatDoesNotExist".
+	err := mgr.Validate("refinement", "{{.FieldThatDoesNotExist}}")
+	if err == nil {
+		t.Fatal("expected execution error for unknown field, got nil")
+	}
+	if !strings.Contains(err.Error(), "execution") {
+		t.Errorf("expected execution error, got: %v", err)
+	}
+}
+
+// TestValidate_ValidOverride verifies that Validate returns nil for a template
+// that both parses and executes correctly against the known context.
+func TestValidate_ValidOverride(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	if err := mgr.Validate("refinement", "Task: {{.Prompt}}"); err != nil {
+		t.Errorf("expected nil for valid override, got: %v", err)
+	}
+}
+
+// TestValidate_UnknownName verifies that Validate returns an error for a name
+// that is not in the known template set.
+func TestValidate_UnknownName(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	err := mgr.Validate("nonexistent", "some content")
+	if err == nil {
+		t.Fatal("expected error for unknown template name, got nil")
+	}
+	if !strings.Contains(err.Error(), "unknown template name") {
+		t.Errorf("expected unknown-name error, got: %v", err)
+	}
+}
+
+// TestValidate_AllKnownNamesWithEmbeddedDefaults verifies that the embedded
+// default content passes Validate for every known template name. This acts as
+// a regression guard ensuring embedded templates remain self-consistent.
+func TestValidate_AllKnownNamesWithEmbeddedDefaults(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	for _, name := range mgr.KnownNames() {
+		content, _, err := mgr.Content(name)
+		if err != nil {
+			t.Fatalf("Content(%q): %v", name, err)
+		}
+		if err := mgr.Validate(name, content); err != nil {
+			t.Errorf("Validate(%q) on embedded default: %v", name, err)
+		}
+	}
+}

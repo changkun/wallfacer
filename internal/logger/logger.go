@@ -20,6 +20,7 @@ var (
 	Git      *slog.Logger
 	Handler  *slog.Logger
 	Recovery *slog.Logger
+	Prompts  *slog.Logger
 )
 
 func init() {
@@ -43,6 +44,7 @@ func Init(format string) {
 	Git = base.With("component", "git")
 	Handler = base.With("component", "handler")
 	Recovery = base.With("component", "recovery")
+	Prompts = base.With("component", "prompts")
 }
 
 // Fatal logs at error level and exits with code 1.
