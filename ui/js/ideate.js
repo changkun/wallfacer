@@ -135,6 +135,7 @@ async function toggleIdeationHeader() {
     ideationNextRun = res.ideation_next_run || null;
     _syncIdeationControls();
     updateNextRunDisplay();
+    if (typeof updateAutomationActiveCount === 'function') updateAutomationActiveCount();
   } catch (e) {
     showAlert('Error toggling brainstorm: ' + e.message);
     if (headerToggle) headerToggle.checked = ideation;
