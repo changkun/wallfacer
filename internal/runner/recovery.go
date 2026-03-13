@@ -2,6 +2,9 @@ package runner
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"changkun.de/wallfacer/internal/gitutil"
@@ -15,6 +18,32 @@ const containerPollInterval = 5 * time.Second
 // ContainerLister can enumerate currently running containers.
 type ContainerLister interface {
 	ListContainers() ([]ContainerInfo, error)
+}
+
+func missingRecoveryWorktrees(t store.Task) []string {
+	var missing []string
+	for repoPath, worktreePath := range t.WorktreePaths {
+		if worktreePath == "" {
+			missing = append(missing, repoPath)
+			continue
+		}
+		if _, err := os.Stat(worktreePath); err != nil {
+			missing = append(missing, repoPath)
+		}
+	}
+	return missing
+}
+
+func markTaskFailedForMissingWorktrees(ctx context.Context, s *store.Store, task store.Task, from store.TaskStatus, trigger store.Trigger) {
+	message := fmt.Sprintf("task worktree missing for: %s", strings.Join(missingRecoveryWorktrees(task), ", "))
+	logger.Recovery.Warn("task worktree missing during recovery", "task", task.ID, "from", from, "error", message)
+	s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	s.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryWorktree)
+	s.InsertEvent(ctx, task.ID, store.EventTypeError, map[string]string{
+		"error": message,
+	})
+	s.InsertEvent(ctx, task.ID, store.EventTypeStateChange,
+		store.NewStateChangeData(from, store.TaskStatusFailed, trigger, nil))
 }
 
 // RecoverOrphanedTasks reconciles in_progress/committing tasks on startup by
@@ -101,6 +130,10 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 				})
 				go monitorContainerUntilStopped(ctx, s, lister, t.ID)
 			} else {
+				if len(missingRecoveryWorktrees(t)) > 0 {
+					markTaskFailedForMissingWorktrees(ctx, s, t, store.TaskStatusInProgress, store.TriggerRecovery)
+					continue
+				}
 				// Container is gone — move to waiting so the user can review
 				// partial results and decide whether to continue or finish.
 				//
@@ -164,6 +197,10 @@ func monitorContainerUntilStoppedWithConfig(ctx context.Context, s *store.Store,
 		}
 		if cur.Status != store.TaskStatusInProgress {
 			// Task was already transitioned by another path (e.g. cancelled).
+			return
+		}
+		if len(missingRecoveryWorktrees(*cur)) > 0 {
+			markTaskFailedForMissingWorktrees(storeCtx, s, *cur, store.TaskStatusInProgress, store.TriggerRecovery)
 			return
 		}
 		// ForceUpdateTaskStatus is used here because a crash may leave a task in an

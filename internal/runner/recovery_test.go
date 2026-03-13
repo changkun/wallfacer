@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -155,6 +156,56 @@ func TestRecoverOrphanedTasks(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRecoverOrphanedTasks_InProgressMissingWorktreeBecomesFailed(t *testing.T) {
+	s, err := store.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	task, err := s.CreateTask(ctx, "test task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{"/repo": filepath.Join(t.TempDir(), "missing-wt")}, "task/branch"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	RecoverOrphanedTasks(ctx, s, &mockLister{})
+
+	updated, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != store.TaskStatusFailed {
+		t.Fatalf("status = %q, want %q", updated.Status, store.TaskStatusFailed)
+	}
+	if updated.FailureCategory != store.FailureCategoryWorktree {
+		t.Fatalf("failure_category = %q, want %q", updated.FailureCategory, store.FailureCategoryWorktree)
+	}
+
+	events, err := s.GetEvents(context.Background(), task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := eventTypes(events)
+	want := []store.EventType{store.EventTypeError, store.EventTypeStateChange}
+	if len(got) != len(want) {
+		t.Fatalf("event types = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("event[%d] = %q, want %q", i, got[i], want[i])
+		}
 	}
 }
 
@@ -398,6 +449,49 @@ func TestMonitorContainerUntilStoppedWithConfig_Timeout(t *testing.T) {
 	for i, want := range wantEvents {
 		if got2[i] != want {
 			t.Errorf("event[%d] = %q, want %q", i, got2[i], want)
+		}
+	}
+}
+
+func TestMonitorContainerUntilStoppedWithConfig_MissingWorktreeBecomesFailed(t *testing.T) {
+	s, task := setupInProgressTask(t)
+
+	if err := s.UpdateTaskWorktrees(context.Background(), task.ID,
+		map[string]string{"/repo": filepath.Join(t.TempDir(), "missing-wt")}, "task/branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	lister := &mockLister{}
+
+	monitorContainerUntilStoppedWithConfig(
+		context.Background(), s, lister, task.ID,
+		10*time.Millisecond,
+		time.Hour,
+	)
+
+	got, err := s.GetTask(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.Status != store.TaskStatusFailed {
+		t.Errorf("status = %q, want failed", got.Status)
+	}
+	if got.FailureCategory != store.FailureCategoryWorktree {
+		t.Errorf("failure_category = %q, want %q", got.FailureCategory, store.FailureCategoryWorktree)
+	}
+
+	wantEvents := []store.EventType{store.EventTypeError, store.EventTypeStateChange}
+	events, err := s.GetEvents(context.Background(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	gotTypes := eventTypes(events)
+	if len(gotTypes) != len(wantEvents) {
+		t.Fatalf("event types = %v, want %v", gotTypes, wantEvents)
+	}
+	for i, want := range wantEvents {
+		if gotTypes[i] != want {
+			t.Errorf("event[%d] = %q, want %q", i, gotTypes[i], want)
 		}
 	}
 }

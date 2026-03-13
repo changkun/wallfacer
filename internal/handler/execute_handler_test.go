@@ -338,7 +338,7 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 	}
 }
 
-func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
+func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAutopilot(true)
 	h.SetAutotest(true)
@@ -368,20 +368,20 @@ func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 	var updated *store.Task
 	for range 20 {
 		updated, _ = h.store.GetTask(ctx, task.ID)
-		if updated != nil && updated.Status == store.TaskStatusWaiting {
+		if updated != nil && updated.Status == store.TaskStatusDone {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if updated == nil || updated.Status != store.TaskStatusWaiting {
-		t.Fatalf("expected task to return to waiting, got %v", updated.Status)
+	if updated == nil || updated.Status != store.TaskStatusDone {
+		t.Fatalf("expected task to reach done via fallback commit message, got %v", updated.Status)
 	}
 
-	if got := gitRun(t, wt, "rev-list", "--count", "HEAD"); got != "1" {
-		t.Fatalf("expected no new commit in worktree after commit message failure, got %s commits", got)
+	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "2" {
+		t.Fatalf("expected fallback commit to land on repo, got %s commits", got)
 	}
 	if !h.AutopilotEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
-		t.Fatal("expected manual completion failure to leave automation toggles unchanged")
+		t.Fatal("expected fallback commit path to leave automation toggles unchanged")
 	}
 }
 
