@@ -630,6 +630,27 @@ func TestGenerateTitleSuccess(t *testing.T) {
 	}
 }
 
+// TestGenerateTitleAcceptsValidOutputOnNonZeroExit verifies that title
+// generation still succeeds when the agent exits non-zero after emitting a
+// valid final result payload.
+func TestGenerateTitleAcceptsValidOutputOnNonZeroExit(t *testing.T) {
+	cmd := fakeCmdScript(t, titleOutput, 1)
+	s, r := setupRunnerWithCmd(t, nil, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Fix the login bug in the authentication module", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.GenerateTitle(task.ID, task.Prompt)
+
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.Title != "Fix Login Bug" {
+		t.Fatalf("expected title 'Fix Login Bug', got %q", updated.Title)
+	}
+}
+
 // TestGenerateTitleSkipsExistingTitle verifies that GenerateTitle is a no-op
 // when the task already has a title.
 func TestGenerateTitleSkipsExistingTitle(t *testing.T) {

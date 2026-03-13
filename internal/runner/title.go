@@ -38,6 +38,8 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	type titleResult struct {
 		output *agentOutput
 		err    error
+		model  string
+		sb     sandbox.Type
 	}
 	runWithSandbox := func(selected sandbox.Type) titleResult {
 		mdl := r.titleModelFromEnvForSandbox(selected)
@@ -56,20 +58,39 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		runErr := cmd.Run()
 		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityTitle})
 
-		if runErr != nil && ctx.Err() == nil {
-			return titleResult{err: fmt.Errorf("%w: stderr=%s", runErr, truncate(stderr.String(), 200))}
+		if ctx.Err() != nil {
+			return titleResult{err: fmt.Errorf("container terminated: %w", ctx.Err()), model: mdl, sb: selected}
 		}
 
 		raw := strings.TrimSpace(stdout.String())
 		if raw == "" {
-			return titleResult{err: fmt.Errorf("empty output")}
+			if runErr != nil {
+				return titleResult{err: fmt.Errorf("%w: stderr=%s", runErr, truncate(stderr.String(), 200)), model: mdl, sb: selected}
+			}
+			return titleResult{err: fmt.Errorf("empty output"), model: mdl, sb: selected}
 		}
 
 		parsed, parseErr := parseOutput(raw)
 		if parseErr != nil {
-			return titleResult{err: fmt.Errorf("parse failure: raw=%s", truncate(raw, 200))}
+			if runErr != nil {
+				return titleResult{
+					err:   fmt.Errorf("%w: stderr=%s stdout=%s", runErr, truncate(stderr.String(), 200), truncate(raw, 200)),
+					model: mdl,
+					sb:    selected,
+				}
+			}
+			return titleResult{err: fmt.Errorf("parse failure: raw=%s", truncate(raw, 200)), model: mdl, sb: selected}
 		}
-		return titleResult{output: parsed}
+		if runErr != nil {
+			if exitErr, ok := runErr.(*exec.ExitError); ok {
+				logger.Runner.Warn("title generation: container exited non-zero but produced valid output",
+					"task", taskID, "code", exitErr.ExitCode(), "sandbox", selected, "model", mdl)
+			} else {
+				logger.Runner.Warn("title generation: container error but produced valid output",
+					"task", taskID, "error", runErr, "sandbox", selected, "model", mdl)
+			}
+		}
+		return titleResult{output: parsed, model: mdl, sb: selected}
 	}
 
 	res := runWithSandbox(sb)
@@ -97,7 +118,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	}
 
 	if res.err != nil {
-		logger.Runner.Warn("title generation failed", "task", taskID, "error", res.err)
+		logger.Runner.Warn("title generation failed", "task", taskID, "sandbox", res.sb, "model", res.model, "error", res.err)
 		return
 	}
 	output := res.output
