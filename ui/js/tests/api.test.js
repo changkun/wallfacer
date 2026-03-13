@@ -256,6 +256,24 @@ describe('showWorkspacePicker', () => {
   });
 });
 
+describe('renderWorkspaceSelectionDraft', () => {
+  it('renders a safe remove button handler for selected paths', () => {
+    const listEl = { innerHTML: '' };
+    const ctx = makeContext({
+      elements: [['workspace-selection-list', listEl]],
+    });
+    loadScript(ctx, 'utils.js');
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    vm.runInContext('workspaceSelectionDraft = ["/Users/test/dev/repo"];', ctx);
+    ctx.renderWorkspaceSelectionDraft();
+
+    expect(listEl.innerHTML).toContain('data-workspace-path="/Users/test/dev/repo"');
+    expect(listEl.innerHTML).toContain('onclick="removeWorkspaceSelection(this.dataset.workspacePath)"');
+  });
+});
+
 describe('browseWorkspaces', () => {
   it('skips hidden folders by default', async () => {
     const pathInput = { value: '/Users/test/dev' };
