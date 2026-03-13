@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -212,5 +213,74 @@ func TestRunTwoPhase(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.run(t, ctx)
 		})
+	}
+}
+
+func TestRunTwoPhase_Phase2MissCallbackFired(t *testing.T) {
+	ctx := context.Background()
+	candidate := makeTask(store.TaskStatusBacklog)
+	missCallbackFired := false
+
+	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
+		Name: "test-miss",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			return &candidate, nil
+		},
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			return false, nil
+		},
+		OnPhase2Miss: func(c *store.Task) {
+			missCallbackFired = true
+		},
+	})
+
+	if !missCallbackFired {
+		t.Fatal("expected OnPhase2Miss callback to be called when Phase2 returns (false, nil)")
+	}
+}
+
+func TestRunTwoPhase_Phase2MissCallbackNotFiredOnSuccess(t *testing.T) {
+	ctx := context.Background()
+	candidate := makeTask(store.TaskStatusBacklog)
+	missCallbackFired := false
+
+	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
+		Name: "test-success",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			return &candidate, nil
+		},
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			return true, nil
+		},
+		OnPhase2Miss: func(c *store.Task) {
+			missCallbackFired = true
+		},
+	})
+
+	if missCallbackFired {
+		t.Fatal("expected OnPhase2Miss callback NOT to be called when Phase2 returns (true, nil)")
+	}
+}
+
+func TestRunTwoPhase_Phase2MissCallbackNotFiredOnError(t *testing.T) {
+	ctx := context.Background()
+	candidate := makeTask(store.TaskStatusBacklog)
+	missCallbackFired := false
+
+	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
+		Name: "test-error",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			return &candidate, nil
+		},
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			return false, errors.New("phase2 error")
+		},
+		OnPhase2Miss: func(c *store.Task) {
+			missCallbackFired = true
+		},
+	})
+
+	if missCallbackFired {
+		t.Fatal("expected OnPhase2Miss callback NOT to be called when Phase2 returns an error")
 	}
 }

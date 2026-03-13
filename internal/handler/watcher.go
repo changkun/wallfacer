@@ -20,6 +20,10 @@ type TwoPhaseWatcherConfig struct {
 	Phase2 func(ctx context.Context, candidate *store.Task) (bool, error)
 	// AfterPhase1 is an optional test hook fired between Phase1 and acquiring the lock.
 	AfterPhase1 func()
+	// OnPhase2Miss is called when Phase2 returns (false, nil) indicating a benign
+	// race. It receives the candidate that was skipped. Callers may use this to
+	// increment a metric or schedule an immediate re-scan. May be nil.
+	OnPhase2Miss func(candidate *store.Task)
 }
 
 // runTwoPhase executes the two-phase protocol described above.
@@ -54,5 +58,8 @@ func runTwoPhase(ctx context.Context, mu *sync.Mutex, cfg TwoPhaseWatcherConfig)
 	if !ok {
 		logger.Handler.Debug("two-phase watcher: phase2 skipped candidate (benign race)",
 			"watcher", cfg.Name, "candidate", candidate.ID)
+		if cfg.OnPhase2Miss != nil {
+			cfg.OnPhase2Miss(candidate)
+		}
 	}
 }
