@@ -383,6 +383,52 @@ describe('renderHeaderWorkspaceGroupsMenu', () => {
     expect(switcherEl.innerHTML).toContain('repo-a + repo-b');
     expect(switcherEl.innerHTML).toContain('Current');
   });
+
+  it('shows a loading state while switching workspace groups', () => {
+    const switcherEl = {
+      innerHTML: '',
+      classList: {
+        _set: new Set(['hidden']),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        toggle(c) {
+          if (this._set.has(c)) {
+            this._set.delete(c);
+            return false;
+          }
+          this._set.add(c);
+          return true;
+        },
+      },
+    };
+    const switchBtn = { disabled: false, innerHTML: '' };
+    const ctx = makeContext({
+      elements: [
+        ['workspace-group-switcher', switcherEl],
+        ['workspace-group-switch-btn', switchBtn],
+      ],
+    });
+    loadScript(ctx, 'utils.js');
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    vm.runInContext(`
+      activeWorkspaces = ["/Users/test/repo-a"];
+      workspaceGroups = [
+        { workspaces: ["/Users/test/repo-a"] },
+        { workspaces: ["/Users/test/repo-b"] }
+      ];
+      workspaceGroupSwitching = true;
+      workspaceGroupSwitchingIndex = 1;
+    `, ctx);
+
+    ctx.renderHeaderWorkspaceGroupsMenu();
+
+    expect(switchBtn.disabled).toBe(true);
+    expect(switchBtn.innerHTML).toContain('Switching...');
+    expect(switcherEl.innerHTML).toContain('Switching...');
+    expect(switcherEl.innerHTML).toContain('spinner');
+  });
 });
 
 describe('browseWorkspaces', () => {
