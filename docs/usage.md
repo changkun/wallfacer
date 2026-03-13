@@ -14,13 +14,30 @@ Wallfacer presents a five-column task board. Every task card moves through these
 
 ## Creating Tasks
 
-Click **+ New Task** in the toolbar, enter a description of what you want the agent to do, and click **Add**. The card appears in Backlog with an auto-generated short title. Each task card has a model/sandbox selector so you can override the default container image for that task.
+Click **+ New Task** in the toolbar, enter a description of what you want the agent to do, and click Add. The card appears in Backlog with an auto-generated short title. Each task card has a model/sandbox selector so you can override the default container image for that task.
+
+### Batch Creation
+
+Use `POST /api/tasks/batch` to create multiple tasks atomically. This endpoint supports symbolic dependency wiring — tasks in the batch can reference each other by position so that dependencies are wired up as part of the same atomic operation.
+
+### Prompt Templates
+
+Save frequently used prompt patterns as templates via **Settings → Prompt Templates** or the API (`GET/POST/DELETE /api/templates`). When creating a task, select a template to pre-fill the prompt.
 
 ### Refining Prompts
 
 For complex tasks, sharpen the prompt before running it. Click the refine icon on a Backlog card to launch a sandbox agent that analyses your codebase and produces a detailed implementation spec. Stream the agent's output in real time. When it finishes, click **Apply** to replace the task prompt with the refined version, or **Dismiss** to discard it.
 
 Prompt refinement is only available for Backlog tasks.
+
+### Task Budgets
+
+Set per-task cost and token limits to prevent runaway execution:
+
+- **Max Cost (USD)** — the task is stopped when accumulated cost exceeds this threshold
+- **Max Input Tokens** — the task is stopped when cumulative input+cache tokens exceed this limit
+
+Set to 0 (default) for unlimited.
 
 ## Ideation
 
@@ -40,6 +57,7 @@ Click a card to open the detail panel, which shows:
 
 - Live log output as the agent works
 - Token usage and estimated cost (broken down by sub-agent activity)
+- Per-turn usage breakdown
 - The git diff of the agent's changes so far
 - **Oversight tab** — a high-level summary of what the agent did, organised into phases (e.g. "Reading codebase", "Implementing feature", "Running tests"). Each phase lists tools used, commands run, and key actions. The **Timeline** tab renders the same data as an interactive flamegraph.
 
@@ -47,9 +65,24 @@ Click a card to open the detail panel, which shows:
 
 Enable **Autopilot** from the toolbar to automatically promote Backlog tasks to In Progress as capacity becomes available. The concurrency limit defaults to 5 and is controlled by `WALLFACER_MAX_PARALLEL` in your env file. Autopilot is off by default and resets to off on server restart.
 
+### Auto-Test and Auto-Submit
+
+- **Auto-Test** — automatically runs the test verification agent on tasks that reach Waiting
+- **Auto-Submit** — automatically promotes verified waiting tasks to Done when conflict-free and up-to-date
+
+Both are toggled via the toolbar or `PUT /api/config`.
+
 ### Task Dependencies
 
 Tasks can declare other tasks as prerequisites (`DependsOn`). Autopilot will not promote a task to In Progress until all of its dependencies have reached Done. The dependency graph panel visualises these relationships.
+
+### Scheduled Execution
+
+Set `ScheduledAt` on a task to delay auto-promotion until a specific time. The auto-promoter skips tasks whose scheduled time has not yet arrived.
+
+### Auto-Retry
+
+Tasks can have an `AutoRetryBudget` that maps failure categories (timeout, budget_exceeded, worktree_setup, container_crash, agent_error, sync_error) to retry counts. When a task fails, the runner checks the budget for that failure category and automatically retries if budget remains.
 
 ## Handling Waiting Tasks
 
@@ -61,7 +94,12 @@ When the agent needs clarification or is blocked, the card moves to **Waiting**.
 | **Mark done** | Skip any remaining agent turns and commit the current changes as-is |
 | **Run test** | Launch a separate verification agent to check whether the work meets requirements (see below) |
 | **Sync** | Rebase the task branch onto the latest default branch — useful when other tasks have merged since this one started |
+| **Fork** | Create a new backlog task branched from the current worktree state — useful for exploring alternative approaches |
 | **Cancel** | Discard all changes and delete the task branch; execution history is preserved |
+
+## Task Forking
+
+From a **Waiting**, **Failed**, or **Done** task, click **Fork** to create a new backlog task that inherits the current worktree state. The forked task starts with the source task's code changes already applied, allowing you to continue work from that point in a separate branch. The fork records its lineage via `ForkedFrom`.
 
 ## Test Verification
 
@@ -84,9 +122,14 @@ When a task reaches **Done**, open it to review what happened:
 
 - **Diff view** — the exact file changes the agent made across all workspaces
 - **Event timeline** — the full history of state changes, outputs, and feedback rounds
-- **Usage** — input/output tokens, cache hits, and total cost accumulated across all turns
+- **Usage** — input/output tokens, cache hits, and total cost accumulated across all turns, broken down by sub-agent activity
+- **Per-turn usage** — detailed token consumption for each individual turn
 
 After review, drag the card to **Archived** (or use **Archive All Done** from the toolbar) to move it off the active board. Archived tasks retain their full history.
+
+## Soft Delete and Restore
+
+Deleting a task creates a tombstone rather than immediately removing data. Soft-deleted tasks can be viewed via `GET /api/tasks/deleted` and restored via `POST /api/tasks/{id}/restore` within the retention window (`WALLFACER_TOMBSTONE_RETENTION_DAYS`, default 7 days). After the retention period, data is permanently pruned on the next server startup.
 
 ## Managing the Git Branch
 
@@ -112,24 +155,58 @@ Both operations are blocked while tasks are in progress.
 
 To rebase your current workspace branch onto the latest upstream, use the sync button in the header bar. This runs `git fetch` and `git rebase` on the workspace itself (not a task branch).
 
+### Auto-Push
+
+Enable auto-push via `WALLFACER_AUTO_PUSH=true` to automatically push to the remote after tasks complete. `WALLFACER_AUTO_PUSH_THRESHOLD` controls the minimum number of completed tasks before a push is triggered.
+
+## Workspace Management
+
+### Runtime Workspace Switching
+
+Workspaces can be changed at runtime without restarting the server. Use the workspace switcher in the UI or `PUT /api/workspaces` to replace the active workspace set. The task board automatically scopes to the new workspace key.
+
+### Workspace Browser
+
+The `GET /api/workspaces/browse` endpoint lists child directories for a given path, making it easy to select workspaces from the UI.
+
 ## Workspace Instructions
 
 Each workspace can have a `AGENTS.md` file that provides instructions to every agent running in that workspace. Open **Settings → Workspace Instructions** to edit this file directly from the UI. All tasks in the workspace share these instructions.
 
 Use workspace instructions to set coding standards, preferred patterns, project context, or any constraints the agent should follow.
 
+## System Prompt Templates
+
+Wallfacer uses built-in prompt templates for background agents (title generation, commit messages, refinement, oversight, test verification, ideation, conflict resolution). These templates can be customized per-installation via **Settings → System Prompts** or the API:
+
+- `GET /api/system-prompts` — list all templates with override status
+- `PUT /api/system-prompts/{name}` — write a user override
+- `DELETE /api/system-prompts/{name}` — restore the embedded default
+
+Overrides are validated before saving to ensure template syntax is correct.
+
 ## Settings
 
 Open **Settings** (gear icon) to access:
 
-- **API Configuration** — credential, base URL, model selection, concurrency limit; changes take effect on the next task run without restarting
+- **API Configuration** — credential, base URL, model selection, concurrency limit, container resource limits, webhook settings; changes take effect on the next task run without restarting
 - **Workspace Instructions** — the `AGENTS.md` content for each workspace
+- **System Prompts** — customize built-in prompt templates for background agents
+- **Prompt Templates** — reusable prompt patterns for task creation
 
 Codex availability rules:
 - If host Codex auth cache exists and is valid at `~/.codex/auth.json`, Codex is available automatically.
 - Otherwise configure `OPENAI_API_KEY` and run **Test (Codex)** once in API Configuration.
 
 **WALLFACER_OVERSIGHT_INTERVAL** controls how often (in minutes) the server generates intermediate oversight summaries while a task is running. Set to `0` (default) to generate only when the task completes.
+
+## Search
+
+Use the search bar (or `GET /api/tasks/search`) to find tasks by keyword across titles, prompts, tags, and oversight summaries. Results include the matched field and a context snippet.
+
+## Webhooks
+
+Configure `WALLFACER_WEBHOOK_URL` and optionally `WALLFACER_WEBHOOK_SECRET` to receive HTTP notifications on task state changes. Use `POST /api/env/test-webhook` to send a synthetic test event to verify your webhook endpoint.
 
 ## Keyboard Shortcuts and Tips
 
@@ -138,6 +215,7 @@ Codex availability rules:
 - Multiple tasks can run simultaneously; each operates on its own isolated branch and container
 - Completed containers are automatically removed (`--rm`); no cleanup needed
 - Use the search bar to filter visible cards by title, prompt text, or tag
+- Use the command palette for quick access to actions
 
 ## Common Workflows
 
@@ -157,6 +235,19 @@ Create multiple Backlog tasks, enable Autopilot, and let Wallfacer run them conc
 2. Run the task; when it reaches Waiting, click Test
 3. If it fails, send feedback with the test output; re-run until passing
 4. Mark Done to commit
+
+### Fork-and-explore
+
+1. Run a task to the Waiting state
+2. Fork the task to create an alternative approach
+3. Compare the diffs of both tasks
+4. Mark the better one as Done; cancel the other
+
+### Fully automated pipeline
+
+1. Enable Autopilot + Auto-Test + Auto-Submit
+2. Create backlog tasks with dependencies
+3. Tasks are automatically promoted, tested, and submitted as they complete
 
 ---
 

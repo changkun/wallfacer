@@ -25,6 +25,7 @@ make test           # Run all tests (backend + frontend)
 make test-backend   # Run Go unit tests (go test ./...)
 make test-frontend  # Run frontend JS unit tests (npx vitest@2 run)
 make ui-css         # Regenerate Tailwind CSS from UI sources
+make api-contract   # Regenerate API route artifacts from apicontract/routes.go
 ```
 
 CLI usage (after `go build -o wallfacer .`):
@@ -34,7 +35,12 @@ wallfacer                                    # Print help
 wallfacer run ~/project1 ~/project2          # Mount workspaces, open browser
 wallfacer run                                # Defaults to current directory
 wallfacer run -addr :9090 -no-browser        # Custom port, no browser
+wallfacer run -no-workspaces                 # Start with no active workspaces
 wallfacer env                                # Show config and env status
+wallfacer status                             # Print board state to terminal
+wallfacer status -watch                      # Live-updating board state
+wallfacer exec <task-id-prefix>              # Attach to running task container
+wallfacer exec --sandbox claude              # Open shell in a new sandbox
 ```
 
 The Makefile uses Podman (`/opt/podman/bin/podman`) by default. Adjust `PODMAN` variable if using Docker.
@@ -53,52 +59,96 @@ npx --yes vitest@2 run    # Run frontend tests
 The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.
 
 Key server files:
-- `main.go` — Subcommand dispatch, CLI flags, workspace resolution, HTTP routing, browser launch
+- `main.go` — Subcommand dispatch, CLI flags, workspace resolution, browser launch
 - `server.go` — HTTP server setup, mux construction, route registration, container recovery
-- `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream, execute, files, oversight, refine)
-- `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement
-- `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TaskEvent, TaskOversight, RefinementJob), event sourcing
+- `cmd_status.go` — Terminal-based board status display
+- `exec.go` — Attach to running task containers
+- `internal/apicontract/` — Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js`
+- `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream, execute, files, oversight, refine, ideate, templates, stats, admin, workspace, runtime)
+- `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; forking; auto-retry; circuit breaker
+- `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TurnUsageRecord, TaskEvent, TaskOversight, TaskSummary, Tombstone, RetryRecord, FailureCategory), event sourcing, soft delete, search index
 - `internal/envconfig/` — `.env` file parsing and atomic update; exposes `Parse` and `Update` for the handler and runner
 - `internal/instructions/` — Workspace-level AGENTS.md management (`~/.wallfacer/instructions/`)
 - `internal/gitutil/` — Git utility operations (ops, repo, status, stash, worktree)
+- `internal/workspace/` — Workspace manager; scopes data by workspace key; supports runtime workspace switching
 - `internal/logger/` — Structured logging utilities
+- `internal/metrics/` — Prometheus-compatible metrics
+- `internal/sandbox/` — Sandbox type enumeration (Claude, Codex)
+- `prompts/` — System prompt templates (title, commit, refinement, oversight, test, ideation, conflict)
 - `ui/index.html` + `ui/js/` — Task board UI (vanilla JS + Tailwind CSS + Sortable.js)
 
 ## API Routes
 
-See `docs/internals/orchestration.md` for full details.
+All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/orchestration.md` for full details.
 
-- `GET /` — Task board UI (embedded static files)
-- `GET /api/config` — Server config (workspaces, instructions path)
-- `PUT /api/config` — Update config
-- `GET /api/containers` — List running containers
-- `GET /api/files` — File listing for @ mention autocomplete
-- `GET /api/tasks` — List all tasks
+### Debug & Monitoring
+- `GET /api/debug/health` — Operational health check
+- `GET /api/debug/spans` — Aggregate span timing statistics
+- `GET /api/debug/runtime` — Live server internals (goroutines, memory, task states, containers)
+- `GET /api/debug/board` — Board manifest as seen by a hypothetical new task
+
+### Configuration
+- `GET /api/config` — Server config (workspaces, autopilot flags, sandbox list)
+- `PUT /api/config` — Update config (autopilot, autotest, autosubmit, sandbox assignments)
+- `GET /api/env` — Get env config (tokens masked)
+- `PUT /api/env` — Update env config; omitted/empty token fields are preserved
+- `POST /api/env/test` — Validate sandbox credentials via test container
+- `POST /api/env/test-webhook` — Send a synthetic webhook event
+
+### Workspace Management
+- `GET /api/workspaces/browse` — List child directories for an absolute host path
+- `PUT /api/workspaces` — Replace the active workspace set and switch task board
+
+### Instructions
+- `GET /api/instructions` — Get workspace AGENTS.md content
+- `PUT /api/instructions` — Save workspace AGENTS.md (JSON: `{content}`)
+- `POST /api/instructions/reinit` — Rebuild workspace AGENTS.md from default + repo files
+
+### System Prompt Templates
+- `GET /api/system-prompts` — List all built-in system prompt templates with override status
+- `GET /api/system-prompts/{name}` — Get a single system prompt template
+- `PUT /api/system-prompts/{name}` — Write a user override for a built-in template
+- `DELETE /api/system-prompts/{name}` — Remove override, restoring the embedded default
+
+### Prompt Templates
+- `GET /api/templates` — List all prompt templates
+- `POST /api/templates` — Create a new named prompt template
+- `DELETE /api/templates/{id}` — Delete a prompt template
+
+### Tasks
+- `GET /api/tasks` — List all tasks (optionally including archived)
 - `POST /api/tasks` — Create task (JSON: `{prompt, timeout}`)
-- `PATCH /api/tasks/{id}` — Update status/position/prompt/timeout/fresh_start/model
-- `DELETE /api/tasks/{id}` — Delete task
+- `POST /api/tasks/batch` — Create multiple tasks atomically with symbolic dependency wiring
+- `PATCH /api/tasks/{id}` — Update status/position/prompt/timeout/sandbox/dependencies/fresh_start
+- `DELETE /api/tasks/{id}` — Soft-delete task (tombstone); data retained within retention window
 - `POST /api/tasks/{id}/feedback` — Submit feedback for waiting tasks
 - `POST /api/tasks/{id}/done` — Mark waiting task as done (triggers commit-and-push)
 - `POST /api/tasks/{id}/cancel` — Cancel task; discard worktrees; move to Cancelled
 - `POST /api/tasks/{id}/resume` — Resume failed task with existing session
+- `POST /api/tasks/{id}/restore` — Restore a soft-deleted task by removing its tombstone
 - `POST /api/tasks/{id}/sync` — Rebase task worktrees onto latest default branch
 - `POST /api/tasks/{id}/test` — Run test verification on task worktrees
-- `POST /api/tasks/{id}/refine` — Start prompt refinement via sandbox agent
-- `DELETE /api/tasks/{id}/refine` — Cancel active refinement
-- `GET /api/tasks/{id}/refine/logs` — Stream refinement container logs
-- `POST /api/tasks/{id}/refine/apply` — Apply refined prompt to task
-- `GET /api/tasks/{id}/oversight` — Get task oversight summary
-- `GET /api/tasks/{id}/oversight/test` — Get test oversight summary
+- `POST /api/tasks/{id}/fork` — Create a new backlog task branched from the source task's worktree state
 - `POST /api/tasks/{id}/archive` — Move done/cancelled task to archived
 - `POST /api/tasks/{id}/unarchive` — Restore archived task
 - `POST /api/tasks/archive-done` — Archive all done tasks
 - `POST /api/tasks/generate-titles` — Auto-generate missing task titles
 - `POST /api/tasks/generate-oversight` — Generate missing oversight summaries
+- `GET /api/tasks/search` — Search tasks by keyword
+- `GET /api/tasks/summaries` — Immutable task summaries for completed tasks (cost dashboard)
+- `GET /api/tasks/deleted` — List soft-deleted (tombstoned) tasks within retention window
 - `GET /api/tasks/stream` — SSE: push task list on state change
-- `GET /api/tasks/{id}/events` — Task event timeline
+- `GET /api/tasks/{id}/events` — Task event timeline (supports cursor pagination)
 - `GET /api/tasks/{id}/diff` — Git diff for task worktrees vs default branch
 - `GET /api/tasks/{id}/outputs/{filename}` — Raw Claude Code output per turn
 - `GET /api/tasks/{id}/logs` — SSE: stream live container logs
+- `GET /api/tasks/{id}/turn-usage` — Per-turn token usage breakdown
+- `GET /api/tasks/{id}/spans` — Span timing statistics for a task
+- `GET /api/tasks/{id}/oversight` — Get task oversight summary
+- `GET /api/tasks/{id}/oversight/test` — Get test oversight summary
+- `GET /api/tasks/{id}/board` — Board manifest as it appeared to a specific task
+
+### Git
 - `GET /api/git/status` — Git status for all workspaces
 - `GET /api/git/stream` — SSE: git status updates
 - `POST /api/git/push` — Push a workspace
@@ -107,11 +157,28 @@ See `docs/internals/orchestration.md` for full details.
 - `GET /api/git/branches` — List git branches
 - `POST /api/git/checkout` — Checkout a branch
 - `POST /api/git/create-branch` — Create a new branch
-- `GET /api/env` — Get env config (tokens masked)
-- `PUT /api/env` — Update env config; omitted/empty token fields are preserved
-- `GET /api/instructions` — Get workspace AGENTS.md content
-- `PUT /api/instructions` — Save workspace AGENTS.md (JSON: `{content}`)
-- `POST /api/instructions/reinit` — Rebuild workspace AGENTS.md from default + repo files
+- `POST /api/git/open-folder` — Open workspace directory in the OS file manager
+
+### Refinement
+- `POST /api/tasks/{id}/refine` — Start prompt refinement via sandbox agent
+- `DELETE /api/tasks/{id}/refine` — Cancel active refinement
+- `GET /api/tasks/{id}/refine/logs` — Stream refinement container logs
+- `POST /api/tasks/{id}/refine/apply` — Apply refined prompt to task
+- `POST /api/tasks/{id}/refine/dismiss` — Dismiss refinement result without applying
+
+### Ideation
+- `GET /api/ideate` — Get current ideation session state
+- `POST /api/ideate` — Launch brainstorm/ideation agent
+- `DELETE /api/ideate` — Cancel running ideation agent
+
+### Usage & Statistics
+- `GET /api/usage` — Aggregated token and cost usage statistics
+- `GET /api/stats` — Task status and workspace cost statistics
+- `GET /api/containers` — List running containers
+- `GET /api/files` — File listing for @ mention autocomplete
+
+### Admin
+- `POST /api/admin/rebuild-index` — Rebuild the in-memory search index from disk
 
 ## Task Lifecycle
 
@@ -127,26 +194,40 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - `max_tokens`/`pause_turn` → auto-continue in same session
 - Feedback on Waiting → resumes execution
 - "Mark as Done" on Waiting → Done + auto commit-and-push
-- "Cancel" on Backlog/In Progress/Waiting/Failed → Cancelled; kills container, discards worktrees
+- "Cancel" on Backlog/In Progress/Waiting/Failed/Done → Cancelled; kills container, discards worktrees
 - "Resume" on Failed → continues in existing session
 - "Retry" on Failed/Done/Waiting/Cancelled → resets to Backlog (via PATCH with status change)
 - "Sync" on Waiting/Failed → rebases worktrees onto latest default branch without merging
 - "Test" on Waiting/Done/Failed → runs test verification agent on task worktrees
+- "Fork" on Waiting/Failed/Done → creates a new backlog task branched from current worktree state
 - Auto-promoter watches for capacity and promotes backlog tasks to in_progress
+- Auto-retry automatically retries failed tasks based on failure category and budget
 
 ## Key Conventions
 
 - **UUIDs** for all task IDs (auto-generated via `github.com/google/uuid`)
-- **Event sourcing** via per-task trace files; types: `state_change`, `output`, `feedback`, `error`, `system`
+- **Event sourcing** via per-task trace files; types: `state_change`, `output`, `feedback`, `error`, `system`, `span_start`, `span_end`
 - **Per-task directory storage** with atomic writes (temp file + rename); `sync.RWMutex` for concurrency
+- **Soft delete** via tombstone files; `DELETE /api/tasks/{id}` writes a tombstone, data pruned after retention window (`WALLFACER_TOMBSTONE_RETENTION_DAYS`, default 7)
 - **Git worktrees** per task for isolation; see `docs/internals/git-worktrees.md`
-- **Usage tracking** accumulates input/output tokens, cache tokens, and cost across turns; per-sub-agent breakdown (implementation, test, refinement, title, oversight, oversight-test)
+- **Usage tracking** accumulates input/output tokens, cache tokens, and cost across turns; per-sub-agent breakdown (implementation, test, refinement, title, oversight, oversight-test, commit_message, idea_agent); per-turn records available via `/api/tasks/{id}/turn-usage`
 - **Container execution** creates ephemeral containers via `os/exec`; mounts worktrees under `/workspace/<basename>`
+- **Container resource limits** configurable via `WALLFACER_CONTAINER_CPUS` and `WALLFACER_CONTAINER_MEMORY`
 - **Workspace AGENTS.md** mounted read-only at `/workspace/AGENTS.md` so Claude Code picks it up automatically
 - **Oversight summaries** generated asynchronously when tasks reach waiting/done/failed
 - **Task refinement** via sandbox agent: refines prompts before execution
+- **System prompt templates** are overridable built-in prompts (`prompts/*.tmpl`); users can customize via the UI or API
+- **Prompt templates** for reusable task creation patterns
+- **Task forking** creates a new task branched from an existing task's worktree state
+- **Auto-retry** with per-failure-category budget; failed tasks can be automatically retried
+- **Cost/token budgets** via `MaxCostUSD` and `MaxInputTokens` per task
+- **Failure categorization** classifies failures (timeout, budget_exceeded, worktree_setup, container_crash, agent_error, sync_error, unknown)
+- **Execution environment recording** captures container image, model, API base URL, and instructions hash for reproducibility
+- **Webhook notifications** via `WALLFACER_WEBHOOK_URL`/`WALLFACER_WEBHOOK_SECRET`
 - **Frontend** uses SSE for live updates; escapes HTML to prevent XSS
 - **No framework** on backend (stdlib `net/http`) or frontend (vanilla JS)
+- **Server API key** authentication via `WALLFACER_SERVER_API_KEY`
+- **Circuit breaker** for container launches (`WALLFACER_CONTAINER_CB_THRESHOLD`)
 
 ## Workspace AGENTS.md (Instructions)
 
@@ -155,13 +236,13 @@ The file is identified by a SHA-256 fingerprint of the sorted workspace paths, s
 
 On first run the file is created from:
 1. A default wallfacer template (defined in `instructions.go`).
-2. Any `AGENTS.md` found at the root of each workspace directory (appended in order).
+2. A reference list of per-repo `AGENTS.md` (or legacy `CLAUDE.md`) paths so agents can read them on demand.
 
 Users can manually edit the file from **Settings → AGENTS.md → Edit** in the UI, or regenerate it from the repo files at any time with **Re-init**. The file is mounted read-only into every task container at `/workspace/AGENTS.md`.
 
 ## Configuration
 
-See `docs/internals/architecture.md#configuration` for the full reference.
+See `docs/getting-started.md` for the full configuration reference.
 
 `~/.wallfacer/.env` must contain at least one of:
 - `CLAUDE_CODE_OAUTH_TOKEN` — OAuth token from `claude setup-token`
@@ -172,12 +253,26 @@ Optional variables (also in `.env`):
 - `ANTHROPIC_BASE_URL` — custom API endpoint; when set, the server queries `{base_url}/v1/models` to populate the model dropdown
 - `CLAUDE_DEFAULT_MODEL` — default model passed as `--model` to task containers
 - `CLAUDE_TITLE_MODEL` — model for background title generation; falls back to `CLAUDE_DEFAULT_MODEL`
+- `WALLFACER_SERVER_API_KEY` — bearer token for server API authentication
 - `WALLFACER_MAX_PARALLEL` — maximum concurrent tasks for auto-promotion (default: 5)
+- `WALLFACER_MAX_TEST_PARALLEL` — maximum concurrent test runs (default: inherits from MAX_PARALLEL)
 - `WALLFACER_OVERSIGHT_INTERVAL` — minutes between periodic oversight generation while a task runs (0 = only at task completion, default: 0)
+- `WALLFACER_AUTO_PUSH` — enable auto-push after task completion (`true`/`false`)
+- `WALLFACER_AUTO_PUSH_THRESHOLD` — minimum completed tasks before auto-push triggers
+- `WALLFACER_SANDBOX_FAST` — enable fast-mode sandbox hints (default: `true`)
+- `WALLFACER_CONTAINER_NETWORK` — container network name
+- `WALLFACER_CONTAINER_CPUS` — container CPU limit (e.g. `"2.0"`)
+- `WALLFACER_CONTAINER_MEMORY` — container memory limit (e.g. `"4g"`)
+- `WALLFACER_WEBHOOK_URL` — webhook URL for task state change notifications
+- `WALLFACER_WEBHOOK_SECRET` — HMAC secret for webhook signature verification
+- `WALLFACER_WORKSPACES` — workspace paths (OS path-list separated)
+- `WALLFACER_ARCHIVED_TASKS_PER_PAGE` — pagination size for archived tasks
+- `WALLFACER_TOMBSTONE_RETENTION_DAYS` — days to retain soft-deleted task data (default: 7)
 - `OPENAI_API_KEY` — API key for OpenAI Codex sandbox
 - `OPENAI_BASE_URL` — custom OpenAI API endpoint
 - `CODEX_DEFAULT_MODEL` — default model for Codex sandbox containers
 - `CODEX_TITLE_MODEL` — model for Codex title generation
+- Sandbox routing: `WALLFACER_DEFAULT_SANDBOX`, `WALLFACER_SANDBOX_IMPLEMENTATION`, `WALLFACER_SANDBOX_TESTING`, `WALLFACER_SANDBOX_REFINEMENT`, `WALLFACER_SANDBOX_TITLE`, `WALLFACER_SANDBOX_OVERSIGHT`, `WALLFACER_SANDBOX_COMMIT_MESSAGE`, `WALLFACER_SANDBOX_IDEA_AGENT`
 
 All can be edited from **Settings → API Configuration** in the UI (calls `PUT /api/env`).
 
