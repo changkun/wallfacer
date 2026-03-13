@@ -41,6 +41,7 @@ let workspacePickerRequired = false;
 let workspaceBrowserPath = '';
 let workspaceBrowserEntries = [];
 let workspaceBrowserFocusIndex = -1;
+let workspaceBrowserFilterQuery = '';
 let workspaceSelectionDraft = [];
 
 // Autopilot state
