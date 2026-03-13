@@ -28,6 +28,10 @@ Existing active tasks:
 {{add $i 1}}. [{{$t.Title}}] (status: {{$t.Status}}) — {{$t.Prompt}}
 {{end}}
 {{end -}}
+{{if .RejectedTitles}}
+The following ideas were previously proposed and rejected. Do NOT re-propose any of them:
+{{range .RejectedTitles}}- {{.}}
+{{end}}{{end}}
 Then propose exactly 3 improvements, each covering a distinct area of the project.
 
 Suggested focus areas (use as inspiration — you are NOT limited to these):
