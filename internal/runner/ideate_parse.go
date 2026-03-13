@@ -38,7 +38,7 @@ func normalizeIdeationImpact(idea *IdeateResult) {
 		case "high":
 			idea.ImpactScore = 85
 		case "medium":
-			idea.ImpactScore = 60
+			idea.ImpactScore = 72
 		case "low":
 			idea.ImpactScore = 35
 		default:
@@ -49,7 +49,7 @@ func normalizeIdeationImpact(idea *IdeateResult) {
 		switch {
 		case idea.ImpactScore >= 80:
 			idea.Priority = "high"
-		case idea.ImpactScore >= 65:
+		case idea.ImpactScore >= 72:
 			idea.Priority = "medium"
 		default:
 			idea.Priority = "low"

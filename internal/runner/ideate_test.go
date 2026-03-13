@@ -28,7 +28,11 @@ func ideaOutput(ideas []IdeateResult) string {
 		if cat == "" {
 			cat = "code quality / refactoring"
 		}
-		items = append(items, fmt.Sprintf(`{"title":%q,"category":%q,"prompt":%q}`, idea.Title, cat, idea.Prompt))
+		score := idea.ImpactScore
+		if score == 0 {
+			score = 80
+		}
+		items = append(items, fmt.Sprintf(`{"title":%q,"category":%q,"prompt":%q,"impact_score":%d}`, idea.Title, cat, idea.Prompt, score))
 	}
 	jsonArray := "[" + strings.Join(items, ",") + "]"
 	// Escape the JSON array so it can be embedded inside the result field.
@@ -44,9 +48,9 @@ func ideaOutput(ideas []IdeateResult) string {
 // to "done" when the brainstorm container exits successfully.
 func TestIdeationTaskTransitionsToDone(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "Add tests", Prompt: "Write unit tests for all handlers."},
-		{Title: "Improve docs", Prompt: "Update the README with usage examples."},
-		{Title: "Refactor auth", Prompt: "Move auth logic to a dedicated package."},
+		{Title: "Add tests", Prompt: "Write unit tests for all handlers.", ImpactScore: 80},
+		{Title: "Improve docs", Prompt: "Update the README with usage examples.", ImpactScore: 78},
+		{Title: "Refactor auth", Prompt: "Move auth logic to a dedicated package.", ImpactScore: 85},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
@@ -75,9 +79,9 @@ func TestIdeationTaskTransitionsToDone(t *testing.T) {
 // tasks from the brainstorm results.
 func TestIdeationTaskCreatesChildTasks(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "Add tests", Prompt: "Write unit tests for all handlers."},
-		{Title: "Improve docs", Prompt: "Update the README with usage examples."},
-		{Title: "Refactor auth", Prompt: "Move auth logic to a dedicated package."},
+		{Title: "Add tests", Prompt: "Write unit tests for all handlers.", ImpactScore: 80},
+		{Title: "Improve docs", Prompt: "Update the README with usage examples.", ImpactScore: 78},
+		{Title: "Refactor auth", Prompt: "Move auth logic to a dedicated package.", ImpactScore: 85},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
@@ -122,9 +126,9 @@ func TestIdeationTaskCreatesChildTasks(t *testing.T) {
 // category is visible on the task card in the UI.
 func TestIdeationTaskTagsChildTasksWithCategory(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "Add tests", Category: "test coverage", Prompt: "Write unit tests for all handlers."},
-		{Title: "Improve docs", Category: "developer experience", Prompt: "Update the README with usage examples."},
-		{Title: "Refactor auth", Category: "code quality / refactoring", Prompt: "Move auth logic to a dedicated package."},
+		{Title: "Add tests", Category: "test coverage", Prompt: "Write unit tests for all handlers.", ImpactScore: 80},
+		{Title: "Improve docs", Category: "developer experience", Prompt: "Update the README with usage examples.", ImpactScore: 78},
+		{Title: "Refactor auth", Category: "code quality / refactoring", Prompt: "Move auth logic to a dedicated package.", ImpactScore: 85},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
@@ -179,9 +183,9 @@ func TestIdeationTaskTagsChildTasksWithCategory(t *testing.T) {
 // persisted as turn-0001.json so it can be inspected and used for oversight.
 func TestIdeationTaskSavesTurnOutput(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "Add tests", Prompt: "Write unit tests."},
-		{Title: "Fix bugs", Prompt: "Fix known bugs."},
-		{Title: "Improve perf", Prompt: "Optimise hot paths."},
+		{Title: "Add tests", Prompt: "Write unit tests.", ImpactScore: 80},
+		{Title: "Fix bugs", Prompt: "Fix known bugs.", ImpactScore: 85},
+		{Title: "Improve perf", Prompt: "Optimise hot paths.", ImpactScore: 78},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
@@ -218,9 +222,9 @@ func TestIdeationTaskSavesTurnOutput(t *testing.T) {
 // generation (which skips tasks with Turns==0).
 func TestIdeationTaskRecordsTurns(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "A", Prompt: "Do A."},
-		{Title: "B", Prompt: "Do B."},
-		{Title: "C", Prompt: "Do C."},
+		{Title: "A", Prompt: "Do A.", ImpactScore: 80},
+		{Title: "B", Prompt: "Do B.", ImpactScore: 78},
+		{Title: "C", Prompt: "Do C.", ImpactScore: 75},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
@@ -250,9 +254,9 @@ func TestIdeationTaskRecordsTurns(t *testing.T) {
 // of regular implementation tasks and enables the event timeline to work.
 func TestIdeationTaskEmitsOutputEvent(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "A", Prompt: "Do A."},
-		{Title: "B", Prompt: "Do B."},
-		{Title: "C", Prompt: "Do C."},
+		{Title: "A", Prompt: "Do A.", ImpactScore: 80},
+		{Title: "B", Prompt: "Do B.", ImpactScore: 78},
+		{Title: "C", Prompt: "Do C.", ImpactScore: 75},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
@@ -289,9 +293,9 @@ func TestIdeationTaskEmitsOutputEvent(t *testing.T) {
 // so that the Oversight tab shows content instead of "no data".
 func TestIdeationTaskOversightGeneratedAfterDone(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "A", Prompt: "Do A."},
-		{Title: "B", Prompt: "Do B."},
-		{Title: "C", Prompt: "Do C."},
+		{Title: "A", Prompt: "Do A.", ImpactScore: 80},
+		{Title: "B", Prompt: "Do B.", ImpactScore: 78},
+		{Title: "C", Prompt: "Do C.", ImpactScore: 75},
 	}
 	// Use a stateful command: first call is the brainstorm container (ideas),
 	// second call is the oversight agent.
@@ -329,9 +333,9 @@ func TestIdeationTaskOversightGeneratedAfterDone(t *testing.T) {
 // ExecutionPrompt.
 func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "Add tests", Prompt: "Write unit tests for all handlers."},
-		{Title: "Improve docs", Prompt: "Update the README with usage examples."},
-		{Title: "Refactor auth", Prompt: "Move auth logic to a dedicated package."},
+		{Title: "Add tests", Prompt: "Write unit tests for all handlers.", ImpactScore: 80},
+		{Title: "Improve docs", Prompt: "Update the README with usage examples.", ImpactScore: 78},
+		{Title: "Refactor auth", Prompt: "Move auth logic to a dedicated package.", ImpactScore: 85},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
@@ -409,7 +413,7 @@ func TestBuildIdeationPromptNoExistingTasks(t *testing.T) {
 	if strings.Contains(prompt, "Existing active tasks") {
 		t.Fatal("prompt should not mention existing tasks when none are provided")
 	}
-	if !strings.Contains(prompt, "Suggested focus areas") {
+	if !strings.Contains(prompt, "Example focus areas") {
 		t.Fatal("prompt must still include suggested focus areas")
 	}
 }
@@ -484,9 +488,9 @@ func TestBuildIdeationPromptUntitledTask(t *testing.T) {
 // full implementation text in ExecutionPrompt.
 func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "Add tests", Prompt: "Write unit tests for all handlers."},
-		{Title: "Improve docs", Prompt: "Update the README with usage examples."},
-		{Title: "Refactor auth", Prompt: "Move auth logic to a dedicated package."},
+		{Title: "Add tests", Prompt: "Write unit tests for all handlers.", ImpactScore: 80},
+		{Title: "Improve docs", Prompt: "Update the README with usage examples.", ImpactScore: 78},
+		{Title: "Refactor auth", Prompt: "Move auth logic to a dedicated package.", ImpactScore: 85},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
@@ -572,9 +576,9 @@ func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 // backlog, in_progress, and waiting tasks are relevant.
 func TestIdeationTaskExcludesDoneAndFailedFromContext(t *testing.T) {
 	ideas := []IdeateResult{
-		{Title: "Add tests", Prompt: "Write unit tests."},
-		{Title: "Improve docs", Prompt: "Update docs."},
-		{Title: "Refactor auth", Prompt: "Refactor auth."},
+		{Title: "Add tests", Prompt: "Write unit tests.", ImpactScore: 80},
+		{Title: "Improve docs", Prompt: "Update docs.", ImpactScore: 78},
+		{Title: "Refactor auth", Prompt: "Refactor auth.", ImpactScore: 85},
 	}
 	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
@@ -898,7 +902,7 @@ func TestRepairTruncatedJSONArray(t *testing.T) {
 
 func TestParseIdeaJSONArray(t *testing.T) {
 	// A valid JSON object whose fields pass all normalization filters.
-	validObj := `{"title":"Add tests","category":"quality","prompt":"Write unit tests for all handlers.","impact_score":70}`
+	validObj := `{"title":"Add tests","category":"quality","prompt":"Write unit tests for all handlers.","impact_score":80}`
 	validArray := "[" + validObj + "]"
 
 	t.Run("input wrapped in json fence parsed correctly", func(t *testing.T) {
