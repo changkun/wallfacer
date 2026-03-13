@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"runtime"
 	"sort"
+	"sync"
 	"time"
 
 	"changkun.de/wallfacer/internal/runner"
@@ -37,11 +38,19 @@ type healthResponse struct {
 // phaseStats holds aggregate latency statistics for a single execution phase.
 type phaseStats struct {
 	Count int   `json:"count"`
+	SumMs int64 `json:"sum_ms"`
 	MinMs int64 `json:"min_ms"`
 	P50Ms int64 `json:"p50_ms"`
 	P95Ms int64 `json:"p95_ms"`
 	P99Ms int64 `json:"p99_ms"`
 	MaxMs int64 `json:"max_ms"`
+}
+
+// spanStatsCache holds a single cached GetSpanStats response with a TTL.
+type spanStatsCache struct {
+	mu        sync.Mutex
+	resp      *spanStatsResponse
+	expiresAt time.Time
 }
 
 // spanStatsResponse is the JSON shape returned by GET /api/debug/spans.
@@ -114,8 +123,17 @@ func (h *Handler) TaskBoardManifest(w http.ResponseWriter, r *http.Request, id u
 }
 
 // GetSpanStats aggregates span timing data across all tasks (including archived)
-// and returns per-phase latency statistics (count, min, p50, p95, p99, max).
+// and returns per-phase latency statistics (count, sum, min, p50, p95, p99, max).
+// Results are cached for 60 seconds so repeated dashboard refreshes are free.
 func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
+	h.spanCache.mu.Lock()
+	defer h.spanCache.mu.Unlock()
+
+	if h.spanCache.resp != nil && time.Now().Before(h.spanCache.expiresAt) {
+		writeJSON(w, http.StatusOK, h.spanCache.resp)
+		return
+	}
+
 	tasks, _ := h.store.ListTasks(r.Context(), true)
 	durations := make(map[string][]int64) // phase → []durationMs
 	spansTotal := 0
@@ -135,8 +153,13 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 	for phase, ds := range durations {
 		sort.Slice(ds, func(i, j int) bool { return ds[i] < ds[j] })
 		n := len(ds)
+		var sumMs int64
+		for _, d := range ds {
+			sumMs += d
+		}
 		phases[phase] = phaseStats{
 			Count: n,
+			SumMs: sumMs,
 			MinMs: ds[0],
 			P50Ms: ds[percentileIndex(n, 50)],
 			P95Ms: ds[percentileIndex(n, 95)],
@@ -145,11 +168,14 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, spanStatsResponse{
+	resp := &spanStatsResponse{
 		Phases:       phases,
 		TasksScanned: len(tasks),
 		SpansTotal:   spansTotal,
-	})
+	}
+	h.spanCache.resp = resp
+	h.spanCache.expiresAt = time.Now().Add(60 * time.Second)
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // Health returns a lightweight operational health snapshot:

@@ -20,49 +20,47 @@ type SpanRecord struct {
 }
 
 // computeSpans pairs span_start/span_end events from the given event slice and
-// returns a sorted slice of SpanRecords. Unpaired starts are discarded; the
-// most-recent start wins when a phase+label key is seen multiple times.
+// returns a sorted slice of SpanRecords. Unpaired starts are discarded; when
+// multiple span_starts share the same phase+label key, they are matched to
+// span_ends in FIFO order so every completed span is captured.
 func computeSpans(events []store.TaskEvent) []SpanRecord {
-	type spanKey struct {
-		phase string
-		label string
-	}
-	// startTimes maps phase+label to the timestamp of its most recent span_start.
-	// We use the most recent start to handle potential retries cleanly.
-	startTimes := make(map[spanKey]time.Time)
-	var spans []SpanRecord
+	// pending[key] holds unmatched span_start events in arrival order (FIFO).
+	pending := map[string][]*store.TaskEvent{}
+	var records []SpanRecord
 
-	for _, ev := range events {
-		if ev.EventType != store.EventTypeSpanStart && ev.EventType != store.EventTypeSpanEnd {
+	for i := range events {
+		e := &events[i]
+		if e.EventType != store.EventTypeSpanStart && e.EventType != store.EventTypeSpanEnd {
 			continue
 		}
 		var data store.SpanData
-		if err := json.Unmarshal(ev.Data, &data); err != nil {
+		if err := json.Unmarshal(e.Data, &data); err != nil {
 			continue
 		}
-		key := spanKey{phase: data.Phase, label: data.Label}
-		if ev.EventType == store.EventTypeSpanStart {
-			startTimes[key] = ev.CreatedAt
-		} else {
-			// span_end: pair with the matching span_start if present.
-			if startedAt, ok := startTimes[key]; ok {
-				spans = append(spans, SpanRecord{
+		key := data.Phase + ":" + data.Label
+		switch e.EventType {
+		case store.EventTypeSpanStart:
+			pending[key] = append(pending[key], e)
+		case store.EventTypeSpanEnd:
+			if q := pending[key]; len(q) > 0 {
+				start := q[0]
+				pending[key] = q[1:]
+				records = append(records, SpanRecord{
 					Phase:      data.Phase,
 					Label:      data.Label,
-					StartedAt:  startedAt,
-					EndedAt:    ev.CreatedAt,
-					DurationMs: ev.CreatedAt.Sub(startedAt).Milliseconds(),
+					StartedAt:  start.CreatedAt,
+					EndedAt:    e.CreatedAt,
+					DurationMs: e.CreatedAt.Sub(start.CreatedAt).Milliseconds(),
 				})
-				delete(startTimes, key)
 			}
 		}
 	}
 
-	sort.Slice(spans, func(i, j int) bool {
-		return spans[i].StartedAt.Before(spans[j].StartedAt)
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].StartedAt.Before(records[j].StartedAt)
 	})
 
-	return spans
+	return records
 }
 
 // GetTaskSpans reads all events for a task, pairs span_start/span_end events

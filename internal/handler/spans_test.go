@@ -54,11 +54,12 @@ func TestComputeSpans_UnpairedStartOmitted(t *testing.T) {
 	}
 }
 
-func TestComputeSpans_MostRecentStartWins(t *testing.T) {
+func TestComputeSpans_FIFOPairing(t *testing.T) {
 	t0 := time.Now()
 	t1 := t0.Add(10 * time.Millisecond)
-	t2 := t1.Add(100 * time.Millisecond)
-	// Two starts for the same key; the second (t1) should win.
+	t2 := t1.Add(100 * time.Millisecond) // = t0 + 110ms
+	// Two starts for the same key followed by one end: FIFO pairs the first
+	// start (t0) with the end (t2); the second start (t1) is unpaired.
 	events := []store.TaskEvent{
 		makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", t0),
 		makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", t1),
@@ -68,9 +69,72 @@ func TestComputeSpans_MostRecentStartWins(t *testing.T) {
 	if len(spans) != 1 {
 		t.Fatalf("expected 1 span, got %d", len(spans))
 	}
-	// Duration must be measured from t1 (most recent start) to t2 = 100ms.
-	if spans[0].DurationMs != 100 {
-		t.Errorf("expected DurationMs=100, got %d", spans[0].DurationMs)
+	// Duration must be measured from t0 (first-in start) to t2 = 110ms.
+	if spans[0].DurationMs != 110 {
+		t.Errorf("expected DurationMs=110, got %d", spans[0].DurationMs)
+	}
+}
+
+// TestComputeSpans_TableDriven covers the four key pairing scenarios as a
+// single table-driven test.
+func TestComputeSpans_TableDriven(t *testing.T) {
+	t0 := time.Now()
+	ms := func(n int) time.Time { return t0.Add(time.Duration(n) * time.Millisecond) }
+
+	tests := []struct {
+		name       string
+		events     []store.TaskEvent
+		wantCount  int
+		wantFirstDurationMs int64 // checked only when wantCount >= 1
+	}{
+		{
+			name: "basic pair",
+			events: []store.TaskEvent{
+				makeSpanEvent(store.EventTypeSpanStart, "commit", "commit", ms(0)),
+				makeSpanEvent(store.EventTypeSpanEnd, "commit", "commit", ms(50)),
+			},
+			wantCount:           1,
+			wantFirstDurationMs: 50,
+		},
+		{
+			name: "two sequential spans with same key both appear",
+			events: []store.TaskEvent{
+				makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", ms(0)),
+				makeSpanEvent(store.EventTypeSpanEnd, "agent_turn", "agent_turn_1", ms(30)),
+				makeSpanEvent(store.EventTypeSpanStart, "agent_turn", "agent_turn_1", ms(40)),
+				makeSpanEvent(store.EventTypeSpanEnd, "agent_turn", "agent_turn_1", ms(80)),
+			},
+			wantCount:           2,
+			wantFirstDurationMs: 30,
+		},
+		{
+			name: "unpaired start is dropped",
+			events: []store.TaskEvent{
+				makeSpanEvent(store.EventTypeSpanStart, "worktree_setup", "worktree_setup", ms(0)),
+				// no matching span_end
+			},
+			wantCount: 0,
+		},
+		{
+			name: "unpaired end is dropped",
+			events: []store.TaskEvent{
+				makeSpanEvent(store.EventTypeSpanEnd, "commit", "commit", ms(10)),
+				// no preceding span_start
+			},
+			wantCount: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			spans := computeSpans(tc.events)
+			if len(spans) != tc.wantCount {
+				t.Fatalf("got %d spans, want %d", len(spans), tc.wantCount)
+			}
+			if tc.wantCount >= 1 && spans[0].DurationMs != tc.wantFirstDurationMs {
+				t.Errorf("first span DurationMs = %d, want %d", spans[0].DurationMs, tc.wantFirstDurationMs)
+			}
+		})
 	}
 }
 
