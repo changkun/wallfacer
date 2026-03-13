@@ -17,6 +17,7 @@ import (
 
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/metrics"
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/internal/workspace"
 	"changkun.de/wallfacer/prompts"
@@ -291,6 +292,7 @@ type RunnerConfig struct {
 	ContainerMemory  string           // --memory value for task containers (empty = read from env file, no limit)
 	Prompts          *prompts.Manager // prompt template manager; nil = use prompts.Default
 	WorkspaceManager *workspace.Manager
+	Reg              *metrics.Registry // optional metrics registry; nil disables metric collection
 }
 
 // Runner orchestrates agent container execution for tasks.
@@ -336,6 +338,7 @@ type Runner struct {
 	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
 	shutdownCtx         context.Context
 	shutdownCancel      context.CancelFunc
+	reg                 *metrics.Registry // optional; nil disables metric collection
 }
 
 // ContainerCircuitAllow returns true when the container circuit breaker
@@ -539,6 +542,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	}
 	r.containerCB = NewCircuitBreaker(cbThreshold, time.Duration(cbOpenSec)*time.Second)
 	r.executor = &osContainerExecutor{command: r.command}
+	r.reg = cfg.Reg
 
 	if r.workspaceManager != nil {
 		snap := r.workspaceManager.Snapshot()

@@ -106,6 +106,11 @@ func runServer(configDir string, args []string) {
 		envCfg = cfg
 	}
 
+	// Build the Prometheus metrics registry early so it can be threaded into
+	// the runner (for worktree health counters) and handler (for autopilot
+	// action counters).
+	reg := metrics.NewRegistry()
+
 	promptsDir := filepath.Join(configDir, "prompts")
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:          *containerCmd,
@@ -120,6 +125,7 @@ func runServer(configDir string, args []string) {
 		ContainerMemory:  envCfg.ContainerMemory,
 		Prompts:          prompts.NewManager(promptsDir),
 		WorkspaceManager: wsMgr,
+		Reg:              reg,
 	})
 
 	r.PruneUnknownWorktrees()
@@ -133,12 +139,7 @@ func runServer(configDir string, args []string) {
 		runner.RecoverOrphanedTasks(ctx, s, r)
 	}
 	go r.StartWorktreeGC(ctx)
-
-	logger.Main.Info("workspaces", "paths", strings.Join(workspaces, ", "))
-
-	// Build the Prometheus metrics registry early so it can be threaded into
-	// the handler for autopilot action counters.
-	reg := metrics.NewRegistry()
+	go r.StartWorktreeHealthWatcher(ctx)
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
 	r.SetStopReasonHandler(func(taskID uuid.UUID, stopReason string) {

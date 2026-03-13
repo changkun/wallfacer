@@ -11,6 +11,114 @@ import (
 	"github.com/google/uuid"
 )
 
+// ScanMissingTaskWorktrees iterates over all tasks in in_progress, waiting,
+// and committing states and returns those where at least one WorktreePaths
+// entry is missing on disk. It does not remove anything.
+func (r *Runner) ScanMissingTaskWorktrees(ctx context.Context) ([]store.Task, error) {
+	s := r.currentStore()
+	if s == nil {
+		return nil, nil
+	}
+
+	activeStatuses := []store.TaskStatus{
+		store.TaskStatusInProgress,
+		store.TaskStatusWaiting,
+		store.TaskStatusCommitting,
+	}
+
+	var missing []store.Task
+	for _, status := range activeStatuses {
+		tasks, err := s.ListTasksByStatus(ctx, status)
+		if err != nil {
+			return nil, err
+		}
+		for _, task := range tasks {
+			for _, path := range task.WorktreePaths {
+				if _, statErr := os.Stat(path); os.IsNotExist(statErr) {
+					missing = append(missing, task)
+					break // one missing path is enough to flag the task
+				}
+			}
+		}
+	}
+	return missing, nil
+}
+
+// RestoreMissingTaskWorktrees attempts to recreate worktrees for each task in
+// the slice by calling ensureTaskWorktrees. On success it appends a system
+// event to the task's audit trail and increments the
+// wallfacer_worktree_restorations_total counter. Returns the count of
+// successfully restored tasks.
+func (r *Runner) RestoreMissingTaskWorktrees(ctx context.Context, tasks []store.Task) int {
+	s := r.currentStore()
+	if s == nil {
+		return 0
+	}
+
+	restored := 0
+	for _, task := range tasks {
+		if task.BranchName == "" {
+			logger.Runner.Debug("worktree health: skipping task with empty branch name", "task", task.ID)
+			continue
+		}
+		if _, _, err := r.ensureTaskWorktrees(task.ID, task.WorktreePaths, task.BranchName); err != nil {
+			logger.Runner.Warn("worktree health: restore failed", "task", task.ID, "error", err)
+			continue
+		}
+		if err := s.InsertEvent(ctx, task.ID, store.EventTypeSystem, map[string]string{
+			"message": "worktree restored by health watcher",
+		}); err != nil {
+			logger.Runner.Warn("worktree health: insert event failed", "task", task.ID, "error", err)
+		}
+		if r.reg != nil {
+			r.reg.Counter("wallfacer_worktree_restorations_total",
+				"Total number of task worktrees restored by the health watcher.").Inc(nil)
+		}
+		restored++
+	}
+	return restored
+}
+
+const defaultWorktreeHealthInterval = 2 * time.Minute
+
+// StartWorktreeHealthWatcher proactively scans active tasks for missing
+// worktree directories and attempts to restore them. It runs an initial scan
+// at startup and then repeats every 2 minutes. Errors are logged at Warn level
+// and do not crash the loop. Keep this goroutine separate from StartWorktreeGC
+// since the two have distinct concerns (GC removes orphans; health watcher
+// restores missing paths for live tasks).
+func (r *Runner) StartWorktreeHealthWatcher(ctx context.Context) {
+	r.backgroundWg.Add("worktree-health")
+	defer r.backgroundWg.Done("worktree-health")
+
+	runScan := func() {
+		missing, err := r.ScanMissingTaskWorktrees(ctx)
+		if err != nil {
+			logger.Runner.Warn("worktree health: scan failed", "error", err)
+			return
+		}
+		if len(missing) > 0 {
+			logger.Runner.Info("worktree health: missing worktrees detected", "count", len(missing))
+			r.RestoreMissingTaskWorktrees(ctx, missing)
+		}
+	}
+
+	// Run one scan immediately at startup before the first tick.
+	runScan()
+
+	ticker := time.NewTicker(defaultWorktreeHealthInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			runScan()
+		}
+	}
+}
+
 // ScanOrphanedWorktrees inspects r.worktreesDir and returns the task IDs
 // whose worktree directories exist on disk but whose tasks are in a terminal
 // or non-existent state (done, cancelled, archived, or unknown to the store).
