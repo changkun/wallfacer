@@ -34,7 +34,7 @@ function _isCurrentModalSeq(seq) {
 }
 
 function _modalApiJson(url, signal) {
-  if (typeof api === 'function') return api(url, { signal: signal });
+  if (typeof apiGet === 'function') return apiGet(url, { signal: signal });
   return fetch(url, { signal: signal }).then(function(res) { return res.json(); });
 }
 
@@ -303,7 +303,7 @@ function startImplLogFetch(id, seq) {
   document.getElementById('modal-logs').innerHTML = '';
   _renderedLogLen = 0; _renderedLogMode = ''; _renderedLogQuery = '';
   const decoder = new TextDecoder();
-  fetch(`/api/tasks/${id}/logs?phase=impl`, { signal: signal })
+  fetch(withAuthToken(`/api/tasks/${id}/logs?phase=impl`), { signal: signal, headers: withBearerHeaders() })
     .then(res => {
       if (!res.ok || !res.body) return;
       const reader = res.body.getReader();
@@ -407,7 +407,7 @@ function _fetchTestLogs(id, retryDelay, seq) {
     setTimeout(() => _fetchTestLogs(id, nextDelay, seq), delay);
   }
 
-  fetch(url, { signal: testLogsAbort.signal })
+  fetch(withAuthToken(url), { signal: testLogsAbort.signal, headers: withBearerHeaders() })
     .then(res => {
       if (!res.ok || !res.body) { reconnect(); return; }
       const reader = res.body.getReader();
@@ -432,7 +432,7 @@ function _fetchTestLogs(id, retryDelay, seq) {
 function _downloadFullLog() {
   var id = getOpenModalTaskId();
   if (!id) return;
-  window.open('/api/tasks/' + id + '/logs?raw=true');
+  window.open(withAuthToken('/api/tasks/' + id + '/logs?raw=true'));
 }
 
 function _fetchLogs(id, retryDelay, seq) {
@@ -462,7 +462,7 @@ function _fetchLogs(id, retryDelay, seq) {
     setTimeout(() => _fetchLogs(id, nextDelay, seq), delay);
   }
 
-  fetch(url, { signal: logsAbort.signal })
+  fetch(withAuthToken(url), { signal: logsAbort.signal, headers: withBearerHeaders() })
     .then(res => {
       if (!res.ok || !res.body) { reconnect(); return; }
       const reader = res.body.getReader();

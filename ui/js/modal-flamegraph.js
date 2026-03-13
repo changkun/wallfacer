@@ -293,8 +293,8 @@
     var oversightUrl = '/api/tasks/' + taskId + '/oversight';
     var turnUsageUrl = '/api/tasks/' + taskId + '/turn-usage';
     function fetchJson(url) {
-      if (typeof api === 'function') {
-        return api(url, { signal: signal });
+      if (typeof apiGet === 'function') {
+        return apiGet(url, { signal: signal });
       }
       return fetch(url, { signal: signal }).then(function(res) { return res.json(); });
     }

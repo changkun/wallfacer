@@ -559,8 +559,7 @@ function _searchRemote(query, seq) {
       '</div>';
   }
 
-  return fetch('/api/tasks/search?q=' + encodeURIComponent(trimmed))
-    .then(function(resp) { return resp.ok ? resp.json() : Promise.reject(resp.status); })
+  return apiGet('/api/tasks/search?q=' + encodeURIComponent(trimmed))
     .then(function(results) {
       if (seq !== _commandPaletteServerSeq) return;
       const rows = (results || []).map(function(result) {

@@ -18,6 +18,7 @@ type Config struct {
 	APIKey               string // ANTHROPIC_API_KEY
 	AuthToken            string // ANTHROPIC_AUTH_TOKEN (gateway proxy token)
 	BaseURL              string // ANTHROPIC_BASE_URL
+	ServerAPIKey         string // WALLFACER_SERVER_API_KEY
 	DefaultModel         string // CLAUDE_DEFAULT_MODEL
 	TitleModel           string // CLAUDE_TITLE_MODEL
 	MaxParallelTasks     int    // WALLFACER_MAX_PARALLEL (0 means use default)
@@ -57,6 +58,7 @@ var knownKeys = []string{
 	"CLAUDE_CODE_OAUTH_TOKEN",
 	"ANTHROPIC_API_KEY",
 	"ANTHROPIC_BASE_URL",
+	"WALLFACER_SERVER_API_KEY",
 	"OPENAI_API_KEY",
 	"OPENAI_BASE_URL",
 	"CLAUDE_DEFAULT_MODEL",
@@ -108,6 +110,8 @@ func Parse(path string) (Config, error) {
 			cfg.AuthToken = v
 		case "ANTHROPIC_BASE_URL":
 			cfg.BaseURL = v
+		case "WALLFACER_SERVER_API_KEY":
+			cfg.ServerAPIKey = v
 		case "CLAUDE_DEFAULT_MODEL":
 			cfg.DefaultModel = v
 		case "CLAUDE_TITLE_MODEL":
@@ -312,6 +316,7 @@ func Update(
 	oauthToken,
 	apiKey,
 	baseURL,
+	serverAPIKey,
 	openAIAPIKey,
 	openAIBaseURL,
 	defaultModel,
@@ -336,6 +341,7 @@ func Update(
 		"CLAUDE_CODE_OAUTH_TOKEN":           oauthToken,
 		"ANTHROPIC_API_KEY":                 apiKey,
 		"ANTHROPIC_BASE_URL":                baseURL,
+		"WALLFACER_SERVER_API_KEY":          serverAPIKey,
 		"OPENAI_API_KEY":                    openAIAPIKey,
 		"OPENAI_BASE_URL":                   openAIBaseURL,
 		"CLAUDE_DEFAULT_MODEL":              defaultModel,

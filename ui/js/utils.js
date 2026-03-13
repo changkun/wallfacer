@@ -56,16 +56,12 @@ function bindModalBackdropClose(modal, onClose) {
 
 function loadJsonEndpoint(url, onSuccess, setState, options) {
   setState('loading');
-  return fetch(url, options || {})
-    .then(function (res) {
-      return res.json().then(function (data) { return { ok: res.ok, data: data }; });
-    })
-    .then(function (result) {
-      if (!result.ok) {
-        setState('error', result.data.error || JSON.stringify(result.data));
-        return;
-      }
-      onSuccess(result.data);
+  var request = (typeof apiGet === 'function')
+    ? apiGet(url, options || {})
+    : fetch(url, options || {}).then(function(res) { return res.json(); });
+  return request
+    .then(function (data) {
+      onSuccess(data);
     })
     .catch(function (err) {
       setState('error', String(err));

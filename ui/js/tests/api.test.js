@@ -764,3 +764,69 @@ describe('startTasksStream', () => {
     expect(instances[1].url).toBe('/api/tasks/stream?last_event_id=evt-1');
   });
 });
+
+describe('auth helpers', () => {
+  it('adds bearer auth to non-GET API requests when a token meta tag is present', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      text: async () => '',
+    });
+    const ctx = makeContext({
+      fetch,
+      document: {
+        getElementById: () => null,
+        querySelectorAll: () => [],
+        querySelector: (selector) => selector === 'meta[name="wallfacer-token"]' ? { content: 'secret-token' } : null,
+        addEventListener: () => {},
+        documentElement: { setAttribute: () => {} },
+        readyState: 'complete',
+      },
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    await ctx.api('/api/tasks', { method: 'POST', body: '{}' });
+
+    expect(fetch).toHaveBeenCalledWith('/api/tasks', expect.objectContaining({
+      headers: expect.objectContaining({
+        Authorization: 'Bearer secret-token',
+      }),
+    }));
+  });
+
+  it('appends the token to task stream SSE URLs', () => {
+    const instances = [];
+    class MockEventSource {
+      constructor(url) {
+        this.url = url;
+        this.readyState = 1;
+        this.listeners = {};
+        instances.push(this);
+      }
+      addEventListener(type, handler) {
+        this.listeners[type] = handler;
+      }
+      close() {}
+    }
+    const ctx = makeContext({
+      EventSource: MockEventSource,
+      Routes: { tasks: { stream: () => '/api/tasks/stream' } },
+      document: {
+        getElementById: () => null,
+        querySelectorAll: () => [],
+        querySelector: (selector) => selector === 'meta[name="wallfacer-token"]' ? { content: 'secret-token' } : null,
+        addEventListener: () => {},
+        documentElement: { setAttribute: () => {} },
+        readyState: 'complete',
+      },
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+    vm.runInContext('activeWorkspaces = ["/Users/test/repo"];', ctx);
+
+    ctx.startTasksStream();
+
+    expect(instances[0].url).toBe('/api/tasks/stream?token=secret-token');
+  });
+});

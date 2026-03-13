@@ -821,8 +821,7 @@ function renderOversightInLogs() {
     if (!oversightFetching && currentTaskId) {
       oversightFetching = true;
       const id = currentTaskId;
-      fetch('/api/tasks/' + id + '/oversight')
-        .then(function(res) { return res.json(); })
+      apiGet('/api/tasks/' + id + '/oversight')
         .then(function(data) {
           if (currentTaskId !== id) return;
           oversightData = data;
@@ -925,7 +924,7 @@ function startImplLogFetch(id) {
   rawLogBuffer = '';
   document.getElementById('modal-logs').innerHTML = '';
   const decoder = new TextDecoder();
-  fetch(`/api/tasks/${id}/logs?phase=impl`)
+  fetch(withAuthToken(`/api/tasks/${id}/logs?phase=impl`), { headers: withBearerHeaders() })
     .then(res => {
       if (!res.ok || !res.body) return;
       const reader = res.body.getReader();
@@ -952,8 +951,7 @@ function renderTestOversightInTestLogs() {
     if (!testOversightFetching && currentTaskId) {
       testOversightFetching = true;
       const id = currentTaskId;
-      fetch('/api/tasks/' + id + '/oversight/test')
-        .then(function(res) { return res.json(); })
+      apiGet('/api/tasks/' + id + '/oversight/test')
         .then(function(data) {
           if (currentTaskId !== id) return;
           testOversightData = data;
@@ -1059,7 +1057,7 @@ function _fetchTestLogs(id, retryDelay) {
     setTimeout(() => _fetchTestLogs(id, nextDelay), delay);
   }
 
-  fetch(url, { signal: testLogsAbort.signal })
+  fetch(withAuthToken(url), { signal: testLogsAbort.signal, headers: withBearerHeaders() })
     .then(res => {
       if (!res.ok || !res.body) { reconnect(); return; }
       const reader = res.body.getReader();
@@ -1103,7 +1101,7 @@ function _fetchLogs(id, retryDelay) {
     setTimeout(() => _fetchLogs(id, nextDelay), delay);
   }
 
-  fetch(url, { signal: logsAbort.signal })
+  fetch(withAuthToken(url), { signal: logsAbort.signal, headers: withBearerHeaders() })
     .then(res => {
       if (!res.ok || !res.body) { reconnect(); return; }
       const reader = res.body.getReader();

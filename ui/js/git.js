@@ -6,7 +6,7 @@ function startGitStream() {
     return;
   }
   if (gitStatusSource) gitStatusSource.close();
-  gitStatusSource = new EventSource(Routes.git.stream());
+  gitStatusSource = new EventSource(withAuthToken(Routes.git.stream()));
   gitStatusSource.onmessage = function(e) {
     gitRetryDelay = 1000;
     try {
@@ -66,7 +66,7 @@ function setGitActionPending(btn, pendingLabel) {
 async function requestGitWorkspaceMutation(path, payload) {
   const res = await fetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withAuthHeaders({ 'Content-Type': 'application/json' }, 'POST'),
     body: JSON.stringify(payload),
   });
 

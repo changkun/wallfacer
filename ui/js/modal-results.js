@@ -454,8 +454,8 @@ function renderTimeline(taskId) {
   _ensureTimelineStyles();
 
   var signal = _modalState.abort ? _modalState.abort.signal : undefined;
-  var req = (typeof api === 'function')
-    ? api('/api/tasks/' + taskId + '/spans', { signal: signal })
+  var req = (typeof apiGet === 'function')
+    ? apiGet('/api/tasks/' + taskId + '/spans', { signal: signal })
     : fetch('/api/tasks/' + taskId + '/spans', { signal: signal }).then(function(res) { return res.json(); });
   req
     .then(function(data) {

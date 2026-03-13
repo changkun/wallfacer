@@ -24,7 +24,7 @@ func TestGetEnvConfig_WebhookURLMasked(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
 	webhookURL := "https://example.com/webhook"
 	webhookSecret := "topsecret"
-	if err := envconfig.Update(envPath, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &webhookURL, &webhookSecret, nil); err != nil {
+	if err := envconfig.Update(envPath, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &webhookURL, &webhookSecret, nil); err != nil {
 		t.Fatalf("Update env: %v", err)
 	}
 
@@ -76,7 +76,7 @@ func TestTestWebhook_Success(t *testing.T) {
 
 	webhookURL := srv.URL
 	webhookSecret := "handler-secret"
-	if err := envconfig.Update(envPath, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &webhookURL, &webhookSecret, nil); err != nil {
+	if err := envconfig.Update(envPath, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &webhookURL, &webhookSecret, nil); err != nil {
 		t.Fatalf("Update env: %v", err)
 	}
 
@@ -130,7 +130,7 @@ func TestTestWebhook_DownstreamFailure(t *testing.T) {
 	defer srv.Close()
 
 	webhookURL := srv.URL
-	if err := envconfig.Update(envPath, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &webhookURL, nil, nil); err != nil {
+	if err := envconfig.Update(envPath, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &webhookURL, nil, nil); err != nil {
 		t.Fatalf("Update env: %v", err)
 	}
 	h.webhookNotifier = func(cfg envconfig.Config) *runner.WebhookNotifier {

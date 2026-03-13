@@ -54,8 +54,7 @@ function triggerServerSearch(rawQuery) {
   clearTimeout(_searchTimer);
   if (Array.from(q).length < 2) { hideSearchPanel(); return; }
   _searchTimer = setTimeout(() => {
-    fetch('/api/tasks/search?q=' + encodeURIComponent(q))
-      .then(r => r.ok ? r.json() : Promise.reject(r.statusText))
+    apiGet('/api/tasks/search?q=' + encodeURIComponent(q))
       .then(results => renderSearchPanel(results, q))
       .catch(() => hideSearchPanel());
   }, 250);

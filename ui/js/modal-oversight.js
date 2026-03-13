@@ -10,7 +10,7 @@ let testOversightData = null;
 let testOversightFetching = false;
 
 function _fetchOversightJson(url, signal) {
-  if (typeof api === 'function') return api(url, { signal: signal });
+  if (typeof apiGet === 'function') return apiGet(url, { signal: signal });
   return fetch(url, { signal: signal }).then(function(res) { return res.json(); });
 }
 
