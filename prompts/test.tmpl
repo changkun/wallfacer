@@ -25,16 +25,17 @@ The implementation agent reported:
 ## Instructions
 
 You are running directly in the task's own workspace — the code changes are already present.
-{{if .Diff -}}
-1. The diff above shows exactly what was changed — focus your verification on those files.
-{{else -}}
-1. Examine the code to understand what was implemented.
-{{end -}}
-2. Run any available tests (unit tests, integration tests, linters, build checks, etc.).
-3. Verify the implementation satisfies every requirement listed above.
-4. End your response with your verdict on its own line: **PASS** if all requirements are met, or **FAIL** if any are not.
 
-Be thorough but focused. Do not modify any code. If tests fail or requirements are unmet, describe exactly what is missing or broken.
+Your verification must be fast and focused. Do NOT explore the entire codebase or run unrelated checks. Follow these steps strictly:
+
+1. **Read only the changed files.** {{if .Diff}}The diff above shows exactly what was changed — restrict your review to those files and their direct callers/callees.{{else}}Run `git diff HEAD~1` to see what changed, then restrict your review to those files.{{end}}
+2. **Check acceptance criteria.** Verify each requirement from the original task and any explicit acceptance criteria above. If a requirement is ambiguous, check only the most obvious interpretation.
+3. **Run only the relevant tests.** Run tests for the packages/files that were modified (e.g. `go test ./internal/handler/` not `go test ./...`). If no tests exist for the changed code, note it but do not write or run unrelated tests.
+4. **Stop as soon as you have a verdict.** Do not investigate further once you can determine PASS or FAIL.
+
+Do not modify any code. Do not run linters, formatters, or full-project builds unless the acceptance criteria explicitly require them.
+
+End your response with your verdict on its own line: **PASS** if all requirements are met, or **FAIL** if any are not. If failing, state the specific unmet requirement in one sentence before the verdict.
 
 CRITICAL — VERDICT REQUIREMENT:
 You MUST end your response with a clear verdict. The very last line of your entire response must be one of these two exact strings (bold markdown, all caps):
