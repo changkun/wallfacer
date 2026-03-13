@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -15,13 +16,21 @@ import (
 // a minimal runner, and a real metrics registry for counter assertions.
 func newTestHandlerWithRegistry(t *testing.T) (*Handler, *metrics.Registry) {
 	t.Helper()
-	s, err := store.NewStore(t.TempDir())
+	// Use os.MkdirTemp instead of t.TempDir for the store directory so that
+	// late trace-file writes from background goroutines don't cause TempDir
+	// cleanup failures.
+	storeDir, err := os.MkdirTemp("", "wallfacer-handler-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.NewStore(storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{})
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
+	t.Cleanup(func() { os.RemoveAll(storeDir) })
 	reg := metrics.NewRegistry()
 	// Pre-register the counter so it appears in exposition even before any
 	// increments occur.

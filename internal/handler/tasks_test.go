@@ -3704,3 +3704,137 @@ func TestAutoRetry_MaxTotalCap(t *testing.T) {
 		t.Errorf("expected AutoRetryCount=3 (unchanged after cap), got %d", got.AutoRetryCount)
 	}
 }
+
+// TestWatcherBreaker_AutoSyncDoesNotAffectAutoPromote verifies that opening
+// the "auto-sync" circuit breaker leaves the "auto-promote" breaker closed.
+func TestWatcherBreaker_AutoSyncDoesNotAffectAutoPromote(t *testing.T) {
+	h := newTestHandler(t)
+
+	// Open the auto-sync breaker via a simulated failure.
+	h.openWatcherBreaker("auto-sync", nil, "git rebase failed")
+
+	if !h.breakers["auto-sync"].isOpen() {
+		t.Error("expected auto-sync breaker to be open after failure")
+	}
+	if h.breakers["auto-promote"].isOpen() {
+		t.Error("expected auto-promote breaker to remain closed after auto-sync failure")
+	}
+}
+
+// TestWatcherBreaker_AutoRecoversAfterTimeout verifies that a breaker returns
+// to closed (healthy) once its openUntil time has elapsed.
+func TestWatcherBreaker_AutoRecoversAfterTimeout(t *testing.T) {
+	wb := &watcherBreaker{}
+
+	wb.recordFailure(nil, "transient error")
+	if !wb.isOpen() {
+		t.Fatal("expected breaker to be open immediately after failure")
+	}
+
+	// Wind the openUntil back to the past to simulate the timeout elapsing.
+	wb.mu.Lock()
+	wb.openUntil = time.Now().Add(-time.Second)
+	wb.mu.Unlock()
+
+	if wb.isOpen() {
+		t.Error("expected breaker to be closed after openUntil has elapsed")
+	}
+}
+
+// TestWatcherBreaker_RecordSuccessResets verifies that recordSuccess resets
+// the failure counter and closes the breaker.
+func TestWatcherBreaker_RecordSuccessResets(t *testing.T) {
+	wb := &watcherBreaker{}
+
+	wb.recordFailure(nil, "error 1")
+	wb.recordFailure(nil, "error 2")
+
+	if wb.failures != 2 {
+		t.Errorf("expected failures=2, got %d", wb.failures)
+	}
+	if !wb.isOpen() {
+		t.Error("expected breaker to be open after failures")
+	}
+
+	wb.recordSuccess()
+
+	if wb.failures != 0 {
+		t.Errorf("expected failures=0 after recordSuccess, got %d", wb.failures)
+	}
+	if wb.isOpen() {
+		t.Error("expected breaker to be closed after recordSuccess")
+	}
+}
+
+// TestGetConfig_IncludesWatcherHealth verifies that GET /api/config includes
+// a watcher_health array with all six watcher entries.
+func TestGetConfig_IncludesWatcherHealth(t *testing.T) {
+	h := newTestHandler(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	healthRaw, ok := resp["watcher_health"]
+	if !ok {
+		t.Fatal("expected watcher_health in config response")
+	}
+	health, ok := healthRaw.([]any)
+	if !ok {
+		t.Fatalf("expected watcher_health to be an array, got %T", healthRaw)
+	}
+
+	wantNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-refine"}
+	if len(health) != len(wantNames) {
+		t.Fatalf("expected %d watcher health entries, got %d", len(wantNames), len(health))
+	}
+
+	for i, entry := range health {
+		m, ok := entry.(map[string]any)
+		if !ok {
+			t.Errorf("entry %d: expected map, got %T", i, entry)
+			continue
+		}
+		if m["name"] != wantNames[i] {
+			t.Errorf("entry %d: expected name=%q, got %q", i, wantNames[i], m["name"])
+		}
+		healthy, ok := m["healthy"].(bool)
+		if !ok {
+			t.Errorf("entry %d: expected healthy bool, got %T", i, m["healthy"])
+		} else if !healthy {
+			t.Errorf("entry %d: expected healthy=true by default, got false", i)
+		}
+	}
+
+	// Open one breaker and verify it is reflected in the health report.
+	h.openWatcherBreaker("auto-sync", nil, "test failure")
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w2 := httptest.NewRecorder()
+	h.GetConfig(w2, req2)
+
+	var resp2 map[string]any
+	if err := json.NewDecoder(w2.Body).Decode(&resp2); err != nil {
+		t.Fatalf("decode 2: %v", err)
+	}
+	health2 := resp2["watcher_health"].([]any)
+	for _, entry := range health2 {
+		m := entry.(map[string]any)
+		if m["name"] == "auto-sync" {
+			if m["healthy"].(bool) {
+				t.Error("expected auto-sync to be unhealthy after opening breaker")
+			}
+			if m["last_reason"] != "test failure" {
+				t.Errorf("expected last_reason=%q, got %q", "test failure", m["last_reason"])
+			}
+		}
+	}
+}

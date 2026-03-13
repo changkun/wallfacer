@@ -45,7 +45,10 @@ func TestSetAutopilot_Toggle(t *testing.T) {
 	}
 }
 
-func TestPauseAllAutomation_DisablesAllToggles(t *testing.T) {
+// TestPauseAllAutomation_OpensWatcherBreaker verifies that pauseAllAutomation
+// now opens the circuit breaker only for the watcher that failed and does NOT
+// disable user-controlled automation toggles.
+func TestPauseAllAutomation_OpensWatcherBreaker(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAutopilot(true)
 	h.SetAutotest(true)
@@ -54,10 +57,30 @@ func TestPauseAllAutomation_DisablesAllToggles(t *testing.T) {
 	taskID := uuid.New()
 	paused := h.pauseAllAutomation(&taskID, "auto-submit", "boom")
 	if !paused {
-		t.Fatal("expected pauseAllAutomation to report a state change")
+		t.Fatal("expected pauseAllAutomation to return true (new failure)")
 	}
-	if h.AutopilotEnabled() || h.AutotestEnabled() || h.AutosubmitEnabled() {
-		t.Fatal("expected all automation toggles to be disabled")
+
+	// The circuit breaker for the failing watcher should be open.
+	if !h.breakers["auto-submit"].isOpen() {
+		t.Error("expected auto-submit circuit breaker to be open")
+	}
+	// Other watchers must remain healthy.
+	if h.breakers["auto-promote"].isOpen() {
+		t.Error("expected auto-promote circuit breaker to remain closed")
+	}
+	if h.breakers["auto-test"].isOpen() {
+		t.Error("expected auto-test circuit breaker to remain closed")
+	}
+
+	// User-controlled toggles must NOT be disabled by a circuit breaker event.
+	if !h.AutopilotEnabled() {
+		t.Error("expected autopilot toggle to remain enabled")
+	}
+	if !h.AutotestEnabled() {
+		t.Error("expected autotest toggle to remain enabled")
+	}
+	if !h.AutosubmitEnabled() {
+		t.Error("expected autosubmit toggle to remain enabled")
 	}
 }
 

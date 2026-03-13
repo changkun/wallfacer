@@ -102,6 +102,14 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	if len(workspaces) > 0 {
 		groups = workspacegroups.Normalize(append([]workspacegroups.Group{{Workspaces: workspaces}}, groups...))
 	}
+	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-refine"}
+	watcherHealth := make([]watcherHealthEntry, 0, len(watcherNames))
+	for _, name := range watcherNames {
+		if wb, ok := h.breakers[name]; ok {
+			watcherHealth = append(watcherHealth, wb.healthEntry(name))
+		}
+	}
+
 	resp := map[string]any{
 		"workspaces":             workspaces,
 		"workspace_browser_path": workspaceBrowserPath,
@@ -126,7 +134,8 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"ideation_categories":      h.runner.IdeationCategories(),
 		"ideation_ignore_patterns": h.runner.IdeationIgnorePatterns(),
 		"default_model":            "",
-		"payload_limits":         payloadLimits,
+		"payload_limits":           payloadLimits,
+		"watcher_health":           watcherHealth,
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun

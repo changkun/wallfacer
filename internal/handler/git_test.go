@@ -47,7 +47,14 @@ func setupRepo(t *testing.T) string {
 // newTestHandler creates a Handler backed by a temp-dir store and minimal runner.
 func newTestHandler(t *testing.T) *Handler {
 	t.Helper()
-	s, err := store.NewStore(t.TempDir())
+	// Use os.MkdirTemp instead of t.TempDir for the store directory so that
+	// late trace-file writes from background goroutines (which race with
+	// shutdown) don't cause TempDir cleanup failures.
+	storeDir, err := os.MkdirTemp("", "wallfacer-handler-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.NewStore(storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,6 +64,7 @@ func newTestHandler(t *testing.T) *Handler {
 	// goroutine exits cleanly before WaitBackground drains remaining work.
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
+	t.Cleanup(func() { os.RemoveAll(storeDir) })
 	return NewHandler(s, r, t.TempDir(), nil, nil)
 }
 
