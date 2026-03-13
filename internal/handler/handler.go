@@ -8,15 +8,18 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/metrics"
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/internal/workspace"
 )
 
 // Handler holds dependencies for all HTTP API handlers.
 type Handler struct {
 	store      *store.Store
+	workspace  *workspace.Manager
 	runner     *runner.Runner
 	configDir  string
 	workspaces []string
@@ -59,8 +62,16 @@ type Handler struct {
 
 // NewHandler constructs a Handler with the given dependencies.
 func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces []string, reg *metrics.Registry) *Handler {
+	wsMgr := (*workspace.Manager)(nil)
+	if r != nil {
+		wsMgr = r.WorkspaceManager()
+	}
+	if wsMgr == nil {
+		wsMgr = workspace.NewStatic(s, workspaces, instructions.FilePath(configDir, workspaces))
+	}
 	h := &Handler{
 		store:            s,
+		workspace:        wsMgr,
 		runner:           r,
 		configDir:        configDir,
 		workspaces:       workspaces,
@@ -76,8 +87,71 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 			"codex":  false,
 		},
 	}
+	if snap := wsMgr.Snapshot(); true {
+		h.store = snap.Store
+		h.workspaces = snap.Workspaces
+	}
+	if wsMgr != nil {
+		_, ch := wsMgr.Subscribe()
+		go func() {
+			for snap := range ch {
+				h.store = snap.Store
+				h.workspaces = snap.Workspaces
+			}
+		}()
+	}
 	h.refreshCodexBootstrapAuthState()
 	return h
+}
+
+func (h *Handler) currentStore() (*store.Store, bool) {
+	if h.workspace != nil {
+		return h.workspace.Store()
+	}
+	return h.store, h.store != nil
+}
+
+func (h *Handler) requireStore(w http.ResponseWriter) (*store.Store, bool) {
+	s, ok := h.currentStore()
+	if !ok || s == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		return nil, false
+	}
+	return s, true
+}
+
+func (h *Handler) currentWorkspaces() []string {
+	if h.workspace != nil {
+		return h.workspace.Workspaces()
+	}
+	if len(h.workspaces) == 0 {
+		return nil
+	}
+	out := make([]string, len(h.workspaces))
+	copy(out, h.workspaces)
+	return out
+}
+
+func (h *Handler) currentInstructionsPath() string {
+	if h.workspace != nil {
+		return h.workspace.InstructionsPath()
+	}
+	return ""
+}
+
+func (h *Handler) hasStore() bool {
+	_, ok := h.currentStore()
+	return ok
+}
+
+func (h *Handler) RequireStoreMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !h.hasStore() {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // incAutopilotAction increments the autopilot action counter for the given

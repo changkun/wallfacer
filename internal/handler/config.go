@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
-	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 )
@@ -85,9 +84,15 @@ func defaultSandbox(cfg envconfig.Config) string {
 
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
 	promptsDir := h.runner.Prompts().PromptsDir()
+	workspaces := h.currentWorkspaces()
+	instructionsPath := h.currentInstructionsPath()
+	payloadLimits := store.PayloadLimits{}
+	if s, ok := h.currentStore(); ok && s != nil {
+		payloadLimits = s.GetPayloadLimits()
+	}
 	resp := map[string]any{
-		"workspaces":          h.runner.Workspaces(),
-		"instructions_path":   instructions.FilePath(h.configDir, h.workspaces),
+		"workspaces":          workspaces,
+		"instructions_path":   instructionsPath,
 		"prompts_dir":         promptsDir,
 		"sandbox_activities":  store.SandboxActivities,
 		"sandboxes":           []string{"claude", "codex"},
@@ -103,7 +108,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"ideation_interval":   int(h.IdeationInterval().Minutes()),
 		"ideation_categories": h.runner.IdeationCategories(),
 		"default_model":       "",
-		"payload_limits":      h.store.GetPayloadLimits(),
+		"payload_limits":      payloadLimits,
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun
@@ -137,7 +142,11 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 
 // ideationRunning returns true if any idea-agent task is currently in_progress.
 func (h *Handler) ideationRunning(ctx context.Context) bool {
-	tasks, err := h.store.ListTasks(ctx, false)
+	s, ok := h.currentStore()
+	if !ok || s == nil {
+		return false
+	}
+	tasks, err := s.ListTasks(ctx, false)
 	if err != nil {
 		return false
 	}

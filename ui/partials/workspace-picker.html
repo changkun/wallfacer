@@ -1,0 +1,36 @@
+<div id="workspace-picker" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4" style="background: rgba(15, 23, 42, 0.55);">
+  <div class="modal-card" style="max-width: 920px; width: 100%; padding: 24px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;">
+      <div>
+        <h3 style="margin:0 0 6px;font-size:18px;font-weight:700;">Select Workspaces</h3>
+        <p style="margin:0;font-size:13px;color:var(--text-muted);line-height:1.5;">Choose one or more host directories to activate a task board. Switching workspaces loads a different board fingerprint without restarting the server.</p>
+      </div>
+      <button id="workspace-picker-close" type="button" class="btn-ghost" style="display:none;" onclick="hideWorkspacePicker()">Close</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:16px;">
+      <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg-card);">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+          <input id="workspace-browser-path" class="field" type="text" placeholder="/absolute/path" style="font-family:monospace;font-size:12px;" onkeydown="workspaceBrowserPathKeydown(event)">
+          <button type="button" class="btn-icon" onclick="browseWorkspaces()">Browse</button>
+          <button type="button" class="btn-ghost" onclick="addCurrentWorkspaceFolder()">Add Current Folder</button>
+        </div>
+        <div id="workspace-browser-breadcrumb" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;min-height:1em;"></div>
+        <div id="workspace-browser-status" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;min-height:1em;"></div>
+        <div id="workspace-browser-list" tabindex="0" style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:6px;background:var(--bg-elevated);" onkeydown="workspaceBrowserListKeydown(event)"></div>
+      </div>
+
+      <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--bg-card);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;">Selected</div>
+          <button type="button" class="btn-ghost" onclick="clearWorkspaceSelection()">Clear</button>
+        </div>
+        <div id="workspace-selection-list" style="display:flex;flex-direction:column;gap:8px;max-height:240px;overflow:auto;"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:14px;">
+          <button type="button" class="btn btn-accent" onclick="applyWorkspaceSelection()">Apply</button>
+          <span id="workspace-apply-status" style="font-size:11px;color:var(--text-muted);min-height:1em;"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,6 +1,10 @@
 // --- Git status stream ---
 
 function startGitStream() {
+  if (!activeWorkspaces || activeWorkspaces.length === 0) {
+    renderWorkspaces();
+    return;
+  }
   if (gitStatusSource) gitStatusSource.close();
   gitStatusSource = new EventSource(Routes.git.stream());
   gitStatusSource.onmessage = function(e) {
@@ -46,7 +50,14 @@ async function openWorkspaceFolder(path) {
 
 function renderWorkspaces() {
   const el = document.getElementById('workspace-list');
-  if (!gitStatuses || gitStatuses.length === 0) return;
+  if (!el) return;
+  if (!gitStatuses || gitStatuses.length === 0) {
+    el.innerHTML = '';
+    if (activeWorkspaces && activeWorkspaces.length > 0) {
+      document.title = 'Wallfacer';
+    }
+    return;
+  }
   // Update browser tab title with workspace names
   const names = gitStatuses.map(ws => ws.name).filter(Boolean);
   if (names.length > 0) {

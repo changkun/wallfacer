@@ -28,7 +28,7 @@ var skipDirs = map[string]bool{
 // mount path inside containers), making them directly usable in task prompts.
 // Results are served from a per-workspace cache; see fileIndex for invalidation policy.
 func (h *Handler) GetFiles(w http.ResponseWriter, r *http.Request) {
-	workspaces := h.runner.Workspaces()
+	workspaces := h.currentWorkspaces()
 	files := make([]string, 0, 256)
 
 	for _, ws := range workspaces {

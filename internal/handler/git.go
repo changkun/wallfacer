@@ -39,7 +39,7 @@ func collectWorkspaceStatuses(workspaces []string) []gitutil.WorkspaceGitStatus 
 
 // GitStatus returns git status for every configured workspace.
 func (h *Handler) GitStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, collectWorkspaceStatuses(h.runner.Workspaces()))
+	writeJSON(w, http.StatusOK, collectWorkspaceStatuses(h.currentWorkspaces()))
 }
 
 // GitStatusStream streams git status for all workspaces as SSE (5-second poll).
@@ -55,7 +55,7 @@ func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 
 	collect := func() []gitutil.WorkspaceGitStatus {
-		return collectWorkspaceStatuses(h.runner.Workspaces())
+		return collectWorkspaceStatuses(h.currentWorkspaces())
 	}
 
 	send := func(statuses []gitutil.WorkspaceGitStatus) bool {
@@ -173,7 +173,12 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Refuse while tasks are in progress.
-	tasks, err := h.store.ListTasks(r.Context(), false)
+	s, ok := h.currentStore()
+	if !ok || s == nil {
+		http.Error(w, "no workspaces configured", http.StatusServiceUnavailable)
+		return
+	}
+	tasks, err := s.ListTasks(r.Context(), false)
 	if err == nil {
 		for _, t := range tasks {
 			if t.Status == "in_progress" {
@@ -507,7 +512,7 @@ func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
 
 // isAllowedWorkspace checks that the workspace path is one the server was started with.
 func (h *Handler) isAllowedWorkspace(ws string) bool {
-	for _, configured := range h.runner.Workspaces() {
+	for _, configured := range h.currentWorkspaces() {
 		if configured == ws {
 			return true
 		}

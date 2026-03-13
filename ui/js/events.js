@@ -47,8 +47,6 @@ document.getElementById('new-prompt').addEventListener('input', (e) => {
 // --- Initialization ---
 try { initSortable(); } catch (e) { console.error('sortable init:', e); }
 try { initTrashBin(); } catch (e) { console.error('trash bin init:', e); }
-startGitStream();
-startTasksStream();
 loadMaxParallel();
 loadOversightInterval();
 loadAutoPush();

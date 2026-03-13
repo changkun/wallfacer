@@ -18,6 +18,7 @@ import (
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/internal/workspace"
 	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
@@ -284,30 +285,33 @@ type RunnerConfig struct {
 	Workspaces       string // space-separated workspace paths
 	WorktreesDir     string
 	InstructionsPath string
-	CodexAuthPath    string // host path to codex auth cache directory (default: ~/.codex)
-	ContainerNetwork string // --network value for task containers (empty = read from env file, fallback "host")
-	ContainerCPUs    string // --cpus value for task containers (empty = read from env file, no limit)
-	ContainerMemory  string // --memory value for task containers (empty = read from env file, no limit)
+	CodexAuthPath    string           // host path to codex auth cache directory (default: ~/.codex)
+	ContainerNetwork string           // --network value for task containers (empty = read from env file, fallback "host")
+	ContainerCPUs    string           // --cpus value for task containers (empty = read from env file, no limit)
+	ContainerMemory  string           // --memory value for task containers (empty = read from env file, no limit)
 	Prompts          *prompts.Manager // prompt template manager; nil = use prompts.Default
+	WorkspaceManager *workspace.Manager
 }
 
 // Runner orchestrates agent container execution for tasks.
 // It manages worktree isolation, container lifecycle, and the commit pipeline.
 type Runner struct {
 	store            *store.Store
+	storeMu          sync.RWMutex
 	command          string
 	sandboxImage     string
 	envFile          string
 	workspaces       string
 	worktreesDir     string
 	instructionsPath string
+	workspaceManager *workspace.Manager
 	codexAuthPath    string
-	containerNetwork string            // --network override; empty = read from env file
-	containerCPUs    string            // --cpus override; empty = read from env file
-	containerMemory  string            // --memory override; empty = read from env file
-	promptsMgr       *prompts.Manager  // prompt template manager
-	worktreeMu       sync.Mutex        // serializes all worktree filesystem operations on worktreesDir
-	repoMu           sync.Map          // per-repo *sync.Mutex for serializing rebase+merge
+	containerNetwork string             // --network override; empty = read from env file
+	containerCPUs    string             // --cpus override; empty = read from env file
+	containerMemory  string             // --memory override; empty = read from env file
+	promptsMgr       *prompts.Manager   // prompt template manager
+	worktreeMu       sync.Mutex         // serializes all worktree filesystem operations on worktreesDir
+	repoMu           sync.Map           // per-repo *sync.Mutex for serializing rebase+merge
 	taskContainers   *containerRegistry // taskID → container name
 	refineContainers *containerRegistry // taskID → refinement container name
 	ideateContainer  *containerRegistry // singleton: ideation container name
@@ -327,11 +331,11 @@ type Runner struct {
 		json       []byte
 		mounts     map[string]map[string]string
 	}
-	boardChangeSeq     atomic.Uint64  // incremented on every store notification
-	shutdownCh         chan struct{}   // closed by Shutdown to stop the subscription goroutine
+	boardChangeSeq      atomic.Uint64  // incremented on every store notification
+	shutdownCh          chan struct{}  // closed by Shutdown to stop the subscription goroutine
 	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
-	shutdownCtx    context.Context
-	shutdownCancel context.CancelFunc
+	shutdownCtx         context.Context
+	shutdownCancel      context.CancelFunc
 }
 
 // ContainerCircuitAllow returns true when the container circuit breaker
@@ -509,6 +513,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		containerCPUs:    cfg.ContainerCPUs,
 		containerMemory:  cfg.ContainerMemory,
 		promptsMgr:       mgr,
+		workspaceManager: cfg.WorkspaceManager,
 		taskContainers:   &containerRegistry{},
 		refineContainers: &containerRegistry{},
 		ideateContainer:  &containerRegistry{},
@@ -535,6 +540,11 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	r.containerCB = NewCircuitBreaker(cbThreshold, time.Duration(cbOpenSec)*time.Second)
 	r.executor = &osContainerExecutor{command: r.command}
 
+	if r.workspaceManager != nil {
+		snap := r.workspaceManager.Snapshot()
+		r.applyWorkspaceSnapshot(snap)
+	}
+
 	// Subscribe to store changes to drive the board-context cache invalidation.
 	// Each store mutation increments boardChangeSeq so generateBoardContextAndMounts
 	// knows when a cached result is stale.
@@ -542,24 +552,81 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	// remains unaffected — tests often call WaitBackground() directly in the test
 	// body before cleanup has a chance to close shutdownCh.
 	// Guard against nil store (some tests construct a Runner without a store).
-	if s != nil {
-		subID, subCh := s.Subscribe()
-		r.boardSubscriptionWg.Add(1)
-		go func() {
-			defer r.boardSubscriptionWg.Done()
-			defer s.Unsubscribe(subID)
-			for {
-				select {
-				case <-subCh:
-					r.boardChangeSeq.Add(1)
-				case <-r.shutdownCh:
-					return
-				}
-			}
-		}()
-	}
+	r.startBoardSubscriptionLoop(s)
 
 	return r
+}
+
+func (r *Runner) WorkspaceManager() *workspace.Manager {
+	return r.workspaceManager
+}
+
+func (r *Runner) applyWorkspaceSnapshot(s workspace.Snapshot) {
+	r.storeMu.Lock()
+	r.store = s.Store
+	r.workspaces = strings.Join(s.Workspaces, " ")
+	r.instructionsPath = s.InstructionsPath
+	r.storeMu.Unlock()
+}
+
+func (r *Runner) currentStore() *store.Store {
+	r.storeMu.RLock()
+	defer r.storeMu.RUnlock()
+	return r.store
+}
+
+func (r *Runner) startBoardSubscriptionLoop(initial *store.Store) {
+	r.boardSubscriptionWg.Add(1)
+	go func() {
+		defer r.boardSubscriptionWg.Done()
+
+		var (
+			wsSubID int
+			wsCh    <-chan workspace.Snapshot
+			subID   int
+			subCh   <-chan store.SequencedDelta
+			cur     = initial
+		)
+		if r.workspaceManager != nil {
+			wsSubID, wsCh = r.workspaceManager.Subscribe()
+			defer r.workspaceManager.Unsubscribe(wsSubID)
+			cur = r.workspaceManager.Snapshot().Store
+		}
+		subscribeStore := func(s *store.Store) {
+			if cur != nil && subCh != nil {
+				cur.Unsubscribe(subID)
+			}
+			cur = s
+			subCh = nil
+			subID = 0
+			if s != nil {
+				subID, subCh = s.Subscribe()
+			}
+		}
+		subscribeStore(cur)
+		defer func() {
+			if cur != nil && subCh != nil {
+				cur.Unsubscribe(subID)
+			}
+		}()
+
+		for {
+			select {
+			case <-r.shutdownCh:
+				return
+			case <-subCh:
+				r.boardChangeSeq.Add(1)
+			case snap, ok := <-wsCh:
+				if !ok {
+					wsCh = nil
+					continue
+				}
+				r.applyWorkspaceSnapshot(snap)
+				r.boardChangeSeq.Add(1)
+				subscribeStore(snap.Store)
+			}
+		}
+	}()
 }
 
 // resolvedContainerNetwork returns the --network value to use for task containers.
@@ -621,6 +688,9 @@ func (r *Runner) WorktreesDir() string {
 
 // InstructionsPath returns the host path mounted as /workspace/AGENTS.md.
 func (r *Runner) InstructionsPath() string {
+	if r.workspaceManager != nil {
+		return r.workspaceManager.InstructionsPath()
+	}
 	return r.instructionsPath
 }
 
@@ -680,6 +750,9 @@ func (r *Runner) HostCodexAuthStatus(now time.Time) (bool, string) {
 
 // Workspaces returns the list of configured workspace paths.
 func (r *Runner) Workspaces() []string {
+	if r.workspaceManager != nil {
+		return r.workspaceManager.Workspaces()
+	}
 	if r.workspaces == "" {
 		return nil
 	}
