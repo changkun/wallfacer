@@ -160,7 +160,11 @@ func runServer(configDir string, args []string) {
 
 	logger.Main.Info("workspaces", "paths", strings.Join(workspaces, ", "))
 
-	h := handler.NewHandler(s, r, configDir, workspaces)
+	// Build the Prometheus metrics registry early so it can be threaded into
+	// the handler for autopilot action counters.
+	reg := metrics.NewRegistry()
+
+	h := handler.NewHandler(s, r, configDir, workspaces, reg)
 	r.SetStopReasonHandler(func(taskID uuid.UUID, stopReason string) {
 		if stopReason == "max_tokens" {
 			h.SetAutopilot(false)
@@ -194,10 +198,9 @@ func runServer(configDir string, args []string) {
 		go wn.Start(ctx)
 	}
 
-	// Build the Prometheus metrics registry and register scrape-time gauge
-	// collectors. HTTP counter and histogram are created inside loggingMiddleware
-	// so they are available via the same registry for /metrics.
-	reg := metrics.NewRegistry()
+	// Register scrape-time gauge collectors. HTTP counter and histogram are
+	// created inside loggingMiddleware so they are available via the same
+	// registry for /metrics.
 	reg.Gauge(
 		"wallfacer_tasks_total",
 		"Number of tasks grouped by status and archived flag.",
@@ -284,6 +287,10 @@ func runServer(configDir string, args []string) {
 			}
 			return []metrics.LabeledValue{{Value: v}}
 		},
+	)
+	reg.Counter(
+		"wallfacer_autopilot_actions_total",
+		"Total number of autonomous actions taken by autopilot watchers, by watcher and outcome.",
 	)
 
 	mux := buildMux(h, r, reg)

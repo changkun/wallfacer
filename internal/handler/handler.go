@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/metrics"
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 )
@@ -21,6 +22,7 @@ type Handler struct {
 	workspaces []string
 	envFile    string
 	startTime  time.Time
+	reg        *metrics.Registry
 
 	autopilotMu sync.RWMutex
 	autopilot   bool
@@ -56,7 +58,7 @@ type Handler struct {
 }
 
 // NewHandler constructs a Handler with the given dependencies.
-func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces []string) *Handler {
+func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces []string, reg *metrics.Registry) *Handler {
 	h := &Handler{
 		store:            s,
 		runner:           r,
@@ -68,6 +70,7 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		startTime:        time.Now(),
 		ideationEnabled:  true,
 		ideationInterval: 60 * time.Minute,
+		reg:              reg,
 		sandboxTestPassed: map[string]bool{
 			"claude": false,
 			"codex":  false,
@@ -75,6 +78,18 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 	}
 	h.refreshCodexBootstrapAuthState()
 	return h
+}
+
+// incAutopilotAction increments the autopilot action counter for the given
+// watcher and outcome. It is a no-op when no registry is configured.
+func (h *Handler) incAutopilotAction(watcher, outcome string) {
+	if h.reg == nil {
+		return
+	}
+	h.reg.Counter("wallfacer_autopilot_actions_total", "").Inc(map[string]string{
+		"watcher": watcher,
+		"outcome": outcome,
+	})
 }
 
 func (h *Handler) setSandboxTestPassed(sandbox string, passed bool) {

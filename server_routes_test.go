@@ -53,7 +53,7 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 		WorktreesDir: worktrees,
 		Workspaces:   workdir,
 	})
-	h := handler.NewHandler(s, r, workdir, []string{workdir})
+	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
 
 	// buildMux panics if any route in the contract lacks a handler entry, so

@@ -57,7 +57,7 @@ func newTestHandler(t *testing.T) *Handler {
 	// goroutine exits cleanly before WaitBackground drains remaining work.
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	return NewHandler(s, r, t.TempDir(), nil)
+	return NewHandler(s, r, t.TempDir(), nil, nil)
 }
 
 // diffResponse is the JSON shape returned by TaskDiff.

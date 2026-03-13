@@ -33,7 +33,7 @@ func newTestHandlerWithInstructions(t *testing.T) (*Handler, string) {
 	t.Cleanup(r.WaitBackground)
 
 	workspaces := []string{t.TempDir()}
-	h := NewHandler(s, r, configDir, workspaces)
+	h := NewHandler(s, r, configDir, workspaces, nil)
 	return h, configDir
 }
 

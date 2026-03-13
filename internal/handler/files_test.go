@@ -254,7 +254,7 @@ func newTestHandlerWithTwoWorkspaces(t *testing.T) (*Handler, string, string) {
 		Workspaces: ws1 + " " + ws2,
 	})
 	t.Cleanup(r.WaitBackground)
-	h := NewHandler(s, r, configDir, []string{ws1, ws2})
+	h := NewHandler(s, r, configDir, []string{ws1, ws2}, nil)
 	return h, ws1, ws2
 }
 

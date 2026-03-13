@@ -221,6 +221,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			// Phase 1 (no lock): build candidate without holding promoteMu.
 			regularInProgress := h.store.CountRegularInProgress()
 			if regularInProgress >= h.maxConcurrentTasks() {
+				h.incAutopilotAction("auto_promoter", "skipped_capacity")
 				return nil, nil
 			}
 
@@ -237,10 +238,12 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				}
 				// Skip tasks that have a future scheduled start time.
 				if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
+					h.incAutopilotAction("auto_promoter", "skipped_scheduled")
 					continue
 				}
 				satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
 				if err != nil || !satisfied {
+					h.incAutopilotAction("auto_promoter", "skipped_dependency")
 					continue // skip: dependencies not yet done
 				}
 				if bestBacklog == nil || t.Position < bestBacklog.Position {
@@ -256,6 +259,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			// Re-read in-progress count; state may have changed during Phase 1 I/O.
 			freshInProgress := h.store.CountRegularInProgress()
 			if freshInProgress >= h.maxConcurrentTasks() {
+				h.incAutopilotAction("auto_promoter", "skipped_capacity")
 				return false, nil
 			}
 
@@ -276,6 +280,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				logger.Handler.Error("auto-promote status update", "task", candidate.ID, "error", err)
 				return false, nil
 			}
+			h.incAutopilotAction("auto_promoter", "promoted")
 			h.store.InsertEvent(ctx, candidate.ID, store.EventTypeStateChange, map[string]string{
 				"from":    string(store.TaskStatusBacklog),
 				"to":      string(store.TaskStatusInProgress),
@@ -311,12 +316,14 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 		logger.Handler.Info("auto-retry suppressed: max retries reached",
 			"task", task.ID, "auto_retry_count", task.AutoRetryCount,
 			"category", task.FailureCategory)
+		h.incAutopilotAction("auto_retrier", "suppressed_budget")
 		return
 	}
 	// For container-crash failures, honour the circuit breaker.
 	if task.FailureCategory == store.FailureCategoryContainerCrash && !h.runner.ContainerCircuitAllow() {
 		logger.Handler.Warn("auto-retry suppressed: container circuit breaker open",
 			"task", task.ID)
+		h.incAutopilotAction("auto_retrier", "suppressed_circuit")
 		return
 	}
 	logger.Handler.Info("auto-retrying failed task",
@@ -326,6 +333,7 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 		logger.Handler.Error("auto-retry reset failed", "task", task.ID, "error", err)
 		return
 	}
+	h.incAutopilotAction("auto_retrier", "retried")
 	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{
 		"from":             string(store.TaskStatusFailed),
 		"to":               string(store.TaskStatusBacklog),
@@ -405,6 +413,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			promoteMu.Unlock()
 			logger.Handler.Info("auto-sync: regular in-progress limit reached, deferring sync",
 				"task", t.ID, "count", regularInProgress, "max", maxTasks)
+			h.incAutopilotAction("sync_watcher", "skipped_capacity")
 			continue
 		}
 
@@ -414,6 +423,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			continue
 		}
 		regularInProgress++
+		h.incAutopilotAction("sync_watcher", "synced")
 		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
 			"from":    string(store.TaskStatusWaiting),
 			"to":      string(store.TaskStatusInProgress),
@@ -583,6 +593,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				if testInProgress >= maxTestTasks {
 					logger.Handler.Info("auto-test: test concurrency limit reached, deferring remaining tests",
 						"limit", maxTestTasks)
+					h.incAutopilotAction("auto_tester", "skipped_capacity")
 					break
 				}
 
@@ -614,6 +625,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				h.runner.RunBackground(c.task.ID, c.testPrompt, "", false)
 				testInProgress++
 				triggered = true
+				h.incAutopilotAction("auto_tester", "tested")
 			}
 
 			return triggered, nil
@@ -725,6 +737,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						break
 					}
 					if hasConflict {
+						h.incAutopilotAction("auto_submitter", "skipped_conflict")
 						skip = true
 						break
 					}
@@ -802,6 +815,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 					})
 				}
 				submitted = true
+				h.incAutopilotAction("auto_submitter", "submitted")
 			}
 			return submitted, nil
 		},
