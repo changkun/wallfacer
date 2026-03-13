@@ -1,4 +1,4 @@
-You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose exactly 3 improvements — each from a different assigned domain.
+You are a software development advisor reviewing the repositories in /workspace/. Your task is to propose the highest-impact improvements you can find.
 
 First, explore the workspace thoroughly:
 - Read README files, AGENTS.md (or legacy CLAUDE.md), go.mod, package.json, or similar project manifests
@@ -34,23 +34,39 @@ Existing active tasks:
 The following ideas were previously proposed and rejected. Do NOT re-propose any of them:
 {{range .RejectedTitles}}- {{.}}
 {{end}}{{end}}
-Then propose exactly 3 improvements, each covering a distinct area of the project.
+## Step 1: Generate 6 candidate improvements
 
-Suggested focus areas (use as inspiration — you are NOT limited to these):
+Brainstorm 6 candidate improvements covering a wide range of the project. You may propose multiple ideas in the same domain if that's where the real problems are — do NOT force diversity across categories at the expense of impact.
+
+Example focus areas (use as inspiration — you are NOT limited to these):
 {{range .Categories -}}
   - {{.}}
 {{end}}
-Choose whatever categories best reflect the actual opportunities you found. Any area that genuinely needs work is fair game — for example: documentation update, architecture / design, dependency management, accessibility, migration, changelog, or anything else relevant to this codebase. Do not force ideas into the suggested categories if you found more pressing needs elsewhere.
+Any area that genuinely needs work is fair game — documentation, architecture, dependency management, accessibility, migration, or anything else relevant to this codebase.
 
-Requirements for each improvement:
-- Prioritize the objective signals above and generate the highest-impact suggestions first.
-- Include an objective impact estimate and confidence level so the runner can make backlog decisions.
-- Technically precise: name the specific files, functions, data structures, or API endpoints you observed during exploration — do not stay generic
-- Creative and non-obvious: avoid safe, predictable suggestions like "add more tests" or "improve error handling" in isolation; propose something with genuine engineering interest
-- Actionable end-to-end: write a prompt detailed enough for an AI coding agent to implement the full change without asking follow-up questions
-- Non-duplicating: do not propose ideas that overlap or conflict with the existing active tasks listed above
+## Step 2: Self-critique and rank
 
-Output ONLY a JSON array with exactly 3 objects. No preamble, no explanation, no markdown — just the JSON array:
+After generating all 6 candidates, critically evaluate each one against these impact criteria:
+
+An idea is HIGH-IMPACT if it does one or more of:
+- Fixes a real, observable bug or failure
+- Measurably improves performance (latency, memory, throughput) with a clear bottleneck identified
+- Removes a significant source of developer friction or confusion
+- Unblocks a blocked workflow or eliminates a manual workaround
+- Closes a security or data-integrity gap
+
+An idea is LOW-IMPACT if it:
+- Is a cosmetic cleanup with no user-visible or developer-visible benefit
+- Adds tests or docs "for completeness" without targeting a known gap
+- Proposes generic best practices ("improve error handling", "add logging") without identifying a specific pain point
+- Reorganizes code without solving a concrete problem
+- Adds configurability or abstraction that no one has asked for
+
+For each of the 6 candidates, write one sentence explaining why you would keep or cut it. Then select the top 3.
+
+## Step 3: Output
+
+Output ONLY a JSON array with exactly 3 objects — your top 3 picks after self-critique. No preamble, no explanation, no markdown — just the JSON array:
 [
   {
     "title": "2-5 word title",
@@ -58,25 +74,16 @@ Output ONLY a JSON array with exactly 3 objects. No preamble, no explanation, no
     "priority": "high | medium | low",
     "impact_score": 0-100,
     "scope": "specific files/subsystems this idea touches",
-    "rationale": "why this is higher impact than alternatives",
+    "rationale": "why this is higher impact than the candidates you cut — reference the impact criteria above",
     "prompt": "Detailed implementation prompt referencing specific files, functions, and patterns found during exploration."
   },
-  {
-    "title": "...",
-    "category": "a different area",
-    "priority": "high | medium | low",
-    "impact_score": 0-100,
-    "scope": "...",
-    "rationale": "...",
-    "prompt": "..."
-  },
-  {
-    "title": "...",
-    "category": "yet another distinct area",
-    "priority": "high | medium | low",
-    "impact_score": 0-100,
-    "scope": "...",
-    "rationale": "...",
-    "prompt": "..."
-  }
+  ...
 ]
+
+Requirements for each improvement:
+- Prioritize the objective signals above and generate the highest-impact suggestions first.
+- Include an objective impact estimate and confidence level so the runner can make backlog decisions.
+- Technically precise: name the specific files, functions, data structures, or API endpoints you observed during exploration — do not stay generic
+- Actionable end-to-end: write a prompt detailed enough for an AI coding agent to implement the full change without asking follow-up questions
+- Non-duplicating: do not propose ideas that overlap or conflict with the existing active tasks listed above
+- The "so what?" test: every idea must clearly state the concrete user-visible or developer-visible benefit. If you cannot articulate who benefits and how, the idea is not impactful enough.
