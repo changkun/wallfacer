@@ -1097,7 +1097,7 @@ func TestParseTestVerdict(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := parseTestVerdict(tc.input)
+			got := parseTestVerdict(tc.input, nil, nil)
 			if got != tc.expected {
 				t.Errorf("parseTestVerdict(%q) = %q, want %q", tc.input, got, tc.expected)
 			}

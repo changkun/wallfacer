@@ -301,6 +301,12 @@ type Task struct {
 	TestRunStartTurn    int    `json:"test_run_start_turn,omitempty"`   // turn count when the test run started (implementation turn boundary)
 	PendingTestFeedback string `json:"pending_test_feedback,omitempty"` // failing test outcome awaiting auto-resume as feedback
 
+	// CustomPassPatterns are user-supplied regex patterns applied to test output
+	// before the built-in heuristics. A match on any pattern returns "pass".
+	CustomPassPatterns []string `json:"custom_pass_patterns,omitempty"`
+	// CustomFailPatterns are checked first; a match returns "fail" immediately.
+	CustomFailPatterns []string `json:"custom_fail_patterns,omitempty"`
+
 	// Kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
 	// Empty string and "task" are equivalent: a standard implementation task.
 	Kind TaskKind `json:"kind,omitempty"`
@@ -371,6 +377,8 @@ func deepCloneTask(t *Task) Task {
 	cp.RefineSessions = cloneRefinementSessions(t.RefineSessions)
 	cp.Tags = slices.Clone(t.Tags)
 	cp.DependsOn = slices.Clone(t.DependsOn)
+	cp.CustomPassPatterns = slices.Clone(t.CustomPassPatterns)
+	cp.CustomFailPatterns = slices.Clone(t.CustomFailPatterns)
 	cp.TruncatedTurns = slices.Clone(t.TruncatedTurns)
 	cp.SandboxByActivity = maps.Clone(t.SandboxByActivity)
 	cp.UsageBreakdown = maps.Clone(t.UsageBreakdown)

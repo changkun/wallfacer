@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -149,17 +150,19 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 // CreateTask creates a new task in backlog status.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Prompt            string                  `json:"prompt"`
-		Timeout           int                     `json:"timeout"`
-		MountWorktrees    bool                    `json:"mount_worktrees"`
-		Sandbox           sandbox.Type            `json:"sandbox"`
-		SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity"`
-		Kind              store.TaskKind          `json:"kind"`
-		Tags              []string                `json:"tags"`
-		MaxCostUSD        float64                 `json:"max_cost_usd"`
-		MaxInputTokens    int                     `json:"max_input_tokens"`
-		Model             string                  `json:"model"`
-		ScheduledAt       *time.Time              `json:"scheduled_at,omitempty"`
+		Prompt             string                  `json:"prompt"`
+		Timeout            int                     `json:"timeout"`
+		MountWorktrees     bool                    `json:"mount_worktrees"`
+		Sandbox            sandbox.Type            `json:"sandbox"`
+		SandboxByActivity  map[string]sandbox.Type `json:"sandbox_by_activity"`
+		Kind               store.TaskKind          `json:"kind"`
+		Tags               []string                `json:"tags"`
+		MaxCostUSD         float64                 `json:"max_cost_usd"`
+		MaxInputTokens     int                     `json:"max_input_tokens"`
+		Model              string                  `json:"model"`
+		ScheduledAt        *time.Time              `json:"scheduled_at,omitempty"`
+		CustomPassPatterns []string                `json:"custom_pass_patterns,omitempty"`
+		CustomFailPatterns []string                `json:"custom_fail_patterns,omitempty"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -172,19 +175,25 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if err := validateCustomPatterns(req.CustomPassPatterns, req.CustomFailPatterns); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
-		Prompt:            req.Prompt,
-		Timeout:           req.Timeout,
-		Tags:              req.Tags,
-		MountWorktrees:    req.MountWorktrees,
-		Kind:              req.Kind,
-		Sandbox:           req.Sandbox,
-		SandboxByActivity: req.SandboxByActivity,
-		MaxCostUSD:        req.MaxCostUSD,
-		MaxInputTokens:    req.MaxInputTokens,
-		ModelOverride:     req.Model,
-		ScheduledAt:       req.ScheduledAt,
+		Prompt:             req.Prompt,
+		Timeout:            req.Timeout,
+		Tags:               req.Tags,
+		MountWorktrees:     req.MountWorktrees,
+		Kind:               req.Kind,
+		Sandbox:            req.Sandbox,
+		SandboxByActivity:  req.SandboxByActivity,
+		MaxCostUSD:         req.MaxCostUSD,
+		MaxInputTokens:     req.MaxInputTokens,
+		ModelOverride:      req.Model,
+		ScheduledAt:        req.ScheduledAt,
+		CustomPassPatterns: req.CustomPassPatterns,
+		CustomFailPatterns: req.CustomFailPatterns,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -526,7 +535,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Model *string `json:"model"`
 		// ScheduledAt uses json.RawMessage so we can distinguish "absent" (nil)
 		// from explicitly-sent "null" (clear the schedule) or a valid time (set it).
-		ScheduledAt json.RawMessage `json:"scheduled_at"`
+		ScheduledAt        json.RawMessage `json:"scheduled_at"`
+		CustomPassPatterns []string        `json:"custom_pass_patterns,omitempty"`
+		CustomFailPatterns []string        `json:"custom_fail_patterns,omitempty"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -538,8 +549,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Allow editing prompt, timeout, fresh_start, mount_worktrees, sandbox, model, and budget for backlog tasks.
-	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil) {
+	// Allow editing prompt, timeout, fresh_start, mount_worktrees, sandbox, model, budget, and custom patterns for backlog tasks.
+	if task.Status == store.TaskStatusBacklog && (req.Prompt != nil || req.Timeout != nil || req.FreshStart != nil || req.MountWorktrees != nil || req.Sandbox != nil || req.SandboxByActivity != nil || req.MaxCostUSD != nil || req.MaxInputTokens != nil || req.Model != nil || req.CustomPassPatterns != nil || req.CustomFailPatterns != nil) {
 		sandbox := task.Sandbox
 		if req.Sandbox != nil {
 			sandbox = *req.Sandbox
@@ -549,6 +560,10 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			activity = *req.SandboxByActivity
 		}
 		if err := h.validateRequestedSandboxes(sandbox, activity); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := validateCustomPatterns(req.CustomPassPatterns, req.CustomFailPatterns); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -564,6 +579,20 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		}
 		if req.Model != nil {
 			if err := h.store.UpdateTaskModelOverride(r.Context(), id, *req.Model); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		if req.CustomPassPatterns != nil || req.CustomFailPatterns != nil {
+			passP := req.CustomPassPatterns
+			failP := req.CustomFailPatterns
+			if passP == nil {
+				passP = task.CustomPassPatterns
+			}
+			if failP == nil {
+				failP = task.CustomFailPatterns
+			}
+			if err := h.store.UpdateTaskCustomPatterns(r.Context(), id, passP, failP); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -796,4 +825,20 @@ func (h *Handler) RestoreTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// validateCustomPatterns compiles each pattern to ensure it is valid RE2 syntax.
+// Returns a 400-friendly error message that includes the offending pattern.
+func validateCustomPatterns(passPatterns, failPatterns []string) error {
+	for _, p := range passPatterns {
+		if _, err := regexp.Compile(p); err != nil {
+			return fmt.Errorf("invalid custom_pass_pattern %q: %v", p, err)
+		}
+	}
+	for _, p := range failPatterns {
+		if _, err := regexp.Compile(p); err != nil {
+			return fmt.Errorf("invalid custom_fail_pattern %q: %v", p, err)
+		}
+	}
+	return nil
 }
