@@ -68,3 +68,35 @@ func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) 
 		t.Fatal("expected store for restored workspace group")
 	}
 }
+
+func TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup(t *testing.T) {
+	configDir := t.TempDir()
+	dataDir := t.TempDir()
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	ws := t.TempDir()
+	if err := workspacegroups.Save(configDir, []workspacegroups.Group{
+		{Workspaces: []string{ws}},
+	}); err != nil {
+		t.Fatalf("save workspace groups: %v", err)
+	}
+
+	m, err := NewManager(configDir, dataDir, envFile, []string{})
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+
+	snap := m.Snapshot()
+	if len(snap.Workspaces) != 0 {
+		t.Fatalf("expected no restored workspaces, got %v", snap.Workspaces)
+	}
+	if snap.InstructionsPath != "" {
+		t.Fatalf("expected no instructions path for explicit empty startup, got %q", snap.InstructionsPath)
+	}
+	if snap.Store == nil {
+		t.Fatal("expected store for explicit empty workspace set")
+	}
+}

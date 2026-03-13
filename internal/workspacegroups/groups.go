@@ -58,9 +58,14 @@ func Upsert(configDir string, workspaces []string) error {
 		return err
 	}
 	key := groupKey(workspaces)
-	for _, group := range groups {
+	for i, group := range groups {
 		if groupKey(group.Workspaces) == key {
-			return nil
+			if i == 0 {
+				return nil
+			}
+			reordered := append([]Group{{Workspaces: workspaces}}, groups[:i]...)
+			reordered = append(reordered, groups[i+1:]...)
+			return Save(configDir, reordered)
 		}
 	}
 	groups = append([]Group{{Workspaces: workspaces}}, groups...)
