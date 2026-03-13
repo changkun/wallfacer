@@ -284,6 +284,7 @@ type Task struct {
 	Environment *ExecutionEnvironment `json:"environment,omitempty"`
 	Position    int                   `json:"position"`
 	CreatedAt   time.Time             `json:"created_at"`
+	StartedAt   *time.Time            `json:"started_at,omitempty"`
 	UpdatedAt   time.Time             `json:"updated_at"`
 
 	// Worktree isolation fields (populated when task moves to in_progress).
@@ -407,6 +408,10 @@ func deepCloneTask(t *Task) Task {
 		envCopy := *t.Environment
 		cp.Environment = &envCopy
 	}
+	if t.StartedAt != nil {
+		startedAt := *t.StartedAt
+		cp.StartedAt = &startedAt
+	}
 	if t.ScheduledAt != nil {
 		scheduledAt := *t.ScheduledAt
 		cp.ScheduledAt = &scheduledAt
@@ -452,9 +457,10 @@ type TaskSummary struct {
 	TaskID          uuid.UUID            `json:"task_id"`
 	Title           string               `json:"title"`
 	Status          TaskStatus           `json:"status"`
-	CompletedAt     time.Time            `json:"completed_at"`
-	CreatedAt       time.Time            `json:"created_at"`
-	DurationSeconds float64              `json:"duration_seconds"`
+	CompletedAt              time.Time            `json:"completed_at"`
+	CreatedAt                time.Time            `json:"created_at"`
+	DurationSeconds          float64              `json:"duration_seconds"`
+	ExecutionDurationSeconds float64              `json:"execution_duration_seconds"`
 	TotalTurns      int                  `json:"total_turns"`
 	TotalCostUSD    float64              `json:"total_cost_usd"`
 	ByActivity      map[string]TaskUsage `json:"by_activity"`

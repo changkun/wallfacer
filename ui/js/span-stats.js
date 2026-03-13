@@ -54,14 +54,17 @@
     );
   }
 
+  var throughputEl;
+
   function init() {
-    modal     = document.getElementById('span-stats-modal');
-    loadingEl = document.getElementById('span-stats-loading');
-    errorEl   = document.getElementById('span-stats-error');
-    emptyEl   = document.getElementById('span-stats-empty');
-    contentEl = document.getElementById('span-stats-content');
-    summaryEl = document.getElementById('span-stats-summary');
-    tbody     = document.getElementById('span-stats-tbody');
+    modal       = document.getElementById('span-stats-modal');
+    loadingEl   = document.getElementById('span-stats-loading');
+    errorEl     = document.getElementById('span-stats-error');
+    emptyEl     = document.getElementById('span-stats-empty');
+    contentEl   = document.getElementById('span-stats-content');
+    summaryEl   = document.getElementById('span-stats-summary');
+    tbody       = document.getElementById('span-stats-tbody');
+    throughputEl = document.getElementById('span-stats-throughput');
 
     bindModalBackdropClose(modal, closeSpanStats);
     setState = createModalStateController({
@@ -77,11 +80,68 @@
     loadJsonEndpoint('/api/debug/spans', renderStats, setState);
   }
 
+  function fmtSeconds(s) {
+    if (s === undefined || s === null || s === 0) return '\u2014';
+    if (s < 60) return s.toFixed(1) + 's';
+    return (s / 60).toFixed(1) + 'm';
+  }
+
+  function renderThroughput(tp) {
+    if (!throughputEl) return;
+    if (!tp) { throughputEl.innerHTML = ''; return; }
+
+    var hasData = tp.total_completed > 0 || tp.total_failed > 0;
+
+    // Stat tiles.
+    var tiles = [
+      { label: 'Completed', value: hasData ? String(tp.total_completed) : '\u2014' },
+      { label: 'Failed',    value: hasData ? String(tp.total_failed)    : '\u2014' },
+      { label: 'Success',   value: hasData ? tp.success_rate_pct.toFixed(1) + '%' : '\u2014' },
+      { label: 'Median',    value: fmtSeconds(tp.median_execution_s) },
+      { label: 'P95',       value: fmtSeconds(tp.p95_execution_s) }
+    ];
+
+    var tilesHtml = tiles.map(function (tile) {
+      return '<div style="display:flex;flex-direction:column;gap:2px;min-width:72px;">' +
+        '<span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;">' + tile.label + '</span>' +
+        '<span style="font-size:20px;font-weight:700;line-height:1.2;">' + tile.value + '</span>' +
+      '</div>';
+    }).join('');
+
+    // Mini bar chart for daily completions (last 30 days).
+    var chartHtml = '';
+    var daily = tp.daily_completions || [];
+    if (daily.length > 0) {
+      var maxCount = 0;
+      daily.forEach(function (d) { if (d.count > maxCount) maxCount = d.count; });
+      var bars = daily.map(function (d) {
+        var heightPct = maxCount > 0 ? Math.max(4, Math.round((d.count / maxCount) * 100)) : 4;
+        var filled = d.count > 0;
+        return '<div title="' + escapeHtml(d.date) + ': ' + d.count + '" style="' +
+          'flex:1;height:32px;display:flex;align-items:flex-end;">' +
+          '<div style="width:100%;height:' + heightPct + '%;' +
+          'background:' + (filled ? 'var(--accent)' : 'var(--border)') + ';' +
+          'border-radius:2px 2px 0 0;"></div>' +
+        '</div>';
+      }).join('');
+      chartHtml = '<div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px;">' +
+        '<span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;">Daily completions (30d)</span>' +
+        '<div style="display:flex;gap:2px;align-items:flex-end;height:36px;">' + bars + '</div>' +
+      '</div>';
+    }
+
+    throughputEl.innerHTML = tilesHtml + chartHtml;
+  }
+
   function renderStats(data) {
     var phases = data.phases || {};
     var keys = Object.keys(phases).sort();
 
-    if (keys.length === 0) { setState('empty'); return; }
+    renderThroughput(data.throughput);
+
+    var tp = data.throughput || {};
+    var hasThroughput = tp.total_completed > 0 || tp.total_failed > 0;
+    if (keys.length === 0 && !hasThroughput) { setState('empty'); return; }
 
     // Compute the global max across all phases for proportional bar scaling.
     var globalMaxMs = 0;

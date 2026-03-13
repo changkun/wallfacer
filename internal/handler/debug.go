@@ -54,11 +54,29 @@ type spanStatsCache struct {
 	expiresAt time.Time
 }
 
+// DayCount holds the number of completed tasks for a single UTC calendar day.
+type DayCount struct {
+	Date  string `json:"date"`  // "2006-01-02"
+	Count int    `json:"count"`
+}
+
+// taskThroughput aggregates task completion metrics across all done/failed tasks.
+type taskThroughput struct {
+	TotalCompleted   int        `json:"total_completed"`
+	TotalFailed      int        `json:"total_failed"`
+	SuccessRatePct   float64    `json:"success_rate_pct"`
+	AvgExecutionS    float64    `json:"avg_execution_s"`
+	MedianExecutionS float64    `json:"median_execution_s"`
+	P95ExecutionS    float64    `json:"p95_execution_s"`
+	DailyCompletions []DayCount `json:"daily_completions"`
+}
+
 // spanStatsResponse is the JSON shape returned by GET /api/debug/spans.
 type spanStatsResponse struct {
 	Phases       map[string]phaseStats `json:"phases"`
 	TasksScanned int                   `json:"tasks_scanned"`
 	SpansTotal   int                   `json:"spans_total"`
+	Throughput   taskThroughput        `json:"throughput"`
 }
 
 // percentileIndex returns the slice index for the given percentile (0–100)
@@ -139,6 +157,12 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 	durations := make(map[string][]int64) // phase → []durationMs
 	spansTotal := 0
 
+	// Throughput tracking.
+	var execDurations []float64
+	dailyBuckets := make(map[string]int) // "2006-01-02" → count
+	totalCompleted := 0
+	totalFailed := 0
+
 	for _, t := range tasks {
 		events, err := h.store.GetEvents(r.Context(), t.ID)
 		if err != nil {
@@ -149,6 +173,55 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 			durations[sr.Phase] = append(durations[sr.Phase], sr.DurationMS)
 			spansTotal++
 		}
+
+		switch t.Status {
+		case store.TaskStatusDone:
+			totalCompleted++
+			summary, _ := h.store.LoadSummary(t.ID)
+			var execS float64
+			if summary != nil {
+				if summary.ExecutionDurationSeconds > 0 {
+					execS = summary.ExecutionDurationSeconds
+				} else {
+					execS = summary.DurationSeconds
+				}
+				dayKey := summary.CompletedAt.UTC().Format("2006-01-02")
+				dailyBuckets[dayKey]++
+			}
+			if execS > 0 {
+				execDurations = append(execDurations, execS)
+			}
+		case store.TaskStatusFailed:
+			totalFailed++
+		}
+	}
+
+	// Compute percentiles for execution durations.
+	sort.Float64s(execDurations)
+	var medianExecS, p95ExecS, avgExecS float64
+	if n := len(execDurations); n > 0 {
+		medianExecS = execDurations[percentileIndex(n, 50)]
+		p95ExecS = execDurations[percentileIndex(n, 95)]
+		var sum float64
+		for _, d := range execDurations {
+			sum += d
+		}
+		avgExecS = sum / float64(n)
+	}
+
+	// Compute success rate.
+	var successRatePct float64
+	if total := totalCompleted + totalFailed; total > 0 {
+		successRatePct = float64(totalCompleted) / float64(total) * 100.0
+	}
+
+	// Build 30-day daily completions, always emitting exactly 30 entries.
+	now := time.Now().UTC()
+	dailyCompletions := make([]DayCount, 30)
+	for i := 0; i < 30; i++ {
+		day := now.AddDate(0, 0, -(29 - i))
+		key := day.Format("2006-01-02")
+		dailyCompletions[i] = DayCount{Date: key, Count: dailyBuckets[key]}
 	}
 
 	phases := make(map[string]phaseStats, len(durations))
@@ -174,6 +247,15 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 		Phases:       phases,
 		TasksScanned: len(tasks),
 		SpansTotal:   spansTotal,
+		Throughput: taskThroughput{
+			TotalCompleted:   totalCompleted,
+			TotalFailed:      totalFailed,
+			SuccessRatePct:   successRatePct,
+			AvgExecutionS:    avgExecS,
+			MedianExecutionS: medianExecS,
+			P95ExecutionS:    p95ExecS,
+			DailyCompletions: dailyCompletions,
+		},
 	}
 	h.spanCache.resp = resp
 	h.spanCache.expiresAt = time.Now().Add(60 * time.Second)

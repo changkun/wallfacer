@@ -388,6 +388,138 @@ func TestTaskBoardManifest_IsSelfTrue(t *testing.T) {
 	}
 }
 
+// --- Throughput tests ---
+
+// TestGetSpanStats_ThroughputEmptyStore verifies that the throughput fields are
+// zero-valued and DailyCompletions has exactly 30 entries when no tasks exist.
+func TestGetSpanStats_ThroughputEmptyStore(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/debug/spans", nil)
+	w := httptest.NewRecorder()
+	h.GetSpanStats(w, req)
+
+	var resp spanStatsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	tp := resp.Throughput
+	if tp.TotalCompleted != 0 {
+		t.Errorf("expected TotalCompleted=0, got %d", tp.TotalCompleted)
+	}
+	if tp.TotalFailed != 0 {
+		t.Errorf("expected TotalFailed=0, got %d", tp.TotalFailed)
+	}
+	if tp.SuccessRatePct != 0 {
+		t.Errorf("expected SuccessRatePct=0, got %v", tp.SuccessRatePct)
+	}
+	if len(tp.DailyCompletions) != 30 {
+		t.Errorf("expected exactly 30 DailyCompletions, got %d", len(tp.DailyCompletions))
+	}
+}
+
+// TestGetSpanStats_ThroughputWithDoneAndFailed seeds done and failed tasks and
+// verifies the throughput fields are populated correctly.
+func TestGetSpanStats_ThroughputWithDoneAndFailed(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	// Create 2 done tasks and 1 failed task.
+	for i := 0; i < 2; i++ {
+		task, err := h.store.CreateTask(ctx, "done task", 15, false, "", store.TaskKindTask)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(2 * time.Millisecond)
+		if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone); err != nil {
+			t.Fatal(err)
+		}
+	}
+	failedTask, err := h.store.CreateTask(ctx, "failed task", 15, false, "", store.TaskKindTask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, failedTask.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, failedTask.ID, store.TaskStatusFailed); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/debug/spans", nil)
+	w := httptest.NewRecorder()
+	h.GetSpanStats(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp spanStatsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	tp := resp.Throughput
+	if tp.TotalCompleted != 2 {
+		t.Errorf("expected TotalCompleted=2, got %d", tp.TotalCompleted)
+	}
+	if tp.TotalFailed != 1 {
+		t.Errorf("expected TotalFailed=1, got %d", tp.TotalFailed)
+	}
+	// 2 done out of 3 total → ~66.67%
+	wantRate := 2.0 / 3.0 * 100.0
+	if tp.SuccessRatePct < wantRate-0.1 || tp.SuccessRatePct > wantRate+0.1 {
+		t.Errorf("expected SuccessRatePct≈%.2f, got %.2f", wantRate, tp.SuccessRatePct)
+	}
+	if len(tp.DailyCompletions) != 30 {
+		t.Errorf("expected 30 DailyCompletions, got %d", len(tp.DailyCompletions))
+	}
+	// Today's completions should reflect the 2 done tasks.
+	today := time.Now().UTC().Format("2006-01-02")
+	var todayCount int
+	for _, dc := range tp.DailyCompletions {
+		if dc.Date == today {
+			todayCount = dc.Count
+		}
+	}
+	if todayCount != 2 {
+		t.Errorf("expected today's DailyCompletions=2, got %d", todayCount)
+	}
+}
+
+// TestGetSpanStats_ThroughputDailyCompletionsAlways30 verifies that
+// DailyCompletions always has exactly 30 entries even when there are done tasks.
+func TestGetSpanStats_ThroughputDailyCompletionsAlways30(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "task", 15, false, "", store.TaskKindTask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/debug/spans", nil)
+	w := httptest.NewRecorder()
+	h.GetSpanStats(w, req)
+
+	var resp spanStatsResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if len(resp.Throughput.DailyCompletions) != 30 {
+		t.Errorf("expected exactly 30 DailyCompletions, got %d", len(resp.Throughput.DailyCompletions))
+	}
+}
+
 // TestBoardManifest_SizeMetadata verifies that SizeBytes > 0 and SizeWarn=false
 // for a small (empty) store.
 func TestBoardManifest_SizeMetadata(t *testing.T) {
