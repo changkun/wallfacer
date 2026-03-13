@@ -168,6 +168,10 @@ func runServer(configDir string, args []string) {
 	// verified (pass), not behind the default branch, and conflict-free.
 	h.StartAutoSubmitter(ctx)
 
+	// Start the auto-refiner: triggers refinement for backlog tasks that
+	// have not yet been refined, when auto-refine is enabled.
+	h.StartAutoRefiner(ctx)
+
 	// Start the webhook notifier if a URL is configured in the env file.
 	if envCfg.WebhookURL != "" {
 		wn := runner.NewWorkspaceWebhookNotifier(wsMgr, envCfg)

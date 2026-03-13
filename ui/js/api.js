@@ -636,15 +636,27 @@ async function fetchConfig() {
     workspaceGroups = Array.isArray(cfg.workspace_groups) ? cfg.workspace_groups.slice() : [];
     workspaceBrowserPath = cfg.workspace_browser_path || activeWorkspaces[0] || workspaceBrowserPath || '';
     workspacePickerRequired = activeWorkspaces.length === 0;
+    var toggleMap = {
+      'autopilot': 'autopilot-toggle',
+      'autorefine': 'autorefine-toggle',
+      'autotest': 'autotest-toggle',
+      'autosubmit': 'autosubmit-toggle',
+      'autosync': 'autosync-toggle',
+      'autopush': 'autopush-toggle',
+    };
+    for (var key in toggleMap) {
+      var val = !!cfg[key];
+      window[key] = val;
+      var el = document.getElementById(toggleMap[key]);
+      if (el) el.checked = val;
+    }
+    // Keep globals in sync (they are used elsewhere).
     autopilot = !!cfg.autopilot;
-    var toggle = document.getElementById('autopilot-toggle');
-    if (toggle) toggle.checked = autopilot;
+    autorefine = !!cfg.autorefine;
     autotest = !!cfg.autotest;
-    var atToggle = document.getElementById('autotest-toggle');
-    if (atToggle) atToggle.checked = autotest;
     autosubmit = !!cfg.autosubmit;
-    var asToggle = document.getElementById('autosubmit-toggle');
-    if (asToggle) asToggle.checked = autosubmit;
+    autosync = !!cfg.autosync;
+    autopush = !!cfg.autopush;
     availableSandboxes = Array.isArray(cfg.sandboxes) ? cfg.sandboxes : [];
     defaultSandbox = cfg.default_sandbox || '';
     defaultSandboxByActivity = cfg.activity_sandboxes || {};
@@ -1074,5 +1086,44 @@ async function toggleAutosubmit() {
     showAlert('Error toggling auto-submit: ' + e.message);
     // Revert checkbox on failure.
     if (toggle) toggle.checked = autosubmit;
+  }
+}
+
+async function toggleAutorefine() {
+  var toggle = document.getElementById('autorefine-toggle');
+  var enabled = toggle ? toggle.checked : !autorefine;
+  try {
+    var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autorefine: enabled }) });
+    autorefine = !!res.autorefine;
+    if (toggle) toggle.checked = autorefine;
+  } catch (e) {
+    showAlert('Error toggling auto-refine: ' + e.message);
+    if (toggle) toggle.checked = autorefine;
+  }
+}
+
+async function toggleAutosync() {
+  var toggle = document.getElementById('autosync-toggle');
+  var enabled = toggle ? toggle.checked : !autosync;
+  try {
+    var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autosync: enabled }) });
+    autosync = !!res.autosync;
+    if (toggle) toggle.checked = autosync;
+  } catch (e) {
+    showAlert('Error toggling auto-sync: ' + e.message);
+    if (toggle) toggle.checked = autosync;
+  }
+}
+
+async function toggleAutopush() {
+  var toggle = document.getElementById('autopush-toggle');
+  var enabled = toggle ? toggle.checked : !autopush;
+  try {
+    var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autopush: enabled }) });
+    autopush = !!res.autopush;
+    if (toggle) toggle.checked = autopush;
+  } catch (e) {
+    showAlert('Error toggling auto-push: ' + e.message);
+    if (toggle) toggle.checked = autopush;
   }
 }

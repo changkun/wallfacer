@@ -1520,6 +1520,7 @@ func TestTryAutoRetry_ManualRetriesDoNotBlock(t *testing.T) {
 // waiting state are left untouched.
 func TestCheckAndSyncWaitingTasks_SkipsNonWaiting(t *testing.T) {
 	h := newTestHandler(t)
+	h.SetAutosync(true)
 	ctx := context.Background()
 
 	repo := setupRepo(t)
@@ -1547,6 +1548,7 @@ func TestCheckAndSyncWaitingTasks_SkipsNonWaiting(t *testing.T) {
 // tasks without worktrees are not touched.
 func TestCheckAndSyncWaitingTasks_SkipsWaitingWithNoWorktrees(t *testing.T) {
 	h := newTestHandler(t)
+	h.SetAutosync(true)
 	ctx := context.Background()
 
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
@@ -1565,6 +1567,7 @@ func TestCheckAndSyncWaitingTasks_SkipsWaitingWithNoWorktrees(t *testing.T) {
 // whose worktree is already up to date is not synced.
 func TestCheckAndSyncWaitingTasks_SkipsWaitingUpToDate(t *testing.T) {
 	h := newTestHandler(t)
+	h.SetAutosync(true)
 	ctx := context.Background()
 
 	repo := setupRepo(t)
@@ -1589,6 +1592,7 @@ func TestCheckAndSyncWaitingTasks_SkipsWaitingUpToDate(t *testing.T) {
 // in_progress and synced back to waiting.
 func TestCheckAndSyncWaitingTasks_SyncsWhenBehind(t *testing.T) {
 	h := newTestHandler(t)
+	h.SetAutosync(true)
 	ctx := context.Background()
 
 	repo := setupRepo(t)
@@ -1626,6 +1630,7 @@ func TestCheckAndSyncWaitingTasks_SyncsWhenBehind(t *testing.T) {
 // lightweight host-side git rebases and do not compete for container slots.
 func TestCheckAndSyncWaitingTasks_SyncsAtFullCapacity(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
+	h.SetAutosync(true)
 	ctx := context.Background()
 
 	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
@@ -1664,6 +1669,98 @@ func TestCheckAndSyncWaitingTasks_SyncsAtFullCapacity(t *testing.T) {
 	}
 	if behind != 0 {
 		t.Fatalf("expected synced worktree to be up to date, got behind=%d", behind)
+	}
+}
+
+// TestCheckAndSyncWaitingTasks_DisabledNoOp verifies that auto-sync does nothing
+// when the autosync toggle is off.
+func TestCheckAndSyncWaitingTasks_DisabledNoOp(t *testing.T) {
+	h := newTestHandler(t)
+	// autosync is off by default
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
+	// Add a commit to main so the worktree is behind.
+	os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "upstream commit")
+
+	h.checkAndSyncWaitingTasks(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected task to remain waiting when autosync is off, got %s", got.Status)
+	}
+}
+
+// --- tryAutoRefine tests ---
+
+// TestTryAutoRefine_DisabledNoOp verifies that auto-refine does nothing when disabled.
+func TestTryAutoRefine_DisabledNoOp(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	h.store.CreateTask(ctx, "build a widget", 15, false, "", "")
+	h.tryAutoRefine(ctx)
+
+	// No refinement should have been started.
+	tasks, _ := h.store.ListTasks(ctx, false)
+	for _, task := range tasks {
+		if task.CurrentRefinement != nil {
+			t.Error("expected no refinement to be started when auto-refine is disabled")
+		}
+	}
+}
+
+// TestTryAutoRefine_TriggersForUnrefinedBacklog verifies that auto-refine triggers
+// refinement for backlog tasks that have not been refined.
+func TestTryAutoRefine_TriggersForUnrefinedBacklog(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutorefine(true)
+	ctx := context.Background()
+
+	h.store.CreateTask(ctx, "build a widget", 15, false, "", "")
+	h.tryAutoRefine(ctx)
+
+	tasks, _ := h.store.ListTasks(ctx, false)
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].CurrentRefinement == nil {
+		t.Error("expected refinement to be started for unrefined backlog task")
+	}
+	if tasks[0].CurrentRefinement != nil && tasks[0].CurrentRefinement.Source != "auto" {
+		t.Errorf("expected refinement source to be 'auto', got %q", tasks[0].CurrentRefinement.Source)
+	}
+}
+
+// TestTryAutoRefine_SkipsAlreadyRefined verifies that auto-refine skips tasks
+// that have already been refined.
+func TestTryAutoRefine_SkipsAlreadyRefined(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutorefine(true)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "build a widget", 15, false, "", "")
+	// Mark as having a completed refinement session.
+	h.store.ApplyRefinement(ctx, task.ID, "refined prompt", store.RefinementSession{
+		ID:          "session-1",
+		StartPrompt: "build a widget",
+		Result:      "refined",
+	})
+
+	h.tryAutoRefine(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.CurrentRefinement != nil {
+		t.Error("expected no new refinement for already-refined task")
 	}
 }
 

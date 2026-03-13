@@ -41,6 +41,15 @@ type Handler struct {
 	autosubmitMu sync.RWMutex
 	autosubmit   bool
 
+	autorefineMu sync.RWMutex
+	autorefine   bool
+
+	autosyncMu sync.RWMutex
+	autosync   bool
+
+	autopushMu sync.RWMutex
+	autopush   bool
+
 	diffCache *diffCache
 	fileIndex *fileIndex
 	spanCache spanStatsCache
@@ -92,6 +101,10 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 			sandbox.Claude: false,
 			sandbox.Codex:  false,
 		},
+	}
+	// Initialize auto-push from env config so the header toggle reflects the persisted state.
+	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
+		h.autopush = envCfg.AutoPushEnabled
 	}
 	h.webhookNotifier = func(cfg envconfig.Config) *runner.WebhookNotifier {
 		return runner.NewWorkspaceWebhookNotifier(h.workspace, cfg)
@@ -241,11 +254,54 @@ func (h *Handler) SetAutosubmit(enabled bool) {
 	h.autosubmitMu.Unlock()
 }
 
+// AutorefineEnabled returns whether auto-refinement mode is active.
+func (h *Handler) AutorefineEnabled() bool {
+	h.autorefineMu.RLock()
+	defer h.autorefineMu.RUnlock()
+	return h.autorefine
+}
+
+// SetAutorefine enables or disables auto-refinement mode.
+func (h *Handler) SetAutorefine(enabled bool) {
+	h.autorefineMu.Lock()
+	h.autorefine = enabled
+	h.autorefineMu.Unlock()
+}
+
+// AutosyncEnabled returns whether auto-sync (tip-sync) mode is active.
+func (h *Handler) AutosyncEnabled() bool {
+	h.autosyncMu.RLock()
+	defer h.autosyncMu.RUnlock()
+	return h.autosync
+}
+
+// SetAutosync enables or disables auto-sync (tip-sync) mode.
+func (h *Handler) SetAutosync(enabled bool) {
+	h.autosyncMu.Lock()
+	h.autosync = enabled
+	h.autosyncMu.Unlock()
+}
+
+// AutopushEnabled returns whether auto-push mode is active.
+func (h *Handler) AutopushEnabled() bool {
+	h.autopushMu.RLock()
+	defer h.autopushMu.RUnlock()
+	return h.autopush
+}
+
+// SetAutopush enables or disables auto-push mode.
+func (h *Handler) SetAutopush(enabled bool) {
+	h.autopushMu.Lock()
+	h.autopush = enabled
+	h.autopushMu.Unlock()
+}
+
 // pauseAllAutomation disables the board-level automation toggles after an
 // automated watcher/action fails so the server stops making further automatic
 // changes until the user explicitly re-enables automation.
 func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) bool {
-	wasEnabled := h.AutopilotEnabled() || h.AutotestEnabled() || h.AutosubmitEnabled()
+	wasEnabled := h.AutopilotEnabled() || h.AutotestEnabled() || h.AutosubmitEnabled() ||
+		h.AutorefineEnabled() || h.AutosyncEnabled() || h.AutopushEnabled()
 	if !wasEnabled {
 		return false
 	}
@@ -253,13 +309,16 @@ func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) 
 	h.SetAutopilot(false)
 	h.SetAutotest(false)
 	h.SetAutosubmit(false)
+	h.SetAutorefine(false)
+	h.SetAutosync(false)
+	h.SetAutopush(false)
 
 	taskValue := ""
 	if taskID != nil {
 		taskValue = taskID.String()
 		h.store.InsertEvent(context.Background(), *taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf(
-				"Automation paused after %s failed: %s. Autopilot, auto-test, and auto-submit were disabled.",
+				"Automation paused after %s failed: %s. All automation toggles were disabled.",
 				watcher, reason,
 			),
 		})
