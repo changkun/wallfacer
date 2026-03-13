@@ -105,6 +105,9 @@ func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID, trigger, fail
 					h.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 						"result": "Commit aborted: commit message generation failed. Task returned to waiting for review.",
 					})
+					if trigger != store.TriggerUser {
+						h.pauseAllAutomation(&taskID, "auto-submit", err.Error())
+					}
 					return
 				}
 			}
@@ -117,6 +120,9 @@ func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID, trigger, fail
 				"to":      string(store.TaskStatusFailed),
 				"trigger": trigger,
 			})
+			if trigger != store.TriggerUser {
+				h.pauseAllAutomation(&taskID, "auto-submit", err.Error())
+			}
 			return
 		}
 		h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)

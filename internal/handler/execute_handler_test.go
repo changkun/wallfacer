@@ -292,6 +292,9 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 
 func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 	h := newTestHandler(t)
+	h.SetAutopilot(true)
+	h.SetAutotest(true)
+	h.SetAutosubmit(true)
 	t.Cleanup(func() { waitForBackground(200) })
 	ctx := context.Background()
 
@@ -328,6 +331,9 @@ func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 
 	if got := gitRun(t, wt, "rev-list", "--count", "HEAD"); got != "1" {
 		t.Fatalf("expected no new commit in worktree after commit message failure, got %s commits", got)
+	}
+	if !h.AutopilotEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
+		t.Fatal("expected manual completion failure to leave automation toggles unchanged")
 	}
 }
 

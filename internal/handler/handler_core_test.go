@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"changkun.de/wallfacer/internal/store"
+	"github.com/google/uuid"
 )
 
 // TestSetAutopilot verifies that autopilot state can be toggled.
@@ -41,6 +42,22 @@ func TestSetAutopilot_Toggle(t *testing.T) {
 		if h.AutopilotEnabled() != enabled {
 			t.Errorf("iteration %d: expected autopilot=%v, got %v", i, enabled, h.AutopilotEnabled())
 		}
+	}
+}
+
+func TestPauseAllAutomation_DisablesAllToggles(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+	h.SetAutotest(true)
+	h.SetAutosubmit(true)
+
+	taskID := uuid.New()
+	paused := h.pauseAllAutomation(&taskID, "auto-submit", "boom")
+	if !paused {
+		t.Fatal("expected pauseAllAutomation to report a state change")
+	}
+	if h.AutopilotEnabled() || h.AutotestEnabled() || h.AutosubmitEnabled() {
+		t.Fatal("expected all automation toggles to be disabled")
 	}
 }
 

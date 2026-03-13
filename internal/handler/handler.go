@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -15,6 +17,7 @@ import (
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/internal/workspace"
+	"github.com/google/uuid"
 )
 
 // Handler holds dependencies for all HTTP API handlers.
@@ -235,6 +238,37 @@ func (h *Handler) SetAutosubmit(enabled bool) {
 	h.autosubmitMu.Lock()
 	h.autosubmit = enabled
 	h.autosubmitMu.Unlock()
+}
+
+// pauseAllAutomation disables the board-level automation toggles after an
+// automated watcher/action fails so the server stops making further automatic
+// changes until the user explicitly re-enables automation.
+func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) bool {
+	wasEnabled := h.AutopilotEnabled() || h.AutotestEnabled() || h.AutosubmitEnabled()
+	if !wasEnabled {
+		return false
+	}
+
+	h.SetAutopilot(false)
+	h.SetAutotest(false)
+	h.SetAutosubmit(false)
+
+	taskValue := ""
+	if taskID != nil {
+		taskValue = taskID.String()
+		h.store.InsertEvent(context.Background(), *taskID, store.EventTypeSystem, map[string]string{
+			"result": fmt.Sprintf(
+				"Automation paused after %s failed: %s. Autopilot, auto-test, and auto-submit were disabled.",
+				watcher, reason,
+			),
+		})
+	}
+
+	logger.Handler.Error("automation paused after failure",
+		"watcher", watcher,
+		"task", taskValue,
+		"reason", reason)
+	return true
 }
 
 // IdeationEnabled returns whether brainstorm auto-repeat is active.
