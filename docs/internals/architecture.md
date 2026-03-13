@@ -4,28 +4,32 @@ Wallfacer is a host-native Go service that coordinates autonomous coding agents 
 
 ## System Overview
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ Browser UI (Vanilla JS + Tailwind + Sortable.js)                  │
-│ - Drag-and-drop task board                                         │
-│ - SSE streams for live updates                                     │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │ HTTP / SSE
-┌──────────────────────────────▼──────────────────────────────────────┐
-│ Go Server (stdlib net/http, no framework)                          │
-│                                                                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
-│  │ Handler  │  │  Runner  │  │  Store   │  │ Automation Loops  │  │
-│  │ REST API │→ │ orchestr.│→ │ state +  │← │ promote/test/     │  │
-│  │ + SSE    │  │ + commit │  │ persist  │  │ submit/sync/retry │  │
-│  └──────────┘  └────┬─────┘  └──────────┘  └───────────────────┘  │
-└──────────────────────┼────────────────────────────────────────────── ┘
-                       │ os/exec
-          ┌────────────▼────────────┐    ┌──────────────────────────┐
-          │ Sandbox Containers      │    │ Per-task Git Worktrees   │
-          │ Claude / Codex images   │←──→│ ~/.wallfacer/worktrees/  │
-          │ ephemeral, one per turn │    │ task/<id> branches       │
-          └─────────────────────────┘    └──────────────────────────┘
+```mermaid
+graph TB
+    subgraph Browser
+        UI["Browser UI<br/>(Vanilla JS + Tailwind + Sortable.js)<br/>Drag-and-drop task board + SSE live updates"]
+    end
+
+    subgraph Server["Go Server (stdlib net/http)"]
+        Handler["Handler<br/>REST API + SSE"]
+        Runner["Runner<br/>orchestration + commit"]
+        Store["Store<br/>state + persistence"]
+        Automation["Automation Loops<br/>promote / test / submit / sync / retry"]
+
+        Handler --> Runner
+        Runner --> Store
+        Automation --> Store
+        Store -.->|pub/sub| Automation
+    end
+
+    subgraph Infra["Host Infrastructure"]
+        Containers["Sandbox Containers<br/>Claude / Codex images<br/>ephemeral, one per turn"]
+        Worktrees["Per-task Git Worktrees<br/>~/.wallfacer/worktrees/<br/>task/&lt;id&gt; branches"]
+        Containers <--> Worktrees
+    end
+
+    UI -->|HTTP / SSE| Handler
+    Runner -->|os/exec| Containers
 ```
 
 ## Design Decisions
@@ -42,34 +46,35 @@ Wallfacer is a host-native Go service that coordinates autonomous coding agents 
 
 ## Task State Machine
 
-```text
-                    ┌──────────────────────────────────────────────────────────┐
-                    │                                                          │
- ┌─────────┐  drag/autopilot  ┌─────────────┐  end_turn   ┌───────────┐  commit  ┌──────┐
- │ BACKLOG ├─────────────────→│ IN_PROGRESS ├────────────→│ COMMITTING├────────→│ DONE │
- └────┬────┘                  └──┬──┬───┬────┘             └─────┬─────┘        └──┬───┘
-      │                          │  │   │                        │                 │
-      │cancel              max_tokens  │   │error/timeout/budget  │fail              │cancel
-      │               pause_turn│  │   │                        │                 │
-      │                    ┌────┘  │   ▼                        ▼                 │
-      │                    │       │ ┌────────┐            ┌────────┐              │
-      │                  (loop)    │ │WAITING │            │ FAILED │              │
-      │                            │ └┬─┬─┬──┘            └┬──┬─┬──┘              │
-      │                            │  │ │ │                │  │ │                  │
-      │              empty stop────┘  │ │ │  resume────────┘  │ │                  │
-      │              reason           │ │ │                   │ │                  │
-      │                               │ │ │  retry/auto_retry─┘ │                  │
-      │           feedback────────────┘ │ │  ──→ BACKLOG         │                  │
-      │           ──→ IN_PROGRESS       │ │                      │                  │
-      │                                 │ │  fork────────────────┘                  │
-      │           mark done─────────────┘ │  ──→ new BACKLOG                       │
-      │           ──→ COMMITTING → DONE   │                                        │
-      │                                   │                                        │
-      ▼                                   ▼                                        ▼
- ┌───────────┐                       ┌───────────┐                           ┌───────────┐
- │ CANCELLED │←──────────────────────│ CANCELLED │←──────────────────────────│ CANCELLED │
- └─────┬─────┘                       └───────────┘                           └───────────┘
-       │ retry ──→ BACKLOG
+```mermaid
+stateDiagram-v2
+    [*] --> backlog
+
+    backlog --> in_progress : drag / autopilot
+    backlog --> cancelled : cancel
+
+    in_progress --> in_progress : max_tokens / pause_turn<br/>(auto-continue)
+    in_progress --> committing : end_turn
+    in_progress --> waiting : empty stop_reason
+    in_progress --> failed : error / timeout / budget
+
+    committing --> done : commit success
+    committing --> failed : commit failure
+
+    waiting --> in_progress : feedback
+    waiting --> in_progress : test (IsTestRun)
+    waiting --> committing : mark done
+    waiting --> cancelled : cancel
+
+    failed --> in_progress : resume (same session)
+    failed --> backlog : retry / auto_retry
+    failed --> cancelled : cancel
+
+    done --> cancelled : cancel
+    cancelled --> backlog : retry
+
+    note right of waiting : fork → new backlog task
+    note right of failed : fork → new backlog task
 ```
 
 States: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`.
@@ -77,93 +82,36 @@ States: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `ca
 
 ## Turn Loop
 
-```text
-                    ┌──────────────┐
-                    │  Start turn  │
-                    │ (increment N)│
-                    └──────┬───────┘
-                           │
-                    ┌──────▼───────┐
-                    │Launch container│
-                    │with prompt +  │
-                    │session ID     │
-                    └──────┬───────┘
-                           │
-                    ┌──────▼───────┐
-                    │Save output to│
-                    │turn-NNNN.json│
-                    └──────┬───────┘
-                           │
-                    ┌──────▼───────┐
-                    │ Accumulate   │
-                    │ usage/cost   │
-                    └──────┬───────┘
-                           │
-                    ┌──────▼───────┐     over budget
-                    │Check budgets ├──────────────────→ FAILED
-                    │MaxCost/Tokens│                    (budget_exceeded)
-                    └──────┬───────┘
-                           │ within budget
-                    ┌──────▼──────────────┐
-                    │  Parse stop_reason  │
-                    └──┬───┬───┬───┬──────┘
-                       │   │   │   │
-          end_turn ────┘   │   │   └──── error/timeout
-          │                │   │                │
-          ▼                │   │                ▼
-     ┌──────────┐          │   │           ┌────────┐
-     │COMMITTING│          │   │           │ FAILED │
-     │→ commit  │          │   │           │classify│
-     │→ rebase  │          │   │           │category│
-     │→ push?   │          │   │           └────────┘
-     │→ DONE    │          │   │
-     └──────────┘          │   │
-                           │   └──── empty/unknown
-           max_tokens ─────┘              │
-           pause_turn                     ▼
-              │                      ┌─────────┐
-              │                      │ WAITING │
-              └──→ next turn ◄───────│feedback │
-                   (same session)    │resumes  │
-                                     └─────────┘
+```mermaid
+flowchart TD
+    Start["Start turn (increment N)"] --> Launch["Launch container<br/>with prompt + session ID"]
+    Launch --> Save["Save output to turn-NNNN.json"]
+    Save --> Usage["Accumulate usage/cost"]
+    Usage --> Budget{"Check budgets<br/>MaxCost / MaxTokens"}
+
+    Budget -->|over budget| FailedBudget["FAILED<br/>(budget_exceeded)"]
+    Budget -->|within budget| Parse{"Parse stop_reason"}
+
+    Parse -->|end_turn| Commit["COMMITTING<br/>git add → commit → rebase → push? → DONE"]
+    Parse -->|max_tokens / pause_turn| Start
+    Parse -->|empty / unknown| Waiting["WAITING<br/>blocks until user feedback"]
+    Parse -->|error / timeout| FailedError["FAILED<br/>(classify failure category)"]
+
+    Waiting -->|feedback received| Start
 ```
 
 ## Background Automation
 
-```text
-  Store (pub/sub on state changes)
-       │
-       ├──→ Auto-promoter
-       │      if autopilot ON
-       │        && in_progress < MAX_PARALLEL
-       │        && dependencies met
-       │        && scheduled time reached
-       │      then: backlog → in_progress
-       │
-       ├──→ Auto-tester
-       │      if autotest ON
-       │        && task is waiting + untested
-       │        && test slots available
-       │      then: launch test verification
-       │
-       ├──→ Auto-submitter
-       │      if autosubmit ON
-       │        && task is waiting + test passed
-       │        && conflict-free + up-to-date
-       │      then: waiting → done (commit pipeline)
-       │
-       ├──→ Waiting-sync
-       │      if task is waiting + behind default branch
-       │      then: rebase worktree onto latest
-       │
-       ├──→ Auto-retry
-       │      if task just failed
-       │        && retry budget for that failure category > 0
-       │      then: failed → backlog (fresh session)
-       │
-       └──→ Ideation watcher
-              if ideation ON + interval elapsed
-              then: launch idea-agent task
+```mermaid
+flowchart LR
+    PubSub["Store<br/>pub/sub on<br/>state changes"]
+
+    PubSub --> Promoter["Auto-promoter<br/>backlog → in_progress<br/>when capacity available<br/>+ deps met + scheduled"]
+    PubSub --> Tester["Auto-tester<br/>launch test verification<br/>on untested waiting tasks"]
+    PubSub --> Submitter["Auto-submitter<br/>waiting → done<br/>when test passed<br/>+ conflict-free"]
+    PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
+    PubSub --> Retry["Auto-retry<br/>failed → backlog<br/>if retry budget > 0"]
+    PubSub --> Ideation["Ideation watcher<br/>launch idea-agent<br/>on interval"]
 ```
 
 ## Component Responsibilities
