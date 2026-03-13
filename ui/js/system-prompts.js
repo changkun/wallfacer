@@ -3,6 +3,15 @@
 var _systemPromptsData = [];   // [{name, has_override, content}, ...]
 var _systemPromptCurrent = ''; // currently-selected template name
 
+function openSystemPromptsFromSettings(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+  if (typeof closeSettings === 'function') closeSettings();
+  showSystemPromptsEditor().catch(function(err) {
+    console.error('Failed to open system prompts editor:', err);
+  });
+}
+
 async function showSystemPromptsEditor() {
   var modal = document.getElementById('system-prompts-modal');
   if (!modal) return;
