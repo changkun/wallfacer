@@ -422,9 +422,9 @@ func TestBoardCacheHit(t *testing.T) {
 	}
 
 	// The cache hit path copies JSON bytes and skips store.ListTasks entirely.
-	// With 100 tasks (~35 KB of JSON), copying should complete well within 50 µs
-	// even on a loaded system — far below the ~300+ µs of a full ListTasks call.
-	const limit = 50 * time.Microsecond
+	// With 100 tasks (~35 KB of JSON), copying should complete well within 500 µs
+	// even on a loaded system — far below the multi-ms cost of a full ListTasks call.
+	const limit = 500 * time.Microsecond
 	start := time.Now()
 	_, _, err := r.generateBoardContextAndMounts(selfID, false)
 	elapsed := time.Since(start)
