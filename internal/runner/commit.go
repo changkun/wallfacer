@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -166,6 +167,10 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 	var errs []string
 
 	for repoPath, worktreePath := range worktreePaths {
+		if _, err := os.Stat(worktreePath); err != nil {
+			logger.Runner.Warn("host commit: worktree missing, skipping", "repo", repoPath, "path", worktreePath)
+			continue
+		}
 		if out, err := exec.Command("git", "-C", worktreePath, "add", "-A").CombinedOutput(); err != nil {
 			logger.Runner.Warn("host commit: git add -A", "repo", repoPath, "error", err, "output", string(out))
 			errs = append(errs, fmt.Sprintf("git add in %s: %v", repoPath, err))
@@ -354,6 +359,10 @@ func (r *Runner) rebaseAndMerge(
 	baseHashes := make(map[string]string)
 
 	for repoPath, worktreePath := range worktreePaths {
+		if _, err := os.Stat(worktreePath); err != nil {
+			logger.Runner.Warn("rebase+merge: worktree missing, skipping", "task", taskID, "repo", repoPath, "path", worktreePath)
+			continue
+		}
 		logger.Runner.Info("rebase+merge", "task", taskID, "repo", repoPath)
 
 		// Serialize rebase+merge per repo so concurrent tasks on the same
