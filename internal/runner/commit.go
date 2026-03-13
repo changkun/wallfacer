@@ -512,7 +512,7 @@ func (r *Runner) rebaseAndMergeOne(
 			"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d)...", repoPath, attempt),
 		})
 
-		if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch); resolveErr != nil {
+		if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch, "commit", attempt, maxRebaseRetries); resolveErr != nil {
 			return fmt.Errorf("conflict resolution failed: %w", resolveErr)
 		}
 	}
@@ -552,13 +552,27 @@ func (r *Runner) resolveConflicts(
 	repoPath, worktreePath string,
 	sessionID string,
 	defBranch string,
+	trigger string,
+	attempt int,
+	maxAttempts int,
 ) error {
 	basename := filepath.Base(worktreePath)
 	containerPath := "/workspace/" + basename
+	repoName := filepath.Base(repoPath)
 
 	prompt := r.promptsMgr.ConflictResolution(prompts.ConflictData{
 		ContainerPath: containerPath,
 		DefaultBranch: defBranch,
+	})
+
+	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]any{
+		"phase":        "conflict_resolver",
+		"status":       "started",
+		"trigger":      trigger,
+		"repo":         repoName,
+		"attempt":      attempt,
+		"max_attempts": maxAttempts,
+		"result":       fmt.Sprintf("Conflict resolver started for %s (%s, attempt %d/%d).", repoName, trigger, attempt, maxAttempts),
 	})
 
 	// Mount only the conflicted worktree for this targeted fix.
@@ -577,18 +591,43 @@ func (r *Runner) resolveConflicts(
 		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 			"stderr_file": stderrFile,
 			"turn":        fmt.Sprintf("%d", turns),
+			"phase":       "conflict_resolver",
 		})
 	}
 
 	if err != nil {
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeError, map[string]any{
+			"phase":        "conflict_resolver",
+			"status":       "failed",
+			"trigger":      trigger,
+			"repo":         repoName,
+			"attempt":      attempt,
+			"max_attempts": maxAttempts,
+			"error":        fmt.Sprintf("Conflict resolver container failed for %s: %v", repoName, err),
+		})
 		return fmt.Errorf("conflict resolver container: %w", err)
 	}
 	if output.IsError {
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeError, map[string]any{
+			"phase":        "conflict_resolver",
+			"status":       "failed",
+			"trigger":      trigger,
+			"repo":         repoName,
+			"attempt":      attempt,
+			"max_attempts": maxAttempts,
+			"error":        "Conflict resolver reported error: " + truncate(output.Result, 300),
+		})
 		return fmt.Errorf("conflict resolver reported error: %s", truncate(output.Result, 300))
 	}
 
-	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
-		"result": "Conflict resolver: " + truncate(output.Result, 500),
+	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]any{
+		"phase":        "conflict_resolver",
+		"status":       "succeeded",
+		"trigger":      trigger,
+		"repo":         repoName,
+		"attempt":      attempt,
+		"max_attempts": maxAttempts,
+		"result":       "Conflict resolver: " + truncate(output.Result, 500),
 	})
 	return nil
 }

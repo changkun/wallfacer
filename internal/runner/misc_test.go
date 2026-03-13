@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -177,8 +178,31 @@ func TestResolveConflictsSuccess(t *testing.T) {
 	repoPath := t.TempDir()
 	worktreePath := t.TempDir()
 
-	if err := r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main"); err != nil {
+	if err := r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main", "commit", 1, 3); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
+	}
+	events, err := s.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("get events: %v", err)
+	}
+	var started, succeeded bool
+	for _, ev := range events {
+		if ev.EventType != store.EventTypeSystem {
+			continue
+		}
+		var data map[string]any
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			t.Fatalf("unmarshal event: %v", err)
+		}
+		if data["phase"] == "conflict_resolver" && data["status"] == "started" {
+			started = true
+		}
+		if data["phase"] == "conflict_resolver" && data["status"] == "succeeded" {
+			succeeded = true
+		}
+	}
+	if !started || !succeeded {
+		t.Fatalf("expected conflict_resolver started and succeeded events, got started=%v succeeded=%v", started, succeeded)
 	}
 }
 
@@ -197,7 +221,7 @@ func TestResolveConflictsContainerError(t *testing.T) {
 	repoPath := t.TempDir()
 	worktreePath := t.TempDir()
 
-	err = r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main")
+	err = r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main", "commit", 1, 3)
 	if err == nil {
 		t.Fatal("expected error from container failure")
 	}
@@ -221,7 +245,7 @@ func TestResolveConflictsIsError(t *testing.T) {
 	repoPath := t.TempDir()
 	worktreePath := t.TempDir()
 
-	err = r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main")
+	err = r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main", "commit", 1, 3)
 	if err == nil {
 		t.Fatal("expected error when container reports is_error=true")
 	}
