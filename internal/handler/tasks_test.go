@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -1604,6 +1605,52 @@ func TestCheckAndSyncWaitingTasks_SyncsWhenBehind(t *testing.T) {
 	// be back in waiting (successfully synced) or in_progress (sync in flight).
 	if got.Status == store.TaskStatusBacklog || got.Status == store.TaskStatusDone {
 		t.Errorf("unexpected status %s after auto-sync trigger", got.Status)
+	}
+}
+
+// TestCheckAndSyncWaitingTasks_UsesVerificationCapacity verifies that a waiting
+// task on the auto-test path can still be synced when regular task capacity is
+// full, borrowing from the dedicated verification budget.
+func TestCheckAndSyncWaitingTasks_UsesVerificationCapacity(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\nWALLFACER_MAX_TEST_PARALLEL=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	regular, _ := h.store.CreateTask(ctx, "regular task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, regular.ID, store.TaskStatusInProgress)
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
+	if err := os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "upstream commit")
+
+	h.checkAndSyncWaitingTasks(ctx)
+	h.runner.WaitBackground()
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected task to return to waiting after auto-sync, got %s", got.Status)
+	}
+
+	behind, err := gitutil.CommitsBehind(repo, wt)
+	if err != nil {
+		t.Fatalf("CommitsBehind: %v", err)
+	}
+	if behind != 0 {
+		t.Fatalf("expected synced worktree to be up to date, got behind=%d", behind)
 	}
 }
 
