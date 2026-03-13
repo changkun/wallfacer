@@ -16,6 +16,7 @@ import (
 func parseOutput(raw string) (*agentOutput, error) {
 	var output agentOutput
 	if err := json.Unmarshal([]byte(raw), &output); err == nil {
+		normalizeConversationID(&output, raw)
 		return &output, nil
 	}
 	lines := strings.Split(raw, "\n")
@@ -36,13 +37,29 @@ func parseOutput(raw string) (*agentOutput, error) {
 		// Prefer the message that has stop_reason set — that is the "result"
 		// message emitted by the agent at the end of every run.
 		if candidate.StopReason != "" {
+			normalizeConversationID(&candidate, raw)
 			return &candidate, nil
 		}
 	}
 	if fallback != nil {
+		normalizeConversationID(fallback, raw)
 		return fallback, nil
 	}
 	return nil, fmt.Errorf("no valid JSON object found in output")
+}
+
+func normalizeConversationID(output *agentOutput, raw string) {
+	if output == nil {
+		return
+	}
+	if output.SessionID != "" {
+		return
+	}
+	if output.ThreadID != "" {
+		output.SessionID = output.ThreadID
+		return
+	}
+	output.SessionID = extractSessionID([]byte(raw))
 }
 
 // extractSessionID scans raw NDJSON output for a session_id field.
@@ -56,9 +73,15 @@ func extractSessionID(raw []byte) string {
 		}
 		var obj struct {
 			SessionID string `json:"session_id"`
+			ThreadID  string `json:"thread_id"`
 		}
-		if json.Unmarshal([]byte(line), &obj) == nil && obj.SessionID != "" {
-			return obj.SessionID
+		if json.Unmarshal([]byte(line), &obj) == nil {
+			if obj.SessionID != "" {
+				return obj.SessionID
+			}
+			if obj.ThreadID != "" {
+				return obj.ThreadID
+			}
 		}
 	}
 	return ""
