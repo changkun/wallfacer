@@ -661,6 +661,17 @@ function workspaceGroupsEqual(a, b) {
   return true;
 }
 
+function workspaceSwitchSpinnerHtml() {
+  return '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;"></span>';
+}
+
+function setWorkspaceGroupSwitching(index, switching) {
+  workspaceGroupSwitchingIndex = switching ? index : -1;
+  workspaceGroupSwitching = !!switching;
+  renderWorkspaceGroups();
+  renderHeaderWorkspaceGroupsMenu();
+}
+
 function renderWorkspaceGroups() {
   var el = document.getElementById('settings-workspace-groups');
   if (!el) return;
@@ -671,13 +682,14 @@ function renderWorkspaceGroups() {
   el.innerHTML = workspaceGroups.map(function(group, index) {
     var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
     var active = workspaceGroupsEqual(paths, activeWorkspaces);
+    var switching = workspaceGroupSwitching && workspaceGroupSwitchingIndex === index;
     return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-elevated);display:flex;flex-direction:column;gap:8px;">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
       '<div style="font-size:12px;font-weight:600;">' + escapeHtml(workspaceGroupLabel(group)) + (active ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Current</span>' : '') + '</div>' +
       '<div style="display:flex;gap:6px;align-items:center;">' +
-      '<button type="button" class="btn-icon" style="font-size:11px;padding:3px 8px;" onclick="useWorkspaceGroup(' + index + ')">Use</button>' +
-      '<button type="button" class="btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="editWorkspaceGroup(' + index + ')">Edit</button>' +
-      '<button type="button" class="btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="deleteWorkspaceGroup(' + index + ')">Remove</button>' +
+      '<button type="button" class="btn-icon" style="font-size:11px;padding:3px 8px;" onclick="useWorkspaceGroup(' + index + ')"' + (workspaceGroupSwitching ? ' disabled' : '') + '>' + (switching ? workspaceSwitchSpinnerHtml() + ' Switching...' : 'Use') + '</button>' +
+      '<button type="button" class="btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="editWorkspaceGroup(' + index + ')"' + (workspaceGroupSwitching ? ' disabled' : '') + '>Edit</button>' +
+      '<button type="button" class="btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="deleteWorkspaceGroup(' + index + ')"' + (workspaceGroupSwitching ? ' disabled' : '') + '>Remove</button>' +
       '</div>' +
       '</div>' +
       '<div style="display:flex;flex-direction:column;gap:4px;">' +
@@ -693,7 +705,10 @@ function renderHeaderWorkspaceGroupsMenu() {
   var el = document.getElementById('workspace-group-switcher');
   var btn = document.getElementById('workspace-group-switch-btn');
   if (!el) return;
-  if (btn) btn.disabled = workspaceGroups.length === 0;
+  if (btn) {
+    btn.disabled = workspaceGroups.length === 0 || workspaceGroupSwitching;
+    btn.innerHTML = workspaceGroupSwitching ? workspaceSwitchSpinnerHtml() + ' Switching...' : 'Switch';
+  }
   if (!workspaceGroups.length) {
     el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:4px;">No saved workspace groups yet.</div>';
     return;
@@ -701,8 +716,9 @@ function renderHeaderWorkspaceGroupsMenu() {
   el.innerHTML = workspaceGroups.map(function(group, index) {
     var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
     var active = workspaceGroupsEqual(paths, activeWorkspaces);
-    return '<button type="button" onclick="useWorkspaceGroup(' + index + ')" style="width:100%;display:flex;flex-direction:column;gap:4px;text-align:left;padding:8px;border:none;border-radius:8px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:inherit;cursor:pointer;">' +
-      '<span style="font-size:12px;font-weight:600;">' + escapeHtml(workspaceGroupLabel(group)) + (active ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Current</span>' : '') + '</span>' +
+    var switching = workspaceGroupSwitching && workspaceGroupSwitchingIndex === index;
+    return '<button type="button" onclick="useWorkspaceGroup(' + index + ')" style="width:100%;display:flex;flex-direction:column;gap:4px;text-align:left;padding:8px;border:none;border-radius:8px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:inherit;cursor:' + (workspaceGroupSwitching ? 'wait' : 'pointer') + ';"' + (workspaceGroupSwitching ? ' disabled' : '') + '>' +
+      '<span style="font-size:12px;font-weight:600;">' + (switching ? workspaceSwitchSpinnerHtml() + ' ' : '') + escapeHtml(workspaceGroupLabel(group)) + (active ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Current</span>' : '') + (switching ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Switching...</span>' : '') + '</span>' +
       '<span style="font-size:11px;color:var(--text-muted);line-height:1.4;">' + escapeHtml(paths.join(' • ')) + '</span>' +
       '</button>';
   }).join('');
@@ -885,9 +901,14 @@ async function saveWorkspaceGroups() {
 async function useWorkspaceGroup(index) {
   var group = workspaceGroups[index];
   if (!group || !Array.isArray(group.workspaces)) return;
+  setWorkspaceGroupSwitching(index, true);
   workspaceSelectionDraft = group.workspaces.slice();
   renderWorkspaceSelectionDraft();
-  await applyWorkspaceSelection();
+  try {
+    await applyWorkspaceSelection();
+  } finally {
+    setWorkspaceGroupSwitching(-1, false);
+  }
 }
 
 function editWorkspaceGroup(index) {

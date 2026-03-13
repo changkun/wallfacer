@@ -44,6 +44,8 @@ let workspaceBrowserEntries = [];
 let workspaceBrowserFocusIndex = -1;
 let workspaceBrowserFilterQuery = '';
 let workspaceSelectionDraft = [];
+let workspaceGroupSwitchingIndex = -1;
+let workspaceGroupSwitching = false;
 
 // Autopilot state
 let autopilot = false;
