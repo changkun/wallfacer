@@ -60,10 +60,38 @@ func newTestHandler(t *testing.T) *Handler {
 	return NewHandler(s, r, t.TempDir(), nil, nil)
 }
 
+func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
+	t.Helper()
+	s, err := store.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	envPath := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envPath, []byte{}, 0644); err != nil {
+		t.Fatal(err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		EnvFile:    envPath,
+		Workspaces: strings.Join(workspaces, " "),
+	})
+	t.Cleanup(r.WaitBackground)
+	return NewHandler(s, r, t.TempDir(), workspaces, nil)
+}
+
 // diffResponse is the JSON shape returned by TaskDiff.
 type diffResponse struct {
 	Diff         string         `json:"diff"`
 	BehindCounts map[string]int `json:"behind_counts"`
+}
+
+type gitWorkspaceConflictResponse struct {
+	Error         string `json:"error"`
+	Workspace     string `json:"workspace"`
+	BlockingTasks []struct {
+		ID     string `json:"id"`
+		Title  string `json:"title"`
+		Status string `json:"status"`
+	} `json:"blocking_tasks"`
 }
 
 func callTaskDiff(t *testing.T, h *Handler, taskID uuid.UUID) diffResponse {
@@ -345,6 +373,7 @@ func TestGitRebaseOnMain_RejectsWhenTasksInProgress(t *testing.T) {
 
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
 
 	body := `{"workspace": "` + repo + `"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
@@ -353,6 +382,157 @@ func TestGitRebaseOnMain_RejectsWhenTasksInProgress(t *testing.T) {
 
 	if w.Code != http.StatusConflict {
 		t.Errorf("expected 409 when tasks are in progress, got %d", w.Code)
+	}
+	var resp gitWorkspaceConflictResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode conflict response: %v", err)
+	}
+	if len(resp.BlockingTasks) != 1 || resp.BlockingTasks[0].ID != task.ID.String() {
+		t.Fatalf("unexpected blocking tasks: %+v", resp.BlockingTasks)
+	}
+}
+
+func TestGitSyncWorkspace_DoesNotBlockForUnrelatedWorkspaceTask(t *testing.T) {
+	repoA := setupRepo(t)
+	repoB := setupRepo(t)
+	h := newStaticWorkspaceHandler(t, []string{repoA, repoB})
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "other workspace task", 15, false, "", "")
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repoB: filepath.Join(t.TempDir(), "wt-b")}, "task-b"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	body := `{"workspace": "` + repoA + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/sync", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitSyncWorkspace(w, req)
+
+	if w.Code == http.StatusConflict {
+		t.Fatalf("expected unrelated workspace task not to block, got 409: %s", w.Body.String())
+	}
+}
+
+func TestGitCheckout_BlocksWaitingTaskWithWorkspaceWorktree(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "waiting task", 15, false, "", "")
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-waiting"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("UpdateTaskStatus waiting: %v", err)
+	}
+
+	body := `{"workspace": "` + repo + `", "branch": "main"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitCheckout(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp gitWorkspaceConflictResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode conflict response: %v", err)
+	}
+	if len(resp.BlockingTasks) != 1 {
+		t.Fatalf("expected 1 blocking task, got %+v", resp.BlockingTasks)
+	}
+	if resp.BlockingTasks[0].Status != string(store.TaskStatusWaiting) {
+		t.Fatalf("expected waiting blocker, got %+v", resp.BlockingTasks[0])
+	}
+}
+
+func TestGitCreateBranch_DoesNotBlockFailedTaskWithoutWorktree(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "failed task", 15, false, "", "")
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("UpdateTaskStatus failed: %v", err)
+	}
+
+	body := `{"workspace": "` + repo + `", "branch": "new-feature"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitCreateBranch(w, req)
+
+	if w.Code == http.StatusConflict {
+		t.Fatalf("expected failed task without worktree not to block, got 409: %s", w.Body.String())
+	}
+}
+
+func TestGitCreateBranch_DoesNotBlockFailedTaskWithMissingWorktreeDir(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "failed task", 15, false, "", "")
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	missingWorktree := filepath.Join(t.TempDir(), "missing-worktree")
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: missingWorktree}, "task-failed"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("UpdateTaskStatus failed: %v", err)
+	}
+
+	body := `{"workspace": "` + repo + `", "branch": "new-feature"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitCreateBranch(w, req)
+
+	if w.Code == http.StatusConflict {
+		t.Fatalf("expected failed task with missing worktree dir not to block, got 409: %s", w.Body.String())
+	}
+}
+
+func TestGitRebaseOnMain_BlocksOnlyTargetedWorkspace(t *testing.T) {
+	repoA := setupRepo(t)
+	repoB := setupRepo(t)
+	h := newStaticWorkspaceHandler(t, []string{repoA, repoB})
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "repo B task", 15, false, "", "")
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repoB: filepath.Join(t.TempDir(), "wt-b")}, "task-b"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	bodyA := `{"workspace": "` + repoA + `"}`
+	reqA := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(bodyA))
+	wA := httptest.NewRecorder()
+	h.GitRebaseOnMain(wA, reqA)
+	if wA.Code == http.StatusConflict {
+		t.Fatalf("expected repo A rebase not to be blocked by repo B task, got 409: %s", wA.Body.String())
+	}
+
+	bodyB := `{"workspace": "` + repoB + `"}`
+	reqB := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(bodyB))
+	wB := httptest.NewRecorder()
+	h.GitRebaseOnMain(wB, reqB)
+	if wB.Code != http.StatusConflict {
+		t.Fatalf("expected repo B rebase to be blocked, got %d: %s", wB.Code, wB.Body.String())
 	}
 }
 

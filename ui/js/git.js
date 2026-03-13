@@ -40,6 +40,58 @@ function remoteUrlToHttps(url) {
   return null;
 }
 
+function formatGitWorkspaceConflict(err, fallbackAction) {
+  if (!err || !Array.isArray(err.blocking_tasks) || err.blocking_tasks.length === 0) {
+    return (err && err.error) || (fallbackAction + ' failed');
+  }
+  const lines = err.blocking_tasks.map(function(task) {
+    const title = task.title || '(untitled task)';
+    return '- [' + String(task.status || 'unknown').replace(/_/g, ' ') + '] ' + title + ' (' + task.id + ')';
+  });
+  return ((err && err.error) || (fallbackAction + ' blocked')) + '\n\nBlocking tasks:\n' + lines.join('\n');
+}
+
+function setGitActionPending(btn, pendingLabel) {
+  if (!btn) return function() {};
+  const originalDisabled = !!btn.disabled;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  if (pendingLabel) btn.textContent = pendingLabel;
+  return function restore() {
+    btn.disabled = originalDisabled;
+    btn.textContent = originalText;
+  };
+}
+
+async function requestGitWorkspaceMutation(path, payload) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (res.status === 204) return null;
+
+  const text = await res.text();
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (_) {
+      data = null;
+    }
+  }
+
+  if (!res.ok) {
+    const err = new Error((data && data.error) || text || ('HTTP ' + res.status));
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+
+  return data;
+}
+
 async function openWorkspaceFolder(path) {
   try {
     await api(Routes.git.openFolder(), { method: 'POST', body: JSON.stringify({ path: path }) });
@@ -234,16 +286,18 @@ async function selectBranch(item) {
     return;
   }
 
-  item.style.opacity = '0.5';
-  item.style.pointerEvents = 'none';
+  const restore = setGitActionPending(item);
   try {
-    await api(Routes.git.checkout(), { method: 'POST', body: JSON.stringify({ workspace: ws.path, branch: branch }) });
+    await requestGitWorkspaceMutation(Routes.git.checkout(), { workspace: ws.path, branch: branch });
     closeBranchDropdown();
     document.removeEventListener('click', closeBranchDropdownOnClick);
   } catch (e) {
-    showAlert('Branch switch failed: ' + e.message);
-    item.style.opacity = '';
-    item.style.pointerEvents = '';
+    if (e.status === 409) {
+      showAlert('Branch switch blocked:\n\n' + formatGitWorkspaceConflict(e.data, 'Branch switch'));
+    } else {
+      showAlert('Branch switch failed: ' + e.message);
+    }
+    restore();
   }
 }
 
@@ -253,16 +307,18 @@ async function createNewBranch(btn) {
   const branch = btn.getAttribute('data-new-branch');
   if (!ws || !branch) return;
 
-  btn.style.opacity = '0.5';
-  btn.style.pointerEvents = 'none';
+  const restore = setGitActionPending(btn);
   try {
-    await api(Routes.git.createBranch(), { method: 'POST', body: JSON.stringify({ workspace: ws.path, branch: branch }) });
+    await requestGitWorkspaceMutation(Routes.git.createBranch(), { workspace: ws.path, branch: branch });
     closeBranchDropdown();
     document.removeEventListener('click', closeBranchDropdownOnClick);
   } catch (e) {
-    showAlert('Failed to create branch: ' + e.message);
-    btn.style.opacity = '';
-    btn.style.pointerEvents = '';
+    if (e.status === 409) {
+      showAlert('Create branch blocked:\n\n' + formatGitWorkspaceConflict(e.data, 'Create branch'));
+    } else {
+      showAlert('Failed to create branch: ' + e.message);
+    }
+    restore();
   }
 }
 
@@ -285,19 +341,19 @@ async function syncWorkspace(btn) {
   const idx = parseInt(btn.getAttribute('data-ws-idx'), 10);
   const ws = gitStatuses[idx];
   if (!ws) return;
-  btn.disabled = true;
-  btn.textContent = '...';
+  const restore = setGitActionPending(btn, '...');
   try {
-    await api(Routes.git.sync(), { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
+    await requestGitWorkspaceMutation(Routes.git.sync(), { workspace: ws.path });
     // Status stream will update behind_count automatically.
   } catch (e) {
-    if (e.message && e.message.includes('rebase conflict')) {
+    if (e.status === 409 && e.data && Array.isArray(e.data.blocking_tasks)) {
+      showAlert('Sync blocked:\n\n' + formatGitWorkspaceConflict(e.data, 'Sync'));
+    } else if (e.message && e.message.includes('rebase conflict')) {
       showAlert('Sync failed: rebase conflict in ' + ws.name + '.\n\nResolve the conflict manually in:\n' + ws.path);
     } else {
       showAlert('Sync failed: ' + e.message);
     }
-    btn.disabled = false;
-    btn.textContent = 'Sync';
+    restore();
   }
 }
 
@@ -305,19 +361,18 @@ async function rebaseOnMain(btn) {
   const idx = parseInt(btn.getAttribute('data-ws-idx'), 10);
   const ws = gitStatuses[idx];
   if (!ws) return;
-  const label = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '...';
+  const restore = setGitActionPending(btn, '...');
   try {
-    await api(Routes.git.rebaseOnMain(), { method: 'POST', body: JSON.stringify({ workspace: ws.path }) });
+    await requestGitWorkspaceMutation(Routes.git.rebaseOnMain(), { workspace: ws.path });
     // Status stream will pick up the updated state.
   } catch (e) {
-    if (e.message && e.message.includes('rebase conflict')) {
+    if (e.status === 409 && e.data && Array.isArray(e.data.blocking_tasks)) {
+      showAlert('Rebase blocked:\n\n' + formatGitWorkspaceConflict(e.data, 'Rebase'));
+    } else if (e.message && e.message.includes('rebase conflict')) {
       showAlert('Rebase failed: conflict in ' + ws.name + '.\n\nResolve the conflict manually in:\n' + ws.path);
     } else {
       showAlert('Rebase failed: ' + e.message);
     }
-    btn.disabled = false;
-    btn.textContent = label;
+    restore();
   }
 }

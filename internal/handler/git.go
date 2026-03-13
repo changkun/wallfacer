@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,18 @@ import (
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
+
+type workspaceMutationBlockingTask struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Status string `json:"status"`
+}
+
+type workspaceMutationConflictResponse struct {
+	Error         string                          `json:"error"`
+	Workspace     string                          `json:"workspace"`
+	BlockingTasks []workspaceMutationBlockingTask `json:"blocking_tasks"`
+}
 
 // collectWorkspaceStatuses fetches git status for all workspaces concurrently,
 // capping parallelism at 4 to avoid overwhelming the system with git subprocesses.
@@ -35,6 +48,72 @@ func collectWorkspaceStatuses(workspaces []string) []gitutil.WorkspaceGitStatus 
 	}
 	wg.Wait()
 	return results
+}
+
+func workspaceMutationGuardStatuses() []store.TaskStatus {
+	return []store.TaskStatus{
+		store.TaskStatusInProgress,
+		store.TaskStatusWaiting,
+		store.TaskStatusCommitting,
+		store.TaskStatusFailed,
+	}
+}
+
+func taskBlocksWorkspaceMutation(task store.Task, workspace string) bool {
+	worktreePath, ok := task.WorktreePaths[workspace]
+	if !ok || worktreePath == "" {
+		return false
+	}
+	if task.Status != store.TaskStatusFailed {
+		return true
+	}
+	if _, err := os.Stat(worktreePath); err != nil {
+		return false
+	}
+	return true
+}
+
+func workspaceMutationBlockingTasks(ctx context.Context, s *store.Store, workspace string) ([]workspaceMutationBlockingTask, error) {
+	var blocking []workspaceMutationBlockingTask
+	for _, status := range workspaceMutationGuardStatuses() {
+		tasks, err := s.ListTasksByStatus(ctx, status)
+		if err != nil {
+			return nil, err
+		}
+		for _, task := range tasks {
+			if !taskBlocksWorkspaceMutation(task, workspace) {
+				continue
+			}
+			blocking = append(blocking, workspaceMutationBlockingTask{
+				ID:     task.ID.String(),
+				Title:  task.Title,
+				Status: string(task.Status),
+			})
+		}
+	}
+	return blocking, nil
+}
+
+func (h *Handler) refuseWorkspaceMutationIfBlocked(w http.ResponseWriter, r *http.Request, workspace, action string) bool {
+	s, ok := h.currentStore()
+	if !ok || s == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		return true
+	}
+	blocking, err := workspaceMutationBlockingTasks(r.Context(), s, workspace)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return true
+	}
+	if len(blocking) == 0 {
+		return false
+	}
+	writeJSON(w, http.StatusConflict, workspaceMutationConflictResponse{
+		Error:         fmt.Sprintf("cannot %s workspace while tasks still depend on its local git state", action),
+		Workspace:     workspace,
+		BlockingTasks: blocking,
+	})
+	return true
 }
 
 // GitStatus returns git status for every configured workspace.
@@ -134,6 +213,9 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
+	if h.refuseWorkspaceMutationIfBlocked(w, r, req.Workspace, "sync") {
+		return
+	}
 
 	logger.Git.Info("sync workspace", "workspace", req.Workspace)
 
@@ -171,21 +253,8 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
-
-	// Refuse while tasks are in progress.
-	s, ok := h.currentStore()
-	if !ok || s == nil {
-		http.Error(w, "no workspaces configured", http.StatusServiceUnavailable)
+	if h.refuseWorkspaceMutationIfBlocked(w, r, req.Workspace, "rebase") {
 		return
-	}
-	tasks, err := s.ListTasks(r.Context(), false)
-	if err == nil {
-		for _, t := range tasks {
-			if t.Status == "in_progress" {
-				http.Error(w, "cannot rebase while tasks are in progress", http.StatusConflict)
-				return
-			}
-		}
 	}
 
 	mainBranch := gitutil.RemoteDefaultBranch(req.Workspace)
@@ -414,16 +483,8 @@ func (h *Handler) GitCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid branch name", http.StatusBadRequest)
 		return
 	}
-
-	// Refuse to switch while any task is in_progress — worktrees are based on the current branch.
-	tasks, err := h.store.ListTasks(r.Context(), false)
-	if err == nil {
-		for _, t := range tasks {
-			if t.Status == "in_progress" {
-				http.Error(w, "cannot switch branch while tasks are in progress", http.StatusConflict)
-				return
-			}
-		}
+	if h.refuseWorkspaceMutationIfBlocked(w, r, req.Workspace, "switch branches for") {
+		return
 	}
 
 	logger.Git.Info("checkout", "workspace", req.Workspace, "branch", req.Branch)
@@ -457,16 +518,8 @@ func (h *Handler) GitCreateBranch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid branch name", http.StatusBadRequest)
 		return
 	}
-
-	// Refuse to create while any task is in_progress.
-	tasks, err := h.store.ListTasks(r.Context(), false)
-	if err == nil {
-		for _, t := range tasks {
-			if t.Status == "in_progress" {
-				http.Error(w, "cannot create branch while tasks are in progress", http.StatusConflict)
-				return
-			}
-		}
+	if h.refuseWorkspaceMutationIfBlocked(w, r, req.Workspace, "create branches for") {
+		return
 	}
 
 	logger.Git.Info("create-branch", "workspace", req.Workspace, "branch", req.Branch)
