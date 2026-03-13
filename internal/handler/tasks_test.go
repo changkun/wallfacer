@@ -1392,13 +1392,9 @@ func TestTryAutoRetry_MaxRetries(t *testing.T) {
 	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
 		t.Fatalf("SetTaskFailureCategory: %v", err)
 	}
-	for i := 0; i < maxAutoRetries; i++ {
-		if err := h.store.ResetTaskForRetry(ctx, task.ID, task.Prompt, false); err != nil {
-			t.Fatalf("ResetTaskForRetry(%d): %v", i, err)
-		}
-		h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
-		if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
-			t.Fatalf("SetTaskFailureCategory(%d): %v", i, err)
+	for i := 0; i < maxHandlerAutoRetries; i++ {
+		if err := h.store.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+			t.Fatalf("IncrementAutoRetryCount(%d): %v", i, err)
 		}
 	}
 
@@ -1406,8 +1402,8 @@ func TestTryAutoRetry_MaxRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got := len(failed.RetryHistory); got != maxAutoRetries {
-		t.Fatalf("RetryHistory len = %d, want %d", got, maxAutoRetries)
+	if got := failed.AutoRetryCount; got != maxHandlerAutoRetries {
+		t.Fatalf("AutoRetryCount = %d, want %d", got, maxHandlerAutoRetries)
 	}
 	h.tryAutoRetry(ctx, *failed)
 
@@ -1448,6 +1444,59 @@ func TestTryAutoRetry_CircuitOpen(t *testing.T) {
 	}
 	if got.Status != store.TaskStatusFailed {
 		t.Fatalf("Status = %q, want %q", got.Status, store.TaskStatusFailed)
+	}
+}
+
+// TestTryAutoRetry_ManualRetriesDoNotBlock verifies that manual retries
+// (via ResetTaskForRetry, which increments RetryHistory but not AutoRetryCount)
+// do not consume the auto-retry budget. A task with a long RetryHistory but
+// AutoRetryCount=0 and remaining budget should still be auto-retried.
+func TestTryAutoRetry_ManualRetriesDoNotBlock(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "manual retries should not block auto-retry", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+
+	// Simulate two manual retries: RetryHistory grows but AutoRetryCount stays 0.
+	for i := 0; i < 2; i++ {
+		if err := h.store.ResetTaskForRetry(ctx, task.ID, task.Prompt, false); err != nil {
+			t.Fatalf("ResetTaskForRetry(%d): %v", i, err)
+		}
+		h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+		if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+			t.Fatalf("SetTaskFailureCategory(%d): %v", i, err)
+		}
+	}
+
+	failed, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if len(failed.RetryHistory) != 2 {
+		t.Fatalf("RetryHistory len = %d, want 2", len(failed.RetryHistory))
+	}
+	if failed.AutoRetryCount != 0 {
+		t.Fatalf("AutoRetryCount = %d, want 0", failed.AutoRetryCount)
+	}
+
+	// tryAutoRetry should NOT be suppressed: AutoRetryCount=0 < maxHandlerAutoRetries
+	// and budget remains (container_crash starts with 2).
+	h.tryAutoRetry(ctx, *failed)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after tryAutoRetry: %v", err)
+	}
+	if got.Status != store.TaskStatusBacklog {
+		t.Fatalf("Status = %q, want %q (manual retries should not block auto-retry)",
+			got.Status, store.TaskStatusBacklog)
 	}
 }
 
