@@ -2,7 +2,9 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -13,6 +15,41 @@ import (
 	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
+
+func validateTaskWorktreesForCommit(task *store.Task) error {
+	if len(task.WorktreePaths) == 0 {
+		return httpErrorf(http.StatusConflict, "task has no worktrees to commit")
+	}
+
+	var missing []string
+	for repoPath, worktreePath := range task.WorktreePaths {
+		if worktreePath == "" {
+			missing = append(missing, repoPath)
+			continue
+		}
+		if _, err := os.Stat(worktreePath); err != nil {
+			missing = append(missing, repoPath)
+		}
+	}
+	if len(missing) > 0 {
+		return httpErrorf(http.StatusConflict, "task worktree missing for: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+type statusError struct {
+	code int
+	msg  string
+}
+
+func (e *statusError) Error() string { return e.msg }
+
+func httpErrorf(code int, format string, args ...any) error {
+	return &statusError{
+		code: code,
+		msg:  fmt.Sprintf(format, args...),
+	}
+}
 
 // SubmitFeedback resumes a waiting task with user-provided feedback.
 func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
@@ -135,6 +172,14 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 	}
 
 	if task.SessionID != nil && *task.SessionID != "" {
+		if err := validateTaskWorktreesForCommit(task); err != nil {
+			if se, ok := err.(*statusError); ok {
+				http.Error(w, se.msg, se.code)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		// Transition to "committing" while auto-commit runs in the background.
 		// Use ForceUpdateTaskStatus since waiting → committing is a legitimate
 		// user-initiated flow not in the automated state machine.

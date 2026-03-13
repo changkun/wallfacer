@@ -299,6 +299,21 @@ func TestHostStageAndCommitErrorsWhenAllWorktreesMissing(t *testing.T) {
 	}
 }
 
+func TestHostStageAndCommitErrorsWhenNoWorktreesConfigured(t *testing.T) {
+	runner := runnerWithCmd(t, "echo")
+
+	committed, err := runner.hostStageAndCommit(uuid.New(), nil, "some prompt")
+	if err == nil {
+		t.Fatal("expected error when no worktrees are configured")
+	}
+	if committed {
+		t.Fatal("expected committed=false when no worktrees are configured")
+	}
+	if !strings.Contains(err.Error(), "no worktrees to commit") {
+		t.Fatalf("expected 'no worktrees to commit' in error, got: %v", err)
+	}
+}
+
 // TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing verifies that
 // hostStageAndCommit still succeeds when only some worktrees are missing
 // but others exist (nothing to commit is not an error when at least one

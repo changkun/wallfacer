@@ -192,8 +192,10 @@ func TestCompleteTask_WithSession_GoesToCommitting(t *testing.T) {
 	// before TempDir cleanup removes the store directory (LIFO: sleep runs first).
 	t.Cleanup(func() { waitForBackground(200) })
 	ctx := context.Background()
+	repo := setupRepo(t)
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
 	setTaskSessionID(t, h, task.ID, "sess-123")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
@@ -209,6 +211,27 @@ func TestCompleteTask_WithSession_GoesToCommitting(t *testing.T) {
 	updated, _ := h.store.GetTask(ctx, task.ID)
 	if updated.Status != store.TaskStatusCommitting && updated.Status != store.TaskStatusDone && updated.Status != store.TaskStatusFailed {
 		t.Errorf("unexpected status %s", updated.Status)
+	}
+}
+
+func TestCompleteTask_WithSessionRejectsMissingWorktrees(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	setTaskSessionID(t, h, task.ID, "sess-123")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
+	w := httptest.NewRecorder()
+	h.CompleteTask(w, req, task.ID)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+
+	updated, _ := h.store.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected waiting after rejected completion, got %s", updated.Status)
 	}
 }
 
@@ -266,8 +289,10 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 	h := newTestHandler(t)
 	t.Cleanup(func() { waitForBackground(200) })
 	ctx := context.Background()
+	repo := setupRepo(t)
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
 	setTaskSessionID(t, h, task.ID, "sess-abc")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
