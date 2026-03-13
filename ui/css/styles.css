@@ -77,7 +77,6 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .app-header {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   padding: 12px 24px 10px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
@@ -187,31 +186,66 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   flex-shrink: 0;
 }
 
-.app-header__secondary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 0;
+.automation-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.automation-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-card);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+  z-index: 30;
+}
+
+.automation-menu__header {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 4px 6px;
+}
+
+.automation-active-count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
 }
 
 .header-toggle-strip {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
 }
 
 .header-toggle-chip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 32px;
-  padding: 5px 9px 5px 11px;
+  min-height: 30px;
+  padding: 4px 9px 4px 11px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 8px;
   background: color-mix(in oklab, var(--bg-card) 90%, transparent);
   color: var(--text-secondary);
   cursor: pointer;
@@ -1923,32 +1957,15 @@ pre.result-entry-body {
   .command-palette-trigger-text {
     font-size: 12px;
   }
-  .app-header__secondary {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  .header-toggle-strip {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
+  .automation-menu {
+    right: -4px;
+    min-width: min(280px, calc(100vw - 28px));
   }
   .header-toggle-strip::-webkit-scrollbar {
     display: none;
   }
-  .header-toggle-chip {
-    min-width: max-content;
-    min-height: 34px;
-    padding: 6px 10px 6px 11px;
-  }
-  .header-toggle-chip__label {
-    font-size: 11px;
-  }
   .app-header__next-run {
-    width: 100%;
     white-space: normal;
-    justify-content: center;
     text-align: center;
   }
 

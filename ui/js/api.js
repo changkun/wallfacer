@@ -683,6 +683,7 @@ async function fetchConfig() {
     }
     // Sync ideation toggle and spinner state.
     if (typeof updateIdeationConfig === 'function') updateIdeationConfig(cfg);
+    updateAutomationActiveCount();
   } catch (e) {
     console.error('fetchConfig:', e);
   }
@@ -1047,6 +1048,41 @@ async function applyWorkspaceSelection() {
   }
 }
 
+function toggleAutomationMenu(event) {
+  if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+  var el = document.getElementById('automation-menu');
+  if (!el) return;
+  el.classList.toggle('hidden');
+}
+
+function hideAutomationMenu() {
+  var el = document.getElementById('automation-menu');
+  if (!el) return;
+  el.classList.add('hidden');
+}
+
+document.addEventListener('click', function(e) {
+  var wrap = document.querySelector('.automation-menu-wrap');
+  if (wrap && !wrap.contains(e.target)) hideAutomationMenu();
+});
+
+function updateAutomationActiveCount() {
+  var ids = ['ideation-header-toggle', 'autorefine-toggle', 'autopilot-toggle', 'autosync-toggle', 'autotest-toggle', 'autosubmit-toggle', 'autopush-toggle', 'dep-graph-toggle'];
+  var count = 0;
+  ids.forEach(function(id) {
+    var cb = document.getElementById(id);
+    if (cb && cb.checked) count++;
+  });
+  var badge = document.getElementById('automation-active-count');
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = count;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
 async function toggleAutopilot() {
   var toggle = document.getElementById('autopilot-toggle');
   var enabled = toggle ? toggle.checked : !autopilot;
@@ -1054,9 +1090,9 @@ async function toggleAutopilot() {
     var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autopilot: enabled }) });
     autopilot = !!res.autopilot;
     if (toggle) toggle.checked = autopilot;
+    updateAutomationActiveCount();
   } catch (e) {
     showAlert('Error toggling autopilot: ' + e.message);
-    // Revert checkbox on failure.
     if (toggle) toggle.checked = autopilot;
   }
 }
@@ -1068,9 +1104,9 @@ async function toggleAutotest() {
     var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autotest: enabled }) });
     autotest = !!res.autotest;
     if (toggle) toggle.checked = autotest;
+    updateAutomationActiveCount();
   } catch (e) {
     showAlert('Error toggling auto-test: ' + e.message);
-    // Revert checkbox on failure.
     if (toggle) toggle.checked = autotest;
   }
 }
@@ -1082,9 +1118,9 @@ async function toggleAutosubmit() {
     var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autosubmit: enabled }) });
     autosubmit = !!res.autosubmit;
     if (toggle) toggle.checked = autosubmit;
+    updateAutomationActiveCount();
   } catch (e) {
     showAlert('Error toggling auto-submit: ' + e.message);
-    // Revert checkbox on failure.
     if (toggle) toggle.checked = autosubmit;
   }
 }
@@ -1096,6 +1132,7 @@ async function toggleAutorefine() {
     var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autorefine: enabled }) });
     autorefine = !!res.autorefine;
     if (toggle) toggle.checked = autorefine;
+    updateAutomationActiveCount();
   } catch (e) {
     showAlert('Error toggling auto-refine: ' + e.message);
     if (toggle) toggle.checked = autorefine;
@@ -1109,6 +1146,7 @@ async function toggleAutosync() {
     var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autosync: enabled }) });
     autosync = !!res.autosync;
     if (toggle) toggle.checked = autosync;
+    updateAutomationActiveCount();
   } catch (e) {
     showAlert('Error toggling auto-sync: ' + e.message);
     if (toggle) toggle.checked = autosync;
@@ -1122,6 +1160,7 @@ async function toggleAutopush() {
     var res = await api(configUpdateRoute(), { method: 'PUT', body: JSON.stringify({ autopush: enabled }) });
     autopush = !!res.autopush;
     if (toggle) toggle.checked = autopush;
+    updateAutomationActiveCount();
   } catch (e) {
     showAlert('Error toggling auto-push: ' + e.message);
     if (toggle) toggle.checked = autopush;

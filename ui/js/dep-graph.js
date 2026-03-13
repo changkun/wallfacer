@@ -169,6 +169,7 @@ function renderDependencyGraph(tasks) {
 function toggleDependencyGraph() {
   const cb = document.getElementById('dep-graph-toggle');
   window.depGraphEnabled = cb ? cb.checked : !window.depGraphEnabled;
+  if (typeof updateAutomationActiveCount === 'function') updateAutomationActiveCount();
   if (typeof scheduleRender === 'function') scheduleRender();
   else if (typeof render === 'function') render();
 }
