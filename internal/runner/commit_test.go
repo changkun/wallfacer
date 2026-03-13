@@ -67,7 +67,10 @@ func TestGenerateCommitMessageSuccess(t *testing.T) {
 	cmd := fakeCmdScript(t, validStreamJSON, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
+	msg, err := runner.generateCommitMessage(uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
+	if err != nil {
+		t.Fatalf("generateCommitMessage error: %v", err)
+	}
 
 	const want = "Add authentication endpoint"
 	if msg != want {
@@ -75,74 +78,39 @@ func TestGenerateCommitMessageSuccess(t *testing.T) {
 	}
 }
 
-// TestGenerateCommitMessageFallbackOnInvalidOutput verifies that when the
-// container outputs non-JSON (e.g. the "echo" dummy), generateCommitMessage
-// returns the "wallfacer: <first line of prompt>" fallback.
-func TestGenerateCommitMessageFallbackOnInvalidOutput(t *testing.T) {
+func TestGenerateCommitMessageErrorsOnInvalidOutput(t *testing.T) {
 	runner := runnerWithCmd(t, "echo") // outputs its args, not valid JSON
 
-	prompt := "Fix the login bug\nwith more detail on a second line"
-	msg := runner.generateCommitMessage(uuid.New(), prompt, "login.go | 3 +-", "")
-
-	if !strings.HasPrefix(msg, "wallfacer: ") {
-		t.Fatalf("expected fallback 'wallfacer: ...' prefix, got: %q", msg)
+	_, err := runner.generateCommitMessage(uuid.New(), "Fix the login bug", "login.go | 3 +-", "")
+	if err == nil {
+		t.Fatal("expected error for invalid commit message output")
 	}
-	// Fallback uses the first line of the prompt.
-	if !strings.Contains(msg, "Fix the login bug") {
-		t.Fatalf("fallback should contain first line of prompt, got: %q", msg)
-	}
-	// Should NOT include any text from subsequent lines.
-	if strings.Contains(msg, "second line") {
-		t.Fatalf("fallback should only use first line of prompt, got: %q", msg)
+	if !IsCommitMessageGenerationError(err) {
+		t.Fatalf("expected commit message generation error, got %v", err)
 	}
 }
 
-// TestGenerateCommitMessageFallbackOnCommandError verifies the fallback when
-// the container command exits non-zero with no stdout.
-func TestGenerateCommitMessageFallbackOnCommandError(t *testing.T) {
+func TestGenerateCommitMessageErrorsOnCommandError(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 1) // exits 1 with empty output
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Refactor database layer", "db/*.go | 120 ++--", "")
-
-	if !strings.HasPrefix(msg, "wallfacer: ") {
-		t.Fatalf("expected fallback prefix, got: %q", msg)
+	_, err := runner.generateCommitMessage(uuid.New(), "Refactor database layer", "db/*.go | 120 ++--", "")
+	if err == nil {
+		t.Fatal("expected error for failed commit message command")
 	}
-	if !strings.Contains(msg, "Refactor database layer") {
-		t.Fatalf("fallback should contain prompt text, got: %q", msg)
+	if !IsCommitMessageGenerationError(err) {
+		t.Fatalf("expected commit message generation error, got %v", err)
 	}
 }
 
-// TestGenerateCommitMessageFallbackOnBlankResult verifies the fallback when
-// the container returns valid JSON but the result field is empty.
-func TestGenerateCommitMessageFallbackOnBlankResult(t *testing.T) {
+func TestGenerateCommitMessageErrorsOnBlankResult(t *testing.T) {
 	blankResult := `{"result":"","session_id":"abc","stop_reason":"end_turn","is_error":false}`
 	cmd := fakeCmdScript(t, blankResult, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Update configuration", "config.go | 5 +-", "")
-
-	if !strings.HasPrefix(msg, "wallfacer: ") {
-		t.Fatalf("expected fallback for blank result, got: %q", msg)
-	}
-}
-
-// TestGenerateCommitMessageFallbackTruncatesLongPrompt verifies that the
-// fallback subject line is capped to a reasonable length regardless of how
-// long the task prompt is.
-func TestGenerateCommitMessageFallbackTruncatesLongPrompt(t *testing.T) {
-	longPrompt := strings.Repeat("A", 200)
-	runner := runnerWithCmd(t, "echo") // always triggers fallback
-
-	msg := runner.generateCommitMessage(uuid.New(), longPrompt, "", "")
-
-	// "wallfacer: " (11 chars) + truncate(prompt, 72) → max 86 chars total
-	// because truncate appends "..." (3 chars) when the string is cut.
-	if len(msg) > 86 {
-		t.Fatalf("fallback message too long (%d chars): %q", len(msg), msg)
-	}
-	if !strings.HasPrefix(msg, "wallfacer: ") {
-		t.Fatalf("expected 'wallfacer: ' prefix, got: %q", msg)
+	_, err := runner.generateCommitMessage(uuid.New(), "Update configuration", "config.go | 5 +-", "")
+	if err == nil {
+		t.Fatal("expected error for blank commit message result")
 	}
 }
 
@@ -154,7 +122,10 @@ func TestGenerateCommitMessageMultiline(t *testing.T) {
 	cmd := fakeCmdScript(t, multilineResult, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Add auth", "auth.go | 80 ++++", "")
+	msg, err := runner.generateCommitMessage(uuid.New(), "Add auth", "auth.go | 80 ++++", "")
+	if err != nil {
+		t.Fatalf("generateCommitMessage error: %v", err)
+	}
 
 	if !strings.Contains(msg, "Add auth endpoint") {
 		t.Fatalf("expected subject line in message, got: %q", msg)
@@ -174,7 +145,10 @@ func TestGenerateCommitMessageNDJSON(t *testing.T) {
 	cmd := fakeCmdScript(t, ndjson, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Fix crash", "main.go | 2 +-", "")
+	msg, err := runner.generateCommitMessage(uuid.New(), "Fix crash", "main.go | 2 +-", "")
+	if err != nil {
+		t.Fatalf("generateCommitMessage error: %v", err)
+	}
 
 	const want = "Fix null pointer dereference"
 	if msg != want {
@@ -187,7 +161,10 @@ func TestGenerateCommitMessageFallsBackToCodexOnTokenLimit(t *testing.T) {
 	cmd := fakeStatefulCmd(t, []string{tokenLimit, validStreamJSON})
 	runner := runnerWithCmd(t, cmd)
 
-	msg := runner.generateCommitMessage(uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
+	msg, err := runner.generateCommitMessage(uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
+	if err != nil {
+		t.Fatalf("generateCommitMessage error: %v", err)
+	}
 
 	const want = "Add authentication endpoint"
 	if msg != want {
@@ -251,10 +228,7 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 	}
 }
 
-// TestHostStageAndCommitFallsBackOnContainerFailure verifies that when the
-// container command fails, hostStageAndCommit still creates a commit using
-// the "wallfacer: <prompt>" fallback message.
-func TestHostStageAndCommitFallsBackOnContainerFailure(t *testing.T) {
+func TestHostStageAndCommitStopsOnCommitMessageFailure(t *testing.T) {
 	repo := setupTestRepo(t)
 	cmd := fakeCmdScript(t, "", 1) // always fails
 
@@ -288,19 +262,17 @@ func TestHostStageAndCommitFallsBackOnContainerFailure(t *testing.T) {
 	}
 
 	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "Add new feature")
-	if err != nil {
-		t.Fatalf("hostStageAndCommit error: %v", err)
+	if err == nil {
+		t.Fatal("expected hostStageAndCommit to fail when commit message generation fails")
 	}
-	if !committed {
-		t.Fatal("expected a commit to be created even when container fails")
+	if !IsCommitMessageGenerationError(err) {
+		t.Fatalf("expected commit message generation error, got %v", err)
 	}
-
-	subject := gitRun(t, wt, "log", "--format=%s", "-1")
-	if !strings.HasPrefix(subject, "wallfacer: ") {
-		t.Fatalf("expected fallback 'wallfacer: ...' commit message, got: %q", subject)
+	if committed {
+		t.Fatal("expected committed=false when commit message generation fails")
 	}
-	if !strings.Contains(subject, "Add new feature") {
-		t.Fatalf("fallback commit message should contain prompt, got: %q", subject)
+	if got := gitRun(t, wt, "rev-list", "--count", "HEAD"); got != "1" {
+		t.Fatalf("expected no new commit to be created, got %s commits", got)
 	}
 }
 

@@ -2273,6 +2273,44 @@ func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
 	}
 }
 
+func TestTryAutoSubmit_CommitMessageFailureReturnsToWaiting(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	t.Cleanup(func() { waitForBackground(200) })
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt-autosubmit-fail")
+	gitRun(t, repo, "worktree", "add", "-b", "task-autosubmit-fail", wt, "HEAD")
+	if err := os.WriteFile(filepath.Join(wt, "feature.txt"), []byte("new work\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-autosubmit-fail")
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+	setTaskSessionID(t, h, task.ID, "sess-autosubmit-fail")
+
+	h.tryAutoSubmit(ctx)
+
+	var got *store.Task
+	for range 20 {
+		got, _ = h.store.GetTask(ctx, task.ID)
+		if got != nil && got.Status == store.TaskStatusWaiting {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if got == nil || got.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected task to return to waiting, got %v", got.Status)
+	}
+
+	if got := gitRun(t, wt, "rev-list", "--count", "HEAD"); got != "1" {
+		t.Fatalf("expected no new commit in worktree after auto-submit failure, got %s commits", got)
+	}
+}
+
 // --- Trigger attribution tests ---
 
 // TestTryAutoPromote_EventHasAutoPromoteTrigger verifies that the state_change

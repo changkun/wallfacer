@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"changkun.de/wallfacer/internal/gitutil"
+	runnerpkg "changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
@@ -90,6 +91,43 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 	return nil
 }
 
+func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID, trigger, failurePrefix string) {
+	go func() {
+		bgCtx := context.Background()
+		if err := h.runner.Commit(taskID, sessionID); err != nil {
+			if runnerpkg.IsCommitMessageGenerationError(err) {
+				if waitErr := h.store.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr == nil {
+					h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+						"from":    string(store.TaskStatusCommitting),
+						"to":      string(store.TaskStatusWaiting),
+						"trigger": trigger,
+					})
+					h.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+						"result": "Commit aborted: commit message generation failed. Task returned to waiting for review.",
+					})
+					return
+				}
+			}
+			h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			h.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
+				"error": failurePrefix + err.Error(),
+			})
+			h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+				"from":    string(store.TaskStatusCommitting),
+				"to":      string(store.TaskStatusFailed),
+				"trigger": trigger,
+			})
+			return
+		}
+		h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+		h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+			"from":    string(store.TaskStatusCommitting),
+			"to":      string(store.TaskStatusDone),
+			"trigger": trigger,
+		})
+	}()
+}
+
 // CompleteTask marks a waiting task as done and triggers the commit pipeline.
 func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	task, err := h.store.GetTask(r.Context(), id)
@@ -115,28 +153,7 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 			"to":      string(store.TaskStatusCommitting),
 			"trigger": store.TriggerUser,
 		})
-		sessionID := *task.SessionID
-		go func() {
-			bgCtx := context.Background()
-			if err := h.runner.Commit(id, sessionID); err != nil {
-				h.store.UpdateTaskStatus(bgCtx, id, store.TaskStatusFailed)
-				h.store.InsertEvent(bgCtx, id, store.EventTypeError, map[string]string{
-					"error": "commit failed: " + err.Error(),
-				})
-				h.store.InsertEvent(bgCtx, id, store.EventTypeStateChange, map[string]string{
-					"from":    string(store.TaskStatusCommitting),
-					"to":      string(store.TaskStatusFailed),
-					"trigger": store.TriggerUser,
-				})
-				return
-			}
-			h.store.UpdateTaskStatus(bgCtx, id, store.TaskStatusDone)
-			h.store.InsertEvent(bgCtx, id, store.EventTypeStateChange, map[string]string{
-				"from":    string(store.TaskStatusCommitting),
-				"to":      string(store.TaskStatusDone),
-				"trigger": store.TriggerUser,
-			})
-		}()
+		h.runCommitTransition(id, *task.SessionID, store.TriggerUser, "commit failed: ")
 	} else {
 		// No session to commit — go directly to done (bypasses state machine
 		// since waiting→done is deliberately blocked to protect the commit pipeline).
