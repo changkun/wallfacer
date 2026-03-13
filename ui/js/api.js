@@ -716,7 +716,7 @@ async function browseWorkspaces(path) {
     workspaceBrowserEntries = Array.isArray(resp.entries) ? resp.entries : [];
     workspaceBrowserFocusIndex = getVisibleWorkspaceBrowserEntries().length ? 0 : -1;
     if (pathInput) pathInput.value = workspaceBrowserPath;
-    if (status) status.textContent = workspaceBrowserEntries.length ? 'Double-click a folder to enter it. Filter to narrow the list; press Enter to open the selected folder.' : 'No subdirectories found.';
+    if (status) status.textContent = workspaceBrowserEntries.length ? 'Double-click a folder to enter it. Filter to narrow the list; press Enter to add the selected folder.' : 'No subdirectories found.';
     renderWorkspaceBrowser();
   } catch (e) {
     if (status) status.textContent = e.message;
@@ -751,10 +751,10 @@ function workspaceBrowserListKeydown(event) {
   } else if (event.key === 'Enter') {
     event.preventDefault();
     if (event.metaKey || event.ctrlKey) {
-      addWorkspaceSelection(visibleEntries[workspaceBrowserFocusIndex].path);
+      openWorkspaceBrowserEntry(workspaceBrowserFocusIndex);
       return;
     }
-    openWorkspaceBrowserEntry(workspaceBrowserFocusIndex);
+    addWorkspaceSelection(visibleEntries[workspaceBrowserFocusIndex].path);
   }
 }
 
