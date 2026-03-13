@@ -214,6 +214,9 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 	if !h.AutopilotEnabled() {
 		return
 	}
+	if h.breakers["auto-promote"].isOpen() {
+		return
+	}
 
 	type autoResumeCandidate struct {
 		task     store.Task
@@ -308,6 +311,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					return false, nil
 				}
 				h.incAutopilotAction("auto_promoter", "resumed_failed_test")
+				h.breakers["auto-promote"].recordSuccess()
 				return true, nil
 			}
 
@@ -346,6 +350,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				sessionID = *candidate.SessionID
 			}
 			h.runner.RunBackground(candidate.ID, candidate.Prompt, sessionID, false)
+			h.breakers["auto-promote"].recordSuccess()
 			return true, nil
 		},
 	})
@@ -364,6 +369,9 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 		return
 	}
 	if !retryableCategories[task.FailureCategory] {
+		return
+	}
+	if h.breakers["auto-retry"].isOpen() {
 		return
 	}
 	if task.AutoRetryBudget[task.FailureCategory] <= 0 || task.AutoRetryCount >= maxHandlerAutoRetries {
@@ -389,6 +397,7 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 		return
 	}
 	h.incAutopilotAction("auto_retrier", "retried")
+	h.breakers["auto-retry"].recordSuccess()
 	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange,
 		store.NewStateChangeData(store.TaskStatusFailed, store.TaskStatusBacklog, store.TriggerAutoRetry, map[string]string{
 			"failure_category": string(task.FailureCategory),
@@ -429,12 +438,16 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 	if !h.AutosyncEnabled() {
 		return
 	}
+	if h.breakers["auto-sync"].isOpen() {
+		return
+	}
 
 	tasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 	if err != nil {
 		return
 	}
 
+	breakerOpened := false
 	for i := range tasks {
 		t := &tasks[i]
 		if len(t.WorktreePaths) == 0 {
@@ -471,6 +484,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			promoteMu.Unlock()
 			logger.Handler.Error("auto-sync: update task status", "task", t.ID, "error", err)
 			h.pauseAllAutomation(&t.ID, "auto-sync", err.Error())
+			breakerOpened = true
 			continue
 		}
 		h.incAutopilotAction("sync_watcher", "synced")
@@ -490,6 +504,9 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		h.runner.SyncWorktreesBackground(taskID, sessionID, store.TaskStatusWaiting, func() {
 			h.diffCache.invalidate(taskID)
 		})
+	}
+	if !breakerOpened {
+		h.breakers["auto-sync"].recordSuccess()
 	}
 }
 
@@ -544,6 +561,9 @@ type autoTestCandidate struct {
 // concurrency limit, then trigger each still-eligible candidate.
 func (h *Handler) tryAutoTest(ctx context.Context) {
 	if !h.AutotestEnabled() {
+		return
+	}
+	if h.breakers["auto-test"].isOpen() {
 		return
 	}
 
@@ -641,6 +661,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 
 			maxTestTasks := h.maxTestConcurrentTasks()
 			triggered := false
+			breakerOpened := false
 
 			for _, c := range candidates {
 				if testInProgress >= maxTestTasks {
@@ -664,11 +685,13 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				if err := h.store.UpdateTaskTestRun(ctx, c.task.ID, true, ""); err != nil {
 					logger.Handler.Error("auto-test: update test run flag", "task", c.task.ID, "error", err)
 					h.pauseAllAutomation(&c.task.ID, "auto-test", err.Error())
+					breakerOpened = true
 					continue
 				}
 				if err := h.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
 					logger.Handler.Error("auto-test: update task status", "task", c.task.ID, "error", err)
 					h.pauseAllAutomation(&c.task.ID, "auto-test", err.Error())
+					breakerOpened = true
 					continue
 				}
 				h.store.InsertEvent(ctx, c.task.ID, store.EventTypeStateChange,
@@ -683,6 +706,9 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				h.incAutopilotAction("auto_tester", "tested")
 			}
 
+			if !breakerOpened {
+				h.breakers["auto-test"].recordSuccess()
+			}
 			return triggered, nil
 		},
 	})
@@ -736,6 +762,9 @@ type autoSubmitCandidate struct {
 // Phase 2 (no lock): execute the status transitions for all collected candidates.
 func (h *Handler) tryAutoSubmit(ctx context.Context) {
 	if !h.AutosubmitEnabled() {
+		return
+	}
+	if h.breakers["auto-submit"].isOpen() {
 		return
 	}
 
@@ -818,6 +847,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 		},
 		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
 			submitted := false
+			breakerOpened := false
 			for _, c := range candidates {
 				t := c.task
 				if len(t.WorktreePaths) == 0 || len(missingTaskWorktrees(&t)) > 0 {
@@ -855,6 +885,9 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				submitted = true
 				h.incAutopilotAction("auto_submitter", "submitted")
 			}
+			if !breakerOpened {
+				h.breakers["auto-submit"].recordSuccess()
+			}
 			return submitted, nil
 		},
 	})
@@ -889,6 +922,9 @@ func (h *Handler) StartAutoRefiner(ctx context.Context) {
 // Does nothing when auto-refine is disabled.
 func (h *Handler) tryAutoRefine(ctx context.Context) {
 	if !h.AutorefineEnabled() {
+		return
+	}
+	if h.breakers["auto-refine"].isOpen() {
 		return
 	}
 
@@ -928,6 +964,7 @@ func (h *Handler) tryAutoRefine(ctx context.Context) {
 		})
 		h.runner.RunRefinementBackground(t.ID, "")
 		h.incAutopilotAction("auto_refiner", "refined")
+		h.breakers["auto-refine"].recordSuccess()
 
 		// Only trigger one per poll to avoid overwhelming the system.
 		return

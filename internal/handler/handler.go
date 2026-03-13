@@ -21,6 +21,79 @@ import (
 	"github.com/google/uuid"
 )
 
+// watcherBreaker is a per-watcher circuit breaker that suppresses a specific
+// watcher when it encounters repeated failures. Unlike pauseAllAutomation it
+// leaves all other watchers unaffected and auto-heals after a backoff period.
+type watcherBreaker struct {
+	mu         sync.Mutex
+	failures   int
+	openUntil  time.Time // zero means closed (healthy)
+	lastReason string
+	lastTaskID *uuid.UUID
+}
+
+func (wb *watcherBreaker) isOpen() bool {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	return !wb.openUntil.IsZero() && time.Now().Before(wb.openUntil)
+}
+
+// recordFailure increments the failure counter and opens the breaker with
+// exponential backoff (30s * 2^(n-1), capped at 5 minutes). Returns the
+// updated failure count.
+func (wb *watcherBreaker) recordFailure(taskID *uuid.UUID, reason string) int {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	wb.failures++
+	wb.lastReason = reason
+	if taskID != nil {
+		cp := *taskID
+		wb.lastTaskID = &cp
+	} else {
+		wb.lastTaskID = nil
+	}
+	// Exponential backoff: 30s * 2^(n-1), capped at 5 minutes.
+	backoff := time.Duration(30<<uint(wb.failures-1)) * time.Second
+	if backoff > 5*time.Minute {
+		backoff = 5 * time.Minute
+	}
+	wb.openUntil = time.Now().Add(backoff)
+	return wb.failures
+}
+
+func (wb *watcherBreaker) recordSuccess() {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	wb.failures = 0
+	wb.openUntil = time.Time{}
+}
+
+// watcherHealthEntry is the per-watcher health state returned by GET /api/config.
+type watcherHealthEntry struct {
+	Name       string     `json:"name"`
+	Healthy    bool       `json:"healthy"`
+	Failures   int        `json:"failures,omitempty"`
+	RetryAt    *time.Time `json:"retry_at,omitempty"`
+	LastReason string     `json:"last_reason,omitempty"`
+}
+
+func (wb *watcherBreaker) healthEntry(name string) watcherHealthEntry {
+	wb.mu.Lock()
+	defer wb.mu.Unlock()
+	open := !wb.openUntil.IsZero() && time.Now().Before(wb.openUntil)
+	entry := watcherHealthEntry{
+		Name:     name,
+		Healthy:  !open,
+		Failures: wb.failures,
+	}
+	if open {
+		retryAt := wb.openUntil
+		entry.RetryAt = &retryAt
+		entry.LastReason = wb.lastReason
+	}
+	return entry
+}
+
 // Handler holds dependencies for all HTTP API handlers.
 type Handler struct {
 	store      *store.Store
@@ -49,6 +122,11 @@ type Handler struct {
 
 	autopushMu sync.RWMutex
 	autopush   bool
+
+	// breakers holds per-watcher circuit breakers. Keyed by watcher name
+	// (e.g. "auto-promote"). These are transient and auto-heal; they do not
+	// affect the user-controlled toggle flags.
+	breakers map[string]*watcherBreaker
 
 	diffCache *diffCache
 	fileIndex *fileIndex
@@ -100,6 +178,14 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		sandboxTestPassed: map[sandbox.Type]bool{
 			sandbox.Claude: false,
 			sandbox.Codex:  false,
+		},
+		breakers: map[string]*watcherBreaker{
+			"auto-promote": {},
+			"auto-retry":   {},
+			"auto-test":    {},
+			"auto-submit":  {},
+			"auto-sync":    {},
+			"auto-refine":  {},
 		},
 	}
 	// Initialize auto-push from env config so the header toggle reflects the persisted state.
@@ -306,39 +392,36 @@ func (h *Handler) SetAutopush(enabled bool) {
 	h.autopushMu.Unlock()
 }
 
-// pauseAllAutomation disables the board-level automation toggles after an
-// automated watcher/action fails so the server stops making further automatic
-// changes until the user explicitly re-enables automation.
-func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) bool {
-	wasEnabled := h.AutopilotEnabled() || h.AutotestEnabled() || h.AutosubmitEnabled() ||
-		h.AutorefineEnabled() || h.AutosyncEnabled() || h.AutopushEnabled()
-	if !wasEnabled {
+// openWatcherBreaker opens the circuit breaker for a specific watcher.
+// It does NOT disable other watchers. Returns true if the breaker was
+// previously closed (i.e., this is a new failure).
+func (h *Handler) openWatcherBreaker(watcherName string, taskID *uuid.UUID, reason string) bool {
+	wb, ok := h.breakers[watcherName]
+	if !ok {
+		logger.Handler.Error("unknown watcher breaker", "watcher", watcherName)
 		return false
 	}
-
-	h.SetAutopilot(false)
-	h.SetAutotest(false)
-	h.SetAutosubmit(false)
-	h.SetAutorefine(false)
-	h.SetAutosync(false)
-	h.SetAutopush(false)
-
-	taskValue := ""
+	wasHealthy := !wb.isOpen()
+	failures := wb.recordFailure(taskID, reason)
 	if taskID != nil {
-		taskValue = taskID.String()
 		h.store.InsertEvent(context.Background(), *taskID, store.EventTypeSystem, map[string]string{
-			"result": fmt.Sprintf(
-				"Automation paused after %s failed: %s. All automation toggles were disabled.",
-				watcher, reason,
-			),
+			"result": fmt.Sprintf("[%s] circuit breaker opened: %s", watcherName, reason),
 		})
 	}
+	logger.Handler.Warn("watcher circuit breaker opened",
+		"watcher", watcherName,
+		"task", taskID,
+		"reason", reason,
+		"failures", failures,
+	)
+	return wasHealthy
+}
 
-	logger.Handler.Error("automation paused after failure",
-		"watcher", watcher,
-		"task", taskValue,
-		"reason", reason)
-	return true
+// pauseAllAutomation opens the circuit breaker for the watcher that failed.
+// It no longer disables all board-level toggles; the circuit breaker is a
+// transient, auto-healing layer that suppresses only the affected watcher.
+func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) bool {
+	return h.openWatcherBreaker(watcher, taskID, reason)
 }
 
 // IdeationEnabled returns whether brainstorm auto-repeat is active.
