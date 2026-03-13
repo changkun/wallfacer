@@ -1634,11 +1634,13 @@ func TestMockIdeaAgentJSONParsing(t *testing.T) {
 	r.Run(task.ID, "", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
-	if updated.Status != store.TaskStatusWaiting {
-		t.Fatalf("expected status=waiting after idea-agent run, got %q", updated.Status)
+	// Idea-agent tasks now transition through waiting→committing→done
+	// immediately since brainstorm tasks produce no code changes.
+	if updated.Status != store.TaskStatusDone {
+		t.Fatalf("expected status=done after idea-agent run, got %q", updated.Status)
 	}
 
-	allTasks, _ := s.ListTasks(ctx, false)
+	allTasks, _ := s.ListTasks(ctx, true)
 	var childTasks []store.Task
 	for _, tsk := range allTasks {
 		if tsk.ID == task.ID {
