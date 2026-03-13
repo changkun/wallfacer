@@ -251,6 +251,9 @@ function ensureArchivedScrollBinding() {
 }
 
 function startTasksStream() {
+  if (!activeWorkspaces || activeWorkspaces.length === 0) {
+    return;
+  }
   if (tasksSource) tasksSource.close();
   ensureArchivedScrollBinding();
 
@@ -345,6 +348,37 @@ function startTasksStream() {
       tasksRetryDelay = Math.min(tasksRetryDelay * 2, 30000);
     }
   };
+}
+
+function stopTasksStream() {
+  if (tasksSource) tasksSource.close();
+  tasksSource = null;
+}
+
+function stopGitStream() {
+  if (gitStatusSource) gitStatusSource.close();
+  gitStatusSource = null;
+}
+
+function resetBoardState() {
+  tasks = [];
+  archivedTasks = [];
+  archivedPage = { loadState: 'idle', hasMoreBefore: false, hasMoreAfter: false };
+  gitStatuses = [];
+  lastTasksEventId = null;
+  rawLogBuffer = '';
+  testRawLogBuffer = '';
+  renderWorkspaces();
+  scheduleRender();
+}
+
+function restartActiveStreams() {
+  stopTasksStream();
+  stopGitStream();
+  if (activeWorkspaces && activeWorkspaces.length > 0) {
+    startGitStream();
+    startTasksStream();
+  }
 }
 
 /**
@@ -519,6 +553,8 @@ function configUpdateRoute() {
 async function fetchConfig() {
   try {
     var cfg = await api(configGetRoute());
+    activeWorkspaces = Array.isArray(cfg.workspaces) ? cfg.workspaces.slice() : [];
+    workspacePickerRequired = activeWorkspaces.length === 0;
     autopilot = !!cfg.autopilot;
     var toggle = document.getElementById('autopilot-toggle');
     if (toggle) toggle.checked = autopilot;
@@ -540,10 +576,209 @@ async function fetchConfig() {
       setBrainstormCategories(cfg.ideation_categories || []);
     }
     populateSandboxSelects();
+    renderWorkspaceSelectionSummary();
+    if (workspacePickerRequired) {
+      stopTasksStream();
+      stopGitStream();
+      resetBoardState();
+      showWorkspacePicker(true);
+    } else {
+      hideWorkspacePicker();
+      restartActiveStreams();
+    }
     // Sync ideation toggle and spinner state.
     if (typeof updateIdeationConfig === 'function') updateIdeationConfig(cfg);
   } catch (e) {
     console.error('fetchConfig:', e);
+  }
+}
+
+function workspaceBrowseRoute() {
+  return Routes.workspaces.browse();
+}
+
+function workspaceUpdateRoute() {
+  return Routes.workspaces.update();
+}
+
+function showWorkspacePicker(required) {
+  var modal = document.getElementById('workspace-picker');
+  var closeBtn = document.getElementById('workspace-picker-close');
+  if (!modal) return;
+  workspacePickerRequired = !!required;
+  if (closeBtn) closeBtn.style.display = workspacePickerRequired ? 'none' : '';
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  if (!workspaceSelectionDraft.length && activeWorkspaces.length) {
+    workspaceSelectionDraft = activeWorkspaces.slice();
+  }
+  renderWorkspaceSelectionDraft();
+  if (!workspaceBrowserPath) {
+    browseWorkspaces();
+  }
+}
+
+function hideWorkspacePicker() {
+  if (workspacePickerRequired) return;
+  var modal = document.getElementById('workspace-picker');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+function renderWorkspaceSelectionSummary() {
+  var el = document.getElementById('settings-workspace-list');
+  if (!el) return;
+  if (!activeWorkspaces.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);">No workspaces configured.</div>';
+    return;
+  }
+  el.innerHTML = activeWorkspaces.map(function(path) {
+    return '<div style="font-family:monospace;font-size:11px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-elevated);">' + escapeHtml(path) + '</div>';
+  }).join('');
+}
+
+function renderWorkspaceSelectionDraft() {
+  var el = document.getElementById('workspace-selection-list');
+  if (!el) return;
+  if (!workspaceSelectionDraft.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">No folders selected.</div>';
+    return;
+  }
+  el.innerHTML = workspaceSelectionDraft.map(function(path) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-elevated);">' +
+      '<span style="font-family:monospace;font-size:11px;word-break:break-all;">' + escapeHtml(path) + '</span>' +
+      '<button type="button" class="btn-ghost" onclick="removeWorkspaceSelection(' + JSON.stringify(path) + ')">Remove</button>' +
+      '</div>';
+  }).join('');
+}
+
+function renderWorkspaceBrowser() {
+  var crumb = document.getElementById('workspace-browser-breadcrumb');
+  var list = document.getElementById('workspace-browser-list');
+  if (crumb) crumb.textContent = workspaceBrowserPath || '';
+  if (!list) return;
+  if (!workspaceBrowserEntries.length) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:8px;">No directories found.</div>';
+    return;
+  }
+  list.innerHTML = workspaceBrowserEntries.map(function(entry, index) {
+    var active = index === workspaceBrowserFocusIndex;
+    return '<button type="button" data-workspace-entry-index="' + index + '" onclick="selectWorkspaceBrowserEntry(' + index + ')" ondblclick="openWorkspaceBrowserEntry(' + index + ')" style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:none;border-radius:6px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:inherit;cursor:pointer;text-align:left;">' +
+      '<span style="font-size:12px;">' + escapeHtml(entry.name) + '</span>' +
+      '<span style="font-size:10px;color:var(--text-muted);">' + (entry.is_git_repo ? 'git repo' : 'folder') + '</span>' +
+      '</button>';
+  }).join('');
+}
+
+async function browseWorkspaces(path) {
+  var pathInput = document.getElementById('workspace-browser-path');
+  var status = document.getElementById('workspace-browser-status');
+  var nextPath = typeof path === 'string' ? path : (pathInput ? pathInput.value.trim() : '');
+  try {
+    if (status) status.textContent = 'Loading...';
+    var url = workspaceBrowseRoute();
+    if (nextPath) {
+      url += '?path=' + encodeURIComponent(nextPath);
+    }
+    var resp = await api(url);
+    workspaceBrowserPath = resp.path || nextPath || '';
+    workspaceBrowserEntries = Array.isArray(resp.entries) ? resp.entries : [];
+    workspaceBrowserFocusIndex = workspaceBrowserEntries.length ? 0 : -1;
+    if (pathInput) pathInput.value = workspaceBrowserPath;
+    if (status) status.textContent = workspaceBrowserEntries.length ? 'Double-click a folder to enter it. Select and press Enter to add it.' : 'No subdirectories found.';
+    renderWorkspaceBrowser();
+  } catch (e) {
+    if (status) status.textContent = e.message;
+    workspaceBrowserEntries = [];
+    workspaceBrowserFocusIndex = -1;
+    renderWorkspaceBrowser();
+  }
+}
+
+function workspaceBrowserPathKeydown(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    browseWorkspaces();
+  }
+}
+
+function workspaceBrowserListKeydown(event) {
+  if (!workspaceBrowserEntries.length) return;
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    workspaceBrowserFocusIndex = Math.min(workspaceBrowserEntries.length - 1, workspaceBrowserFocusIndex + 1);
+    renderWorkspaceBrowser();
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    workspaceBrowserFocusIndex = Math.max(0, workspaceBrowserFocusIndex - 1);
+    renderWorkspaceBrowser();
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    if (event.metaKey || event.ctrlKey) {
+      addWorkspaceSelection(workspaceBrowserEntries[workspaceBrowserFocusIndex].path);
+      return;
+    }
+    openWorkspaceBrowserEntry(workspaceBrowserFocusIndex);
+  }
+}
+
+function selectWorkspaceBrowserEntry(index) {
+  workspaceBrowserFocusIndex = index;
+  renderWorkspaceBrowser();
+}
+
+function openWorkspaceBrowserEntry(index) {
+  var entry = workspaceBrowserEntries[index];
+  if (!entry) return;
+  browseWorkspaces(entry.path);
+}
+
+function addCurrentWorkspaceFolder() {
+  if (!workspaceBrowserPath) return;
+  addWorkspaceSelection(workspaceBrowserPath);
+}
+
+function addWorkspaceSelection(path) {
+  if (!path) return;
+  if (!workspaceSelectionDraft.includes(path)) {
+    workspaceSelectionDraft.push(path);
+  }
+  renderWorkspaceSelectionDraft();
+}
+
+function removeWorkspaceSelection(path) {
+  workspaceSelectionDraft = workspaceSelectionDraft.filter(function(item) { return item !== path; });
+  renderWorkspaceSelectionDraft();
+}
+
+function clearWorkspaceSelection() {
+  workspaceSelectionDraft = [];
+  renderWorkspaceSelectionDraft();
+}
+
+async function applyWorkspaceSelection() {
+  var status = document.getElementById('workspace-apply-status');
+  var settingsStatus = document.getElementById('settings-workspace-status');
+  try {
+    if (status) status.textContent = 'Switching...';
+    if (settingsStatus) settingsStatus.textContent = 'Switching...';
+    stopTasksStream();
+    stopGitStream();
+    resetBoardState();
+    await api(workspaceUpdateRoute(), {
+      method: 'PUT',
+      body: JSON.stringify({ workspaces: workspaceSelectionDraft.slice() }),
+    });
+    activeWorkspaces = workspaceSelectionDraft.slice();
+    workspacePickerRequired = activeWorkspaces.length === 0;
+    await fetchConfig();
+    if (status) status.textContent = 'Saved.';
+    if (settingsStatus) settingsStatus.textContent = 'Updated.';
+  } catch (e) {
+    if (status) status.textContent = e.message;
+    if (settingsStatus) settingsStatus.textContent = e.message;
+    showAlert('Failed to switch workspaces: ' + e.message);
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 72,
+  "route_count": 74,
   "routes": [
     {
       "method": "GET",
@@ -82,6 +82,24 @@
       "description": "Update server configuration (autopilot, autotest, autosubmit, sandbox assignments).",
       "tags": [
         "config"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/workspaces/browse",
+      "name": "BrowseWorkspaces",
+      "description": "List child directories for an absolute host path.",
+      "tags": [
+        "workspaces"
+      ]
+    },
+    {
+      "method": "PUT",
+      "pattern": "/api/workspaces",
+      "name": "UpdateWorkspaces",
+      "description": "Replace the active workspace set and switch the scoped task board.",
+      "tags": [
+        "workspaces"
       ]
     },
     {

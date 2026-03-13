@@ -21,11 +21,11 @@ import (
 	"changkun.de/wallfacer/internal/apicontract"
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/handler"
-	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/metrics"
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/internal/workspace"
 	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
 )
@@ -43,6 +43,7 @@ func runServer(configDir string, args []string) {
 	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage), "sandbox container image")
 	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
+	noWorkspaces := fs.Bool("no-workspaces", false, "start with no active workspaces")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags] [workspace ...]\n\n")
@@ -60,59 +61,31 @@ func runServer(configDir string, args []string) {
 	// Auto-initialize config directory and .env template.
 	initConfigDir(configDir, *envFile)
 
-	// Positional args are workspace directories.
-	workspaces := fs.Args()
-	if len(workspaces) == 0 {
-		cwd, err := os.Getwd()
-		if err != nil {
-			logger.Fatal(logger.Main, "getwd", "error", err)
-		}
-		workspaces = []string{cwd}
-	}
-
-	// Resolve to absolute paths and validate.
-	for i, ws := range workspaces {
-		abs, err := filepath.Abs(ws)
-		if err != nil {
-			logger.Fatal(logger.Main, "resolve workspace", "workspace", ws, "error", err)
-		}
-		info, err := os.Stat(abs)
-		if err != nil {
-			logger.Fatal(logger.Main, "workspace", "path", abs, "error", err)
-		}
-		if !info.IsDir() {
-			logger.Fatal(logger.Main, "workspace is not a directory", "path", abs)
-		}
-		workspaces[i] = abs
-	}
-
-	// Scope the data directory to the specific workspace combination.
-	scopedDataDir := filepath.Join(*dataDir, instructions.Key(workspaces))
-
-	s, err := store.NewStore(scopedDataDir)
+	workspaces := resolveStartupWorkspaces(*noWorkspaces, fs.Args(), *envFile)
+	wsMgr, err := workspace.NewManager(configDir, *dataDir, *envFile, workspaces)
 	if err != nil {
-		logger.Fatal(logger.Main, "store", "error", err)
+		logger.Fatal(logger.Main, "workspace manager", "error", err)
 	}
-	defer s.Close()
-	logger.Main.Info("store loaded", "path", scopedDataDir)
+	snapshot := wsMgr.Snapshot()
+	s := snapshot.Store
+	if s != nil {
+		logger.Main.Info("store loaded", "path", snapshot.ScopedDataDir)
 
-	// Purge tombstoned tasks older than the retention period.
-	tombstoneRetentionDays := 7
-	if v, err := strconv.Atoi(os.Getenv("WALLFACER_TOMBSTONE_RETENTION_DAYS")); err == nil && v > 0 {
-		tombstoneRetentionDays = v
+		// Purge tombstoned tasks older than the retention period.
+		tombstoneRetentionDays := 7
+		if v, err := strconv.Atoi(os.Getenv("WALLFACER_TOMBSTONE_RETENTION_DAYS")); err == nil && v > 0 {
+			tombstoneRetentionDays = v
+		}
+		s.PurgeExpiredTombstones(tombstoneRetentionDays)
 	}
-	s.PurgeExpiredTombstones(tombstoneRetentionDays)
 
 	worktreesDir := filepath.Join(configDir, "worktrees")
 	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
 		logger.Fatal(logger.Main, "create worktrees dir", "error", err)
 	}
 
-	instructionsPath, err := instructions.Ensure(configDir, workspaces)
-	if err != nil {
-		logger.Main.Warn("init workspace instructions", "error", err)
-	} else {
-		logger.Main.Info("workspace instructions", "path", instructionsPath)
+	if snapshot.InstructionsPath != "" {
+		logger.Main.Info("workspace instructions", "path", snapshot.InstructionsPath)
 	}
 
 	resolvedImage := ensureImage(*containerCmd, *sandboxImage)
@@ -140,12 +113,13 @@ func runServer(configDir string, args []string) {
 		EnvFile:          *envFile,
 		Workspaces:       strings.Join(workspaces, " "),
 		WorktreesDir:     worktreesDir,
-		InstructionsPath: instructionsPath,
+		InstructionsPath: snapshot.InstructionsPath,
 		CodexAuthPath:    codexAuthPath,
 		ContainerNetwork: containerNetwork,
 		ContainerCPUs:    containerCPUs,
 		ContainerMemory:  containerMemory,
 		Prompts:          prompts.NewManager(promptsDir),
+		WorkspaceManager: wsMgr,
 	})
 
 	r.PruneUnknownWorktrees()
@@ -155,7 +129,9 @@ func runServer(configDir string, args []string) {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 
-	runner.RecoverOrphanedTasks(ctx, s, r)
+	if s != nil {
+		runner.RecoverOrphanedTasks(ctx, s, r)
+	}
 	go r.StartWorktreeGC(ctx)
 
 	logger.Main.Info("workspaces", "paths", strings.Join(workspaces, ", "))
@@ -194,7 +170,7 @@ func runServer(configDir string, args []string) {
 
 	// Start the webhook notifier if a URL is configured in the env file.
 	if wCfg, err := envconfig.Parse(*envFile); err == nil && wCfg.WebhookURL != "" {
-		wn := runner.NewWebhookNotifier(s, wCfg)
+		wn := runner.NewWorkspaceWebhookNotifier(wsMgr, wCfg)
 		go wn.Start(ctx)
 	}
 
@@ -205,7 +181,11 @@ func runServer(configDir string, args []string) {
 		"wallfacer_tasks_total",
 		"Number of tasks grouped by status and archived flag.",
 		func() []metrics.LabeledValue {
-			tasks, err := s.ListTasks(context.Background(), true)
+			active, ok := wsMgr.Store()
+			if !ok {
+				return nil
+			}
+			tasks, err := active.ListTasks(context.Background(), true)
 			if err != nil {
 				return nil
 			}
@@ -246,14 +226,22 @@ func runServer(configDir string, args []string) {
 		"wallfacer_store_subscribers",
 		"Number of active SSE subscribers listening for task state changes.",
 		func() []metrics.LabeledValue {
-			return []metrics.LabeledValue{{Value: float64(s.SubscriberCount())}}
+			active, ok := wsMgr.Store()
+			if !ok {
+				return []metrics.LabeledValue{{Value: 0}}
+			}
+			return []metrics.LabeledValue{{Value: float64(active.SubscriberCount())}}
 		},
 	)
 	reg.Gauge(
 		"wallfacer_failed_tasks_by_category",
 		"Number of currently-failed (non-archived) tasks grouped by failure_category.",
 		func() []metrics.LabeledValue {
-			tasks, err := s.ListTasks(context.Background(), false /* exclude archived */)
+			active, ok := wsMgr.Store()
+			if !ok {
+				return nil
+			}
+			tasks, err := active.ListTasks(context.Background(), false /* exclude archived */)
 			if err != nil {
 				return nil
 			}
@@ -421,8 +409,10 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"GetFiles": h.GetFiles,
 
 		// Server configuration.
-		"GetConfig":    h.GetConfig,
-		"UpdateConfig": h.UpdateConfig,
+		"GetConfig":        h.GetConfig,
+		"UpdateConfig":     h.UpdateConfig,
+		"BrowseWorkspaces": h.BrowseWorkspaces,
+		"UpdateWorkspaces": h.UpdateWorkspaces,
 
 		// Ideation agent.
 		"GetIdeationStatus": h.GetIdeationStatus,
@@ -583,6 +573,9 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		if limit, ok := bodyLimits[route.Name]; ok {
 			registered = handler.MaxBytesMiddleware(limit)(registered)
 		}
+		if requiresStore(route.Name) {
+			registered = h.RequireStoreMiddleware(registered)
+		}
 		mux.Handle(route.FullPattern(), registered)
 	}
 
@@ -683,4 +676,59 @@ func ensureImage(containerCmd, image string) string {
 		logger.Main.Warn("no sandbox image available; tasks may fail")
 	}
 	return image
+}
+
+func resolveStartupWorkspaces(noWorkspaces bool, cliArgs []string, envFile string) []string {
+	if noWorkspaces {
+		return nil
+	}
+	if len(cliArgs) > 0 {
+		return mustResolveWorkspaces(cliArgs)
+	}
+	cfg, err := envconfig.Parse(envFile)
+	if err == nil && len(cfg.Workspaces) > 0 {
+		if resolved, err := tryResolveWorkspaces(cfg.Workspaces); err == nil {
+			return resolved
+		}
+		logger.Main.Warn("persisted workspaces invalid; starting without workspaces")
+		return nil
+	}
+	return nil
+}
+
+func mustResolveWorkspaces(paths []string) []string {
+	resolved, err := tryResolveWorkspaces(paths)
+	if err != nil {
+		logger.Fatal(logger.Main, "resolve workspaces", "error", err)
+	}
+	return resolved
+}
+
+func tryResolveWorkspaces(paths []string) ([]string, error) {
+	resolved := make([]string, 0, len(paths))
+	for _, ws := range paths {
+		abs, err := filepath.Abs(ws)
+		if err != nil {
+			return nil, err
+		}
+		clean := filepath.Clean(abs)
+		info, err := os.Stat(clean)
+		if err != nil {
+			return nil, err
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("%s is not a directory", clean)
+		}
+		resolved = append(resolved, clean)
+	}
+	return resolved, nil
+}
+
+func requiresStore(name string) bool {
+	switch name {
+	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream":
+		return false
+	default:
+		return true
+	}
 }

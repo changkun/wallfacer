@@ -39,6 +39,13 @@ var Routes = {
     update: function() { return "/api/config"; },
   },
 
+  workspaces: {
+    // GET /api/workspaces/browse
+    browse: function() { return "/api/workspaces/browse"; },
+    // PUT /api/workspaces
+    update: function() { return "/api/workspaces"; },
+  },
+
   ideate: {
     // GET /api/ideate
     status: function() { return "/api/ideate"; },

@@ -103,6 +103,20 @@ var Routes = []Route{
 		Tags:        []string{"config"},
 	},
 
+	// --- Workspace selection ---
+
+	{
+		Method: "GET", Pattern: "/api/workspaces/browse", Name: "BrowseWorkspaces",
+		Description: "List child directories for an absolute host path.",
+		Tags:        []string{"workspaces"},
+	},
+	{
+		Method: "PUT", Pattern: "/api/workspaces", Name: "UpdateWorkspaces",
+		JSName:      "update",
+		Description: "Replace the active workspace set and switch the scoped task board.",
+		Tags:        []string{"workspaces"},
+	},
+
 	// --- Ideation / brainstorm agent ---
 
 	{

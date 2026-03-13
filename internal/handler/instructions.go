@@ -9,7 +9,11 @@ import (
 
 // GetInstructions returns the current workspace AGENTS.md content.
 func (h *Handler) GetInstructions(w http.ResponseWriter, r *http.Request) {
-	path := instructions.FilePath(h.configDir, h.workspaces)
+	path := h.currentInstructionsPath()
+	if path == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		return
+	}
 	content, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -30,7 +34,11 @@ func (h *Handler) UpdateInstructions(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSONBody(w, r, &req) {
 		return
 	}
-	path := instructions.FilePath(h.configDir, h.workspaces)
+	path := h.currentInstructionsPath()
+	if path == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		return
+	}
 	if err := os.WriteFile(path, []byte(req.Content), 0644); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -40,7 +48,12 @@ func (h *Handler) UpdateInstructions(w http.ResponseWriter, r *http.Request) {
 
 // ReinitInstructions rebuilds the workspace AGENTS.md from defaults and repo files.
 func (h *Handler) ReinitInstructions(w http.ResponseWriter, r *http.Request) {
-	path, err := instructions.Reinit(h.configDir, h.workspaces)
+	path := h.currentInstructionsPath()
+	if path == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		return
+	}
+	path, err := instructions.Reinit(h.configDir, h.currentWorkspaces())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

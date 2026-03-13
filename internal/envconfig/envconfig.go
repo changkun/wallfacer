@@ -5,6 +5,7 @@ package envconfig
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -46,8 +47,9 @@ type Config struct {
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
 	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
 
-	WebhookURL    string // WALLFACER_WEBHOOK_URL
-	WebhookSecret string // WALLFACER_WEBHOOK_SECRET
+	WebhookURL    string   // WALLFACER_WEBHOOK_URL
+	WebhookSecret string   // WALLFACER_WEBHOOK_SECRET
+	Workspaces    []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -81,6 +83,7 @@ var knownKeys = []string{
 	"WALLFACER_CONTAINER_MEMORY",
 	"WALLFACER_WEBHOOK_URL",
 	"WALLFACER_WEBHOOK_SECRET",
+	"WALLFACER_WORKSPACES",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -167,9 +170,41 @@ func Parse(path string) (Config, error) {
 			cfg.WebhookURL = v
 		case "WALLFACER_WEBHOOK_SECRET":
 			cfg.WebhookSecret = v
+		case "WALLFACER_WORKSPACES":
+			cfg.Workspaces = ParseWorkspaces(v)
 		}
 	}
 	return cfg, nil
+}
+
+// ParseWorkspaces decodes WALLFACER_WORKSPACES from an OS path-list formatted
+// string (':' on Unix, ';' on Windows), trimming empty entries.
+func ParseWorkspaces(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := filepath.SplitList(raw)
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// FormatWorkspaces encodes workspaces for WALLFACER_WORKSPACES using the OS
+// path-list separator.
+func FormatWorkspaces(workspaces []string) string {
+	if len(workspaces) == 0 {
+		return ""
+	}
+	return strings.Join(workspaces, string(os.PathListSeparator))
 }
 
 func (c Config) SandboxByActivity() map[string]sandbox.Type {
@@ -294,7 +329,8 @@ func Update(
 	containerCPUs,
 	containerMemory,
 	webhookURL,
-	webhookSecret *string,
+	webhookSecret,
+	workspaces *string,
 ) error {
 	updates := map[string]*string{
 		"CLAUDE_CODE_OAUTH_TOKEN":           oauthToken,
@@ -318,8 +354,17 @@ func Update(
 		"WALLFACER_CONTAINER_MEMORY":        containerMemory,
 		"WALLFACER_WEBHOOK_URL":             webhookURL,
 		"WALLFACER_WEBHOOK_SECRET":          webhookSecret,
+		"WALLFACER_WORKSPACES":              workspaces,
 	}
 	return updateFile(path, updates)
+}
+
+// UpdateWorkspaces replaces or clears WALLFACER_WORKSPACES in the env file.
+func UpdateWorkspaces(path string, workspaces []string) error {
+	encoded := FormatWorkspaces(workspaces)
+	return updateFile(path, map[string]*string{
+		"WALLFACER_WORKSPACES": &encoded,
+	})
 }
 
 // UpdateSandboxSettings merges global sandbox-routing settings into the env file.

@@ -36,6 +36,12 @@ let lastTasksEventId = null;
 let gitStatuses = [];
 let gitStatusSource = null;
 let gitRetryDelay = 1000;
+let activeWorkspaces = [];
+let workspacePickerRequired = false;
+let workspaceBrowserPath = '';
+let workspaceBrowserEntries = [];
+let workspaceBrowserFocusIndex = -1;
+let workspaceSelectionDraft = [];
 
 // Autopilot state
 let autopilot = false;

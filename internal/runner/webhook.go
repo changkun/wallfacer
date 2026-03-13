@@ -13,6 +13,7 @@ import (
 
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/internal/workspace"
 	"github.com/google/uuid"
 )
 
@@ -32,9 +33,19 @@ type WebhookPayload struct {
 // HTTP POST to webhookURL whenever a task transitions to a new status.
 type WebhookNotifier struct {
 	store         *store.Store
+	workspace     *workspace.Manager
 	webhookURL    string
 	webhookSecret string
 	client        *http.Client
+}
+
+func NewWorkspaceWebhookNotifier(m *workspace.Manager, cfg envconfig.Config) *WebhookNotifier {
+	return &WebhookNotifier{
+		workspace:     m,
+		webhookURL:    cfg.WebhookURL,
+		webhookSecret: cfg.WebhookSecret,
+		client:        &http.Client{Timeout: 10 * time.Second},
+	}
 }
 
 // NewWebhookNotifier constructs a WebhookNotifier from runtime config.
@@ -50,11 +61,59 @@ func NewWebhookNotifier(s *store.Store, cfg envconfig.Config) *WebhookNotifier {
 // Start subscribes to the store and dispatches webhook deliveries in the
 // background until ctx is cancelled.
 func (wn *WebhookNotifier) Start(ctx context.Context) {
-	id, ch := wn.store.Subscribe()
-	defer wn.store.Unsubscribe(id)
-
 	lastStatus := make(map[uuid.UUID]store.TaskStatus)
+	if wn.workspace == nil {
+		id, ch := wn.store.Subscribe()
+		defer wn.store.Unsubscribe(id)
+		wn.runLoop(ctx, ch, lastStatus)
+		return
+	}
 
+	wsSubID, wsCh := wn.workspace.Subscribe()
+	defer wn.workspace.Unsubscribe(wsSubID)
+
+	var (
+		curStore *store.Store
+		subID    int
+		subCh    <-chan store.SequencedDelta
+	)
+	subscribeStore := func(s *store.Store) {
+		if curStore != nil && subCh != nil {
+			curStore.Unsubscribe(subID)
+		}
+		curStore = s
+		subCh = nil
+		if s != nil {
+			subID, subCh = s.Subscribe()
+		}
+	}
+	subscribeStore(wn.workspace.Snapshot().Store)
+	defer func() {
+		if curStore != nil && subCh != nil {
+			curStore.Unsubscribe(subID)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case snap, ok := <-wsCh:
+			if !ok {
+				return
+			}
+			subscribeStore(snap.Store)
+		case delta, ok := <-subCh:
+			if !ok {
+				subCh = nil
+				continue
+			}
+			wn.handleDelta(delta, lastStatus)
+		}
+	}
+}
+
+func (wn *WebhookNotifier) runLoop(ctx context.Context, ch <-chan store.SequencedDelta, lastStatus map[uuid.UUID]store.TaskStatus) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -63,51 +122,52 @@ func (wn *WebhookNotifier) Start(ctx context.Context) {
 			if !ok {
 				return
 			}
-			// Skip deletes — there is no meaningful status to report.
-			if delta.Deleted || delta.Task == nil {
-				continue
-			}
-			task := delta.Task
-
-			// Only deliver when the status actually changes.
-			if prev, seen := lastStatus[task.ID]; seen && prev == task.Status {
-				continue
-			}
-			lastStatus[task.ID] = task.Status
-
-			prompt := task.Prompt
-			if len(prompt) > 200 {
-				prompt = prompt[:200]
-			}
-
-			result := ""
-			if task.Result != nil {
-				result = *task.Result
-				if len(result) > 500 {
-					result = result[:500]
-				}
-			}
-
-			title := task.Title
-			if title == "" {
-				title = task.Prompt
-				if len(title) > 80 {
-					title = title[:80]
-				}
-			}
-
-			payload := WebhookPayload{
-				EventType:  "task.state_changed",
-				TaskID:     task.ID.String(),
-				Status:     task.Status,
-				Title:      title,
-				Prompt:     prompt,
-				Result:     result,
-				OccurredAt: time.Now().UTC(),
-			}
-			go wn.deliver(payload)
+			wn.handleDelta(delta, lastStatus)
 		}
 	}
+}
+
+func (wn *WebhookNotifier) handleDelta(delta store.SequencedDelta, lastStatus map[uuid.UUID]store.TaskStatus) {
+	if delta.Deleted || delta.Task == nil {
+		return
+	}
+	task := delta.Task
+	if prev, seen := lastStatus[task.ID]; seen && prev == task.Status {
+		return
+	}
+	lastStatus[task.ID] = task.Status
+
+	prompt := task.Prompt
+	if len(prompt) > 200 {
+		prompt = prompt[:200]
+	}
+
+	result := ""
+	if task.Result != nil {
+		result = *task.Result
+		if len(result) > 500 {
+			result = result[:500]
+		}
+	}
+
+	title := task.Title
+	if title == "" {
+		title = task.Prompt
+		if len(title) > 80 {
+			title = title[:80]
+		}
+	}
+
+	payload := WebhookPayload{
+		EventType:  "task.state_changed",
+		TaskID:     task.ID.String(),
+		Status:     task.Status,
+		Title:      title,
+		Prompt:     prompt,
+		Result:     result,
+		OccurredAt: time.Now().UTC(),
+	}
+	go wn.deliver(payload)
 }
 
 // deliver POSTs payload to the webhook URL. It retries up to 3 times on
