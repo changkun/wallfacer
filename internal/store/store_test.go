@@ -643,6 +643,36 @@ func TestSetTaskFailureCategory(t *testing.T) {
 	}
 }
 
+func TestResetTaskForRetry_ClearsFailureCategory(t *testing.T) {
+	s := newTestStore(t)
+
+	task, err := s.CreateTask(bg(), "retry clears category", 15, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus(in_progress): %v", err)
+	}
+	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusFailed); err != nil {
+		t.Fatalf("UpdateTaskStatus(failed): %v", err)
+	}
+	if err := s.SetTaskFailureCategory(bg(), task.ID, FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+
+	if err := s.ResetTaskForRetry(bg(), task.ID, "retry prompt", false); err != nil {
+		t.Fatalf("ResetTaskForRetry: %v", err)
+	}
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got.FailureCategory != "" {
+		t.Fatalf("FailureCategory = %q, want empty string", got.FailureCategory)
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Status-partitioned secondary index: ListTasksByStatus / CountByStatus
 // ─────────────────────────────────────────────────────────────────────────────

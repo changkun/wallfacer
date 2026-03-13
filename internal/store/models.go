@@ -480,6 +480,7 @@ const (
 const (
 	TriggerUser        = "user"
 	TriggerAutoPromote = "auto_promote"
+	TriggerAutoRetry   = "auto_retry"
 	TriggerAutoTest    = "auto_test"
 	TriggerAutoSubmit  = "auto_submit"
 	TriggerFeedback    = "feedback"

@@ -170,6 +170,7 @@ func runServer(configDir string, args []string) {
 	// Start the auto-promoter: watches for state changes and promotes
 	// backlog tasks to in_progress when capacity is available.
 	h.StartAutoPromoter(ctx)
+	h.StartAutoRetrier(ctx)
 
 	// Start the ideation watcher: when ideation is enabled and an idea-agent
 	// task completes, automatically enqueues the next one.

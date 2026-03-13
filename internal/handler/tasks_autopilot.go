@@ -111,6 +111,51 @@ func (h *Handler) StartAutoPromoter(ctx context.Context) {
 	}()
 }
 
+// maxAutoRetries is the maximum number of automatic retries for transient failures.
+const maxAutoRetries = 2
+
+// retryableCategories lists FailureCategory values that represent transient
+// infrastructure errors that are safe to retry automatically.
+var retryableCategories = map[store.FailureCategory]bool{
+	store.FailureCategoryContainerCrash: true,
+	store.FailureCategoryWorktree:       true,
+	store.FailureCategorySyncError:      true,
+}
+
+// StartAutoRetrier subscribes to store change notifications and automatically
+// retries tasks that failed with a transient infrastructure error category.
+// It also runs a recovery scan on startup to pick up any failed tasks that
+// may have been missed while the server was down.
+func (h *Handler) StartAutoRetrier(ctx context.Context) {
+	go func() {
+		subID, ch := h.store.Subscribe()
+		defer h.store.Unsubscribe(subID)
+
+		// Recovery scan: retry any eligible failed tasks that predate startup.
+		failed, _ := h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
+		for _, t := range failed {
+			h.tryAutoRetry(ctx, t)
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case delta, ok := <-ch:
+				if !ok {
+					return
+				}
+				if delta.Deleted || delta.Task == nil {
+					continue
+				}
+				if delta.Task.Status == store.TaskStatusFailed {
+					h.tryAutoRetry(ctx, *delta.Task)
+				}
+			}
+		}
+	}()
+}
+
 // taskReachable reports whether target is reachable from start by following
 // DependsOn edges (i.e., target is a transitive dependency of start).
 // Used to detect cycles before accepting a new dependency edge.
@@ -243,6 +288,48 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			h.runner.RunBackground(candidate.ID, candidate.Prompt, sessionID, false)
 			return true, nil
 		},
+	})
+}
+
+// tryAutoRetry checks whether a newly-failed task should be automatically
+// reset to backlog for a retry. Only transient infrastructure failure
+// categories (container_crash, worktree_setup, sync_error) are retried.
+// Agent errors, budget overruns, timeouts, and unknown failures require
+// human review.
+//
+// It respects the container circuit breaker: if the circuit is open,
+// container_crash retries are suppressed to avoid cascading restarts.
+func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
+	if task.Status != store.TaskStatusFailed {
+		return
+	}
+	if !retryableCategories[task.FailureCategory] {
+		return
+	}
+	if len(task.RetryHistory) >= maxAutoRetries {
+		logger.Handler.Info("auto-retry suppressed: max retries reached",
+			"task", task.ID, "retries", len(task.RetryHistory),
+			"category", task.FailureCategory)
+		return
+	}
+	// For container-crash failures, honour the circuit breaker.
+	if task.FailureCategory == store.FailureCategoryContainerCrash && !h.runner.ContainerCircuitAllow() {
+		logger.Handler.Warn("auto-retry suppressed: container circuit breaker open",
+			"task", task.ID)
+		return
+	}
+	logger.Handler.Info("auto-retrying failed task",
+		"task", task.ID, "category", task.FailureCategory,
+		"retry_attempt", len(task.RetryHistory)+1)
+	if err := h.store.ResetTaskForRetry(ctx, task.ID, task.Prompt, false); err != nil {
+		logger.Handler.Error("auto-retry reset failed", "task", task.ID, "error", err)
+		return
+	}
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{
+		"from":             string(store.TaskStatusFailed),
+		"to":               string(store.TaskStatusBacklog),
+		"trigger":          store.TriggerAutoRetry,
+		"failure_category": string(task.FailureCategory),
 	})
 }
 
