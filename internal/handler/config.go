@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -86,29 +87,36 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	promptsDir := h.runner.Prompts().PromptsDir()
 	workspaces := h.currentWorkspaces()
 	instructionsPath := h.currentInstructionsPath()
+	workspaceBrowserPath := ""
+	if len(workspaces) > 0 {
+		workspaceBrowserPath = workspaces[0]
+	} else if cwd, err := os.Getwd(); err == nil {
+		workspaceBrowserPath = cwd
+	}
 	payloadLimits := store.PayloadLimits{}
 	if s, ok := h.currentStore(); ok && s != nil {
 		payloadLimits = s.GetPayloadLimits()
 	}
 	resp := map[string]any{
-		"workspaces":          workspaces,
-		"instructions_path":   instructionsPath,
-		"prompts_dir":         promptsDir,
-		"sandbox_activities":  store.SandboxActivities,
-		"sandboxes":           []string{"claude", "codex"},
-		"default_sandbox":     "claude",
-		"sandbox_usable":      map[string]bool{"claude": true, "codex": true},
-		"sandbox_reasons":     map[string]string{},
-		"activity_sandboxes":  map[string]string{},
-		"autopilot":           h.AutopilotEnabled(),
-		"autotest":            h.AutotestEnabled(),
-		"autosubmit":          h.AutosubmitEnabled(),
-		"ideation":            h.IdeationEnabled(),
-		"ideation_running":    h.ideationRunning(ctx),
-		"ideation_interval":   int(h.IdeationInterval().Minutes()),
-		"ideation_categories": h.runner.IdeationCategories(),
-		"default_model":       "",
-		"payload_limits":      payloadLimits,
+		"workspaces":              workspaces,
+		"workspace_browser_path":  workspaceBrowserPath,
+		"instructions_path":       instructionsPath,
+		"prompts_dir":             promptsDir,
+		"sandbox_activities":      store.SandboxActivities,
+		"sandboxes":               []string{"claude", "codex"},
+		"default_sandbox":         "claude",
+		"sandbox_usable":          map[string]bool{"claude": true, "codex": true},
+		"sandbox_reasons":         map[string]string{},
+		"activity_sandboxes":      map[string]string{},
+		"autopilot":               h.AutopilotEnabled(),
+		"autotest":                h.AutotestEnabled(),
+		"autosubmit":              h.AutosubmitEnabled(),
+		"ideation":                h.IdeationEnabled(),
+		"ideation_running":        h.ideationRunning(ctx),
+		"ideation_interval":       int(h.IdeationInterval().Minutes()),
+		"ideation_categories":     h.runner.IdeationCategories(),
+		"default_model":           "",
+		"payload_limits":          payloadLimits,
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun

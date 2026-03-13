@@ -63,6 +63,32 @@ func TestGetConfig_ReturnsWorkspaces(t *testing.T) {
 	if workspaces[0].(string) != ws {
 		t.Errorf("expected workspace %q, got %q", ws, workspaces[0])
 	}
+	if got, ok := resp["workspace_browser_path"].(string); !ok || got != ws {
+		t.Fatalf("expected workspace_browser_path %q, got %#v", ws, resp["workspace_browser_path"])
+	}
+}
+
+func TestGetConfig_UsesCWDForWorkspaceBrowserPathWithoutWorkspaces(t *testing.T) {
+	h := newTestHandler(t)
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got, ok := resp["workspace_browser_path"].(string); !ok || got != cwd {
+		t.Fatalf("expected workspace_browser_path %q, got %#v", cwd, resp["workspace_browser_path"])
+	}
 }
 
 func TestGetConfig_AutopilotFalseByDefault(t *testing.T) {
