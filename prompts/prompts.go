@@ -235,13 +235,56 @@ type IdeationTask struct {
 	Prompt string
 }
 
+// WorkspaceSignal represents a single scored hotspot file from workspace analysis.
+// It carries enough context for the advisor to understand why the file was surfaced
+// and which workspace it belongs to when multiple workspaces are active.
+type WorkspaceSignal struct {
+	// DisplayPath is the path shown to the advisor. It is workspace-relative when
+	// only one workspace is active, and prefixed with the workspace basename
+	// (e.g. "wallfacer/internal/runner/ideate.go") when multiple workspaces exist.
+	DisplayPath string
+
+	// Score is the raw signal strength: commit count for churn signals, marker
+	// occurrence count for TODO signals.
+	Score int
+
+	// Reason is a human-readable description of why this file was selected,
+	// e.g. "11 commits" or "3 TODO markers".
+	Reason string
+
+	// Workspace is the basename of the workspace directory this path belongs to.
+	// Empty when only one workspace is active.
+	Workspace string
+
+	// Boosted is true when the path received a score multiplier for matching a
+	// preferred source directory pattern (internal/, ui/js/ non-vendor, ui/partials/,
+	// or a test file suffix). Boosted paths rank ahead of equivalent-count vendor paths.
+	Boosted bool
+}
+
 // IdeationData holds template variables for the ideation prompt.
 type IdeationData struct {
 	ExistingTasks  []IdeationTask
 	Categories     []string
 	FailureSignals []string // tasks that failed or had failing tests
-	ChurnSignals   []string // recently-modified hot files
-	TodoSignals    []string // files with high TODO/FIXME density
+
+	// ChurnHotspots contains recently-modified files scored and filtered by the
+	// signal pipeline. Vendor/generated/artifact paths are excluded; files in
+	// actionable source directories are boosted.
+	ChurnHotspots []WorkspaceSignal
+
+	// TodoHotspots contains files with high TODO/FIXME/XXX marker density,
+	// scored and filtered. Prompt templates and vendor paths are excluded.
+	TodoHotspots []WorkspaceSignal
+
+	// FilteredChurnCount is the number of churn paths excluded by ignore rules
+	// (vendor, generated, minified). Used to inform the advisor that filtering occurred.
+	FilteredChurnCount int
+
+	// FilteredTodoCount is the number of TODO paths excluded by ignore rules
+	// (vendor, generated, prompt templates). Used to inform the advisor of filtering.
+	FilteredTodoCount int
+
 	RejectedTitles []string // previously proposed but rejected idea titles (within TTL)
 }
 

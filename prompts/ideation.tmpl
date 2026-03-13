@@ -10,15 +10,17 @@ Objective failure signals (highest priority):
 {{range .FailureSignals -}}
   - {{.}}
 {{end}}{{end -}}
-{{if .ChurnSignals}}
-Recent-file churn hotspots (prioritize these):
-{{range .ChurnSignals -}}
-  - {{.}}
+{{if .ChurnHotspots}}
+Recent-file churn hotspots (vendor/generated/artifact paths have been excluded; results are weighted toward actionable source code — files in internal/, ui/js/ non-vendor, ui/partials/, and adjacent test files rank higher):
+{{range .ChurnHotspots -}}
+  - {{.DisplayPath}} ({{.Reason}}{{if .Boosted}}, priority source{{end}})
+{{end}}{{if gt .FilteredChurnCount 0}}  ({{.FilteredChurnCount}} vendor/generated/artifact path(s) were filtered from this list and intentionally omitted.)
 {{end}}{{end -}}
-{{if .TodoSignals}}
-TODO/FIXME concentration hotspots:
-{{range .TodoSignals -}}
-  - {{.}}
+{{if .TodoHotspots}}
+TODO/FIXME concentration hotspots (prompt templates and vendor/generated paths have been excluded; only actionable source files are listed):
+{{range .TodoHotspots -}}
+  - {{.DisplayPath}} ({{.Reason}}{{if .Boosted}}, priority source{{end}})
+{{end}}{{if gt .FilteredTodoCount 0}}  ({{.FilteredTodoCount}} vendor/template/generated path(s) were filtered from this list and intentionally omitted.)
 {{end}}{{end -}}
 {{if .ExistingTasks}}
 The following tasks are already queued or actively being worked on. Do NOT propose ideas that duplicate or directly conflict with any of them. If a proposed idea is closely related to an existing task, you MUST reference it explicitly in the prompt field with a note such as: "Note: This is related to the existing task '[title]' (status: [status])."

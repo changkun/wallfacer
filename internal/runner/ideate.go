@@ -27,9 +27,11 @@ const (
 )
 
 type ideationContext struct {
-	FailureSignals []string
-	ChurnSignals   []string
-	TodoSignals    []string
+	FailureSignals     []string
+	ChurnSignals       []prompts.WorkspaceSignal
+	TodoSignals        []prompts.WorkspaceSignal
+	FilteredChurnCount int
+	FilteredTodoCount  int
 }
 
 // ideaCategoryPool is the set of example improvement areas shown to the
@@ -60,6 +62,15 @@ var ideaCategoryPool = []string{
 func (r *Runner) IdeationCategories() []string {
 	result := make([]string, len(ideaCategoryPool))
 	copy(result, ideaCategoryPool)
+	return result
+}
+
+// IdeationIgnorePatterns returns the ordered list of path prefixes excluded from
+// workspace signal collection. This is exposed via GET /api/config so clients can
+// understand and reproduce the filtering without reading source code.
+func (r *Runner) IdeationIgnorePatterns() []string {
+	result := make([]string, len(IdeationIgnorePatterns))
+	copy(result, IdeationIgnorePatterns)
 	return result
 }
 
@@ -118,12 +129,14 @@ func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ide
 	}
 
 	return r.promptsMgr.Ideation(prompts.IdeationData{
-		ExistingTasks:  tasks,
-		Categories:     cats,
-		FailureSignals: signals.FailureSignals,
-		ChurnSignals:   signals.ChurnSignals,
-		TodoSignals:    signals.TodoSignals,
-		RejectedTitles: rejectedTitles,
+		ExistingTasks:      tasks,
+		Categories:         cats,
+		FailureSignals:     signals.FailureSignals,
+		ChurnHotspots:      signals.ChurnSignals,
+		TodoHotspots:       signals.TodoSignals,
+		FilteredChurnCount: signals.FilteredChurnCount,
+		FilteredTodoCount:  signals.FilteredTodoCount,
+		RejectedTitles:     rejectedTitles,
 	})
 }
 
@@ -497,10 +510,14 @@ func (r *Runner) collectIdeationContext(ctx context.Context) ideationContext {
 }
 
 func (r *Runner) collectIdeationContextFromTasks(ctx context.Context, tasks []store.Task) ideationContext {
+	churnSignals, filteredChurn := r.collectWorkspaceChurnSignals(ctx)
+	todoSignals, filteredTodo := r.collectWorkspaceTodoSignals(ctx)
 	return ideationContext{
-		FailureSignals: collectIdeationFailureSignals(tasks),
-		ChurnSignals:   r.collectWorkspaceChurnSignals(ctx),
-		TodoSignals:    r.collectWorkspaceTodoSignals(ctx),
+		FailureSignals:     collectIdeationFailureSignals(tasks),
+		ChurnSignals:       churnSignals,
+		TodoSignals:        todoSignals,
+		FilteredChurnCount: filteredChurn,
+		FilteredTodoCount:  filteredTodo,
 	}
 }
 
