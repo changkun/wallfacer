@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 // ErrRefinementAlreadyRunning is returned by StartRefinementJobIfIdle when a
 // refinement job is already in "running" state for the given task.
 var ErrRefinementAlreadyRunning = errors.New("refinement already running")
@@ -250,32 +249,37 @@ const snippetPadding = 60
 func (s *Store) SearchTasks(_ context.Context, query string) ([]TaskSearchResult, error) {
 	q := strings.ToLower(query)
 
-	// Snapshot task pointers and their index entries together under a single
-	// RLock. No disk I/O occurs after the lock is released.
-	s.mu.RLock()
-	type candidate struct {
-		task  *Task
-		entry indexedTaskText
+	// Match against the in-memory index under a single RLock, then clone only
+	// the matched tasks after releasing the lock.
+	type matchResult struct {
+		id      uuid.UUID
+		field   string
+		snippet string
 	}
-	candidates := make([]candidate, 0, len(s.tasks))
+
+	s.mu.RLock()
+	matches := make([]matchResult, 0)
 	for id, t := range s.tasks {
-		cp := deepCloneTask(t)
-		candidates = append(candidates, candidate{task: &cp, entry: s.searchIndex[id]})
+		if len(matches) >= maxSearchResults {
+			break
+		}
+		if field, snippet, ok := matchTask(t, s.searchIndex[id], q); ok {
+			matches = append(matches, matchResult{id: id, field: field, snippet: snippet})
+		}
 	}
 	s.mu.RUnlock()
 
-	results := make([]TaskSearchResult, 0)
-	for _, c := range candidates {
-		if len(results) >= maxSearchResults {
-			break
+	results := make([]TaskSearchResult, 0, len(matches))
+	for _, m := range matches {
+		t, err := s.GetTask(context.Background(), m.id)
+		if err != nil {
+			continue
 		}
-		if field, snippet, ok := matchTask(c.task, c.entry, q); ok {
-			results = append(results, TaskSearchResult{
-				Task:         c.task,
-				MatchedField: field,
-				Snippet:      snippet,
-			})
-		}
+		results = append(results, TaskSearchResult{
+			Task:         t,
+			MatchedField: m.field,
+			Snippet:      m.snippet,
+		})
 	}
 	return results, nil
 }

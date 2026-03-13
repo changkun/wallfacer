@@ -659,8 +659,8 @@ func BenchmarkSearchTasks_Indexed(b *testing.B) {
 		b.Fatalf("NewStore: %v", err)
 	}
 
-	// Create 200 tasks, half with oversight, to simulate a loaded board.
-	for i := 0; i < 200; i++ {
+	// Create 500 tasks, half with oversight, to simulate a loaded board.
+	for i := 0; i < 500; i++ {
 		task, err := s.CreateTask(bg(), fmt.Sprintf("benchmark task prompt number %d with various keywords", i), 60, false, "", TaskKindTask)
 		if err != nil {
 			b.Fatalf("CreateTask: %v", err)

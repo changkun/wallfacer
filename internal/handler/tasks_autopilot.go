@@ -3,9 +3,9 @@ package handler
 import (
 	"context"
 	"errors"
-	"os"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -550,16 +550,13 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 		return
 	}
 
-	tasks, err := h.store.ListTasks(ctx, false)
+	tasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 	if err != nil {
 		return
 	}
 
 	for i := range tasks {
 		t := &tasks[i]
-		if t.Status != store.TaskStatusWaiting {
-			continue
-		}
 		// Determine eligibility:
 		// (a) Passed verification ("pass").
 		// (b) Naturally completed (stop_reason="end_turn") and not yet tested,

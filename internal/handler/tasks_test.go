@@ -1761,6 +1761,58 @@ func TestTryAutoSubmit_SkipsNonWaiting(t *testing.T) {
 	}
 }
 
+func TestTryAutoSubmit_ProcessesOnlyWaitingTasks(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	waitingWT := filepath.Join(t.TempDir(), "waiting-wt")
+	gitRun(t, repo, "worktree", "add", "-b", "waiting-branch", waitingWT, "HEAD")
+
+	doneWT := filepath.Join(t.TempDir(), "done-wt")
+	gitRun(t, repo, "worktree", "add", "-b", "done-branch", doneWT, "HEAD")
+
+	waitingTask, _ := h.store.CreateTask(ctx, "verified waiting task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, waitingTask.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, waitingTask.ID, map[string]string{repo: waitingWT}, "waiting-branch")
+	h.store.UpdateTaskTestRun(ctx, waitingTask.ID, false, "pass")
+
+	doneTask, _ := h.store.CreateTask(ctx, "verified done task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, doneTask.ID, store.TaskStatusDone)
+	h.store.UpdateTaskWorktrees(ctx, doneTask.ID, map[string]string{repo: doneWT}, "done-branch")
+	h.store.UpdateTaskTestRun(ctx, doneTask.ID, false, "pass")
+
+	h.tryAutoSubmit(ctx)
+
+	gotWaiting, _ := h.store.GetTask(ctx, waitingTask.ID)
+	if gotWaiting.Status != store.TaskStatusDone {
+		t.Fatalf("expected waiting task to be auto-submitted, got %s", gotWaiting.Status)
+	}
+
+	gotDone, _ := h.store.GetTask(ctx, doneTask.ID)
+	if gotDone.Status != store.TaskStatusDone {
+		t.Fatalf("expected done task to remain done, got %s", gotDone.Status)
+	}
+
+	events, err := h.store.GetEvents(ctx, doneTask.ID)
+	if err != nil {
+		t.Fatalf("GetEvents(done task): %v", err)
+	}
+	for _, event := range events {
+		if event.EventType != store.EventTypeStateChange {
+			continue
+		}
+		var data map[string]string
+		if err := json.Unmarshal(event.Data, &data); err != nil {
+			t.Fatalf("json.Unmarshal(event data): %v", err)
+		}
+		if data["trigger"] == store.TriggerAutoSubmit {
+			t.Fatalf("done task should not receive auto-submit state changes: %#v", event.Data)
+		}
+	}
+}
+
 // TestTryAutoSubmit_SkipsNotVerified verifies that unverified tasks are not submitted.
 func TestTryAutoSubmit_SkipsNotVerified(t *testing.T) {
 	h := newTestHandler(t)
@@ -2181,8 +2233,8 @@ func TestBatchCreateTasks_HappyPath(t *testing.T) {
 	}
 
 	var resp struct {
-		Tasks    []store.Task      `json:"tasks"`
-		RefToID  map[string]string `json:"ref_to_id"`
+		Tasks   []store.Task      `json:"tasks"`
+		RefToID map[string]string `json:"ref_to_id"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -3003,7 +3055,6 @@ func TestCreateTask_ScheduledTaskNotAutoPromotedBeforeScheduledAt(t *testing.T) 
 		t.Errorf("scheduled task was auto-promoted before scheduled_at: status=%s", got.Status)
 	}
 }
-
 
 // ---------------------------------------------------------------------------
 // Auto-retry integration tests
