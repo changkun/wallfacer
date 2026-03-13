@@ -217,3 +217,83 @@ func TestPruneOrphanedWorktrees_EmptyList(t *testing.T) {
 		t.Errorf("expected 0 removed for empty list, got %d", removed)
 	}
 }
+
+// TestScanMissingTaskWorktrees_DetectsMissing verifies that an in_progress task
+// whose WorktreePaths map points to a non-existent directory is returned by
+// ScanMissingTaskWorktrees.
+func TestScanMissingTaskWorktrees_DetectsMissing(t *testing.T) {
+	s, r := setupTestRunner(t, nil)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "missing worktree task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	nonexistent := filepath.Join(t.TempDir(), "does-not-exist", "repo")
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{"/fake/repo": nonexistent}, "task/test1234"); err != nil {
+		t.Fatal(err)
+	}
+
+	missing, err := r.ScanMissingTaskWorktrees(ctx)
+	if err != nil {
+		t.Fatalf("ScanMissingTaskWorktrees: %v", err)
+	}
+
+	found := false
+	for _, m := range missing {
+		if m.ID == task.ID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected task %s with missing worktree to be returned, got %v", task.ID, missing)
+	}
+}
+
+// TestScanMissingTaskWorktrees_SkipsTerminalTasks verifies that done and
+// cancelled tasks are NOT returned by ScanMissingTaskWorktrees even when their
+// WorktreePaths point to non-existent directories.
+func TestScanMissingTaskWorktrees_SkipsTerminalTasks(t *testing.T) {
+	s, r := setupTestRunner(t, nil)
+	ctx := context.Background()
+
+	createTerminal := func(status store.TaskStatus) *store.Task {
+		t.Helper()
+		task, err := s.CreateTask(ctx, "terminal task "+string(status), 5, false, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.ForceUpdateTaskStatus(ctx, task.ID, status); err != nil {
+			t.Fatal(err)
+		}
+		nonexistent := filepath.Join(t.TempDir(), "does-not-exist", "repo")
+		if err := s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{"/fake/repo": nonexistent}, "task/test5678"); err != nil {
+			t.Fatal(err)
+		}
+		return task
+	}
+
+	doneTask := createTerminal(store.TaskStatusDone)
+	cancelledTask := createTerminal(store.TaskStatusCancelled)
+
+	missing, err := r.ScanMissingTaskWorktrees(ctx)
+	if err != nil {
+		t.Fatalf("ScanMissingTaskWorktrees: %v", err)
+	}
+
+	inMissing := make(map[uuid.UUID]bool, len(missing))
+	for _, m := range missing {
+		inMissing[m.ID] = true
+	}
+
+	if inMissing[doneTask.ID] {
+		t.Errorf("done task %s should NOT be in missing list", doneTask.ID)
+	}
+	if inMissing[cancelledTask.ID] {
+		t.Errorf("cancelled task %s should NOT be in missing list", cancelledTask.ID)
+	}
+}
