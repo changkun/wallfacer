@@ -554,6 +554,7 @@ async function fetchConfig() {
   try {
     var cfg = await api(configGetRoute());
     activeWorkspaces = Array.isArray(cfg.workspaces) ? cfg.workspaces.slice() : [];
+    workspaceBrowserPath = cfg.workspace_browser_path || activeWorkspaces[0] || workspaceBrowserPath || '';
     workspacePickerRequired = activeWorkspaces.length === 0;
     autopilot = !!cfg.autopilot;
     var toggle = document.getElementById('autopilot-toggle');

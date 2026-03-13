@@ -166,6 +166,7 @@ describe('fetchConfig', () => {
       autotest: true,
       autosubmit: false,
       workspaces: ['/Users/test/repo'],
+      workspace_browser_path: '/Users/test/repo',
       sandboxes: ['claude', 'codex'],
       default_sandbox: 'claude',
       activity_sandboxes: { implementation: 'codex' },
@@ -230,6 +231,39 @@ describe('fetchConfig', () => {
     expect(vm.runInContext('autopilot', ctx)).toBe(true);
     expect(vm.runInContext('autotest', ctx)).toBe(true);
     expect(vm.runInContext('autosubmit', ctx)).toBe(false);
+    expect(vm.runInContext('workspaceBrowserPath', ctx)).toBe('/Users/test/repo');
+  });
+
+  it('prefers workspace_browser_path from config over an empty picker path', async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        workspaces: [],
+        workspace_browser_path: '/Users/test/current',
+      }),
+      text: async () => '',
+    });
+    const ctx = makeContext({
+      fetch,
+      renderWorkspaces: vi.fn(),
+      scheduleRender: vi.fn(),
+      stopTasksStream: vi.fn(),
+      stopGitStream: vi.fn(),
+      resetBoardState: vi.fn(),
+      Routes: {
+        config: {
+          get: () => '/api/config',
+          update: () => '/api/config',
+        },
+      },
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    await ctx.fetchConfig();
+
+    expect(vm.runInContext('workspaceBrowserPath', ctx)).toBe('/Users/test/current');
   });
 });
 
