@@ -176,59 +176,91 @@ func (r *Runner) runRefinementContainer(
 	r.refineContainers.Set(taskID, containerName)
 	defer r.refineContainers.Delete(taskID)
 
-	exec.Command(r.command, "rm", "-f", containerName).Run()
-
-	args := r.buildRefinementContainerArgs(containerName, taskID.String(), prompt, modelOverride, sandbox)
-
-	cmd := exec.CommandContext(ctx, r.command, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	logger.Runner.Debug("refine exec", "cmd", r.command, "args", strings.Join(args, " "))
-	runErr := cmd.Run()
-
-	if ctx.Err() != nil {
-		exec.Command(r.command, "kill", containerName).Run()
+	runWithSandbox := func(selectedSandbox string) (*agentOutput, []byte, []byte, error) {
 		exec.Command(r.command, "rm", "-f", containerName).Run()
-		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("refinement container terminated: %w", ctx.Err())
-	}
 
-	raw := strings.TrimSpace(stdout.String())
-	if raw == "" {
-		if runErr != nil {
-			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				return nil, stdout.Bytes(), stderr.Bytes(),
-					fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), stderr.String())
-			}
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+		args := r.buildRefinementContainerArgs(containerName, taskID.String(), prompt, modelOverride, selectedSandbox)
+
+		cmd := exec.CommandContext(ctx, r.command, args...)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		logger.Runner.Debug("refine exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
+		runErr := cmd.Run()
+
+		if ctx.Err() != nil {
+			exec.Command(r.command, "kill", containerName).Run()
+			exec.Command(r.command, "rm", "-f", containerName).Run()
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("refinement container terminated: %w", ctx.Err())
 		}
-		stderrStr := strings.TrimSpace(stderr.String())
-		if stderrStr != "" {
+
+		raw := strings.TrimSpace(stdout.String())
+		if raw == "" {
+			if runErr != nil {
+				if exitErr, ok := runErr.(*exec.ExitError); ok {
+					return nil, stdout.Bytes(), stderr.Bytes(),
+						fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), stderr.String())
+				}
+				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+			}
+			stderrStr := strings.TrimSpace(stderr.String())
+			if stderrStr != "" {
+				return nil, stdout.Bytes(), stderr.Bytes(),
+					fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
+			}
+			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
+		}
+
+		output, parseErr := parseOutput(raw)
+		if parseErr != nil {
+			if runErr != nil {
+				if exitErr, ok := runErr.(*exec.ExitError); ok {
+					return nil, stdout.Bytes(), stderr.Bytes(),
+						fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
+							exitErr.ExitCode(), stderr.String(), truncate(raw, 500))
+				}
+				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+			}
 			return nil, stdout.Bytes(), stderr.Bytes(),
-				fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
+				fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
 		}
-		return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
-	}
 
-	output, parseErr := parseOutput(raw)
-	if parseErr != nil {
 		if runErr != nil {
 			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				return nil, stdout.Bytes(), stderr.Bytes(),
-					fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
-						exitErr.ExitCode(), stderr.String(), truncate(raw, 500))
+				logger.Runner.Warn("refinement container exited non-zero but produced valid output",
+					"task", taskID, "code", exitErr.ExitCode(), "sandbox", selectedSandbox)
 			}
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
 		}
-		return nil, stdout.Bytes(), stderr.Bytes(),
-			fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
+		output.ActualSandbox = selectedSandbox
+		return output, stdout.Bytes(), stderr.Bytes(), nil
 	}
 
-	if runErr != nil {
-		if exitErr, ok := runErr.(*exec.ExitError); ok {
-			logger.Runner.Warn("refinement container exited non-zero but produced valid output",
-				"task", taskID, "code", exitErr.ExitCode())
+	initialSandbox := sandbox
+	output, rawStdout, rawStderr, err := runWithSandbox(initialSandbox)
+	if err != nil {
+		if strings.EqualFold(initialSandbox, "claude") && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
+			logger.Runner.Warn("refinement: claude token limit hit; retrying with codex", "task", taskID)
+			r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+				"result": "Sandbox fallback: claude → codex (token/rate limit hit during refinement)",
+			})
+			output, rawStdout, rawStderr, err = runWithSandbox("codex")
+			sandbox = "codex"
+		}
+		if err != nil {
+			return nil, rawStdout, rawStderr, err
+		}
+	}
+	if strings.EqualFold(initialSandbox, "claude") && output != nil && output.IsError &&
+		isLikelyTokenLimitError(output.Result, output.Subtype) {
+		logger.Runner.Warn("refinement: claude output reported token limit; retrying with codex", "task", taskID)
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+			"result": "Sandbox fallback: claude → codex (token/rate limit in refinement output)",
+		})
+		output, rawStdout, rawStderr, err = runWithSandbox("codex")
+		sandbox = "codex"
+		if err != nil {
+			return nil, rawStdout, rawStderr, err
 		}
 	}
 
@@ -249,14 +281,14 @@ func (r *Runner) runRefinementContainer(
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
-			Sandbox:              sandbox,
+			Sandbox:              output.ActualSandbox,
 			SubAgent:             "refinement",
 		}); appErr != nil {
 			logger.Runner.Warn("refinement: append turn usage failed", "task", taskID, "error", appErr)
 		}
 	}
 
-	return output, stdout.Bytes(), stderr.Bytes(), nil
+	return output, rawStdout, rawStderr, nil
 }
 
 // cleanRefinementResult strips any agent preamble (internal monologue,

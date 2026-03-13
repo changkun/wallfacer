@@ -540,6 +540,7 @@ func TestParseOversightResultEmptyText(t *testing.T) {
 
 const oversightOutput = `{"result":"{\"phases\":[{\"timestamp\":\"2024-01-15T10:00:00Z\",\"title\":\"Explored codebase\",\"summary\":\"Read key files\",\"tools_used\":[\"Read\"],\"actions\":[\"Read main.go\"]}]}","session_id":"s1","stop_reason":"end_turn","is_error":false}`
 const oversightOutputEmptyResult = `{"result":"","session_id":"s1","stop_reason":"end_turn","is_error":false}`
+const oversightOutputWithUsage = `{"result":"{\"phases\":[{\"timestamp\":\"2024-01-15T10:00:00Z\",\"title\":\"Explored codebase\",\"summary\":\"Read key files\",\"tools_used\":[\"Read\"],\"actions\":[\"Read main.go\"]}]}","session_id":"s1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001,"usage":{"input_tokens":123,"output_tokens":45}}`
 
 // TestGenerateOversightSuccess verifies that GenerateOversight saves a ready
 // oversight when the container succeeds and produces valid structured JSON.
@@ -613,6 +614,48 @@ func TestGenerateOversightContainerError(t *testing.T) {
 	}
 	if oversight.Error == "" {
 		t.Fatal("expected non-empty error message")
+	}
+}
+
+func TestGenerateOversightFallsBackToCodexOnTokenLimit(t *testing.T) {
+	tokenLimit := `{"result":"rate limit exceeded: token limit reached","session_id":"s1","stop_reason":"end_turn","is_error":true,"total_cost_usd":0.001}`
+	cmd := fakeStatefulCmd(t, []string{tokenLimit, oversightOutputWithUsage})
+	s, r := setupRunnerWithCmd(t, nil, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Task with codex fallback oversight", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outputsDir := s.OutputsDir(task.ID)
+	if err := os.MkdirAll(outputsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	turnData := `{"type":"assistant","message":{"content":[{"type":"text","text":"working"}]}}`
+	if err := os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(turnData), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	r.GenerateOversight(task.ID)
+
+	oversight, err := s.GetOversight(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error reading oversight: %v", err)
+	}
+	if oversight.Status != store.OversightStatusReady {
+		t.Fatalf("expected status=ready after fallback, got %q (error: %s)", oversight.Status, oversight.Error)
+	}
+
+	usages, err := s.GetTurnUsages(task.ID)
+	if err != nil {
+		t.Fatalf("GetTurnUsages: %v", err)
+	}
+	if len(usages) == 0 {
+		t.Fatal("expected oversight usage record after fallback")
+	}
+	if usages[len(usages)-1].Sandbox != "codex" {
+		t.Fatalf("expected oversight usage sandbox codex, got %q", usages[len(usages)-1].Sandbox)
 	}
 }
 

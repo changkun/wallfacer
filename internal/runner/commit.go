@@ -261,11 +261,9 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	}
 
 	sandbox := "claude"
-	model := ""
 	if task != nil {
 		sandbox = r.sandboxForTaskActivity(task, activityCommitMessage)
 	}
-	model = r.modelFromEnvForSandbox(sandbox)
 
 	firstLine := prompt
 	if idx := strings.IndexByte(firstLine, '\n'); idx >= 0 {
@@ -277,41 +275,71 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	defer cancel()
 
 	containerName := "wallfacer-commit-" + taskID.String()[:8]
-	exec.Command(r.command, "rm", "-f", containerName).Run()
-
-	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
-
 	commitPrompt := r.promptsMgr.CommitMessage(prompts.CommitData{
 		Prompt:    prompt,
 		DiffStat:  diffStat,
 		RecentLog: recentLog,
 	})
-	spec.Cmd = buildAgentCmd(commitPrompt, model)
+	runWithSandbox := func(selectedSandbox string) (*agentOutput, error) {
+		selectedModel := r.modelFromEnvForSandbox(selectedSandbox)
+		exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	cmd := exec.CommandContext(ctx, r.command, spec.Build()...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+		spec := r.buildBaseContainerSpec(containerName, selectedModel, selectedSandbox)
+		spec.Cmd = buildAgentCmd(commitPrompt, selectedModel)
 
-	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityCommitMessage})
-	runErr := cmd.Run()
-	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityCommitMessage})
-	if runErr != nil && ctx.Err() == nil {
-		logger.Runner.Warn("commit message generation failed", "task", taskID, "error", runErr,
-			"stderr", truncate(stderr.String(), 200))
-		return fallback
+		cmd := exec.CommandContext(ctx, r.command, spec.Build()...)
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityCommitMessage})
+		runErr := cmd.Run()
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityCommitMessage})
+		if runErr != nil && ctx.Err() == nil {
+			return nil, fmt.Errorf("%w: stderr=%s", runErr, truncate(stderr.String(), 200))
+		}
+
+		raw := strings.TrimSpace(stdout.String())
+		if raw == "" {
+			return nil, fmt.Errorf("empty output")
+		}
+
+		output, err := parseOutput(raw)
+		if err != nil {
+			return nil, fmt.Errorf("parse failure: raw=%s", truncate(raw, 200))
+		}
+		output.ActualSandbox = selectedSandbox
+		return output, nil
 	}
 
-	raw := strings.TrimSpace(stdout.String())
-	if raw == "" {
-		logger.Runner.Warn("commit message generation: empty output", "task", taskID)
-		return fallback
-	}
-
-	output, err := parseOutput(raw)
+	initialSandbox := sandbox
+	output, err := runWithSandbox(initialSandbox)
 	if err != nil {
-		logger.Runner.Warn("commit message generation: parse failure", "task", taskID, "raw", truncate(raw, 200))
-		return fallback
+		if strings.EqualFold(initialSandbox, "claude") && isLikelyTokenLimitError(err.Error()) {
+			logger.Runner.Warn("commit message generation: claude token limit hit; retrying with codex", "task", taskID)
+			r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+				"result": "Sandbox fallback: claude → codex (token/rate limit hit during commit message generation)",
+			})
+			output, err = runWithSandbox("codex")
+			sandbox = "codex"
+		}
+		if err != nil {
+			logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
+			return fallback
+		}
+	}
+	if strings.EqualFold(initialSandbox, "claude") && output != nil && output.IsError &&
+		isLikelyTokenLimitError(output.Result, output.Subtype) {
+		logger.Runner.Warn("commit message generation: claude output reported token limit; retrying with codex", "task", taskID)
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+			"result": "Sandbox fallback: claude → codex (token/rate limit in commit message output)",
+		})
+		output, err = runWithSandbox("codex")
+		sandbox = "codex"
+		if err != nil {
+			logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
+			return fallback
+		}
 	}
 
 	msg := strings.TrimSpace(output.Result)
@@ -323,7 +351,6 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	}
 
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		sandboxName := sandbox
 		r.store.AccumulateSubAgentUsage(context.Background(), taskID, store.SandboxActivityCommitMessage, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
@@ -339,7 +366,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
-			Sandbox:              sandboxName,
+			Sandbox:              output.ActualSandbox,
 			SubAgent:             store.SandboxActivityCommitMessage,
 		}); appErr != nil {
 			logger.Runner.Warn("commit message: append turn usage failed", "task", taskID, "error", appErr)
