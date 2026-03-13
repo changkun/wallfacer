@@ -1,6 +1,8 @@
 // Brainstorm category values are loaded from /api/config (backend authoritative
 // source) so new categories can be added without frontend code changes.
 var BRAINSTORM_CATEGORIES = new Set();
+let _taskIndex = new Map();
+let _renderableTaskIndex = new Map();
 
 function tagStyle(tag) {
   let sum = 0;
@@ -71,10 +73,37 @@ function formatRelativeTime(date) {
 }
 
 function getRenderableTasks() {
-  if (showArchived && Array.isArray(archivedTasks) && archivedTasks.length > 0) {
+  if (typeof showArchived !== 'undefined' && showArchived &&
+      typeof archivedTasks !== 'undefined' &&
+      Array.isArray(archivedTasks) &&
+      archivedTasks.length > 0) {
     return tasks.concat(archivedTasks);
   }
   return tasks;
+}
+
+function _rebuildTaskIndexes() {
+  _taskIndex = new Map();
+  for (const task of tasks) _taskIndex.set(task.id, task);
+  _renderableTaskIndex = typeof showArchived !== 'undefined' && showArchived &&
+    typeof archivedTasks !== 'undefined' &&
+    Array.isArray(archivedTasks) &&
+    archivedTasks.length > 0
+    ? new Map(getRenderableTasks().map(function(task) { return [task.id, task]; }))
+    : _taskIndex;
+}
+
+function _ensureTaskIndexes() {
+  const activeCount = Array.isArray(tasks) ? tasks.length : 0;
+  const archivedCount = typeof showArchived !== 'undefined' && showArchived &&
+    typeof archivedTasks !== 'undefined' &&
+    Array.isArray(archivedTasks)
+    ? archivedTasks.length
+    : 0;
+  const expectedRenderableCount = activeCount + archivedCount;
+  if (_taskIndex.size !== activeCount || _renderableTaskIndex.size !== expectedRenderableCount) {
+    _rebuildTaskIndexes();
+  }
 }
 
 function getTaskImpactScore(task) {
@@ -94,7 +123,8 @@ function getTaskImpactScore(task) {
 }
 
 function sortBacklogTasks(items) {
-  if (backlogSortMode !== 'impact') {
+  const mode = typeof backlogSortMode === 'string' ? backlogSortMode : 'manual';
+  if (mode !== 'impact') {
     items.sort((a, b) => a.position - b.position);
     return items;
   }
@@ -113,7 +143,7 @@ function sortBacklogTasks(items) {
 function updateBacklogSortButton() {
   const button = document.getElementById('backlog-sort-btn');
   if (!button) return;
-  const impactSort = backlogSortMode === 'impact';
+  const impactSort = (typeof backlogSortMode === 'string' ? backlogSortMode : 'manual') === 'impact';
   button.textContent = impactSort ? 'Sort: Impact' : 'Sort: Manual';
   button.setAttribute('aria-pressed', impactSort ? 'true' : 'false');
   button.classList.toggle('active', impactSort);
@@ -135,18 +165,18 @@ function toggleBacklogSort() {
 
 function areDepsBlocked(t) {
   if (!t.depends_on || t.depends_on.length === 0) return false;
-  const allTasks = getRenderableTasks();
+  _ensureTaskIndexes();
   return t.depends_on.some(function(depId) {
-    var dep = allTasks.find(function(d) { return d.id === depId; });
+    var dep = _renderableTaskIndex.get(depId);
     return !dep || dep.status !== 'done';
   });
 }
 
 function getBlockingTaskNames(t) {
   if (!t.depends_on) return '';
-  const allTasks = getRenderableTasks();
+  _ensureTaskIndexes();
   return t.depends_on.map(function(id) {
-    var dep = allTasks.find(function(d) { return d.id === id; });
+    var dep = _renderableTaskIndex.get(id);
     if (dep && dep.status === 'done') return null;
     if (!dep) return id.slice(0, 8) + '\u2026';
     return dep.title || (dep.prompt.length > 30 ? dep.prompt.slice(0, 30) + '\u2026' : dep.prompt);
@@ -302,13 +332,16 @@ function hasExecutionTrail(t) {
 }
 
 // Invalidate cached diff/behind-count state so that the next render re-fetches
-// data. When taskId is provided only that entry is evicted; otherwise the full
-// cache is cleared (used on full snapshots).
+// data. Preserve the cached diff body so cards can continue rendering the last
+// known summary while forcing a behind-count refresh on the next fetch.
 function invalidateDiffBehindCounts(taskId) {
   if (taskId) {
-    diffCache.delete(taskId);
+    const cached = diffCache.get(taskId);
+    if (cached && cached !== 'loading') cached.behindFetchedAt = 0;
   } else {
-    diffCache.clear();
+    diffCache.forEach(function(cached) {
+      if (cached && cached !== 'loading') cached.behindFetchedAt = 0;
+    });
   }
 }
 
@@ -351,7 +384,10 @@ async function fetchDiff(card, taskId, updatedAt) {
   }
   diffCache.set(taskId, 'loading');
   try {
-    const data = await api(task(taskId).diff());
+    const diffPath = typeof task === 'function'
+      ? task(taskId).diff()
+      : '/api/tasks/' + encodeURIComponent(taskId) + '/diff';
+    const data = await api(diffPath);
     const behindCounts = data.behind_counts || {};
     diffCache.set(taskId, { diff: data.diff, behindCounts, updatedAt, behindFetchedAt: Date.now() });
     const latestEl = card.querySelector('[data-diff]');
@@ -381,6 +417,7 @@ function applyDiffToCard(el, diff, behindCounts, taskId) {
 }
 
 function render() {
+  _rebuildTaskIndexes();
   // Sync ideation spinner from live task list (no polling needed).
   if (typeof updateIdeationFromTasks === 'function') updateIdeationFromTasks(tasks);
   updateBacklogSortButton();
@@ -588,7 +625,7 @@ function _cardFingerprint(t, rank) {
   // immediately when a dependency moves to done/failed without waiting for
   // the dependent task itself to change.
   const depStatuses = (t.depends_on || []).map(depId => {
-    const dep = tasks.find(d => d.id === depId);
+    const dep = _taskIndex.get(depId);
     return dep ? dep.status : '';
   }).join(',');
   return [
@@ -684,8 +721,12 @@ card.style.opacity = isArchived ? '0.55' : '';
     ? `<span class="badge badge-failure-category" title="Failure reason: ${escapeHtml(t.failure_category)}" style="font-family:monospace;font-size:9px;">${escapeHtml(_fcLabel)}</span>`
     : '';
   const implSandbox = (t.sandbox_by_activity && t.sandbox_by_activity.implementation) || t.sandbox || 'default';
-  const cardTitle = getTaskAccessibleTitle(t);
-  const cardStatusLabel = formatTaskStatusLabel(statusLabel);
+  const cardTitle = typeof getTaskAccessibleTitle === 'function'
+    ? getTaskAccessibleTitle(t)
+    : (t.title || t.prompt || t.id);
+  const cardStatusLabel = typeof formatTaskStatusLabel === 'function'
+    ? formatTaskStatusLabel(statusLabel)
+    : String(statusLabel || '').replace(/_/g, ' ');
   card.innerHTML = `
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
@@ -764,8 +805,10 @@ card.style.opacity = isArchived ? '0.55' : '';
   }
 
   card.tabIndex = 0;
-  card.setAttribute('role', 'listitem');
-  card.setAttribute('aria-label', `${cardTitle} — ${cardStatusLabel}`);
+  if (typeof card.setAttribute === 'function') {
+    card.setAttribute('role', 'listitem');
+    card.setAttribute('aria-label', `${cardTitle} — ${cardStatusLabel}`);
+  }
 
   const promptEl = card.querySelector('.card-prose');
   if (promptEl && !promptEl.id) promptEl.id = _cardDescriptionId(t.id, 'prompt');
@@ -774,9 +817,9 @@ card.style.opacity = isArchived ? '0.55' : '';
   const failedResultEl = card.querySelector('.card-error-text');
   if (failedResultEl && !failedResultEl.id) failedResultEl.id = _cardDescriptionId(t.id, 'error');
   const describedByEl = failedResultEl || waitingResultEl || promptEl;
-  if (describedByEl && describedByEl.id) {
+  if (typeof card.setAttribute === 'function' && describedByEl && describedByEl.id) {
     card.setAttribute('aria-describedby', describedByEl.id);
-  } else {
+  } else if (typeof card.removeAttribute === 'function') {
     card.removeAttribute('aria-describedby');
   }
 

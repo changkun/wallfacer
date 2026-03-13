@@ -74,7 +74,12 @@ body {
 h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 
 /* --- Layout --- */
-.column { flex: 1; min-height: 0; overflow-y: auto; }
+.column {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  contain: layout paint style;
+}
 .col-bg { background: var(--bg-raised); border-radius: 12px; padding: 12px; }
 
 /* Board grid: 4 equal columns on desktop */
@@ -93,6 +98,9 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 280px;
 }
 .card:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
 .card.sortable-ghost { opacity: 0.4; }

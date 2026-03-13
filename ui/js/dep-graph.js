@@ -14,6 +14,7 @@ function hideDependencyGraph() {
 
 // Redraw on scroll within any board column, throttled to one redraw per frame.
 let _depGraphScrollPending = false;
+let _depGraphListenersAttached = false;
 function _onColumnScroll() {
   if (_depGraphScrollPending) return;
   _depGraphScrollPending = true;
@@ -24,69 +25,111 @@ function _onColumnScroll() {
 }
 
 function _attachColumnScrollListeners() {
+  if (_depGraphListenersAttached) return;
   document.querySelectorAll('.column').forEach(col => {
     col.addEventListener('scroll', _onColumnScroll, { passive: true });
   });
+  _depGraphListenersAttached = true;
 }
 
 function _detachColumnScrollListeners() {
+  if (!_depGraphListenersAttached) return;
   document.querySelectorAll('.column').forEach(col => {
     col.removeEventListener('scroll', _onColumnScroll);
   });
+  _depGraphListenersAttached = false;
+}
+
+function _clearChildren(el) {
+  if (!el || typeof el.replaceChildren !== 'function') return;
+  el.replaceChildren();
+}
+
+function _ensureOverlay() {
+  let svg = document.getElementById('dep-graph-overlay');
+  let clipRect = null;
+  let group = null;
+  if (!svg) {
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.id = 'dep-graph-overlay';
+    svg.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:40;overflow:visible;';
+
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+    clipPath.id = 'dep-graph-clip';
+    clipRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    clipPath.appendChild(clipRect);
+    defs.appendChild(clipPath);
+    svg.appendChild(defs);
+
+    group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('clip-path', 'url(#dep-graph-clip)');
+    svg.appendChild(group);
+    document.body.appendChild(svg);
+  } else {
+    clipRect = svg.querySelector ? svg.querySelector('clipPath rect') : null;
+    group = svg.querySelector ? svg.querySelector('g') : null;
+  }
+  return { svg, clipRect, group };
+}
+
+function _buildCardIndex(tasks) {
+  const byId = new Map();
+  if (document.querySelectorAll) {
+    document.querySelectorAll('.card[data-task-id]').forEach(function(el) {
+      if (el && el.dataset && el.dataset.taskId) byId.set(el.dataset.taskId, el);
+    });
+  }
+  if (byId.size > 0) return byId;
+  for (const task of tasks) {
+    const el = document.querySelector('[data-task-id="' + task.id + '"]');
+    if (el) byId.set(task.id, el);
+  }
+  return byId;
 }
 
 function renderDependencyGraph(tasks) {
-  hideDependencyGraph();
-
   // Build edge list: each entry is { from: taskId, to: depId, depStatus }
+  const taskById = new Map(tasks.map(function(task) { return [task.id, task]; }));
   const edges = [];
   for (const t of tasks) {
     if (!t.depends_on || t.depends_on.length === 0) continue;
     for (const depId of t.depends_on) {
-      const dep = tasks.find(d => d.id === depId);
+      const dep = taskById.get(depId);
       if (!dep) continue;
       edges.push({ from: t.id, to: depId, depStatus: dep.status });
     }
   }
-  if (edges.length === 0) return;
+  if (edges.length === 0) {
+    hideDependencyGraph();
+    return;
+  }
 
   _attachColumnScrollListeners();
-
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.id = 'dep-graph-overlay';
-  svg.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:40;overflow:visible;';
-  document.body.appendChild(svg);
+  const overlay = _ensureOverlay();
+  if (!overlay.group || !overlay.clipRect) return;
+  _clearChildren(overlay.group);
 
   // Clip drawing to the board area so curves don't bleed through the header
   // or other UI chrome when cards scroll out of view.
   const boardEl = document.getElementById('board');
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-  const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
-  clipPath.id = 'dep-graph-clip';
-  const clipRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   if (boardEl) {
     const br = boardEl.getBoundingClientRect();
-    clipRect.setAttribute('x', br.left);
-    clipRect.setAttribute('y', br.top);
-    clipRect.setAttribute('width', br.width);
-    clipRect.setAttribute('height', br.height);
+    overlay.clipRect.setAttribute('x', br.left);
+    overlay.clipRect.setAttribute('y', br.top);
+    overlay.clipRect.setAttribute('width', br.width);
+    overlay.clipRect.setAttribute('height', br.height);
   } else {
-    clipRect.setAttribute('x', 0);
-    clipRect.setAttribute('y', 0);
-    clipRect.setAttribute('width', '100vw');
-    clipRect.setAttribute('height', '100vh');
+    overlay.clipRect.setAttribute('x', 0);
+    overlay.clipRect.setAttribute('y', 0);
+    overlay.clipRect.setAttribute('width', '100vw');
+    overlay.clipRect.setAttribute('height', '100vh');
   }
-  clipPath.appendChild(clipRect);
-  defs.appendChild(clipPath);
-  svg.appendChild(defs);
-
-  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  g.setAttribute('clip-path', 'url(#dep-graph-clip)');
-  svg.appendChild(g);
+  const cardIndex = _buildCardIndex(tasks);
 
   for (const { from, to, depStatus } of edges) {
-    const fromEl = document.querySelector('[data-task-id="' + from + '"]');
-    const toEl = document.querySelector('[data-task-id="' + to + '"]');
+    const fromEl = cardIndex.get(from);
+    const toEl = cardIndex.get(to);
     if (!fromEl || !toEl) continue;
 
     const fr = fromEl.getBoundingClientRect();
@@ -118,8 +161,8 @@ function renderDependencyGraph(tasks) {
     marker.setAttribute('r', '4');
     marker.setAttribute('fill', color);
 
-    g.appendChild(path);
-    g.appendChild(marker);
+    overlay.group.appendChild(path);
+    overlay.group.appendChild(marker);
   }
 }
 
