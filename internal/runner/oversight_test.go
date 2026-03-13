@@ -263,6 +263,37 @@ func TestFillMissingPhaseTimestampsPartialValid(t *testing.T) {
 	}
 }
 
+// TestFillMissingPhaseTimestampsAllSameNonZero verifies that when multiple
+// phases all carry the same non-zero timestamp, the timestamps are treated as
+// degenerate model output and rebalanced across the activity log.
+func TestFillMissingPhaseTimestampsAllSameNonZero(t *testing.T) {
+	t0 := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	t1 := time.Date(2024, 1, 15, 10, 3, 0, 0, time.UTC)
+	t2 := time.Date(2024, 1, 15, 10, 6, 0, 0, time.UTC)
+	activities := []turnActivity{
+		{Turn: 1, Timestamp: t0},
+		{Turn: 2, Timestamp: t1},
+		{Turn: 3, Timestamp: t2},
+	}
+	phases := []store.OversightPhase{
+		{Title: "Phase A", Timestamp: t0},
+		{Title: "Phase B", Timestamp: t0},
+		{Title: "Phase C", Timestamp: t0},
+	}
+
+	result := fillMissingPhaseTimestamps(phases, activities)
+
+	if !result[0].Timestamp.Equal(t0) {
+		t.Fatalf("phase A timestamp: expected %v, got %v", t0, result[0].Timestamp)
+	}
+	if !result[1].Timestamp.Equal(t1) {
+		t.Fatalf("phase B timestamp: expected %v, got %v", t1, result[1].Timestamp)
+	}
+	if !result[2].Timestamp.Equal(t2) {
+		t.Fatalf("phase C timestamp: expected %v, got %v", t2, result[2].Timestamp)
+	}
+}
+
 // TestFillMissingPhaseTimestampsEmptyActivities verifies that an empty
 // activities slice leaves phases unchanged.
 func TestFillMissingPhaseTimestampsEmptyActivities(t *testing.T) {

@@ -832,23 +832,46 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 }
 
 // fillMissingPhaseTimestamps assigns proportional timestamps to oversight
-// phases when all of them have zero (missing) timestamps. This happens when
-// the LLM returns empty strings for the timestamp field.  Phases are
-// distributed evenly across the available turn timestamps: phase i is anchored
-// to the first turn in its proportional slice of the activity log.
+// phases when the model-provided timestamps are clearly unusable:
+//   - every phase timestamp is zero (missing), or
+//   - multiple phases all carry the same non-zero timestamp.
 //
-// If any phase already carries a non-zero timestamp the slice is returned
-// unchanged so that valid partial data is never discarded.
+// In those cases, phases are distributed evenly across the available turn
+// timestamps: phase i is anchored to the first turn in its proportional slice
+// of the activity log.
+//
+// If the phase timestamps contain multiple distinct non-zero values, the slice
+// is returned unchanged so valid model output is preserved.
 func fillMissingPhaseTimestamps(phases []store.OversightPhase, activities []turnActivity) []store.OversightPhase {
 	if len(phases) == 0 || len(activities) == 0 {
 		return phases
 	}
-	// Only intervene when every timestamp is zero.
+	firstNonZero := time.Time{}
+	hasDistinctNonZero := false
+	hasNonZero := false
+	zeroCount := 0
 	for _, p := range phases {
-		if !p.Timestamp.IsZero() {
-			return phases
+		if p.Timestamp.IsZero() {
+			zeroCount++
+			continue
+		}
+		if !hasNonZero {
+			firstNonZero = p.Timestamp
+			hasNonZero = true
+			continue
+		}
+		if !p.Timestamp.Equal(firstNonZero) {
+			hasDistinctNonZero = true
+			break
 		}
 	}
+	if hasDistinctNonZero {
+		return phases
+	}
+	if hasNonZero && zeroCount > 0 {
+		return phases
+	}
+
 	numPhases := len(phases)
 	numTurns := len(activities)
 	for i := range phases {
