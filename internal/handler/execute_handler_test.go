@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -475,6 +476,105 @@ func TestResumeTask_Success(t *testing.T) {
 	// command configured), moving the task back to failed.
 	if updated.Status != store.TaskStatusInProgress && updated.Status != store.TaskStatusFailed {
 		t.Errorf("expected in_progress or failed, got %s", updated.Status)
+	}
+}
+
+// --- Resume/Feedback bypass capacity ---
+
+// createInProgressTask creates a task and moves it to in_progress status.
+func createInProgressTask(t *testing.T, h *Handler, prompt string) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	task, err := h.store.CreateTask(ctx, prompt, 15, false, "", "")
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("set in_progress: %v", err)
+	}
+	return task.ID
+}
+
+// createFailedTaskWithSession creates a failed task that has a session ID,
+// ready to be resumed.
+func createFailedTaskWithSession(t *testing.T, h *Handler, prompt, sessionID string) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	task, err := h.store.CreateTask(ctx, prompt, 15, false, "", "")
+	if err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("set failed: %v", err)
+	}
+	setTaskSessionID(t, h, task.ID, sessionID)
+	// UpdateTaskResult may change status; force it back to failed.
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("re-set failed: %v", err)
+	}
+	return task.ID
+}
+
+func TestResumeTask_SucceedsAtFullCapacity(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+
+	// Set max parallel tasks to 1 so a single in-progress task fills capacity.
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fill the single slot with an in-progress task.
+	createInProgressTask(t, h, "occupying slot")
+
+	// Create a failed task with a session — this is the one we want to resume.
+	failedID := createFailedTaskWithSession(t, h, "need resume", "sess-resume")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+failedID.String()+"/resume", strings.NewReader(`{}`))
+	w := httptest.NewRecorder()
+	h.ResumeTask(w, req, failedID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (resume should bypass capacity), got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp["status"] != "resumed" {
+		t.Errorf("expected status=resumed, got %q", resp["status"])
+	}
+}
+
+func TestSubmitFeedback_SucceedsAtFullCapacity(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+
+	// Set max parallel tasks to 1.
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fill the single slot.
+	createInProgressTask(t, h, "occupying slot")
+
+	// Create a waiting task that needs feedback.
+	task, err := h.store.CreateTask(context.Background(), "needs feedback", 15, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(context.Background(), task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/feedback",
+		strings.NewReader(`{"message": "please continue"}`))
+	w := httptest.NewRecorder()
+	h.SubmitFeedback(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (feedback should bypass capacity), got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp["status"] != "resumed" {
+		t.Errorf("expected status=resumed, got %q", resp["status"])
 	}
 }
 
