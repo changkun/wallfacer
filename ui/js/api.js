@@ -613,9 +613,7 @@ function showWorkspacePicker(required) {
     workspaceSelectionDraft = activeWorkspaces.slice();
   }
   renderWorkspaceSelectionDraft();
-  if (!workspaceBrowserPath) {
-    browseWorkspaces();
-  }
+  browseWorkspaces(workspaceBrowserPath || '');
 }
 
 function hideWorkspacePicker() {
