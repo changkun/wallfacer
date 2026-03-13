@@ -66,7 +66,7 @@ var Routes = {
     reinit: function() { return "/api/instructions/reinit"; },
   },
 
-  system-prompts: {
+  "system-prompts": {
     // GET /api/system-prompts
     list: function() { return "/api/system-prompts"; },
     // GET /api/system-prompts/{name}

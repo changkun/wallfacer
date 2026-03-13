@@ -339,9 +339,29 @@ func GenerateRoutesJS() string {
 	return b.String()
 }
 
+// needsQuoting reports whether a namespace key must be quoted in the JS output
+// (i.e. it is not a valid bare JavaScript identifier).
+func needsQuoting(s string) bool {
+	for _, r := range s {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '$') {
+			return true
+		}
+	}
+	return s == ""
+}
+
+// jsKey returns the namespace formatted as a JS object key, quoting it if
+// it contains characters that are not valid in a bare identifier.
+func jsKey(ns string) string {
+	if needsQuoting(ns) {
+		return fmt.Sprintf("%q", ns)
+	}
+	return ns
+}
+
 // emitNamespace writes one namespace block into b.
 func emitNamespace(b *bytes.Buffer, ns string, routes []Route) {
-	fmt.Fprintf(b, "\n  %s: {\n", ns)
+	fmt.Fprintf(b, "\n  %s: {\n", jsKey(ns))
 	emitted := map[string]bool{}
 	for _, r := range routes {
 		jsName := jsMethodName(r, ns)
