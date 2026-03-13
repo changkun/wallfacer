@@ -271,22 +271,26 @@ describe('showWorkspacePicker', () => {
   it('refreshes the workspace browser every time the picker opens', () => {
     const modal = { classList: { remove: vi.fn(), add: vi.fn() } };
     const closeBtn = { style: {} };
+    const filterInput = { value: 'repo' };
     const ctx = makeContext({
       elements: [
         ['workspace-picker', modal],
         ['workspace-picker-close', closeBtn],
+        ['workspace-browser-filter', filterInput],
       ],
     });
     loadScript(ctx, 'state.js');
     loadScript(ctx, 'api.js');
 
     const browseSpy = vi.spyOn(ctx, 'browseWorkspaces').mockImplementation(() => {});
-    vm.runInContext('workspaceBrowserPath = "/Users/test/dev"; activeWorkspaces = []; workspaceSelectionDraft = [];', ctx);
+    vm.runInContext('workspaceBrowserPath = "/Users/test/dev"; workspaceBrowserFilterQuery = "repo"; activeWorkspaces = []; workspaceSelectionDraft = [];', ctx);
 
     ctx.showWorkspacePicker(true);
 
     expect(browseSpy).toHaveBeenCalledWith('/Users/test/dev');
     expect(closeBtn.style.display).toBe('none');
+    expect(filterInput.value).toBe('');
+    expect(vm.runInContext('workspaceBrowserFilterQuery', ctx)).toBe('');
   });
 });
 
@@ -371,6 +375,39 @@ describe('browseWorkspaces', () => {
     await ctx.browseWorkspaces();
 
     expect(fetch).toHaveBeenCalledWith('/api/workspaces/browse?path=%2FUsers%2Ftest%2Fdev&include_hidden=true', expect.any(Object));
+  });
+});
+
+describe('workspace browser filter', () => {
+  it('filters the visible folder list client-side', () => {
+    const listEl = { innerHTML: '' };
+    const crumbEl = { textContent: '' };
+    const ctx = makeContext({
+      elements: [
+        ['workspace-browser-list', listEl],
+        ['workspace-browser-breadcrumb', crumbEl],
+      ],
+    });
+    loadScript(ctx, 'utils.js');
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    vm.runInContext(`
+      workspaceBrowserPath = "/Users/test/dev";
+      workspaceBrowserEntries = [
+        { name: "alpha-repo", path: "/Users/test/dev/alpha-repo", is_git_repo: true },
+        { name: "beta-tools", path: "/Users/test/dev/beta-tools", is_git_repo: false },
+        { name: "gamma-app", path: "/Users/test/dev/gamma-app", is_git_repo: true }
+      ];
+      workspaceBrowserFocusIndex = 0;
+    `, ctx);
+
+    ctx.setWorkspaceBrowserFilter('app');
+
+    expect(listEl.innerHTML).toContain('gamma-app');
+    expect(listEl.innerHTML).not.toContain('alpha-repo');
+    expect(listEl.innerHTML).not.toContain('beta-tools');
+    expect(vm.runInContext('workspaceBrowserFocusIndex', ctx)).toBe(0);
   });
 });
 

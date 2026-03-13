@@ -605,11 +605,14 @@ function workspaceUpdateRoute() {
 function showWorkspacePicker(required) {
   var modal = document.getElementById('workspace-picker');
   var closeBtn = document.getElementById('workspace-picker-close');
+  var filterInput = document.getElementById('workspace-browser-filter');
   if (!modal) return;
   workspacePickerRequired = !!required;
   if (closeBtn) closeBtn.style.display = workspacePickerRequired ? 'none' : '';
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+  workspaceBrowserFilterQuery = '';
+  if (filterInput) filterInput.value = '';
   if (!workspaceSelectionDraft.length && activeWorkspaces.length) {
     workspaceSelectionDraft = activeWorkspaces.slice();
   }
@@ -655,19 +658,35 @@ function renderWorkspaceSelectionDraft() {
 function renderWorkspaceBrowser() {
   var crumb = document.getElementById('workspace-browser-breadcrumb');
   var list = document.getElementById('workspace-browser-list');
+  var visibleEntries = getVisibleWorkspaceBrowserEntries();
   if (crumb) crumb.textContent = workspaceBrowserPath || '';
   if (!list) return;
-  if (!workspaceBrowserEntries.length) {
-    list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:8px;">No directories found.</div>';
+  if (!visibleEntries.length) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:8px;">' + (workspaceBrowserFilterQuery ? 'No matching directories found.' : 'No directories found.') + '</div>';
     return;
   }
-  list.innerHTML = workspaceBrowserEntries.map(function(entry, index) {
+  list.innerHTML = visibleEntries.map(function(entry, index) {
     var active = index === workspaceBrowserFocusIndex;
     return '<button type="button" data-workspace-entry-index="' + index + '" onclick="selectWorkspaceBrowserEntry(' + index + ')" ondblclick="openWorkspaceBrowserEntry(' + index + ')" style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:none;border-radius:6px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:inherit;cursor:pointer;text-align:left;">' +
       '<span style="font-size:12px;">' + escapeHtml(entry.name) + '</span>' +
       '<span style="font-size:10px;color:var(--text-muted);">' + (entry.is_git_repo ? 'git repo' : 'folder') + '</span>' +
       '</button>';
   }).join('');
+}
+
+function getVisibleWorkspaceBrowserEntries() {
+  var query = (workspaceBrowserFilterQuery || '').trim().toLowerCase();
+  if (!query) return workspaceBrowserEntries.slice();
+  return workspaceBrowserEntries.filter(function(entry) {
+    return entry && ((entry.name || '').toLowerCase().includes(query) || (entry.path || '').toLowerCase().includes(query));
+  });
+}
+
+function setWorkspaceBrowserFilter(query) {
+  workspaceBrowserFilterQuery = (query || '').trim();
+  var visibleEntries = getVisibleWorkspaceBrowserEntries();
+  workspaceBrowserFocusIndex = visibleEntries.length ? 0 : -1;
+  renderWorkspaceBrowser();
 }
 
 function workspaceBrowserIncludeHidden() {
@@ -695,9 +714,9 @@ async function browseWorkspaces(path) {
     var resp = await api(url);
     workspaceBrowserPath = resp.path || nextPath || '';
     workspaceBrowserEntries = Array.isArray(resp.entries) ? resp.entries : [];
-    workspaceBrowserFocusIndex = workspaceBrowserEntries.length ? 0 : -1;
+    workspaceBrowserFocusIndex = getVisibleWorkspaceBrowserEntries().length ? 0 : -1;
     if (pathInput) pathInput.value = workspaceBrowserPath;
-    if (status) status.textContent = workspaceBrowserEntries.length ? 'Double-click a folder to enter it. Select and press Enter to add it.' : 'No subdirectories found.';
+    if (status) status.textContent = workspaceBrowserEntries.length ? 'Double-click a folder to enter it. Filter to narrow the list; press Enter to open the selected folder.' : 'No subdirectories found.';
     renderWorkspaceBrowser();
   } catch (e) {
     if (status) status.textContent = e.message;
@@ -719,10 +738,11 @@ function workspaceBrowserPathKeydown(event) {
 }
 
 function workspaceBrowserListKeydown(event) {
-  if (!workspaceBrowserEntries.length) return;
+  var visibleEntries = getVisibleWorkspaceBrowserEntries();
+  if (!visibleEntries.length) return;
   if (event.key === 'ArrowDown') {
     event.preventDefault();
-    workspaceBrowserFocusIndex = Math.min(workspaceBrowserEntries.length - 1, workspaceBrowserFocusIndex + 1);
+    workspaceBrowserFocusIndex = Math.min(visibleEntries.length - 1, workspaceBrowserFocusIndex + 1);
     renderWorkspaceBrowser();
   } else if (event.key === 'ArrowUp') {
     event.preventDefault();
@@ -731,7 +751,7 @@ function workspaceBrowserListKeydown(event) {
   } else if (event.key === 'Enter') {
     event.preventDefault();
     if (event.metaKey || event.ctrlKey) {
-      addWorkspaceSelection(workspaceBrowserEntries[workspaceBrowserFocusIndex].path);
+      addWorkspaceSelection(visibleEntries[workspaceBrowserFocusIndex].path);
       return;
     }
     openWorkspaceBrowserEntry(workspaceBrowserFocusIndex);
@@ -744,7 +764,7 @@ function selectWorkspaceBrowserEntry(index) {
 }
 
 function openWorkspaceBrowserEntry(index) {
-  var entry = workspaceBrowserEntries[index];
+  var entry = getVisibleWorkspaceBrowserEntries()[index];
   if (!entry) return;
   browseWorkspaces(entry.path);
 }
