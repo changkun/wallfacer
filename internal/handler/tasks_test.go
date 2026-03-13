@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -3000,5 +3001,161 @@ func TestCreateTask_ScheduledTaskNotAutoPromotedBeforeScheduledAt(t *testing.T) 
 	}
 	if got.Status != store.TaskStatusBacklog {
 		t.Errorf("scheduled task was auto-promoted before scheduled_at: status=%s", got.Status)
+	}
+}
+
+
+// ---------------------------------------------------------------------------
+// Auto-retry integration tests
+// ---------------------------------------------------------------------------
+
+func autoRetryCrashCmd(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	script := filepath.Join(dir, "fake-cmd")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return script
+}
+
+func autoRetryBudgetErrorCmd(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	out := `{"result":"budget exceeded","session_id":"s1","stop_reason":"end_turn","is_error":true,"total_cost_usd":0.001}`
+	script := filepath.Join(dir, "fake-cmd")
+	content := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' '%s'\nexit 0\n", out)
+	if err := os.WriteFile(script, []byte(content), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return script
+}
+
+func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runner) {
+	t.Helper()
+	repo := setupRepo(t)
+
+	var dataDir string
+	if d, err := os.MkdirTemp("/dev/shm", "wallfacer-ar-*"); err == nil {
+		dataDir = d
+		t.Cleanup(func() { os.RemoveAll(dataDir) })
+	} else {
+		dataDir = t.TempDir()
+	}
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	worktreesDir := filepath.Join(t.TempDir(), "worktrees")
+	if err := os.MkdirAll(worktreesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      cmd,
+		SandboxImage: "test:latest",
+		Workspaces:   repo,
+		WorktreesDir: worktreesDir,
+	})
+	t.Cleanup(r.WaitBackground)
+	t.Cleanup(r.Shutdown)
+	return s, r
+}
+
+func TestAutoRetry_ContainerCrash(t *testing.T) {
+	cmd := autoRetryCrashCmd(t)
+	s, r := setupAutoRetryRunner(t, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "crash retry test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range 3 {
+		if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+			t.Fatalf("run %d: UpdateTaskStatus in_progress: %v", i+1, err)
+		}
+		r.Run(task.ID, "do the task", "", false)
+
+		got, err := s.GetTask(ctx, task.ID)
+		if err != nil {
+			t.Fatalf("run %d: GetTask: %v", i+1, err)
+		}
+		if i < 2 {
+			if got.Status != store.TaskStatusBacklog {
+				t.Errorf("run %d: expected backlog after auto-retry, got %s", i+1, got.Status)
+			}
+		} else {
+			if got.Status != store.TaskStatusFailed {
+				t.Errorf("run %d: expected failed after budget exhausted, got %s", i+1, got.Status)
+			}
+			if got.FailureCategory != store.FailureCategoryContainerCrash {
+				t.Errorf("run %d: expected failure_category=%s, got %s",
+					i+1, store.FailureCategoryContainerCrash, got.FailureCategory)
+			}
+			if got.AutoRetryCount != 2 {
+				t.Errorf("run %d: expected AutoRetryCount=2, got %d", i+1, got.AutoRetryCount)
+			}
+		}
+	}
+}
+
+func TestAutoRetry_BudgetCategoryDoesNotRetry(t *testing.T) {
+	cmd := autoRetryBudgetErrorCmd(t)
+	s, r := setupAutoRetryRunner(t, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "budget exceeded test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != store.TaskStatusFailed {
+		t.Errorf("expected failed (no retry budget for budget_exceeded), got %s", got.Status)
+	}
+	if got.AutoRetryCount != 0 {
+		t.Errorf("expected AutoRetryCount=0 (no retry attempted), got %d", got.AutoRetryCount)
+	}
+}
+
+func TestAutoRetry_MaxTotalCap(t *testing.T) {
+	cmd := autoRetryCrashCmd(t)
+	s, r := setupAutoRetryRunner(t, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "total cap test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for range 3 {
+		if err := s.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategorySyncError); err != nil {
+			t.Fatalf("IncrementAutoRetryCount: %v", err)
+		}
+	}
+
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != store.TaskStatusFailed {
+		t.Errorf("expected failed (global cap reached), got %s", got.Status)
+	}
+	if got.AutoRetryCount != 3 {
+		t.Errorf("expected AutoRetryCount=3 (unchanged after cap), got %d", got.AutoRetryCount)
 	}
 }

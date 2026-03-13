@@ -385,7 +385,8 @@ func TestMigrateTaskJSON_AlreadyCurrent(t *testing.T) {
 		"status": "backlog",
 		"timeout": 30,
 		"created_at": %q,
-		"updated_at": %q
+		"updated_at": %q,
+		"auto_retry_budget": {"container_crash": 2, "sync_error": 2, "worktree_setup": 1}
 	}`, CurrentTaskSchemaVersion, id.String(), now.Format(time.RFC3339), now.Format(time.RFC3339)))
 
 	_, changed, err := migrateTaskJSON(raw, time.Now())

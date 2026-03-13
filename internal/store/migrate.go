@@ -21,7 +21,8 @@ import (
 //     stable-sort.
 //  3. Normalize Sandbox (trim) and SandboxByActivity via
 //     normalizeSandboxByActivity.
-//  4. Stamp SchemaVersion = CurrentTaskSchemaVersion.
+//  4. Backfill AutoRetryBudget for tasks created before schema version 2.
+//  5. Stamp SchemaVersion = CurrentTaskSchemaVersion.
 func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	var task Task
 	if err := json.Unmarshal(raw, &task); err != nil {
@@ -67,7 +68,17 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 		changed = true
 	}
 
-	// (4) Guarantee SchemaVersion is current.
+	// (4) Backfill AutoRetryBudget for tasks created before schema version 2.
+	if task.AutoRetryBudget == nil {
+		task.AutoRetryBudget = map[FailureCategory]int{
+			FailureCategoryContainerCrash: 2,
+			FailureCategorySyncError:      2,
+			FailureCategoryWorktree:       1,
+		}
+		changed = true
+	}
+
+	// (5) Guarantee SchemaVersion is current.
 	if task.SchemaVersion != CurrentTaskSchemaVersion {
 		task.SchemaVersion = CurrentTaskSchemaVersion
 		changed = true

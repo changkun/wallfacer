@@ -17,6 +17,10 @@ import (
 	"github.com/google/uuid"
 )
 
+// maxTotalAutoRetries is the global cap on the total number of automatic
+// retry attempts for a single task, regardless of per-category budgets.
+const maxTotalAutoRetries = 3
+
 var (
 	// verdictLabelPattern detects explicit labeled verdict lines such as:
 	// "Result: PASS", "Verdict: FAILED", "Status - Pass", etc.
@@ -77,6 +81,36 @@ func classifyFailure(err error, isError bool, result string) store.FailureCatego
 	return store.FailureCategoryUnknown
 }
 
+// tryAutoRetry checks whether the task should be automatically retried given
+// the failure category. It returns true and resets the task to backlog when:
+//   - the per-category budget is > 0, AND
+//   - the total auto-retry count is < maxTotalAutoRetries.
+//
+// The caller must set statusSet=true before calling and return immediately
+// when tryAutoRetry returns true, so the deferred guard does not overwrite
+// the backlog status.
+func (r *Runner) tryAutoRetry(bgCtx context.Context, taskID uuid.UUID, category store.FailureCategory) bool {
+	t, err := r.store.GetTask(bgCtx, taskID)
+	if err != nil {
+		return false
+	}
+	if t.AutoRetryBudget[category] <= 0 || t.AutoRetryCount >= maxTotalAutoRetries {
+		return false
+	}
+	if err := r.store.IncrementAutoRetryCount(bgCtx, taskID, category); err != nil {
+		return false
+	}
+	// Re-read to get the updated count for the event message.
+	if updated, err := r.store.GetTask(bgCtx, taskID); err == nil {
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			"message": fmt.Sprintf("auto-retry %d/%d after %s",
+				updated.AutoRetryCount, maxTotalAutoRetries, category),
+		})
+	}
+	r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusBacklog)
+	return true
+}
+
 // Run is the main task execution loop. It sets up worktrees, runs the agent
 // in a container, handles auto-continue turns, and transitions the task to the
 // appropriate terminal state (done/waiting/failed).
@@ -92,8 +126,12 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			logger.Runner.Error("run panic", "task", taskID, "panic", p)
 		}
 		if !statusSet {
+			category := store.FailureCategoryUnknown
+			r.store.SetTaskFailureCategory(bgCtx, taskID, category)
+			if r.tryAutoRetry(bgCtx, taskID, category) {
+				return
+			}
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-			r.store.SetTaskFailureCategory(bgCtx, taskID, store.FailureCategoryUnknown)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from":    string(store.TaskStatusInProgress),
 				"to":      string(store.TaskStatusFailed),
@@ -322,11 +360,15 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				statusSet = true
 				return
 			}
-			statusSet = true
-			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-			r.store.SetTaskFailureCategory(bgCtx, taskID, classifyFailure(err, false, ""))
+			category := classifyFailure(err, false, "")
+			r.store.SetTaskFailureCategory(bgCtx, taskID, category)
 			r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", turns)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
+			statusSet = true
+			if r.tryAutoRetry(bgCtx, taskID, category) {
+				return
+			}
+			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from":    string(store.TaskStatusInProgress),
 				"to":      string(store.TaskStatusFailed),
@@ -433,9 +475,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				}
 				continue
 			}
+			category := classifyFailure(nil, true, output.Result)
+			r.store.SetTaskFailureCategory(bgCtx, taskID, category)
 			statusSet = true
+			if r.tryAutoRetry(bgCtx, taskID, category) {
+				return
+			}
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-			r.store.SetTaskFailureCategory(bgCtx, taskID, classifyFailure(nil, true, ""))
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from":    string(store.TaskStatusInProgress),
 				"to":      string(store.TaskStatusFailed),
