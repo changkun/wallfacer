@@ -154,9 +154,9 @@ func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) 
 // the highest-priority (lowest position) backlog task if so.
 // When autopilot is disabled, no promotion happens.
 //
-// Concurrency design mirrors tryAutoTest's two-phase approach:
+// Concurrency design: two-phase protocol via runTwoPhase.
 //
-// Phase 1 (no lock): call store.ListTasks, compute the regular in-progress
+// Phase 1 (no lock): call store.ListTasksByStatus, compute the regular in-progress
 // count, and find the best backlog candidate. AreDependenciesSatisfied may do
 // disk I/O here; we must not hold promoteMu during these potentially slow
 // operations so that a concurrent tryAutoPromote call (or tryAutoTest) can
@@ -169,84 +169,81 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		return
 	}
 
-	// Phase 1 (no lock): build candidate and count without holding promoteMu.
-	regularInProgress := h.store.CountRegularInProgress()
-	maxTasks := h.maxConcurrentTasks()
+	runTwoPhase(ctx, &promoteMu, TwoPhaseWatcherConfig{
+		Name: "auto-promote",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			// Phase 1 (no lock): build candidate without holding promoteMu.
+			regularInProgress := h.store.CountRegularInProgress()
+			if regularInProgress >= h.maxConcurrentTasks() {
+				return nil, nil
+			}
 
-	if regularInProgress >= maxTasks {
-		return
-	}
+			backlogTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusBacklog)
+			if err != nil {
+				return nil, nil
+			}
 
-	backlogTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusBacklog)
-	if err != nil {
-		return
-	}
+			var bestBacklog *store.Task
+			for i := range backlogTasks {
+				t := &backlogTasks[i]
+				if t.Kind == store.TaskKindIdeaAgent {
+					continue
+				}
+				// Skip tasks that have a future scheduled start time.
+				if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
+					continue
+				}
+				satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
+				if err != nil || !satisfied {
+					continue // skip: dependencies not yet done
+				}
+				if bestBacklog == nil || t.Position < bestBacklog.Position {
+					cp := *t
+					bestBacklog = &cp
+				}
+			}
+			return bestBacklog, nil
+		},
+		AfterPhase1: h.testPhase1Done,
+		Phase2: func(ctx context.Context, candidate *store.Task) (bool, error) {
+			// Phase 2 (under promoteMu): re-verify capacity with a fresh count and promote.
+			// Re-read in-progress count; state may have changed during Phase 1 I/O.
+			freshInProgress := h.store.CountRegularInProgress()
+			if freshInProgress >= h.maxConcurrentTasks() {
+				return false, nil
+			}
 
-	var bestBacklog *store.Task
-	for i := range backlogTasks {
-		t := &backlogTasks[i]
-		if t.Kind == store.TaskKindIdeaAgent {
-			continue
-		}
-		// Skip tasks that have a future scheduled start time.
-		if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
-			continue
-		}
-		satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
-		if err != nil || !satisfied {
-			continue // skip: dependencies not yet done
-		}
-		if bestBacklog == nil || t.Position < bestBacklog.Position {
-			cp := *t
-			bestBacklog = &cp
-		}
-	}
+			// Abort promotion when the container runtime is known-unavailable.
+			// Without this guard, slot openings caused by failures would trigger
+			// back-to-back promotions that all immediately fail, cascading across
+			// every backlog task.
+			if !h.runner.ContainerCircuitAllow() {
+				logger.Handler.Warn("auto-promote skipped: container circuit breaker open")
+				return false, nil
+			}
 
-	if bestBacklog == nil {
-		return
-	}
+			logger.Handler.Info("auto-promoting backlog task",
+				"task", candidate.ID, "position", candidate.Position,
+				"in_progress", freshInProgress)
 
-	if h.testPhase1Done != nil {
-		h.testPhase1Done()
-	}
+			if err := h.store.UpdateTaskStatus(ctx, candidate.ID, store.TaskStatusInProgress); err != nil {
+				logger.Handler.Error("auto-promote status update", "task", candidate.ID, "error", err)
+				return false, nil
+			}
+			h.store.InsertEvent(ctx, candidate.ID, store.EventTypeStateChange, map[string]string{
+				"from":    string(store.TaskStatusBacklog),
+				"to":      string(store.TaskStatusInProgress),
+				"trigger": store.TriggerAutoPromote,
+			})
 
-	// Phase 2 (under promoteMu): re-verify capacity with a fresh count and promote.
-	promoteMu.Lock()
-	defer promoteMu.Unlock()
-
-	// Re-read in-progress count; state may have changed during Phase 1 I/O.
-	if h.store.CountRegularInProgress() >= maxTasks {
-		return
-	}
-
-	// Abort promotion when the container runtime is known-unavailable.
-	// Without this guard, slot openings caused by failures would trigger
-	// back-to-back promotions that all immediately fail, cascading across
-	// every backlog task.
-	if !h.runner.ContainerCircuitAllow() {
-		logger.Handler.Warn("auto-promote skipped: container circuit breaker open")
-		return
-	}
-
-	logger.Handler.Info("auto-promoting backlog task",
-		"task", bestBacklog.ID, "position", bestBacklog.Position,
-		"in_progress", regularInProgress)
-
-	if err := h.store.UpdateTaskStatus(ctx, bestBacklog.ID, store.TaskStatusInProgress); err != nil {
-		logger.Handler.Error("auto-promote status update", "task", bestBacklog.ID, "error", err)
-		return
-	}
-	h.store.InsertEvent(ctx, bestBacklog.ID, store.EventTypeStateChange, map[string]string{
-		"from":    string(store.TaskStatusBacklog),
-		"to":      string(store.TaskStatusInProgress),
-		"trigger": store.TriggerAutoPromote,
+			sessionID := ""
+			if !candidate.FreshStart && candidate.SessionID != nil {
+				sessionID = *candidate.SessionID
+			}
+			h.runner.RunBackground(candidate.ID, candidate.Prompt, sessionID, false)
+			return true, nil
+		},
 	})
-
-	sessionID := ""
-	if !bestBacklog.FreshStart && bestBacklog.SessionID != nil {
-		sessionID = *bestBacklog.SessionID
-	}
-	h.runner.RunBackground(bestBacklog.ID, bestBacklog.Prompt, sessionID, false)
 }
 
 // waitingSyncInterval is how often the watcher polls for waiting tasks that
@@ -392,127 +389,148 @@ type autoTestCandidate struct {
 // in-progress tasks count against this limit; regular tasks are unaffected.
 // The promoteMu mutex is still shared with tryAutoPromote to prevent races on
 // the same task.
+//
+// Uses the two-phase protocol via runTwoPhase:
+//
+// Phase 1 (no lock): scan waiting tasks and build the full candidates list,
+// performing git I/O (CommitsBehind) without holding promoteMu.
+//
+// Phase 2 (under promoteMu): re-read a fresh task snapshot, enforce the test
+// concurrency limit, then trigger each still-eligible candidate.
 func (h *Handler) tryAutoTest(ctx context.Context) {
 	if !h.AutotestEnabled() {
 		return
 	}
 
-	waitingTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-	if err != nil {
-		return
-	}
-
-	// Phase 1 (no lock): build the list of eligible candidates.
-	// Git I/O (CommitsBehind) happens here so we don't hold promoteMu
-	// during potentially slow filesystem operations.
+	// candidates is populated by Phase1 and consumed by Phase2 via closure.
 	var candidates []autoTestCandidate
-	for i := range waitingTasks {
-		t := &waitingTasks[i]
-		// Skip tasks that already have a test result or are currently being tested.
-		if t.LastTestResult != "" || t.IsTestRun {
-			continue
-		}
 
-		// Skip tasks with no worktrees (nothing to test yet).
-		if len(t.WorktreePaths) == 0 {
-			continue
-		}
-
-		// Only trigger if the worktree is up to date with the default branch.
-		behind := false
-		for repoPath, worktreePath := range t.WorktreePaths {
-			n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+	runTwoPhase(ctx, &promoteMu, TwoPhaseWatcherConfig{
+		Name: "auto-test",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			// Phase 1 (no lock): build the list of eligible candidates.
+			// Git I/O (CommitsBehind) happens here so we don't hold promoteMu
+			// during potentially slow filesystem operations.
+			waitingTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 			if err != nil {
-				logger.Handler.Warn("auto-test: check commits behind",
-					"task", t.ID, "repo", repoPath, "error", err)
-				behind = true // treat errors conservatively
-				break
+				return nil, nil
 			}
-			if n > 0 {
-				behind = true
-				break
+
+			for i := range waitingTasks {
+				t := &waitingTasks[i]
+				// Skip tasks that already have a test result or are currently being tested.
+				if t.LastTestResult != "" || t.IsTestRun {
+					continue
+				}
+
+				// Skip tasks with no worktrees (nothing to test yet).
+				if len(t.WorktreePaths) == 0 {
+					continue
+				}
+
+				// Only trigger if the worktree is up to date with the default branch.
+				behind := false
+				for repoPath, worktreePath := range t.WorktreePaths {
+					n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+					if err != nil {
+						logger.Handler.Warn("auto-test: check commits behind",
+							"task", t.ID, "repo", repoPath, "error", err)
+						behind = true // treat errors conservatively
+						break
+					}
+					if n > 0 {
+						behind = true
+						break
+					}
+				}
+				if behind {
+					continue
+				}
+
+				implResult := ""
+				if t.Result != nil {
+					implResult = *t.Result
+				}
+				diff := generateWorktreeDiff(t.WorktreePaths)
+				testPrompt := buildTestPrompt(t.Prompt, "", implResult, diff)
+				candidates = append(candidates, autoTestCandidate{task: *t, testPrompt: testPrompt})
 			}
-		}
-		if behind {
-			continue
-		}
 
-		implResult := ""
-		if t.Result != nil {
-			implResult = *t.Result
-		}
-		diff := generateWorktreeDiff(t.WorktreePaths)
-		testPrompt := buildTestPrompt(t.Prompt, "", implResult, diff)
-		candidates = append(candidates, autoTestCandidate{task: *t, testPrompt: testPrompt})
-	}
+			if len(candidates) == 0 {
+				return nil, nil
+			}
+			// Return first candidate as signal that there is at least one eligible task.
+			first := &candidates[0].task
+			return first, nil
+		},
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			// Phase 2 (under promoteMu): enforce the concurrency limit and trigger.
+			// Sharing promoteMu with tryAutoPromote prevents the two from racing to
+			// exceed maxConcurrentTasks simultaneously.
 
-	if len(candidates) == 0 {
-		return
-	}
+			// Re-read for a fresh snapshot; state may have changed during the git checks above.
+			freshWaiting, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
+			if err != nil {
+				return false, nil
+			}
+			freshByID := make(map[uuid.UUID]store.Task, len(freshWaiting))
+			for _, t := range freshWaiting {
+				freshByID[t.ID] = t
+			}
+			freshInProgress, err := h.store.ListTasksByStatus(ctx, store.TaskStatusInProgress)
+			if err != nil {
+				return false, nil
+			}
+			testInProgress := 0
+			for _, t := range freshInProgress {
+				if t.IsTestRun {
+					testInProgress++
+				}
+			}
 
-	// Phase 2 (under promoteMu): enforce the concurrency limit and trigger.
-	// Sharing promoteMu with tryAutoPromote prevents the two from racing to
-	// exceed maxConcurrentTasks simultaneously.
-	promoteMu.Lock()
-	defer promoteMu.Unlock()
+			maxTestTasks := h.maxTestConcurrentTasks()
+			triggered := false
 
-	// Re-read for a fresh snapshot; state may have changed during the git checks above.
-	freshWaiting, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-	if err != nil {
-		return
-	}
-	freshByID := make(map[uuid.UUID]store.Task, len(freshWaiting))
-	for _, t := range freshWaiting {
-		freshByID[t.ID] = t
-	}
-	freshInProgress, err := h.store.ListTasksByStatus(ctx, store.TaskStatusInProgress)
-	if err != nil {
-		return
-	}
-	testInProgress := 0
-	for _, t := range freshInProgress {
-		if t.IsTestRun {
-			testInProgress++
-		}
-	}
+			for _, c := range candidates {
+				if testInProgress >= maxTestTasks {
+					logger.Handler.Info("auto-test: test concurrency limit reached, deferring remaining tests",
+						"limit", maxTestTasks)
+					break
+				}
 
-	maxTestTasks := h.maxTestConcurrentTasks()
+				// Re-verify eligibility using the fresh snapshot.
+				ft, ok := freshByID[c.task.ID]
+				if !ok || ft.Status != store.TaskStatusWaiting || ft.LastTestResult != "" || ft.IsTestRun {
+					continue
+				}
 
-	for _, c := range candidates {
-		if testInProgress >= maxTestTasks {
-			logger.Handler.Info("auto-test: test concurrency limit reached, deferring remaining tests",
-				"limit", maxTestTasks)
-			break
-		}
+				logger.Handler.Info("auto-test: triggering test agent for waiting task", "task", c.task.ID)
 
-		// Re-verify eligibility using the fresh snapshot.
-		ft, ok := freshByID[c.task.ID]
-		if !ok || ft.Status != store.TaskStatusWaiting || ft.LastTestResult != "" || ft.IsTestRun {
-			continue
-		}
+				if err := h.store.UpdateTaskTestRun(ctx, c.task.ID, true, ""); err != nil {
+					logger.Handler.Error("auto-test: update test run flag", "task", c.task.ID, "error", err)
+					continue
+				}
+				if err := h.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
+					logger.Handler.Error("auto-test: update task status", "task", c.task.ID, "error", err)
+					continue
+				}
+				h.store.InsertEvent(ctx, c.task.ID, store.EventTypeStateChange, map[string]string{
+					"from":    string(store.TaskStatusWaiting),
+					"to":      string(store.TaskStatusInProgress),
+					"trigger": store.TriggerAutoTest,
+				})
+				h.store.InsertEvent(ctx, c.task.ID, store.EventTypeSystem, map[string]string{
+					"result": "Auto-test: triggering test verification agent.",
+				})
 
-		logger.Handler.Info("auto-test: triggering test agent for waiting task", "task", c.task.ID)
+				h.runner.RunBackground(c.task.ID, c.testPrompt, "", false)
+				testInProgress++
+				triggered = true
+			}
 
-		if err := h.store.UpdateTaskTestRun(ctx, c.task.ID, true, ""); err != nil {
-			logger.Handler.Error("auto-test: update test run flag", "task", c.task.ID, "error", err)
-			continue
-		}
-		if err := h.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
-			logger.Handler.Error("auto-test: update task status", "task", c.task.ID, "error", err)
-			continue
-		}
-		h.store.InsertEvent(ctx, c.task.ID, store.EventTypeStateChange, map[string]string{
-			"from":    string(store.TaskStatusWaiting),
-			"to":      string(store.TaskStatusInProgress),
-			"trigger": store.TriggerAutoTest,
-		})
-		h.store.InsertEvent(ctx, c.task.ID, store.EventTypeSystem, map[string]string{
-			"result": "Auto-test: triggering test verification agent.",
-		})
-
-		h.runner.RunBackground(c.task.ID, c.testPrompt, "", false)
-		testInProgress++
-	}
+			return triggered, nil
+		},
+	})
 }
 
 // autoSubmitInterval is how often the auto-submitter polls for eligible waiting tasks
@@ -541,121 +559,163 @@ func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 	}()
 }
 
+// autoSubmitCandidate holds a waiting task that has passed all eligibility checks
+// and is ready for auto-submission.
+type autoSubmitCandidate struct {
+	task              store.Task
+	naturallyComplete bool
+}
+
 // tryAutoSubmit scans all waiting tasks and moves any that are verified
 // (LastTestResult == "pass"), not behind the default branch, and free of
 // worktree conflicts directly to done (via the commit pipeline if a session
 // exists). Does nothing when auto-submit is disabled.
+//
+// Uses the two-phase protocol via runTwoPhase with a nil mutex (auto-submit
+// transitions tasks to done/committing rather than in_progress, so it does
+// not compete for the promoteMu capacity slot):
+//
+// Phase 1 (no lock): perform the slow git I/O (CommitsBehind, HasConflicts)
+// for every eligible waiting task and collect the candidates.
+//
+// Phase 2 (no lock): execute the status transitions for all collected candidates.
 func (h *Handler) tryAutoSubmit(ctx context.Context) {
 	if !h.AutosubmitEnabled() {
 		return
 	}
 
-	tasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-	if err != nil {
-		return
-	}
+	// candidates is populated by Phase1 and consumed by Phase2 via closure.
+	var candidates []autoSubmitCandidate
 
-	for i := range tasks {
-		t := &tasks[i]
-		// Determine eligibility:
-		// (a) Passed verification ("pass").
-		// (b) Naturally completed (stop_reason="end_turn") and not yet tested,
-		//     but only when auto-test is off — otherwise let auto-test run first.
-		// Tasks that failed testing are never auto-submitted.
-		tested := t.LastTestResult == "pass"
-		naturallyComplete := t.StopReason != nil && *t.StopReason == "end_turn" && t.LastTestResult == "" && !h.AutotestEnabled()
-		if !tested && !naturallyComplete {
-			continue
-		}
-		// Skip while the test agent is still running.
-		if t.IsTestRun {
-			continue
-		}
-
-		// Check that all worktrees are up to date and conflict-free.
-		skip := false
-		for repoPath, worktreePath := range t.WorktreePaths {
-			n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
+		Name: "auto-submit",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			tasks, err := h.store.ListTasks(ctx, false)
 			if err != nil {
-				logger.Handler.Warn("auto-submit: check commits behind",
-					"task", t.ID, "repo", repoPath, "error", err)
-				skip = true
-				break
+				return nil, nil
 			}
-			if n > 0 {
-				skip = true
-				break
-			}
-			hasConflict, err := gitutil.HasConflicts(worktreePath)
-			if err != nil {
-				logger.Handler.Warn("auto-submit: check conflicts",
-					"task", t.ID, "worktree", worktreePath, "error", err)
-				skip = true
-				break
-			}
-			if hasConflict {
-				skip = true
-				break
-			}
-		}
-		if skip {
-			continue
-		}
 
-		logger.Handler.Info("auto-submit: completing verified waiting task", "task", t.ID)
-		autoSubmitMsg := "Auto-submit: task verified with passing tests, up to date, and no conflicts."
-		if naturallyComplete {
-			autoSubmitMsg = "Auto-submit: task naturally completed, up to date, and no conflicts."
-		}
-		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
-			"result": autoSubmitMsg,
-		})
+			for i := range tasks {
+				t := &tasks[i]
+				if t.Status != store.TaskStatusWaiting {
+					continue
+				}
+				// Determine eligibility:
+				// (a) Passed verification ("pass").
+				// (b) Naturally completed (stop_reason="end_turn") and not yet tested,
+				//     but only when auto-test is off — otherwise let auto-test run first.
+				// Tasks that failed testing are never auto-submitted.
+				tested := t.LastTestResult == "pass"
+				naturallyComplete := t.StopReason != nil && *t.StopReason == "end_turn" && t.LastTestResult == "" && !h.AutotestEnabled()
+				if !tested && !naturallyComplete {
+					continue
+				}
+				// Skip while the test agent is still running.
+				if t.IsTestRun {
+					continue
+				}
 
-		if t.SessionID != nil && *t.SessionID != "" {
-			if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusCommitting); err != nil {
-				logger.Handler.Error("auto-submit: update task status", "task", t.ID, "error", err)
-				continue
+				// Check that all worktrees are up to date and conflict-free.
+				skip := false
+				for repoPath, worktreePath := range t.WorktreePaths {
+					n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+					if err != nil {
+						logger.Handler.Warn("auto-submit: check commits behind",
+							"task", t.ID, "repo", repoPath, "error", err)
+						skip = true
+						break
+					}
+					if n > 0 {
+						skip = true
+						break
+					}
+					hasConflict, err := gitutil.HasConflicts(worktreePath)
+					if err != nil {
+						logger.Handler.Warn("auto-submit: check conflicts",
+							"task", t.ID, "worktree", worktreePath, "error", err)
+						skip = true
+						break
+					}
+					if hasConflict {
+						skip = true
+						break
+					}
+				}
+				if skip {
+					continue
+				}
+
+				candidates = append(candidates, autoSubmitCandidate{task: *t, naturallyComplete: naturallyComplete})
 			}
-			h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-				"from":    string(store.TaskStatusWaiting),
-				"to":      string(store.TaskStatusCommitting),
-				"trigger": store.TriggerAutoSubmit,
-			})
-			sessionID := *t.SessionID
-			taskID := t.ID
-			go func() {
-				bgCtx := context.Background()
-				if err := h.runner.Commit(taskID, sessionID); err != nil {
-					h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-					h.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
-						"error": "auto-submit: commit failed: " + err.Error(),
-					})
-					h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-						"from":    string(store.TaskStatusCommitting),
-						"to":      string(store.TaskStatusFailed),
+
+			if len(candidates) == 0 {
+				return nil, nil
+			}
+			first := &candidates[0].task
+			return first, nil
+		},
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			submitted := false
+			for _, c := range candidates {
+				t := c.task
+				logger.Handler.Info("auto-submit: completing verified waiting task", "task", t.ID)
+				autoSubmitMsg := "Auto-submit: task verified with passing tests, up to date, and no conflicts."
+				if c.naturallyComplete {
+					autoSubmitMsg = "Auto-submit: task naturally completed, up to date, and no conflicts."
+				}
+				h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+					"result": autoSubmitMsg,
+				})
+
+				if t.SessionID != nil && *t.SessionID != "" {
+					if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusCommitting); err != nil {
+						logger.Handler.Error("auto-submit: update task status", "task", t.ID, "error", err)
+						continue
+					}
+					h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+						"from":    string(store.TaskStatusWaiting),
+						"to":      string(store.TaskStatusCommitting),
 						"trigger": store.TriggerAutoSubmit,
 					})
-					return
+					sessionID := *t.SessionID
+					taskID := t.ID
+					go func() {
+						bgCtx := context.Background()
+						if err := h.runner.Commit(taskID, sessionID); err != nil {
+							h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+							h.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
+								"error": "auto-submit: commit failed: " + err.Error(),
+							})
+							h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+								"from":    string(store.TaskStatusCommitting),
+								"to":      string(store.TaskStatusFailed),
+								"trigger": store.TriggerAutoSubmit,
+							})
+							return
+						}
+						h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+						h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
+							"from":    string(store.TaskStatusCommitting),
+							"to":      string(store.TaskStatusDone),
+							"trigger": store.TriggerAutoSubmit,
+						})
+					}()
+				} else {
+					// No session — move directly to done (bypasses state machine
+					// since waiting→done is deliberately blocked to protect the commit pipeline).
+					if err := h.store.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
+						logger.Handler.Error("auto-submit: update task status to done", "task", t.ID, "error", err)
+						continue
+					}
+					h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
+						"from":    string(store.TaskStatusWaiting),
+						"to":      string(store.TaskStatusDone),
+						"trigger": store.TriggerAutoSubmit,
+					})
 				}
-				h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
-				h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-					"from":    string(store.TaskStatusCommitting),
-					"to":      string(store.TaskStatusDone),
-					"trigger": store.TriggerAutoSubmit,
-				})
-			}()
-		} else {
-			// No session — move directly to done (bypasses state machine
-			// since waiting→done is deliberately blocked to protect the commit pipeline).
-			if err := h.store.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
-				logger.Handler.Error("auto-submit: update task status to done", "task", t.ID, "error", err)
-				continue
+				submitted = true
 			}
-			h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-				"from":    string(store.TaskStatusWaiting),
-				"to":      string(store.TaskStatusDone),
-				"trigger": store.TriggerAutoSubmit,
-			})
-		}
-	}
+			return submitted, nil
+		},
+	})
 }
