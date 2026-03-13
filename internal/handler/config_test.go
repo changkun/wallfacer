@@ -37,7 +37,7 @@ func newTestHandlerWithWorkspaces(t *testing.T) (*Handler, string) {
 		Workspaces: ws,
 	})
 	t.Cleanup(r.WaitBackground)
-	h := NewHandler(s, r, configDir, []string{ws})
+	h := NewHandler(s, r, configDir, []string{ws}, nil)
 	return h, ws
 }
 
@@ -747,7 +747,7 @@ func newTestHandlerWithWorkspacesFromRepo(t *testing.T, repo string) (*Handler, 
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{Workspaces: repo})
 	t.Cleanup(r.WaitBackground)
-	return NewHandler(s, r, configDir, []string{repo}), repo
+	return NewHandler(s, r, configDir, []string{repo}, nil), repo
 }
 
 // --- strict JSON decoding ---

@@ -30,7 +30,7 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath})
 	t.Cleanup(r.WaitBackground)
-	h := NewHandler(s, r, t.TempDir(), nil)
+	h := NewHandler(s, r, t.TempDir(), nil, nil)
 	return h, envPath
 }
 
@@ -50,7 +50,7 @@ func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) 
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath, CodexAuthPath: codexAuthDir})
 	t.Cleanup(r.WaitBackground)
-	h := NewHandler(s, r, t.TempDir(), nil)
+	h := NewHandler(s, r, t.TempDir(), nil, nil)
 	return h, envPath, codexAuthDir
 }
 

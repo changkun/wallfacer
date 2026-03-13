@@ -29,7 +29,7 @@ func newTestHandlerWithPrompts(t *testing.T) (*Handler, *prompts.Manager) {
 		Prompts: mgr,
 	})
 	t.Cleanup(r.WaitBackground)
-	h := NewHandler(s, r, dir, []string{})
+	h := NewHandler(s, r, dir, []string{}, nil)
 	return h, mgr
 }
 
