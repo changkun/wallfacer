@@ -581,6 +581,45 @@ func TestGenerateOversightSuccess(t *testing.T) {
 	}
 }
 
+// TestGenerateOversightAcceptsValidOutputOnNonZeroExit verifies that oversight
+// generation still succeeds when the agent exits non-zero after emitting a
+// valid final result payload.
+func TestGenerateOversightAcceptsValidOutputOnNonZeroExit(t *testing.T) {
+	cmd := fakeCmdScript(t, oversightOutput, 1)
+	s, r := setupRunnerWithCmd(t, nil, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Add feature X", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outputsDir := s.OutputsDir(task.ID)
+	if err := os.MkdirAll(outputsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	turnData := `{"type":"assistant","message":{"content":[{"type":"text","text":"Starting work"}]}}`
+	if err := os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(turnData), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	r.GenerateOversight(task.ID)
+
+	oversight, err := s.GetOversight(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error reading oversight: %v", err)
+	}
+	if oversight.Status != store.OversightStatusReady {
+		t.Fatalf("expected status=ready, got %q (error: %s)", oversight.Status, oversight.Error)
+	}
+	if len(oversight.Phases) == 0 {
+		t.Fatal("expected at least one phase")
+	}
+	if oversight.Phases[0].Title != "Explored codebase" {
+		t.Fatalf("unexpected phase title: %q", oversight.Phases[0].Title)
+	}
+}
+
 // TestGenerateOversightContainerError verifies that GenerateOversight saves a
 // failed status when the container exits non-zero with no output.
 func TestGenerateOversightContainerError(t *testing.T) {
