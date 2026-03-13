@@ -37,13 +37,17 @@ func TestStashPop(t *testing.T) {
 		if !StashIfDirty(repo) {
 			t.Fatal("expected stash to be created")
 		}
-		StashPop(repo)
+		if err := StashPop(repo); err != nil {
+			t.Fatalf("StashPop returned unexpected error: %v", err)
+		}
 		if _, err := os.Stat(filepath.Join(repo, "stash-me.txt")); os.IsNotExist(err) {
 			t.Error("stashed file not restored after StashPop")
 		}
 	})
 
-	t.Run("no stash entry does not panic", func(t *testing.T) {
-		StashPop(setupRepo(t))
+	t.Run("no stash entry returns error", func(t *testing.T) {
+		if err := StashPop(setupRepo(t)); err == nil {
+			t.Error("StashPop with no stash entry should return error")
+		}
 	})
 }

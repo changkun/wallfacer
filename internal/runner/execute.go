@@ -668,8 +668,19 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			}
 		}
 
+		var stashPopErr error
 		if stashed {
-			gitutil.StashPop(worktreePath)
+			if rebaseErr == nil {
+				// Rebase succeeded — try to restore stashed changes on top.
+				stashPopErr = gitutil.StashPop(worktreePath)
+			} else {
+				// Rebase failed/aborted — restore stashed changes onto the
+				// unchanged task branch (should always succeed).
+				if popErr := gitutil.StashPop(worktreePath); popErr != nil {
+					logger.Runner.Error("sync: stash pop failed after aborted rebase",
+						"task", taskID, "repo", repoPath, "error", popErr)
+				}
+			}
 		}
 
 		if rebaseErr != nil {
@@ -718,6 +729,38 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 				defBranch, filepath.Base(worktreePath), defBranch, defBranch,
 			)
 			r.Run(taskID, conflictPrompt, sessionID, false)
+			return
+		}
+
+		// Rebase succeeded but stash pop failed: the uncommitted changes
+		// conflict with the rebased state. The stash entry is preserved.
+		// Hand off to the agent to integrate those changes manually.
+		if stashPopErr != nil {
+			statusSet = true
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+				"result": fmt.Sprintf(
+					"Rebase of %s succeeded, but restoring uncommitted changes failed "+
+						"(they conflict with the rebased code). The changes are saved in "+
+						"`git stash list`. Handing off to agent to re-apply them.",
+					filepath.Base(repoPath)),
+			})
+			if !testStateInvalidated {
+				r.store.UpdateTaskTestRun(bgCtx, taskID, false, "")
+				testStateInvalidated = true
+			}
+			stashPrompt := fmt.Sprintf(
+				"The worktree %s was successfully rebased onto %s, but your "+
+					"uncommitted changes could not be automatically restored because "+
+					"they conflict with the rebased code.\n\n"+
+					"Your uncommitted work is saved in the git stash. Please:\n"+
+					"1. Run `git stash show -p` to see what was stashed\n"+
+					"2. Run `git stash pop` to attempt restoring (may produce conflicts)\n"+
+					"3. Resolve any conflicts, ensuring your changes work with the updated code\n"+
+					"4. Commit the result\n\n"+
+					"Do NOT discard the stash — it contains your work in progress.",
+				filepath.Base(worktreePath), defBranch,
+			)
+			r.Run(taskID, stashPrompt, sessionID, false)
 			return
 		}
 
