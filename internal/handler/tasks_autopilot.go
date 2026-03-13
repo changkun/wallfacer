@@ -45,6 +45,25 @@ func (h *Handler) countRegularInProgress(_ context.Context) (int, error) {
 	return h.store.CountRegularInProgress(), nil
 }
 
+func (h *Handler) waitingTaskUsesVerificationCapacity(t *store.Task) bool {
+	if t == nil {
+		return false
+	}
+	if h.AutotestEnabled() && t.LastTestResult == "" {
+		return true
+	}
+	if !h.AutosubmitEnabled() {
+		return false
+	}
+	if t.IsTestRun {
+		return false
+	}
+	if t.LastTestResult == "pass" {
+		return true
+	}
+	return t.StopReason != nil && *t.StopReason == "end_turn" && t.LastTestResult == "" && !h.AutotestEnabled()
+}
+
 func countRegularInProgress(tasks []store.Task) int {
 	count := 0
 	for i := range tasks {
@@ -374,6 +393,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		return
 	}
 	maxTasks := h.maxConcurrentTasks()
+	maxVerificationTasks := h.maxTestConcurrentTasks()
 
 	for i := range tasks {
 		t := &tasks[i]
@@ -408,11 +428,15 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 
 		promoteMu.Lock()
 		regularInProgress := h.store.CountRegularInProgress()
+		syncCapacity := maxTasks
+		if h.waitingTaskUsesVerificationCapacity(t) {
+			syncCapacity += maxVerificationTasks
+		}
 
-		if regularInProgress >= maxTasks {
+		if regularInProgress >= syncCapacity {
 			promoteMu.Unlock()
-			logger.Handler.Info("auto-sync: regular in-progress limit reached, deferring sync",
-				"task", t.ID, "count", regularInProgress, "max", maxTasks)
+			logger.Handler.Info("auto-sync: in-progress limit reached, deferring sync",
+				"task", t.ID, "count", regularInProgress, "max", syncCapacity)
 			h.incAutopilotAction("sync_watcher", "skipped_capacity")
 			continue
 		}
