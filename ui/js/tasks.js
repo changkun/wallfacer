@@ -240,7 +240,9 @@ async function createTask() {
     localStorage.removeItem('wallfacer-new-task-draft');
     hideNewTaskForm();
     if (newTask && newTask.id) {
-      waitForTaskDelta(newTask.id);
+      waitForTaskDelta(newTask.id).then(function() {
+        return waitForTaskTitle(newTask.id);
+      });
     } else {
       fetchTasks();
     }

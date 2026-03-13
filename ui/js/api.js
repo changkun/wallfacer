@@ -448,6 +448,40 @@ function waitForTaskDelta(taskId, timeoutMs) {
   });
 }
 
+function findTaskById(taskId) {
+  return tasks.find(function(t) { return t.id === taskId; }) ||
+    archivedTasks.find(function(t) { return t.id === taskId; }) ||
+    null;
+}
+
+/**
+ * waitForTaskTitle keeps watching a task until it has a non-empty title, or
+ * gives up after timeoutMs (default 30 000 ms). This makes manual task
+ * creation resilient when the task-created delta arrives but the later
+ * title-update delta is delayed or missed and we need a fetch fallback.
+ */
+function waitForTaskTitle(taskId, timeoutMs) {
+  var deadline = Date.now() + (typeof timeoutMs === 'number' ? timeoutMs : 30000);
+
+  function step() {
+    var current = findTaskById(taskId);
+    if (!current || current.title) {
+      return Promise.resolve();
+    }
+    var remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      return Promise.resolve();
+    }
+    return waitForTaskDelta(taskId, Math.min(remaining, 3000)).then(function() {
+      return step();
+    }, function() {
+      return Promise.resolve();
+    });
+  }
+
+  return step();
+}
+
 function toggleShowArchived() {
   showArchived = document.getElementById('show-archived-toggle').checked;
   localStorage.setItem('wallfacer-show-archived', showArchived ? 'true' : 'false');

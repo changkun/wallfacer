@@ -243,6 +243,38 @@ describe('waitForTaskDelta — stream absent triggers fetchTasks fallback', () =
   });
 });
 
+describe('waitForTaskTitle — fetch fallback fills delayed titles', () => {
+  it('keeps polling the task until a later fetch returns a generated title', async () => {
+    const TASK_ID = 'aaaaaaaa-0000-0000-0000-000000000004';
+    const ctx = makeContext();
+
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    vm.runInContext(
+      `tasks = [{ id: "${TASK_ID}", title: "", prompt: "Implement title fallback" }];`,
+      ctx,
+    );
+    vm.runInContext('tasksSource = null;', ctx);
+
+    let fetchCount = 0;
+    ctx.fetchTasks = vi.fn().mockImplementation(async () => {
+      fetchCount++;
+      if (fetchCount === 1) {
+        vm.runInContext(
+          `tasks = [{ id: "${TASK_ID}", title: "Title Loaded", prompt: "Implement title fallback" }];`,
+          ctx,
+        );
+      }
+    });
+
+    await ctx.waitForTaskTitle(TASK_ID, 5000);
+
+    expect(ctx.fetchTasks).toHaveBeenCalledOnce();
+    expect(vm.runInContext(`tasks[0].title`, ctx)).toBe('Title Loaded');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Test 3 — Regression: openRaiseLimitInline uses task(id).update() and no
 //           longer crashes with a TypeError for the missing Routes.tasks.update
