@@ -854,29 +854,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						"to":      string(store.TaskStatusCommitting),
 						"trigger": store.TriggerAutoSubmit,
 					})
-					sessionID := *t.SessionID
-					taskID := t.ID
-					go func() {
-						bgCtx := context.Background()
-						if err := h.runner.Commit(taskID, sessionID); err != nil {
-							h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
-							h.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
-								"error": "auto-submit: commit failed: " + err.Error(),
-							})
-							h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-								"from":    string(store.TaskStatusCommitting),
-								"to":      string(store.TaskStatusFailed),
-								"trigger": store.TriggerAutoSubmit,
-							})
-							return
-						}
-						h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
-						h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
-							"from":    string(store.TaskStatusCommitting),
-							"to":      string(store.TaskStatusDone),
-							"trigger": store.TriggerAutoSubmit,
-						})
-					}()
+					h.runCommitTransition(t.ID, *t.SessionID, store.TriggerAutoSubmit, "auto-submit: commit failed: ")
 				} else {
 					// No session — move directly to done (bypasses state machine
 					// since waiting→done is deliberately blocked to protect the commit pipeline).

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -286,6 +287,47 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 		// OK — commit pipeline was triggered.
 	default:
 		t.Errorf("expected committing/done/failed, got %s — commit pipeline was not triggered", updated.Status)
+	}
+}
+
+func TestCompleteTask_CommitMessageFailureReturnsToWaiting(t *testing.T) {
+	h := newTestHandler(t)
+	t.Cleanup(func() { waitForBackground(200) })
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt-commit-fail")
+	gitRun(t, repo, "worktree", "add", "-b", "task-commit-fail", wt, "HEAD")
+	if err := os.WriteFile(filepath.Join(wt, "feature.txt"), []byte("new work\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-commit-fail")
+	setTaskSessionID(t, h, task.ID, "sess-fail")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
+	w := httptest.NewRecorder()
+	h.CompleteTask(w, req, task.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var updated *store.Task
+	for range 20 {
+		updated, _ = h.store.GetTask(ctx, task.ID)
+		if updated != nil && updated.Status == store.TaskStatusWaiting {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if updated == nil || updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected task to return to waiting, got %v", updated.Status)
+	}
+
+	if got := gitRun(t, wt, "rev-list", "--count", "HEAD"); got != "1" {
+		t.Fatalf("expected no new commit in worktree after commit message failure, got %s commits", got)
 	}
 }
 

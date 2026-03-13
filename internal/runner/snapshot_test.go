@@ -166,6 +166,7 @@ func TestCommitPipelineNonGitWorkspace(t *testing.T) {
 	}
 
 	s, runner := setupTestRunner(t, []string{ws})
+	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
 	task, err := s.CreateTask(ctx, "Non-git commit test", 5, false, "", "")

@@ -75,6 +75,11 @@ func setupTestRunner(t *testing.T, workspaces []string) (*store.Store, *Runner) 
 	return s, runner
 }
 
+func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
+	t.Helper()
+	runner.command = fakeCmdScript(t, `{"result":"wallfacer: generated commit","session_id":"abc123","stop_reason":"end_turn","is_error":false}`, 0)
+}
+
 // newTestRunnerWithInstructions creates a Runner whose instructionsPath points
 // to the given path (may or may not exist on disk).
 func newTestRunnerWithInstructions(t *testing.T, instructionsPath string) *Runner {
@@ -543,6 +548,7 @@ func TestWorktreeGitFilePointsToHost(t *testing.T) {
 func TestHostStageAndCommit(t *testing.T) {
 	repo := setupTestRepo(t)
 	_, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 
 	taskID := uuid.New()
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
@@ -612,6 +618,7 @@ func TestHostStageAndCommitNoChanges(t *testing.T) {
 func TestCommitPipelineBasic(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 
 	initialHash := gitRun(t, repo, "rev-parse", "HEAD")
 
@@ -679,6 +686,7 @@ func TestCommitPipelineBasic(t *testing.T) {
 func TestCommitPipelineDivergedBranch(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 
 	ctx := context.Background()
 	task, err := s.CreateTask(ctx, "Add feature", 5, false, "", "")
@@ -779,6 +787,7 @@ func TestCommitPipelineNoChanges(t *testing.T) {
 func TestCompleteTaskE2E(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 
 	ctx := context.Background()
 
@@ -851,6 +860,7 @@ func TestCompleteTaskE2E(t *testing.T) {
 func TestCommitOnTopOfLatestMain(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 
 	ctx := context.Background()
 	task, err := s.CreateTask(ctx, "Task on stale branch", 5, false, "", "")
@@ -916,6 +926,7 @@ func TestCommitOnTopOfLatestMain(t *testing.T) {
 func TestParallelTasksSameRepo(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
 	// Create two tasks.
@@ -1008,6 +1019,7 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 	repoX := setupTestRepo(t)
 	repoY := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repoX, repoY})
+	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
 	task, err := s.CreateTask(ctx, "Change both repos", 5, false, "", "")
@@ -1064,6 +1076,7 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 func TestParallelTasksConflictingChanges(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
 	taskA, err := s.CreateTask(ctx, "Add line to README", 5, false, "", "")
@@ -1377,6 +1390,7 @@ func TestParallelWorktreeIsolation(t *testing.T) {
 func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
 	// Create two tasks.
@@ -1467,6 +1481,7 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 func TestConcurrentCompleteTaskCommitErrorPropagated(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
 	task, err := s.CreateTask(ctx, "Conflict task", 5, false, "", "")
@@ -1514,6 +1529,7 @@ func TestConcurrentCompleteTaskCommitErrorPropagated(t *testing.T) {
 func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
+	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
 	// Record main HEAD before creating a feature branch.

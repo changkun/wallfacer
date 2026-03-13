@@ -20,6 +20,21 @@ import (
 	"github.com/google/uuid"
 )
 
+// ErrCommitMessageGeneration marks failures that occur while generating the
+// synthetic git commit message prior to the host-side commit step.
+var ErrCommitMessageGeneration = errors.New("commit message generation failed")
+
+// IsCommitMessageGenerationError reports whether err originated from commit
+// message generation and should return the task to waiting rather than using a
+// prompt-derived fallback commit message.
+func IsCommitMessageGenerationError(err error) bool {
+	return errors.Is(err, ErrCommitMessageGeneration)
+}
+
+func newCommitMessageGenerationError(format string, args ...any) error {
+	return fmt.Errorf("%w: %s", ErrCommitMessageGeneration, fmt.Sprintf(format, args...))
+}
+
 // Commit creates its own timeout context and runs the full commit pipeline
 // (stage → rebase → merge → cleanup) for a task.
 // Returns an error if any phase of the pipeline fails.
@@ -63,8 +78,12 @@ func (r *Runner) commit(
 	}
 	if _, stageErr := r.hostStageAndCommit(taskID, worktreePaths, taskPrompt); stageErr != nil {
 		logger.Runner.Error("host stage/commit failed", "task", taskID, "error", stageErr)
+		eventMessage := "stage/commit failed: " + stageErr.Error()
+		if IsCommitMessageGenerationError(stageErr) {
+			eventMessage = stageErr.Error()
+		}
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
-			"error": "stage/commit failed: " + stageErr.Error(),
+			"error": eventMessage,
 		})
 		return fmt.Errorf("stage and commit: %w", stageErr)
 	}
@@ -215,7 +234,10 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 			allLogs.WriteString(p.recentLog + "\n")
 		}
 	}
-	msg := r.generateCommitMessage(taskID, prompt, allStats.String(), allLogs.String())
+	msg, err := r.generateCommitMessage(taskID, prompt, allStats.String(), allLogs.String())
+	if err != nil {
+		return false, fmt.Errorf("generate commit message: %w", err)
+	}
 
 	// Second pass: commit each worktree with the generated message.
 	// Use global git identity to prevent sandbox-set local configs from
@@ -254,8 +276,7 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 // generateCommitMessage runs a lightweight container to produce a descriptive
 // git commit message from the task prompt, staged diff stats, and recent git
 // log history (used to match the project's commit style).
-// Falls back to a truncated prompt on any error.
-func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recentLog string) string {
+func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recentLog string) (string, error) {
 	task, err := r.store.GetTask(context.Background(), taskID)
 	if err != nil {
 		logger.Runner.Warn("generate commit message: get task", "task", taskID, "error", err)
@@ -265,12 +286,6 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	if task != nil {
 		sb = r.sandboxForTaskActivity(task, activityCommitMessage)
 	}
-
-	firstLine := prompt
-	if idx := strings.IndexByte(firstLine, '\n'); idx >= 0 {
-		firstLine = firstLine[:idx]
-	}
-	fallback := "wallfacer: " + truncate(firstLine, 72)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
@@ -326,7 +341,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		}
 		if err != nil {
 			logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
-			return fallback
+			return "", newCommitMessageGenerationError("%v", err)
 		}
 	}
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
@@ -339,8 +354,16 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		sb = sandbox.Codex
 		if err != nil {
 			logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
-			return fallback
+			return "", newCommitMessageGenerationError("%v", err)
 		}
+	}
+	if output != nil && output.IsError {
+		logger.Runner.Warn("commit message generation: agent error", "task", taskID, "subtype", output.Subtype)
+		message := strings.TrimSpace(output.Result)
+		if message == "" {
+			message = "agent returned an error result"
+		}
+		return "", newCommitMessageGenerationError("%s", message)
 	}
 
 	msg := strings.TrimSpace(output.Result)
@@ -348,7 +371,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	msg = strings.TrimSpace(msg)
 	if msg == "" {
 		logger.Runner.Warn("commit message generation: blank result", "task", taskID)
-		return fallback
+		return "", newCommitMessageGenerationError("blank result")
 	}
 
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
@@ -374,7 +397,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		}
 	}
 
-	return msg
+	return msg, nil
 }
 
 // rebaseAndMerge performs the host-side git pipeline for all worktrees:
