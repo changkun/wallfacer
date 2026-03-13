@@ -120,11 +120,12 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"autosubmit":             h.AutosubmitEnabled(),
 		"autosync":               h.AutosyncEnabled(),
 		"autopush":               h.AutopushEnabled(),
-		"ideation":               h.IdeationEnabled(),
-		"ideation_running":       h.ideationRunning(ctx),
-		"ideation_interval":      int(h.IdeationInterval().Minutes()),
-		"ideation_categories":    h.runner.IdeationCategories(),
-		"default_model":          "",
+		"ideation":                 h.IdeationEnabled(),
+		"ideation_running":         h.ideationRunning(ctx),
+		"ideation_interval":        int(h.IdeationInterval().Minutes()),
+		"ideation_categories":      h.runner.IdeationCategories(),
+		"ideation_ignore_patterns": h.runner.IdeationIgnorePatterns(),
+		"default_model":            "",
 		"payload_limits":         payloadLimits,
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
