@@ -716,7 +716,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Successfully synced %s with %s.", filepath.Base(repoPath), defBranch),
 		})
-		if !testStateInvalidated {
+		if !testStateInvalidated && conflictDetected {
 			r.store.UpdateTaskTestRun(bgCtx, taskID, false, "")
 			testStateInvalidated = true
 		}

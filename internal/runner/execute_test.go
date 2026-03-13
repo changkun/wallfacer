@@ -1474,13 +1474,13 @@ func TestRunBudgetTokensExceededTransitionsToWaiting(t *testing.T) {
 	}
 }
 
-func TestSyncWorktrees_ClearsPreviousTestVerdictAfterSuccessfulSync(t *testing.T) {
+func TestSyncWorktrees_PreservesTestVerdictAfterCleanSync(t *testing.T) {
 	repo := setupTestRepo(t)
 	cmd := fakeCmdScript(t, "", 0)
 	s, runner := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Sync clears stale test verdict", 5, false, "", "")
+	task, err := s.CreateTask(ctx, "Sync preserves test verdict on clean rebase", 5, false, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1512,8 +1512,8 @@ func TestSyncWorktrees_ClearsPreviousTestVerdictAfterSuccessfulSync(t *testing.T
 	if updated.Status != "waiting" {
 		t.Fatalf("expected status=waiting after sync, got %q", updated.Status)
 	}
-	if updated.LastTestResult != "" {
-		t.Fatalf("expected sync to clear stale test verdict, got %q", updated.LastTestResult)
+	if updated.LastTestResult != "pass" {
+		t.Fatalf("expected clean sync to preserve test verdict, got %q", updated.LastTestResult)
 	}
 }
 
