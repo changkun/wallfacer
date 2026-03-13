@@ -43,10 +43,22 @@ func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager,
 		envFile:   envFile,
 		subs:      make(map[int]chan Snapshot),
 	}
+	initial = m.startupWorkspaces(initial)
 	if _, err := m.Switch(initial); err != nil {
 		return nil, err
 	}
 	return m, nil
+}
+
+func (m *Manager) startupWorkspaces(initial []string) []string {
+	if len(initial) > 0 {
+		return initial
+	}
+	groups, err := workspacegroups.Load(m.configDir)
+	if err != nil || len(groups) == 0 {
+		return nil
+	}
+	return cloneStrings(groups[0].Workspaces)
 }
 
 func NewStatic(store *store.Store, workspaces []string, instructionsPath string) *Manager {
