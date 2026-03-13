@@ -269,3 +269,167 @@ func TestValidate_AllKnownNamesWithEmbeddedDefaults(t *testing.T) {
 		}
 	}
 }
+
+// --- Tests for all six remaining template renderers ---
+
+func TestRefinement_ReturnsNonEmptyRendered(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	data := prompts.RefinementData{
+		CreatedAt:        "2024-01-01",
+		Today:            "2024-06-15",
+		AgeDays:          165,
+		Status:           "backlog",
+		Prompt:           "build a login form",
+		UserInstructions: "use TypeScript",
+	}
+	got := mgr.Refinement(data)
+	if strings.TrimSpace(got) == "" {
+		t.Error("Refinement returned empty string")
+	}
+	if strings.Contains(got, "{{") {
+		t.Errorf("Refinement returned unreplaced template syntax: %q", got)
+	}
+}
+
+func TestIdeation_ReturnsNonEmptyRendered(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	data := prompts.IdeationData{
+		ExistingTasks: []prompts.IdeationTask{
+			{Title: "existing task", Status: "done", Prompt: "do something"},
+		},
+		Categories: []string{"feature", "bugfix"},
+	}
+	got := mgr.Ideation(data)
+	if strings.TrimSpace(got) == "" {
+		t.Error("Ideation returned empty string")
+	}
+	if strings.Contains(got, "{{") {
+		t.Errorf("Ideation returned unreplaced template syntax: %q", got)
+	}
+}
+
+func TestOversight_ReturnsNonEmptyRendered(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	got := mgr.Oversight("Phase 1: analyzed codebase. Phase 2: implemented feature.")
+	if strings.TrimSpace(got) == "" {
+		t.Error("Oversight returned empty string")
+	}
+	if strings.Contains(got, "{{") {
+		t.Errorf("Oversight returned unreplaced template syntax: %q", got)
+	}
+}
+
+func TestCommitMessage_ReturnsNonEmptyRendered(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	data := prompts.CommitData{
+		Prompt:    "add user authentication",
+		DiffStat:  "3 files changed, 100 insertions(+), 2 deletions(-)",
+		RecentLog: "abc1234 previous commit message",
+	}
+	got := mgr.CommitMessage(data)
+	if strings.TrimSpace(got) == "" {
+		t.Error("CommitMessage returned empty string")
+	}
+	if strings.Contains(got, "{{") {
+		t.Errorf("CommitMessage returned unreplaced template syntax: %q", got)
+	}
+}
+
+func TestConflictResolution_ReturnsNonEmptyRendered(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	data := prompts.ConflictData{
+		ContainerPath: "/workspace/myrepo",
+		DefaultBranch: "main",
+	}
+	got := mgr.ConflictResolution(data)
+	if strings.TrimSpace(got) == "" {
+		t.Error("ConflictResolution returned empty string")
+	}
+	if strings.Contains(got, "{{") {
+		t.Errorf("ConflictResolution returned unreplaced template syntax: %q", got)
+	}
+}
+
+func TestTestVerification_ReturnsNonEmptyRendered(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	data := prompts.TestData{
+		OriginalPrompt: "build a widget",
+		Criteria:       "widget must render in < 100ms",
+		ImplResult:     "I implemented the widget",
+		Diff:           "--- a/widget.go\n+++ b/widget.go\n@@ -1 +1 @@",
+	}
+	got := mgr.TestVerification(data)
+	if strings.TrimSpace(got) == "" {
+		t.Error("TestVerification returned empty string")
+	}
+	if strings.Contains(got, "{{") {
+		t.Errorf("TestVerification returned unreplaced template syntax: %q", got)
+	}
+}
+
+// Package-level delegation functions.
+
+func TestPackageLevelRefinement_NonEmpty(t *testing.T) {
+	got := prompts.Refinement(prompts.RefinementData{Prompt: "do something", Status: "backlog"})
+	if strings.TrimSpace(got) == "" {
+		t.Error("prompts.Refinement() returned empty string")
+	}
+}
+
+func TestPackageLevelIdeation_NonEmpty(t *testing.T) {
+	got := prompts.Ideation(prompts.IdeationData{})
+	if strings.TrimSpace(got) == "" {
+		t.Error("prompts.Ideation() returned empty string")
+	}
+}
+
+func TestPackageLevelOversight_NonEmpty(t *testing.T) {
+	got := prompts.Oversight("some activity log")
+	if strings.TrimSpace(got) == "" {
+		t.Error("prompts.Oversight() returned empty string")
+	}
+}
+
+func TestPackageLevelCommitMessage_NonEmpty(t *testing.T) {
+	got := prompts.CommitMessage(prompts.CommitData{Prompt: "fix bug"})
+	if strings.TrimSpace(got) == "" {
+		t.Error("prompts.CommitMessage() returned empty string")
+	}
+}
+
+func TestPackageLevelConflictResolution_NonEmpty(t *testing.T) {
+	got := prompts.ConflictResolution(prompts.ConflictData{ContainerPath: "/workspace/repo", DefaultBranch: "main"})
+	if strings.TrimSpace(got) == "" {
+		t.Error("prompts.ConflictResolution() returned empty string")
+	}
+}
+
+func TestPackageLevelTestVerification_NonEmpty(t *testing.T) {
+	got := prompts.TestVerification(prompts.TestData{OriginalPrompt: "build widget"})
+	if strings.TrimSpace(got) == "" {
+		t.Error("prompts.TestVerification() returned empty string")
+	}
+}
+
+func TestPackageLevelTitle_NonEmpty(t *testing.T) {
+	got := prompts.Title("my task prompt")
+	if strings.TrimSpace(got) == "" {
+		t.Error("prompts.Title() returned empty string")
+	}
+}
+
+func TestIdeation_EmptyData(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	got := mgr.Ideation(prompts.IdeationData{})
+	if strings.TrimSpace(got) == "" {
+		t.Error("Ideation with empty data returned empty string")
+	}
+}
+
+func TestTestVerification_NoCriteria(t *testing.T) {
+	mgr := prompts.NewManager(t.TempDir())
+	got := mgr.TestVerification(prompts.TestData{OriginalPrompt: "build something"})
+	if strings.TrimSpace(got) == "" {
+		t.Error("TestVerification without criteria returned empty string")
+	}
+}

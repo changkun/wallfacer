@@ -25,6 +25,7 @@ func newTestHandlerWithRegistry(t *testing.T) (*Handler, *metrics.Registry) {
 	}
 	s, err := store.NewStore(storeDir)
 	if err != nil {
+		os.RemoveAll(storeDir)
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{})
