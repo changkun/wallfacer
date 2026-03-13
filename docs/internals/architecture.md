@@ -7,14 +7,14 @@ Wallfacer is a host-native Go service that coordinates autonomous coding agents 
 ```mermaid
 graph TB
     subgraph Browser
-        UI["Browser UI<br/>(Vanilla JS + Tailwind + Sortable.js)<br/>Drag-and-drop task board + SSE live updates"]
+        UI["Browser UI\n(Vanilla JS + Tailwind + Sortable.js)\nDrag-and-drop task board, SSE live updates"]
     end
 
     subgraph Server["Go Server (stdlib net/http)"]
-        Handler["Handler<br/>REST API + SSE"]
-        Runner["Runner<br/>orchestration + commit"]
-        Store["Store<br/>state + persistence"]
-        Automation["Automation Loops<br/>promote / test / submit / sync / retry"]
+        Handler["Handler\nREST API + SSE"]
+        Runner["Runner\norchestration + commit"]
+        Store["Store\nstate + persistence"]
+        Automation["Automation Loops\npromote / test / submit\nsync / retry / ideation"]
 
         Handler --> Runner
         Runner --> Store
@@ -23,12 +23,12 @@ graph TB
     end
 
     subgraph Infra["Host Infrastructure"]
-        Containers["Sandbox Containers<br/>Claude / Codex images<br/>ephemeral, one per turn"]
-        Worktrees["Per-task Git Worktrees<br/>~/.wallfacer/worktrees/<br/>task/&lt;id&gt; branches"]
-        Containers <--> Worktrees
+        Containers["Sandbox Containers\nClaude / Codex images\nephemeral, one per turn"]
+        Worktrees["Per-task Git Worktrees\n~/.wallfacer/worktrees/\ntask/ID branches"]
+        Containers --- Worktrees
     end
 
-    UI -->|HTTP / SSE| Handler
+    UI -->|"HTTP / SSE"| Handler
     Runner -->|os/exec| Containers
 ```
 
@@ -53,7 +53,7 @@ stateDiagram-v2
     backlog --> in_progress : drag / autopilot
     backlog --> cancelled : cancel
 
-    in_progress --> in_progress : max_tokens / pause_turn<br/>(auto-continue)
+    in_progress --> in_progress : max_tokens / pause_turn (auto-continue)
     in_progress --> committing : end_turn
     in_progress --> waiting : empty stop_reason
     in_progress --> failed : error / timeout / budget
@@ -73,8 +73,12 @@ stateDiagram-v2
     done --> cancelled : cancel
     cancelled --> backlog : retry
 
-    note right of waiting : fork → new backlog task
-    note right of failed : fork → new backlog task
+    note right of waiting
+        fork: creates new backlog task
+    end note
+    note right of failed
+        fork: creates new backlog task
+    end note
 ```
 
 States: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `cancelled`.
@@ -84,18 +88,18 @@ States: `backlog`, `in_progress`, `waiting`, `committing`, `done`, `failed`, `ca
 
 ```mermaid
 flowchart TD
-    Start["Start turn (increment N)"] --> Launch["Launch container<br/>with prompt + session ID"]
-    Launch --> Save["Save output to turn-NNNN.json"]
-    Save --> Usage["Accumulate usage/cost"]
-    Usage --> Budget{"Check budgets<br/>MaxCost / MaxTokens"}
+    Start["Start turn\n(increment N)"] --> Launch["Launch container\nwith prompt + session ID"]
+    Launch --> Save["Save output to\nturn-NNNN.json"]
+    Save --> Usage["Accumulate\nusage/cost"]
+    Usage --> Budget{"Check budgets\nMaxCost / MaxTokens"}
 
-    Budget -->|over budget| FailedBudget["FAILED<br/>(budget_exceeded)"]
+    Budget -->|over budget| FailedBudget["FAILED\n(budget_exceeded)"]
     Budget -->|within budget| Parse{"Parse stop_reason"}
 
-    Parse -->|end_turn| Commit["COMMITTING<br/>git add → commit → rebase → push? → DONE"]
-    Parse -->|max_tokens / pause_turn| Start
-    Parse -->|empty / unknown| Waiting["WAITING<br/>blocks until user feedback"]
-    Parse -->|error / timeout| FailedError["FAILED<br/>(classify failure category)"]
+    Parse -->|end_turn| Commit["COMMITTING\ngit add, commit,\nrebase, push, DONE"]
+    Parse -->|"max_tokens / pause_turn"| Start
+    Parse -->|"empty / unknown"| Waiting["WAITING\nblocks until\nuser feedback"]
+    Parse -->|"error / timeout"| FailedError["FAILED\n(classify failure\ncategory)"]
 
     Waiting -->|feedback received| Start
 ```
@@ -104,14 +108,14 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    PubSub["Store<br/>pub/sub on<br/>state changes"]
+    PubSub["Store\npub/sub on\nstate changes"]
 
-    PubSub --> Promoter["Auto-promoter<br/>backlog → in_progress<br/>when capacity available<br/>+ deps met + scheduled"]
-    PubSub --> Tester["Auto-tester<br/>launch test verification<br/>on untested waiting tasks"]
-    PubSub --> Submitter["Auto-submitter<br/>waiting → done<br/>when test passed<br/>+ conflict-free"]
-    PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
-    PubSub --> Retry["Auto-retry<br/>failed → backlog<br/>if retry budget > 0"]
-    PubSub --> Ideation["Ideation watcher<br/>launch idea-agent<br/>on interval"]
+    PubSub --> Promoter["Auto-promoter\nbacklog to in_progress\nwhen capacity available\n+ deps met + scheduled"]
+    PubSub --> Tester["Auto-tester\nlaunch test verification\non untested waiting tasks"]
+    PubSub --> Submitter["Auto-submitter\nwaiting to done\nwhen test passed\n+ conflict-free"]
+    PubSub --> Sync["Waiting-sync\nrebase worktrees\nbehind default branch"]
+    PubSub --> Retry["Auto-retry\nfailed to backlog\nif retry budget > 0"]
+    PubSub --> Ideation["Ideation watcher\nlaunch idea-agent\non interval"]
 ```
 
 ## Component Responsibilities
