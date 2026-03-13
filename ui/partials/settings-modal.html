@@ -260,6 +260,10 @@
                   <input id="env-webhook-secret" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
                   <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">HMAC-SHA256 signing secret sent as <code style="font-family:monospace;">X-Wallfacer-Signature</code>. Leave blank to keep the current value.</div>
                 </div>
+                <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                  <button onclick="testWebhookConfig()" type="button" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Test Webhook</button>
+                  <span id="env-webhook-test-status" style="font-size: 11px; color: var(--text-muted); min-height: 1em;"></span>
+                </div>
               </div>
             </div>
           </div>

@@ -423,6 +423,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"GetEnvConfig":    h.GetEnvConfig,
 		"UpdateEnvConfig": h.UpdateEnvConfig,
 		"TestSandbox":     h.TestSandbox,
+		"TestWebhook":     h.TestWebhook,
 
 		// Workspace instructions.
 		"GetInstructions":    h.GetInstructions,
@@ -519,6 +520,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		// Environment configuration.
 		"UpdateEnvConfig": handler.BodyLimitDefault,
 		"TestSandbox":     handler.BodyLimitDefault,
+		"TestWebhook":     handler.BodyLimitDefault,
 
 		// Workspace instructions.
 		"UpdateInstructions": handler.BodyLimitInstructions,
@@ -726,7 +728,7 @@ func tryResolveWorkspaces(paths []string) ([]string, error) {
 
 func requiresStore(name string) bool {
 	switch name {
-	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream":
+	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "TestWebhook", "GitStatus", "GitStatusStream":
 		return false
 	default:
 		return true

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,7 +56,8 @@ func TestWebhookNotifier_DeliverOnStateChange(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Create a task; the store calls notify() with status=backlog.
-	task, err := s.CreateTask(context.Background(), "implement feature X", 30, false, "", store.TaskKindTask)
+	longPrompt := strings.Repeat("p", 220)
+	task, err := s.CreateTask(context.Background(), longPrompt, 30, false, "", store.TaskKindTask)
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -86,8 +88,8 @@ func TestWebhookNotifier_DeliverOnStateChange(t *testing.T) {
 	}
 
 	// Validate event header.
-	if got := req.header.Get("X-Wallfacer-Event"); got != "task.state_changed" {
-		t.Errorf("X-Wallfacer-Event = %q, want %q", got, "task.state_changed")
+	if got := req.header.Get("X-Wallfacer-Event"); got != runner.WebhookEventTaskStateChanged {
+		t.Errorf("X-Wallfacer-Event = %q, want %q", got, runner.WebhookEventTaskStateChanged)
 	}
 	if got := req.header.Get("Content-Type"); got != "application/json" {
 		t.Errorf("Content-Type = %q, want %q", got, "application/json")
@@ -98,8 +100,8 @@ func TestWebhookNotifier_DeliverOnStateChange(t *testing.T) {
 	if err := json.Unmarshal(req.body, &payload); err != nil {
 		t.Fatalf("unmarshal payload: %v", err)
 	}
-	if payload.EventType != "task.state_changed" {
-		t.Errorf("event_type = %q, want %q", payload.EventType, "task.state_changed")
+	if payload.EventType != runner.WebhookEventTaskStateChanged {
+		t.Errorf("event_type = %q, want %q", payload.EventType, runner.WebhookEventTaskStateChanged)
 	}
 	if payload.TaskID != task.ID.String() {
 		t.Errorf("task_id = %q, want %q", payload.TaskID, task.ID.String())
@@ -107,14 +109,21 @@ func TestWebhookNotifier_DeliverOnStateChange(t *testing.T) {
 	if payload.Status != store.TaskStatusBacklog {
 		t.Errorf("status = %q, want %q", payload.Status, store.TaskStatusBacklog)
 	}
-	if payload.Prompt == "" {
-		t.Error("prompt must not be empty")
+	if len(payload.Prompt) != 200 {
+		t.Errorf("prompt length = %d, want 200", len(payload.Prompt))
+	}
+	if len(payload.Title) != 80 {
+		t.Errorf("title length = %d, want 80", len(payload.Title))
 	}
 	if payload.OccurredAt.IsZero() {
 		t.Error("occurred_at must not be zero")
 	}
 
 	// --- Status change triggers a second delivery ---
+	longResult := strings.Repeat("r", 520)
+	if err := s.UpdateTaskResult(context.Background(), task.ID, longResult, "sess-1", "end_turn", 1); err != nil {
+		t.Fatalf("UpdateTaskResult: %v", err)
+	}
 	if err := s.UpdateTaskStatus(context.Background(), task.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus: %v", err)
 	}
@@ -126,6 +135,9 @@ func TestWebhookNotifier_DeliverOnStateChange(t *testing.T) {
 		}
 		if p2.Status != store.TaskStatusInProgress {
 			t.Errorf("second delivery status = %q, want %q", p2.Status, store.TaskStatusInProgress)
+		}
+		if len(p2.Result) != 500 {
+			t.Errorf("result length = %d, want 500", len(p2.Result))
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for second webhook delivery on status change")
@@ -203,6 +215,7 @@ func TestWebhookNotifier_RetriesOnFailure(t *testing.T) {
 	// notify via the store directly.
 	_ = os.MkdirAll(dir, 0o755)
 	wn := runner.NewWebhookNotifier(s, envconfig.Config{WebhookURL: srv.URL})
+	wn.SetRetryBackoffs([]time.Duration{0, 10 * time.Millisecond})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go wn.Start(ctx)
@@ -217,7 +230,7 @@ func TestWebhookNotifier_RetriesOnFailure(t *testing.T) {
 		if attempts < 2 {
 			t.Errorf("expected at least 2 attempts, got %d", attempts)
 		}
-	case <-time.After(15 * time.Second): // 2s backoff before retry
+	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for successful retry")
 	}
 }

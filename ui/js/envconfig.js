@@ -249,6 +249,27 @@ async function testSandboxConfig(sandbox) {
   }
 }
 
+async function testWebhookConfig() {
+  const statusEl = document.getElementById('env-webhook-test-status');
+  if (!statusEl) return;
+  statusEl.textContent = 'Testing…';
+
+  try {
+    await api(Routes.env.testWebhook(), {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    statusEl.textContent = 'Delivered.';
+    setTimeout(() => {
+      if (statusEl.textContent === 'Delivered.') {
+        statusEl.textContent = '';
+      }
+    }, 6000);
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+}
+
 function showEnvConfigEditor(event) {
   if (event) event.stopPropagation();
   return loadEnvConfig();
@@ -287,6 +308,7 @@ async function loadEnvConfig() {
   safeSetValue('env-config-status', (el) => { el.textContent = ''; });
   safeSetValue('env-claude-test-status', (el) => { el.textContent = ''; });
   safeSetValue('env-codex-test-status', (el) => { el.textContent = ''; });
+  safeSetValue('env-webhook-test-status', (el) => { el.textContent = ''; });
 
   let cfg = {
     oauth_token: '',
@@ -337,6 +359,7 @@ async function loadEnvConfig() {
   }
   safeSetValue('env-claude-test-status', (el) => { el.textContent = ''; });
   safeSetValue('env-codex-test-status', (el) => { el.textContent = ''; });
+  safeSetValue('env-webhook-test-status', (el) => { el.textContent = ''; });
 }
 
 function closeEnvConfigEditor() {

@@ -157,6 +157,11 @@ var Routes = []Route{
 		Description: "Test sandbox configuration by running a lightweight probe task.",
 		Tags:        []string{"env"},
 	},
+	{
+		Method: "POST", Pattern: "/api/env/test-webhook", Name: "TestWebhook",
+		Description: "Send a synthetic webhook event using the configured webhook settings.",
+		Tags:        []string{"env"},
+	},
 
 	// --- Workspace instructions ---
 

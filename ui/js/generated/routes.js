@@ -62,6 +62,8 @@ var Routes = {
     update: function() { return "/api/env"; },
     // POST /api/env/test
     test: function() { return "/api/env/test"; },
+    // POST /api/env/test-webhook
+    testWebhook: function() { return "/api/env/test-webhook"; },
   },
 
   instructions: {

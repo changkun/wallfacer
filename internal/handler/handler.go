@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/metrics"
@@ -53,6 +54,7 @@ type Handler struct {
 
 	sandboxTestMu     sync.RWMutex
 	sandboxTestPassed map[string]bool
+	webhookNotifier   func(envconfig.Config) *runner.WebhookNotifier
 
 	// testPhase1Done is called by tryAutoPromote after Phase 1 completes and
 	// before Phase 2 begins. It is nil in production; tests set it to
@@ -86,6 +88,9 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 			"claude": false,
 			"codex":  false,
 		},
+	}
+	h.webhookNotifier = func(cfg envconfig.Config) *runner.WebhookNotifier {
+		return runner.NewWorkspaceWebhookNotifier(h.workspace, cfg)
 	}
 	if snap := wsMgr.Snapshot(); true {
 		h.store = snap.Store

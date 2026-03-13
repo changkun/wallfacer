@@ -2,7 +2,11 @@ package handler
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,9 +15,141 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 )
+
+func TestGetEnvConfig_WebhookURLMasked(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	webhookURL := "https://example.com/webhook"
+	webhookSecret := "topsecret"
+	if err := envconfig.Update(envPath, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &webhookURL, &webhookSecret, nil); err != nil {
+		t.Fatalf("Update env: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/env", nil)
+	w := httptest.NewRecorder()
+	h.GetEnvConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp envConfigResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.WebhookURL != "configured" {
+		t.Fatalf("webhook_url = %q, want %q", resp.WebhookURL, "configured")
+	}
+}
+
+func TestTestWebhook_MissingConfiguration(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/env/test-webhook", strings.NewReader(`{}`))
+	w := httptest.NewRecorder()
+	h.TestWebhook(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "webhook URL is not configured") {
+		t.Fatalf("unexpected body: %s", w.Body.String())
+	}
+}
+
+func TestTestWebhook_Success(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	type received struct {
+		header http.Header
+		body   []byte
+	}
+	reqCh := make(chan received, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		reqCh <- received{header: r.Header.Clone(), body: body}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	webhookURL := srv.URL
+	webhookSecret := "handler-secret"
+	if err := envconfig.Update(envPath, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &webhookURL, &webhookSecret, nil); err != nil {
+		t.Fatalf("Update env: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/env/test-webhook", strings.NewReader(`{}`))
+	w := httptest.NewRecorder()
+	h.TestWebhook(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	select {
+	case got := <-reqCh:
+		if got.header.Get("X-Wallfacer-Event") != runner.WebhookEventTaskStateChanged {
+			t.Fatalf("event header = %q", got.header.Get("X-Wallfacer-Event"))
+		}
+		var payload runner.WebhookPayload
+		if err := json.Unmarshal(got.body, &payload); err != nil {
+			t.Fatalf("unmarshal payload: %v", err)
+		}
+		if payload.EventType != runner.WebhookEventTaskStateChanged {
+			t.Fatalf("event_type = %q", payload.EventType)
+		}
+		if payload.Status != store.TaskStatusDone {
+			t.Fatalf("status = %q", payload.Status)
+		}
+		mac := hmac.New(sha256.New, []byte(webhookSecret))
+		mac.Write(got.body)
+		wantSig := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+		if got.header.Get("X-Wallfacer-Signature") != wantSig {
+			t.Fatalf("signature = %q, want %q", got.header.Get("X-Wallfacer-Signature"), wantSig)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for webhook request")
+	}
+
+	tasks, err := h.store.ListTasks(context.Background(), true)
+	if err != nil {
+		t.Fatalf("ListTasks: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Fatalf("expected no tasks to be created, got %d", len(tasks))
+	}
+}
+
+func TestTestWebhook_DownstreamFailure(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	webhookURL := srv.URL
+	if err := envconfig.Update(envPath, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &webhookURL, nil, nil); err != nil {
+		t.Fatalf("Update env: %v", err)
+	}
+	h.webhookNotifier = func(cfg envconfig.Config) *runner.WebhookNotifier {
+		wn := runner.NewWorkspaceWebhookNotifier(h.workspace, cfg)
+		wn.SetRetryBackoffs([]time.Duration{0, 5 * time.Millisecond})
+		return wn
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/env/test-webhook", strings.NewReader(`{}`))
+	w := httptest.NewRecorder()
+	h.TestWebhook(w, req)
+
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "webhook delivery failed") {
+		t.Fatalf("unexpected body: %s", w.Body.String())
+	}
+}
 
 // newTestHandlerWithEnv creates a Handler backed by a temp-dir store and a
 // real env file so that UpdateEnvConfig can write to it.
