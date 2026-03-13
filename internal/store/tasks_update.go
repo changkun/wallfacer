@@ -600,6 +600,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.BaseCommitHashes = nil
 	t.IsTestRun = false
 	t.LastTestResult = ""
+	t.PendingTestFeedback = ""
 	t.UpdatedAt = time.Now()
 	s.removeFromStatusIndex(oldStatus, id)
 	s.addToStatusIndex(t.Status, id)

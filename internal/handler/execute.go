@@ -47,29 +47,47 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	// paused for user input — blocking it would leave it stuck when autopilot
 	// fills all slots.
 	promoteMu.Lock()
-	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
+	if err := h.resumeWaitingTaskWithFeedbackLocked(r.Context(), task, req.Message, store.TriggerFeedback, ""); err != nil {
 		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	promoteMu.Unlock()
 
-	h.store.InsertEvent(r.Context(), id, store.EventTypeFeedback, map[string]string{
-		"message": req.Message,
+	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
+}
+
+func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task *store.Task, message, trigger, systemMessage string) error {
+	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, ""); err != nil {
+		return err
+	}
+	if err := h.store.UpdateTaskPendingTestFeedback(ctx, task.ID, ""); err != nil {
+		return err
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		return err
+	}
+
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeFeedback, map[string]string{
+		"message": message,
 	})
-	h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{
 		"from":    string(store.TaskStatusWaiting),
 		"to":      string(store.TaskStatusInProgress),
-		"trigger": store.TriggerFeedback,
+		"trigger": trigger,
 	})
+	if systemMessage != "" {
+		h.store.InsertEvent(ctx, task.ID, store.EventTypeSystem, map[string]string{
+			"result": systemMessage,
+		})
+	}
 
 	sessionID := ""
 	if task.SessionID != nil {
 		sessionID = *task.SessionID
 	}
-	h.runner.RunBackground(id, req.Message, sessionID, true)
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
+	h.runner.RunBackground(task.ID, message, sessionID, true)
+	return nil
 }
 
 // CompleteTask marks a waiting task as done and triggers the commit pipeline.
@@ -418,19 +436,11 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	oldStatus := task.Status
 	// Use ForceUpdateTaskStatus to handle failed → in_progress which is a
 	// valid operational flow not in the automated state machine.
+	// Syncing a waiting/failed task must not be blocked by the regular
+	// in-progress capacity limit. Like resume/feedback, this is follow-up work
+	// on an existing task, and rejecting it when autopilot has filled all slots
+	// leaves the user unable to recover or update the task.
 	promoteMu.Lock()
-	regularInProgress, err := h.countRegularInProgress(r.Context())
-	if err != nil {
-		promoteMu.Unlock()
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if regularInProgress >= h.maxConcurrentTasks() {
-		promoteMu.Unlock()
-		http.Error(w, "max concurrent tasks reached", http.StatusConflict)
-		return
-	}
-
 	if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
 		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
