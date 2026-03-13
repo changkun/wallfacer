@@ -527,6 +527,35 @@ func (s *Store) UpdateTaskModelOverride(_ context.Context, id uuid.UUID, model s
 	return nil
 }
 
+// UpdateTaskCustomPatterns replaces the custom pass/fail regex pattern slices on a task.
+// Passing a nil slice clears the corresponding field; passing a non-nil empty slice also clears it.
+func (s *Store) UpdateTaskCustomPatterns(_ context.Context, id uuid.UUID, passPatterns, failPatterns []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	if len(passPatterns) == 0 {
+		t.CustomPassPatterns = nil
+	} else {
+		t.CustomPassPatterns = append([]string(nil), passPatterns...)
+	}
+	if len(failPatterns) == 0 {
+		t.CustomFailPatterns = nil
+	} else {
+		t.CustomFailPatterns = append([]string(nil), failPatterns...)
+	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	// Search index not updated: custom patterns are not search-indexed fields.
+	s.notify(t, false)
+	return nil
+}
+
 // UpdateTaskEnvironment records the execution environment captured at the start of Run().
 // The environment is written atomically alongside the task and broadcast to SSE subscribers.
 func (s *Store) UpdateTaskEnvironment(_ context.Context, id uuid.UUID, env ExecutionEnvironment) error {

@@ -476,7 +476,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			statusSet = true
 			if isTestRun {
 				// Test verification complete: don't commit, return to waiting with verdict.
-				verdict := parseTestVerdict(output.Result)
+				verdict := parseTestVerdict(output.Result, task.CustomPassPatterns, task.CustomFailPatterns)
 				if verdict == "" {
 					// No clear verdict detected; treat as fail so the task is not
 					// auto-submitted without explicit confirmation.
@@ -529,7 +529,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			if isTestRun {
 				// Test run ended without an explicit stop_reason. Record
 				// "fail" when no verdict is detected so the task is not auto-submitted.
-				verdict := parseTestVerdict(output.Result)
+				verdict := parseTestVerdict(output.Result, task.CustomPassPatterns, task.CustomFailPatterns)
 				if verdict == "" {
 					verdict = "fail"
 				}
@@ -756,10 +756,12 @@ func (r *Runner) failSync(ctx context.Context, taskID uuid.UUID, sessionID strin
 // Returns "" if no clear verdict is found.
 //
 // Detection strategy (in priority order):
-//  1. Explicit markdown bold markers (**PASS** or **FAIL**) anywhere in the text.
-//  2. The last non-empty line ends with the verdict word, after stripping common
+//  1. User-defined customFail patterns (immediate fail on match).
+//  2. User-defined customPass patterns (immediate pass on match).
+//  3. Explicit markdown bold markers (**PASS** or **FAIL**) anywhere in the text.
+//  4. The last non-empty line ends with the verdict word, after stripping common
 //     trailing punctuation (handles "PASS.", "Result: PASS", etc.).
-func parseTestVerdict(result string) string {
+func parseTestVerdict(result string, customPass, customFail []string) string {
 	upper := strings.ToUpper(result)
 
 	// Highest confidence: explicit markdown bold markers.
@@ -803,7 +805,7 @@ func parseTestVerdict(result string) string {
 
 	// Broader content scan for common test runner passing summaries when
 	// neither explicit markers nor tail-line heuristics found a verdict.
-	if v := inferPassFromContent(result); v != "" {
+	if v := inferPassFromContent(result, customPass, customFail); v != "" {
 		return v
 	}
 
@@ -820,9 +822,23 @@ func buildTestFailureFeedback(result string) string {
 
 // inferPassFromContent scans the full test output for common test runner
 // success patterns that don't use the explicit PASS/FAIL vocabulary.
+// customFail patterns are checked first (immediate fail); customPass patterns
+// are checked next (immediate pass); then built-in heuristics follow.
 // Returns "pass" if a passing pattern is found and no non-zero failure count
 // is detected, otherwise "".
-func inferPassFromContent(result string) string {
+func inferPassFromContent(result string, customPass, customFail []string) string {
+	// User-defined patterns take priority.
+	for _, p := range customFail {
+		if re, err := regexp.Compile(p); err == nil && re.MatchString(result) {
+			return "fail"
+		}
+	}
+	for _, p := range customPass {
+		if re, err := regexp.Compile(p); err == nil && re.MatchString(result) {
+			return "pass"
+		}
+	}
+
 	// If a non-zero number of failures is mentioned, don't infer pass.
 	if failureInContentPattern.MatchString(result) {
 		return ""

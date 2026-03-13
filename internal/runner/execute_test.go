@@ -1872,3 +1872,60 @@ func TestAutoRetry_MaxTotalCap(t *testing.T) {
 		t.Errorf("expected AutoRetryCount=%d (unchanged), got %d", maxTotalAutoRetries, got.AutoRetryCount)
 	}
 }
+
+// TestParseTestVerdictCustomPatterns verifies that user-supplied regex patterns
+// are evaluated before the built-in heuristics.
+func TestParseTestVerdictCustomPatterns(t *testing.T) {
+	cases := []struct {
+		name        string
+		input       string
+		customPass  []string
+		customFail  []string
+		expected    string
+	}{
+		{
+			name:       "custom fail pattern matches",
+			input:      "something went BOOM in the pipeline",
+			customFail: []string{"BOOM"},
+			expected:   "fail",
+		},
+		{
+			name:       "custom pass pattern matches",
+			input:      "compilation finished: BUILD OK",
+			customPass: []string{"BUILD OK"},
+			expected:   "pass",
+		},
+		{
+			name:       "custom fail takes precedence over built-in pass heuristic",
+			input:      "ok  github.com/foo/bar\t0.003s\nCUSTOM_FAIL_MARKER",
+			customFail: []string{"CUSTOM_FAIL_MARKER"},
+			expected:   "fail",
+		},
+		{
+			name:       "invalid custom regex is silently skipped, falls through to built-in",
+			input:      "ok  github.com/foo/bar\t0.003s",
+			customFail: []string{"[invalid"},
+			expected:   "pass", // built-in goTestOKPattern fires
+		},
+		{
+			name:     "empty custom slices reproduce existing behaviour",
+			input:    "5 passing (23ms)",
+			expected: "pass",
+		},
+		{
+			name:     "empty custom slices, no match",
+			input:    "no verdict here",
+			expected: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseTestVerdict(tc.input, tc.customPass, tc.customFail)
+			if got != tc.expected {
+				t.Errorf("parseTestVerdict(%q, pass=%v, fail=%v) = %q, want %q",
+					tc.input, tc.customPass, tc.customFail, got, tc.expected)
+			}
+		})
+	}
+}
