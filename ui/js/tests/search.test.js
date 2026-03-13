@@ -132,6 +132,39 @@ describe('matchesFilter', () => {
     expect(ctx.matchesFilter({ title: 'Fix the bug' })).toBe(true);
     expect(ctx.matchesFilter({ title: 'Add feature' })).toBe(false);
   });
+
+  it('matches tags in free-text search', () => {
+    setFilter(ctx, 'backend');
+    expect(ctx.matchesFilter({ title: 'unrelated', prompt: 'unrelated', tags: ['backend', 'api'] })).toBe(true);
+    expect(ctx.matchesFilter({ title: 'unrelated', prompt: 'unrelated', tags: ['frontend'] })).toBe(false);
+  });
+
+  it('handles tasks with no tags gracefully', () => {
+    setFilter(ctx, 'backend');
+    expect(ctx.matchesFilter({ title: 'unrelated', prompt: 'unrelated' })).toBe(false);
+    expect(ctx.matchesFilter({ title: 'unrelated', prompt: 'unrelated', tags: [] })).toBe(false);
+  });
+
+  it('#tag token filters by exact tag match', () => {
+    setFilter(ctx, '#backend');
+    expect(ctx.matchesFilter({ title: 'x', prompt: 'y', tags: ['backend'] })).toBe(true);
+    expect(ctx.matchesFilter({ title: 'x', prompt: 'y', tags: ['frontend'] })).toBe(false);
+    expect(ctx.matchesFilter({ title: 'x', prompt: 'y' })).toBe(false);
+  });
+
+  it('multiple #tag tokens are AND-combined', () => {
+    setFilter(ctx, '#backend #api');
+    expect(ctx.matchesFilter({ title: 'x', prompt: 'y', tags: ['backend', 'api'] })).toBe(true);
+    expect(ctx.matchesFilter({ title: 'x', prompt: 'y', tags: ['backend'] })).toBe(false);
+    expect(ctx.matchesFilter({ title: 'x', prompt: 'y', tags: ['api'] })).toBe(false);
+  });
+
+  it('#tag + free text both must match', () => {
+    setFilter(ctx, '#backend auth');
+    expect(ctx.matchesFilter({ title: 'auth service', prompt: 'y', tags: ['backend'] })).toBe(true);
+    expect(ctx.matchesFilter({ title: 'auth service', prompt: 'y', tags: ['frontend'] })).toBe(false);
+    expect(ctx.matchesFilter({ title: 'unrelated', prompt: 'y', tags: ['backend'] })).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

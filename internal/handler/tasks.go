@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 // SearchTasks handles GET /api/tasks/search?q=<text>.
 // Returns a JSON array of store.TaskSearchResult (at most 50).
 // q must be at least 2 runes; returns 400 otherwise.
@@ -150,6 +149,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Sandbox           string            `json:"sandbox"`
 		SandboxByActivity map[string]string `json:"sandbox_by_activity"`
 		Kind              store.TaskKind    `json:"kind"`
+		Tags              []string          `json:"tags"`
 		MaxCostUSD        float64           `json:"max_cost_usd"`
 		MaxInputTokens    int               `json:"max_input_tokens"`
 		Model             string            `json:"model"`
@@ -170,6 +170,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
 		Prompt:            req.Prompt,
 		Timeout:           req.Timeout,
+		Tags:              req.Tags,
 		MountWorktrees:    req.MountWorktrees,
 		Kind:              req.Kind,
 		Sandbox:           req.Sandbox,
@@ -516,6 +517,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Sandbox           *string            `json:"sandbox"`
 		SandboxByActivity *map[string]string `json:"sandbox_by_activity"`
 		DependsOn         *[]string          `json:"depends_on"`
+		Tags              *[]string          `json:"tags"`
 		MaxCostUSD        *float64           `json:"max_cost_usd"`
 		MaxInputTokens    *int               `json:"max_input_tokens"`
 		// Model sets the per-task model override; empty string clears it.
@@ -634,6 +636,13 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			strs[i] = d.String()
 		}
 		if err := h.store.UpdateTaskDependsOn(r.Context(), id, strs); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if req.Tags != nil {
+		if err := h.store.UpdateTaskTags(r.Context(), id, *req.Tags); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -798,4 +807,3 @@ func (h *Handler) RestoreTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-

@@ -124,6 +124,10 @@
           <div id="modal-backlog-edit" class="hidden mb-4">
             <h3 class="section-title">Edit Prompt</h3>
             <textarea id="modal-edit-prompt" rows="6" class="field" style="font-family:monospace;font-size:12px;"></textarea>
+            <div class="mt-2">
+              <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Tags</label>
+              <div id="modal-edit-tag-input" data-onchange="scheduleBacklogSave"></div>
+            </div>
           </div>
 
           <!-- Start section (backlog only) -->
@@ -386,5 +390,4 @@
     </div>
   </div>
 </div>
-
 
