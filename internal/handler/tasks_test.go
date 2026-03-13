@@ -1621,18 +1621,18 @@ func TestCheckAndSyncWaitingTasks_SyncsWhenBehind(t *testing.T) {
 	}
 }
 
-// TestCheckAndSyncWaitingTasks_UsesVerificationCapacity verifies that a waiting
-// task on the auto-test path can still be synced when regular task capacity is
-// full, borrowing from the dedicated verification budget.
-func TestCheckAndSyncWaitingTasks_UsesVerificationCapacity(t *testing.T) {
+// TestCheckAndSyncWaitingTasks_SyncsAtFullCapacity verifies that sync proceeds
+// even when regular task capacity is fully saturated. Sync operations are
+// lightweight host-side git rebases and do not compete for container slots.
+func TestCheckAndSyncWaitingTasks_SyncsAtFullCapacity(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
-	h.SetAutotest(true)
 	ctx := context.Background()
 
-	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\nWALLFACER_MAX_TEST_PARALLEL=1\n"), 0644); err != nil {
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
+	// Fill all regular capacity.
 	regular, _ := h.store.CreateTask(ctx, "regular task", 15, false, "", "")
 	h.store.ForceUpdateTaskStatus(ctx, regular.ID, store.TaskStatusInProgress)
 

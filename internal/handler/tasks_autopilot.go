@@ -45,25 +45,6 @@ func (h *Handler) countRegularInProgress(_ context.Context) (int, error) {
 	return h.store.CountRegularInProgress(), nil
 }
 
-func (h *Handler) waitingTaskUsesVerificationCapacity(t *store.Task) bool {
-	if t == nil {
-		return false
-	}
-	if h.AutotestEnabled() && t.LastTestResult == "" {
-		return true
-	}
-	if !h.AutosubmitEnabled() {
-		return false
-	}
-	if t.IsTestRun {
-		return false
-	}
-	if t.LastTestResult == "pass" {
-		return true
-	}
-	return t.StopReason != nil && *t.StopReason == "end_turn" && t.LastTestResult == "" && !h.AutotestEnabled()
-}
-
 func countRegularInProgress(tasks []store.Task) int {
 	count := 0
 	for i := range tasks {
@@ -437,13 +418,15 @@ func (h *Handler) StartWaitingSyncWatcher(ctx context.Context) {
 // any worktree is behind the default branch it automatically transitions the
 // task to in_progress and triggers SyncWorktrees, exactly as if the user had
 // clicked the "Sync" button.
+//
+// Sync operations are lightweight host-side git rebases — they do not launch
+// containers and therefore bypass the regular task capacity check. This ensures
+// waiting tasks stay up to date even when the board is running at full capacity.
 func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 	tasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 	if err != nil {
 		return
 	}
-	maxTasks := h.maxConcurrentTasks()
-	maxVerificationTasks := h.maxTestConcurrentTasks()
 
 	for i := range tasks {
 		t := &tasks[i]
@@ -477,27 +460,12 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			"task", t.ID)
 
 		promoteMu.Lock()
-		regularInProgress := h.store.CountRegularInProgress()
-		syncCapacity := maxTasks
-		if h.waitingTaskUsesVerificationCapacity(t) {
-			syncCapacity += maxVerificationTasks
-		}
-
-		if regularInProgress >= syncCapacity {
-			promoteMu.Unlock()
-			logger.Handler.Info("auto-sync: in-progress limit reached, deferring sync",
-				"task", t.ID, "count", regularInProgress, "max", syncCapacity)
-			h.incAutopilotAction("sync_watcher", "skipped_capacity")
-			continue
-		}
-
 		if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusInProgress); err != nil {
 			promoteMu.Unlock()
 			logger.Handler.Error("auto-sync: update task status", "task", t.ID, "error", err)
 			h.pauseAllAutomation(&t.ID, "auto-sync", err.Error())
 			continue
 		}
-		regularInProgress++
 		h.incAutopilotAction("sync_watcher", "synced")
 		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerSync, nil))
