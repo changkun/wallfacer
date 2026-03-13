@@ -233,7 +233,12 @@ describe('render.js diffCache', () => {
 
     renderExports.invalidateDiffBehindCounts('task-a');
 
-    expect(renderExports.diffCache.has('task-a')).toBe(false);
+    expect(renderExports.diffCache.get('task-a')).toEqual({
+      diff: 'a',
+      behindCounts: {},
+      updatedAt: 'u1',
+      behindFetchedAt: 0,
+    });
     expect(renderExports.diffCache.get('task-b')).toEqual({
       diff: 'b',
       behindCounts: {},
