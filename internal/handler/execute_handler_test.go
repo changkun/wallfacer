@@ -860,3 +860,39 @@ func TestSyncTask_FailedWithWorktrees(t *testing.T) {
 		t.Errorf("expected status=syncing, got %q", resp["status"])
 	}
 }
+
+func TestSyncTask_SucceedsAtFullCapacity(t *testing.T) {
+	repo := setupRepo(t)
+	h, envPath := newTestHandlerWithEnv(t)
+	ctx := context.Background()
+
+	if err := os.WriteFile(envPath, []byte("WALLFACER_MAX_PARALLEL=1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	createInProgressTask(t, h, "occupying slot")
+
+	task, err := h.store.CreateTask(ctx, "sync me", 15, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/sync", nil)
+	w := httptest.NewRecorder()
+	h.SyncTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (sync should bypass capacity), got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp["status"] != "syncing" {
+		t.Errorf("expected status=syncing, got %q", resp["status"])
+	}
+}
