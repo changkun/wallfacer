@@ -70,8 +70,8 @@ func TestIdeationTaskTransitionsToDone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Status != store.TaskStatusWaiting {
-		t.Fatalf("expected status=waiting, got %q", updated.Status)
+	if updated.Status != store.TaskStatusDone {
+		t.Fatalf("expected status=done, got %q", updated.Status)
 	}
 }
 
@@ -663,7 +663,7 @@ func TestExtractIdeasRejectsPromptEqualsTitle(t *testing.T) {
 func TestExtractIdeasPartiallyRejectsPromptEqualsTitle(t *testing.T) {
 	raw := `[
 		{"title": "Add tests",  "category": "test coverage", "prompt": "Add tests"},
-		{"title": "Fix bug",    "category": "backend / API", "prompt": "Reproduce and fix the nil-pointer in handler/tasks.go:82 by adding a guard before the dereference."},
+		{"title": "Fix bug",    "category": "backend / API", "prompt": "Reproduce and fix the nil-pointer in handler/tasks.go:82 by adding a guard before the dereference.", "impact_score": 80},
 		{"title": "Refactor auth","category": "code quality","prompt": "Refactor auth"}
 	]`
 	ideas, rejections, err := extractIdeas(raw)
@@ -732,7 +732,7 @@ func TestExtractIdeasReturnsRejectionReasonsAndScores(t *testing.T) {
 
 func TestExtractIdeasFromRunOutputFallsBackToPreviousNDJSONResult(t *testing.T) {
 	stream := strings.Join([]string{
-		`{"result":"[{\"title\":\"Add tests\",\"category\":\"test quality\",\"prompt\":\"Write unit tests for all handlers.\"}]","session_id":"ideate-sess","stop_reason":"","is_error":false,"total_cost_usd":0.002}`,
+		`{"result":"[{\"title\":\"Add tests\",\"category\":\"test quality\",\"prompt\":\"Write unit tests for all handlers.\",\"impact_score\":80}]","session_id":"ideate-sess","stop_reason":"","is_error":false,"total_cost_usd":0.002}`,
 		`{"result":"The background exploration is complete and confirms all three findings. The output JSON was already delivered above.","session_id":"ideate-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.002}`,
 	}, "\n")
 

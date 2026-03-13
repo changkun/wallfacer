@@ -56,6 +56,7 @@ func newTestHandler(t *testing.T) *Handler {
 	}
 	s, err := store.NewStore(storeDir)
 	if err != nil {
+		os.RemoveAll(storeDir)
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{})
@@ -70,8 +71,13 @@ func newTestHandler(t *testing.T) *Handler {
 
 func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 	t.Helper()
-	s, err := store.NewStore(t.TempDir())
+	storeDir, err := os.MkdirTemp("", "wallfacer-ws-handler-test-*")
 	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.NewStore(storeDir)
+	if err != nil {
+		os.RemoveAll(storeDir)
 		t.Fatal(err)
 	}
 	envPath := filepath.Join(t.TempDir(), ".env")
@@ -83,6 +89,8 @@ func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 		Workspaces: strings.Join(workspaces, " "),
 	})
 	t.Cleanup(r.WaitBackground)
+	t.Cleanup(r.Shutdown)
+	t.Cleanup(func() { os.RemoveAll(storeDir) })
 	return NewHandler(s, r, t.TempDir(), workspaces, nil)
 }
 
