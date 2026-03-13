@@ -60,10 +60,12 @@ function createContext(options = {}) {
     },
     tasks: [],
     archivedTasks: [],
+    activeWorkspaces: ['/workspace/test'],
     showArchived: false,
     backlogSortMode: 'manual',
     filterQuery: '',
     maxParallelTasks: 0,
+    withAuthToken: (url) => url,
     ensureArchivedScrollBinding: () => {},
     loadArchivedTasksPage: vi.fn(),
     resetArchivedWindow: vi.fn(),
@@ -129,6 +131,7 @@ function loadRenderAndApiHarness(options = {}) {
   const harness = createContext(options);
   loadScript('render.js', harness.ctx);
   const renderExports = harness.ctx.module.exports;
+  loadScript('task-stream.js', harness.ctx);
   loadScript('api.js', harness.ctx);
   return { ...harness, renderExports };
 }

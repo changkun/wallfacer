@@ -140,6 +140,11 @@ function makeContext(extra = {}) {
         storage.clear();
       },
     },
+    // apiGet is defined in transport.js; provide a stub here so tests that load
+    // command-palette.js directly (without transport.js) can call _searchRemote.
+    apiGet: extra.fetch
+      ? (path) => extra.fetch(path).then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      : () => Promise.resolve(null),
     ...extra,
   };
   ctx.window.localStorage = ctx.localStorage;
