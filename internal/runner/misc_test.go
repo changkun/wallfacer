@@ -302,6 +302,23 @@ func TestPruneUnknownWorktreesMissingDir(t *testing.T) {
 	runner.PruneUnknownWorktrees()
 }
 
+func TestPruneUnknownWorktreesNilStore(t *testing.T) {
+	repo := setupTestRepo(t)
+	_, runner := setupRunnerWithCmd(t, []string{repo}, "echo")
+	runner.store = nil
+
+	orphanDir := filepath.Join(runner.worktreesDir, uuid.New().String())
+	if err := os.MkdirAll(orphanDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	runner.PruneUnknownWorktrees()
+
+	if _, err := os.Stat(orphanDir); !os.IsNotExist(err) {
+		t.Fatal("orphan worktree dir should be pruned even when store is nil")
+	}
+}
+
 // TestPruneUnknownWorktreesRunsGitWorktreePrune verifies that
 // PruneUnknownWorktrees runs `git worktree prune` on git workspaces.
 func TestPruneUnknownWorktreesRunsGitWorktreePrune(t *testing.T) {
@@ -933,8 +950,8 @@ func TestIsUUID(t *testing.T) {
 		{"249e9c9c-1234-5678-abcd-ef0123456789", true},
 		{"00000000-0000-0000-0000-000000000000", true},
 		{"ffffffff-ffff-ffff-ffff-ffffffffffff", true},
-		{"add-dark-mode-249e9c9c", false},          // slug-based name fragment
-		{"249e9c9c", false},                        // short UUID
+		{"add-dark-mode-249e9c9c", false}, // slug-based name fragment
+		{"249e9c9c", false},               // short UUID
 		{"", false},
 		{"not-a-uuid-at-all-xxxxxxxxxxxxxxxxxx", false},
 	}
