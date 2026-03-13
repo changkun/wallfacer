@@ -400,10 +400,10 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"RebuildIndex": h.RebuildIndex,
 
 		// Debug & monitoring.
-		"Health":           h.Health,
-		"GetSpanStats":     h.GetSpanStats,
-		"GetRuntimeStatus": h.GetRuntimeStatus,
-		"BoardManifest":    h.BoardManifest,
+		"Health":            h.Health,
+		"GetSpanStats":      h.GetSpanStats,
+		"GetRuntimeStatus":  h.GetRuntimeStatus,
+		"BoardManifest":     h.BoardManifest,
 		"TaskBoardManifest": withID(h.TaskBoardManifest),
 
 		// Container monitoring.
@@ -437,9 +437,9 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"UpdateSystemPrompt": h.UpdateSystemPrompt,
 		"DeleteSystemPrompt": h.DeleteSystemPrompt,
 
-		"ListTemplates":   h.ListTemplates,
-		"CreateTemplate":  h.CreateTemplate,
-		"DeleteTemplate":  h.DeleteTemplate,
+		"ListTemplates":  h.ListTemplates,
+		"CreateTemplate": h.CreateTemplate,
+		"DeleteTemplate": h.DeleteTemplate,
 
 		// Git workspace operations.
 		"GitStatus":        h.GitStatus,
@@ -469,21 +469,21 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"ListDeletedTasks":         h.ListDeletedTasks,
 
 		// Task instance operations (UUID extracted via withID).
-		"UpdateTask":    withID(h.UpdateTask),
-		"DeleteTask":    withID(h.DeleteTask),
-		"GetEvents":     withID(h.GetEvents),
+		"UpdateTask":     withID(h.UpdateTask),
+		"DeleteTask":     withID(h.DeleteTask),
+		"GetEvents":      withID(h.GetEvents),
 		"SubmitFeedback": withID(h.SubmitFeedback),
-		"CompleteTask":  withID(h.CompleteTask),
-		"CancelTask":    withID(h.CancelTask),
-		"ResumeTask":    withID(h.ResumeTask),
-		"RestoreTask":   withID(h.RestoreTask),
-		"ArchiveTask":   withID(h.ArchiveTask),
-		"UnarchiveTask": withID(h.UnarchiveTask),
-		"SyncTask":      withID(h.SyncTask),
-		"TestTask":      withID(h.TestTask),
-		"ForkTask":      withID(h.ForkTask),
-		"TaskDiff":      withID(h.TaskDiff),
-		"StreamLogs":    withID(h.StreamLogs),
+		"CompleteTask":   withID(h.CompleteTask),
+		"CancelTask":     withID(h.CancelTask),
+		"ResumeTask":     withID(h.ResumeTask),
+		"RestoreTask":    withID(h.RestoreTask),
+		"ArchiveTask":    withID(h.ArchiveTask),
+		"UnarchiveTask":  withID(h.UnarchiveTask),
+		"SyncTask":       withID(h.SyncTask),
+		"TestTask":       withID(h.TestTask),
+		"ForkTask":       withID(h.ForkTask),
+		"TaskDiff":       withID(h.TaskDiff),
+		"StreamLogs":     withID(h.StreamLogs),
 
 		// GetTurnUsage reads {id} internally (not via withID).
 		"GetTurnUsage": h.GetTurnUsage,
@@ -511,6 +511,57 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 		"RefineDismiss":    withID(h.RefineDismiss),
 	}
 
+	bodyLimits := map[string]int64{
+		// Server configuration.
+		"UpdateConfig": handler.BodyLimitDefault,
+
+		// Ideation agent.
+		"TriggerIdeation": handler.BodyLimitDefault,
+
+		// Environment configuration.
+		"UpdateEnvConfig": handler.BodyLimitDefault,
+		"TestSandbox":     handler.BodyLimitDefault,
+
+		// Workspace instructions.
+		"UpdateInstructions": handler.BodyLimitInstructions,
+		"ReinitInstructions": handler.BodyLimitDefault,
+
+		// System prompt templates.
+		"UpdateSystemPrompt": handler.BodyLimitDefault,
+
+		// Prompt templates.
+		"CreateTemplate": handler.BodyLimitDefault,
+
+		// Git workspace operations.
+		"GitPush":          handler.BodyLimitDefault,
+		"GitSyncWorkspace": handler.BodyLimitDefault,
+		"GitRebaseOnMain":  handler.BodyLimitDefault,
+		"GitCheckout":      handler.BodyLimitDefault,
+		"GitCreateBranch":  handler.BodyLimitDefault,
+		"OpenFolder":       handler.BodyLimitDefault,
+
+		// Task collection.
+		"CreateTask":               handler.BodyLimitDefault,
+		"BatchCreateTasks":         handler.BodyLimitDefault,
+		"GenerateMissingTitles":    handler.BodyLimitDefault,
+		"GenerateMissingOversight": handler.BodyLimitDefault,
+		"ArchiveAllDone":           handler.BodyLimitDefault,
+
+		// Task instance operations.
+		"UpdateTask":     handler.BodyLimitDefault,
+		"DeleteTask":     handler.BodyLimitDefault,
+		"SubmitFeedback": handler.BodyLimitFeedback,
+		"CompleteTask":   handler.BodyLimitDefault,
+		"ResumeTask":     handler.BodyLimitDefault,
+		"TestTask":       handler.BodyLimitDefault,
+		"ForkTask":       handler.BodyLimitDefault,
+
+		// Refinement agent.
+		"StartRefinement": handler.BodyLimitDefault,
+		"RefineApply":     handler.BodyLimitDefault,
+		"RefineDismiss":   handler.BodyLimitDefault,
+	}
+
 	// Register all routes from the contract. A missing handler entry panics at
 	// startup, making it impossible to deploy with a route in the contract but
 	// no handler wired up.
@@ -520,7 +571,11 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 			panic(fmt.Sprintf("buildMux: no handler registered for contract route %q (%s %s)",
 				route.Name, route.Method, route.Pattern))
 		}
-		mux.HandleFunc(route.FullPattern(), fn)
+		var registered http.Handler = fn
+		if limit, ok := bodyLimits[route.Name]; ok {
+			registered = handler.MaxBytesMiddleware(limit)(registered)
+		}
+		mux.Handle(route.FullPattern(), registered)
 	}
 
 	// Prometheus metrics endpoint (not an API route; excluded from the contract).

@@ -202,6 +202,11 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, v any) bool {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
+			return false
+		}
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return false
 	}
@@ -225,6 +230,11 @@ func decodeOptionalJSONBody(w http.ResponseWriter, r *http.Request, v any) bool 
 	if err := dec.Decode(v); err != nil {
 		if errors.Is(err, io.EOF) {
 			return true // empty body — treat as no body provided
+		}
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
+			return false
 		}
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return false
