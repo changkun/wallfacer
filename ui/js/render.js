@@ -2,10 +2,11 @@
 // source) so new categories can be added without frontend code changes.
 var BRAINSTORM_CATEGORIES = new Set();
 
-function tagColor(tag) {
+function tagStyle(tag) {
   let sum = 0;
   for (let index = 0; index < tag.length; index++) sum += tag.charCodeAt(index);
-  return 'var(--tag-color-' + (sum % 12) + ')';
+  const n = sum % 12;
+  return `background:var(--tag-bg-${n});color:var(--tag-text-${n});`;
 }
 
 function setBrainstormCategories(values) {
@@ -711,13 +712,14 @@ card.style.opacity = isArchived ? '0.55' : '';
     </div>` : ''}
     ${isIdeaAgent ? `<div class="card-title">&#129504; ${highlightMatch(t.title || 'Brainstorm', filterQuery)}</div>` : t.title ? `<div class="card-title">${highlightMatch(t.title, filterQuery)}</div>` : ''}
     ${t.tags && t.tags.length > 0 ? (() => {
-      const visible = t.tags.slice(0, 3);
-      const overflow = t.tags.length - visible.length;
-      const chips = visible.map(tag =>
-        `<span class="tag-chip" data-tag="${escapeHtml(tag)}" style="background:${tagColor(tag)};" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`
-      ).join('');
+      const VISIBLE = 3;
+      const overflow = t.tags.length - VISIBLE;
+      const chips = t.tags.map((tag, i) => {
+        const extra = i >= VISIBLE ? ' tag-chip-extra' : '';
+        return `<span class="tag-chip${extra}" data-tag="${escapeHtml(tag)}" style="${tagStyle(tag)}" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`;
+      }).join('');
       const overflowChip = overflow > 0
-        ? `<span class="tag-chip tag-chip-overflow" title="${escapeHtml(t.tags.slice(3).join(', '))}">+${overflow}</span>`
+        ? `<span class="tag-chip tag-chip-overflow" onclick="event.stopPropagation();this.closest('.tag-chip-row').classList.toggle('expanded');" title="Show all tags">+${overflow}</span>`
         : '';
       return `<div class="tag-chip-row">${chips}${overflowChip}</div>`;
     })() : ''}
