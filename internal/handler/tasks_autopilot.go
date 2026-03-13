@@ -111,8 +111,9 @@ func (h *Handler) StartAutoPromoter(ctx context.Context) {
 	}()
 }
 
-// maxAutoRetries is the maximum number of automatic retries for transient failures.
-const maxAutoRetries = 2
+// maxHandlerAutoRetries is the maximum total number of automatic retries for a
+// single task, mirroring the runner's maxTotalAutoRetries cap.
+const maxHandlerAutoRetries = 3
 
 // retryableCategories lists FailureCategory values that represent transient
 // infrastructure errors that are safe to retry automatically.
@@ -306,9 +307,9 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 	if !retryableCategories[task.FailureCategory] {
 		return
 	}
-	if len(task.RetryHistory) >= maxAutoRetries {
+	if task.AutoRetryBudget[task.FailureCategory] <= 0 || task.AutoRetryCount >= maxHandlerAutoRetries {
 		logger.Handler.Info("auto-retry suppressed: max retries reached",
-			"task", task.ID, "retries", len(task.RetryHistory),
+			"task", task.ID, "auto_retry_count", task.AutoRetryCount,
 			"category", task.FailureCategory)
 		return
 	}
@@ -320,7 +321,7 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 	}
 	logger.Handler.Info("auto-retrying failed task",
 		"task", task.ID, "category", task.FailureCategory,
-		"retry_attempt", len(task.RetryHistory)+1)
+		"retry_attempt", task.AutoRetryCount+1)
 	if err := h.store.ResetTaskForRetry(ctx, task.ID, task.Prompt, false); err != nil {
 		logger.Handler.Error("auto-retry reset failed", "task", task.ID, "error", err)
 		return
