@@ -512,7 +512,7 @@ func (r *Runner) rebaseAndMergeOne(
 			"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d)...", repoPath, attempt),
 		})
 
-		if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch, "commit", attempt, maxRebaseRetries); resolveErr != nil {
+		if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch, ConflictResolverTriggerCommit, attempt, maxRebaseRetries); resolveErr != nil {
 			return fmt.Errorf("conflict resolution failed: %w", resolveErr)
 		}
 	}
@@ -552,7 +552,7 @@ func (r *Runner) resolveConflicts(
 	repoPath, worktreePath string,
 	sessionID string,
 	defBranch string,
-	trigger string,
+	trigger ConflictResolverTrigger,
 	attempt int,
 	maxAttempts int,
 ) error {
@@ -568,7 +568,7 @@ func (r *Runner) resolveConflicts(
 	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]any{
 		"phase":        "conflict_resolver",
 		"status":       "started",
-		"trigger":      trigger,
+		"trigger":      string(trigger),
 		"repo":         repoName,
 		"attempt":      attempt,
 		"max_attempts": maxAttempts,
@@ -599,7 +599,7 @@ func (r *Runner) resolveConflicts(
 		r.store.InsertEvent(context.Background(), taskID, store.EventTypeError, map[string]any{
 			"phase":        "conflict_resolver",
 			"status":       "failed",
-			"trigger":      trigger,
+			"trigger":      string(trigger),
 			"repo":         repoName,
 			"attempt":      attempt,
 			"max_attempts": maxAttempts,
@@ -611,7 +611,7 @@ func (r *Runner) resolveConflicts(
 		r.store.InsertEvent(context.Background(), taskID, store.EventTypeError, map[string]any{
 			"phase":        "conflict_resolver",
 			"status":       "failed",
-			"trigger":      trigger,
+			"trigger":      string(trigger),
 			"repo":         repoName,
 			"attempt":      attempt,
 			"max_attempts": maxAttempts,
@@ -623,7 +623,7 @@ func (r *Runner) resolveConflicts(
 	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]any{
 		"phase":        "conflict_resolver",
 		"status":       "succeeded",
-		"trigger":      trigger,
+		"trigger":      string(trigger),
 		"repo":         repoName,
 		"attempt":      attempt,
 		"max_attempts": maxAttempts,
