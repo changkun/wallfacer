@@ -122,6 +122,38 @@ func TestCommitsBehind(t *testing.T) {
 			t.Error("expected error, got nil")
 		}
 	})
+
+	t.Run("detached repo head with only origin main still works", func(t *testing.T) {
+		origin := t.TempDir()
+		gitRun(t, origin, "init", "--bare", "-b", "main")
+		repo := setupRepo(t)
+		gitRun(t, repo, "remote", "add", "origin", origin)
+		gitRun(t, repo, "push", "-u", "origin", "main")
+
+		wtDir := filepath.Join(t.TempDir(), "wt")
+		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
+		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "task") })
+
+		writeFile(t, filepath.Join(repo, "m1.txt"), "main\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "main advance")
+		gitRun(t, repo, "push", "origin", "main")
+
+		headHash := gitRun(t, repo, "rev-parse", "HEAD")
+		gitRun(t, repo, "checkout", headHash)
+		gitRun(t, repo, "branch", "-D", "main")
+		if exec.Command("git", "-C", repo, "rev-parse", "--verify", "main").Run() == nil {
+			t.Fatal("expected local main branch to be absent for regression setup")
+		}
+		if exec.Command("git", "-C", repo, "rev-parse", "--verify", "origin/main").Run() != nil {
+			t.Fatal("expected origin/main to remain available for regression setup")
+		}
+
+		n, err := CommitsBehind(repo, wtDir)
+		if err != nil || n != 1 {
+			t.Fatalf("CommitsBehind = %d, %v; want 1, nil", n, err)
+		}
+	})
 }
 
 func TestHasCommitsAheadOf(t *testing.T) {
