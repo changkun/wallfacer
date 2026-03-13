@@ -52,7 +52,11 @@ function renderWorkspaces() {
   const el = document.getElementById('workspace-list');
   if (!el) return;
   if (!gitStatuses || gitStatuses.length === 0) {
-    el.innerHTML = '';
+    el.innerHTML = (activeWorkspaces || []).map((path) => {
+      const parts = String(path || '').replace(/[\\/]+$/, '').split(/[\\/]/);
+      const name = parts[parts.length - 1] || path;
+      return `<span title="${escapeHtml(path)}" style="font-size:11px;padding:2px 8px;border-radius:999px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);">${escapeHtml(name)}</span>`;
+    }).join('');
     if (activeWorkspaces && activeWorkspaces.length > 0) {
       document.title = 'Wallfacer';
     }

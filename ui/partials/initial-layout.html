@@ -30,7 +30,16 @@
 <header style="border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;">
   <div style="display: flex; align-items: center; gap: 16px;">
     <h1 style="font-size: 22px; font-weight: 400; letter-spacing: 0.01em; margin: 0;"><a href="https://github.com/changkun/wallfacer" target="_blank" rel="noopener noreferrer" style="font-family: 'Instrument Serif', Georgia, serif; font-style: italic; background: linear-gradient(135deg, #d97757 0%, #c4623f 60%, #a84e2e 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-decoration: none;">Wallfacer</a></h1>
-    <div id="workspace-list" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+    <div id="workspace-group-bar" style="display:flex;align-items:center;gap:10px;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);box-shadow:inset 0 1px 0 rgba(255,255,255,0.03);">
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);">Workspace Group</div>
+        <div id="workspace-list" style="display:flex;gap:6px;flex-wrap:wrap;min-width:0;"></div>
+      </div>
+      <div style="position:relative;flex-shrink:0;">
+        <button id="workspace-group-switch-btn" type="button" class="btn-icon" style="font-size:11px;padding:3px 9px;" onclick="toggleHeaderWorkspaceGroups(event)">Switch</button>
+        <div id="workspace-group-switcher" class="hidden" style="position:absolute;top:calc(100% + 8px);right:0;min-width:260px;max-width:360px;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);box-shadow:0 12px 32px rgba(0,0,0,0.18);z-index:30;"></div>
+      </div>
+    </div>
     <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
       <input type="checkbox" id="autopilot-toggle" onchange="toggleAutopilot()" style="cursor: pointer; accent-color: var(--accent);">
       Autopilot
