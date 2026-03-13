@@ -575,6 +575,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 		CostUSD:         t.Usage.CostUSD,
 		FailureCategory: retiredCategory,
 	})
+
 	t.FailureCategory = ""
 
 	oldStatus := t.Status

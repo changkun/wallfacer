@@ -1324,6 +1324,133 @@ func TestTryAutoPromote_DoesNotCountTestRuns(t *testing.T) {
 	}
 }
 
+func TestTryAutoRetry_ContainerCrash(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "retry me", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+
+	failed, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	h.tryAutoRetry(ctx, *failed)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after tryAutoRetry: %v", err)
+	}
+	if got.Status != store.TaskStatusBacklog {
+		t.Fatalf("Status = %q, want %q", got.Status, store.TaskStatusBacklog)
+	}
+}
+
+func TestTryAutoRetry_AgentError(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "do not retry", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryAgentError); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+
+	failed, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	h.tryAutoRetry(ctx, *failed)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after tryAutoRetry: %v", err)
+	}
+	if got.Status != store.TaskStatusFailed {
+		t.Fatalf("Status = %q, want %q", got.Status, store.TaskStatusFailed)
+	}
+}
+
+func TestTryAutoRetry_MaxRetries(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "retry budget exhausted", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+	for i := 0; i < maxAutoRetries; i++ {
+		if err := h.store.ResetTaskForRetry(ctx, task.ID, task.Prompt, false); err != nil {
+			t.Fatalf("ResetTaskForRetry(%d): %v", i, err)
+		}
+		h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+		if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+			t.Fatalf("SetTaskFailureCategory(%d): %v", i, err)
+		}
+	}
+
+	failed, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if got := len(failed.RetryHistory); got != maxAutoRetries {
+		t.Fatalf("RetryHistory len = %d, want %d", got, maxAutoRetries)
+	}
+	h.tryAutoRetry(ctx, *failed)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after tryAutoRetry: %v", err)
+	}
+	if got.Status != store.TaskStatusFailed {
+		t.Fatalf("Status = %q, want %q", got.Status, store.TaskStatusFailed)
+	}
+}
+
+func TestTryAutoRetry_CircuitOpen(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "blocked by circuit", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+	for i := 0; i < runner.DefaultCBThreshold; i++ {
+		h.runner.RecordContainerFailure()
+	}
+
+	failed, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	h.tryAutoRetry(ctx, *failed)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after tryAutoRetry: %v", err)
+	}
+	if got.Status != store.TaskStatusFailed {
+		t.Fatalf("Status = %q, want %q", got.Status, store.TaskStatusFailed)
+	}
+}
+
 // --- checkAndSyncWaitingTasks tests ---
 
 // TestCheckAndSyncWaitingTasks_SkipsNonWaiting verifies that tasks not in the
