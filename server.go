@@ -239,6 +239,45 @@ func runServer(configDir string, args []string) {
 			return []metrics.LabeledValue{{Value: float64(s.SubscriberCount())}}
 		},
 	)
+	reg.Gauge(
+		"wallfacer_failed_tasks_by_category",
+		"Number of currently-failed (non-archived) tasks grouped by failure_category.",
+		func() []metrics.LabeledValue {
+			tasks, err := s.ListTasks(context.Background(), false /* exclude archived */)
+			if err != nil {
+				return nil
+			}
+			counts := make(map[string]int)
+			for _, t := range tasks {
+				if t.Status == store.TaskStatusFailed {
+					cat := string(t.FailureCategory)
+					if cat == "" {
+						cat = "unknown"
+					}
+					counts[cat]++
+				}
+			}
+			vals := make([]metrics.LabeledValue, 0, len(counts))
+			for cat, n := range counts {
+				vals = append(vals, metrics.LabeledValue{
+					Labels: map[string]string{"category": cat},
+					Value:  float64(n),
+				})
+			}
+			return vals
+		},
+	)
+	reg.Gauge(
+		"wallfacer_circuit_breaker_open",
+		"1 when the container launch circuit breaker is open (runtime unavailable), 0 when closed.",
+		func() []metrics.LabeledValue {
+			v := 0.0
+			if r.ContainerCircuitOpen() {
+				v = 1.0
+			}
+			return []metrics.LabeledValue{{Value: v}}
+		},
+	)
 
 	mux := buildMux(h, r, reg)
 
