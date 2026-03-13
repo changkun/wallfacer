@@ -179,6 +179,27 @@ func TestBrowseWorkspaces_HiddenFoldersExcludedByDefault(t *testing.T) {
 	}
 }
 
+func TestBrowseWorkspaces_AcceptsTrailingSlash(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/workspaces/browse?path="+ws+"/", nil)
+	w := httptest.NewRecorder()
+	h.BrowseWorkspaces(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Path != ws {
+		t.Fatalf("expected normalized path %q, got %q", ws, resp.Path)
+	}
+}
+
 func TestBrowseWorkspaces_HiddenFoldersIncludedWhenRequested(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 	hidden := filepath.Join(ws, ".hidden-repo")

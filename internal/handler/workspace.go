@@ -25,10 +25,11 @@ func (h *Handler) BrowseWorkspaces(w http.ResponseWriter, r *http.Request) {
 		home, _ := os.UserHomeDir()
 		path = home
 	}
-	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+	if !filepath.IsAbs(path) {
 		http.Error(w, "path must be an absolute clean directory", http.StatusBadRequest)
 		return
 	}
+	path = filepath.Clean(path)
 	info, err := os.Stat(path)
 	if err != nil || !info.IsDir() {
 		http.Error(w, "path must be an existing directory", http.StatusBadRequest)
