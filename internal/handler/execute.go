@@ -42,19 +42,11 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		return
 	}
 
+	// Submitting feedback to a waiting task is always allowed even when max
+	// concurrent tasks is reached. The task was previously in_progress and
+	// paused for user input — blocking it would leave it stuck when autopilot
+	// fills all slots.
 	promoteMu.Lock()
-	regularInProgress, err := h.countRegularInProgress(r.Context())
-	if err != nil {
-		promoteMu.Unlock()
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if regularInProgress >= h.maxConcurrentTasks() {
-		promoteMu.Unlock()
-		http.Error(w, "max concurrent tasks reached", http.StatusConflict)
-		return
-	}
-
 	if err := h.store.UpdateTaskStatus(r.Context(), id, store.TaskStatusInProgress); err != nil {
 		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -215,19 +207,12 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
+	// Resuming a failed task is always allowed even when max concurrent tasks
+	// is reached. When autopilot is on, all slots are filled by auto-promotion
+	// and the user would otherwise be unable to resume any failed task. The
+	// autopilot will naturally refrain from promoting another backlog task while
+	// this resumed task is running, so the over-capacity is transient.
 	promoteMu.Lock()
-	regularInProgress, err := h.countRegularInProgress(r.Context())
-	if err != nil {
-		promoteMu.Unlock()
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if regularInProgress >= h.maxConcurrentTasks() {
-		promoteMu.Unlock()
-		http.Error(w, "max concurrent tasks reached", http.StatusConflict)
-		return
-	}
-
 	if err := h.store.ResumeTask(r.Context(), id, req.Timeout); err != nil {
 		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
