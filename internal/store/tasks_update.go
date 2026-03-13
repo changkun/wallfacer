@@ -25,6 +25,10 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	s.removeFromStatusIndex(t.Status, id)
 	t.Status = status
 	s.addToStatusIndex(t.Status, id)
+	if status == TaskStatusInProgress && t.StartedAt == nil {
+		now := time.Now()
+		t.StartedAt = &now
+	}
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
@@ -58,20 +62,25 @@ func (s *Store) buildAndSaveSummary(task Task) {
 	}
 
 	duration := task.UpdatedAt.Sub(task.CreatedAt).Seconds()
+	execDuration := duration // fallback: same as wall-clock if no StartedAt
+	if task.StartedAt != nil {
+		execDuration = task.UpdatedAt.Sub(*task.StartedAt).Seconds()
+	}
 
 	summary := TaskSummary{
-		TaskID:          task.ID,
-		Title:           task.Title,
-		Status:          task.Status,
-		CompletedAt:     task.UpdatedAt,
-		CreatedAt:       task.CreatedAt,
-		DurationSeconds: duration,
-		TotalTurns:      task.Turns,
-		TotalCostUSD:    task.Usage.CostUSD,
-		ByActivity:      task.UsageBreakdown,
-		TestResult:      task.LastTestResult,
-		PhaseCount:      phaseCount,
-		FailureCategory: task.FailureCategory,
+		TaskID:                   task.ID,
+		Title:                    task.Title,
+		Status:                   task.Status,
+		CompletedAt:              task.UpdatedAt,
+		CreatedAt:                task.CreatedAt,
+		DurationSeconds:          duration,
+		ExecutionDurationSeconds: execDuration,
+		TotalTurns:               task.Turns,
+		TotalCostUSD:             task.Usage.CostUSD,
+		ByActivity:               task.UsageBreakdown,
+		TestResult:               task.LastTestResult,
+		PhaseCount:               phaseCount,
+		FailureCategory:          task.FailureCategory,
 	}
 
 	if err := s.SaveSummary(task.ID, summary); err != nil {
@@ -97,6 +106,10 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	s.removeFromStatusIndex(t.Status, id)
 	t.Status = status
 	s.addToStatusIndex(t.Status, id)
+	if status == TaskStatusInProgress && t.StartedAt == nil {
+		now := time.Now()
+		t.StartedAt = &now
+	}
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err
@@ -701,6 +714,10 @@ func (s *Store) ResumeTask(_ context.Context, id uuid.UUID, timeout *int) error 
 	s.removeFromStatusIndex(t.Status, id)
 	t.Status = TaskStatusInProgress
 	s.addToStatusIndex(t.Status, id)
+	if t.StartedAt == nil {
+		now := time.Now()
+		t.StartedAt = &now
+	}
 	if timeout != nil {
 		t.Timeout = clampTimeout(*timeout)
 	}
