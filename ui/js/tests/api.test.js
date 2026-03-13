@@ -409,6 +409,30 @@ describe('workspace browser filter', () => {
     expect(listEl.innerHTML).not.toContain('beta-tools');
     expect(vm.runInContext('workspaceBrowserFocusIndex', ctx)).toBe(0);
   });
+
+  it('adds the highlighted folder on Enter', () => {
+    const ctx = makeContext();
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    vm.runInContext(`
+      workspaceBrowserEntries = [
+        { name: "alpha-repo", path: "/Users/test/dev/alpha-repo", is_git_repo: true },
+        { name: "beta-tools", path: "/Users/test/dev/beta-tools", is_git_repo: false }
+      ];
+      workspaceBrowserFocusIndex = 1;
+      workspaceSelectionDraft = [];
+    `, ctx);
+
+    ctx.workspaceBrowserListKeydown({
+      key: 'Enter',
+      preventDefault: vi.fn(),
+      metaKey: false,
+      ctrlKey: false,
+    });
+
+    expect(vm.runInContext('workspaceSelectionDraft.slice()', ctx)).toEqual(['/Users/test/dev/beta-tools']);
+  });
 });
 
 describe('toggleAutopilot', () => {
