@@ -167,3 +167,104 @@ func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
 		t.Fatalf("expected fallback image, got %q", got)
 	}
 }
+
+func TestGauge_FailedTasksByCategory(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	task, err := s.CreateTask(context.Background(), "test prompt", 10, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(context.Background(), task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+	if err := s.SetTaskFailureCategory(context.Background(), task.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+
+	// Mirror the gauge collector from server.go.
+	collector := func() []metrics.LabeledValue {
+		tasks, err := s.ListTasks(context.Background(), false)
+		if err != nil {
+			return nil
+		}
+		counts := make(map[string]int)
+		for _, t := range tasks {
+			if t.Status == store.TaskStatusFailed {
+				cat := string(t.FailureCategory)
+				if cat == "" {
+					cat = "unknown"
+				}
+				counts[cat]++
+			}
+		}
+		vals := make([]metrics.LabeledValue, 0, len(counts))
+		for cat, n := range counts {
+			vals = append(vals, metrics.LabeledValue{
+				Labels: map[string]string{"category": cat},
+				Value:  float64(n),
+			})
+		}
+		return vals
+	}
+
+	vals := collector()
+	if len(vals) != 1 {
+		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
+	}
+	if vals[0].Labels["category"] != string(store.FailureCategoryContainerCrash) {
+		t.Errorf("category label = %q, want %q", vals[0].Labels["category"], store.FailureCategoryContainerCrash)
+	}
+	if vals[0].Value != 1 {
+		t.Errorf("value = %v, want 1", vals[0].Value)
+	}
+}
+
+func TestGauge_CircuitBreakerOpen(t *testing.T) {
+	workdir := t.TempDir()
+	s, err := store.NewStore(filepath.Join(workdir, "data"))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:      "true",
+		EnvFile:      filepath.Join(workdir, ".env"),
+		WorktreesDir: filepath.Join(workdir, "worktrees"),
+		Workspaces:   workdir,
+	})
+
+	// Circuit should be closed initially.
+	collector := func() []metrics.LabeledValue {
+		v := 0.0
+		if r.ContainerCircuitOpen() {
+			v = 1.0
+		}
+		return []metrics.LabeledValue{{Value: v}}
+	}
+
+	vals := collector()
+	if len(vals) != 1 {
+		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
+	}
+	if vals[0].Value != 0.0 {
+		t.Errorf("circuit breaker open = %v, want 0 (closed)", vals[0].Value)
+	}
+
+	// Trip the circuit breaker by recording failures above the threshold.
+	for i := 0; i < runner.DefaultCBThreshold+1; i++ {
+		r.RecordContainerFailure()
+	}
+
+	vals = collector()
+	if len(vals) != 1 {
+		t.Fatalf("expected 1 LabeledValue, got %d", len(vals))
+	}
+	if vals[0].Value != 1.0 {
+		t.Errorf("circuit breaker open = %v, want 1 (open)", vals[0].Value)
+	}
+}

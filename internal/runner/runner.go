@@ -22,6 +22,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// DefaultCBThreshold is the number of consecutive container launch failures
+// required to open the circuit breaker. It can be overridden at startup via
+// WALLFACER_CONTAINER_CB_THRESHOLD.
+const DefaultCBThreshold = 5
+
 // trackedWg is a sync.WaitGroup that also records the label of each
 // outstanding goroutine so that Shutdown can report what it is waiting for.
 type trackedWg struct {
@@ -336,6 +341,18 @@ func (r *Runner) ContainerCircuitAllow() bool {
 	return r.containerCB.Allow()
 }
 
+// ContainerCircuitOpen reports whether the container launch circuit breaker
+// is currently open (runtime considered unavailable). The inverse of ContainerCircuitAllow.
+func (r *Runner) ContainerCircuitOpen() bool {
+	return !r.ContainerCircuitAllow()
+}
+
+// RecordContainerFailure records a single container launch failure against
+// the circuit breaker. Exposed primarily for testing.
+func (r *Runner) RecordContainerFailure() {
+	r.containerCB.RecordFailure()
+}
+
 // ContainerCircuitState returns the human-readable state of the container
 // circuit breaker ("closed", "open", or "half-open").
 func (r *Runner) ContainerCircuitState() string {
@@ -503,7 +520,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	// Defaults: 5 consecutive failures trip the breaker; it stays open for
 	// 30 s before allowing a single probe (half-open).
 	// Both values can be overridden via environment variables.
-	cbThreshold := 5
+	cbThreshold := DefaultCBThreshold
 	cbOpenSec := 30
 	if v := os.Getenv("WALLFACER_CONTAINER_CB_THRESHOLD"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
