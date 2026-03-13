@@ -276,6 +276,16 @@ Optional variables (also in `.env`):
 
 All can be edited from **Settings → API Configuration** in the UI (calls `PUT /api/env`).
 
+## Implementation checklist
+
+Every implementation task MUST complete all three steps before finishing:
+
+1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. Run `go test ./...` (backend) or `npx vitest@2 run` (frontend) to confirm they pass before committing.
+
+2. **Update docs** — If your change adds, removes, or modifies any API route, CLI flag, env variable, data model field, or user-visible behavior, update the corresponding documentation (`AGENTS.md`, `docs/getting-started.md`, `docs/usage.md`, `docs/internals/*.md`). Do not skip this step.
+
+3. **Reflect on codebase health** — After implementing, review the files you touched and their immediate surroundings. If you spot a small, safe refactoring opportunity (dead code, unclear naming, duplicated logic, missing error handling) that is directly related to your change, include it. Keep refactoring changes minimal and scoped — do not redesign unrelated subsystems.
+
 ## Commit and push strategy
 
 - Keep commits small and focused on one logical change.
