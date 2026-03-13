@@ -302,65 +302,66 @@ func stripEnvInlineComment(v string) string {
 	return strings.TrimSpace(v)
 }
 
-// Update merges changes into the env file at path.
+// Updates holds optional changes for each env key.
 //
 // Each pointer field controls how the corresponding key is handled:
 //   - nil → leave the existing line unchanged
 //   - non-nil, non-empty → set to the provided value
 //   - non-nil, empty → remove the line (clear the value)
-//
+type Updates struct {
+	OAuthToken           *string
+	APIKey               *string
+	BaseURL              *string
+	ServerAPIKey         *string
+	OpenAIAPIKey         *string
+	OpenAIBaseURL        *string
+	DefaultModel         *string
+	TitleModel           *string
+	CodexDefaultModel    *string
+	CodexTitleModel      *string
+	MaxParallel          *string
+	MaxTestParallel      *string
+	OversightInterval    *string
+	ArchivedTasksPerPage *string
+	AutoPush             *string
+	AutoPushThreshold    *string
+	SandboxFast          *string
+	ContainerNetwork     *string
+	ContainerCPUs        *string
+	ContainerMemory      *string
+	WebhookURL           *string
+	WebhookSecret        *string
+	Workspaces           *string
+}
+
+// Update merges changes into the env file at path.
 // Keys not already present in the file are appended when non-empty.
 // Comments and unrecognized keys are preserved verbatim.
-func Update(
-	path string,
-	oauthToken,
-	apiKey,
-	baseURL,
-	serverAPIKey,
-	openAIAPIKey,
-	openAIBaseURL,
-	defaultModel,
-	titleModel,
-	codexDefaultModel,
-	codexTitleModel,
-	maxParallel,
-	maxTestParallel,
-	oversightInterval,
-	archivedTasksPerPage,
-	autoPush,
-	autoPushThreshold,
-	sandboxFast,
-	containerNetwork,
-	containerCPUs,
-	containerMemory,
-	webhookURL,
-	webhookSecret,
-	workspaces *string,
-) error {
+func Update(path string, u Updates) error {
 	updates := map[string]*string{
-		"CLAUDE_CODE_OAUTH_TOKEN":           oauthToken,
-		"ANTHROPIC_API_KEY":                 apiKey,
-		"ANTHROPIC_BASE_URL":                baseURL,
-		"WALLFACER_SERVER_API_KEY":          serverAPIKey,
-		"OPENAI_API_KEY":                    openAIAPIKey,
-		"OPENAI_BASE_URL":                   openAIBaseURL,
-		"CLAUDE_DEFAULT_MODEL":              defaultModel,
-		"CLAUDE_TITLE_MODEL":                titleModel,
-		"CODEX_DEFAULT_MODEL":               codexDefaultModel,
-		"CODEX_TITLE_MODEL":                 codexTitleModel,
-		"WALLFACER_MAX_PARALLEL":            maxParallel,
-		"WALLFACER_MAX_TEST_PARALLEL":       maxTestParallel,
-		"WALLFACER_OVERSIGHT_INTERVAL":      oversightInterval,
-		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": archivedTasksPerPage,
-		"WALLFACER_AUTO_PUSH":               autoPush,
-		"WALLFACER_AUTO_PUSH_THRESHOLD":     autoPushThreshold,
-		"WALLFACER_SANDBOX_FAST":            sandboxFast,
-		"WALLFACER_CONTAINER_NETWORK":       containerNetwork,
-		"WALLFACER_CONTAINER_CPUS":          containerCPUs,
-		"WALLFACER_CONTAINER_MEMORY":        containerMemory,
-		"WALLFACER_WEBHOOK_URL":             webhookURL,
-		"WALLFACER_WEBHOOK_SECRET":          webhookSecret,
-		"WALLFACER_WORKSPACES":              workspaces,
+		"CLAUDE_CODE_OAUTH_TOKEN":           u.OAuthToken,
+		"ANTHROPIC_API_KEY":                 u.APIKey,
+		"ANTHROPIC_BASE_URL":                u.BaseURL,
+		"WALLFACER_SERVER_API_KEY":          u.ServerAPIKey,
+		"OPENAI_API_KEY":                    u.OpenAIAPIKey,
+		"OPENAI_BASE_URL":                   u.OpenAIBaseURL,
+		"CLAUDE_DEFAULT_MODEL":              u.DefaultModel,
+		"CLAUDE_TITLE_MODEL":                u.TitleModel,
+		"CODEX_DEFAULT_MODEL":               u.CodexDefaultModel,
+		"CODEX_TITLE_MODEL":                 u.CodexTitleModel,
+		"WALLFACER_MAX_PARALLEL":            u.MaxParallel,
+		"WALLFACER_MAX_TEST_PARALLEL":       u.MaxTestParallel,
+		"WALLFACER_OVERSIGHT_INTERVAL":      u.OversightInterval,
+		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": u.ArchivedTasksPerPage,
+		"WALLFACER_AUTO_PUSH":               u.AutoPush,
+		"WALLFACER_AUTO_PUSH_THRESHOLD":     u.AutoPushThreshold,
+		"WALLFACER_SANDBOX_FAST":            u.SandboxFast,
+		"WALLFACER_CONTAINER_NETWORK":       u.ContainerNetwork,
+		"WALLFACER_CONTAINER_CPUS":          u.ContainerCPUs,
+		"WALLFACER_CONTAINER_MEMORY":        u.ContainerMemory,
+		"WALLFACER_WEBHOOK_URL":             u.WebhookURL,
+		"WALLFACER_WEBHOOK_SECRET":          u.WebhookSecret,
+		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}
 	return updateFile(path, updates)
 }

@@ -382,32 +382,18 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		}
 	}
 
-	if err := envconfig.Update(
-		tempFile.Name(),
-		req.OAuthToken,
-		req.APIKey,
-		req.BaseURL,
-		nil,
-		req.OpenAIAPIKey,
-		req.OpenAIBaseURL,
-		req.DefaultModel,
-		req.TitleModel,
-		req.CodexDefaultModel,
-		req.CodexTitleModel,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		reqBoolString(req.SandboxFast),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	); err != nil {
+	if err := envconfig.Update(tempFile.Name(), envconfig.Updates{
+		OAuthToken:        req.OAuthToken,
+		APIKey:            req.APIKey,
+		BaseURL:           req.BaseURL,
+		OpenAIAPIKey:      req.OpenAIAPIKey,
+		OpenAIBaseURL:     req.OpenAIBaseURL,
+		DefaultModel:      req.DefaultModel,
+		TitleModel:        req.TitleModel,
+		CodexDefaultModel: req.CodexDefaultModel,
+		CodexTitleModel:   req.CodexTitleModel,
+		SandboxFast:       reqBoolString(req.SandboxFast),
+	}); err != nil {
 		return "", err
 	}
 	if err := envconfig.UpdateSandboxSettings(
@@ -614,32 +600,29 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := envconfig.Update(
-		h.envFile,
-		req.OAuthToken,
-		req.APIKey,
-		req.BaseURL,
-		nil,
-		req.OpenAIAPIKey,
-		req.OpenAIBaseURL,
-		req.DefaultModel,
-		req.TitleModel,
-		req.CodexDefaultModel,
-		req.CodexTitleModel,
-		maxParallel,
-		maxTestParallel,
-		oversightInterval,
-		archivedTasksPerPage,
-		autoPush,
-		autoPushThreshold,
-		sandboxFast,
-		req.ContainerNetwork,
-		req.ContainerCPUs,
-		req.ContainerMemory,
-		req.WebhookURL,
-		req.WebhookSecret,
-		nil,
-	); err != nil {
+	if err := envconfig.Update(h.envFile, envconfig.Updates{
+		OAuthToken:           req.OAuthToken,
+		APIKey:               req.APIKey,
+		BaseURL:              req.BaseURL,
+		OpenAIAPIKey:         req.OpenAIAPIKey,
+		OpenAIBaseURL:        req.OpenAIBaseURL,
+		DefaultModel:         req.DefaultModel,
+		TitleModel:           req.TitleModel,
+		CodexDefaultModel:    req.CodexDefaultModel,
+		CodexTitleModel:      req.CodexTitleModel,
+		MaxParallel:          maxParallel,
+		MaxTestParallel:      maxTestParallel,
+		OversightInterval:    oversightInterval,
+		ArchivedTasksPerPage: archivedTasksPerPage,
+		AutoPush:             autoPush,
+		AutoPushThreshold:    autoPushThreshold,
+		SandboxFast:          sandboxFast,
+		ContainerNetwork:     req.ContainerNetwork,
+		ContainerCPUs:        req.ContainerCPUs,
+		ContainerMemory:      req.ContainerMemory,
+		WebhookURL:           req.WebhookURL,
+		WebhookSecret:        req.WebhookSecret,
+	}); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

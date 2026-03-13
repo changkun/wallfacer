@@ -115,8 +115,11 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"sandbox_reasons":        map[string]string{},
 		"activity_sandboxes":     map[string]string{},
 		"autopilot":              h.AutopilotEnabled(),
+		"autorefine":             h.AutorefineEnabled(),
 		"autotest":               h.AutotestEnabled(),
 		"autosubmit":             h.AutosubmitEnabled(),
+		"autosync":               h.AutosyncEnabled(),
+		"autopush":               h.AutopushEnabled(),
 		"ideation":               h.IdeationEnabled(),
 		"ideation_running":       h.ideationRunning(ctx),
 		"ideation_interval":      int(h.IdeationInterval().Minutes()),
@@ -187,8 +190,11 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Autopilot        *bool                   `json:"autopilot"`
+		Autorefine       *bool                   `json:"autorefine"`
 		Autotest         *bool                   `json:"autotest"`
 		Autosubmit       *bool                   `json:"autosubmit"`
+		Autosync         *bool                   `json:"autosync"`
+		Autopush         *bool                   `json:"autopush"`
 		Ideation         *bool                   `json:"ideation"`
 		IdeationInterval *int                    `json:"ideation_interval"` // minutes; 0 = run immediately on completion
 		WorkspaceGroups  []workspacegroups.Group `json:"workspace_groups"`
@@ -212,8 +218,22 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	applyBoolToggle(req.Autopilot, h.SetAutopilot, h.AutopilotEnabled, h.tryAutoPromote)
+	applyBoolToggle(req.Autorefine, h.SetAutorefine, h.AutorefineEnabled, h.tryAutoRefine)
 	applyBoolToggle(req.Autotest, h.SetAutotest, h.AutotestEnabled, h.tryAutoTest)
 	applyBoolToggle(req.Autosubmit, h.SetAutosubmit, h.AutosubmitEnabled, h.tryAutoSubmit)
+	applyBoolToggle(req.Autosync, h.SetAutosync, h.AutosyncEnabled, h.checkAndSyncWaitingTasks)
+	// Auto-push: update both the in-memory toggle and the .env file so the
+	// runner (which reads .env on every commit) picks it up immediately.
+	if req.Autopush != nil {
+		h.SetAutopush(*req.Autopush)
+		if h.envFile != "" {
+			v := "false"
+			if *req.Autopush {
+				v = "true"
+			}
+			envconfig.Update(h.envFile, envconfig.Updates{AutoPush: &v})
+		}
+	}
 	if req.IdeationInterval != nil {
 		mins := *req.IdeationInterval
 		if mins < 0 {
@@ -235,8 +255,11 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := map[string]any{
 		"autopilot":           h.AutopilotEnabled(),
+		"autorefine":          h.AutorefineEnabled(),
 		"autotest":            h.AutotestEnabled(),
 		"autosubmit":          h.AutosubmitEnabled(),
+		"autosync":            h.AutosyncEnabled(),
+		"autopush":            h.AutopushEnabled(),
 		"ideation":            h.IdeationEnabled(),
 		"ideation_running":    h.ideationRunning(r.Context()),
 		"ideation_interval":   int(h.IdeationInterval().Minutes()),
