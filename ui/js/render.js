@@ -753,7 +753,7 @@ card.style.opacity = isArchived ? '0.55' : '';
     </div>` : ''}
     ${isIdeaAgent ? `<div class="card-title">&#129504; ${highlightMatch(t.title || 'Brainstorm', filterQuery)}</div>` : t.title ? `<div class="card-title">${highlightMatch(t.title, filterQuery)}</div>` : ''}
     ${t.tags && t.tags.length > 0 ? (() => {
-      const VISIBLE = 3;
+      const VISIBLE = 4;
       const overflow = t.tags.length - VISIBLE;
       const chips = t.tags.map((tag, i) => {
         const extra = i >= VISIBLE ? ' tag-chip-extra' : '';
