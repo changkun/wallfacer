@@ -302,6 +302,13 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		// Position is set under the lock after scanning existing backlog tasks.
 		CreatedAt: now,
 		UpdatedAt: now,
+		// AutoRetryBudget provides per-category retry allowances for transient
+		// failures. Budget is only granted for categories where retrying is safe.
+		AutoRetryBudget: map[FailureCategory]int{
+			FailureCategoryContainerCrash: 2,
+			FailureCategorySyncError:      2,
+			FailureCategoryWorktree:       1,
+		},
 	}
 
 	// Tags: deep-copy to protect store state from caller mutation.
@@ -1614,6 +1621,31 @@ func (s *Store) MarkTurnTruncated(_ context.Context, taskID uuid.UUID, turn int)
 
 	task.TruncatedTurns = append(task.TruncatedTurns, turn)
 	return s.saveTask(taskID, task)
+}
+
+// IncrementAutoRetryCount records one auto-retry attempt for the given
+// FailureCategory: it increments AutoRetryCount and decrements the per-category
+// budget in AutoRetryBudget (flooring at zero).
+func (s *Store) IncrementAutoRetryCount(_ context.Context, id uuid.UUID, category FailureCategory) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.AutoRetryCount++
+	if t.AutoRetryBudget == nil {
+		t.AutoRetryBudget = make(map[FailureCategory]int)
+	}
+	if t.AutoRetryBudget[category] > 0 {
+		t.AutoRetryBudget[category]--
+	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
 }
 
 // clampTimeout ensures timeout stays in [1, 1440] minutes with a default of 60.

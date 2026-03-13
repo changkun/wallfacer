@@ -1642,8 +1642,11 @@ func TestMockDeferredPanicRecovery(t *testing.T) {
 // FailureCategoryContainerCrash and the task to transition to failed.
 func TestMockFailureCategoryContainerCrash(t *testing.T) {
 	repo := setupTestRepo(t)
+	// Provide 3 crash responses: 2 consumed by auto-retries, 1 for final failure.
 	mock := &MockContainerExecutor{
 		responses: []ContainerResponse{
+			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
+			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
 			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
 		},
 	}
@@ -1654,14 +1657,18 @@ func TestMockFailureCategoryContainerCrash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
-		t.Fatal(err)
+
+	// Run 3 times: 2 auto-retries then permanent failure.
+	for i := range 3 {
+		if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+			t.Fatalf("run %d: UpdateTaskStatus: %v", i+1, err)
+		}
+		r.Run(task.ID, "do the task", "", false)
 	}
-	r.Run(task.ID, "do the task", "", false)
 
 	updated, _ := s.GetTask(ctx, task.ID)
 	if updated.Status != store.TaskStatusFailed {
-		t.Fatalf("expected status=failed on container crash, got %q", updated.Status)
+		t.Fatalf("expected status=failed after budget exhausted, got %q", updated.Status)
 	}
 	if updated.FailureCategory != store.FailureCategoryContainerCrash {
 		t.Fatalf("expected failure_category=container_crash, got %q", updated.FailureCategory)
@@ -1709,5 +1716,112 @@ func TestMockSessionIDPassedToResume(t *testing.T) {
 	}
 	if !foundResume {
 		t.Fatalf("expected --resume %s in turn-2 args, got: %v", wantSession, args2)
+	}
+}
+
+
+// ---------------------------------------------------------------------------
+// Auto-retry tests
+// ---------------------------------------------------------------------------
+
+func TestAutoRetry_ContainerCrash(t *testing.T) {
+	repo := setupTestRepo(t)
+	cmd := fakeCmdScript(t, "", 0)
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "crash retry test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range 3 {
+		if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+			t.Fatalf("run %d: UpdateTaskStatus in_progress: %v", i+1, err)
+		}
+		r.Run(task.ID, "do the task", "", false)
+
+		got, err := s.GetTask(ctx, task.ID)
+		if err != nil {
+			t.Fatalf("run %d: GetTask: %v", i+1, err)
+		}
+		if i < 2 {
+			if got.Status != store.TaskStatusBacklog {
+				t.Errorf("run %d: expected backlog after retry, got %s", i+1, got.Status)
+			}
+		} else {
+			if got.Status != store.TaskStatusFailed {
+				t.Errorf("run %d: expected failed after budget exhausted, got %s", i+1, got.Status)
+			}
+			if got.FailureCategory != store.FailureCategoryContainerCrash {
+				t.Errorf("run %d: expected failure_category=container_crash, got %s", i+1, got.FailureCategory)
+			}
+			if got.AutoRetryCount != 2 {
+				t.Errorf("run %d: expected AutoRetryCount=2, got %d", i+1, got.AutoRetryCount)
+			}
+		}
+	}
+}
+
+func TestAutoRetry_BudgetCategoryDoesNotRetry(t *testing.T) {
+	repo := setupTestRepo(t)
+	budgetErrOutput := `{"result":"budget exceeded","session_id":"s1","stop_reason":"end_turn","is_error":true,"total_cost_usd":0.001}`
+	cmd := fakeCmdScript(t, budgetErrOutput, 0)
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "budget exceeded test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != store.TaskStatusFailed {
+		t.Errorf("expected failed (no retry budget for budget_exceeded), got %s", got.Status)
+	}
+	if got.AutoRetryCount != 0 {
+		t.Errorf("expected AutoRetryCount=0 (no retry attempted), got %d", got.AutoRetryCount)
+	}
+}
+
+func TestAutoRetry_MaxTotalCap(t *testing.T) {
+	repo := setupTestRepo(t)
+	cmd := fakeCmdScript(t, "", 0)
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "total cap test", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for range maxTotalAutoRetries {
+		if err := s.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategorySyncError); err != nil {
+			t.Fatalf("IncrementAutoRetryCount: %v", err)
+		}
+	}
+
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "do the task", "", false)
+
+	got, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != store.TaskStatusFailed {
+		t.Errorf("expected failed (total cap hit), got %s", got.Status)
+	}
+	if got.AutoRetryCount != maxTotalAutoRetries {
+		t.Errorf("expected AutoRetryCount=%d (unchanged), got %d", maxTotalAutoRetries, got.AutoRetryCount)
 	}
 }

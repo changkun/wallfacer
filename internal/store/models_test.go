@@ -105,7 +105,7 @@ func TestTaskStatus_AllowedTransitions(t *testing.T) {
 		expected []TaskStatus
 	}{
 		{TaskStatusBacklog, []TaskStatus{TaskStatusInProgress}},
-		{TaskStatusInProgress, []TaskStatus{TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled}},
+		{TaskStatusInProgress, []TaskStatus{TaskStatusBacklog, TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled}},
 		{TaskStatusCommitting, []TaskStatus{TaskStatusDone, TaskStatusFailed}},
 		{TaskStatusWaiting, []TaskStatus{TaskStatusInProgress, TaskStatusCommitting, TaskStatusCancelled}},
 		{TaskStatusFailed, []TaskStatus{TaskStatusBacklog, TaskStatusCancelled}},

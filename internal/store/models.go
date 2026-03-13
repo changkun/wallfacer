@@ -162,7 +162,7 @@ var ErrInvalidTransition = errors.New("invalid transition")
 // present in this map are accepted by UpdateTaskStatus; all others are rejected.
 var allowedTransitions = map[TaskStatus][]TaskStatus{
 	TaskStatusBacklog:    {TaskStatusInProgress},
-	TaskStatusInProgress: {TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled},
+	TaskStatusInProgress: {TaskStatusBacklog, TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled},
 	TaskStatusCommitting: {TaskStatusDone, TaskStatusFailed},
 	TaskStatusWaiting:    {TaskStatusInProgress, TaskStatusCommitting, TaskStatusCancelled},
 	TaskStatusFailed:     {TaskStatusBacklog, TaskStatusCancelled},
@@ -198,7 +198,7 @@ func (s TaskStatus) AllowedTransitions() []TaskStatus {
 // Increment this constant whenever a new migration step is added to
 // migrateTaskJSON so that already-migrated files are not re-written on
 // every startup.
-const CurrentTaskSchemaVersion = 1
+const CurrentTaskSchemaVersion = 2
 
 // DefaultRetryHistoryLimit, DefaultRefineSessionsLimit, and
 // DefaultPromptHistoryLimit cap the number of entries persisted for the three
@@ -308,6 +308,15 @@ type Task struct {
 	// by the server-side WALLFACER_MAX_TURN_OUTPUT_BYTES budget. Set
 	// automatically by SaveTurnOutput when truncation occurs.
 	TruncatedTurns []int `json:"truncated_turns,omitempty"`
+
+	// AutoRetryBudget maps each FailureCategory to the number of automatic
+	// retries remaining for that category. Decremented by IncrementAutoRetryCount.
+	// Nil or missing key means zero budget (no auto-retry for that category).
+	AutoRetryBudget map[FailureCategory]int `json:"auto_retry_budget,omitempty"`
+
+	// AutoRetryCount is the total number of auto-retries consumed across all
+	// categories. Capped at maxTotalAutoRetries in the runner.
+	AutoRetryCount int `json:"auto_retry_count,omitempty"`
 }
 
 // HasTag reports whether the task has the given tag.
@@ -337,6 +346,7 @@ func deepCloneTask(t *Task) Task {
 	cp.SandboxByActivity = maps.Clone(t.SandboxByActivity)
 	cp.UsageBreakdown = maps.Clone(t.UsageBreakdown)
 	cp.WorktreePaths = maps.Clone(t.WorktreePaths)
+	cp.AutoRetryBudget = maps.Clone(t.AutoRetryBudget)
 	cp.CommitHashes = maps.Clone(t.CommitHashes)
 	cp.BaseCommitHashes = maps.Clone(t.BaseCommitHashes)
 
