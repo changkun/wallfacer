@@ -622,7 +622,6 @@ func normalizeCodexCommand(command string) string {
 	return rest
 }
 
-
 // formatActivityLog renders the pre-processed activities as a human-readable text block for the prompt.
 func formatActivityLog(activities []turnActivity) string {
 	var sb strings.Builder
@@ -695,7 +694,13 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 	if task != nil {
 		sb = r.sandboxForTaskActivity(task, activityOversight)
 	}
-	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, error) {
+	type oversightRunResult struct {
+		output *agentOutput
+		err    error
+		model  string
+		sb     sandbox.Type
+	}
+	runWithSandbox := func(selectedSandbox sandbox.Type) oversightRunResult {
 		model := r.titleModelFromEnvForSandbox(selectedSandbox)
 		spec := r.buildBaseContainerSpec(containerName, model, selectedSandbox)
 		// Note: oversight agent uses no workspace mounts, no instructions mount,
@@ -714,49 +719,82 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: agent})
 		runErr := cmd.Run()
 		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: agent})
-		if runErr != nil && runCtx.Err() == nil {
-			return nil, fmt.Errorf("container: %w (stderr: %s)", runErr, truncate(stderr.String(), 300))
+		if runCtx.Err() != nil {
+			return oversightRunResult{
+				err:   fmt.Errorf("container terminated: %w", runCtx.Err()),
+				model: model,
+				sb:    selectedSandbox,
+			}
 		}
 
 		raw := strings.TrimSpace(stdout.String())
 		if raw == "" {
-			return nil, fmt.Errorf("empty output from oversight agent")
+			if runErr != nil {
+				return oversightRunResult{
+					err:   fmt.Errorf("container: %w (stderr: %s)", runErr, truncate(stderr.String(), 300)),
+					model: model,
+					sb:    selectedSandbox,
+				}
+			}
+			return oversightRunResult{err: fmt.Errorf("empty output from oversight agent"), model: model, sb: selectedSandbox}
 		}
 
 		output, err := parseOutput(raw)
 		if err != nil {
-			return nil, fmt.Errorf("parse output: %w", err)
+			if runErr != nil {
+				return oversightRunResult{
+					err:   fmt.Errorf("container: %w (stderr: %s stdout: %s)", runErr, truncate(stderr.String(), 300), truncate(raw, 300)),
+					model: model,
+					sb:    selectedSandbox,
+				}
+			}
+			return oversightRunResult{err: fmt.Errorf("parse output: %w", err), model: model, sb: selectedSandbox}
+		}
+		if runErr != nil {
+			if exitErr, ok := runErr.(*exec.ExitError); ok {
+				logger.Runner.Warn("oversight: container exited non-zero but produced valid output",
+					"task", taskID, "agent", agent, "code", exitErr.ExitCode(), "sandbox", selectedSandbox, "model", model)
+			} else {
+				logger.Runner.Warn("oversight: container error but produced valid output",
+					"task", taskID, "agent", agent, "error", runErr, "sandbox", selectedSandbox, "model", model)
+			}
 		}
 		output.ActualSandbox = selectedSandbox
-		return output, nil
+		return oversightRunResult{output: output, model: model, sb: selectedSandbox}
 	}
 
 	initialSandbox := sb
-	output, err := runWithSandbox(initialSandbox)
-	if err != nil {
-		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error()) {
+	res := runWithSandbox(initialSandbox)
+	if res.err != nil {
+		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(res.err.Error()) {
 			logger.Runner.Warn("oversight: claude token limit hit; retrying with codex", "task", taskID, "agent", agent)
 			r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during oversight)",
 			})
-			output, err = runWithSandbox(sandbox.Codex)
-			sb = sandbox.Codex
+			res = runWithSandbox(sandbox.Codex)
 		}
-		if err != nil {
-			return nil, err
+		if res.err != nil {
+			logger.Runner.Warn("oversight: agent container failed",
+				"task", taskID, "agent", agent, "sandbox", res.sb, "model", res.model, "error", res.err)
+			return nil, res.err
 		}
+		sb = res.sb
 	}
+	output := res.output
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("oversight: claude output reported token limit; retrying with codex", "task", taskID, "agent", agent)
 		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
 			"result": "Sandbox fallback: claude → codex (token/rate limit in oversight output)",
 		})
-		output, err = runWithSandbox(sandbox.Codex)
-		sb = sandbox.Codex
-		if err != nil {
-			return nil, err
+		res = runWithSandbox(sandbox.Codex)
+		if res.err != nil {
+			logger.Runner.Warn("oversight: codex fallback failed",
+				"task", taskID, "agent", agent, "sandbox", res.sb, "model", res.model, "error", res.err)
+			return nil, res.err
 		}
+		output = res.output
+		sb = res.sb
 	}
 
 	// Accumulate token/cost usage for this oversight sub-agent.
