@@ -1,6 +1,7 @@
 package gitutil
 
 import (
+	"fmt"
 	"log/slog"
 	"os/exec"
 	"strings"
@@ -18,11 +19,18 @@ func StashIfDirty(worktreePath string) bool {
 }
 
 // StashPop restores the most recent stash entry.
-// Errors are logged at warn level but are not fatal.
-func StashPop(worktreePath string) {
+// Returns an error when the pop fails (e.g. conflicts with rebased state).
+// A failed pop leaves the stash entry intact so it can be recovered.
+func StashPop(worktreePath string) error {
 	out, err := exec.Command("git", "-C", worktreePath, "stash", "pop").CombinedOutput()
 	if err != nil {
+		// Abort the conflicted pop so the stash entry is preserved and the
+		// worktree returns to a clean state.
+		_ = exec.Command("git", "-C", worktreePath, "checkout", "--", ".").Run()
+		_ = exec.Command("git", "-C", worktreePath, "clean", "-fd").Run()
 		slog.Default().With("component", "git").Warn("stash pop failed",
 			"path", worktreePath, "error", err, "output", string(out))
+		return fmt.Errorf("stash pop in %s: %w\n%s", worktreePath, err, out)
 	}
+	return nil
 }
