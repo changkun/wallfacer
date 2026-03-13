@@ -33,6 +33,7 @@ type Handler struct {
 
 	diffCache *diffCache
 	fileIndex *fileIndex
+	spanCache spanStatsCache
 
 	// ideationEnabled controls whether brainstorm auto-repeat is active.
 	// ideationInterval is the delay between consecutive brainstorm runs (0 = run immediately on completion).

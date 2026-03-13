@@ -103,6 +103,7 @@
         { text: s.count, style: 'padding:8px 10px;text-align:right;color:var(--text-muted);font-size:12px;' },
         { text: fmtMs(s.min_ms), style: 'padding:8px 10px;text-align:right;color:var(--text-muted);font-size:12px;' },
         { html: '<div style="font-weight:600;">' + fmtMs(s.p50_ms) + '</div>' + barHtml(s.p50_ms, globalMaxMs), style: 'padding:8px 10px;text-align:right;font-size:12px;' },
+        { text: s.count > 0 ? (s.sum_ms / s.count).toFixed(0) + ' ms' : '\u2014', style: 'padding:8px 10px;text-align:right;font-size:12px;color:var(--text-muted);' },
         { text: fmtMs(s.p95_ms), style: 'padding:8px 10px;text-align:right;font-size:12px;font-weight:500;' + colorStyleForMs(s.p95_ms) },
         { text: fmtMs(s.p99_ms), style: 'padding:8px 10px;text-align:right;font-size:12px;' + colorStyleForMs(s.p99_ms) },
         { text: fmtMs(s.max_ms), style: 'padding:8px 10px;text-align:right;color:var(--text-muted);font-size:12px;' }
