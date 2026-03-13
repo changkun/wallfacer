@@ -16,8 +16,11 @@ func TestCodexEntrypointPreservesUsageFromStream(t *testing.T) {
 
 	tempDir := t.TempDir()
 	fakeCodexPath := filepath.Join(tempDir, "codex")
+	argsPath := filepath.Join(tempDir, "codex.args")
 	fakeCodex := `#!/bin/bash
 set -euo pipefail
+
+printf '%s\n' "$@" > "` + argsPath + `"
 
 LAST_MSG=""
 while [[ $# -gt 0 ]]; do
@@ -101,5 +104,57 @@ printf 'final answer from codex' > "$LAST_MSG"
 	}
 	if envelope.Usage.CacheCreationInputTokens != 0 {
 		t.Fatalf("CacheCreationInputTokens = %d, want 0", envelope.Usage.CacheCreationInputTokens)
+	}
+
+	argsRaw, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatalf("read args: %v", err)
+	}
+	if !strings.Contains(string(argsRaw), "--config\nmodel_reasoning_effort=\"low\"\n") {
+		t.Fatalf("expected /fast codex config in args, got:\n%s", string(argsRaw))
+	}
+}
+
+func TestCodexEntrypointSkipsFastConfigWhenDisabled(t *testing.T) {
+	tempDir := t.TempDir()
+	fakeCodexPath := filepath.Join(tempDir, "codex")
+	argsPath := filepath.Join(tempDir, "codex.args")
+	fakeCodex := `#!/bin/bash
+set -euo pipefail
+printf '%s\n' "$@" > "` + argsPath + `"
+LAST_MSG=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --output-last-message)
+            LAST_MSG="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+printf 'ok' > "$LAST_MSG"
+printf '{"type":"turn.completed","session_id":"sess","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}\n'
+`
+	if err := os.WriteFile(fakeCodexPath, []byte(fakeCodex), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+
+	cmd := exec.Command("/bin/bash", "sandbox/codex/entrypoint.sh", "-p", "test prompt")
+	cmd.Env = append(os.Environ(),
+		"PATH="+tempDir+":"+os.Getenv("PATH"),
+		"WALLFACER_SANDBOX_FAST=false",
+	)
+	if _, err := cmd.Output(); err != nil {
+		t.Fatalf("run entrypoint: %v", err)
+	}
+
+	argsRaw, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatalf("read args: %v", err)
+	}
+	if strings.Contains(string(argsRaw), "model_reasoning_effort=\"low\"") {
+		t.Fatalf("did not expect fast config in args, got:\n%s", string(argsRaw))
 	}
 }

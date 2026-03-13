@@ -42,6 +42,9 @@ STREAM_FILE="/tmp/codex-stream.jsonl"
 rm -f "$LAST_MSG_FILE" "$STDERR_FILE" "$STREAM_FILE"
 
 CODEX_ARGS=(exec --full-auto --sandbox workspace-write --skip-git-repo-check --json --output-last-message "$LAST_MSG_FILE" --color never)
+if [ "${WALLFACER_SANDBOX_FAST:-true}" != "false" ]; then
+    CODEX_ARGS+=(--config model_reasoning_effort=\"low\")
+fi
 if [ -n "$MODEL" ]; then
     CODEX_ARGS+=(--model "$MODEL")
 fi

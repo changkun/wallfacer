@@ -95,53 +95,55 @@ func validateBaseURL(u string) error {
 // envConfigResponse is the JSON representation of the env config sent to the UI.
 // Sensitive tokens are masked so they are never exposed in full over HTTP.
 type envConfigResponse struct {
-	OAuthToken           string            `json:"oauth_token"` // masked
-	APIKey               string            `json:"api_key"`     // masked
-	BaseURL              string            `json:"base_url"`
-	OpenAIAPIKey         string            `json:"openai_api_key"` // masked
-	OpenAIBaseURL        string            `json:"openai_base_url"`
-	DefaultModel         string            `json:"default_model"`
-	TitleModel           string            `json:"title_model"`
-	CodexDefaultModel    string            `json:"codex_default_model"`
-	CodexTitleModel      string            `json:"codex_title_model"`
+	OAuthToken           string                  `json:"oauth_token"` // masked
+	APIKey               string                  `json:"api_key"`     // masked
+	BaseURL              string                  `json:"base_url"`
+	OpenAIAPIKey         string                  `json:"openai_api_key"` // masked
+	OpenAIBaseURL        string                  `json:"openai_base_url"`
+	DefaultModel         string                  `json:"default_model"`
+	TitleModel           string                  `json:"title_model"`
+	CodexDefaultModel    string                  `json:"codex_default_model"`
+	CodexTitleModel      string                  `json:"codex_title_model"`
 	DefaultSandbox       sandbox.Type            `json:"default_sandbox"`
 	SandboxByActivity    map[string]sandbox.Type `json:"sandbox_by_activity,omitempty"`
-	MaxParallelTasks     int               `json:"max_parallel_tasks"`
-	MaxTestParallelTasks int               `json:"max_test_parallel_tasks"`
-	OversightInterval    int               `json:"oversight_interval"`
-	ArchivedTasksPerPage int               `json:"archived_tasks_per_page"`
-	AutoPushEnabled      bool              `json:"auto_push_enabled"`
-	AutoPushThreshold    int               `json:"auto_push_threshold"`
-	ContainerNetwork     string            `json:"container_network"`
-	ContainerCPUs        string            `json:"container_cpus"`
-	ContainerMemory      string            `json:"container_memory"`
-	WebhookURL           string            `json:"webhook_url"` // "configured" when set, "" otherwise
+	MaxParallelTasks     int                     `json:"max_parallel_tasks"`
+	MaxTestParallelTasks int                     `json:"max_test_parallel_tasks"`
+	OversightInterval    int                     `json:"oversight_interval"`
+	ArchivedTasksPerPage int                     `json:"archived_tasks_per_page"`
+	AutoPushEnabled      bool                    `json:"auto_push_enabled"`
+	AutoPushThreshold    int                     `json:"auto_push_threshold"`
+	SandboxFast          bool                    `json:"sandbox_fast"`
+	ContainerNetwork     string                  `json:"container_network"`
+	ContainerCPUs        string                  `json:"container_cpus"`
+	ContainerMemory      string                  `json:"container_memory"`
+	WebhookURL           string                  `json:"webhook_url"` // "configured" when set, "" otherwise
 }
 
 type sandboxTestResponse struct {
-	TaskID         string `json:"task_id"`
+	TaskID         string       `json:"task_id"`
 	Sandbox        sandbox.Type `json:"sandbox"`
-	Status         string `json:"status"`
-	LastTestResult string `json:"last_test_result,omitempty"`
-	Result         string `json:"result,omitempty"`
-	StopReason     string `json:"stop_reason,omitempty"`
+	Status         string       `json:"status"`
+	LastTestResult string       `json:"last_test_result,omitempty"`
+	Result         string       `json:"result,omitempty"`
+	StopReason     string       `json:"stop_reason,omitempty"`
 }
 
 type sandboxTestRequest struct {
-	Sandbox           *sandbox.Type     `json:"sandbox"`
-	Timeout           *int              `json:"timeout"`
-	Prompt            *string           `json:"prompt"`
-	OAuthToken        *string           `json:"oauth_token"`
-	APIKey            *string           `json:"api_key"`
-	BaseURL           *string           `json:"base_url"`
-	OpenAIAPIKey      *string           `json:"openai_api_key"`
-	OpenAIBaseURL     *string           `json:"openai_base_url"`
-	DefaultModel      *string           `json:"default_model"`
-	TitleModel        *string           `json:"title_model"`
-	CodexDefaultModel *string           `json:"codex_default_model"`
-	CodexTitleModel   *string           `json:"codex_title_model"`
+	Sandbox           *sandbox.Type           `json:"sandbox"`
+	Timeout           *int                    `json:"timeout"`
+	Prompt            *string                 `json:"prompt"`
+	OAuthToken        *string                 `json:"oauth_token"`
+	APIKey            *string                 `json:"api_key"`
+	BaseURL           *string                 `json:"base_url"`
+	OpenAIAPIKey      *string                 `json:"openai_api_key"`
+	OpenAIBaseURL     *string                 `json:"openai_base_url"`
+	DefaultModel      *string                 `json:"default_model"`
+	TitleModel        *string                 `json:"title_model"`
+	CodexDefaultModel *string                 `json:"codex_default_model"`
+	CodexTitleModel   *string                 `json:"codex_title_model"`
 	DefaultSandbox    *sandbox.Type           `json:"default_sandbox"`
 	SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity"`
+	SandboxFast       *bool                   `json:"sandbox_fast"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -189,6 +191,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ArchivedTasksPerPage: archivedTasksPerPage,
 		AutoPushEnabled:      cfg.AutoPushEnabled,
 		AutoPushThreshold:    autoPushThreshold,
+		SandboxFast:          cfg.SandboxFast,
 		ContainerNetwork:     cfg.ContainerNetwork,
 		ContainerCPUs:        cfg.ContainerCPUs,
 		ContainerMemory:      cfg.ContainerMemory,
@@ -208,11 +211,11 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 
 	sb := sandbox.Claude
 	if req.Sandbox != nil {
-		sb = req.Sandbox.OrDefault()
-	}
-	if !sb.IsValid() {
-		http.Error(w, "invalid sandbox: use claude or codex", http.StatusBadRequest)
-		return
+		if !req.Sandbox.IsValid() {
+			http.Error(w, "invalid sandbox: use claude or codex", http.StatusBadRequest)
+			return
+		}
+		sb = *req.Sandbox
 	}
 
 	// Preserve existing token handling behavior (empty string means no change).
@@ -364,6 +367,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		nil,
 		nil,
 		nil,
+		reqBoolString(req.SandboxFast),
 		nil,
 		nil,
 		nil,
@@ -440,28 +444,29 @@ func testCodexImage(baseImage string) string {
 // as "no change" to prevent accidental token deletion.
 func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		OAuthToken           *string           `json:"oauth_token"`
-		APIKey               *string           `json:"api_key"`
-		BaseURL              *string           `json:"base_url"`
-		OpenAIAPIKey         *string           `json:"openai_api_key"`
-		OpenAIBaseURL        *string           `json:"openai_base_url"`
-		DefaultModel         *string           `json:"default_model"`
-		TitleModel           *string           `json:"title_model"`
-		CodexDefaultModel    *string           `json:"codex_default_model"`
-		CodexTitleModel      *string           `json:"codex_title_model"`
+		OAuthToken           *string                 `json:"oauth_token"`
+		APIKey               *string                 `json:"api_key"`
+		BaseURL              *string                 `json:"base_url"`
+		OpenAIAPIKey         *string                 `json:"openai_api_key"`
+		OpenAIBaseURL        *string                 `json:"openai_base_url"`
+		DefaultModel         *string                 `json:"default_model"`
+		TitleModel           *string                 `json:"title_model"`
+		CodexDefaultModel    *string                 `json:"codex_default_model"`
+		CodexTitleModel      *string                 `json:"codex_title_model"`
 		DefaultSandbox       *sandbox.Type           `json:"default_sandbox"`
 		SandboxByActivity    map[string]sandbox.Type `json:"sandbox_by_activity"`
-		MaxParallelTasks     *int              `json:"max_parallel_tasks"`
-		MaxTestParallelTasks *int              `json:"max_test_parallel_tasks"`
-		OversightInterval    *int              `json:"oversight_interval"`
-		ArchivedTasksPerPage *int              `json:"archived_tasks_per_page"`
-		AutoPushEnabled      *bool             `json:"auto_push_enabled"`
-		AutoPushThreshold    *int              `json:"auto_push_threshold"`
-		ContainerNetwork     *string           `json:"container_network"`
-		ContainerCPUs        *string           `json:"container_cpus"`
-		ContainerMemory      *string           `json:"container_memory"`
-		WebhookURL           *string           `json:"webhook_url"`
-		WebhookSecret        *string           `json:"webhook_secret"`
+		MaxParallelTasks     *int                    `json:"max_parallel_tasks"`
+		MaxTestParallelTasks *int                    `json:"max_test_parallel_tasks"`
+		OversightInterval    *int                    `json:"oversight_interval"`
+		ArchivedTasksPerPage *int                    `json:"archived_tasks_per_page"`
+		AutoPushEnabled      *bool                   `json:"auto_push_enabled"`
+		AutoPushThreshold    *int                    `json:"auto_push_threshold"`
+		SandboxFast          *bool                   `json:"sandbox_fast"`
+		ContainerNetwork     *string                 `json:"container_network"`
+		ContainerCPUs        *string                 `json:"container_cpus"`
+		ContainerMemory      *string                 `json:"container_memory"`
+		WebhookURL           *string                 `json:"webhook_url"`
+		WebhookSecret        *string                 `json:"webhook_secret"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -552,6 +557,15 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		autoPushThreshold = &s
 	}
 
+	var sandboxFast *string
+	if req.SandboxFast != nil {
+		v := "false"
+		if *req.SandboxFast {
+			v = "true"
+		}
+		sandboxFast = &v
+	}
+
 	// Validate the base URL if provided to prevent SSRF.
 	if req.BaseURL != nil && *req.BaseURL != "" {
 		if err := validateBaseURL(*req.BaseURL); err != nil {
@@ -583,6 +597,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		archivedTasksPerPage,
 		autoPush,
 		autoPushThreshold,
+		sandboxFast,
 		req.ContainerNetwork,
 		req.ContainerCPUs,
 		req.ContainerMemory,
@@ -617,4 +632,15 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func reqBoolString(v *bool) *string {
+	if v == nil {
+		return nil
+	}
+	s := "false"
+	if *v {
+		s = "true"
+	}
+	return &s
 }
