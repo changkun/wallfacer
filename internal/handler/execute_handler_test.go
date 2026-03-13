@@ -235,26 +235,39 @@ func TestCompleteTask_WithSessionRejectsMissingWorktrees(t *testing.T) {
 	}
 }
 
-func TestCompleteTask_WithSessionRejectsMissingWorktreeDir(t *testing.T) {
+func TestCompleteTask_WithSessionRestoresMissingWorktreeDir(t *testing.T) {
 	h := newTestHandler(t)
+	t.Cleanup(func() { waitForBackground(200) })
 	ctx := context.Background()
 	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt-missing")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+	if err := os.RemoveAll(wt); err != nil {
+		t.Fatal(err)
+	}
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "missing-wt")}, "task-branch")
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 	setTaskSessionID(t, h, task.ID, "sess-123")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
 	w := httptest.NewRecorder()
 	h.CompleteTask(w, req, task.ID)
 
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	updated, _ := h.store.GetTask(ctx, task.ID)
-	if updated.Status != store.TaskStatusWaiting {
-		t.Fatalf("expected waiting after rejected completion, got %s", updated.Status)
+	var updated *store.Task
+	for range 20 {
+		updated, _ = h.store.GetTask(ctx, task.ID)
+		if updated != nil && updated.Status == store.TaskStatusDone {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if updated == nil || updated.Status != store.TaskStatusDone {
+		t.Fatalf("expected done after restoring missing worktree, got %v", updated.Status)
 	}
 }
 
