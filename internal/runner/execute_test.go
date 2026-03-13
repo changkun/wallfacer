@@ -734,7 +734,8 @@ func TestRunCostResumedFromWaiting(t *testing.T) {
 }
 
 // TestSyncWorktreesPrevStatusRestored verifies that SyncWorktrees restores
-// the task to the exact prevStatus provided, not a hardcoded value.
+// a failed task to waiting (not back to failed, which would cause a retry
+// loop), while non-failed tasks are restored to their original prevStatus.
 func TestSyncWorktreesPrevStatusRestored(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
@@ -758,12 +759,13 @@ func TestSyncWorktreesPrevStatusRestored(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Restore to "failed" (a different prevStatus from "waiting").
+	// A failed task should be restored to "waiting" after a successful sync,
+	// not back to "failed" (which would cause a retry loop).
 	runner.SyncWorktrees(task.ID, "", "failed")
 
 	updated, _ := s.GetTask(ctx, task.ID)
-	if updated.Status != "failed" {
-		t.Fatalf("expected status=failed (prevStatus), got %q", updated.Status)
+	if updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected status=waiting after syncing a failed task, got %q", updated.Status)
 	}
 }
 

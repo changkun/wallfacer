@@ -525,10 +525,16 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			logger.Runner.Error("sync panic", "task", taskID, "panic", p)
 		}
 		if !statusSet {
-			r.store.UpdateTaskStatus(bgCtx, taskID, prevStatus)
+			// Use ForceUpdateTaskStatus because this recovery path may need
+			// transitions not in the normal state machine (e.g. failed → waiting).
+			restoreStatus := prevStatus
+			if restoreStatus == store.TaskStatusFailed {
+				restoreStatus = store.TaskStatusWaiting
+			}
+			r.store.ForceUpdateTaskStatus(bgCtx, taskID, restoreStatus)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 				"from":    string(store.TaskStatusInProgress),
-				"to":      string(prevStatus),
+				"to":      string(restoreStatus),
 				"trigger": store.TriggerSystem,
 			})
 		}
@@ -552,6 +558,12 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 	})
 
 	for repoPath, worktreePath := range task.WorktreePaths {
+		if _, statErr := os.Stat(worktreePath); statErr != nil {
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+				"result": fmt.Sprintf("Skipping %s — worktree no longer exists on disk.", filepath.Base(repoPath)),
+			})
+			continue
+		}
 		if !gitutil.IsGitRepo(repoPath) {
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 				"result": fmt.Sprintf("Skipping %s — not a git repository, cannot sync.", filepath.Base(repoPath)),
@@ -663,10 +675,19 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 	}
 
 	statusSet = true
-	r.store.UpdateTaskStatus(bgCtx, taskID, prevStatus)
+	// After a successful sync, restore to prevStatus — except when the task
+	// was failed: putting it back to failed would be nonsensical (and can
+	// cause retry loops). Restore failed tasks to waiting instead.
+	// Use ForceUpdateTaskStatus because this may need transitions not in the
+	// normal state machine (e.g. the task was force-moved to in_progress for sync).
+	restoreStatus := prevStatus
+	if restoreStatus == store.TaskStatusFailed {
+		restoreStatus = store.TaskStatusWaiting
+	}
+	r.store.ForceUpdateTaskStatus(bgCtx, taskID, restoreStatus)
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
 		"from":    string(store.TaskStatusInProgress),
-		"to":      string(prevStatus),
+		"to":      string(restoreStatus),
 		"trigger": store.TriggerSystem,
 	})
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
