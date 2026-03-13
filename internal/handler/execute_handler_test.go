@@ -235,6 +235,29 @@ func TestCompleteTask_WithSessionRejectsMissingWorktrees(t *testing.T) {
 	}
 }
 
+func TestCompleteTask_WithSessionRejectsMissingWorktreeDir(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	repo := setupRepo(t)
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "missing-wt")}, "task-branch")
+	setTaskSessionID(t, h, task.ID, "sess-123")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
+	w := httptest.NewRecorder()
+	h.CompleteTask(w, req, task.ID)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+
+	updated, _ := h.store.GetTask(ctx, task.ID)
+	if updated.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected waiting after rejected completion, got %s", updated.Status)
+	}
+}
+
 // --- WaitingToDone must go through commit pipeline ---
 
 // TestWaitingToDone_PATCHBlocked verifies that the PATCH handler rejects a

@@ -597,6 +597,9 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				if len(t.WorktreePaths) == 0 {
 					continue
 				}
+				if len(missingTaskWorktrees(t)) > 0 {
+					continue
+				}
 
 				// Only trigger if the worktree is up to date with the default branch.
 				behind := false
@@ -672,6 +675,9 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				// Re-verify eligibility using the fresh snapshot.
 				ft, ok := freshByID[c.task.ID]
 				if !ok || ft.Status != store.TaskStatusWaiting || ft.LastTestResult != "" || ft.IsTestRun {
+					continue
+				}
+				if len(ft.WorktreePaths) == 0 || len(missingTaskWorktrees(&ft)) > 0 {
 					continue
 				}
 
@@ -785,6 +791,9 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				if t.IsTestRun {
 					continue
 				}
+				if len(t.WorktreePaths) == 0 || len(missingTaskWorktrees(t)) > 0 {
+					continue
+				}
 
 				// Check that all worktrees are up to date and conflict-free.
 				skip := false
@@ -830,6 +839,9 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 			submitted := false
 			for _, c := range candidates {
 				t := c.task
+				if len(t.WorktreePaths) == 0 || len(missingTaskWorktrees(&t)) > 0 {
+					continue
+				}
 				logger.Handler.Info("auto-submit: completing verified waiting task", "task", t.ID)
 				autoSubmitMsg := "Auto-submit: task verified with passing tests, up to date, and no conflicts."
 				if c.naturallyComplete {

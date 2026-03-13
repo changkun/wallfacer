@@ -21,6 +21,18 @@ func validateTaskWorktreesForCommit(task *store.Task) error {
 		return httpErrorf(http.StatusConflict, "task has no worktrees to commit")
 	}
 
+	missing := missingTaskWorktrees(task)
+	if len(missing) > 0 {
+		return httpErrorf(http.StatusConflict, "task worktree missing for: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+func missingTaskWorktrees(task *store.Task) []string {
+	if task == nil {
+		return nil
+	}
+
 	var missing []string
 	for repoPath, worktreePath := range task.WorktreePaths {
 		if worktreePath == "" {
@@ -31,10 +43,7 @@ func validateTaskWorktreesForCommit(task *store.Task) error {
 			missing = append(missing, repoPath)
 		}
 	}
-	if len(missing) > 0 {
-		return httpErrorf(http.StatusConflict, "task worktree missing for: %s", strings.Join(missing, ", "))
-	}
-	return nil
+	return missing
 }
 
 type statusError struct {
@@ -128,6 +137,19 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID string, trigger store.Trigger, failurePrefix string) {
 	go func() {
 		bgCtx := context.Background()
+		task, err := h.store.GetTask(bgCtx, taskID)
+		if err == nil && task != nil {
+			if err := validateTaskWorktreesForCommit(task); err != nil {
+				if waitErr := h.store.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr == nil {
+					h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+						store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusWaiting, trigger, nil))
+					h.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
+						"error": err.Error(),
+					})
+					return
+				}
+			}
+		}
 		if err := h.runner.Commit(taskID, sessionID); err != nil {
 			if runnerpkg.IsCommitMessageGenerationError(err) {
 				if waitErr := h.store.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr == nil {
