@@ -1779,6 +1779,27 @@ func TestTryAutoTest_SkipsNoWorktrees(t *testing.T) {
 	}
 }
 
+func TestTryAutoTest_SkipsMissingWorktreeDir(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutotest(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "missing-wt")}, "task-branch")
+
+	h.tryAutoTest(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected task with missing worktree dir to remain waiting, got %s", got.Status)
+	}
+	if got.IsTestRun {
+		t.Error("expected task with missing worktree dir not to enter test run")
+	}
+}
+
 // TestTryAutoTest_SkipsBehindTip verifies that tasks whose worktrees are behind the
 // default branch are not auto-tested.
 func TestTryAutoTest_SkipsBehindTip(t *testing.T) {
@@ -2219,6 +2240,25 @@ func TestTryAutoSubmit_SkipsCurrentlyTesting(t *testing.T) {
 	got, _ := h.store.GetTask(ctx, task.ID)
 	if got.Status != store.TaskStatusWaiting {
 		t.Errorf("expected currently-testing task to remain waiting, got %s", got.Status)
+	}
+}
+
+func TestTryAutoSubmit_SkipsMissingWorktreeDir(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+	task, _ := h.store.CreateTask(ctx, "verified task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "missing-wt")}, "task-branch")
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+
+	h.tryAutoSubmit(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected task with missing worktree dir to remain waiting, got %s", got.Status)
 	}
 }
 
