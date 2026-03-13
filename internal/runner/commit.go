@@ -175,6 +175,10 @@ func (r *Runner) maybeAutoPush(ctx context.Context, taskID uuid.UUID, worktreePa
 // worktree directly on the host. Returns true if any new commits were created.
 // Returns an error if changes were present but could not be staged or committed.
 func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]string, prompt string) (bool, error) {
+	if len(worktreePaths) == 0 {
+		return false, fmt.Errorf("no worktrees to commit")
+	}
+
 	// First pass: stage all changes and collect diff stats for each worktree
 	// that has pending changes.
 	type pendingCommit struct {
