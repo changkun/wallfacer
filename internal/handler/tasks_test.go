@@ -15,6 +15,7 @@ import (
 
 	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/runner"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -266,7 +267,7 @@ func TestCreateTask_RespectsSandbox(t *testing.T) {
 	if wEnv.Code != http.StatusNoContent {
 		t.Fatalf("expected env update 204, got %d: %s", wEnv.Code, wEnv.Body.String())
 	}
-	h.setSandboxTestPassed("codex", true)
+	h.setSandboxTestPassed(sandbox.Codex, true)
 
 	body := `{"prompt": "build a thing", "sandbox": "codex"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(body))
@@ -2120,7 +2121,7 @@ func TestTryAutoSubmit_ProcessesOnlyWaitingTasks(t *testing.T) {
 		if err := json.Unmarshal(event.Data, &data); err != nil {
 			t.Fatalf("json.Unmarshal(event data): %v", err)
 		}
-		if data["trigger"] == store.TriggerAutoSubmit {
+		if data["trigger"] == string(store.TriggerAutoSubmit) {
 			t.Fatalf("done task should not receive auto-submit state changes: %#v", event.Data)
 		}
 	}
@@ -2368,7 +2369,7 @@ func TestTryAutoPromote_EventHasAutoPromoteTrigger(t *testing.T) {
 		}
 		if data["from"] == string(store.TaskStatusBacklog) && data["to"] == string(store.TaskStatusInProgress) {
 			found = true
-			if data["trigger"] != store.TriggerAutoPromote {
+			if data["trigger"] != string(store.TriggerAutoPromote) {
 				t.Errorf("expected trigger=%q, got %q", store.TriggerAutoPromote, data["trigger"])
 			}
 		}
@@ -2411,7 +2412,7 @@ func TestSubmitFeedback_EventHasFeedbackTrigger(t *testing.T) {
 		}
 		if data["from"] == string(store.TaskStatusWaiting) && data["to"] == string(store.TaskStatusInProgress) {
 			found = true
-			if data["trigger"] != store.TriggerFeedback {
+			if data["trigger"] != string(store.TriggerFeedback) {
 				t.Errorf("expected trigger=%q, got %q", store.TriggerFeedback, data["trigger"])
 			}
 		}

@@ -17,13 +17,13 @@ type containerCircuitStatus struct {
 
 // runtimeStatusResponse is the JSON shape returned by GET /api/debug/runtime.
 type runtimeStatusResponse struct {
-	Goroutines       []string               `json:"goroutines"`
-	GoGoroutineCount int                    `json:"go_goroutine_count"`
-	GoHeapAllocBytes uint64                 `json:"go_heap_alloc_bytes"`
-	TaskStates       map[string]int         `json:"task_states"`
-	ActiveContainers int                    `json:"active_containers"`
-	ContainerCircuit containerCircuitStatus `json:"container_circuit"`
-	Timestamp        time.Time              `json:"timestamp"`
+	Goroutines       []string                 `json:"goroutines"`
+	GoGoroutineCount int                      `json:"go_goroutine_count"`
+	GoHeapAllocBytes uint64                   `json:"go_heap_alloc_bytes"`
+	TaskStates       map[store.TaskStatus]int `json:"task_states"`
+	ActiveContainers int                      `json:"active_containers"`
+	ContainerCircuit containerCircuitStatus   `json:"container_circuit"`
+	Timestamp        time.Time                `json:"timestamp"`
 }
 
 // GetRuntimeStatus returns a live snapshot of server internals for operational
@@ -42,17 +42,17 @@ func (h *Handler) GetRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Task counts grouped by status (include archived tasks).
 	tasks, _ := h.store.ListTasks(r.Context(), true)
-	taskStates := map[string]int{
-		string(store.TaskStatusBacklog):    0,
-		string(store.TaskStatusInProgress): 0,
-		string(store.TaskStatusWaiting):    0,
-		string(store.TaskStatusDone):       0,
-		string(store.TaskStatusFailed):     0,
-		string(store.TaskStatusCancelled):  0,
-		string(store.TaskStatusCommitting): 0,
+	taskStates := map[store.TaskStatus]int{
+		store.TaskStatusBacklog:    0,
+		store.TaskStatusInProgress: 0,
+		store.TaskStatusWaiting:    0,
+		store.TaskStatusDone:       0,
+		store.TaskStatusFailed:     0,
+		store.TaskStatusCancelled:  0,
+		store.TaskStatusCommitting: 0,
 	}
 	for _, t := range tasks {
-		taskStates[string(t.Status)]++
+		taskStates[t.Status]++
 	}
 
 	// Count running containers (errors treated as zero).

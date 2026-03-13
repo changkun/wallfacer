@@ -57,7 +57,7 @@ type Handler struct {
 	ideationTimer    *time.Timer
 
 	sandboxTestMu     sync.RWMutex
-	sandboxTestPassed map[string]bool
+	sandboxTestPassed map[sandbox.Type]bool
 	webhookNotifier   func(envconfig.Config) *runner.WebhookNotifier
 
 	// testPhase1Done is called by tryAutoPromote after Phase 1 completes and
@@ -88,9 +88,9 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		ideationEnabled:  true,
 		ideationInterval: 60 * time.Minute,
 		reg:              reg,
-		sandboxTestPassed: map[string]bool{
-			string(sandbox.Claude): false,
-			string(sandbox.Codex):  false,
+		sandboxTestPassed: map[sandbox.Type]bool{
+			sandbox.Claude: false,
+			sandbox.Codex:  false,
 		},
 	}
 	h.webhookNotifier = func(cfg envconfig.Config) *runner.WebhookNotifier {
@@ -175,18 +175,18 @@ func (h *Handler) incAutopilotAction(watcher, outcome string) {
 	})
 }
 
-func (h *Handler) setSandboxTestPassed(sandbox string, passed bool) {
-	s := normalizeSandbox(sandbox)
+func (h *Handler) setSandboxTestPassed(sb sandbox.Type, passed bool) {
+	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.Lock()
-	h.sandboxTestPassed[string(s)] = passed
+	h.sandboxTestPassed[s] = passed
 	h.sandboxTestMu.Unlock()
 }
 
-func (h *Handler) sandboxTestPassedState(sandbox string) bool {
-	s := normalizeSandbox(sandbox)
+func (h *Handler) sandboxTestPassedState(sb sandbox.Type) bool {
+	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.RLock()
 	defer h.sandboxTestMu.RUnlock()
-	return h.sandboxTestPassed[string(s)]
+	return h.sandboxTestPassed[s]
 }
 
 func (h *Handler) refreshCodexBootstrapAuthState() {
@@ -195,7 +195,7 @@ func (h *Handler) refreshCodexBootstrapAuthState() {
 	}
 	ok, _ := h.runner.HostCodexAuthStatus(time.Now())
 	if ok {
-		h.setSandboxTestPassed(string(sandbox.Codex), true)
+		h.setSandboxTestPassed(sandbox.Codex, true)
 	}
 }
 

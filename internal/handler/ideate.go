@@ -141,14 +141,12 @@ func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
 	// Brainstorm tasks skip the backlog queue and go straight to in_progress.
 	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		logger.Handler.Error("ideation: promote idea-agent task", "task", task.ID, "error", err)
-		h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{
-			"to": string(store.TaskStatusBacklog),
-		})
+		h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange,
+			store.NewStateChangeData("", store.TaskStatusBacklog, "", nil))
 		return task
 	}
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{
-		"to": string(store.TaskStatusInProgress),
-	})
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange,
+		store.NewStateChangeData("", store.TaskStatusInProgress, "", nil))
 	h.runner.RunBackground(task.ID, task.Prompt, "", false)
 	logger.Handler.Info("ideation: started idea-agent task", "task", task.ID)
 	return task
@@ -183,17 +181,13 @@ func (h *Handler) CancelIdeation(w http.ResponseWriter, r *http.Request) {
 			// Status will be set to cancelled by the cancel handler's
 			// UpdateTaskStatus call; just kill the container here.
 			h.store.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
-			h.store.InsertEvent(r.Context(), t.ID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusInProgress),
-				"to":   string(store.TaskStatusCancelled),
-			})
+			h.store.InsertEvent(r.Context(), t.ID, store.EventTypeStateChange,
+				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusCancelled, "", nil))
 			cancelled = true
 		case store.TaskStatusBacklog:
 			h.store.UpdateTaskStatus(r.Context(), t.ID, store.TaskStatusCancelled)
-			h.store.InsertEvent(r.Context(), t.ID, store.EventTypeStateChange, map[string]string{
-				"from": string(store.TaskStatusBacklog),
-				"to":   string(store.TaskStatusCancelled),
-			})
+			h.store.InsertEvent(r.Context(), t.ID, store.EventTypeStateChange,
+				store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusCancelled, "", nil))
 			cancelled = true
 		}
 	}

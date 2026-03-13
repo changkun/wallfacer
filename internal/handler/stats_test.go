@@ -372,7 +372,7 @@ func TestFilterTasksByWorkspace(t *testing.T) {
 			WorktreePaths: map[string]string{repoB: "/worktrees/b"},
 		},
 		{
-			ID:            uuid.New(), Title: "Task None",
+			ID: uuid.New(), Title: "Task None",
 			WorktreePaths: nil,
 		},
 	}
@@ -458,7 +458,7 @@ func TestAggregateStats_ByFailureCategory(t *testing.T) {
 	resp := aggregateStats(tasks, noSummary)
 
 	// "timeout" bucket: task1 (0.10) + task3 backfill (0.05)
-	timeoutStat, ok := resp.ByFailureCategory[string(store.FailureCategoryTimeout)]
+	timeoutStat, ok := resp.ByFailureCategory[store.FailureCategoryTimeout]
 	if !ok {
 		t.Fatal("ByFailureCategory missing 'timeout'")
 	}
@@ -477,7 +477,7 @@ func TestAggregateStats_ByFailureCategory(t *testing.T) {
 	}
 
 	// "container_crash" bucket: task2 only (0.20)
-	crashStat, ok := resp.ByFailureCategory[string(store.FailureCategoryContainerCrash)]
+	crashStat, ok := resp.ByFailureCategory[store.FailureCategoryContainerCrash]
 	if !ok {
 		t.Fatal("ByFailureCategory missing 'container_crash'")
 	}

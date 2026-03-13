@@ -17,6 +17,7 @@ import (
 
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/runner"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 )
 
@@ -649,7 +650,7 @@ func TestSandboxImageForTest_CodexResolution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sandboxImageForTest(tt.sandbox, tt.inImage)
+			got := sandboxImageForTest(sandbox.Type(tt.sandbox), tt.inImage)
 			if got != tt.want {
 				t.Fatalf("sandboxImageForTest(%q, %q) = %q; want %q", tt.sandbox, tt.inImage, got, tt.want)
 			}

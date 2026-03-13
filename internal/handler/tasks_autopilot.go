@@ -354,11 +354,8 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				return false, nil
 			}
 			h.incAutopilotAction("auto_promoter", "promoted")
-			h.store.InsertEvent(ctx, candidate.ID, store.EventTypeStateChange, map[string]string{
-				"from":    string(store.TaskStatusBacklog),
-				"to":      string(store.TaskStatusInProgress),
-				"trigger": store.TriggerAutoPromote,
-			})
+			h.store.InsertEvent(ctx, candidate.ID, store.EventTypeStateChange,
+				store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusInProgress, store.TriggerAutoPromote, nil))
 
 			sessionID := ""
 			if !candidate.FreshStart && candidate.SessionID != nil {
@@ -408,12 +405,10 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 		return
 	}
 	h.incAutopilotAction("auto_retrier", "retried")
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{
-		"from":             string(store.TaskStatusFailed),
-		"to":               string(store.TaskStatusBacklog),
-		"trigger":          store.TriggerAutoRetry,
-		"failure_category": string(task.FailureCategory),
-	})
+	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange,
+		store.NewStateChangeData(store.TaskStatusFailed, store.TaskStatusBacklog, store.TriggerAutoRetry, map[string]string{
+			"failure_category": string(task.FailureCategory),
+		}))
 }
 
 // waitingSyncInterval is how often the watcher polls for waiting tasks that
@@ -504,11 +499,8 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		}
 		regularInProgress++
 		h.incAutopilotAction("sync_watcher", "synced")
-		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-			"from":    string(store.TaskStatusWaiting),
-			"to":      string(store.TaskStatusInProgress),
-			"trigger": store.TriggerSync,
-		})
+		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
+			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerSync, nil))
 		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
 			"result": "Auto-syncing: worktree is behind the default branch.",
 		})
@@ -695,11 +687,8 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 					h.pauseAllAutomation(&c.task.ID, "auto-test", err.Error())
 					continue
 				}
-				h.store.InsertEvent(ctx, c.task.ID, store.EventTypeStateChange, map[string]string{
-					"from":    string(store.TaskStatusWaiting),
-					"to":      string(store.TaskStatusInProgress),
-					"trigger": store.TriggerAutoTest,
-				})
+				h.store.InsertEvent(ctx, c.task.ID, store.EventTypeStateChange,
+					store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerAutoTest, nil))
 				h.store.InsertEvent(ctx, c.task.ID, store.EventTypeSystem, map[string]string{
 					"result": "Auto-test: triggering test verification agent.",
 				})
@@ -856,11 +845,8 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						h.pauseAllAutomation(&t.ID, "auto-submit", err.Error())
 						continue
 					}
-					h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-						"from":    string(store.TaskStatusWaiting),
-						"to":      string(store.TaskStatusCommitting),
-						"trigger": store.TriggerAutoSubmit,
-					})
+					h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
+						store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerAutoSubmit, nil))
 					h.runCommitTransition(t.ID, *t.SessionID, store.TriggerAutoSubmit, "auto-submit: commit failed: ")
 				} else {
 					// No session — move directly to done (bypasses state machine
@@ -870,11 +856,8 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						h.pauseAllAutomation(&t.ID, "auto-submit", err.Error())
 						continue
 					}
-					h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-						"from":    string(store.TaskStatusWaiting),
-						"to":      string(store.TaskStatusDone),
-						"trigger": store.TriggerAutoSubmit,
-					})
+					h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
+						store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerAutoSubmit, nil))
 				}
 				submitted = true
 				h.incAutopilotAction("auto_submitter", "submitted")

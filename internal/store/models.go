@@ -167,7 +167,8 @@ const (
 
 // ParseFailureCategory normalizes a string into a known failure category.
 func ParseFailureCategory(raw string) (FailureCategory, bool) {
-	switch FailureCategory(strings.TrimSpace(raw)) {
+	category := FailureCategory(strings.TrimSpace(raw))
+	switch category {
 	case FailureCategoryTimeout,
 		FailureCategoryBudget,
 		FailureCategoryWorktree,
@@ -175,7 +176,7 @@ func ParseFailureCategory(raw string) (FailureCategory, bool) {
 		FailureCategoryAgentError,
 		FailureCategorySyncError,
 		FailureCategoryUnknown:
-		return FailureCategory(strings.TrimSpace(raw)), true
+		return category, true
 	default:
 		return "", false
 	}
@@ -503,18 +504,33 @@ const (
 	EventTypeSpanEnd     EventType = "span_end"
 )
 
-// Trigger constants identify what caused a state_change event.
+// Trigger identifies what caused a state_change event.
+type Trigger string
+
 const (
-	TriggerUser        = "user"
-	TriggerAutoPromote = "auto_promote"
-	TriggerAutoRetry   = "auto_retry"
-	TriggerAutoTest    = "auto_test"
-	TriggerAutoSubmit  = "auto_submit"
-	TriggerFeedback    = "feedback"
-	TriggerSync        = "sync"
-	TriggerRecovery    = "recovery"
-	TriggerSystem      = "system"
+	TriggerUser        Trigger = "user"
+	TriggerAutoPromote Trigger = "auto_promote"
+	TriggerAutoRetry   Trigger = "auto_retry"
+	TriggerAutoTest    Trigger = "auto_test"
+	TriggerAutoSubmit  Trigger = "auto_submit"
+	TriggerFeedback    Trigger = "feedback"
+	TriggerSync        Trigger = "sync"
+	TriggerRecovery    Trigger = "recovery"
+	TriggerSystem      Trigger = "system"
 )
+
+// NewStateChangeData builds the canonical payload for a state_change event.
+func NewStateChangeData(from, to TaskStatus, trigger Trigger, extra map[string]string) map[string]string {
+	data := map[string]string{
+		"from":    string(from),
+		"to":      string(to),
+		"trigger": string(trigger),
+	}
+	for k, v := range extra {
+		data[k] = v
+	}
+	return data
+}
 
 // SpanData holds metadata for a span_start or span_end event.
 // Phase identifies the execution phase (e.g. "worktree_setup", "agent_turn",

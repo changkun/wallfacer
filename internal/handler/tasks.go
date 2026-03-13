@@ -191,10 +191,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange, map[string]string{
-		"to":      string(store.TaskStatusBacklog),
-		"trigger": store.TriggerUser,
-	})
+	h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange,
+		store.NewStateChangeData("", store.TaskStatusBacklog, store.TriggerUser, nil))
 
 	if task.Kind != store.TaskKindIdeaAgent {
 		h.runner.GenerateTitleBackground(task.ID, task.Prompt)
@@ -475,10 +473,8 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange, map[string]string{
-			"to":      string(store.TaskStatusBacklog),
-			"trigger": store.TriggerUser,
-		})
+		h.store.InsertEvent(r.Context(), task.ID, store.EventTypeStateChange,
+			store.NewStateChangeData("", store.TaskStatusBacklog, store.TriggerUser, nil))
 
 		if t.Kind != store.TaskKindIdeaAgent {
 			h.runner.GenerateTitleBackground(task.ID, task.Prompt)
@@ -677,11 +673,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-				"from":    string(oldStatus),
-				"to":      string(store.TaskStatusBacklog),
-				"trigger": store.TriggerUser,
-			})
+			h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange,
+				store.NewStateChangeData(oldStatus, store.TaskStatusBacklog, store.TriggerUser, nil))
 			h.diffCache.invalidate(id)
 
 			updated, err := h.store.GetTask(r.Context(), id)
@@ -697,11 +690,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
 					return
 				}
-				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-					"from":    string(oldStatus),
-					"to":      string(newStatus),
-					"trigger": store.TriggerUser,
-				})
+				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange,
+					store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
 				h.diffCache.invalidate(id)
 				sessionID := ""
 				if !task.FreshStart && task.SessionID != nil {
@@ -724,11 +714,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
 					return
 				}
-				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-					"from":    string(oldStatus),
-					"to":      string(newStatus),
-					"trigger": store.TriggerUser,
-				})
+				h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange,
+					store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
 				h.diffCache.invalidate(id)
 				updated, err := h.store.GetTask(r.Context(), id)
 				if err != nil {
@@ -748,11 +735,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			}
 			return
 		}
-		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange, map[string]string{
-			"from":    string(oldStatus),
-			"to":      string(newStatus),
-			"trigger": store.TriggerUser,
-		})
+		h.store.InsertEvent(r.Context(), id, store.EventTypeStateChange,
+			store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
 		h.diffCache.invalidate(id)
 
 		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog {

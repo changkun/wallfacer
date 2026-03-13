@@ -446,9 +446,8 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 				logger.Runner.Warn("ideation task: append accepted idea to history", "title", idea.Title, "error", appErr)
 			}
 		}
-		r.store.InsertEvent(bgCtx, newTask.ID, store.EventTypeStateChange, map[string]string{
-			"to": string(store.TaskStatusBacklog),
-		})
+		r.store.InsertEvent(bgCtx, newTask.ID, store.EventTypeStateChange,
+			store.NewStateChangeData("", store.TaskStatusBacklog, "", nil))
 		if idea.Title != "" {
 			r.store.UpdateTaskTitle(bgCtx, newTask.ID, idea.Title)
 			titles = append(titles, idea.Title)
