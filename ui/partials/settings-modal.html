@@ -239,6 +239,25 @@
                 </div>
               </div>
             </div>
+
+            <div style="border:1px solid var(--border); border-radius:8px; padding:12px;">
+              <label style="display:block; font-size:12px; font-weight:700; color:var(--text-secondary); margin-bottom:10px;">Webhook Notifications</label>
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                  <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Webhook URL (WALLFACER_WEBHOOK_URL)</label>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <input id="env-webhook-url" type="url" class="field" style="font-family:monospace; font-size:12px; flex:1;" placeholder="https://example.com/webhook" autocomplete="off">
+                    <span id="env-webhook-url-badge" style="font-size:11px; color:var(--text-muted); white-space:nowrap;"></span>
+                  </div>
+                  <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">POST endpoint for <code style="font-family:monospace;">task.state_changed</code> events. Clear to disable.</div>
+                </div>
+                <div>
+                  <label style="display:block; font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:4px;">Webhook Secret (WALLFACER_WEBHOOK_SECRET)</label>
+                  <input id="env-webhook-secret" type="password" class="field" style="font-family:monospace; font-size:12px;" placeholder="(not set)" autocomplete="off">
+                  <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">HMAC-SHA256 signing secret sent as <code style="font-family:monospace;">X-Wallfacer-Signature</code>. Leave blank to keep the current value.</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div style="display: flex; align-items: center; gap: 8px; margin-top: 20px;">

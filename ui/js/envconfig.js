@@ -163,6 +163,8 @@ function buildSaveEnvPayload() {
   const sandboxByActivity = collectSandboxByActivity('env-sandbox-');
   const containerCPUs = document.getElementById('env-container-cpus') ? document.getElementById('env-container-cpus').value.trim() : '';
   const containerMemory = document.getElementById('env-container-memory') ? document.getElementById('env-container-memory').value.trim() : '';
+  const webhookURL = document.getElementById('env-webhook-url') ? document.getElementById('env-webhook-url').value.trim() : '';
+  const webhookSecretRaw = document.getElementById('env-webhook-secret') ? document.getElementById('env-webhook-secret').value.trim() : '';
 
   const body = {};
   if (oauthRaw) body.oauth_token = oauthRaw;
@@ -178,6 +180,8 @@ function buildSaveEnvPayload() {
   body.sandbox_by_activity = sandboxByActivity;
   body.container_cpus = containerCPUs; // empty = clear
   body.container_memory = containerMemory; // empty = clear
+  body.webhook_url = webhookURL; // empty = clear/disable
+  if (webhookSecretRaw) body.webhook_secret = webhookSecretRaw; // empty = no change
 
   return body;
 }
@@ -273,6 +277,9 @@ async function loadEnvConfig() {
   safeSetValue('env-default-sandbox', (el) => { el.value = ''; });
   safeSetValue('env-container-cpus', (el) => { el.value = ''; });
   safeSetValue('env-container-memory', (el) => { el.value = ''; });
+  safeSetValue('env-webhook-url', (el) => { el.value = ''; });
+  safeSetValue('env-webhook-url-badge', (el) => { el.textContent = ''; });
+  safeSetValue('env-webhook-secret', (el) => { el.value = ''; el.placeholder = '(not set)'; });
   safeSetValue('env-config-status', (el) => { el.textContent = ''; });
   safeSetValue('env-claude-test-status', (el) => { el.textContent = ''; });
   safeSetValue('env-codex-test-status', (el) => { el.textContent = ''; });
@@ -311,6 +318,10 @@ async function loadEnvConfig() {
   applySandboxByActivity('env-sandbox-', cfg.sandbox_by_activity || {});
   safeSetValue('env-container-cpus', (el) => { el.value = cfg.container_cpus || ''; });
   safeSetValue('env-container-memory', (el) => { el.value = cfg.container_memory || ''; });
+  // Webhook fields: the server returns "configured" (not the actual URL) when set.
+  safeSetValue('env-webhook-url', (el) => { el.value = ''; }); // never pre-fill with the masked value
+  safeSetValue('env-webhook-url-badge', (el) => { el.textContent = cfg.webhook_url === 'configured' ? 'configured' : ''; });
+  safeSetValue('env-webhook-secret', (el) => { el.placeholder = cfg.webhook_url === 'configured' ? '(set)' : '(not set)'; });
   safeSetValue('env-config-status', (el) => {
     if (el.textContent === 'Failed to load configuration.') return;
     el.textContent = '';
@@ -335,10 +346,12 @@ async function saveEnvConfig() {
   try {
     await api(Routes.env.update(), { method: 'PUT', body: JSON.stringify(body) });
     statusEl.textContent = 'Saved.';
-    // Clear token inputs after saving so they don't linger in the DOM.
+    // Clear sensitive inputs after saving so they don't linger in the DOM.
     document.getElementById('env-oauth-token').value = '';
     document.getElementById('env-api-key').value = '';
     document.getElementById('env-openai-api-key').value = '';
+    const whSecret = document.getElementById('env-webhook-secret');
+    if (whSecret) whSecret.value = '';
     // Refresh placeholders.
     setTimeout(() => showEnvConfigEditor(null), 600);
   } catch (e) {
