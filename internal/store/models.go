@@ -74,13 +74,14 @@ type RefinementSession struct {
 // RetryRecord captures the execution outcome of one task lifecycle before it
 // is reset for a retry. Appended to Task.RetryHistory by ResetTaskForRetry.
 type RetryRecord struct {
-	RetiredAt time.Time  `json:"retired_at"`
-	Prompt    string     `json:"prompt"`
-	Status    TaskStatus `json:"status"`
-	Result    string     `json:"result,omitempty"` // truncated to 2000 chars
-	SessionID string     `json:"session_id,omitempty"`
-	Turns     int        `json:"turns"`
-	CostUSD   float64    `json:"cost_usd"`
+	RetiredAt       time.Time       `json:"retired_at"`
+	Prompt          string          `json:"prompt"`
+	Status          TaskStatus      `json:"status"`
+	Result          string          `json:"result,omitempty"` // truncated to 2000 chars
+	SessionID       string          `json:"session_id,omitempty"`
+	Turns           int             `json:"turns"`
+	CostUSD         float64         `json:"cost_usd"`
+	FailureCategory FailureCategory `json:"failure_category,omitempty"` // root cause of the retired run
 }
 
 // RefinementJob tracks the state of an active or recently completed

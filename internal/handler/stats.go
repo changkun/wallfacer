@@ -18,6 +18,7 @@ type StatsResponse struct {
 	ByStatus          map[string]UsageStat `json:"by_status"`
 	ByActivity        map[string]UsageStat `json:"by_activity"`
 	ByWorkspace       map[string]UsageStat `json:"by_workspace"`
+	ByFailureCategory map[string]UsageStat `json:"by_failure_category"`
 	TopTasks          []TaskCostEntry      `json:"top_tasks"`
 	DailyUsage        []DayStat            `json:"daily_usage"`
 }
@@ -58,9 +59,10 @@ type DayStat struct {
 // always use the live Task struct (backward-compatible fallback, used in tests).
 func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.TaskSummary, error)) StatsResponse {
 	resp := StatsResponse{
-		ByStatus:    make(map[string]UsageStat),
-		ByActivity:  make(map[string]UsageStat),
-		ByWorkspace: make(map[string]UsageStat),
+		ByStatus:          make(map[string]UsageStat),
+		ByActivity:        make(map[string]UsageStat),
+		ByWorkspace:       make(map[string]UsageStat),
+		ByFailureCategory: make(map[string]UsageStat),
 	}
 
 	dailyMap := make(map[string]*DayStat)
@@ -111,6 +113,24 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 			ws.CacheCreationTokens += t.Usage.CacheCreationTokens
 			ws.Count++
 			resp.ByWorkspace[repoPath] = ws
+		}
+
+		// ByFailureCategory: bucket all tasks (including retried ones that are now done)
+		// by their current FailureCategory. For done/cancelled tasks whose FailureCategory
+		// is now empty (cleared on retry), use the RetryHistory to backfill the last
+		// known category.
+		effectiveCat := string(t.FailureCategory)
+		if effectiveCat == "" && len(t.RetryHistory) > 0 {
+			last := t.RetryHistory[len(t.RetryHistory)-1]
+			effectiveCat = string(last.FailureCategory)
+		}
+		if effectiveCat != "" {
+			fc := resp.ByFailureCategory[effectiveCat]
+			fc.CostUSD += u.CostUSD
+			fc.InputTokens += u.InputTokens
+			fc.OutputTokens += u.OutputTokens
+			fc.Count++
+			resp.ByFailureCategory[effectiveCat] = fc
 		}
 
 		// Daily accumulation keyed by creation date.

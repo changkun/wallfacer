@@ -412,6 +412,88 @@ func TestFilterTasksByWorkspace(t *testing.T) {
 	}
 }
 
+// TestAggregateStats_ByFailureCategory verifies that ByFailureCategory correctly
+// buckets tasks by their effective failure category.
+func TestAggregateStats_ByFailureCategory(t *testing.T) {
+	now := time.Now().UTC()
+
+	tasks := []store.Task{
+		{
+			// Failed task with an active FailureCategory — should appear directly.
+			ID:              uuid.New(),
+			Status:          store.TaskStatusFailed,
+			FailureCategory: store.FailureCategoryTimeout,
+			CreatedAt:       now,
+			Usage:           store.TaskUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.10},
+		},
+		{
+			// Failed task with a different category.
+			ID:              uuid.New(),
+			Status:          store.TaskStatusFailed,
+			FailureCategory: store.FailureCategoryContainerCrash,
+			CreatedAt:       now,
+			Usage:           store.TaskUsage{InputTokens: 200, OutputTokens: 80, CostUSD: 0.20},
+		},
+		{
+			// Done task with empty FailureCategory but a RetryHistory entry — should
+			// backfill from the last RetryRecord.
+			ID:              uuid.New(),
+			Status:          store.TaskStatusDone,
+			FailureCategory: "",
+			CreatedAt:       now,
+			Usage:           store.TaskUsage{InputTokens: 50, OutputTokens: 20, CostUSD: 0.05},
+			RetryHistory: []store.RetryRecord{
+				{FailureCategory: store.FailureCategoryTimeout},
+			},
+		},
+		{
+			// Done task with no FailureCategory and no RetryHistory — not bucketed.
+			ID:        uuid.New(),
+			Status:    store.TaskStatusDone,
+			CreatedAt: now,
+			Usage:     store.TaskUsage{InputTokens: 300, OutputTokens: 100, CostUSD: 0.30},
+		},
+	}
+
+	resp := aggregateStats(tasks, noSummary)
+
+	// "timeout" bucket: task1 (0.10) + task3 backfill (0.05)
+	timeoutStat, ok := resp.ByFailureCategory[string(store.FailureCategoryTimeout)]
+	if !ok {
+		t.Fatal("ByFailureCategory missing 'timeout'")
+	}
+	if timeoutStat.Count != 2 {
+		t.Errorf("ByFailureCategory[timeout].Count = %d, want 2", timeoutStat.Count)
+	}
+	wantTimeoutCost := 0.10 + 0.05
+	if diff := timeoutStat.CostUSD - wantTimeoutCost; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByFailureCategory[timeout].CostUSD = %v, want %v", timeoutStat.CostUSD, wantTimeoutCost)
+	}
+	if timeoutStat.InputTokens != 100+50 {
+		t.Errorf("ByFailureCategory[timeout].InputTokens = %d, want %d", timeoutStat.InputTokens, 100+50)
+	}
+	if timeoutStat.OutputTokens != 50+20 {
+		t.Errorf("ByFailureCategory[timeout].OutputTokens = %d, want %d", timeoutStat.OutputTokens, 50+20)
+	}
+
+	// "container_crash" bucket: task2 only (0.20)
+	crashStat, ok := resp.ByFailureCategory[string(store.FailureCategoryContainerCrash)]
+	if !ok {
+		t.Fatal("ByFailureCategory missing 'container_crash'")
+	}
+	if crashStat.Count != 1 {
+		t.Errorf("ByFailureCategory[container_crash].Count = %d, want 1", crashStat.Count)
+	}
+	if diff := crashStat.CostUSD - 0.20; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByFailureCategory[container_crash].CostUSD = %v, want 0.20", crashStat.CostUSD)
+	}
+
+	// Done task4 (no category, no retry history) must not create a bucket.
+	if len(resp.ByFailureCategory) != 2 {
+		t.Errorf("ByFailureCategory len = %d, want 2 (timeout and container_crash only)", len(resp.ByFailureCategory))
+	}
+}
+
 // TestAggregateStats_SummaryFallback verifies that aggregateStats uses a
 // summary's ByActivity and TotalCostUSD for done tasks when a summary is
 // available, while still accumulating live data for non-done tasks.

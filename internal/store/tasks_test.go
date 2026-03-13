@@ -1167,6 +1167,30 @@ func TestResetTaskForRetryAccumulatesHistory(t *testing.T) {
 	}
 }
 
+func TestResetTaskForRetry_PreservesFailureCategoryInRecord(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(bg(), "crash prompt", 5, false, "", "")
+	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
+	s.SetTaskFailureCategory(bg(), task.ID, FailureCategoryContainerCrash)
+
+	if err := s.ResetTaskForRetry(bg(), task.ID, "retry prompt", true); err != nil {
+		t.Fatalf("ResetTaskForRetry: %v", err)
+	}
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if len(got.RetryHistory) != 1 {
+		t.Fatalf("RetryHistory length = %d, want 1", len(got.RetryHistory))
+	}
+	if got.RetryHistory[0].FailureCategory != FailureCategoryContainerCrash {
+		t.Errorf("RetryHistory[0].FailureCategory = %q, want %q",
+			got.RetryHistory[0].FailureCategory, FailureCategoryContainerCrash)
+	}
+	// FailureCategory on the live task should be cleared after retry.
+	if got.FailureCategory != "" {
+		t.Errorf("FailureCategory after reset = %q, want empty", got.FailureCategory)
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SetTaskArchived
 // ─────────────────────────────────────────────────────────────────────────────
