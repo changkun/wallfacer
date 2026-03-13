@@ -123,15 +123,40 @@ func CommitsBehind(repoPath, worktreePath string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	defHash, err := defaultBranchCommitHash(repoPath, defBranch)
+	if err != nil {
+		return 0, err
+	}
 	out, err := exec.Command(
 		"git", "-C", worktreePath,
-		"rev-list", "--count", "HEAD.."+defBranch,
+		"rev-list", "--count", "HEAD.."+defHash,
 	).Output()
 	if err != nil {
 		return 0, fmt.Errorf("git rev-list in %s: %w", worktreePath, err)
 	}
 	n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
 	return n, nil
+}
+
+func defaultBranchCommitHash(repoPath, defBranch string) (string, error) {
+	candidates := []string{
+		defBranch,
+		"refs/heads/" + defBranch,
+		"origin/" + defBranch,
+		"refs/remotes/origin/" + defBranch,
+	}
+	var lastErr error
+	for _, ref := range candidates {
+		hash, err := GetCommitHashForRef(repoPath, ref)
+		if err == nil {
+			return hash, nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("default branch %q not found in %s", defBranch, repoPath)
+	}
+	return "", lastErr
 }
 
 // HasCommitsAheadOf reports whether worktreePath has commits not yet in baseBranch.
