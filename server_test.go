@@ -81,7 +81,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := buildMux(h, r, reg)
+	mux := buildMux(h, r, reg, indexViewData{})
 
 	paths := []struct {
 		method string

@@ -195,7 +195,7 @@ function startRefineLogStream(taskId) {
 
   const decoder = new TextDecoder();
 
-  fetch(task(taskId).refineLogs(), { signal: refineLogsAbort.signal })
+  fetch(withAuthToken(task(taskId).refineLogs()), { signal: refineLogsAbort.signal, headers: withBearerHeaders() })
     .then(async resp => {
       if (resp.status === 204) {
         // Container already done.

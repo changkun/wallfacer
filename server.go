@@ -33,6 +33,10 @@ import (
 //go:embed ui
 var uiFiles embed.FS
 
+type indexViewData struct {
+	ServerAPIKey string
+}
+
 func runServer(configDir string, args []string) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
@@ -97,13 +101,9 @@ func runServer(configDir string, args []string) {
 	// Read initial container settings from env file (if present) so the runner
 	// starts with the configured policies without waiting for the first
 	// container launch to re-read the file.
-	containerNetwork := ""
-	containerCPUs := ""
-	containerMemory := ""
+	envCfg := envconfig.Config{}
 	if cfg, err := envconfig.Parse(*envFile); err == nil {
-		containerNetwork = cfg.ContainerNetwork
-		containerCPUs = cfg.ContainerCPUs
-		containerMemory = cfg.ContainerMemory
+		envCfg = cfg
 	}
 
 	promptsDir := filepath.Join(configDir, "prompts")
@@ -115,9 +115,9 @@ func runServer(configDir string, args []string) {
 		WorktreesDir:     worktreesDir,
 		InstructionsPath: snapshot.InstructionsPath,
 		CodexAuthPath:    codexAuthPath,
-		ContainerNetwork: containerNetwork,
-		ContainerCPUs:    containerCPUs,
-		ContainerMemory:  containerMemory,
+		ContainerNetwork: envCfg.ContainerNetwork,
+		ContainerCPUs:    envCfg.ContainerCPUs,
+		ContainerMemory:  envCfg.ContainerMemory,
 		Prompts:          prompts.NewManager(promptsDir),
 		WorkspaceManager: wsMgr,
 	})
@@ -169,8 +169,8 @@ func runServer(configDir string, args []string) {
 	h.StartAutoSubmitter(ctx)
 
 	// Start the webhook notifier if a URL is configured in the env file.
-	if wCfg, err := envconfig.Parse(*envFile); err == nil && wCfg.WebhookURL != "" {
-		wn := runner.NewWorkspaceWebhookNotifier(wsMgr, wCfg)
+	if envCfg.WebhookURL != "" {
+		wn := runner.NewWorkspaceWebhookNotifier(wsMgr, envCfg)
 		go wn.Start(ctx)
 	}
 
@@ -281,7 +281,7 @@ func runServer(configDir string, args []string) {
 		"Total number of autonomous actions taken by autopilot watchers, by watcher and outcome.",
 	)
 
-	mux := buildMux(h, r, reg)
+	mux := buildMux(h, r, reg, indexViewData{ServerAPIKey: envCfg.ServerAPIKey})
 
 	host, _, _ := net.SplitHostPort(*addr)
 	ln, err := net.Listen("tcp", *addr)
@@ -293,17 +293,18 @@ func runServer(configDir string, args []string) {
 		}
 	}
 
+	actualHostPort := normalizeBrowserVisibleHostPort(*addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 	if !*noBrowser {
 		browserHost := host
-		if browserHost == "" {
+		if browserHost == "" || browserHost == "0.0.0.0" || browserHost == "::" || browserHost == "[::]" {
 			browserHost = "localhost"
 		}
 		go openBrowser(fmt.Sprintf("http://%s:%d", browserHost, actualPort))
 	}
 
 	srv := &http.Server{
-		Handler:     loggingMiddleware(mux, reg),
+		Handler:     loggingMiddleware(handler.CSRFMiddleware(actualHostPort)(handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)), reg),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
 
@@ -349,7 +350,7 @@ func runServer(configDir string, args []string) {
 // applying per-route middleware (e.g. UUID parsing via withID) at map
 // construction time. A startup panic is triggered if a route in the contract
 // has no corresponding handler entry, preventing silent drift.
-func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http.ServeMux {
+func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry, indexData indexViewData) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static files (task board UI).
@@ -364,7 +365,7 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := indexTemplates.ExecuteTemplate(w, "index.html", nil); err != nil {
+		if err := indexTemplates.ExecuteTemplate(w, "index.html", indexData); err != nil {
 			logger.Main.Error("render index", "error", err)
 			http.Error(w, "failed to render index", http.StatusInternalServerError)
 		}
@@ -588,6 +589,23 @@ func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry) *http
 	})
 
 	return mux
+}
+
+func normalizeBrowserVisibleHostPort(requestedAddr string, addr net.Addr) string {
+	host, port, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return addr.String()
+	}
+	switch host {
+	case "", "0.0.0.0", "::", "[::]":
+		reqHost, _, splitErr := net.SplitHostPort(requestedAddr)
+		if splitErr == nil && reqHost != "" && reqHost != "0.0.0.0" && reqHost != "::" && reqHost != "[::]" {
+			host = reqHost
+		} else {
+			host = "localhost"
+		}
+	}
+	return net.JoinHostPort(host, port)
 }
 
 // statusResponseWriter wraps http.ResponseWriter to capture the HTTP status code.

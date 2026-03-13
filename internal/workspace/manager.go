@@ -159,7 +159,7 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 		encoded := envconfig.FormatWorkspaces(validated)
 		if err := envconfig.Update(
 			m.envFile,
-			nil, nil, nil, nil, nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 			nil,
 			&encoded,
