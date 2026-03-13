@@ -151,6 +151,66 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// --- Tag input helpers ---
+
+function renderTagChips(containerId, tags) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container._tags = Array.isArray(tags) ? tags : [];
+  const chips = container._tags.map(function(tag, index) {
+    const background = typeof tagColor === 'function' ? tagColor(tag) : 'var(--tag-color-0)';
+    return `<span class="tag-chip tag-chip-edit" style="background:${background};">${escapeHtml(tag)}<button class="tag-chip-remove" data-idx="${index}" title="Remove tag" onclick="event.preventDefault();event.stopPropagation();_removeTagAt(this.closest('[id]'), ${index})">×</button></span>`;
+  }).join('');
+  container.innerHTML = `<div class="tag-chip-row tag-chip-input-row">${chips}<input class="tag-chip-input" type="text" placeholder="Add tag…" maxlength="32"></div>`;
+  const input = container.querySelector('.tag-chip-input');
+  if (!input) return;
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      _addTag(container, input.value);
+      input.value = '';
+    } else if (e.key === 'Backspace' && input.value === '' && container._tags.length > 0) {
+      e.preventDefault();
+      _removeTagAt(container, container._tags.length - 1);
+    }
+  });
+}
+
+function initTagInput(containerId, initialTags) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container._tags = (initialTags || []).map(function(tag) {
+    return String(tag).trim().toLowerCase();
+  }).filter(Boolean);
+  renderTagChips(containerId, container._tags);
+}
+
+function _notifyTagInputChange(container) {
+  if (!container) return;
+  const cbName = container.dataset.onchange;
+  if (cbName && typeof window[cbName] === 'function') window[cbName]();
+}
+
+function _addTag(container, rawValue) {
+  const tag = String(rawValue || '').trim().toLowerCase();
+  if (!tag) return;
+  if (!container._tags.includes(tag)) container._tags.push(tag);
+  renderTagChips(container.id, container._tags);
+  _notifyTagInputChange(container);
+}
+
+function _removeTagAt(container, index) {
+  if (!container || !Array.isArray(container._tags)) return;
+  container._tags.splice(index, 1);
+  renderTagChips(container.id, container._tags);
+  _notifyTagInputChange(container);
+}
+
+function getTagValues(containerId) {
+  const container = document.getElementById(containerId);
+  return container ? (container._tags || []) : [];
+}
+
 // --- Task creation ---
 
 async function createTask() {
@@ -167,11 +227,12 @@ async function createTask() {
     const mount_worktrees = document.getElementById('new-mount-worktrees').checked;
     const sandbox = document.getElementById('new-sandbox').value;
     const sandbox_by_activity = collectSandboxByActivity('new-sandbox-');
+    const tags = getTagValues('new-task-tag-input');
     const max_cost_usd = parseFloat(document.getElementById('new-max-cost-usd').value) || 0;
     const max_input_tokens = parseInt(document.getElementById('new-max-input-tokens').value, 10) || 0;
     const scheduledAtEl = document.getElementById('new-scheduled-at');
     const scheduled_at = scheduledAtEl && scheduledAtEl.value ? new Date(scheduledAtEl.value).toISOString() : undefined;
-    const newTask = await api(Routes.tasks.create(), { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, max_cost_usd, max_input_tokens, scheduled_at }) });
+    const newTask = await api(Routes.tasks.create(), { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, tags, max_cost_usd, max_input_tokens, scheduled_at }) });
     const dependsOn = getDepPickerValues('new-depends-on-picker');
     if (dependsOn.length > 0 && newTask && newTask.id) {
       await api(task(newTask.id).update(), { method: 'PATCH', body: JSON.stringify({ depends_on: dependsOn }) });
@@ -207,6 +268,7 @@ function showNewTaskForm() {
   // from shadowing an explicit task sandbox (e.g. codex).
   applySandboxByActivity('new-sandbox-', {});
   setActivityOverrideDefaultSandbox('new-sandbox-', (sandboxSelect && sandboxSelect.value) ? sandboxSelect.value : '');
+  initTagInput('new-task-tag-input', []);
   var depsRow = document.getElementById('new-depends-on-row');
   populateDependsOnPicker('new-depends-on-picker', null, []);
   if (depsRow) depsRow.style.display = tasks.length > 0 ? '' : 'none';
@@ -231,6 +293,7 @@ function hideNewTaskForm() {
   if (maxTokensEl) maxTokensEl.value = '';
   const scheduledAtEl = document.getElementById('new-scheduled-at');
   if (scheduledAtEl) scheduledAtEl.value = '';
+  initTagInput('new-task-tag-input', []);
   var depPicker = document.getElementById('new-depends-on-picker');
   if (depPicker) {
     depPicker.querySelector('.dep-picker-list').innerHTML = '';
@@ -385,6 +448,7 @@ function scheduleBacklogSave() {
     const sandbox = document.getElementById('modal-edit-sandbox').value;
     const sandbox_by_activity = collectSandboxByActivity('modal-edit-sandbox-');
     const depends_on = getDepPickerValues('modal-edit-depends-on-picker');
+    const tags = getTagValues('modal-edit-tag-input');
     const maxCostEl = document.getElementById('modal-edit-max-cost-usd');
     const maxTokensEl = document.getElementById('modal-edit-max-input-tokens');
     const max_cost_usd = maxCostEl ? (parseFloat(maxCostEl.value) || 0) : undefined;
@@ -393,7 +457,7 @@ function scheduleBacklogSave() {
     const scheduled_at = scheduledAtEl ? (scheduledAtEl.value ? new Date(scheduledAtEl.value).toISOString() : null) : undefined;
     const modelOverrideEl = document.getElementById('modal-edit-model-override');
     const model = modelOverrideEl ? modelOverrideEl.value.trim() : undefined;
-    const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on, max_cost_usd, max_input_tokens, scheduled_at, model };
+    const patchBody = { prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on, tags, max_cost_usd, max_input_tokens, scheduled_at, model };
     try {
       await api(task(getOpenModalTaskId()).update(), {
         method: 'PATCH',

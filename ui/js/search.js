@@ -7,8 +7,24 @@
 function matchesFilter(t) {
   if (!filterQuery) return true;
   const q = filterQuery.toLowerCase();
-  return (t.title || '').toLowerCase().includes(q) ||
-    (t.prompt || '').toLowerCase().includes(q);
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const tagTokens = tokens.filter(tok => tok.startsWith('#')).map(tok => tok.slice(1));
+  const textTokens = tokens.filter(tok => !tok.startsWith('#'));
+
+  if (tagTokens.length > 0) {
+    const taskTags = (t.tags || []).map(tag => String(tag).toLowerCase());
+    if (!tagTokens.every(tagToken => taskTags.includes(tagToken))) return false;
+    if (textTokens.length === 0) return true;
+  }
+
+  const title = (t.title || '').toLowerCase();
+  const prompt = (t.prompt || '').toLowerCase();
+  const tagText = (t.tags || []).join(' ').toLowerCase();
+  return textTokens.every(tok =>
+    title.includes(tok) ||
+    prompt.includes(tok) ||
+    tagText.includes(tok)
+  );
 }
 
 /**

@@ -191,6 +191,9 @@ async function openModal(id) {
       setActivityOverrideDefaultSandbox('modal-edit-sandbox-', task.sandbox || '');
     }
     populateDependsOnPicker('modal-edit-depends-on-picker', task.id, task.depends_on || []);
+    if (typeof initTagInput === 'function') {
+      initTagInput('modal-edit-tag-input', task.tags || []);
+    }
     const editScheduledAtEl = document.getElementById('modal-edit-scheduled-at');
     if (editScheduledAtEl) {
       if (task.scheduled_at) {

@@ -2,6 +2,12 @@
 // source) so new categories can be added without frontend code changes.
 var BRAINSTORM_CATEGORIES = new Set();
 
+function tagColor(tag) {
+  let sum = 0;
+  for (let index = 0; index < tag.length; index++) sum += tag.charCodeAt(index);
+  return 'var(--tag-color-' + (sum % 12) + ')';
+}
+
 function setBrainstormCategories(values) {
   BRAINSTORM_CATEGORIES = new Set(
     Array.isArray(values)
@@ -697,7 +703,6 @@ card.style.opacity = isArchived ? '0.55' : '';
         ${t.mount_worktrees ? '<span class="text-[10px] text-v-muted" title="Sibling worktrees mounted">worktrees</span>' : ''}
         <span class="text-[10px] text-v-muted" title="Timeout">${formatTimeout(t.timeout)}</span>
         <span class="text-[10px] text-v-muted">${timeAgo(t.created_at)}</span>
-        ${renderTaskTagBadges(t.tags)}
       </div>
     </div>
     ${t.status === 'backlog' && t.session_id ? `<div class="flex items-center gap-1.5 mb-1" onclick="event.stopPropagation()">
@@ -705,6 +710,17 @@ card.style.opacity = isArchived ? '0.55' : '';
       <label for="resume-chk-${t.id}" class="text-[10px] text-v-muted" style="cursor:pointer;">Resume previous session</label>
     </div>` : ''}
     ${isIdeaAgent ? `<div class="card-title">&#129504; ${highlightMatch(t.title || 'Brainstorm', filterQuery)}</div>` : t.title ? `<div class="card-title">${highlightMatch(t.title, filterQuery)}</div>` : ''}
+    ${t.tags && t.tags.length > 0 ? (() => {
+      const visible = t.tags.slice(0, 3);
+      const overflow = t.tags.length - visible.length;
+      const chips = visible.map(tag =>
+        `<span class="tag-chip" data-tag="${escapeHtml(tag)}" style="background:${tagColor(tag)};" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`
+      ).join('');
+      const overflowChip = overflow > 0
+        ? `<span class="tag-chip tag-chip-overflow" title="${escapeHtml(t.tags.slice(3).join(', '))}">+${overflow}</span>`
+        : '';
+      return `<div class="tag-chip-row">${chips}${overflowChip}</div>`;
+    })() : ''}
     <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${_cachedMarkdown(cardDisplayPrompt(t))}</div>
     ${t.status === 'failed' && t.result ? `
     <div class="card-error-reason">

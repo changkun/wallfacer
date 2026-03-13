@@ -308,6 +308,33 @@ func (s *Store) UpdateTaskDependsOn(_ context.Context, id uuid.UUID, dependsOn [
 	return nil
 }
 
+// UpdateTaskTags sets the tag labels for a task. An empty or nil slice clears
+// all tags.
+func (s *Store) UpdateTaskTags(_ context.Context, id uuid.UUID, tags []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	if len(tags) == 0 {
+		t.Tags = nil
+	} else {
+		t.Tags = append([]string(nil), tags...)
+	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	if entry, ok := s.searchIndex[id]; ok {
+		entry.tags = strings.ToLower(strings.Join(t.Tags, " "))
+		s.searchIndex[id] = entry
+	}
+	s.notify(t, false)
+	return nil
+}
+
 // AreDependenciesSatisfied reports whether every task listed in t.DependsOn has
 // status TaskStatusDone. A missing or malformed dependency UUID is treated as
 // unsatisfied to avoid silent unblocking.
