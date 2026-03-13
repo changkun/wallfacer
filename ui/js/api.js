@@ -646,7 +646,7 @@ function renderWorkspaceSelectionDraft() {
   el.innerHTML = workspaceSelectionDraft.map(function(path) {
     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-elevated);">' +
       '<span style="font-family:monospace;font-size:11px;word-break:break-all;">' + escapeHtml(path) + '</span>' +
-      '<button type="button" class="btn-ghost" onclick="removeWorkspaceSelection(' + JSON.stringify(path) + ')">Remove</button>' +
+      '<button type="button" class="btn-ghost" data-workspace-path="' + escapeHtml(path) + '" onclick="removeWorkspaceSelection(this.dataset.workspacePath)">Remove</button>' +
       '</div>';
   }).join('');
 }
