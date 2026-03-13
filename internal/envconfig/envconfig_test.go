@@ -100,7 +100,7 @@ func TestUpdateExistingKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=old-token\nANTHROPIC_BASE_URL=https://old.example.com\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), nil, nil, ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, ptr("new-token"), nil, ptr("https://new.example.com"), nil, nil, ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func TestUpdateNilSkips(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// nil pointer → leave unchanged.
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -142,7 +142,7 @@ func TestUpdateClearsField(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	// Empty string pointer → clear the field.
-	if err := envconfig.Update(path, nil, nil, ptr(""), nil, nil, ptr(""), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr(""), nil, nil, ptr(""), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -162,7 +162,7 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, ptr("claude-sonnet-4-5"), ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, ptr("https://example.com"), nil, nil, ptr("claude-sonnet-4-5"), ptr("claude-haiku-4-5"), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -182,7 +182,7 @@ func TestUpdatePreservesComments(t *testing.T) {
 	content := "# Auth token\nCLAUDE_CODE_OAUTH_TOKEN=tok\n# end\n"
 	path := writeEnvFile(t, content)
 
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -342,7 +342,7 @@ func TestUpdateMaxTestParallelTasks(t *testing.T) {
 
 	v := "4"
 	// maxTestParallel is at position 11 (after maxParallel at 10).
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -360,7 +360,7 @@ func TestUpdateOversightInterval(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	v := "15"
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -378,7 +378,7 @@ func TestUpdateArchivedTasksPerPage(t *testing.T) {
 	path := writeEnvFile(t, content)
 
 	v := "40"
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &v, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -425,13 +425,51 @@ func TestParseAutoPushDefaults(t *testing.T) {
 	}
 }
 
+func TestParseSandboxFastDefaultsToTrue(t *testing.T) {
+	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !cfg.SandboxFast {
+		t.Fatal("SandboxFast = false; want true when absent")
+	}
+}
+
+func TestParseSandboxFastFalse(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_SANDBOX_FAST=false\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.SandboxFast {
+		t.Fatal("SandboxFast = true; want false when configured false")
+	}
+}
+
+func TestUpdateSandboxFast(t *testing.T) {
+	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
+	enabled := "false"
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &enabled, nil, nil, nil, nil, nil); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse after update: %v", err)
+	}
+	if cfg.SandboxFast {
+		t.Fatal("SandboxFast = true; want false after update")
+	}
+}
+
 func TestUpdateAutoPush(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
 
 	enabled := "true"
 	threshold := "5"
-	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &enabled, &threshold, nil, nil, nil, nil, nil); err != nil {
+	if err := envconfig.Update(path, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &enabled, &threshold, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 

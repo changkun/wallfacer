@@ -40,6 +40,7 @@ type Config struct {
 	OversightSandbox      sandbox.Type // WALLFACER_SANDBOX_OVERSIGHT
 	CommitMessageSandbox  sandbox.Type // WALLFACER_SANDBOX_COMMIT_MESSAGE
 	IdeaAgentSandbox      sandbox.Type // WALLFACER_SANDBOX_IDEA_AGENT
+	SandboxFast           bool         // WALLFACER_SANDBOX_FAST ("true"/"false"), defaults to true when unset
 
 	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
@@ -74,6 +75,7 @@ var knownKeys = []string{
 	"WALLFACER_SANDBOX_OVERSIGHT",
 	"WALLFACER_SANDBOX_COMMIT_MESSAGE",
 	"WALLFACER_SANDBOX_IDEA_AGENT",
+	"WALLFACER_SANDBOX_FAST",
 	"WALLFACER_CONTAINER_NETWORK",
 	"WALLFACER_CONTAINER_CPUS",
 	"WALLFACER_CONTAINER_MEMORY",
@@ -88,7 +90,7 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	var cfg Config
+	cfg := Config{SandboxFast: true}
 	for _, line := range strings.Split(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
 		if !ok {
@@ -153,6 +155,8 @@ func Parse(path string) (Config, error) {
 			cfg.CommitMessageSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_IDEA_AGENT":
 			cfg.IdeaAgentSandbox = sandbox.Normalize(v)
+		case "WALLFACER_SANDBOX_FAST":
+			cfg.SandboxFast = v != "false"
 		case "WALLFACER_CONTAINER_NETWORK":
 			cfg.ContainerNetwork = v
 		case "WALLFACER_CONTAINER_CPUS":
@@ -285,6 +289,7 @@ func Update(
 	archivedTasksPerPage,
 	autoPush,
 	autoPushThreshold,
+	sandboxFast,
 	containerNetwork,
 	containerCPUs,
 	containerMemory,
@@ -307,6 +312,7 @@ func Update(
 		"WALLFACER_ARCHIVED_TASKS_PER_PAGE": archivedTasksPerPage,
 		"WALLFACER_AUTO_PUSH":               autoPush,
 		"WALLFACER_AUTO_PUSH_THRESHOLD":     autoPushThreshold,
+		"WALLFACER_SANDBOX_FAST":            sandboxFast,
 		"WALLFACER_CONTAINER_NETWORK":       containerNetwork,
 		"WALLFACER_CONTAINER_CPUS":          containerCPUs,
 		"WALLFACER_CONTAINER_MEMORY":        containerMemory,

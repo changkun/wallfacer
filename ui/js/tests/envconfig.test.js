@@ -14,6 +14,10 @@ function makeInput(value = '') {
   return { value, placeholder: '', textContent: '' };
 }
 
+function makeCheckbox(checked = false) {
+  return { checked, value: '', placeholder: '', textContent: '' };
+}
+
 function makeContext(overrides = {}) {
   const elements = new Map(overrides.elements || []);
   const ctx = {
@@ -56,6 +60,7 @@ describe('buildSaveEnvPayload', () => {
         ['env-codex-default-model', makeInput('codex-default')],
         ['env-codex-title-model', makeInput('')],
         ['env-default-sandbox', makeInput('codex')],
+        ['env-sandbox-fast', makeCheckbox(true)],
       ],
     });
     loadScript(ctx, 'envconfig.js');
@@ -70,6 +75,7 @@ describe('buildSaveEnvPayload', () => {
       sandbox_by_activity: { implementation: 'codex', testing: 'claude' },
       codex_default_model: 'codex-default',
       codex_title_model: '',
+      sandbox_fast: true,
     });
     expect(body.openai_api_key).toBeUndefined();
     expect(body).not.toHaveProperty('openai_api_key');
@@ -92,6 +98,7 @@ describe('buildSandboxTestPayload', () => {
         ['env-codex-default-model', makeInput('')],
         ['env-codex-title-model', makeInput('')],
         ['env-default-sandbox', makeInput('claude')],
+        ['env-sandbox-fast', makeCheckbox(true)],
       ],
       collectSandboxByActivity: () => ({ implementation: 'claude' }),
     });
@@ -102,6 +109,7 @@ describe('buildSandboxTestPayload', () => {
       sandbox: 'claude',
       default_sandbox: 'claude',
       sandbox_by_activity: { implementation: 'claude' },
+      sandbox_fast: true,
       base_url: 'https://claude',
       default_model: 'claude-model',
       title_model: 'claude-title',
@@ -124,6 +132,7 @@ describe('buildSandboxTestPayload', () => {
         ['env-codex-default-model', makeInput('codex-default')],
         ['env-codex-title-model', makeInput('codex-title')],
         ['env-default-sandbox', makeInput('codex')],
+        ['env-sandbox-fast', makeCheckbox(false)],
       ],
       collectSandboxByActivity: () => ({ testing: 'codex' }),
     });
@@ -134,6 +143,7 @@ describe('buildSandboxTestPayload', () => {
       sandbox: 'codex',
       default_sandbox: 'codex',
       sandbox_by_activity: { testing: 'codex' },
+      sandbox_fast: false,
       openai_base_url: 'https://openai',
       codex_default_model: 'codex-default',
       codex_title_model: 'codex-title',
@@ -170,6 +180,7 @@ describe('loadEnvConfig', () => {
     const codexDefaultModelEl = makeInput('');
     const codexTitleModelEl = makeInput('');
     const defaultSandboxEl = makeInput('');
+    const sandboxFastEl = makeCheckbox(false);
     const statusEl = makeInput('');
     const implementationEl = { value: '' };
     const testingEl = { value: '' };
@@ -190,6 +201,7 @@ describe('loadEnvConfig', () => {
       codex_title_model: 'codex-title',
       default_sandbox: 'codex',
       sandbox_by_activity: { implementation: 'claude', testing: 'codex' },
+      sandbox_fast: true,
     });
 
     const ctx = makeContext({
@@ -204,6 +216,7 @@ describe('loadEnvConfig', () => {
         ['env-codex-default-model', codexDefaultModelEl],
         ['env-codex-title-model', codexTitleModelEl],
         ['env-default-sandbox', defaultSandboxEl],
+        ['env-sandbox-fast', sandboxFastEl],
         ['env-config-status', statusEl],
         ['env-sandbox-implementation', implementationEl],
         ['env-sandbox-testing', testingEl],
@@ -237,6 +250,7 @@ describe('loadEnvConfig', () => {
     expect(codexDefaultModelEl.value).toBe('codex-default');
     expect(codexTitleModelEl.value).toBe('codex-title');
     expect(defaultSandboxEl.value).toBe('codex');
+    expect(sandboxFastEl.checked).toBe(true);
     expect(statusEl.textContent).toBe('');
     expect(claudeTestStatusEl.textContent).toBe('');
     expect(codexTestStatusEl.textContent).toBe('');
@@ -264,6 +278,7 @@ describe('loadEnvConfig', () => {
         ['env-codex-default-model', makeInput('')],
         ['env-codex-title-model', makeInput('')],
         ['env-default-sandbox', makeInput('')],
+        ['env-sandbox-fast', makeCheckbox(false)],
         ['env-config-status', statusEl],
         ['env-claude-test-status', makeInput('')],
         ['env-codex-test-status', makeInput('')],

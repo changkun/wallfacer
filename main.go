@@ -228,7 +228,9 @@ func initConfigDir(configDir, envFile string) {
 			"# Optional: default model for Codex tasks.\n" +
 			"# CODEX_DEFAULT_MODEL=codex-mini-latest\n\n" +
 			"# Optional: model for auto-generating task titles with Codex (falls back to CODEX_DEFAULT_MODEL).\n" +
-			"# CODEX_TITLE_MODEL=codex-mini-latest\n"
+			"# CODEX_TITLE_MODEL=codex-mini-latest\n\n" +
+			"# Optional: enable fast-mode sandbox hints by default (set to false to disable).\n" +
+			"WALLFACER_SANDBOX_FAST=true\n"
 		if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
 			logger.Fatal(logger.Main, "create env file", "error", err)
 		}
