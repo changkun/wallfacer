@@ -178,7 +178,7 @@ func TestResolveConflictsSuccess(t *testing.T) {
 	repoPath := t.TempDir()
 	worktreePath := t.TempDir()
 
-	if err := r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main", "commit", 1, 3); err != nil {
+	if err := r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main", ConflictResolverTriggerCommit, 1, 3); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 	events, err := s.GetEvents(ctx, task.ID)
@@ -221,7 +221,7 @@ func TestResolveConflictsContainerError(t *testing.T) {
 	repoPath := t.TempDir()
 	worktreePath := t.TempDir()
 
-	err = r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main", "commit", 1, 3)
+	err = r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main", ConflictResolverTriggerCommit, 1, 3)
 	if err == nil {
 		t.Fatal("expected error from container failure")
 	}
@@ -245,7 +245,7 @@ func TestResolveConflictsIsError(t *testing.T) {
 	repoPath := t.TempDir()
 	worktreePath := t.TempDir()
 
-	err = r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main", "commit", 1, 3)
+	err = r.resolveConflicts(ctx, task.ID, repoPath, worktreePath, "", "main", ConflictResolverTriggerCommit, 1, 3)
 	if err == nil {
 		t.Fatal("expected error when container reports is_error=true")
 	}
