@@ -343,6 +343,48 @@ describe('renderWorkspaceGroups', () => {
   });
 });
 
+describe('renderHeaderWorkspaceGroupsMenu', () => {
+  it('renders saved groups for the header switcher and enables the switch button', () => {
+    const switcherEl = {
+      innerHTML: '',
+      classList: {
+        _set: new Set(['hidden']),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        toggle(c) {
+          if (this._set.has(c)) {
+            this._set.delete(c);
+            return false;
+          }
+          this._set.add(c);
+          return true;
+        },
+      },
+    };
+    const switchBtn = { disabled: true };
+    const ctx = makeContext({
+      elements: [
+        ['workspace-group-switcher', switcherEl],
+        ['workspace-group-switch-btn', switchBtn],
+      ],
+    });
+    loadScript(ctx, 'utils.js');
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    vm.runInContext(`
+      activeWorkspaces = ["/Users/test/repo-a", "/Users/test/repo-b"];
+      workspaceGroups = [{ workspaces: ["/Users/test/repo-a", "/Users/test/repo-b"] }];
+    `, ctx);
+
+    ctx.renderHeaderWorkspaceGroupsMenu();
+
+    expect(switchBtn.disabled).toBe(false);
+    expect(switcherEl.innerHTML).toContain('repo-a + repo-b');
+    expect(switcherEl.innerHTML).toContain('Current');
+  });
+});
+
 describe('browseWorkspaces', () => {
   it('skips hidden folders by default', async () => {
     const pathInput = { value: '/Users/test/dev' };

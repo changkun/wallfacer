@@ -580,6 +580,7 @@ async function fetchConfig() {
     populateSandboxSelects();
     renderWorkspaceSelectionSummary();
     renderWorkspaceGroups();
+    renderHeaderWorkspaceGroupsMenu();
     if (workspacePickerRequired) {
       stopTasksStream();
       stopGitStream();
@@ -652,6 +653,14 @@ function workspaceGroupLabel(group) {
   return names.join(' + ');
 }
 
+function workspaceGroupsEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 function renderWorkspaceGroups() {
   var el = document.getElementById('settings-workspace-groups');
   if (!el) return;
@@ -661,7 +670,7 @@ function renderWorkspaceGroups() {
   }
   el.innerHTML = workspaceGroups.map(function(group, index) {
     var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
-    var active = JSON.stringify(paths) === JSON.stringify(activeWorkspaces);
+    var active = workspaceGroupsEqual(paths, activeWorkspaces);
     return '<div style="border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-elevated);display:flex;flex-direction:column;gap:8px;">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
       '<div style="font-size:12px;font-weight:600;">' + escapeHtml(workspaceGroupLabel(group)) + (active ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Current</span>' : '') + '</div>' +
@@ -678,6 +687,39 @@ function renderWorkspaceGroups() {
       '</div>' +
       '</div>';
   }).join('');
+}
+
+function renderHeaderWorkspaceGroupsMenu() {
+  var el = document.getElementById('workspace-group-switcher');
+  var btn = document.getElementById('workspace-group-switch-btn');
+  if (!el) return;
+  if (btn) btn.disabled = workspaceGroups.length === 0;
+  if (!workspaceGroups.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:4px;">No saved workspace groups yet.</div>';
+    return;
+  }
+  el.innerHTML = workspaceGroups.map(function(group, index) {
+    var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
+    var active = workspaceGroupsEqual(paths, activeWorkspaces);
+    return '<button type="button" onclick="useWorkspaceGroup(' + index + ')" style="width:100%;display:flex;flex-direction:column;gap:4px;text-align:left;padding:8px;border:none;border-radius:8px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:inherit;cursor:pointer;">' +
+      '<span style="font-size:12px;font-weight:600;">' + escapeHtml(workspaceGroupLabel(group)) + (active ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Current</span>' : '') + '</span>' +
+      '<span style="font-size:11px;color:var(--text-muted);line-height:1.4;">' + escapeHtml(paths.join(' • ')) + '</span>' +
+      '</button>';
+  }).join('');
+}
+
+function hideHeaderWorkspaceGroups() {
+  var el = document.getElementById('workspace-group-switcher');
+  if (!el) return;
+  el.classList.add('hidden');
+}
+
+function toggleHeaderWorkspaceGroups(event) {
+  if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+  var el = document.getElementById('workspace-group-switcher');
+  if (!el) return;
+  renderHeaderWorkspaceGroupsMenu();
+  el.classList.toggle('hidden');
 }
 
 function renderWorkspaceSelectionDraft() {
@@ -858,6 +900,7 @@ function editWorkspaceGroup(index) {
 async function deleteWorkspaceGroup(index) {
   workspaceGroups = workspaceGroups.filter(function(_, i) { return i !== index; });
   renderWorkspaceGroups();
+  renderHeaderWorkspaceGroupsMenu();
   try {
     await saveWorkspaceGroups();
   } catch (e) {
@@ -882,6 +925,7 @@ async function applyWorkspaceSelection() {
     activeWorkspaces = workspaceSelectionDraft.slice();
     workspacePickerRequired = activeWorkspaces.length === 0;
     await fetchConfig();
+    hideHeaderWorkspaceGroups();
     if (status) status.textContent = 'Saved.';
     if (settingsStatus) settingsStatus.textContent = 'Updated.';
   } catch (e) {
