@@ -4,62 +4,103 @@
 
 All state changes flow through `handler.go`. The handler never blocks — long-running work is always handed off to a goroutine.
 
+All routes are canonically defined in `internal/apicontract/routes.go`.
+
 ### Routes
 
 | Method + Path | Handler action |
 |---|---|
-| `GET /api/config` | Return workspace paths, instructions file path, autopilot state, available models |
-| `PUT /api/config` | Update server config (`{autopilot: bool}`); re-triggers auto-promotion if enabled |
-| `GET /api/env` | Return current env config (tokens masked) |
-| `PUT /api/env` | Update env config (token, base URL, default model, title model, max parallel); writes `~/.wallfacer/.env` atomically |
-| `GET /api/instructions` | Get workspace AGENTS.md content |
-| `PUT /api/instructions` | Save workspace AGENTS.md (`{content}`) |
-| `POST /api/instructions/reinit` | Rebuild workspace AGENTS.md from default + repo files |
-| `GET /api/tasks` | List all tasks (from in-memory store) |
-| `POST /api/tasks` | Create task, assign UUID, persist to disk |
-| `PATCH /api/tasks/{id}` | Update status / position / prompt / timeout — may launch `runner.Run` goroutine |
-| `DELETE /api/tasks/{id}` | Delete task + cleanup worktrees |
-| `POST /api/tasks/{id}/feedback` | Write feedback event → launch `runner.Run` (resume) goroutine |
-| `POST /api/tasks/{id}/done` | Set `committing` → launch commit pipeline goroutine |
-| `POST /api/tasks/{id}/cancel` | Kill container (if running), clean up worktrees, set `cancelled`; traces/logs kept |
-| `POST /api/tasks/{id}/resume` | Resume failed task, same session → launch `runner.Run` goroutine |
-| `POST /api/tasks/{id}/sync` | Rebase task worktrees onto latest default branch (waiting/failed only) |
-| `POST /api/tasks/{id}/test` | Start test verification agent on a waiting task; records pass/fail verdict |
-| `POST /api/tasks/{id}/refine` | Launch sandbox refinement container for a backlog task |
-| `DELETE /api/tasks/{id}/refine` | Cancel active sandbox refinement container |
-| `GET /api/tasks/{id}/refine/logs` | SSE: stream refinement container logs |
-| `POST /api/tasks/{id}/refine/apply` | Apply refined prompt; persists result as `RefinementSession` |
-| `POST /api/tasks/{id}/refine/dismiss` | Discard refinement result without applying |
-| `GET /api/tasks/{id}/oversight` | Get aggregated oversight summary for a task |
-| `GET /api/tasks/{id}/oversight/test` | Get test-run oversight summary |
-| `GET /api/tasks/{id}/spans` | Get span timing data for a task |
-| `POST /api/tasks/{id}/archive` | Move done or cancelled task to archived |
-| `POST /api/tasks/{id}/unarchive` | Restore archived task |
-| `POST /api/tasks/archive-done` | Archive all done and cancelled tasks in one operation |
-| `GET /api/tasks/stream` | SSE: push task list on any state change |
-| `GET /api/tasks/{id}/events` | Return event trace log; supports cursor pagination (`after`, `limit`) and type filtering (`types`); see [Event Pagination](#event-pagination) |
-| `GET /api/tasks/{id}/diff` | Git diff for task worktrees vs default branch |
-| `GET /api/tasks/{id}/outputs/{filename}` | Serve raw turn output file |
-| `GET /api/tasks/{id}/logs` | SSE: stream live container logs (`podman/docker logs -f`) |
-| `POST /api/tasks/generate-titles` | Trigger background title generation for untitled tasks |
-| `POST /api/tasks/generate-oversight` | Generate oversight summaries for tasks missing them |
-| `GET /api/containers` | List all wallfacer sandbox containers (running and stopped) |
-| `GET /api/git/status` | Current branch / remote status for all workspaces |
-| `GET /api/git/stream` | SSE: poll git status every few seconds |
-| `POST /api/git/push` | Run `git push` on a workspace |
-| `POST /api/git/sync` | Fetch from remote and rebase workspace onto upstream |
-| `POST /api/git/rebase-on-main` | Fetch remote default branch and rebase current workspace branch onto it (blocked while tasks in_progress) |
-| `GET /api/git/branches` | List local branches for a workspace (`?workspace=<path>`) |
-| `POST /api/git/checkout` | Switch the active branch for a workspace |
-| `POST /api/git/create-branch` | Create a new branch and check it out |
-| `GET /api/ideate` | Get current ideation session state |
-| `POST /api/ideate` | Launch brainstorm/ideation agent |
-| `DELETE /api/ideate` | Cancel running ideation agent |
-| `GET /api/usage` | Aggregate usage statistics across all tasks |
+| **Debug & monitoring** | |
+| `GET /api/debug/health` | Operational health check: goroutine count, task counts, uptime |
+| `GET /api/debug/spans` | Aggregate span timing statistics across all tasks |
+| `GET /api/debug/runtime` | Live server internals: pending goroutines, memory, task states, containers |
+| `GET /api/debug/board` | Board manifest as seen by a hypothetical new task (no self-task, no worktree mounts) |
+| `GET /api/tasks/{id}/board` | Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied) |
+| **Container monitoring** | |
+| `GET /api/containers` | List running sandbox containers |
+| **File listing** | |
 | `GET /api/files` | File listing for @ mention autocomplete |
-| `POST /api/env/test` | Validate sandbox credentials via test container |
-| `GET /api/debug/health` | Health check |
-| `GET /api/debug/spans` | Aggregate span timing statistics |
+| **Server configuration** | |
+| `GET /api/config` | Get server configuration (workspaces, autopilot flags, sandbox list, payload limits) |
+| `PUT /api/config` | Update server configuration (autopilot, autotest, autosubmit, sandbox assignments) |
+| **Workspace management** | |
+| `GET /api/workspaces/browse` | List child directories for an absolute host path |
+| `PUT /api/workspaces` | Replace the active workspace set and switch the scoped task board |
+| **Ideation / brainstorm** | |
+| `GET /api/ideate` | Get brainstorm/ideation agent status |
+| `POST /api/ideate` | Trigger the ideation agent to generate new task ideas |
+| `DELETE /api/ideate` | Cancel an in-progress ideation run |
+| **Environment configuration** | |
+| `GET /api/env` | Get environment configuration (tokens masked) |
+| `PUT /api/env` | Update environment file; omitted/empty token fields are preserved |
+| `POST /api/env/test` | Test sandbox configuration by running a lightweight probe task |
+| `POST /api/env/test-webhook` | Send a synthetic webhook event using the configured webhook settings |
+| **Workspace instructions** | |
+| `GET /api/instructions` | Get the workspace AGENTS.md content |
+| `PUT /api/instructions` | Save the workspace AGENTS.md |
+| `POST /api/instructions/reinit` | Rebuild workspace AGENTS.md from default template and repo files |
+| **System prompt templates** | |
+| `GET /api/system-prompts` | List all built-in system prompt templates with override status and content |
+| `GET /api/system-prompts/{name}` | Get a single built-in system prompt template by name |
+| `PUT /api/system-prompts/{name}` | Write a user override for a built-in system prompt template; validates before writing |
+| `DELETE /api/system-prompts/{name}` | Remove user override, restoring the embedded default |
+| **Prompt templates** | |
+| `GET /api/templates` | List all prompt templates sorted by created_at descending |
+| `POST /api/templates` | Create a new named prompt template |
+| `DELETE /api/templates/{id}` | Delete a prompt template by ID |
+| **Git workspace operations** | |
+| `GET /api/git/status` | Git status for all mounted workspaces |
+| `GET /api/git/stream` | SSE stream of git status updates for all workspaces |
+| `POST /api/git/push` | Push a workspace to its remote |
+| `POST /api/git/sync` | Fetch and rebase a workspace onto its upstream branch |
+| `POST /api/git/rebase-on-main` | Fetch origin/<main> and rebase the current branch on top |
+| `GET /api/git/branches` | List branches for a workspace |
+| `POST /api/git/checkout` | Switch a workspace to a different branch |
+| `POST /api/git/create-branch` | Create and check out a new branch in a workspace |
+| `POST /api/git/open-folder` | Open a workspace directory in the OS file manager |
+| **Usage & statistics** | |
+| `GET /api/usage` | Aggregated token and cost usage statistics |
+| `GET /api/stats` | Task status and workspace cost statistics. Optional `?workspace=<path>` restricts aggregation |
+| **Task collection (no {id})** | |
+| `GET /api/tasks` | List all tasks (optionally including archived) |
+| `GET /api/tasks/stream` | SSE: full snapshot then incremental task-updated/task-deleted events |
+| `POST /api/tasks` | Create a new task in the backlog |
+| `POST /api/tasks/batch` | Create multiple tasks atomically with symbolic dependency wiring |
+| `POST /api/tasks/generate-titles` | Bulk-generate titles for tasks that lack one |
+| `POST /api/tasks/generate-oversight` | Bulk-generate oversight summaries for eligible tasks |
+| `GET /api/tasks/search` | Search tasks by keyword |
+| `POST /api/tasks/archive-done` | Archive all tasks in the done state |
+| `GET /api/tasks/summaries` | List immutable task summaries for completed tasks (cost dashboard) |
+| `GET /api/tasks/deleted` | List soft-deleted (tombstoned) tasks within retention window |
+| **Task instance operations ({id})** | |
+| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, sandbox, dependencies, fresh_start |
+| `DELETE /api/tasks/{id}` | Soft-delete a task (tombstone); data retained within retention window |
+| `GET /api/tasks/{id}/events` | Task event timeline; supports cursor pagination (`after`, `limit`) and type filtering (`types`) |
+| `POST /api/tasks/{id}/feedback` | Submit a feedback message to a waiting task |
+| `POST /api/tasks/{id}/done` | Mark a waiting task as done and trigger commit-and-push |
+| `POST /api/tasks/{id}/cancel` | Cancel a task: kill container and discard worktrees |
+| `POST /api/tasks/{id}/resume` | Resume a failed task using its existing session |
+| `POST /api/tasks/{id}/restore` | Restore a soft-deleted task by removing its tombstone |
+| `POST /api/tasks/{id}/archive` | Move a done/cancelled task to the archived state |
+| `POST /api/tasks/{id}/unarchive` | Restore an archived task |
+| `POST /api/tasks/{id}/sync` | Rebase task worktrees onto the latest default branch |
+| `POST /api/tasks/{id}/test` | Trigger the test agent for a task |
+| `POST /api/tasks/{id}/fork` | Create a new backlog task branched from the source task's current worktree state |
+| `GET /api/tasks/{id}/diff` | Git diff of task worktrees versus the default branch |
+| `GET /api/tasks/{id}/logs` | SSE stream of live container logs for a running task |
+| `GET /api/tasks/{id}/outputs/{filename}` | Raw Claude Code output file for a single agent turn |
+| `GET /api/tasks/{id}/turn-usage` | Per-turn token usage breakdown for a task |
+| `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
+| `GET /api/tasks/{id}/oversight` | Oversight summary for a completed task |
+| `GET /api/tasks/{id}/oversight/test` | Test oversight summary for a task |
+| **Admin** | |
+| `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
+| **Refinement agent** | |
+| `POST /api/tasks/{id}/refine` | Start the refinement sandbox agent for a backlog task |
+| `DELETE /api/tasks/{id}/refine` | Cancel an in-progress refinement agent |
+| `GET /api/tasks/{id}/refine/logs` | Stream live logs from the refinement agent |
+| `POST /api/tasks/{id}/refine/apply` | Apply the refined prompt as the new task prompt |
+| `POST /api/tasks/{id}/refine/dismiss` | Dismiss the refinement result without applying it |
 
 ### Triggering Task Execution
 
@@ -102,6 +143,7 @@ Each turn launches an ephemeral container via the configured runtime (Podman or 
   -v claude-config:/home/claude/.claude \
   -v <worktree-path>:/workspace/<repo-name> \
   -v ~/.gitconfig:/home/claude/.gitconfig:ro \
+  [--cpus <limit>] [--memory <limit>] [--network <name>] \
   wallfacer:latest \
   claude -p "<prompt>" \
          --model <model> \
@@ -112,10 +154,13 @@ Each turn launches an ephemeral container via the configured runtime (Podman or 
 
 - `--rm` — container is destroyed on exit; no state leaks between tasks
 - `--env-file` — injects `CLAUDE_CODE_OAUTH_TOKEN` (or `ANTHROPIC_API_KEY`), `ANTHROPIC_BASE_URL`, and any other variables from `~/.wallfacer/.env` into the container environment
-- `--model` — per-task model takes priority; falls back to `CLAUDE_DEFAULT_MODEL` from the env file; the server re-reads the file on every container launch so changes take effect immediately without a restart
+- `--model` — per-task model override takes priority; falls back to `CLAUDE_DEFAULT_MODEL` from the env file; the server re-reads the file on every container launch so changes take effect immediately without a restart
 - `--resume` — omitted on the first turn or when `FreshStart` is set
+- `--cpus` / `--memory` — set from `WALLFACER_CONTAINER_CPUS` / `WALLFACER_CONTAINER_MEMORY` if configured
+- `--network` — set from `WALLFACER_CONTAINER_NETWORK` if configured
 - Output is captured as NDJSON, parsed, and saved to disk
 - Stderr is saved separately if non-empty
+- Output size is limited by `WALLFACER_MAX_TURN_OUTPUT_BYTES` (default 8 MB)
 
 The container name `wallfacer-<uuid>` lets the server stream logs with `<runtime> logs -f wallfacer-<uuid>` while the container is running.
 
@@ -128,6 +173,10 @@ The `-container` flag defaults to auto-detection (`detectContainerRuntime()` in 
 3. `docker` on `$PATH`
 
 Override with `CONTAINER_CMD` env var or `-container` flag. Both Podman and Docker are fully supported — the server handles their different JSON output formats transparently (Podman emits a JSON array from `ps --format json`; Docker emits NDJSON with one object per line).
+
+### Circuit Breaker
+
+Container launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`), the circuit opens and rejects further launches until it resets. This prevents cascading failures when the container runtime is unhealthy.
 
 ### Board Context
 
@@ -236,18 +285,21 @@ TaskUsage {
   InputTokens              int
   OutputTokens             int
   CacheReadInputTokens     int
-  CacheCreationInputTokens int
+  CacheCreationTokens      int
   CostUSD                  float64
 }
 ```
 
 Usage is displayed on task cards and aggregated in the Done column header. It persists in `task.json` across server restarts.
 
-In addition to the aggregate `TaskUsage`, each task records a `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `testing`, `refinement`, `title`, `oversight`, `commit_message`, `idea_agent`. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
+In addition to the aggregate `TaskUsage`, each task records:
+
+- `UsageBreakdown map[string]TaskUsage` keyed by activity: `implementation`, `testing`, `refinement`, `title`, `oversight`, `commit_message`, `idea_agent`. This lets the Usage tab in the task detail panel show cost per sub-agent rather than a single lump sum.
+- Per-turn `TurnUsageRecord` entries accessible via `GET /api/tasks/{id}/turn-usage`, providing detailed per-turn token consumption, stop reasons, and sub-agent labels.
 
 ## Multi-Workspace Support
 
-Multiple workspace paths can be passed at startup (see [Architecture — Configuration](architecture.md#configuration)). For each workspace:
+Multiple workspace paths can be passed at startup (see [Architecture — Configuration](architecture.md#configuration)) or switched at runtime via `PUT /api/workspaces`. For each workspace:
 
 - Git status is polled independently and shown in the UI header
 - A separate worktree is created per task per workspace
@@ -318,6 +370,8 @@ StartAutoPromoter():
     count in_progress tasks
     if count < WALLFACER_MAX_PARALLEL and backlog not empty:
       pick lowest-position backlog task
+      skip if DependsOn has unmet dependencies
+      skip if ScheduledAt is in the future
       update status: backlog → in_progress
       go runner.Run(task)
 ```
@@ -405,6 +459,18 @@ POST /api/ideate
 GET /api/ideate  — returns current ideation session state (task ID, status, created task count)
 DELETE /api/ideate  — kills running ideation container, marks task cancelled
 ```
+
+## Webhook Notifications
+
+When `WALLFACER_WEBHOOK_URL` is configured, the server sends HTTP POST notifications on task state changes. The payload includes the task ID, old status, new status, and timestamp. If `WALLFACER_WEBHOOK_SECRET` is set, the request includes an HMAC signature header for verification.
+
+Use `POST /api/env/test-webhook` to send a synthetic event and verify your endpoint.
+
+## Task Search
+
+`GET /api/tasks/search?q=<keyword>` searches across task titles, prompts, tags, and oversight text. Results are returned as `TaskSearchResult` objects with the matched field and a context snippet.
+
+The search index is maintained in-memory and updated on task changes. Use `POST /api/admin/rebuild-index` to manually rebuild if needed.
 
 ## Span Instrumentation
 

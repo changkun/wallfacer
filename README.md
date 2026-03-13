@@ -24,11 +24,11 @@ Create tasks, run them in isolated sandboxes, review diffs, and keep shipping wi
 
 ## Capability Stack
 
-- **Execution engine**: isolated containers, per-task git worktrees, safe parallel runs
-- **Autonomous loop**: refinement, implementation, testing, auto-submit, autopilot promotion
-- **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility
-- **Repo operations**: branch switching, sync/rebase helpers, auto commit and push
-- **Flexible runtime**: Podman/Docker support, workspace-level instructions, Claude + Codex backends
+- **Execution engine**: isolated containers, per-task git worktrees, safe parallel runs, circuit breaker, resource limits
+- **Autonomous loop**: refinement, implementation, testing, auto-submit, autopilot promotion, auto-retry, cost/token budgets
+- **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility, per-turn breakdown, task search
+- **Repo operations**: branch switching, sync/rebase helpers, auto commit and push, task forking, webhook notifications
+- **Flexible runtime**: Podman/Docker support, workspace-level instructions, Claude + Codex backends, system prompt customization
 
 For a complete walkthrough of workflows and controls, see [Usage Guide](docs/usage.md).
 
@@ -96,13 +96,16 @@ Codex can be enabled either by:
 
 | Target | Description |
 |---|---|
-| `make build` | Build both sandbox images (Claude + Codex) |
+| `make build` | Build binary + both sandbox images (Claude + Codex) |
+| `make build-binary` | Build just the Go binary |
 | `make build-claude` | Build the Claude sandbox image only |
 | `make build-codex` | Build the OpenAI Codex sandbox image only |
 | `make server` | Build and run the Go server |
 | `make run PROMPT="..."` | Headless one-shot agent execution |
 | `make shell` | Debug shell inside a sandbox container |
+| `make test` | Run all tests (backend + frontend) |
 | `make ui-css` | Regenerate Tailwind CSS from UI sources |
+| `make api-contract` | Regenerate API route artifacts |
 | `make clean` | Remove both sandbox images |
 
 ## Documentation

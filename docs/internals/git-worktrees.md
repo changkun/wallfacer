@@ -92,9 +92,20 @@ git branch -D task/<uuid8>    ← delete task branch
 rm -rf ~/.wallfacer/worktrees/<uuid>/   ← remove task worktree directory
 ```
 
-Note: `data/<uuid>/` (task record, traces, outputs, oversights) is **preserved** after cleanup so execution history remains accessible in the UI.
+Note: `data/<uuid>/` (task record, traces, outputs, oversights, summary) is **preserved** after cleanup so execution history remains accessible in the UI.
 
 Cleanup is idempotent and safe to call multiple times (errors are logged, not fatal).
+
+## Task Forking
+
+`POST /api/tasks/{id}/fork` creates a new backlog task that inherits the source task's worktree state:
+
+1. The source task's worktree is copied to a new location under `~/.wallfacer/worktrees/<new-uuid>/`
+2. A new branch `task/<new-uuid8>` is created from the current worktree state
+3. The new task records `ForkedFrom = source_task_uuid` for lineage tracking
+4. The forked task can be independently executed, tested, and merged
+
+Forking is available from `waiting`, `failed`, or `done` tasks.
 
 ## Orphan Pruning
 
