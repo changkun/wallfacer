@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+
+	"changkun.de/wallfacer/internal/store"
 )
 
 // containerCircuitStatus is the JSON shape for the container circuit breaker
@@ -41,13 +43,13 @@ func (h *Handler) GetRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 	// Task counts grouped by status (include archived tasks).
 	tasks, _ := h.store.ListTasks(r.Context(), true)
 	taskStates := map[string]int{
-		"backlog":    0,
-		"in_progress": 0,
-		"waiting":    0,
-		"done":       0,
-		"failed":     0,
-		"cancelled":  0,
-		"committing": 0,
+		string(store.TaskStatusBacklog):    0,
+		string(store.TaskStatusInProgress): 0,
+		string(store.TaskStatusWaiting):    0,
+		string(store.TaskStatusDone):       0,
+		string(store.TaskStatusFailed):     0,
+		string(store.TaskStatusCancelled):  0,
+		string(store.TaskStatusCommitting): 0,
 	}
 	for _, t := range tasks {
 		taskStates[string(t.Status)]++

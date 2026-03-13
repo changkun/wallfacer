@@ -25,7 +25,7 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "backlog" {
+	if task.Status != store.TaskStatusBacklog {
 		http.Error(w, "task is not in backlog", http.StatusBadRequest)
 		return
 	}
@@ -39,7 +39,7 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 	job := &store.RefinementJob{
 		ID:        uuid.New().String(),
 		CreatedAt: time.Now(),
-		Status:    "running",
+		Status:    store.RefinementJobStatusRunning,
 		Source:    "runner",
 	}
 	if err := h.store.StartRefinementJobIfIdle(r.Context(), id, job); err != nil {
@@ -70,7 +70,7 @@ func (h *Handler) CancelRefinement(w http.ResponseWriter, r *http.Request, id uu
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.CurrentRefinement == nil || task.CurrentRefinement.Status != "running" {
+	if task.CurrentRefinement == nil || task.CurrentRefinement.Status != store.RefinementJobStatusRunning {
 		http.Error(w, "no refinement running", http.StatusBadRequest)
 		return
 	}
@@ -78,7 +78,7 @@ func (h *Handler) CancelRefinement(w http.ResponseWriter, r *http.Request, id uu
 	h.runner.KillRefineContainer(id)
 
 	// Mark as failed (cancelled).
-	task.CurrentRefinement.Status = "failed"
+	task.CurrentRefinement.Status = store.RefinementJobStatusFailed
 	task.CurrentRefinement.Error = "cancelled by user"
 	if err := h.store.UpdateRefinementJob(r.Context(), id, task.CurrentRefinement); err != nil {
 		logger.Handler.Error("cancel refinement: update job", "task", id, "error", err)
@@ -104,11 +104,11 @@ func (h *Handler) RefineDismiss(w http.ResponseWriter, r *http.Request, id uuid.
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "backlog" {
+	if task.Status != store.TaskStatusBacklog {
 		http.Error(w, "task is not in backlog", http.StatusBadRequest)
 		return
 	}
-	if task.CurrentRefinement == nil || task.CurrentRefinement.Status != "done" {
+	if task.CurrentRefinement == nil || task.CurrentRefinement.Status != store.RefinementJobStatusDone {
 		http.Error(w, "no completed refinement to dismiss", http.StatusBadRequest)
 		return
 	}
@@ -141,7 +141,7 @@ func (h *Handler) RefineApply(w http.ResponseWriter, r *http.Request, id uuid.UU
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
-	if task.Status != "backlog" {
+	if task.Status != store.TaskStatusBacklog {
 		http.Error(w, "task is not in backlog", http.StatusBadRequest)
 		return
 	}

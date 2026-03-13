@@ -15,6 +15,7 @@ import (
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/metrics"
 	"changkun.de/wallfacer/internal/runner"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/internal/workspace"
 	"github.com/google/uuid"
@@ -88,8 +89,8 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 		ideationInterval: 60 * time.Minute,
 		reg:              reg,
 		sandboxTestPassed: map[string]bool{
-			"claude": false,
-			"codex":  false,
+			string(sandbox.Claude): false,
+			string(sandbox.Codex):  false,
 		},
 	}
 	h.webhookNotifier = func(cfg envconfig.Config) *runner.WebhookNotifier {
@@ -194,7 +195,7 @@ func (h *Handler) refreshCodexBootstrapAuthState() {
 	}
 	ok, _ := h.runner.HostCodexAuthStatus(time.Now())
 	if ok {
-		h.setSandboxTestPassed("codex", true)
+		h.setSandboxTestPassed(string(sandbox.Codex), true)
 	}
 }
 
