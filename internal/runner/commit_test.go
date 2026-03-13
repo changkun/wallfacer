@@ -290,3 +290,69 @@ func TestHostStageAndCommitFallsBackOnContainerFailure(t *testing.T) {
 		t.Fatalf("fallback commit message should contain prompt, got: %q", subject)
 	}
 }
+
+// TestHostStageAndCommitErrorsWhenAllWorktreesMissing verifies that
+// hostStageAndCommit returns an error when every worktree path is missing,
+// instead of silently succeeding with no commits.
+func TestHostStageAndCommitErrorsWhenAllWorktreesMissing(t *testing.T) {
+	runner := runnerWithCmd(t, "echo")
+	taskID := uuid.New()
+
+	worktreePaths := map[string]string{
+		"/tmp/repo-a": "/nonexistent/worktree-a",
+		"/tmp/repo-b": "/nonexistent/worktree-b",
+	}
+	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "some prompt")
+	if err == nil {
+		t.Fatal("expected error when all worktrees are missing, got nil")
+	}
+	if committed {
+		t.Fatal("expected committed=false when all worktrees are missing")
+	}
+	if !strings.Contains(err.Error(), "all worktrees missing") {
+		t.Fatalf("expected 'all worktrees missing' in error, got: %v", err)
+	}
+}
+
+// TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing verifies that
+// hostStageAndCommit still succeeds when only some worktrees are missing
+// but others exist (nothing to commit is not an error when at least one
+// worktree was reachable).
+func TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	worktreesDir := filepath.Join(t.TempDir(), "worktrees")
+	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	runner := NewRunner(s, RunnerConfig{
+		Command:      "echo",
+		SandboxImage: "test:latest",
+		Workspaces:   repo,
+		WorktreesDir: worktreesDir,
+	})
+
+	taskID := uuid.New()
+	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
+
+	// Add a missing worktree alongside the real one.
+	worktreePaths["/tmp/missing-repo"] = "/nonexistent/worktree"
+
+	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "some prompt")
+	if err != nil {
+		t.Fatalf("unexpected error when only some worktrees are missing: %v", err)
+	}
+	if committed {
+		t.Fatal("expected committed=false when no worktree has changes")
+	}
+}

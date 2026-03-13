@@ -166,9 +166,11 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 	var pending []pendingCommit
 	var errs []string
 
+	var missing []string
 	for repoPath, worktreePath := range worktreePaths {
 		if _, err := os.Stat(worktreePath); err != nil {
 			logger.Runner.Warn("host commit: worktree missing, skipping", "repo", repoPath, "path", worktreePath)
+			missing = append(missing, repoPath)
 			continue
 		}
 		if out, err := exec.Command("git", "-C", worktreePath, "add", "-A").CombinedOutput(); err != nil {
@@ -191,6 +193,9 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 	if len(pending) == 0 {
 		if len(errs) > 0 {
 			return false, fmt.Errorf("staging failed: %s", strings.Join(errs, "; "))
+		}
+		if len(missing) > 0 && len(missing) == len(worktreePaths) {
+			return false, fmt.Errorf("all worktrees missing: %s", strings.Join(missing, ", "))
 		}
 		return false, nil
 	}
@@ -358,9 +363,11 @@ func (r *Runner) rebaseAndMerge(
 	commitHashes := make(map[string]string)
 	baseHashes := make(map[string]string)
 
+	var missing int
 	for repoPath, worktreePath := range worktreePaths {
 		if _, err := os.Stat(worktreePath); err != nil {
 			logger.Runner.Warn("rebase+merge: worktree missing, skipping", "task", taskID, "repo", repoPath, "path", worktreePath)
+			missing++
 			continue
 		}
 		logger.Runner.Info("rebase+merge", "task", taskID, "repo", repoPath)
@@ -376,6 +383,10 @@ func (r *Runner) rebaseAndMerge(
 		if err != nil {
 			return commitHashes, baseHashes, err
 		}
+	}
+
+	if missing > 0 && missing == len(worktreePaths) {
+		return commitHashes, baseHashes, fmt.Errorf("all worktrees missing, nothing to rebase/merge")
 	}
 
 	return commitHashes, baseHashes, nil
