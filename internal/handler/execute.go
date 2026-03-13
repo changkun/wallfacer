@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"changkun.de/wallfacer/internal/gitutil"
+	"changkun.de/wallfacer/internal/logger"
 	runnerpkg "changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/prompts"
@@ -44,6 +45,28 @@ func missingTaskWorktrees(task *store.Task) []string {
 		}
 	}
 	return missing
+}
+
+func (h *Handler) restoreTaskWorktreesForCommit(ctx context.Context, task *store.Task) (*store.Task, error) {
+	if task == nil || len(task.WorktreePaths) == 0 || h.runner == nil {
+		return task, nil
+	}
+	if len(missingTaskWorktrees(task)) == 0 {
+		return task, nil
+	}
+
+	worktreePaths, branchName, err := h.runner.EnsureTaskWorktrees(task.ID, task.WorktreePaths, task.BranchName)
+	if err != nil {
+		return task, err
+	}
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
+		return task, err
+	}
+	updated, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		return task, err
+	}
+	return updated, nil
 }
 
 type statusError struct {
@@ -139,6 +162,10 @@ func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID string, trigge
 		bgCtx := context.Background()
 		task, err := h.store.GetTask(bgCtx, taskID)
 		if err == nil && task != nil {
+			task, err = h.restoreTaskWorktreesForCommit(bgCtx, task)
+			if err != nil {
+				logger.Handler.Error("restore task worktrees for commit", "task", taskID, "error", err)
+			}
 			if err := validateTaskWorktreesForCommit(task); err != nil {
 				if waitErr := h.store.ForceUpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting); waitErr == nil {
 					h.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
@@ -194,6 +221,11 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 	}
 
 	if task.SessionID != nil && *task.SessionID != "" {
+		task, err = h.restoreTaskWorktreesForCommit(r.Context(), task)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		if err := validateTaskWorktreesForCommit(task); err != nil {
 			if se, ok := err.(*statusError); ok {
 				http.Error(w, se.msg, se.code)

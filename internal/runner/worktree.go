@@ -19,15 +19,36 @@ import (
 // Returns (worktreePaths, branchName, error).
 // Idempotent: if the worktree/snapshot directory already exists it is reused.
 func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, error) {
+	return r.ensureTaskWorktrees(taskID, nil, "")
+}
+
+func (r *Runner) ensureTaskWorktrees(taskID uuid.UUID, existing map[string]string, branchName string) (map[string]string, string, error) {
 	r.worktreeMu.Lock()
 	defer r.worktreeMu.Unlock()
 
-	branchName := "task/" + taskID.String()[:8]
+	if branchName == "" {
+		branchName = "task/" + taskID.String()[:8]
+	}
 	worktreePaths := make(map[string]string)
+	createdPaths := make(map[string]string)
 
-	for _, ws := range r.Workspaces() {
+	repos := r.Workspaces()
+	if len(existing) > 0 {
+		repos = make([]string, 0, len(existing))
+		for repoPath := range existing {
+			repos = append(repos, repoPath)
+		}
+	}
+
+	for _, ws := range repos {
 		basename := filepath.Base(ws)
-		worktreePath := filepath.Join(r.worktreesDir, taskID.String(), basename)
+		worktreePath := ""
+		if existing != nil {
+			worktreePath = existing[ws]
+		}
+		if worktreePath == "" {
+			worktreePath = filepath.Join(r.worktreesDir, taskID.String(), basename)
+		}
 
 		// Idempotent: reuse existing worktree/snapshot (e.g. task resumed from waiting).
 		if _, err := os.Stat(worktreePath); err == nil {
@@ -36,7 +57,7 @@ func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, er
 		}
 
 		if err := os.MkdirAll(filepath.Dir(worktreePath), 0755); err != nil {
-			r.cleanupWorktrees(taskID, worktreePaths, branchName)
+			r.cleanupWorktrees(taskID, createdPaths, branchName)
 			return nil, "", fmt.Errorf("mkdir worktree parent: %w", err)
 		}
 
@@ -46,24 +67,32 @@ func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, er
 				// the task can still run with a local git for tracking.
 				logger.Runner.Warn("empty git repo, using snapshot instead", "workspace", ws)
 				if err := setupNonGitSnapshot(ws, worktreePath); err != nil {
-					r.cleanupWorktrees(taskID, worktreePaths, branchName)
+					r.cleanupWorktrees(taskID, createdPaths, branchName)
 					return nil, "", fmt.Errorf("snapshot for empty repo %s: %w", ws, err)
 				}
 			} else if err != nil {
-				r.cleanupWorktrees(taskID, worktreePaths, branchName)
+				r.cleanupWorktrees(taskID, createdPaths, branchName)
 				return nil, "", fmt.Errorf("createWorktree for %s: %w", ws, err)
 			}
 		} else {
 			if err := setupNonGitSnapshot(ws, worktreePath); err != nil {
-				r.cleanupWorktrees(taskID, worktreePaths, branchName)
+				r.cleanupWorktrees(taskID, createdPaths, branchName)
 				return nil, "", fmt.Errorf("snapshot for %s: %w", ws, err)
 			}
 		}
 
 		worktreePaths[ws] = worktreePath
+		createdPaths[ws] = worktreePath
 	}
 
 	return worktreePaths, branchName, nil
+}
+
+// EnsureTaskWorktrees recreates missing task worktrees when the task branch
+// still exists (for example after a lost linked-worktree directory). Existing
+// worktrees are reused unchanged.
+func (r *Runner) EnsureTaskWorktrees(taskID uuid.UUID, existing map[string]string, branchName string) (map[string]string, string, error) {
+	return r.ensureTaskWorktrees(taskID, existing, branchName)
 }
 
 // CleanupWorktrees is the exported variant of cleanupWorktrees for handler use.
