@@ -38,6 +38,11 @@ function makeEl(id = '') {
     querySelector: () => null,
     querySelectorAll: () => [],
     appendChild: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    hasAttribute: () => false,
+    focus: () => {},
+    remove: () => {},
   };
 }
 
@@ -60,7 +65,7 @@ class MockAbortController {
   }
 }
 
-function makeRaceContext() {
+function makeRaceContext(overrides = {}) {
   const elements = {};
   function getEl(id) {
     if (!elements[id]) elements[id] = makeEl(id);
@@ -139,6 +144,7 @@ function makeRaceContext() {
       total_filtered: 1,
     },
     '/api/tasks/task-2/diff': { diff: 'diff-from-task-2', behind_counts: {} },
+    ...(overrides.payloads || {}),
   };
 
   function api(path, opts = {}) {
@@ -152,7 +158,7 @@ function makeRaceContext() {
         reject(err);
         return;
       }
-      const timer = setTimeout(() => resolve(payloads[basePath]), delays[basePath] || 0);
+      const timer = setTimeout(() => resolve(payloads[basePath]), (overrides.delays && overrides.delays[basePath]) || delays[basePath] || 0);
       if (opts.signal && typeof opts.signal.addEventListener === 'function') {
         opts.signal.addEventListener('abort', () => {
           clearTimeout(timer);
@@ -275,5 +281,36 @@ describe('modal open race safety', () => {
 
     await vm.runInContext("openModal('archived-1')", ctx);
     expect(elements['modal-id'].textContent).toBe('ID: archived-1');
+  });
+
+  it('renders structured conflict resolver events clearly', async () => {
+    const { ctx, elements } = makeRaceContext({
+      payloads: {
+        '/api/tasks/task-1/events': {
+          events: [{
+            event_type: 'system',
+            created_at: new Date().toISOString(),
+            data: {
+              phase: 'conflict_resolver',
+              status: 'handoff',
+              trigger: 'sync',
+              repo: 'repo-a',
+              attempt: 3,
+              max_attempts: 3,
+              result: 'Automatic conflict resolver exhausted retries for repo-a. Handing off to the main agent for interactive resolution.',
+            },
+          }],
+          next_after: 1,
+          has_more: false,
+          total_filtered: 1,
+        },
+      },
+    });
+
+    await vm.runInContext("openModal('task-1')", ctx);
+    expect(elements['modal-events'].innerHTML).toContain('Conflict Resolution');
+    expect(elements['modal-events'].innerHTML).toContain('resolver handoff');
+    expect(elements['modal-events'].innerHTML).toContain('repo-a');
+    expect(elements['modal-events'].innerHTML).toContain('attempt 3/3');
   });
 });

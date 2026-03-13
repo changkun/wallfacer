@@ -618,7 +618,26 @@ async function openModal(id) {
     const time = new Date(e.created_at).toLocaleTimeString();
     let detail = '';
     const data = e.data || {};
-    if (e.event_type === 'state_change') {
+    if (data.phase === 'conflict_resolver') {
+      const trigger = data.trigger ? ` · ${escapeHtml(String(data.trigger))}` : '';
+      const repo = data.repo ? ` · ${escapeHtml(String(data.repo))}` : '';
+      const attempt = data.attempt && data.max_attempts
+        ? ` · attempt ${escapeHtml(String(data.attempt))}/${escapeHtml(String(data.max_attempts))}`
+        : '';
+      const statusColors = {
+        started: 'background:#f59e0b;color:#111827',
+        succeeded: 'background:#10b981;color:#fff',
+        failed: 'background:#ef4444;color:#fff',
+        handoff: 'background:#8b5cf6;color:#fff',
+      };
+      const badgeStyle = statusColors[data.status] || 'background:#6b7280;color:#fff';
+      const badge = `<span style="font-size:10px;padding:1px 5px;border-radius:3px;${badgeStyle};margin-right:6px;">resolver ${escapeHtml(String(data.status || 'update'))}</span>`;
+      const body = escapeHtml(data.result || data.error || '');
+      detail = `<div style="border-left:3px solid #f59e0b;padding:8px 10px;margin:4px 0;">` +
+        `<div style="font-weight:600;color:var(--text);margin-bottom:4px;">${badge}Conflict Resolution${trigger}${repo}${attempt}</div>` +
+        `<div>${body}</div>` +
+        `</div>`;
+    } else if (e.event_type === 'state_change') {
       const triggerColors = {
         user:         'background:#3b82f6;color:#fff',
         auto_promote: 'background:#22c55e;color:#fff',

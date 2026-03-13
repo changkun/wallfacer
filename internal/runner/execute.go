@@ -679,7 +679,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 				"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d/%d)...",
 					filepath.Base(repoPath), attempt, maxRebaseRetries),
 			})
-			if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch); resolveErr != nil {
+			if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch, "sync", attempt, maxRebaseRetries); resolveErr != nil {
 				rebaseErr = fmt.Errorf("conflict resolution failed: %w", resolveErr)
 				break
 			}
@@ -708,6 +708,15 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 						"handing off to agent for interactive resolution.",
 					filepath.Base(repoPath),
 				),
+			})
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]any{
+				"phase":        "conflict_resolver",
+				"status":       "handoff",
+				"trigger":      "sync",
+				"repo":         filepath.Base(repoPath),
+				"attempt":      maxRebaseRetries,
+				"max_attempts": maxRebaseRetries,
+				"result":       fmt.Sprintf("Automatic conflict resolver exhausted retries for %s. Handing off to the main agent for interactive resolution.", filepath.Base(repoPath)),
 			})
 			if !testStateInvalidated {
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, "")
