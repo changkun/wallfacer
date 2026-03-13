@@ -42,8 +42,11 @@ printf 'final answer from codex' > "$LAST_MSG"
 		t.Fatalf("write fake codex: %v", err)
 	}
 
+	// The entrypoint path is relative to the repo root. Since this test file
+	// lives in the repo root package, the default working directory is correct
+	// when running via `go test`. We avoid hardcoding /workspace/wallfacer
+	// which only exists inside containers.
 	cmd := exec.Command("/bin/bash", "sandbox/codex/entrypoint.sh", "-p", "test prompt", "--verbose", "--output-format", "stream-json")
-	cmd.Dir = "/workspace/wallfacer"
 	cmd.Env = append(os.Environ(), "PATH="+tempDir+":"+os.Getenv("PATH"))
 	out, err := cmd.Output()
 	if err != nil {
