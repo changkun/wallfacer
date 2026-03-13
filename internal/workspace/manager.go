@@ -157,13 +157,9 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	}
 	if m.envFile != "" {
 		encoded := envconfig.FormatWorkspaces(validated)
-		if err := envconfig.Update(
-			m.envFile,
-			nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-			nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-			nil,
-			&encoded,
-		); err != nil {
+		if err := envconfig.Update(m.envFile, envconfig.Updates{
+			Workspaces: &encoded,
+		}); err != nil {
 			return Snapshot{}, fmt.Errorf("persist workspaces: %w", err)
 		}
 	}
