@@ -320,15 +320,15 @@ When `git rebase` fails during the commit pipeline:
 
 ```mermaid
 flowchart TD
-    Rebase["git rebase default-branch"] --> Result{"Rebase\nsucceeded?"}
-    Result -->|yes| FFMerge["git merge --ff-only\ntask branch into default"]
-    Result -->|no| Invoke["Invoke agent\n(same session ID)\nwith conflict details"]
-    Invoke --> Resolve["Agent resolves conflicts\nand stages files"]
+    Rebase["git rebase default-branch"] --> Result{"Rebase<br/>succeeded?"}
+    Result -->|yes| FFMerge["git merge --ff-only<br/>task branch into default"]
+    Result -->|no| Invoke["Invoke agent<br/>(same session ID)<br/>with conflict details"]
+    Invoke --> Resolve["Agent resolves conflicts<br/>and stages files"]
     Resolve --> Continue["git rebase --continue"]
-    Continue --> Retry{"Still\nfailing?"}
+    Continue --> Retry{"Still<br/>failing?"}
     Retry -->|"no (resolved)"| FFMerge
     Retry -->|"yes (attempt < 3)"| Invoke
-    Retry -->|"yes (attempts exhausted)"| Failed["Mark task failed\nclean up worktrees"]
+    Retry -->|"yes (attempts exhausted)"| Failed["Mark task failed<br/>clean up worktrees"]
 ```
 
 Using the same session ID means the agent has full context of the original task when making conflict resolution decisions.
@@ -339,16 +339,16 @@ Using the same session ID means the agent has full context of the original task 
 
 ```mermaid
 flowchart TD
-    Click["User clicks Test\non waiting task"] --> Setup["Set IsTestRun=true\nclear LastTestResult"]
+    Click["User clicks Test<br/>on waiting task"] --> Setup["Set IsTestRun=true<br/>clear LastTestResult"]
     Setup --> Transition["waiting to in_progress"]
-    Transition --> Launch["Launch fresh container\n(no --resume, new session)\nwith test prompt"]
-    Launch --> Loop["Runner loop\n(isTestRun=true)"]
+    Transition --> Launch["Launch fresh container<br/>(no --resume, new session)<br/>with test prompt"]
+    Launch --> Loop["Runner loop<br/>(isTestRun=true)"]
     Loop --> StopReason{"stop_reason?"}
     StopReason -->|"max_tokens / pause_turn"| Loop
-    StopReason -->|end_turn| Parse["parseTestVerdict()\nextract PASS / FAIL"]
-    Parse --> Record["IsTestRun = false\nLastTestResult = verdict\nin_progress to waiting\n(no commit pipeline)"]
+    StopReason -->|end_turn| Parse["parseTestVerdict()<br/>extract PASS / FAIL"]
+    Parse --> Record["IsTestRun = false<br/>LastTestResult = verdict<br/>in_progress to waiting<br/>(no commit pipeline)"]
 
-    Note1["TestRunStartTurn marks boundary\nbetween implementation and test output"]
+    Note1["TestRunStartTurn marks boundary<br/>between implementation and test output"]
     style Note1 fill:none,stroke-dasharray: 5 5
 ```
 
@@ -360,16 +360,16 @@ Autopilot automatically promotes backlog tasks without user drag-and-drop:
 
 ```mermaid
 flowchart TD
-    Start["StartAutoPromoter()\nsubscribe to store changes"] --> Notify{"Notification\nreceived"}
-    Notify --> Enabled{"Autopilot\nenabled?"}
+    Start["StartAutoPromoter()<br/>subscribe to store changes"] --> Notify{"Notification<br/>received"}
+    Notify --> Enabled{"Autopilot<br/>enabled?"}
     Enabled -->|no| Wait[Wait for next notification]
     Enabled -->|yes| Lock["Lock promoteMu"]
-    Lock --> Count{"in_progress\n< MAX_PARALLEL?"}
+    Lock --> Count{"in_progress<br/>< MAX_PARALLEL?"}
     Count -->|no| Unlock[Unlock]
-    Count -->|yes| Pick["Pick lowest-position\nbacklog task"]
-    Pick --> Deps{"DependsOn met?\nScheduledAt reached?"}
+    Count -->|yes| Pick["Pick lowest-position<br/>backlog task"]
+    Pick --> Deps{"DependsOn met?<br/>ScheduledAt reached?"}
     Deps -->|no| Unlock
-    Deps -->|yes| Promote["backlog to in_progress\ngo runner.Run(task)"]
+    Deps -->|yes| Promote["backlog to in_progress<br/>go runner.Run(task)"]
     Promote --> Unlock
     Unlock --> Wait
     Wait --> Notify
@@ -428,13 +428,13 @@ Oversight is generated asynchronously whenever a task transitions to `waiting`, 
 
 ```mermaid
 flowchart TD
-    Trigger["Task reaches\nwaiting / done / failed"] --> BG["Background goroutine:\nGenerateOversight(taskID)"]
-    BG --> Status1["TaskOversight.Status\n= generating"]
-    Status1 --> Read["Read trace events\nfrom traces/NNNN.json"]
-    Read --> Send["Send to Claude with\nsummarisation prompt"]
-    Send --> Parse["Parse response into\nOversightPhase list"]
-    Parse --> Status2["TaskOversight.Status\n= ready"]
-    Status2 --> Store["Store in\noversights/id.json"]
+    Trigger["Task reaches<br/>waiting / done / failed"] --> BG["Background goroutine:<br/>GenerateOversight(taskID)"]
+    BG --> Status1["TaskOversight.Status<br/>= generating"]
+    Status1 --> Read["Read trace events<br/>from traces/NNNN.json"]
+    Read --> Send["Send to Claude with<br/>summarisation prompt"]
+    Send --> Parse["Parse response into<br/>OversightPhase list"]
+    Parse --> Status2["TaskOversight.Status<br/>= ready"]
+    Status2 --> Store["Store in<br/>oversights/id.json"]
 ```
 
 Served by:
@@ -447,14 +447,14 @@ The UI renders phases in the Oversight tab and as an interactive flamegraph Time
 
 ```mermaid
 flowchart TD
-    Trigger["POST /api/ideate"] --> Create["Create task with\nKind = idea-agent"]
+    Trigger["POST /api/ideate"] --> Create["Create task with<br/>Kind = idea-agent"]
     Create --> Launch["Launch sandbox container"]
-    Launch --> Analyse["Read workspace contents\nanalyse code structure"]
-    Analyse --> Generate["Create backlog tasks\nvia wallfacer API\n(each tagged)"]
-    Generate --> Done["Container completes\ntasks appear on board"]
+    Launch --> Analyse["Read workspace contents<br/>analyse code structure"]
+    Analyse --> Generate["Create backlog tasks<br/>via wallfacer API<br/>(each tagged)"]
+    Generate --> Done["Container completes<br/>tasks appear on board"]
 
-    Status["GET /api/ideate\nreturns session state"]
-    Cancel["DELETE /api/ideate\nkills container"]
+    Status["GET /api/ideate<br/>returns session state"]
+    Cancel["DELETE /api/ideate<br/>kills container"]
 ```
 
 ## Webhook Notifications

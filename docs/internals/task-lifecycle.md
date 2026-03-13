@@ -253,15 +253,15 @@ When autopilot is enabled, the server automatically promotes backlog tasks to `i
 
 ```mermaid
 flowchart TD
-    Enable["PUT /api/config\nautopilot: true"] --> Subscribe["StartAutoPromoter\nsubscribes to store changes"]
-    Subscribe --> Check{"On each state change:\nautopilot enabled?"}
+    Enable["PUT /api/config<br/>autopilot: true"] --> Subscribe["StartAutoPromoter<br/>subscribes to store changes"]
+    Subscribe --> Check{"On each state change:<br/>autopilot enabled?"}
     Check -->|no| Skip[Skip]
-    Check -->|yes| Capacity{"in_progress count\n< MAX_PARALLEL?"}
+    Check -->|yes| Capacity{"in_progress count<br/>< MAX_PARALLEL?"}
     Capacity -->|no| Skip
-    Capacity -->|yes| Pick["Pick lowest-position\nbacklog task"]
-    Pick --> Deps{"DependsOn met?\nScheduledAt reached?"}
+    Capacity -->|yes| Pick["Pick lowest-position<br/>backlog task"]
+    Pick --> Deps{"DependsOn met?<br/>ScheduledAt reached?"}
     Deps -->|no| Skip
-    Deps -->|yes| Promote["Promote to in_progress\nlaunch runner.Run"]
+    Deps -->|yes| Promote["Promote to in_progress<br/>launch runner.Run"]
 ```
 
 Concurrency limit is read from `WALLFACER_MAX_PARALLEL` in the env file (default: 5). Autopilot is off by default and does not persist across server restarts.
