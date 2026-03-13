@@ -763,6 +763,7 @@ func TestGitCheckout_RejectsWhenTasksInProgress(t *testing.T) {
 	// Create a task and move it to in_progress.
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
 
 	body := `{"workspace": "` + repo + `", "branch": "main"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
@@ -820,6 +821,7 @@ func TestGitCreateBranch_RejectsWhenTasksInProgress(t *testing.T) {
 
 	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
 	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
 
 	body := `{"workspace": "` + repo + `", "branch": "new-branch"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
