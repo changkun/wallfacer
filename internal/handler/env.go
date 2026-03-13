@@ -112,10 +112,7 @@ type envConfigResponse struct {
 	ArchivedTasksPerPage int                     `json:"archived_tasks_per_page"`
 	AutoPushEnabled      bool                    `json:"auto_push_enabled"`
 	AutoPushThreshold    int                     `json:"auto_push_threshold"`
-<<<<<<< Updated upstream
 	SandboxFast          bool                    `json:"sandbox_fast"`
-=======
->>>>>>> Stashed changes
 	ContainerNetwork     string                  `json:"container_network"`
 	ContainerCPUs        string                  `json:"container_cpus"`
 	ContainerMemory      string                  `json:"container_memory"`
@@ -218,11 +215,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid sandbox: use claude or codex", http.StatusBadRequest)
 			return
 		}
-<<<<<<< Updated upstream
 		sb = *req.Sandbox
-=======
-		sb = req.Sandbox.OrDefault()
->>>>>>> Stashed changes
 	}
 
 	// Preserve existing token handling behavior (empty string means no change).
@@ -469,10 +462,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ArchivedTasksPerPage *int                    `json:"archived_tasks_per_page"`
 		AutoPushEnabled      *bool                   `json:"auto_push_enabled"`
 		AutoPushThreshold    *int                    `json:"auto_push_threshold"`
-<<<<<<< Updated upstream
 		SandboxFast          *bool                   `json:"sandbox_fast"`
-=======
->>>>>>> Stashed changes
 		ContainerNetwork     *string                 `json:"container_network"`
 		ContainerCPUs        *string                 `json:"container_cpus"`
 		ContainerMemory      *string                 `json:"container_memory"`

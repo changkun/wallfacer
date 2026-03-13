@@ -144,6 +144,7 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 			m.envFile,
 			nil, nil, nil, nil, nil, nil, nil, nil, nil,
 			nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+			nil,
 			&encoded,
 		); err != nil {
 			return Snapshot{}, fmt.Errorf("persist workspaces: %w", err)
