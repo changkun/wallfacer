@@ -75,8 +75,8 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 						"result": "server restarted after commit completed; auto-recovered to done",
 					})
 					s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-						"from":    "committing",
-						"to":      "done",
+						"from":    string(store.TaskStatusCommitting),
+						"to":      string(store.TaskStatusDone),
 						"trigger": store.TriggerRecovery,
 					})
 					break
@@ -90,8 +90,8 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 					"error": "server restarted during commit",
 				})
 				s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-					"from":    "committing",
-					"to":      "failed",
+					"from":    string(store.TaskStatusCommitting),
+					"to":      string(store.TaskStatusFailed),
 					"trigger": store.TriggerRecovery,
 				})
 			}
@@ -120,8 +120,8 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 					"result": "Server restarted while task was running. Container is no longer active — please review the output and decide whether to continue or mark as done.",
 				})
 				s.InsertEvent(ctx, t.ID, store.EventTypeStateChange, map[string]string{
-					"from":    "in_progress",
-					"to":      "waiting",
+					"from":    string(store.TaskStatusInProgress),
+					"to":      string(store.TaskStatusWaiting),
 					"trigger": store.TriggerRecovery,
 				})
 			}
@@ -183,8 +183,8 @@ func monitorContainerUntilStoppedWithConfig(ctx context.Context, s *store.Store,
 			"result": "Container has stopped. Please review the output and decide whether to continue or mark as done.",
 		})
 		s.InsertEvent(storeCtx, taskID, store.EventTypeStateChange, map[string]string{
-			"from":    "in_progress",
-			"to":      "waiting",
+			"from":    string(store.TaskStatusInProgress),
+			"to":      string(store.TaskStatusWaiting),
 			"trigger": store.TriggerRecovery,
 		})
 	}

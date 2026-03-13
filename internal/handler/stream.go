@@ -170,12 +170,12 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	// Test-phase logs: serve only the turns that belong to the test agent
 	// (after the implementation turns). Only meaningful for completed tasks
 	// where the test agent has already run.
-	if r.URL.Query().Get("phase") == "test" && task.Status != "in_progress" && task.Status != "committing" {
+	if r.URL.Query().Get("phase") == "test" && task.Status != store.TaskStatusInProgress && task.Status != store.TaskStatusCommitting {
 		h.serveStoredLogsFrom(w, r, id, task.TestRunStartTurn)
 		return
 	}
 
-	if task.Status != "in_progress" && task.Status != "committing" {
+	if task.Status != store.TaskStatusInProgress && task.Status != store.TaskStatusCommitting {
 		// Container is gone (--rm). Serve saved stderr from disk instead.
 		h.serveStoredLogs(w, r, id)
 		return

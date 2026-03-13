@@ -18,7 +18,6 @@ import (
 
 const refinementTimeout = 30 * time.Minute
 
-
 // RunRefinement runs the sandbox agent in read-only mode to produce a
 // detailed implementation spec for the task's current prompt. The task
 // stays in backlog; only CurrentRefinement is updated to track state.
@@ -48,7 +47,7 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 		if getErr != nil || cur.CurrentRefinement == nil {
 			return
 		}
-		cur.CurrentRefinement.Status = "failed"
+		cur.CurrentRefinement.Status = store.RefinementJobStatusFailed
 		cur.CurrentRefinement.Error = err.Error()
 		r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
 		return
@@ -58,7 +57,7 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	if getErr != nil || cur.CurrentRefinement == nil {
 		return
 	}
-	cur.CurrentRefinement.Status = "done"
+	cur.CurrentRefinement.Status = store.RefinementJobStatusDone
 	cur.CurrentRefinement.Result = cleanRefinementResult(output.Result)
 	r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
 

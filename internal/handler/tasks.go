@@ -124,7 +124,12 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		tasks = []store.Task{}
 	}
 	if q := r.URL.Query().Get("failure_category"); q != "" {
-		tasks = filterByFailureCategory(tasks, store.FailureCategory(q))
+		category, ok := store.ParseFailureCategory(q)
+		if !ok {
+			http.Error(w, "invalid failure_category", http.StatusBadRequest)
+			return
+		}
+		tasks = filterByFailureCategory(tasks, category)
 	}
 	writeJSON(w, http.StatusOK, tasks)
 }
@@ -144,17 +149,17 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 // CreateTask creates a new task in backlog status.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Prompt            string            `json:"prompt"`
-		Timeout           int               `json:"timeout"`
-		MountWorktrees    bool              `json:"mount_worktrees"`
+		Prompt            string                  `json:"prompt"`
+		Timeout           int                     `json:"timeout"`
+		MountWorktrees    bool                    `json:"mount_worktrees"`
 		Sandbox           sandbox.Type            `json:"sandbox"`
 		SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity"`
-		Kind              store.TaskKind    `json:"kind"`
-		Tags              []string          `json:"tags"`
-		MaxCostUSD        float64           `json:"max_cost_usd"`
-		MaxInputTokens    int               `json:"max_input_tokens"`
-		Model             string            `json:"model"`
-		ScheduledAt       *time.Time        `json:"scheduled_at,omitempty"`
+		Kind              store.TaskKind          `json:"kind"`
+		Tags              []string                `json:"tags"`
+		MaxCostUSD        float64                 `json:"max_cost_usd"`
+		MaxInputTokens    int                     `json:"max_input_tokens"`
+		Model             string                  `json:"model"`
+		ScheduledAt       *time.Time              `json:"scheduled_at,omitempty"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -200,15 +205,15 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 // batchTaskInput describes a single task in a BatchCreateTasks request.
 type batchTaskInput struct {
-	Ref               string            `json:"ref"`
-	Prompt            string            `json:"prompt"`
-	Timeout           int               `json:"timeout"`
-	Tags              []string          `json:"tags"`
+	Ref               string                  `json:"ref"`
+	Prompt            string                  `json:"prompt"`
+	Timeout           int                     `json:"timeout"`
+	Tags              []string                `json:"tags"`
 	Sandbox           sandbox.Type            `json:"sandbox"`
 	SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity"`
-	Kind              store.TaskKind    `json:"kind"`
-	MountWorktrees    bool              `json:"mount_worktrees"`
-	DependsOnRefs     []string          `json:"depends_on_refs"`
+	Kind              store.TaskKind          `json:"kind"`
+	MountWorktrees    bool                    `json:"mount_worktrees"`
+	DependsOnRefs     []string                `json:"depends_on_refs"`
 }
 
 type batchCreateRequest struct {
@@ -509,18 +514,18 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 // UpdateTask handles PATCH requests: status transitions, position, prompt, etc.
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	var req struct {
-		Status            *store.TaskStatus  `json:"status"`
-		Position          *int               `json:"position"`
-		Prompt            *string            `json:"prompt"`
-		Timeout           *int               `json:"timeout"`
-		FreshStart        *bool              `json:"fresh_start"`
-		MountWorktrees    *bool              `json:"mount_worktrees"`
+		Status            *store.TaskStatus        `json:"status"`
+		Position          *int                     `json:"position"`
+		Prompt            *string                  `json:"prompt"`
+		Timeout           *int                     `json:"timeout"`
+		FreshStart        *bool                    `json:"fresh_start"`
+		MountWorktrees    *bool                    `json:"mount_worktrees"`
 		Sandbox           *sandbox.Type            `json:"sandbox"`
 		SandboxByActivity *map[string]sandbox.Type `json:"sandbox_by_activity"`
-		DependsOn         *[]string          `json:"depends_on"`
-		Tags              *[]string          `json:"tags"`
-		MaxCostUSD        *float64           `json:"max_cost_usd"`
-		MaxInputTokens    *int               `json:"max_input_tokens"`
+		DependsOn         *[]string                `json:"depends_on"`
+		Tags              *[]string                `json:"tags"`
+		MaxCostUSD        *float64                 `json:"max_cost_usd"`
+		MaxInputTokens    *int                     `json:"max_input_tokens"`
 		// Model sets the per-task model override; empty string clears it.
 		Model *string `json:"model"`
 		// ScheduledAt uses json.RawMessage so we can distinguish "absent" (nil)

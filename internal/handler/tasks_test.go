@@ -67,6 +67,18 @@ func TestListTasks_IncludesCreated(t *testing.T) {
 	}
 }
 
+func TestListTasks_InvalidFailureCategory(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks?failure_category=not-a-category", nil)
+	w := httptest.NewRecorder()
+
+	h.ListTasks(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
 // TestListTasks_ExcludesArchivedByDefault checks that archived tasks are not
 // returned when include_archived is not set.
 func TestListTasks_ExcludesArchivedByDefault(t *testing.T) {

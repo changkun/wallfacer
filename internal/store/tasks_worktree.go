@@ -183,10 +183,10 @@ func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *R
 	}
 	if t.CurrentRefinement != nil {
 		status := t.CurrentRefinement.Status
-		if status == "running" {
+		if status == RefinementJobStatusRunning {
 			return ErrRefinementAlreadyRunning
 		}
-		if t.CurrentRefinement.Source == "runner" && (status == "failed" || status == "done") {
+		if t.CurrentRefinement.Source == "runner" && (status == RefinementJobStatusFailed || status == RefinementJobStatusDone) {
 			elapsed := time.Since(t.UpdatedAt)
 			if elapsed >= 0 && elapsed < refinementRecentCompleteWindow && (t.CurrentRefinement.Error != "" || t.CurrentRefinement.Result != "") {
 				return ErrRefinementAlreadyRunning

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"changkun.de/wallfacer/internal/sandbox"
@@ -27,27 +28,27 @@ type TaskUsage struct {
 // It is recorded once at the start of Run() and stored alongside the task for
 // reproducibility auditing and debugging when results differ between runs.
 type ExecutionEnvironment struct {
-	ContainerImage   string    `json:"container_image"`   // e.g. "wallfacer-sandbox"
-	ContainerDigest  string    `json:"container_digest"`  // sha256 of image, empty if unavailable
-	ModelName        string    `json:"model_name"`        // e.g. "claude-opus-4-6"
-	APIBaseURL       string    `json:"api_base_url"`      // empty string = default Anthropic endpoint
-	InstructionsHash string    `json:"instructions_hash"` // sha256 hex of CLAUDE.md at run start
-	Sandbox          sandbox.Type `json:"sandbox"`        // configured sandbox: "claude", "codex", etc.
-	RecordedAt       time.Time `json:"recorded_at"`
+	ContainerImage   string       `json:"container_image"`   // e.g. "wallfacer-sandbox"
+	ContainerDigest  string       `json:"container_digest"`  // sha256 of image, empty if unavailable
+	ModelName        string       `json:"model_name"`        // e.g. "claude-opus-4-6"
+	APIBaseURL       string       `json:"api_base_url"`      // empty string = default Anthropic endpoint
+	InstructionsHash string       `json:"instructions_hash"` // sha256 hex of CLAUDE.md at run start
+	Sandbox          sandbox.Type `json:"sandbox"`           // configured sandbox: "claude", "codex", etc.
+	RecordedAt       time.Time    `json:"recorded_at"`
 }
 
 // TurnUsageRecord captures token consumption and stop reason for a single agent turn.
 type TurnUsageRecord struct {
-	Turn                 int       `json:"turn"`
-	Timestamp            time.Time `json:"timestamp"`
-	InputTokens          int       `json:"input_tokens"`
-	OutputTokens         int       `json:"output_tokens"`
-	CacheReadInputTokens int       `json:"cache_read_input_tokens"`
-	CacheCreationTokens  int       `json:"cache_creation_tokens"`
-	CostUSD              float64   `json:"cost_usd"`
-	StopReason           string    `json:"stop_reason,omitempty"`
+	Turn                 int          `json:"turn"`
+	Timestamp            time.Time    `json:"timestamp"`
+	InputTokens          int          `json:"input_tokens"`
+	OutputTokens         int          `json:"output_tokens"`
+	CacheReadInputTokens int          `json:"cache_read_input_tokens"`
+	CacheCreationTokens  int          `json:"cache_creation_tokens"`
+	CostUSD              float64      `json:"cost_usd"`
+	StopReason           string       `json:"stop_reason,omitempty"`
 	Sandbox              sandbox.Type `json:"sandbox,omitempty"`
-	SubAgent             string    `json:"sub_agent,omitempty"` // "implementation", "test", "refinement", etc.
+	SubAgent             string       `json:"sub_agent,omitempty"` // "implementation", "test", "refinement", etc.
 }
 
 // RefinementMessage is a single turn in a refinement chat session.
@@ -87,12 +88,20 @@ type RetryRecord struct {
 
 // RefinementJob tracks the state of an active or recently completed
 // sandbox refinement run for a backlog task.
+type RefinementJobStatus string
+
+const (
+	RefinementJobStatusRunning RefinementJobStatus = "running"
+	RefinementJobStatusDone    RefinementJobStatus = "done"
+	RefinementJobStatusFailed  RefinementJobStatus = "failed"
+)
+
 type RefinementJob struct {
-	ID        string    `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	Status    string    `json:"status"` // "running", "done", "failed"
-	Result    string    `json:"result,omitempty"`
-	Error     string    `json:"error,omitempty"`
+	ID        string              `json:"id"`
+	CreatedAt time.Time           `json:"created_at"`
+	Status    RefinementJobStatus `json:"status"`
+	Result    string              `json:"result,omitempty"`
+	Error     string              `json:"error,omitempty"`
 	// source indicates who created the job. "runner" jobs originate from the
 	// UI-triggered refinement flow and may be briefly treated as in-flight while
 	// async startup/failure races settle.
@@ -155,6 +164,22 @@ const (
 	FailureCategorySyncError      FailureCategory = "sync_error"
 	FailureCategoryUnknown        FailureCategory = "unknown"
 )
+
+// ParseFailureCategory normalizes a string into a known failure category.
+func ParseFailureCategory(raw string) (FailureCategory, bool) {
+	switch FailureCategory(strings.TrimSpace(raw)) {
+	case FailureCategoryTimeout,
+		FailureCategoryBudget,
+		FailureCategoryWorktree,
+		FailureCategoryContainerCrash,
+		FailureCategoryAgentError,
+		FailureCategorySyncError,
+		FailureCategoryUnknown:
+		return FailureCategory(strings.TrimSpace(raw)), true
+	default:
+		return "", false
+	}
+}
 
 // ErrInvalidTransition is returned by UpdateTaskStatus when the requested
 // status change is not permitted by the task state machine.
@@ -230,25 +255,25 @@ type PayloadLimits struct {
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
-	SchemaVersion     int                 `json:"schema_version"`
-	ID                uuid.UUID           `json:"id"`
-	Title             string              `json:"title,omitempty"`
-	Prompt            string              `json:"prompt"`
-	PromptHistory     []string            `json:"prompt_history,omitempty"`
-	RetryHistory      []RetryRecord       `json:"retry_history,omitempty"`
-	RefineSessions    []RefinementSession `json:"refine_sessions,omitempty"`
-	CurrentRefinement *RefinementJob      `json:"current_refinement,omitempty"`
-	Status            TaskStatus          `json:"status"`
-	Archived          bool                `json:"archived,omitempty"`
-	SessionID         *string             `json:"session_id"`
-	FreshStart        bool                `json:"fresh_start,omitempty"`
-	Result            *string             `json:"result"`
-	StopReason        *string             `json:"stop_reason"`
-	Turns             int                 `json:"turns"`
-	Timeout           int                 `json:"timeout"`
-	MaxCostUSD        float64             `json:"max_cost_usd,omitempty"`     // 0 = unlimited
-	MaxInputTokens    int                 `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
-	Usage             TaskUsage           `json:"usage"`
+	SchemaVersion     int                     `json:"schema_version"`
+	ID                uuid.UUID               `json:"id"`
+	Title             string                  `json:"title,omitempty"`
+	Prompt            string                  `json:"prompt"`
+	PromptHistory     []string                `json:"prompt_history,omitempty"`
+	RetryHistory      []RetryRecord           `json:"retry_history,omitempty"`
+	RefineSessions    []RefinementSession     `json:"refine_sessions,omitempty"`
+	CurrentRefinement *RefinementJob          `json:"current_refinement,omitempty"`
+	Status            TaskStatus              `json:"status"`
+	Archived          bool                    `json:"archived,omitempty"`
+	SessionID         *string                 `json:"session_id"`
+	FreshStart        bool                    `json:"fresh_start,omitempty"`
+	Result            *string                 `json:"result"`
+	StopReason        *string                 `json:"stop_reason"`
+	Turns             int                     `json:"turns"`
+	Timeout           int                     `json:"timeout"`
+	MaxCostUSD        float64                 `json:"max_cost_usd,omitempty"`     // 0 = unlimited
+	MaxInputTokens    int                     `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
+	Usage             TaskUsage               `json:"usage"`
 	Sandbox           sandbox.Type            `json:"sandbox,omitempty"`
 	SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity,omitempty"`
 	// UsageBreakdown tracks token/cost per sub-agent activity (e.g. "implementation",
@@ -270,10 +295,10 @@ type Task struct {
 	ModelOverride    *string           `json:"model_override,omitempty"` // per-task model override; nil means use global default
 
 	// Test verification fields.
-	IsTestRun           bool   `json:"is_test_run,omitempty"`            // true while the task is running as a test verifier
-	LastTestResult      string `json:"last_test_result,omitempty"`       // "pass", "fail", or "" (not yet tested)
-	TestRunStartTurn    int    `json:"test_run_start_turn,omitempty"`    // turn count when the test run started (implementation turn boundary)
-	PendingTestFeedback string `json:"pending_test_feedback,omitempty"`  // failing test outcome awaiting auto-resume as feedback
+	IsTestRun           bool   `json:"is_test_run,omitempty"`           // true while the task is running as a test verifier
+	LastTestResult      string `json:"last_test_result,omitempty"`      // "pass", "fail", or "" (not yet tested)
+	TestRunStartTurn    int    `json:"test_run_start_turn,omitempty"`   // turn count when the test run started (implementation turn boundary)
+	PendingTestFeedback string `json:"pending_test_feedback,omitempty"` // failing test outcome awaiting auto-resume as feedback
 
 	// Kind identifies the execution mode (TaskKindTask or TaskKindIdeaAgent).
 	// Empty string and "task" are equivalent: a standard implementation task.

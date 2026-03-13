@@ -59,8 +59,8 @@ func availableSandboxes(cfg envconfig.Config) []string {
 	}
 	// Always expose both built-in sandboxes in the UI so users can select
 	// either provider even before model/env values are configured.
-	add("claude")
-	add("codex")
+	add(string(sandbox.Claude))
+	add(string(sandbox.Codex))
 
 	if cfg.DefaultSandbox != "" {
 		add(string(cfg.DefaultSandbox))
@@ -76,12 +76,12 @@ func defaultSandbox(cfg envconfig.Config) string {
 		return string(cfg.DefaultSandbox)
 	}
 	if cfg.DefaultModel != "" {
-		return "claude"
+		return string(sandbox.Claude)
 	}
 	if cfg.CodexDefaultModel != "" {
-		return "codex"
+		return string(sandbox.Codex)
 	}
-	return "claude"
+	return string(sandbox.Claude)
 }
 
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
@@ -103,26 +103,26 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		groups = workspacegroups.Normalize(append([]workspacegroups.Group{{Workspaces: workspaces}}, groups...))
 	}
 	resp := map[string]any{
-		"workspaces":              workspaces,
-		"workspace_browser_path":  workspaceBrowserPath,
-		"workspace_groups":        groups,
-		"instructions_path":       instructionsPath,
-		"prompts_dir":             promptsDir,
-		"sandbox_activities":      store.SandboxActivities,
-		"sandboxes":               []string{"claude", "codex"},
-		"default_sandbox":         "claude",
-		"sandbox_usable":          map[string]bool{"claude": true, "codex": true},
-		"sandbox_reasons":         map[string]string{},
-		"activity_sandboxes":      map[string]string{},
-		"autopilot":               h.AutopilotEnabled(),
-		"autotest":                h.AutotestEnabled(),
-		"autosubmit":              h.AutosubmitEnabled(),
-		"ideation":                h.IdeationEnabled(),
-		"ideation_running":        h.ideationRunning(ctx),
-		"ideation_interval":       int(h.IdeationInterval().Minutes()),
-		"ideation_categories":     h.runner.IdeationCategories(),
-		"default_model":           "",
-		"payload_limits":          payloadLimits,
+		"workspaces":             workspaces,
+		"workspace_browser_path": workspaceBrowserPath,
+		"workspace_groups":       groups,
+		"instructions_path":      instructionsPath,
+		"prompts_dir":            promptsDir,
+		"sandbox_activities":     store.SandboxActivities,
+		"sandboxes":              []string{string(sandbox.Claude), string(sandbox.Codex)},
+		"default_sandbox":        string(sandbox.Claude),
+		"sandbox_usable":         map[string]bool{string(sandbox.Claude): true, string(sandbox.Codex): true},
+		"sandbox_reasons":        map[string]string{},
+		"activity_sandboxes":     map[string]string{},
+		"autopilot":              h.AutopilotEnabled(),
+		"autotest":               h.AutotestEnabled(),
+		"autosubmit":             h.AutosubmitEnabled(),
+		"ideation":               h.IdeationEnabled(),
+		"ideation_running":       h.ideationRunning(ctx),
+		"ideation_interval":      int(h.IdeationInterval().Minutes()),
+		"ideation_categories":    h.runner.IdeationCategories(),
+		"default_model":          "",
+		"payload_limits":         payloadLimits,
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun
@@ -133,8 +133,8 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 
 	sandboxes := availableSandboxes(*cfg)
 	sandboxUsable := map[string]bool{
-		"claude": true,
-		"codex":  true,
+		string(sandbox.Claude): true,
+		string(sandbox.Codex):  true,
 	}
 	sandboxReasons := map[string]string{}
 	for _, sbox := range sandboxes {
@@ -186,11 +186,11 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // UpdateConfig handles PUT /api/config to update server-level settings.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Autopilot        *bool `json:"autopilot"`
-		Autotest         *bool `json:"autotest"`
-		Autosubmit       *bool `json:"autosubmit"`
-		Ideation         *bool `json:"ideation"`
-		IdeationInterval *int  `json:"ideation_interval"` // minutes; 0 = run immediately on completion
+		Autopilot        *bool                   `json:"autopilot"`
+		Autotest         *bool                   `json:"autotest"`
+		Autosubmit       *bool                   `json:"autosubmit"`
+		Ideation         *bool                   `json:"ideation"`
+		IdeationInterval *int                    `json:"ideation_interval"` // minutes; 0 = run immediately on completion
 		WorkspaceGroups  []workspacegroups.Group `json:"workspace_groups"`
 	}
 	if !decodeJSONBody(w, r, &req) {
