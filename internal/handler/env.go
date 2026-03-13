@@ -14,6 +14,7 @@ import (
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
+	"github.com/google/uuid"
 )
 
 const fallbackCodexSandboxImage = "wallfacer-codex:latest"
@@ -197,6 +198,37 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerMemory:      cfg.ContainerMemory,
 		WebhookURL:           webhookURL,
 	})
+}
+
+// TestWebhook sends a synthetic task.state_changed payload using the canonical
+// webhook notifier path without mutating store state or creating a task.
+func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
+	cfg, err := envconfig.Parse(h.envFile)
+	if err != nil {
+		http.Error(w, "failed to read env file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if strings.TrimSpace(cfg.WebhookURL) == "" {
+		http.Error(w, "webhook URL is not configured", http.StatusBadRequest)
+		return
+	}
+
+	now := time.Now().UTC()
+	payload := runner.NewTaskStateChangedPayload(
+		uuid.NewString(),
+		store.TaskStatusDone,
+		"Webhook delivery smoke test",
+		"Manual webhook test triggered from Wallfacer settings.",
+		"Synthetic task completion used to verify webhook delivery.",
+		now,
+	)
+
+	notifier := h.webhookNotifier(cfg)
+	if err := notifier.Send(payload); err != nil {
+		http.Error(w, "webhook delivery failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // TestSandbox spins up a sandbox with the provided (or saved) credentials and

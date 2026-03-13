@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -15,6 +16,13 @@ import (
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/internal/workspace"
 	"github.com/google/uuid"
+)
+
+const (
+	WebhookEventTaskStateChanged = "task.state_changed"
+	maxWebhookPromptLen          = 200
+	maxWebhookResultLen          = 500
+	maxWebhookTitleLen           = 80
 )
 
 // WebhookPayload is the JSON body posted to the configured webhook URL on every
@@ -37,6 +45,7 @@ type WebhookNotifier struct {
 	webhookURL    string
 	webhookSecret string
 	client        *http.Client
+	backoffs      []time.Duration
 }
 
 func NewWorkspaceWebhookNotifier(m *workspace.Manager, cfg envconfig.Config) *WebhookNotifier {
@@ -45,6 +54,7 @@ func NewWorkspaceWebhookNotifier(m *workspace.Manager, cfg envconfig.Config) *We
 		webhookURL:    cfg.WebhookURL,
 		webhookSecret: cfg.WebhookSecret,
 		client:        &http.Client{Timeout: 10 * time.Second},
+		backoffs:      []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second},
 	}
 }
 
@@ -55,7 +65,12 @@ func NewWebhookNotifier(s *store.Store, cfg envconfig.Config) *WebhookNotifier {
 		webhookURL:    cfg.WebhookURL,
 		webhookSecret: cfg.WebhookSecret,
 		client:        &http.Client{Timeout: 10 * time.Second},
+		backoffs:      []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second},
 	}
+}
+
+func (wn *WebhookNotifier) SetRetryBackoffs(backoffs []time.Duration) {
+	wn.backoffs = append([]time.Duration(nil), backoffs...)
 }
 
 // Start subscribes to the store and dispatches webhook deliveries in the
@@ -137,47 +152,50 @@ func (wn *WebhookNotifier) handleDelta(delta store.SequencedDelta, lastStatus ma
 	}
 	lastStatus[task.ID] = task.Status
 
-	prompt := task.Prompt
-	if len(prompt) > 200 {
-		prompt = prompt[:200]
-	}
-
 	result := ""
 	if task.Result != nil {
 		result = *task.Result
-		if len(result) > 500 {
-			result = result[:500]
+	}
+	payload := NewTaskStateChangedPayload(task.ID.String(), task.Status, task.Title, task.Prompt, result, time.Now().UTC())
+	go func() {
+		if err := wn.Send(payload); err != nil {
+			slog.Error("webhook: delivery failed", "event", payload.EventType, "task_id", payload.TaskID, "error", err)
 		}
-	}
-
-	title := task.Title
-	if title == "" {
-		title = task.Prompt
-		if len(title) > 80 {
-			title = title[:80]
-		}
-	}
-
-	payload := WebhookPayload{
-		EventType:  "task.state_changed",
-		TaskID:     task.ID.String(),
-		Status:     task.Status,
-		Title:      title,
-		Prompt:     prompt,
-		Result:     result,
-		OccurredAt: time.Now().UTC(),
-	}
-	go wn.deliver(payload)
+	}()
 }
 
-// deliver POSTs payload to the webhook URL. It retries up to 3 times on
-// non-2xx responses, sleeping 2 s, 5 s, and 10 s between attempts. Errors
-// are logged but never propagate (the caller must not block).
-func (wn *WebhookNotifier) deliver(payload WebhookPayload) {
+func NewTaskStateChangedPayload(taskID string, status store.TaskStatus, title, prompt, result string, occurredAt time.Time) WebhookPayload {
+	title = truncateWebhookField(title, maxWebhookTitleLen)
+	if title == "" {
+		title = truncateWebhookField(prompt, maxWebhookTitleLen)
+	}
+	return WebhookPayload{
+		EventType:  WebhookEventTaskStateChanged,
+		TaskID:     taskID,
+		Status:     status,
+		Title:      title,
+		Prompt:     truncateWebhookField(prompt, maxWebhookPromptLen),
+		Result:     truncateWebhookField(result, maxWebhookResultLen),
+		OccurredAt: occurredAt.UTC(),
+	}
+}
+
+func truncateWebhookField(s string, limit int) string {
+	if len(s) > limit {
+		return s[:limit]
+	}
+	return s
+}
+
+// Send POSTs payload to the configured webhook URL. It retries up to 3 times
+// on non-2xx responses, sleeping 2 s, 5 s, and 10 s between attempts.
+func (wn *WebhookNotifier) Send(payload WebhookPayload) error {
+	if wn.webhookURL == "" {
+		return fmt.Errorf("webhook URL is not configured")
+	}
 	data, err := json.Marshal(payload)
 	if err != nil {
-		slog.Error("webhook: marshal payload", "error", err)
-		return
+		return fmt.Errorf("marshal payload: %w", err)
 	}
 
 	sig := ""
@@ -188,32 +206,32 @@ func (wn *WebhookNotifier) deliver(payload WebhookPayload) {
 	}
 
 	// Attempt 0 is immediate; attempts 1-3 wait for the respective backoff.
-	backoffs := []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second}
-	for attempt, delay := range backoffs {
+	var lastErr error
+	for attempt, delay := range wn.backoffs {
 		if delay > 0 {
 			time.Sleep(delay)
 		}
 
 		req, err := http.NewRequest(http.MethodPost, wn.webhookURL, bytes.NewReader(data))
 		if err != nil {
-			slog.Error("webhook: create request", "error", err)
-			return
+			return fmt.Errorf("create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Wallfacer-Event", "task.state_changed")
+		req.Header.Set("X-Wallfacer-Event", payload.EventType)
 		if sig != "" {
 			req.Header.Set("X-Wallfacer-Signature", sig)
 		}
 
 		resp, err := wn.client.Do(req)
 		if err != nil {
-			slog.Error("webhook: POST failed", "attempt", attempt+1, "error", err)
+			lastErr = fmt.Errorf("attempt %d POST failed: %w", attempt+1, err)
 			continue
 		}
 		resp.Body.Close()
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			return
+			return nil
 		}
-		slog.Error("webhook: non-2xx response", "attempt", attempt+1, "status", resp.StatusCode)
+		lastErr = fmt.Errorf("attempt %d returned HTTP %d", attempt+1, resp.StatusCode)
 	}
+	return lastErr
 }

@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 74,
+  "route_count": 75,
   "routes": [
     {
       "method": "GET",
@@ -152,6 +152,15 @@
       "pattern": "/api/env/test",
       "name": "TestSandbox",
       "description": "Test sandbox configuration by running a lightweight probe task.",
+      "tags": [
+        "env"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/env/test-webhook",
+      "name": "TestWebhook",
+      "description": "Send a synthetic webhook event using the configured webhook settings.",
       "tags": [
         "env"
       ]
