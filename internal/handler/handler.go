@@ -188,6 +188,16 @@ func (h *Handler) incAutopilotAction(watcher, outcome string) {
 	})
 }
 
+// incAutopilotPhase2Miss increments the phase-2 miss counter for the named watcher.
+func (h *Handler) incAutopilotPhase2Miss(watcher string) {
+	if h.reg == nil {
+		return
+	}
+	h.reg.Counter("wallfacer_autopilot_phase2_miss_total", "").Inc(map[string]string{
+		"watcher": watcher,
+	})
+}
+
 func (h *Handler) setSandboxTestPassed(sb sandbox.Type, passed bool) {
 	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.Lock()

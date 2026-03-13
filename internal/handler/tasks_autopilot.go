@@ -284,6 +284,9 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			return bestBacklog, nil
 		},
 		AfterPhase1: h.testPhase1Done,
+		OnPhase2Miss: func(candidate *store.Task) {
+			h.incAutopilotPhase2Miss("auto_promoter")
+		},
 		Phase2: func(ctx context.Context, candidate *store.Task) (bool, error) {
 			if resumeCandidate != nil && candidate != nil && candidate.ID == resumeCandidate.task.ID {
 				freshTask, err := h.store.GetTask(ctx, candidate.ID)
@@ -549,6 +552,9 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 
 	runTwoPhase(ctx, &promoteMu, TwoPhaseWatcherConfig{
 		Name: "auto-test",
+		OnPhase2Miss: func(candidate *store.Task) {
+			h.incAutopilotPhase2Miss("auto_tester")
+		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			// Phase 1 (no lock): build the list of eligible candidates.
 			// Git I/O (CommitsBehind) happens here so we don't hold promoteMu
@@ -738,6 +744,9 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 
 	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
 		Name: "auto-submit",
+		OnPhase2Miss: func(candidate *store.Task) {
+			h.incAutopilotPhase2Miss("auto_submitter")
+		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			tasks, err := h.store.ListTasks(ctx, false)
 			if err != nil {
