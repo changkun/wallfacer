@@ -75,21 +75,6 @@ func (r *Runner) IdeationIgnorePatterns() []string {
 	return result
 }
 
-// pickCategories returns n unique categories sampled at random from
-// ideaCategoryPool using a Fisher-Yates partial shuffle.
-func pickCategories(n int) []string {
-	pool := make([]string, len(ideaCategoryPool))
-	copy(pool, ideaCategoryPool)
-	for i := len(pool) - 1; i > 0; i-- {
-		j := rand.Intn(i + 1)
-		pool[i], pool[j] = pool[j], pool[i]
-	}
-	if n > len(pool) {
-		n = len(pool)
-	}
-	return pool[:n]
-}
-
 // pickCategoriesForInspiration returns a broader set of categories for the
 // generate-then-rank pipeline. Unlike pickCategories which assigned one
 // category per idea slot, this provides a larger pool purely as inspiration.
@@ -111,9 +96,11 @@ func pickCategoriesForInspiration() []string {
 	return pool[:n]
 }
 
-// buildIdeationPrompt constructs the full ideation prompt by randomly
-// assigning 3 distinct categories — one per idea slot — so that every
-// brainstorm run surfaces improvements from different areas of the project.
+// buildIdeationPrompt constructs the full ideation prompt using a
+// generate-then-rank pipeline: the agent brainstorms 6 candidates, self-
+// critiques them against concrete impact criteria, and outputs the top 3.
+// A broad set of inspiration categories is shown but the agent is free to
+// propose multiple ideas in the same domain.
 // existingTasks lists tasks currently in backlog, in_progress, or waiting state
 // so the agent can avoid proposing duplicates or conflicting ideas.
 func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ideationContext) string {
