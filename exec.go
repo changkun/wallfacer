@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"changkun.de/wallfacer/internal/sandbox"
 )
 
 type execMode int
@@ -19,7 +21,7 @@ const (
 type execConfig struct {
 	mode    execMode
 	prefix  string
-	sandbox string
+	sandbox sandbox.Type
 	command []string
 }
 
@@ -111,7 +113,7 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 				return nil, fmt.Errorf("missing sandbox value for --sandbox")
 			}
 			cfg.mode = execModeSandbox
-			cfg.sandbox = strings.ToLower(strings.TrimSpace(positional[i+1]))
+			cfg.sandbox = sandbox.Normalize(positional[i+1])
 			if i+2 < len(positional) {
 				cfg.command = append(cfg.command[:0], positional[i+2:]...)
 			}
@@ -122,7 +124,7 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 
 	switch cfg.mode {
 	case execModeSandbox:
-		if cfg.sandbox != "claude" && cfg.sandbox != "codex" {
+		if !cfg.sandbox.IsValid() {
 			return nil, fmt.Errorf("invalid sandbox %q (use claude or codex)", cfg.sandbox)
 		}
 		if len(positional) > 0 && len(cfg.command) == 1 && cfg.command[0] == "bash" {
@@ -141,7 +143,7 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 	return cfg, nil
 }
 
-func buildSandboxExecArgs(runtimePath, configDir, sandbox string, command []string) ([]string, error) {
+func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, command []string) ([]string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("getwd: %w", err)
@@ -150,7 +152,7 @@ func buildSandboxExecArgs(runtimePath, configDir, sandbox string, command []stri
 	if base == "." || base == "/" || base == "" {
 		base = "workspace"
 	}
-	image := resolveSandboxImageForExec(envOrDefault("SANDBOX_IMAGE", defaultSandboxImage), sandbox)
+	image := resolveSandboxImageForExec(envOrDefault("SANDBOX_IMAGE", defaultSandboxImage), sb)
 	envFile := envOrDefault("ENV_FILE", filepath.Join(configDir, ".env"))
 	runtimeBin := filepath.Base(runtimePath)
 
@@ -158,10 +160,10 @@ func buildSandboxExecArgs(runtimePath, configDir, sandbox string, command []stri
 	if info, err := os.Stat(envFile); err == nil && !info.IsDir() {
 		args = append(args, "--env-file", envFile)
 	}
-	if sandbox == "claude" {
+	if sb == sandbox.Claude {
 		args = append(args, "-v", "claude-config:/home/claude/.claude")
 	}
-	if sandbox == "codex" {
+	if sb == sandbox.Codex {
 		if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 			codexPath := filepath.Join(home, ".codex")
 			if info, err := os.Stat(filepath.Join(codexPath, "auth.json")); err == nil && !info.IsDir() {
@@ -178,9 +180,9 @@ func buildSandboxExecArgs(runtimePath, configDir, sandbox string, command []stri
 	return args, nil
 }
 
-func resolveSandboxImageForExec(baseImage, sandbox string) string {
+func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
 	baseImage = strings.TrimSpace(baseImage)
-	if sandbox != "codex" {
+	if sb != sandbox.Codex {
 		return baseImage
 	}
 	if baseImage == "" {

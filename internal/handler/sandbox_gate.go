@@ -6,19 +6,16 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
+	"changkun.de/wallfacer/internal/sandbox"
 )
 
-func normalizeSandbox(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	if s == "" {
-		return "claude"
-	}
-	return s
+func normalizeSandbox(s string) sandbox.Type {
+	return sandbox.Default(s)
 }
 
-func (h *Handler) sandboxUsable(sandbox string) (bool, string) {
-	s := normalizeSandbox(sandbox)
-	if s != "codex" {
+func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
+	s := sb.OrDefault()
+	if s != sandbox.Codex {
 		return true, ""
 	}
 	hasHostAuth := false
@@ -45,13 +42,13 @@ func (h *Handler) sandboxUsable(sandbox string) (bool, string) {
 		}
 		return false, reason
 	}
-	if !h.sandboxTestPassedState("codex") {
+	if !h.sandboxTestPassedState(string(sandbox.Codex)) {
 		return false, "Codex unavailable: run Settings -> API Configuration -> Test (Codex) first."
 	}
 	return true, ""
 }
 
-func (h *Handler) validateRequestedSandboxes(taskSandbox string, byActivity map[string]string) error {
+func (h *Handler) validateRequestedSandboxes(taskSandbox sandbox.Type, byActivity map[string]sandbox.Type) error {
 	if ok, reason := h.sandboxUsable(taskSandbox); !ok {
 		return errors.New(reason)
 	}

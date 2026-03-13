@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -67,8 +68,8 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	task.SessionID = &sessionID
 	task.Result = &result
 	task.StopReason = &stopReason
-	task.SandboxByActivity = map[string]string{
-		SandboxActivityImplementation: "workspace-write",
+	task.SandboxByActivity = map[string]sandbox.Type{
+		SandboxActivityImplementation: sandbox.Claude,
 	}
 	task.UsageBreakdown = map[string]TaskUsage{
 		SandboxActivityImplementation: {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
@@ -83,16 +84,16 @@ func (r *Runner) buildRefinementPrompt(task *store.Task, userInstructions string
 // buildRefinementContainerArgs builds container args for a read-only refinement
 // run. Workspaces are mounted read-only; no worktrees, board context, or sibling
 // mounts are used since the agent should only read, not commit.
-func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, modelOverride, sandbox string) []string {
+func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, modelOverride string, sb sandbox.Type) []string {
 	model := modelOverride
 	if model == "" {
-		model = r.modelFromEnvForSandbox(sandbox)
+		model = r.modelFromEnvForSandbox(sb)
 	}
 
 	spec := ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
-		Image:   r.sandboxImageForSandbox(sandbox),
+		Image:   r.sandboxImageForSandbox(sb),
 	}
 
 	if taskID != "" {
@@ -114,7 +115,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 		Host:      "claude-config",
 		Container: "/home/claude/.claude",
 	})
-	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
+	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)
 
 	var basenames []string
 	if r.workspaces != "" {
@@ -142,7 +143,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 		if _, err := os.Stat(r.instructionsPath); err == nil {
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      r.instructionsPath,
-				Container: "/workspace/" + instructionsFilenameForSandbox(sandbox),
+				Container: "/workspace/" + instructionsFilenameForSandbox(sb),
 				Options:   "z,ro",
 			})
 		}
@@ -168,7 +169,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 func (r *Runner) runRefinementContainer(
 	ctx context.Context,
 	taskID uuid.UUID,
-	prompt, modelOverride, sandbox string,
+	prompt, modelOverride string, sb sandbox.Type,
 ) (*agentOutput, []byte, []byte, error) {
 	slug := slugifyPrompt(prompt, 20)
 	containerName := "wallfacer-refine-" + slug + "-" + taskID.String()[:8]
@@ -176,7 +177,7 @@ func (r *Runner) runRefinementContainer(
 	r.refineContainers.Set(taskID, containerName)
 	defer r.refineContainers.Delete(taskID)
 
-	runWithSandbox := func(selectedSandbox string) (*agentOutput, []byte, []byte, error) {
+	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
 		exec.Command(r.command, "rm", "-f", containerName).Run()
 
 		args := r.buildRefinementContainerArgs(containerName, taskID.String(), prompt, modelOverride, selectedSandbox)
@@ -236,29 +237,29 @@ func (r *Runner) runRefinementContainer(
 		return output, stdout.Bytes(), stderr.Bytes(), nil
 	}
 
-	initialSandbox := sandbox
+	initialSandbox := sb
 	output, rawStdout, rawStderr, err := runWithSandbox(initialSandbox)
 	if err != nil {
-		if strings.EqualFold(initialSandbox, "claude") && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
+		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
 			logger.Runner.Warn("refinement: claude token limit hit; retrying with codex", "task", taskID)
 			r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during refinement)",
 			})
-			output, rawStdout, rawStderr, err = runWithSandbox("codex")
-			sandbox = "codex"
+			output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
+			sb = sandbox.Codex
 		}
 		if err != nil {
 			return nil, rawStdout, rawStderr, err
 		}
 	}
-	if strings.EqualFold(initialSandbox, "claude") && output != nil && output.IsError &&
+	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("refinement: claude output reported token limit; retrying with codex", "task", taskID)
 		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
 			"result": "Sandbox fallback: claude → codex (token/rate limit in refinement output)",
 		})
-		output, rawStdout, rawStderr, err = runWithSandbox("codex")
-		sandbox = "codex"
+		output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
+		sb = sandbox.Codex
 		if err != nil {
 			return nil, rawStdout, rawStderr, err
 		}

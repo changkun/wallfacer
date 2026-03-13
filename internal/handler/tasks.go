@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -146,8 +147,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Prompt            string            `json:"prompt"`
 		Timeout           int               `json:"timeout"`
 		MountWorktrees    bool              `json:"mount_worktrees"`
-		Sandbox           string            `json:"sandbox"`
-		SandboxByActivity map[string]string `json:"sandbox_by_activity"`
+		Sandbox           sandbox.Type            `json:"sandbox"`
+		SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity"`
 		Kind              store.TaskKind    `json:"kind"`
 		Tags              []string          `json:"tags"`
 		MaxCostUSD        float64           `json:"max_cost_usd"`
@@ -203,8 +204,8 @@ type batchTaskInput struct {
 	Prompt            string            `json:"prompt"`
 	Timeout           int               `json:"timeout"`
 	Tags              []string          `json:"tags"`
-	Sandbox           string            `json:"sandbox"`
-	SandboxByActivity map[string]string `json:"sandbox_by_activity"`
+	Sandbox           sandbox.Type            `json:"sandbox"`
+	SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity"`
 	Kind              store.TaskKind    `json:"kind"`
 	MountWorktrees    bool              `json:"mount_worktrees"`
 	DependsOnRefs     []string          `json:"depends_on_refs"`
@@ -514,8 +515,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Timeout           *int               `json:"timeout"`
 		FreshStart        *bool              `json:"fresh_start"`
 		MountWorktrees    *bool              `json:"mount_worktrees"`
-		Sandbox           *string            `json:"sandbox"`
-		SandboxByActivity *map[string]string `json:"sandbox_by_activity"`
+		Sandbox           *sandbox.Type            `json:"sandbox"`
+		SandboxByActivity *map[string]sandbox.Type `json:"sandbox_by_activity"`
 		DependsOn         *[]string          `json:"depends_on"`
 		Tags              *[]string          `json:"tags"`
 		MaxCostUSD        *float64           `json:"max_cost_usd"`

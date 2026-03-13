@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"changkun.de/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -31,7 +32,7 @@ type ExecutionEnvironment struct {
 	ModelName        string    `json:"model_name"`        // e.g. "claude-opus-4-6"
 	APIBaseURL       string    `json:"api_base_url"`      // empty string = default Anthropic endpoint
 	InstructionsHash string    `json:"instructions_hash"` // sha256 hex of CLAUDE.md at run start
-	Sandbox          string    `json:"sandbox"`           // configured sandbox: "claude", "codex", etc.
+	Sandbox          sandbox.Type `json:"sandbox"`        // configured sandbox: "claude", "codex", etc.
 	RecordedAt       time.Time `json:"recorded_at"`
 }
 
@@ -45,7 +46,7 @@ type TurnUsageRecord struct {
 	CacheCreationTokens  int       `json:"cache_creation_tokens"`
 	CostUSD              float64   `json:"cost_usd"`
 	StopReason           string    `json:"stop_reason,omitempty"`
-	Sandbox              string    `json:"sandbox,omitempty"`
+	Sandbox              sandbox.Type `json:"sandbox,omitempty"`
 	SubAgent             string    `json:"sub_agent,omitempty"` // "implementation", "test", "refinement", etc.
 }
 
@@ -248,8 +249,8 @@ type Task struct {
 	MaxCostUSD        float64             `json:"max_cost_usd,omitempty"`     // 0 = unlimited
 	MaxInputTokens    int                 `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
 	Usage             TaskUsage           `json:"usage"`
-	Sandbox           string              `json:"sandbox,omitempty"`
-	SandboxByActivity map[string]string   `json:"sandbox_by_activity,omitempty"`
+	Sandbox           sandbox.Type            `json:"sandbox,omitempty"`
+	SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity,omitempty"`
 	// UsageBreakdown tracks token/cost per sub-agent activity (e.g. "implementation",
 	// "test", "title", "oversight", "oversight-test", "refinement").
 	UsageBreakdown map[string]TaskUsage `json:"usage_breakdown,omitempty"`

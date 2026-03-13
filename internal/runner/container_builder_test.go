@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 )
 
@@ -147,7 +148,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRunnerForArgTest(t, tc.cfgFn(t))
-			spec := r.buildBaseContainerSpec("c-test", tc.model, tc.sandbox)
+			spec := r.buildBaseContainerSpec("c-test", tc.model, sandbox.Normalize(tc.sandbox))
 			args := spec.Build()
 
 			for _, p := range tc.wantPairs {
@@ -376,7 +377,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRunnerForArgTest(t, tc.cfgFn(t))
-			args := r.buildIdeationContainerArgs("ideate-test", "analyze the workspace", tc.sandbox)
+			args := r.buildIdeationContainerArgs("ideate-test", "analyze the workspace", sandbox.Normalize(tc.sandbox))
 
 			for _, p := range tc.wantPairs {
 				if p.value == "" {
@@ -663,7 +664,7 @@ func TestAppendInstructionsMount(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRunnerForArgTest(t, tc.cfgFn(t))
 			initial := []VolumeMount{{Host: "claude-config", Container: "/home/claude/.claude"}}
-			result := r.appendInstructionsMount(initial, tc.sandbox)
+			result := r.appendInstructionsMount(initial, sandbox.Normalize(tc.sandbox))
 
 			if tc.wantNone {
 				if len(result) != len(initial) {
@@ -689,8 +690,8 @@ func TestAppendInstructionsMount(t *testing.T) {
 // TestAppendInstructionsMountReadOnly verifies the mount is always read-only,
 // regardless of sandbox type.
 func TestAppendInstructionsMountReadOnly(t *testing.T) {
-	for _, sandbox := range []string{"claude", "codex"} {
-		t.Run(sandbox, func(t *testing.T) {
+	for _, sb := range []string{"claude", "codex"} {
+		t.Run(sb, func(t *testing.T) {
 			p := filepath.Join(t.TempDir(), "instructions.md")
 			if err := os.WriteFile(p, []byte("# Instructions"), 0644); err != nil {
 				t.Fatal(err)
@@ -700,7 +701,7 @@ func TestAppendInstructionsMountReadOnly(t *testing.T) {
 				SandboxImage:     "img",
 				InstructionsPath: p,
 			})
-			result := r.appendInstructionsMount(nil, sandbox)
+			result := r.appendInstructionsMount(nil, sandbox.Normalize(sb))
 			if len(result) != 1 {
 				t.Fatalf("expected 1 mount; got %d", len(result))
 			}

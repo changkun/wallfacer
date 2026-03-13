@@ -12,6 +12,7 @@ import (
 
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/runner"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 )
 
@@ -103,8 +104,8 @@ type envConfigResponse struct {
 	TitleModel           string            `json:"title_model"`
 	CodexDefaultModel    string            `json:"codex_default_model"`
 	CodexTitleModel      string            `json:"codex_title_model"`
-	DefaultSandbox       string            `json:"default_sandbox"`
-	SandboxByActivity    map[string]string `json:"sandbox_by_activity,omitempty"`
+	DefaultSandbox       sandbox.Type            `json:"default_sandbox"`
+	SandboxByActivity    map[string]sandbox.Type `json:"sandbox_by_activity,omitempty"`
 	MaxParallelTasks     int               `json:"max_parallel_tasks"`
 	MaxTestParallelTasks int               `json:"max_test_parallel_tasks"`
 	OversightInterval    int               `json:"oversight_interval"`
@@ -119,7 +120,7 @@ type envConfigResponse struct {
 
 type sandboxTestResponse struct {
 	TaskID         string `json:"task_id"`
-	Sandbox        string `json:"sandbox"`
+	Sandbox        sandbox.Type `json:"sandbox"`
 	Status         string `json:"status"`
 	LastTestResult string `json:"last_test_result,omitempty"`
 	Result         string `json:"result,omitempty"`
@@ -127,7 +128,7 @@ type sandboxTestResponse struct {
 }
 
 type sandboxTestRequest struct {
-	Sandbox           *string           `json:"sandbox"`
+	Sandbox           *sandbox.Type     `json:"sandbox"`
 	Timeout           *int              `json:"timeout"`
 	Prompt            *string           `json:"prompt"`
 	OAuthToken        *string           `json:"oauth_token"`
@@ -139,8 +140,8 @@ type sandboxTestRequest struct {
 	TitleModel        *string           `json:"title_model"`
 	CodexDefaultModel *string           `json:"codex_default_model"`
 	CodexTitleModel   *string           `json:"codex_title_model"`
-	DefaultSandbox    *string           `json:"default_sandbox"`
-	SandboxByActivity map[string]string `json:"sandbox_by_activity"`
+	DefaultSandbox    *sandbox.Type           `json:"default_sandbox"`
+	SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -205,18 +206,13 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sandbox := "claude"
+	sb := sandbox.Claude
 	if req.Sandbox != nil {
-		sandbox = strings.ToLower(strings.TrimSpace(*req.Sandbox))
+		sb = req.Sandbox.OrDefault()
 	}
-	switch sandbox {
-	case "", "claude", "codex":
-	default:
+	if !sb.IsValid() {
 		http.Error(w, "invalid sandbox: use claude or codex", http.StatusBadRequest)
 		return
-	}
-	if sandbox == "" {
-		sandbox = "claude"
 	}
 
 	// Preserve existing token handling behavior (empty string means no change).
@@ -264,7 +260,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	task, err := h.store.CreateTaskWithOptions(r.Context(), store.TaskCreateOptions{
 		Prompt:  prompt,
 		Timeout: timeout,
-		Sandbox: sandbox,
+		Sandbox: sb,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -281,7 +277,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 
 	probeRunner := runner.NewRunner(h.store, runner.RunnerConfig{
 		Command:          h.runner.Command(),
-		SandboxImage:     sandboxImageForTest(sandbox, h.runner.SandboxImage()),
+		SandboxImage:     sandboxImageForTest(string(sb), h.runner.SandboxImage()),
 		EnvFile:          tempEnvFile,
 		Workspaces:       strings.Join(h.workspaces, " "),
 		WorktreesDir:     h.runner.WorktreesDir(),
@@ -315,7 +311,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 
 	resp := sandboxTestResponse{
 		TaskID:         updated.ID.String(),
-		Sandbox:        sandbox,
+		Sandbox:        sb,
 		Status:         string(updated.Status),
 		LastTestResult: updated.LastTestResult,
 	}
@@ -328,7 +324,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 
 	passed := strings.EqualFold(updated.LastTestResult, "pass") &&
 		(updated.Status == store.TaskStatusDone || updated.Status == store.TaskStatusWaiting)
-	h.setSandboxTestPassed(sandbox, passed)
+	h.setSandboxTestPassed(string(sb), passed)
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -453,8 +449,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		TitleModel           *string           `json:"title_model"`
 		CodexDefaultModel    *string           `json:"codex_default_model"`
 		CodexTitleModel      *string           `json:"codex_title_model"`
-		DefaultSandbox       *string           `json:"default_sandbox"`
-		SandboxByActivity    map[string]string `json:"sandbox_by_activity"`
+		DefaultSandbox       *sandbox.Type           `json:"default_sandbox"`
+		SandboxByActivity    map[string]sandbox.Type `json:"sandbox_by_activity"`
 		MaxParallelTasks     *int              `json:"max_parallel_tasks"`
 		MaxTestParallelTasks *int              `json:"max_test_parallel_tasks"`
 		OversightInterval    *int              `json:"oversight_interval"`

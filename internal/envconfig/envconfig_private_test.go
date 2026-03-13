@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"changkun.de/wallfacer/internal/sandbox"
 )
 
 func TestParseEnvLinePreservesHashesInsideQuotes(t *testing.T) {
@@ -63,7 +65,7 @@ func TestSandboxByActivity(t *testing.T) {
 		t.Fatalf("SandboxByActivity size = %d, want %d", len(got), len(want))
 	}
 	for k, v := range want {
-		if got[k] != v {
+		if string(got[k]) != v {
 			t.Errorf("SandboxByActivity[%q] = %q, want %q", k, got[k], v)
 		}
 	}
@@ -88,10 +90,10 @@ func TestUpdateSandboxSettings(t *testing.T) {
 		t.Fatalf("write env file: %v", err)
 	}
 
-	defaultSandbox := "codex"
-	if err := UpdateSandboxSettings(path, &defaultSandbox, map[string]string{
-		"implementation": "codex",
-		"idea_agent":     "claude",
+	defaultSandbox := sandbox.Codex
+	if err := UpdateSandboxSettings(path, &defaultSandbox, map[string]sandbox.Type{
+		"implementation": sandbox.Codex,
+		"idea_agent":     sandbox.Claude,
 		"commit_message": "",
 	}); err != nil {
 		t.Fatalf("UpdateSandboxSettings: %v", err)

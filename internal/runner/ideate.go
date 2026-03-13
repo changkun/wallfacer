@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/prompts"
 	"github.com/google/uuid"
@@ -155,13 +156,13 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 	r.ideateContainer.SetSingleton(containerName)
 	defer r.ideateContainer.DeleteSingleton()
 
-	sandbox := "claude"
+	sb := sandbox.Claude
 	if taskID != uuid.Nil {
 		if task, err := r.store.GetTask(context.Background(), taskID); err == nil {
-			sandbox = r.sandboxForTaskActivity(task, activityIdeaAgent)
+			sb = r.sandboxForTaskActivity(task, activityIdeaAgent)
 		}
 	}
-	runWithSandbox := func(selectedSandbox string) (*agentOutput, []byte, []byte, error) {
+	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
 		args := r.buildIdeationContainerArgs(containerName, prompt, selectedSandbox)
 
 		logger.Runner.Debug("ideate exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
@@ -199,21 +200,21 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 		return output, rawStdout, rawStderr, nil
 	}
 
-	output, rawStdout, rawStderr, err := runWithSandbox(sandbox)
+	output, rawStdout, rawStderr, err := runWithSandbox(sb)
 	if err != nil {
-		if strings.EqualFold(sandbox, "claude") && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
+		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
 			logger.Runner.Warn("ideation: claude token limit hit; retrying with codex", "task", taskID)
-			output, rawStdout, rawStderr, err = runWithSandbox("codex")
+			output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
 		}
 		if err != nil {
 			return nil, nil, nil, rawStdout, rawStderr, err
 		}
 	}
 
-	if strings.EqualFold(sandbox, "claude") && output != nil && output.IsError &&
+	if sb == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("ideation: claude output reported token limit; retrying with codex", "task", taskID)
-		retryOutput, retryStdout, retryStderr, retryErr := runWithSandbox("codex")
+		retryOutput, retryStdout, retryStderr, retryErr := runWithSandbox(sandbox.Codex)
 		if retryErr == nil {
 			output = retryOutput
 			rawStdout = retryStdout
@@ -244,9 +245,9 @@ func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
 // buildIdeationContainerArgs builds the container run arguments for the
 // ideation agent. Workspaces are mounted read-only; no task label, no
 // worktrees, and no board context are used.
-func (r *Runner) buildIdeationContainerArgs(containerName, prompt, sandbox string) []string {
-	model := r.modelFromEnvForSandbox(sandbox)
-	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
+func (r *Runner) buildIdeationContainerArgs(containerName, prompt string, sb sandbox.Type) []string {
+	model := r.modelFromEnvForSandbox(sb)
+	spec := r.buildBaseContainerSpec(containerName, model, sb)
 
 	var basenames []string
 	if r.workspaces != "" {
@@ -270,7 +271,7 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt, sandbox strin
 		}
 	}
 
-	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sandbox)
+	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb)
 
 	spec.WorkDir = workdirForBasenames(basenames)
 	spec.Cmd = buildAgentCmd(prompt, model)
@@ -545,4 +546,3 @@ func collectIdeationFailureSignals(tasks []store.Task) []string {
 	}
 	return result
 }
-
