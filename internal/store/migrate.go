@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -59,7 +60,7 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	}
 
 	// (3) Normalize Sandbox and SandboxByActivity.
-	if normalSandbox := strings.TrimSpace(task.Sandbox); normalSandbox != task.Sandbox {
+	if normalSandbox := sandbox.Normalize(string(task.Sandbox)); normalSandbox != task.Sandbox {
 		task.Sandbox = normalSandbox
 		changed = true
 	}
@@ -128,7 +129,7 @@ func stringSliceEqual(a, b []string) bool {
 
 // sandboxByActivityEqual reports whether two sandbox-by-activity maps contain
 // exactly the same keys and values.
-func sandboxByActivityEqual(a, b map[string]string) bool {
+func sandboxByActivityEqual(a, b map[string]sandbox.Type) bool {
 	if len(a) != len(b) {
 		return false
 	}

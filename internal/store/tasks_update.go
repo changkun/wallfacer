@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -363,7 +364,7 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 }
 
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[string]string, maxCostUSD *float64, maxInputTokens *int) error {
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[string]sandbox.Type, maxCostUSD *float64, maxInputTokens *int) error {
 	// Compute the lowercased prompt before acquiring the lock so that
 	// strings.ToLower does not extend the critical section.
 	var loweredPrompt string
@@ -457,7 +458,7 @@ func (s *Store) UpdateTaskBudget(_ context.Context, id uuid.UUID, maxCostUSD *fl
 
 // UpdateTaskSandboxByActivity stores task sandbox overrides by activity key.
 // Passing an empty map clears the override map.
-func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[string]string) error {
+func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[string]sandbox.Type) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -476,7 +477,7 @@ func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, san
 }
 
 // UpdateTaskSandbox stores the task sandbox selection (e.g. "claude" or "codex").
-func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sandbox string) error {
+func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sb sandbox.Type) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -484,7 +485,7 @@ func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sandbox strin
 	if !ok {
 		return fmt.Errorf("task not found: %s", id)
 	}
-	t.Sandbox = strings.TrimSpace(sandbox)
+	t.Sandbox = sandbox.Normalize(string(sb))
 	t.UpdatedAt = time.Now()
 	if err := s.saveTask(id, t); err != nil {
 		return err

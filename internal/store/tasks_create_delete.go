@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -21,8 +22,8 @@ type TaskCreateOptions struct {
 	MountWorktrees    bool
 	Kind              TaskKind
 	Tags              []string
-	Sandbox           string
-	SandboxByActivity map[string]string
+	Sandbox           sandbox.Type
+	SandboxByActivity map[string]sandbox.Type
 	MaxCostUSD        float64
 	MaxInputTokens    int
 	ScheduledAt       *time.Time
@@ -78,7 +79,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 
 	// Sandbox.
 	if opts.Sandbox != "" {
-		task.Sandbox = strings.TrimSpace(opts.Sandbox)
+		task.Sandbox = sandbox.Normalize(string(opts.Sandbox))
 	}
 
 	// SandboxByActivity: normalise (validates keys, strips invalid entries).
@@ -184,9 +185,9 @@ func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt s
 		return nil, fmt.Errorf("source task %s not found", sourceID)
 	}
 	sandboxSnapshot := source.Sandbox
-	var sbaSnapshot map[string]string
+	var sbaSnapshot map[string]sandbox.Type
 	if len(source.SandboxByActivity) > 0 {
-		sbaSnapshot = make(map[string]string, len(source.SandboxByActivity))
+		sbaSnapshot = make(map[string]sandbox.Type, len(source.SandboxByActivity))
 		for k, v := range source.SandboxByActivity {
 			sbaSnapshot[k] = v
 		}
@@ -255,7 +256,7 @@ func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt s
 	return &ret, nil
 }
 
-func normalizeSandboxByActivity(input map[string]string) map[string]string {
+func normalizeSandboxByActivity(input map[string]sandbox.Type) map[string]sandbox.Type {
 	if len(input) == 0 {
 		return nil
 	}
@@ -263,14 +264,14 @@ func normalizeSandboxByActivity(input map[string]string) map[string]string {
 	for _, key := range SandboxActivities {
 		allowed[key] = struct{}{}
 	}
-	out := make(map[string]string)
+	out := make(map[string]sandbox.Type)
 	for k, v := range input {
 		key := strings.ToLower(strings.TrimSpace(k))
 		if _, ok := allowed[key]; !ok {
 			continue
 		}
-		val := strings.ToLower(strings.TrimSpace(v))
-		if val == "" {
+		val, ok := sandbox.Parse(string(v))
+		if !ok {
 			continue
 		}
 		out[key] = val

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -25,7 +26,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	if task.Title != "" {
 		return
 	}
-	sandbox := r.sandboxForTaskActivity(task, activityTitle)
+	sb := r.sandboxForTaskActivity(task, activityTitle)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -38,12 +39,12 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		output *agentOutput
 		err    error
 	}
-	runWithSandbox := func(sb string) titleResult {
-		mdl := r.titleModelFromEnvForSandbox(sb)
+	runWithSandbox := func(selected sandbox.Type) titleResult {
+		mdl := r.titleModelFromEnvForSandbox(selected)
 		containerName := "wallfacer-title-" + taskID.String()[:8]
 		exec.Command(r.command, "rm", "-f", containerName).Run()
 
-		spec := r.buildBaseContainerSpec(containerName, mdl, sb)
+		spec := r.buildBaseContainerSpec(containerName, mdl, selected)
 		spec.Cmd = buildAgentCmd(titlePrompt, mdl)
 
 		cmd := exec.CommandContext(ctx, r.command, spec.Build()...)
@@ -71,28 +72,28 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		return titleResult{output: parsed}
 	}
 
-	res := runWithSandbox(sandbox)
+	res := runWithSandbox(sb)
 
 	// Fallback: if the claude sandbox hit a rate/token limit, retry with codex.
-	if strings.EqualFold(sandbox, "claude") && res.err != nil &&
+	if sb == sandbox.Claude && res.err != nil &&
 		isLikelyTokenLimitError(res.err.Error()) {
 		logger.Runner.Warn("title generation: claude sandbox token limit hit; retrying with codex",
 			"task", taskID)
 		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Sandbox fallback: claude → codex (token/rate limit hit during title generation)",
 		})
-		sandbox = "codex"
-		res = runWithSandbox("codex")
+		sb = sandbox.Codex
+		res = runWithSandbox(sandbox.Codex)
 	}
-	if strings.EqualFold(sandbox, "claude") && res.output != nil && res.output.IsError &&
+	if sb == sandbox.Claude && res.output != nil && res.output.IsError &&
 		isLikelyTokenLimitError(res.output.Result, res.output.Subtype) {
 		logger.Runner.Warn("title generation: claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID)
 		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Sandbox fallback: claude → codex (token/rate limit in title output)",
 		})
-		sandbox = "codex"
-		res = runWithSandbox("codex")
+		sb = sandbox.Codex
+		res = runWithSandbox(sandbox.Codex)
 	}
 
 	if res.err != nil {
@@ -132,7 +133,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
-			Sandbox:              sandbox,
+			Sandbox:              sb,
 			SubAgent:             "title",
 		}); err != nil {
 			logger.Runner.Warn("title generation: append turn usage failed", "task", taskID, "error", err)

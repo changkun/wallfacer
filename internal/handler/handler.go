@@ -95,7 +95,7 @@ func (h *Handler) incAutopilotAction(watcher, outcome string) {
 func (h *Handler) setSandboxTestPassed(sandbox string, passed bool) {
 	s := normalizeSandbox(sandbox)
 	h.sandboxTestMu.Lock()
-	h.sandboxTestPassed[s] = passed
+	h.sandboxTestPassed[string(s)] = passed
 	h.sandboxTestMu.Unlock()
 }
 
@@ -103,7 +103,7 @@ func (h *Handler) sandboxTestPassedState(sandbox string) bool {
 	s := normalizeSandbox(sandbox)
 	h.sandboxTestMu.RLock()
 	defer h.sandboxTestMu.RUnlock()
-	return h.sandboxTestPassed[s]
+	return h.sandboxTestPassed[string(s)]
 }
 
 func (h *Handler) refreshCodexBootstrapAuthState() {

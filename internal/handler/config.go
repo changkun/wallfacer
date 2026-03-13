@@ -10,6 +10,7 @@ import (
 
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/instructions"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 )
 
@@ -61,17 +62,17 @@ func availableSandboxes(cfg envconfig.Config) []string {
 	add("codex")
 
 	if cfg.DefaultSandbox != "" {
-		add(cfg.DefaultSandbox)
+		add(string(cfg.DefaultSandbox))
 	}
 	for _, v := range cfg.SandboxByActivity() {
-		add(v)
+		add(string(v))
 	}
 	return sandboxes
 }
 
 func defaultSandbox(cfg envconfig.Config) string {
 	if cfg.DefaultSandbox != "" {
-		return cfg.DefaultSandbox
+		return string(cfg.DefaultSandbox)
 	}
 	if cfg.DefaultModel != "" {
 		return "claude"
@@ -118,7 +119,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 	sandboxReasons := map[string]string{}
 	for _, sbox := range sandboxes {
-		ok, reason := h.sandboxUsable(sbox)
+		ok, reason := h.sandboxUsable(sandbox.Normalize(sbox))
 		sandboxUsable[sbox] = ok
 		if reason != "" {
 			sandboxReasons[sbox] = reason

@@ -12,6 +12,7 @@ import (
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/instructions"
 	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -37,7 +38,7 @@ type agentOutput struct {
 
 	// ActualSandbox is set by runContainer (not parsed from JSON) to record
 	// which sandbox actually executed this turn, including fallback scenarios.
-	ActualSandbox string `json:"-"`
+	ActualSandbox sandbox.Type `json:"-"`
 }
 
 const (
@@ -67,7 +68,7 @@ func (r *Runner) buildContainerArgs(
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
 ) []string {
-	return r.buildContainerArgsForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, "claude")
+	return r.buildContainerArgsForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, sandbox.Claude)
 }
 
 func (r *Runner) buildContainerArgsForSandbox(
@@ -75,15 +76,16 @@ func (r *Runner) buildContainerArgsForSandbox(
 	worktreeOverrides map[string]string,
 	boardDir string,
 	siblingMounts map[string]map[string]string,
-	modelOverride, sandbox string,
+	modelOverride string,
+	sb sandbox.Type,
 ) []string {
 	// Resolve model once: override takes priority, then env default.
 	model := modelOverride
 	if model == "" {
-		model = r.modelFromEnvForSandbox(sandbox)
+		model = r.modelFromEnvForSandbox(sb)
 	}
 
-	spec := r.buildBaseContainerSpec(containerName, model, sandbox)
+	spec := r.buildBaseContainerSpec(containerName, model, sb)
 
 	// Label the container with task metadata so the monitor can correlate
 	// containers to tasks by label rather than by parsing the container name.
@@ -138,7 +140,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 	// Mount workspace-level instructions file based on sandbox convention:
 	// - Claude sandbox expects /workspace/CLAUDE.md
 	// - Codex sandbox expects /workspace/AGENTS.md
-	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sandbox)
+	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb)
 
 	// Board context: mount board.json read-only at /workspace/.tasks/.
 	if boardDir != "" {
@@ -190,8 +192,8 @@ func (r *Runner) buildContainerArgsForSandbox(
 	return spec.Build()
 }
 
-func instructionsFilenameForSandbox(sandbox string) string {
-	if strings.EqualFold(strings.TrimSpace(sandbox), "codex") {
+func instructionsFilenameForSandbox(sb sandbox.Type) string {
+	if sb == sandbox.Codex {
 		return instructions.InstructionsFilename
 	}
 	return instructions.LegacyInstructionsFilename
@@ -201,7 +203,7 @@ func instructionsFilenameForSandbox(sandbox string) string {
 // read-only bind mount (CLAUDE.md for claude, AGENTS.md for codex).
 // It is a no-op when instructionsPath is empty or does not exist on the host.
 // Both buildContainerArgsForSandbox and buildIdeationContainerArgs share this logic.
-func (r *Runner) appendInstructionsMount(volumes []VolumeMount, sandbox string) []VolumeMount {
+func (r *Runner) appendInstructionsMount(volumes []VolumeMount, sb sandbox.Type) []VolumeMount {
 	if r.instructionsPath == "" {
 		return volumes
 	}
@@ -210,7 +212,7 @@ func (r *Runner) appendInstructionsMount(volumes []VolumeMount, sandbox string) 
 	}
 	return append(volumes, VolumeMount{
 		Host:      r.instructionsPath,
-		Container: "/workspace/" + instructionsFilenameForSandbox(sandbox),
+		Container: "/workspace/" + instructionsFilenameForSandbox(sb),
 		Options:   "z,ro",
 	})
 }
@@ -237,8 +239,8 @@ func buildAgentCmd(prompt, model string) []string {
 	return cmd
 }
 
-func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sandbox string) []VolumeMount {
-	if !strings.EqualFold(strings.TrimSpace(sandbox), "codex") {
+func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sb sandbox.Type) []VolumeMount {
+	if sb != sandbox.Codex {
 		return volumes
 	}
 	if hostPath := r.hostCodexAuthPath(); hostPath != "" {
@@ -261,11 +263,11 @@ func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sandbox string) []V
 //
 // Callers set Labels, additional Volumes (workspace directories, instructions
 // file, board context), WorkDir, and Cmd for their specific needs.
-func (r *Runner) buildBaseContainerSpec(containerName, model, sandbox string) ContainerSpec {
+func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.Type) ContainerSpec {
 	spec := ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
-		Image:   r.sandboxImageForSandbox(sandbox),
+		Image:   r.sandboxImageForSandbox(sb),
 	}
 	if r.envFile != "" {
 		spec.EnvFile = r.envFile
@@ -277,15 +279,15 @@ func (r *Runner) buildBaseContainerSpec(containerName, model, sandbox string) Co
 		Host:      "claude-config",
 		Container: "/home/claude/.claude",
 	})
-	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sandbox)
+	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)
 	spec.Network = r.resolvedContainerNetwork()
 	spec.CPUs = r.resolvedContainerCPUs()
 	spec.Memory = r.resolvedContainerMemory()
 	return spec
 }
 
-func (r *Runner) sandboxImageForSandbox(sandbox string) string {
-	if !strings.EqualFold(strings.TrimSpace(sandbox), "codex") {
+func (r *Runner) sandboxImageForSandbox(sb sandbox.Type) string {
+	if sb != sandbox.Codex {
 		return strings.TrimSpace(r.sandboxImage)
 	}
 	baseImage := strings.TrimSpace(r.sandboxImage)
@@ -321,30 +323,30 @@ func (r *Runner) sandboxImageForSandbox(sandbox string) string {
 
 // modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file (if configured).
 // Returns an empty string when the file cannot be read or the key is absent.
-func (r *Runner) sandboxForTask(task *store.Task) string {
+func (r *Runner) sandboxForTask(task *store.Task) sandbox.Type {
 	return r.sandboxForTaskActivity(task, activityImplementation)
 }
 
-func (r *Runner) sandboxForTaskActivity(task *store.Task, activity string) string {
+func (r *Runner) sandboxForTaskActivity(task *store.Task, activity string) sandbox.Type {
 	if task == nil {
-		return "claude"
+		return sandbox.Claude
 	}
 	activity = strings.ToLower(strings.TrimSpace(activity))
 	if task.SandboxByActivity != nil {
-		if sandbox := strings.ToLower(strings.TrimSpace(task.SandboxByActivity[activity])); sandbox != "" {
-			return sandbox
+		if sb, ok := task.SandboxByActivity[activity]; ok && sb.IsValid() {
+			return sb
 		}
 	}
-	if sandbox := strings.ToLower(strings.TrimSpace(task.Sandbox)); sandbox != "" {
-		return sandbox
+	if task.Sandbox.IsValid() {
+		return task.Sandbox
 	}
-	if sandbox := r.sandboxFromEnvForActivity(activity); sandbox != "" {
-		return sandbox
+	if sb := r.sandboxFromEnvForActivity(activity); sb != "" {
+		return sb
 	}
-	return "claude"
+	return sandbox.Claude
 }
 
-func (r *Runner) sandboxFromEnvForActivity(activity string) string {
+func (r *Runner) sandboxFromEnvForActivity(activity string) sandbox.Type {
 	if r.envFile == "" {
 		return ""
 	}
@@ -383,16 +385,16 @@ func (r *Runner) sandboxFromEnvForActivity(activity string) string {
 			return cfg.IdeaAgentSandbox
 		}
 	}
-	return strings.ToLower(strings.TrimSpace(cfg.DefaultSandbox))
+	return cfg.DefaultSandbox
 }
 
 func (r *Runner) modelFromEnv() string {
-	return r.modelFromEnvForSandbox("claude")
+	return r.modelFromEnvForSandbox(sandbox.Claude)
 }
 
 // modelFromEnvForSandbox reads the default model for the given sandbox.
 // Supports "claude" and "codex" values.
-func (r *Runner) modelFromEnvForSandbox(sandbox string) string {
+func (r *Runner) modelFromEnvForSandbox(sb sandbox.Type) string {
 	if r.envFile == "" {
 		return ""
 	}
@@ -400,8 +402,8 @@ func (r *Runner) modelFromEnvForSandbox(sandbox string) string {
 	if err != nil {
 		return ""
 	}
-	switch strings.ToLower(strings.TrimSpace(sandbox)) {
-	case "codex":
+	switch sb {
+	case sandbox.Codex:
 		return cfg.CodexDefaultModel
 	default:
 		return cfg.DefaultModel
@@ -411,12 +413,12 @@ func (r *Runner) modelFromEnvForSandbox(sandbox string) string {
 // titleModelFromEnv reads CLAUDE_TITLE_MODEL from the env file,
 // falling back to CLAUDE_DEFAULT_MODEL if the title model is not set.
 func (r *Runner) titleModelFromEnv() string {
-	return r.titleModelFromEnvForSandbox("claude")
+	return r.titleModelFromEnvForSandbox(sandbox.Claude)
 }
 
 // titleModelFromEnvForSandbox returns the sandbox-specific title model.
 // Supports "claude" and "codex" values.
-func (r *Runner) titleModelFromEnvForSandbox(sandbox string) string {
+func (r *Runner) titleModelFromEnvForSandbox(sb sandbox.Type) string {
 	if r.envFile == "" {
 		return ""
 	}
@@ -424,8 +426,8 @@ func (r *Runner) titleModelFromEnvForSandbox(sandbox string) string {
 	if err != nil {
 		return ""
 	}
-	switch strings.ToLower(strings.TrimSpace(sandbox)) {
-	case "codex":
+	switch sb {
+	case sandbox.Codex:
 		if cfg.CodexTitleModel != "" {
 			return cfg.CodexTitleModel
 		}
@@ -460,14 +462,14 @@ func (r *Runner) runContainer(
 	r.taskContainers.Set(taskID, containerName)
 	defer r.taskContainers.Delete(taskID)
 
-	sandbox := "claude"
+	sb := sandbox.Claude
 	if task, err := r.store.GetTask(context.Background(), taskID); err == nil {
-		sandbox = r.sandboxForTaskActivity(task, activity)
+		sb = r.sandboxForTaskActivity(task, activity)
 	} else {
 		logger.Runner.Warn("runContainer: get task", "task", taskID, "error", err)
 	}
 
-	runWithSandbox := func(selectedSandbox string) (*agentOutput, []byte, []byte, error) {
+	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
 		// Refuse to launch if the container runtime is known-unavailable.
 		if !r.containerCB.Allow() {
 			return nil, nil, nil, fmt.Errorf("container circuit breaker open: container runtime may be unavailable")
@@ -541,27 +543,27 @@ func (r *Runner) runContainer(
 		return output, rawStdout, rawStderr, nil
 	}
 
-	output, rawStdout, rawStderr, err := runWithSandbox(sandbox)
+	output, rawStdout, rawStderr, err := runWithSandbox(sb)
 	if err != nil {
-		if strings.EqualFold(sandbox, "claude") && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
+		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
 			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
 				"task", taskID, "activity", activity)
 			r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit)",
 			})
-			return runWithSandbox("codex")
+			return runWithSandbox(sandbox.Codex)
 		}
 		return nil, rawStdout, rawStderr, err
 	}
 
-	if strings.EqualFold(sandbox, "claude") && output != nil && output.IsError &&
+	if sb == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID, "activity", activity)
 		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Sandbox fallback: claude → codex (token/rate limit in output)",
 		})
-		return runWithSandbox("codex")
+		return runWithSandbox(sandbox.Codex)
 	}
 
 	return output, rawStdout, rawStderr, nil

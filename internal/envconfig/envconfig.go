@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"changkun.de/wallfacer/internal/sandbox"
 )
 
 // Config holds the known configuration values from the .env file.
@@ -30,14 +32,14 @@ type Config struct {
 	CodexDefaultModel string // CODEX_DEFAULT_MODEL
 	CodexTitleModel   string // CODEX_TITLE_MODEL
 
-	DefaultSandbox        string // WALLFACER_DEFAULT_SANDBOX
-	ImplementationSandbox string // WALLFACER_SANDBOX_IMPLEMENTATION
-	TestingSandbox        string // WALLFACER_SANDBOX_TESTING
-	RefinementSandbox     string // WALLFACER_SANDBOX_REFINEMENT
-	TitleSandbox          string // WALLFACER_SANDBOX_TITLE
-	OversightSandbox      string // WALLFACER_SANDBOX_OVERSIGHT
-	CommitMessageSandbox  string // WALLFACER_SANDBOX_COMMIT_MESSAGE
-	IdeaAgentSandbox      string // WALLFACER_SANDBOX_IDEA_AGENT
+	DefaultSandbox        sandbox.Type // WALLFACER_DEFAULT_SANDBOX
+	ImplementationSandbox sandbox.Type // WALLFACER_SANDBOX_IMPLEMENTATION
+	TestingSandbox        sandbox.Type // WALLFACER_SANDBOX_TESTING
+	RefinementSandbox     sandbox.Type // WALLFACER_SANDBOX_REFINEMENT
+	TitleSandbox          sandbox.Type // WALLFACER_SANDBOX_TITLE
+	OversightSandbox      sandbox.Type // WALLFACER_SANDBOX_OVERSIGHT
+	CommitMessageSandbox  sandbox.Type // WALLFACER_SANDBOX_COMMIT_MESSAGE
+	IdeaAgentSandbox      sandbox.Type // WALLFACER_SANDBOX_IDEA_AGENT
 
 	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
@@ -136,21 +138,21 @@ func Parse(path string) (Config, error) {
 		case "CODEX_TITLE_MODEL":
 			cfg.CodexTitleModel = v
 		case "WALLFACER_DEFAULT_SANDBOX":
-			cfg.DefaultSandbox = strings.ToLower(strings.TrimSpace(v))
+			cfg.DefaultSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_IMPLEMENTATION":
-			cfg.ImplementationSandbox = strings.ToLower(strings.TrimSpace(v))
+			cfg.ImplementationSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_TESTING":
-			cfg.TestingSandbox = strings.ToLower(strings.TrimSpace(v))
+			cfg.TestingSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_REFINEMENT":
-			cfg.RefinementSandbox = strings.ToLower(strings.TrimSpace(v))
+			cfg.RefinementSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_TITLE":
-			cfg.TitleSandbox = strings.ToLower(strings.TrimSpace(v))
+			cfg.TitleSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_OVERSIGHT":
-			cfg.OversightSandbox = strings.ToLower(strings.TrimSpace(v))
+			cfg.OversightSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_COMMIT_MESSAGE":
-			cfg.CommitMessageSandbox = strings.ToLower(strings.TrimSpace(v))
+			cfg.CommitMessageSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_IDEA_AGENT":
-			cfg.IdeaAgentSandbox = strings.ToLower(strings.TrimSpace(v))
+			cfg.IdeaAgentSandbox = sandbox.Normalize(v)
 		case "WALLFACER_CONTAINER_NETWORK":
 			cfg.ContainerNetwork = v
 		case "WALLFACER_CONTAINER_CPUS":
@@ -166,8 +168,8 @@ func Parse(path string) (Config, error) {
 	return cfg, nil
 }
 
-func (c Config) SandboxByActivity() map[string]string {
-	out := map[string]string{}
+func (c Config) SandboxByActivity() map[string]sandbox.Type {
+	out := map[string]sandbox.Type{}
 	if c.ImplementationSandbox != "" {
 		out["implementation"] = c.ImplementationSandbox
 	}
@@ -318,8 +320,9 @@ func Update(
 // defaultSandbox controls WALLFACER_DEFAULT_SANDBOX.
 // sandboxByActivity supports keys: implementation, testing, refinement, title,
 // oversight, commit_message, idea_agent.
-func UpdateSandboxSettings(path string, defaultSandbox *string, sandboxByActivity map[string]string) error {
+func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByActivity map[string]sandbox.Type) error {
 	var impl, test, refine, title, oversight, commit, idea *string
+	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
 		emptyImpl, emptyTest, emptyRefine := "", "", ""
 		emptyTitle, emptyOversight, emptyCommit, emptyIdea := "", "", "", ""
@@ -327,38 +330,38 @@ func UpdateSandboxSettings(path string, defaultSandbox *string, sandboxByActivit
 		title, oversight, commit, idea = &emptyTitle, &emptyOversight, &emptyCommit, &emptyIdea
 
 		if v, ok := sandboxByActivity["implementation"]; ok {
-			s := strings.ToLower(strings.TrimSpace(v))
+			s := string(sandbox.Normalize(string(v)))
 			impl = &s
 		}
 		if v, ok := sandboxByActivity["testing"]; ok {
-			s := strings.ToLower(strings.TrimSpace(v))
+			s := string(sandbox.Normalize(string(v)))
 			test = &s
 		}
 		if v, ok := sandboxByActivity["refinement"]; ok {
-			s := strings.ToLower(strings.TrimSpace(v))
+			s := string(sandbox.Normalize(string(v)))
 			refine = &s
 		}
 		if v, ok := sandboxByActivity["title"]; ok {
-			s := strings.ToLower(strings.TrimSpace(v))
+			s := string(sandbox.Normalize(string(v)))
 			title = &s
 		}
 		if v, ok := sandboxByActivity["oversight"]; ok {
-			s := strings.ToLower(strings.TrimSpace(v))
+			s := string(sandbox.Normalize(string(v)))
 			oversight = &s
 		}
 		if v, ok := sandboxByActivity["commit_message"]; ok {
-			s := strings.ToLower(strings.TrimSpace(v))
+			s := string(sandbox.Normalize(string(v)))
 			commit = &s
 		}
 		if v, ok := sandboxByActivity["idea_agent"]; ok {
-			s := strings.ToLower(strings.TrimSpace(v))
+			s := string(sandbox.Normalize(string(v)))
 			idea = &s
 		}
 	}
 
 	if defaultSandbox != nil {
-		s := strings.ToLower(strings.TrimSpace(*defaultSandbox))
-		defaultSandbox = &s
+		s := string(sandbox.Normalize(string(*defaultSandbox)))
+		defaultSandboxValue = &s
 	}
 
 	raw, err := os.ReadFile(path)
@@ -367,7 +370,7 @@ func UpdateSandboxSettings(path string, defaultSandbox *string, sandboxByActivit
 	}
 
 	updates := map[string]*string{
-		"WALLFACER_DEFAULT_SANDBOX":        defaultSandbox,
+		"WALLFACER_DEFAULT_SANDBOX":        defaultSandboxValue,
 		"WALLFACER_SANDBOX_IMPLEMENTATION": impl,
 		"WALLFACER_SANDBOX_TESTING":        test,
 		"WALLFACER_SANDBOX_REFINEMENT":     refine,
