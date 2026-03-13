@@ -19,7 +19,8 @@ import (
 const ideationTimeout = 10 * time.Minute
 const (
 	maxIdeationIdeas            = 3
-	minIdeationImpactScore      = 60
+	ideationCandidateCount      = 6
+	minIdeationImpactScore      = 72
 	defaultIdeationImpactScore  = 60
 	maxIdeationChurnSignals     = 6
 	maxIdeationTodoSignals      = 6
@@ -89,6 +90,27 @@ func pickCategories(n int) []string {
 	return pool[:n]
 }
 
+// pickCategoriesForInspiration returns a broader set of categories for the
+// generate-then-rank pipeline. Unlike pickCategories which assigned one
+// category per idea slot, this provides a larger pool purely as inspiration.
+func pickCategoriesForInspiration() []string {
+	pool := make([]string, len(ideaCategoryPool))
+	copy(pool, ideaCategoryPool)
+	for i := len(pool) - 1; i > 0; i-- {
+		j := rand.Intn(i + 1)
+		pool[i], pool[j] = pool[j], pool[i]
+	}
+	// Show 5-6 categories as inspiration, enough variety without overwhelming.
+	n := 5
+	if len(pool) > 5 {
+		n = 5 + rand.Intn(2) // 5 or 6
+	}
+	if n > len(pool) {
+		n = len(pool)
+	}
+	return pool[:n]
+}
+
 // buildIdeationPrompt constructs the full ideation prompt by randomly
 // assigning 3 distinct categories — one per idea slot — so that every
 // brainstorm run surfaces improvements from different areas of the project.
@@ -100,7 +122,7 @@ func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ide
 		signals = contexts[0]
 	}
 
-	cats := pickCategories(3)
+	cats := pickCategoriesForInspiration()
 
 	var tasks []prompts.IdeationTask
 	for _, t := range existingTasks {
