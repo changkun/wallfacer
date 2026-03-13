@@ -327,6 +327,7 @@ describe('browseWorkspaces', () => {
         ['workspace-browser-path', pathInput],
         ['workspace-browser-status', statusEl],
         ['workspace-browser-list', { innerHTML: '' }],
+        ['workspace-browser-entries', { innerHTML: '' }],
         ['workspace-browser-breadcrumb', { textContent: '' }],
         ['workspace-browser-include-hidden', { checked: false }],
       ],
@@ -359,6 +360,7 @@ describe('browseWorkspaces', () => {
         ['workspace-browser-path', pathInput],
         ['workspace-browser-status', statusEl],
         ['workspace-browser-list', { innerHTML: '' }],
+        ['workspace-browser-entries', { innerHTML: '' }],
         ['workspace-browser-breadcrumb', { textContent: '' }],
         ['workspace-browser-include-hidden', { checked: true }],
       ],
@@ -380,11 +382,12 @@ describe('browseWorkspaces', () => {
 
 describe('workspace browser filter', () => {
   it('filters the visible folder list client-side', () => {
-    const listEl = { innerHTML: '' };
+    const entriesEl = { innerHTML: '' };
     const crumbEl = { textContent: '' };
     const ctx = makeContext({
       elements: [
-        ['workspace-browser-list', listEl],
+        ['workspace-browser-list', {}],
+        ['workspace-browser-entries', entriesEl],
         ['workspace-browser-breadcrumb', crumbEl],
       ],
     });
@@ -404,9 +407,9 @@ describe('workspace browser filter', () => {
 
     ctx.setWorkspaceBrowserFilter('app');
 
-    expect(listEl.innerHTML).toContain('gamma-app');
-    expect(listEl.innerHTML).not.toContain('alpha-repo');
-    expect(listEl.innerHTML).not.toContain('beta-tools');
+    expect(entriesEl.innerHTML).toContain('gamma-app');
+    expect(entriesEl.innerHTML).not.toContain('alpha-repo');
+    expect(entriesEl.innerHTML).not.toContain('beta-tools');
     expect(vm.runInContext('workspaceBrowserFocusIndex', ctx)).toBe(0);
   });
 

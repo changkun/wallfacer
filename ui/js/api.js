@@ -658,14 +658,15 @@ function renderWorkspaceSelectionDraft() {
 function renderWorkspaceBrowser() {
   var crumb = document.getElementById('workspace-browser-breadcrumb');
   var list = document.getElementById('workspace-browser-list');
+  var entriesEl = document.getElementById('workspace-browser-entries');
   var visibleEntries = getVisibleWorkspaceBrowserEntries();
   if (crumb) crumb.textContent = workspaceBrowserPath || '';
-  if (!list) return;
+  if (!list || !entriesEl) return;
   if (!visibleEntries.length) {
-    list.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:8px;">' + (workspaceBrowserFilterQuery ? 'No matching directories found.' : 'No directories found.') + '</div>';
+    entriesEl.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:8px;">' + (workspaceBrowserFilterQuery ? 'No matching directories found.' : 'No directories found.') + '</div>';
     return;
   }
-  list.innerHTML = visibleEntries.map(function(entry, index) {
+  entriesEl.innerHTML = visibleEntries.map(function(entry, index) {
     var active = index === workspaceBrowserFocusIndex;
     return '<button type="button" data-workspace-entry-index="' + index + '" onclick="selectWorkspaceBrowserEntry(' + index + ')" ondblclick="openWorkspaceBrowserEntry(' + index + ')" style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:none;border-radius:6px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:inherit;cursor:pointer;text-align:left;">' +
       '<span style="font-size:12px;">' + escapeHtml(entry.name) + '</span>' +
