@@ -7,10 +7,10 @@ Every task gets its own git worktree. The agent operates in an isolated copy of 
 ```mermaid
 graph LR
     subgraph Main["Main repo (~/projects/myapp)"]
-        MB["branch: main\nworking tree: clean"]
+        MB["branch: main<br/>working tree: clean"]
     end
     subgraph Worktree["Task worktree (~/.wallfacer/worktrees/uuid/myapp)"]
-        TB["branch: task/a1b2c3d4\nmounted into container"]
+        TB["branch: task/a1b2c3d4<br/>mounted into container"]
     end
     Main -.->|"git worktree add"| Worktree
 ```
@@ -23,8 +23,8 @@ For each configured workspace:
 
 ```mermaid
 flowchart TD
-    A["git rev-parse --git-dir\nverify path is a git repo"] --> B["git worktree add -b task/uuid8\n~/.wallfacer/worktrees/task-uuid/repo-basename"]
-    B --> C["Store worktree path + branch name\non the Task struct"]
+    A["git rev-parse --git-dir<br/>verify path is a git repo"] --> B["git worktree add -b task/uuid8<br/>~/.wallfacer/worktrees/task-uuid/repo-basename"]
+    B --> C["Store worktree path + branch name<br/>on the Task struct"]
 ```
 
 Branch naming uses the first 8 characters of the task UUID: `task/a1b2c3d4`.
@@ -69,10 +69,10 @@ in each worktree. This happens inside the sandbox with the same user identity as
 ```mermaid
 flowchart TD
     Rebase["git rebase default-branch"] --> Check{"Conflicts?"}
-    Check -->|no| Merge["git merge --ff-only task-branch\ninto default branch"]
-    Check -->|yes| Resolve["Invoke agent with conflict details\n(same session ID)"]
+    Check -->|no| Merge["git merge --ff-only task-branch<br/>into default branch"]
+    Check -->|yes| Resolve["Invoke agent with conflict details<br/>(same session ID)"]
     Resolve --> Continue["git rebase --continue"]
-    Continue --> Retry{"Still\nfailing?"}
+    Continue --> Retry{"Still<br/>failing?"}
     Retry -->|"no"| Merge
     Retry -->|"yes (< 3 attempts)"| Resolve
     Retry -->|"yes (exhausted)"| Failed["Task marked failed"]
@@ -125,16 +125,16 @@ Tasks in `waiting` or `failed` status can be synced with the latest default bran
 
 ```mermaid
 flowchart TD
-    Sync["POST /api/tasks/{id}/sync"] --> InProgress["Task status\nto in_progress (temporarily)"]
-    InProgress --> Fetch["For each worktree:\ngit fetch origin"]
+    Sync["POST /api/tasks/{id}/sync"] --> InProgress["Task status<br/>to in_progress (temporarily)"]
+    InProgress --> Fetch["For each worktree:<br/>git fetch origin"]
     Fetch --> Rebase["git rebase default-branch"]
-    Rebase --> Result{"Rebase\nsucceeded?"}
-    Result -->|yes| Restore["Restore previous status\n(waiting or failed)"]
-    Result -->|no| Resolve["Invoke agent\n(same session)\nto resolve conflicts"]
-    Resolve --> Retry{"Resolved\nwithin 3 attempts?"}
+    Rebase --> Result{"Rebase<br/>succeeded?"}
+    Result -->|yes| Restore["Restore previous status<br/>(waiting or failed)"]
+    Result -->|no| Resolve["Invoke agent<br/>(same session)<br/>to resolve conflicts"]
+    Resolve --> Retry{"Resolved<br/>within 3 attempts?"}
     Retry -->|yes| Restore
-    Retry -->|no| RunAgent["Invoke agent (Run)\nwith conflict prompt\ntask stays in_progress"]
-    RunAgent --> AgentResult["Agent resolves conflict\ntask to waiting or done"]
+    Retry -->|no| RunAgent["Invoke agent (Run)<br/>with conflict prompt<br/>task stays in_progress"]
+    RunAgent --> AgentResult["Agent resolves conflict<br/>task to waiting or done"]
 ```
 
 This is useful when other tasks have merged changes to the default branch and you want the current task to pick them up before continuing.
