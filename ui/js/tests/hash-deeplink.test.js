@@ -49,6 +49,13 @@ function makeEl(id = '') {
     querySelector: () => null,
     appendChild: () => {},
     addEventListener: () => {},
+    removeEventListener: () => {},
+    hasAttribute: () => false,
+    getAttribute: () => null,
+    removeAttribute: () => {},
+    focus: () => {},
+    remove: () => {},
+    tabIndex: -1,
   };
 }
 
@@ -363,6 +370,7 @@ function makeApiContext({ hash = '' } = {}) {
     Date,
     Promise,
     tasks: [task],
+    archivedTasks: [],
     _hashHandled: false,
     showArchived: false,
     tasksSource: null,
@@ -414,6 +422,10 @@ function makeApiContext({ hash = '' } = {}) {
     requestAnimationFrame: () => {},
   });
 
+  // Load the full module chain that api.js depends on.
+  loadScript('transport.js', ctx);
+  loadScript('task-stream.js', ctx);
+  loadScript('workspace.js', ctx);
   loadScript('api.js', ctx);
   return { ctx, openModalCalls, setRightTabCalls, setLeftTabCalls, task };
 }

@@ -124,6 +124,8 @@ function makeContext() {
       getItem(k)    { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; },
       setItem(k, v) { store[k] = String(v); },
     },
+    // Stub browser API used to read CSS custom properties for edge colours.
+    getComputedStyle: () => ({ getPropertyValue: () => '' }),
     console,
   });
 
