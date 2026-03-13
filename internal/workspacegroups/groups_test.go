@@ -1,29 +1,34 @@
 package workspacegroups
 
-import (
-	"path/filepath"
-	"reflect"
-	"testing"
-)
+import "testing"
 
-func TestUpsertAndLoad(t *testing.T) {
+func TestUpsertMovesExistingGroupToFront(t *testing.T) {
 	configDir := t.TempDir()
-	wsA := filepath.Join(configDir, "a")
-	wsB := filepath.Join(configDir, "b")
+	wsA := t.TempDir()
+	wsB := t.TempDir()
 
-	if err := Upsert(configDir, []string{wsB, wsA, wsA}); err != nil {
-		t.Fatalf("upsert: %v", err)
+	if err := Save(configDir, []Group{
+		{Workspaces: []string{wsA}},
+		{Workspaces: []string{wsB}},
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
 	}
-	if err := Upsert(configDir, []string{wsA, wsB}); err != nil {
-		t.Fatalf("upsert duplicate: %v", err)
+
+	if err := Upsert(configDir, []string{wsB}); err != nil {
+		t.Fatalf("Upsert: %v", err)
 	}
 
 	groups, err := Load(configDir)
 	if err != nil {
-		t.Fatalf("load: %v", err)
+		t.Fatalf("Load: %v", err)
 	}
-	want := []Group{{Workspaces: []string{wsA, wsB}}}
-	if !reflect.DeepEqual(groups, want) {
-		t.Fatalf("groups mismatch\nwant: %#v\ngot:  %#v", want, groups)
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 groups, got %d", len(groups))
+	}
+	if got := groups[0].Workspaces; len(got) != 1 || got[0] != wsB {
+		t.Fatalf("expected wsB group first, got %#v", got)
+	}
+	if got := groups[1].Workspaces; len(got) != 1 || got[0] != wsA {
+		t.Fatalf("expected wsA group second, got %#v", got)
 	}
 }

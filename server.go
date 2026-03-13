@@ -682,7 +682,7 @@ func ensureImage(containerCmd, image string) string {
 
 func resolveStartupWorkspaces(noWorkspaces bool, cliArgs []string, envFile string) []string {
 	if noWorkspaces {
-		return nil
+		return []string{}
 	}
 	if len(cliArgs) > 0 {
 		return mustResolveWorkspaces(cliArgs)

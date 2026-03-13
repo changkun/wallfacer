@@ -51,7 +51,7 @@ func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager,
 }
 
 func (m *Manager) startupWorkspaces(initial []string) []string {
-	if len(initial) > 0 {
+	if initial != nil {
 		return initial
 	}
 	groups, err := workspacegroups.Load(m.configDir)
