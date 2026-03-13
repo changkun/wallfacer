@@ -123,15 +123,16 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 
-	var next Snapshot
+	next := Snapshot{
+		Key:           instructions.Key(validated),
+		ScopedDataDir: filepath.Join(m.dataDir, instructions.Key(validated)),
+	}
+	s, err := store.NewStore(next.ScopedDataDir)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("open scoped store: %w", err)
+	}
+	next.Store = s
 	if len(validated) > 0 {
-		next.Key = instructions.Key(validated)
-		next.ScopedDataDir = filepath.Join(m.dataDir, next.Key)
-		s, err := store.NewStore(next.ScopedDataDir)
-		if err != nil {
-			return Snapshot{}, fmt.Errorf("open scoped store: %w", err)
-		}
-		next.Store = s
 		instructionsPath, err := instructions.Ensure(m.configDir, validated)
 		if err != nil {
 			return Snapshot{}, fmt.Errorf("ensure instructions: %w", err)
