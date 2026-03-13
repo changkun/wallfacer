@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -268,9 +269,48 @@ func (s *Store) loadEvents(id uuid.UUID, dirName string) error {
 		return err
 	}
 
-	maxSeq := 0
+	var events []TaskEvent
+	compactMaxID := int64(0)
+	compactPath := filepath.Join(tracesDir, "compact.ndjson")
+	if _, err := os.Stat(compactPath); err == nil {
+		f, err := os.Open(compactPath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		scanner := bufio.NewScanner(f)
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, 1024*1024)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" {
+				continue
+			}
+			var evt TaskEvent
+			if err := jsonUnmarshal([]byte(line), &evt); err != nil {
+				logger.Store.Warn("skipping compact trace line", "task", dirName, "trace", "compact.ndjson", "error", err)
+				continue
+			}
+			events = append(events, evt)
+			if evt.ID > compactMaxID {
+				compactMaxID = evt.ID
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
+	maxSeq := int(compactMaxID)
 	for _, te := range traceEntries {
-		if te.IsDir() || !strings.HasSuffix(te.Name(), ".json") {
+		if te.IsDir() {
+			continue
+		}
+		traceFile, ok := parseNumberedTraceFile(te.Name())
+		if !ok || int64(traceFile.seq) <= compactMaxID {
 			continue
 		}
 		raw, err := os.ReadFile(filepath.Join(tracesDir, te.Name()))
@@ -283,19 +323,18 @@ func (s *Store) loadEvents(id uuid.UUID, dirName string) error {
 			logger.Store.Warn("skipping trace", "task", dirName, "trace", te.Name(), "error", err)
 			continue
 		}
-		s.events[id] = append(s.events[id], evt)
-
-		base := strings.TrimSuffix(te.Name(), ".json")
-		if seq, err := strconv.Atoi(base); err == nil && seq > maxSeq {
-			maxSeq = seq
+		events = append(events, evt)
+		if traceFile.seq > maxSeq {
+			maxSeq = traceFile.seq
 		}
 	}
 
 	// Sort events by ID for consistent ordering.
-	sort.Slice(s.events[id], func(i, j int) bool {
-		return s.events[id][i].ID < s.events[id][j].ID
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].ID < events[j].ID
 	})
 
+	s.events[id] = events
 	s.nextSeq[id] = maxSeq + 1
 	return nil
 }

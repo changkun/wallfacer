@@ -35,6 +35,13 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	// Search index not updated: status is not a search-indexed field
 	// (title, prompt, tags, oversight).
 	s.notify(t, false)
+	if status == TaskStatusDone || status == TaskStatusFailed || status == TaskStatusCancelled {
+		go func(taskID uuid.UUID) {
+			if err := s.compactTaskEvents(taskID); err != nil {
+				logger.Store.Error("failed to compact task traces", "task", taskID, "error", err)
+			}
+		}(id)
+	}
 	return nil
 }
 
