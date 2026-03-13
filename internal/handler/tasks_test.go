@@ -2326,7 +2326,7 @@ func TestTryAutoSubmit_SubmitsEligibleTaskNoSession(t *testing.T) {
 	}
 }
 
-func TestTryAutoSubmit_CommitMessageFailureReturnsToWaiting(t *testing.T) {
+func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	h := newTestHandler(t)
 	h.SetAutopilot(true)
 	h.SetAutotest(true)
@@ -2352,20 +2352,20 @@ func TestTryAutoSubmit_CommitMessageFailureReturnsToWaiting(t *testing.T) {
 	var got *store.Task
 	for range 20 {
 		got, _ = h.store.GetTask(ctx, task.ID)
-		if got != nil && got.Status == store.TaskStatusWaiting {
+		if got != nil && got.Status == store.TaskStatusDone {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if got == nil || got.Status != store.TaskStatusWaiting {
-		t.Fatalf("expected task to return to waiting, got %v", got.Status)
+	if got == nil || got.Status != store.TaskStatusDone {
+		t.Fatalf("expected task to complete via fallback commit message, got %v", got.Status)
 	}
 
-	if got := gitRun(t, wt, "rev-list", "--count", "HEAD"); got != "1" {
-		t.Fatalf("expected no new commit in worktree after auto-submit failure, got %s commits", got)
+	if got := gitRun(t, repo, "rev-list", "--count", "HEAD"); got != "2" {
+		t.Fatalf("expected fallback commit to land on repo, got %s commits", got)
 	}
-	if h.AutopilotEnabled() || h.AutotestEnabled() || h.AutosubmitEnabled() {
-		t.Fatal("expected all automation toggles to be disabled after auto-submit failure")
+	if !h.AutopilotEnabled() || !h.AutotestEnabled() || !h.AutosubmitEnabled() {
+		t.Fatal("expected automation toggles to remain enabled after fallback commit message")
 	}
 }
 

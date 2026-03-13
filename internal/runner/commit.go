@@ -240,7 +240,11 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 	}
 	msg, err := r.generateCommitMessage(taskID, prompt, allStats.String(), allLogs.String())
 	if err != nil {
-		return false, fmt.Errorf("generate commit message: %w", err)
+		msg = localFallbackCommitMessage(prompt, allStats.String())
+		logger.Runner.Warn("commit message generation failed, using local fallback", "task", taskID, "error", err, "message", msg)
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+			"result": "Commit message generation failed; using fallback commit message.",
+		})
 	}
 
 	// Second pass: commit each worktree with the generated message.
@@ -275,6 +279,34 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 		return false, fmt.Errorf("commit failed: %s", strings.Join(errs, "; "))
 	}
 	return committed, nil
+}
+
+func localFallbackCommitMessage(prompt, diffStat string) string {
+	subject := strings.TrimSpace(prompt)
+	if idx := strings.Index(subject, "\n"); idx >= 0 {
+		subject = subject[:idx]
+	}
+	subject = strings.Join(strings.Fields(subject), " ")
+	subject = strings.Trim(subject, "`")
+	subject = strings.TrimSpace(subject)
+	if subject == "" {
+		subject = strings.TrimSpace(diffStat)
+		if idx := strings.Index(subject, "\n"); idx >= 0 {
+			subject = subject[:idx]
+		}
+		subject = strings.Join(strings.Fields(subject), " ")
+	}
+	if subject == "" {
+		subject = "update task changes"
+	}
+
+	const prefix = "wallfacer: "
+	const maxSubjectRunes = 72 - len(prefix)
+	runes := []rune(subject)
+	if len(runes) > maxSubjectRunes {
+		subject = strings.TrimSpace(string(runes[:maxSubjectRunes]))
+	}
+	return prefix + subject
 }
 
 // generateCommitMessage runs a lightweight container to produce a descriptive

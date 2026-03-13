@@ -228,7 +228,7 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 	}
 }
 
-func TestHostStageAndCommitStopsOnCommitMessageFailure(t *testing.T) {
+func TestHostStageAndCommitFallsBackOnCommitMessageFailure(t *testing.T) {
 	repo := setupTestRepo(t)
 	cmd := fakeCmdScript(t, "", 1) // always fails
 
@@ -262,18 +262,17 @@ func TestHostStageAndCommitStopsOnCommitMessageFailure(t *testing.T) {
 	}
 
 	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "Add new feature")
-	if err == nil {
-		t.Fatal("expected hostStageAndCommit to fail when commit message generation fails")
-	}
-	if !IsCommitMessageGenerationError(err) {
-		t.Fatalf("expected commit message generation error, got %v", err)
+	if err != nil {
+		t.Fatalf("expected fallback commit message to succeed, got %v", err)
 	}
 	if committed {
-		t.Fatal("expected committed=false when commit message generation fails")
+		subject := gitRun(t, wt, "log", "--format=%s", "-1")
+		if !strings.HasPrefix(subject, "wallfacer: ") {
+			t.Fatalf("expected fallback commit subject, got %q", subject)
+		}
+		return
 	}
-	if got := gitRun(t, wt, "rev-list", "--count", "HEAD"); got != "1" {
-		t.Fatalf("expected no new commit to be created, got %s commits", got)
-	}
+	t.Fatal("expected fallback path to create a commit")
 }
 
 // TestHostStageAndCommitErrorsWhenAllWorktreesMissing verifies that
