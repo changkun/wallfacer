@@ -415,6 +415,24 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 
 		if output.IsError {
+			// If the error is a stale session ("No conversation found"),
+			// drop the session and retry with the original prompt instead
+			// of failing permanently.
+			combinedErr := output.Result + " " + string(rawStdout)
+			if sessionID != "" && strings.Contains(combinedErr, "No conversation found") {
+				logger.Runner.Warn("session not found, retrying without session",
+					"task", taskID, "session", sessionID)
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+					"result": "Session expired or lost. Retrying with fresh session...",
+				})
+				sessionID = ""
+				if task.ExecutionPrompt != "" {
+					prompt = task.ExecutionPrompt
+				} else {
+					prompt = task.Prompt
+				}
+				continue
+			}
 			statusSet = true
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 			r.store.SetTaskFailureCategory(bgCtx, taskID, classifyFailure(nil, true, ""))
