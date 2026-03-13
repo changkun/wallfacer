@@ -158,8 +158,8 @@ function renderTagChips(containerId, tags) {
   if (!container) return;
   container._tags = Array.isArray(tags) ? tags : [];
   const chips = container._tags.map(function(tag, index) {
-    const background = typeof tagColor === 'function' ? tagColor(tag) : 'var(--tag-color-0)';
-    return `<span class="tag-chip tag-chip-edit" style="background:${background};">${escapeHtml(tag)}<button class="tag-chip-remove" data-idx="${index}" title="Remove tag" onclick="event.preventDefault();event.stopPropagation();_removeTagAt(this.closest('[id]'), ${index})">×</button></span>`;
+    const style = typeof tagStyle === 'function' ? tagStyle(tag) : 'background:var(--tag-bg-0);color:var(--tag-text-0);';
+    return `<span class="tag-chip tag-chip-edit" style="${style}">${escapeHtml(tag)}<button class="tag-chip-remove" data-idx="${index}" title="Remove tag" onclick="event.preventDefault();event.stopPropagation();_removeTagAt(this.closest('[id]'), ${index})">×</button></span>`;
   }).join('');
   container.innerHTML = `<div class="tag-chip-row tag-chip-input-row">${chips}<input class="tag-chip-input" type="text" placeholder="Add tag…" maxlength="32"></div>`;
   const input = container.querySelector('.tag-chip-input');
