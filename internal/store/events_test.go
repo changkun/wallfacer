@@ -2,15 +2,49 @@
 package store
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+func insertOutputEvents(t *testing.T, s *Store, taskID uuid.UUID, count int) {
+	t.Helper()
+	for i := 1; i <= count; i++ {
+		if err := s.InsertEvent(bg(), taskID, EventTypeOutput, map[string]int{"n": i}); err != nil {
+			t.Fatalf("InsertEvent[%d]: %v", i, err)
+		}
+	}
+}
+
+func readCompactEvents(t *testing.T, path string) ([]TaskEvent, []byte) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%s): %v", path, err)
+	}
+	lines := bytes.Split(raw, []byte{'\n'})
+	var events []TaskEvent
+	for _, line := range lines {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		var evt TaskEvent
+		if err := json.Unmarshal(line, &evt); err != nil {
+			t.Fatalf("unmarshal compact line: %v", err)
+		}
+		events = append(events, evt)
+	}
+	return events, raw
+}
 
 // makeSpanEvt constructs a TaskEvent for span testing without a real store.
 func makeSpanEvt(eventType EventType, phase, label string, ts time.Time) TaskEvent {
@@ -245,6 +279,152 @@ func TestConcurrentInsertEvent(t *testing.T) {
 	events, _ := s.GetEvents(bg(), task.ID)
 	if len(events) != n {
 		t.Errorf("expected %d events, got %d", n, len(events))
+	}
+}
+
+func TestCompactTaskEvents_Basic(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	insertOutputEvents(t, s, task.ID, 10)
+
+	if err := s.compactTaskEvents(task.ID); err != nil {
+		t.Fatalf("compactTaskEvents: %v", err)
+	}
+
+	tracesDir := filepath.Join(s.dir, task.ID.String(), "traces")
+	compactPath := filepath.Join(tracesDir, "compact.ndjson")
+	events, _ := readCompactEvents(t, compactPath)
+	if len(events) != 10 {
+		t.Fatalf("expected 10 compacted events, got %d", len(events))
+	}
+	for i, evt := range events {
+		if evt.ID != int64(i+1) {
+			t.Fatalf("events[%d].ID = %d, want %d", i, evt.ID, i+1)
+		}
+	}
+
+	entries, err := os.ReadDir(tracesDir)
+	if err != nil {
+		t.Fatalf("ReadDir(traces): %v", err)
+	}
+	for _, entry := range entries {
+		if entry.Name() == "compact.ndjson" {
+			continue
+		}
+		if _, ok := parseNumberedTraceFile(entry.Name()); ok {
+			t.Fatalf("numbered trace file still exists after compaction: %s", entry.Name())
+		}
+	}
+}
+
+func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	insertOutputEvents(t, s, task.ID, 10)
+	if err := s.compactTaskEvents(task.ID); err != nil {
+		t.Fatalf("compactTaskEvents: %v", err)
+	}
+
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore reload: %v", err)
+	}
+	events, err := s2.GetEvents(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(events) != 10 {
+		t.Fatalf("expected 10 events, got %d", len(events))
+	}
+	for i, evt := range events {
+		if evt.ID != int64(i+1) {
+			t.Fatalf("events[%d].ID = %d, want %d", i, evt.ID, i+1)
+		}
+	}
+	if got := s2.nextSeq[task.ID]; got != 11 {
+		t.Fatalf("nextSeq = %d, want 11", got)
+	}
+}
+
+func TestCompactTaskEvents_HybridLoad(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	insertOutputEvents(t, s, task.ID, 8)
+	if err := s.compactTaskEvents(task.ID); err != nil {
+		t.Fatalf("compactTaskEvents: %v", err)
+	}
+
+	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
+	for i := 9; i <= 10; i++ {
+		event := TaskEvent{
+			ID:        int64(i),
+			TaskID:    task.ID,
+			EventType: EventTypeOutput,
+			Data:      json.RawMessage([]byte(`{"n":` + strconv.Itoa(i) + `}`)),
+			CreatedAt: time.Now(),
+		}
+		if err := atomicWriteJSON(filepath.Join(tracesDir, fmt.Sprintf("%04d.json", i)), event); err != nil {
+			t.Fatalf("atomicWriteJSON(%d): %v", i, err)
+		}
+	}
+
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore reload: %v", err)
+	}
+	events, err := s2.GetEvents(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(events) != 10 {
+		t.Fatalf("expected 10 events, got %d", len(events))
+	}
+	for i, evt := range events {
+		if evt.ID != int64(i+1) {
+			t.Fatalf("events[%d].ID = %d, want %d", i, evt.ID, i+1)
+		}
+	}
+	if got := s2.nextSeq[task.ID]; got != 11 {
+		t.Fatalf("nextSeq = %d, want 11", got)
+	}
+}
+
+func TestCompactTaskEvents_Idempotent(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	insertOutputEvents(t, s, task.ID, 10)
+
+	if err := s.compactTaskEvents(task.ID); err != nil {
+		t.Fatalf("first compactTaskEvents: %v", err)
+	}
+	tracesDir := filepath.Join(s.dir, task.ID.String(), "traces")
+	compactPath := filepath.Join(tracesDir, "compact.ndjson")
+	_, before := readCompactEvents(t, compactPath)
+
+	if err := s.compactTaskEvents(task.ID); err != nil {
+		t.Fatalf("second compactTaskEvents: %v", err)
+	}
+	_, after := readCompactEvents(t, compactPath)
+	if !bytes.Equal(before, after) {
+		t.Fatal("compact.ndjson changed after idempotent compaction run")
+	}
+
+	entries, err := os.ReadDir(tracesDir)
+	if err != nil {
+		t.Fatalf("ReadDir(traces): %v", err)
+	}
+	for _, entry := range entries {
+		if _, ok := parseNumberedTraceFile(entry.Name()); ok {
+			t.Fatalf("numbered trace file reappeared after second compaction: %s", entry.Name())
+		}
 	}
 }
 

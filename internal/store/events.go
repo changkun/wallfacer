@@ -7,8 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
+	"changkun.de/wallfacer/internal/logger"
 	"github.com/google/uuid"
 )
 
@@ -196,4 +199,95 @@ func (s *Store) saveEvent(taskID uuid.UUID, seq int, event TaskEvent) error {
 	}
 	path := filepath.Join(tracesDir, fmt.Sprintf("%04d.json", seq))
 	return atomicWriteJSON(path, event)
+}
+
+type numberedTraceFile struct {
+	name string
+	seq  int
+}
+
+func parseNumberedTraceFile(name string) (numberedTraceFile, bool) {
+	if !strings.HasSuffix(name, ".json") {
+		return numberedTraceFile{}, false
+	}
+	base := strings.TrimSuffix(name, ".json")
+	if base == "" {
+		return numberedTraceFile{}, false
+	}
+	seq, err := strconv.Atoi(base)
+	if err != nil {
+		return numberedTraceFile{}, false
+	}
+	return numberedTraceFile{name: name, seq: seq}, true
+}
+
+func (s *Store) compactTaskEvents(taskID uuid.UUID) error {
+	tracesDir := filepath.Join(s.dir, taskID.String(), "traces")
+	entries, err := os.ReadDir(tracesDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	var traceFiles []numberedTraceFile
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		traceFile, ok := parseNumberedTraceFile(entry.Name())
+		if !ok {
+			continue
+		}
+		traceFiles = append(traceFiles, traceFile)
+	}
+	if len(traceFiles) == 0 {
+		return nil
+	}
+
+	sort.Slice(traceFiles, func(i, j int) bool {
+		return traceFiles[i].seq < traceFiles[j].seq
+	})
+
+	var compact []byte
+	for _, traceFile := range traceFiles {
+		path := filepath.Join(tracesDir, traceFile.name)
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			logger.Store.Warn("compact: skipping unreadable trace", "task", taskID, "trace", traceFile.name, "error", err)
+			continue
+		}
+
+		var evt TaskEvent
+		if err := json.Unmarshal(raw, &evt); err != nil {
+			logger.Store.Warn("compact: skipping corrupt trace", "task", taskID, "trace", traceFile.name, "error", err)
+			continue
+		}
+
+		line, err := json.Marshal(evt)
+		if err != nil {
+			logger.Store.Warn("compact: skipping unmarshalable trace", "task", taskID, "trace", traceFile.name, "error", err)
+			continue
+		}
+		compact = append(compact, line...)
+		compact = append(compact, '\n')
+	}
+
+	tmpPath := filepath.Join(tracesDir, "compact.ndjson.tmp")
+	compactPath := filepath.Join(tracesDir, "compact.ndjson")
+	if err := os.WriteFile(tmpPath, compact, 0644); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, compactPath); err != nil {
+		return err
+	}
+
+	for _, traceFile := range traceFiles {
+		if err := os.Remove(filepath.Join(tracesDir, traceFile.name)); err != nil && !os.IsNotExist(err) {
+			logger.Store.Warn("compact: failed to remove trace", "task", taskID, "trace", traceFile.name, "error", err)
+		}
+	}
+
+	return nil
 }
