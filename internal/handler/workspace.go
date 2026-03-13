@@ -20,6 +20,7 @@ type workspaceBrowseEntry struct {
 
 func (h *Handler) BrowseWorkspaces(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimSpace(r.URL.Query().Get("path"))
+	includeHidden := r.URL.Query().Get("include_hidden") == "true"
 	if path == "" {
 		home, _ := os.UserHomeDir()
 		path = home
@@ -41,6 +42,9 @@ func (h *Handler) BrowseWorkspaces(w http.ResponseWriter, r *http.Request) {
 	resp := make([]workspaceBrowseEntry, 0, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() {
+			continue
+		}
+		if !includeHidden && strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 		child := filepath.Join(path, entry.Name())

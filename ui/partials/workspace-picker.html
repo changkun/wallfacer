@@ -15,6 +15,10 @@
           <button type="button" class="btn-icon" onclick="browseWorkspaces()">Load</button>
           <button type="button" class="btn-ghost" onclick="addCurrentWorkspaceFolder()">Add Current Folder</button>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:11px;color:var(--text-muted);cursor:pointer;">
+          <input id="workspace-browser-include-hidden" type="checkbox" onchange="toggleWorkspaceBrowserHidden()" style="cursor:pointer;accent-color:var(--accent);">
+          Show hidden folders
+        </label>
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.4;">Enter an absolute path, then click <strong>Load</strong>. This browser lists folders inline below; double-click a folder to enter it, then use <strong>Apply</strong> to switch boards.</div>
         <div id="workspace-browser-breadcrumb" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;min-height:1em;"></div>
         <div id="workspace-browser-status" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;min-height:1em;"></div>

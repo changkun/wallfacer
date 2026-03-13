@@ -669,6 +669,11 @@ function renderWorkspaceBrowser() {
   }).join('');
 }
 
+function workspaceBrowserIncludeHidden() {
+  var toggle = document.getElementById('workspace-browser-include-hidden');
+  return !!(toggle && toggle.checked);
+}
+
 async function browseWorkspaces(path) {
   var pathInput = document.getElementById('workspace-browser-path');
   var status = document.getElementById('workspace-browser-status');
@@ -676,8 +681,15 @@ async function browseWorkspaces(path) {
   try {
     if (status) status.textContent = 'Loading...';
     var url = workspaceBrowseRoute();
+    var query = [];
     if (nextPath) {
-      url += '?path=' + encodeURIComponent(nextPath);
+      query.push('path=' + encodeURIComponent(nextPath));
+    }
+    if (workspaceBrowserIncludeHidden()) {
+      query.push('include_hidden=true');
+    }
+    if (query.length > 0) {
+      url += '?' + query.join('&');
     }
     var resp = await api(url);
     workspaceBrowserPath = resp.path || nextPath || '';
@@ -692,6 +704,10 @@ async function browseWorkspaces(path) {
     workspaceBrowserFocusIndex = -1;
     renderWorkspaceBrowser();
   }
+}
+
+function toggleWorkspaceBrowserHidden() {
+  browseWorkspaces(workspaceBrowserPath || '');
 }
 
 function workspaceBrowserPathKeydown(event) {

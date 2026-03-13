@@ -122,6 +122,69 @@ func TestGetConfig_ExposesIdeationCategories(t *testing.T) {
 	}
 }
 
+func TestBrowseWorkspaces_HiddenFoldersExcludedByDefault(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	hidden := filepath.Join(ws, ".hidden-repo")
+	visible := filepath.Join(ws, "visible-repo")
+	if err := os.MkdirAll(hidden, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(visible, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/workspaces/browse?path="+ws, nil)
+	w := httptest.NewRecorder()
+	h.BrowseWorkspaces(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Entries []workspaceBrowseEntry `json:"entries"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, entry := range resp.Entries {
+		if entry.Name == ".hidden-repo" {
+			t.Fatal("expected hidden folder to be excluded by default")
+		}
+	}
+}
+
+func TestBrowseWorkspaces_HiddenFoldersIncludedWhenRequested(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	hidden := filepath.Join(ws, ".hidden-repo")
+	if err := os.MkdirAll(hidden, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/workspaces/browse?path="+ws+"&include_hidden=true", nil)
+	w := httptest.NewRecorder()
+	h.BrowseWorkspaces(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Entries []workspaceBrowseEntry `json:"entries"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	found := false
+	for _, entry := range resp.Entries {
+		if entry.Name == ".hidden-repo" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected hidden folder to be included when include_hidden=true")
+	}
+}
+
 func TestGetConfig_AlwaysIncludesCodexSandbox(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 
