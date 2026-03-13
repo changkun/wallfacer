@@ -367,6 +367,155 @@ func TestGenerateBoardContext_ArchivedTaskExcluded(t *testing.T) {
 	}
 }
 
+// TestStreamBoardJSON verifies that streamBoardJSON produces board.json output
+// whose task count, IsSelf flags, and truncation lengths match both the legacy
+// JSON path and GenerateBoardManifest for the same store state.
+func TestStreamBoardJSON(t *testing.T) {
+	s, r := setupRunnerWithCmd(t, nil, "echo")
+	ctx := bg()
+
+	longPrompt := strings.Repeat("A", 2000) // exceeds 500-char sibling cap
+	longResult := strings.Repeat("B", 3000) // exceeds 1000-char sibling cap
+
+	var selfID [16]byte
+	var selfIDStr string
+	for i := 0; i < 5; i++ {
+		task, err := s.CreateTask(ctx, longPrompt, 5, false, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 2 {
+			selfID = task.ID
+			selfIDStr = task.ID.String()
+		}
+		s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+		s.UpdateTaskResult(ctx, task.ID, longResult, "sess", "end_turn", 3)
+	}
+
+	dir, written, err := streamBoardJSON(ctx, s, selfID, false)
+	if err != nil {
+		t.Fatalf("streamBoardJSON: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	if written == 0 {
+		t.Error("written bytes should be > 0")
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "board.json"))
+	if err != nil {
+		t.Fatalf("read board.json: %v", err)
+	}
+	if int64(len(data)) != written {
+		t.Errorf("written counter %d != file size %d", written, len(data))
+	}
+
+	var manifest BoardManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("invalid JSON from streamBoardJSON: %v", err)
+	}
+
+	refData, err := r.generateBoardContext(ctx, selfID, false)
+	if err != nil {
+		t.Fatalf("generateBoardContext: %v", err)
+	}
+	var refJSON BoardManifest
+	if err := json.Unmarshal(refData, &refJSON); err != nil {
+		t.Fatalf("invalid JSON from generateBoardContext: %v", err)
+	}
+
+	// Task count.
+	if len(manifest.Tasks) != 5 {
+		t.Errorf("expected 5 tasks, got %d", len(manifest.Tasks))
+	}
+	if len(manifest.Tasks) != len(refJSON.Tasks) {
+		t.Errorf("task count mismatch: stream=%d legacy=%d", len(manifest.Tasks), len(refJSON.Tasks))
+	}
+
+	// IsSelf flag and truncation lengths.
+	for _, bt := range manifest.Tasks {
+		if bt.ID == selfIDStr {
+			if !bt.IsSelf {
+				t.Error("self task should have is_self=true")
+			}
+			if bt.Prompt != longPrompt {
+				t.Errorf("self task prompt truncated: len=%d, want %d", len(bt.Prompt), len(longPrompt))
+			}
+			if bt.Result == nil || *bt.Result != longResult {
+				t.Error("self task result should not be truncated")
+			}
+		} else {
+			if bt.IsSelf {
+				t.Errorf("task %s should not be is_self", bt.ShortID)
+			}
+			if len(bt.Prompt) > 503 { // 500 chars + "..."
+				t.Errorf("sibling prompt too long: len=%d", len(bt.Prompt))
+			}
+			if bt.Result != nil && len(*bt.Result) > 1003 { // 1000 chars + "..."
+				t.Errorf("sibling result too long: len=%d", len(*bt.Result))
+			}
+		}
+	}
+
+	// Compare task-level fields against GenerateBoardManifest for the same state.
+	waitBoardSeqStable(r)
+	refManifest, err := r.GenerateBoardManifest(ctx, selfID, false)
+	if err != nil {
+		t.Fatalf("GenerateBoardManifest: %v", err)
+	}
+	if len(refManifest.Tasks) != len(manifest.Tasks) {
+		t.Errorf("task count mismatch: stream=%d ref=%d", len(manifest.Tasks), len(refManifest.Tasks))
+	}
+
+	streamByID := make(map[string]BoardTask, len(manifest.Tasks))
+	for _, bt := range manifest.Tasks {
+		streamByID[bt.ID] = bt
+	}
+	refJSONByID := make(map[string]BoardTask, len(refJSON.Tasks))
+	for _, bt := range refJSON.Tasks {
+		refJSONByID[bt.ID] = bt
+	}
+	refByID := make(map[string]BoardTask, len(refManifest.Tasks))
+	for _, bt := range refManifest.Tasks {
+		refByID[bt.ID] = bt
+	}
+
+	for id, streamTask := range streamByID {
+		refJSONTask, ok := refJSONByID[id]
+		if !ok {
+			t.Errorf("task %s present in streamBoardJSON but missing from generateBoardContext", id)
+			continue
+		}
+		refTask, ok := refByID[id]
+		if !ok {
+			t.Errorf("task %s present in streamBoardJSON but missing from GenerateBoardManifest", id)
+			continue
+		}
+		if streamTask.IsSelf != refJSONTask.IsSelf {
+			t.Errorf("task %s IsSelf: stream=%v legacy=%v", id, streamTask.IsSelf, refJSONTask.IsSelf)
+		}
+		if len(streamTask.Prompt) != len(refJSONTask.Prompt) {
+			t.Errorf("task %s prompt length: stream=%d legacy=%d", id, len(streamTask.Prompt), len(refJSONTask.Prompt))
+		}
+		if (streamTask.Result == nil) != (refJSONTask.Result == nil) {
+			t.Errorf("task %s result nil mismatch: stream=%v legacy=%v", id, streamTask.Result == nil, refJSONTask.Result == nil)
+		} else if streamTask.Result != nil && len(*streamTask.Result) != len(*refJSONTask.Result) {
+			t.Errorf("task %s result length: stream=%d legacy=%d", id, len(*streamTask.Result), len(*refJSONTask.Result))
+		}
+		if streamTask.IsSelf != refTask.IsSelf {
+			t.Errorf("task %s IsSelf: stream=%v ref=%v", id, streamTask.IsSelf, refTask.IsSelf)
+		}
+		if len(streamTask.Prompt) != len(refTask.Prompt) {
+			t.Errorf("task %s prompt length: stream=%d ref=%d", id, len(streamTask.Prompt), len(refTask.Prompt))
+		}
+		if (streamTask.Result == nil) != (refTask.Result == nil) {
+			t.Errorf("task %s result nil mismatch: stream=%v ref=%v", id, streamTask.Result == nil, refTask.Result == nil)
+		} else if streamTask.Result != nil && len(*streamTask.Result) != len(*refTask.Result) {
+			t.Errorf("task %s result length: stream=%d ref=%d", id, len(*streamTask.Result), len(*refTask.Result))
+		}
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsString(s, substr))
 }
@@ -526,8 +675,8 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 	ctx := bg()
 
 	// Build prompts and results that far exceed the per-field caps.
-	longPrompt := repeat("A", 2000)  // 2000 chars, cap is 500
-	longResult := repeat("B", 3000)  // 3000 chars, cap is 1000
+	longPrompt := repeat("A", 2000) // 2000 chars, cap is 500
+	longResult := repeat("B", 3000) // 3000 chars, cap is 1000
 
 	// Create several sibling tasks with long text so the manifest would be huge
 	// without truncation.
