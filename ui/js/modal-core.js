@@ -133,6 +133,17 @@ async function openModal(id) {
   document.getElementById('modal-time').textContent = new Date(task.created_at).toLocaleString();
   document.getElementById('modal-id').textContent = `ID: ${task.id}`;
 
+  const titleEl = document.getElementById('modal-title');
+  if (titleEl) {
+    if (task.title) {
+      titleEl.textContent = task.title;
+      titleEl.classList.remove('hidden');
+    } else {
+      titleEl.textContent = '';
+      titleEl.classList.add('hidden');
+    }
+  }
+
   // Remove any previously injected fork-info element to avoid duplicates.
   document.getElementById('modal-fork-info')?.remove();
   if (task.forked_from) {
