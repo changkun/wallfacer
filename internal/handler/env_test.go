@@ -156,7 +156,14 @@ func TestTestWebhook_DownstreamFailure(t *testing.T) {
 // real env file so that UpdateEnvConfig can write to it.
 func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 	t.Helper()
-	s, err := store.NewStore(t.TempDir())
+	// Use os.MkdirTemp instead of t.TempDir for the store directory so that
+	// late trace-file writes from background goroutines (which race with
+	// shutdown) don't cause TempDir cleanup failures.
+	storeDir, err := os.MkdirTemp("", "wallfacer-handler-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.NewStore(storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +173,12 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath})
+	// Cleanups run in LIFO order. Register WaitBackground first (runs second);
+	// register Shutdown second (runs first) so background goroutines are
+	// cancelled before WaitBackground drains remaining work.
 	t.Cleanup(r.WaitBackground)
+	t.Cleanup(r.Shutdown)
+	t.Cleanup(func() { os.RemoveAll(storeDir) })
 	h := NewHandler(s, r, t.TempDir(), nil, nil)
 	return h, envPath
 }
@@ -187,6 +199,7 @@ func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) 
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath, CodexAuthPath: codexAuthDir})
 	t.Cleanup(r.WaitBackground)
+	t.Cleanup(r.Shutdown)
 	h := NewHandler(s, r, t.TempDir(), nil, nil)
 	return h, envPath, codexAuthDir
 }
