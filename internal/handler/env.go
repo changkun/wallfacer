@@ -114,6 +114,7 @@ type envConfigResponse struct {
 	ContainerNetwork     string            `json:"container_network"`
 	ContainerCPUs        string            `json:"container_cpus"`
 	ContainerMemory      string            `json:"container_memory"`
+	WebhookURL           string            `json:"webhook_url"` // "configured" when set, "" otherwise
 }
 
 type sandboxTestResponse struct {
@@ -165,6 +166,10 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 	if archivedTasksPerPage <= 0 {
 		archivedTasksPerPage = defaultArchivedTasksPerPage
 	}
+	webhookURL := ""
+	if cfg.WebhookURL != "" {
+		webhookURL = "configured"
+	}
 	writeJSON(w, http.StatusOK, envConfigResponse{
 		OAuthToken:           envconfig.MaskToken(cfg.OAuthToken),
 		APIKey:               envconfig.MaskToken(cfg.APIKey),
@@ -186,6 +191,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerNetwork:     cfg.ContainerNetwork,
 		ContainerCPUs:        cfg.ContainerCPUs,
 		ContainerMemory:      cfg.ContainerMemory,
+		WebhookURL:           webhookURL,
 	})
 }
 
@@ -365,6 +371,8 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 		nil,
 		nil,
 		nil,
+		nil,
+		nil,
 	); err != nil {
 		return "", err
 	}
@@ -456,12 +464,14 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerNetwork     *string           `json:"container_network"`
 		ContainerCPUs        *string           `json:"container_cpus"`
 		ContainerMemory      *string           `json:"container_memory"`
+		WebhookURL           *string           `json:"webhook_url"`
+		WebhookSecret        *string           `json:"webhook_secret"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 
-	// Guard: treat empty-string tokens as "no change" to avoid accidental clears.
+	// Guard: treat empty-string tokens and secrets as "no change" to avoid accidental clears.
 	if req.OAuthToken != nil && *req.OAuthToken == "" {
 		req.OAuthToken = nil
 	}
@@ -470,6 +480,9 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.OpenAIAPIKey != nil && *req.OpenAIAPIKey == "" {
 		req.OpenAIAPIKey = nil
+	}
+	if req.WebhookSecret != nil && *req.WebhookSecret == "" {
+		req.WebhookSecret = nil
 	}
 
 	// Convert max_parallel_tasks int to string for the env file.
@@ -577,6 +590,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		req.ContainerNetwork,
 		req.ContainerCPUs,
 		req.ContainerMemory,
+		req.WebhookURL,
+		req.WebhookSecret,
 	); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return

@@ -42,6 +42,9 @@ type Config struct {
 	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
 	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
+
+	WebhookURL    string // WALLFACER_WEBHOOK_URL
+	WebhookSecret string // WALLFACER_WEBHOOK_SECRET
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -72,6 +75,8 @@ var knownKeys = []string{
 	"WALLFACER_CONTAINER_NETWORK",
 	"WALLFACER_CONTAINER_CPUS",
 	"WALLFACER_CONTAINER_MEMORY",
+	"WALLFACER_WEBHOOK_URL",
+	"WALLFACER_WEBHOOK_SECRET",
 }
 
 // Parse reads the env file at path and returns the known configuration values.
@@ -152,6 +157,10 @@ func Parse(path string) (Config, error) {
 			cfg.ContainerCPUs = v
 		case "WALLFACER_CONTAINER_MEMORY":
 			cfg.ContainerMemory = v
+		case "WALLFACER_WEBHOOK_URL":
+			cfg.WebhookURL = v
+		case "WALLFACER_WEBHOOK_SECRET":
+			cfg.WebhookSecret = v
 		}
 	}
 	return cfg, nil
@@ -276,7 +285,9 @@ func Update(
 	autoPushThreshold,
 	containerNetwork,
 	containerCPUs,
-	containerMemory *string,
+	containerMemory,
+	webhookURL,
+	webhookSecret *string,
 ) error {
 	updates := map[string]*string{
 		"CLAUDE_CODE_OAUTH_TOKEN":           oauthToken,
@@ -297,6 +308,8 @@ func Update(
 		"WALLFACER_CONTAINER_NETWORK":       containerNetwork,
 		"WALLFACER_CONTAINER_CPUS":          containerCPUs,
 		"WALLFACER_CONTAINER_MEMORY":        containerMemory,
+		"WALLFACER_WEBHOOK_URL":             webhookURL,
+		"WALLFACER_WEBHOOK_SECRET":          webhookSecret,
 	}
 	return updateFile(path, updates)
 }

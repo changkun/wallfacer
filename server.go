@@ -187,6 +187,12 @@ func runServer(configDir string, args []string) {
 	// verified (pass), not behind the default branch, and conflict-free.
 	h.StartAutoSubmitter(ctx)
 
+	// Start the webhook notifier if a URL is configured in the env file.
+	if wCfg, err := envconfig.Parse(*envFile); err == nil && wCfg.WebhookURL != "" {
+		wn := runner.NewWebhookNotifier(s, wCfg)
+		go wn.Start(ctx)
+	}
+
 	// Build the Prometheus metrics registry and register scrape-time gauge
 	// collectors. HTTP counter and histogram are created inside loggingMiddleware
 	// so they are available via the same registry for /metrics.
