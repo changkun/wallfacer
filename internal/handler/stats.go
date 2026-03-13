@@ -11,16 +11,16 @@ import (
 
 // StatsResponse is the JSON body returned by GET /api/stats.
 type StatsResponse struct {
-	TotalCostUSD      float64              `json:"total_cost_usd"`
-	TotalInputTokens  int                  `json:"total_input_tokens"`
-	TotalOutputTokens int                  `json:"total_output_tokens"`
-	TotalCacheTokens  int                  `json:"total_cache_tokens"`
-	ByStatus          map[string]UsageStat `json:"by_status"`
-	ByActivity        map[string]UsageStat `json:"by_activity"`
-	ByWorkspace       map[string]UsageStat `json:"by_workspace"`
-	ByFailureCategory map[string]UsageStat `json:"by_failure_category"`
-	TopTasks          []TaskCostEntry      `json:"top_tasks"`
-	DailyUsage        []DayStat            `json:"daily_usage"`
+	TotalCostUSD      float64                             `json:"total_cost_usd"`
+	TotalInputTokens  int                                 `json:"total_input_tokens"`
+	TotalOutputTokens int                                 `json:"total_output_tokens"`
+	TotalCacheTokens  int                                 `json:"total_cache_tokens"`
+	ByStatus          map[store.TaskStatus]UsageStat      `json:"by_status"`
+	ByActivity        map[string]UsageStat                `json:"by_activity"`
+	ByWorkspace       map[string]UsageStat                `json:"by_workspace"`
+	ByFailureCategory map[store.FailureCategory]UsageStat `json:"by_failure_category"`
+	TopTasks          []TaskCostEntry                     `json:"top_tasks"`
+	DailyUsage        []DayStat                           `json:"daily_usage"`
 }
 
 // UsageStat holds aggregated token/cost data for a single bucket.
@@ -35,10 +35,10 @@ type UsageStat struct {
 
 // TaskCostEntry holds abbreviated task information for the top-cost list.
 type TaskCostEntry struct {
-	ID      string  `json:"id"`
-	Title   string  `json:"title"`
-	Status  string  `json:"status"`
-	CostUSD float64 `json:"cost_usd"`
+	ID      string           `json:"id"`
+	Title   string           `json:"title"`
+	Status  store.TaskStatus `json:"status"`
+	CostUSD float64          `json:"cost_usd"`
 }
 
 // DayStat holds usage totals for a single calendar day.
@@ -59,10 +59,10 @@ type DayStat struct {
 // always use the live Task struct (backward-compatible fallback, used in tests).
 func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.TaskSummary, error)) StatsResponse {
 	resp := StatsResponse{
-		ByStatus:          make(map[string]UsageStat),
+		ByStatus:          make(map[store.TaskStatus]UsageStat),
 		ByActivity:        make(map[string]UsageStat),
 		ByWorkspace:       make(map[string]UsageStat),
-		ByFailureCategory: make(map[string]UsageStat),
+		ByFailureCategory: make(map[store.FailureCategory]UsageStat),
 	}
 
 	dailyMap := make(map[string]*DayStat)
@@ -86,12 +86,11 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 		resp.TotalCacheTokens += u.CacheReadInputTokens + u.CacheCreationTokens
 
 		// ByStatus bucket.
-		statusKey := string(t.Status)
-		s := resp.ByStatus[statusKey]
+		s := resp.ByStatus[t.Status]
 		s.CostUSD += u.CostUSD
 		s.InputTokens += u.InputTokens
 		s.OutputTokens += u.OutputTokens
-		resp.ByStatus[statusKey] = s
+		resp.ByStatus[t.Status] = s
 
 		// ByActivity buckets from per-task breakdown.
 		for activity, au := range breakdown {
@@ -119,10 +118,10 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 		// by their current FailureCategory. For done/cancelled tasks whose FailureCategory
 		// is now empty (cleared on retry), use the RetryHistory to backfill the last
 		// known category.
-		effectiveCat := string(t.FailureCategory)
+		effectiveCat := t.FailureCategory
 		if effectiveCat == "" && len(t.RetryHistory) > 0 {
 			last := t.RetryHistory[len(t.RetryHistory)-1]
-			effectiveCat = string(last.FailureCategory)
+			effectiveCat = last.FailureCategory
 		}
 		if effectiveCat != "" {
 			fc := resp.ByFailureCategory[effectiveCat]
@@ -164,7 +163,7 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 		resp.TopTasks[i] = TaskCostEntry{
 			ID:      t.ID.String(),
 			Title:   title,
-			Status:  string(t.Status),
+			Status:  t.Status,
 			CostUSD: t.Usage.CostUSD,
 		}
 	}

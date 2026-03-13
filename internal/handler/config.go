@@ -46,11 +46,11 @@ func ssrfHardenedTransport() *http.Transport {
 		},
 	}
 }
-func availableSandboxes(cfg envconfig.Config) []string {
-	sandboxSet := map[string]bool{}
-	var sandboxes []string
-	add := func(name string) {
-		name = strings.TrimSpace(name)
+func availableSandboxes(cfg envconfig.Config) []sandbox.Type {
+	sandboxSet := map[sandbox.Type]bool{}
+	var sandboxes []sandbox.Type
+	add := func(name sandbox.Type) {
+		name = sandbox.Normalize(strings.TrimSpace(string(name)))
 		if name == "" || sandboxSet[name] {
 			return
 		}
@@ -59,29 +59,29 @@ func availableSandboxes(cfg envconfig.Config) []string {
 	}
 	// Always expose both built-in sandboxes in the UI so users can select
 	// either provider even before model/env values are configured.
-	add(string(sandbox.Claude))
-	add(string(sandbox.Codex))
+	add(sandbox.Claude)
+	add(sandbox.Codex)
 
 	if cfg.DefaultSandbox != "" {
-		add(string(cfg.DefaultSandbox))
+		add(cfg.DefaultSandbox)
 	}
 	for _, v := range cfg.SandboxByActivity() {
-		add(string(v))
+		add(v)
 	}
 	return sandboxes
 }
 
-func defaultSandbox(cfg envconfig.Config) string {
+func defaultSandbox(cfg envconfig.Config) sandbox.Type {
 	if cfg.DefaultSandbox != "" {
-		return string(cfg.DefaultSandbox)
+		return cfg.DefaultSandbox
 	}
 	if cfg.DefaultModel != "" {
-		return string(sandbox.Claude)
+		return sandbox.Claude
 	}
 	if cfg.CodexDefaultModel != "" {
-		return string(sandbox.Codex)
+		return sandbox.Codex
 	}
-	return string(sandbox.Claude)
+	return sandbox.Claude
 }
 
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
@@ -109,9 +109,9 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"instructions_path":      instructionsPath,
 		"prompts_dir":            promptsDir,
 		"sandbox_activities":     store.SandboxActivities,
-		"sandboxes":              []string{string(sandbox.Claude), string(sandbox.Codex)},
-		"default_sandbox":        string(sandbox.Claude),
-		"sandbox_usable":         map[string]bool{string(sandbox.Claude): true, string(sandbox.Codex): true},
+		"sandboxes":              []sandbox.Type{sandbox.Claude, sandbox.Codex},
+		"default_sandbox":        sandbox.Claude,
+		"sandbox_usable":         map[sandbox.Type]bool{sandbox.Claude: true, sandbox.Codex: true},
 		"sandbox_reasons":        map[string]string{},
 		"activity_sandboxes":     map[string]string{},
 		"autopilot":              h.AutopilotEnabled(),
@@ -132,16 +132,16 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 
 	sandboxes := availableSandboxes(*cfg)
-	sandboxUsable := map[string]bool{
-		string(sandbox.Claude): true,
-		string(sandbox.Codex):  true,
+	sandboxUsable := map[sandbox.Type]bool{
+		sandbox.Claude: true,
+		sandbox.Codex:  true,
 	}
 	sandboxReasons := map[string]string{}
 	for _, sbox := range sandboxes {
-		ok, reason := h.sandboxUsable(sandbox.Normalize(sbox))
+		ok, reason := h.sandboxUsable(sbox)
 		sandboxUsable[sbox] = ok
 		if reason != "" {
-			sandboxReasons[sbox] = reason
+			sandboxReasons[string(sbox)] = reason
 		}
 	}
 

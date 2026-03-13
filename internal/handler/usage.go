@@ -10,11 +10,11 @@ import (
 
 // usageResponse is the JSON body returned by GET /api/usage.
 type usageResponse struct {
-	Total      store.TaskUsage            `json:"total"`
-	ByStatus   map[string]store.TaskUsage `json:"by_status"`
-	BySubAgent map[string]store.TaskUsage `json:"by_sub_agent"`
-	TaskCount  int                        `json:"task_count"`
-	PeriodDays int                        `json:"period_days"`
+	Total      store.TaskUsage                      `json:"total"`
+	ByStatus   map[store.TaskStatus]store.TaskUsage `json:"by_status"`
+	BySubAgent map[string]store.TaskUsage           `json:"by_sub_agent"`
+	TaskCount  int                                  `json:"task_count"`
+	PeriodDays int                                  `json:"period_days"`
 }
 
 func addUsage(dst *store.TaskUsage, src store.TaskUsage) {
@@ -48,7 +48,7 @@ func (h *Handler) GetUsageStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := usageResponse{
-		ByStatus:   make(map[string]store.TaskUsage),
+		ByStatus:   make(map[store.TaskStatus]store.TaskUsage),
 		BySubAgent: make(map[string]store.TaskUsage),
 		PeriodDays: days,
 	}
@@ -61,10 +61,9 @@ func (h *Handler) GetUsageStats(w http.ResponseWriter, r *http.Request) {
 
 		addUsage(&resp.Total, t.Usage)
 
-		statusKey := string(t.Status)
-		s := resp.ByStatus[statusKey]
+		s := resp.ByStatus[t.Status]
 		addUsage(&s, t.Usage)
-		resp.ByStatus[statusKey] = s
+		resp.ByStatus[t.Status] = s
 
 		for agent, u := range t.UsageBreakdown {
 			a := resp.BySubAgent[agent]

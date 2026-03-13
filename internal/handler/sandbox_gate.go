@@ -42,7 +42,7 @@ func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 		}
 		return false, reason
 	}
-	if !h.sandboxTestPassedState(string(sandbox.Codex)) {
+	if !h.sandboxTestPassedState(sandbox.Codex) {
 		return false, "Codex unavailable: run Settings -> API Configuration -> Test (Codex) first."
 	}
 	return true, ""

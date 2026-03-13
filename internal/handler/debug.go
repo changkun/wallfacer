@@ -30,10 +30,10 @@ type runningContainerInfo struct {
 
 // healthResponse is the JSON shape returned by GET /api/debug/health.
 type healthResponse struct {
-	Goroutines        int                  `json:"goroutines"`
-	TasksByStatus     map[string]int       `json:"tasks_by_status"`
-	RunningContainers runningContainerInfo `json:"running_containers"`
-	UptimeSeconds     float64              `json:"uptime_seconds"`
+	Goroutines        int                      `json:"goroutines"`
+	TasksByStatus     map[store.TaskStatus]int `json:"tasks_by_status"`
+	RunningContainers runningContainerInfo     `json:"running_containers"`
+	UptimeSeconds     float64                  `json:"uptime_seconds"`
 }
 
 // phaseStats holds aggregate latency statistics for a single execution phase.
@@ -188,9 +188,9 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	// Task counts by status.
 	tasks, _ := h.store.ListTasks(r.Context(), false)
-	tasksByStatus := make(map[string]int)
+	tasksByStatus := make(map[store.TaskStatus]int)
 	for _, t := range tasks {
-		tasksByStatus[string(t.Status)]++
+		tasksByStatus[t.Status]++
 	}
 
 	// Running containers (errors treated as empty list).
