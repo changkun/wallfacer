@@ -502,6 +502,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 					verdict = "fail"
 				}
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
+				if verdict == "fail" {
+					r.store.UpdateTaskPendingTestFeedback(bgCtx, taskID, buildTestFailureFeedback(output.Result))
+				}
 				r.GenerateTestOversight(taskID, task.TestRunStartTurn)
 				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange, map[string]string{
@@ -556,6 +559,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 					verdict = "fail"
 				}
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
+				if verdict == "fail" {
+					r.store.UpdateTaskPendingTestFeedback(bgCtx, taskID, buildTestFailureFeedback(output.Result))
+				}
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 					"result": "Test verification complete: " + strings.ToUpper(verdict),
 				})
@@ -839,6 +845,14 @@ func parseTestVerdict(result string) string {
 	}
 
 	return ""
+}
+
+func buildTestFailureFeedback(result string) string {
+	result = strings.TrimSpace(result)
+	if result == "" {
+		result = "The test agent did not provide detailed failure output."
+	}
+	return "Automated test verification failed. Address the following issues before continuing:\n\n" + result
 }
 
 // inferPassFromContent scans the full test output for common test runner

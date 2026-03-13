@@ -234,10 +234,40 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		return
 	}
 
+	type autoResumeCandidate struct {
+		task     store.Task
+		feedback string
+	}
+
+	var resumeCandidate *autoResumeCandidate
+
 	runTwoPhase(ctx, &promoteMu, TwoPhaseWatcherConfig{
 		Name: "auto-promote",
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			// Phase 1 (no lock): build candidate without holding promoteMu.
+			waitingTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
+			if err == nil {
+				for i := range waitingTasks {
+					t := &waitingTasks[i]
+					if t.IsTestRun || t.PendingTestFeedback == "" || t.LastTestResult != "fail" {
+						continue
+					}
+					if t.SessionID == nil || *t.SessionID == "" {
+						continue
+					}
+					if resumeCandidate == nil || t.Position < resumeCandidate.task.Position {
+						cp := *t
+						resumeCandidate = &autoResumeCandidate{
+							task:     cp,
+							feedback: t.PendingTestFeedback,
+						}
+					}
+				}
+			}
+			if resumeCandidate != nil {
+				return &resumeCandidate.task, nil
+			}
+
 			regularInProgress := h.store.CountRegularInProgress()
 			if regularInProgress >= h.maxConcurrentTasks() {
 				h.incAutopilotAction("auto_promoter", "skipped_capacity")
@@ -274,6 +304,28 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		},
 		AfterPhase1: h.testPhase1Done,
 		Phase2: func(ctx context.Context, candidate *store.Task) (bool, error) {
+			if resumeCandidate != nil && candidate != nil && candidate.ID == resumeCandidate.task.ID {
+				freshTask, err := h.store.GetTask(ctx, candidate.ID)
+				if err != nil || freshTask == nil {
+					return false, nil
+				}
+				if freshTask.Status != store.TaskStatusWaiting || freshTask.IsTestRun || freshTask.LastTestResult != "fail" || freshTask.PendingTestFeedback == "" {
+					return false, nil
+				}
+				if freshTask.SessionID == nil || *freshTask.SessionID == "" {
+					return false, nil
+				}
+
+				logger.Handler.Info("auto-promote: resuming waiting task from failed test feedback",
+					"task", freshTask.ID)
+				if err := h.resumeWaitingTaskWithFeedbackLocked(ctx, freshTask, freshTask.PendingTestFeedback, store.TriggerFeedback, "Autopilot: resuming task with failed test feedback."); err != nil {
+					logger.Handler.Error("auto-promote resume failed test feedback", "task", freshTask.ID, "error", err)
+					return false, nil
+				}
+				h.incAutopilotAction("auto_promoter", "resumed_failed_test")
+				return true, nil
+			}
+
 			// Phase 2 (under promoteMu): re-verify capacity with a fresh count and promote.
 			// Re-read in-progress count; state may have changed during Phase 1 I/O.
 			freshInProgress := h.store.CountRegularInProgress()

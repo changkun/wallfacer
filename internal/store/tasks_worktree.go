@@ -67,6 +67,9 @@ func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun boo
 	}
 	t.IsTestRun = isTestRun
 	t.LastTestResult = lastTestResult
+	if isTestRun || lastTestResult != "fail" {
+		t.PendingTestFeedback = ""
+	}
 	if isTestRun {
 		// Record the current turn count so we know which turn files belong to
 		// the implementation phase vs the test phase.
@@ -77,6 +80,25 @@ func (s *Store) UpdateTaskTestRun(_ context.Context, id uuid.UUID, isTestRun boo
 		return err
 	}
 	// Search index not updated: test-run state and result are not search-indexed fields.
+	s.notify(t, false)
+	return nil
+}
+
+// UpdateTaskPendingTestFeedback stores or clears the pending feedback message
+// generated from the latest failed test run.
+func (s *Store) UpdateTaskPendingTestFeedback(_ context.Context, id uuid.UUID, message string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	t.PendingTestFeedback = message
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
 	s.notify(t, false)
 	return nil
 }

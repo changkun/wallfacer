@@ -893,9 +893,56 @@ func TestRunTestRunPreservesImplementationResult(t *testing.T) {
 	if afterTest.LastTestResult != "pass" {
 		t.Fatalf("expected last_test_result=pass, got %q", afterTest.LastTestResult)
 	}
+	if afterTest.PendingTestFeedback != "" {
+		t.Fatalf("expected no pending test feedback on pass, got %q", afterTest.PendingTestFeedback)
+	}
 	// IsTestRun must be cleared after the test completes.
 	if afterTest.IsTestRun {
 		t.Fatal("IsTestRun should be false after test completion")
+	}
+}
+
+func TestRunTestRunFailStoresPendingFeedback(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	implOutput := `{"result":"implementation done","session_id":"impl-sess","stop_reason":"","is_error":false,"total_cost_usd":0.001}`
+	testOutput := `{"result":"pytest failed\n\n- TestFoo: expected 200, got 500\n\n**FAIL**","session_id":"test-sess","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`
+
+	cmd := fakeStatefulCmd(t, []string{implOutput, testOutput})
+	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTask(ctx, "Store test failure feedback", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	r.Run(task.ID, "implement the feature", "", false)
+
+	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	r.Run(task.ID, "verify the implementation", "", false)
+
+	afterTest, _ := s.GetTask(ctx, task.ID)
+	if afterTest.Status != "waiting" {
+		t.Fatalf("expected status=waiting after failed test run, got %q", afterTest.Status)
+	}
+	if afterTest.LastTestResult != "fail" {
+		t.Fatalf("expected last_test_result=fail, got %q", afterTest.LastTestResult)
+	}
+	if !strings.Contains(afterTest.PendingTestFeedback, "Automated test verification failed.") {
+		t.Fatalf("expected pending feedback header, got %q", afterTest.PendingTestFeedback)
+	}
+	if !strings.Contains(afterTest.PendingTestFeedback, "expected 200, got 500") {
+		t.Fatalf("expected failing test details in pending feedback, got %q", afterTest.PendingTestFeedback)
 	}
 }
 

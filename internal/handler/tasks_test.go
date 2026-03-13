@@ -1904,6 +1904,84 @@ func TestTryAutoTest_RegularTasksDoNotConsumeTestSlots(t *testing.T) {
 	}
 }
 
+func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing.T) {
+	s, err := store.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmdPath := filepath.Join(t.TempDir(), "fake-runner.sh")
+	script := "#!/bin/sh\nsleep 0.2\nprintf '%s\\n' '{\"result\":\"need more work\",\"session_id\":\"impl-sess\",\"stop_reason\":\"\",\"is_error\":false,\"total_cost_usd\":0.001}'\n"
+	if err := os.WriteFile(cmdPath, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := setupRepo(t)
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		Command:    cmdPath,
+		Workspaces: repo,
+	})
+	t.Cleanup(r.WaitBackground)
+	t.Cleanup(r.Shutdown)
+
+	h := NewHandler(s, r, t.TempDir(), []string{repo}, nil)
+	h.SetAutopilot(true)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "failed test follow-up", 15, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	h.store.UpdateTaskResult(ctx, task.ID, "implementation result", "impl-sess", "", 2)
+	h.store.UpdateTaskTestRun(ctx, task.ID, false, "fail")
+	h.store.UpdateTaskPendingTestFeedback(ctx, task.ID, "Automated test verification failed.\n\n- fix the broken assertion")
+
+	h.tryAutoPromote(ctx)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != store.TaskStatusInProgress {
+		t.Fatalf("expected task to resume to in_progress, got %s", got.Status)
+	}
+	if got.LastTestResult != "" {
+		t.Fatalf("expected last_test_result to be cleared on resume, got %q", got.LastTestResult)
+	}
+	if got.PendingTestFeedback != "" {
+		t.Fatalf("expected pending test feedback to be cleared on resume, got %q", got.PendingTestFeedback)
+	}
+
+	events, err := h.store.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundFeedback := false
+	for _, event := range events {
+		if event.EventType != store.EventTypeFeedback {
+			continue
+		}
+		var data map[string]string
+		if err := json.Unmarshal(event.Data, &data); err != nil {
+			t.Fatalf("json.Unmarshal(feedback): %v", err)
+		}
+		if strings.Contains(data["message"], "fix the broken assertion") {
+			foundFeedback = true
+			break
+		}
+	}
+	if !foundFeedback {
+		t.Fatal("expected failed test outcome to be recorded as feedback")
+	}
+
+	r.WaitBackground()
+}
+
 // TestAutotest_SetAndGet verifies the SetAutotest / AutotestEnabled accessors.
 func TestAutotest_SetAndGet(t *testing.T) {
 	h := newTestHandler(t)
