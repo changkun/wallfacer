@@ -256,6 +256,72 @@ describe('showWorkspacePicker', () => {
   });
 });
 
+describe('browseWorkspaces', () => {
+  it('skips hidden folders by default', async () => {
+    const pathInput = { value: '/Users/test/dev' };
+    const statusEl = { textContent: '' };
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ path: '/Users/test/dev', entries: [] }),
+      text: async () => '',
+    });
+    const ctx = makeContext({
+      elements: [
+        ['workspace-browser-path', pathInput],
+        ['workspace-browser-status', statusEl],
+        ['workspace-browser-list', { innerHTML: '' }],
+        ['workspace-browser-breadcrumb', { textContent: '' }],
+        ['workspace-browser-include-hidden', { checked: false }],
+      ],
+      fetch,
+      Routes: {
+        workspaces: {
+          browse: () => '/api/workspaces/browse',
+        },
+      },
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    await ctx.browseWorkspaces();
+
+    expect(fetch).toHaveBeenCalledWith('/api/workspaces/browse?path=%2FUsers%2Ftest%2Fdev', expect.any(Object));
+  });
+
+  it('includes hidden folders when the toggle is enabled', async () => {
+    const pathInput = { value: '/Users/test/dev' };
+    const statusEl = { textContent: '' };
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ path: '/Users/test/dev', entries: [] }),
+      text: async () => '',
+    });
+    const ctx = makeContext({
+      elements: [
+        ['workspace-browser-path', pathInput],
+        ['workspace-browser-status', statusEl],
+        ['workspace-browser-list', { innerHTML: '' }],
+        ['workspace-browser-breadcrumb', { textContent: '' }],
+        ['workspace-browser-include-hidden', { checked: true }],
+      ],
+      fetch,
+      Routes: {
+        workspaces: {
+          browse: () => '/api/workspaces/browse',
+        },
+      },
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    await ctx.browseWorkspaces();
+
+    expect(fetch).toHaveBeenCalledWith('/api/workspaces/browse?path=%2FUsers%2Ftest%2Fdev&include_hidden=true', expect.any(Object));
+  });
+});
+
 describe('toggleAutopilot', () => {
   it('updates autopilot and reverts checkbox on API failure', async () => {
     const toggle = makeInput(false);
