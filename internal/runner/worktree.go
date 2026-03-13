@@ -109,10 +109,13 @@ func (r *Runner) PruneUnknownWorktrees() {
 	}
 
 	ctx := context.Background()
-	tasks, _ := r.store.ListTasks(ctx, true)
-	knownIDs := make(map[string]bool, len(tasks))
-	for _, t := range tasks {
-		knownIDs[t.ID.String()] = true
+	knownIDs := map[string]bool{}
+	if r.store != nil {
+		tasks, _ := r.store.ListTasks(ctx, true)
+		knownIDs = make(map[string]bool, len(tasks))
+		for _, t := range tasks {
+			knownIDs[t.ID.String()] = true
+		}
 	}
 
 	for _, entry := range entries {
