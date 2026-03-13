@@ -30,6 +30,7 @@ type agentUsage struct {
 type agentOutput struct {
 	Result       string     `json:"result"`
 	SessionID    string     `json:"session_id"`
+	ThreadID     string     `json:"thread_id,omitempty"`
 	StopReason   string     `json:"stop_reason"`
 	Subtype      string     `json:"subtype"`
 	IsError      bool       `json:"is_error"`

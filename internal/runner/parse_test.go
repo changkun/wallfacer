@@ -169,6 +169,14 @@ func TestParseOutputEdgeCases(t *testing.T) {
 			wantSession: "s2",
 			wantStop:    "end_turn",
 		},
+		{
+			name: "thread id fallback is used when result line has empty session id",
+			input: `{"type":"thread.started","thread_id":"thread-123"}` + "\n" +
+				`{"result":"done","session_id":"","stop_reason":"end_turn","is_error":false}`,
+			wantResult:  "done",
+			wantSession: "thread-123",
+			wantStop:    "end_turn",
+		},
 	}
 
 	for _, tc := range tests {
@@ -193,5 +201,14 @@ func TestParseOutputEdgeCases(t *testing.T) {
 				t.Errorf("StopReason: got %q, want %q", got.StopReason, tc.wantStop)
 			}
 		})
+	}
+}
+
+func TestExtractSessionID_UsesThreadIDFallback(t *testing.T) {
+	raw := []byte(`{"type":"thread.started","thread_id":"thread-xyz"}` + "\n" +
+		`{"result":"done","session_id":"","stop_reason":"end_turn"}`)
+
+	if got := extractSessionID(raw); got != "thread-xyz" {
+		t.Fatalf("extractSessionID() = %q, want %q", got, "thread-xyz")
 	}
 }
