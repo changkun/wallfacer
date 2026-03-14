@@ -63,11 +63,14 @@ function setLeftTab(tab) {
 
 // Phase colors per spec: worktree_setup → muted blue, agent_turn → accent, commit → green.
 var _phaseColors = {
-  worktree_setup: '#5e81ac',
-  agent_turn:     'var(--accent)',
-  commit:         '#3fb950',
-  container_run:  '#9e6ec7',
-  refinement:     '#d19a66',
+  worktree_setup:    '#5e81ac',
+  agent_turn:        'var(--accent)',
+  commit:            '#d97706',
+  container_run:     '#9e6ec7',
+  refinement:        '#d19a66',
+  board_context:     '#6b7280',
+  feedback_waiting:  '#eab308',
+  worktree_cleanup:  '#6366f1',
 };
 
 function _phaseColor(phase) {
@@ -98,8 +101,11 @@ function _humanSpanLabel(phase, label) {
     return actMap[label] || ('Container (' + label + ')');
   }
   if (phase === 'worktree_setup') return 'Worktree Setup';
-  if (phase === 'commit') return 'Commit & Push';
+  if (phase === 'commit') return label || 'Commit & Push';
   if (phase === 'refinement') return 'Refinement';
+  if (phase === 'board_context') return label || 'Board Context';
+  if (phase === 'feedback_waiting') return 'Waiting for Feedback';
+  if (phase === 'worktree_cleanup') return 'Worktree Cleanup';
   return label || phase;
 }
 
@@ -336,11 +342,14 @@ function _buildTimelineHtml(spans) {
 
   // Phase legend (unique phases present)
   var _phaseLegendNames = {
-    worktree_setup: 'Worktree Setup',
-    agent_turn:     'Agent Turn',
-    commit:         'Commit & Push',
-    container_run:  'Container',
-    refinement:     'Refinement',
+    worktree_setup:   'Worktree Setup',
+    agent_turn:       'Agent Turn',
+    commit:           'Commit & Push',
+    container_run:    'Container',
+    refinement:       'Refinement',
+    board_context:    'Board Context',
+    feedback_waiting: 'Waiting for Feedback',
+    worktree_cleanup: 'Worktree Cleanup',
   };
   var seenPhases = {};
   var legendHtml = '';

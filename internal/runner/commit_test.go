@@ -1,6 +1,8 @@
 package runner
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -353,5 +355,112 @@ func TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing(t *testing.T) {
 	}
 	if committed {
 		t.Fatal("expected committed=false when no worktree has changes")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Commit pipeline span event tests
+// ---------------------------------------------------------------------------
+
+// collectSpanKeys scans a slice of events and returns two maps — one for
+// span_start events and one for span_end events — keyed by phase+label.
+func collectSpanKeys(events []store.TaskEvent) (started, ended map[[2]string]bool) {
+	started = map[[2]string]bool{}
+	ended = map[[2]string]bool{}
+	for _, ev := range events {
+		if ev.EventType != store.EventTypeSpanStart && ev.EventType != store.EventTypeSpanEnd {
+			continue
+		}
+		var d store.SpanData
+		if err := json.Unmarshal(ev.Data, &d); err != nil {
+			continue
+		}
+		key := [2]string{d.Phase, d.Label}
+		if ev.EventType == store.EventTypeSpanStart {
+			started[key] = true
+		} else {
+			ended[key] = true
+		}
+	}
+	return started, ended
+}
+
+// TestCommitPipelineEmitsStageRebaseMergeCleanupSpans verifies that the
+// commit pipeline emits span_start/span_end pairs for all three phases:
+// commit/stage, commit/rebase_merge, and commit/cleanup.
+// It also verifies that cleanupWorktrees emits a worktree_cleanup span.
+func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
+	repo := setupTestRepo(t)
+	cmd := fakeCmdScript(t, validStreamJSON, 0) // for commit message generation
+
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	worktreesDir := filepath.Join(t.TempDir(), "worktrees")
+	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	runner := NewRunner(s, RunnerConfig{
+		Command:      cmd,
+		SandboxImage: "test:latest",
+		Workspaces:   repo,
+		WorktreesDir: worktreesDir,
+	})
+
+	ctx := context.Background()
+	task, err := s.CreateTask(ctx, "test commit spans", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set up worktrees and persist them so Commit can read them.
+	worktreePaths, branchName, err := runner.setupWorktrees(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, worktreePaths, branchName); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make a change in the worktree so there is something to commit.
+	wt := worktreePaths[repo]
+	if err := os.WriteFile(filepath.Join(wt, "feature.go"), []byte("package main\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runner.Commit(task.ID, "sess1"); err != nil {
+		t.Fatalf("Commit error: %v", err)
+	}
+
+	events, err := s.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started, ended := collectSpanKeys(events)
+
+	// All three commit pipeline phases must have matching start/end pairs.
+	for _, wantKey := range [][2]string{
+		{"commit", "stage"},
+		{"commit", "rebase_merge"},
+		{"commit", "cleanup"},
+	} {
+		if !started[wantKey] {
+			t.Errorf("missing span_start for phase=%q label=%q", wantKey[0], wantKey[1])
+		}
+		if !ended[wantKey] {
+			t.Errorf("missing span_end for phase=%q label=%q", wantKey[0], wantKey[1])
+		}
+	}
+
+	// cleanupWorktrees must emit its own worktree_cleanup span.
+	cleanupKey := [2]string{"worktree_cleanup", "worktree_cleanup"}
+	if !started[cleanupKey] {
+		t.Error("missing span_start for worktree_cleanup")
+	}
+	if !ended[cleanupKey] {
+		t.Error("missing span_end for worktree_cleanup")
 	}
 }
