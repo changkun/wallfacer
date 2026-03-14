@@ -90,8 +90,8 @@ func (h *Handler) UpdateWorkspaces(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	h.store = snap.Store
-	h.workspaces = snap.Workspaces
+	// h.store and h.workspaces are updated asynchronously by the workspace
+	// subscription goroutine started in NewHandler; no direct assignment here.
 	if snap.Store != nil {
 		h.runner.PruneUnknownWorktrees()
 	}

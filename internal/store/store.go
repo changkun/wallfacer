@@ -42,8 +42,9 @@ func buildIndexEntry(t *Task, oversightRaw string) indexedTaskText {
 // Store is the in-memory task database backed by per-task directory persistence.
 // All mutations are atomic (temp-file + rename) and guarded by a RWMutex.
 type Store struct {
-	mu      sync.RWMutex
-	dir     string
+	mu     sync.RWMutex
+	dir    string
+	closed atomic.Bool
 	tasks   map[uuid.UUID]*Task
 	deleted map[uuid.UUID]*Task // tombstoned tasks (soft-deleted, not yet purged)
 	events  map[uuid.UUID][]TaskEvent
@@ -131,8 +132,12 @@ func NewStore(dir string) (*Store, error) {
 	return s, nil
 }
 
-// Close is a no-op placeholder for future resource cleanup.
-func (s *Store) Close() {}
+// Close marks the store as closed. It sets an internal flag that callers can
+// query via IsClosed; it does not interrupt any in-flight operations.
+func (s *Store) Close() { s.closed.Store(true) }
+
+// IsClosed reports whether Close has been called on this store.
+func (s *Store) IsClosed() bool { return s.closed.Load() }
 
 // addToStatusIndex inserts id into tasksByStatus[status].
 // Must be called while s.mu is held for writing.

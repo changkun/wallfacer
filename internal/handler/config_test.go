@@ -10,9 +10,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
+	"changkun.de/wallfacer/internal/workspace"
 )
 
 // newTestHandlerWithWorkspaces creates a Handler with real workspace directories
@@ -897,6 +899,169 @@ func newTestHandlerWithWorkspacesFromRepo(t *testing.T, repo string) (*Handler, 
 	r := runner.NewRunner(s, runner.RunnerConfig{Workspaces: repo})
 	t.Cleanup(r.WaitBackground)
 	return NewHandler(s, r, configDir, []string{repo}, nil), repo
+}
+
+// --- UpdateWorkspaces ---
+
+// newTestHandlerWithRealWorkspaceManager creates a Handler backed by a real
+// workspace.Manager (not a static one) so that UpdateWorkspaces exercises the
+// full transactional switch pipeline.
+func newTestHandlerWithRealWorkspaceManager(t *testing.T) (*Handler, *workspace.Manager, string) {
+	t.Helper()
+	configDir := t.TempDir()
+	dataDir := t.TempDir()
+
+	storeDir, err := os.MkdirTemp("", "wallfacer-handler-wsmgr-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(storeDir) })
+
+	s, err := store.NewStore(storeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, []byte{}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ws := t.TempDir()
+	wsMgr, err := workspace.NewManager(configDir, dataDir, envFile, []string{ws})
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+
+	r := runner.NewRunner(s, runner.RunnerConfig{
+		EnvFile:          envFile,
+		WorkspaceManager: wsMgr,
+	})
+	t.Cleanup(r.WaitBackground)
+	t.Cleanup(r.Shutdown)
+
+	h := NewHandler(s, r, configDir, []string{ws}, nil)
+	return h, wsMgr, ws
+}
+
+// TestUpdateWorkspaces_SwitchesToNewWorkspace verifies that POST /api/workspaces
+// with a valid new workspace switches the active workspace and returns a config
+// response that reflects the new workspace set.
+func TestUpdateWorkspaces_SwitchesToNewWorkspace(t *testing.T) {
+	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
+
+	newWS := t.TempDir()
+	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	w := httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	workspaces, ok := resp["workspaces"].([]any)
+	if !ok || len(workspaces) == 0 {
+		t.Fatalf("expected workspaces in response, got %v", resp["workspaces"])
+	}
+	if workspaces[0].(string) != newWS {
+		t.Errorf("expected new workspace %q in response, got %q", newWS, workspaces[0])
+	}
+}
+
+// TestUpdateWorkspaces_RejectsInProgressTasks verifies that workspace switching
+// is blocked when tasks are in progress.
+func TestUpdateWorkspaces_RejectsInProgressTasks(t *testing.T) {
+	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
+
+	// Create a task and move it to in_progress.
+	s, ok := h.currentStore()
+	if !ok || s == nil {
+		t.Fatal("expected store to be available")
+	}
+	ctx := context.Background()
+	task, err := s.CreateTask(ctx, "test task", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+
+	newWS := t.TempDir()
+	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	w := httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409 when tasks in progress, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateWorkspaces_InvalidWorkspaceReturns400 verifies that an invalid
+// (non-existent) workspace path causes a 400 response.
+func TestUpdateWorkspaces_InvalidWorkspaceReturns400(t *testing.T) {
+	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
+
+	body := strings.NewReader(`{"workspaces":["/does/not/exist/at/all"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	w := httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for non-existent workspace, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateWorkspaces_SubscriptionUpdatesHandlerStore verifies that after a
+// successful workspace switch the handler's mirrored store field is updated via
+// the workspace subscription goroutine (not via a direct assignment).
+func TestUpdateWorkspaces_SubscriptionUpdatesHandlerStore(t *testing.T) {
+	h, wsMgr, _ := newTestHandlerWithRealWorkspaceManager(t)
+
+	// Record the store pointer before the switch.
+	storeBefore, ok := h.currentStore()
+	if !ok || storeBefore == nil {
+		t.Fatal("expected initial store")
+	}
+
+	newWS := t.TempDir()
+	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
+	w := httptest.NewRecorder()
+	h.UpdateWorkspaces(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// The workspace manager's snapshot should already reflect the new workspace.
+	snap := wsMgr.Snapshot()
+	if len(snap.Workspaces) != 1 || snap.Workspaces[0] != newWS {
+		t.Errorf("workspace manager snapshot not updated: got %v", snap.Workspaces)
+	}
+
+	// The subscription goroutine runs asynchronously; give it a short window to
+	// propagate the new snapshot into h.store.
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if h.store != storeBefore {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	if h.store == storeBefore {
+		t.Error("expected h.store to be updated by the subscription goroutine after workspace switch")
+	}
+	if h.store == nil {
+		t.Error("expected h.store to be non-nil after workspace switch")
+	}
 }
 
 // --- strict JSON decoding ---

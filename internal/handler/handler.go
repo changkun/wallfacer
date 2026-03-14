@@ -195,16 +195,12 @@ func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces [
 	h.webhookNotifier = func(cfg envconfig.Config) *runner.WebhookNotifier {
 		return runner.NewWorkspaceWebhookNotifier(h.workspace, cfg)
 	}
-	if snap := wsMgr.Snapshot(); true {
-		h.store = snap.Store
-		h.workspaces = snap.Workspaces
-	}
+	h.applySnapshot(wsMgr.Snapshot())
 	if wsMgr != nil {
 		_, ch := wsMgr.Subscribe()
 		go func() {
 			for snap := range ch {
-				h.store = snap.Store
-				h.workspaces = snap.Workspaces
+				h.applySnapshot(snap)
 			}
 		}()
 	}
@@ -245,6 +241,16 @@ func (h *Handler) currentInstructionsPath() string {
 		return h.workspace.InstructionsPath()
 	}
 	return ""
+}
+
+// applySnapshot updates all handler fields that mirror the active workspace
+// snapshot. It is the single place where snapshot-derived state is written
+// into the handler, called both at construction time and from the workspace
+// subscription goroutine so that every workspace switch is reflected
+// consistently.
+func (h *Handler) applySnapshot(snap workspace.Snapshot) {
+	h.store = snap.Store
+	h.workspaces = snap.Workspaces
 }
 
 func (h *Handler) hasStore() bool {
