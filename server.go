@@ -33,9 +33,14 @@ import (
 //go:embed ui
 var uiFiles embed.FS
 
-type indexViewData struct {
+// IndexViewData holds the data passed to the index.html template.
+type IndexViewData struct {
 	ServerAPIKey string
 }
+
+// indexViewData is a backward-compatible alias kept for the few internal
+// callers that were written before the type was exported.
+type indexViewData = IndexViewData
 
 func runServer(configDir string, args []string) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
@@ -286,7 +291,7 @@ func runServer(configDir string, args []string) {
 		"Total number of autonomous actions taken by autopilot watchers, by watcher and outcome.",
 	)
 
-	mux := buildMux(h, r, reg, indexViewData{ServerAPIKey: envCfg.ServerAPIKey})
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey})
 
 	host, _, _ := net.SplitHostPort(*addr)
 	ln, err := net.Listen("tcp", *addr)
@@ -348,14 +353,14 @@ func runServer(configDir string, args []string) {
 	logger.Main.Info("shutdown complete")
 }
 
-// buildMux constructs the HTTP request router.
+// BuildMux constructs the HTTP request router.
 //
 // All API routes are registered from apicontract.Routes (the single source of
 // truth). The handlers map below pairs each route Name with its http.HandlerFunc,
 // applying per-route middleware (e.g. UUID parsing via withID) at map
 // construction time. A startup panic is triggered if a route in the contract
 // has no corresponding handler entry, preventing silent drift.
-func buildMux(h *handler.Handler, _ *runner.Runner, reg *metrics.Registry, indexData indexViewData) *http.ServeMux {
+func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static files (task board UI).

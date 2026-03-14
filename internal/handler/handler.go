@@ -98,7 +98,7 @@ func (wb *watcherBreaker) healthEntry(name string) watcherHealthEntry {
 type Handler struct {
 	store      *store.Store
 	workspace  *workspace.Manager
-	runner     *runner.Runner
+	runner     runner.Interface
 	configDir  string
 	workspaces []string
 	envFile    string
@@ -154,7 +154,7 @@ type Handler struct {
 }
 
 // NewHandler constructs a Handler with the given dependencies.
-func NewHandler(s *store.Store, r *runner.Runner, configDir string, workspaces []string, reg *metrics.Registry) *Handler {
+func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces []string, reg *metrics.Registry) *Handler {
 	wsMgr := (*workspace.Manager)(nil)
 	if r != nil {
 		wsMgr = r.WorkspaceManager()
