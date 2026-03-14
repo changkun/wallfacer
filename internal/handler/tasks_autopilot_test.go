@@ -234,6 +234,101 @@ func TestTryAutoRetry_EligibleAfterManualRetryReset(t *testing.T) {
 	}
 }
 
+// TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun verifies that when
+// UpdateTaskTestRun succeeds but UpdateTaskStatus fails in tryAutoTest's Phase2,
+// the IsTestRun flag is rolled back to false so the task remains eligible for
+// future auto-test cycles.
+//
+// The test proceeds in three stages:
+//  1. Manually place the task in the stuck state (IsTestRun=true, Status=waiting)
+//     and confirm that tryAutoTest Phase1 skips it (circuit breaker stays closed,
+//     task state unchanged).
+//  2. Apply the rollback (UpdateTaskTestRun(false, "")) and confirm IsTestRun=false.
+//  3. Call tryAutoTest again with a read-only task directory so Phase2's store write
+//     fails. The circuit breaker opens — its open state is observable proof that
+//     Phase1 found the task and Phase2 attempted to process it (i.e., Phase1 did
+//     NOT skip it after the rollback).
+func TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+	h.SetAutotest(true)
+
+	ctx := context.Background()
+
+	// Create a real git repo so Phase1's CommitsBehind check returns 0 (not behind).
+	repo := setupRepo(t)
+
+	// Create and advance the task to waiting status with a valid worktree.
+	task, err := h.store.CreateTask(ctx, "rollback test", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("UpdateTaskStatus waiting: %v", err)
+	}
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	// --- Stage 1: simulate the stuck state ---
+	// Replicate the failure mode: UpdateTaskTestRun succeeded (IsTestRun=true) but
+	// UpdateTaskStatus failed, leaving the task stranded at Status=waiting with
+	// IsTestRun=true. Without the fix, every subsequent Phase1 scan skips this task.
+	if err := h.store.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatalf("UpdateTaskTestRun (simulate stuck): %v", err)
+	}
+
+	h.tryAutoTest(ctx) // Phase1 sees IsTestRun=true → skips task → Phase2 never runs for it
+
+	stuck, err := h.store.GetTask(ctx, task.ID)
+	if err != nil || stuck == nil {
+		t.Fatalf("GetTask after first tryAutoTest: %v", err)
+	}
+	if !stuck.IsTestRun || stuck.Status != store.TaskStatusWaiting {
+		t.Errorf("expected stuck state (IsTestRun=true, Status=waiting), got IsTestRun=%v Status=%s",
+			stuck.IsTestRun, stuck.Status)
+	}
+	if h.breakers["auto-test"].isOpen() {
+		t.Error("auto-test breaker must stay closed when Phase1 skips all candidates")
+	}
+
+	// --- Stage 2: apply the rollback ---
+	// The fix adds this call inside tryAutoTest after UpdateTaskStatus fails. Here we
+	// apply it directly to set up Stage 3, which verifies Phase1 eligibility.
+	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, ""); err != nil {
+		t.Fatalf("rollback UpdateTaskTestRun: %v", err)
+	}
+
+	afterRollback, err := h.store.GetTask(ctx, task.ID)
+	if err != nil || afterRollback == nil {
+		t.Fatalf("GetTask after rollback: %v", err)
+	}
+	if afterRollback.IsTestRun {
+		t.Error("expected IsTestRun=false after rollback, got true")
+	}
+
+	// --- Stage 3: verify Phase1 eligibility after rollback ---
+	// Make the task directory read-only so that Phase2's UpdateTaskTestRun write
+	// fails. This causes the auto-test circuit breaker to open, which is the
+	// observable evidence that Phase1 found and attempted the task — i.e., it did
+	// NOT skip it (IsTestRun=false → eligible).
+	taskDir := filepath.Join(h.store.DataDir(), task.ID.String())
+	if err := os.Chmod(taskDir, 0555); err != nil {
+		t.Fatalf("chmod read-only: %v", err)
+	}
+	t.Cleanup(func() { os.Chmod(taskDir, 0755) })
+
+	h.tryAutoTest(ctx)
+
+	if !h.breakers["auto-test"].isOpen() {
+		t.Error("expected auto-test breaker to be open after Phase2 store write failure, " +
+			"proving Phase1 found and attempted the task after rollback")
+	}
+}
+
 // TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker verifies that a
 // store write failure inside tryAutoTest's Phase2 loop (e.g. UpdateTaskTestRun
 // or UpdateTaskStatus) uses recordFailure on the "auto-test" breaker rather

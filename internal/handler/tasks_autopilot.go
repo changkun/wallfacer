@@ -689,6 +689,10 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				if err := h.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
 					logger.Handler.Error("auto-test: update task status", "task", c.task.ID, "error", err)
 					h.breakers["auto-test"].recordFailure(&c.task.ID, err.Error())
+					// Roll back the IsTestRun flag so the task remains eligible for future test cycles.
+					if rbErr := h.store.UpdateTaskTestRun(ctx, c.task.ID, false, ""); rbErr != nil {
+						logger.Handler.Error("auto-test: rollback IsTestRun flag", "task", c.task.ID, "error", rbErr)
+					}
 					continue
 				}
 				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeStateChange,
