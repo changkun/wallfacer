@@ -10,7 +10,7 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary build-claude build-codex server run shell clean ui-css api-contract test test-backend test-frontend commit-seq push-once
+.PHONY: build build-binary build-claude build-codex server run shell clean ui-css api-contract lint test test-backend test-frontend commit-seq push-once
 
 # Build the wallfacer binary and both sandbox images.
 build: build-binary build-claude build-codex
@@ -81,6 +81,10 @@ api-contract:
 ui-css:
 	npx tailwindcss@3 -i tailwind.input.css -o ui/css/tailwind.css \
 		--content './ui/**/*.{html,js}' --minify
+
+# Run golangci-lint
+lint:
+	golangci-lint run ./...
 
 # Run all tests (backend + frontend)
 test: test-backend test-frontend

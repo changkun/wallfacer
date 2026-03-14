@@ -28,9 +28,10 @@ jobs:
         run: npm ci --no-audit --no-fund
         working-directory: .
 
-      - name: Vet
-        run: go vet ./...
-        working-directory: .
+      - name: Lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: latest
 
       - name: Test
         run: go test -v -race ./...
