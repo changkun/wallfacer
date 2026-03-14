@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 )
@@ -287,5 +289,217 @@ func TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker(t *testing.T) {
 	}
 	if h.breakers["auto-submit"].isOpen() {
 		t.Error("auto-submit breaker must remain closed after auto-test store error")
+	}
+}
+
+// taskWithDeps returns a store.Task with only ID and DependsOn populated.
+func taskWithDeps(id uuid.UUID, deps ...uuid.UUID) store.Task {
+	depStrs := make([]string, len(deps))
+	for i, d := range deps {
+		depStrs[i] = d.String()
+	}
+	return store.Task{ID: id, DependsOn: depStrs}
+}
+
+func TestTaskReachable(t *testing.T) {
+	a := uuid.New()
+	b := uuid.New()
+	c := uuid.New()
+	d := uuid.New()
+
+	tests := []struct {
+		name   string
+		tasks  []store.Task
+		start  uuid.UUID
+		target uuid.UUID
+		want   bool
+	}{
+		{
+			// Empty graph — nothing reachable.
+			name:   "no tasks",
+			tasks:  nil,
+			start:  a,
+			target: b,
+			want:   false,
+		},
+		{
+			// A has no DependsOn; an unrelated UUID is not reachable.
+			name:   "single task no dependencies cannot reach unrelated target",
+			tasks:  []store.Task{taskWithDeps(a)},
+			start:  a,
+			target: b,
+			want:   false,
+		},
+		{
+			// A→B: B is directly reachable from A.
+			name:   "direct dependency forward reachable",
+			tasks:  []store.Task{taskWithDeps(a, b), taskWithDeps(b)},
+			start:  a,
+			target: b,
+			want:   true,
+		},
+		{
+			// A→B: A is not reachable from B (no reverse edge).
+			name:   "direct dependency reverse not reachable",
+			tasks:  []store.Task{taskWithDeps(a, b), taskWithDeps(b)},
+			start:  b,
+			target: a,
+			want:   false,
+		},
+		{
+			// A→B→C: C is transitively reachable from A.
+			name:   "transitive chain forward reachable",
+			tasks:  []store.Task{taskWithDeps(a, b), taskWithDeps(b, c), taskWithDeps(c)},
+			start:  a,
+			target: c,
+			want:   true,
+		},
+		{
+			// A→B→C: A is not reachable from C (edges go the other way).
+			name:   "transitive chain reverse not reachable",
+			tasks:  []store.Task{taskWithDeps(a, b), taskWithDeps(b, c), taskWithDeps(c)},
+			start:  c,
+			target: a,
+			want:   false,
+		},
+		{
+			// A→B, B→A (direct cycle): A can reach B by following the direct edge.
+			name:   "direct cycle A reaches B",
+			tasks:  []store.Task{taskWithDeps(a, b), taskWithDeps(b, a)},
+			start:  a,
+			target: b,
+			want:   true,
+		},
+		{
+			// A→B, B→A (direct cycle): B can reach A by following the direct edge.
+			name:   "direct cycle B reaches A",
+			tasks:  []store.Task{taskWithDeps(a, b), taskWithDeps(b, a)},
+			start:  b,
+			target: a,
+			want:   true,
+		},
+		{
+			// A→B→C→A (indirect cycle): C is reachable from A.
+			name:   "indirect cycle A reaches C",
+			tasks:  []store.Task{taskWithDeps(a, b), taskWithDeps(b, c), taskWithDeps(c, a)},
+			start:  a,
+			target: c,
+			want:   true,
+		},
+		{
+			// A→B→C→A (indirect cycle): A is reachable from C via the back-edge.
+			name:   "indirect cycle C reaches A",
+			tasks:  []store.Task{taskWithDeps(a, b), taskWithDeps(b, c), taskWithDeps(c, a)},
+			start:  c,
+			target: a,
+			want:   true,
+		},
+		{
+			// {A→B} and {C→D} are disconnected; B is not reachable from C.
+			name:   "disconnected graph B not reachable from C",
+			tasks:  []store.Task{taskWithDeps(a, b), taskWithDeps(b), taskWithDeps(c, d), taskWithDeps(d)},
+			start:  c,
+			target: b,
+			want:   false,
+		},
+		{
+			// Diamond: A→B, A→C, B→D, C→D; D is reachable from A via two paths.
+			name:   "diamond dependency A reaches D",
+			tasks:  []store.Task{taskWithDeps(a, b, c), taskWithDeps(b, d), taskWithDeps(c, d), taskWithDeps(d)},
+			start:  a,
+			target: d,
+			want:   true,
+		},
+		{
+			// Target UUID not present in any task's ID or DependsOn.
+			name:   "target not in graph",
+			tasks:  []store.Task{taskWithDeps(a)},
+			start:  a,
+			target: uuid.New(),
+			want:   false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := taskReachable(tc.tasks, tc.start, tc.target)
+			if got != tc.want {
+				t.Errorf("taskReachable(..., start=%v, target=%v) = %v, want %v",
+					tc.start, tc.target, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTaskReachableInAdj(t *testing.T) {
+	a := uuid.New()
+	b := uuid.New()
+	c := uuid.New()
+
+	tests := []struct {
+		name   string
+		adj    map[uuid.UUID][]uuid.UUID
+		start  uuid.UUID
+		target uuid.UUID
+		want   bool
+	}{
+		{
+			// Chain A→B→C: C is transitively reachable from A.
+			name:   "chain: A reaches C",
+			adj:    map[uuid.UUID][]uuid.UUID{a: {b}, b: {c}},
+			start:  a,
+			target: c,
+			want:   true,
+		},
+		{
+			// Chain A→B→C: A is not reachable from C (no back edges).
+			name:   "chain: C does not reach A",
+			adj:    map[uuid.UUID][]uuid.UUID{a: {b}, b: {c}},
+			start:  c,
+			target: a,
+			want:   false,
+		},
+		{
+			// Direct cycle A↔B: DFS must terminate; A can reach B.
+			name:   "direct cycle terminates: A reaches B",
+			adj:    map[uuid.UUID][]uuid.UUID{a: {b}, b: {a}},
+			start:  a,
+			target: b,
+			want:   true,
+		},
+		{
+			// Direct cycle A↔B: DFS must terminate; an absent target is not found.
+			name:   "direct cycle terminates: unreachable target returns false",
+			adj:    map[uuid.UUID][]uuid.UUID{a: {b}, b: {a}},
+			start:  a,
+			target: uuid.New(),
+			want:   false,
+		},
+		{
+			// Indirect cycle A→B→C→A: C is reachable from A; visited set prevents infinite loop.
+			name:   "indirect cycle terminates: A reaches C",
+			adj:    map[uuid.UUID][]uuid.UUID{a: {b}, b: {c}, c: {a}},
+			start:  a,
+			target: c,
+			want:   true,
+		},
+		{
+			// Indirect cycle A→B→C→A: a UUID outside the cycle is not reachable.
+			name:   "indirect cycle terminates: absent target returns false",
+			adj:    map[uuid.UUID][]uuid.UUID{a: {b}, b: {c}, c: {a}},
+			start:  a,
+			target: uuid.New(),
+			want:   false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := taskReachableInAdj(tc.adj, tc.start, tc.target)
+			if got != tc.want {
+				t.Errorf("taskReachableInAdj(adj, start=%v, target=%v) = %v, want %v",
+					tc.start, tc.target, got, tc.want)
+			}
+		})
 	}
 }
