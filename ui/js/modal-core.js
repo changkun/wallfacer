@@ -955,6 +955,6 @@ async function openForkModal() {
     await forkTask(task.id, prompt.trim(), task.timeout);
     closeModal();
   } catch (e) {
-    alert('Fork failed: ' + e.message);
+    showAlert('Fork failed: ' + e.message);
   }
 }
