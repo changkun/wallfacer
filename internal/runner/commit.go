@@ -213,8 +213,9 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 			if ctx.Err() != nil {
 				return false, fmt.Errorf("context canceled during git add: %w", ctx.Err())
 			}
-			logger.Runner.Warn("host commit: git add -A", "repo", repoPath, "error", err, "output", string(out))
-			errs = append(errs, fmt.Sprintf("git add in %s: %v", repoPath, err))
+			gitOutput := strings.TrimSpace(string(out))
+			logger.Runner.Warn("host commit: git add -A", "repo", repoPath, "worktree", worktreePath, "error", err, "output", gitOutput)
+			errs = append(errs, fmt.Sprintf("git add in %s (worktree %s): %v: %s", repoPath, worktreePath, err, gitOutput))
 			continue
 		}
 

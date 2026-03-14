@@ -51,9 +51,17 @@ func (r *Runner) ensureTaskWorktrees(taskID uuid.UUID, existing map[string]strin
 		}
 
 		// Idempotent: reuse existing worktree/snapshot (e.g. task resumed from waiting).
+		// The directory must also be a valid git repo; if the .git link inside the
+		// worktree was deleted or corrupted (e.g. by a container), we tear the
+		// directory down and recreate it below.
 		if _, err := os.Stat(worktreePath); err == nil {
-			worktreePaths[ws] = worktreePath
-			continue
+			if gitutil.IsGitRepo(worktreePath) {
+				worktreePaths[ws] = worktreePath
+				continue
+			}
+			logger.Runner.Warn("worktree directory exists but is not a valid git repo, removing",
+				"workspace", ws, "path", worktreePath)
+			os.RemoveAll(worktreePath)
 		}
 
 		if err := os.MkdirAll(filepath.Dir(worktreePath), 0755); err != nil {

@@ -405,11 +405,8 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 				if file == "" {
 					continue
 				}
-				fd, noIndexErr := exec.CommandContext(r.Context(), "git", "-C", worktreePath,
+				fd, _ := exec.CommandContext(r.Context(), "git", "-C", worktreePath,
 					"diff", "--no-index", "/dev/null", file).Output()
-				if noIndexErr != nil {
-					logger.Git.Debug("git diff --no-index failed", "worktree", worktreePath, "file", file, "error", noIndexErr)
-				}
 				out = append(out, fd...)
 			}
 		}

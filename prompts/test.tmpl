@@ -35,15 +35,13 @@ Your verification must be fast and focused. Do NOT explore the entire codebase o
 
 Do not modify any code. Do not run linters, formatters, or full-project builds unless the acceptance criteria explicitly require them.
 
-End your response with your verdict on its own line: **PASS** if all requirements are met, or **FAIL** if any are not. If failing, state the specific unmet requirement in one sentence before the verdict.
+If failing, state the specific unmet requirement in one sentence before the verdict.
 
 CRITICAL — VERDICT REQUIREMENT:
-You MUST end your response with a clear verdict. The very last line of your entire response must be one of these two exact strings (bold markdown, all caps):
+The absolute last line of your response must be exactly one of:
 
 **PASS**
 
-or
-
 **FAIL**
 
-This is non-negotiable. Without this exact line, the automated system cannot detect your verdict and the test will be marked as failed by default. Do NOT omit the verdict. Do NOT place it in the middle of your response — it must be the absolute final line.
+Nothing else may follow the verdict — no explanation, no summary, no trailing text. The automated system parses only this final line. If you omit it or bury it mid-response, the result defaults to FAIL regardless of your analysis. Always emit the verdict, even when the answer is obvious.

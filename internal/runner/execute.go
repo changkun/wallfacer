@@ -49,6 +49,21 @@ var (
 	// failureInContentPattern detects non-zero failure counts used to guard
 	// against false-positive pass inference in mixed output like "5 passed, 1 failed".
 	failureInContentPattern = regexp.MustCompile(`(?i)\b[1-9]\d*\s+(?:tests?\s+)?(?:failed|failures?|failing)\b`)
+
+	// LLM-style verdict inference patterns for test agents that conclude
+	// everything passes but forget to emit the explicit **PASS** marker.
+
+	// satisfiesRequirementsPattern matches "satisfies every requirement", "satisfies all requirements", etc.
+	satisfiesRequirementsPattern = regexp.MustCompile(`(?i)\bsatisfies\s+(?:every|all)\s+requirement`)
+	// allRequirementsMetPattern matches "all requirements are met", "all requirements met", "meets all requirements", etc.
+	allRequirementsMetPattern = regexp.MustCompile(`(?i)\b(?:all\s+requirements?\s+(?:are\s+)?met|meets?\s+(?:all|every)\s+requirements?)\b`)
+	// noChangesNeededPattern matches "no changes are needed", "no changes needed", "no changes required", etc.
+	noChangesNeededPattern = regexp.MustCompile(`(?i)\bno\s+changes\s+(?:are\s+)?(?:needed|required|necessary)\b`)
+	// correctAsWrittenPattern matches "correct as written", "correct as-is", etc.
+	correctAsWrittenPattern = regexp.MustCompile(`(?i)\bcorrect\s+as[\s\-](?:written|is)\b`)
+	// llmFailureGuardPattern detects explicit failure language from an LLM test
+	// agent to prevent false-positive pass inference from the patterns above.
+	llmFailureGuardPattern = regexp.MustCompile(`(?i)\b(?:requirement.*(?:not|un)\s*met|does\s+not\s+(?:meet|satisfy)|fail(?:s|ed)?\s+to\s+(?:meet|satisfy)|missing\s+requirement|unmet\s+requirement)\b`)
 )
 
 // classifyFailure returns the machine-readable FailureCategory for a task
@@ -246,10 +261,18 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	branchName := task.BranchName
 	needSetup := len(worktreePaths) == 0
 	if !needSetup {
-		// Verify stored paths still exist on disk.
+		// Verify stored paths still exist on disk and are valid git repos.
+		// A directory can exist but have a broken .git link (e.g. if the
+		// container deleted the .git file), so check both.
 		for _, wt := range worktreePaths {
 			if _, statErr := os.Stat(wt); statErr != nil {
 				logger.Runner.Warn("stored worktree path missing, will recreate",
+					"task", taskID, "path", wt)
+				needSetup = true
+				break
+			}
+			if !gitutil.IsGitRepo(wt) {
+				logger.Runner.Warn("stored worktree path is not a valid git repo, will recreate",
 					"task", taskID, "path", wt)
 				needSetup = true
 				break
@@ -943,6 +966,18 @@ func inferPassFromContent(result string, customPass, customFail []string) string
 	if succeedPattern.MatchString(result) {
 		return "pass"
 	}
+
+	// LLM-style verdict inference: the test agent concluded everything is
+	// fine but forgot to emit the **PASS** marker.
+	if !llmFailureGuardPattern.MatchString(result) {
+		if satisfiesRequirementsPattern.MatchString(result) ||
+			allRequirementsMetPattern.MatchString(result) ||
+			noChangesNeededPattern.MatchString(result) ||
+			correctAsWrittenPattern.MatchString(result) {
+			return "pass"
+		}
+	}
+
 	return ""
 }
 

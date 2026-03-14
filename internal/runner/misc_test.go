@@ -1098,6 +1098,18 @@ func TestParseTestVerdict(t *testing.T) {
 		{"all green", "runs all 4 CLI cases against it (0.5 s, all green).", "pass"},
 		{"passes succeed", "Both passes succeed:\n- make test-integration\n- make test", "pass"},
 		{"tests succeed", "All tests succeed on first try.", "pass"},
+		// LLM-style verdict inference: test agent concludes pass without marker.
+		{"satisfies every requirement", "The workflow satisfies every requirement. No issues found.", "pass"},
+		{"satisfies all requirements", "The implementation satisfies all requirements listed above.", "pass"},
+		{"no changes needed", "No changes are needed — the code is correct.", "pass"},
+		{"no changes required", "No changes required to meet the acceptance criteria.", "pass"},
+		{"meets all requirements", "The code meets all requirements specified in the task.", "pass"},
+		{"all requirements met", "All requirements are met as verified by running the tests.", "pass"},
+		{"correct as written", "The workflow is correct as written.", "pass"},
+		{"correct as-is", "The implementation is correct as-is.", "pass"},
+		// LLM-style: failure guard prevents false pass.
+		{"satisfies but requirement not met", "Satisfies every requirement except one.\nRequirement not met: missing lint step.", ""},
+		{"no changes needed but fails to meet", "No changes needed for A, but fails to satisfy B.", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

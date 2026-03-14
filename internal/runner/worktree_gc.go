@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"changkun.de/wallfacer/internal/gitutil"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -37,6 +38,15 @@ func (r *Runner) ScanMissingTaskWorktrees(ctx context.Context) ([]store.Task, er
 				if _, statErr := os.Stat(path); os.IsNotExist(statErr) {
 					missing = append(missing, task)
 					break // one missing path is enough to flag the task
+				} else if statErr == nil && !gitutil.IsGitRepo(path) {
+					// Directory exists but .git link is broken (e.g. container
+					// deleted the .git file). Remove the broken directory so
+					// ensureTaskWorktrees can recreate it cleanly.
+					logger.Runner.Warn("worktree health: directory exists but is not a valid git repo, removing",
+						"task", task.ID, "path", path)
+					os.RemoveAll(path)
+					missing = append(missing, task)
+					break
 				}
 			}
 		}
