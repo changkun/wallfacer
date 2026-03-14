@@ -233,7 +233,7 @@ func (h *Handler) ForkTask(w http.ResponseWriter, r *http.Request, sourceID uuid
 		return
 	}
 
-	h.store.InsertEvent(r.Context(), newTask.ID, store.EventTypeSystem, map[string]string{
+	h.insertEventOrLog(r.Context(), newTask.ID, store.EventTypeSystem, map[string]string{
 		"message": fmt.Sprintf("forked from task %s", sourceID.String()[:8]),
 	})
 	h.runner.GenerateTitleBackground(newTask.ID, newTask.Prompt)
