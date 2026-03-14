@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -143,5 +145,63 @@ func TestTryAutoPromote_Phase1StoreErrorsLogAndOpenBreaker(t *testing.T) {
 				t.Fatalf("expected store error in log, got %q", logOutput)
 			}
 		})
+	}
+}
+
+// TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker verifies that a
+// store write failure inside tryAutoTest's Phase2 loop (e.g. UpdateTaskTestRun
+// or UpdateTaskStatus) uses recordFailure on the "auto-test" breaker rather
+// than pauseAllAutomation, so global autopilot remains enabled and no other
+// watcher breakers are affected.
+func TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+	h.SetAutotest(true)
+
+	ctx := context.Background()
+
+	// Create a real git repo so Phase1's CommitsBehind check returns 0 (not behind).
+	repo := setupRepo(t)
+
+	// Create and advance the task to waiting status.
+	task, err := h.store.CreateTask(ctx, "auto-test candidate", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("UpdateTaskStatus waiting: %v", err)
+	}
+	// Set worktree paths so Phase1 finds the task as an eligible candidate.
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	// Make the task directory read-only so Phase2 store writes fail.
+	taskDir := filepath.Join(h.store.DataDir(), task.ID.String())
+	if err := os.Chmod(taskDir, 0555); err != nil {
+		t.Fatalf("chmod read-only: %v", err)
+	}
+	// Restore write permission before cleanup (os.RemoveAll) runs; t.Cleanup
+	// callbacks execute in LIFO order, so this runs before newTestHandler's cleanup.
+	t.Cleanup(func() { os.Chmod(taskDir, 0755) })
+
+	h.tryAutoTest(ctx)
+
+	// Global automation must NOT be paused — a transient store error must only
+	// open the per-watcher breaker, not the global autopilot toggle.
+	if !h.AutopilotEnabled() {
+		t.Error("AutopilotEnabled() = false after store error in tryAutoTest; expected true")
+	}
+	if !h.breakers["auto-test"].isOpen() {
+		t.Error("expected auto-test breaker to be open after store write failure in Phase2")
+	}
+	if h.breakers["auto-promote"].isOpen() {
+		t.Error("auto-promote breaker must remain closed after auto-test store error")
+	}
+	if h.breakers["auto-submit"].isOpen() {
+		t.Error("auto-submit breaker must remain closed after auto-test store error")
 	}
 }
