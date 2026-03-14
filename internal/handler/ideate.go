@@ -21,9 +21,9 @@ func (h *Handler) StartIdeationWatcher(ctx context.Context) {
 	// Kick off the first brainstorm run (or timer) right away.
 	go h.maybeScheduleNextIdeation(ctx)
 
-	subID, ch := h.store.Subscribe()
+	subID, ch := h.store.SubscribeWake()
 	go func() {
-		defer h.store.Unsubscribe(subID)
+		defer h.store.UnsubscribeWake(subID)
 		for {
 			select {
 			case <-ctx.Done():

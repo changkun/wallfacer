@@ -93,10 +93,10 @@ var promoteMu sync.Mutex
 // periodically so that scheduled tasks are promoted even when no other
 // state change occurs.
 func (h *Handler) StartAutoPromoter(ctx context.Context) {
-	subID, ch := h.store.Subscribe()
+	subID, ch := h.store.SubscribeWake()
 	ticker := time.NewTicker(60 * time.Second)
 	go func() {
-		defer h.store.Unsubscribe(subID)
+		defer h.store.UnsubscribeWake(subID)
 		defer ticker.Stop()
 		for {
 			select {
@@ -129,8 +129,8 @@ var retryableCategories = map[store.FailureCategory]bool{
 // may have been missed while the server was down.
 func (h *Handler) StartAutoRetrier(ctx context.Context) {
 	go func() {
-		subID, ch := h.store.Subscribe()
-		defer h.store.Unsubscribe(subID)
+		subID, ch := h.store.SubscribeWake()
+		defer h.store.UnsubscribeWake(subID)
 
 		// Recovery scan: retry any eligible failed tasks that predate startup.
 		failed, _ := h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
@@ -142,15 +142,10 @@ func (h *Handler) StartAutoRetrier(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case delta, ok := <-ch:
-				if !ok {
-					return
-				}
-				if delta.Deleted || delta.Task == nil {
-					continue
-				}
-				if delta.Task.Status == store.TaskStatusFailed {
-					h.tryAutoRetry(ctx, *delta.Task)
+			case <-ch:
+				failed, _ := h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
+				for _, t := range failed {
+					h.tryAutoRetry(ctx, t)
 				}
 			}
 		}
@@ -522,10 +517,10 @@ const autoTestInterval = 30 * time.Second
 // triggers the test agent for waiting tasks that are untested and not behind
 // the default branch tip.
 func (h *Handler) StartAutoTester(ctx context.Context) {
-	subID, ch := h.store.Subscribe()
+	subID, ch := h.store.SubscribeWake()
 	ticker := time.NewTicker(autoTestInterval)
 	go func() {
-		defer h.store.Unsubscribe(subID)
+		defer h.store.UnsubscribeWake(subID)
 		defer ticker.Stop()
 		for {
 			select {
@@ -729,10 +724,10 @@ const autoSubmitInterval = 30 * time.Second
 // moves waiting tasks to done when they are verified (LastTestResult == "pass"),
 // not behind the default branch tip, and have no unresolved worktree conflicts.
 func (h *Handler) StartAutoSubmitter(ctx context.Context) {
-	subID, ch := h.store.Subscribe()
+	subID, ch := h.store.SubscribeWake()
 	ticker := time.NewTicker(autoSubmitInterval)
 	go func() {
-		defer h.store.Unsubscribe(subID)
+		defer h.store.UnsubscribeWake(subID)
 		defer ticker.Stop()
 		for {
 			select {
@@ -909,10 +904,10 @@ const autoRefineInterval = 30 * time.Second
 // StartAutoRefiner subscribes to store change notifications and automatically
 // triggers the refinement agent for backlog tasks that have not yet been refined.
 func (h *Handler) StartAutoRefiner(ctx context.Context) {
-	subID, ch := h.store.Subscribe()
+	subID, ch := h.store.SubscribeWake()
 	ticker := time.NewTicker(autoRefineInterval)
 	go func() {
-		defer h.store.Unsubscribe(subID)
+		defer h.store.UnsubscribeWake(subID)
 		defer ticker.Stop()
 		for {
 			select {

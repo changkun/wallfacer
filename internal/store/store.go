@@ -76,6 +76,10 @@ type Store struct {
 	subscribers map[int]chan SequencedDelta
 	nextSubID   int
 
+	wakeSubMu       sync.Mutex
+	wakeSubscribers map[int]chan struct{}
+	nextWakeSubID   int
+
 	// Payload pruning limits. A value of 0 disables pruning for that field.
 	// Configured at startup from environment variables with fallback to the
 	// Default* constants in models.go.
@@ -110,6 +114,7 @@ func NewStore(dir string) (*Store, error) {
 		tasksByStatus:       make(map[TaskStatus]map[uuid.UUID]struct{}),
 		searchIndex:         make(map[uuid.UUID]indexedTaskText),
 		subscribers:         make(map[int]chan SequencedDelta),
+		wakeSubscribers:     make(map[int]chan struct{}),
 		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", DefaultRetryHistoryLimit),
 		refineSessionsLimit: readEnvInt("WALLFACER_REFINE_SESSIONS_LIMIT", DefaultRefineSessionsLimit),
 		promptHistoryLimit:  readEnvInt("WALLFACER_PROMPT_HISTORY_LIMIT", DefaultPromptHistoryLimit),

@@ -66,6 +66,35 @@ func (s *Store) Unsubscribe(id int) {
 	}
 }
 
+// SubscribeWake registers a lightweight wake channel that receives a struct{}
+// signal whenever task state changes. The channel has capacity 1 so that rapid
+// bursts of notifications coalesce: once the channel is full, subsequent sends
+// are dropped (the pending signal is already sufficient). The caller must call
+// UnsubscribeWake with the returned ID when done.
+func (s *Store) SubscribeWake() (int, <-chan struct{}) {
+	s.wakeSubMu.Lock()
+	defer s.wakeSubMu.Unlock()
+	id := s.nextWakeSubID
+	s.nextWakeSubID++
+	ch := make(chan struct{}, 1)
+	s.wakeSubscribers[id] = ch
+	return id, ch
+}
+
+// UnsubscribeWake removes the wake subscriber and drains any buffered signal.
+func (s *Store) UnsubscribeWake(id int) {
+	s.wakeSubMu.Lock()
+	ch, ok := s.wakeSubscribers[id]
+	delete(s.wakeSubscribers, id)
+	s.wakeSubMu.Unlock()
+	if ok {
+		select {
+		case <-ch:
+		default:
+		}
+	}
+}
+
 // notify stamps a TaskDelta with a sequence number, appends it to the bounded
 // replay buffer, and pushes it to all SSE subscribers. Non-blocking: if a
 // subscriber's buffer is already full, the delta is dropped for that subscriber.
@@ -93,13 +122,24 @@ func (s *Store) notify(task *Task, deleted bool) {
 
 	// Fan out to live subscribers.
 	s.subMu.Lock()
-	defer s.subMu.Unlock()
 	for _, ch := range s.subscribers {
 		select {
 		case ch <- cloneSequencedDelta(sd):
 		default:
 		}
 	}
+	s.subMu.Unlock()
+
+	// Fan out wake signal to wake-only subscribers. The capacity-1 channel
+	// coalesces bursts: if a signal is already pending, the send is a no-op.
+	s.wakeSubMu.Lock()
+	for _, ch := range s.wakeSubscribers {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+	s.wakeSubMu.Unlock()
 }
 
 // LatestDeltaSeq returns the sequence number of the most recently emitted delta.
