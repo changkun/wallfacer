@@ -255,6 +255,86 @@ func TestSubscribe_DeltaPayloadIsIsolatedFromStoreAndReplay(t *testing.T) {
 	}
 }
 
+// --- SubscribeWake / UnsubscribeWake tests ---
+
+// TestSubscribeWake_ReceivesSignal verifies that a wake subscriber receives a
+// signal after a notify call.
+func TestSubscribeWake_ReceivesSignal(t *testing.T) {
+	s := newTestStore(t)
+	id, ch := s.SubscribeWake()
+	defer s.UnsubscribeWake(id)
+
+	dummy := &Task{}
+	s.notify(dummy, false)
+
+	select {
+	case <-ch:
+	case <-time.After(time.Second):
+		t.Error("expected wake signal after notify, timed out")
+	}
+}
+
+// TestSubscribeWake_BurstCoalescing verifies that 100 rapid notify calls result
+// in exactly 1 or 2 receives on the wake channel (burst coalescing), and that
+// no notify call blocks.
+func TestSubscribeWake_BurstCoalescing(t *testing.T) {
+	s := newTestStore(t)
+	id, ch := s.SubscribeWake()
+	defer s.UnsubscribeWake(id)
+
+	dummy := &Task{}
+
+	// Fire 100 rapid notify calls without draining — must not block.
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 100; i++ {
+			s.notify(dummy, false)
+		}
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("notify calls blocked unexpectedly")
+	}
+
+	// Drain all available signals. With a capacity-1 channel and non-blocking
+	// sends, at most 1 signal should be buffered after the burst. A count of 2
+	// is also acceptable in case a receive races with a concurrent send.
+	received := 0
+	for {
+		select {
+		case <-ch:
+			received++
+		default:
+			goto drained
+		}
+	}
+drained:
+	if received < 1 || received > 2 {
+		t.Errorf("expected 1 or 2 wake receives after 100 notifies (burst coalescing), got %d", received)
+	}
+}
+
+// TestUnsubscribeWake_StopsSignals verifies that no signal is received after
+// UnsubscribeWake is called.
+func TestUnsubscribeWake_StopsSignals(t *testing.T) {
+	s := newTestStore(t)
+	id, ch := s.SubscribeWake()
+	s.UnsubscribeWake(id)
+
+	dummy := &Task{}
+	s.notify(dummy, false)
+
+	select {
+	case <-ch:
+		t.Error("should not receive wake signal after UnsubscribeWake")
+	case <-time.After(20 * time.Millisecond):
+		// correct: no signal received
+	}
+}
+
 // --- Replay buffer and sequence ID tests ---
 
 // TestNotify_StampsMonotonicSeq verifies that each delta emitted by notify gets
