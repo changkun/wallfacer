@@ -228,6 +228,18 @@ func BranchTipCommit(repoPath, branch string) (hash, subject string, ts time.Tim
 	return
 }
 
+// FetchOrigin runs `git fetch origin` in the given repository path to update
+// remote tracking refs. Returns an error if the fetch fails (e.g. no network,
+// no remote configured). Callers should log the error and continue — stale
+// refs are better than aborting the operation entirely.
+func FetchOrigin(repoPath string) error {
+	out, err := exec.Command("git", "-C", repoPath, "fetch", "origin").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git fetch origin in %s: %w\n%s", repoPath, err, out)
+	}
+	return nil
+}
+
 // IsConflictOutput reports whether git output text indicates a merge conflict.
 func IsConflictOutput(s string) bool {
 	return strings.Contains(s, "CONFLICT") ||

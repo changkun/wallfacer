@@ -136,6 +136,11 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 	if err := h.store.UpdateTaskPendingTestFeedback(ctx, task.ID, ""); err != nil {
 		return err
 	}
+	// Reset the consecutive test failure counter so the auto-resume cycle
+	// can start fresh after manual intervention.
+	if err := h.store.ResetTestFailCount(ctx, task.ID); err != nil {
+		return err
+	}
 	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		return err
 	}

@@ -18,6 +18,11 @@ import (
 
 const defaultMaxConcurrentTasks = 5
 
+// maxTestFailRetries is the maximum number of consecutive test failures before
+// the auto-resume cycle is halted. After this many failures without a passing
+// test or manual feedback, the task stays in waiting until the user intervenes.
+const maxTestFailRetries = 3
+
 // defaultMaxTestConcurrentTasks is used when WALLFACER_MAX_TEST_PARALLEL is not set.
 const defaultMaxTestConcurrentTasks = 2
 
@@ -252,6 +257,12 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				if t.SessionID == nil || *t.SessionID == "" {
 					continue
 				}
+				// Cap: skip tasks that have failed too many consecutive tests.
+				if t.TestFailCount >= maxTestFailRetries {
+					logger.Handler.Info("auto-promote: skipping task — test fail cap reached",
+						"task", t.ID, "test_fail_count", t.TestFailCount, "max", maxTestFailRetries)
+					continue
+				}
 				if resumeCandidate == nil || t.Position < resumeCandidate.task.Position {
 					cp := *t
 					resumeCandidate = &autoResumeCandidate{
@@ -312,6 +323,14 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					return false, nil
 				}
 				if freshTask.SessionID == nil || *freshTask.SessionID == "" {
+					return false, nil
+				}
+				if freshTask.TestFailCount >= maxTestFailRetries {
+					logger.Handler.Info("auto-promote: test fail cap reached, stopping auto-resume",
+						"task", freshTask.ID, "test_fail_count", freshTask.TestFailCount)
+					h.insertEventOrLog(ctx, freshTask.ID, store.EventTypeSystem, map[string]string{
+						"result": fmt.Sprintf("Auto-resume halted: %d consecutive test failures (cap: %d). Manual feedback required to continue.", freshTask.TestFailCount, maxTestFailRetries),
+					})
 					return false, nil
 				}
 
@@ -474,6 +493,11 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			if !gitutil.IsGitRepo(worktreePath) {
 				// Directory exists but .git link is broken; skip silently.
 				continue
+			}
+			// Fetch from remote so CommitsBehind operates on up-to-date refs.
+			if fetchErr := gitutil.FetchOrigin(repoPath); fetchErr != nil {
+				logger.Handler.Warn("auto-sync: git fetch failed, continuing with local refs",
+					"task", t.ID, "repo", repoPath, "error", fetchErr)
 			}
 			n, err := gitutil.CommitsBehind(repoPath, worktreePath)
 			if err != nil {
