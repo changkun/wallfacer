@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"changkun.de/wallfacer/internal/logger"
 )
 
 // fileIndexTTL is the default time-to-live for a cached workspace file list.
@@ -61,11 +63,19 @@ func workspaceMtime(ws string) (time.Time, error) {
 // start. Hidden directories and entries in skipDirs are skipped. The list is
 // capped at maxFileListSize.
 func buildFiles(ws string) ([]string, time.Time) {
-	mtime, _ := workspaceMtime(ws)
+	mtime, err := workspaceMtime(ws)
+	if err != nil {
+		logger.Handler.Warn("file-index: workspace mtime unavailable", "workspace", ws, "error", err)
+		mtime = time.Now()
+	}
 	files := make([]string, 0, 256)
 	base := filepath.Base(ws)
 	_ = filepath.Walk(ws, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			logger.Handler.Warn("file-index: walk error", "path", path, "error", err)
+			if info != nil && info.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if info.IsDir() {
@@ -80,6 +90,7 @@ func buildFiles(ws string) ([]string, time.Time) {
 		}
 		rel, relErr := filepath.Rel(ws, path)
 		if relErr != nil {
+			logger.Handler.Warn("file-index: rel path error", "workspace", ws, "path", path, "error", relErr)
 			return nil
 		}
 		files = append(files, filepath.ToSlash(filepath.Join(base, rel)))
