@@ -364,7 +364,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	mux := http.NewServeMux()
 
 	// Static files (task board UI).
-	uiFS, _ := fsLib.Sub(uiFiles, "ui")
+	uiFS, err := fsLib.Sub(uiFiles, "ui")
+	if err != nil {
+		logger.Fatal(logger.Main, "sub ui fs", "error", err)
+	}
 	indexTemplates, err := template.New("index.html").ParseFS(uiFS, "index.html", "partials/*.html")
 	if err != nil {
 		logger.Fatal(logger.Main, "parse ui templates", "error", err)

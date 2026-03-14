@@ -20,19 +20,31 @@ func setupNonGitSnapshot(ws, snapshotPath string) error {
 	// Copy all files (including hidden) from ws into the snapshot.
 	// The trailing "/." on the source ensures hidden files are included.
 	if out, err := exec.Command("cp", "-a", ws+"/.", snapshotPath).CombinedOutput(); err != nil {
-		os.RemoveAll(snapshotPath)
+		if rmErr := os.RemoveAll(snapshotPath); rmErr != nil {
+			logger.Runner.Warn("snapshot cleanup failed after cp error", "path", snapshotPath, "error", rmErr)
+		}
 		return fmt.Errorf("cp workspace to snapshot: %w\n%s", err, out)
 	}
 	// Initialise a git repo so Phase 1 (hostStageAndCommit) can commit changes.
 	if out, err := exec.Command("git", "-C", snapshotPath, "init").CombinedOutput(); err != nil {
-		os.RemoveAll(snapshotPath)
+		if rmErr := os.RemoveAll(snapshotPath); rmErr != nil {
+			logger.Runner.Warn("snapshot cleanup failed after git init error", "path", snapshotPath, "error", rmErr)
+		}
 		return fmt.Errorf("git init snapshot: %w\n%s", err, out)
 	}
-	exec.Command("git", "-C", snapshotPath, "config", "user.email", "wallfacer@local").Run()
-	exec.Command("git", "-C", snapshotPath, "config", "user.name", "Wallfacer").Run()
-	exec.Command("git", "-C", snapshotPath, "add", "-A").Run()
+	if err := exec.Command("git", "-C", snapshotPath, "config", "user.email", "wallfacer@local").Run(); err != nil {
+		logger.Runner.Warn("snapshot git config user.email", "path", snapshotPath, "error", err)
+	}
+	if err := exec.Command("git", "-C", snapshotPath, "config", "user.name", "Wallfacer").Run(); err != nil {
+		logger.Runner.Warn("snapshot git config user.name", "path", snapshotPath, "error", err)
+	}
+	if err := exec.Command("git", "-C", snapshotPath, "add", "-A").Run(); err != nil {
+		logger.Runner.Warn("snapshot git add", "path", snapshotPath, "error", err)
+	}
 	// --allow-empty handles the edge case of an empty workspace.
-	exec.Command("git", "-C", snapshotPath, "commit", "--allow-empty", "-m", "wallfacer: initial snapshot").Run()
+	if err := exec.Command("git", "-C", snapshotPath, "commit", "--allow-empty", "-m", "wallfacer: initial snapshot").Run(); err != nil {
+		logger.Runner.Warn("snapshot git commit", "path", snapshotPath, "error", err)
+	}
 	return nil
 }
 
@@ -62,6 +74,8 @@ func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
 		return fmt.Errorf("cp snapshot to workspace: %w\n%s", err, out)
 	}
 	// Remove the .git directory that cp may have brought over from the snapshot.
-	os.RemoveAll(filepath.Join(targetPath, ".git"))
+	if err := os.RemoveAll(filepath.Join(targetPath, ".git")); err != nil {
+		logger.Runner.Warn("failed to remove .git from extracted snapshot", "path", targetPath, "error", err)
+	}
 	return nil
 }

@@ -10,11 +10,16 @@ import (
 // StashIfDirty stashes uncommitted changes in worktreePath if the working tree
 // is dirty. Returns true if a stash entry was created.
 func StashIfDirty(worktreePath string) bool {
-	out, _ := exec.Command("git", "-C", worktreePath, "status", "--porcelain").Output()
+	out, err := exec.Command("git", "-C", worktreePath, "status", "--porcelain").Output()
+	if err != nil {
+		slog.Default().With("component", "git").Warn("git status failed in StashIfDirty; assuming clean",
+			"path", worktreePath, "error", err)
+		return false
+	}
 	if len(strings.TrimSpace(string(out))) == 0 {
 		return false
 	}
-	err := exec.Command("git", "-C", worktreePath, "stash", "--include-untracked").Run()
+	err = exec.Command("git", "-C", worktreePath, "stash", "--include-untracked").Run()
 	return err == nil
 }
 

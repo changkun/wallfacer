@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -424,7 +425,11 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			if depIdx, ok := refToIdx[dep]; ok {
 				depID = preAssignedIDs[depIdx]
 			} else {
-				depID, _ = uuid.Parse(dep)
+				var parseErr error
+				depID, parseErr = uuid.Parse(dep)
+				if parseErr != nil {
+					logger.Handler.Warn("batch create: invalid dependency ref UUID", "ref", dep, "error", parseErr)
+				}
 			}
 			combinedAdj[myID] = append(combinedAdj[myID], depID)
 		}
