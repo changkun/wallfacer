@@ -71,10 +71,8 @@ func isIdeaDuplicateTitle(added map[string]struct{}, title string) bool {
 	if current == "" {
 		return true
 	}
-	for existing := range added {
-		if existing == current || strings.Contains(existing, current) || strings.Contains(current, existing) {
-			return true
-		}
+	if _, ok := added[current]; ok {
+		return true
 	}
 	added[current] = struct{}{}
 	return false
