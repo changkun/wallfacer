@@ -190,3 +190,24 @@ func TestBuildTaskPathExpr_Substitution(t *testing.T) {
 		}
 	}
 }
+
+func TestRoute_FullPattern(t *testing.T) {
+	r := Route{Method: "GET", Pattern: "/api/tasks"}
+	got := r.FullPattern()
+	want := "GET /api/tasks"
+	if got != want {
+		t.Errorf("FullPattern() = %q, want %q", got, want)
+	}
+}
+
+func TestRoute_FullPattern_AllRoutes(t *testing.T) {
+	for _, r := range Routes {
+		fp := r.FullPattern()
+		if fp == "" {
+			t.Errorf("Route %q FullPattern() = empty string", r.Name)
+		}
+		if fp[0:len(r.Method)] != r.Method {
+			t.Errorf("FullPattern() %q does not start with method %q", fp, r.Method)
+		}
+	}
+}

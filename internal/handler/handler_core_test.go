@@ -378,3 +378,126 @@ func TestTryAutoPromote_PromotesManualTaskButNotIdeaAgentKind(t *testing.T) {
 		t.Errorf("manual task: expected promotion out of backlog, still in backlog")
 	}
 }
+
+// TestStatusError_Error verifies that the statusError type implements error correctly.
+func TestStatusError_Error(t *testing.T) {
+	err := httpErrorf(http.StatusBadRequest, "invalid %s", "input")
+	if err == nil {
+		t.Fatal("expected non-nil error from httpErrorf")
+	}
+	if err.Error() != "invalid input" {
+		t.Errorf("Error() = %q, want %q", err.Error(), "invalid input")
+	}
+}
+
+// TestHasStore_WithStore verifies that hasStore returns true when the handler
+// has a configured store.
+func TestHasStore_WithStore(t *testing.T) {
+	h := newTestHandler(t)
+	if !h.hasStore() {
+		t.Error("expected hasStore=true when handler has a store")
+	}
+}
+
+// TestHasStore_WithoutStore verifies that hasStore returns false when no
+// workspaces are configured.
+func TestHasStore_WithoutStore(t *testing.T) {
+	h := &Handler{} // no store
+	if h.hasStore() {
+		t.Error("expected hasStore=false for handler with no store")
+	}
+}
+
+// TestRequireStore_WithStore verifies that requireStore returns the store
+// and true when the handler has a store configured.
+func TestRequireStore_WithStore(t *testing.T) {
+	h := newTestHandler(t)
+	w := httptest.NewRecorder()
+	s, ok := h.requireStore(w)
+	if !ok {
+		t.Error("expected requireStore to return ok=true")
+	}
+	if s == nil {
+		t.Error("expected non-nil store from requireStore")
+	}
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 response code, got %d", w.Code)
+	}
+}
+
+// TestRequireStore_WithoutStore verifies that requireStore writes a 503 and
+// returns nil, false when no store is configured.
+func TestRequireStore_WithoutStore(t *testing.T) {
+	h := &Handler{} // no store
+	w := httptest.NewRecorder()
+	s, ok := h.requireStore(w)
+	if ok {
+		t.Error("expected requireStore to return ok=false with no store")
+	}
+	if s != nil {
+		t.Error("expected nil store from requireStore with no store")
+	}
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+}
+
+// TestRequireStoreMiddleware_WithStore verifies that RequireStoreMiddleware
+// passes through to the next handler when a store is configured.
+func TestRequireStoreMiddleware_WithStore(t *testing.T) {
+	h := newTestHandler(t)
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := h.RequireStoreMiddleware(next)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	mw.ServeHTTP(w, req)
+	if !called {
+		t.Error("expected next handler to be called when store is present")
+	}
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+// TestRequireStoreMiddleware_WithoutStore verifies that RequireStoreMiddleware
+// returns a 503 and does not call next when no store is configured.
+func TestRequireStoreMiddleware_WithoutStore(t *testing.T) {
+	h := &Handler{} // no store
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	})
+	mw := h.RequireStoreMiddleware(next)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	mw.ServeHTTP(w, req)
+	if called {
+		t.Error("expected next handler NOT to be called when store is absent")
+	}
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503, got %d", w.Code)
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(strings.NewReader(w.Body.String())).Decode(&resp); err == nil {
+		if resp["error"] == "" {
+			t.Error("expected non-empty error in response body")
+		}
+	}
+}
+
+// TestSetAutopush_Toggle verifies that SetAutopush toggles the autopush state.
+func TestSetAutopush_Toggle(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopush(true)
+	if !h.AutopushEnabled() {
+		t.Error("expected autopush=true after SetAutopush(true)")
+	}
+	h.SetAutopush(false)
+	if h.AutopushEnabled() {
+		t.Error("expected autopush=false after SetAutopush(false)")
+	}
+}

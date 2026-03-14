@@ -198,3 +198,18 @@ func TestDecodeJSONBody_Returns413ForMaxBytesError(t *testing.T) {
 
 	assertBodyTooLarge(t, w)
 }
+
+// TestMaxBytesMiddleware_AllowsSmallBody verifies that small bodies pass through.
+func TestMaxBytesMiddleware_AllowsSmallBody(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := MaxBytesMiddleware(1024)(next)
+	body := strings.NewReader(`{"key":"value"}`)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, "/", body)
+	w := httptest.NewRecorder()
+	mw.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for small body, got %d", w.Code)
+	}
+}

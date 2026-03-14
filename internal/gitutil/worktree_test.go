@@ -88,3 +88,58 @@ func TestRemoveWorktree(t *testing.T) {
 		}
 	})
 }
+
+func TestCreateWorktreeAt(t *testing.T) {
+	t.Run("creates worktree at specific commit", func(t *testing.T) {
+		repo := setupRepo(t)
+		baseCommit := gitRun(t, repo, "rev-parse", "HEAD")
+		wtDir := filepath.Join(t.TempDir(), "wt-at")
+
+		if err := CreateWorktreeAt(repo, wtDir, "at-branch", baseCommit); err != nil {
+			t.Fatalf("CreateWorktreeAt: %v", err)
+		}
+		if _, err := os.Stat(wtDir); os.IsNotExist(err) {
+			t.Error("worktree directory was not created")
+		}
+		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "at-branch") })
+	})
+
+	t.Run("handles existing branch by delete and recreate", func(t *testing.T) {
+		repo := setupRepo(t)
+		baseCommit := gitRun(t, repo, "rev-parse", "HEAD")
+		wtDir := filepath.Join(t.TempDir(), "wt-at2")
+
+		// Create once.
+		if err := CreateWorktreeAt(repo, wtDir, "at-branch2", baseCommit); err != nil {
+			t.Fatalf("first CreateWorktreeAt: %v", err)
+		}
+		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "at-branch2") })
+
+		// Remove dir but keep branch — simulates server restart.
+		os.RemoveAll(wtDir)
+
+		// Create again at same commit.
+		if err := CreateWorktreeAt(repo, wtDir, "at-branch2", baseCommit); err != nil {
+			t.Fatalf("second CreateWorktreeAt: %v", err)
+		}
+	})
+}
+
+func TestResolveHead(t *testing.T) {
+	t.Run("returns 40-char hash for valid repo", func(t *testing.T) {
+		repo := setupRepo(t)
+		hash, err := ResolveHead(repo)
+		if err != nil {
+			t.Fatalf("ResolveHead: %v", err)
+		}
+		if len(hash) != 40 {
+			t.Errorf("hash len = %d, want 40; got %q", len(hash), hash)
+		}
+	})
+
+	t.Run("returns error for non-git directory", func(t *testing.T) {
+		if _, err := ResolveHead(t.TempDir()); err == nil {
+			t.Error("expected error for non-git path")
+		}
+	})
+}

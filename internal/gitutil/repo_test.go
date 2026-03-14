@@ -144,3 +144,44 @@ func TestGetCommitHash(t *testing.T) {
 		}
 	})
 }
+
+func TestHasCommits(t *testing.T) {
+	t.Run("repo with commits returns true", func(t *testing.T) {
+		repo := setupRepo(t)
+		if !HasCommits(repo) {
+			t.Error("expected HasCommits=true for repo with commits")
+		}
+	})
+
+	t.Run("empty non-git dir returns false", func(t *testing.T) {
+		if HasCommits(t.TempDir()) {
+			t.Error("expected HasCommits=false for non-git directory")
+		}
+	})
+}
+
+func TestConflictError_Error(t *testing.T) {
+	e := &ConflictError{
+		WorktreePath:    "/repo/wt",
+		ConflictedFiles: []string{"a.go", "b.go"},
+	}
+	msg := e.Error()
+	if msg == "" {
+		t.Error("expected non-empty error message")
+	}
+	if !contains(msg, "2") {
+		t.Errorf("error message should mention 2 conflicted files, got: %q", msg)
+	}
+}
+
+func contains(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
+		func() bool {
+			for i := 0; i <= len(s)-len(sub); i++ {
+				if s[i:i+len(sub)] == sub {
+					return true
+				}
+			}
+			return false
+		}())
+}
