@@ -232,6 +232,10 @@ function makeRaceContext(overrides = {}) {
     DEFAULT_TASK_TIMEOUT: 60,
   });
 
+  ctx.findTaskById = function(taskId) {
+    return (ctx.tasks || []).find((task) => task.id === taskId) || null;
+  };
+
   loadScript('modal-core.js', ctx);
   return { ctx, elements };
 }
@@ -312,5 +316,62 @@ describe('modal open race safety', () => {
     expect(elements['modal-events'].innerHTML).toContain('resolver handoff');
     expect(elements['modal-events'].innerHTML).toContain('repo-a');
     expect(elements['modal-events'].innerHTML).toContain('attempt 3/3');
+  });
+
+  it('renders dependency rows with title fallback, removed entries, and summary text', () => {
+    const { ctx, elements } = makeRaceContext();
+    vm.runInContext(
+      `tasks = [
+        {
+          id: 'dep-1',
+          status: 'in_progress',
+          prompt: 'dependency prompt',
+          created_at: '${new Date().toISOString()}',
+          title: '',
+          tags: [],
+          usage: null,
+          usage_breakdown: null,
+          worktree_paths: {},
+          prompt_history: [],
+          session_id: null,
+          turns: 0,
+          is_test_run: false,
+          last_test_result: null,
+          test_run_start_turn: 0,
+          archived: false,
+          result: null
+        },
+        {
+          id: 'task-1',
+          status: 'backlog',
+          prompt: 'task prompt',
+          created_at: '${new Date().toISOString()}',
+          title: 'Task 1',
+          depends_on: ['dep-1', 'missing-dep'],
+          tags: [],
+          usage: null,
+          usage_breakdown: null,
+          worktree_paths: {},
+          prompt_history: [],
+          session_id: null,
+          turns: 0,
+          is_test_run: false,
+          last_test_result: null,
+          test_run_start_turn: 0,
+          archived: false,
+          result: null
+        }
+      ];`,
+      ctx,
+    );
+
+    vm.runInContext("renderModalDependencies(tasks[1])", ctx);
+
+    expect(elements['modal-dependencies'].classList.contains('hidden')).toBe(false);
+    expect(elements['modal-dependencies-list'].innerHTML).toContain('in progress');
+    expect(elements['modal-dependencies-list'].innerHTML).toContain("openModal('dep-1')");
+    expect(elements['modal-dependencies-list'].innerHTML).toContain('dep-1');
+    expect(elements['modal-dependencies-list'].innerHTML).toContain('[removed] missing-');
+    expect(elements['modal-dependencies-summary'].textContent).toBe('Waiting on 2 of 2 tasks');
   });
 });

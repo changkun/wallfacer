@@ -57,6 +57,13 @@ function renderTaskTagBadges(tags) {
   return tags.map(renderTaskTagBadge).join('');
 }
 
+function getTaskDependencyIds(task) {
+  if (!task || typeof task !== 'object') return [];
+  if (Array.isArray(task.depends_on)) return task.depends_on;
+  if (Array.isArray(task.dependencies)) return task.dependencies;
+  return [];
+}
+
 // formatRelativeTime returns a short human-readable relative time string for a
 // future Date, e.g. "in 3h", "in 45m", "in 2d". Returns '' for past dates.
 function formatRelativeTime(date) {
@@ -164,18 +171,30 @@ function toggleBacklogSort() {
 // --- Dependency badge helpers ---
 
 function areDepsBlocked(t) {
-  if (!t.depends_on || t.depends_on.length === 0) return false;
+  var depIds = getTaskDependencyIds(t);
+  if (depIds.length === 0) return false;
   _ensureTaskIndexes();
-  return t.depends_on.some(function(depId) {
+  return depIds.some(function(depId) {
     var dep = _renderableTaskIndex.get(depId);
     return !dep || (dep.status !== 'done' && dep.status !== 'cancelled');
   });
 }
 
-function getBlockingTaskNames(t) {
-  if (!t.depends_on) return '';
+function getUnmetDependencyCount(t) {
+  var depIds = getTaskDependencyIds(t);
+  if (depIds.length === 0) return 0;
   _ensureTaskIndexes();
-  return t.depends_on.map(function(id) {
+  return depIds.filter(function(depId) {
+    var dep = _renderableTaskIndex.get(depId);
+    return !dep || (dep.status !== 'done' && dep.status !== 'cancelled');
+  }).length;
+}
+
+function getBlockingTaskNames(t) {
+  var depIds = getTaskDependencyIds(t);
+  if (depIds.length === 0) return '';
+  _ensureTaskIndexes();
+  return depIds.map(function(id) {
     var dep = _renderableTaskIndex.get(id);
     if (dep && (dep.status === 'done' || dep.status === 'cancelled')) return null;
     if (!dep) return id.slice(0, 8) + '\u2026';
@@ -183,6 +202,28 @@ function getBlockingTaskNames(t) {
   }).filter(function(name) {
     return !!name;
   }).join(', ');
+}
+
+function _dependencyBadgeSvg(kind) {
+  if (kind === 'ready') {
+    return '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
+      '<path d="M3.5 8.5 6.5 11.5 12.5 4.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path>' +
+      '</svg>';
+  }
+  return '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
+    '<path d="M6.25 9.75 9.75 6.25M5 5a2 2 0 0 1 2-2h1.25M11 11a2 2 0 0 1-2 2H7.75M4.75 11.25l-1-1a2 2 0 0 1 0-2.5l1.5-1.5a2 2 0 0 1 2.5 0M11.25 4.75l1 1a2 2 0 0 1 0 2.5l-1.5 1.5a2 2 0 0 1-2.5 0" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"></path>' +
+    '</svg>';
+}
+
+function renderDependencyBadge(t) {
+  if (!t || t.status !== 'backlog') return '';
+  var depIds = getTaskDependencyIds(t);
+  if (depIds.length === 0) return '';
+  var unmetCount = getUnmetDependencyCount(t);
+  if (unmetCount > 0) {
+    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700 font-medium badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">${_dependencyBadgeSvg('blocked')}<span>${depIds.length} dep${depIds.length !== 1 ? 's' : ''}</span></span>`;
+  }
+  return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-emerald-100 text-emerald-700 font-medium badge badge-deps-met" title="All dependencies satisfied; ready for promotion">${_dependencyBadgeSvg('ready')}<span>ready</span></span>`;
 }
 
 function focusFirstCardInColumn(status) {
@@ -624,7 +665,7 @@ function _cardFingerprint(t, rank) {
   // Include the status of each dependency so the blocked badge updates
   // immediately when a dependency moves to done/failed without waiting for
   // the dependent task itself to change.
-  const depStatuses = (t.depends_on || []).map(depId => {
+  const depStatuses = getTaskDependencyIds(t).map(depId => {
     const dep = _taskIndex.get(depId);
     return dep ? dep.status : '';
   }).join(',');
@@ -634,7 +675,7 @@ function _cardFingerprint(t, rank) {
     !!t.fresh_start, t.timeout, t.stop_reason || '', t.last_test_result || '',
     t.sandbox || '', JSON.stringify(t.sandbox_by_activity || {}),
     !!t.mount_worktrees, JSON.stringify(t.tags || []),
-    JSON.stringify(t.depends_on || []), depStatuses,
+    JSON.stringify(getTaskDependencyIds(t)), depStatuses,
     t.current_refinement ? t.current_refinement.status : '',
     JSON.stringify(t.worktree_paths || {}), displayRank,
     filterQuery,
@@ -685,19 +726,7 @@ card.style.opacity = isArchived ? '0.55' : '';
   }
   const displayRank = rank !== undefined ? rank + 1 : t.position + 1;
   const priorityBadge = t.status === 'backlog' ? `<span class="badge badge-priority" title="Priority #${displayRank}">#${displayRank}</span>` : '';
-  let depsBadge = '';
-  if (t.status === 'backlog' && t.depends_on && t.depends_on.length > 0) {
-    _ensureTaskIndexes();
-    const unmetCount = t.depends_on.filter(function(depId) {
-      var dep = _renderableTaskIndex.get(depId);
-      return !dep || (dep.status !== 'done' && dep.status !== 'cancelled');
-    }).length;
-    if (unmetCount > 0) {
-      depsBadge = `<span class="badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">${unmetCount} dep${unmetCount !== 1 ? 's' : ''}</span>`;
-    } else {
-      depsBadge = `<span class="badge badge-deps-met" title="All dependencies satisfied">\u2713 deps</span>`;
-    }
-  }
+  const depsBadge = renderDependencyBadge(t);
   const scheduledBadge = (t.status === 'backlog' && t.scheduled_at && new Date(t.scheduled_at) > new Date())
     ? `<span class="badge badge-scheduled" title="Scheduled: ${escapeHtml(new Date(t.scheduled_at).toLocaleString())}">\u23F0 ${escapeHtml(formatRelativeTime(new Date(t.scheduled_at)))}</span>`
     : '';
@@ -839,7 +868,10 @@ card.style.opacity = isArchived ? '0.55' : '';
 if (typeof module !== 'undefined') {
   module.exports = {
     areDepsBlocked,
+    getTaskDependencyIds,
+    getUnmetDependencyCount,
     getBlockingTaskNames,
+    renderDependencyBadge,
     isTestCard,
     invalidateDiffBehindCounts,
     BEHIND_TTL_MS,

@@ -1,9 +1,97 @@
 package store
 
 import (
+	"fmt"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
+
+// TestMutateTask_UpdatedAtPersistedAfterRefactoredMethod verifies that calling
+// a refactored Update method exercises mutateTask: UpdatedAt is advanced and
+// the change is visible both in-memory and after a fresh store reload from disk.
+func TestMutateTask_UpdatedAtPersistedAfterRefactoredMethod(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "mutate test", 15, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	before := task.UpdatedAt
+
+	// Ensure the clock advances so UpdatedAt will be strictly after before.
+	time.Sleep(2 * time.Millisecond)
+
+	if err := s.UpdateTaskPosition(bg(), task.ID, 42); err != nil {
+		t.Fatalf("UpdateTaskPosition: %v", err)
+	}
+
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil || got == nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if !got.UpdatedAt.After(before) {
+		t.Errorf("expected UpdatedAt to advance: got %v, want after %v", got.UpdatedAt, before)
+	}
+	if got.Position != 42 {
+		t.Errorf("expected Position=42, got %d", got.Position)
+	}
+
+	// Verify persistence by loading through a fresh store backed by the same dir.
+	s2, err := NewStore(s.dir)
+	if err != nil {
+		t.Fatalf("NewStore (reload): %v", err)
+	}
+	loaded, err := s2.GetTask(bg(), task.ID)
+	if err != nil || loaded == nil {
+		t.Fatalf("GetTask from reloaded store: %v", err)
+	}
+	if loaded.Position != 42 {
+		t.Errorf("persisted Position: got %d, want 42", loaded.Position)
+	}
+	if !loaded.UpdatedAt.Equal(got.UpdatedAt) {
+		t.Errorf("persisted UpdatedAt mismatch: got %v, want %v", loaded.UpdatedAt, got.UpdatedAt)
+	}
+}
+
+// TestMutateTask_ErrorOnTaskNotFound verifies that mutateTask propagates a
+// "task not found" error when the supplied ID does not exist.
+func TestMutateTask_ErrorOnTaskNotFound(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.UpdateTaskPosition(bg(), uuid.New(), 1); err == nil {
+		t.Fatal("expected error for non-existent task, got nil")
+	}
+}
+
+// TestMutateTask_AbortOnFnError verifies that when fn returns an error the task
+// is not saved and UpdatedAt is not changed.
+func TestMutateTask_AbortOnFnError(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "abort test", 15, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	originalUpdatedAt := task.UpdatedAt
+
+	time.Sleep(2 * time.Millisecond)
+
+	// UpdateTaskBudget with a nil pointer → fn does nothing → succeeds.
+	// We need a fn that actually returns an error.  Use mutateTask directly.
+	callErr := fmt.Errorf("intentional fn error")
+	err = s.mutateTask(task.ID, func(_ *Task) error { return callErr })
+	if err != callErr {
+		t.Fatalf("expected callErr back, got %v", err)
+	}
+
+	// UpdatedAt must not have changed.
+	got, err := s.GetTask(bg(), task.ID)
+	if err != nil || got == nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	if !got.UpdatedAt.Equal(originalUpdatedAt) {
+		t.Errorf("UpdatedAt changed despite fn error: got %v, want %v", got.UpdatedAt, originalUpdatedAt)
+	}
+}
 
 // TestUpdateTaskStatus_StartedAtSetOnFirstInProgress verifies that StartedAt is
 // populated when a task transitions to in_progress for the first time.

@@ -76,6 +76,8 @@ Both are toggled via the toolbar or `PUT /api/config`.
 
 Tasks can declare other tasks as prerequisites (`DependsOn`). Autopilot will not promote a task to In Progress until all of its dependencies have reached Done. The dependency graph panel visualises these relationships.
 
+Backlog cards show a dependency badge when prerequisites are still unmet, and switch to a ready badge once all dependencies are satisfied. The task detail modal also includes a **Blocked by** section with live dependency status badges and links to each prerequisite task.
+
 ### Scheduled Execution
 
 Set `ScheduledAt` on a task to delay auto-promotion until a specific time. The auto-promoter skips tasks whose scheduled time has not yet arrived.
