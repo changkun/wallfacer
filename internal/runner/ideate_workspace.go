@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"changkun.de/wallfacer/prompts"
@@ -214,7 +215,9 @@ func (r *Runner) collectWorkspaceChurnSignals(ctx context.Context) ([]prompts.Wo
 // repo), the top 3 paths are included anyway so the caller always receives some
 // signal rather than nothing. The fallback count is not added to filteredCount.
 func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(ctx context.Context, workspace string, multi bool) ([]prompts.WorkspaceSignal, int) {
-	raw, err := r.runWorkspaceGitCommand(ctx, workspace, "log", "--name-only", "--pretty=format:", "-n", "30")
+	raw, err := r.runWorkspaceGitCommand(ctx, workspace, "log", "--name-only", "--pretty=format:",
+		fmt.Sprintf("--since=%d.days.ago", churnLookbackDays),
+		"-n", strconv.Itoa(maxChurnCommits))
 	if err != nil {
 		return nil, 0
 	}

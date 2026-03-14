@@ -25,6 +25,9 @@ const (
 	maxIdeationChurnSignals     = 6
 	maxIdeationTodoSignals      = 6
 	workspaceIdeationCommandTTL = 2 * time.Second
+
+	churnLookbackDays = 90  // only include commits newer than this many days
+	maxChurnCommits   = 200 // hard cap so very active repos don't scan unboundedly
 )
 
 type ideationContext struct {
