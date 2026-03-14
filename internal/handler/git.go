@@ -163,8 +163,16 @@ func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-ticker.C:
 			next := collect()
-			nextData, _ := json.Marshal(next)
-			curData, _ := json.Marshal(current)
+			nextData, nextErr := json.Marshal(next)
+			curData, curErr := json.Marshal(current)
+			if nextErr != nil || curErr != nil {
+				logger.Git.Warn("git status marshal error", "next_err", nextErr, "cur_err", curErr)
+				if !send(next) {
+					return
+				}
+				current = next
+				continue
+			}
 			if string(nextData) != string(curData) {
 				if !send(next) {
 					return
@@ -227,7 +235,9 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 
 	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "rebase", "@{u}").CombinedOutput()
 	if err != nil {
-		exec.Command("git", "-C", req.Workspace, "rebase", "--abort").Run()
+		if abortErr := exec.Command("git", "-C", req.Workspace, "rebase", "--abort").Run(); abortErr != nil {
+			logger.Git.Warn("rebase abort failed", "workspace", req.Workspace, "error", abortErr)
+		}
 		logger.Git.Error("sync rebase failed", "workspace", req.Workspace, "error", err)
 		if gitutil.IsConflictOutput(string(out)) {
 			http.Error(w, "rebase conflict: resolve manually in "+req.Workspace, http.StatusConflict)
@@ -270,7 +280,9 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 	// Rebase onto origin/<main>.
 	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "rebase", "origin/"+mainBranch).CombinedOutput()
 	if err != nil {
-		exec.Command("git", "-C", req.Workspace, "rebase", "--abort").Run()
+		if abortErr := exec.Command("git", "-C", req.Workspace, "rebase", "--abort").Run(); abortErr != nil {
+			logger.Git.Warn("rebase abort failed", "workspace", req.Workspace, "error", abortErr)
+		}
 		logger.Git.Error("rebase-on-main failed", "workspace", req.Workspace, "error", err)
 		if gitutil.IsConflictOutput(string(out)) {
 			http.Error(w, "rebase conflict: resolve manually in "+req.Workspace, http.StatusConflict)

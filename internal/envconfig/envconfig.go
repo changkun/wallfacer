@@ -4,6 +4,7 @@ package envconfig
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -506,7 +507,9 @@ func updateRawWithUpdates(path string, raw []byte, updates map[string]*string) e
 		return fmt.Errorf("write env file: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp)
+		if removeErr := os.Remove(tmp); removeErr != nil {
+			slog.Default().With("component", "envconfig").Warn("cleanup temp env file after rename failure", "path", tmp, "error", removeErr)
+		}
 		return fmt.Errorf("rename env file: %w", err)
 	}
 	return nil

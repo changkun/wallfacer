@@ -3,6 +3,7 @@ package gitutil
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strings"
 )
@@ -54,7 +55,9 @@ func CreateWorktreeAt(repoPath, worktreePath, branchName, baseCommit string) err
 		"worktree", "add", "-b", branchName, worktreePath, baseCommit,
 	).CombinedOutput()
 	if err != nil && strings.Contains(string(out), "already exists") {
-		exec.Command("git", "-C", repoPath, "branch", "-D", branchName).Run()
+		if delErr := exec.Command("git", "-C", repoPath, "branch", "-D", branchName).Run(); delErr != nil {
+			slog.Default().With("component", "git").Debug("branch delete before retry (best-effort)", "repo", repoPath, "branch", branchName, "error", delErr)
+		}
 		out, err = exec.Command(
 			"git", "-C", repoPath,
 			"worktree", "add", "-b", branchName, worktreePath, baseCommit,
@@ -99,13 +102,17 @@ func RemoveWorktree(repoPath, worktreePath, branchName string) error {
 		if strings.Contains(string(out), "not a worktree") ||
 			strings.Contains(string(out), "not a working tree") ||
 			strings.Contains(string(out), "not found") {
-			exec.Command("git", "-C", repoPath, "worktree", "prune").Run()
+			if pruneErr := exec.Command("git", "-C", repoPath, "worktree", "prune").Run(); pruneErr != nil {
+				slog.Default().With("component", "git").Debug("worktree prune (best-effort)", "repo", repoPath, "error", pruneErr)
+			}
 		} else {
 			return fmt.Errorf("git worktree remove %s: %w\n%s", worktreePath, err, out)
 		}
 	}
 	// Delete the branch (best-effort) — always attempted so stale branches
 	// are cleaned up even when the worktree directory was already missing.
-	exec.Command("git", "-C", repoPath, "branch", "-D", branchName).Run()
+	if delErr := exec.Command("git", "-C", repoPath, "branch", "-D", branchName).Run(); delErr != nil {
+		slog.Default().With("component", "git").Debug("branch delete after worktree remove (best-effort)", "repo", repoPath, "branch", branchName, "error", delErr)
+	}
 	return nil
 }

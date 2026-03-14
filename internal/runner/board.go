@@ -297,7 +297,14 @@ func streamBoardJSON(ctx context.Context, st *store.Store, selfTaskID uuid.UUID,
 		os.RemoveAll(dir)
 		return "", 0, ferr
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("close board.json: %w", closeErr)
+			os.RemoveAll(dir)
+			dir = ""
+			written = 0
+		}
+	}()
 
 	cw := &countWriter{w: f}
 

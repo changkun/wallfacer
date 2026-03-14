@@ -23,13 +23,16 @@ func (s *Store) AppendTurnUsage(taskID uuid.UUID, rec TurnUsageRecord) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	line, err := json.Marshal(rec)
 	if err != nil {
+		f.Close()
 		return err
 	}
-	_, err = f.Write(append(line, '\n'))
-	return err
+	if _, err = f.Write(append(line, '\n')); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // GetTurnUsages reads and returns all TurnUsageRecord entries for a task.

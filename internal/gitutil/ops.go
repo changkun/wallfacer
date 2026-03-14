@@ -2,6 +2,7 @@ package gitutil
 
 import (
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -24,7 +25,9 @@ func RebaseOntoDefault(repoPath, worktreePath string) error {
 	out, err := exec.Command("git", "-C", worktreePath, "rebase", defBranch).CombinedOutput()
 	if err != nil {
 		// Abort so the repo is not stuck mid-rebase.
-		exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run()
+		if abortErr := exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run(); abortErr != nil {
+			slog.Default().With("component", "git").Debug("rebase abort after failure", "path", worktreePath, "error", abortErr)
+		}
 		if IsConflictOutput(string(out)) || IsRebaseNeedsMergeOutput(string(out)) {
 			return &ConflictError{
 				WorktreePath:    worktreePath,
@@ -50,8 +53,14 @@ func recoverRebaseState(worktreePath string) error {
 	}
 
 	// Clear stale merge/rebase metadata so the next attempt starts clean.
-	_ = exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run()
-	_ = exec.Command("git", "-C", worktreePath, "merge", "--abort").Run()
+	// Both are attempted; only the one matching the current state will succeed,
+	// so errors from the other are expected and intentionally ignored.
+	if err := exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run(); err != nil {
+		slog.Default().With("component", "git").Debug("rebase abort (expected if not in rebase)", "path", worktreePath, "error", err)
+	}
+	if err := exec.Command("git", "-C", worktreePath, "merge", "--abort").Run(); err != nil {
+		slog.Default().With("component", "git").Debug("merge abort (expected if not in merge)", "path", worktreePath, "error", err)
+	}
 
 	if err := clearConflictedPaths(worktreePath); err != nil {
 		return fmt.Errorf("clear stale rebase state in %s: %w", worktreePath, err)

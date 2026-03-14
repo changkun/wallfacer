@@ -102,10 +102,13 @@ func (h *IdeationHistory) Append(e HistoryEntry) error {
 	if err != nil {
 		return fmt.Errorf("open ideation history for append: %w", err)
 	}
-	defer f.Close()
 
 	if _, err := fmt.Fprintf(f, "%s\n", data); err != nil {
+		f.Close()
 		return fmt.Errorf("write ideation history entry: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close ideation history: %w", err)
 	}
 	return nil
 }

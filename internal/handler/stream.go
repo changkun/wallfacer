@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -213,7 +214,9 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	// Close the write end once the subprocess exits.
 	go func() {
-		cmd.Wait()
+		if err := cmd.Wait(); err != nil {
+			logger.Handler.Debug("container log stream process exited", "error", err)
+		}
 		pw.Close()
 	}()
 
@@ -231,6 +234,9 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		scanner := bufio.NewScanner(pr)
 		for scanner.Scan() {
 			lines <- scanner.Text()
+		}
+		if err := scanner.Err(); err != nil {
+			logger.Handler.Warn("container log stream scanner error", "error", err)
 		}
 	}()
 
@@ -298,10 +304,13 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 
 	go func() {
 		// Drain stderr so the process is not blocked writing to it.
-		io.Copy(io.Discard, stderrPR)
+		io.Copy(io.Discard, stderrPR) //nolint:errcheck
+		stderrPR.Close()
 	}()
 	go func() {
-		cmd.Wait()
+		if err := cmd.Wait(); err != nil {
+			logger.Handler.Debug("refine log stream process exited", "error", err)
+		}
 		pw.Close()
 		stderrPW.Close()
 	}()
@@ -319,6 +328,9 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 		scanner := bufio.NewScanner(pr)
 		for scanner.Scan() {
 			lines <- scanner.Text()
+		}
+		if err := scanner.Err(); err != nil {
+			logger.Handler.Warn("refine log stream scanner error", "error", err)
 		}
 	}()
 
@@ -403,12 +415,16 @@ func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, r *http.Request, i
 		if readErr != nil || len(strings.TrimSpace(string(content))) == 0 {
 			continue
 		}
-		w.Write(content)
-		fmt.Fprintln(w)
+		if _, writeErr := w.Write(content); writeErr != nil {
+			return
+		}
+		if _, writeErr := fmt.Fprintln(w); writeErr != nil {
+			return
+		}
 		wrote = true
 	}
 	if !wrote {
-		fmt.Fprintln(w, "(no output saved for this task)")
+		fmt.Fprintln(w, "(no output saved for this task)") //nolint:errcheck
 	}
 }
 
