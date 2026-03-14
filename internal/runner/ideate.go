@@ -49,16 +49,10 @@ var ideaCategoryPool = []string{
 	"backend / API",
 	"performance optimization",
 	"code quality / refactoring",
-	"test coverage",
-	"developer experience",
 	"security hardening",
 	"observability / debugging",
-	"infrastructure / ops",
 	"data model / storage",
-	"documentation update",
 	"architecture / design",
-	"dependency management",
-	"accessibility",
 }
 
 // IdeationCategories returns the full inspiration pool used when generating
