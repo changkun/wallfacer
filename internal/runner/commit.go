@@ -209,6 +209,11 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 			missing = append(missing, repoPath)
 			continue
 		}
+		if !gitutil.IsGitRepo(worktreePath) {
+			logger.Runner.Warn("host commit: worktree is not a valid git repo, skipping", "repo", repoPath, "path", worktreePath)
+			missing = append(missing, repoPath)
+			continue
+		}
 		if out, err := exec.CommandContext(ctx, "git", "-C", worktreePath, "add", "-A").CombinedOutput(); err != nil {
 			if ctx.Err() != nil {
 				return false, fmt.Errorf("context canceled during git add: %w", ctx.Err())

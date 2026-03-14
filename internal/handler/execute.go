@@ -42,6 +42,8 @@ func missingTaskWorktrees(task *store.Task) []string {
 		}
 		if _, err := os.Stat(worktreePath); err != nil {
 			missing = append(missing, repoPath)
+		} else if !gitutil.IsGitRepo(worktreePath) {
+			missing = append(missing, repoPath)
 		}
 	}
 	return missing
