@@ -356,3 +356,265 @@ func TestHasConflicts_NonGitDir(t *testing.T) {
 		t.Error("expected error for non-git directory")
 	}
 }
+
+// createMergeConflict sets up two branches with conflicting changes to the
+// given files and runs git merge, leaving the repo in a conflicted state.
+// Returns the repo path. The caller is responsible for aborting the merge.
+func createMergeConflict(t *testing.T, files []string) string {
+	t.Helper()
+	repo := setupRepo(t)
+
+	// Add extra files to the initial commit if needed.
+	for i := 1; i < len(files); i++ {
+		writeFile(t, filepath.Join(repo, files[i]), "initial\n")
+	}
+	if len(files) > 1 {
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "add extra files")
+	}
+
+	// Create branch-a with conflicting changes.
+	gitRun(t, repo, "checkout", "-b", "branch-a")
+	for _, f := range files {
+		writeFile(t, filepath.Join(repo, f), "branch-a version\n")
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "branch-a changes")
+
+	// Advance main with conflicting changes.
+	gitRun(t, repo, "checkout", "main")
+	for _, f := range files {
+		writeFile(t, filepath.Join(repo, f), "main version\n")
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "main changes")
+
+	// Merge branch-a into main, which will conflict.
+	exec.Command("git", "-C", repo, "merge", "--no-ff", "branch-a").Run()
+	return repo
+}
+
+func TestClearConflictedPaths(t *testing.T) {
+	t.Run("clean repo is a no-op", func(t *testing.T) {
+		repo := setupRepo(t)
+		if err := clearConflictedPaths(repo); err != nil {
+			t.Errorf("clearConflictedPaths on clean repo: %v", err)
+		}
+	})
+
+	t.Run("single conflicted file is cleared", func(t *testing.T) {
+		repo := createMergeConflict(t, []string{"file.txt"})
+		t.Cleanup(func() { exec.Command("git", "-C", repo, "merge", "--abort").Run() })
+
+		has, _ := HasConflicts(repo)
+		if !has {
+			t.Skip("no conflict detected; setup may need adjustment")
+		}
+
+		if err := clearConflictedPaths(repo); err != nil {
+			t.Errorf("clearConflictedPaths: %v", err)
+		}
+
+		has, err := HasConflicts(repo)
+		if err != nil {
+			t.Fatalf("HasConflicts after clear: %v", err)
+		}
+		if has {
+			t.Error("expected no conflicts after clearConflictedPaths, still has conflicts")
+		}
+	})
+
+	t.Run("multiple conflicted files are cleared", func(t *testing.T) {
+		repo := createMergeConflict(t, []string{"file.txt", "file2.txt"})
+		t.Cleanup(func() { exec.Command("git", "-C", repo, "merge", "--abort").Run() })
+
+		has, _ := HasConflicts(repo)
+		if !has {
+			t.Skip("no conflicts detected; setup may need adjustment")
+		}
+
+		if err := clearConflictedPaths(repo); err != nil {
+			t.Errorf("clearConflictedPaths: %v", err)
+		}
+
+		has, err := HasConflicts(repo)
+		if err != nil {
+			t.Fatalf("HasConflicts after clear: %v", err)
+		}
+		if has {
+			t.Error("expected no conflicts after clearConflictedPaths, still has conflicts")
+		}
+	})
+
+	// git reset --merge refuses to reset when a file has both staged and unstaged
+	// changes (index != HEAD and worktree != index). In that case clearConflictedPaths
+	// falls through to "git restore --staged --worktree --source=HEAD".
+	t.Run("dirty index falls through to restore path", func(t *testing.T) {
+		repo := setupRepo(t)
+
+		// Stage a change.
+		writeFile(t, filepath.Join(repo, "file.txt"), "staged content\n")
+		gitRun(t, repo, "add", ".")
+		// Also modify the working tree without staging — now index != HEAD and worktree != index.
+		writeFile(t, filepath.Join(repo, "file.txt"), "unstaged content\n")
+
+		if err := clearConflictedPaths(repo); err != nil {
+			t.Errorf("clearConflictedPaths with dirty index: %v", err)
+		}
+	})
+
+	// When all three git commands fail (non-git directory) the function returns an error.
+	t.Run("non-git directory returns error", func(t *testing.T) {
+		if err := clearConflictedPaths(t.TempDir()); err == nil {
+			t.Error("expected error for non-git directory, got nil")
+		}
+	})
+}
+
+func TestRecoverRebaseState(t *testing.T) {
+	t.Run("clean repo returns nil", func(t *testing.T) {
+		repo := setupRepo(t)
+		if err := recoverRebaseState(repo); err != nil {
+			t.Errorf("recoverRebaseState on clean repo: %v", err)
+		}
+	})
+
+	t.Run("aborts stale rebase state", func(t *testing.T) {
+		repo := setupRepo(t)
+
+		// Create a task branch with a conflicting change.
+		gitRun(t, repo, "checkout", "-b", "task")
+		writeFile(t, filepath.Join(repo, "file.txt"), "task version\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "task change")
+
+		// Advance main with a conflicting change.
+		gitRun(t, repo, "checkout", "main")
+		writeFile(t, filepath.Join(repo, "file.txt"), "main version\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "main change")
+
+		// Attempt rebase from task — will stop at conflict.
+		gitRun(t, repo, "checkout", "task")
+		exec.Command("git", "-C", repo, "rebase", "main").Run()
+
+		has, _ := hasRebaseOrMergeState(repo)
+		if !has {
+			t.Skip("rebase state not created; skipping")
+		}
+
+		if err := recoverRebaseState(repo); err != nil {
+			t.Errorf("recoverRebaseState: %v", err)
+		}
+
+		has, err := hasRebaseOrMergeState(repo)
+		if err != nil {
+			t.Fatalf("hasRebaseOrMergeState after recovery: %v", err)
+		}
+		if has {
+			t.Error("expected rebase state to be cleared, still present")
+		}
+	})
+
+	t.Run("aborts stale merge state", func(t *testing.T) {
+		repo := createMergeConflict(t, []string{"file.txt"})
+
+		has, _ := hasRebaseOrMergeState(repo)
+		if !has {
+			t.Skip("merge state not created; skipping")
+		}
+
+		if err := recoverRebaseState(repo); err != nil {
+			t.Errorf("recoverRebaseState: %v", err)
+		}
+
+		has, err := hasRebaseOrMergeState(repo)
+		if err != nil {
+			t.Fatalf("hasRebaseOrMergeState after recovery: %v", err)
+		}
+		if has {
+			t.Error("expected merge state to be cleared, still present")
+		}
+	})
+}
+
+func TestHasRebaseMergeState(t *testing.T) {
+	t.Run("no state returns false", func(t *testing.T) {
+		repo := setupRepo(t)
+		got, err := hasRebaseOrMergeState(repo)
+		if err != nil {
+			t.Fatalf("hasRebaseOrMergeState: %v", err)
+		}
+		if got {
+			t.Error("expected false for clean repo, got true")
+		}
+	})
+
+	t.Run("REBASE_HEAD set via conflicting rebase returns true", func(t *testing.T) {
+		repo := setupRepo(t)
+
+		gitRun(t, repo, "checkout", "-b", "task")
+		writeFile(t, filepath.Join(repo, "file.txt"), "task version\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "task change")
+
+		gitRun(t, repo, "checkout", "main")
+		writeFile(t, filepath.Join(repo, "file.txt"), "main version\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "main change")
+
+		gitRun(t, repo, "checkout", "task")
+		exec.Command("git", "-C", repo, "rebase", "main").Run()
+		t.Cleanup(func() { exec.Command("git", "-C", repo, "rebase", "--abort").Run() })
+
+		got, err := hasRebaseOrMergeState(repo)
+		if err != nil {
+			t.Fatalf("hasRebaseOrMergeState: %v", err)
+		}
+		if !got {
+			t.Error("expected true with REBASE_HEAD set, got false")
+		}
+	})
+
+	t.Run("MERGE_HEAD set via conflicting merge returns true", func(t *testing.T) {
+		repo := createMergeConflict(t, []string{"file.txt"})
+		t.Cleanup(func() { exec.Command("git", "-C", repo, "merge", "--abort").Run() })
+
+		got, err := hasRebaseOrMergeState(repo)
+		if err != nil {
+			t.Fatalf("hasRebaseOrMergeState: %v", err)
+		}
+		if !got {
+			t.Error("expected true with MERGE_HEAD set, got false")
+		}
+	})
+
+	t.Run("CHERRY_PICK_HEAD set via conflicting cherry-pick returns true", func(t *testing.T) {
+		repo := setupRepo(t)
+
+		// Create a commit on a feature branch that changes file.txt.
+		gitRun(t, repo, "checkout", "-b", "feature")
+		writeFile(t, filepath.Join(repo, "file.txt"), "feature version\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "feature change")
+		featureCommit := gitRun(t, repo, "rev-parse", "HEAD")
+
+		// Advance main with a conflicting change so the cherry-pick will fail.
+		gitRun(t, repo, "checkout", "main")
+		writeFile(t, filepath.Join(repo, "file.txt"), "main version\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "main change")
+
+		// Cherry-pick the feature commit — it will conflict and set CHERRY_PICK_HEAD.
+		exec.Command("git", "-C", repo, "cherry-pick", featureCommit).Run()
+		t.Cleanup(func() { exec.Command("git", "-C", repo, "cherry-pick", "--abort").Run() })
+
+		got, err := hasRebaseOrMergeState(repo)
+		if err != nil {
+			t.Fatalf("hasRebaseOrMergeState: %v", err)
+		}
+		if !got {
+			t.Error("expected true with CHERRY_PICK_HEAD set, got false")
+		}
+	})
+}
