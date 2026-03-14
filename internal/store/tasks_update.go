@@ -471,6 +471,10 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 		FailureCategorySyncError:      defaultAutoRetryBudget[FailureCategorySyncError],
 		FailureCategoryWorktree:       defaultAutoRetryBudget[FailureCategoryWorktree],
 	}
+	t.CurrentRefinement = nil
+	if freshStart {
+		t.RefineSessions = nil
+	}
 	t.UpdatedAt = time.Now()
 	s.removeFromStatusIndex(oldStatus, id)
 	s.addToStatusIndex(t.Status, id)

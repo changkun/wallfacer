@@ -1764,6 +1764,56 @@ func TestTryAutoRefine_SkipsAlreadyRefined(t *testing.T) {
 	}
 }
 
+// TestTryAutoRefine_PicksUpTaskAfterRetry verifies that a task whose
+// CurrentRefinement was cleared by ResetTaskForRetry is eligible for
+// auto-refinement again. This is the regression test for the bug where
+// ResetTaskForRetry omitted clearing CurrentRefinement, causing tryAutoRefine
+// to permanently skip the retried task.
+func TestTryAutoRefine_PicksUpTaskAfterRetry(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutorefine(true)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "build a widget", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Simulate a completed refinement job from the previous attempt.
+	job := &store.RefinementJob{
+		ID:     "job-old",
+		Status: store.RefinementJobStatusDone,
+		Result: "old spec",
+	}
+	if err := h.store.UpdateRefinementJob(ctx, task.ID, job); err != nil {
+		t.Fatalf("UpdateRefinementJob: %v", err)
+	}
+
+	// Before the fix, ResetTaskForRetry would leave CurrentRefinement set,
+	// and tryAutoRefine would skip the task. After the fix, CurrentRefinement
+	// is cleared and tryAutoRefine can pick it up.
+	if err := h.store.ResetTaskForRetry(ctx, task.ID, "build a better widget", true); err != nil {
+		t.Fatalf("ResetTaskForRetry: %v", err)
+	}
+
+	// Verify CurrentRefinement was cleared by the reset.
+	afterReset, _ := h.store.GetTask(ctx, task.ID)
+	if afterReset.CurrentRefinement != nil {
+		t.Fatal("expected CurrentRefinement to be nil after ResetTaskForRetry")
+	}
+
+	// tryAutoRefine should now start a new refinement for this task.
+	h.tryAutoRefine(ctx)
+
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.CurrentRefinement == nil {
+		t.Error("expected tryAutoRefine to start a new refinement after retry reset")
+	}
+	if got.CurrentRefinement != nil && got.CurrentRefinement.Source != "auto" {
+		t.Errorf("expected refinement source 'auto', got %q", got.CurrentRefinement.Source)
+	}
+}
+
 // --- tryAutoTest tests ---
 
 // TestTryAutoTest_DisabledNoOp verifies that auto-test does nothing when disabled.
