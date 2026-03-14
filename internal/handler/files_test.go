@@ -198,10 +198,20 @@ func TestFileIndex_OnlyOneRefreshInFlight(t *testing.T) {
 		}()
 	}
 
-	// Wait for ALL goroutines to finish returning stale data. The background
-	// refresh goroutine is still blocked on <-gate, so its refreshCount
-	// increment happened before any goroutine returned.
+	// Wait for ALL goroutines to finish returning stale data.
 	wg.Wait()
+
+	// The background refresh goroutine may not have been scheduled yet — Go
+	// does not guarantee a spawned goroutine runs before the spawning
+	// goroutine returns. Poll until it starts; once it increments refreshCount
+	// it blocks on <-gate, so the count will stay at exactly 1.
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if refreshCount.Load() >= 1 {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
 
 	// While gate is still closed, exactly one build is in progress.
 	if got := refreshCount.Load(); got != 1 {
@@ -212,7 +222,7 @@ func TestFileIndex_OnlyOneRefreshInFlight(t *testing.T) {
 	close(gate)
 
 	// Wait for the background goroutine to finish.
-	deadline := time.Now().Add(5 * time.Second)
+	deadline = time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		idx.mu.RLock()
 		r := idx.refreshing[ws]
