@@ -458,6 +458,10 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 				// Worktree directory no longer exists on disk; skip silently.
 				continue
 			}
+			if !gitutil.IsGitRepo(worktreePath) {
+				// Directory exists but .git link is broken; skip silently.
+				continue
+			}
 			n, err := gitutil.CommitsBehind(repoPath, worktreePath)
 			if err != nil {
 				logger.Handler.Warn("auto-sync: check commits behind",
@@ -812,6 +816,10 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				// Check that all worktrees are up to date and conflict-free.
 				skip := false
 				for repoPath, worktreePath := range t.WorktreePaths {
+					if !gitutil.IsGitRepo(worktreePath) {
+						skip = true
+						break
+					}
 					n, err := gitutil.CommitsBehind(repoPath, worktreePath)
 					if err != nil {
 						logger.Handler.Warn("auto-submit: check commits behind",
