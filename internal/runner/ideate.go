@@ -472,7 +472,6 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 			store.NewStateChangeData("", store.TaskStatusBacklog, "", nil))
 		if idea.Title != "" {
 			r.store.UpdateTaskTitle(bgCtx, newTask.ID, idea.Title)
-			titles = append(titles, idea.Title)
 		}
 		// Also set ExecutionPrompt so the sandbox always receives the full details
 		// even if the user edits the Prompt field before running the task.
