@@ -63,6 +63,25 @@ func (s *Store) UpdateTaskPendingTestFeedback(_ context.Context, id uuid.UUID, m
 	})
 }
 
+// IncrementTestFailCount atomically increments the consecutive test failure
+// counter for a task. Called by the runner when a test verdict is "fail".
+func (s *Store) IncrementTestFailCount(_ context.Context, id uuid.UUID) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.TestFailCount++
+		return nil
+	})
+}
+
+// ResetTestFailCount resets the consecutive test failure counter to zero.
+// Called when the user manually provides feedback or when a test passes,
+// so the auto-resume cycle can start fresh.
+func (s *Store) ResetTestFailCount(_ context.Context, id uuid.UUID) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.TestFailCount = 0
+		return nil
+	})
+}
+
 // SetTaskFailureCategory sets the failure_category field on a task.
 // It is called immediately after a TaskStatusFailed transition to record
 // the machine-readable root cause. The field is persisted atomically so

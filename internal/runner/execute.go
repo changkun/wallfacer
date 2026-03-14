@@ -535,7 +535,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				}
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
 				if verdict == "fail" {
+					r.store.IncrementTestFailCount(bgCtx, taskID)
 					r.store.UpdateTaskPendingTestFeedback(bgCtx, taskID, buildTestFailureFeedback(output.Result))
+				} else {
+					r.store.ResetTestFailCount(bgCtx, taskID)
 				}
 				r.GenerateTestOversight(taskID, task.TestRunStartTurn)
 				r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
@@ -587,7 +590,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				}
 				r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
 				if verdict == "fail" {
+					r.store.IncrementTestFailCount(bgCtx, taskID)
 					r.store.UpdateTaskPendingTestFeedback(bgCtx, taskID, buildTestFailureFeedback(output.Result))
+				} else {
+					r.store.ResetTestFailCount(bgCtx, taskID)
 				}
 				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 					"result": "Test verification complete: " + strings.ToUpper(verdict),
@@ -661,6 +667,12 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 				"result": fmt.Sprintf("Skipping %s — not a git repository, cannot sync.", filepath.Base(repoPath)),
 			})
 			continue
+		}
+
+		// Fetch from remote so CommitsBehind operates on up-to-date refs.
+		if fetchErr := gitutil.FetchOrigin(repoPath); fetchErr != nil {
+			logger.Runner.Warn("sync: git fetch failed, continuing with local refs",
+				"task", taskID, "repo", repoPath, "error", fetchErr)
 		}
 
 		defBranch, err := gitutil.DefaultBranch(repoPath)
@@ -873,7 +885,7 @@ func parseTestVerdict(result string, customPass, customFail []string) string {
 	// verdict word. Check a small tail window so trailing status text does not
 	// hide a valid verdict.
 	lines := strings.Split(upper, "\n")
-	const maxTailLines = 6
+	const maxTailLines = 15
 	seen := 0
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimRight(strings.TrimSpace(lines[i]), ".*!?:;,-")

@@ -38,10 +38,10 @@ Do not modify any code. Do not run linters, formatters, or full-project builds u
 If failing, state the specific unmet requirement in one sentence before the verdict.
 
 CRITICAL — VERDICT REQUIREMENT:
-The absolute last line of your response must be exactly one of:
+You MUST output exactly `**PASS**` or `**FAIL**` on a line by itself as your very last line. Do not include any other text on that line.
 
 **PASS**
 
 **FAIL**
 
-Nothing else may follow the verdict — no explanation, no summary, no trailing text. The automated system parses only this final line. If you omit it or bury it mid-response, the result defaults to FAIL regardless of your analysis. Always emit the verdict, even when the answer is obvious.
+Nothing else may follow the verdict — no explanation, no summary, no trailing text after the verdict line. The automated system parses only this final line. If you omit it or bury it mid-response, the result defaults to FAIL regardless of your analysis. Always emit the verdict, even when the answer is obvious.

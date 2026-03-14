@@ -365,6 +365,11 @@ type Task struct {
 	// AutoRetryCount is the total number of auto-retries consumed across all
 	// categories. Capped at maxTotalAutoRetries in the runner.
 	AutoRetryCount int `json:"auto_retry_count,omitempty"`
+
+	// TestFailCount tracks the number of consecutive test failures for this task.
+	// Used to cap the auto-resume cycle and prevent infinite test-fail loops.
+	// Reset when the user manually provides feedback or when a test passes.
+	TestFailCount int `json:"test_fail_count,omitempty"`
 }
 
 // HasTag reports whether the task has the given tag.

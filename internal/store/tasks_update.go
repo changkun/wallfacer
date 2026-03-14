@@ -472,6 +472,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.IsTestRun = false
 	t.LastTestResult = ""
 	t.PendingTestFeedback = ""
+	t.TestFailCount = 0
 	// Reset auto-retry counters so that a manual retry after budget exhaustion
 	// grants a fresh allowance and the auto-retrier can act on the next failure.
 	t.AutoRetryCount = 0
