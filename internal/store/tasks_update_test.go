@@ -271,3 +271,124 @@ func TestBuildAndSaveSummary_ExecutionDurationFallbackWithoutStartedAt(t *testin
 			summary.ExecutionDurationSeconds, summary.DurationSeconds)
 	}
 }
+
+// TestResetTaskForRetry_ResetsAutoRetryCountAndBudget verifies that a manual
+// retry (ResetTaskForRetry) fully resets AutoRetryCount and AutoRetryBudget so
+// the auto-retrier is eligible to fire again after the reset.
+func TestResetTaskForRetry_ResetsAutoRetryCountAndBudget(t *testing.T) {
+	s := newTestStore(t)
+	ctx := bg()
+
+	task, err := s.CreateTask(ctx, "retry reset test", 15, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Confirm initial budget matches defaults.
+	if task.AutoRetryCount != 0 {
+		t.Fatalf("initial AutoRetryCount: got %d, want 0", task.AutoRetryCount)
+	}
+	if got := task.AutoRetryBudget[FailureCategoryContainerCrash]; got != defaultAutoRetryBudget[FailureCategoryContainerCrash] {
+		t.Fatalf("initial AutoRetryBudget[ContainerCrash]: got %d, want %d", got, defaultAutoRetryBudget[FailureCategoryContainerCrash])
+	}
+
+	// Simulate three auto-retry increments (exhaust count cap).
+	for i := 0; i < 3; i++ {
+		if err := s.IncrementAutoRetryCount(ctx, task.ID, FailureCategoryContainerCrash); err != nil {
+			t.Fatalf("IncrementAutoRetryCount[%d]: %v", i, err)
+		}
+	}
+
+	// Transition through in_progress → failed so ResetTaskForRetry is valid.
+	if err := s.UpdateTaskStatus(ctx, task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, TaskStatusFailed); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus failed: %v", err)
+	}
+
+	// Verify the counters are exhausted before reset.
+	before, err := s.GetTask(ctx, task.ID)
+	if err != nil || before == nil {
+		t.Fatalf("GetTask before reset: %v", err)
+	}
+	if before.AutoRetryCount != 3 {
+		t.Fatalf("AutoRetryCount before reset: got %d, want 3", before.AutoRetryCount)
+	}
+	// ContainerCrash budget decremented twice (budget was 2), now 0.
+	if got := before.AutoRetryBudget[FailureCategoryContainerCrash]; got != 0 {
+		t.Fatalf("AutoRetryBudget[ContainerCrash] before reset: got %d, want 0", got)
+	}
+
+	// Perform the manual retry reset.
+	if err := s.ResetTaskForRetry(ctx, task.ID, task.Prompt, true); err != nil {
+		t.Fatalf("ResetTaskForRetry: %v", err)
+	}
+
+	after, err := s.GetTask(ctx, task.ID)
+	if err != nil || after == nil {
+		t.Fatalf("GetTask after reset: %v", err)
+	}
+
+	// AutoRetryCount must be reset to 0.
+	if after.AutoRetryCount != 0 {
+		t.Errorf("AutoRetryCount after reset: got %d, want 0", after.AutoRetryCount)
+	}
+
+	// AutoRetryBudget must be fully restored to defaults.
+	for cat, want := range defaultAutoRetryBudget {
+		if got := after.AutoRetryBudget[cat]; got != want {
+			t.Errorf("AutoRetryBudget[%s] after reset: got %d, want %d", cat, got, want)
+		}
+	}
+
+	// After reset, the auto-retry eligibility check must pass:
+	//   budget > 0 && count < maxHandlerAutoRetries(3)
+	budget := after.AutoRetryBudget[FailureCategoryContainerCrash]
+	if budget <= 0 || after.AutoRetryCount >= 3 {
+		t.Errorf("task not eligible for auto-retry after reset: budget=%d count=%d", budget, after.AutoRetryCount)
+	}
+}
+
+// TestResetTaskForRetry_ResetsAutoRetryCountAndBudget_Persisted verifies that
+// the reset values survive a store reload from disk.
+func TestResetTaskForRetry_ResetsAutoRetryCountAndBudget_Persisted(t *testing.T) {
+	s := newTestStore(t)
+	ctx := bg()
+
+	task, err := s.CreateTask(ctx, "persist retry reset test", 15, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	if err := s.IncrementAutoRetryCount(ctx, task.ID, FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("IncrementAutoRetryCount: %v", err)
+	}
+	if err := s.UpdateTaskStatus(ctx, task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, TaskStatusFailed); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus failed: %v", err)
+	}
+	if err := s.ResetTaskForRetry(ctx, task.ID, task.Prompt, true); err != nil {
+		t.Fatalf("ResetTaskForRetry: %v", err)
+	}
+
+	// Reload from disk to verify persistence.
+	s2, err := NewStore(s.dir)
+	if err != nil {
+		t.Fatalf("NewStore reload: %v", err)
+	}
+	loaded, err := s2.GetTask(ctx, task.ID)
+	if err != nil || loaded == nil {
+		t.Fatalf("GetTask from reloaded store: %v", err)
+	}
+	if loaded.AutoRetryCount != 0 {
+		t.Errorf("persisted AutoRetryCount: got %d, want 0", loaded.AutoRetryCount)
+	}
+	for cat, want := range defaultAutoRetryBudget {
+		if got := loaded.AutoRetryBudget[cat]; got != want {
+			t.Errorf("persisted AutoRetryBudget[%s]: got %d, want %d", cat, got, want)
+		}
+	}
+}
