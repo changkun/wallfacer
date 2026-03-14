@@ -980,3 +980,21 @@ func BenchmarkCountByStatusFullScan(b *testing.B) {
 		_ = count
 	}
 }
+
+// TestIsClosed_FalseWhenOpen verifies IsClosed returns false for a newly opened store.
+func TestIsClosed_FalseWhenOpen(t *testing.T) {
+	s := newTestStore(t)
+	defer s.Close()
+	if s.IsClosed() {
+		t.Error("expected IsClosed to be false for an open store")
+	}
+}
+
+// TestIsClosed_TrueAfterClose verifies IsClosed returns true after Close is called.
+func TestIsClosed_TrueAfterClose(t *testing.T) {
+	s := newTestStore(t)
+	s.Close()
+	if !s.IsClosed() {
+		t.Error("expected IsClosed to be true after Close")
+	}
+}

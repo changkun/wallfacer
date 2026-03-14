@@ -3991,3 +3991,198 @@ func TestGetStats_UnknownWorkspace(t *testing.T) {
 		t.Errorf("expected 400 for unknown workspace, got %d", w.Code)
 	}
 }
+
+// TestUpdateTask_SetTags verifies that tags can be updated via PATCH.
+func TestUpdateTask_SetTags(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "tagged task", 15, false, "", "")
+
+	body := `{"tags": ["alpha", "beta", "gamma"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if len(updated.Tags) != 3 {
+		t.Fatalf("expected 3 tags, got %d: %v", len(updated.Tags), updated.Tags)
+	}
+	if updated.Tags[0] != "alpha" || updated.Tags[1] != "beta" || updated.Tags[2] != "gamma" {
+		t.Errorf("unexpected tags: %v", updated.Tags)
+	}
+}
+
+// TestUpdateTask_SetTagsEmpty verifies that an empty tags slice clears existing tags.
+func TestUpdateTask_SetTagsEmpty(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "tagged task", 15, false, "", "")
+
+	// First, set some tags.
+	h.store.UpdateTaskTags(ctx, task.ID, []string{"old-tag"})
+
+	body := `{"tags": []}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if len(updated.Tags) != 0 {
+		t.Errorf("expected empty tags, got %v", updated.Tags)
+	}
+}
+
+// TestUpdateTask_WaitingBudgetUpdate verifies that budget limits can be raised
+// for a task in the waiting state.
+func TestUpdateTask_WaitingBudgetUpdate(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "waiting task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	maxCost := 10.0
+	body := fmt.Sprintf(`{"max_cost_usd": %g}`, maxCost)
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if updated.MaxCostUSD != maxCost {
+		t.Errorf("expected MaxCostUSD %g, got %g", maxCost, updated.MaxCostUSD)
+	}
+}
+
+// TestUpdateTask_RetryFromWaiting verifies that a waiting task can be retried to backlog.
+func TestUpdateTask_RetryFromWaiting(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "waiting task", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	body := `{"status": "backlog"}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if updated.Status != store.TaskStatusBacklog {
+		t.Errorf("expected backlog, got %s", updated.Status)
+	}
+}
+
+// TestUpdateTask_InvalidStatusTransition verifies that an invalid status transition
+// returns 400.
+func TestUpdateTask_InvalidStatusTransition(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	// Task is in backlog; transition directly to done is invalid.
+	body := `{"status": "done"}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid transition backlog->done, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateTask_CustomPassPattern verifies that valid custom pass patterns
+// can be set on a backlog task.
+func TestUpdateTask_CustomPassPattern(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "pattern task", 15, false, "", "")
+
+	body := `{"custom_pass_patterns": ["PASS", "ok$"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if len(updated.CustomPassPatterns) != 2 {
+		t.Errorf("expected 2 custom pass patterns, got %d", len(updated.CustomPassPatterns))
+	}
+}
+
+// TestUpdateTask_InvalidCustomPassPattern verifies that an invalid regex in
+// custom_pass_patterns returns 400.
+func TestUpdateTask_InvalidCustomPassPattern(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "pattern task", 15, false, "", "")
+
+	// An invalid regex (unmatched parenthesis).
+	body := `{"custom_pass_patterns": ["(invalid"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid regex, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateTask_InvalidCustomFailPattern verifies that an invalid regex in
+// custom_fail_patterns returns 400.
+func TestUpdateTask_InvalidCustomFailPattern(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "pattern task", 15, false, "", "")
+
+	// An invalid regex (unmatched bracket).
+	body := `{"custom_fail_patterns": ["[bad"]}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid fail regex, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateTask_FreshStartRetry verifies that a retry with fresh_start=true
+// clears the session and resets to backlog.
+func TestUpdateTask_FreshStartRetry(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "original", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
+	body := `{"status": "backlog", "fresh_start": true}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var updated store.Task
+	json.NewDecoder(w.Body).Decode(&updated)
+	if updated.Status != store.TaskStatusBacklog {
+		t.Errorf("expected backlog, got %s", updated.Status)
+	}
+	if !updated.FreshStart {
+		t.Error("expected FreshStart to be true after fresh_start retry")
+	}
+}
