@@ -250,14 +250,6 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 		normalizeIdeationImpact(&idea)
 		idea.Title = title
 		idea.Prompt = prompt
-		if idea.ImpactScore < minIdeationImpactScore {
-			rejections = append(rejections, ideaRejection{
-				Title:  title,
-				Score:  idea.ImpactScore,
-				Reason: ideaRejectLowImpact,
-			})
-			continue
-		}
 		if isIdeaDuplicateTitle(seen, idea.Title) {
 			rejections = append(rejections, ideaRejection{
 				Title:  title,

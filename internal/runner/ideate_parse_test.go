@@ -331,21 +331,15 @@ func TestExtractIdeas_DegenerateTitle(t *testing.T) {
 	}
 }
 
-func TestExtractIdeas_LowImpact(t *testing.T) {
-	// Impact score below minimum threshold.
+func TestExtractIdeas_LowImpactAccepted(t *testing.T) {
+	// Impact score filtering is removed — the agent's self-critique is trusted.
 	input := `[{"title":"minor tweak","prompt":"make a small change to button color","impact_score":1}]`
-	_, rejections, err := extractIdeas(input)
-	// Should fail (all rejected) or have rejection records.
-	_ = err
-
-	lowImpactCount := 0
-	for _, r := range rejections {
-		if r.Reason == ideaRejectLowImpact {
-			lowImpactCount++
-		}
+	ideas, _, err := extractIdeas(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if lowImpactCount == 0 {
-		t.Error("expected at least one below_threshold rejection")
+	if len(ideas) != 1 {
+		t.Fatalf("expected 1 idea (low impact accepted), got %d", len(ideas))
 	}
 }
 

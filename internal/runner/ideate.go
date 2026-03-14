@@ -19,10 +19,9 @@ import (
 
 const ideationTimeout = 10 * time.Minute
 const (
-	maxIdeationIdeas            = 3
-	ideationCandidateCount      = 6
-	minIdeationImpactScore      = 72
-	defaultIdeationImpactScore  = 60
+	maxIdeationIdeas           = 3
+	ideationCandidateCount     = 6
+	defaultIdeationImpactScore = 60
 	maxIdeationChurnSignals     = 6
 	maxIdeationTodoSignals      = 6
 	workspaceIdeationCommandTTL = 2 * time.Second

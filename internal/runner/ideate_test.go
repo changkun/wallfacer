@@ -698,35 +698,24 @@ func TestExtractIdeasReturnsRejectionReasonsAndScores(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(ideas) != 1 {
-		t.Fatalf("expected 1 valid idea, got %d", len(ideas))
+	// "Low impact" is now accepted (impact score filtering removed — the agent
+	// already self-critiques and ranks). Only empty-fields and duplicate are rejected.
+	if len(ideas) != 2 {
+		t.Fatalf("expected 2 valid ideas, got %d", len(ideas))
 	}
-	if ideas[0].Title != "Duplicate" {
-		t.Fatalf("expected surviving idea to be 'Duplicate', got %q", ideas[0].Title)
-	}
-	if len(rejections) != 3 {
-		t.Fatalf("expected 3 rejections, got %d", len(rejections))
+	if len(rejections) != 2 {
+		t.Fatalf("expected 2 rejections, got %d", len(rejections))
 	}
 
 	seen := map[ideaRejectReason]int{}
-	lowImpactScore := -1
 	for _, rej := range rejections {
 		seen[rej.Reason]++
-		if rej.Reason == ideaRejectLowImpact {
-			lowImpactScore = rej.Score
-		}
-	}
-	if seen[ideaRejectLowImpact] != 1 {
-		t.Fatalf("expected 1 low-impact rejection, got %d", seen[ideaRejectLowImpact])
 	}
 	if seen[ideaRejectEmptyFields] != 1 {
 		t.Fatalf("expected 1 empty-field rejection, got %d", seen[ideaRejectEmptyFields])
 	}
 	if seen[ideaRejectDuplicateTitle] != 1 {
 		t.Fatalf("expected 1 duplicate-title rejection, got %d", seen[ideaRejectDuplicateTitle])
-	}
-	if lowImpactScore != 40 {
-		t.Fatalf("expected low-impact score 40, got %d", lowImpactScore)
 	}
 }
 
