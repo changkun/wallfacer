@@ -134,7 +134,10 @@ func CommitsBehind(repoPath, worktreePath string) (int, error) {
 	}
 	defHash, err := defaultBranchCommitHash(repoPath, defBranch)
 	if err != nil {
-		return 0, err
+		// No resolvable ref for the default branch (e.g. empty repo with no
+		// commits or no remote configured). The worktree cannot be behind a
+		// branch that does not exist yet, so report 0.
+		return 0, nil
 	}
 	out, err := exec.Command(
 		"git", "-C", worktreePath,
