@@ -87,6 +87,7 @@ func (s *Store) buildAndSaveSummary(task Task) {
 		TotalTurns:               task.Turns,
 		TotalCostUSD:             task.Usage.CostUSD,
 		ByActivity:               task.UsageBreakdown,
+		WorkspaceUsageBreakdown:  buildFinalWorkspaceBreakdown(task.WorkspaceUsageBreakdown, task.WorktreePaths, task.Usage),
 		TestResult:               task.LastTestResult,
 		PhaseCount:               phaseCount,
 		FailureCategory:          task.FailureCategory,
@@ -95,6 +96,79 @@ func (s *Store) buildAndSaveSummary(task Task) {
 	if err := s.SaveSummary(task.ID, summary); err != nil {
 		logger.Store.Warn("failed to save task summary", "task", task.ID, "error", err)
 	}
+}
+
+// buildFinalWorkspaceBreakdown derives a per-workspace TaskUsage breakdown
+// that sums exactly to finalUsage. It extracts proportional weights from the
+// stored breakdown (computed at commit time using git diff line counts), then
+// rescales those weights against the final task usage so that any cost
+// accumulated after the commit pipeline (e.g. oversight generation) is
+// distributed proportionally.
+//
+// Fallback chain when stored is nil or has no cost/token data:
+//  1. Equal split across worktreePaths.
+//  2. Nil (when worktreePaths is empty).
+func buildFinalWorkspaceBreakdown(stored map[string]TaskUsage, worktreePaths map[string]string, finalUsage TaskUsage) map[string]TaskUsage {
+	if len(worktreePaths) == 0 {
+		return nil
+	}
+
+	// Derive per-repo weights from the stored breakdown when present.
+	weights := make(map[string]float64, len(worktreePaths))
+	if len(stored) > 0 {
+		// Prefer cost-based proportions; fall back to input-token proportions.
+		var totalCost float64
+		for _, u := range stored {
+			totalCost += u.CostUSD
+		}
+		if totalCost > 0 {
+			for repo, u := range stored {
+				weights[repo] = u.CostUSD / totalCost
+			}
+		} else {
+			var totalInput int
+			for _, u := range stored {
+				totalInput += u.InputTokens
+			}
+			if totalInput > 0 {
+				for repo, u := range stored {
+					weights[repo] = float64(u.InputTokens) / float64(totalInput)
+				}
+			}
+		}
+	}
+
+	// Validate that every repo in worktreePaths has a weight. If the stored
+	// breakdown has mismatched keys (e.g. due to migration), reset to equal split.
+	valid := len(weights) > 0
+	if valid {
+		for repo := range worktreePaths {
+			if _, ok := weights[repo]; !ok {
+				valid = false
+				break
+			}
+		}
+	}
+	if !valid {
+		eq := 1.0 / float64(len(worktreePaths))
+		for repo := range worktreePaths {
+			weights[repo] = eq
+		}
+	}
+
+	// Apply weights to finalUsage.
+	breakdown := make(map[string]TaskUsage, len(worktreePaths))
+	for repo := range worktreePaths {
+		w := weights[repo]
+		breakdown[repo] = TaskUsage{
+			InputTokens:          int(float64(finalUsage.InputTokens) * w),
+			OutputTokens:         int(float64(finalUsage.OutputTokens) * w),
+			CacheReadInputTokens: int(float64(finalUsage.CacheReadInputTokens) * w),
+			CacheCreationTokens:  int(float64(finalUsage.CacheCreationTokens) * w),
+			CostUSD:              finalUsage.CostUSD * w,
+		}
+	}
+	return breakdown
 }
 
 // ForceUpdateTaskStatus sets a task's status field without validating the

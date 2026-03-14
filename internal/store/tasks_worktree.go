@@ -109,6 +109,17 @@ func (s *Store) UpdateTaskBaseCommitHashes(_ context.Context, id uuid.UUID, hash
 	})
 }
 
+// UpdateTaskWorkspaceUsageBreakdown stores the proportional per-workspace usage
+// breakdown computed from git diff statistics after the commit pipeline merges
+// changes. The breakdown values sum to the task usage at computation time;
+// buildAndSaveSummary rescales them to the final usage when writing the summary.
+func (s *Store) UpdateTaskWorkspaceUsageBreakdown(_ context.Context, id uuid.UUID, breakdown map[string]TaskUsage) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.WorkspaceUsageBreakdown = breakdown
+		return nil
+	})
+}
+
 // UpdateRefinementJob persists the current refinement job state.
 // Pass nil to clear the active refinement job.
 func (s *Store) UpdateRefinementJob(_ context.Context, id uuid.UUID, job *RefinementJob) error {

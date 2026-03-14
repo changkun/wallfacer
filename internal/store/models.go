@@ -370,6 +370,15 @@ type Task struct {
 	// Used to cap the auto-resume cycle and prevent infinite test-fail loops.
 	// Reset when the user manually provides feedback or when a test passes.
 	TestFailCount int `json:"test_fail_count,omitempty"`
+
+	// WorkspaceUsageBreakdown records the proportional share of this task's
+	// total usage attributed to each repository in WorktreePaths. It is
+	// computed once after the commit pipeline merges changes (using git diff
+	// --numstat line-counts as weights) and then rescaled to the final task
+	// usage when the task summary is written. For tasks that never completed
+	// the commit pipeline the field is nil and analytics fall back to an
+	// equal split across WorktreePaths.
+	WorkspaceUsageBreakdown map[string]TaskUsage `json:"workspace_usage_breakdown,omitempty"`
 }
 
 // HasTag reports whether the task has the given tag.
@@ -404,6 +413,7 @@ func deepCloneTask(t *Task) Task {
 	cp.AutoRetryBudget = maps.Clone(t.AutoRetryBudget)
 	cp.CommitHashes = maps.Clone(t.CommitHashes)
 	cp.BaseCommitHashes = maps.Clone(t.BaseCommitHashes)
+	cp.WorkspaceUsageBreakdown = maps.Clone(t.WorkspaceUsageBreakdown)
 
 	if t.CurrentRefinement != nil {
 		jobCopy := *t.CurrentRefinement
@@ -479,9 +489,10 @@ type TaskSummary struct {
 	DurationSeconds          float64              `json:"duration_seconds"`
 	ExecutionDurationSeconds float64              `json:"execution_duration_seconds"`
 	TotalTurns      int                  `json:"total_turns"`
-	TotalCostUSD    float64              `json:"total_cost_usd"`
-	ByActivity      map[SandboxActivity]TaskUsage `json:"by_activity"`
-	TestResult      string               `json:"test_result"`
+	TotalCostUSD            float64                      `json:"total_cost_usd"`
+	ByActivity              map[SandboxActivity]TaskUsage `json:"by_activity"`
+	WorkspaceUsageBreakdown map[string]TaskUsage          `json:"workspace_usage_breakdown,omitempty"`
+	TestResult              string                        `json:"test_result"`
 	PhaseCount      int                  `json:"phase_count"`
 	FailureCategory FailureCategory      `json:"failure_category,omitempty"`
 }
