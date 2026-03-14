@@ -464,7 +464,7 @@ func (r *Runner) runContainer(
 	defer r.taskContainers.Delete(taskID)
 
 	sb := sandbox.Claude
-	if task, err := r.store.GetTask(context.Background(), taskID); err == nil {
+	if task, err := r.store.GetTask(r.shutdownCtx, taskID); err == nil {
 		sb = r.sandboxForTaskActivity(task, activity)
 	} else {
 		logger.Runner.Warn("runContainer: get task", "task", taskID, "error", err)

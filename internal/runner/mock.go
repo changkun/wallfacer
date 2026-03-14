@@ -132,6 +132,8 @@ func (m *MockRunner) HostCodexAuthStatus(_ time.Time) (bool, string) { return fa
 
 func (m *MockRunner) CodexAuthPath() string { return m.CodexPath }
 
+func (m *MockRunner) ShutdownCtx() context.Context { return context.Background() }
+
 func (m *MockRunner) Command() string { return m.Cmd }
 
 func (m *MockRunner) SandboxImage() string { return m.Image }

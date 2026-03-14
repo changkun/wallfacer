@@ -44,7 +44,7 @@ func (r *Runner) GenerateOversight(taskID uuid.UUID) {
 // generateOversightLocked is the implementation of GenerateOversight.
 // The caller must hold the per-task oversightLock before calling this function.
 func (r *Runner) generateOversightLocked(taskID uuid.UUID) {
-	ctx := context.Background()
+	ctx := r.shutdownCtx
 
 	// Mark as generating so the UI can show a loading state.
 	_ = r.store.SaveOversight(taskID, store.TaskOversight{
@@ -109,7 +109,7 @@ func (r *Runner) GenerateTestOversight(taskID uuid.UUID, fromTurn int) {
 // generateTestOversightLocked is the implementation of GenerateTestOversight.
 // The caller must hold the per-task oversightLock before calling this function.
 func (r *Runner) generateTestOversightLocked(taskID uuid.UUID, fromTurn int) {
-	ctx := context.Background()
+	ctx := r.shutdownCtx
 
 	_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
 		Status: store.OversightStatusGenerating,
@@ -680,13 +680,13 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 
 	prompt := r.promptsMgr.Oversight(log)
 
-	runCtx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	runCtx, cancel := context.WithTimeout(r.shutdownCtx, 3*time.Minute)
 	defer cancel()
 
 	containerName := "wallfacer-oversight-" + taskID.String()[:8]
 	exec.Command(r.command, "rm", "-f", containerName).Run()
 
-	task, err := r.store.GetTask(context.Background(), taskID)
+	task, err := r.store.GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Warn("oversight: get task", "task", taskID, "error", err)
 	}
@@ -716,9 +716,9 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
 		runErr := cmd.Run()
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
 		if runCtx.Err() != nil {
 			return oversightRunResult{
 				err:   fmt.Errorf("container terminated: %w", runCtx.Err()),
@@ -768,7 +768,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	if res.err != nil {
 		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(res.err.Error()) {
 			logger.Runner.Warn("oversight: claude token limit hit; retrying with codex", "task", taskID, "agent", agent)
-			r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+			r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during oversight)",
 			})
 			res = runWithSandbox(sandbox.Codex)
@@ -784,7 +784,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("oversight: claude output reported token limit; retrying with codex", "task", taskID, "agent", agent)
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Sandbox fallback: claude → codex (token/rate limit in oversight output)",
 		})
 		res = runWithSandbox(sandbox.Codex)
@@ -799,7 +799,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 
 	// Accumulate token/cost usage for this oversight sub-agent.
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		if accErr := r.store.AccumulateSubAgentUsage(context.Background(), taskID, agent, store.TaskUsage{
+		if accErr := r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, agent, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,

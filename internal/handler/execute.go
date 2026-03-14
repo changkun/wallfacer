@@ -159,7 +159,7 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 
 func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID string, trigger store.Trigger, failurePrefix string) {
 	go func() {
-		bgCtx := context.Background()
+		bgCtx := h.runner.ShutdownCtx()
 		task, err := h.store.GetTask(bgCtx, taskID)
 		if err == nil && task != nil {
 			task, err = h.restoreTaskWorktreesForCommit(bgCtx, task)

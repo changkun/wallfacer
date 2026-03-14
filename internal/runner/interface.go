@@ -57,6 +57,9 @@ type Interface interface {
 	HostCodexAuthStatus(now time.Time) (bool, string)
 	CodexAuthPath() string
 
+	// Shutdown context.
+	ShutdownCtx() context.Context
+
 	// Configuration accessors.
 	Command() string
 	SandboxImage() string

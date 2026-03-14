@@ -24,8 +24,8 @@ const refinementTimeout = 30 * time.Minute
 // userInstructions is an optional hint from the user that narrows the
 // agent's focus (e.g. "keep backward compatibility").
 func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
-	bgCtx := context.Background()
-	ctx, cancel := context.WithTimeout(bgCtx, refinementTimeout)
+	bgCtx := r.shutdownCtx
+	ctx, cancel := context.WithTimeout(r.shutdownCtx, refinementTimeout)
 	defer cancel()
 
 	task, err := r.store.GetTask(bgCtx, taskID)
@@ -241,7 +241,7 @@ func (r *Runner) runRefinementContainer(
 	if err != nil {
 		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
 			logger.Runner.Warn("refinement: claude token limit hit; retrying with codex", "task", taskID)
-			r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+			r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during refinement)",
 			})
 			output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
@@ -254,7 +254,7 @@ func (r *Runner) runRefinementContainer(
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("refinement: claude output reported token limit; retrying with codex", "task", taskID)
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Sandbox fallback: claude → codex (token/rate limit in refinement output)",
 		})
 		output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
@@ -266,7 +266,7 @@ func (r *Runner) runRefinementContainer(
 
 	// Accumulate usage attributed to refinement sub-agent.
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 {
-		r.store.AccumulateSubAgentUsage(context.Background(), taskID, store.SandboxActivityRefinement, store.TaskUsage{
+		r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityRefinement, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,

@@ -101,7 +101,7 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 	}
 	r.boardCache.mu.Unlock()
 
-	tasks, err := r.store.ListTasks(context.Background(), false)
+	tasks, err := r.store.ListTasks(r.shutdownCtx, false)
 	if err != nil {
 		return nil, nil, err
 	}

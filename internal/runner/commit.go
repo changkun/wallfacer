@@ -39,7 +39,7 @@ func newCommitMessageGenerationError(format string, args ...any) error {
 // (stage → rebase → merge → cleanup) for a task.
 // Returns an error if any phase of the pipeline fails.
 func (r *Runner) Commit(taskID uuid.UUID, sessionID string) error {
-	task, err := r.store.GetTask(context.Background(), taskID)
+	task, err := r.store.GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Error("commit get task", "task", taskID, "error", err)
 		return fmt.Errorf("get task: %w", err)
@@ -48,7 +48,7 @@ func (r *Runner) Commit(taskID uuid.UUID, sessionID string) error {
 	if timeout <= 0 {
 		timeout = defaultTaskTimeout
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(r.shutdownCtx, timeout)
 	defer cancel()
 	return r.commit(ctx, taskID, sessionID, task.Turns, task.WorktreePaths, task.BranchName)
 }
@@ -64,7 +64,7 @@ func (r *Runner) commit(
 	worktreePaths map[string]string,
 	branchName string,
 ) error {
-	bgCtx := context.Background()
+	bgCtx := r.shutdownCtx
 	logger.Runner.Info("auto-commit", "task", taskID, "session", sessionID)
 
 	// Phase 1: stage and commit all uncommitted changes on the host.
@@ -252,13 +252,13 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 	if err != nil {
 		msg = localFallbackCommitMessage(prompt, allStats.String())
 		logger.Runner.Warn("commit message generation failed, using local fallback", "task", taskID, "error", err, "message", msg)
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Commit message generation failed; using fallback commit message.",
 		})
 	}
 
 	// Persist the commit message so it can be displayed in the UI.
-	if saveErr := r.store.UpdateTaskCommitMessage(context.Background(), taskID, msg); saveErr != nil {
+	if saveErr := r.store.UpdateTaskCommitMessage(r.shutdownCtx, taskID, msg); saveErr != nil {
 		logger.Runner.Warn("save commit message", "task", taskID, "error", saveErr)
 	}
 
@@ -328,7 +328,7 @@ func localFallbackCommitMessage(prompt, diffStat string) string {
 // git commit message from the task prompt, staged diff stats, and recent git
 // log history (used to match the project's commit style).
 func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recentLog string) (string, error) {
-	task, err := r.store.GetTask(context.Background(), taskID)
+	task, err := r.store.GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Warn("generate commit message: get task", "task", taskID, "error", err)
 	}
@@ -338,7 +338,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		sb = r.sandboxForTaskActivity(task, activityCommitMessage)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(r.shutdownCtx, 90*time.Second)
 	defer cancel()
 
 	containerName := "wallfacer-commit-" + taskID.String()[:8]
@@ -359,9 +359,9 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 		runErr := cmd.Run()
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 		if runErr != nil && ctx.Err() == nil {
 			return nil, fmt.Errorf("%w: stderr=%s", runErr, truncate(stderr.String(), 200))
 		}
@@ -384,7 +384,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	if err != nil {
 		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error()) {
 			logger.Runner.Warn("commit message generation: claude token limit hit; retrying with codex", "task", taskID)
-			r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+			r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during commit message generation)",
 			})
 			output, err = runWithSandbox(sandbox.Codex)
@@ -398,7 +398,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("commit message generation: claude output reported token limit; retrying with codex", "task", taskID)
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]string{
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 			"result": "Sandbox fallback: claude → codex (token/rate limit in commit message output)",
 		})
 		output, err = runWithSandbox(sandbox.Codex)
@@ -426,7 +426,7 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 	}
 
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		r.store.AccumulateSubAgentUsage(context.Background(), taskID, store.SandboxActivityCommitMessage, store.TaskUsage{
+		r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityCommitMessage, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
@@ -461,7 +461,7 @@ func (r *Runner) rebaseAndMerge(
 	branchName string,
 	sessionID string,
 ) (map[string]string, map[string]string, error) {
-	bgCtx := context.Background()
+	bgCtx := r.shutdownCtx
 	commitHashes := make(map[string]string)
 	baseHashes := make(map[string]string)
 
@@ -639,7 +639,7 @@ func (r *Runner) resolveConflicts(
 		DefaultBranch: defBranch,
 	})
 
-	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]any{
+	r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]any{
 		"phase":        "conflict_resolver",
 		"status":       "started",
 		"trigger":      string(trigger),
@@ -654,7 +654,7 @@ func (r *Runner) resolveConflicts(
 
 	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, override, "", nil, "", activityCommitMessage)
 
-	task, _ := r.store.GetTask(context.Background(), taskID)
+	task, _ := r.store.GetTask(r.shutdownCtx, taskID)
 	turns := 0
 	if task != nil {
 		turns = task.Turns + 1
@@ -670,7 +670,7 @@ func (r *Runner) resolveConflicts(
 	}
 
 	if err != nil {
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeError, map[string]any{
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeError, map[string]any{
 			"phase":        "conflict_resolver",
 			"status":       "failed",
 			"trigger":      string(trigger),
@@ -682,7 +682,7 @@ func (r *Runner) resolveConflicts(
 		return fmt.Errorf("conflict resolver container: %w", err)
 	}
 	if output.IsError {
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeError, map[string]any{
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeError, map[string]any{
 			"phase":        "conflict_resolver",
 			"status":       "failed",
 			"trigger":      string(trigger),
@@ -694,7 +694,7 @@ func (r *Runner) resolveConflicts(
 		return fmt.Errorf("conflict resolver reported error: %s", truncate(output.Result, 300))
 	}
 
-	r.store.InsertEvent(context.Background(), taskID, store.EventTypeSystem, map[string]any{
+	r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]any{
 		"phase":        "conflict_resolver",
 		"status":       "succeeded",
 		"trigger":      string(trigger),

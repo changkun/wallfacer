@@ -180,7 +180,7 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 
 	sb := sandbox.Claude
 	if taskID != uuid.Nil {
-		if task, err := r.store.GetTask(context.Background(), taskID); err == nil {
+		if task, err := r.store.GetTask(r.shutdownCtx, taskID); err == nil {
 			sb = r.sandboxForTaskActivity(task, activityIdeaAgent)
 		}
 	}

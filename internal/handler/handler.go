@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -423,7 +422,7 @@ func (h *Handler) openWatcherBreaker(watcherName string, taskID *uuid.UUID, reas
 	wasHealthy := !wb.isOpen()
 	failures := wb.recordFailure(taskID, reason)
 	if taskID != nil {
-		h.insertEventOrLog(context.Background(), *taskID, store.EventTypeSystem, map[string]string{
+		h.insertEventOrLog(h.runner.ShutdownCtx(), *taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("[%s] circuit breaker opened: %s", watcherName, reason),
 		})
 	}
