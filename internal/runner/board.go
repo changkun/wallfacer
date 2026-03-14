@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"changkun.de/wallfacer/internal/logger"
@@ -41,6 +42,21 @@ type BoardTask struct {
 	WorktreeMount *string          `json:"worktree_mount"`
 	CreatedAt     time.Time        `json:"created_at"`
 	UpdatedAt     time.Time        `json:"updated_at"`
+}
+
+// sharesWorkspace reports whether a task's worktree paths overlap with any of
+// the self task's workspace paths. Tasks with no worktrees (e.g. backlog) are
+// considered to share all workspaces so they appear in board context.
+func sharesWorkspace(worktreePaths map[string]string, selfWorkspaces map[string]struct{}) bool {
+	if len(worktreePaths) == 0 {
+		return true // backlog tasks have no worktrees; include them
+	}
+	for repoPath := range worktreePaths {
+		if _, ok := selfWorkspaces[repoPath]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // canMountWorktree reports whether a sibling task's worktrees are eligible
@@ -106,11 +122,38 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 		return nil, nil, err
 	}
 
+	// Build the set of workspace repo paths the self task is operating on.
+	// Siblings are only visible if they share at least one workspace.
+	selfWorkspaces := make(map[string]struct{})
+	for _, t := range tasks {
+		if t.ID == selfTaskID {
+			for repoPath := range t.WorktreePaths {
+				selfWorkspaces[repoPath] = struct{}{}
+			}
+			break
+		}
+	}
+	// If the self task has no worktrees (e.g. backlog), fall back to the
+	// runner's configured workspace list so board context is still useful.
+	if len(selfWorkspaces) == 0 && r.workspaces != "" {
+		for _, ws := range strings.Fields(r.workspaces) {
+			ws = strings.TrimSpace(ws)
+			if ws != "" {
+				selfWorkspaces[ws] = struct{}{}
+			}
+		}
+	}
+
 	boardTasks := make([]BoardTask, 0, len(tasks))
 	mounts := make(map[string]map[string]string)
 	for _, t := range tasks {
 		isSelf := t.ID == selfTaskID
 		shortID := t.ID.String()[:8]
+
+		// Skip siblings that do not share any workspace with the self task.
+		if !isSelf && len(selfWorkspaces) > 0 && !sharesWorkspace(t.WorktreePaths, selfWorkspaces) {
+			continue
+		}
 
 		var worktreeMount *string
 		if mountWorktrees && !isSelf && canMountWorktree(t.Status, t.WorktreePaths) && len(t.WorktreePaths) > 0 {
