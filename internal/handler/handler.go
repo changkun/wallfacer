@@ -96,6 +96,11 @@ func (wb *watcherBreaker) healthEntry(name string) watcherHealthEntry {
 
 // Handler holds dependencies for all HTTP API handlers.
 type Handler struct {
+	// snapshotMu guards the store and workspaces mirror fields, which are
+	// written by the workspace subscription goroutine (via applySnapshot) and
+	// read by HTTP handler goroutines. All other fields are either set once at
+	// construction time or protected by their own mutex.
+	snapshotMu sync.RWMutex
 	store      *store.Store
 	workspace  *workspace.Manager
 	runner     runner.Interface
@@ -212,7 +217,10 @@ func (h *Handler) currentStore() (*store.Store, bool) {
 	if h.workspace != nil {
 		return h.workspace.Store()
 	}
-	return h.store, h.store != nil
+	h.snapshotMu.RLock()
+	s := h.store
+	h.snapshotMu.RUnlock()
+	return s, s != nil
 }
 
 func (h *Handler) requireStore(w http.ResponseWriter) (*store.Store, bool) {
@@ -228,11 +236,14 @@ func (h *Handler) currentWorkspaces() []string {
 	if h.workspace != nil {
 		return h.workspace.Workspaces()
 	}
-	if len(h.workspaces) == 0 {
+	h.snapshotMu.RLock()
+	ws := h.workspaces
+	h.snapshotMu.RUnlock()
+	if len(ws) == 0 {
 		return nil
 	}
-	out := make([]string, len(h.workspaces))
-	copy(out, h.workspaces)
+	out := make([]string, len(ws))
+	copy(out, ws)
 	return out
 }
 
@@ -249,8 +260,10 @@ func (h *Handler) currentInstructionsPath() string {
 // subscription goroutine so that every workspace switch is reflected
 // consistently.
 func (h *Handler) applySnapshot(snap workspace.Snapshot) {
+	h.snapshotMu.Lock()
 	h.store = snap.Store
 	h.workspaces = snap.Workspaces
+	h.snapshotMu.Unlock()
 }
 
 func (h *Handler) hasStore() bool {

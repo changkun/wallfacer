@@ -1048,18 +1048,23 @@ func TestUpdateWorkspaces_SubscriptionUpdatesHandlerStore(t *testing.T) {
 
 	// The subscription goroutine runs asynchronously; give it a short window to
 	// propagate the new snapshot into h.store.
+	mirroredStore := func() *store.Store {
+		h.snapshotMu.RLock()
+		defer h.snapshotMu.RUnlock()
+		return h.store
+	}
 	deadline := time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {
-		if h.store != storeBefore {
+		if mirroredStore() != storeBefore {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	if h.store == storeBefore {
+	if mirroredStore() == storeBefore {
 		t.Error("expected h.store to be updated by the subscription goroutine after workspace switch")
 	}
-	if h.store == nil {
+	if mirroredStore() == nil {
 		t.Error("expected h.store to be non-nil after workspace switch")
 	}
 }
