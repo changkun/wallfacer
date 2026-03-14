@@ -144,6 +144,7 @@ async function fetchConfig() {
     // Sync ideation toggle and spinner state.
     if (typeof updateIdeationConfig === 'function') updateIdeationConfig(cfg);
     updateAutomationActiveCount();
+    if (typeof updateWatcherHealth === 'function') updateWatcherHealth(cfg.watcher_health || []);
   } catch (e) {
     console.error('fetchConfig:', e);
   }
