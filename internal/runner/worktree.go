@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -141,7 +140,7 @@ func (r *Runner) PruneUnknownWorktrees() {
 		return
 	}
 
-	ctx := context.Background()
+	ctx := r.shutdownCtx
 	knownIDs := map[string]bool{}
 	if r.store != nil {
 		tasks, _ := r.store.ListTasks(ctx, true)

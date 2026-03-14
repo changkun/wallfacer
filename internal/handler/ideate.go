@@ -93,7 +93,7 @@ func (h *Handler) scheduleIdeation(ctx context.Context) {
 		h.ideationMu.Unlock()
 
 		if enabled {
-			h.createIdeaAgentTask(context.Background())
+			h.createIdeaAgentTask(h.runner.ShutdownCtx())
 		}
 	})
 	h.ideationMu.Unlock()

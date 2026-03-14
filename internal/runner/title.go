@@ -18,7 +18,7 @@ import (
 // summarising the task prompt, then persists it via the store.
 // Errors are logged and silently dropped so callers can fire-and-forget.
 func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
-	task, err := r.store.GetTask(context.Background(), taskID)
+	task, err := r.store.GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Warn("GenerateTitle get task failed", "task", taskID, "error", err)
 		return
@@ -28,7 +28,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	}
 	sb := r.sandboxForTaskActivity(task, activityTitle)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(r.shutdownCtx, 60*time.Second)
 	defer cancel()
 
 	titlePrompt := r.promptsMgr.Title(prompt)
@@ -54,9 +54,9 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 		runErr := cmd.Run()
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 
 		if ctx.Err() != nil {
 			return titleResult{err: fmt.Errorf("container terminated: %w", ctx.Err()), model: mdl, sb: selected}
@@ -131,13 +131,13 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		return
 	}
 
-	if err := r.store.UpdateTaskTitle(context.Background(), taskID, title); err != nil {
+	if err := r.store.UpdateTaskTitle(r.shutdownCtx, taskID, title); err != nil {
 		logger.Runner.Warn("title generation: store update failed", "task", taskID, "error", err)
 	}
 
 	// Accumulate token/cost usage for the title generation sub-agent.
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		if err := r.store.AccumulateSubAgentUsage(context.Background(), taskID, store.SandboxActivityTitle, store.TaskUsage{
+		if err := r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityTitle, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,

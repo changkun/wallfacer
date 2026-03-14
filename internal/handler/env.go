@@ -644,10 +644,10 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// When the parallel task limit changes, re-evaluate immediately so new
 	// capacity is filled without waiting for the next store event.
 	if req.MaxParallelTasks != nil {
-		go h.tryAutoPromote(context.Background())
+		go h.tryAutoPromote(h.runner.ShutdownCtx())
 	}
 	if req.MaxTestParallelTasks != nil {
-		go h.tryAutoTest(context.Background())
+		go h.tryAutoTest(h.runner.ShutdownCtx())
 	}
 
 	w.WriteHeader(http.StatusNoContent)

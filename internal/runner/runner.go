@@ -341,6 +341,13 @@ type Runner struct {
 	reg                 *metrics.Registry // optional; nil disables metric collection
 }
 
+// ShutdownCtx returns the runner's shutdown context. It is cancelled when
+// Shutdown() is called, allowing background goroutines and store operations
+// to be cancelled on graceful shutdown.
+func (r *Runner) ShutdownCtx() context.Context {
+	return r.shutdownCtx
+}
+
 // ContainerCircuitAllow returns true when the container circuit breaker
 // permits a new launch. Use this in handlers before promoting a task to
 // in-progress to avoid firing launches that would immediately fail.
