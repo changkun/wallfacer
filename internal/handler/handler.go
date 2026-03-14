@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
@@ -135,6 +136,13 @@ type Handler struct {
 	diffCache *diffCache
 	fileIndex *fileIndex
 	spanCache spanStatsCache
+
+	// cachedMaxParallel and cachedMaxTestParallel cache the configured parallel
+	// task limits so that maxConcurrentTasks/maxTestConcurrentTasks do not
+	// re-parse the env file on every call. A value of 0 is the sentinel for
+	// "not yet loaded"; UpdateEnvConfig resets them to 0 to force a reload.
+	cachedMaxParallel     atomic.Int32
+	cachedMaxTestParallel atomic.Int32
 
 	// ideationEnabled controls whether brainstorm auto-repeat is active.
 	// ideationInterval is the delay between consecutive brainstorm runs (0 = run immediately on completion).

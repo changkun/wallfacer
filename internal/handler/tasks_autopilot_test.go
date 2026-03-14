@@ -2,11 +2,12 @@ package handler
 
 import (
 	"bytes"
-	"net/http"
-	"net/http/httptest"
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/store"
 )
@@ -715,5 +717,136 @@ func TestCheckConcurrencyAndUpdateStatus_MaxConcurrency(t *testing.T) {
 	}
 	if w.Code != http.StatusConflict {
 		t.Errorf("expected 409 Conflict, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestMaxConcurrentTasks_Caching verifies that maxConcurrentTasks reads from
+// the env file only on the first call and caches the result for subsequent
+// calls. It also verifies that resetting the cache (Store(0)) causes the next
+// call to re-read the updated file value.
+func TestMaxConcurrentTasks_Caching(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+
+	// Write an initial MaxParallelTasks value to the env file.
+	initialLimit := "7"
+	if err := envconfig.Update(envPath, envconfig.Updates{MaxParallel: &initialLimit}); err != nil {
+		t.Fatalf("envconfig.Update initial: %v", err)
+	}
+
+	// First call should read from the file and cache the value.
+	got := h.maxConcurrentTasks()
+	if got != 7 {
+		t.Fatalf("first call: want 7, got %d", got)
+	}
+
+	// Overwrite the env file with a different value WITHOUT invalidating the cache.
+	updatedLimit := "12"
+	if err := envconfig.Update(envPath, envconfig.Updates{MaxParallel: &updatedLimit}); err != nil {
+		t.Fatalf("envconfig.Update updated: %v", err)
+	}
+
+	// Second call should still return the cached value (7), not the new value (12).
+	got = h.maxConcurrentTasks()
+	if got != 7 {
+		t.Fatalf("second call (cached): want 7, got %d", got)
+	}
+
+	// Manually invalidate the cache (simulating what UpdateEnvConfig does).
+	h.cachedMaxParallel.Store(0)
+
+	// Third call should re-read from the file and return the updated value.
+	got = h.maxConcurrentTasks()
+	if got != 12 {
+		t.Fatalf("third call (after invalidation): want 12, got %d", got)
+	}
+}
+
+// TestMaxTestConcurrentTasks_Caching mirrors TestMaxConcurrentTasks_Caching
+// for the test-parallel limit.
+func TestMaxTestConcurrentTasks_Caching(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+
+	initialLimit := "3"
+	if err := envconfig.Update(envPath, envconfig.Updates{MaxTestParallel: &initialLimit}); err != nil {
+		t.Fatalf("envconfig.Update initial: %v", err)
+	}
+
+	got := h.maxTestConcurrentTasks()
+	if got != 3 {
+		t.Fatalf("first call: want 3, got %d", got)
+	}
+
+	updatedLimit := "8"
+	if err := envconfig.Update(envPath, envconfig.Updates{MaxTestParallel: &updatedLimit}); err != nil {
+		t.Fatalf("envconfig.Update updated: %v", err)
+	}
+
+	// Cache still holds 3.
+	got = h.maxTestConcurrentTasks()
+	if got != 3 {
+		t.Fatalf("second call (cached): want 3, got %d", got)
+	}
+
+	h.cachedMaxTestParallel.Store(0)
+
+	got = h.maxTestConcurrentTasks()
+	if got != 8 {
+		t.Fatalf("third call (after invalidation): want 8, got %d", got)
+	}
+}
+
+// TestUpdateEnvConfig_InvalidatesParallelLimitCache verifies that calling
+// UpdateEnvConfig with a new MaxParallelTasks value invalidates the in-process
+// cache so that the next call to maxConcurrentTasks reflects the new limit.
+func TestUpdateEnvConfig_InvalidatesParallelLimitCache(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	// Prime the cache with the default (no env file entry → default 5).
+	initial := h.maxConcurrentTasks()
+	if initial != defaultMaxConcurrentTasks {
+		t.Fatalf("initial: want %d, got %d", defaultMaxConcurrentTasks, initial)
+	}
+
+	// Call UpdateEnvConfig to change max_parallel_tasks to 9.
+	newLimit := 9
+	body, _ := json.Marshal(map[string]any{"max_parallel_tasks": newLimit})
+	req := httptest.NewRequest(http.MethodPut, "/api/env", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("UpdateEnvConfig: want 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// The cache should have been invalidated; the next call must return 9.
+	got := h.maxConcurrentTasks()
+	if got != newLimit {
+		t.Fatalf("after UpdateEnvConfig: want %d, got %d", newLimit, got)
+	}
+}
+
+// TestUpdateEnvConfig_InvalidatesTestParallelLimitCache mirrors the above for
+// the test-parallel limit.
+func TestUpdateEnvConfig_InvalidatesTestParallelLimitCache(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	initial := h.maxTestConcurrentTasks()
+	if initial != defaultMaxTestConcurrentTasks {
+		t.Fatalf("initial: want %d, got %d", defaultMaxTestConcurrentTasks, initial)
+	}
+
+	newLimit := 6
+	body, _ := json.Marshal(map[string]any{"max_test_parallel_tasks": newLimit})
+	req := httptest.NewRequest(http.MethodPut, "/api/env", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("UpdateEnvConfig: want 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	got := h.maxTestConcurrentTasks()
+	if got != newLimit {
+		t.Fatalf("after UpdateEnvConfig: want %d, got %d", newLimit, got)
 	}
 }
