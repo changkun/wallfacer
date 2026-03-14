@@ -530,31 +530,31 @@ function render() {
       existing.set(child.dataset.id, child);
     }
 
-    const newIds = new Set(visibleItems.map(t => t.id));
-
-    // Remove cards that are no longer in this column or hidden by the filter.
-    for (const [id, child] of existing) {
-      if (!newIds.has(id)) child.remove();
-    }
-
-    // Add or update visible cards, maintaining sorted order in the DOM.
+    // Build the new card order in a DocumentFragment so that intermediate
+    // DOM writes (innerHTML in updateCard) do not trigger synchronous
+    // document-level layout recalculations.  Existing cards are moved into
+    // the fragment first (detaching them from the live DOM), updated there,
+    // then the entire fragment is appended in a single reflow.
+    const frag = document.createDocumentFragment();
     for (let i = 0; i < visibleItems.length; i++) {
       const t = visibleItems[i];
       let card = existing.get(t.id);
       const rank = status === 'backlog' ? i : undefined;
-      if (!card) {
-        card = createCard(t, rank);
-      } else {
+      if (card) {
+        frag.appendChild(card); // detach from live DOM before update
         updateCard(card, t, rank);
-      }
-      if (el.children[i] !== card) {
-        el.insertBefore(card, el.children[i] || null);
+      } else {
+        card = createCard(t, rank);
+        frag.appendChild(card);
       }
       // Load diff for any task that has worktrees
       if (t.worktree_paths && Object.keys(t.worktree_paths).length > 0) {
         fetchDiff(card, t.id, t.updated_at);
       }
     }
+    // Single DOM mutation: clear stale cards and append the ordered fragment.
+    el.textContent = '';
+    el.appendChild(frag);
   }
 
   // Update done column usage stats

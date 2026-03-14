@@ -44,11 +44,32 @@ function createElement(ownerDocument, tagName, overrides = {}) {
     attributes: {},
     _listeners: {},
     innerHTML: '',
-    textContent: '',
+    _textContent: '',
+    get textContent() { return this._textContent; },
+    set textContent(v) {
+      this._textContent = v;
+      if (v === '') {
+        for (const child of this.children) child.parentElement = null;
+        this.children = [];
+      }
+    },
     tabIndex: undefined,
     onclick: null,
     appendChild(child) {
+      if (child.parentElement) {
+        const idx = child.parentElement.children.indexOf(child);
+        if (idx >= 0) child.parentElement.children.splice(idx, 1);
+      }
       child.parentElement = this;
+      // DocumentFragment: append fragment's children instead of the fragment itself
+      if (child.tagName === 'FRAGMENT' && child.children) {
+        for (const fc of child.children.slice()) {
+          fc.parentElement = this;
+          this.children.push(fc);
+        }
+        child.children = [];
+        return child;
+      }
       this.children.push(child);
       return child;
     },
@@ -194,6 +215,9 @@ function setupContext() {
     documentElement: { setAttribute: () => {} },
     createElement(tag) {
       return createElement(document, tag);
+    },
+    createDocumentFragment() {
+      return createElement(document, 'fragment');
     },
     getElementById(id) {
       return elements.get(id) || null;

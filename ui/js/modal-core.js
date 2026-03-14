@@ -11,13 +11,28 @@ let _modalKeydownHandler = null;
 
 function getOpenModalTaskId() { return _modalState.taskId; }
 
+// Cache focusable elements to avoid expensive querySelectorAll on every Tab press.
+// The cache is time-limited so it stays fresh when async content loads into the modal.
+let _focusableCache = null;
+let _focusableCacheTime = 0;
+const _FOCUSABLE_CACHE_MS = 400;
+
 function _getModalFocusableElements(modal) {
   if (!modal || typeof modal.querySelectorAll !== 'function') return [];
-  return Array.from(modal.querySelectorAll(
-    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-  )).filter(function(el) {
-    return !!el && !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true';
-  });
+  const now = Date.now();
+  if (_focusableCache && (now - _focusableCacheTime) < _FOCUSABLE_CACHE_MS) {
+    return _focusableCache;
+  }
+  _focusableCache = Array.from(modal.querySelectorAll(
+    'button:not([disabled]):not([aria-hidden="true"]), [href]:not([aria-hidden="true"]), input:not([disabled]):not([aria-hidden="true"]), select:not([disabled]):not([aria-hidden="true"]), textarea:not([disabled]):not([aria-hidden="true"]), [tabindex]:not([tabindex="-1"]):not([aria-hidden="true"])'
+  ));
+  _focusableCacheTime = now;
+  return _focusableCache;
+}
+
+function _invalidateFocusableCache() {
+  _focusableCache = null;
+  _focusableCacheTime = 0;
 }
 
 function _attachModalFocusTrap(modal) {
@@ -869,8 +884,15 @@ async function openModal(id) {
 
 function closeModal() {
   const modalEl = document.getElementById('modal');
+  // Hide the modal immediately so that subsequent DOM cleanup writes
+  // (innerHTML, classList, style) do not trigger visible reflows.
+  modalEl.classList.add('hidden');
+  modalEl.classList.remove('flex');
+  _detachModalFocusTrap(modalEl);
+  _invalidateFocusableCache();
   if (_modalState.abort) { _modalState.abort.abort(); _modalState.abort = null; }
   _modalState.seq += 1;
+  _modalState.taskId = null;
   if (logsAbort) {
     logsAbort.abort();
     logsAbort = null;
@@ -904,14 +926,10 @@ function closeModal() {
   document.getElementById('modal-backlog-right').classList.add('hidden');
   document.getElementById('modal-backlog-settings').classList.add('hidden');
   document.getElementById('modal-backlog-edit').classList.add('hidden');
-  _modalState.taskId = null;
   document.querySelector('#modal .modal-card').classList.remove('modal-wide');
   const modalBody = document.getElementById('modal-body');
   modalBody.style.display = '';
   modalBody.style.gap = '';
-  _detachModalFocusTrap(modalEl);
-  modalEl.classList.add('hidden');
-  modalEl.classList.remove('flex');
   history.replaceState(null, '', location.pathname + location.search);
   const canRestoreFocus = _previousModalFocus && typeof _previousModalFocus.focus === 'function' && (
     _previousModalFocus.isConnected ||

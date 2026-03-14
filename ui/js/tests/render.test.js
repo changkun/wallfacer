@@ -618,10 +618,14 @@ describe('render.js column aria-live attributes', () => {
       getAttribute: (k) => attrs[k] ?? null,
       setAttribute: (k, v) => { attrs[k] = v; },
       insertBefore: () => {},
+      appendChild(c) { return c; },
+      get textContent() { return ''; },
+      set textContent(_v) { this.children = []; },
     };
     ctx.document = {
       getElementById: (id) => id === 'col-backlog' ? mockEl : null,
       createElement: () => ({ innerHTML: '' }),
+      createDocumentFragment: () => ({ children: [], appendChild(c) { this.children.push(c); return c; } }),
       querySelectorAll: () => [],
       addEventListener: () => {},
       readyState: 'complete',
