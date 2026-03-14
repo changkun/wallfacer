@@ -129,91 +129,45 @@ func (s *Store) UpdateTaskTitle(_ context.Context, id uuid.UUID, title string) e
 	// strings.ToLower call (potentially non-trivial for long titles) does not
 	// extend the critical section.
 	loweredTitle := strings.ToLower(title)
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	t.Title = title
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	if entry, ok := s.searchIndex[id]; ok {
-		entry.title = loweredTitle
-		s.searchIndex[id] = entry
-	}
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.Title = title
+		if entry, ok := s.searchIndex[id]; ok {
+			entry.title = loweredTitle
+			s.searchIndex[id] = entry
+		}
+		return nil
+	})
 }
 
 // UpdateTaskExecutionPrompt sets the full execution prompt used at runtime.
 // When non-empty, the runner passes ExecutionPrompt to the sandbox instead of
 // Prompt, so Prompt can be kept as a short human-readable card label.
 func (s *Store) UpdateTaskExecutionPrompt(_ context.Context, id uuid.UUID, executionPrompt string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	t.ExecutionPrompt = executionPrompt
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: ExecutionPrompt is not a search-indexed field;
-	// the indexed prompt is the human-readable card label stored in Prompt.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.ExecutionPrompt = executionPrompt
+		return nil
+	})
 }
 
 // UpdateTaskTurns updates only the turn counter for a task, leaving all other
 // fields (Result, SessionID, StopReason) unchanged. Used during test runs so
 // that the implementation agent's output is not overwritten.
 func (s *Store) UpdateTaskTurns(_ context.Context, id uuid.UUID, turns int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	t.Turns = turns
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: turn count is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.Turns = turns
+		return nil
+	})
 }
 
 // UpdateTaskResult stores the final output, session ID, stop reason, and turn count.
 func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessionID, stopReason string, turns int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	t.Result = &result
-	t.SessionID = &sessionID
-	t.StopReason = &stopReason
-	t.Turns = turns
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: result, sessionID, stopReason, and turns are
-	// not search-indexed fields (title, prompt, tags, oversight).
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.Result = &result
+		t.SessionID = &sessionID
+		t.StopReason = &stopReason
+		t.Turns = turns
+		return nil
+	})
 }
 
 // AccumulateSubAgentUsage adds token/cost deltas to the task's running totals
@@ -221,37 +175,24 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 // agent should be one of: "implementation", "test", "title", "oversight",
 // "oversight-test", "refinement".
 func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent string, delta TaskUsage) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	// Accumulate into the aggregate total.
-	t.Usage.InputTokens += delta.InputTokens
-	t.Usage.OutputTokens += delta.OutputTokens
-	t.Usage.CacheReadInputTokens += delta.CacheReadInputTokens
-	t.Usage.CacheCreationTokens += delta.CacheCreationTokens
-	t.Usage.CostUSD += delta.CostUSD
-	// Accumulate into the per-sub-agent breakdown.
-	if t.UsageBreakdown == nil {
-		t.UsageBreakdown = make(map[string]TaskUsage)
-	}
-	prev := t.UsageBreakdown[agent]
-	prev.InputTokens += delta.InputTokens
-	prev.OutputTokens += delta.OutputTokens
-	prev.CacheReadInputTokens += delta.CacheReadInputTokens
-	prev.CacheCreationTokens += delta.CacheCreationTokens
-	prev.CostUSD += delta.CostUSD
-	t.UsageBreakdown[agent] = prev
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: token/cost usage is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.Usage.InputTokens += delta.InputTokens
+		t.Usage.OutputTokens += delta.OutputTokens
+		t.Usage.CacheReadInputTokens += delta.CacheReadInputTokens
+		t.Usage.CacheCreationTokens += delta.CacheCreationTokens
+		t.Usage.CostUSD += delta.CostUSD
+		if t.UsageBreakdown == nil {
+			t.UsageBreakdown = make(map[string]TaskUsage)
+		}
+		prev := t.UsageBreakdown[agent]
+		prev.InputTokens += delta.InputTokens
+		prev.OutputTokens += delta.OutputTokens
+		prev.CacheReadInputTokens += delta.CacheReadInputTokens
+		prev.CacheCreationTokens += delta.CacheCreationTokens
+		prev.CostUSD += delta.CostUSD
+		t.UsageBreakdown[agent] = prev
+		return nil
+	})
 }
 
 // AccumulateTaskUsage is a convenience wrapper that accumulates usage without
@@ -262,98 +203,55 @@ func (s *Store) AccumulateTaskUsage(ctx context.Context, id uuid.UUID, delta Tas
 
 // UpdateTaskPosition updates the task board column sort position.
 func (s *Store) UpdateTaskPosition(_ context.Context, id uuid.UUID, position int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	t.Position = position
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: board position is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.Position = position
+		return nil
+	})
 }
 
 // UpdateTaskScheduledAt sets or clears the scheduled start time for a task.
 // Pass nil to clear the schedule (task will be eligible for immediate promotion).
 func (s *Store) UpdateTaskScheduledAt(_ context.Context, id uuid.UUID, scheduledAt *time.Time) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	if scheduledAt == nil {
-		t.ScheduledAt = nil
-	} else {
-		ts := *scheduledAt
-		t.ScheduledAt = &ts
-	}
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: scheduled time is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		if scheduledAt == nil {
+			t.ScheduledAt = nil
+		} else {
+			ts := *scheduledAt
+			t.ScheduledAt = &ts
+		}
+		return nil
+	})
 }
 
 // UpdateTaskDependsOn sets the list of task UUID strings that must all reach
 // TaskStatusDone before this task is auto-promoted. An empty or nil slice clears
 // all dependencies.
 func (s *Store) UpdateTaskDependsOn(_ context.Context, id uuid.UUID, dependsOn []string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	if len(dependsOn) == 0 {
-		t.DependsOn = nil // normalise so omitempty keeps JSON clean
-	} else {
-		t.DependsOn = dependsOn
-	}
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: dependency list is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		if len(dependsOn) == 0 {
+			t.DependsOn = nil // normalise so omitempty keeps JSON clean
+		} else {
+			t.DependsOn = dependsOn
+		}
+		return nil
+	})
 }
 
 // UpdateTaskTags sets the tag labels for a task. An empty or nil slice clears
 // all tags.
 func (s *Store) UpdateTaskTags(_ context.Context, id uuid.UUID, tags []string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	if len(tags) == 0 {
-		t.Tags = nil
-	} else {
-		t.Tags = append([]string(nil), tags...)
-	}
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	if entry, ok := s.searchIndex[id]; ok {
-		entry.tags = strings.ToLower(strings.Join(t.Tags, " "))
-		s.searchIndex[id] = entry
-	}
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		if len(tags) == 0 {
+			t.Tags = nil
+		} else {
+			t.Tags = append([]string(nil), tags...)
+		}
+		if entry, ok := s.searchIndex[id]; ok {
+			entry.tags = strings.ToLower(strings.Join(t.Tags, " "))
+			s.searchIndex[id] = entry
+		}
+		return nil
+	})
 }
 
 // AreDependenciesSatisfied reports whether every task listed in t.DependsOn has
@@ -391,202 +289,125 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 	if prompt != nil {
 		loweredPrompt = strings.ToLower(*prompt)
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	if prompt != nil {
-		t.Prompt = *prompt
-	}
-	if timeout != nil {
-		t.Timeout = clampTimeout(*timeout)
-	}
-	if freshStart != nil {
-		t.FreshStart = *freshStart
-	}
-	if mountWorktrees != nil {
-		t.MountWorktrees = *mountWorktrees
-	}
-	if sandboxByActivity != nil {
-		t.SandboxByActivity = normalizeSandboxByActivity(*sandboxByActivity)
-	}
-	if maxCostUSD != nil {
-		v := *maxCostUSD
-		if v < 0 {
-			v = 0
+	return s.mutateTask(id, func(t *Task) error {
+		if prompt != nil {
+			t.Prompt = *prompt
 		}
-		t.MaxCostUSD = v
-	}
-	if maxInputTokens != nil {
-		v := *maxInputTokens
-		if v < 0 {
-			v = 0
+		if timeout != nil {
+			t.Timeout = clampTimeout(*timeout)
 		}
-		t.MaxInputTokens = v
-	}
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	if prompt != nil {
-		if entry, ok := s.searchIndex[id]; ok {
-			entry.prompt = loweredPrompt
-			s.searchIndex[id] = entry
+		if freshStart != nil {
+			t.FreshStart = *freshStart
 		}
-	}
-	s.notify(t, false)
-	return nil
+		if mountWorktrees != nil {
+			t.MountWorktrees = *mountWorktrees
+		}
+		if sandboxByActivity != nil {
+			t.SandboxByActivity = normalizeSandboxByActivity(*sandboxByActivity)
+		}
+		if maxCostUSD != nil {
+			v := *maxCostUSD
+			if v < 0 {
+				v = 0
+			}
+			t.MaxCostUSD = v
+		}
+		if maxInputTokens != nil {
+			v := *maxInputTokens
+			if v < 0 {
+				v = 0
+			}
+			t.MaxInputTokens = v
+		}
+		if prompt != nil {
+			if entry, ok := s.searchIndex[id]; ok {
+				entry.prompt = loweredPrompt
+				s.searchIndex[id] = entry
+			}
+		}
+		return nil
+	})
 }
 
 // UpdateTaskBudget updates the max_cost_usd and max_input_tokens guardrails on
 // a task. Unlike UpdateTaskBacklog it is not gated on status, so it can be
 // called for waiting tasks to "raise the limit" from the UI.
 func (s *Store) UpdateTaskBudget(_ context.Context, id uuid.UUID, maxCostUSD *float64, maxInputTokens *int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	if maxCostUSD != nil {
-		v := *maxCostUSD
-		if v < 0 {
-			v = 0
+	return s.mutateTask(id, func(t *Task) error {
+		if maxCostUSD != nil {
+			v := *maxCostUSD
+			if v < 0 {
+				v = 0
+			}
+			t.MaxCostUSD = v
 		}
-		t.MaxCostUSD = v
-	}
-	if maxInputTokens != nil {
-		v := *maxInputTokens
-		if v < 0 {
-			v = 0
+		if maxInputTokens != nil {
+			v := *maxInputTokens
+			if v < 0 {
+				v = 0
+			}
+			t.MaxInputTokens = v
 		}
-		t.MaxInputTokens = v
-	}
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: budget limits are not search-indexed fields.
-	s.notify(t, false)
-	return nil
+		return nil
+	})
 }
 
 // UpdateTaskSandboxByActivity stores task sandbox overrides by activity key.
 // Passing an empty map clears the override map.
 func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[string]sandbox.Type) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	t.SandboxByActivity = normalizeSandboxByActivity(sandboxByActivity)
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: sandbox selection is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.SandboxByActivity = normalizeSandboxByActivity(sandboxByActivity)
+		return nil
+	})
 }
 
 // UpdateTaskSandbox stores the task sandbox selection (e.g. "claude" or "codex").
 func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sb sandbox.Type) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	t.Sandbox = sandbox.Normalize(string(sb))
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: sandbox selection is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.Sandbox = sandbox.Normalize(string(sb))
+		return nil
+	})
 }
 
 // UpdateTaskModelOverride sets or clears the per-task model override.
 // Passing a non-empty string sets the override; an empty string clears it (sets to nil).
 func (s *Store) UpdateTaskModelOverride(_ context.Context, id uuid.UUID, model string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
 	model = strings.TrimSpace(model)
-	if model == "" {
-		t.ModelOverride = nil
-	} else {
-		t.ModelOverride = &model
-	}
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: model override is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		if model == "" {
+			t.ModelOverride = nil
+		} else {
+			t.ModelOverride = &model
+		}
+		return nil
+	})
 }
 
 // UpdateTaskCustomPatterns replaces the custom pass/fail regex pattern slices on a task.
 // Passing a nil slice clears the corresponding field; passing a non-nil empty slice also clears it.
 func (s *Store) UpdateTaskCustomPatterns(_ context.Context, id uuid.UUID, passPatterns, failPatterns []string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	if len(passPatterns) == 0 {
-		t.CustomPassPatterns = nil
-	} else {
-		t.CustomPassPatterns = append([]string(nil), passPatterns...)
-	}
-	if len(failPatterns) == 0 {
-		t.CustomFailPatterns = nil
-	} else {
-		t.CustomFailPatterns = append([]string(nil), failPatterns...)
-	}
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: custom patterns are not search-indexed fields.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		if len(passPatterns) == 0 {
+			t.CustomPassPatterns = nil
+		} else {
+			t.CustomPassPatterns = append([]string(nil), passPatterns...)
+		}
+		if len(failPatterns) == 0 {
+			t.CustomFailPatterns = nil
+		} else {
+			t.CustomFailPatterns = append([]string(nil), failPatterns...)
+		}
+		return nil
+	})
 }
 
 // UpdateTaskEnvironment records the execution environment captured at the start of Run().
 // The environment is written atomically alongside the task and broadcast to SSE subscribers.
 func (s *Store) UpdateTaskEnvironment(_ context.Context, id uuid.UUID, env ExecutionEnvironment) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	t.Environment = &env
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: execution environment is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.Environment = &env
+		return nil
+	})
 }
 
 // ResetTaskForRetry moves a done/failed/cancelled task back to backlog with a fresh state.
@@ -684,21 +505,10 @@ func (s *Store) ArchiveAllDone(_ context.Context) ([]uuid.UUID, error) {
 
 // SetTaskArchived sets the archived flag on a task.
 func (s *Store) SetTaskArchived(_ context.Context, id uuid.UUID, archived bool) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t, ok := s.tasks[id]
-	if !ok {
-		return fmt.Errorf("task not found: %s", id)
-	}
-	t.Archived = archived
-	t.UpdatedAt = time.Now()
-	if err := s.saveTask(id, t); err != nil {
-		return err
-	}
-	// Search index not updated: archived flag is not a search-indexed field.
-	s.notify(t, false)
-	return nil
+	return s.mutateTask(id, func(t *Task) error {
+		t.Archived = archived
+		return nil
+	})
 }
 
 // ResumeTask transitions a failed task back to in_progress, optionally updating timeout.
@@ -729,5 +539,3 @@ func (s *Store) ResumeTask(_ context.Context, id uuid.UUID, timeout *int) error 
 	s.notify(t, false)
 	return nil
 }
-
-// UpdateTaskWorktrees persists the worktree paths and branch name for a task.

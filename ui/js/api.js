@@ -188,7 +188,10 @@ function startTasksStream() {
         var openId = getOpenModalTaskId();
         if (openId) {
           var openTask = findTaskById(openId);
-          if (openTask && Array.isArray(openTask.depends_on) && openTask.depends_on.indexOf(task.id) !== -1) {
+          var openDeps = typeof getTaskDependencyIds === 'function'
+            ? getTaskDependencyIds(openTask)
+            : (openTask && Array.isArray(openTask.depends_on) ? openTask.depends_on : []);
+          if (openTask && (openId === task.id || openDeps.indexOf(task.id) !== -1)) {
             renderModalDependencies(openTask);
           }
         }
@@ -204,14 +207,27 @@ function startTasksStream() {
     tasksRetryDelay = 1000;
     if (e.lastEventId) lastTasksEventId = e.lastEventId;
     try {
+      const deleted = JSON.parse(e.data);
       const next = applyTaskDeleted({
         tasks: tasks,
         archivedTasks: archivedTasks,
         archivedPage: archivedPage,
-      }, JSON.parse(e.data));
+      }, deleted);
       tasks = next.tasks;
       archivedTasks = next.archivedTasks;
       scheduleRender();
+      if (typeof getOpenModalTaskId === 'function' && typeof renderModalDependencies === 'function') {
+        var openId = getOpenModalTaskId();
+        if (openId) {
+          var openTask = findTaskById(openId);
+          var openDeps = typeof getTaskDependencyIds === 'function'
+            ? getTaskDependencyIds(openTask)
+            : (openTask && Array.isArray(openTask.depends_on) ? openTask.depends_on : []);
+          if (openTask && deleted && openDeps.indexOf(deleted.id) !== -1) {
+            renderModalDependencies(openTask);
+          }
+        }
+      }
     } catch (err) {
       console.error('tasks SSE task-deleted parse error:', err);
     }

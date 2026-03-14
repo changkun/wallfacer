@@ -262,6 +262,27 @@ func (s *Store) loadAll() error {
 	return nil
 }
 
+// mutateTask acquires the write lock, finds the task by id, calls fn to mutate
+// it (fn may return an error to abort without saving), sets UpdatedAt, persists
+// with saveTask, and notifies subscribers. fn must not acquire s.mu itself.
+func (s *Store) mutateTask(id uuid.UUID, fn func(t *Task) error) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.tasks[id]
+	if !ok {
+		return fmt.Errorf("task not found: %s", id)
+	}
+	if err := fn(t); err != nil {
+		return err
+	}
+	t.UpdatedAt = time.Now()
+	if err := s.saveTask(id, t); err != nil {
+		return err
+	}
+	s.notify(t, false)
+	return nil
+}
+
 // loadEvents reads trace files for a single task into memory.
 func (s *Store) loadEvents(id uuid.UUID, dirName string) error {
 	tracesDir := filepath.Join(s.dir, dirName, "traces")

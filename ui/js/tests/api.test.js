@@ -53,6 +53,7 @@ function makeContext(overrides = {}) {
     formatTaskStatusLabel: vi.fn((s) => s),
     scheduleRender: vi.fn(),
     invalidateDiffBehindCounts: vi.fn(),
+    withAuthToken: (url) => url,
     renderWorkspaces: vi.fn(),
     startGitStream: vi.fn(),
     stopGitStream: vi.fn(),
@@ -192,6 +193,50 @@ describe('startTasksStream', () => {
     vm.runInContext('activeWorkspaces = [];', ctx);
     ctx.startTasksStream();
     expect(instances).toHaveLength(0);
+  });
+
+  it('refreshes modal dependencies when a dependency task receives an SSE update', () => {
+    const instances = [];
+    class MockEventSource {
+      constructor(url) {
+        this.url = url;
+        this.readyState = 1;
+        this.listeners = {};
+        instances.push(this);
+      }
+      addEventListener(type, handler) { this.listeners[type] = handler; }
+      close() {}
+    }
+    MockEventSource.CLOSED = 2;
+
+    const renderModalDependencies = vi.fn();
+    const ctx = makeContext({
+      EventSource: MockEventSource,
+      renderModalDependencies,
+      getOpenModalTaskId: vi.fn(() => 'task-1'),
+      findTaskById: vi.fn((id) => {
+        const tasks = vm.runInContext('tasks', ctx);
+        const archived = vm.runInContext('archivedTasks', ctx);
+        return tasks.find((t) => t.id === id) || archived.find((t) => t.id === id) || null;
+      }),
+    });
+    loadApiCoreStack(ctx);
+    vm.runInContext(`
+      activeWorkspaces = ["/Users/test/repo"];
+      tasks = [
+        ${JSON.stringify(task('dep-1', { status: 'in_progress' }))},
+        ${JSON.stringify(task('task-1', { depends_on: ['dep-1'] }))},
+      ];
+    `, ctx);
+
+    ctx.startTasksStream();
+    instances[0].listeners['task-updated']({
+      data: JSON.stringify(task('dep-1', { status: 'done' })),
+      lastEventId: 'evt-2',
+    });
+
+    expect(renderModalDependencies).toHaveBeenCalledTimes(1);
+    expect(renderModalDependencies.mock.calls[0][0].id).toBe('task-1');
   });
 });
 

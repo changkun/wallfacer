@@ -155,6 +155,13 @@ describe('render.js dependency helpers', () => {
     expect(renderExports.areDepsBlocked({ id: 'task-a' })).toBe(false);
   });
 
+  it('reads dependency ids from dependencies when depends_on is absent', () => {
+    ctx.tasks = [{ id: 'dep-1', status: 'in_progress' }];
+
+    expect(renderExports.getTaskDependencyIds({ id: 'task-a', dependencies: ['dep-1'] })).toEqual(['dep-1']);
+    expect(renderExports.areDepsBlocked({ id: 'task-a', dependencies: ['dep-1'] })).toBe(true);
+  });
+
   it('returns false when all dependencies are present and done', () => {
     ctx.tasks = [
       { id: 'dep-1', status: 'done' },
@@ -189,6 +196,57 @@ describe('render.js dependency helpers', () => {
     const names = renderExports.getBlockingTaskNames({ id: 'task-a', depends_on: ['dep-1', 'dep-2', 'dep-3'] });
 
     expect(names).toBe('Active task, Needs manual fix');
+  });
+
+  it('counts unmet dependencies including removed tasks', () => {
+    ctx.tasks = [
+      { id: 'dep-1', status: 'done' },
+      { id: 'dep-2', status: 'waiting' },
+    ];
+
+    expect(renderExports.getUnmetDependencyCount({ id: 'task-a', depends_on: ['dep-1', 'dep-2', 'missing-dep'] })).toBe(2);
+  });
+
+  it('renders blocked backlog badges with the total dependency count', () => {
+    ctx.tasks = [
+      { id: 'dep-1', status: 'done', title: 'Finished', prompt: 'finished prompt' },
+      { id: 'dep-2', status: 'in_progress', title: 'Running', prompt: 'running prompt' },
+    ];
+
+    const badge = renderExports.renderDependencyBadge({
+      id: 'task-a',
+      status: 'backlog',
+      depends_on: ['dep-1', 'dep-2'],
+    });
+
+    expect(badge).toContain('2 deps');
+    expect(badge).toContain('badge-blocked');
+  });
+
+  it('renders a ready badge when all backlog dependencies are satisfied', () => {
+    ctx.tasks = [
+      { id: 'dep-1', status: 'done', title: 'Finished', prompt: 'finished prompt' },
+      { id: 'dep-2', status: 'cancelled', title: 'Cancelled', prompt: 'cancelled prompt' },
+    ];
+
+    const badge = renderExports.renderDependencyBadge({
+      id: 'task-a',
+      status: 'backlog',
+      depends_on: ['dep-1', 'dep-2'],
+    });
+
+    expect(badge).toContain('ready');
+    expect(badge).toContain('badge-deps-met');
+  });
+
+  it('suppresses dependency badges outside backlog', () => {
+    ctx.tasks = [{ id: 'dep-1', status: 'in_progress', title: 'Running', prompt: 'running prompt' }];
+
+    expect(renderExports.renderDependencyBadge({
+      id: 'task-a',
+      status: 'in_progress',
+      depends_on: ['dep-1'],
+    })).toBe('');
   });
 
   it('returns false when all dependencies are cancelled', () => {
@@ -391,6 +449,154 @@ describe('api.js SSE modal dependency refresh', () => {
     });
 
     expect(ctx.renderModalDependencies).not.toHaveBeenCalled();
+  });
+
+  it('refreshes when the open task uses the dependencies field', () => {
+    ctx.tasks = [
+      { id: 'task-a', status: 'in_progress', title: 'Task A' },
+      { id: 'task-b', status: 'backlog', title: 'Task B', dependencies: ['task-a'] },
+    ];
+    ctx.startTasksStream();
+    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+
+    handler({
+      data: JSON.stringify({ id: 'task-a', status: 'done', title: 'Task A', updated_at: '2026-03-10T00:00:00Z' }),
+      lastEventId: 'evt-4',
+    });
+
+    expect(ctx.renderModalDependencies).toHaveBeenCalledTimes(1);
+    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe('task-b');
+  });
+
+  it('refreshes when the open task itself receives a dependency update', () => {
+    ctx.tasks = [
+      { id: 'task-a', status: 'in_progress', title: 'Task A' },
+      { id: 'task-b', status: 'backlog', title: 'Task B', dependencies: [] },
+    ];
+    ctx.getOpenModalTaskId = vi.fn(() => 'task-b');
+    ctx.startTasksStream();
+    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+
+    handler({
+      data: JSON.stringify({ id: 'task-b', status: 'backlog', title: 'Task B', dependencies: ['task-a'], updated_at: '2026-03-10T00:00:00Z' }),
+      lastEventId: 'evt-4b',
+    });
+
+    expect(ctx.renderModalDependencies).toHaveBeenCalledTimes(1);
+    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe('task-b');
+  });
+
+  it('refreshes when a dependency of the open task is deleted', () => {
+    ctx.startTasksStream();
+    const handler = ctx.EventSource.instance.listeners['task-deleted'][0];
+
+    handler({
+      data: JSON.stringify({ id: 'task-a' }),
+      lastEventId: 'evt-5',
+    });
+
+    expect(ctx.renderModalDependencies).toHaveBeenCalledTimes(1);
+    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe('task-b');
+  });
+});
+
+describe('render.js backlog dependency badge', () => {
+  let ctx;
+
+  beforeEach(() => {
+    ({ ctx } = loadRenderHarness());
+    ctx.tasks = [];
+    ctx.archivedTasks = [];
+  });
+
+  function makeCard() {
+    return {
+      dataset: {},
+      style: {},
+      classList: {
+        add: () => {},
+        remove: () => {},
+      },
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      setAttribute: () => {},
+      removeAttribute: () => {},
+      querySelector: () => null,
+      appendChild: () => {},
+      innerHTML: '',
+    };
+  }
+
+  it('renders an unmet dependency badge on backlog cards', () => {
+    ctx.tasks = [{ id: 'dep-1', status: 'in_progress', title: 'Dependency task', prompt: 'Dependency task' }];
+    const card = makeCard();
+    const task = {
+      id: 'task-a',
+      status: 'backlog',
+      position: 0,
+      prompt: 'Test task',
+      title: 'Test task',
+      depends_on: ['dep-1'],
+      tags: [],
+      sandbox_by_activity: {},
+      worktree_paths: {},
+      created_at: '2026-03-10T00:00:00Z',
+      updated_at: '2026-03-10T00:00:00Z',
+    };
+
+    ctx.updateCard(card, task, 0);
+
+    expect(card.innerHTML).toContain('badge-blocked');
+    expect(card.innerHTML).toContain('bg-amber-100');
+    expect(card.innerHTML).toContain('1 dep');
+    expect(card.innerHTML).toContain('<svg');
+  });
+
+  it('renders a ready badge when all dependencies are satisfied', () => {
+    ctx.tasks = [{ id: 'dep-1', status: 'done', title: 'Dependency task', prompt: 'Dependency task' }];
+    const card = makeCard();
+    const task = {
+      id: 'task-a',
+      status: 'backlog',
+      position: 0,
+      prompt: 'Test task',
+      title: 'Test task',
+      depends_on: ['dep-1'],
+      tags: [],
+      sandbox_by_activity: {},
+      worktree_paths: {},
+      created_at: '2026-03-10T00:00:00Z',
+      updated_at: '2026-03-10T00:00:00Z',
+    };
+
+    ctx.updateCard(card, task, 0);
+
+    expect(card.innerHTML).toContain('badge-deps-met');
+    expect(card.innerHTML).toContain('bg-emerald-100');
+    expect(card.innerHTML).toContain('ready');
+  });
+
+  it('does not render a dependency badge for non-backlog cards', () => {
+    ctx.tasks = [{ id: 'dep-1', status: 'in_progress', title: 'Dependency task', prompt: 'Dependency task' }];
+    const card = makeCard();
+    const task = {
+      id: 'task-a',
+      status: 'waiting',
+      position: 0,
+      prompt: 'Test task',
+      title: 'Test task',
+      depends_on: ['dep-1'],
+      tags: [],
+      sandbox_by_activity: {},
+      worktree_paths: {},
+      created_at: '2026-03-10T00:00:00Z',
+      updated_at: '2026-03-10T00:00:00Z',
+    };
+
+    ctx.updateCard(card, task, 0);
+
+    expect(card.innerHTML).not.toContain('badge-blocked');
+    expect(card.innerHTML).not.toContain('badge-deps-met');
   });
 });
 
