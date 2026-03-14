@@ -1094,6 +1094,10 @@ func TestParseTestVerdict(t *testing.T) {
 		// Content-level inference: mixed pass/fail correctly returns fail.
 		{"mixed N passed N failed", "5 passed, 1 failed", "fail"},
 		{"mixed passed and failed text", "10 tests passed\n2 tests failed", "fail"},
+		// Content-level inference: informal pass indicators.
+		{"all green", "runs all 4 CLI cases against it (0.5 s, all green).", "pass"},
+		{"passes succeed", "Both passes succeed:\n- make test-integration\n- make test", "pass"},
+		{"tests succeed", "All tests succeed on first try.", "pass"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
