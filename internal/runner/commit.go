@@ -76,7 +76,10 @@ func (r *Runner) commit(
 	if task != nil {
 		taskPrompt = task.Prompt
 	}
-	if _, stageErr := r.hostStageAndCommit(taskID, worktreePaths, taskPrompt); stageErr != nil {
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "stage"})
+	_, stageErr := r.hostStageAndCommit(taskID, worktreePaths, taskPrompt)
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "stage"})
+	if stageErr != nil {
 		logger.Runner.Error("host stage/commit failed", "task", taskID, "error", stageErr)
 		eventMessage := "stage/commit failed: " + stageErr.Error()
 		if IsCommitMessageGenerationError(stageErr) {
@@ -92,7 +95,9 @@ func (r *Runner) commit(
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Phase 2/3: Rebasing and merging into default branch...",
 	})
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "rebase_merge"})
 	commitHashes, baseHashes, mergeErr := r.rebaseAndMerge(ctx, taskID, worktreePaths, branchName, sessionID)
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "rebase_merge"})
 	if mergeErr != nil {
 		logger.Runner.Error("rebase/merge failed", "task", taskID, "error", mergeErr)
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
@@ -115,7 +120,9 @@ func (r *Runner) commit(
 			logger.Runner.Warn("save base commit hashes", "task", taskID, "error", err)
 		}
 	}
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "cleanup"})
 	r.cleanupWorktrees(taskID, worktreePaths, branchName)
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "cleanup"})
 
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Commit pipeline completed.",
@@ -156,7 +163,10 @@ func (r *Runner) maybeAutoPush(ctx context.Context, taskID uuid.UUID, worktreePa
 		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Auto-pushing %s (%d commit(s) ahead)...", repoPath, s.AheadCount),
 		})
+		pushLabel := "push_" + filepath.Base(repoPath)
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: pushLabel})
 		out, pushErr := exec.CommandContext(ctx, "git", "-C", repoPath, "push").CombinedOutput()
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: pushLabel})
 		if pushErr != nil {
 			logger.Runner.Error("auto-push failed", "task", taskID, "repo", repoPath, "error", pushErr)
 			r.store.InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{

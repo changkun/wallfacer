@@ -210,6 +210,38 @@ func TestBuildTurnTimestampsIgnoresNonAgentTurnPhases(t *testing.T) {
 	}
 }
 
+// TestBuildTurnTimestampsIgnoresNewInstrumentedPhases verifies that the new
+// instrumentation phases — board_context, feedback_waiting, worktree_cleanup —
+// are not counted as agent turns by buildTurnTimestamps.
+func TestBuildTurnTimestampsIgnoresNewInstrumentedPhases(t *testing.T) {
+	t0 := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	t1 := time.Date(2024, 1, 15, 10, 1, 0, 0, time.UTC)
+	t2 := time.Date(2024, 1, 15, 10, 2, 0, 0, time.UTC)
+
+	boardSpan, _ := json.Marshal(store.SpanData{Phase: "board_context", Label: "board_context"})
+	boardRefreshSpan, _ := json.Marshal(store.SpanData{Phase: "board_context", Label: "board_context_1"})
+	feedbackSpan, _ := json.Marshal(store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
+	cleanupSpan, _ := json.Marshal(store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
+	agentSpan, _ := json.Marshal(store.SpanData{Phase: "agent_turn", Label: "implementation_1"})
+
+	events := []store.TaskEvent{
+		{EventType: store.EventTypeSpanStart, Data: boardSpan, CreatedAt: t0},                           // not counted
+		{EventType: store.EventTypeSpanEnd, Data: boardSpan, CreatedAt: t0.Add(100 * time.Millisecond)}, // not counted
+		{EventType: store.EventTypeSpanStart, Data: boardRefreshSpan, CreatedAt: t0.Add(200 * time.Millisecond)}, // not counted
+		{EventType: store.EventTypeSpanStart, Data: agentSpan, CreatedAt: t1},                           // counted: turn 1
+		{EventType: store.EventTypeSpanStart, Data: feedbackSpan, CreatedAt: t1.Add(30 * time.Second)},  // not counted
+		{EventType: store.EventTypeSpanEnd, Data: feedbackSpan, CreatedAt: t2},                          // not counted
+		{EventType: store.EventTypeSpanStart, Data: cleanupSpan, CreatedAt: t2.Add(1 * time.Second)},    // not counted
+	}
+	ts := buildTurnTimestamps(events)
+	if len(ts) != 1 {
+		t.Fatalf("expected 1 turn timestamp (only agent_turn counted), got %d: %v", len(ts), ts)
+	}
+	if !ts[1].Equal(t1) {
+		t.Fatalf("turn 1 timestamp: expected %v, got %v", t1, ts[1])
+	}
+}
+
 // ---------------------------------------------------------------------------
 // fillMissingPhaseTimestamps
 // ---------------------------------------------------------------------------

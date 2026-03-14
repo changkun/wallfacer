@@ -117,6 +117,11 @@ func (r *Runner) tryAutoRetry(bgCtx context.Context, taskID uuid.UUID, category 
 func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
 	bgCtx := r.shutdownCtx
 
+	// Close the feedback_waiting span opened when the task entered waiting.
+	if resumedFromWaiting {
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
+	}
+
 	// Guard: if this goroutine returns without explicitly setting the task
 	// status (panic, early error), move to "failed" so the task doesn't
 	// stay stuck in "in_progress" forever.
@@ -277,6 +282,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	// Prepare board context and sibling mounts in a single fused call.
 	var siblingMounts map[string]map[string]string
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: "board_context"})
 	boardJSON, siblingMounts, boardErr := r.generateBoardContextAndMounts(taskID, task.MountWorktrees)
 	if boardErr != nil {
 		logger.Runner.Warn("board context failed", "task", taskID, "error", boardErr)
@@ -288,6 +294,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			logger.Runner.Warn("board context write failed", "task", taskID, "error", boardErr)
 		}
 	}
+	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "board_context", Label: "board_context"})
 	defer func() {
 		if boardDir != "" {
 			os.RemoveAll(boardDir)
@@ -300,10 +307,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 		// Refresh board.json and sibling mounts before each turn so they reflect latest state.
 		if boardDir != "" {
+			boardRefreshLabel := fmt.Sprintf("board_context_%d", turns)
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
 			if data, mounts, err := r.generateBoardContextAndMounts(taskID, task.MountWorktrees); err == nil {
 				os.WriteFile(filepath.Join(boardDir, "board.json"), data, 0644)
 				siblingMounts = mounts
 			}
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
 		}
 
 		runActivity := activityImplementation
@@ -444,6 +454,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 					"budget_exceeded": true,
 				})
 				r.GenerateOversightBackground(taskID)
+				r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 				return
 			}
 		}
@@ -512,6 +523,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 					"result": "Task complete — awaiting review.",
 				})
 			}
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 			return
 
 		case "max_tokens", "pause_turn":
@@ -555,6 +567,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 			return
 		}
 	}
