@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // commitFileInRepo creates a file at relPath inside repoDir and commits it.
@@ -550,5 +552,72 @@ func TestIdeationIgnorePatterns(t *testing.T) {
 			t.Errorf("IdeationIgnorePatterns contains duplicate entry %q", p)
 		}
 		seen[p] = true
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Churn lookback window
+// ---------------------------------------------------------------------------
+
+// TestChurnSignalsExcludeOldCommits verifies that commits older than
+// churnLookbackDays are excluded from churn signals, while recent commits
+// are included.
+func TestChurnSignalsExcludeOldCommits(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Commit a file with a backdated timestamp (91 days ago, outside the window).
+	oldDate := time.Now().AddDate(0, 0, -91).Format(time.RFC3339)
+	backdatedEnv := append(os.Environ(),
+		"GIT_COMMITTER_DATE="+oldDate,
+		"GIT_AUTHOR_DATE="+oldDate,
+	)
+
+	oldFile := "internal/old_file.go"
+	fullOldPath := filepath.Join(repo, filepath.FromSlash(oldFile))
+	if err := os.MkdirAll(filepath.Dir(fullOldPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fullOldPath, []byte("package foo\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	addCmd := exec.Command("git", "-C", repo, "add", oldFile)
+	if out, err := addCmd.CombinedOutput(); err != nil {
+		t.Fatalf("git add failed: %v\n%s", err, out)
+	}
+	commitCmd := exec.Command("git", "-C", repo, "commit", "-m", "old commit")
+	commitCmd.Env = backdatedEnv
+	if out, err := commitCmd.CombinedOutput(); err != nil {
+		t.Fatalf("git commit (backdated) failed: %v\n%s", err, out)
+	}
+
+	// Commit a recent file with the current date.
+	commitFileInRepo(t, repo, "internal/recent_file.go", "package foo\n", "recent commit")
+
+	_, r := setupTestRunner(t, []string{repo})
+	signals, _ := r.collectWorkspaceChurnSignals(context.Background())
+
+	var paths []string
+	for _, sig := range signals {
+		paths = append(paths, sig.DisplayPath)
+	}
+
+	// The old file must not appear — it falls outside the lookback window.
+	for _, p := range paths {
+		if strings.Contains(p, "old_file.go") {
+			t.Errorf("churn signals contain old_file.go from 91 days ago; expected it to be excluded by %d-day window",
+				churnLookbackDays)
+		}
+	}
+
+	// The recent file must appear.
+	var found bool
+	for _, p := range paths {
+		if strings.Contains(p, "recent_file.go") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("churn signals do not contain recent_file.go; got paths: %v", paths)
 	}
 }
