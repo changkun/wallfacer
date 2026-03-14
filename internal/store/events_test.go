@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -287,7 +288,7 @@ func TestCompactTaskEvents_Basic(t *testing.T) {
 	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
 	insertOutputEvents(t, s, task.ID, 10)
 
-	if err := s.compactTaskEvents(task.ID); err != nil {
+	if err := s.compactTaskEvents(task.ID, math.MaxInt64); err != nil {
 		t.Fatalf("compactTaskEvents: %v", err)
 	}
 
@@ -325,7 +326,7 @@ func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
 	}
 	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
 	insertOutputEvents(t, s, task.ID, 10)
-	if err := s.compactTaskEvents(task.ID); err != nil {
+	if err := s.compactTaskEvents(task.ID, math.MaxInt64); err != nil {
 		t.Fatalf("compactTaskEvents: %v", err)
 	}
 
@@ -358,7 +359,7 @@ func TestCompactTaskEvents_HybridLoad(t *testing.T) {
 	}
 	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
 	insertOutputEvents(t, s, task.ID, 8)
-	if err := s.compactTaskEvents(task.ID); err != nil {
+	if err := s.compactTaskEvents(task.ID, math.MaxInt64); err != nil {
 		t.Fatalf("compactTaskEvents: %v", err)
 	}
 
@@ -402,14 +403,14 @@ func TestCompactTaskEvents_Idempotent(t *testing.T) {
 	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
 	insertOutputEvents(t, s, task.ID, 10)
 
-	if err := s.compactTaskEvents(task.ID); err != nil {
+	if err := s.compactTaskEvents(task.ID, math.MaxInt64); err != nil {
 		t.Fatalf("first compactTaskEvents: %v", err)
 	}
 	tracesDir := filepath.Join(s.dir, task.ID.String(), "traces")
 	compactPath := filepath.Join(tracesDir, "compact.ndjson")
 	_, before := readCompactEvents(t, compactPath)
 
-	if err := s.compactTaskEvents(task.ID); err != nil {
+	if err := s.compactTaskEvents(task.ID, math.MaxInt64); err != nil {
 		t.Fatalf("second compactTaskEvents: %v", err)
 	}
 	_, after := readCompactEvents(t, compactPath)
@@ -698,6 +699,120 @@ func TestGetEventsPage_EmptyTask(t *testing.T) {
 	}
 	if page.TotalFiltered != 0 {
 		t.Errorf("TotalFiltered = %d, want 0", page.TotalFiltered)
+	}
+}
+
+// TestCompactTaskEvents_SessionBoundary verifies that compactTaskEvents only
+// touches trace files up to and including maxSeq, leaving files beyond that
+// boundary as numbered files. This prevents a race where an immediate retry
+// causes the compaction goroutine (launched at task completion) to bundle
+// new-session events into the previous session's compact.ndjson.
+func TestCompactTaskEvents_SessionBoundary(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+
+	// Session 1: insert 5 events (seqs 1-5).
+	insertOutputEvents(t, s, task.ID, 5)
+
+	// Simulate what UpdateTaskStatus does: snapshot the event horizon at task
+	// completion time, then compact only up to that horizon.
+	const session1MaxSeq = int64(5)
+	if err := s.compactTaskEvents(task.ID, session1MaxSeq); err != nil {
+		t.Fatalf("compactTaskEvents(maxSeq=5): %v", err)
+	}
+
+	// Session 2 (retry): insert 3 more events (seqs 6-8).
+	insertOutputEvents(t, s, task.ID, 3)
+
+	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
+	compactPath := filepath.Join(tracesDir, "compact.ndjson")
+
+	// compact.ndjson must contain exactly events 1-5.
+	compactEvents, _ := readCompactEvents(t, compactPath)
+	if len(compactEvents) != 5 {
+		t.Fatalf("compact.ndjson: expected 5 events, got %d", len(compactEvents))
+	}
+	for i, evt := range compactEvents {
+		if evt.ID != int64(i+1) {
+			t.Errorf("compact event[%d].ID = %d, want %d", i, evt.ID, i+1)
+		}
+	}
+
+	// Events 6-8 must still exist as numbered files, not be included in compact.
+	for seq := 6; seq <= 8; seq++ {
+		name := fmt.Sprintf("%04d.json", seq)
+		if _, err := os.Stat(filepath.Join(tracesDir, name)); os.IsNotExist(err) {
+			t.Errorf("numbered trace file %s should still exist after bounded compaction", name)
+		}
+	}
+
+	// Events 1-5 must NOT still exist as numbered files (they were compacted).
+	for seq := 1; seq <= 5; seq++ {
+		name := fmt.Sprintf("%04d.json", seq)
+		if _, err := os.Stat(filepath.Join(tracesDir, name)); err == nil {
+			t.Errorf("numbered trace file %s should have been removed after compaction", name)
+		}
+	}
+
+	// A fresh store load must surface all 8 events in order.
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore reload: %v", err)
+	}
+	all, err := s2.GetEvents(bg(), task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(all) != 8 {
+		t.Fatalf("expected 8 events after reload, got %d", len(all))
+	}
+	for i, evt := range all {
+		if evt.ID != int64(i+1) {
+			t.Errorf("all[%d].ID = %d, want %d", i, evt.ID, i+1)
+		}
+	}
+}
+
+// TestCurrentMaxEventSeq verifies that currentMaxEventSeq returns the highest
+// sequence number among numbered trace files in the traces directory.
+func TestCurrentMaxEventSeq(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+
+	// No events yet: should return 0.
+	max, err := s.currentMaxEventSeq(task.ID)
+	if err != nil {
+		t.Fatalf("currentMaxEventSeq (empty): %v", err)
+	}
+	if max != 0 {
+		t.Errorf("empty traces: got %d, want 0", max)
+	}
+
+	// Insert 7 events; highest seq should be 7.
+	insertOutputEvents(t, s, task.ID, 7)
+	max, err = s.currentMaxEventSeq(task.ID)
+	if err != nil {
+		t.Fatalf("currentMaxEventSeq (7 events): %v", err)
+	}
+	if max != 7 {
+		t.Errorf("7 events: got %d, want 7", max)
+	}
+
+	// After compacting events 1-4, numbered files 5-7 remain; max should still be 7.
+	if err := s.compactTaskEvents(task.ID, 4); err != nil {
+		t.Fatalf("compactTaskEvents(maxSeq=4): %v", err)
+	}
+	max, err = s.currentMaxEventSeq(task.ID)
+	if err != nil {
+		t.Fatalf("currentMaxEventSeq (after partial compact): %v", err)
+	}
+	if max != 7 {
+		t.Errorf("after compact(4): got %d, want 7", max)
 	}
 }
 

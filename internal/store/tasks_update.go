@@ -40,11 +40,20 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	// (title, prompt, tags, oversight).
 	s.notify(t, false)
 	if status == TaskStatusDone || status == TaskStatusFailed || status == TaskStatusCancelled {
-		go func(taskID uuid.UUID) {
-			if err := s.compactTaskEvents(taskID); err != nil {
+		// Capture the highest sequence number present right now, while we still
+		// hold the store lock, so the goroutine only compacts events that belong
+		// to the session that just finished. If the task is immediately retried,
+		// new events (higher seqs) will be left as numbered files.
+		maxSeq, seqErr := s.currentMaxEventSeq(id)
+		go func(taskID uuid.UUID, maxSeq int64, seqErr error) {
+			if seqErr != nil {
+				logger.Store.Warn("skipping compaction: failed to read event horizon", "task", taskID, "error", seqErr)
+				return
+			}
+			if err := s.compactTaskEvents(taskID, maxSeq); err != nil {
 				logger.Store.Error("failed to compact task traces", "task", taskID, "error", err)
 			}
-		}(id)
+		}(id, maxSeq, seqErr)
 	}
 	return nil
 }

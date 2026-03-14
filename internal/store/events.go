@@ -221,7 +221,40 @@ func parseNumberedTraceFile(name string) (numberedTraceFile, bool) {
 	return numberedTraceFile{name: name, seq: seq}, true
 }
 
-func (s *Store) compactTaskEvents(taskID uuid.UUID) error {
+// currentMaxEventSeq reads the traces directory for taskID and returns the
+// highest sequence number among all numbered trace files (e.g. 0005.json → 5).
+// Returns 0 if the directory is empty, does not exist, or contains no numbered
+// files. This is a pure filesystem read with no in-memory side effects.
+func (s *Store) currentMaxEventSeq(taskID uuid.UUID) (int64, error) {
+	tracesDir := filepath.Join(s.dir, taskID.String(), "traces")
+	entries, err := os.ReadDir(tracesDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	var max int64
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		tf, ok := parseNumberedTraceFile(entry.Name())
+		if !ok {
+			continue
+		}
+		if int64(tf.seq) > max {
+			max = int64(tf.seq)
+		}
+	}
+	return max, nil
+}
+
+// compactTaskEvents merges all numbered trace files whose sequence number is
+// ≤ maxSeq into a single compact.ndjson file, then removes those individual
+// files. Files beyond maxSeq are left untouched, preserving session boundaries
+// when a task is retried immediately after completion.
+func (s *Store) compactTaskEvents(taskID uuid.UUID, maxSeq int64) error {
 	tracesDir := filepath.Join(s.dir, taskID.String(), "traces")
 	entries, err := os.ReadDir(tracesDir)
 	if err != nil {
@@ -239,6 +272,9 @@ func (s *Store) compactTaskEvents(taskID uuid.UUID) error {
 		traceFile, ok := parseNumberedTraceFile(entry.Name())
 		if !ok {
 			continue
+		}
+		if int64(traceFile.seq) > maxSeq {
+			continue // beyond the session boundary; leave for the next session
 		}
 		traceFiles = append(traceFiles, traceFile)
 	}
