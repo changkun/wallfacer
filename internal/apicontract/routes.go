@@ -13,6 +13,8 @@
 // registered in the mux, and that the generated artifacts are not stale.
 package apicontract
 
+import "net/http"
+
 // Route describes a single HTTP API endpoint.
 type Route struct {
 	// Method is the HTTP verb: GET, POST, PUT, PATCH, or DELETE.
@@ -45,27 +47,27 @@ var Routes = []Route{
 	// --- Debug & monitoring ---
 
 	{
-		Method: "GET", Pattern: "/api/debug/health", Name: "Health",
+		Method: http.MethodGet, Pattern: "/api/debug/health", Name: "Health",
 		Description: "Operational health check: goroutine count, task counts, uptime.",
 		Tags:        []string{"debug"},
 	},
 	{
-		Method: "GET", Pattern: "/api/debug/spans", Name: "GetSpanStats",
+		Method: http.MethodGet, Pattern: "/api/debug/spans", Name: "GetSpanStats",
 		Description: "Aggregate span timing statistics across all tasks.",
 		Tags:        []string{"debug"},
 	},
 	{
-		Method: "GET", Pattern: "/api/debug/runtime", Name: "GetRuntimeStatus",
+		Method: http.MethodGet, Pattern: "/api/debug/runtime", Name: "GetRuntimeStatus",
 		Description: "Live server internals: pending goroutines, memory, task states, containers.",
 		Tags:        []string{"debug"},
 	},
 	{
-		Method: "GET", Pattern: "/api/debug/board", Name: "BoardManifest",
+		Method: http.MethodGet, Pattern: "/api/debug/board", Name: "BoardManifest",
 		Description: "Board manifest as seen by a hypothetical new task (no self-task, no worktree mounts).",
 		Tags:        []string{"debug"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/board", Name: "TaskBoardManifest",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/board", Name: "TaskBoardManifest",
 		Description: "Board manifest as it appeared to a specific task (is_self=true, MountWorktrees applied).",
 		Tags:        []string{"tasks", "debug"},
 	},
@@ -73,7 +75,7 @@ var Routes = []Route{
 	// --- Container monitoring ---
 
 	{
-		Method: "GET", Pattern: "/api/containers", Name: "GetContainers",
+		Method: http.MethodGet, Pattern: "/api/containers", Name: "GetContainers",
 		JSName:      "list",
 		Description: "List running sandbox containers.",
 		Tags:        []string{"containers"},
@@ -82,7 +84,7 @@ var Routes = []Route{
 	// --- File listing ---
 
 	{
-		Method: "GET", Pattern: "/api/files", Name: "GetFiles",
+		Method: http.MethodGet, Pattern: "/api/files", Name: "GetFiles",
 		JSName:      "list",
 		Description: "File listing for @ mention autocomplete.",
 		Tags:        []string{"files"},
@@ -91,13 +93,13 @@ var Routes = []Route{
 	// --- Server configuration ---
 
 	{
-		Method: "GET", Pattern: "/api/config", Name: "GetConfig",
+		Method: http.MethodGet, Pattern: "/api/config", Name: "GetConfig",
 		JSName:      "get",
 		Description: "Get server configuration (workspaces, autopilot flags, sandbox list).",
 		Tags:        []string{"config"},
 	},
 	{
-		Method: "PUT", Pattern: "/api/config", Name: "UpdateConfig",
+		Method: http.MethodPut, Pattern: "/api/config", Name: "UpdateConfig",
 		JSName:      "update",
 		Description: "Update server configuration (autopilot, autotest, autosubmit, sandbox assignments).",
 		Tags:        []string{"config"},
@@ -106,12 +108,12 @@ var Routes = []Route{
 	// --- Workspace selection ---
 
 	{
-		Method: "GET", Pattern: "/api/workspaces/browse", Name: "BrowseWorkspaces",
+		Method: http.MethodGet, Pattern: "/api/workspaces/browse", Name: "BrowseWorkspaces",
 		Description: "List child directories for an absolute host path.",
 		Tags:        []string{"workspaces"},
 	},
 	{
-		Method: "PUT", Pattern: "/api/workspaces", Name: "UpdateWorkspaces",
+		Method: http.MethodPut, Pattern: "/api/workspaces", Name: "UpdateWorkspaces",
 		JSName:      "update",
 		Description: "Replace the active workspace set and switch the scoped task board.",
 		Tags:        []string{"workspaces"},
@@ -120,19 +122,19 @@ var Routes = []Route{
 	// --- Ideation / brainstorm agent ---
 
 	{
-		Method: "GET", Pattern: "/api/ideate", Name: "GetIdeationStatus",
+		Method: http.MethodGet, Pattern: "/api/ideate", Name: "GetIdeationStatus",
 		JSName:      "status",
 		Description: "Get brainstorm/ideation agent status.",
 		Tags:        []string{"ideate"},
 	},
 	{
-		Method: "POST", Pattern: "/api/ideate", Name: "TriggerIdeation",
+		Method: http.MethodPost, Pattern: "/api/ideate", Name: "TriggerIdeation",
 		JSName:      "trigger",
 		Description: "Trigger the ideation agent to generate new task ideas.",
 		Tags:        []string{"ideate"},
 	},
 	{
-		Method: "DELETE", Pattern: "/api/ideate", Name: "CancelIdeation",
+		Method: http.MethodDelete, Pattern: "/api/ideate", Name: "CancelIdeation",
 		JSName:      "cancel",
 		Description: "Cancel an in-progress ideation run.",
 		Tags:        []string{"ideate"},
@@ -141,24 +143,24 @@ var Routes = []Route{
 	// --- Environment configuration ---
 
 	{
-		Method: "GET", Pattern: "/api/env", Name: "GetEnvConfig",
+		Method: http.MethodGet, Pattern: "/api/env", Name: "GetEnvConfig",
 		JSName:      "get",
 		Description: "Get environment configuration (tokens masked).",
 		Tags:        []string{"env"},
 	},
 	{
-		Method: "PUT", Pattern: "/api/env", Name: "UpdateEnvConfig",
+		Method: http.MethodPut, Pattern: "/api/env", Name: "UpdateEnvConfig",
 		JSName:      "update",
 		Description: "Update environment file; omitted/empty token fields are preserved.",
 		Tags:        []string{"env"},
 	},
 	{
-		Method: "POST", Pattern: "/api/env/test", Name: "TestSandbox",
+		Method: http.MethodPost, Pattern: "/api/env/test", Name: "TestSandbox",
 		Description: "Test sandbox configuration by running a lightweight probe task.",
 		Tags:        []string{"env"},
 	},
 	{
-		Method: "POST", Pattern: "/api/env/test-webhook", Name: "TestWebhook",
+		Method: http.MethodPost, Pattern: "/api/env/test-webhook", Name: "TestWebhook",
 		Description: "Send a synthetic webhook event using the configured webhook settings.",
 		Tags:        []string{"env"},
 	},
@@ -166,19 +168,19 @@ var Routes = []Route{
 	// --- Workspace instructions ---
 
 	{
-		Method: "GET", Pattern: "/api/instructions", Name: "GetInstructions",
+		Method: http.MethodGet, Pattern: "/api/instructions", Name: "GetInstructions",
 		JSName:      "get",
 		Description: "Get the workspace CLAUDE.md content.",
 		Tags:        []string{"instructions"},
 	},
 	{
-		Method: "PUT", Pattern: "/api/instructions", Name: "UpdateInstructions",
+		Method: http.MethodPut, Pattern: "/api/instructions", Name: "UpdateInstructions",
 		JSName:      "update",
 		Description: "Save the workspace CLAUDE.md.",
 		Tags:        []string{"instructions"},
 	},
 	{
-		Method: "POST", Pattern: "/api/instructions/reinit", Name: "ReinitInstructions",
+		Method: http.MethodPost, Pattern: "/api/instructions/reinit", Name: "ReinitInstructions",
 		Description: "Rebuild workspace CLAUDE.md from default template and repo files.",
 		Tags:        []string{"instructions"},
 	},
@@ -186,25 +188,25 @@ var Routes = []Route{
 	// --- System prompt templates (user-overridable built-in prompts) ---
 
 	{
-		Method: "GET", Pattern: "/api/system-prompts", Name: "ListSystemPrompts",
+		Method: http.MethodGet, Pattern: "/api/system-prompts", Name: "ListSystemPrompts",
 		JSName:      "list",
 		Description: "List all 7 built-in system prompt templates with override status and content.",
 		Tags:        []string{"system-prompts"},
 	},
 	{
-		Method: "GET", Pattern: "/api/system-prompts/{name}", Name: "GetSystemPrompt",
+		Method: http.MethodGet, Pattern: "/api/system-prompts/{name}", Name: "GetSystemPrompt",
 		JSName:      "get",
 		Description: "Get a single built-in system prompt template by name.",
 		Tags:        []string{"system-prompts"},
 	},
 	{
-		Method: "PUT", Pattern: "/api/system-prompts/{name}", Name: "UpdateSystemPrompt",
+		Method: http.MethodPut, Pattern: "/api/system-prompts/{name}", Name: "UpdateSystemPrompt",
 		JSName:      "update",
 		Description: "Write a user override for a built-in system prompt template; validates the template before writing.",
 		Tags:        []string{"system-prompts"},
 	},
 	{
-		Method: "DELETE", Pattern: "/api/system-prompts/{name}", Name: "DeleteSystemPrompt",
+		Method: http.MethodDelete, Pattern: "/api/system-prompts/{name}", Name: "DeleteSystemPrompt",
 		JSName:      "delete",
 		Description: "Remove the user override for a built-in system prompt template, restoring the embedded default.",
 		Tags:        []string{"system-prompts"},
@@ -213,19 +215,19 @@ var Routes = []Route{
 	// --- Prompt templates ---
 
 	{
-		Method: "GET", Pattern: "/api/templates", Name: "ListTemplates",
+		Method: http.MethodGet, Pattern: "/api/templates", Name: "ListTemplates",
 		JSName:      "list",
 		Description: "List all prompt templates sorted by created_at descending.",
 		Tags:        []string{"templates"},
 	},
 	{
-		Method: "POST", Pattern: "/api/templates", Name: "CreateTemplate",
+		Method: http.MethodPost, Pattern: "/api/templates", Name: "CreateTemplate",
 		JSName:      "create",
 		Description: "Create a new named prompt template.",
 		Tags:        []string{"templates"},
 	},
 	{
-		Method: "DELETE", Pattern: "/api/templates/{id}", Name: "DeleteTemplate",
+		Method: http.MethodDelete, Pattern: "/api/templates/{id}", Name: "DeleteTemplate",
 		JSName:      "delete",
 		Description: "Delete a prompt template by ID.",
 		Tags:        []string{"templates"},
@@ -234,47 +236,47 @@ var Routes = []Route{
 	// --- Git workspace operations ---
 
 	{
-		Method: "GET", Pattern: "/api/git/status", Name: "GitStatus",
+		Method: http.MethodGet, Pattern: "/api/git/status", Name: "GitStatus",
 		Description: "Git status for all mounted workspaces.",
 		Tags:        []string{"git"},
 	},
 	{
-		Method: "GET", Pattern: "/api/git/stream", Name: "GitStatusStream",
+		Method: http.MethodGet, Pattern: "/api/git/stream", Name: "GitStatusStream",
 		Description: "SSE stream of git status updates for all workspaces.",
 		Tags:        []string{"git", "sse"},
 	},
 	{
-		Method: "POST", Pattern: "/api/git/push", Name: "GitPush",
+		Method: http.MethodPost, Pattern: "/api/git/push", Name: "GitPush",
 		Description: "Push a workspace to its remote.",
 		Tags:        []string{"git"},
 	},
 	{
-		Method: "POST", Pattern: "/api/git/sync", Name: "GitSyncWorkspace",
+		Method: http.MethodPost, Pattern: "/api/git/sync", Name: "GitSyncWorkspace",
 		Description: "Fetch and rebase a workspace onto its upstream branch.",
 		Tags:        []string{"git"},
 	},
 	{
-		Method: "POST", Pattern: "/api/git/rebase-on-main", Name: "GitRebaseOnMain",
+		Method: http.MethodPost, Pattern: "/api/git/rebase-on-main", Name: "GitRebaseOnMain",
 		Description: "Fetch origin/<main> and rebase the current branch on top.",
 		Tags:        []string{"git"},
 	},
 	{
-		Method: "GET", Pattern: "/api/git/branches", Name: "GitBranches",
+		Method: http.MethodGet, Pattern: "/api/git/branches", Name: "GitBranches",
 		Description: "List branches for a workspace.",
 		Tags:        []string{"git"},
 	},
 	{
-		Method: "POST", Pattern: "/api/git/checkout", Name: "GitCheckout",
+		Method: http.MethodPost, Pattern: "/api/git/checkout", Name: "GitCheckout",
 		Description: "Switch a workspace to a different branch.",
 		Tags:        []string{"git"},
 	},
 	{
-		Method: "POST", Pattern: "/api/git/create-branch", Name: "GitCreateBranch",
+		Method: http.MethodPost, Pattern: "/api/git/create-branch", Name: "GitCreateBranch",
 		Description: "Create and check out a new branch in a workspace.",
 		Tags:        []string{"git"},
 	},
 	{
-		Method: "POST", Pattern: "/api/git/open-folder", Name: "OpenFolder",
+		Method: http.MethodPost, Pattern: "/api/git/open-folder", Name: "OpenFolder",
 		Description: "Open a workspace directory in the OS file manager.",
 		Tags:        []string{"git"},
 	},
@@ -282,13 +284,13 @@ var Routes = []Route{
 	// --- Usage & statistics ---
 
 	{
-		Method: "GET", Pattern: "/api/usage", Name: "GetUsageStats",
+		Method: http.MethodGet, Pattern: "/api/usage", Name: "GetUsageStats",
 		JSName:      "stats",
 		Description: "Aggregated token and cost usage statistics.",
 		Tags:        []string{"stats"},
 	},
 	{
-		Method: "GET", Pattern: "/api/stats", Name: "GetStats",
+		Method: http.MethodGet, Pattern: "/api/stats", Name: "GetStats",
 		JSName:      "get",
 		Description: "Task status and workspace cost statistics. Optional ?workspace=<repo-root-path> restricts aggregation to tasks for that workspace (400 if no tasks match).",
 		Tags:        []string{"stats"},
@@ -297,56 +299,56 @@ var Routes = []Route{
 	// --- Task collection (no {id}) ---
 
 	{
-		Method: "GET", Pattern: "/api/tasks", Name: "ListTasks",
+		Method: http.MethodGet, Pattern: "/api/tasks", Name: "ListTasks",
 		JSName:      "list",
 		Description: "List all tasks (optionally including archived).",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/stream", Name: "StreamTasks",
+		Method: http.MethodGet, Pattern: "/api/tasks/stream", Name: "StreamTasks",
 		Description: "SSE stream: full snapshot then incremental task-updated/task-deleted events.",
 		Tags:        []string{"tasks", "sse"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks", Name: "CreateTask",
+		Method: http.MethodPost, Pattern: "/api/tasks", Name: "CreateTask",
 		JSName:      "create",
 		Description: "Create a new task in the backlog.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/batch", Name: "BatchCreateTasks",
+		Method: http.MethodPost, Pattern: "/api/tasks/batch", Name: "BatchCreateTasks",
 		JSName:      "batchCreate",
 		Description: "Create multiple tasks atomically with symbolic dependency wiring.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/generate-titles", Name: "GenerateMissingTitles",
+		Method: http.MethodPost, Pattern: "/api/tasks/generate-titles", Name: "GenerateMissingTitles",
 		Description: "Bulk-generate titles for tasks that lack one.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/generate-oversight", Name: "GenerateMissingOversight",
+		Method: http.MethodPost, Pattern: "/api/tasks/generate-oversight", Name: "GenerateMissingOversight",
 		Description: "Bulk-generate oversight summaries for eligible tasks.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/search", Name: "SearchTasks",
+		Method: http.MethodGet, Pattern: "/api/tasks/search", Name: "SearchTasks",
 		Description: "Search tasks by keyword.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/archive-done", Name: "ArchiveAllDone",
+		Method: http.MethodPost, Pattern: "/api/tasks/archive-done", Name: "ArchiveAllDone",
 		Description: "Archive all tasks in the done state.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/summaries", Name: "ListSummaries",
+		Method: http.MethodGet, Pattern: "/api/tasks/summaries", Name: "ListSummaries",
 		JSName:      "summaries",
 		Description: "List immutable task summaries for completed tasks (cost dashboard, no full task.json read).",
 		Tags:        []string{"tasks", "stats"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/deleted", Name: "ListDeletedTasks",
+		Method: http.MethodGet, Pattern: "/api/tasks/deleted", Name: "ListDeletedTasks",
 		JSName:      "listDeleted",
 		Description: "List soft-deleted (tombstoned) tasks that are within the retention window.",
 		Tags:        []string{"tasks"},
@@ -355,104 +357,104 @@ var Routes = []Route{
 	// --- Task instance operations (require {id}) ---
 
 	{
-		Method: "PATCH", Pattern: "/api/tasks/{id}", Name: "UpdateTask",
+		Method: http.MethodPatch, Pattern: "/api/tasks/{id}", Name: "UpdateTask",
 		JSName:      "update",
 		Description: "Update task fields: status, prompt, timeout, sandbox, dependencies, fresh_start.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "DELETE", Pattern: "/api/tasks/{id}", Name: "DeleteTask",
+		Method: http.MethodDelete, Pattern: "/api/tasks/{id}", Name: "DeleteTask",
 		JSName:      "delete",
 		Description: "Permanently delete a task and its data.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/events", Name: "GetEvents",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/events", Name: "GetEvents",
 		Description: "Task event timeline (state changes, outputs, feedback, errors).",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/feedback", Name: "SubmitFeedback",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/feedback", Name: "SubmitFeedback",
 		Description: "Submit a feedback message to a waiting task.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/done", Name: "CompleteTask",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/done", Name: "CompleteTask",
 		Description: "Mark a waiting task as done and trigger commit-and-push.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/cancel", Name: "CancelTask",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/cancel", Name: "CancelTask",
 		Description: "Cancel a task: kill container and discard worktrees.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/resume", Name: "ResumeTask",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/resume", Name: "ResumeTask",
 		Description: "Resume a failed task using its existing session.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/restore", Name: "RestoreTask",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/restore", Name: "RestoreTask",
 		Description: "Restore a soft-deleted task by removing its tombstone.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/archive", Name: "ArchiveTask",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/archive", Name: "ArchiveTask",
 		Description: "Move a done task to the archived state.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/unarchive", Name: "UnarchiveTask",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/unarchive", Name: "UnarchiveTask",
 		Description: "Restore an archived task to the done state.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/sync", Name: "SyncTask",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/sync", Name: "SyncTask",
 		Description: "Rebase task worktrees onto the latest default branch.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/test", Name: "TestTask",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/test", Name: "TestTask",
 		Description: "Trigger the test agent for a task.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/fork", Name: "ForkTask",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/fork", Name: "ForkTask",
 		Description: "Create a new backlog task branched from the source task's current worktree state.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/diff", Name: "TaskDiff",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/diff", Name: "TaskDiff",
 		Description: "Git diff of task worktrees versus the default branch.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/logs", Name: "StreamLogs",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/logs", Name: "StreamLogs",
 		Description: "SSE stream of live container logs for a running task.",
 		Tags:        []string{"tasks", "sse"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/outputs/{filename}", Name: "ServeOutput",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/outputs/{filename}", Name: "ServeOutput",
 		Description: "Raw Claude Code output file for a single agent turn.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/turn-usage", Name: "GetTurnUsage",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/turn-usage", Name: "GetTurnUsage",
 		Description: "Per-turn token usage breakdown for a task.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/spans", Name: "GetTaskSpans",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/spans", Name: "GetTaskSpans",
 		Description: "Span timing statistics for a task.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/oversight", Name: "GetOversight",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/oversight", Name: "GetOversight",
 		Description: "Oversight summary for a completed task.",
 		Tags:        []string{"tasks"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/oversight/test", Name: "GetTestOversight",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/oversight/test", Name: "GetTestOversight",
 		Description: "Test oversight summary for a task.",
 		Tags:        []string{"tasks"},
 	},
@@ -460,7 +462,7 @@ var Routes = []Route{
 	// --- Admin operations ---
 
 	{
-		Method: "POST", Pattern: "/api/admin/rebuild-index", Name: "RebuildIndex",
+		Method: http.MethodPost, Pattern: "/api/admin/rebuild-index", Name: "RebuildIndex",
 		Description: "Rebuild the in-memory search index from disk; returns the number of repaired entries.",
 		Tags:        []string{"admin"},
 	},
@@ -468,29 +470,29 @@ var Routes = []Route{
 	// --- Refinement agent ---
 
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/refine", Name: "StartRefinement",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/refine", Name: "StartRefinement",
 		JSName:      "refine",
 		Description: "Start the refinement sandbox agent for a backlog task.",
 		Tags:        []string{"tasks", "refine"},
 	},
 	{
-		Method: "DELETE", Pattern: "/api/tasks/{id}/refine", Name: "CancelRefinement",
+		Method: http.MethodDelete, Pattern: "/api/tasks/{id}/refine", Name: "CancelRefinement",
 		JSName:      "refine",
 		Description: "Cancel an in-progress refinement agent.",
 		Tags:        []string{"tasks", "refine"},
 	},
 	{
-		Method: "GET", Pattern: "/api/tasks/{id}/refine/logs", Name: "StreamRefineLogs",
+		Method: http.MethodGet, Pattern: "/api/tasks/{id}/refine/logs", Name: "StreamRefineLogs",
 		Description: "Stream live logs from the refinement agent.",
 		Tags:        []string{"tasks", "refine", "sse"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/refine/apply", Name: "RefineApply",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/refine/apply", Name: "RefineApply",
 		Description: "Apply the refined prompt as the new task prompt.",
 		Tags:        []string{"tasks", "refine"},
 	},
 	{
-		Method: "POST", Pattern: "/api/tasks/{id}/refine/dismiss", Name: "RefineDismiss",
+		Method: http.MethodPost, Pattern: "/api/tasks/{id}/refine/dismiss", Name: "RefineDismiss",
 		Description: "Dismiss the refinement result without applying it.",
 		Tags:        []string{"tasks", "refine"},
 	},
