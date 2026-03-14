@@ -106,7 +106,7 @@ func (r *Runner) CleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 // directory. Must be called with r.worktreeMu held (use CleanupWorktrees for
 // the public API). Safe to call multiple times — errors are logged as warnings.
 func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]string, branchName string) {
-	bgCtx := context.Background()
+	bgCtx := r.shutdownCtx
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
 	for repoPath, wt := range worktreePaths {
 		if !gitutil.IsGitRepo(repoPath) || !gitutil.HasCommits(repoPath) {
