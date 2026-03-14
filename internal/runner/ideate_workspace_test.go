@@ -64,6 +64,22 @@ func TestIsIgnoredChurnPath(t *testing.T) {
 		{"static/styles.min.css", true},
 		{"proto/foo.pb.go", true},
 		{"gen/code_generated.go", true},
+		// Lock files — exact basename matches
+		{"go.sum", true},
+		{"package-lock.json", true},
+		{"pnpm-lock.yaml", true},
+		{"packages.lock.json", true},
+		// Lock files in subdirectories
+		{"subdir/go.sum", true},
+		{"subdir/package-lock.json", true},
+		// Lock files matched by .lock suffix
+		{"yarn.lock", true},
+		{"Cargo.lock", true},
+		{"poetry.lock", true},
+		{"Gemfile.lock", true},
+		{"composer.lock", true},
+		{"flake.lock", true},
+		{"some/custom.lock", true},
 		// Non-ignored source paths
 		{"internal/runner/ideate.go", false},
 		{"ui/js/board.js", false},           // ui/js/ but not vendor/generated
@@ -93,6 +109,14 @@ func TestIsIgnoredTodoPath(t *testing.T) {
 		{"prompts/ideation.tmpl", true},
 		{"prompts/commit.tmpl", true},
 		{"testdata/fixture.txt", true},
+		// Lock files — exact basename matches
+		{"go.sum", true},
+		{"package-lock.json", true},
+		{"subdir/go.sum", true},
+		// Lock files matched by .lock suffix
+		{"yarn.lock", true},
+		{"Cargo.lock", true},
+		{"some/custom.lock", true},
 		// Non-ignored source paths
 		{"internal/runner/ideate.go", false},
 		{"ui/js/board.js", false},
@@ -189,6 +213,58 @@ func TestChurnSignalsIgnoreVendorAndMinifiedPaths(t *testing.T) {
 			paths = append(paths, s.DisplayPath)
 		}
 		t.Errorf("expected internal/runner/foo.go in churn signals; got: %v", paths)
+	}
+}
+
+// TestChurnSignalsIgnoreLockFiles verifies that dependency lock files are excluded
+// from churn signals even when they have high commit counts, while real source
+// files continue to appear.
+func TestChurnSignalsIgnoreLockFiles(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Real source file that must appear in results.
+	commitFileInRepo(t, repo, "internal/main.go", "package main\n", "add source file")
+
+	// Lock files committed multiple times — should all be filtered out.
+	for i := 0; i < 5; i++ {
+		commitFileInRepo(t, repo, "go.sum",
+			fmt.Sprintf("h1:hash%d\n", i), fmt.Sprintf("update go.sum %d", i))
+		commitFileInRepo(t, repo, "package-lock.json",
+			fmt.Sprintf(`{"lockfileVersion":%d}`, i), fmt.Sprintf("update package-lock.json %d", i))
+	}
+
+	_, r := setupTestRunner(t, []string{repo})
+	signals, filtered := r.collectWorkspaceChurnSignals(context.Background())
+
+	// No lock files should appear.
+	for _, sig := range signals {
+		if sig.DisplayPath == "go.sum" || strings.HasSuffix(sig.DisplayPath, "/go.sum") {
+			t.Errorf("go.sum must not appear in churn signals; got %q", sig.DisplayPath)
+		}
+		if sig.DisplayPath == "package-lock.json" || strings.HasSuffix(sig.DisplayPath, "/package-lock.json") {
+			t.Errorf("package-lock.json must not appear in churn signals; got %q", sig.DisplayPath)
+		}
+	}
+
+	// filteredCount should be positive.
+	if filtered == 0 {
+		t.Error("expected filteredCount > 0 for lock file commits; got 0")
+	}
+
+	// Source file must appear.
+	var found bool
+	for _, sig := range signals {
+		if sig.DisplayPath == "internal/main.go" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		var paths []string
+		for _, s := range signals {
+			paths = append(paths, s.DisplayPath)
+		}
+		t.Errorf("expected internal/main.go in churn signals; got: %v", paths)
 	}
 }
 
@@ -405,6 +481,57 @@ func TestTodoSignalsVendorFilesExcluded(t *testing.T) {
 	}
 }
 
+// TestTodoSignalsIgnoreLockFiles verifies that dependency lock files are excluded
+// from TODO signals even if they contain TODO-like text, while real source files
+// with TODO markers continue to appear.
+func TestTodoSignalsIgnoreLockFiles(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Lock files with TODO-like content — should be filtered out.
+	commitFileInRepo(t, repo, "go.sum",
+		"# TODO: this is not a real work item\nh1:abc123\n", "add go.sum with TODO-like text")
+	commitFileInRepo(t, repo, "package-lock.json",
+		`{"name":"app","lockfileVersion":3,"requires":true}`, "add package-lock.json")
+
+	// Real source file with actual TODO markers — must appear.
+	commitFileInRepo(t, repo, "internal/main.go",
+		"package main\n// TODO: implement feature\n// FIXME: fix this\n", "add source with TODOs")
+
+	_, r := setupTestRunner(t, []string{repo})
+	signals, filtered := r.collectWorkspaceTodoSignals(context.Background())
+
+	// No lock files should appear.
+	for _, sig := range signals {
+		if sig.DisplayPath == "go.sum" || strings.HasSuffix(sig.DisplayPath, "/go.sum") {
+			t.Errorf("go.sum must not appear in TODO signals; got %q", sig.DisplayPath)
+		}
+		if sig.DisplayPath == "package-lock.json" || strings.HasSuffix(sig.DisplayPath, "/package-lock.json") {
+			t.Errorf("package-lock.json must not appear in TODO signals; got %q", sig.DisplayPath)
+		}
+	}
+
+	// filteredCount should be positive (go.sum was filtered).
+	if filtered == 0 {
+		t.Error("expected filteredCount > 0 for lock file TODOs; got 0")
+	}
+
+	// Source file must appear.
+	var found bool
+	for _, sig := range signals {
+		if sig.DisplayPath == "internal/main.go" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		var paths []string
+		for _, s := range signals {
+			paths = append(paths, s.DisplayPath)
+		}
+		t.Errorf("expected internal/main.go in TODO signals; got: %v", paths)
+	}
+}
+
 // TestTodoSignalsFallbackWhenAllIgnored verifies that when every file with a TODO
 // marker is in an ignored directory (except prompts/), the collector falls back
 // to returning those files rather than emitting nothing.
@@ -523,15 +650,30 @@ func TestSignalReasonFormat(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestIdeationIgnorePatterns verifies that the exported pattern list includes
-// the canonical vendor/generated/prompt paths and contains no duplicates.
+// the canonical vendor/generated/prompt paths, lock file exact names, the .lock
+// suffix, and contains no duplicates.
 func TestIdeationIgnorePatterns(t *testing.T) {
 	must := []string{
+		// Directory prefixes
 		"ui/js/vendor/",
 		"ui/js/generated/",
 		"node_modules/",
 		".git/",
 		"vendor/",
 		"prompts/",
+		// Lock file exact basenames
+		"go.sum",
+		"package-lock.json",
+		"yarn.lock",
+		"pnpm-lock.yaml",
+		"Cargo.lock",
+		"poetry.lock",
+		"Gemfile.lock",
+		"composer.lock",
+		"flake.lock",
+		"packages.lock.json",
+		// Lock file suffix
+		".lock",
 	}
 	for _, want := range must {
 		var found bool
