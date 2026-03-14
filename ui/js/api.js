@@ -298,7 +298,11 @@ async function fetchTasks() {
  */
 function waitForTaskDelta(taskId, timeoutMs) {
   var ms = typeof timeoutMs === 'number' ? timeoutMs : 2000;
-  if (!tasksSource || tasksSource.readyState === EventSource.CLOSED) {
+  // Capture the source reference at call time so finish() removes from the
+  // correct object even if startTasksStream() replaces the module-level
+  // tasksSource while this promise is in-flight.
+  var capturedSource = tasksSource;
+  if (!capturedSource || capturedSource.readyState === EventSource.CLOSED) {
     return fetchTasks();
   }
   return new Promise(function(resolve) {
@@ -309,10 +313,9 @@ function waitForTaskDelta(taskId, timeoutMs) {
       if (done) return;
       done = true;
       if (timer !== null) { clearTimeout(timer); timer = null; }
-      if (tasksSource) {
-        tasksSource.removeEventListener('task-updated', onUpdated);
-        tasksSource.removeEventListener('task-deleted', onDeleted);
-      }
+      // Use capturedSource, not the module-level tasksSource.
+      capturedSource.removeEventListener('task-updated', onUpdated);
+      capturedSource.removeEventListener('task-deleted', onDeleted);
       if (useFetch) {
         fetchTasks().then(resolve, resolve);
       } else {
@@ -334,8 +337,8 @@ function waitForTaskDelta(taskId, timeoutMs) {
       } catch (_) {}
     }
 
-    tasksSource.addEventListener('task-updated', onUpdated);
-    tasksSource.addEventListener('task-deleted', onDeleted);
+    capturedSource.addEventListener('task-updated', onUpdated);
+    capturedSource.addEventListener('task-deleted', onDeleted);
     timer = setTimeout(function() { finish(true); }, ms);
   });
 }
