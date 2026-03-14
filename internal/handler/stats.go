@@ -70,16 +70,12 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 	for _, t := range tasks {
 		u := t.Usage
 		breakdown := t.UsageBreakdown
-		wsBreakdown := t.WorkspaceUsageBreakdown
 
 		// For immutable done tasks, prefer the cached summary when available.
 		if t.Status == store.TaskStatusDone && loadSummary != nil {
 			if summary, err := loadSummary(t.ID); err == nil && summary != nil {
 				u.CostUSD = summary.TotalCostUSD
 				breakdown = summary.ByActivity
-				if summary.WorkspaceUsageBreakdown != nil {
-					wsBreakdown = summary.WorkspaceUsageBreakdown
-				}
 			}
 		}
 
@@ -105,36 +101,17 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 			resp.ByActivity[activity] = a
 		}
 
-		// ByWorkspace: use the stored per-workspace breakdown when available so
-		// that a task touching N repos contributes proportionally to each bucket
-		// rather than duplicating its full usage N times.
-		//
-		// Fallback (when no breakdown is stored): split usage equally across all
-		// repos in WorktreePaths. Tasks that never ran (empty WorktreePaths) are
-		// excluded entirely.
-		if len(wsBreakdown) > 0 {
-			for repoPath, wu := range wsBreakdown {
-				ws := resp.ByWorkspace[repoPath]
-				ws.CostUSD += wu.CostUSD
-				ws.InputTokens += wu.InputTokens
-				ws.OutputTokens += wu.OutputTokens
-				ws.CacheReadTokens += wu.CacheReadInputTokens
-				ws.CacheCreationTokens += wu.CacheCreationTokens
-				ws.Count++
-				resp.ByWorkspace[repoPath] = ws
-			}
-		} else if len(t.WorktreePaths) > 0 {
-			n := float64(len(t.WorktreePaths))
-			for repoPath := range t.WorktreePaths {
-				ws := resp.ByWorkspace[repoPath]
-				ws.CostUSD += u.CostUSD / n
-				ws.InputTokens += int(float64(u.InputTokens) / n)
-				ws.OutputTokens += int(float64(u.OutputTokens) / n)
-				ws.CacheReadTokens += int(float64(u.CacheReadInputTokens) / n)
-				ws.CacheCreationTokens += int(float64(u.CacheCreationTokens) / n)
-				ws.Count++
-				resp.ByWorkspace[repoPath] = ws
-			}
+		// ByWorkspace buckets: one entry per repo root in WorktreePaths.
+		// Tasks that never ran (empty WorktreePaths) are excluded.
+		for repoPath := range t.WorktreePaths {
+			ws := resp.ByWorkspace[repoPath]
+			ws.CostUSD += u.CostUSD
+			ws.InputTokens += u.InputTokens
+			ws.OutputTokens += u.OutputTokens
+			ws.CacheReadTokens += t.Usage.CacheReadInputTokens
+			ws.CacheCreationTokens += t.Usage.CacheCreationTokens
+			ws.Count++
+			resp.ByWorkspace[repoPath] = ws
 		}
 
 		// ByFailureCategory: bucket all tasks (including retried ones that are now done)
