@@ -316,9 +316,22 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	oldStatus := task.Status
 
-	// For in_progress tasks: kill the running container first.
+	// Kill any active containers for this task before persisting the new status.
+	// KillRefineContainer is a no-op when no refinement container is registered.
+	h.runner.KillRefineContainer(id)
+	// For in_progress tasks: also kill the main execution container.
 	if oldStatus == store.TaskStatusInProgress {
 		h.runner.KillContainer(id)
+	}
+
+	// If a refinement is actively running, mark it as failed so the UI
+	// reflects the correct state (same pattern as CancelRefinement).
+	if task.CurrentRefinement != nil && task.CurrentRefinement.Status == store.RefinementJobStatusRunning {
+		task.CurrentRefinement.Status = store.RefinementJobStatusFailed
+		task.CurrentRefinement.Error = "task cancelled"
+		if err := h.store.UpdateRefinementJob(r.Context(), id, task.CurrentRefinement); err != nil {
+			logger.Handler.Error("cancel task: update refinement job", "task", id, "error", err)
+		}
 	}
 
 	// Persist the cancelled status BEFORE cleaning up worktrees.

@@ -30,10 +30,11 @@ type MockRunner struct {
 	CodexPath   string
 
 	// Recorded call arguments (mutex-protected for race-safety).
-	RunBackgroundCalls    []uuid.UUID
-	KillContainerCalls    []uuid.UUID
-	CleanupWorktreesCalls []uuid.UUID
-	GenerateTitleCalls    []uuid.UUID
+	RunBackgroundCalls        []uuid.UUID
+	KillContainerCalls        []uuid.UUID
+	KillRefineContainerCalls  []uuid.UUID
+	CleanupWorktreesCalls     []uuid.UUID
+	GenerateTitleCalls        []uuid.UUID
 
 	// Optional overrides for ContainerName / RefineContainerName return values.
 	// When nil the methods return "" (no container active), matching the default
@@ -60,6 +61,15 @@ func (m *MockRunner) KillCalls() []uuid.UUID {
 	defer m.mu.Unlock()
 	out := make([]uuid.UUID, len(m.KillContainerCalls))
 	copy(out, m.KillContainerCalls)
+	return out
+}
+
+// KillRefineCalls returns a race-safe snapshot of the KillRefineContainer call IDs.
+func (m *MockRunner) KillRefineCalls() []uuid.UUID {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]uuid.UUID, len(m.KillRefineContainerCalls))
+	copy(out, m.KillRefineContainerCalls)
 	return out
 }
 
@@ -112,7 +122,11 @@ func (m *MockRunner) KillContainer(taskID uuid.UUID) {
 	m.mu.Unlock()
 }
 
-func (m *MockRunner) KillRefineContainer(_ uuid.UUID) {}
+func (m *MockRunner) KillRefineContainer(taskID uuid.UUID) {
+	m.mu.Lock()
+	m.KillRefineContainerCalls = append(m.KillRefineContainerCalls, taskID)
+	m.mu.Unlock()
+}
 
 func (m *MockRunner) ContainerCircuitAllow() bool { return true }
 

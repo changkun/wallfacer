@@ -512,6 +512,69 @@ func TestCancelTask_InsertsCancelledEvent(t *testing.T) {
 	}
 }
 
+func TestCancelTask_KillsRefineContainer(t *testing.T) {
+	m := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, m)
+	ctx := context.Background()
+
+	task, _ := s.CreateTask(ctx, "backlog with refinement", 15, false, "", "")
+	// Task is in backlog (default) — no need to change status.
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// KillRefineContainer must have been called regardless of task status.
+	calls := m.KillRefineCalls()
+	if len(calls) != 1 || calls[0] != task.ID {
+		t.Errorf("expected KillRefineContainer called with %v, got %v", task.ID, calls)
+	}
+}
+
+func TestCancelTask_MarksRunningRefinementFailed(t *testing.T) {
+	m := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, m)
+	ctx := context.Background()
+
+	task, _ := s.CreateTask(ctx, "backlog with running refinement", 15, false, "", "")
+
+	// Attach a running refinement job.
+	job := &store.RefinementJob{
+		ID:     uuid.New().String(),
+		Status: store.RefinementJobStatusRunning,
+	}
+	if err := s.UpdateRefinementJob(ctx, task.ID, job); err != nil {
+		t.Fatalf("UpdateRefinementJob: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// The refinement job must be marked failed in the store.
+	updated, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.CurrentRefinement == nil {
+		t.Fatal("expected CurrentRefinement to be present after cancel")
+	}
+	if updated.CurrentRefinement.Status != store.RefinementJobStatusFailed {
+		t.Errorf("expected refinement status %q, got %q", store.RefinementJobStatusFailed, updated.CurrentRefinement.Status)
+	}
+	if updated.CurrentRefinement.Error != "task cancelled" {
+		t.Errorf("expected error 'task cancelled', got %q", updated.CurrentRefinement.Error)
+	}
+}
+
 // --- ResumeTask ---
 
 func TestResumeTask_NotFound(t *testing.T) {
