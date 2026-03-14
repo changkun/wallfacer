@@ -42,6 +42,10 @@ var (
 	buildSuccessPattern = regexp.MustCompile(`(?i)\bBUILD\s+SUCCESS\b`)
 	// nPassedPattern matches "5 passed", "5 tests passed", "5 examples passed" (pytest, rspec, etc.).
 	nPassedPattern = regexp.MustCompile(`(?i)\b\d+\s+(?:tests?\s+|specs?\s+|examples?\s+)?passed\b`)
+	// allGreenPattern matches "all green", "all 4 cases ... green", "(all green)", etc.
+	allGreenPattern = regexp.MustCompile(`(?i)\ball\s+green\b`)
+	// succeedPattern matches "passes succeed", "tests succeed", "both succeed", etc.
+	succeedPattern = regexp.MustCompile(`(?i)\b(?:pass(?:es)?|tests?|both|all)\s+succeed(?:ed|s)?\b`)
 	// failureInContentPattern detects non-zero failure counts used to guard
 	// against false-positive pass inference in mixed output like "5 passed, 1 failed".
 	failureInContentPattern = regexp.MustCompile(`(?i)\b[1-9]\d*\s+(?:tests?\s+)?(?:failed|failures?|failing)\b`)
@@ -930,6 +934,13 @@ func inferPassFromContent(result string, customPass, customFail []string) string
 	}
 	// Pytest/RSpec: "N passed", "N tests passed", "N examples passed".
 	if nPassedPattern.MatchString(result) {
+		return "pass"
+	}
+	// Informal pass indicators: "all green", "passes succeed", etc.
+	if allGreenPattern.MatchString(result) {
+		return "pass"
+	}
+	if succeedPattern.MatchString(result) {
 		return "pass"
 	}
 	return ""
