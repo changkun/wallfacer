@@ -3838,3 +3838,106 @@ func TestGetConfig_IncludesWatcherHealth(t *testing.T) {
 		}
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SearchTasks
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestSearchTasks_ShortQuery verifies that q < 2 runes returns 400.
+func TestSearchTasks_ShortQuery(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/search?q=a", nil)
+	w := httptest.NewRecorder()
+	h.SearchTasks(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for short query, got %d", w.Code)
+	}
+}
+
+// TestSearchTasks_EmptyQuery verifies that an empty q returns 400.
+func TestSearchTasks_EmptyQuery(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/search", nil)
+	w := httptest.NewRecorder()
+	h.SearchTasks(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for empty query, got %d", w.Code)
+	}
+}
+
+// TestSearchTasks_NoResults verifies that a valid query with no matches returns an empty array.
+func TestSearchTasks_NoResults(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/search?q=nonexistent", nil)
+	w := httptest.NewRecorder()
+	h.SearchTasks(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+	var results []interface{}
+	if err := json.NewDecoder(w.Body).Decode(&results); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}
+
+// TestSearchTasks_MatchesPrompt verifies that a query matching a task's prompt is returned.
+func TestSearchTasks_MatchesPrompt(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	_, err := h.store.CreateTask(ctx, "fix authentication bug in login", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/search?q=authentication", nil)
+	w := httptest.NewRecorder()
+	h.SearchTasks(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+	var results []interface{}
+	if err := json.NewDecoder(w.Body).Decode(&results); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(results) == 0 {
+		t.Error("expected at least 1 result for matching query")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GetStats
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestGetStats_EmptyStore verifies that GetStats returns a 200 with stats for an empty store.
+func TestGetStats_EmptyStore(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/stats", nil)
+	w := httptest.NewRecorder()
+	h.GetStats(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var stats interface{}
+	if err := json.NewDecoder(w.Body).Decode(&stats); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+}
+
+// TestGetStats_UnknownWorkspace verifies that filtering by unknown workspace returns 400.
+func TestGetStats_UnknownWorkspace(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	_, err := h.store.CreateTask(ctx, "some task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/stats?workspace=/nonexistent", nil)
+	w := httptest.NewRecorder()
+	h.GetStats(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unknown workspace, got %d", w.Code)
+	}
+}

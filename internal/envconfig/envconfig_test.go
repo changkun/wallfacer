@@ -551,3 +551,124 @@ func TestMaskToken(t *testing.T) {
 		}
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ParseWorkspaces / FormatWorkspaces
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestParseWorkspaces_Empty(t *testing.T) {
+	if got := envconfig.ParseWorkspaces(""); got != nil {
+		t.Errorf("ParseWorkspaces(\"\") = %v, want nil", got)
+	}
+	if got := envconfig.ParseWorkspaces("   "); got != nil {
+		t.Errorf("ParseWorkspaces(whitespace) = %v, want nil", got)
+	}
+}
+
+func TestParseWorkspaces_SinglePath(t *testing.T) {
+	got := envconfig.ParseWorkspaces("/workspace/proj")
+	if len(got) != 1 || got[0] != "/workspace/proj" {
+		t.Errorf("ParseWorkspaces single = %v, want [/workspace/proj]", got)
+	}
+}
+
+func TestParseWorkspaces_MultiplePaths(t *testing.T) {
+	input := "/a:/b:/c"
+	got := envconfig.ParseWorkspaces(input)
+	if len(got) != 3 {
+		t.Fatalf("ParseWorkspaces(%q) len = %d, want 3", input, len(got))
+	}
+	if got[0] != "/a" || got[1] != "/b" || got[2] != "/c" {
+		t.Errorf("ParseWorkspaces(%q) = %v, want [/a /b /c]", input, got)
+	}
+}
+
+func TestParseWorkspaces_FiltersEmptyEntries(t *testing.T) {
+	// Leading/trailing/double separators produce empty parts.
+	got := envconfig.ParseWorkspaces(":/a::/b:")
+	if len(got) != 2 {
+		t.Errorf("ParseWorkspaces with empty entries = %v (len %d), want 2 entries", got, len(got))
+	}
+}
+
+func TestParseWorkspaces_AllEmptyEntriesReturnsNil(t *testing.T) {
+	if got := envconfig.ParseWorkspaces(":::"); got != nil {
+		t.Errorf("ParseWorkspaces(all separators) = %v, want nil", got)
+	}
+}
+
+func TestFormatWorkspaces_Empty(t *testing.T) {
+	if got := envconfig.FormatWorkspaces(nil); got != "" {
+		t.Errorf("FormatWorkspaces(nil) = %q, want \"\"", got)
+	}
+	if got := envconfig.FormatWorkspaces([]string{}); got != "" {
+		t.Errorf("FormatWorkspaces([]) = %q, want \"\"", got)
+	}
+}
+
+func TestFormatWorkspaces_Single(t *testing.T) {
+	got := envconfig.FormatWorkspaces([]string{"/workspace/proj"})
+	if got != "/workspace/proj" {
+		t.Errorf("FormatWorkspaces single = %q, want \"/workspace/proj\"", got)
+	}
+}
+
+func TestFormatWorkspaces_Multiple(t *testing.T) {
+	paths := []string{"/a", "/b", "/c"}
+	got := envconfig.FormatWorkspaces(paths)
+	if !strings.Contains(got, "/a") || !strings.Contains(got, "/b") || !strings.Contains(got, "/c") {
+		t.Errorf("FormatWorkspaces(%v) = %q; expected all paths present", paths, got)
+	}
+}
+
+func TestFormatWorkspaces_RoundTrip(t *testing.T) {
+	original := []string{"/workspace/project1", "/workspace/project2"}
+	encoded := envconfig.FormatWorkspaces(original)
+	decoded := envconfig.ParseWorkspaces(encoded)
+	if len(decoded) != len(original) {
+		t.Fatalf("round-trip len: %d, want %d", len(decoded), len(original))
+	}
+	for i := range original {
+		if decoded[i] != original[i] {
+			t.Errorf("round-trip[%d] = %q, want %q", i, decoded[i], original[i])
+		}
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UpdateWorkspaces
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestUpdateWorkspaces_WritesAndReads(t *testing.T) {
+	path := writeEnvFile(t, "ANTHROPIC_API_KEY=sk-test\n")
+
+	workspaces := []string{"/workspace/proj1", "/workspace/proj2"}
+	if err := envconfig.UpdateWorkspaces(path, workspaces); err != nil {
+		t.Fatalf("UpdateWorkspaces: %v", err)
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(content), "WALLFACER_WORKSPACES") {
+		t.Error("expected WALLFACER_WORKSPACES in updated file")
+	}
+}
+
+func TestUpdateWorkspaces_ClearsWithEmpty(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_WORKSPACES=/old/path\nANTHROPIC_API_KEY=sk-test\n")
+
+	if err := envconfig.UpdateWorkspaces(path, nil); err != nil {
+		t.Fatalf("UpdateWorkspaces clear: %v", err)
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	// The value should now be empty.
+	if strings.Contains(string(content), "/old/path") {
+		t.Error("expected old workspace path to be cleared")
+	}
+}

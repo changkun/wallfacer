@@ -1142,3 +1142,156 @@ func TestParseOutputFallsBackToLastJSON(t *testing.T) {
 		t.Fatalf("expected session_id=s2 from last JSON, got %q", out.SessionID)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Runner accessors
+// ---------------------------------------------------------------------------
+
+// TestRunnerEnvFile verifies that EnvFile() returns the configured env file path.
+func TestRunnerEnvFile(t *testing.T) {
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, []byte("KEY=val\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	r := NewRunner(s, RunnerConfig{Command: "echo", EnvFile: envFile})
+	if r.EnvFile() != envFile {
+		t.Errorf("EnvFile() = %q, want %q", r.EnvFile(), envFile)
+	}
+}
+
+// TestRunnerWorktreesDir verifies that WorktreesDir() returns the configured worktrees directory.
+func TestRunnerWorktreesDir(t *testing.T) {
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	wtDir := filepath.Join(t.TempDir(), "worktrees")
+	r := NewRunner(s, RunnerConfig{Command: "echo", WorktreesDir: wtDir})
+	if r.WorktreesDir() != wtDir {
+		t.Errorf("WorktreesDir() = %q, want %q", r.WorktreesDir(), wtDir)
+	}
+}
+
+// TestRunnerSandboxImage verifies that SandboxImage() returns the configured image.
+func TestRunnerSandboxImage(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+	// setupTestRunner uses "test:latest".
+	if r.SandboxImage() != "test:latest" {
+		t.Errorf("SandboxImage() = %q, want 'test:latest'", r.SandboxImage())
+	}
+}
+
+// TestRunnerInstructionsPath verifies InstructionsPath() when workspaceManager is nil.
+func TestRunnerInstructionsPath(t *testing.T) {
+	instructionsFile := filepath.Join(t.TempDir(), "CLAUDE.md")
+	if err := os.WriteFile(instructionsFile, []byte("# test\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	r := NewRunner(s, RunnerConfig{Command: "echo", InstructionsPath: instructionsFile})
+	if r.InstructionsPath() != instructionsFile {
+		t.Errorf("InstructionsPath() = %q, want %q", r.InstructionsPath(), instructionsFile)
+	}
+}
+
+// TestRunnerPendingGoroutines verifies PendingGoroutines() returns an empty
+// slice when no background goroutines are running.
+func TestRunnerPendingGoroutines(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+	pending := r.PendingGoroutines()
+	if len(pending) != 0 {
+		t.Errorf("expected 0 pending goroutines initially, got %d: %v", len(pending), pending)
+	}
+}
+
+// TestRunnerCodexAuthPath verifies CodexAuthPath() returns an empty string
+// when no valid host codex auth cache exists.
+func TestRunnerCodexAuthPath(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+	// No real codex auth path configured, should return "".
+	path := r.CodexAuthPath()
+	_ = path // just verify it doesn't panic
+}
+
+// TestRunnerHasHostCodexAuth verifies HasHostCodexAuth() returns false when
+// no valid host codex auth cache exists.
+func TestRunnerHasHostCodexAuth(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+	// No real codex auth path, should return false without panicking.
+	r.HasHostCodexAuth()
+}
+
+// TestContainerCircuitBreaker verifies that the container circuit breaker
+// accessors work correctly: Allow/Open/State/Failures/RecordContainerFailure.
+func TestContainerCircuitBreaker(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+
+	// Initially circuit should be closed (Allow=true, Open=false).
+	if !r.ContainerCircuitAllow() {
+		t.Error("expected ContainerCircuitAllow=true initially")
+	}
+	if r.ContainerCircuitOpen() {
+		t.Error("expected ContainerCircuitOpen=false initially")
+	}
+	if r.ContainerCircuitFailures() != 0 {
+		t.Errorf("expected 0 failures initially, got %d", r.ContainerCircuitFailures())
+	}
+	if r.ContainerCircuitState() == "" {
+		t.Error("expected non-empty circuit state")
+	}
+
+	// Record a failure.
+	r.RecordContainerFailure()
+	if r.ContainerCircuitFailures() != 1 {
+		t.Errorf("expected 1 failure after RecordContainerFailure, got %d", r.ContainerCircuitFailures())
+	}
+}
+
+// TestRefineContainerName_Empty verifies that RefineContainerName returns empty
+// when no refinement container is registered.
+func TestRefineContainerName_Empty(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+	name := r.RefineContainerName(uuid.New())
+	if name != "" {
+		t.Errorf("expected empty container name, got %q", name)
+	}
+}
+
+// TestKillRefineContainer_NoOp verifies KillRefineContainer does not panic
+// when no refinement container is running.
+func TestKillRefineContainer_NoOp(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+	// Should not panic.
+	r.KillRefineContainer(uuid.New())
+}
+
+// TestIdeateContainerName_Empty verifies that IdeateContainerName returns empty
+// when no ideation container is running.
+func TestIdeateContainerName_Empty(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+	name := r.IdeateContainerName()
+	if name != "" {
+		t.Errorf("expected empty ideation container name, got %q", name)
+	}
+}
+
+// TestKillIdeateContainer_NoOp verifies KillIdeateContainer does not panic
+// when no ideation container is running.
+func TestKillIdeateContainer_NoOp(t *testing.T) {
+	_, r := setupTestRunner(t, nil)
+	// Should not panic.
+	r.KillIdeateContainer()
+}

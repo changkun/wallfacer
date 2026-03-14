@@ -338,3 +338,21 @@ func TestBranchTipCommit(t *testing.T) {
 		}
 	})
 }
+
+func TestHasConflicts_CleanRepo(t *testing.T) {
+	repo := setupRepo(t)
+	has, err := HasConflicts(repo)
+	if err != nil {
+		t.Fatalf("HasConflicts: %v", err)
+	}
+	if has {
+		t.Error("expected HasConflicts=false for clean repo")
+	}
+}
+
+func TestHasConflicts_NonGitDir(t *testing.T) {
+	_, err := HasConflicts(t.TempDir())
+	if err == nil {
+		t.Error("expected error for non-git directory")
+	}
+}

@@ -42,9 +42,9 @@ func buildIndexEntry(t *Task, oversightRaw string) indexedTaskText {
 // Store is the in-memory task database backed by per-task directory persistence.
 // All mutations are atomic (temp-file + rename) and guarded by a RWMutex.
 type Store struct {
-	mu     sync.RWMutex
-	dir    string
-	closed atomic.Bool
+	mu      sync.RWMutex
+	dir     string
+	closed  atomic.Bool
 	tasks   map[uuid.UUID]*Task
 	deleted map[uuid.UUID]*Task // tombstoned tasks (soft-deleted, not yet purged)
 	events  map[uuid.UUID][]TaskEvent

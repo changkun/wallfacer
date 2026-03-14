@@ -51,3 +51,37 @@ func TestBuildRefinementPromptNoUserInstructionsBlockWhenEmpty(t *testing.T) {
 		t.Fatalf("did not expect user instructions block for empty instructions\n--- prompt ---\n%s", prompt)
 	}
 }
+
+// TestCleanRefinementResult verifies that cleanRefinementResult strips preamble
+// before the first top-level heading.
+func TestCleanRefinementResult_StartsWithHeading(t *testing.T) {
+	input := "# My Spec\nContent here."
+	got := cleanRefinementResult(input)
+	if got != input {
+		t.Errorf("cleanRefinementResult(%q) = %q, want unchanged", input, got)
+	}
+}
+
+func TestCleanRefinementResult_HeadingAfterPreamble(t *testing.T) {
+	input := "Here is some preamble.\n\n# My Spec\nContent here."
+	got := cleanRefinementResult(input)
+	want := "# My Spec\nContent here."
+	if got != want {
+		t.Errorf("cleanRefinementResult(%q) = %q, want %q", input, got, want)
+	}
+}
+
+func TestCleanRefinementResult_NoHeading(t *testing.T) {
+	input := "Just some text with no headings."
+	got := cleanRefinementResult(input)
+	if got != input {
+		t.Errorf("cleanRefinementResult(%q) = %q, want unchanged", input, got)
+	}
+}
+
+func TestCleanRefinementResult_Empty(t *testing.T) {
+	got := cleanRefinementResult("")
+	if got != "" {
+		t.Errorf("cleanRefinementResult(%q) = %q, want %q", "", got, "")
+	}
+}
