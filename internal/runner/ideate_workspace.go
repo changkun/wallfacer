@@ -43,14 +43,39 @@ var ignoredTodoPrefixes = []string{
 	"testdata/",
 }
 
-// ignoredPathSuffixes lists file extension suffixes that indicate minified or
-// generated assets. These are excluded regardless of directory.
+// ignoredPathSuffixes lists file extension suffixes that indicate minified,
+// generated, or lock-file assets. These are excluded regardless of directory.
+// The ".lock" suffix covers Cargo.lock, yarn.lock, poetry.lock, Gemfile.lock,
+// composer.lock, flake.lock, and any other "<name>.lock" dependency lock files.
+// Files whose exact basename needs matching (e.g. go.sum, package-lock.json)
+// are handled by ignoredChurnExactNames instead.
 var ignoredPathSuffixes = []string{
 	".min.js",
 	".min.css",
 	".pb.go",
 	"_gen.go",
 	"_generated.go",
+	".lock",
+}
+
+// ignoredChurnExactNames lists exact file basenames excluded from both churn
+// and TODO signal collection. Dependency lock files accumulate the highest
+// commit counts in most repos (every dependency update touches them) yet carry
+// zero signal about code quality or technical debt. Files whose names end in
+// ".lock" are also caught by ignoredPathSuffixes; these entries provide
+// explicit documentation and cover names that do not match the suffix rule
+// (go.sum, package-lock.json, packages.lock.json, pnpm-lock.yaml).
+var ignoredChurnExactNames = []string{
+	"go.sum",
+	"package-lock.json",
+	"yarn.lock",
+	"pnpm-lock.yaml",
+	"Cargo.lock",
+	"poetry.lock",
+	"Gemfile.lock",
+	"composer.lock",
+	"flake.lock",
+	"packages.lock.json",
 }
 
 // boostedPathPrefixes lists directory prefixes whose files are considered
@@ -71,9 +96,12 @@ var boostedPathSuffixes = []string{
 	".spec.js",
 }
 
-// IdeationIgnorePatterns is the canonical ordered list of path prefixes excluded
-// from workspace signal collection. It is exposed via GET /api/config so callers
-// can understand and reproduce the filtering logic without reading source code.
+// IdeationIgnorePatterns is the canonical ordered list of path prefixes and
+// exact basenames excluded from workspace signal collection. It is exposed via
+// GET /api/config so callers can understand and reproduce the filtering logic
+// without reading source code. Entries without a trailing "/" are exact
+// basename matches (e.g. "go.sum"); entries with a trailing "/" are directory
+// prefix matches; ".lock" is a filename suffix match.
 var IdeationIgnorePatterns = func() []string {
 	seen := make(map[string]bool)
 	var result []string
@@ -83,12 +111,28 @@ var IdeationIgnorePatterns = func() []string {
 			result = append(result, p)
 		}
 	}
+	for _, name := range ignoredChurnExactNames {
+		if !seen[name] {
+			seen[name] = true
+			result = append(result, name)
+		}
+	}
+	if !seen[".lock"] {
+		seen[".lock"] = true
+		result = append(result, ".lock")
+	}
 	return result
 }()
 
 // isIgnoredChurnPath reports whether a workspace-relative file path should be
 // excluded from churn signal collection.
 func isIgnoredChurnPath(path string) bool {
+	base := filepath.Base(path)
+	for _, name := range ignoredChurnExactNames {
+		if base == name {
+			return true
+		}
+	}
 	for _, sfx := range ignoredPathSuffixes {
 		if strings.HasSuffix(path, sfx) {
 			return true
@@ -105,6 +149,12 @@ func isIgnoredChurnPath(path string) bool {
 // isIgnoredTodoPath reports whether a workspace-relative file path should be
 // excluded from TODO signal collection.
 func isIgnoredTodoPath(path string) bool {
+	base := filepath.Base(path)
+	for _, name := range ignoredChurnExactNames {
+		if base == name {
+			return true
+		}
+	}
 	for _, sfx := range ignoredPathSuffixes {
 		if strings.HasSuffix(path, sfx) {
 			return true
