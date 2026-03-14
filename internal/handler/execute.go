@@ -224,6 +224,21 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 		return
 	}
 
+	// Idea-agent tasks held at waiting: create backlog tasks on approval.
+	if task.Kind == store.TaskKindIdeaAgent {
+		if createErr := h.runner.CreateIdeaBacklogTasks(r.Context(), id); createErr != nil {
+			logger.Handler.Warn("complete idea-agent task: create backlog tasks", "task", id, "error", createErr)
+		}
+		if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusDone); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
+			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerUser, nil))
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		return
+	}
+
 	if task.SessionID != nil && *task.SessionID != "" {
 		task, err = h.restoreTaskWorktreesForCommit(r.Context(), task)
 		if err != nil {

@@ -323,6 +323,7 @@ type Runner struct {
 	backgroundWg     trackedWg          // tracks fire-and-forget background goroutines
 	stopReasonMu     sync.RWMutex
 	onStopReason     func(taskID uuid.UUID, stopReason string)
+	autosubmitFn     func() bool // returns true when auto-submit is enabled
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation.
@@ -408,6 +409,20 @@ func (r *Runner) notifyStopReason(taskID uuid.UUID, stopReason string) {
 	if fn != nil {
 		fn(taskID, stopReason)
 	}
+}
+
+// SetAutosubmitFunc registers a callback that reports whether auto-submit is
+// currently enabled. The ideation pipeline uses this to decide whether to
+// create backlog tasks immediately or wait for manual approval.
+func (r *Runner) SetAutosubmitFunc(fn func() bool) {
+	r.autosubmitFn = fn
+}
+
+func (r *Runner) isAutosubmitEnabled() bool {
+	if r.autosubmitFn == nil {
+		return true // default to auto-create for backward compatibility
+	}
+	return r.autosubmitFn()
 }
 
 // Shutdown waits for all tracked background goroutines to complete before

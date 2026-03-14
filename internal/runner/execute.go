@@ -189,20 +189,25 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			return
 		}
 		r.GenerateOversightBackground(taskID)
-		// Brainstorm tasks produce no code changes, so auto-test will never
-		// pick them up.  Transition through waiting→committing→done immediately.
+
+		// When auto-submit is enabled, transition straight through to done.
+		// When auto-submit is off, stop at waiting so the user can review
+		// proposed ideas before they are created as backlog tasks.
 		r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
-		r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
-		r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerSystem, nil))
-		r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
-		r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-			store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, store.TriggerSystem, nil))
-		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
-			"result": "Ideation complete.",
-		})
+
+		if r.isAutosubmitEnabled() {
+			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+				store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerSystem, nil))
+			r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+				store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, store.TriggerSystem, nil))
+			r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+				"result": "Ideation complete.",
+			})
+		}
 		return
 	}
 

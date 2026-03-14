@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -424,16 +425,59 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		return err
 	}
 
-	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
-		"result": fmt.Sprintf("Brainstorm complete — creating %d idea task(s).", len(ideas)),
-	})
+	// Build the summary from parsed ideas and store it as the task result.
+	summary := ideaSummaryLines(ideas)
+	if len(summary) > 0 {
+		var sb strings.Builder
+		for _, line := range summary {
+			sb.WriteString("- ")
+			sb.WriteString(line)
+			sb.WriteString("\n")
+		}
+		r.store.UpdateTaskResult(bgCtx, taskID, strings.TrimSpace(sb.String()), "", "", 1)
+	} else {
+		r.store.UpdateTaskResult(bgCtx, taskID, "No idea reached the minimum impact threshold.", "", "", 1)
+	}
 
-	// Create a backlog task for each proposed idea.
-	// The card's Prompt is set to the full implementation text.
-	// ExecutionPrompt is also set so the sandbox uses the full details
-	// even if the Prompt field is later edited.
-	var titles []string
-	var summary []string
+	// When auto-submit is enabled, create backlog tasks immediately.
+	// Otherwise the brainstorm task will move to waiting for manual review;
+	// backlog tasks are created when the user approves (moves to done).
+	if r.isAutosubmitEnabled() {
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			"result": fmt.Sprintf("Brainstorm complete — creating %d idea task(s).", len(ideas)),
+		})
+		r.createIdeaBacklogTasks(bgCtx, taskID, ideas)
+	} else {
+		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			"result": fmt.Sprintf("Brainstorm complete — %d idea(s) proposed. Approve to create backlog tasks.", len(ideas)),
+		})
+	}
+
+	return nil
+}
+
+// ideaSummaryLines builds a display label for each idea.
+func ideaSummaryLines(ideas []IdeateResult) []string {
+	var lines []string
+	for _, idea := range ideas {
+		label := fmt.Sprintf("[%s %d] %s", idea.Priority, idea.ImpactScore, idea.Title)
+		if idea.Priority == "" {
+			label = idea.Title
+		}
+		lines = append(lines, label)
+	}
+	return lines
+}
+
+// createIdeaBacklogTasks creates a backlog task for each proposed idea and
+// records accepted ideas in history.
+func (r *Runner) createIdeaBacklogTasks(ctx context.Context, parentTaskID uuid.UUID, ideas []IdeateResult) {
+	hist, histErr := LoadHistory(r.store.DataDir())
+	if histErr != nil {
+		logger.Runner.Warn("ideation: load history for recording", "task", parentTaskID, "error", histErr)
+		hist = nil
+	}
+
 	for _, idea := range ideas {
 		tags := make([]string, 0, 4)
 		tags = append(tags, "idea-agent")
@@ -446,17 +490,15 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		if idea.ImpactScore > 0 {
 			tags = append(tags, "impact:"+strconv.Itoa(idea.ImpactScore))
 		}
-		// Use the full implementation prompt as the card prompt.
 		cardPrompt := idea.Prompt
 		if cardPrompt == "" {
-			cardPrompt = idea.Title // fallback: use title if prompt is missing
+			cardPrompt = idea.Title
 		}
-		newTask, createErr := r.store.CreateTask(bgCtx, cardPrompt, 60, false, "", store.TaskKindTask, tags...)
+		newTask, createErr := r.store.CreateTask(ctx, cardPrompt, 60, false, "", store.TaskKindTask, tags...)
 		if createErr != nil {
-			logger.Runner.Warn("ideation task: create idea task", "task", taskID, "error", createErr)
+			logger.Runner.Warn("ideation task: create idea task", "task", parentTaskID, "error", createErr)
 			continue
 		}
-		// Record accepted idea in history so it is not excluded from future prompts.
 		if hist != nil && idea.Title != "" {
 			he := HistoryEntry{
 				Title:      idea.Title,
@@ -468,42 +510,56 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 				logger.Runner.Warn("ideation task: append accepted idea to history", "title", idea.Title, "error", appErr)
 			}
 		}
-		r.store.InsertEvent(bgCtx, newTask.ID, store.EventTypeStateChange,
+		r.store.InsertEvent(ctx, newTask.ID, store.EventTypeStateChange,
 			store.NewStateChangeData("", store.TaskStatusBacklog, "", nil))
 		if idea.Title != "" {
-			r.store.UpdateTaskTitle(bgCtx, newTask.ID, idea.Title)
+			r.store.UpdateTaskTitle(ctx, newTask.ID, idea.Title)
 		}
-		// Also set ExecutionPrompt so the sandbox always receives the full details
-		// even if the user edits the Prompt field before running the task.
-		if err := r.store.UpdateTaskExecutionPrompt(bgCtx, newTask.ID, idea.Prompt); err != nil {
+		if err := r.store.UpdateTaskExecutionPrompt(ctx, newTask.ID, idea.Prompt); err != nil {
 			logger.Runner.Warn("ideation task: set execution prompt", "task", newTask.ID, "error", err)
 		}
 		label := fmt.Sprintf("[%s %d] %s", idea.Priority, idea.ImpactScore, idea.Title)
 		if idea.Priority == "" {
 			label = idea.Title
 		}
-		titles = append(titles, idea.Title)
-		summary = append(summary, label)
-		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		r.store.InsertEvent(ctx, parentTaskID, store.EventTypeSystem, map[string]string{
 			"result": fmt.Sprintf("Created idea task: %s", label),
 		})
 	}
+}
 
-	// Store a summary of proposed ideas as the task result so the card
-	// displays what was generated without requiring a click-through.
-	// Pass turns=1 to preserve the turn count set by the earlier UpdateTaskResult call.
-	if len(titles) > 0 {
-		var sb strings.Builder
-		for _, summaryLine := range summary {
-			sb.WriteString("- ")
-			sb.WriteString(summaryLine)
-			sb.WriteString("\n")
-		}
-		r.store.UpdateTaskResult(bgCtx, taskID, strings.TrimSpace(sb.String()), "", "", 1)
-	} else {
-		r.store.UpdateTaskResult(bgCtx, taskID, "No idea reached the minimum impact threshold.", "", "", 1)
+// CreateIdeaBacklogTasks re-extracts ideas from a completed brainstorm task's
+// turn output and creates backlog tasks from them. This is used when the user
+// manually approves a brainstorm that was held at waiting status.
+func (r *Runner) CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) error {
+	// The raw agent output is stored in the turn output file; the task Result
+	// field contains only the summary lines. Re-extract from the turn output.
+	turnFile := r.store.OutputsDir(taskID) + "/turn-0001.json"
+	rawStdout, readErr := os.ReadFile(turnFile)
+	if readErr != nil {
+		return fmt.Errorf("read turn output: %w", readErr)
 	}
 
+	var rawStderr []byte
+	stderrFile := r.store.OutputsDir(taskID) + "/turn-0001.stderr.txt"
+	if data, err := os.ReadFile(stderrFile); err == nil {
+		rawStderr = data
+	}
+
+	output, parseErr := parseOutput(strings.TrimSpace(string(rawStdout)))
+	if parseErr != nil {
+		return fmt.Errorf("parse output: %w", parseErr)
+	}
+
+	ideas, _, extractErr := extractIdeasFromRunOutput(output.Result, rawStdout, rawStderr)
+	if extractErr != nil {
+		return fmt.Errorf("extract ideas: %w", extractErr)
+	}
+
+	r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		"result": fmt.Sprintf("Approved — creating %d idea task(s).", len(ideas)),
+	})
+	r.createIdeaBacklogTasks(ctx, taskID, ideas)
 	return nil
 }
 

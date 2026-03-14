@@ -124,6 +124,8 @@ func (m *MockRunner) GenerateBoardManifest(_ context.Context, _ uuid.UUID, _ boo
 
 func (m *MockRunner) BuildIdeationPrompt(_ []store.Task) string { return "" }
 
+func (m *MockRunner) CreateIdeaBacklogTasks(_ context.Context, _ uuid.UUID) error { return nil }
+
 func (m *MockRunner) IdeationCategories() []string { return nil }
 
 func (m *MockRunner) IdeationIgnorePatterns() []string { return nil }
