@@ -338,22 +338,38 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 			var out []byte
 			if commitHash != "" {
 				if baseHash := task.BaseCommitHashes[repoPath]; baseHash != "" {
-					out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
+					var gitErr error
+					out, gitErr = exec.CommandContext(r.Context(), "git", "-C", repoPath,
 						"diff", baseHash, commitHash).Output()
+					if gitErr != nil {
+						logger.Git.Debug("git diff base..commit failed", "repo", repoPath, "error", gitErr)
+					}
 				} else {
-					out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
+					var gitErr error
+					out, gitErr = exec.CommandContext(r.Context(), "git", "-C", repoPath,
 						"show", commitHash).Output()
+					if gitErr != nil {
+						logger.Git.Debug("git show commit failed", "repo", repoPath, "error", gitErr)
+					}
 				}
 			} else if task.BranchName != "" {
 				if defBranch, err := gitutil.DefaultBranch(repoPath); err == nil {
 					// Use merge-base so we only see changes introduced on the task
 					// branch, not the inverse of commits that advanced main.
 					if base, mbErr := gitutil.MergeBase(repoPath, defBranch, task.BranchName); mbErr == nil {
-						out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
+						var gitErr error
+						out, gitErr = exec.CommandContext(r.Context(), "git", "-C", repoPath,
 							"diff", base, task.BranchName).Output()
+						if gitErr != nil {
+							logger.Git.Debug("git diff merge-base..branch failed", "repo", repoPath, "error", gitErr)
+						}
 					} else {
-						out, _ = exec.CommandContext(r.Context(), "git", "-C", repoPath,
+						var gitErr error
+						out, gitErr = exec.CommandContext(r.Context(), "git", "-C", repoPath,
 							"diff", defBranch+".."+task.BranchName).Output()
+						if gitErr != nil {
+							logger.Git.Debug("git diff default..branch failed", "repo", repoPath, "error", gitErr)
+						}
 					}
 				}
 			}
@@ -377,7 +393,10 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		if err != nil {
 			base = defBranch
 		}
-		out, _ := exec.CommandContext(r.Context(), "git", "-C", worktreePath, "diff", base).Output()
+		out, diffErr := exec.CommandContext(r.Context(), "git", "-C", worktreePath, "diff", base).Output()
+		if diffErr != nil {
+			logger.Git.Debug("git diff base failed", "worktree", worktreePath, "error", diffErr)
+		}
 
 		// Include untracked files via --no-index diffs.
 		if untrackedRaw, err := exec.CommandContext(r.Context(), "git", "-C", worktreePath,
@@ -386,8 +405,11 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 				if file == "" {
 					continue
 				}
-				fd, _ := exec.CommandContext(r.Context(), "git", "-C", worktreePath,
+				fd, noIndexErr := exec.CommandContext(r.Context(), "git", "-C", worktreePath,
 					"diff", "--no-index", "/dev/null", file).Output()
+				if noIndexErr != nil {
+					logger.Git.Debug("git diff --no-index failed", "worktree", worktreePath, "file", file, "error", noIndexErr)
+				}
 				out = append(out, fd...)
 			}
 		}
