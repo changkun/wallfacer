@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
@@ -49,6 +50,7 @@ type WebhookNotifier struct {
 	webhookSecret string
 	client        *http.Client
 	backoffs      []time.Duration
+	wg            sync.WaitGroup
 }
 
 func NewWorkspaceWebhookNotifier(m *workspace.Manager, cfg envconfig.Config) *WebhookNotifier {
@@ -126,7 +128,7 @@ func (wn *WebhookNotifier) Start(ctx context.Context) {
 				subCh = nil
 				continue
 			}
-			wn.handleDelta(delta, lastStatus)
+			wn.handleDelta(ctx, delta, lastStatus)
 		}
 	}
 }
@@ -140,12 +142,12 @@ func (wn *WebhookNotifier) runLoop(ctx context.Context, ch <-chan store.Sequence
 			if !ok {
 				return
 			}
-			wn.handleDelta(delta, lastStatus)
+			wn.handleDelta(ctx, delta, lastStatus)
 		}
 	}
 }
 
-func (wn *WebhookNotifier) handleDelta(delta store.SequencedDelta, lastStatus map[uuid.UUID]store.TaskStatus) {
+func (wn *WebhookNotifier) handleDelta(ctx context.Context, delta store.SequencedDelta, lastStatus map[uuid.UUID]store.TaskStatus) {
 	if delta.Deleted || delta.Task == nil {
 		return
 	}
@@ -160,12 +162,17 @@ func (wn *WebhookNotifier) handleDelta(delta store.SequencedDelta, lastStatus ma
 		result = *task.Result
 	}
 	payload := NewTaskStateChangedPayload(task.ID.String(), task.Status, task.Title, task.Prompt, result, time.Now().UTC())
+	wn.wg.Add(1)
 	go func() {
-		if err := wn.Send(payload); err != nil {
+		defer wn.wg.Done()
+		if err := wn.Send(ctx, payload); err != nil {
 			slog.Error("webhook: delivery failed", "event", payload.EventType, "task_id", payload.TaskID, "error", err)
 		}
 	}()
 }
+
+// Wait blocks until all in-flight webhook deliveries have completed.
+func (wn *WebhookNotifier) Wait() { wn.wg.Wait() }
 
 func NewTaskStateChangedPayload(taskID string, status store.TaskStatus, title, prompt, result string, occurredAt time.Time) WebhookPayload {
 	title = truncateWebhookField(title, maxWebhookTitleLen)
@@ -192,7 +199,9 @@ func truncateWebhookField(s string, limit int) string {
 
 // Send POSTs payload to the configured webhook URL. It retries up to 3 times
 // on non-2xx responses, sleeping 2 s, 5 s, and 10 s between attempts.
-func (wn *WebhookNotifier) Send(payload WebhookPayload) error {
+// The context controls cancellation of inter-attempt sleeps; a cancelled
+// context causes Send to return early with a wrapped context error.
+func (wn *WebhookNotifier) Send(ctx context.Context, payload WebhookPayload) error {
 	if wn.webhookURL == "" {
 		return fmt.Errorf("webhook URL is not configured")
 	}
@@ -212,10 +221,14 @@ func (wn *WebhookNotifier) Send(payload WebhookPayload) error {
 	var lastErr error
 	for attempt, delay := range wn.backoffs {
 		if delay > 0 {
-			time.Sleep(delay)
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("webhook retry cancelled: %w", ctx.Err())
+			case <-time.After(delay):
+			}
 		}
 
-		req, err := http.NewRequest(http.MethodPost, wn.webhookURL, bytes.NewReader(data))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, wn.webhookURL, bytes.NewReader(data))
 		if err != nil {
 			return fmt.Errorf("create request: %w", err)
 		}
