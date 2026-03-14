@@ -23,6 +23,15 @@ type Snapshot struct {
 	Generation       uint64
 }
 
+// pendingSwap carries the before/after snapshots and a cleanup callback
+// for an in-flight Switch operation. cleanup closes next.Store on failure
+// paths; it is cleared to a no-op once the swap commits successfully.
+type pendingSwap struct {
+	previous Snapshot
+	next     Snapshot
+	cleanup  func() // closes next.Store; set to a no-op after successful commit
+}
+
 type Manager struct {
 	configDir string
 	dataDir   string
@@ -34,6 +43,10 @@ type Manager struct {
 	subsMu    sync.Mutex
 	subs      map[int]chan Snapshot
 	nextSubID int
+
+	// newStore is the factory used to open scoped stores. It defaults to
+	// store.NewStore and can be replaced in tests to intercept created stores.
+	newStore func(dir string) (*store.Store, error)
 }
 
 func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager, error) {
@@ -42,6 +55,7 @@ func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager,
 		dataDir:   dataDir,
 		envFile:   envFile,
 		subs:      make(map[int]chan Snapshot),
+		newStore:  store.NewStore,
 	}
 	initial = m.startupWorkspaces(initial)
 	if _, err := m.Switch(initial); err != nil {
@@ -130,29 +144,70 @@ func (m *Manager) Unsubscribe(id int) {
 	}
 }
 
+// Switch validates and normalizes paths, then transitions the manager to the
+// new workspace set. It short-circuits when the normalized set matches the
+// current workspaces. All external side effects (store creation, instructions,
+// workspace groups, env file) are applied before the atomic swap; every
+// failure path closes the candidate store so it does not accumulate. After a
+// successful swap the previous store is closed outside the lock.
 func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	validated, err := validate(paths)
 	if err != nil {
 		return Snapshot{}, err
 	}
 
-	next := Snapshot{
-		Key:           instructions.Key(validated),
-		ScopedDataDir: filepath.Join(m.dataDir, instructions.Key(validated)),
+	// Short-circuit: no-op when the normalized workspace set is unchanged.
+	// Only after the first successful Switch (generation > 0) so that the
+	// initial Switch call in NewManager always proceeds and creates the store.
+	m.mu.RLock()
+	sameSet := m.current.Generation > 0 && workspacesEqual(validated, m.current.Workspaces)
+	m.mu.RUnlock()
+	if sameSet {
+		return m.Snapshot(), nil
 	}
-	s, err := store.NewStore(next.ScopedDataDir)
+
+	// Determine the factory to use (supports injection in tests).
+	newStoreFn := m.newStore
+	if newStoreFn == nil {
+		newStoreFn = store.NewStore
+	}
+
+	// Build the candidate snapshot. All external side effects happen here,
+	// before the atomic swap, so the manager is never left in a partial state.
+	key := instructions.Key(validated)
+	swap := pendingSwap{
+		next: Snapshot{
+			Key:           key,
+			ScopedDataDir: filepath.Join(m.dataDir, key),
+		},
+	}
+
+	s, err := newStoreFn(swap.next.ScopedDataDir)
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("open scoped store: %w", err)
 	}
-	next.Store = s
+	swap.next.Store = s
+
+	// cleanup is idempotent; called on every failure path to release the
+	// candidate store. Cleared to a no-op after the swap commits.
+	closed := false
+	swap.cleanup = func() {
+		if !closed {
+			closed = true
+			s.Close()
+		}
+	}
+
 	if len(validated) > 0 {
 		instructionsPath, err := instructions.Ensure(m.configDir, validated)
 		if err != nil {
+			swap.cleanup()
 			return Snapshot{}, fmt.Errorf("ensure instructions: %w", err)
 		}
-		next.InstructionsPath = instructionsPath
+		swap.next.InstructionsPath = instructionsPath
 	}
 	if err := workspacegroups.Upsert(m.configDir, validated); err != nil {
+		swap.cleanup()
 		return Snapshot{}, fmt.Errorf("persist workspace group: %w", err)
 	}
 	if m.envFile != "" {
@@ -160,19 +215,31 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 		if err := envconfig.Update(m.envFile, envconfig.Updates{
 			Workspaces: &encoded,
 		}); err != nil {
+			swap.cleanup()
 			return Snapshot{}, fmt.Errorf("persist workspaces: %w", err)
 		}
 	}
 
+	// All external effects succeeded: atomically install the new snapshot.
 	m.mu.Lock()
 	m.nextGen++
-	next.Generation = m.nextGen
-	next.Workspaces = validated
-	m.current = next
+	swap.next.Generation = m.nextGen
+	swap.next.Workspaces = validated
+	swap.previous = m.current // capture actual current under write lock
+	m.current = swap.next
 	snapshot := cloneSnapshot(m.current)
 	m.mu.Unlock()
 
+	// Mark the swap as committed so the cleanup no-op is safe, then publish.
+	swap.cleanup = func() {} // no-op: next.Store is now owned by m.current
 	m.publish(snapshot)
+
+	// Close the previous store outside the lock so old scoped stores do not
+	// accumulate. Subscribers already received the new snapshot via publish.
+	if swap.previous.Store != nil {
+		swap.previous.Store.Close()
+	}
+
 	return snapshot, nil
 }
 
@@ -220,6 +287,12 @@ func validate(paths []string) ([]string, error) {
 	}
 	slices.Sort(validated)
 	return validated, nil
+}
+
+// workspacesEqual reports whether two validated (sorted, deduplicated) workspace
+// slices represent the same set.
+func workspacesEqual(a, b []string) bool {
+	return slices.Equal(a, b)
 }
 
 func cloneSnapshot(s Snapshot) Snapshot {
