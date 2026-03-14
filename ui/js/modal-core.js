@@ -509,6 +509,18 @@ async function openModal(id) {
       const behindEl = document.getElementById('modal-diff-behind');
       filesEl.innerHTML = '<span class="text-xs text-v-muted">Loading diff\u2026</span>';
       if (behindEl) behindEl.classList.add('hidden');
+      // Render commit message if available (set when task completes commit pipeline).
+      const commitMsgEl = document.getElementById('modal-commit-message');
+      if (commitMsgEl) {
+        if (task.commit_message) {
+          commitMsgEl.innerHTML =
+            '<div class="commit-message-label">Commit message</div>' +
+            '<pre class="commit-message-body">' + escapeHtml(task.commit_message) + '</pre>';
+          commitMsgEl.classList.remove('hidden');
+        } else {
+          commitMsgEl.classList.add('hidden');
+        }
+      }
       api(`/api/tasks/${task.id}/diff`, { signal: modalLoad.signal }).then(data => {
         if (!_isActiveModalLoad(seq, id)) return;
         const el = document.getElementById('modal-diff-files');
