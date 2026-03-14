@@ -12,6 +12,10 @@ import (
 // diffCacheTTL is the time-to-live for cached diff entries for non-terminal tasks.
 const diffCacheTTL = 10 * time.Second
 
+// maxImmutableEntries caps the number of retained terminal-task diff entries.
+// At ~16 KB max diff size this bounds worst-case memory at ~4 MB.
+const maxImmutableEntries = 256
+
 // diffCacheEntry holds a pre-serialized diff response with cache metadata.
 type diffCacheEntry struct {
 	payload   []byte    // pre-serialized JSON response
@@ -22,17 +26,19 @@ type diffCacheEntry struct {
 
 // diffCache is a task-state-keyed in-memory cache for diff responses.
 // Non-terminal tasks are cached for diffCacheTTL; terminal tasks are cached
-// indefinitely (immutable).
+// indefinitely (immutable) up to maxImmutableEntries, with oldest-first eviction.
 type diffCache struct {
-	mu      sync.Mutex
-	entries map[uuid.UUID]diffCacheEntry
-	now     func() time.Time // injectable clock for testing
+	mu            sync.Mutex
+	entries       map[uuid.UUID]diffCacheEntry
+	immutableKeys []uuid.UUID // insertion order, for oldest-first eviction
+	now           func() time.Time // injectable clock for testing
 }
 
 func newDiffCache() *diffCache {
 	return &diffCache{
-		entries: make(map[uuid.UUID]diffCacheEntry),
-		now:     time.Now,
+		entries:       make(map[uuid.UUID]diffCacheEntry),
+		immutableKeys: make([]uuid.UUID, 0, maxImmutableEntries+1),
+		now:           time.Now,
 	}
 }
 
@@ -52,10 +58,21 @@ func (c *diffCache) get(id uuid.UUID) (diffCacheEntry, bool) {
 	return entry, true
 }
 
-// set stores an entry in the cache.
+// set stores an entry in the cache. For immutable entries, it tracks insertion
+// order and evicts the oldest when maxImmutableEntries is exceeded.
 func (c *diffCache) set(id uuid.UUID, entry diffCacheEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if entry.immutable {
+		if _, exists := c.entries[id]; !exists {
+			c.immutableKeys = append(c.immutableKeys, id)
+			if len(c.immutableKeys) > maxImmutableEntries {
+				oldest := c.immutableKeys[0]
+				c.immutableKeys = c.immutableKeys[1:]
+				delete(c.entries, oldest)
+			}
+		}
+	}
 	c.entries[id] = entry
 }
 
@@ -63,6 +80,14 @@ func (c *diffCache) set(id uuid.UUID, entry diffCacheEntry) {
 func (c *diffCache) invalidate(id uuid.UUID) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if e, ok := c.entries[id]; ok && e.immutable {
+		for i, k := range c.immutableKeys {
+			if k == id {
+				c.immutableKeys = append(c.immutableKeys[:i], c.immutableKeys[i+1:]...)
+				break
+			}
+		}
+	}
 	delete(c.entries, id)
 }
 
