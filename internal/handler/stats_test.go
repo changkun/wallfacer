@@ -236,7 +236,8 @@ func TestAggregateStats(t *testing.T) {
 	}
 }
 
-// TestAggregateStats_ByWorkspace verifies workspace-level cost and token bucketing.
+// TestAggregateStats_ByWorkspace verifies workspace-level cost and token bucketing
+// using the equal-split fallback (no WorkspaceUsageBreakdown set).
 func TestAggregateStats_ByWorkspace(t *testing.T) {
 	now := time.Now().UTC()
 
@@ -245,7 +246,8 @@ func TestAggregateStats_ByWorkspace(t *testing.T) {
 
 	tasks := []store.Task{
 		{
-			// Task with two worktree paths — contributes to both repoA and repoB.
+			// Task with two worktree paths and no stored breakdown.
+			// Falls back to equal split: each repo gets half the usage.
 			ID:        uuid.New(),
 			Title:     "Task 1 — two repos",
 			Status:    store.TaskStatusDone,
@@ -266,7 +268,7 @@ func TestAggregateStats_ByWorkspace(t *testing.T) {
 			},
 		},
 		{
-			// Task with only repoA.
+			// Task with only repoA — 100% of usage goes to repoA.
 			ID:        uuid.New(),
 			Title:     "Task 2 — repo-a only",
 			Status:    store.TaskStatusFailed,
@@ -307,7 +309,8 @@ func TestAggregateStats_ByWorkspace(t *testing.T) {
 		t.Fatalf("ByWorkspace len = %d, want 2 (repoA and repoB)", len(resp.ByWorkspace))
 	}
 
-	// repoA: task1 + task2
+	// Task 1 has no breakdown → equal split: repoA and repoB each get half.
+	// Task 2 has only repoA → repoA gets 100%.
 	wsA, ok := resp.ByWorkspace[repoA]
 	if !ok {
 		t.Fatalf("ByWorkspace missing %q", repoA)
@@ -315,26 +318,29 @@ func TestAggregateStats_ByWorkspace(t *testing.T) {
 	if wsA.Count != 2 {
 		t.Errorf("ByWorkspace[repoA].Count = %d, want 2", wsA.Count)
 	}
-	wantACost := 0.10 + 0.04
+	// 0.05 (half of task1) + 0.04 (all of task2) = 0.09
+	wantACost := 0.10/2 + 0.04
 	if diff := wsA.CostUSD - wantACost; diff > 1e-9 || diff < -1e-9 {
 		t.Errorf("ByWorkspace[repoA].CostUSD = %v, want %v", wsA.CostUSD, wantACost)
 	}
-	if wsA.InputTokens != 1000+400 {
-		t.Errorf("ByWorkspace[repoA].InputTokens = %d, want %d", wsA.InputTokens, 1000+400)
+	// int(1000/2) + 400 = 500 + 400
+	if wsA.InputTokens != 500+400 {
+		t.Errorf("ByWorkspace[repoA].InputTokens = %d, want %d", wsA.InputTokens, 500+400)
 	}
-	if wsA.OutputTokens != 500+200 {
-		t.Errorf("ByWorkspace[repoA].OutputTokens = %d, want %d", wsA.OutputTokens, 500+200)
+	// int(500/2) + 200 = 250 + 200
+	if wsA.OutputTokens != 250+200 {
+		t.Errorf("ByWorkspace[repoA].OutputTokens = %d, want %d", wsA.OutputTokens, 250+200)
 	}
-	// CacheReadTokens: 100 (task1) + 20 (task2)
-	if wsA.CacheReadTokens != 100+20 {
-		t.Errorf("ByWorkspace[repoA].CacheReadTokens = %d, want %d", wsA.CacheReadTokens, 100+20)
+	// CacheReadTokens: int(100/2) + 20 = 50 + 20
+	if wsA.CacheReadTokens != 50+20 {
+		t.Errorf("ByWorkspace[repoA].CacheReadTokens = %d, want %d", wsA.CacheReadTokens, 50+20)
 	}
-	// CacheCreationTokens: 50 (task1) + 0 (task2)
-	if wsA.CacheCreationTokens != 50 {
-		t.Errorf("ByWorkspace[repoA].CacheCreationTokens = %d, want 50", wsA.CacheCreationTokens)
+	// CacheCreationTokens: int(50/2) + 0 = 25
+	if wsA.CacheCreationTokens != 25 {
+		t.Errorf("ByWorkspace[repoA].CacheCreationTokens = %d, want 25", wsA.CacheCreationTokens)
 	}
 
-	// repoB: task1 only
+	// repoB: task1 equal-split half only → 0.05
 	wsB, ok := resp.ByWorkspace[repoB]
 	if !ok {
 		t.Fatalf("ByWorkspace missing %q", repoB)
@@ -342,8 +348,16 @@ func TestAggregateStats_ByWorkspace(t *testing.T) {
 	if wsB.Count != 1 {
 		t.Errorf("ByWorkspace[repoB].Count = %d, want 1", wsB.Count)
 	}
-	if diff := wsB.CostUSD - 0.10; diff > 1e-9 || diff < -1e-9 {
-		t.Errorf("ByWorkspace[repoB].CostUSD = %v, want 0.10", wsB.CostUSD)
+	if diff := wsB.CostUSD - 0.05; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByWorkspace[repoB].CostUSD = %v, want 0.05", wsB.CostUSD)
+	}
+
+	// Total across all workspace buckets must equal tasks that have WorktreePaths
+	// (task1 + task2 = 0.14), not doubled.
+	totalWS := wsA.CostUSD + wsB.CostUSD
+	wantWStotal := 0.10 + 0.04 // task3 excluded (no WorktreePaths)
+	if diff := totalWS - wantWStotal; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByWorkspace total cost = %v, want %v (no doubling)", totalWS, wantWStotal)
 	}
 
 	// --- Task 3 (no WorktreePaths) is excluded from ByWorkspace ---
@@ -354,6 +368,255 @@ func TestAggregateStats_ByWorkspace(t *testing.T) {
 	}
 	if diff := cancelled.CostUSD - 0.01; diff > 1e-9 || diff < -1e-9 {
 		t.Errorf("ByStatus[cancelled].CostUSD = %v, want 0.01", cancelled.CostUSD)
+	}
+}
+
+// TestAggregateStats_ByWorkspace_NoDoubling is the focused regression test that
+// proves tasks touching multiple repos no longer double total_cost_usd,
+// input_tokens, or cache tokens in ByWorkspace.
+func TestAggregateStats_ByWorkspace_NoDoubling(t *testing.T) {
+	now := time.Now().UTC()
+
+	repoA := "/repo/alpha"
+	repoB := "/repo/beta"
+
+	// Task 1 touches both repos with an explicit 75/25 breakdown.
+	task1 := store.Task{
+		ID:        uuid.New(),
+		Title:     "Task 1 — two repos with breakdown",
+		Status:    store.TaskStatusDone,
+		CreatedAt: now,
+		Usage: store.TaskUsage{
+			InputTokens:          2000,
+			OutputTokens:         800,
+			CacheReadInputTokens: 400,
+			CacheCreationTokens:  200,
+			CostUSD:              0.20,
+		},
+		WorktreePaths: map[string]string{
+			repoA: "/worktrees/a",
+			repoB: "/worktrees/b",
+		},
+		// Breakdown: repoA 75%, repoB 25%.
+		WorkspaceUsageBreakdown: map[string]store.TaskUsage{
+			repoA: {InputTokens: 1500, OutputTokens: 600, CacheReadInputTokens: 300, CacheCreationTokens: 150, CostUSD: 0.15},
+			repoB: {InputTokens: 500, OutputTokens: 200, CacheReadInputTokens: 100, CacheCreationTokens: 50, CostUSD: 0.05},
+		},
+	}
+
+	// Task 2 touches only repoA.
+	task2 := store.Task{
+		ID:        uuid.New(),
+		Title:     "Task 2 — single repo",
+		Status:    store.TaskStatusDone,
+		CreatedAt: now,
+		Usage: store.TaskUsage{
+			InputTokens:          500,
+			OutputTokens:         200,
+			CacheReadInputTokens: 50,
+			CostUSD:              0.05,
+		},
+		WorktreePaths: map[string]string{
+			repoA: "/worktrees/a2",
+		},
+		WorkspaceUsageBreakdown: map[string]store.TaskUsage{
+			repoA: {InputTokens: 500, OutputTokens: 200, CacheReadInputTokens: 50, CostUSD: 0.05},
+		},
+	}
+
+	tasks := []store.Task{task1, task2}
+	resp := aggregateStats(tasks, noSummary)
+
+	// Global total: task1 + task2, not doubled.
+	wantGlobalCost := 0.20 + 0.05
+	if diff := resp.TotalCostUSD - wantGlobalCost; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("TotalCostUSD = %v, want %v", resp.TotalCostUSD, wantGlobalCost)
+	}
+
+	// ByWorkspace totals across all repos must equal the global total (no duplication).
+	var wsTotalCost float64
+	var wsTotalInput int
+	var wsTotalCacheRead int
+	for _, ws := range resp.ByWorkspace {
+		wsTotalCost += ws.CostUSD
+		wsTotalInput += ws.InputTokens
+		wsTotalCacheRead += ws.CacheReadTokens
+	}
+	if diff := wsTotalCost - wantGlobalCost; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByWorkspace total cost = %v, want %v (no doubling)", wsTotalCost, wantGlobalCost)
+	}
+	wantGlobalInput := 2000 + 500
+	if wsTotalInput != wantGlobalInput {
+		t.Errorf("ByWorkspace total input_tokens = %d, want %d (no doubling)", wsTotalInput, wantGlobalInput)
+	}
+	wantGlobalCacheRead := 400 + 50
+	if wsTotalCacheRead != wantGlobalCacheRead {
+		t.Errorf("ByWorkspace total cache_read_tokens = %d, want %d (no doubling)", wsTotalCacheRead, wantGlobalCacheRead)
+	}
+
+	// repoA: task1 75% ($0.15) + task2 100% ($0.05) = $0.20
+	wsA, ok := resp.ByWorkspace[repoA]
+	if !ok {
+		t.Fatalf("ByWorkspace missing %q", repoA)
+	}
+	wantACost := 0.15 + 0.05
+	if diff := wsA.CostUSD - wantACost; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByWorkspace[repoA].CostUSD = %v, want %v", wsA.CostUSD, wantACost)
+	}
+	if wsA.InputTokens != 1500+500 {
+		t.Errorf("ByWorkspace[repoA].InputTokens = %d, want %d", wsA.InputTokens, 1500+500)
+	}
+	if wsA.CacheReadTokens != 300+50 {
+		t.Errorf("ByWorkspace[repoA].CacheReadTokens = %d, want %d", wsA.CacheReadTokens, 300+50)
+	}
+	if wsA.Count != 2 {
+		t.Errorf("ByWorkspace[repoA].Count = %d, want 2", wsA.Count)
+	}
+
+	// repoB: task1 25% only ($0.05)
+	wsB, ok := resp.ByWorkspace[repoB]
+	if !ok {
+		t.Fatalf("ByWorkspace missing %q", repoB)
+	}
+	if diff := wsB.CostUSD - 0.05; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByWorkspace[repoB].CostUSD = %v, want 0.05", wsB.CostUSD)
+	}
+	if wsB.InputTokens != 500 {
+		t.Errorf("ByWorkspace[repoB].InputTokens = %d, want 500", wsB.InputTokens)
+	}
+	if wsB.Count != 1 {
+		t.Errorf("ByWorkspace[repoB].Count = %d, want 1", wsB.Count)
+	}
+}
+
+// TestAggregateStats_ByWorkspace_EqualSplitFallback verifies that tasks without
+// a stored WorkspaceUsageBreakdown fall back to equal splitting, keeping totals
+// internally consistent (no N-fold amplification).
+func TestAggregateStats_ByWorkspace_EqualSplitFallback(t *testing.T) {
+	now := time.Now().UTC()
+
+	repoA := "/repo/a"
+	repoB := "/repo/b"
+	repoC := "/repo/c"
+
+	tasks := []store.Task{
+		{
+			// Task touching 3 repos, no breakdown → equal split (1/3 each).
+			ID:        uuid.New(),
+			Status:    store.TaskStatusInProgress,
+			CreatedAt: now,
+			Usage: store.TaskUsage{
+				InputTokens:          900,
+				OutputTokens:         300,
+				CacheReadInputTokens: 150,
+				CostUSD:              0.09,
+			},
+			WorktreePaths: map[string]string{
+				repoA: "/wt/a",
+				repoB: "/wt/b",
+				repoC: "/wt/c",
+			},
+			// WorkspaceUsageBreakdown intentionally nil.
+		},
+	}
+
+	resp := aggregateStats(tasks, noSummary)
+
+	// Total across all workspace buckets must equal the single task cost (not 3×).
+	var totalCost float64
+	var totalInput int
+	var totalCacheRead int
+	for _, ws := range resp.ByWorkspace {
+		totalCost += ws.CostUSD
+		totalInput += ws.InputTokens
+		totalCacheRead += ws.CacheReadTokens
+	}
+	// Allow small rounding tolerance from integer division.
+	if diff := totalCost - 0.09; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByWorkspace total cost = %v, want 0.09 (no tripling)", totalCost)
+	}
+	// int(900/3) * 3 = 300 * 3 = 900
+	if totalInput != 900 {
+		t.Errorf("ByWorkspace total input_tokens = %d, want 900 (no tripling)", totalInput)
+	}
+
+	// Each repo should have the same share.
+	wantPerRepo := 300 // int(900/3)
+	for _, repo := range []string{repoA, repoB, repoC} {
+		ws, ok := resp.ByWorkspace[repo]
+		if !ok {
+			t.Fatalf("ByWorkspace missing %q", repo)
+		}
+		if ws.InputTokens != wantPerRepo {
+			t.Errorf("ByWorkspace[%s].InputTokens = %d, want %d", repo, ws.InputTokens, wantPerRepo)
+		}
+	}
+}
+
+// TestAggregateStats_ByWorkspace_SummaryBreakdown verifies that for done tasks,
+// the workspace breakdown from the cached summary is preferred over the live
+// task breakdown, and that totals remain consistent.
+func TestAggregateStats_ByWorkspace_SummaryBreakdown(t *testing.T) {
+	now := time.Now().UTC()
+
+	repoA := "/repo/a"
+	repoB := "/repo/b"
+	doneID := uuid.New()
+
+	tasks := []store.Task{
+		{
+			ID:        doneID,
+			Status:    store.TaskStatusDone,
+			CreatedAt: now,
+			Usage: store.TaskUsage{
+				InputTokens: 1000,
+				CostUSD:     0.10,
+			},
+			WorktreePaths: map[string]string{
+				repoA: "/wt/a",
+				repoB: "/wt/b",
+			},
+			// Live task has 50/50 breakdown, but summary should win (80/20).
+			WorkspaceUsageBreakdown: map[string]store.TaskUsage{
+				repoA: {InputTokens: 500, CostUSD: 0.05},
+				repoB: {InputTokens: 500, CostUSD: 0.05},
+			},
+		},
+	}
+
+	// Summary has an 80/20 breakdown.
+	summaryBreakdown := map[string]store.TaskUsage{
+		repoA: {InputTokens: 800, CostUSD: 0.08},
+		repoB: {InputTokens: 200, CostUSD: 0.02},
+	}
+	loadSummary := func(id uuid.UUID) (*store.TaskSummary, error) {
+		if id == doneID {
+			return &store.TaskSummary{
+				TaskID:                  doneID,
+				Status:                  store.TaskStatusDone,
+				TotalCostUSD:            0.10,
+				WorkspaceUsageBreakdown: summaryBreakdown,
+			}, nil
+		}
+		return nil, nil
+	}
+
+	resp := aggregateStats(tasks, loadSummary)
+
+	// Summary breakdown should win over the live task breakdown.
+	wsA := resp.ByWorkspace[repoA]
+	if wsA.InputTokens != 800 {
+		t.Errorf("ByWorkspace[repoA].InputTokens = %d, want 800 (from summary)", wsA.InputTokens)
+	}
+	wsB := resp.ByWorkspace[repoB]
+	if wsB.InputTokens != 200 {
+		t.Errorf("ByWorkspace[repoB].InputTokens = %d, want 200 (from summary)", wsB.InputTokens)
+	}
+
+	// Total must not double.
+	total := wsA.CostUSD + wsB.CostUSD
+	if diff := total - 0.10; diff > 1e-9 || diff < -1e-9 {
+		t.Errorf("ByWorkspace total cost = %v, want 0.10 (no doubling)", total)
 	}
 }
 
