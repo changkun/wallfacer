@@ -74,6 +74,14 @@ func (s *Store) SetTaskFailureCategory(_ context.Context, id uuid.UUID, cat Fail
 	})
 }
 
+// UpdateTaskCommitMessage persists the generated git commit message from the commit pipeline.
+func (s *Store) UpdateTaskCommitMessage(_ context.Context, id uuid.UUID, msg string) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.CommitMessage = msg
+		return nil
+	})
+}
+
 // UpdateTaskBaseCommitHashes stores the default-branch HEAD captured before merge.
 func (s *Store) UpdateTaskBaseCommitHashes(_ context.Context, id uuid.UUID, hashes map[string]string) error {
 	return s.mutateTask(id, func(t *Task) error {

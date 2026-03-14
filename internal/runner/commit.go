@@ -247,6 +247,11 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 		})
 	}
 
+	// Persist the commit message so it can be displayed in the UI.
+	if saveErr := r.store.UpdateTaskCommitMessage(context.Background(), taskID, msg); saveErr != nil {
+		logger.Runner.Warn("save commit message", "task", taskID, "error", saveErr)
+	}
+
 	// Second pass: commit each worktree with the generated message.
 	// Use global git identity to prevent sandbox-set local configs from
 	// overriding the host user's author information.

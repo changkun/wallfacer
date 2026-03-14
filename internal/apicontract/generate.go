@@ -93,6 +93,7 @@ var jsTypeRegistry = []jsTypeDef{
 			{JSONName: "branch_name", JSType: "string"},
 			{JSONName: "commit_hashes", JSType: "Object.<string, string>"},
 			{JSONName: "base_commit_hashes", JSType: "Object.<string, string>"},
+			{JSONName: "commit_message", JSType: "string"},
 			{JSONName: "mount_worktrees", JSType: "boolean"},
 			{JSONName: "model", JSType: "string"},
 			{JSONName: "model_override", JSType: "string", Nullable: true},

@@ -67,6 +67,7 @@
  * @property {string} branch_name
  * @property {Object.<string, string>} commit_hashes
  * @property {Object.<string, string>} base_commit_hashes
+ * @property {string} commit_message
  * @property {boolean} mount_worktrees
  * @property {string} model
  * @property {string|null} model_override
