@@ -392,3 +392,97 @@ func TestResetTaskForRetry_ResetsAutoRetryCountAndBudget_Persisted(t *testing.T)
 		}
 	}
 }
+
+// TestResetTaskForRetry_ClearsCurrentRefinement verifies that ResetTaskForRetry
+// always clears CurrentRefinement regardless of the freshStart flag.
+func TestResetTaskForRetry_ClearsCurrentRefinement(t *testing.T) {
+	for _, freshStart := range []bool{true, false} {
+		freshStart := freshStart
+		t.Run(fmt.Sprintf("freshStart=%v", freshStart), func(t *testing.T) {
+			s := newTestStore(t)
+			task, err := s.CreateTask(bg(), "original prompt", 15, false, "", TaskKindTask)
+			if err != nil {
+				t.Fatalf("CreateTask: %v", err)
+			}
+
+			// Simulate a running refinement job.
+			job := &RefinementJob{
+				ID:     "job-1",
+				Status: RefinementJobStatusRunning,
+			}
+			if err := s.StartRefinementJobIfIdle(bg(), task.ID, job); err != nil {
+				t.Fatalf("StartRefinementJobIfIdle: %v", err)
+			}
+
+			// Verify CurrentRefinement is set before reset.
+			before, _ := s.GetTask(bg(), task.ID)
+			if before.CurrentRefinement == nil {
+				t.Fatal("expected CurrentRefinement to be set before reset")
+			}
+
+			if err := s.ResetTaskForRetry(bg(), task.ID, "new prompt", freshStart); err != nil {
+				t.Fatalf("ResetTaskForRetry: %v", err)
+			}
+
+			got, _ := s.GetTask(bg(), task.ID)
+			if got.CurrentRefinement != nil {
+				t.Errorf("expected CurrentRefinement == nil after reset, got %+v", got.CurrentRefinement)
+			}
+		})
+	}
+}
+
+// TestResetTaskForRetry_ClearsRefinementSessionsOnFreshStart verifies that
+// RefineSessions is cleared when freshStart=true but preserved when freshStart=false.
+func TestResetTaskForRetry_ClearsRefinementSessionsOnFreshStart(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTask(bg(), "original prompt", 15, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Apply a refinement to populate RefineSessions.
+	session := RefinementSession{
+		ID:          "session-1",
+		StartPrompt: "original prompt",
+		Result:      "refined spec",
+	}
+	if err := s.ApplyRefinement(bg(), task.ID, "refined prompt", session); err != nil {
+		t.Fatalf("ApplyRefinement: %v", err)
+	}
+
+	before, _ := s.GetTask(bg(), task.ID)
+	if len(before.RefineSessions) == 0 {
+		t.Fatal("expected RefineSessions to be non-empty after ApplyRefinement")
+	}
+
+	t.Run("freshStart=false preserves sessions", func(t *testing.T) {
+		s2 := newTestStore(t)
+		task2, _ := s2.CreateTask(bg(), "original prompt", 15, false, "", TaskKindTask)
+		s2.ApplyRefinement(bg(), task2.ID, "refined prompt", session) //nolint:errcheck
+
+		if err := s2.ResetTaskForRetry(bg(), task2.ID, "same prompt", false); err != nil {
+			t.Fatalf("ResetTaskForRetry(freshStart=false): %v", err)
+		}
+		got, _ := s2.GetTask(bg(), task2.ID)
+		if len(got.RefineSessions) == 0 {
+			t.Error("expected RefineSessions to be preserved when freshStart=false")
+		}
+		if got.CurrentRefinement != nil {
+			t.Error("expected CurrentRefinement to be nil regardless of freshStart")
+		}
+	})
+
+	t.Run("freshStart=true clears sessions", func(t *testing.T) {
+		if err := s.ResetTaskForRetry(bg(), task.ID, "new prompt", true); err != nil {
+			t.Fatalf("ResetTaskForRetry(freshStart=true): %v", err)
+		}
+		got, _ := s.GetTask(bg(), task.ID)
+		if len(got.RefineSessions) != 0 {
+			t.Errorf("expected RefineSessions to be cleared when freshStart=true, got %d sessions", len(got.RefineSessions))
+		}
+		if got.CurrentRefinement != nil {
+			t.Error("expected CurrentRefinement to be nil")
+		}
+	})
+}
