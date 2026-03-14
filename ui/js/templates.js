@@ -211,9 +211,7 @@ function openTemplatesManagerFromSettings(event) {
   }
 
   openTemplatesManager().catch(function(err) {
-    if (window.alert) {
-      alert('Failed to open Templates: ' + (err && err.message ? err.message : 'Unknown error'));
-    }
+    showAlert('Failed to open Templates: ' + (err && err.message ? err.message : 'Unknown error'));
     console.error('Failed to open templates manager:', err);
   });
 }
@@ -311,6 +309,6 @@ async function _deleteTemplate(id) {
     await api('/api/templates/' + id, { method: 'DELETE' });
     await _refreshTemplatesList();
   } catch (e) {
-    alert('Error deleting template: ' + e.message);
+    showAlert('Error deleting template: ' + e.message);
   }
 }

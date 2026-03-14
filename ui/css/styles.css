@@ -759,19 +759,24 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .modal-card.modal-wide {
   max-width: min(96vw, 1600px);
   overflow-y: hidden;
+  display: flex; flex-direction: column;
+}
+.modal-card.modal-wide > .p-6 {
+  display: flex; flex-direction: column;
+  overflow: hidden; flex: 1; min-height: 0;
 }
 .modal-wide #modal-body {
-  display: flex; gap: 0;
+  display: flex; gap: 0; flex: 1; min-height: 0;
 }
 .modal-wide #modal-left {
-  flex: 2; min-width: 0; overflow-y: auto; max-height: calc(95vh - 80px);
+  flex: 2; min-width: 0; overflow-y: auto;
   border-right: 1px solid var(--border); padding-right: 28px; margin-right: 28px;
 }
 .modal-wide #modal-right {
-  flex: 3; min-width: 0; overflow-y: auto; max-height: calc(95vh - 80px);
+  flex: 3; min-width: 0; overflow-y: auto;
 }
 .modal-wide #modal-backlog-right {
-  flex: 3; min-width: 0; overflow-y: auto; max-height: calc(95vh - 80px);
+  flex: 3; min-width: 0; overflow-y: auto;
   display: flex; flex-direction: column;
 }
 .modal-wide #modal-backlog-right.hidden { display: none; }
