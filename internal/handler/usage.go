@@ -12,7 +12,7 @@ import (
 type usageResponse struct {
 	Total      store.TaskUsage                      `json:"total"`
 	ByStatus   map[store.TaskStatus]store.TaskUsage `json:"by_status"`
-	BySubAgent map[string]store.TaskUsage           `json:"by_sub_agent"`
+	BySubAgent map[store.SandboxActivity]store.TaskUsage `json:"by_sub_agent"`
 	TaskCount  int                                  `json:"task_count"`
 	PeriodDays int                                  `json:"period_days"`
 }
@@ -49,7 +49,7 @@ func (h *Handler) GetUsageStats(w http.ResponseWriter, r *http.Request) {
 
 	resp := usageResponse{
 		ByStatus:   make(map[store.TaskStatus]store.TaskUsage),
-		BySubAgent: make(map[string]store.TaskUsage),
+		BySubAgent: make(map[store.SandboxActivity]store.TaskUsage),
 		PeriodDays: days,
 	}
 

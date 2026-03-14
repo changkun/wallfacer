@@ -91,7 +91,7 @@ func TestTestWebhook_Success(t *testing.T) {
 
 	select {
 	case got := <-reqCh:
-		if got.header.Get("X-Wallfacer-Event") != runner.WebhookEventTaskStateChanged {
+		if got.header.Get("X-Wallfacer-Event") != string(runner.WebhookEventTaskStateChanged) {
 			t.Fatalf("event header = %q", got.header.Get("X-Wallfacer-Event"))
 		}
 		var payload runner.WebhookPayload

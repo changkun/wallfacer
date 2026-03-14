@@ -48,7 +48,7 @@ type TurnUsageRecord struct {
 	CostUSD              float64      `json:"cost_usd"`
 	StopReason           string       `json:"stop_reason,omitempty"`
 	Sandbox              sandbox.Type `json:"sandbox,omitempty"`
-	SubAgent             string       `json:"sub_agent,omitempty"` // "implementation", "test", "refinement", etc.
+	SubAgent             SandboxActivity `json:"sub_agent,omitempty"`
 }
 
 // RefinementMessage is a single turn in a refinement chat session.
@@ -112,24 +112,36 @@ type RefinementJob struct {
 // The zero value ("") and "task" both mean a standard implementation task.
 // "idea-agent" is a special task that runs the brainstorm agent: it analyses
 // the workspaces, proposes ideas, and creates backlog tasks from the results.
-type TaskKind = string
+type TaskKind string
 
 const (
 	TaskKindTask      TaskKind = ""           // default; regular implementation task
 	TaskKindIdeaAgent TaskKind = "idea-agent" // brainstorm / ideation task
 )
 
+// SandboxActivity identifies which phase of a task a container run belongs to.
+// The routing constants (Implementation through IdeaAgent) are used for
+// sandbox-per-activity configuration. Test and OversightTest are
+// usage-attribution-only values that appear in UsageBreakdown and turn logs.
+type SandboxActivity string
+
 const (
-	SandboxActivityImplementation = "implementation"
-	SandboxActivityTesting        = "testing"
-	SandboxActivityRefinement     = "refinement"
-	SandboxActivityTitle          = "title"
-	SandboxActivityOversight      = "oversight"
-	SandboxActivityCommitMessage  = "commit_message"
-	SandboxActivityIdeaAgent      = "idea_agent"
+	// Sandbox-routing activities (also used for usage attribution).
+	SandboxActivityImplementation SandboxActivity = "implementation"
+	SandboxActivityTesting        SandboxActivity = "testing"
+	SandboxActivityRefinement     SandboxActivity = "refinement"
+	SandboxActivityTitle          SandboxActivity = "title"
+	SandboxActivityOversight      SandboxActivity = "oversight"
+	SandboxActivityCommitMessage  SandboxActivity = "commit_message"
+	SandboxActivityIdeaAgent      SandboxActivity = "idea_agent"
+
+	// Usage-attribution-only activities (not used for sandbox routing).
+	SandboxActivityTest         SandboxActivity = "test"
+	SandboxActivityOversightTest SandboxActivity = "oversight-test"
 )
 
-var SandboxActivities = []string{
+// SandboxActivities lists activities that support per-activity sandbox routing.
+var SandboxActivities = []SandboxActivity{
 	SandboxActivityImplementation,
 	SandboxActivityTesting,
 	SandboxActivityRefinement,
@@ -276,10 +288,9 @@ type Task struct {
 	MaxInputTokens    int                     `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
 	Usage             TaskUsage               `json:"usage"`
 	Sandbox           sandbox.Type            `json:"sandbox,omitempty"`
-	SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity,omitempty"`
-	// UsageBreakdown tracks token/cost per sub-agent activity (e.g. "implementation",
-	// "test", "title", "oversight", "oversight-test", "refinement").
-	UsageBreakdown map[string]TaskUsage `json:"usage_breakdown,omitempty"`
+	SandboxByActivity map[SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
+	// UsageBreakdown tracks token/cost per sub-agent activity.
+	UsageBreakdown map[SandboxActivity]TaskUsage `json:"usage_breakdown,omitempty"`
 	// Environment records the runtime environment captured at the start of execution.
 	Environment *ExecutionEnvironment `json:"environment,omitempty"`
 	Position    int                   `json:"position"`
@@ -464,7 +475,7 @@ type TaskSummary struct {
 	ExecutionDurationSeconds float64              `json:"execution_duration_seconds"`
 	TotalTurns      int                  `json:"total_turns"`
 	TotalCostUSD    float64              `json:"total_cost_usd"`
-	ByActivity      map[string]TaskUsage `json:"by_activity"`
+	ByActivity      map[SandboxActivity]TaskUsage `json:"by_activity"`
 	TestResult      string               `json:"test_result"`
 	PhaseCount      int                  `json:"phase_count"`
 	FailureCategory FailureCategory      `json:"failure_category,omitempty"`

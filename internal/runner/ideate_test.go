@@ -708,7 +708,7 @@ func TestExtractIdeasReturnsRejectionReasonsAndScores(t *testing.T) {
 		t.Fatalf("expected 3 rejections, got %d", len(rejections))
 	}
 
-	seen := map[string]int{}
+	seen := map[ideaRejectReason]int{}
 	lowImpactScore := -1
 	for _, rej := range rejections {
 		seen[rej.Reason]++

@@ -23,7 +23,7 @@ type TaskCreateOptions struct {
 	Kind              TaskKind
 	Tags              []string
 	Sandbox           sandbox.Type
-	SandboxByActivity map[string]sandbox.Type
+	SandboxByActivity map[SandboxActivity]sandbox.Type
 	MaxCostUSD        float64
 	MaxInputTokens    int
 	ScheduledAt        *time.Time
@@ -195,9 +195,9 @@ func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt s
 		return nil, fmt.Errorf("source task %s not found", sourceID)
 	}
 	sandboxSnapshot := source.Sandbox
-	var sbaSnapshot map[string]sandbox.Type
+	var sbaSnapshot map[SandboxActivity]sandbox.Type
 	if len(source.SandboxByActivity) > 0 {
-		sbaSnapshot = make(map[string]sandbox.Type, len(source.SandboxByActivity))
+		sbaSnapshot = make(map[SandboxActivity]sandbox.Type, len(source.SandboxByActivity))
 		for k, v := range source.SandboxByActivity {
 			sbaSnapshot[k] = v
 		}
@@ -266,17 +266,17 @@ func (s *Store) CreateForkedTask(_ context.Context, sourceID uuid.UUID, prompt s
 	return &ret, nil
 }
 
-func normalizeSandboxByActivity(input map[string]sandbox.Type) map[string]sandbox.Type {
+func normalizeSandboxByActivity(input map[SandboxActivity]sandbox.Type) map[SandboxActivity]sandbox.Type {
 	if len(input) == 0 {
 		return nil
 	}
-	allowed := make(map[string]struct{}, len(SandboxActivities))
+	allowed := make(map[SandboxActivity]struct{}, len(SandboxActivities))
 	for _, key := range SandboxActivities {
 		allowed[key] = struct{}{}
 	}
-	out := make(map[string]sandbox.Type)
+	out := make(map[SandboxActivity]sandbox.Type)
 	for k, v := range input {
-		key := strings.ToLower(strings.TrimSpace(k))
+		key := SandboxActivity(strings.ToLower(strings.TrimSpace(string(k))))
 		if _, ok := allowed[key]; !ok {
 			continue
 		}

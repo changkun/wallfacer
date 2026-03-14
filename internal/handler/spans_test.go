@@ -215,8 +215,8 @@ func TestComputeSpans_AllSandboxActivities(t *testing.T) {
 	for i, act := range activities {
 		offset := time.Duration(i*10) * time.Millisecond
 		events = append(events,
-			makeSpanEvent(store.EventTypeSpanStart, "container_run", act, t0.Add(offset)),
-			makeSpanEvent(store.EventTypeSpanEnd, "container_run", act, t0.Add(offset+5*time.Millisecond)),
+			makeSpanEvent(store.EventTypeSpanStart, "container_run", string(act), t0.Add(offset)),
+			makeSpanEvent(store.EventTypeSpanEnd, "container_run", string(act), t0.Add(offset+5*time.Millisecond)),
 		)
 	}
 	spans, _ := store.ComputeSpans(events)
@@ -232,7 +232,7 @@ func TestComputeSpans_AllSandboxActivities(t *testing.T) {
 		found[s.Label] = true
 	}
 	for _, act := range activities {
-		if !found[act] {
+		if !found[string(act)] {
 			t.Errorf("no span found for activity %q", act)
 		}
 	}

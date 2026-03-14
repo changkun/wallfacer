@@ -70,7 +70,7 @@ func (r *Runner) generateOversightLocked(taskID uuid.UUID) {
 		return
 	}
 
-	phases, err := r.runOversightAgent(taskID, "oversight", log)
+	phases, err := r.runOversightAgent(taskID, store.SandboxActivityOversight, log)
 	if err != nil {
 		logger.Runner.Warn("oversight: agent failed", "task", taskID, "error", err)
 		_ = r.store.SaveOversight(taskID, store.TaskOversight{
@@ -133,7 +133,7 @@ func (r *Runner) generateTestOversightLocked(taskID uuid.UUID, fromTurn int) {
 		return
 	}
 
-	phases, err := r.runOversightAgent(taskID, "oversight-test", log)
+	phases, err := r.runOversightAgent(taskID, store.SandboxActivityOversightTest, log)
 	if err != nil {
 		logger.Runner.Warn("test oversight: agent failed", "task", taskID, "error", err)
 		_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
@@ -667,9 +667,9 @@ type oversightResult struct {
 }
 
 // runOversightAgent runs a lightweight agent container with the activity log and
-// parses the structured JSON it produces. agent is the sub-agent name used for
-// usage attribution (e.g. "oversight" or "oversight-test").
-func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []turnActivity) ([]store.OversightPhase, error) {
+// parses the structured JSON it produces. agent is the sub-agent activity used for
+// usage attribution (SandboxActivityOversight or SandboxActivityOversightTest).
+func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity, activities []turnActivity) ([]store.OversightPhase, error) {
 	log := formatActivityLog(activities)
 
 	// Cap total log size to avoid exceeding prompt limits.
@@ -716,9 +716,9 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent string, activities []
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: agent})
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
 		runErr := cmd.Run()
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: agent})
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
 		if runCtx.Err() != nil {
 			return oversightRunResult{
 				err:   fmt.Errorf("container terminated: %w", runCtx.Err()),

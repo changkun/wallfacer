@@ -266,7 +266,7 @@ func (r *Runner) runRefinementContainer(
 
 	// Accumulate usage attributed to refinement sub-agent.
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 {
-		r.store.AccumulateSubAgentUsage(context.Background(), taskID, "refinement", store.TaskUsage{
+		r.store.AccumulateSubAgentUsage(context.Background(), taskID, store.SandboxActivityRefinement, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
@@ -282,7 +282,7 @@ func (r *Runner) runRefinementContainer(
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 			Sandbox:              output.ActualSandbox,
-			SubAgent:             "refinement",
+			SubAgent:             store.SandboxActivityRefinement,
 		}); appErr != nil {
 			logger.Runner.Warn("refinement: append turn usage failed", "task", taskID, "error", appErr)
 		}

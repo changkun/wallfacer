@@ -349,9 +349,9 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityCommitMessage})
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 		runErr := cmd.Run()
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityCommitMessage})
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 		if runErr != nil && ctx.Err() == nil {
 			return nil, fmt.Errorf("%w: stderr=%s", runErr, truncate(stderr.String(), 200))
 		}

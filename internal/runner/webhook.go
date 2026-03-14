@@ -18,17 +18,20 @@ import (
 	"github.com/google/uuid"
 )
 
+// WebhookEventType identifies the kind of webhook notification.
+type WebhookEventType string
+
 const (
-	WebhookEventTaskStateChanged = "task.state_changed"
-	maxWebhookPromptLen          = 200
-	maxWebhookResultLen          = 500
-	maxWebhookTitleLen           = 80
+	WebhookEventTaskStateChanged WebhookEventType = "task.state_changed"
+	maxWebhookPromptLen                           = 200
+	maxWebhookResultLen                           = 500
+	maxWebhookTitleLen                            = 80
 )
 
 // WebhookPayload is the JSON body posted to the configured webhook URL on every
 // task state-change event.
 type WebhookPayload struct {
-	EventType  string           `json:"event_type"`
+	EventType  WebhookEventType `json:"event_type"`
 	TaskID     string           `json:"task_id"`
 	Status     store.TaskStatus `json:"status"`
 	Title      string           `json:"title"`
@@ -217,7 +220,7 @@ func (wn *WebhookNotifier) Send(payload WebhookPayload) error {
 			return fmt.Errorf("create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Wallfacer-Event", payload.EventType)
+		req.Header.Set("X-Wallfacer-Event", string(payload.EventType))
 		if sig != "" {
 			req.Header.Set("X-Wallfacer-Signature", sig)
 		}

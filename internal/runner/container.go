@@ -328,11 +328,11 @@ func (r *Runner) sandboxForTask(task *store.Task) sandbox.Type {
 	return r.sandboxForTaskActivity(task, activityImplementation)
 }
 
-func (r *Runner) sandboxForTaskActivity(task *store.Task, activity string) sandbox.Type {
+func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) sandbox.Type {
 	if task == nil {
 		return sandbox.Claude
 	}
-	activity = strings.ToLower(strings.TrimSpace(activity))
+	activity = store.SandboxActivity(strings.ToLower(strings.TrimSpace(string(activity))))
 	if task.SandboxByActivity != nil {
 		if sb, ok := task.SandboxByActivity[activity]; ok && sb.IsValid() {
 			return sb
@@ -347,7 +347,7 @@ func (r *Runner) sandboxForTaskActivity(task *store.Task, activity string) sandb
 	return sandbox.Claude
 }
 
-func (r *Runner) sandboxFromEnvForActivity(activity string) sandbox.Type {
+func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) sandbox.Type {
 	if r.envFile == "" {
 		return ""
 	}
@@ -355,7 +355,7 @@ func (r *Runner) sandboxFromEnvForActivity(activity string) sandbox.Type {
 	if err != nil {
 		return ""
 	}
-	activity = strings.ToLower(strings.TrimSpace(activity))
+	activity = store.SandboxActivity(strings.ToLower(strings.TrimSpace(string(activity))))
 	switch activity {
 	case activityImplementation:
 		if cfg.ImplementationSandbox != "" {
@@ -451,7 +451,7 @@ func (r *Runner) runContainer(
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
-	activity string,
+	activity store.SandboxActivity,
 ) (*agentOutput, []byte, []byte, error) {
 	// Build a human-readable container name: wallfacer-<slug>-<uuid8>
 	// The slug is derived from the task prompt so external tools (docker ps,
@@ -479,9 +479,9 @@ func (r *Runner) runContainer(
 		args := r.buildContainerArgsForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
 
 		logger.Runner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
-		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: activity})
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(activity)})
 		rawStdout, rawStderr, runErr := r.executor.RunArgs(ctx, containerName, args)
-		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: activity})
+		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
 
 		// Detect container runtime failures (daemon/binary unavailable).
 		// Only trip the breaker for runtime-level errors, not for Claude
