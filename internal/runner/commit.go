@@ -106,8 +106,7 @@ func (r *Runner) commit(
 		return fmt.Errorf("rebase/merge: %w", mergeErr)
 	}
 
-	// Phase 3: persist commit hashes, compute workspace usage breakdown, and
-	// clean up worktrees.
+	// Phase 3: persist commit hashes and clean up worktrees.
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Phase 3/3: Cleaning up...",
 	})
@@ -121,11 +120,6 @@ func (r *Runner) commit(
 			logger.Runner.Warn("save base commit hashes", "task", taskID, "error", err)
 		}
 	}
-
-	// Compute and persist the per-workspace usage breakdown using git diff
-	// --numstat line counts as weights. This allows analytics to attribute usage
-	// proportionally rather than duplicating the full task cost across every repo.
-	r.computeAndSaveWorkspaceBreakdown(bgCtx, taskID, baseHashes, commitHashes)
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "cleanup"})
 	r.cleanupWorktrees(taskID, worktreePaths, branchName)
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "cleanup"})
@@ -140,71 +134,6 @@ func (r *Runner) commit(
 	r.maybeAutoPush(bgCtx, taskID, worktreePaths)
 
 	return nil
-}
-
-// computeAndSaveWorkspaceBreakdown derives a per-workspace usage breakdown
-// from git diff --numstat statistics and persists it in the task store. The
-// breakdown values are proportional to the number of lines changed in each
-// repository between baseHashes and commitHashes. buildAndSaveSummary later
-// rescales the stored values to the final task usage when writing summary.json.
-//
-// Errors are logged and swallowed: a missing breakdown degrades analytics
-// gracefully (ByWorkspace falls back to equal split) without blocking the
-// commit pipeline.
-func (r *Runner) computeAndSaveWorkspaceBreakdown(ctx context.Context, taskID uuid.UUID, baseHashes, commitHashes map[string]string) {
-	if len(commitHashes) == 0 || len(baseHashes) == 0 {
-		return
-	}
-
-	// Build the [baseHash, headHash] pairs for each repo.
-	repoHashes := make(map[string][2]string, len(commitHashes))
-	for repoPath, headHash := range commitHashes {
-		baseHash := baseHashes[repoPath]
-		if baseHash != "" && headHash != "" {
-			repoHashes[repoPath] = [2]string{baseHash, headHash}
-		}
-	}
-	if len(repoHashes) == 0 {
-		return
-	}
-
-	weights := gitutil.WorkspaceWeights(repoHashes)
-	if len(weights) == 0 {
-		return
-	}
-
-	// Read current task usage to produce absolute breakdown values.
-	// buildAndSaveSummary will rescale proportionally to final usage.
-	task, err := r.store.GetTask(ctx, taskID)
-	if err != nil || task == nil {
-		logger.Runner.Warn("workspace breakdown: get task", "task", taskID, "error", err)
-		return
-	}
-
-	breakdown := applyWorkspaceWeights(weights, task.Usage)
-	if err := r.store.UpdateTaskWorkspaceUsageBreakdown(ctx, taskID, breakdown); err != nil {
-		logger.Runner.Warn("save workspace usage breakdown", "task", taskID, "error", err)
-	}
-}
-
-// applyWorkspaceWeights multiplies normalized per-repo weights by totalUsage
-// to produce a map[repoPath]TaskUsage breakdown. The returned values sum to
-// totalUsage when weights themselves sum to 1.0.
-func applyWorkspaceWeights(weights map[string]float64, totalUsage store.TaskUsage) map[string]store.TaskUsage {
-	if len(weights) == 0 {
-		return nil
-	}
-	breakdown := make(map[string]store.TaskUsage, len(weights))
-	for repo, w := range weights {
-		breakdown[repo] = store.TaskUsage{
-			InputTokens:          int(float64(totalUsage.InputTokens) * w),
-			OutputTokens:         int(float64(totalUsage.OutputTokens) * w),
-			CacheReadInputTokens: int(float64(totalUsage.CacheReadInputTokens) * w),
-			CacheCreationTokens:  int(float64(totalUsage.CacheCreationTokens) * w),
-			CostUSD:              totalUsage.CostUSD * w,
-		}
-	}
-	return breakdown
 }
 
 // maybeAutoPush checks the auto-push configuration and, for each repo that
