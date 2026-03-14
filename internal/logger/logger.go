@@ -6,6 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -30,7 +32,7 @@ func init() {
 // Init configures all named loggers.
 // format is "text" (colored, human-friendly) or "json" (structured JSON).
 func Init(format string) {
-	opts := &slog.HandlerOptions{Level: slog.LevelDebug}
+	opts := &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true}
 	var h slog.Handler
 	if format == "json" {
 		h = slog.NewJSONHandler(os.Stdout, opts)
@@ -173,6 +175,13 @@ func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 	b.WriteString(col(ansiCyan+ansiDim, fmt.Sprintf("%-8s", component)))
 	b.WriteString("  ")
 
+	// Source: file:line, dim so it does not dominate the message.
+	if r.PC != 0 {
+		frame := slogSource(r.PC)
+		b.WriteString(col(ansiDim, fmt.Sprintf("%s:%d", filepath.Base(frame.File), frame.Line)))
+		b.WriteString("  ")
+	}
+
 	// Message: bold so it stands out from surrounding metadata.
 	b.WriteString(col(ansiBold, r.Message))
 
@@ -197,6 +206,13 @@ func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 	defer h.mu.Unlock()
 	_, err := fmt.Fprint(h.w, b.String())
 	return err
+}
+
+// slogSource extracts the source frame from a program counter.
+func slogSource(pc uintptr) runtime.Frame {
+	frames := runtime.CallersFrames([]uintptr{pc})
+	f, _ := frames.Next()
+	return f
 }
 
 // prettyValue formats a slog.Value for display.
