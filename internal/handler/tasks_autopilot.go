@@ -342,7 +342,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				return false, nil
 			}
 			h.incAutopilotAction("auto_promoter", "promoted")
-			h.store.InsertEvent(ctx, candidate.ID, store.EventTypeStateChange,
+			h.insertEventOrLog(ctx, candidate.ID, store.EventTypeStateChange,
 				store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusInProgress, store.TriggerAutoPromote, nil))
 
 			sessionID := ""
@@ -398,7 +398,7 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 	}
 	h.incAutopilotAction("auto_retrier", "retried")
 	h.breakers["auto-retry"].recordSuccess()
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange,
+	h.insertEventOrLog(ctx, task.ID, store.EventTypeStateChange,
 		store.NewStateChangeData(store.TaskStatusFailed, store.TaskStatusBacklog, store.TriggerAutoRetry, map[string]string{
 			"failure_category": string(task.FailureCategory),
 		}))
@@ -488,9 +488,9 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			continue
 		}
 		h.incAutopilotAction("sync_watcher", "synced")
-		h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
+		h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerSync, nil))
-		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
 			"result": "Auto-syncing: worktree is behind the default branch.",
 		})
 
@@ -694,9 +694,9 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 					breakerOpened = true
 					continue
 				}
-				h.store.InsertEvent(ctx, c.task.ID, store.EventTypeStateChange,
+				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeStateChange,
 					store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerAutoTest, nil))
-				h.store.InsertEvent(ctx, c.task.ID, store.EventTypeSystem, map[string]string{
+				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeSystem, map[string]string{
 					"result": "Auto-test: triggering test verification agent.",
 				})
 
@@ -858,7 +858,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				if c.naturallyComplete {
 					autoSubmitMsg = "Auto-submit: task naturally completed, up to date, and no conflicts."
 				}
-				h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+				h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
 					"result": autoSubmitMsg,
 				})
 
@@ -868,7 +868,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						h.pauseAllAutomation(&t.ID, "auto-submit", err.Error())
 						continue
 					}
-					h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
+					h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
 						store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerAutoSubmit, nil))
 					h.runCommitTransition(t.ID, *t.SessionID, store.TriggerAutoSubmit, "auto-submit: commit failed: ")
 				} else {
@@ -879,7 +879,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						h.pauseAllAutomation(&t.ID, "auto-submit", err.Error())
 						continue
 					}
-					h.store.InsertEvent(ctx, t.ID, store.EventTypeStateChange,
+					h.insertEventOrLog(ctx, t.ID, store.EventTypeStateChange,
 						store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerAutoSubmit, nil))
 				}
 				submitted = true
@@ -959,7 +959,7 @@ func (h *Handler) tryAutoRefine(ctx context.Context) {
 			continue // already running or race — skip silently
 		}
 
-		h.store.InsertEvent(ctx, t.ID, store.EventTypeSystem, map[string]string{
+		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
 			"result": "Auto-refine: triggering refinement agent for backlog task.",
 		})
 		h.runner.RunRefinementBackground(t.ID, "")
