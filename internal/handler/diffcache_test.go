@@ -208,6 +208,129 @@ func TestDiffETag(t *testing.T) {
 	}
 }
 
+func TestDiffCacheLRUEviction(t *testing.T) {
+	c := newDiffCache()
+
+	// Insert maxImmutableEntries + 1 distinct immutable entries.
+	ids := make([]uuid.UUID, maxImmutableEntries+1)
+	for i := range ids {
+		ids[i] = uuid.New()
+		c.set(ids[i], diffCacheEntry{
+			payload:   []byte(`"data"`),
+			etag:      "e",
+			immutable: true,
+		})
+	}
+
+	// Only maxImmutableEntries should remain.
+	c.mu.Lock()
+	got := len(c.entries)
+	c.mu.Unlock()
+	if got != maxImmutableEntries {
+		t.Errorf("expected %d entries after eviction, got %d", maxImmutableEntries, got)
+	}
+
+	// The oldest entry (ids[0]) must have been evicted.
+	if _, ok := c.get(ids[0]); ok {
+		t.Error("oldest entry should have been evicted but is still retrievable")
+	}
+
+	// The newest entry (ids[maxImmutableEntries]) must still be present.
+	if _, ok := c.get(ids[maxImmutableEntries]); !ok {
+		t.Error("newest entry should still be retrievable after eviction")
+	}
+}
+
+func TestDiffCacheLRUImmutableKeysLen(t *testing.T) {
+	c := newDiffCache()
+
+	// Insert exactly maxImmutableEntries entries — no eviction should occur.
+	for i := 0; i < maxImmutableEntries; i++ {
+		c.set(uuid.New(), diffCacheEntry{immutable: true, payload: []byte(`"x"`), etag: "e"})
+	}
+	c.mu.Lock()
+	nKeys := len(c.immutableKeys)
+	nEntries := len(c.entries)
+	c.mu.Unlock()
+	if nKeys != maxImmutableEntries {
+		t.Errorf("immutableKeys length should be %d, got %d", maxImmutableEntries, nKeys)
+	}
+	if nEntries != maxImmutableEntries {
+		t.Errorf("entries length should be %d, got %d", maxImmutableEntries, nEntries)
+	}
+}
+
+func TestDiffCacheInvalidateRemovesFromImmutableKeys(t *testing.T) {
+	c := newDiffCache()
+	id := uuid.New()
+	c.set(id, diffCacheEntry{immutable: true, payload: []byte(`"x"`), etag: "e"})
+
+	c.invalidate(id)
+
+	c.mu.Lock()
+	nKeys := len(c.immutableKeys)
+	c.mu.Unlock()
+	if nKeys != 0 {
+		t.Errorf("immutableKeys should be empty after invalidate, got len=%d", nKeys)
+	}
+}
+
+func TestDiffCacheLRUNonImmutableNotTracked(t *testing.T) {
+	clock := time.Now()
+	c := &diffCache{
+		entries:       make(map[uuid.UUID]diffCacheEntry),
+		immutableKeys: make([]uuid.UUID, 0, maxImmutableEntries+1),
+		now:           func() time.Time { return clock },
+	}
+
+	// Non-immutable entries must not appear in immutableKeys.
+	id := uuid.New()
+	c.set(id, diffCacheEntry{
+		payload:   []byte(`"data"`),
+		etag:      "e",
+		immutable: false,
+		expiresAt: clock.Add(diffCacheTTL),
+	})
+
+	c.mu.Lock()
+	nKeys := len(c.immutableKeys)
+	c.mu.Unlock()
+	if nKeys != 0 {
+		t.Errorf("non-immutable entry should not be tracked in immutableKeys, got len=%d", nKeys)
+	}
+
+	// TTL expiry still works (regression guard).
+	clock = clock.Add(diffCacheTTL + time.Millisecond)
+	if _, ok := c.get(id); ok {
+		t.Error("non-immutable entry should have expired, but get() returned a hit")
+	}
+}
+
+func TestDiffCacheLRUResetOnDuplicateSet(t *testing.T) {
+	c := newDiffCache()
+	id := uuid.New()
+
+	// Set the same immutable ID twice — immutableKeys must not grow.
+	c.set(id, diffCacheEntry{immutable: true, payload: []byte(`"v1"`), etag: "e1"})
+	c.set(id, diffCacheEntry{immutable: true, payload: []byte(`"v2"`), etag: "e2"})
+
+	c.mu.Lock()
+	nKeys := len(c.immutableKeys)
+	c.mu.Unlock()
+	if nKeys != 1 {
+		t.Errorf("duplicate set should not append to immutableKeys; want 1, got %d", nKeys)
+	}
+
+	// Latest value should be returned.
+	entry, ok := c.get(id)
+	if !ok {
+		t.Fatal("entry should be retrievable")
+	}
+	if string(entry.payload) != `"v2"` {
+		t.Errorf("expected latest payload %q, got %q", `"v2"`, entry.payload)
+	}
+}
+
 func TestDiffCacheConcurrentAccess(t *testing.T) {
 	c := newDiffCache()
 	id := uuid.New()
