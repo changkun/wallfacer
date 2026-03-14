@@ -77,7 +77,7 @@ func (r *Runner) commit(
 		taskPrompt = task.Prompt
 	}
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "stage"})
-	_, stageErr := r.hostStageAndCommit(taskID, worktreePaths, taskPrompt)
+	_, stageErr := r.hostStageAndCommit(ctx, taskID, worktreePaths, taskPrompt)
 	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "stage"})
 	if stageErr != nil {
 		logger.Runner.Error("host stage/commit failed", "task", taskID, "error", stageErr)
@@ -184,7 +184,9 @@ func (r *Runner) maybeAutoPush(ctx context.Context, taskID uuid.UUID, worktreePa
 // hostStageAndCommit stages and commits all uncommitted changes in each
 // worktree directly on the host. Returns true if any new commits were created.
 // Returns an error if changes were present but could not be staged or committed.
-func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]string, prompt string) (bool, error) {
+// ctx is the task timeout context: all git subprocesses are tied to it so that
+// a task timeout or server shutdown interrupts them promptly.
+func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, worktreePaths map[string]string, prompt string) (bool, error) {
 	if len(worktreePaths) == 0 {
 		return false, fmt.Errorf("no worktrees to commit")
 	}
@@ -207,20 +209,23 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 			missing = append(missing, repoPath)
 			continue
 		}
-		if out, err := exec.Command("git", "-C", worktreePath, "add", "-A").CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(ctx, "git", "-C", worktreePath, "add", "-A").CombinedOutput(); err != nil {
+			if ctx.Err() != nil {
+				return false, fmt.Errorf("context canceled during git add: %w", ctx.Err())
+			}
 			logger.Runner.Warn("host commit: git add -A", "repo", repoPath, "error", err, "output", string(out))
 			errs = append(errs, fmt.Sprintf("git add in %s: %v", repoPath, err))
 			continue
 		}
 
-		out, _ := exec.Command("git", "-C", worktreePath, "status", "--porcelain").Output()
+		out, _ := exec.CommandContext(ctx, "git", "-C", worktreePath, "status", "--porcelain").Output()
 		if len(strings.TrimSpace(string(out))) == 0 {
 			logger.Runner.Info("host commit: nothing to commit", "repo", repoPath)
 			continue
 		}
 
-		statOut, _ := exec.Command("git", "-C", worktreePath, "diff", "--cached", "--stat").Output()
-		logOut, _ := exec.Command("git", "-C", worktreePath, "log", "--format=%s", "-5").Output()
+		statOut, _ := exec.CommandContext(ctx, "git", "-C", worktreePath, "diff", "--cached", "--stat").Output()
+		logOut, _ := exec.CommandContext(ctx, "git", "-C", worktreePath, "log", "--format=%s", "-5").Output()
 		pending = append(pending, pendingCommit{repoPath, worktreePath, strings.TrimSpace(string(statOut)), strings.TrimSpace(string(logOut))})
 	}
 
@@ -266,12 +271,12 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 	// Use global git identity to prevent sandbox-set local configs from
 	// overriding the host user's author information.
 	var gitConfigOverrides []string
-	if out, err := exec.Command("git", "config", "--global", "user.name").Output(); err == nil {
+	if out, err := exec.CommandContext(ctx, "git", "config", "--global", "user.name").Output(); err == nil {
 		if n := strings.TrimSpace(string(out)); n != "" {
 			gitConfigOverrides = append(gitConfigOverrides, "-c", "user.name="+n)
 		}
 	}
-	if out, err := exec.Command("git", "config", "--global", "user.email").Output(); err == nil {
+	if out, err := exec.CommandContext(ctx, "git", "config", "--global", "user.email").Output(); err == nil {
 		if e := strings.TrimSpace(string(out)); e != "" {
 			gitConfigOverrides = append(gitConfigOverrides, "-c", "user.email="+e)
 		}
@@ -281,7 +286,10 @@ func (r *Runner) hostStageAndCommit(taskID uuid.UUID, worktreePaths map[string]s
 	for _, p := range pending {
 		args := append([]string{"-C", p.worktreePath}, gitConfigOverrides...)
 		args = append(args, "commit", "-m", msg)
-		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+		if out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput(); err != nil {
+			if ctx.Err() != nil {
+				return false, fmt.Errorf("context canceled during git commit: %w", ctx.Err())
+			}
 			logger.Runner.Warn("host commit: git commit", "repo", p.repoPath, "error", err, "output", string(out))
 			errs = append(errs, fmt.Sprintf("git commit in %s: %v", p.repoPath, err))
 			continue

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -214,7 +215,7 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "Add authentication")
+	committed, err := runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "Add authentication")
 	if err != nil {
 		t.Fatalf("hostStageAndCommit error: %v", err)
 	}
@@ -263,7 +264,7 @@ func TestHostStageAndCommitFallsBackOnCommitMessageFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "Add new feature")
+	committed, err := runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "Add new feature")
 	if err != nil {
 		t.Fatalf("expected fallback commit message to succeed, got %v", err)
 	}
@@ -288,7 +289,7 @@ func TestHostStageAndCommitErrorsWhenAllWorktreesMissing(t *testing.T) {
 		"/tmp/repo-a": "/nonexistent/worktree-a",
 		"/tmp/repo-b": "/nonexistent/worktree-b",
 	}
-	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "some prompt")
+	committed, err := runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "some prompt")
 	if err == nil {
 		t.Fatal("expected error when all worktrees are missing, got nil")
 	}
@@ -303,7 +304,7 @@ func TestHostStageAndCommitErrorsWhenAllWorktreesMissing(t *testing.T) {
 func TestHostStageAndCommitErrorsWhenNoWorktreesConfigured(t *testing.T) {
 	runner := runnerWithCmd(t, "echo")
 
-	committed, err := runner.hostStageAndCommit(uuid.New(), nil, "some prompt")
+	committed, err := runner.hostStageAndCommit(context.Background(), uuid.New(), nil, "some prompt")
 	if err == nil {
 		t.Fatal("expected error when no worktrees are configured")
 	}
@@ -349,7 +350,7 @@ func TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing(t *testing.T) {
 	// Add a missing worktree alongside the real one.
 	worktreePaths["/tmp/missing-repo"] = "/nonexistent/worktree"
 
-	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "some prompt")
+	committed, err := runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "some prompt")
 	if err != nil {
 		t.Fatalf("unexpected error when only some worktrees are missing: %v", err)
 	}
@@ -462,5 +463,80 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 	}
 	if !ended[cleanupKey] {
 		t.Error("missing span_end for worktree_cleanup")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Context cancellation regression test
+// ---------------------------------------------------------------------------
+
+// TestHostStageAndCommitRespectsContextCancellation verifies that when the
+// context is already cancelled, hostStageAndCommit returns promptly with a
+// context-related error rather than blocking on git subprocesses.
+//
+// This is a regression guard: the fix replaces exec.Command with
+// exec.CommandContext so that git calls are interrupted by the task timeout
+// or server shutdown context. Without the fix the function would hang until
+// the git subprocess finished naturally even after the context expired.
+func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	worktreesDir := filepath.Join(t.TempDir(), "worktrees")
+	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	runner := NewRunner(s, RunnerConfig{
+		Command:      "echo", // dummy — not used for git operations
+		SandboxImage: "test:latest",
+		Workspaces:   repo,
+		WorktreesDir: worktreesDir,
+	})
+
+	taskID := uuid.New()
+	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
+
+	// Write a file so that git add -A has something to stage, ensuring the
+	// first git subprocess (git add) is reached before context cancellation
+	// takes effect.
+	wt := worktreePaths[repo]
+	if err := os.WriteFile(filepath.Join(wt, "cancel_test.go"), []byte("package main\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a context that is already cancelled before the call.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := runner.hostStageAndCommit(ctx, taskID, worktreePaths, "cancellation regression test")
+		done <- err
+	}()
+
+	select {
+	case gotErr := <-done:
+		// Returned promptly — verify it is a context-related error.
+		if gotErr == nil {
+			t.Fatal("expected a non-nil error when context is already cancelled")
+		}
+		if ctx.Err() == nil {
+			t.Fatal("expected ctx.Err() to be non-nil")
+		}
+		// The error must wrap the context error or contain context information.
+		if !strings.Contains(gotErr.Error(), "context") {
+			t.Fatalf("expected context-related error, got: %v", gotErr)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("hostStageAndCommit did not return within 1s with a pre-cancelled context — likely missing exec.CommandContext")
 	}
 }

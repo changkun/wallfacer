@@ -565,7 +565,7 @@ func TestHostStageAndCommit(t *testing.T) {
 	}
 
 	// Run host-side commit.
-	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "Add hello world file")
+	committed, err := runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "Add hello world file")
 	if err != nil {
 		t.Fatalf("hostStageAndCommit error: %v", err)
 	}
@@ -600,7 +600,7 @@ func TestHostStageAndCommitNoChanges(t *testing.T) {
 	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
 
 	// No changes made — commit should be a no-op.
-	committed, err := runner.hostStageAndCommit(taskID, worktreePaths, "Nothing to do")
+	committed, err := runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "Nothing to do")
 	if err != nil {
 		t.Fatalf("hostStageAndCommit error: %v", err)
 	}
