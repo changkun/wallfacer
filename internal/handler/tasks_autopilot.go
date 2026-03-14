@@ -227,24 +227,28 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 
 	runTwoPhase(ctx, &promoteMu, TwoPhaseWatcherConfig{
 		Name: "auto-promote",
+		OnPhase1Error: func(err error) {
+			h.breakers["auto-promote"].recordFailure(nil, err.Error())
+		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			// Phase 1 (no lock): build candidate without holding promoteMu.
 			waitingTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-			if err == nil {
-				for i := range waitingTasks {
-					t := &waitingTasks[i]
-					if t.IsTestRun || t.PendingTestFeedback == "" || t.LastTestResult != "fail" {
-						continue
-					}
-					if t.SessionID == nil || *t.SessionID == "" {
-						continue
-					}
-					if resumeCandidate == nil || t.Position < resumeCandidate.task.Position {
-						cp := *t
-						resumeCandidate = &autoResumeCandidate{
-							task:     cp,
-							feedback: t.PendingTestFeedback,
-						}
+			if err != nil {
+				return nil, err
+			}
+			for i := range waitingTasks {
+				t := &waitingTasks[i]
+				if t.IsTestRun || t.PendingTestFeedback == "" || t.LastTestResult != "fail" {
+					continue
+				}
+				if t.SessionID == nil || *t.SessionID == "" {
+					continue
+				}
+				if resumeCandidate == nil || t.Position < resumeCandidate.task.Position {
+					cp := *t
+					resumeCandidate = &autoResumeCandidate{
+						task:     cp,
+						feedback: t.PendingTestFeedback,
 					}
 				}
 			}
@@ -260,7 +264,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 
 			backlogTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusBacklog)
 			if err != nil {
-				return nil, nil
+				return nil, err
 			}
 
 			var bestBacklog *store.Task
@@ -572,6 +576,9 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 
 	runTwoPhase(ctx, &promoteMu, TwoPhaseWatcherConfig{
 		Name: "auto-test",
+		OnPhase1Error: func(err error) {
+			h.breakers["auto-test"].recordFailure(nil, err.Error())
+		},
 		OnPhase2Miss: func(candidate *store.Task) {
 			h.incAutopilotPhase2Miss("auto_tester")
 		},
@@ -581,7 +588,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 			// during potentially slow filesystem operations.
 			waitingTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 			if err != nil {
-				return nil, nil
+				return nil, err
 			}
 
 			for i := range waitingTasks {
@@ -773,13 +780,16 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 
 	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
 		Name: "auto-submit",
+		OnPhase1Error: func(err error) {
+			h.breakers["auto-submit"].recordFailure(nil, err.Error())
+		},
 		OnPhase2Miss: func(candidate *store.Task) {
 			h.incAutopilotPhase2Miss("auto_submitter")
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			tasks, err := h.store.ListTasks(ctx, false)
 			if err != nil {
-				return nil, nil
+				return nil, err
 			}
 
 			for i := range tasks {

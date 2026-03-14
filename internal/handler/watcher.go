@@ -24,6 +24,10 @@ type TwoPhaseWatcherConfig struct {
 	// race. It receives the candidate that was skipped. Callers may use this to
 	// increment a metric or schedule an immediate re-scan. May be nil.
 	OnPhase2Miss func(candidate *store.Task)
+	// OnPhase1Error is an optional callback invoked when Phase1 returns a
+	// non-nil error, after the error has been logged by runTwoPhase. Callers
+	// may use this to record a circuit-breaker failure for the watcher. May be nil.
+	OnPhase1Error func(error)
 }
 
 // runTwoPhase executes the two-phase protocol described above.
@@ -35,6 +39,9 @@ func runTwoPhase(ctx context.Context, mu *sync.Mutex, cfg TwoPhaseWatcherConfig)
 	candidate, err := cfg.Phase1(ctx)
 	if err != nil {
 		logger.Handler.Error("two-phase watcher: phase1 error", "watcher", cfg.Name, "error", err)
+		if cfg.OnPhase1Error != nil {
+			cfg.OnPhase1Error(err)
+		}
 		return
 	}
 	if candidate == nil {

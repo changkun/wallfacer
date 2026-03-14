@@ -284,3 +284,117 @@ func TestRunTwoPhase_Phase2MissCallbackNotFiredOnError(t *testing.T) {
 		t.Fatal("expected OnPhase2Miss callback NOT to be called when Phase2 returns an error")
 	}
 }
+
+// TestRunTwoPhase_Phase1Error_CallsOnPhase1Error verifies that when Phase1
+// returns a non-nil error the OnPhase1Error callback is invoked and Phase2 is
+// never entered.
+func TestRunTwoPhase_Phase1Error_CallsOnPhase1Error(t *testing.T) {
+	ctx := context.Background()
+	sentinelErr := errors.New("injected store error")
+
+	var gotErr error
+	phase2Called := false
+
+	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
+		Name: "test-phase1-error",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			return nil, sentinelErr
+		},
+		OnPhase1Error: func(err error) {
+			gotErr = err
+		},
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			phase2Called = true
+			return true, nil
+		},
+	})
+
+	if gotErr != sentinelErr {
+		t.Fatalf("expected OnPhase1Error to receive sentinel error, got %v", gotErr)
+	}
+	if phase2Called {
+		t.Fatal("expected Phase2 NOT to be called when Phase1 returns an error")
+	}
+}
+
+// TestRunTwoPhase_Phase1Error_CircuitBreakerRecordsFailure verifies that an
+// OnPhase1Error callback that calls recordFailure on a watcherBreaker opens
+// the breaker, and that Phase2 is never entered.
+func TestRunTwoPhase_Phase1Error_CircuitBreakerRecordsFailure(t *testing.T) {
+	ctx := context.Background()
+	wb := &watcherBreaker{}
+	sentinelErr := errors.New("store unavailable")
+
+	phase2Called := false
+
+	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
+		Name: "auto-promote",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			return nil, sentinelErr
+		},
+		OnPhase1Error: func(err error) {
+			wb.recordFailure(nil, err.Error())
+		},
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			phase2Called = true
+			return true, nil
+		},
+	})
+
+	if !wb.isOpen() {
+		t.Fatal("expected circuit breaker to be open after Phase1 error")
+	}
+	if phase2Called {
+		t.Fatal("expected Phase2 NOT to be called when Phase1 errors")
+	}
+}
+
+// TestRunTwoPhase_Phase1Error_OnPhase1ErrorNotCalledOnSuccess verifies that
+// OnPhase1Error is NOT invoked when Phase1 succeeds.
+func TestRunTwoPhase_Phase1Error_OnPhase1ErrorNotCalledOnSuccess(t *testing.T) {
+	ctx := context.Background()
+	candidate := makeTask(store.TaskStatusBacklog)
+	onPhase1ErrorCalled := false
+
+	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
+		Name: "test-no-error",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			return &candidate, nil
+		},
+		OnPhase1Error: func(err error) {
+			onPhase1ErrorCalled = true
+		},
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			return true, nil
+		},
+	})
+
+	if onPhase1ErrorCalled {
+		t.Fatal("expected OnPhase1Error NOT to be called when Phase1 succeeds")
+	}
+}
+
+// TestRunTwoPhase_Phase1NilError_OnPhase1ErrorNotCalledOnNilCandidate verifies
+// that OnPhase1Error is NOT invoked when Phase1 returns (nil, nil) — the normal
+// "nothing to do" signal.
+func TestRunTwoPhase_Phase1Error_OnPhase1ErrorNotCalledOnNilCandidate(t *testing.T) {
+	ctx := context.Background()
+	onPhase1ErrorCalled := false
+
+	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
+		Name: "test-nil-candidate",
+		Phase1: func(ctx context.Context) (*store.Task, error) {
+			return nil, nil
+		},
+		OnPhase1Error: func(err error) {
+			onPhase1ErrorCalled = true
+		},
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			return true, nil
+		},
+	})
+
+	if onPhase1ErrorCalled {
+		t.Fatal("expected OnPhase1Error NOT to be called for (nil, nil) Phase1 result")
+	}
+}
