@@ -12,7 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
+	"github.com/google/uuid"
 )
 
 // --- parseTurnNumber ---
@@ -343,6 +345,23 @@ type flushRecorder struct {
 
 func (f *flushRecorder) Flush() {}
 
+// nonFlushingWriter wraps httptest.ResponseRecorder but deliberately does NOT
+// expose http.Flusher so tests can exercise the "streaming not supported" path.
+type nonFlushingWriter struct {
+	header http.Header
+	code   int
+	body   strings.Builder
+}
+
+func newNonFlushingWriter() *nonFlushingWriter {
+	return &nonFlushingWriter{header: make(http.Header), code: http.StatusOK}
+}
+
+func (w *nonFlushingWriter) Header() http.Header         { return w.header }
+func (w *nonFlushingWriter) WriteHeader(code int)        { w.code = code }
+func (w *nonFlushingWriter) Write(b []byte) (int, error) { return w.body.Write(b) }
+func (w *nonFlushingWriter) Body() string                { return w.body.String() }
+
 // --- SSE id: field and delta replay tests ---
 
 // TestStreamTasks_SnapshotCarriesID verifies that the snapshot event includes
@@ -623,5 +642,519 @@ func TestStreamTasks_ReplayViaLastEventIDHeader(t *testing.T) {
 	}
 	if !strings.Contains(body, "event: task-updated") {
 		t.Errorf("expected replayed task-updated event, got:\n%s", body)
+	}
+}
+
+// --- Additional StreamLogs and StreamRefineLogs coverage tests ---
+
+// newTestHandlerWithMockRunner creates a Handler backed by a temp-dir store and
+// a MockRunner (not a real Runner), so individual fields like ContainerNameFn
+// and RefineContainerNameFn can be configured per-test.
+func newTestHandlerWithMockRunner(t *testing.T, mock *runner.MockRunner) (*Handler, *store.Store) {
+	t.Helper()
+	storeDir, err := os.MkdirTemp("", "wallfacer-mock-handler-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := store.NewStore(storeDir)
+	if err != nil {
+		os.RemoveAll(storeDir)
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(storeDir) })
+	h := &Handler{runner: mock, store: s}
+	return h, s
+}
+
+// TestStreamLogs_UnknownTask verifies that StreamLogs returns 404 for unknown task IDs.
+func TestStreamLogs_UnknownTask(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/logs", nil)
+	w := httptest.NewRecorder()
+	h.StreamLogs(w, req, uuid.New())
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for unknown task, got %d", w.Code)
+	}
+}
+
+// TestStreamLogs_DoneTaskServesStoredLogs verifies that StreamLogs falls back to
+// serveStoredLogs for tasks that are done (no live container).
+func TestStreamLogs_DoneTaskServesStoredLogs(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
+	// Write a turn file so serveStoredLogs returns 200 instead of 404.
+	outputsDir := h.store.OutputsDir(task.ID)
+	os.MkdirAll(outputsDir, 0755)
+	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result":"ok"}`), 0644)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
+	w := httptest.NewRecorder()
+	h.StreamLogs(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for done task with logs, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"result":"ok"`) {
+		t.Errorf("expected turn output in response, got: %s", w.Body.String())
+	}
+}
+
+// TestStreamLogs_CancelledTaskServesStoredLogs verifies that StreamLogs falls
+// back to serveStoredLogs for cancelled tasks.
+func TestStreamLogs_CancelledTaskServesStoredLogs(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "cancel test", 15, false, "", "")
+	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+
+	// No turn files; serveStoredLogs will return 404 "no logs saved".
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
+	w := httptest.NewRecorder()
+	h.StreamLogs(w, req, task.ID)
+
+	// The task exists but has no saved logs — expect 404 from serveStoredLogs.
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (no logs saved), got %d", w.Code)
+	}
+}
+
+// TestStreamLogs_PhaseImplQueryParam verifies that ?phase=impl routes to
+// serveStoredLogsUpTo. With TestRunStartTurn=0 (default), maxTurn=0 means
+// no upper bound and all saved turns are served.
+func TestStreamLogs_PhaseImplQueryParam(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "impl phase test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
+	outputsDir := h.store.OutputsDir(task.ID)
+	os.MkdirAll(outputsDir, 0755)
+	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
+	os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=impl", nil)
+	w := httptest.NewRecorder()
+	h.StreamLogs(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for impl phase with turn files, got %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `"turn":1`) {
+		t.Error("expected turn 1 in impl phase output")
+	}
+	if !strings.Contains(body, `"turn":2`) {
+		t.Error("expected turn 2 in impl phase output")
+	}
+}
+
+// TestStreamLogs_PhaseTestQueryParam verifies that ?phase=test routes to
+// serveStoredLogsFrom for non-running tasks.
+func TestStreamLogs_PhaseTestQueryParam(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test phase test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
+	outputsDir := h.store.OutputsDir(task.ID)
+	os.MkdirAll(outputsDir, 0755)
+	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
+	os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=test", nil)
+	w := httptest.NewRecorder()
+	h.StreamLogs(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for test phase with turn files, got %d", w.Code)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `"turn":1`) {
+		t.Error("expected turn 1 in test phase output (fromTurn=0 means no lower bound)")
+	}
+	if !strings.Contains(body, `"turn":2`) {
+		t.Error("expected turn 2 in test phase output")
+	}
+}
+
+// TestStreamLogs_InProgressNoContainerExitsOnContextCancel verifies that
+// StreamLogs for an in-progress task with no live container (runner returns "")
+// falls back gracefully (serveStoredLogs) rather than panicking.
+func TestStreamLogs_InProgressNoContainerExitsOnContextCancel(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "in progress no container", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	// The mock runner always returns "" for ContainerName, so StreamLogs
+	// falls back to serveStoredLogs (no turn files → 404).
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
+	w := httptest.NewRecorder()
+	h.StreamLogs(w, req, task.ID)
+
+	// No turn files, no container: expect the "no logs saved" 404 path.
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (no logs saved for in-progress task with no container), got %d", w.Code)
+	}
+}
+
+// TestStreamRefineLogs_NoContainerReturns204 verifies that StreamRefineLogs
+// returns 204 No Content when the MockRunner reports no active refine container.
+func TestStreamRefineLogs_NoContainerReturns204(t *testing.T) {
+	h := newTestHandler(t)
+	// The mock runner always returns "" for RefineContainerName.
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil)
+	w := httptest.NewRecorder()
+	h.StreamRefineLogs(w, req, uuid.New())
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204 when no refine container is active, got %d", w.Code)
+	}
+}
+
+// TestStreamLogs_InProgress_NoFlusher verifies that StreamLogs returns 500 when
+// the ResponseWriter does not implement http.Flusher and the task is in-progress
+// with a live container name. Uses nonFlushingWriter which deliberately omits
+// the http.Flusher interface.
+func TestStreamLogs_InProgress_NoFlusher(t *testing.T) {
+	mock := &runner.MockRunner{
+		Cmd: "echo",
+		ContainerNameFn: func(_ uuid.UUID) string { return "test-container" },
+	}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+
+	ctx := context.Background()
+	task, err := s.CreateTask(ctx, "no-flusher test", 15, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
+	// nonFlushingWriter deliberately does not implement http.Flusher.
+	w := newNonFlushingWriter()
+	h.StreamLogs(w, req, task.ID)
+
+	if w.code != http.StatusInternalServerError {
+		t.Errorf("expected 500 (no flusher), got %d", w.code)
+	}
+}
+
+// TestStreamRefineLogs_NoFlusher verifies that StreamRefineLogs returns 500
+// when the ResponseWriter does not implement http.Flusher but a refine
+// container is active. Uses nonFlushingWriter which deliberately omits Flusher.
+func TestStreamRefineLogs_NoFlusher(t *testing.T) {
+	mock := &runner.MockRunner{
+		Cmd: "echo",
+		RefineContainerNameFn: func(_ uuid.UUID) string { return "refine-container" },
+	}
+	h, _ := newTestHandlerWithMockRunner(t, mock)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil)
+	// nonFlushingWriter deliberately does not implement http.Flusher.
+	w := newNonFlushingWriter()
+	h.StreamRefineLogs(w, req, uuid.New())
+
+	if w.code != http.StatusInternalServerError {
+		t.Errorf("expected 500 (no flusher), got %d", w.code)
+	}
+}
+
+// TestStreamLogs_InProgress_ContainerExitsCleanly exercises the live streaming
+// path in StreamLogs end-to-end. The MockRunner returns a non-empty container
+// name and uses a wrapper script as the command, which prints a couple of log
+// lines and exits. The handler's select loop reads the lines and then
+// terminates naturally when the lines channel is closed.
+func TestStreamLogs_InProgress_ContainerExitsCleanly(t *testing.T) {
+	// Write a tiny shell script that prints two log lines and exits.
+	scriptPath := filepath.Join(t.TempDir(), "fake-logs.sh")
+	script := "#!/bin/sh\nprintf 'log line 1\\nlog line 2\\n'\n"
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wrapper script: ignores all arguments (logs -f --tail 100 <name>) and
+	// just runs the inner script.
+	wrapperPath := filepath.Join(t.TempDir(), "fake-podman.sh")
+	wrapper := fmt.Sprintf("#!/bin/sh\nexec sh \"%s\"\n", scriptPath)
+	if err := os.WriteFile(wrapperPath, []byte(wrapper), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &runner.MockRunner{
+		Cmd:             wrapperPath,
+		ContainerNameFn: func(_ uuid.UUID) string { return "fake-container" },
+	}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+
+	ctx := context.Background()
+	task, err := s.CreateTask(ctx, "live stream test", 15, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+	h.StreamLogs(w, req, task.ID)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "log line 1") {
+		t.Errorf("expected 'log line 1' in response, got: %s", body)
+	}
+	if !strings.Contains(body, "log line 2") {
+		t.Errorf("expected 'log line 2' in response, got: %s", body)
+	}
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+// TestStreamLogs_InProgress_CommandStartFails exercises the cmd.Start error
+// path in StreamLogs. When the container command binary does not exist,
+// cmd.Start returns an error and StreamLogs responds with 500.
+func TestStreamLogs_InProgress_CommandStartFails(t *testing.T) {
+	mock := &runner.MockRunner{
+		// Use a non-existent binary so cmd.Start() fails.
+		Cmd:             "/nonexistent-binary-that-cannot-be-found",
+		ContainerNameFn: func(_ uuid.UUID) string { return "some-container" },
+	}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+
+	ctx := context.Background()
+	task, err := s.CreateTask(ctx, "start-fail test", 15, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+	h.StreamLogs(w, req, task.ID)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 when command fails to start, got %d", w.Code)
+	}
+}
+
+// TestStreamLogs_InProgress_ContextCancellation verifies that StreamLogs
+// exits cleanly when the request context is cancelled while logs are streaming.
+func TestStreamLogs_InProgress_ContextCancellation(t *testing.T) {
+	// A script that blocks indefinitely.
+	scriptPath := filepath.Join(t.TempDir(), "blocking.sh")
+	script := "#!/bin/sh\nwhile true; do sleep 1; done\n"
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	wrapperPath := filepath.Join(t.TempDir(), "fake-podman-block.sh")
+	wrapper := fmt.Sprintf("#!/bin/sh\nexec sh \"%s\"\n", scriptPath)
+	if err := os.WriteFile(wrapperPath, []byte(wrapper), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &runner.MockRunner{
+		Cmd:             wrapperPath,
+		ContainerNameFn: func(_ uuid.UUID) string { return "blocking-container" },
+	}
+	h, s := newTestHandlerWithMockRunner(t, mock)
+
+	ctx := context.Background()
+	task, err := s.CreateTask(ctx, "cancellation test", 15, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamLogs(w, req, task.ID)
+	}()
+
+	// Give the handler time to start the subprocess, then cancel.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		// Handler exited cleanly after context cancellation.
+	case <-time.After(5 * time.Second):
+		t.Error("StreamLogs did not exit after context cancellation")
+	}
+}
+
+// TestStreamRefineLogs_ContainerExitsCleanly exercises the live streaming path
+// in StreamRefineLogs. The command prints two lines and exits so the lines
+// channel closes and the handler returns naturally.
+func TestStreamRefineLogs_ContainerExitsCleanly(t *testing.T) {
+	scriptPath := filepath.Join(t.TempDir(), "refine-logs.sh")
+	script := "#!/bin/sh\nprintf 'refine line 1\\nrefine line 2\\n'\n"
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	wrapperPath := filepath.Join(t.TempDir(), "fake-podman-refine.sh")
+	wrapper := fmt.Sprintf("#!/bin/sh\nexec sh \"%s\"\n", scriptPath)
+	if err := os.WriteFile(wrapperPath, []byte(wrapper), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &runner.MockRunner{
+		Cmd:                   wrapperPath,
+		RefineContainerNameFn: func(_ uuid.UUID) string { return "refine-container" },
+	}
+	h, _ := newTestHandlerWithMockRunner(t, mock)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+	h.StreamRefineLogs(w, req, uuid.New())
+
+	body := w.Body.String()
+	if !strings.Contains(body, "refine line 1") {
+		t.Errorf("expected 'refine line 1' in response, got: %s", body)
+	}
+	if !strings.Contains(body, "refine line 2") {
+		t.Errorf("expected 'refine line 2' in response, got: %s", body)
+	}
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+// TestStreamRefineLogs_CommandStartFails exercises the cmd.Start error path in
+// StreamRefineLogs. When the binary does not exist, Start() fails and the
+// handler responds with 500.
+func TestStreamRefineLogs_CommandStartFails(t *testing.T) {
+	mock := &runner.MockRunner{
+		Cmd:                   "/nonexistent-binary-xyz",
+		RefineContainerNameFn: func(_ uuid.UUID) string { return "refine-container" },
+	}
+	h, _ := newTestHandlerWithMockRunner(t, mock)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+	h.StreamRefineLogs(w, req, uuid.New())
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 when command fails to start, got %d", w.Code)
+	}
+}
+
+// TestStreamRefineLogs_ContextCancellation verifies that StreamRefineLogs
+// exits cleanly when the request context is cancelled while streaming.
+func TestStreamRefineLogs_ContextCancellation(t *testing.T) {
+	scriptPath := filepath.Join(t.TempDir(), "blocking-refine.sh")
+	script := "#!/bin/sh\nwhile true; do sleep 1; done\n"
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	wrapperPath := filepath.Join(t.TempDir(), "fake-podman-block-refine.sh")
+	wrapper := fmt.Sprintf("#!/bin/sh\nexec sh \"%s\"\n", scriptPath)
+	if err := os.WriteFile(wrapperPath, []byte(wrapper), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &runner.MockRunner{
+		Cmd:                   wrapperPath,
+		RefineContainerNameFn: func(_ uuid.UUID) string { return "blocking-refine" },
+	}
+	h, _ := newTestHandlerWithMockRunner(t, mock)
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+uuid.New().String()+"/refine/logs", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamRefineLogs(w, req, uuid.New())
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		// Handler exited cleanly.
+	case <-time.After(5 * time.Second):
+		t.Error("StreamRefineLogs did not exit after context cancellation")
+	}
+}
+
+// TestStreamLogs_PhaseTest_InProgress verifies that ?phase=test for an
+// in-progress task does NOT go to serveStoredLogsFrom but instead falls
+// through to the live container path (or stored logs if no container).
+func TestStreamLogs_PhaseTest_InProgress(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "phase-test in-progress", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	// No container (real runner returns ""), so falls back to serveStoredLogs.
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=test", nil)
+	w := httptest.NewRecorder()
+	h.StreamLogs(w, req, task.ID)
+
+	// No turn files saved → serveStoredLogs → 404 "no logs saved".
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (no logs saved, not stored-from path), got %d", w.Code)
+	}
+}
+
+// TestStreamLogs_Committing_ServesStoredLogs verifies that a task in the
+// "committing" status is treated as non-running and falls back to stored logs.
+func TestStreamLogs_Committing_ServesStoredLogs(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "committing test", 15, false, "", "")
+	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting)
+
+	outputsDir := h.store.OutputsDir(task.ID)
+	os.MkdirAll(outputsDir, 0755)
+	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"status":"committing"}`), 0644)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
+	w := httptest.NewRecorder()
+	h.StreamLogs(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for committing task with logs, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "committing") {
+		t.Errorf("expected stored log content in response, got: %s", w.Body.String())
+	}
+}
+
+// TestServeStoredLogsRange_DirectoryMissing verifies that serveStoredLogsRange
+// returns 404 when the outputs directory does not exist.
+func TestServeStoredLogsRange_DirectoryMissing(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "missing dir", 15, false, "", "")
+
+	// Do NOT create the outputs directory.
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
+	w := httptest.NewRecorder()
+	h.serveStoredLogsRange(w, req, task.ID, 0, 0)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for missing outputs directory, got %d", w.Code)
 	}
 }

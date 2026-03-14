@@ -34,6 +34,12 @@ type MockRunner struct {
 	KillContainerCalls    []uuid.UUID
 	CleanupWorktreesCalls []uuid.UUID
 	GenerateTitleCalls    []uuid.UUID
+
+	// Optional overrides for ContainerName / RefineContainerName return values.
+	// When nil the methods return "" (no container active), matching the default
+	// behaviour expected by most tests.
+	ContainerNameFn       func(taskID uuid.UUID) string
+	RefineContainerNameFn func(taskID uuid.UUID) string
 }
 
 // compile-time assertion.
@@ -86,9 +92,19 @@ func (m *MockRunner) PruneUnknownWorktrees() {}
 
 func (m *MockRunner) ListContainers() ([]ContainerInfo, error) { return nil, nil }
 
-func (m *MockRunner) ContainerName(_ uuid.UUID) string { return "" }
+func (m *MockRunner) ContainerName(taskID uuid.UUID) string {
+	if m.ContainerNameFn != nil {
+		return m.ContainerNameFn(taskID)
+	}
+	return ""
+}
 
-func (m *MockRunner) RefineContainerName(_ uuid.UUID) string { return "" }
+func (m *MockRunner) RefineContainerName(taskID uuid.UUID) string {
+	if m.RefineContainerNameFn != nil {
+		return m.RefineContainerNameFn(taskID)
+	}
+	return ""
+}
 
 func (m *MockRunner) KillContainer(taskID uuid.UUID) {
 	m.mu.Lock()
