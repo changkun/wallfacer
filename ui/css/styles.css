@@ -349,6 +349,73 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   white-space: nowrap;
 }
 
+.watcher-health-section {
+  margin-top: 6px;
+}
+
+.watcher-health-header {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 4px 4px;
+}
+
+.watcher-health-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.watcher-health-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 9px 4px 11px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.watcher-health-row--ok {
+  color: var(--text-muted);
+}
+
+.watcher-health-row--tripped {
+  border: 1px solid color-mix(in oklab, #e85d40 30%, var(--border));
+  background: color-mix(in oklab, #e85d40 8%, var(--bg-card));
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.watcher-health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.watcher-health-dot--ok {
+  background: #4caf7d;
+}
+
+.watcher-health-dot--tripped {
+  background: #e85d40;
+}
+
+.watcher-health-name {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.watcher-health-detail {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .column {
   flex: 1;
   min-height: 0;

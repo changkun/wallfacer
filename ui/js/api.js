@@ -422,6 +422,53 @@ function updateAutomationActiveCount() {
   }
 }
 
+var _watcherFriendlyNames = {
+  'auto-promote': 'Implement',
+  'auto-retry':   'Retry',
+  'auto-test':    'Test',
+  'auto-submit':  'Submit',
+  'auto-sync':    'Tip-sync',
+  'auto-refine':  'Refine',
+};
+
+function updateWatcherHealth(entries) {
+  var el = document.getElementById('watcher-health-section');
+  if (!el) return;
+  if (!Array.isArray(entries) || entries.length === 0) {
+    el.innerHTML = '';
+    return;
+  }
+  var tripped = entries.filter(function(e) { return !e.healthy; });
+  var html = '<div class="watcher-health-header">Circuit Breakers</div><div class="watcher-health-list">';
+  if (tripped.length === 0) {
+    html += '<div class="watcher-health-row watcher-health-row--ok">'
+      + '<span class="watcher-health-dot watcher-health-dot--ok"></span>'
+      + '<span class="watcher-health-name">All healthy</span>'
+      + '</div>';
+  } else {
+    tripped.forEach(function(e) {
+      var label = _watcherFriendlyNames[e.name] || e.name;
+      var parts = [];
+      if (e.failures) parts.push(e.failures + (e.failures === 1 ? ' failure' : ' failures'));
+      if (e.retry_at) {
+        var retryMs = new Date(e.retry_at) - Date.now();
+        if (retryMs > 0) {
+          var s = Math.ceil(retryMs / 1000);
+          parts.push('retry in ' + (s < 60 ? s + 's' : Math.ceil(s / 60) + 'm'));
+        }
+      }
+      var titleAttr = e.last_reason ? ' title="' + escapeHtml(e.last_reason) + '"' : '';
+      html += '<div class="watcher-health-row watcher-health-row--tripped"' + titleAttr + '>'
+        + '<span class="watcher-health-dot watcher-health-dot--tripped"></span>'
+        + '<span class="watcher-health-name">' + escapeHtml(label) + '</span>'
+        + (parts.length ? '<span class="watcher-health-detail">' + escapeHtml(parts.join('; ')) + '</span>' : '')
+        + '</div>';
+    });
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
 async function toggleAutopilot() {
   var toggle = document.getElementById('autopilot-toggle');
   var enabled = toggle ? toggle.checked : !autopilot;
