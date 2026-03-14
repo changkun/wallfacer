@@ -175,21 +175,22 @@ func TestIsIdeaDuplicateTitle_CaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestIsIdeaDuplicateTitle_SubstringMatch(t *testing.T) {
+func TestIsIdeaDuplicateTitle_SubstringNoMatch(t *testing.T) {
 	added := map[string]struct{}{}
 	isIdeaDuplicateTitle(added, "add user authentication")
-	// A shorter title that is contained in the existing title.
-	if !isIdeaDuplicateTitle(added, "user authentication") {
-		t.Error("substring of existing title should be duplicate")
+	// A shorter title contained in an existing title should NOT be a duplicate —
+	// only exact case-insensitive matches qualify.
+	if isIdeaDuplicateTitle(added, "user authentication") {
+		t.Error("substring of existing title should not be duplicate")
 	}
 }
 
-func TestIsIdeaDuplicateTitle_SuperstringMatch(t *testing.T) {
+func TestIsIdeaDuplicateTitle_SuperstringNoMatch(t *testing.T) {
 	added := map[string]struct{}{}
 	isIdeaDuplicateTitle(added, "auth")
-	// Existing is a substring of new title.
-	if !isIdeaDuplicateTitle(added, "add auth feature") {
-		t.Error("superstring of existing title should be duplicate")
+	// Existing is a substring of new title — should NOT be a duplicate.
+	if isIdeaDuplicateTitle(added, "add auth feature") {
+		t.Error("superstring of existing title should not be duplicate")
 	}
 }
 
