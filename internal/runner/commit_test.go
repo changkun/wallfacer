@@ -70,7 +70,7 @@ func TestGenerateCommitMessageSuccess(t *testing.T) {
 	cmd := fakeCmdScript(t, validStreamJSON, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg, err := runner.generateCommitMessage(uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
+	msg, err := runner.generateCommitMessage(context.Background(), uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
 	if err != nil {
 		t.Fatalf("generateCommitMessage error: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestGenerateCommitMessageSuccess(t *testing.T) {
 func TestGenerateCommitMessageErrorsOnInvalidOutput(t *testing.T) {
 	runner := runnerWithCmd(t, "echo") // outputs its args, not valid JSON
 
-	_, err := runner.generateCommitMessage(uuid.New(), "Fix the login bug", "login.go | 3 +-", "")
+	_, err := runner.generateCommitMessage(context.Background(), uuid.New(), "Fix the login bug", "login.go | 3 +-", "")
 	if err == nil {
 		t.Fatal("expected error for invalid commit message output")
 	}
@@ -97,7 +97,7 @@ func TestGenerateCommitMessageErrorsOnCommandError(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 1) // exits 1 with empty output
 	runner := runnerWithCmd(t, cmd)
 
-	_, err := runner.generateCommitMessage(uuid.New(), "Refactor database layer", "db/*.go | 120 ++--", "")
+	_, err := runner.generateCommitMessage(context.Background(), uuid.New(), "Refactor database layer", "db/*.go | 120 ++--", "")
 	if err == nil {
 		t.Fatal("expected error for failed commit message command")
 	}
@@ -111,7 +111,7 @@ func TestGenerateCommitMessageErrorsOnBlankResult(t *testing.T) {
 	cmd := fakeCmdScript(t, blankResult, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	_, err := runner.generateCommitMessage(uuid.New(), "Update configuration", "config.go | 5 +-", "")
+	_, err := runner.generateCommitMessage(context.Background(), uuid.New(), "Update configuration", "config.go | 5 +-", "")
 	if err == nil {
 		t.Fatal("expected error for blank commit message result")
 	}
@@ -125,7 +125,7 @@ func TestGenerateCommitMessageMultiline(t *testing.T) {
 	cmd := fakeCmdScript(t, multilineResult, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg, err := runner.generateCommitMessage(uuid.New(), "Add auth", "auth.go | 80 ++++", "")
+	msg, err := runner.generateCommitMessage(context.Background(), uuid.New(), "Add auth", "auth.go | 80 ++++", "")
 	if err != nil {
 		t.Fatalf("generateCommitMessage error: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestGenerateCommitMessageNDJSON(t *testing.T) {
 	cmd := fakeCmdScript(t, ndjson, 0)
 	runner := runnerWithCmd(t, cmd)
 
-	msg, err := runner.generateCommitMessage(uuid.New(), "Fix crash", "main.go | 2 +-", "")
+	msg, err := runner.generateCommitMessage(context.Background(), uuid.New(), "Fix crash", "main.go | 2 +-", "")
 	if err != nil {
 		t.Fatalf("generateCommitMessage error: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestGenerateCommitMessageFallsBackToCodexOnTokenLimit(t *testing.T) {
 	cmd := fakeStatefulCmd(t, []string{tokenLimit, validStreamJSON})
 	runner := runnerWithCmd(t, cmd)
 
-	msg, err := runner.generateCommitMessage(uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
+	msg, err := runner.generateCommitMessage(context.Background(), uuid.New(), "Add authentication", "auth.go | 50 ++++", "")
 	if err != nil {
 		t.Fatalf("generateCommitMessage error: %v", err)
 	}
@@ -469,6 +469,86 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Context cancellation regression test
 // ---------------------------------------------------------------------------
+
+// fakeBlockingCmd creates a shell script that blocks indefinitely on "run"
+// subcommands and exits immediately (with 0) for "rm" and "kill".
+// Used to simulate a container that is running but has not yet produced output,
+// so tests can exercise context cancellation before the container finishes.
+func fakeBlockingCmd(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	// "exec sleep 300" replaces the shell process with sleep, ensuring there is
+// only one process for Go's exec.CommandContext to kill. Without exec, the
+// shell spawns sleep as a child; when Go kills the shell, sleep inherits the
+// stdout pipe and keeps it open, causing cmd.Wait() to hang indefinitely.
+script := `#!/bin/sh
+case "$1" in
+  rm|kill|inspect|ps) exit 0 ;;
+esac
+exec sleep 300
+`
+	scriptPath := dir + "/fake-blocking"
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+	return scriptPath
+}
+
+// ---------------------------------------------------------------------------
+// generateCommitMessage cancellation tests
+// ---------------------------------------------------------------------------
+
+// TestGenerateCommitMessageRespectsCallerContext verifies that
+// generateCommitMessage returns promptly when the caller-supplied context is
+// cancelled, and that while it is running the container name is registered in
+// r.taskContainers so that KillContainer can locate it.
+func TestGenerateCommitMessageRespectsCallerContext(t *testing.T) {
+	cmd := fakeBlockingCmd(t)
+	runner := runnerWithCmd(t, cmd)
+
+	taskID := uuid.New()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	type result struct {
+		msg string
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		msg, err := runner.generateCommitMessage(ctx, taskID, "Add feature", "feature.go | 10 ++++", "")
+		done <- result{msg, err}
+	}()
+
+	// Poll until the container name appears in the registry, confirming
+	// registration happened before the container starts blocking.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, ok := runner.taskContainers.Get(taskID); ok {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if _, ok := runner.taskContainers.Get(taskID); !ok {
+		t.Fatal("container was not registered in taskContainers while generateCommitMessage was running")
+	}
+
+	// Cancel the context — the blocking container should be terminated.
+	cancel()
+
+	select {
+	case res := <-done:
+		if res.err == nil {
+			t.Fatal("expected an error after context cancellation, got nil")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("generateCommitMessage did not return within 3s after context cancellation — caller ctx not respected")
+	}
+
+	// After return the registry entry must have been cleaned up.
+	if _, ok := runner.taskContainers.Get(taskID); ok {
+		t.Error("container entry was not removed from taskContainers after generateCommitMessage returned")
+	}
+}
 
 // TestHostStageAndCommitRespectsContextCancellation verifies that when the
 // context is already cancelled, hostStageAndCommit returns promptly with a

@@ -33,6 +33,10 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 
 	titlePrompt := r.promptsMgr.Title(prompt)
 
+	containerName := "wallfacer-title-" + taskID.String()[:8]
+	r.taskContainers.Set(taskID, containerName)
+	defer r.taskContainers.Delete(taskID)
+
 	// runWithSandbox executes the title container with the given sandbox,
 	// returning the parsed output (or nil) and any error.
 	type titleResult struct {
@@ -43,7 +47,6 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	}
 	runWithSandbox := func(selected sandbox.Type) titleResult {
 		mdl := r.titleModelFromEnvForSandbox(selected)
-		containerName := "wallfacer-title-" + taskID.String()[:8]
 		exec.Command(r.command, "rm", "-f", containerName).Run()
 
 		spec := r.buildBaseContainerSpec(containerName, mdl, selected)

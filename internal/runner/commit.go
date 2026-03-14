@@ -253,7 +253,7 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 			allLogs.WriteString(p.recentLog + "\n")
 		}
 	}
-	msg, err := r.generateCommitMessage(taskID, prompt, allStats.String(), allLogs.String())
+	msg, err := r.generateCommitMessage(ctx, taskID, prompt, allStats.String(), allLogs.String())
 	if err != nil {
 		msg = localFallbackCommitMessage(prompt, allStats.String())
 		logger.Runner.Warn("commit message generation failed, using local fallback", "task", taskID, "error", err, "message", msg)
@@ -335,7 +335,9 @@ func localFallbackCommitMessage(prompt, diffStat string) string {
 // generateCommitMessage runs a lightweight container to produce a descriptive
 // git commit message from the task prompt, staged diff stats, and recent git
 // log history (used to match the project's commit style).
-func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recentLog string) (string, error) {
+// ctx is the caller-supplied task context; a 90-second sub-deadline is derived
+// from it so that task cancellation or timeout propagates into the container.
+func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, prompt, diffStat, recentLog string) (string, error) {
 	task, err := r.store.GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Warn("generate commit message: get task", "task", taskID, "error", err)
@@ -346,10 +348,12 @@ func (r *Runner) generateCommitMessage(taskID uuid.UUID, prompt, diffStat, recen
 		sb = r.sandboxForTaskActivity(task, activityCommitMessage)
 	}
 
-	ctx, cancel := context.WithTimeout(r.shutdownCtx, 90*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 
 	containerName := "wallfacer-commit-" + taskID.String()[:8]
+	r.taskContainers.Set(taskID, containerName)
+	defer r.taskContainers.Delete(taskID)
 	commitPrompt := r.promptsMgr.CommitMessage(prompts.CommitData{
 		Prompt:    prompt,
 		DiffStat:  diffStat,
