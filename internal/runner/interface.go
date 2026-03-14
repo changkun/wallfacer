@@ -50,6 +50,7 @@ type Interface interface {
 
 	// Ideation.
 	BuildIdeationPrompt(existingTasks []store.Task) string
+	CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) error
 	IdeationCategories() []string
 	IdeationIgnorePatterns() []string
 

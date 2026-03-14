@@ -152,6 +152,7 @@ func runServer(configDir string, args []string) {
 			h.SetAutopilot(false)
 		}
 	})
+	r.SetAutosubmitFunc(h.AutosubmitEnabled)
 
 	// Start the auto-promoter: watches for state changes and promotes
 	// backlog tasks to in_progress when capacity is available.
