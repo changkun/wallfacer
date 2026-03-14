@@ -649,6 +649,11 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Invalidate the cached parallel-limit values so the next call to
+	// maxConcurrentTasks / maxTestConcurrentTasks re-reads from the env file.
+	h.cachedMaxParallel.Store(0)
+	h.cachedMaxTestParallel.Store(0)
+
 	// When the parallel task limit changes, re-evaluate immediately so new
 	// capacity is filled without waiting for the next store event.
 	if req.MaxParallelTasks != nil {

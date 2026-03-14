@@ -21,23 +21,36 @@ const defaultMaxConcurrentTasks = 5
 // defaultMaxTestConcurrentTasks is used when WALLFACER_MAX_TEST_PARALLEL is not set.
 const defaultMaxTestConcurrentTasks = 2
 
-// maxConcurrentTasks reads the configured parallel task limit from the env file,
-// falling back to defaultMaxConcurrentTasks.
+// maxConcurrentTasks returns the configured parallel task limit. The value is
+// cached in an atomic field so the env file is only parsed on the first call
+// and after UpdateEnvConfig invalidates the cache (by resetting the field to 0).
 func (h *Handler) maxConcurrentTasks() int {
+	if v := h.cachedMaxParallel.Load(); v > 0 {
+		return int(v)
+	}
 	cfg, err := envconfig.Parse(h.envFile)
 	if err != nil || cfg.MaxParallelTasks <= 0 {
+		h.cachedMaxParallel.Store(int32(defaultMaxConcurrentTasks))
 		return defaultMaxConcurrentTasks
 	}
+	h.cachedMaxParallel.Store(int32(cfg.MaxParallelTasks))
 	return cfg.MaxParallelTasks
 }
 
-// maxTestConcurrentTasks reads the configured parallel test-run limit from the
-// env file, falling back to defaultMaxTestConcurrentTasks.
+// maxTestConcurrentTasks returns the configured parallel test-run limit. The
+// value is cached in an atomic field so the env file is only parsed on the
+// first call and after UpdateEnvConfig invalidates the cache (by resetting the
+// field to 0).
 func (h *Handler) maxTestConcurrentTasks() int {
+	if v := h.cachedMaxTestParallel.Load(); v > 0 {
+		return int(v)
+	}
 	cfg, err := envconfig.Parse(h.envFile)
 	if err != nil || cfg.MaxTestParallelTasks <= 0 {
+		h.cachedMaxTestParallel.Store(int32(defaultMaxTestConcurrentTasks))
 		return defaultMaxTestConcurrentTasks
 	}
+	h.cachedMaxTestParallel.Store(int32(cfg.MaxTestParallelTasks))
 	return cfg.MaxTestParallelTasks
 }
 
