@@ -98,18 +98,30 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 		return
 	}
 
+	// Acquire promoteMu BEFORE reading/modifying the task to prevent races
+	// with tryAutoSubmit (which also holds promoteMu in Phase 2). Without
+	// this, auto-submit can transition the task to committing between our
+	// status check and the UpdateTaskStatus call, causing the feedback to
+	// fail while the commit pipeline cleans up the worktree.
+	promoteMu.Lock()
+
 	task, err := h.store.GetTask(r.Context(), id)
 	if err != nil {
+		promoteMu.Unlock()
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
 	if task.Status != store.TaskStatusWaiting {
+		promoteMu.Unlock()
 		http.Error(w, "task is not in waiting status", http.StatusBadRequest)
 		return
 	}
 
 	// Any further implementation work invalidates prior test verification.
+	// This must happen AFTER the status check to avoid clearing test state
+	// when the transition will fail (e.g. task already moved to committing).
 	if err := h.store.UpdateTaskTestRun(r.Context(), id, false, ""); err != nil {
+		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -118,7 +130,6 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	// concurrent tasks is reached. The task was previously in_progress and
 	// paused for user input — blocking it would leave it stuck when autopilot
 	// fills all slots.
-	promoteMu.Lock()
 	if err := h.resumeWaitingTaskWithFeedbackLocked(r.Context(), task, req.Message, store.TriggerFeedback, ""); err != nil {
 		promoteMu.Unlock()
 		http.Error(w, err.Error(), http.StatusInternalServerError)

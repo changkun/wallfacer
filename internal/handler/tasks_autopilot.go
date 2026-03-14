@@ -794,14 +794,16 @@ type autoSubmitCandidate struct {
 // worktree conflicts directly to done (via the commit pipeline if a session
 // exists). Does nothing when auto-submit is disabled.
 //
-// Uses the two-phase protocol via runTwoPhase with a nil mutex (auto-submit
-// transitions tasks to done/committing rather than in_progress, so it does
-// not compete for the promoteMu capacity slot):
+// Uses the two-phase protocol via runTwoPhase with promoteMu to coordinate
+// with SubmitFeedback and other operations that transition waiting tasks.
+// Without this lock, auto-submit can race with feedback: auto-submit moves
+// the task to committing and the commit pipeline cleans up worktrees while
+// the user believes they are sending feedback to a still-waiting task.
 //
 // Phase 1 (no lock): perform the slow git I/O (CommitsBehind, HasConflicts)
 // for every eligible waiting task and collect the candidates.
 //
-// Phase 2 (no lock): execute the status transitions for all collected candidates.
+// Phase 2 (under promoteMu): execute the status transitions for all collected candidates.
 func (h *Handler) tryAutoSubmit(ctx context.Context) {
 	if !h.AutosubmitEnabled() {
 		return
@@ -813,7 +815,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 	// candidates is populated by Phase1 and consumed by Phase2 via closure.
 	var candidates []autoSubmitCandidate
 
-	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
+	runTwoPhase(ctx, &promoteMu, TwoPhaseWatcherConfig{
 		Name: "auto-submit",
 		OnPhase1Error: func(err error) {
 			h.breakers["auto-submit"].recordFailure(nil, err.Error())

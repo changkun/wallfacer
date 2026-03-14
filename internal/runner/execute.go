@@ -281,7 +281,16 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	}
 	if needSetup {
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
-		worktreePaths, branchName, err = r.setupWorktrees(taskID)
+		// Use ensureTaskWorktrees with the stored paths and branch name so
+		// that existing branches are reattached (preserving committed changes)
+		// rather than creating fresh worktrees from HEAD. When the task has
+		// no stored paths (first run), this falls back to setupWorktrees
+		// behaviour which uses r.Workspaces().
+		if len(task.WorktreePaths) > 0 {
+			worktreePaths, branchName, err = r.ensureTaskWorktrees(taskID, task.WorktreePaths, task.BranchName)
+		} else {
+			worktreePaths, branchName, err = r.setupWorktrees(taskID)
+		}
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
 		if err != nil {
 			logger.Runner.Error("setup worktrees", "task", taskID, "error", err)
