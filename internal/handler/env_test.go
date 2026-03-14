@@ -19,6 +19,7 @@ import (
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
+	"github.com/google/uuid"
 )
 
 func TestGetEnvConfig_WebhookURLMasked(t *testing.T) {
@@ -695,18 +696,89 @@ func TestTestSandbox_PersistsTaskAfterRun(t *testing.T) {
 		t.Fatalf("expected task_id in response")
 	}
 
-	tasks, err := h.store.ListTasks(context.Background(), false)
+	ctx := context.Background()
+
+	// The task must still be retrievable (not deleted) for auditability.
+	taskID, err := uuid.Parse(resp.TaskID)
+	if err != nil {
+		t.Fatalf("parse task_id: %v", err)
+	}
+	task, err := h.store.GetTask(ctx, taskID)
+	if err != nil {
+		t.Fatalf("GetTask failed: task should still exist after archive, got error: %v", err)
+	}
+
+	// The task must be archived so it does not appear on the main board.
+	if !task.Archived {
+		t.Errorf("expected smoke-test task to be archived, got archived=%v status=%q", task.Archived, task.Status)
+	}
+
+	// The task must not appear in the default board view (includeArchived=false).
+	visible, err := h.store.ListTasks(ctx, false)
 	if err != nil {
 		t.Fatalf("ListTasks failed: %v", err)
 	}
-	if len(tasks) != 1 {
-		t.Fatalf("expected one task remaining after test run, got %d", len(tasks))
+	for _, vt := range visible {
+		if vt.ID.String() == resp.TaskID {
+			t.Errorf("archived smoke-test task should not appear in default board view")
+		}
 	}
-	if tasks[0].ID.String() != resp.TaskID {
-		t.Fatalf("remaining task id mismatch: got %q, want %q", tasks[0].ID, resp.TaskID)
+
+	// But it must appear when archived tasks are included.
+	all, err := h.store.ListTasks(ctx, true)
+	if err != nil {
+		t.Fatalf("ListTasks(includeArchived=true) failed: %v", err)
 	}
-	if tasks[0].Status == store.TaskStatusBacklog || tasks[0].Archived {
-		t.Fatalf("expected completed test task, got status=%q archived=%v", tasks[0].Status, tasks[0].Archived)
+	found := false
+	for _, vt := range all {
+		if vt.ID.String() == resp.TaskID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("archived smoke-test task should appear when includeArchived=true")
+	}
+}
+
+// TestTestSandbox_SandboxTestTag verifies that the smoke-test task is created
+// with the "sandbox-test" tag so it can be found by tag search after archiving.
+func TestTestSandbox_SandboxTestTag(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+
+	body := map[string]interface{}{"sandbox": "claude", "timeout": 1}
+	raw, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/api/env/test", strings.NewReader(string(raw)))
+	w := httptest.NewRecorder()
+	h.TestSandbox(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp sandboxTestResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	taskID, err := uuid.Parse(resp.TaskID)
+	if err != nil {
+		t.Fatalf("parse task_id: %v", err)
+	}
+	task, err := h.store.GetTask(context.Background(), taskID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+
+	hasTag := false
+	for _, tag := range task.Tags {
+		if tag == "sandbox-test" {
+			hasTag = true
+			break
+		}
+	}
+	if !hasTag {
+		t.Errorf("expected task to have tag %q, got tags=%v", "sandbox-test", task.Tags)
 	}
 }
 

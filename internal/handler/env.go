@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/envconfig"
+	"changkun.de/wallfacer/internal/logger"
 	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
@@ -296,6 +297,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		Prompt:  prompt,
 		Timeout: timeout,
 		Sandbox: sb,
+		Tags:    []string{"sandbox-test"},
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -342,6 +344,12 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to read sandbox test result: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+	}
+
+	// Auto-archive smoke-test tasks so they don't clutter the board.
+	if archiveErr := h.store.SetTaskArchived(r.Context(), task.ID, true); archiveErr != nil {
+		logger.Handler.Warn("sandbox test: failed to archive smoke task", "task", task.ID, "error", archiveErr)
+		// non-fatal: the test result is still returned correctly
 	}
 
 	resp := sandboxTestResponse{
