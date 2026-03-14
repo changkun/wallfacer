@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -1003,5 +1004,37 @@ func TestSyncTask_SucceedsAtFullCapacity(t *testing.T) {
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp["status"] != "syncing" {
 		t.Errorf("expected status=syncing, got %q", resp["status"])
+	}
+}
+
+// --- runCommitTransition ---
+
+// TestRunCommitTransition_SuccessWithMock verifies that runCommitTransition
+// transitions a committing task to done when the mock runner's Commit succeeds.
+func TestRunCommitTransition_SuccessWithMock(t *testing.T) {
+	m := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, m)
+	ctx := context.Background()
+
+	task, _ := s.CreateTask(ctx, "test", 30, false, "", "")
+	// Manually drive the task to committing status (bypassing the state machine).
+	s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting) //nolint:errcheck
+
+	// Set up a real worktree path so validateTaskWorktreesForCommit does not
+	// reject the task and transition it back to waiting.
+	worktreeDir := t.TempDir()
+	s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{worktreeDir: worktreeDir}, "task/branch") //nolint:errcheck
+
+	h.runCommitTransition(task.ID, "session-1", store.TriggerUser, "commit error: ")
+	// Give the goroutine time to complete.
+	time.Sleep(100 * time.Millisecond)
+
+	updated, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// MockRunner.Commit returns nil, so the task should reach done status.
+	if updated.Status != store.TaskStatusDone {
+		t.Errorf("expected done status, got %q", updated.Status)
 	}
 }

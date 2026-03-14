@@ -1299,3 +1299,206 @@ func TestKillIdeateContainer_NoOp(t *testing.T) {
 	// Should not panic.
 	r.KillIdeateContainer()
 }
+
+// ---------------------------------------------------------------------------
+// sandboxForTask / modelFromEnv / titleModelFromEnv
+// ---------------------------------------------------------------------------
+
+// TestSandboxForTask_NilTask_DefaultsClaude verifies that sandboxForTask with
+// a nil task returns the "claude" sandbox as the default.
+func TestSandboxForTask_NilTask_DefaultsClaude(t *testing.T) {
+	_, r := setupRunnerWithCmd(t, nil, "echo")
+	result := r.sandboxForTask(nil)
+	if result != "claude" {
+		t.Errorf("sandboxForTask(nil) = %q, want %q", result, "claude")
+	}
+}
+
+// TestSandboxForTask_TaskWithSandbox verifies that sandboxForTask returns the
+// sandbox set on the task.
+func TestSandboxForTask_TaskWithSandbox(t *testing.T) {
+	_, r := setupRunnerWithCmd(t, nil, "echo")
+	task := &store.Task{Sandbox: "codex"}
+	result := r.sandboxForTask(task)
+	if result != "codex" {
+		t.Errorf("sandboxForTask(task{Sandbox:codex}) = %q, want %q", result, "codex")
+	}
+}
+
+// TestSandboxForTask_EmptyTask_DefaultsClaude verifies that a task with no
+// sandbox configured falls back to the "claude" default.
+func TestSandboxForTask_EmptyTask_DefaultsClaude(t *testing.T) {
+	_, r := setupRunnerWithCmd(t, nil, "echo")
+	task := &store.Task{}
+	result := r.sandboxForTask(task)
+	if result != "claude" {
+		t.Errorf("sandboxForTask(empty task) = %q, want %q", result, "claude")
+	}
+}
+
+// TestModelFromEnv_NoEnvFile verifies that modelFromEnv returns an empty
+// string when no env file is configured.
+func TestModelFromEnv_NoEnvFile(t *testing.T) {
+	_, r := setupRunnerWithCmd(t, nil, "echo")
+	// setupRunnerWithCmd leaves envFile empty.
+	result := r.modelFromEnv()
+	if result != "" {
+		t.Errorf("modelFromEnv with no env file = %q, want %q", result, "")
+	}
+}
+
+// TestModelFromEnv_WithEnvFile verifies that modelFromEnv reads the model
+// from a populated env file.
+func TestModelFromEnv_WithEnvFile(t *testing.T) {
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, []byte("CLAUDE_DEFAULT_MODEL=claude-opus-4-5\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	r := NewRunner(s, RunnerConfig{
+		Command: "echo",
+		EnvFile: envFile,
+	})
+	result := r.modelFromEnv()
+	if result != "claude-opus-4-5" {
+		t.Errorf("modelFromEnv = %q, want %q", result, "claude-opus-4-5")
+	}
+}
+
+// TestModelFromEnv_BadEnvFile verifies that modelFromEnv returns empty string
+// when the env file cannot be parsed.
+func TestModelFromEnv_BadEnvFile(t *testing.T) {
+	// Point to a non-existent file.
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	r := NewRunner(s, RunnerConfig{
+		Command: "echo",
+		EnvFile: "/nonexistent/path/.env",
+	})
+	result := r.modelFromEnv()
+	if result != "" {
+		t.Errorf("modelFromEnv with bad env file = %q, want %q", result, "")
+	}
+}
+
+// TestTitleModelFromEnv_NoEnvFile verifies that titleModelFromEnv returns an
+// empty string when no env file is configured.
+func TestTitleModelFromEnv_NoEnvFile(t *testing.T) {
+	_, r := setupRunnerWithCmd(t, nil, "echo")
+	result := r.titleModelFromEnv()
+	if result != "" {
+		t.Errorf("titleModelFromEnv with no env file = %q, want %q", result, "")
+	}
+}
+
+// TestTitleModelFromEnv_WithTitleModel verifies that titleModelFromEnv returns
+// the title-specific model when set.
+func TestTitleModelFromEnv_WithTitleModel(t *testing.T) {
+	envFile := filepath.Join(t.TempDir(), ".env")
+	content := "CLAUDE_DEFAULT_MODEL=claude-opus-4-5\nCLAUDE_TITLE_MODEL=claude-haiku-4-5\n"
+	if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	r := NewRunner(s, RunnerConfig{
+		Command: "echo",
+		EnvFile: envFile,
+	})
+	result := r.titleModelFromEnv()
+	if result != "claude-haiku-4-5" {
+		t.Errorf("titleModelFromEnv = %q, want %q", result, "claude-haiku-4-5")
+	}
+}
+
+// TestTitleModelFromEnv_FallsBackToDefaultModel verifies that titleModelFromEnv
+// returns the default model when no title-specific model is set.
+func TestTitleModelFromEnv_FallsBackToDefaultModel(t *testing.T) {
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, []byte("CLAUDE_DEFAULT_MODEL=claude-opus-4-5\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dataDir := t.TempDir()
+	s, err := store.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	r := NewRunner(s, RunnerConfig{
+		Command: "echo",
+		EnvFile: envFile,
+	})
+	result := r.titleModelFromEnv()
+	if result != "claude-opus-4-5" {
+		t.Errorf("titleModelFromEnv fallback = %q, want %q", result, "claude-opus-4-5")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// IdeationCategories / IdeationIgnorePatterns (Runner methods)
+// ---------------------------------------------------------------------------
+
+// TestIdeationCategories_ReturnsNonEmpty verifies that IdeationCategories
+// returns a non-empty slice of category strings.
+func TestIdeationCategories_ReturnsNonEmpty(t *testing.T) {
+	_, r := setupRunnerWithCmd(t, nil, "echo")
+	cats := r.IdeationCategories()
+	if len(cats) == 0 {
+		t.Error("IdeationCategories returned empty slice, want non-empty")
+	}
+}
+
+// TestIdeationCategories_ReturnsCopy verifies that mutations to the returned
+// slice do not affect subsequent calls.
+func TestIdeationCategories_ReturnsCopy(t *testing.T) {
+	_, r := setupRunnerWithCmd(t, nil, "echo")
+	cats1 := r.IdeationCategories()
+	if len(cats1) == 0 {
+		t.Skip("no categories, nothing to mutate")
+	}
+	original := cats1[0]
+	cats1[0] = "mutated"
+	cats2 := r.IdeationCategories()
+	if cats2[0] != original {
+		t.Errorf("IdeationCategories not returning copy; original value changed to %q", cats2[0])
+	}
+}
+
+// TestIdeationIgnorePatterns_ReturnsNonEmpty verifies that
+// IdeationIgnorePatterns returns a non-empty slice of pattern strings.
+func TestIdeationIgnorePatterns_ReturnsNonEmpty(t *testing.T) {
+	_, r := setupRunnerWithCmd(t, nil, "echo")
+	pats := r.IdeationIgnorePatterns()
+	if len(pats) == 0 {
+		t.Error("IdeationIgnorePatterns returned empty slice, want non-empty")
+	}
+}
+
+// TestIdeationIgnorePatterns_ReturnsCopy verifies that mutations to the
+// returned slice do not affect subsequent calls.
+func TestIdeationIgnorePatterns_ReturnsCopy(t *testing.T) {
+	_, r := setupRunnerWithCmd(t, nil, "echo")
+	pats1 := r.IdeationIgnorePatterns()
+	if len(pats1) == 0 {
+		t.Skip("no patterns, nothing to mutate")
+	}
+	original := pats1[0]
+	pats1[0] = "mutated"
+	pats2 := r.IdeationIgnorePatterns()
+	if pats2[0] != original {
+		t.Errorf("IdeationIgnorePatterns not returning copy; original value changed to %q", pats2[0])
+	}
+}

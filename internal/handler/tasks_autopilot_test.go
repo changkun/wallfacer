@@ -2,6 +2,8 @@ package handler
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"context"
 	"errors"
 	"log/slog"
@@ -9,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -596,5 +599,121 @@ func TestTaskReachableInAdj(t *testing.T) {
 					tc.start, tc.target, got, tc.want)
 			}
 		})
+	}
+}
+
+// Tests for Start* autopilot goroutine launchers.
+// Each function spawns a goroutine that exits when ctx is cancelled.
+// Pre-cancelling the context causes the goroutine to exit almost immediately,
+// allowing tests to verify the function does not panic or block indefinitely.
+
+func TestStartAutoPromoter_ExitsOnCancel(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // pre-cancel so the goroutine exits via ctx.Done()
+	h.StartAutoPromoter(ctx)
+	time.Sleep(10 * time.Millisecond) // allow goroutine to exit
+}
+
+func TestStartAutoRetrier_ExitsOnCancel(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // pre-cancel so recovery scan completes and goroutine exits
+	h.StartAutoRetrier(ctx)
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestStartWaitingSyncWatcher_ExitsOnCancel(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	h.StartWaitingSyncWatcher(ctx)
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestStartAutoTester_ExitsOnCancel(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	h.StartAutoTester(ctx)
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestStartAutoSubmitter_ExitsOnCancel(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	h.StartAutoSubmitter(ctx)
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestStartAutoRefiner_ExitsOnCancel(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	h.StartAutoRefiner(ctx)
+	time.Sleep(10 * time.Millisecond)
+}
+
+// --- checkConcurrencyAndUpdateStatus ---
+
+// TestCheckConcurrencyAndUpdateStatus_Success verifies that a valid backlog →
+// in_progress transition returns true and leaves the task in_progress.
+func TestCheckConcurrencyAndUpdateStatus_Success(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	w := httptest.NewRecorder()
+	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, task.ID, store.TaskStatusBacklog, store.TaskStatusInProgress)
+	if !ok {
+		t.Errorf("expected success, got %d: %s", w.Code, w.Body.String())
+	}
+	updated, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != store.TaskStatusInProgress {
+		t.Errorf("expected in_progress, got %q", updated.Status)
+	}
+}
+
+// TestCheckConcurrencyAndUpdateStatus_InvalidTransition verifies that an
+// invalid transition (backlog → done, which is not allowed) returns false and
+// a 400 response.
+func TestCheckConcurrencyAndUpdateStatus_InvalidTransition(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	w := httptest.NewRecorder()
+	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, task.ID, store.TaskStatusBacklog, store.TaskStatusDone)
+	if ok {
+		t.Error("expected failure for invalid transition")
+	}
+	if w.Code != http.StatusBadRequest && w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 400 or 500, got %d", w.Code)
+	}
+}
+
+// TestCheckConcurrencyAndUpdateStatus_MaxConcurrency verifies that attempting to
+// promote a backlog task when the concurrency limit is already reached returns
+// false and a 409 Conflict response.
+func TestCheckConcurrencyAndUpdateStatus_MaxConcurrency(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	max := h.maxConcurrentTasks()
+	// Saturate the concurrency limit with in-progress regular tasks.
+	for i := 0; i < max; i++ {
+		task, _ := h.store.CreateTask(ctx, "running", 15, false, "", "")
+		h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress) //nolint:errcheck
+	}
+	// Try to promote one more backlog task — must be rejected.
+	backlog, _ := h.store.CreateTask(ctx, "backlog", 15, false, "", "")
+	w := httptest.NewRecorder()
+	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, backlog.ID, store.TaskStatusBacklog, store.TaskStatusInProgress)
+	if ok {
+		t.Error("expected concurrency limit rejection")
+	}
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409 Conflict, got %d: %s", w.Code, w.Body.String())
 	}
 }

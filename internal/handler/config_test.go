@@ -12,7 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/runner"
+	"changkun.de/wallfacer/internal/sandbox"
 	"changkun.de/wallfacer/internal/store"
 	"changkun.de/wallfacer/internal/workspace"
 )
@@ -1095,5 +1097,88 @@ func TestUpdateConfig_RejectsTrailingContent(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400 for trailing content, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// --- ssrfHardenedTransport ---
+
+// TestSsrfHardenedTransport_ReturnsNonNil verifies that ssrfHardenedTransport
+// returns a non-nil transport.
+func TestSsrfHardenedTransport_ReturnsNonNil(t *testing.T) {
+	transport := ssrfHardenedTransport()
+	if transport == nil {
+		t.Error("expected non-nil transport")
+	}
+}
+
+// TestSsrfHardenedTransport_BlocksLocalhostRequests verifies that the hardened
+// transport blocks requests to loopback addresses.
+func TestSsrfHardenedTransport_BlocksLocalhostRequests(t *testing.T) {
+	transport := ssrfHardenedTransport()
+	if transport == nil {
+		t.Fatal("nil transport")
+	}
+	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
+	_, err := client.Get("http://localhost/test")
+	if err == nil {
+		t.Error("expected ssrfHardenedTransport to block localhost requests")
+	}
+}
+
+// TestSsrfHardenedTransport_BlocksPrivateIPRequests verifies that the hardened
+// transport blocks requests to RFC-1918 private addresses.
+func TestSsrfHardenedTransport_BlocksPrivateIPRequests(t *testing.T) {
+	transport := ssrfHardenedTransport()
+	if transport == nil {
+		t.Fatal("nil transport")
+	}
+	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
+	_, err := client.Get("http://192.168.1.1/test")
+	if err == nil {
+		t.Error("expected ssrfHardenedTransport to block private IP requests")
+	}
+}
+
+// --- defaultSandbox ---
+
+// TestDefaultSandbox_ExplicitSandboxReturned verifies that an explicitly
+// configured default sandbox is returned as-is.
+func TestDefaultSandbox_ExplicitSandboxReturned(t *testing.T) {
+	cfg := envconfig.Config{DefaultSandbox: sandbox.Codex}
+	result := defaultSandbox(cfg)
+	if result != sandbox.Codex {
+		t.Errorf("expected %q, got %q", sandbox.Codex, result)
+	}
+}
+
+// TestDefaultSandbox_ClaudeModelFallsBackToClaude verifies that when only a
+// Claude default model is set (no explicit sandbox), the function returns the
+// Claude sandbox.
+func TestDefaultSandbox_ClaudeModelFallsBackToClaude(t *testing.T) {
+	cfg := envconfig.Config{DefaultModel: "claude-opus-4-6"}
+	result := defaultSandbox(cfg)
+	if result != sandbox.Claude {
+		t.Errorf("expected %q, got %q", sandbox.Claude, result)
+	}
+}
+
+// TestDefaultSandbox_CodexModelFallsBackToCodex verifies that when only a Codex
+// model is set (no explicit sandbox, no Claude model), the function returns the
+// Codex sandbox.
+func TestDefaultSandbox_CodexModelFallsBackToCodex(t *testing.T) {
+	cfg := envconfig.Config{CodexDefaultModel: "codex-mini-latest"}
+	result := defaultSandbox(cfg)
+	if result != sandbox.Codex {
+		t.Errorf("expected %q, got %q", sandbox.Codex, result)
+	}
+}
+
+// TestDefaultSandbox_EmptyConfigReturnsClaude verifies that with no config at
+// all the function falls back to the Claude sandbox.
+func TestDefaultSandbox_EmptyConfigReturnsClaude(t *testing.T) {
+	cfg := envconfig.Config{}
+	result := defaultSandbox(cfg)
+	if result != sandbox.Claude {
+		t.Errorf("expected %q (default), got %q", sandbox.Claude, result)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/wallfacer/internal/runner"
 	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -101,5 +102,26 @@ func TestForkTask_StoreLayerForkedFrom(t *testing.T) {
 	data, _ := json.Marshal(forked)
 	if !strings.Contains(string(data), `"forked_from"`) {
 		t.Error("JSON missing forked_from field")
+	}
+}
+
+// TestForkTask_SuccessWithMockRunner verifies the happy path for ForkTask: a
+// done source task with worktrees set returns 201 with the new task in the body.
+func TestForkTask_SuccessWithMockRunner(t *testing.T) {
+	m := &runner.MockRunner{}
+	h, s := newTestHandlerWithMockRunner(t, m)
+	ctx := context.Background()
+
+	source, _ := s.CreateTask(ctx, "source task", 30, false, "", "")
+	s.ForceUpdateTaskStatus(ctx, source.ID, store.TaskStatusDone) //nolint:errcheck
+	// Set worktrees so ForkTask doesn't reject with 422.
+	s.UpdateTaskWorktrees(ctx, source.ID, map[string]string{"/repo": "/wt"}, "task/branch") //nolint:errcheck
+
+	body := bytes.NewBufferString(`{"prompt":"forked task prompt","timeout":30}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+source.ID.String()+"/fork", body)
+	w := httptest.NewRecorder()
+	h.ForkTask(w, req, source.ID)
+	if w.Code != http.StatusCreated {
+		t.Errorf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 }

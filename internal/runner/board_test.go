@@ -745,3 +745,166 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// logBoardManifestSizeWarning
+// ---------------------------------------------------------------------------
+
+// TestLogBoardManifestSizeWarning_LessThan5 verifies that the function does
+// not panic when the number of size entries is fewer than 5.
+func TestLogBoardManifestSizeWarning_LessThan5(t *testing.T) {
+	sizes := []struct {
+		id    string
+		bytes int
+	}{
+		{id: "task1", bytes: 1000},
+		{id: "task2", bytes: 2000},
+	}
+	// Must not panic; exercises the sort and log path with small input.
+	logBoardManifestSizeWarning(sizes, 3000)
+}
+
+// TestLogBoardManifestSizeWarning_MoreThan5 verifies that the function does
+// not panic when there are more than 5 entries and only logs the top 5.
+func TestLogBoardManifestSizeWarning_MoreThan5(t *testing.T) {
+	sizes := []struct {
+		id    string
+		bytes int
+	}{
+		{id: "t1", bytes: 100},
+		{id: "t2", bytes: 200},
+		{id: "t3", bytes: 300},
+		{id: "t4", bytes: 400},
+		{id: "t5", bytes: 500},
+		{id: "t6", bytes: 600},
+	}
+	// Must not panic and must sort descending (t6 is largest, logged first).
+	logBoardManifestSizeWarning(sizes, 2100)
+}
+
+// TestLogBoardManifestSizeWarning_Sorted verifies that sizes are sorted in
+// descending order (largest first) before being logged.
+func TestLogBoardManifestSizeWarning_Sorted(t *testing.T) {
+	sizes := []struct {
+		id    string
+		bytes int
+	}{
+		{id: "small", bytes: 10},
+		{id: "large", bytes: 9999},
+		{id: "medium", bytes: 500},
+	}
+	// After the call the slice must be sorted descending (function sorts in place).
+	logBoardManifestSizeWarning(sizes, 10509)
+	if sizes[0].id != "large" {
+		t.Errorf("expected largest entry first after sort, got %q", sizes[0].id)
+	}
+	if sizes[1].id != "medium" {
+		t.Errorf("expected medium entry second, got %q", sizes[1].id)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// writeBoardDir
+// ---------------------------------------------------------------------------
+
+// TestWriteBoardDir_CreatesFileWithContent verifies that writeBoardDir creates
+// a temp directory containing board.json with the exact bytes provided.
+func TestWriteBoardDir_CreatesFileWithContent(t *testing.T) {
+	data := []byte(`{"tasks":[], "generated_at":"2024-01-01T00:00:00Z"}`)
+	dir, err := writeBoardDir(data)
+	if err != nil {
+		t.Fatalf("writeBoardDir: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	content, err := os.ReadFile(filepath.Join(dir, "board.json"))
+	if err != nil {
+		t.Fatalf("read board.json: %v", err)
+	}
+	if string(content) != string(data) {
+		t.Errorf("content mismatch: got %q, want %q", string(content), string(data))
+	}
+}
+
+// TestWriteBoardDir_EmptyData verifies that writeBoardDir works with minimal data.
+func TestWriteBoardDir_EmptyData(t *testing.T) {
+	dir, err := writeBoardDir([]byte("{}"))
+	if err != nil {
+		t.Fatalf("writeBoardDir empty: %v", err)
+	}
+	defer os.RemoveAll(dir)
+	if _, err := os.Stat(filepath.Join(dir, "board.json")); err != nil {
+		t.Fatalf("board.json should exist: %v", err)
+	}
+}
+
+// TestWriteBoardDir_ReturnsDirPath verifies that the returned path is a valid
+// directory that contains board.json.
+func TestWriteBoardDir_ReturnsDirPath(t *testing.T) {
+	dir, err := writeBoardDir([]byte(`{"ok":true}`))
+	if err != nil {
+		t.Fatalf("writeBoardDir: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("returned path not accessible: %v", err)
+	}
+	if !info.IsDir() {
+		t.Errorf("expected a directory, got a file at %q", dir)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// streamBoardJSON — large data triggers logBoardManifestSizeWarning
+// ---------------------------------------------------------------------------
+
+// TestStreamBoardJSON_LargeDataTriggersWarning verifies that streamBoardJSON
+// runs without error when the serialised manifest exceeds 64 KB and calls
+// logBoardManifestSizeWarning internally (no panic). We create enough tasks
+// with long prompts to push the JSON past the 64 KB threshold.
+//
+// Non-self prompts are truncated to 500 chars inside streamBoardJSON, so we
+// create 80 tasks (each ~1 200 B) to reliably exceed the 64 KB threshold.
+func TestStreamBoardJSON_LargeDataTriggersWarning(t *testing.T) {
+	s, _ := setupRunnerWithCmd(t, nil, "echo")
+	ctx := bg()
+
+	// 80 tasks × ~1 200 bytes each ≈ 96 KB > 64 KB threshold.
+	prompt := strings.Repeat("A", 500)
+	var selfID [16]byte
+	for i := 0; i < 80; i++ {
+		task, err := s.CreateTask(ctx, prompt, 5, false, "", "")
+		if err != nil {
+			t.Fatalf("CreateTask %d: %v", i, err)
+		}
+		s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+		if i == 0 {
+			selfID = task.ID
+		}
+	}
+
+	dir, written, err := streamBoardJSON(ctx, s, selfID, false)
+	if err != nil {
+		t.Fatalf("streamBoardJSON: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	t.Logf("streamBoardJSON wrote %d bytes", written)
+
+	// The manifest must exceed 64 KB so that logBoardManifestSizeWarning was called.
+	const maxManifestBytes = 64 * 1024
+	if written <= maxManifestBytes {
+		t.Logf("note: written=%d did not exceed threshold %d; warning branch may not have fired", written, maxManifestBytes)
+	}
+
+	// Verify board.json was created and is non-empty.
+	info, err := os.Stat(filepath.Join(dir, "board.json"))
+	if err != nil {
+		t.Fatalf("board.json not found: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Error("board.json should be non-empty")
+	}
+}

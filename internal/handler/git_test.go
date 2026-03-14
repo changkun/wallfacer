@@ -1067,3 +1067,134 @@ func BenchmarkCollectWorkspaceStatuses(b *testing.B) {
 		collectWorkspaceStatuses(dirs)
 	}
 }
+
+// minimalWriter implements http.ResponseWriter but NOT http.Flusher,
+// used to test SSE endpoints that require a flusher.
+type minimalWriter struct {
+	code    int
+	headers http.Header
+	body    strings.Builder
+}
+
+func (m *minimalWriter) Header() http.Header         { return m.headers }
+func (m *minimalWriter) Write(b []byte) (int, error) { return m.body.Write(b) }
+func (m *minimalWriter) WriteHeader(code int)         { m.code = code }
+
+// TestGitStatusStream_NoFlusher verifies that GitStatusStream returns 500 when
+// the ResponseWriter does not implement http.Flusher.
+func TestGitStatusStream_NoFlusher(t *testing.T) {
+	h := newTestHandler(t)
+	w := &minimalWriter{headers: make(http.Header)}
+	req := httptest.NewRequest(http.MethodGet, "/api/git/stream", nil)
+	h.GitStatusStream(w, req)
+	if w.code != http.StatusInternalServerError {
+		t.Errorf("expected 500 for non-flusher writer, got %d", w.code)
+	}
+}
+
+// TestGitStatusStream_CancelledContext verifies that GitStatusStream exits
+// cleanly and sets SSE headers when the request context is already cancelled.
+func TestGitStatusStream_CancelledContext(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately so the stream loop exits after first send
+	req := httptest.NewRequest(http.MethodGet, "/api/git/stream", nil).WithContext(ctx)
+	w := httptest.NewRecorder()
+	h.GitStatusStream(w, req)
+	if ct := w.Header().Get("Content-Type"); ct == "" {
+		t.Error("expected Content-Type header to be set for SSE stream")
+	}
+}
+
+// TestOpenFolder_InvalidJSON verifies that OpenFolder returns a non-200 status
+// when the request body is malformed JSON.
+func TestOpenFolder_InvalidJSON(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/open-folder", strings.NewReader("{bad json"))
+	w := httptest.NewRecorder()
+	h.OpenFolder(w, req)
+	if w.Code == http.StatusOK {
+		t.Errorf("expected non-200 for malformed JSON, got %d", w.Code)
+	}
+}
+
+// TestOpenFolder_NotAllowedWorkspace verifies that OpenFolder returns 400 when
+// the requested path is not a configured workspace.
+func TestOpenFolder_NotAllowedWorkspace(t *testing.T) {
+	h := newTestHandler(t)
+	body := `{"path":"/tmp/not-a-registered-workspace"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/open-folder", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.OpenFolder(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for unregistered workspace, got %d", w.Code)
+	}
+}
+
+// TestOpenFolder_AllowedWorkspace verifies that OpenFolder does not reject a
+// path that is a configured workspace (it may fail to launch xdg-open/open in
+// the test environment, but must not return 400).
+func TestOpenFolder_AllowedWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	h := newStaticWorkspaceHandler(t, []string{dir})
+	body := `{"path":"` + dir + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/open-folder", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.OpenFolder(w, req)
+	// 400 would mean the workspace wasn't recognised — that is the bug we guard against.
+	if w.Code == http.StatusBadRequest {
+		t.Errorf("should not 400 for a configured workspace, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// --- GitRebaseOnMain additional coverage ---
+
+// TestGitRebaseOnMain_FetchFails verifies that when `git fetch origin` fails
+// (no remote configured), the handler returns 500.
+func TestGitRebaseOnMain_FetchFails(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+
+	// The repo has no remote, so fetch will fail → 500.
+	body := `{"workspace": "` + repo + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitRebaseOnMain(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 when fetch fails (no remote), got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// --- taskBlocksWorkspaceMutation additional coverage ---
+
+// TestTaskBlocksWorkspaceMutation_FailedTaskWithExistingWorktree verifies that
+// a failed task whose worktree directory exists on disk does block a workspace
+// mutation. This exercises the os.Stat success path in taskBlocksWorkspaceMutation.
+func TestTaskBlocksWorkspaceMutation_FailedTaskWithExistingWorktree(t *testing.T) {
+	repo := setupRepo(t)
+	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
+	ctx := context.Background()
+
+	task, _ := h.store.CreateTask(ctx, "failed task with worktree", 15, false, "", "")
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+
+	// Create an existing worktree directory so os.Stat succeeds.
+	existingWorktreeDir := t.TempDir()
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: existingWorktreeDir}, "task-failed-existing"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("UpdateTaskStatus failed: %v", err)
+	}
+
+	// A failed task with an existing worktree should block the rebase.
+	body := `{"workspace": "` + repo + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.GitRebaseOnMain(w, req)
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409 when failed task has existing worktree, got %d: %s", w.Code, w.Body.String())
+	}
+}
