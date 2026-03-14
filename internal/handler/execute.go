@@ -191,7 +191,9 @@ func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID string, trigge
 					return
 				}
 			}
-			h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			if statusErr := h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed); statusErr != nil {
+				logger.Handler.Error("update task status to failed after commit error", "task", taskID, "error", statusErr)
+			}
 			h.insertEventOrLog(bgCtx, taskID, store.EventTypeError, map[string]string{
 				"error": failurePrefix + err.Error(),
 			})
@@ -202,7 +204,9 @@ func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID string, trigge
 			}
 			return
 		}
-		h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+		if statusErr := h.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone); statusErr != nil {
+			logger.Handler.Error("update task status to done after commit", "task", taskID, "error", statusErr)
+		}
 		h.insertEventOrLog(bgCtx, taskID, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, trigger, nil))
 	}()
