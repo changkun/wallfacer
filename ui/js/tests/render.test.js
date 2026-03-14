@@ -115,6 +115,9 @@ function createContext(options = {}) {
       done: () => `/api/tasks/${id}/done`,
       resume: () => `/api/tasks/${id}/resume`,
     }),
+    activeWorkspaces: ['~/project'],
+    getOpenModalTaskId: vi.fn(() => null),
+    renderModalDependencies: vi.fn(),
     ...options,
   });
 
@@ -186,6 +189,36 @@ describe('render.js dependency helpers', () => {
     const names = renderExports.getBlockingTaskNames({ id: 'task-a', depends_on: ['dep-1', 'dep-2', 'dep-3'] });
 
     expect(names).toBe('Active task, Needs manual fix');
+  });
+
+  it('returns false when all dependencies are cancelled', () => {
+    ctx.tasks = [
+      { id: 'dep-1', status: 'cancelled' },
+      { id: 'dep-2', status: 'cancelled' },
+    ];
+
+    expect(renderExports.areDepsBlocked({ id: 'task-a', depends_on: ['dep-1', 'dep-2'] })).toBe(false);
+  });
+
+  it('returns false when dependencies are a mix of done and cancelled', () => {
+    ctx.tasks = [
+      { id: 'dep-1', status: 'done' },
+      { id: 'dep-2', status: 'cancelled' },
+    ];
+
+    expect(renderExports.areDepsBlocked({ id: 'task-a', depends_on: ['dep-1', 'dep-2'] })).toBe(false);
+  });
+
+  it('does not include cancelled dependency names in blocking names', () => {
+    ctx.tasks = [
+      { id: 'dep-1', status: 'done', title: 'Finished task', prompt: 'done prompt' },
+      { id: 'dep-2', status: 'cancelled', title: 'Cancelled task', prompt: 'cancelled prompt' },
+      { id: 'dep-3', status: 'in_progress', title: 'Active task', prompt: 'active prompt' },
+    ];
+
+    const names = renderExports.getBlockingTaskNames({ id: 'task-a', depends_on: ['dep-1', 'dep-2', 'dep-3'] });
+
+    expect(names).toBe('Active task');
   });
 });
 
@@ -303,6 +336,61 @@ describe('render.js cardOversightCache', () => {
 
     expect(renderExports.cardOversightCache.has('task-a')).toBe(false);
     expect(ctx.scheduleRender).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('api.js SSE modal dependency refresh', () => {
+  let ctx;
+
+  beforeEach(() => {
+    ({ ctx } = loadRenderAndApiHarness({
+      activeWorkspaces: ['~/project'],
+      getOpenModalTaskId: vi.fn(() => 'task-b'),
+      renderModalDependencies: vi.fn(),
+    }));
+    ctx.tasks = [
+      { id: 'task-a', status: 'in_progress', title: 'Task A' },
+      { id: 'task-b', status: 'backlog', title: 'Task B', depends_on: ['task-a'] },
+    ];
+    ctx.archivedTasks = [];
+  });
+
+  it('calls renderModalDependencies when a dependency of the open task changes status', () => {
+    ctx.startTasksStream();
+    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+
+    handler({
+      data: JSON.stringify({ id: 'task-a', status: 'done', title: 'Task A', updated_at: '2026-03-10T00:00:00Z' }),
+      lastEventId: 'evt-1',
+    });
+
+    expect(ctx.renderModalDependencies).toHaveBeenCalledTimes(1);
+    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe('task-b');
+  });
+
+  it('does not call renderModalDependencies when the updated task is not a dependency of the open task', () => {
+    ctx.startTasksStream();
+    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+
+    handler({
+      data: JSON.stringify({ id: 'task-c', status: 'done', title: 'Task C', updated_at: '2026-03-10T00:00:00Z' }),
+      lastEventId: 'evt-2',
+    });
+
+    expect(ctx.renderModalDependencies).not.toHaveBeenCalled();
+  });
+
+  it('does not call renderModalDependencies when no modal is open', () => {
+    ctx.getOpenModalTaskId = vi.fn(() => null);
+    ctx.startTasksStream();
+    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+
+    handler({
+      data: JSON.stringify({ id: 'task-a', status: 'done', title: 'Task A', updated_at: '2026-03-10T00:00:00Z' }),
+      lastEventId: 'evt-3',
+    });
+
+    expect(ctx.renderModalDependencies).not.toHaveBeenCalled();
   });
 });
 

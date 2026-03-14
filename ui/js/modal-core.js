@@ -101,6 +101,57 @@ function _renderModalLoadingPlaceholders() {
   }
 }
 
+// renderModalDependencies populates the "Blocked by" section of the task
+// detail modal with a row per dependency. Called both from openModal() and
+// from the SSE task-updated handler when a dependency changes status.
+function renderModalDependencies(task) {
+  var depSection = document.getElementById('modal-dependencies');
+  if (!depSection) return;
+  var deps = task && task.depends_on;
+  if (!deps || deps.length === 0) {
+    depSection.classList.add('hidden');
+    return;
+  }
+  depSection.classList.remove('hidden');
+  var listEl = document.getElementById('modal-dependencies-list');
+  var summaryEl = document.getElementById('modal-dependencies-summary');
+  if (!listEl) return;
+
+  var nonDoneCount = 0;
+  var rows = deps.map(function(depId) {
+    var depTask = (typeof findTaskById === 'function' ? findTaskById(depId) : null);
+    if (!depTask) {
+      nonDoneCount++;
+      return '<div class="flex items-center gap-2 text-sm text-v-muted">' +
+        '<span style="text-decoration:line-through;">[removed] ' + escapeHtml(depId.slice(0, 8)) + '\u2026</span>' +
+        '</div>';
+    }
+    if (depTask.status !== 'done' && depTask.status !== 'cancelled') nonDoneCount++;
+    var statusLabel = depTask.status === 'in_progress' ? 'in progress' : depTask.status;
+    var label = depTask.title ||
+      (depTask.prompt.length > 60 ? depTask.prompt.slice(0, 60) + '\u2026' : depTask.prompt);
+    return '<div class="flex items-center gap-2 text-sm" data-dep-id="' + escapeHtml(depId) + '">' +
+      '<span class="badge badge-' + escapeHtml(depTask.status) + '">' + escapeHtml(statusLabel) + '</span>' +
+      '<button onclick="openModal(\'' + escapeHtml(depId) + '\')" ' +
+        'style="max-width:24rem;text-align:left;background:none;border:none;cursor:pointer;padding:0;font-size:inherit;color:var(--accent);">' +
+        escapeHtml(label) +
+      '</button>' +
+      '</div>';
+  });
+
+  listEl.innerHTML = rows.join('');
+  if (summaryEl) {
+    var total = deps.length;
+    if (nonDoneCount > 0) {
+      summaryEl.textContent = 'Waiting on ' + nonDoneCount + ' of ' + total + ' task' + (total !== 1 ? 's' : '');
+      summaryEl.style.color = '';
+    } else {
+      summaryEl.textContent = 'All ' + total + ' dependenc' + (total !== 1 ? 'ies' : 'y') + ' satisfied';
+      summaryEl.style.color = 'var(--green, #22c55e)';
+    }
+  }
+}
+
 async function openModal(id) {
   function isTestCard(task) {
     return task.status === 'waiting' && !!task.last_test_result && task.test_run_start_turn > 0;
@@ -589,6 +640,9 @@ async function openModal(id) {
   } else {
     retryHistorySection.classList.add('hidden');
   }
+
+  // Dependencies section
+  renderModalDependencies(task);
 
   // Load events
   const _EVENTS_TYPES = 'state_change,output,feedback,error,system';
