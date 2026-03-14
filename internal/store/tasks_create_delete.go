@@ -14,6 +14,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// defaultAutoRetryBudget defines the per-category retry allowances granted to
+// every newly created task. ResetTaskForRetry uses this same map so that a
+// manual retry after a budget-exhausted auto-retry cycle restores the full
+// budget, allowing the auto-retrier to act again on the next failure.
+var defaultAutoRetryBudget = map[FailureCategory]int{
+	FailureCategoryContainerCrash: 2,
+	FailureCategorySyncError:      2,
+	FailureCategoryWorktree:       1,
+}
+
 type TaskCreateOptions struct {
 	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
 	ID                uuid.UUID
@@ -63,9 +73,9 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		// AutoRetryBudget provides per-category retry allowances for transient
 		// failures. Budget is only granted for categories where retrying is safe.
 		AutoRetryBudget: map[FailureCategory]int{
-			FailureCategoryContainerCrash: 2,
-			FailureCategorySyncError:      2,
-			FailureCategoryWorktree:       1,
+			FailureCategoryContainerCrash: defaultAutoRetryBudget[FailureCategoryContainerCrash],
+			FailureCategorySyncError:      defaultAutoRetryBudget[FailureCategorySyncError],
+			FailureCategoryWorktree:       defaultAutoRetryBudget[FailureCategoryWorktree],
 		},
 	}
 

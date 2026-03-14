@@ -463,6 +463,14 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.IsTestRun = false
 	t.LastTestResult = ""
 	t.PendingTestFeedback = ""
+	// Reset auto-retry counters so that a manual retry after budget exhaustion
+	// grants a fresh allowance and the auto-retrier can act on the next failure.
+	t.AutoRetryCount = 0
+	t.AutoRetryBudget = map[FailureCategory]int{
+		FailureCategoryContainerCrash: defaultAutoRetryBudget[FailureCategoryContainerCrash],
+		FailureCategorySyncError:      defaultAutoRetryBudget[FailureCategorySyncError],
+		FailureCategoryWorktree:       defaultAutoRetryBudget[FailureCategoryWorktree],
+	}
 	t.UpdatedAt = time.Now()
 	s.removeFromStatusIndex(oldStatus, id)
 	s.addToStatusIndex(t.Status, id)

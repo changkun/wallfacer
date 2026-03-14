@@ -148,6 +148,90 @@ func TestTryAutoPromote_Phase1StoreErrorsLogAndOpenBreaker(t *testing.T) {
 	}
 }
 
+// TestTryAutoRetry_EligibleAfterManualRetryReset verifies that a task whose
+// auto-retry budget was exhausted (AutoRetryBudget ≤ 0 or AutoRetryCount ≥ 3)
+// is still picked up by tryAutoRetry after the user triggers a manual retry
+// via ResetTaskForRetry, which restores both counters to their initial values.
+//
+// This is a regression test for the bug where ResetTaskForRetry did not reset
+// AutoRetryCount / AutoRetryBudget, causing the auto-retrier to silently skip
+// the task on the next failure.
+func TestTryAutoRetry_EligibleAfterManualRetryReset(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+
+	ctx := context.Background()
+
+	// Create a task and bring it to failed state with an exhausted budget.
+	task, err := h.store.CreateTask(ctx, "retry-reset integration", 15, false, "", store.TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Simulate IncrementAutoRetryCount until the budget and count are exhausted
+	// (ContainerCrash budget = 2, maxHandlerAutoRetries = 3).
+	for i := 0; i < 3; i++ {
+		if err := h.store.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+			t.Fatalf("IncrementAutoRetryCount[%d]: %v", i, err)
+		}
+	}
+
+	// Transition to in_progress then failed with a retryable category.
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus failed: %v", err)
+	}
+	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+
+	// Confirm that tryAutoRetry suppresses the task (budget exhausted).
+	failed, _ := h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
+	for _, ft := range failed {
+		h.tryAutoRetry(ctx, ft)
+	}
+	// After suppression the task should still be in failed state.
+	snapshot, err := h.store.GetTask(ctx, task.ID)
+	if err != nil || snapshot == nil {
+		t.Fatalf("GetTask after suppression: %v", err)
+	}
+	if snapshot.Status != store.TaskStatusFailed {
+		t.Fatalf("expected task still failed after suppression, got %s", snapshot.Status)
+	}
+
+	// --- Manual retry reset ---
+	if err := h.store.ResetTaskForRetry(ctx, task.ID, task.Prompt, true); err != nil {
+		t.Fatalf("ResetTaskForRetry: %v", err)
+	}
+
+	// Transition back to in_progress → failed to simulate the next failure.
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress after reset: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus failed after reset: %v", err)
+	}
+	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory after reset: %v", err)
+	}
+
+	// tryAutoRetry must now reset the task to backlog (budget restored).
+	failed, _ = h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
+	for _, ft := range failed {
+		h.tryAutoRetry(ctx, ft)
+	}
+
+	after, err := h.store.GetTask(ctx, task.ID)
+	if err != nil || after == nil {
+		t.Fatalf("GetTask after retry reset: %v", err)
+	}
+	if after.Status != store.TaskStatusBacklog {
+		t.Errorf("expected task in backlog after auto-retry post-reset, got %s", after.Status)
+	}
+}
+
 // TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker verifies that a
 // store write failure inside tryAutoTest's Phase2 loop (e.g. UpdateTaskTestRun
 // or UpdateTaskStatus) uses recordFailure on the "auto-test" breaker rather
