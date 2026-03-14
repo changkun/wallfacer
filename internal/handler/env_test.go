@@ -810,3 +810,205 @@ func TestUpdateEnvConfig_RejectsTrailingContent(t *testing.T) {
 		t.Errorf("expected 400 for trailing content, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// --- reqBoolString ---
+
+// TestReqBoolString_Nil verifies that a nil pointer returns nil.
+func TestReqBoolString_Nil(t *testing.T) {
+	result := reqBoolString(nil)
+	if result != nil {
+		t.Errorf("expected nil for nil input, got %v", result)
+	}
+}
+
+// TestReqBoolString_True verifies that a true bool pointer returns "true".
+func TestReqBoolString_True(t *testing.T) {
+	b := true
+	result := reqBoolString(&b)
+	if result == nil {
+		t.Fatal("expected non-nil result for true input")
+	}
+	if *result != "true" {
+		t.Errorf("expected 'true', got %q", *result)
+	}
+}
+
+// TestReqBoolString_False verifies that a false bool pointer returns "false".
+func TestReqBoolString_False(t *testing.T) {
+	b := false
+	result := reqBoolString(&b)
+	if result == nil {
+		t.Fatal("expected non-nil result for false input")
+	}
+	if *result != "false" {
+		t.Errorf("expected 'false', got %q", *result)
+	}
+}
+
+// --- UpdateEnvConfig additional coverage ---
+
+// TestUpdateEnvConfig_EmptyOpenAIAPIKeyTreatedAsNoChange verifies that an empty
+// openai_api_key is silently treated as "no change" (not a clear).
+func TestUpdateEnvConfig_EmptyOpenAIAPIKeyTreatedAsNoChange(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	// Pre-seed an OpenAI key so we can verify it is preserved.
+	existingKey := "sk-openai-existing"
+	if err := envconfig.Update(envPath, envconfig.Updates{OpenAIAPIKey: &existingKey}); err != nil {
+		t.Fatalf("seed env: %v", err)
+	}
+
+	body := `{"openai_api_key":""}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Key must still be present in the env file.
+	cfg, err := envconfig.Parse(envPath)
+	if err != nil {
+		t.Fatalf("parse env: %v", err)
+	}
+	if cfg.OpenAIAPIKey != existingKey {
+		t.Errorf("expected openai key %q preserved, got %q", existingKey, cfg.OpenAIAPIKey)
+	}
+}
+
+// TestUpdateEnvConfig_OpenAIBaseURLSSRFRejected verifies that a private-IP
+// openai_base_url is rejected with 422.
+func TestUpdateEnvConfig_OpenAIBaseURLSSRFRejected(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	body := `{"openai_base_url":"http://127.0.0.1/v1"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422 for private openai_base_url, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateEnvConfig_SetTitleModel verifies that title_model can be set.
+func TestUpdateEnvConfig_SetTitleModel(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	model := "claude-haiku-4-5"
+	body := `{"title_model":"claude-haiku-4-5"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	cfg, err := envconfig.Parse(envPath)
+	if err != nil {
+		t.Fatalf("parse env: %v", err)
+	}
+	if cfg.TitleModel != model {
+		t.Errorf("TitleModel = %q; want %q", cfg.TitleModel, model)
+	}
+}
+
+// TestUpdateEnvConfig_MaxTestParallelTasks verifies that max_test_parallel_tasks
+// is accepted and clamped to a minimum of 1.
+func TestUpdateEnvConfig_MaxTestParallelTasks(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	body := `{"max_test_parallel_tasks":2}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateEnvConfig_MaxTestParallelTasksClampedToOne verifies that
+// max_test_parallel_tasks below 1 is clamped to 1.
+func TestUpdateEnvConfig_MaxTestParallelTasksClampedToOne(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	body := `{"max_test_parallel_tasks":0}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	cfg, err := envconfig.Parse(envPath)
+	if err != nil {
+		t.Fatalf("parse env: %v", err)
+	}
+	if cfg.MaxTestParallelTasks < 1 {
+		t.Errorf("MaxTestParallelTasks = %d; want >= 1", cfg.MaxTestParallelTasks)
+	}
+}
+
+// TestUpdateEnvConfig_AutoPushThreshold verifies that auto_push_threshold is
+// accepted and clamped to a minimum of 1.
+func TestUpdateEnvConfig_AutoPushThreshold(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	body := `{"auto_push_threshold":5}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestUpdateEnvConfig_AutoPushThresholdClampedToOne verifies that an
+// auto_push_threshold of 0 is clamped to 1.
+func TestUpdateEnvConfig_AutoPushThresholdClampedToOne(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	body := `{"auto_push_threshold":0}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	cfg, err := envconfig.Parse(envPath)
+	if err != nil {
+		t.Fatalf("parse env: %v", err)
+	}
+	if cfg.AutoPushThreshold < 1 {
+		t.Errorf("AutoPushThreshold = %d; want >= 1", cfg.AutoPushThreshold)
+	}
+}
+
+// TestUpdateEnvConfig_ContainerResourceLimits verifies that container resource
+// limit fields (network, cpus, memory) can be set together.
+func TestUpdateEnvConfig_ContainerResourceLimits(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	body := `{"container_network":"bridge","container_cpus":"2","container_memory":"512m"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	cfg, err := envconfig.Parse(envPath)
+	if err != nil {
+		t.Fatalf("parse env: %v", err)
+	}
+	if cfg.ContainerNetwork != "bridge" {
+		t.Errorf("ContainerNetwork = %q; want bridge", cfg.ContainerNetwork)
+	}
+	if cfg.ContainerCPUs != "2" {
+		t.Errorf("ContainerCPUs = %q; want 2", cfg.ContainerCPUs)
+	}
+	if cfg.ContainerMemory != "512m" {
+		t.Errorf("ContainerMemory = %q; want 512m", cfg.ContainerMemory)
+	}
+}
+
+// TestUpdateEnvConfig_SandboxFastFalse verifies that sandbox_fast=false is
+// stored correctly (exercises the false branch of the sandboxFast conversion).
+func TestUpdateEnvConfig_SandboxFastFalse(t *testing.T) {
+	h, _ := newTestHandlerWithEnv(t)
+	body := `{"sandbox_fast":false}`
+	req := httptest.NewRequest(http.MethodPut, "/api/env", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateEnvConfig(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+}

@@ -512,3 +512,129 @@ func TestStartRefinement_AcceptsEmptyBody(t *testing.T) {
 		t.Errorf("unexpected 400 for empty body: %s", w.Body.String())
 	}
 }
+
+// --- RefineDismiss ---
+
+// TestRefineDismiss_NotFound verifies that a non-existent task ID returns 404.
+func TestRefineDismiss_NotFound(t *testing.T) {
+	h := newTestHandler(t)
+	id := uuid.New()
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+id.String()+"/refine/dismiss", nil)
+	w := httptest.NewRecorder()
+	h.RefineDismiss(w, req, id)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestRefineDismiss_NotBacklog verifies that dismissing a refinement on a task
+// that is not in backlog returns 400.
+func TestRefineDismiss_NotBacklog(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/dismiss", nil)
+	w := httptest.NewRecorder()
+	h.RefineDismiss(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for non-backlog task, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestRefineDismiss_NoRefinement verifies that dismissing when there is no
+// completed refinement returns 400.
+func TestRefineDismiss_NoRefinement(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	// Task is in backlog with no CurrentRefinement.
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/dismiss", nil)
+	w := httptest.NewRecorder()
+	h.RefineDismiss(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 when no completed refinement, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestRefineDismiss_RunningRefinementRejected verifies that a running (not
+// yet completed) refinement job is not dismissable.
+func TestRefineDismiss_RunningRefinementRejected(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Attach a running (not done) refinement job.
+	job := &store.RefinementJob{
+		ID:     uuid.New().String(),
+		Status: store.RefinementJobStatusRunning,
+	}
+	if err := h.store.UpdateRefinementJob(ctx, task.ID, job); err != nil {
+		t.Fatalf("UpdateRefinementJob: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/dismiss", nil)
+	w := httptest.NewRecorder()
+	h.RefineDismiss(w, req, task.ID)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for running (non-done) refinement, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestRefineDismiss_Success verifies that dismissing a completed refinement
+// clears it and returns 200 with the updated task.
+func TestRefineDismiss_Success(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Attach a completed refinement job.
+	job := &store.RefinementJob{
+		ID:     uuid.New().String(),
+		Status: store.RefinementJobStatusDone,
+		Result: "refined spec",
+	}
+	if err := h.store.UpdateRefinementJob(ctx, task.ID, job); err != nil {
+		t.Fatalf("UpdateRefinementJob: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/dismiss", nil)
+	w := httptest.NewRecorder()
+	h.RefineDismiss(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var updated store.Task
+	if err := json.NewDecoder(w.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if updated.CurrentRefinement != nil {
+		t.Errorf("expected CurrentRefinement to be cleared after dismiss, got %+v", updated.CurrentRefinement)
+	}
+}

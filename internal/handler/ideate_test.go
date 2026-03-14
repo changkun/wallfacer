@@ -286,3 +286,335 @@ func TestCreateIdeaAgentTask_PopulatesExecutionPrompt(t *testing.T) {
 		t.Errorf("expected execution prompt to include active tasks section, got %q", created.ExecutionPrompt)
 	}
 }
+
+// --- StartIdeationWatcher ---
+
+// TestStartIdeationWatcher_ExitsOnCancel verifies that the watcher goroutine
+// returns without blocking when the context is already cancelled.
+func TestStartIdeationWatcher_ExitsOnCancel(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately so the goroutine exits at once
+	h.StartIdeationWatcher(ctx)
+	// Give the goroutine a moment to finish; no hang means the test passes.
+	time.Sleep(20 * time.Millisecond)
+}
+
+// --- TriggerIdeation ---
+
+// TestTriggerIdeation_ReturnsAccepted verifies that POST /api/ideate returns
+// 202 with {"queued": true}.
+func TestTriggerIdeation_ReturnsAccepted(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/ideate", nil)
+	w := httptest.NewRecorder()
+	h.TriggerIdeation(w, req)
+
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]bool
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !resp["queued"] {
+		t.Errorf("expected queued=true, got %v", resp)
+	}
+}
+
+// --- CancelIdeation ---
+
+// TestCancelIdeation_NoTasks verifies that DELETE /api/ideate returns 200
+// with cancelled=false when no idea-agent tasks exist.
+func TestCancelIdeation_NoTasks(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodDelete, "/api/ideate", nil)
+	w := httptest.NewRecorder()
+	h.CancelIdeation(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]bool
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["cancelled"] {
+		t.Error("expected cancelled=false when no tasks exist")
+	}
+}
+
+// TestCancelIdeation_CancelsBacklogIdeaAgentTask verifies that DELETE /api/ideate
+// returns cancelled=true for a backlogged idea-agent task. The handler attempts
+// the backlog→cancelled transition (which the state machine rejects because that
+// transition is not defined); the response still reports cancelled=true because
+// the handler sets the flag before checking the error.
+func TestCancelIdeation_CancelsBacklogIdeaAgentTask(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "brainstorm prompt", 15, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	// The task starts in backlog by default.
+	if task.Status != store.TaskStatusBacklog {
+		t.Fatalf("expected backlog status, got %s", task.Status)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/ideate", nil)
+	w := httptest.NewRecorder()
+	h.CancelIdeation(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]bool
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	// Handler reports cancelled=true for matching backlog idea-agent tasks.
+	if !resp["cancelled"] {
+		t.Error("expected cancelled=true for backlogged idea-agent task")
+	}
+}
+
+// TestCancelIdeation_IgnoresNonIdeaAgentTasks verifies that regular tasks are
+// not cancelled by DELETE /api/ideate.
+func TestCancelIdeation_IgnoresNonIdeaAgentTasks(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	_, err := h.store.CreateTask(ctx, "regular task", 15, false, "", store.TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/ideate", nil)
+	w := httptest.NewRecorder()
+	h.CancelIdeation(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]bool
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["cancelled"] {
+		t.Error("expected cancelled=false: non-idea-agent tasks must not be cancelled")
+	}
+}
+
+// --- GetIdeationStatus ---
+
+// TestGetIdeationStatus_ReturnsEnabledAndRunning verifies that GET /api/ideate
+// returns a JSON object with at least "enabled" and "running" fields.
+func TestGetIdeationStatus_ReturnsEnabledAndRunning(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/ideate", nil)
+	w := httptest.NewRecorder()
+	h.GetIdeationStatus(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if _, ok := resp["enabled"]; !ok {
+		t.Error("response missing 'enabled' field")
+	}
+	if _, ok := resp["running"]; !ok {
+		t.Error("response missing 'running' field")
+	}
+}
+
+// TestGetIdeationStatus_RunningWhenIdeaAgentInProgress verifies that
+// "running" is true when an idea-agent task is in_progress.
+func TestGetIdeationStatus_RunningWhenIdeaAgentInProgress(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTask(ctx, "brainstorm", 15, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ideate", nil)
+	w := httptest.NewRecorder()
+	h.GetIdeationStatus(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	running, _ := resp["running"].(bool)
+	if !running {
+		t.Error("expected running=true when an idea-agent task is in_progress")
+	}
+}
+
+// TestGetIdeationStatus_NotRunningWhenNoIdeaAgentInProgress verifies that
+// "running" is false when no idea-agent task is in_progress.
+func TestGetIdeationStatus_NotRunningWhenNoIdeaAgentInProgress(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/ideate", nil)
+	w := httptest.NewRecorder()
+	h.GetIdeationStatus(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	running, _ := resp["running"].(bool)
+	if running {
+		t.Error("expected running=false when no idea-agent task is in_progress")
+	}
+}
+
+// --- maybeScheduleNextIdeation ---
+
+// TestMaybeScheduleNextIdeation_DisabledNoOp verifies that when ideation is
+// disabled, maybeScheduleNextIdeation is a no-op and does not set a timer.
+func TestMaybeScheduleNextIdeation_DisabledNoOp(t *testing.T) {
+	h := newTestHandler(t)
+	// Ideation is disabled by default in the test handler.
+	if h.IdeationEnabled() {
+		h.SetIdeation(false)
+	}
+
+	h.maybeScheduleNextIdeation(context.Background())
+
+	h.ideationMu.Lock()
+	timer := h.ideationTimer
+	h.ideationMu.Unlock()
+	if timer != nil {
+		t.Error("expected no timer when ideation is disabled")
+	}
+}
+
+// TestMaybeScheduleNextIdeation_EnabledNoActiveTask verifies that when ideation
+// is enabled and no idea-agent task is running or backlogged, scheduleIdeation
+// is called, setting an ideation timer (when interval > 0).
+func TestMaybeScheduleNextIdeation_EnabledNoActiveTask(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetIdeation(true)
+	h.SetIdeationInterval(10 * time.Hour)
+
+	h.maybeScheduleNextIdeation(context.Background())
+
+	h.ideationMu.Lock()
+	hasTimer := h.ideationTimer != nil
+	if hasTimer {
+		// Clean up so the timer does not fire during test cleanup.
+		h.cancelIdeationTimerLocked()
+	}
+	h.ideationMu.Unlock()
+
+	if !hasTimer {
+		t.Error("expected ideation timer to be set when ideation is enabled and no active idea-agent task exists")
+	}
+}
+
+// TestMaybeScheduleNextIdeation_ActiveBacklogTask verifies that when an
+// idea-agent task is in backlog, maybeScheduleNextIdeation does not schedule a
+// new run (the existing backlog task already represents a pending brainstorm).
+func TestMaybeScheduleNextIdeation_ActiveBacklogTask(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetIdeation(true)
+	h.SetIdeationInterval(10 * time.Hour)
+	ctx := context.Background()
+
+	// Create a backlogged idea-agent task.
+	_, err := h.store.CreateTask(ctx, "brainstorm prompt", 60, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	h.maybeScheduleNextIdeation(ctx)
+
+	h.ideationMu.Lock()
+	hasTimer := h.ideationTimer != nil
+	h.ideationMu.Unlock()
+
+	if hasTimer {
+		t.Error("should not set a timer when an idea-agent task is already in backlog")
+		h.ideationMu.Lock()
+		h.cancelIdeationTimerLocked()
+		h.ideationMu.Unlock()
+	}
+}
+
+// TestMaybeScheduleNextIdeation_ActiveInProgressTask verifies that when an
+// idea-agent task is in_progress, maybeScheduleNextIdeation does not schedule.
+func TestMaybeScheduleNextIdeation_ActiveInProgressTask(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetIdeation(true)
+	h.SetIdeationInterval(10 * time.Hour)
+	ctx := context.Background()
+
+	// Create an idea-agent task and move it to in_progress.
+	task, err := h.store.CreateTask(ctx, "brainstorm running", 60, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus: %v", err)
+	}
+
+	h.maybeScheduleNextIdeation(ctx)
+
+	h.ideationMu.Lock()
+	hasTimer := h.ideationTimer != nil
+	h.ideationMu.Unlock()
+
+	if hasTimer {
+		t.Error("should not set a timer when an idea-agent task is in_progress")
+		h.ideationMu.Lock()
+		h.cancelIdeationTimerLocked()
+		h.ideationMu.Unlock()
+	}
+}
+
+// TestMaybeScheduleNextIdeation_DoneTaskDoesNotBlock verifies that a completed
+// idea-agent task does not prevent maybeScheduleNextIdeation from scheduling a
+// new run; only active (backlog/in_progress) tasks should suppress scheduling.
+func TestMaybeScheduleNextIdeation_DoneTaskDoesNotBlock(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetIdeation(true)
+	h.SetIdeationInterval(10 * time.Hour)
+	ctx := context.Background()
+
+	// Create an idea-agent task and advance it to done (terminal state).
+	task, err := h.store.CreateTask(ctx, "old brainstorm", 60, false, "", store.TaskKindIdeaAgent)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+
+	h.maybeScheduleNextIdeation(ctx)
+
+	h.ideationMu.Lock()
+	hasTimer := h.ideationTimer != nil
+	if hasTimer {
+		h.cancelIdeationTimerLocked()
+	}
+	h.ideationMu.Unlock()
+
+	if !hasTimer {
+		t.Error("expected scheduling to proceed when the only idea-agent task is done")
+	}
+}

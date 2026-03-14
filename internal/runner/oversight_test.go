@@ -1113,3 +1113,527 @@ func TestPeriodicOversightWorkerSkipsEmptyOutputsDir(t *testing.T) {
 		t.Fatal("expected oversight not to be generated for task with no turn files")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// canonicalizeToolName
+// ---------------------------------------------------------------------------
+
+func TestCanonicalizeToolName(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		// Bash aliases
+		{"bash", "Bash"},
+		{"Bash", "Bash"},
+		{"BASH", "Bash"},
+		{"command_execution", "Bash"},
+		{"Command_Execution", "Bash"},
+		// Read aliases
+		{"read", "Read"},
+		{"read_file", "Read"},
+		{"read_file_tool", "Read"},
+		{"file_read", "Read"},
+		{"readfile", "Read"},
+		{"READ", "Read"},
+		// Write aliases
+		{"write", "Write"},
+		{"write_file", "Write"},
+		{"write_file_tool", "Write"},
+		{"file_write", "Write"},
+		{"writefile", "Write"},
+		{"WRITE_FILE", "Write"},
+		// Edit aliases
+		{"edit", "Edit"},
+		{"edit_file", "Edit"},
+		{"modify_file", "Edit"},
+		{"EDIT", "Edit"},
+		// Glob
+		{"glob", "Glob"},
+		{"Glob", "Glob"},
+		// Grep aliases
+		{"grep", "Grep"},
+		{"search", "Grep"},
+		{"find", "Grep"},
+		{"SEARCH", "Grep"},
+		// WebSearch aliases
+		{"websearch", "WebSearch"},
+		{"web_search", "WebSearch"},
+		{"WebSearch", "WebSearch"},
+		// WebFetch aliases
+		{"webfetch", "WebFetch"},
+		{"web_fetch", "WebFetch"},
+		{"WebFetch", "WebFetch"},
+		// Task
+		{"task", "Task"},
+		{"Task", "Task"},
+		{"TASK", "Task"},
+		// Unknown: trimmed original returned
+		{"unknown_tool", "unknown_tool"},
+		{"  my_tool  ", "my_tool"},
+		{"", ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			got := canonicalizeToolName(tc.input)
+			if got != tc.want {
+				t.Errorf("canonicalizeToolName(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// extractToolInputGo
+// ---------------------------------------------------------------------------
+
+func TestExtractToolInputGo(t *testing.T) {
+	tests := []struct {
+		name  string
+		tool  string
+		input map[string]interface{}
+		want  string
+	}{
+		// Bash
+		{name: "bash command", tool: "Bash", input: map[string]interface{}{"command": "ls -la"}, want: "ls -la"},
+		{name: "bash alias", tool: "bash", input: map[string]interface{}{"command": "echo hi"}, want: "echo hi"},
+		{name: "bash nil input", tool: "Bash", input: nil, want: ""},
+		// Read
+		{name: "read file_path", tool: "Read", input: map[string]interface{}{"file_path": "/workspace/main.go"}, want: "/workspace/main.go"},
+		{name: "read alias", tool: "read_file", input: map[string]interface{}{"file_path": "/foo.go"}, want: "/foo.go"},
+		// Write
+		{name: "write file_path", tool: "Write", input: map[string]interface{}{"file_path": "/workspace/out.txt"}, want: "/workspace/out.txt"},
+		// Edit
+		{name: "edit file_path", tool: "Edit", input: map[string]interface{}{"file_path": "/workspace/a.go"}, want: "/workspace/a.go"},
+		// Glob
+		{name: "glob pattern", tool: "Glob", input: map[string]interface{}{"pattern": "**/*.go"}, want: "**/*.go"},
+		// Grep
+		{name: "grep pattern", tool: "Grep", input: map[string]interface{}{"pattern": "func main"}, want: "func main"},
+		// WebFetch
+		{name: "webfetch url", tool: "WebFetch", input: map[string]interface{}{"url": "https://example.com"}, want: "https://example.com"},
+		// WebSearch
+		{name: "websearch query", tool: "WebSearch", input: map[string]interface{}{"query": "golang channels"}, want: "golang channels"},
+		// Task short prompt
+		{name: "task short prompt", tool: "Task", input: map[string]interface{}{"prompt": "do something"}, want: "do something"},
+		// Task long prompt truncated at 120
+		{name: "task long prompt truncated", tool: "Task", input: map[string]interface{}{"prompt": string(make([]byte, 200))}, want: string(make([]byte, 120))},
+		// Task empty prompt
+		{name: "task empty prompt", tool: "Task", input: map[string]interface{}{"prompt": ""}, want: ""},
+		// Default fallback keys
+		{name: "default file_path fallback", tool: "custom_tool", input: map[string]interface{}{"file_path": "/some/file"}, want: "/some/file"},
+		{name: "default command fallback", tool: "custom_tool", input: map[string]interface{}{"command": "run me"}, want: "run me"},
+		{name: "default pattern fallback", tool: "custom_tool", input: map[string]interface{}{"pattern": "*.go"}, want: "*.go"},
+		{name: "default query fallback", tool: "custom_tool", input: map[string]interface{}{"query": "search term"}, want: "search term"},
+		{name: "default path fallback", tool: "custom_tool", input: map[string]interface{}{"path": "/a/b"}, want: "/a/b"},
+		{name: "default no known key", tool: "custom_tool", input: map[string]interface{}{"other": "val"}, want: ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := extractToolInputGo(tc.tool, tc.input)
+			if got != tc.want {
+				t.Errorf("extractToolInputGo(%q, ...) = %q, want %q", tc.tool, got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// parseContentBlocks
+// ---------------------------------------------------------------------------
+
+func TestParseContentBlocks(t *testing.T) {
+	t.Run("empty raw message returns nil", func(t *testing.T) {
+		got := parseContentBlocks(json.RawMessage{})
+		if got != nil {
+			t.Errorf("expected nil, got %v", got)
+		}
+	})
+
+	t.Run("valid JSON array of blocks", func(t *testing.T) {
+		raw := json.RawMessage(`[{"type":"text","text":"hello"},{"type":"tool_use","name":"Read"}]`)
+		got := parseContentBlocks(raw)
+		if len(got) != 2 {
+			t.Fatalf("expected 2 blocks, got %d", len(got))
+		}
+		if got[0].Type != "text" || got[0].Text != "hello" {
+			t.Errorf("unexpected first block: %+v", got[0])
+		}
+		if got[1].Type != "tool_use" || got[1].Name != "Read" {
+			t.Errorf("unexpected second block: %+v", got[1])
+		}
+	})
+
+	t.Run("single valid JSON object wrapped in slice", func(t *testing.T) {
+		raw := json.RawMessage(`{"type":"text","text":"single"}`)
+		got := parseContentBlocks(raw)
+		if len(got) != 1 {
+			t.Fatalf("expected 1 block, got %d", len(got))
+		}
+		if got[0].Type != "text" || got[0].Text != "single" {
+			t.Errorf("unexpected block: %+v", got[0])
+		}
+	})
+
+	t.Run("invalid JSON returns nil", func(t *testing.T) {
+		raw := json.RawMessage(`not valid json`)
+		got := parseContentBlocks(raw)
+		if got != nil {
+			t.Errorf("expected nil for invalid JSON, got %v", got)
+		}
+	})
+
+	t.Run("empty array returns empty slice", func(t *testing.T) {
+		raw := json.RawMessage(`[]`)
+		got := parseContentBlocks(raw)
+		if got == nil {
+			t.Errorf("expected non-nil empty slice, got nil")
+		}
+		if len(got) != 0 {
+			t.Errorf("expected 0 elements, got %d", len(got))
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// parseRawInput
+// ---------------------------------------------------------------------------
+
+func TestParseRawInput(t *testing.T) {
+	t.Run("empty raw message returns nil", func(t *testing.T) {
+		got := parseRawInput(json.RawMessage{})
+		if got != nil {
+			t.Errorf("expected nil, got %v", got)
+		}
+	})
+
+	t.Run("direct JSON map decoded correctly", func(t *testing.T) {
+		raw := json.RawMessage(`{"file_path":"/workspace/main.go","command":"ls"}`)
+		got := parseRawInput(raw)
+		if got == nil {
+			t.Fatal("expected map, got nil")
+		}
+		if got["file_path"] != "/workspace/main.go" {
+			t.Errorf("file_path: got %q, want %q", got["file_path"], "/workspace/main.go")
+		}
+		if got["command"] != "ls" {
+			t.Errorf("command: got %q, want %q", got["command"], "ls")
+		}
+	})
+
+	t.Run("string-encoded JSON decoded correctly", func(t *testing.T) {
+		inner := `{"file_path":"/encoded/path.go"}`
+		encoded, _ := json.Marshal(inner)
+		got := parseRawInput(json.RawMessage(encoded))
+		if got == nil {
+			t.Fatal("expected map, got nil")
+		}
+		if got["file_path"] != "/encoded/path.go" {
+			t.Errorf("file_path: got %q, want %q", got["file_path"], "/encoded/path.go")
+		}
+	})
+
+	t.Run("invalid JSON string-encoded returns nil map", func(t *testing.T) {
+		// A JSON string whose contents are not valid JSON
+		encoded, _ := json.Marshal("not a json map")
+		got := parseRawInput(json.RawMessage(encoded))
+		// The string decodes fine but inner decode fails; result is nil
+		if got != nil {
+			t.Errorf("expected nil for non-map string content, got %v", got)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// codexToolFromItem
+// ---------------------------------------------------------------------------
+
+func TestCodexToolFromItem(t *testing.T) {
+	t.Run("type field recognized as tool name", func(t *testing.T) {
+		item := &ndjsonItem{
+			Type:  "bash",
+			Input: json.RawMessage(`{"command":"echo hello"}`),
+		}
+		tool, input := codexToolFromItem(item)
+		if tool != "Bash" {
+			t.Errorf("tool: got %q, want %q", tool, "Bash")
+		}
+		if input != "echo hello" {
+			t.Errorf("input: got %q, want %q", input, "echo hello")
+		}
+	})
+
+	t.Run("falls back to Name field when Type unknown", func(t *testing.T) {
+		item := &ndjsonItem{
+			Type:  "function_call",
+			Name:  "read_file",
+			Input: json.RawMessage(`{"file_path":"/foo.go"}`),
+		}
+		tool, input := codexToolFromItem(item)
+		if tool != "Read" {
+			t.Errorf("tool: got %q, want %q", tool, "Read")
+		}
+		if input != "/foo.go" {
+			t.Errorf("input: got %q, want %q", input, "/foo.go")
+		}
+	})
+
+	t.Run("falls back to ToolName field", func(t *testing.T) {
+		// Type must be empty so toolName starts as "" enabling ToolName fallback.
+		item := &ndjsonItem{
+			Type:     "",
+			ToolName: "write_file",
+			Input:    json.RawMessage(`{"file_path":"/out.txt"}`),
+		}
+		tool, input := codexToolFromItem(item)
+		if tool != "Write" {
+			t.Errorf("tool: got %q, want %q", tool, "Write")
+		}
+		if input != "/out.txt" {
+			t.Errorf("input: got %q, want %q", input, "/out.txt")
+		}
+	})
+
+	t.Run("falls back to Tool field", func(t *testing.T) {
+		// Type must be empty so toolName starts as "" enabling Tool fallback.
+		item := &ndjsonItem{
+			Type:  "",
+			Tool:  "glob",
+			Input: json.RawMessage(`{"pattern":"**/*.go"}`),
+		}
+		tool, input := codexToolFromItem(item)
+		if tool != "Glob" {
+			t.Errorf("tool: got %q, want %q", tool, "Glob")
+		}
+		if input != "**/*.go" {
+			t.Errorf("input: got %q, want %q", input, "**/*.go")
+		}
+	})
+
+	t.Run("nil input gives empty string", func(t *testing.T) {
+		item := &ndjsonItem{
+			Type: "bash",
+		}
+		tool, input := codexToolFromItem(item)
+		if tool != "Bash" {
+			t.Errorf("tool: got %q, want %q", tool, "Bash")
+		}
+		if input != "" {
+			t.Errorf("input: got %q, want empty", input)
+		}
+	})
+
+	t.Run("string-encoded input decoded", func(t *testing.T) {
+		inner := `{"file_path":"/encoded.go"}`
+		encoded, _ := json.Marshal(inner)
+		item := &ndjsonItem{
+			Type:  "read",
+			Input: json.RawMessage(encoded),
+		}
+		tool, input := codexToolFromItem(item)
+		if tool != "Read" {
+			t.Errorf("tool: got %q, want %q", tool, "Read")
+		}
+		if input != "/encoded.go" {
+			t.Errorf("input: got %q, want %q", input, "/encoded.go")
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// inferCodexToolName
+// ---------------------------------------------------------------------------
+
+func TestInferCodexToolName(t *testing.T) {
+	tests := []struct {
+		command string
+		want    string
+	}{
+		// Empty command
+		{"", "Bash"},
+		{"   ", "Bash"},
+		// Write: pipe to tee
+		{"make build | tee output.log", "Write"},
+		// Write: redirect >
+		{"echo hello > file.txt", "Write"},
+		// Write: append >>
+		{"echo line >> file.txt", "Write"},
+		// Write: cat >
+		{"cat > newfile.txt", "Write"},
+		// Write: cat>>
+		{"cat>>file.txt", "Write"},
+		// Read: first word is cat
+		{"cat /workspace/main.go", "Read"},
+		// Read: sed
+		{"sed 's/foo/bar/g' file.go", "Read"},
+		// Read: head
+		{"head -n 10 file.txt", "Read"},
+		// Read: tail
+		{"tail -f log.txt", "Read"},
+		// Read: less
+		{"less bigfile.txt", "Read"},
+		// Read: stat
+		{"stat /etc/hosts", "Read"},
+		// Read: pwd
+		{"pwd", "Read"},
+		// Read: find
+		{"find . -name '*.go'", "Read"},
+		// Read: grep
+		{"grep -r pattern /workspace", "Read"},
+		// Read: rg
+		{"rg TODO .", "Read"},
+		// git read operations
+		{"git show HEAD:main.go", "Read"},
+		{"git status", "Read"},
+		{"git diff HEAD", "Read"},
+		{"git log --oneline", "Read"},
+		// git write operations
+		{"git add .", "Write"},
+		{"git commit -m 'fix'", "Write"},
+		{"git mv old new", "Write"},
+		{"git rm file.go", "Write"},
+		{"git reset HEAD~1", "Write"},
+		{"git restore .", "Write"},
+		{"git checkout main", "Write"},
+		{"git switch feature", "Write"},
+		// git other → Write
+		{"git push origin main", "Write"},
+		{"git fetch origin", "Write"},
+		// apply_patch → Write
+		{"apply_patch patch.diff", "Write"},
+		// cp, mv, rm, mkdir etc → Write
+		{"cp src dst", "Write"},
+		{"mv old new", "Write"},
+		{"rm -rf /tmp/dir", "Write"},
+		{"mkdir /new/dir", "Write"},
+		{"rmdir /empty/dir", "Write"},
+		{"touch file.txt", "Write"},
+		{"chmod 755 script.sh", "Write"},
+		{"chown user file", "Write"},
+		{"tee output.txt", "Write"},
+		// sudo prefix stripped, still classified correctly
+		{"sudo cat /etc/passwd", "Read"},
+		{"sudo rm -rf /tmp/old", "Write"},
+		// Bash: unknown first word
+		{"go build ./...", "Bash"},
+		{"make test", "Bash"},
+		{"python script.py", "Bash"},
+		{"npm install", "Bash"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.command, func(t *testing.T) {
+			got := inferCodexToolName(tc.command)
+			if got != tc.want {
+				t.Errorf("inferCodexToolName(%q) = %q, want %q", tc.command, got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// periodicOversightWorker
+// ---------------------------------------------------------------------------
+
+// TestPeriodicOversightWorker_DisabledReturnsImmediately verifies that when
+// the oversight interval is 0 (disabled, no env file configured), the worker
+// goroutine returns immediately without blocking on the context.
+func TestPeriodicOversightWorker_DisabledReturnsImmediately(t *testing.T) {
+	s, err := store.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	// NewRunner with an empty RunnerConfig means envFile == "" →
+	// oversightIntervalFromEnv returns 0 → worker exits immediately.
+	r := NewRunner(s, RunnerConfig{})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		r.periodicOversightWorker(ctx, uuid.New())
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Good — worker returned immediately because interval == 0.
+	case <-time.After(2 * time.Second):
+		t.Error("periodicOversightWorker did not return promptly when interval=0")
+	}
+}
+
+// TestPeriodicOversightWorker_ContextCancellation verifies that the worker
+// exits when its context is cancelled even if the ticker would otherwise keep
+// it alive. This requires a real env file with a non-zero interval.
+func TestPeriodicOversightWorker_ContextCancellation(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Write an env file with a very long oversight interval so the ticker
+	// will never fire during the test, but the worker stays alive until cancel.
+	envPath := filepath.Join(tmpDir, ".env")
+	envContent := "WALLFACER_OVERSIGHT_INTERVAL=99999\n"
+	if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := store.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	r := NewRunner(s, RunnerConfig{EnvFile: envPath})
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan struct{})
+	go func() {
+		r.periodicOversightWorker(ctx, uuid.New())
+		close(done)
+	}()
+
+	// Give the goroutine a moment to start, then cancel.
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		// Good — worker exited on context cancellation.
+	case <-time.After(2 * time.Second):
+		t.Error("periodicOversightWorker did not exit after context cancellation")
+	}
+}
+
+// TestPeriodicOversightWorker_EnvFileMissing verifies that a non-empty but
+// non-existent env file path still causes the worker to return immediately
+// (parse error → interval=0 → disabled).
+func TestPeriodicOversightWorker_EnvFileMissing(t *testing.T) {
+	s, err := store.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	r := NewRunner(s, RunnerConfig{EnvFile: "/does/not/exist/.env"})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		r.periodicOversightWorker(ctx, uuid.New())
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Good — missing file → parse error → interval=0 → returns immediately.
+	case <-time.After(2 * time.Second):
+		t.Error("periodicOversightWorker did not return when env file is missing")
+	}
+}
