@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"changkun.de/wallfacer/internal/sandbox"
+	"changkun.de/wallfacer/internal/store"
 )
 
 func TestParseEnvLinePreservesHashesInsideQuotes(t *testing.T) {
@@ -52,14 +53,14 @@ func TestSandboxByActivity(t *testing.T) {
 		IdeaAgentSandbox:      "claude",
 	}
 	got := cfg.SandboxByActivity()
-	want := map[string]string{
-		"implementation": "claude",
-		"testing":        "codex",
-		"refinement":     "claude",
-		"title":          "claude",
-		"oversight":      "codex",
-		"commit_message": "codex",
-		"idea_agent":     "claude",
+	want := map[store.SandboxActivity]string{
+		store.SandboxActivityImplementation: "claude",
+		store.SandboxActivityTesting:        "codex",
+		store.SandboxActivityRefinement:     "claude",
+		store.SandboxActivityTitle:          "claude",
+		store.SandboxActivityOversight:      "codex",
+		store.SandboxActivityCommitMessage:  "codex",
+		store.SandboxActivityIdeaAgent:      "claude",
 	}
 	if len(got) != len(want) {
 		t.Fatalf("SandboxByActivity size = %d, want %d", len(got), len(want))
@@ -91,10 +92,10 @@ func TestUpdateSandboxSettings(t *testing.T) {
 	}
 
 	defaultSandbox := sandbox.Codex
-	if err := UpdateSandboxSettings(path, &defaultSandbox, map[string]sandbox.Type{
-		"implementation": sandbox.Codex,
-		"idea_agent":     sandbox.Claude,
-		"commit_message": "",
+	if err := UpdateSandboxSettings(path, &defaultSandbox, map[store.SandboxActivity]sandbox.Type{
+		store.SandboxActivityImplementation: sandbox.Codex,
+		store.SandboxActivityIdeaAgent:      sandbox.Claude,
+		store.SandboxActivityCommitMessage:  "",
 	}); err != nil {
 		t.Fatalf("UpdateSandboxSettings: %v", err)
 	}

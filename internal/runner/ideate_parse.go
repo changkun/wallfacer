@@ -80,18 +80,21 @@ func isIdeaDuplicateTitle(added map[string]struct{}, title string) bool {
 	return false
 }
 
-type ideaRejection struct {
-	Title  string
-	Reason string
-	Score  int
-}
+// ideaRejectReason identifies why an idea was filtered out during ideation parsing.
+type ideaRejectReason string
 
 const (
-	ideaRejectEmptyFields     = "empty_fields"
-	ideaRejectDegenerateTitle = "degenerate_prompt"
-	ideaRejectLowImpact       = "below_threshold"
-	ideaRejectDuplicateTitle  = "duplicate_title"
+	ideaRejectEmptyFields     ideaRejectReason = "empty_fields"
+	ideaRejectDegenerateTitle ideaRejectReason = "degenerate_prompt"
+	ideaRejectLowImpact       ideaRejectReason = "below_threshold"
+	ideaRejectDuplicateTitle  ideaRejectReason = "duplicate_title"
 )
+
+type ideaRejection struct {
+	Title  string
+	Reason ideaRejectReason
+	Score  int
+}
 
 func (r *Runner) emitIdeationRejectionEvents(ctx context.Context, taskID uuid.UUID, rejections []ideaRejection) {
 	if len(rejections) == 0 {
@@ -118,7 +121,7 @@ func (r *Runner) emitIdeationRejectionEvents(ctx context.Context, taskID uuid.UU
 	)
 }
 
-func countIdeaRejections(rejections []ideaRejection, reason string) int {
+func countIdeaRejections(rejections []ideaRejection, reason ideaRejectReason) int {
 	total := 0
 	for _, rejection := range rejections {
 		if rejection.Reason == reason {

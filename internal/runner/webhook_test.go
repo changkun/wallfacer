@@ -88,7 +88,7 @@ func TestWebhookNotifier_DeliverOnStateChange(t *testing.T) {
 	}
 
 	// Validate event header.
-	if got := req.header.Get("X-Wallfacer-Event"); got != runner.WebhookEventTaskStateChanged {
+	if got := req.header.Get("X-Wallfacer-Event"); got != string(runner.WebhookEventTaskStateChanged) {
 		t.Errorf("X-Wallfacer-Event = %q, want %q", got, runner.WebhookEventTaskStateChanged)
 	}
 	if got := req.header.Get("Content-Type"); got != "application/json" {

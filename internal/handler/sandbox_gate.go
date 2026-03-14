@@ -7,6 +7,7 @@ import (
 
 	"changkun.de/wallfacer/internal/envconfig"
 	"changkun.de/wallfacer/internal/sandbox"
+	"changkun.de/wallfacer/internal/store"
 )
 
 func normalizeSandbox(s string) sandbox.Type {
@@ -48,7 +49,7 @@ func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 	return true, ""
 }
 
-func (h *Handler) validateRequestedSandboxes(taskSandbox sandbox.Type, byActivity map[string]sandbox.Type) error {
+func (h *Handler) validateRequestedSandboxes(taskSandbox sandbox.Type, byActivity map[store.SandboxActivity]sandbox.Type) error {
 	if ok, reason := h.sandboxUsable(taskSandbox); !ok {
 		return errors.New(reason)
 	}

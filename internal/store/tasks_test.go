@@ -643,7 +643,7 @@ func TestUpdateTaskSandboxByActivity_NormalizesAndClears(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
 
-	updates := map[string]sandbox.Type{
+	updates := map[SandboxActivity]sandbox.Type{
 		"implementation": sandbox.Type("CLAUDE"),
 		"Testing":        sandbox.Type("Codex "),
 		"invalid":        "x",
@@ -655,20 +655,20 @@ func TestUpdateTaskSandboxByActivity_NormalizesAndClears(t *testing.T) {
 	}
 
 	got, _ := s.GetTask(bg(), task.ID)
-	if got.SandboxByActivity["implementation"] != "claude" {
+	if got.SandboxByActivity[SandboxActivityImplementation] != "claude" {
 		t.Fatalf("expected implementation sandbox 'claude', got %#v", got.SandboxByActivity)
 	}
-	if got.SandboxByActivity["testing"] != "codex" {
+	if got.SandboxByActivity[SandboxActivityTesting] != "codex" {
 		t.Fatalf("expected testing sandbox 'codex', got %#v", got.SandboxByActivity)
 	}
-	if _, ok := got.SandboxByActivity["oversight"]; ok {
+	if _, ok := got.SandboxByActivity[SandboxActivityOversight]; ok {
 		t.Fatalf("expected empty oversight value to be dropped, got %#v", got.SandboxByActivity)
 	}
 	if _, ok := got.SandboxByActivity["invalid"]; ok {
 		t.Fatalf("expected invalid activity key to be ignored, got %#v", got.SandboxByActivity)
 	}
 
-	if err := s.UpdateTaskSandboxByActivity(bg(), task.ID, map[string]sandbox.Type{}); err != nil {
+	if err := s.UpdateTaskSandboxByActivity(bg(), task.ID, map[SandboxActivity]sandbox.Type{}); err != nil {
 		t.Fatalf("UpdateTaskSandboxByActivity empty: %v", err)
 	}
 	got, _ = s.GetTask(bg(), task.ID)

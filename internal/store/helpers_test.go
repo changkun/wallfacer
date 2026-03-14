@@ -68,10 +68,10 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	task.SessionID = &sessionID
 	task.Result = &result
 	task.StopReason = &stopReason
-	task.SandboxByActivity = map[string]sandbox.Type{
+	task.SandboxByActivity = map[SandboxActivity]sandbox.Type{
 		SandboxActivityImplementation: sandbox.Claude,
 	}
-	task.UsageBreakdown = map[string]TaskUsage{
+	task.UsageBreakdown = map[SandboxActivity]TaskUsage{
 		SandboxActivityImplementation: {
 			InputTokens:          7,
 			OutputTokens:         11,

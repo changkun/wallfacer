@@ -16,7 +16,7 @@ type StatsResponse struct {
 	TotalOutputTokens int                                 `json:"total_output_tokens"`
 	TotalCacheTokens  int                                 `json:"total_cache_tokens"`
 	ByStatus          map[store.TaskStatus]UsageStat      `json:"by_status"`
-	ByActivity        map[string]UsageStat                `json:"by_activity"`
+	ByActivity        map[store.SandboxActivity]UsageStat `json:"by_activity"`
 	ByWorkspace       map[string]UsageStat                `json:"by_workspace"`
 	ByFailureCategory map[store.FailureCategory]UsageStat `json:"by_failure_category"`
 	TopTasks          []TaskCostEntry                     `json:"top_tasks"`
@@ -60,7 +60,7 @@ type DayStat struct {
 func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.TaskSummary, error)) StatsResponse {
 	resp := StatsResponse{
 		ByStatus:          make(map[store.TaskStatus]UsageStat),
-		ByActivity:        make(map[string]UsageStat),
+		ByActivity:        make(map[store.SandboxActivity]UsageStat),
 		ByWorkspace:       make(map[string]UsageStat),
 		ByFailureCategory: make(map[store.FailureCategory]UsageStat),
 	}

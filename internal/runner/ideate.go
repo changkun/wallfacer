@@ -189,11 +189,11 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 
 		logger.Runner.Debug("ideate exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
 		if taskID != uuid.Nil {
-			r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityIdeaAgent})
+			r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
 		}
 		rawStdout, rawStderr, runErr := r.executor.RunArgs(ctx, containerName, args)
 		if taskID != uuid.Nil {
-			r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityIdeaAgent})
+			r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
 		}
 
 		if ctx.Err() != nil {
@@ -360,7 +360,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 			}
 			he := HistoryEntry{
 				Title:      rej.Title,
-				Reason:     "rejected_" + rej.Reason,
+				Reason:     "rejected_" + string(rej.Reason),
 				RecordedAt: time.Now().UTC(),
 			}
 			if appErr := hist.Append(he); appErr != nil {

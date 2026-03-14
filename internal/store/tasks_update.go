@@ -172,9 +172,8 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 
 // AccumulateSubAgentUsage adds token/cost deltas to the task's running totals
 // and records the contribution under the named sub-agent in UsageBreakdown.
-// agent should be one of: "implementation", "test", "title", "oversight",
-// "oversight-test", "refinement".
-func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent string, delta TaskUsage) error {
+// agent should be one of the SandboxActivity constants.
+func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent SandboxActivity, delta TaskUsage) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.Usage.InputTokens += delta.InputTokens
 		t.Usage.OutputTokens += delta.OutputTokens
@@ -182,7 +181,7 @@ func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent s
 		t.Usage.CacheCreationTokens += delta.CacheCreationTokens
 		t.Usage.CostUSD += delta.CostUSD
 		if t.UsageBreakdown == nil {
-			t.UsageBreakdown = make(map[string]TaskUsage)
+			t.UsageBreakdown = make(map[SandboxActivity]TaskUsage)
 		}
 		prev := t.UsageBreakdown[agent]
 		prev.InputTokens += delta.InputTokens
@@ -198,7 +197,7 @@ func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent s
 // AccumulateTaskUsage is a convenience wrapper that accumulates usage without
 // attributing it to a specific sub-agent. Prefer AccumulateSubAgentUsage.
 func (s *Store) AccumulateTaskUsage(ctx context.Context, id uuid.UUID, delta TaskUsage) error {
-	return s.AccumulateSubAgentUsage(ctx, id, "implementation", delta)
+	return s.AccumulateSubAgentUsage(ctx, id, SandboxActivityImplementation, delta)
 }
 
 // UpdateTaskPosition updates the task board column sort position.
@@ -282,7 +281,7 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 }
 
 // UpdateTaskBacklog edits prompt, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[string]sandbox.Type, maxCostUSD *float64, maxInputTokens *int) error {
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[SandboxActivity]sandbox.Type, maxCostUSD *float64, maxInputTokens *int) error {
 	// Compute the lowercased prompt before acquiring the lock so that
 	// strings.ToLower does not extend the critical section.
 	var loweredPrompt string
@@ -354,7 +353,7 @@ func (s *Store) UpdateTaskBudget(_ context.Context, id uuid.UUID, maxCostUSD *fl
 
 // UpdateTaskSandboxByActivity stores task sandbox overrides by activity key.
 // Passing an empty map clears the override map.
-func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[string]sandbox.Type) error {
+func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[SandboxActivity]sandbox.Type) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.SandboxByActivity = normalizeSandboxByActivity(sandboxByActivity)
 		return nil

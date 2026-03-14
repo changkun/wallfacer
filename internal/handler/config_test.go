@@ -394,7 +394,7 @@ func TestGetConfig_SandboxActivities(t *testing.T) {
 
 	// Value must exactly equal store.SandboxActivities.
 	for i, key := range want {
-		if !slices.Contains(got, key) {
+		if !slices.Contains(got, string(key)) {
 			t.Errorf("sandbox_activities[%d] = %q not found in response %v", i, key, got)
 		}
 	}

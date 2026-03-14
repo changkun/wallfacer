@@ -106,7 +106,7 @@ type envConfigResponse struct {
 	CodexDefaultModel    string                  `json:"codex_default_model"`
 	CodexTitleModel      string                  `json:"codex_title_model"`
 	DefaultSandbox       sandbox.Type            `json:"default_sandbox"`
-	SandboxByActivity    map[string]sandbox.Type `json:"sandbox_by_activity,omitempty"`
+	SandboxByActivity    map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
 	MaxParallelTasks     int                     `json:"max_parallel_tasks"`
 	MaxTestParallelTasks int                     `json:"max_test_parallel_tasks"`
 	OversightInterval    int                     `json:"oversight_interval"`
@@ -143,8 +143,8 @@ type sandboxTestRequest struct {
 	CodexDefaultModel *string                 `json:"codex_default_model"`
 	CodexTitleModel   *string                 `json:"codex_title_model"`
 	DefaultSandbox    *sandbox.Type           `json:"default_sandbox"`
-	SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity"`
-	SandboxFast       *bool                   `json:"sandbox_fast"`
+	SandboxByActivity map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
+	SandboxFast       *bool                                  `json:"sandbox_fast"`
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
@@ -474,8 +474,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		CodexDefaultModel    *string                 `json:"codex_default_model"`
 		CodexTitleModel      *string                 `json:"codex_title_model"`
 		DefaultSandbox       *sandbox.Type           `json:"default_sandbox"`
-		SandboxByActivity    map[string]sandbox.Type `json:"sandbox_by_activity"`
-		MaxParallelTasks     *int                    `json:"max_parallel_tasks"`
+		SandboxByActivity    map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
+		MaxParallelTasks     *int                                   `json:"max_parallel_tasks"`
 		MaxTestParallelTasks *int                    `json:"max_test_parallel_tasks"`
 		OversightInterval    *int                    `json:"oversight_interval"`
 		ArchivedTasksPerPage *int                    `json:"archived_tasks_per_page"`

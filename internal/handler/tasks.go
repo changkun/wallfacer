@@ -154,9 +154,9 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Timeout            int                     `json:"timeout"`
 		MountWorktrees     bool                    `json:"mount_worktrees"`
 		Sandbox            sandbox.Type            `json:"sandbox"`
-		SandboxByActivity  map[string]sandbox.Type `json:"sandbox_by_activity"`
-		Kind               store.TaskKind          `json:"kind"`
-		Tags               []string                `json:"tags"`
+		SandboxByActivity  map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
+		Kind               store.TaskKind                        `json:"kind"`
+		Tags               []string                              `json:"tags"`
 		MaxCostUSD         float64                 `json:"max_cost_usd"`
 		MaxInputTokens     int                     `json:"max_input_tokens"`
 		Model              string                  `json:"model"`
@@ -217,10 +217,10 @@ type batchTaskInput struct {
 	Timeout           int                     `json:"timeout"`
 	Tags              []string                `json:"tags"`
 	Sandbox           sandbox.Type            `json:"sandbox"`
-	SandboxByActivity map[string]sandbox.Type `json:"sandbox_by_activity"`
-	Kind              store.TaskKind          `json:"kind"`
-	MountWorktrees    bool                    `json:"mount_worktrees"`
-	DependsOnRefs     []string                `json:"depends_on_refs"`
+	SandboxByActivity map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
+	Kind              store.TaskKind                        `json:"kind"`
+	MountWorktrees    bool                                  `json:"mount_worktrees"`
+	DependsOnRefs     []string                              `json:"depends_on_refs"`
 }
 
 type batchCreateRequest struct {
@@ -526,7 +526,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		FreshStart        *bool                    `json:"fresh_start"`
 		MountWorktrees    *bool                    `json:"mount_worktrees"`
 		Sandbox           *sandbox.Type            `json:"sandbox"`
-		SandboxByActivity *map[string]sandbox.Type `json:"sandbox_by_activity"`
+		SandboxByActivity *map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
 		DependsOn         *[]string                `json:"depends_on"`
 		Tags              *[]string                `json:"tags"`
 		MaxCostUSD        *float64                 `json:"max_cost_usd"`

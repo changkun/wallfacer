@@ -54,9 +54,9 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: store.SandboxActivityTitle})
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 		runErr := cmd.Run()
-		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: store.SandboxActivityTitle})
+		r.store.InsertEvent(context.Background(), taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 
 		if ctx.Err() != nil {
 			return titleResult{err: fmt.Errorf("container terminated: %w", ctx.Err()), model: mdl, sb: selected}
@@ -137,7 +137,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 
 	// Accumulate token/cost usage for the title generation sub-agent.
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		if err := r.store.AccumulateSubAgentUsage(context.Background(), taskID, "title", store.TaskUsage{
+		if err := r.store.AccumulateSubAgentUsage(context.Background(), taskID, store.SandboxActivityTitle, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
@@ -155,7 +155,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 			Sandbox:              sb,
-			SubAgent:             "title",
+			SubAgent:             store.SandboxActivityTitle,
 		}); err != nil {
 			logger.Runner.Warn("title generation: append turn usage failed", "task", taskID, "error", err)
 		}

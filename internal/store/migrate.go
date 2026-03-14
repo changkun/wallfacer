@@ -129,7 +129,7 @@ func stringSliceEqual(a, b []string) bool {
 
 // sandboxByActivityEqual reports whether two sandbox-by-activity maps contain
 // exactly the same keys and values.
-func sandboxByActivityEqual(a, b map[string]sandbox.Type) bool {
+func sandboxByActivityEqual(a, b map[SandboxActivity]sandbox.Type) bool {
 	if len(a) != len(b) {
 		return false
 	}

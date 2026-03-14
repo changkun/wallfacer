@@ -27,7 +27,7 @@ func TestAggregateStats(t *testing.T) {
 				CacheReadInputTokens: 200,
 				CostUSD:              0.10,
 			},
-			UsageBreakdown: map[string]store.TaskUsage{
+			UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
 				"implementation": {InputTokens: 800, OutputTokens: 400, CostUSD: 0.08},
 				"test":           {InputTokens: 200, OutputTokens: 100, CostUSD: 0.02},
 			},
@@ -42,7 +42,7 @@ func TestAggregateStats(t *testing.T) {
 				OutputTokens: 200,
 				CostUSD:      0.04,
 			},
-			UsageBreakdown: map[string]store.TaskUsage{
+			UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
 				"implementation": {InputTokens: 500, OutputTokens: 200, CostUSD: 0.04},
 			},
 		},
@@ -57,7 +57,7 @@ func TestAggregateStats(t *testing.T) {
 				CacheCreationTokens: 100,
 				CostUSD:             0.20,
 			},
-			UsageBreakdown: map[string]store.TaskUsage{
+			UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
 				"implementation": {InputTokens: 1500, OutputTokens: 600, CostUSD: 0.15},
 				"oversight":      {InputTokens: 500, OutputTokens: 200, CostUSD: 0.05},
 			},
@@ -72,7 +72,7 @@ func TestAggregateStats(t *testing.T) {
 				OutputTokens: 100,
 				CostUSD:      0.01,
 			},
-			UsageBreakdown: map[string]store.TaskUsage{
+			UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
 				"title": {InputTokens: 300, OutputTokens: 100, CostUSD: 0.01},
 			},
 		},
@@ -87,7 +87,7 @@ func TestAggregateStats(t *testing.T) {
 				OutputTokens: 50,
 				CostUSD:      0.005,
 			},
-			UsageBreakdown: map[string]store.TaskUsage{
+			UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
 				"implementation": {InputTokens: 150, OutputTokens: 50, CostUSD: 0.005},
 			},
 		},
@@ -257,7 +257,7 @@ func TestAggregateStats_ByWorkspace(t *testing.T) {
 				CacheCreationTokens:  50,
 				CostUSD:              0.10,
 			},
-			UsageBreakdown: map[string]store.TaskUsage{
+			UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
 				"implementation": {InputTokens: 1000, OutputTokens: 500, CostUSD: 0.10},
 			},
 			WorktreePaths: map[string]string{
@@ -277,7 +277,7 @@ func TestAggregateStats_ByWorkspace(t *testing.T) {
 				CacheReadInputTokens: 20,
 				CostUSD:              0.04,
 			},
-			UsageBreakdown: map[string]store.TaskUsage{
+			UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
 				"implementation": {InputTokens: 400, OutputTokens: 200, CostUSD: 0.04},
 			},
 			WorktreePaths: map[string]string{
@@ -514,7 +514,7 @@ func TestAggregateStats_SummaryFallback(t *testing.T) {
 				OutputTokens: 500,
 				CostUSD:      0.10, // will be overridden by summary
 			},
-			UsageBreakdown: map[string]store.TaskUsage{
+			UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
 				"implementation": {InputTokens: 1000, OutputTokens: 500, CostUSD: 0.10},
 			},
 		},
@@ -528,14 +528,14 @@ func TestAggregateStats_SummaryFallback(t *testing.T) {
 				OutputTokens: 100,
 				CostUSD:      0.05,
 			},
-			UsageBreakdown: map[string]store.TaskUsage{
+			UsageBreakdown: map[store.SandboxActivity]store.TaskUsage{
 				"implementation": {InputTokens: 200, OutputTokens: 100, CostUSD: 0.05},
 			},
 		},
 	}
 
 	// Summary for the done task with different ByActivity (e.g. after re-calc).
-	summaryByActivity := map[string]store.TaskUsage{
+	summaryByActivity := map[store.SandboxActivity]store.TaskUsage{
 		"implementation": {InputTokens: 800, OutputTokens: 400, CostUSD: 0.08},
 		"oversight":      {InputTokens: 200, OutputTokens: 100, CostUSD: 0.02},
 	}

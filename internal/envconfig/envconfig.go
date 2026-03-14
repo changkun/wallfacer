@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"changkun.de/wallfacer/internal/sandbox"
+	"changkun.de/wallfacer/internal/store"
 )
 
 // Config holds the known configuration values from the .env file.
@@ -212,28 +213,28 @@ func FormatWorkspaces(workspaces []string) string {
 	return strings.Join(workspaces, string(os.PathListSeparator))
 }
 
-func (c Config) SandboxByActivity() map[string]sandbox.Type {
-	out := map[string]sandbox.Type{}
+func (c Config) SandboxByActivity() map[store.SandboxActivity]sandbox.Type {
+	out := map[store.SandboxActivity]sandbox.Type{}
 	if c.ImplementationSandbox != "" {
-		out["implementation"] = c.ImplementationSandbox
+		out[store.SandboxActivityImplementation] = c.ImplementationSandbox
 	}
 	if c.TestingSandbox != "" {
-		out["testing"] = c.TestingSandbox
+		out[store.SandboxActivityTesting] = c.TestingSandbox
 	}
 	if c.RefinementSandbox != "" {
-		out["refinement"] = c.RefinementSandbox
+		out[store.SandboxActivityRefinement] = c.RefinementSandbox
 	}
 	if c.TitleSandbox != "" {
-		out["title"] = c.TitleSandbox
+		out[store.SandboxActivityTitle] = c.TitleSandbox
 	}
 	if c.OversightSandbox != "" {
-		out["oversight"] = c.OversightSandbox
+		out[store.SandboxActivityOversight] = c.OversightSandbox
 	}
 	if c.CommitMessageSandbox != "" {
-		out["commit_message"] = c.CommitMessageSandbox
+		out[store.SandboxActivityCommitMessage] = c.CommitMessageSandbox
 	}
 	if c.IdeaAgentSandbox != "" {
-		out["idea_agent"] = c.IdeaAgentSandbox
+		out[store.SandboxActivityIdeaAgent] = c.IdeaAgentSandbox
 	}
 	if len(out) == 0 {
 		return nil
@@ -379,7 +380,7 @@ func UpdateWorkspaces(path string, workspaces []string) error {
 // defaultSandbox controls WALLFACER_DEFAULT_SANDBOX.
 // sandboxByActivity supports keys: implementation, testing, refinement, title,
 // oversight, commit_message, idea_agent.
-func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByActivity map[string]sandbox.Type) error {
+func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByActivity map[store.SandboxActivity]sandbox.Type) error {
 	var impl, test, refine, title, oversight, commit, idea *string
 	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
@@ -388,31 +389,31 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 		impl, test, refine = &emptyImpl, &emptyTest, &emptyRefine
 		title, oversight, commit, idea = &emptyTitle, &emptyOversight, &emptyCommit, &emptyIdea
 
-		if v, ok := sandboxByActivity["implementation"]; ok {
+		if v, ok := sandboxByActivity[store.SandboxActivityImplementation]; ok {
 			s := string(sandbox.Normalize(string(v)))
 			impl = &s
 		}
-		if v, ok := sandboxByActivity["testing"]; ok {
+		if v, ok := sandboxByActivity[store.SandboxActivityTesting]; ok {
 			s := string(sandbox.Normalize(string(v)))
 			test = &s
 		}
-		if v, ok := sandboxByActivity["refinement"]; ok {
+		if v, ok := sandboxByActivity[store.SandboxActivityRefinement]; ok {
 			s := string(sandbox.Normalize(string(v)))
 			refine = &s
 		}
-		if v, ok := sandboxByActivity["title"]; ok {
+		if v, ok := sandboxByActivity[store.SandboxActivityTitle]; ok {
 			s := string(sandbox.Normalize(string(v)))
 			title = &s
 		}
-		if v, ok := sandboxByActivity["oversight"]; ok {
+		if v, ok := sandboxByActivity[store.SandboxActivityOversight]; ok {
 			s := string(sandbox.Normalize(string(v)))
 			oversight = &s
 		}
-		if v, ok := sandboxByActivity["commit_message"]; ok {
+		if v, ok := sandboxByActivity[store.SandboxActivityCommitMessage]; ok {
 			s := string(sandbox.Normalize(string(v)))
 			commit = &s
 		}
-		if v, ok := sandboxByActivity["idea_agent"]; ok {
+		if v, ok := sandboxByActivity[store.SandboxActivityIdeaAgent]; ok {
 			s := string(sandbox.Normalize(string(v)))
 			idea = &s
 		}
