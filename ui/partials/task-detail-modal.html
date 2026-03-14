@@ -45,6 +45,13 @@
             </details>
           </div>
 
+          <!-- Dependencies (shown when task has depends_on entries) -->
+          <div id="modal-dependencies" class="hidden mb-4">
+            <h3 class="section-title">Blocked by</h3>
+            <div id="modal-dependencies-list" class="flex flex-col gap-1"></div>
+            <div id="modal-dependencies-summary" class="text-xs text-v-muted mt-1"></div>
+          </div>
+
           <!-- Settings for backlog tasks (hidden for non-backlog) -->
           <div id="modal-backlog-settings" class="hidden mb-4">
             <h3 class="section-title">Settings</h3>

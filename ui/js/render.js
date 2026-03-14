@@ -168,7 +168,7 @@ function areDepsBlocked(t) {
   _ensureTaskIndexes();
   return t.depends_on.some(function(depId) {
     var dep = _renderableTaskIndex.get(depId);
-    return !dep || dep.status !== 'done';
+    return !dep || (dep.status !== 'done' && dep.status !== 'cancelled');
   });
 }
 
@@ -177,7 +177,7 @@ function getBlockingTaskNames(t) {
   _ensureTaskIndexes();
   return t.depends_on.map(function(id) {
     var dep = _renderableTaskIndex.get(id);
-    if (dep && dep.status === 'done') return null;
+    if (dep && (dep.status === 'done' || dep.status === 'cancelled')) return null;
     if (!dep) return id.slice(0, 8) + '\u2026';
     return dep.title || (dep.prompt.length > 30 ? dep.prompt.slice(0, 30) + '\u2026' : dep.prompt);
   }).filter(function(name) {
@@ -685,10 +685,19 @@ card.style.opacity = isArchived ? '0.55' : '';
   }
   const displayRank = rank !== undefined ? rank + 1 : t.position + 1;
   const priorityBadge = t.status === 'backlog' ? `<span class="badge badge-priority" title="Priority #${displayRank}">#${displayRank}</span>` : '';
-  const isBlocked = t.status === 'backlog' && areDepsBlocked(t);
-  const blockedBadge = isBlocked
-    ? `<span class="badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">\uD83D\uDD12</span>`
-    : '';
+  let depsBadge = '';
+  if (t.status === 'backlog' && t.depends_on && t.depends_on.length > 0) {
+    _ensureTaskIndexes();
+    const unmetCount = t.depends_on.filter(function(depId) {
+      var dep = _renderableTaskIndex.get(depId);
+      return !dep || (dep.status !== 'done' && dep.status !== 'cancelled');
+    }).length;
+    if (unmetCount > 0) {
+      depsBadge = `<span class="badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">${unmetCount} dep${unmetCount !== 1 ? 's' : ''}</span>`;
+    } else {
+      depsBadge = `<span class="badge badge-deps-met" title="All dependencies satisfied">\u2713 deps</span>`;
+    }
+  }
   const scheduledBadge = (t.status === 'backlog' && t.scheduled_at && new Date(t.scheduled_at) > new Date())
     ? `<span class="badge badge-scheduled" title="Scheduled: ${escapeHtml(new Date(t.scheduled_at).toLocaleString())}">\u23F0 ${escapeHtml(formatRelativeTime(new Date(t.scheduled_at)))}</span>`
     : '';
@@ -731,7 +740,7 @@ card.style.opacity = isArchived ? '0.55' : '';
     <div class="flex items-center justify-between mb-1">
       <div class="flex items-center gap-1.5">
         ${priorityBadge}
-        ${blockedBadge}
+        ${depsBadge}
         ${scheduledBadge}
         <span class="badge ${badgeClass}">${statusLabel}</span>
         ${showSpinner ? '<span class="spinner"></span>' : ''}

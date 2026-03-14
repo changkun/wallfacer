@@ -181,6 +181,18 @@ function startTasksStream() {
       }
       invalidateDiffBehindCounts(task.id);
       scheduleRender();
+      // If the modal is open and this updated task is a dependency of the open
+      // task, refresh the modal's dependency section immediately so status
+      // badges update without waiting for the next full render cycle.
+      if (typeof getOpenModalTaskId === 'function' && typeof renderModalDependencies === 'function') {
+        var openId = getOpenModalTaskId();
+        if (openId) {
+          var openTask = findTaskById(openId);
+          if (openTask && Array.isArray(openTask.depends_on) && openTask.depends_on.indexOf(task.id) !== -1) {
+            renderModalDependencies(openTask);
+          }
+        }
+      }
     } catch (err) {
       console.error('tasks SSE task-updated parse error:', err);
     }
