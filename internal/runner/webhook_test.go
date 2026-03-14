@@ -188,6 +188,54 @@ func TestWebhookNotifier_NoDeliveryWhenStatusUnchanged(t *testing.T) {
 	}
 }
 
+func TestSend_ContextCancelledDuringRetry(t *testing.T) {
+	// Server always returns 503 so Send keeps retrying.
+	attempts := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	wn := runner.NewWebhookNotifier(nil, envconfig.Config{WebhookURL: srv.URL})
+	// backoffs: immediate first attempt, then 50 ms, then 200 ms.
+	wn.SetRetryBackoffs([]time.Duration{0, 50 * time.Millisecond, 200 * time.Millisecond})
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	payload := runner.NewTaskStateChangedPayload(
+		"test-id",
+		store.TaskStatusInProgress,
+		"title", "prompt", "result",
+		time.Now().UTC(),
+	)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- wn.Send(ctx, payload)
+	}()
+
+	// Wait for the first attempt to complete, then cancel.
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+
+	// Send must return well before the full retry sequence (50+200 ms) would finish.
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected an error from cancelled Send, got nil")
+		}
+		// Should have completed with only the first attempt (possibly two if
+		// timing is tight), not all three.
+		if attempts >= 3 {
+			t.Errorf("expected Send to abort early, but got %d attempts", attempts)
+		}
+	case <-time.After(150 * time.Millisecond):
+		cancel() // clean up
+		t.Fatal("Send did not return promptly after context cancellation")
+	}
+}
+
 func TestWebhookNotifier_RetriesOnFailure(t *testing.T) {
 	// First request fails; second succeeds.
 	attempts := 0

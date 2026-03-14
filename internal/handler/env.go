@@ -224,7 +224,7 @@ func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
 	)
 
 	notifier := h.webhookNotifier(cfg)
-	if err := notifier.Send(payload); err != nil {
+	if err := notifier.Send(r.Context(), payload); err != nil {
 		http.Error(w, "webhook delivery failed: "+err.Error(), http.StatusBadGateway)
 		return
 	}

@@ -180,8 +180,9 @@ func runServer(configDir string, args []string) {
 	h.StartAutoRefiner(ctx)
 
 	// Start the webhook notifier if a URL is configured in the env file.
+	var wn *runner.WebhookNotifier
 	if envCfg.WebhookURL != "" {
-		wn := runner.NewWorkspaceWebhookNotifier(wsMgr, envCfg)
+		wn = runner.NewWorkspaceWebhookNotifier(wsMgr, envCfg)
 		go wn.Start(ctx)
 	}
 
@@ -350,6 +351,11 @@ func runServer(configDir string, args []string) {
 	// Wait for background runner goroutines (oversight generation, title
 	// generation, etc.) to finish before the process exits.
 	r.Shutdown()
+
+	// Drain any in-flight webhook deliveries before process exit.
+	if wn != nil {
+		wn.Wait()
+	}
 
 	logger.Main.Info("shutdown complete")
 }
