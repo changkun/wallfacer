@@ -194,3 +194,47 @@ func TestUpdateInstructions_RejectsUnknownFields(t *testing.T) {
 		t.Errorf("expected 400 for unknown fields, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// TestUpdateInstructions_WriteError verifies that UpdateInstructions returns 500
+// when the instructions file cannot be written (e.g. directory is read-only).
+func TestUpdateInstructions_WriteError(t *testing.T) {
+	h, configDir := newTestHandlerWithInstructions(t)
+
+	// Make the instructions directory read-only so os.WriteFile fails.
+	instDir := filepath.Join(configDir, "instructions")
+	if err := os.Chmod(instDir, 0555); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	// Restore permissions after test so TempDir cleanup works.
+	t.Cleanup(func() { os.Chmod(instDir, 0755) })
+
+	body := `{"content": "some content"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/instructions", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.UpdateInstructions(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 when write fails, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestReinitInstructions_WriteError verifies that ReinitInstructions returns 500
+// when the instructions directory cannot be written to.
+func TestReinitInstructions_WriteError(t *testing.T) {
+	h, configDir := newTestHandlerWithInstructions(t)
+
+	// Make the instructions directory read-only so instructions.Reinit fails.
+	instDir := filepath.Join(configDir, "instructions")
+	if err := os.Chmod(instDir, 0555); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { os.Chmod(instDir, 0755) })
+
+	req := httptest.NewRequest(http.MethodPost, "/api/instructions/reinit", nil)
+	w := httptest.NewRecorder()
+	h.ReinitInstructions(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500 when reinit write fails, got %d: %s", w.Code, w.Body.String())
+	}
+}

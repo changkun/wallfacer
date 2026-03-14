@@ -141,3 +141,54 @@ func TestTurnUsageFileIsValidJSONL(t *testing.T) {
 		t.Errorf("expected 5 lines, got %d", lineNum)
 	}
 }
+
+// TestAppendTurnUsage_NonExistentDir verifies that AppendTurnUsage returns an error
+// when the task directory does not exist (covering the os.OpenFile error path).
+func TestAppendTurnUsage_NonExistentDir(t *testing.T) {
+	s := newTestStore(t)
+	// Use a random UUID that has no corresponding directory in the store.
+	randomID := uuid.New()
+	err := s.AppendTurnUsage(randomID, TurnUsageRecord{Turn: 1, CostUSD: 0.001})
+	if err == nil {
+		t.Error("expected an error when task directory does not exist, got nil")
+	}
+}
+
+// TestGetTurnUsages_CorruptedLineSkipped verifies that a corrupted JSONL line is
+// silently skipped and valid records are still returned.
+func TestGetTurnUsages_CorruptedLineSkipped(t *testing.T) {
+	s := newTestStore(t)
+
+	task, err := s.CreateTask(bg(), "test prompt", 0, false, "", TaskKindTask)
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+
+	// Write one valid record first.
+	if err := s.AppendTurnUsage(task.ID, TurnUsageRecord{Turn: 1, CostUSD: 0.001}); err != nil {
+		t.Fatalf("AppendTurnUsage: %v", err)
+	}
+
+	// Manually append corrupted JSONL data.
+	path := s.turnUsagePath(task.ID)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Fatalf("open file: %v", err)
+	}
+	f.WriteString("not-valid-json\n")
+	f.Close()
+
+	// Write another valid record.
+	if err := s.AppendTurnUsage(task.ID, TurnUsageRecord{Turn: 2, CostUSD: 0.002}); err != nil {
+		t.Fatalf("AppendTurnUsage: %v", err)
+	}
+
+	got, err := s.GetTurnUsages(task.ID)
+	if err != nil {
+		t.Fatalf("GetTurnUsages: %v", err)
+	}
+	// Only the two valid records should be returned.
+	if len(got) != 2 {
+		t.Errorf("expected 2 records (corrupted line skipped), got %d", len(got))
+	}
+}
