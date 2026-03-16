@@ -130,10 +130,6 @@ func (h *Handler) StartAutoPromoter(ctx context.Context) {
 	}()
 }
 
-// maxHandlerAutoRetries is the maximum total number of automatic retries for a
-// single task, mirroring the runner's maxTotalAutoRetries cap.
-const maxHandlerAutoRetries = 3
-
 // retryableCategories lists FailureCategory values that represent transient
 // infrastructure errors that are safe to retry automatically.
 var retryableCategories = map[store.FailureCategory]bool{
@@ -419,10 +415,10 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 	if h.breakers["auto-retry"].isOpen() {
 		return
 	}
-	if task.AutoRetryBudget[task.FailureCategory] <= 0 || task.AutoRetryCount >= maxHandlerAutoRetries {
+	if !store.IsAutoRetryEligible(task, task.FailureCategory) {
 		logger.Handler.Info("auto-retry suppressed: max retries reached",
 			"task", task.ID, "auto_retry_count", task.AutoRetryCount,
-			"category", task.FailureCategory)
+			"max", store.MaxAutoRetries, "category", task.FailureCategory)
 		h.incAutopilotAction("auto_retrier", "suppressed_budget")
 		return
 	}

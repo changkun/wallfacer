@@ -1852,7 +1852,7 @@ func TestAutoRetry_MaxTotalCap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for range maxTotalAutoRetries {
+	for range store.MaxAutoRetries {
 		if err := s.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategorySyncError); err != nil {
 			t.Fatalf("IncrementAutoRetryCount: %v", err)
 		}
@@ -1870,8 +1870,8 @@ func TestAutoRetry_MaxTotalCap(t *testing.T) {
 	if got.Status != store.TaskStatusFailed {
 		t.Errorf("expected failed (total cap hit), got %s", got.Status)
 	}
-	if got.AutoRetryCount != maxTotalAutoRetries {
-		t.Errorf("expected AutoRetryCount=%d (unchanged), got %d", maxTotalAutoRetries, got.AutoRetryCount)
+	if got.AutoRetryCount != store.MaxAutoRetries {
+		t.Errorf("expected AutoRetryCount=%d (unchanged), got %d", store.MaxAutoRetries, got.AutoRetryCount)
 	}
 }
 

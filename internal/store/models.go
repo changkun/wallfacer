@@ -363,13 +363,27 @@ type Task struct {
 	AutoRetryBudget map[FailureCategory]int `json:"auto_retry_budget,omitempty"`
 
 	// AutoRetryCount is the total number of auto-retries consumed across all
-	// categories. Capped at maxTotalAutoRetries in the runner.
+	// categories. Capped at MaxAutoRetries.
 	AutoRetryCount int `json:"auto_retry_count,omitempty"`
 
 	// TestFailCount tracks the number of consecutive test failures for this task.
 	// Used to cap the auto-resume cycle and prevent infinite test-fail loops.
 	// Reset when the user manually provides feedback or when a test passes.
 	TestFailCount int `json:"test_fail_count,omitempty"`
+}
+
+// MaxAutoRetries is the global cap on automatic retries per task across all
+// failure categories and retry paths (runner and handler).
+const MaxAutoRetries = 3
+
+// IsAutoRetryEligible reports whether task t is eligible for an automatic retry
+// given the failure category that caused it to fail. It returns false when:
+//   - the per-category budget in AutoRetryBudget is zero or missing
+//   - the total AutoRetryCount has reached MaxAutoRetries
+//
+// This is the single authoritative check used by both the runner and handler.
+func IsAutoRetryEligible(t Task, category FailureCategory) bool {
+	return t.AutoRetryBudget[category] > 0 && t.AutoRetryCount < MaxAutoRetries
 }
 
 // HasTag reports whether the task has the given tag.

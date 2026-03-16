@@ -1,7 +1,6 @@
 package handler
 
 import (
-<<<<<<< HEAD
 	"bytes"
 	"context"
 	"encoding/json"
@@ -858,7 +857,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 	// ── Test 1: regression guard ─────────────────────────────────────────────
 	// The exact regressed scenario fixed in a4e6326: the handler was using
 	// len(RetryHistory) (=5) instead of AutoRetryCount (=1) as the gate.
-	// With count=1 < maxHandlerAutoRetries(3) and budget=2 > 0, the task MUST
+	// With count=1 < store.MaxAutoRetries(3) and budget=2 > 0, the task MUST
 	// be retried despite having 5 RetryHistory entries.
 	t.Run("regression_uses_auto_retry_count_not_retry_history_length", func(t *testing.T) {
 		h := newTestHandler(t)
@@ -906,7 +905,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 	})
 
 	// ── Test 2: total cap enforcement ────────────────────────────────────────
-	// AutoRetryCount == maxHandlerAutoRetries(3) must block retry even when
+	// AutoRetryCount == store.MaxAutoRetries(3) must block retry even when
 	// the per-category budget is plentiful.
 	t.Run("total_cap_prevents_retry", func(t *testing.T) {
 		h := newTestHandler(t)
@@ -924,7 +923,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 			ID:              created.ID,
 			Status:          store.TaskStatusFailed,
 			Prompt:          created.Prompt,
-			AutoRetryCount:  maxHandlerAutoRetries, // == 3, at the cap
+			AutoRetryCount:  store.MaxAutoRetries, // == 3, at the cap
 			FailureCategory: store.FailureCategoryContainerCrash,
 			AutoRetryBudget: map[store.FailureCategory]int{
 				store.FailureCategoryContainerCrash: 5, // budget is irrelevant when count is at cap
@@ -1107,7 +1106,7 @@ func TestStartAutoRetrier_StartupScan(t *testing.T) {
 //   - task1: AutoRetryCount=2, FailureCategory=container_crash, budget=1.
 //     The scan should retry this once more (reset to backlog).
 //
-//   - task2: AutoRetryCount=3 (== maxHandlerAutoRetries), FailureCategory=container_crash.
+//   - task2: AutoRetryCount=3 (== store.MaxAutoRetries), FailureCategory=container_crash.
 //     The scan must NOT retry this — the total cap is already hit.
 func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 	h := newTestHandler(t)
@@ -1154,15 +1153,15 @@ func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for range maxHandlerAutoRetries {
+	for range store.MaxAutoRetries {
 		if err := h.store.IncrementAutoRetryCount(ctx, task2.ID, store.FailureCategorySyncError); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	t2pre, _ := h.store.GetTask(ctx, task2.ID)
-	if t2pre.AutoRetryCount != maxHandlerAutoRetries {
-		t.Fatalf("setup: task2 AutoRetryCount=%d, want %d", t2pre.AutoRetryCount, maxHandlerAutoRetries)
+	if t2pre.AutoRetryCount != store.MaxAutoRetries {
+		t.Fatalf("setup: task2 AutoRetryCount=%d, want %d", t2pre.AutoRetryCount, store.MaxAutoRetries)
 	}
 
 	if err := h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusFailed); err != nil {
@@ -1184,15 +1183,15 @@ func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 		t.Errorf("task1: status = %q, want backlog (one retry remaining at count=2)", got1.Status)
 	}
 
-	// task2 must remain failed — count=3 hits maxHandlerAutoRetries.
+	// task2 must remain failed — count=3 hits store.MaxAutoRetries.
 	got2, err := h.store.GetTask(ctx, task2.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got2.Status != store.TaskStatusFailed {
-		t.Errorf("task2: status = %q, want failed (max count=%d already hit)", got2.Status, maxHandlerAutoRetries)
+		t.Errorf("task2: status = %q, want failed (max count=%d already hit)", got2.Status, store.MaxAutoRetries)
 	}
-	if got2.AutoRetryCount != maxHandlerAutoRetries {
-		t.Errorf("task2: AutoRetryCount=%d, want %d (unchanged)", got2.AutoRetryCount, maxHandlerAutoRetries)
+	if got2.AutoRetryCount != store.MaxAutoRetries {
+		t.Errorf("task2: AutoRetryCount=%d, want %d (unchanged)", got2.AutoRetryCount, store.MaxAutoRetries)
 	}
 }

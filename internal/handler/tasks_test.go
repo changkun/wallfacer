@@ -1406,7 +1406,7 @@ func TestTryAutoRetry_MaxRetries(t *testing.T) {
 	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
 		t.Fatalf("SetTaskFailureCategory: %v", err)
 	}
-	for i := 0; i < maxHandlerAutoRetries; i++ {
+	for i := 0; i < store.MaxAutoRetries; i++ {
 		if err := h.store.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
 			t.Fatalf("IncrementAutoRetryCount(%d): %v", i, err)
 		}
@@ -1416,8 +1416,8 @@ func TestTryAutoRetry_MaxRetries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if got := failed.AutoRetryCount; got != maxHandlerAutoRetries {
-		t.Fatalf("AutoRetryCount = %d, want %d", got, maxHandlerAutoRetries)
+	if got := failed.AutoRetryCount; got != store.MaxAutoRetries {
+		t.Fatalf("AutoRetryCount = %d, want %d", got, store.MaxAutoRetries)
 	}
 	h.tryAutoRetry(ctx, *failed)
 
@@ -1500,7 +1500,7 @@ func TestTryAutoRetry_ManualRetriesDoNotBlock(t *testing.T) {
 		t.Fatalf("AutoRetryCount = %d, want 0", failed.AutoRetryCount)
 	}
 
-	// tryAutoRetry should NOT be suppressed: AutoRetryCount=0 < maxHandlerAutoRetries
+	// tryAutoRetry should NOT be suppressed: AutoRetryCount=0 < store.MaxAutoRetries
 	// and budget remains (container_crash starts with 2).
 	h.tryAutoRetry(ctx, *failed)
 

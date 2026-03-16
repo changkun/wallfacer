@@ -17,10 +17,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// maxTotalAutoRetries is the global cap on the total number of automatic
-// retry attempts for a single task, regardless of per-category budgets.
-const maxTotalAutoRetries = 3
-
 var (
 	// verdictLabelPattern detects explicit labeled verdict lines such as:
 	// "Result: PASS", "Verdict: FAILED", "Status - Pass", etc.
@@ -103,7 +99,7 @@ func classifyFailure(err error, isError bool, result string) store.FailureCatego
 // tryAutoRetry checks whether the task should be automatically retried given
 // the failure category. It returns true and resets the task to backlog when:
 //   - the per-category budget is > 0, AND
-//   - the total auto-retry count is < maxTotalAutoRetries.
+//   - the total auto-retry count is < store.MaxAutoRetries.
 //
 // The caller must set statusSet=true before calling and return immediately
 // when tryAutoRetry returns true, so the deferred guard does not overwrite
@@ -113,7 +109,7 @@ func (r *Runner) tryAutoRetry(bgCtx context.Context, taskID uuid.UUID, category 
 	if err != nil {
 		return false
 	}
-	if t.AutoRetryBudget[category] <= 0 || t.AutoRetryCount >= maxTotalAutoRetries {
+	if !store.IsAutoRetryEligible(*t, category) {
 		return false
 	}
 	if err := r.store.IncrementAutoRetryCount(bgCtx, taskID, category); err != nil {
@@ -123,7 +119,7 @@ func (r *Runner) tryAutoRetry(bgCtx context.Context, taskID uuid.UUID, category 
 	if updated, err := r.store.GetTask(bgCtx, taskID); err == nil {
 		r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 			"message": fmt.Sprintf("auto-retry %d/%d after %s",
-				updated.AutoRetryCount, maxTotalAutoRetries, category),
+				updated.AutoRetryCount, store.MaxAutoRetries, category),
 		})
 	}
 	r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusBacklog)
