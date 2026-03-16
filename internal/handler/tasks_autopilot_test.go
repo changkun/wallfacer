@@ -1,6 +1,7 @@
 package handler
 
 import (
+<<<<<<< HEAD
 	"bytes"
 	"context"
 	"encoding/json"
@@ -848,5 +849,350 @@ func TestUpdateEnvConfig_InvalidatesTestParallelLimitCache(t *testing.T) {
 	got := h.maxTestConcurrentTasks()
 	if got != newLimit {
 		t.Fatalf("after UpdateEnvConfig: want %d, got %d", newLimit, got)
+	}
+}
+
+// TestTryAutoRetry_HandlerPath covers the four core guard branches of the
+// handler's tryAutoRetry method.
+func TestTryAutoRetry_HandlerPath(t *testing.T) {
+	// ── Test 1: regression guard ─────────────────────────────────────────────
+	// The exact regressed scenario fixed in a4e6326: the handler was using
+	// len(RetryHistory) (=5) instead of AutoRetryCount (=1) as the gate.
+	// With count=1 < maxHandlerAutoRetries(3) and budget=2 > 0, the task MUST
+	// be retried despite having 5 RetryHistory entries.
+	t.Run("regression_uses_auto_retry_count_not_retry_history_length", func(t *testing.T) {
+		h := newTestHandler(t)
+		ctx := context.Background()
+
+		created, err := h.store.CreateTask(ctx, "regression test prompt", 5, false, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ForceUpdateTaskStatus(ctx, created.ID, store.TaskStatusFailed); err != nil {
+			t.Fatal(err)
+		}
+
+		// Build 5 RetryRecord entries to simulate history from earlier runs.
+		retryHistory := make([]store.RetryRecord, 5)
+		for i := range retryHistory {
+			retryHistory[i] = store.RetryRecord{
+				RetiredAt: time.Now(),
+				Prompt:    "previous prompt",
+				Status:    store.TaskStatusFailed,
+			}
+		}
+
+		task := store.Task{
+			ID:              created.ID,
+			Status:          store.TaskStatusFailed,
+			Prompt:          created.Prompt,
+			AutoRetryCount:  1, // low count — but history length is 5
+			RetryHistory:    retryHistory,
+			FailureCategory: store.FailureCategoryContainerCrash,
+			AutoRetryBudget: map[store.FailureCategory]int{
+				store.FailureCategoryContainerCrash: 2,
+			},
+		}
+
+		h.tryAutoRetry(ctx, task)
+
+		got, err := h.store.GetTask(ctx, created.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != store.TaskStatusBacklog {
+			t.Errorf("status = %q, want backlog — regression: handler must use AutoRetryCount not len(RetryHistory)", got.Status)
+		}
+	})
+
+	// ── Test 2: total cap enforcement ────────────────────────────────────────
+	// AutoRetryCount == maxHandlerAutoRetries(3) must block retry even when
+	// the per-category budget is plentiful.
+	t.Run("total_cap_prevents_retry", func(t *testing.T) {
+		h := newTestHandler(t)
+		ctx := context.Background()
+
+		created, err := h.store.CreateTask(ctx, "cap test prompt", 5, false, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ForceUpdateTaskStatus(ctx, created.ID, store.TaskStatusFailed); err != nil {
+			t.Fatal(err)
+		}
+
+		task := store.Task{
+			ID:              created.ID,
+			Status:          store.TaskStatusFailed,
+			Prompt:          created.Prompt,
+			AutoRetryCount:  maxHandlerAutoRetries, // == 3, at the cap
+			FailureCategory: store.FailureCategoryContainerCrash,
+			AutoRetryBudget: map[store.FailureCategory]int{
+				store.FailureCategoryContainerCrash: 5, // budget is irrelevant when count is at cap
+			},
+		}
+
+		h.tryAutoRetry(ctx, task)
+
+		got, err := h.store.GetTask(ctx, created.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != store.TaskStatusFailed {
+			t.Errorf("status = %q, want failed — total cap should suppress retry", got.Status)
+		}
+	})
+
+	// ── Test 3: per-category budget exhaustion ────────────────────────────────
+	// AutoRetryBudget[container_crash]=0 must block retry even when count < max.
+	t.Run("category_budget_exhausted_prevents_retry", func(t *testing.T) {
+		h := newTestHandler(t)
+		ctx := context.Background()
+
+		created, err := h.store.CreateTask(ctx, "budget test prompt", 5, false, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ForceUpdateTaskStatus(ctx, created.ID, store.TaskStatusFailed); err != nil {
+			t.Fatal(err)
+		}
+
+		task := store.Task{
+			ID:              created.ID,
+			Status:          store.TaskStatusFailed,
+			Prompt:          created.Prompt,
+			AutoRetryCount:  1,
+			FailureCategory: store.FailureCategoryContainerCrash,
+			AutoRetryBudget: map[store.FailureCategory]int{
+				store.FailureCategoryContainerCrash: 0, // budget exhausted
+			},
+		}
+
+		h.tryAutoRetry(ctx, task)
+
+		got, err := h.store.GetTask(ctx, created.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != store.TaskStatusFailed {
+			t.Errorf("status = %q, want failed — exhausted budget should suppress retry", got.Status)
+		}
+	})
+
+	// ── Test 4: non-retryable category ────────────────────────────────────────
+	// agent_error is not in retryableCategories so the handler must not retry.
+	t.Run("non_retryable_category_agent_error", func(t *testing.T) {
+		h := newTestHandler(t)
+		ctx := context.Background()
+
+		created, err := h.store.CreateTask(ctx, "agent error prompt", 5, false, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.ForceUpdateTaskStatus(ctx, created.ID, store.TaskStatusFailed); err != nil {
+			t.Fatal(err)
+		}
+
+		task := store.Task{
+			ID:              created.ID,
+			Status:          store.TaskStatusFailed,
+			Prompt:          created.Prompt,
+			AutoRetryCount:  0,
+			FailureCategory: store.FailureCategoryAgentError,
+			AutoRetryBudget: map[store.FailureCategory]int{
+				store.FailureCategoryAgentError: 5, // budget exists but category is not retryable
+			},
+		}
+
+		h.tryAutoRetry(ctx, task)
+
+		got, err := h.store.GetTask(ctx, created.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != store.TaskStatusFailed {
+			t.Errorf("status = %q, want failed — agent_error is not in retryableCategories", got.Status)
+		}
+	})
+}
+
+// Note (test 5 — runner path): The runner's tryAutoRetry is covered in
+// internal/runner/auto_retry_test.go which tests the unexported method directly
+// in the runner package.
+
+// Note (test 6 — classifyFailure): All 5 branches of classifyFailure are
+// already exhaustively covered in internal/runner/classify_failure_test.go.
+
+// TestStartAutoRetrier_StartupScan verifies the recovery scan that
+// StartAutoRetrier runs on startup.  Three tasks are pre-populated:
+//
+//	(a) failed + container_crash + default budget (>0) + count=0 → MUST be retried
+//	(b) failed + agent_error (non-retryable category) → must NOT be retried
+//	(c) in_progress → not in the failed list, must remain unchanged
+func TestStartAutoRetrier_StartupScan(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// (a) Eligible failed task.
+	taskA, err := h.store.CreateTask(ctx, "crash task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, taskA.ID, store.TaskStatusFailed); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetTaskFailureCategory(ctx, taskA.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatal(err)
+	}
+
+	// (b) Non-retryable failed task.
+	taskB, err := h.store.CreateTask(ctx, "agent error task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, taskB.ID, store.TaskStatusFailed); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetTaskFailureCategory(ctx, taskB.ID, store.FailureCategoryAgentError); err != nil {
+		t.Fatal(err)
+	}
+
+	// (c) In-progress task (not in the failed list; included to confirm no side-effects).
+	taskC, err := h.store.CreateTask(ctx, "in progress task", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, taskC.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+
+	h.StartAutoRetrier(ctx)
+
+	// Allow the startup goroutine time to run the recovery scan (all in-memory).
+	time.Sleep(100 * time.Millisecond)
+
+	// (a) should be reset to backlog.
+	gotA, err := h.store.GetTask(ctx, taskA.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotA.Status != store.TaskStatusBacklog {
+		t.Errorf("task (a): status = %q, want backlog (eligible retry should fire)", gotA.Status)
+	}
+
+	// (b) should remain failed — agent_error is non-retryable.
+	gotB, err := h.store.GetTask(ctx, taskB.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotB.Status != store.TaskStatusFailed {
+		t.Errorf("task (b): status = %q, want failed (agent_error must not be retried)", gotB.Status)
+	}
+
+	// (c) should remain in_progress — not touched by the failed-task scan.
+	gotC, err := h.store.GetTask(ctx, taskC.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotC.Status != store.TaskStatusInProgress {
+		t.Errorf("task (c): status = %q, want in_progress (untouched by startup scan)", gotC.Status)
+	}
+}
+
+// TestStartAutoRetrier_ServerRestartDoubleRetryGuard verifies that the startup
+// scan does not cascade into infinite retries after a server restart.
+//
+// Two tasks are pre-populated to simulate state left on disk after a crash:
+//
+//   - task1: AutoRetryCount=2, FailureCategory=container_crash, budget=1.
+//     The scan should retry this once more (reset to backlog).
+//
+//   - task2: AutoRetryCount=3 (== maxHandlerAutoRetries), FailureCategory=container_crash.
+//     The scan must NOT retry this — the total cap is already hit.
+func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
+	h := newTestHandler(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// ── task1: count=2, container_crash budget=1 ─────────────────────────────
+	// Build count=2 with container_crash budget=1 by incrementing two different
+	// categories so that the container_crash budget is only spent once:
+	//   Inc(sync_error):      count=1, sync_error budget=1, container_crash budget=2
+	//   Inc(container_crash): count=2, container_crash budget=1
+	task1, err := h.store.CreateTask(ctx, "restart task one", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.IncrementAutoRetryCount(ctx, task1.ID, store.FailureCategorySyncError); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.IncrementAutoRetryCount(ctx, task1.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the setup is correct before running the scan.
+	t1pre, _ := h.store.GetTask(ctx, task1.ID)
+	if t1pre.AutoRetryCount != 2 {
+		t.Fatalf("setup: task1 AutoRetryCount=%d, want 2", t1pre.AutoRetryCount)
+	}
+	if t1pre.AutoRetryBudget[store.FailureCategoryContainerCrash] != 1 {
+		t.Fatalf("setup: task1 container_crash budget=%d, want 1",
+			t1pre.AutoRetryBudget[store.FailureCategoryContainerCrash])
+	}
+
+	if err := h.store.ForceUpdateTaskStatus(ctx, task1.ID, store.TaskStatusFailed); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetTaskFailureCategory(ctx, task1.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatal(err)
+	}
+
+	// ── task2: count=3 (cap already hit), container_crash budget=2 ──────────
+	// Build count=3 by incrementing sync_error three times, leaving the
+	// container_crash budget at its default of 2 to isolate the count guard.
+	task2, err := h.store.CreateTask(ctx, "restart task two", 5, false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range maxHandlerAutoRetries {
+		if err := h.store.IncrementAutoRetryCount(ctx, task2.ID, store.FailureCategorySyncError); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t2pre, _ := h.store.GetTask(ctx, task2.ID)
+	if t2pre.AutoRetryCount != maxHandlerAutoRetries {
+		t.Fatalf("setup: task2 AutoRetryCount=%d, want %d", t2pre.AutoRetryCount, maxHandlerAutoRetries)
+	}
+
+	if err := h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusFailed); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetTaskFailureCategory(ctx, task2.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatal(err)
+	}
+
+	h.StartAutoRetrier(ctx)
+	time.Sleep(100 * time.Millisecond)
+
+	// task1 should be reset to backlog (count=2 < 3, budget=1 > 0).
+	got1, err := h.store.GetTask(ctx, task1.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got1.Status != store.TaskStatusBacklog {
+		t.Errorf("task1: status = %q, want backlog (one retry remaining at count=2)", got1.Status)
+	}
+
+	// task2 must remain failed — count=3 hits maxHandlerAutoRetries.
+	got2, err := h.store.GetTask(ctx, task2.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got2.Status != store.TaskStatusFailed {
+		t.Errorf("task2: status = %q, want failed (max count=%d already hit)", got2.Status, maxHandlerAutoRetries)
+	}
+	if got2.AutoRetryCount != maxHandlerAutoRetries {
+		t.Errorf("task2: AutoRetryCount=%d, want %d (unchanged)", got2.AutoRetryCount, maxHandlerAutoRetries)
 	}
 }
