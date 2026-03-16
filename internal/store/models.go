@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -266,6 +265,8 @@ type PayloadLimits struct {
 	PromptHistory  int `json:"prompt_history"`
 }
 
+//go:generate go run ../../cmd/gen-clone/main.go
+
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
 	SchemaVersion     int                     `json:"schema_version"`
@@ -396,70 +397,10 @@ func (t *Task) HasTag(tag string) bool {
 	return false
 }
 
-// deepCloneTask returns a full copy of t, duplicating all slices, maps, and
-// pointer-bearing fields so callers can safely mutate the returned value.
-func deepCloneTask(t *Task) Task {
-	if t == nil {
-		return Task{}
-	}
-
-	cp := *t
-	cp.PromptHistory = slices.Clone(t.PromptHistory)
-	cp.RetryHistory = slices.Clone(t.RetryHistory)
-	cp.RefineSessions = cloneRefinementSessions(t.RefineSessions)
-	cp.Tags = slices.Clone(t.Tags)
-	cp.DependsOn = slices.Clone(t.DependsOn)
-	cp.CustomPassPatterns = slices.Clone(t.CustomPassPatterns)
-	cp.CustomFailPatterns = slices.Clone(t.CustomFailPatterns)
-	cp.TruncatedTurns = slices.Clone(t.TruncatedTurns)
-	cp.SandboxByActivity = maps.Clone(t.SandboxByActivity)
-	cp.UsageBreakdown = maps.Clone(t.UsageBreakdown)
-	cp.WorktreePaths = maps.Clone(t.WorktreePaths)
-	cp.AutoRetryBudget = maps.Clone(t.AutoRetryBudget)
-	cp.CommitHashes = maps.Clone(t.CommitHashes)
-	cp.BaseCommitHashes = maps.Clone(t.BaseCommitHashes)
-
-	if t.CurrentRefinement != nil {
-		jobCopy := *t.CurrentRefinement
-		cp.CurrentRefinement = &jobCopy
-	}
-	if t.SessionID != nil {
-		sessionID := *t.SessionID
-		cp.SessionID = &sessionID
-	}
-	if t.Result != nil {
-		result := *t.Result
-		cp.Result = &result
-	}
-	if t.StopReason != nil {
-		stopReason := *t.StopReason
-		cp.StopReason = &stopReason
-	}
-	if t.Environment != nil {
-		envCopy := *t.Environment
-		cp.Environment = &envCopy
-	}
-	if t.StartedAt != nil {
-		startedAt := *t.StartedAt
-		cp.StartedAt = &startedAt
-	}
-	if t.ScheduledAt != nil {
-		scheduledAt := *t.ScheduledAt
-		cp.ScheduledAt = &scheduledAt
-	}
-	if t.ForkedFrom != nil {
-		forkedFrom := *t.ForkedFrom
-		cp.ForkedFrom = &forkedFrom
-	}
-	if t.ModelOverride != nil {
-		modelOverride := *t.ModelOverride
-		cp.ModelOverride = &modelOverride
-	}
-
-	return cp
-}
-
-func cloneRefinementSessions(src []RefinementSession) []RefinementSession {
+// cloneRefinementSessionSlice deep-copies a []RefinementSession, duplicating
+// each element's Messages slice so the clone does not share backing arrays with
+// the original.  It is called by the generated deepCloneTask function.
+func cloneRefinementSessionSlice(src []RefinementSession) []RefinementSession {
 	if src == nil {
 		return nil
 	}
