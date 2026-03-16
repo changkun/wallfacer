@@ -32,6 +32,13 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 
 	changed := false
 
+	// Migrate deprecated Model field to ModelOverride.
+	if task.Model != "" && task.ModelOverride == nil {
+		task.ModelOverride = &task.Model
+		task.Model = ""
+		changed = true
+	}
+
 	// (1) Default missing/zero values.
 	if task.Status == "" {
 		task.Status = TaskStatusBacklog

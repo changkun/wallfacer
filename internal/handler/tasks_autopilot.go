@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -286,13 +287,16 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				return nil, err
 			}
 
-			var bestBacklog *store.Task
+			type cpCandidate struct {
+				task  store.Task
+				score int
+			}
+			var cpCandidates []cpCandidate
 			for i := range backlogTasks {
 				t := &backlogTasks[i]
 				if t.Kind == store.TaskKindIdeaAgent {
 					continue
 				}
-				// Skip tasks that have a future scheduled start time.
 				if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
 					h.incAutopilotAction("auto_promoter", "skipped_scheduled")
 					continue
@@ -300,14 +304,24 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
 				if err != nil || !satisfied {
 					h.incAutopilotAction("auto_promoter", "skipped_dependency")
-					continue // skip: dependencies not yet done
+					continue
 				}
-				if bestBacklog == nil || t.Position < bestBacklog.Position {
-					cp := *t
-					bestBacklog = &cp
-				}
+				cpCandidates = append(cpCandidates, cpCandidate{task: *t, score: h.store.CriticalPathScore(t.ID)})
 			}
-			return bestBacklog, nil
+			if len(cpCandidates) == 0 {
+				return nil, nil
+			}
+			sort.Slice(cpCandidates, func(i, j int) bool {
+				if cpCandidates[i].score != cpCandidates[j].score {
+					return cpCandidates[i].score > cpCandidates[j].score
+				}
+				if cpCandidates[i].task.Position != cpCandidates[j].task.Position {
+					return cpCandidates[i].task.Position < cpCandidates[j].task.Position
+				}
+				return cpCandidates[i].task.CreatedAt.Before(cpCandidates[j].task.CreatedAt)
+			})
+			best := cpCandidates[0].task
+			return &best, nil
 		},
 		AfterPhase1: h.testPhase1Done,
 		OnPhase2Miss: func(candidate *store.Task) {
