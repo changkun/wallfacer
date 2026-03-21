@@ -81,21 +81,21 @@ function _phaseColor(phase) {
 function _humanSpanLabel(phase, label) {
   var m;
   if (phase === 'agent_turn') {
-    if ((m = label.match(/^implementation_(\d+)$/))) return 'Impl. Turn ' + m[1];
+    if ((m = label.match(/^implementation_(\d+)$/))) return 'Implementation Turn ' + m[1];
     if ((m = label.match(/^test_(\d+)$/))) return 'Test Turn ' + m[1];
     if ((m = label.match(/^agent_turn_(\d+)$/))) return 'Turn ' + m[1]; // legacy
     return label;
   }
   if (phase === 'container_run') {
     var actMap = {
-      'implementation':  'Container (Impl.)',
+      'implementation':  'Container (Implementation)',
       'test':            'Container (Test)',
-      'commit_message':  'Container (Commit)',
+      'commit_message':  'Container (Commit Message)',
       'oversight':       'Container (Oversight)',
-      'oversight_test':  'Container (Oversight-Test)',
-      'refinement':      'Container (Refine)',
+      'oversight_test':  'Container (Oversight Test)',
+      'refinement':      'Container (Refinement)',
       'title':           'Container (Title)',
-      'idea_agent':      'Container (Ideas)',
+      'idea_agent':      'Container (Ideation)',
       'container_run':   'Container', // legacy
     };
     return actMap[label] || ('Container (' + label + ')');
@@ -103,7 +103,11 @@ function _humanSpanLabel(phase, label) {
   if (phase === 'worktree_setup') return 'Worktree Setup';
   if (phase === 'commit') return label || 'Commit & Push';
   if (phase === 'refinement') return 'Refinement';
-  if (phase === 'board_context') return label || 'Board Context';
+  if (phase === 'board_context') {
+    var bc;
+    if ((bc = label.match(/^board_context_(\d+)$/))) return 'Board Sync (Turn ' + bc[1] + ')';
+    return 'Board Sync';
+  }
   if (phase === 'feedback_waiting') return 'Waiting for Feedback';
   if (phase === 'worktree_cleanup') return 'Worktree Cleanup';
   return label || phase;
@@ -347,7 +351,7 @@ function _buildTimelineHtml(spans) {
     commit:           'Commit & Push',
     container_run:    'Container',
     refinement:       'Refinement',
-    board_context:    'Board Context',
+    board_context:    'Board Sync',
     feedback_waiting: 'Waiting for Feedback',
     worktree_cleanup: 'Worktree Cleanup',
   };
