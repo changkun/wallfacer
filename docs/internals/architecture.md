@@ -51,12 +51,13 @@ stateDiagram-v2
     [*] --> backlog
 
     backlog --> in_progress : drag / autopilot
-    backlog --> cancelled : cancel
 
     in_progress --> in_progress : max_tokens / pause_turn (auto-continue)
     in_progress --> waiting : end_turn
     in_progress --> waiting : empty stop_reason
     in_progress --> failed : error / timeout / budget
+    in_progress --> backlog : reset
+    in_progress --> cancelled : cancel
 
     committing --> done : commit success
     committing --> failed : commit failure
