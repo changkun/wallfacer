@@ -1,6 +1,6 @@
 # ⚙️ Configuration & Customization
 
-Wallfacer is configured through a combination of the Settings UI, environment variables in `~/.wallfacer/.env`, CLI flags, and file-based overrides for system prompts and workspace instructions. Most settings take effect on the next task run without restarting the server.
+Wallfacer is configured through the Settings UI, environment variables in `~/.wallfacer/.env`, CLI flags, and file-based overrides for system prompts and workspace instructions. The `.env` file is auto-generated on first run with commented-out defaults; edit it directly or use the Settings UI. Most settings take effect on the next task run without restarting the server.
 
 ---
 
@@ -29,7 +29,7 @@ All changes are written to `~/.wallfacer/.env` and take effect on the next task 
 
 ### Key Environment Variables
 
-All configuration lives in `~/.wallfacer/.env`. The server re-reads this file before each container launch, so changes take effect on the next task without a server restart.
+All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). The server re-reads this file before each container launch, so changes take effect on the next task without a server restart.
 
 | Variable | Required | Description |
 |---|---|---|
@@ -129,7 +129,7 @@ When `WALLFACER_SANDBOX_FAST` is `true` (the default), Wallfacer passes fast-mod
 
 ### 📋 Full Environment Variables Reference
 
-All configuration lives in `~/.wallfacer/.env`. The server re-reads this file before each container launch, so changes take effect on the next task without a server restart.
+All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). The server re-reads this file before each container launch, so changes take effect on the next task without a server restart.
 
 #### Authentication
 

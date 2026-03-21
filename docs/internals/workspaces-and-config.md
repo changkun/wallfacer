@@ -162,7 +162,7 @@ Before launching any task, `Handler.sandboxUsable()` validates that the selected
 
 ### 📂 File Location and Parsing
 
-The environment configuration lives at `~/.wallfacer/.env`. It is a standard dotenv file: blank lines and lines starting with `#` are ignored, an optional `export ` prefix is stripped, values may be quoted (single or double), and inline comments after unquoted values are stripped while literal `#` inside quoted strings is preserved.
+The environment configuration lives at `~/.wallfacer/.env` (auto-generated on first run with commented-out defaults). It is a standard dotenv file: blank lines and lines starting with `#` are ignored, an optional `export ` prefix is stripped, values may be quoted (single or double), and inline comments after unquoted values are stripped while literal `#` inside quoted strings is preserved.
 
 `envconfig.Parse(path)` (`internal/envconfig/envconfig.go`) reads the file and returns a typed `envconfig.Config` struct. The parser is permissive — unknown keys are silently skipped, and integer fields that fail to parse are left at their zero value (which triggers default behavior downstream).
 

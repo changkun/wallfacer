@@ -120,7 +120,7 @@ If the task fails immediately, check:
 
 ## Configuration Reference
 
-All configuration lives in `~/.wallfacer/.env`. The server re-reads this file before each container launch, so changes take effect on the next task without a server restart. You can also edit everything from **Settings → API Configuration** in the web UI.
+All configuration lives in `~/.wallfacer/.env`, which is auto-generated on first run. The server re-reads this file before each container launch, so changes take effect on the next task without a server restart. You can edit variables directly in the file or from **Settings → API Configuration** in the web UI.
 
 ### Claude Code Variables
 
