@@ -336,11 +336,79 @@ async function loadDoc(slug) {
     _appendDocNav(content, slug);
     content.scrollTop = 0;
     _rewriteDocLinks(content, slug);
+    _renderDocToc(content);
     await _ensureMermaid();
     await _renderMermaidBlocks(content);
   } catch (e) {
     content.innerHTML = '<div style="color:var(--text-muted);">Failed to load document.</div>';
   }
+}
+
+// Build a table-of-contents from headings in the rendered content.
+function _renderDocToc(content) {
+  var toc = document.getElementById('docs-toc');
+  if (!toc) return;
+  var headings = content.querySelectorAll('h2, h3');
+  if (headings.length === 0) { toc.innerHTML = ''; return; }
+
+  // Ensure each heading has an id for anchor links.
+  for (var i = 0; i < headings.length; i++) {
+    if (!headings[i].id) {
+      headings[i].id = 'heading-' + i;
+    }
+  }
+
+  var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:8px;">On this page</div>';
+  for (var j = 0; j < headings.length; j++) {
+    var h = headings[j];
+    var level = h.tagName === 'H3' ? 1 : 0;
+    var indent = level * 10;
+    html += '<a href="#' + h.id + '" data-toc-target="' + h.id + '" style="display:block;padding:2px 0 2px ' + indent + 'px;color:var(--text-muted);text-decoration:none;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--text-muted)\'">' + escapeHtml(h.textContent) + '</a>';
+  }
+  toc.innerHTML = html;
+
+  // Click handler: scroll heading into view within the content pane.
+  var tocLinks = toc.querySelectorAll('a[data-toc-target]');
+  for (var k = 0; k < tocLinks.length; k++) {
+    tocLinks[k].onclick = (function(id) {
+      return function(e) {
+        e.preventDefault();
+        var el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+    })(tocLinks[k].getAttribute('data-toc-target'));
+  }
+
+  // Highlight current section on scroll.
+  _setupTocScrollSpy(content, headings, tocLinks);
+}
+
+// Highlight the TOC entry corresponding to the visible section.
+function _setupTocScrollSpy(content, headings, tocLinks) {
+  // Remove previous listener if any.
+  if (content._tocScrollHandler) {
+    content.removeEventListener('scroll', content._tocScrollHandler);
+  }
+  var handler = function() {
+    // Find the last heading that has scrolled past the top.
+    var activeId = '';
+    for (var i = 0; i < headings.length; i++) {
+      var rect = headings[i].getBoundingClientRect();
+      var containerRect = content.getBoundingClientRect();
+      if (rect.top - containerRect.top <= 40) {
+        activeId = headings[i].id;
+      }
+    }
+    for (var j = 0; j < tocLinks.length; j++) {
+      var isActive = tocLinks[j].getAttribute('data-toc-target') === activeId;
+      tocLinks[j].style.color = isActive ? 'var(--text)' : 'var(--text-muted)';
+      tocLinks[j].style.fontWeight = isActive ? '600' : '400';
+    }
+  };
+  content._tocScrollHandler = handler;
+  content.addEventListener('scroll', handler, { passive: true });
+  // Run once immediately.
+  handler();
 }
 
 // Append previous/next navigation bar for ordered guide docs.
