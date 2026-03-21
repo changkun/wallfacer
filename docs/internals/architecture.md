@@ -435,7 +435,7 @@ Alternatively, start the server and configure via **Settings → API Configurati
 ```bash
 make test           # All tests (backend + frontend)
 make test-backend   # Go unit tests: go test ./...
-make test-frontend  # Frontend JS tests: npx vitest@2 run
+make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 ```
 
 ### Other Make Targets

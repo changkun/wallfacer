@@ -79,7 +79,7 @@ api-contract:
 # Regenerate the static Tailwind CSS from UI sources (requires Node.js + network).
 # Run this after adding new Tailwind utility classes to ui/index.html or ui/js/*.js.
 ui-css:
-	npx tailwindcss@3 -i tailwind.input.css -o ui/css/tailwind.css \
+	npx tailwindcss@3 -i ui/tailwind.input.css -o ui/css/tailwind.css \
 		--content './ui/**/*.{html,js}' --minify
 
 # Run golangci-lint
@@ -95,7 +95,7 @@ test-backend:
 
 # Run frontend JavaScript unit tests
 test-frontend:
-	npx --yes vitest@2 run
+	cd ui && npx --yes vitest@2 run
 
 # Remove sandbox images
 clean:

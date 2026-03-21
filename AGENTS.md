@@ -21,7 +21,7 @@ make clean          # Remove all sandbox images
 make run PROMPT="…" # Headless one-shot Claude execution with a prompt
 make test           # Run all tests (backend + frontend)
 make test-backend   # Run Go unit tests (go test ./...)
-make test-frontend  # Run frontend JS unit tests (npx vitest@2 run)
+make test-frontend  # Run frontend JS unit tests (cd ui && npx vitest@2 run)
 make ui-css         # Regenerate Tailwind CSS from UI sources
 make api-contract   # Regenerate API route artifacts from apicontract/routes.go
 ```
@@ -51,7 +51,7 @@ The Go source lives at the top level. Module path: `changkun.de/x/wallfacer`. Go
 go build -o wallfacer .   # Build server binary
 go vet ./...              # Lint
 go test ./...             # Run backend tests
-npx --yes vitest@2 run    # Run frontend tests
+cd ui && npx --yes vitest@2 run    # Run frontend tests
 ```
 
 The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.
@@ -278,7 +278,7 @@ All can be edited from **Settings → API Configuration** in the UI (calls `PUT 
 
 Every implementation task MUST complete all three steps before finishing:
 
-1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. Run `go test ./...` (backend) or `npx vitest@2 run` (frontend) to confirm they pass before committing.
+1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. Run `go test ./...` (backend) or `cd ui && npx vitest@2 run` (frontend) to confirm they pass before committing.
 
 2. **Update docs** — If your change adds, removes, or modifies any API route, CLI flag, env variable, data model field, or user-visible behavior, update the corresponding documentation. Do not skip this step. The user manual lives in `docs/guide/` with these focused guides:
    - `docs/guide/usage.md` — Index page with reading order (update if adding a new guide)

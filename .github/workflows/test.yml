@@ -23,10 +23,11 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: ui/package-lock.json
 
       - name: Install frontend dependencies
         run: npm ci --no-audit --no-fund
-        working-directory: .
+        working-directory: ui
 
       - name: Lint
         uses: golangci/golangci-lint-action@v7
@@ -57,7 +58,7 @@ jobs:
           fi
           echo "total=${js_total}" >> "$GITHUB_OUTPUT"
         id: js-coverage
-        working-directory: .
+        working-directory: ui
 
       - name: Coverage Summary
         run: |
@@ -78,7 +79,7 @@ jobs:
         with:
           files: |
             coverage.out
-            coverage-js/lcov.info
+            ui/coverage-js/lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
@@ -86,4 +87,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: js-coverage
-          path: coverage-js
+          path: ui/coverage-js
