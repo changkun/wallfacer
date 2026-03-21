@@ -370,7 +370,7 @@ lines refactored), `handler.go` (~30 lines), `config.go` (~10 lines)
    message.
 
 2. **Activity indicator** — `renderWorkspaceGroups()` and
-   `renderHeaderWorkspaceGroupsMenu()`: show a dot/badge next to groups
+   `renderHeaderWorkspaceGroupTabs()`: show a dot/badge next to groups
    that appear in `active_group_keys` from the config response.
 
 3. **State** — Add `activeGroupKeys` to `state.js`, populated from

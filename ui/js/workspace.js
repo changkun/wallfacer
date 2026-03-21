@@ -131,7 +131,7 @@ async function fetchConfig() {
     populateSandboxSelects();
     renderWorkspaceSelectionSummary();
     renderWorkspaceGroups();
-    renderHeaderWorkspaceGroupsMenu();
+    renderHeaderWorkspaceGroupTabs();
     if (workspacePickerRequired) {
       stopTasksStream();
       stopGitStream();
@@ -222,7 +222,7 @@ function setWorkspaceGroupSwitching(index, switching) {
   workspaceGroupSwitchingIndex = switching ? index : -1;
   workspaceGroupSwitching = !!switching;
   renderWorkspaceGroups();
-  renderHeaderWorkspaceGroupsMenu();
+  renderHeaderWorkspaceGroupTabs();
 }
 
 function renderWorkspaceGroups() {
@@ -254,42 +254,31 @@ function renderWorkspaceGroups() {
   }).join('');
 }
 
-function renderHeaderWorkspaceGroupsMenu() {
-  var el = document.getElementById('workspace-group-switcher');
-  var btn = document.getElementById('workspace-group-switch-btn');
+function renderHeaderWorkspaceGroupTabs() {
+  var el = document.getElementById('workspace-group-tabs');
   if (!el) return;
-  if (btn) {
-    btn.disabled = workspaceGroups.length === 0 || workspaceGroupSwitching;
-    btn.innerHTML = workspaceGroupSwitching ? workspaceSwitchSpinnerHtml() + ' Switching...' : 'Switch';
-  }
   if (!workspaceGroups.length) {
-    el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:4px;">No saved workspace groups yet.</div>';
+    el.innerHTML = '';
     return;
   }
   el.innerHTML = workspaceGroups.map(function(group, index) {
     var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
     var active = workspaceGroupsEqual(paths, activeWorkspaces);
     var switching = workspaceGroupSwitching && workspaceGroupSwitchingIndex === index;
-    return '<button type="button" onclick="useWorkspaceGroup(' + index + ')" style="width:100%;display:flex;flex-direction:column;gap:4px;text-align:left;padding:8px;border:none;border-radius:8px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:inherit;cursor:' + (workspaceGroupSwitching ? 'wait' : 'pointer') + ';"' + (workspaceGroupSwitching ? ' disabled' : '') + '>' +
-      '<span style="font-size:12px;font-weight:600;">' + (switching ? workspaceSwitchSpinnerHtml() + ' ' : '') + escapeHtml(workspaceGroupLabel(group)) + (active ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Current</span>' : '') + (switching ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Switching...</span>' : '') + '</span>' +
-      '<span style="font-size:11px;color:var(--text-muted);line-height:1.4;">' + escapeHtml(paths.join(' • ')) + '</span>' +
-      '</button>';
+    var cls = 'workspace-group-tab';
+    if (active) cls += ' workspace-group-tab--active';
+    if (switching) cls += ' workspace-group-tab--switching';
+    var label = switching
+      ? workspaceSwitchSpinnerHtml() + ' ' + escapeHtml(workspaceGroupLabel(group))
+      : escapeHtml(workspaceGroupLabel(group));
+    var title = paths.join('\n');
+    return '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (active || workspaceGroupSwitching ? ' disabled' : '') + '>' + label + '</button>';
   }).join('');
 }
 
-function hideHeaderWorkspaceGroups() {
-  var el = document.getElementById('workspace-group-switcher');
-  if (!el) return;
-  el.classList.add('hidden');
-}
-
-function toggleHeaderWorkspaceGroups(event) {
-  if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
-  var el = document.getElementById('workspace-group-switcher');
-  if (!el) return;
-  renderHeaderWorkspaceGroupsMenu();
-  el.classList.toggle('hidden');
-}
+// Keep these as no-ops for callers that still reference them.
+function hideHeaderWorkspaceGroups() {}
+function toggleHeaderWorkspaceGroups() {}
 
 function renderWorkspaceSelectionDraft() {
   var el = document.getElementById('workspace-selection-list');
@@ -482,7 +471,7 @@ function editWorkspaceGroup(index) {
 async function deleteWorkspaceGroup(index) {
   workspaceGroups = workspaceGroups.filter(function(_, i) { return i !== index; });
   renderWorkspaceGroups();
-  renderHeaderWorkspaceGroupsMenu();
+  renderHeaderWorkspaceGroupTabs();
   try {
     await saveWorkspaceGroups();
   } catch (e) {

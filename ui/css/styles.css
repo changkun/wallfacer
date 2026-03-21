@@ -106,8 +106,8 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 
 .workspace-group-bar {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   min-width: min(380px, 100%);
   max-width: 100%;
   padding: 6px 9px;
@@ -117,20 +117,40 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
 }
 
-.workspace-group-bar__main {
+.workspace-group-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  flex-wrap: wrap;
   min-width: 0;
-  flex: 1;
 }
 
-.workspace-group-bar__label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.workspace-group-tab {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
   color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.workspace-group-tab:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+.workspace-group-tab--active {
+  background: var(--accent);
+  color: #fff;
+}
+.workspace-group-tab--active:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.workspace-group-tab--switching {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .workspace-group-bar__list {
@@ -138,30 +158,6 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   gap: 6px;
   flex-wrap: wrap;
   min-width: 0;
-}
-
-.workspace-group-bar__switch-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.workspace-group-bar__switch {
-  font-size: 11px;
-  padding: 3px 9px;
-}
-
-.workspace-group-switcher {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 260px;
-  max-width: 360px;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
-  z-index: 30;
 }
 
 .app-header__actions {
@@ -2013,17 +2009,13 @@ pre.result-entry-body {
     width: 100%;
     padding: 8px 9px;
   }
-  .workspace-group-bar__label {
-    font-size: 9px;
+  .workspace-group-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
   }
   .workspace-group-bar__list {
     flex-wrap: nowrap;
     overflow: hidden;
-  }
-  .workspace-group-switcher {
-    right: -4px;
-    left: auto;
-    min-width: min(280px, calc(100vw - 28px));
   }
   .app-header__actions {
     width: 100%;

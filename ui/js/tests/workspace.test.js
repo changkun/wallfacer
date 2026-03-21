@@ -293,28 +293,15 @@ describe('renderWorkspaceGroups', () => {
 });
 
 // ---------------------------------------------------------------------------
-// renderHeaderWorkspaceGroupsMenu — spinner state during switching
+// renderHeaderWorkspaceGroupTabs — tab rendering and switching state
 // ---------------------------------------------------------------------------
 
-describe('renderHeaderWorkspaceGroupsMenu', () => {
-  it('renders saved groups for the header switcher and enables the switch button', () => {
-    const switcherEl = {
-      innerHTML: '',
-      classList: {
-        _set: new Set(['hidden']),
-        add(c) { this._set.add(c); },
-        remove(c) { this._set.delete(c); },
-        toggle(c) {
-          if (this._set.has(c)) { this._set.delete(c); return false; }
-          this._set.add(c); return true;
-        },
-      },
-    };
-    const switchBtn = { disabled: true };
+describe('renderHeaderWorkspaceGroupTabs', () => {
+  it('renders saved groups as tabs with active group highlighted', () => {
+    const tabsEl = { innerHTML: '' };
     const ctx = makeContext({
       elements: [
-        ['workspace-group-switcher', switcherEl],
-        ['workspace-group-switch-btn', switchBtn],
+        ['workspace-group-tabs', tabsEl],
       ],
     });
     loadScript(ctx, 'state.js');
@@ -325,31 +312,17 @@ describe('renderHeaderWorkspaceGroupsMenu', () => {
       workspaceGroups = [{ workspaces: ["/Users/test/repo-a", "/Users/test/repo-b"] }];
     `, ctx);
 
-    ctx.renderHeaderWorkspaceGroupsMenu();
+    ctx.renderHeaderWorkspaceGroupTabs();
 
-    expect(switchBtn.disabled).toBe(false);
-    expect(switcherEl.innerHTML).toContain('repo-a + repo-b');
-    expect(switcherEl.innerHTML).toContain('Current');
+    expect(tabsEl.innerHTML).toContain('repo-a + repo-b');
+    expect(tabsEl.innerHTML).toContain('workspace-group-tab--active');
   });
 
-  it('shows a loading spinner while switching workspace groups', () => {
-    const switcherEl = {
-      innerHTML: '',
-      classList: {
-        _set: new Set(['hidden']),
-        add(c) { this._set.add(c); },
-        remove(c) { this._set.delete(c); },
-        toggle(c) {
-          if (this._set.has(c)) { this._set.delete(c); return false; }
-          this._set.add(c); return true;
-        },
-      },
-    };
-    const switchBtn = { disabled: false, innerHTML: '' };
+  it('shows a loading spinner on the switching tab', () => {
+    const tabsEl = { innerHTML: '' };
     const ctx = makeContext({
       elements: [
-        ['workspace-group-switcher', switcherEl],
-        ['workspace-group-switch-btn', switchBtn],
+        ['workspace-group-tabs', tabsEl],
       ],
     });
     loadScript(ctx, 'state.js');
@@ -365,12 +338,10 @@ describe('renderHeaderWorkspaceGroupsMenu', () => {
       workspaceGroupSwitchingIndex = 1;
     `, ctx);
 
-    ctx.renderHeaderWorkspaceGroupsMenu();
+    ctx.renderHeaderWorkspaceGroupTabs();
 
-    expect(switchBtn.disabled).toBe(true);
-    expect(switchBtn.innerHTML).toContain('Switching...');
-    expect(switcherEl.innerHTML).toContain('Switching...');
-    expect(switcherEl.innerHTML).toContain('spinner');
+    expect(tabsEl.innerHTML).toContain('workspace-group-tab--switching');
+    expect(tabsEl.innerHTML).toContain('spinner');
   });
 });
 
@@ -494,17 +465,12 @@ describe('workspace browser filter', () => {
 describe('useWorkspaceGroup — spinner lifecycle', () => {
   it('sets switching=true before applyWorkspaceSelection and false afterwards', async () => {
     const spinnerStates = [];
-    const switcherEl = {
-      innerHTML: '',
-      classList: { add: () => {}, remove: () => {}, toggle: () => {} },
-    };
-    const switchBtn = { disabled: false, innerHTML: '' };
+    const tabsEl = { innerHTML: '' };
     const apiFn = vi.fn().mockResolvedValue({});
     const ctx = makeContext({
       api: apiFn,
       elements: [
-        ['workspace-group-switcher', switcherEl],
-        ['workspace-group-switch-btn', switchBtn],
+        ['workspace-group-tabs', tabsEl],
         ['workspace-apply-status', { textContent: '' }],
         ['settings-workspace-status', { textContent: '' }],
         ['settings-workspace-groups', { innerHTML: '' }],
@@ -514,9 +480,9 @@ describe('useWorkspaceGroup — spinner lifecycle', () => {
     loadScript(ctx, 'state.js');
     loadScript(ctx, 'workspace.js');
 
-    // Intercept renderHeaderWorkspaceGroupsMenu to capture switching state.
-    const origRender = ctx.renderHeaderWorkspaceGroupsMenu.bind(ctx);
-    ctx.renderHeaderWorkspaceGroupsMenu = function() {
+    // Intercept renderHeaderWorkspaceGroupTabs to capture switching state.
+    const origRender = ctx.renderHeaderWorkspaceGroupTabs.bind(ctx);
+    ctx.renderHeaderWorkspaceGroupTabs = function() {
       spinnerStates.push(vm.runInContext('workspaceGroupSwitching', ctx));
       origRender();
     };
