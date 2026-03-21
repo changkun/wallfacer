@@ -4,7 +4,7 @@ This guide walks through installing Wallfacer, connecting it to credentials, and
 
 ## Prerequisites
 
-- **Go 1.25+** — [go.dev](https://go.dev/)
+- **Go 1.25+** — [go.dev](https://go.dev/) (only needed if building from source; pre-built binaries are available)
 - **Podman** or **Docker** — Wallfacer auto-detects whichever is available
 - **A Claude credential** — either a Claude Pro/Max OAuth token or an Anthropic API key (see below)
 - **Optional Codex credential** — either host Codex auth cache (`~/.codex/auth.json`) or `OPENAI_API_KEY`
@@ -26,7 +26,21 @@ This prints a token; copy it. If you do not have the `claude` CLI, install it fi
 
 Generate one at [console.anthropic.com](https://console.anthropic.com/) → API Keys. Keys start with `sk-ant-...`.
 
-## Step 2 — Build the Binary
+## Step 2 — Get the Binary
+
+**Option A — Download a pre-built binary (no Go required)**
+
+Download the binary for your platform from the [latest release](https://github.com/changkun/wallfacer/releases/latest):
+
+```bash
+# Example for macOS ARM (Apple Silicon)
+curl -L https://github.com/changkun/wallfacer/releases/latest/download/wallfacer-darwin-arm64 -o wallfacer
+chmod +x wallfacer
+```
+
+Available binaries: `wallfacer-darwin-arm64`, `wallfacer-darwin-amd64`, `wallfacer-linux-arm64`, `wallfacer-linux-amd64`.
+
+**Option B — Build from source (requires Go 1.25+)**
 
 ```bash
 go build -o wallfacer .

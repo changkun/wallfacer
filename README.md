@@ -62,8 +62,9 @@ Track token usage and cost by task/activity so operations stay measurable as aut
 ## Quick Start
 
 ```bash
-# 1. Build the binary
-go build -o wallfacer .
+# 1. Download the binary (or: go build -o wallfacer .)
+curl -L https://github.com/changkun/wallfacer/releases/latest/download/wallfacer-$(uname -s | tr A-Z a-z)-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') -o wallfacer
+chmod +x wallfacer
 
 # 2. Start with the project directories you want to work on
 ./wallfacer run ~/projects/myapp
