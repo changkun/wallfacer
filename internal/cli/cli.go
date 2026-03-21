@@ -41,6 +41,7 @@ func ConfigDir() string {
 	return filepath.Join(home, ".wallfacer")
 }
 
+// PrintUsage writes the CLI help text to stderr.
 func PrintUsage() {
 	v := Version
 	if v == "" {

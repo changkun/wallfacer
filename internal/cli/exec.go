@@ -26,6 +26,7 @@ type execConfig struct {
 	command []string
 }
 
+// RunExec attaches to a running task container or opens a new sandbox shell.
 func RunExec(configDir string, args []string) {
 	// Split args on "--": everything before is positional, after is the command.
 	sepIdx := -1

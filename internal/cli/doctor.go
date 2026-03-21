@@ -126,11 +126,12 @@ func RunDoctor(configDir string) {
 	// --- Sandbox images ---
 	if lookErr == nil {
 		image := envOrDefault("SANDBOX_IMAGE", defaultSandboxImage())
-		if imageExists(runtimePath, image) {
+		switch {
+		case imageExists(runtimePath, image):
 			fmt.Printf("[ok] Claude sandbox image: %s\n", image)
-		} else if image != fallbackSandboxImage && imageExists(runtimePath, fallbackSandboxImage) {
+		case image != fallbackSandboxImage && imageExists(runtimePath, fallbackSandboxImage):
 			fmt.Printf("[ ] Claude sandbox image %s not cached (fallback %s available)\n", image, fallbackSandboxImage)
-		} else {
+		default:
 			fmt.Printf("[ ] Claude sandbox image not cached (will be pulled on first task)\n")
 		}
 
