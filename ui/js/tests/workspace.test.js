@@ -409,7 +409,7 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
     ctx.renderHeaderWorkspaceGroupTabs();
 
     // Active tab should not have a close button, inactive should.
-    const activeMatch = tabsEl.innerHTML.match(/workspace-group-tab--active[^>]*>.*?<\/button>/);
+    const activeMatch = tabsEl.innerHTML.match(/workspace-group-tab--active[^>]*>.*?<\/div>/);
     expect(activeMatch[0]).not.toContain('workspace-group-tab__close');
     // Inactive tab should have close button.
     expect(tabsEl.innerHTML).toContain('workspace-group-tab__close');

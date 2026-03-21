@@ -284,9 +284,10 @@ function renderHeaderWorkspaceGroupTabs() {
     var closeBtn = active
       ? ''
       : '<span class="workspace-group-tab__close" onclick="event.stopPropagation();hideWorkspaceGroupTab(' + index + ')" title="Hide tab">&times;</span>';
-    tabs += '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (active || workspaceGroupSwitching ? ' disabled' : '') + '>' + label + closeBtn + '</button>';
     if (active) {
-      tabs += '<span id="workspace-group-tab-workspaces" class="workspace-group-tab__workspaces"></span>';
+      tabs += '<div class="' + cls + '" title="' + escapeHtml(title) + '">' + label + '<span id="workspace-group-tab-workspaces" class="workspace-group-tab__workspaces"></span></div>';
+    } else {
+      tabs += '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (workspaceGroupSwitching ? ' disabled' : '') + '>' + label + closeBtn + '</button>';
     }
   });
   // "+" button to add a workspace group tab.

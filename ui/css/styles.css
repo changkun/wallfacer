@@ -78,7 +78,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 8px 24px 0;
+  padding: 8px 24px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
 }
@@ -95,7 +95,6 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  margin-bottom: 8px;
 }
 
 .workspace-group-tabs {
@@ -106,6 +105,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   flex: 1 1 0;
   min-width: 0;
   gap: 2px;
+  margin-bottom: -1px;
 }
 
 .workspace-group-tab {
@@ -113,26 +113,28 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   align-items: center;
   gap: 6px;
   padding: 4px 10px 6px;
-  margin-bottom: -1px;
-  border: none;
-  border-bottom: 2px solid transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
   background: transparent;
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.12s, border-color 0.12s;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
   flex-shrink: 0;
 }
 .workspace-group-tab:hover {
   color: var(--text-primary);
-  border-bottom-color: var(--border);
+  background: color-mix(in oklab, var(--bg-input) 50%, transparent);
 }
 .workspace-group-tab--active {
   color: var(--text-primary);
-  border-bottom-color: var(--accent);
+  border-color: var(--border);
+  background: var(--bg);
   font-weight: 600;
+  cursor: default;
 }
 .workspace-group-tab--switching {
   opacity: 0.6;
@@ -189,7 +191,6 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   gap: 8px;
   min-width: 0;
   flex-shrink: 0;
-  margin-bottom: 8px;
 }
 
 .app-header__search {
