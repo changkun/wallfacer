@@ -399,18 +399,38 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 	// Docs API — list and serve embedded documentation.
 	//
-	// Guide docs are returned in a defined reading order so the UI can
-	// present a numbered, progressive learning path.
-	var guideOrder = []string{
-		"getting-started",
-		"board-and-tasks",
-		"workspaces",
-		"automation",
-		"refinement-and-ideation",
-		"oversight-and-analytics",
-		"configuration",
-		"circuit-breakers",
-		"usage",
+	// Guide reading order is derived from docs/guide/usage.md: the server
+	// parses markdown links of the form [Title](file.md) under numbered
+	// "### N." headings in the "Reading Order" section. This keeps the
+	// order in a single place (the index doc) rather than hardcoded here.
+	var guideOrder []string // populated from usage.md below
+	if indexData, err := docsFiles.ReadFile("docs/guide/usage.md"); err == nil {
+		inReadingOrder := false
+		for line := range strings.SplitSeq(string(indexData), "\n") {
+			trimmed := strings.TrimSpace(line)
+			// Enter the reading order section.
+			if trimmed == "## Reading Order" {
+				inReadingOrder = true
+				continue
+			}
+			// Exit on next ## heading.
+			if inReadingOrder && strings.HasPrefix(trimmed, "## ") && trimmed != "## Reading Order" {
+				break
+			}
+			if !inReadingOrder {
+				continue
+			}
+			// Match markdown links like [Title](file.md).
+			if _, after, ok := strings.Cut(trimmed, "]("); ok {
+				if target, _, ok := strings.Cut(after, ")"); ok {
+					// Only .md files in the same directory (no path separators).
+					if strings.HasSuffix(target, ".md") && !strings.Contains(target, "/") {
+						name := strings.TrimSuffix(target, ".md")
+						guideOrder = append(guideOrder, name)
+					}
+				}
+			}
+		}
 	}
 	mux.HandleFunc("GET /api/docs", func(w http.ResponseWriter, _ *http.Request) {
 		type docEntry struct {
