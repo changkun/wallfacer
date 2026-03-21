@@ -250,7 +250,7 @@ Event traces are append-only. Each event is written as a separate file (`traces/
 | Param | Type | Default | Description |
 |---|---|---|---|
 | `after` | int64 | `0` | Exclusive event ID cursor. Only events with `id > after` are returned. Use `next_after` from the previous response to advance the cursor. |
-| `limit` | int | `200` | Maximum events per page. Must be ≥ 1; values > 1000 are silently capped to 1000. |
+| `limit` | int | `200` | Maximum events per page. Must be >= 1; values > 1000 are silently capped to 1000. |
 | `types` | string | (all) | Comma-separated list of event types to include. Unknown types return 400. Valid values: `state_change`, `output`, `error`, `system`, `feedback`, `span_start`, `span_end`. |
 
 ### Response Fields
@@ -266,13 +266,13 @@ Event traces are append-only. Each event is written as a separate file (`traces/
 
 ```
 GET /api/tasks/{id}/events?limit=100&types=output
-→ { events: [...100 items], next_after: 347, has_more: true, total_filtered: 250 }
+-> { events: [...100 items], next_after: 347, has_more: true, total_filtered: 250 }
 
 GET /api/tasks/{id}/events?after=347&limit=100&types=output
-→ { events: [...100 items], next_after: 503, has_more: true, total_filtered: 250 }
+-> { events: [...100 items], next_after: 503, has_more: true, total_filtered: 250 }
 
 GET /api/tasks/{id}/events?after=503&limit=100&types=output
-→ { events: [...50 items], next_after: 553, has_more: false, total_filtered: 250 }
+-> { events: [...50 items], next_after: 553, has_more: false, total_filtered: 250 }
 ```
 
 ### Validation
@@ -309,7 +309,7 @@ Multiple workspace paths can be passed at startup or switched at runtime via `PU
 
 - Git status is polled independently and shown in the UI header
 - A separate worktree is created per task per workspace
-- The commit pipeline runs phases 1–3 for each workspace in sequence
+- The commit pipeline runs phases 1-3 for each workspace in sequence
 
 Non-git directories are supported as plain mount targets (no worktree, no commit pipeline for that workspace).
 
@@ -474,3 +474,427 @@ Key execution phases are instrumented with `span_start` / `span_end` trace event
 
 - `GET /api/tasks/{id}/spans` — returns all span events for a task, useful for profiling turn latency
 - `GET /api/debug/spans` — aggregate span timing statistics across all tasks
+
+---
+
+## Environment Configuration
+
+### File Location and Parsing
+
+The environment configuration lives at `~/.wallfacer/.env`. It is a standard dotenv file: blank lines and lines starting with `#` are ignored, an optional `export ` prefix is stripped, values may be quoted (single or double), and inline comments after unquoted values are stripped while literal `#` inside quoted strings is preserved.
+
+`envconfig.Parse(path)` (`internal/envconfig/envconfig.go`) reads the file and returns a typed `envconfig.Config` struct. The parser is permissive — unknown keys are silently skipped, and integer fields that fail to parse are left at their zero value (which triggers default behavior downstream).
+
+### Config Fields
+
+The `Config` struct covers all known keys. Key categories:
+
+| Category | Fields |
+|---|---|
+| **Authentication** | `OAuthToken` (`CLAUDE_CODE_OAUTH_TOKEN`), `APIKey` (`ANTHROPIC_API_KEY`), `AuthToken` (`ANTHROPIC_AUTH_TOKEN`), `ServerAPIKey` (`WALLFACER_SERVER_API_KEY`) |
+| **Claude model** | `BaseURL`, `DefaultModel`, `TitleModel` |
+| **OpenAI/Codex** | `OpenAIAPIKey`, `OpenAIBaseURL`, `CodexDefaultModel`, `CodexTitleModel` |
+| **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
+| **Sandbox routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `RefinementSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox`, `SandboxFast` |
+| **Container** | `ContainerNetwork`, `ContainerCPUs`, `ContainerMemory` |
+| **Webhooks** | `WebhookURL`, `WebhookSecret` |
+| **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold` |
+| **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
+
+The `SandboxFast` field defaults to `true` when unset — the parser initializes it before scanning lines, and it is only set to `false` when the env file explicitly contains `WALLFACER_SANDBOX_FAST=false`.
+
+### Atomic Updates
+
+`envconfig.Update(path, updates)` performs a read-modify-write merge:
+
+1. Reads the existing file line-by-line.
+2. For each line whose key matches an entry in the `Updates` struct:
+   - `nil` pointer: line is left unchanged (field preservation for omitted token fields).
+   - Non-nil, non-empty: line is replaced with `KEY=value`.
+   - Non-nil, empty string: line is removed (cleared).
+3. New keys not already in the file are appended in the stable order defined by `knownKeys`.
+4. The result is written atomically via a temp file + `os.Rename`.
+
+This design means that `PUT /api/env` can safely omit token fields — they are preserved in the file as-is. The handler only sets a pointer when the caller explicitly provides a value.
+
+### Propagation to Running Components
+
+The env file is re-read on every container launch (`r.modelFromEnvForSandbox`, `r.resolvedContainerNetwork`, etc.), so changes made via the UI take effect immediately for new containers without a server restart. Running containers are unaffected — they received their environment at launch time via `--env-file`.
+
+Watchers (auto-promoter, auto-retrier, etc.) do not directly subscribe to env file changes. They read configuration values from in-memory state on the `Handler` or `Runner` structs, which are populated from the env file at startup. Some values (like `MaxParallelTasks`) are re-read from the env file whenever they are needed by the promoter logic.
+
+---
+
+## Webhook Implementation
+
+### Payload Structure
+
+Every webhook delivery is an HTTP POST with a JSON body of type `WebhookPayload` (`internal/runner/webhook.go`):
+
+```json
+{
+  "event_type": "task.state_changed",
+  "task_id": "abc12345-...",
+  "status": "done",
+  "title": "Fix auth regression",
+  "prompt": "Fix the login flow...",
+  "result": "Applied fix to auth.go...",
+  "occurred_at": "2026-03-21T12:00:00Z"
+}
+```
+
+Fields are truncated to prevent oversized payloads: `title` to 80 characters, `prompt` to 200, `result` to 500. If `title` is empty, it falls back to the first 80 characters of the prompt.
+
+### HMAC-SHA256 Signature
+
+When `WALLFACER_WEBHOOK_SECRET` is configured, each request includes the header:
+
+```
+X-Wallfacer-Signature: sha256=<hex-encoded-hmac>
+```
+
+The HMAC is computed over the raw JSON body bytes using `crypto/hmac` with `sha256.New` and the secret as the key. Receivers should recompute the HMAC and compare using `hmac.Equal` to verify authenticity.
+
+An additional header `X-Wallfacer-Event: task.state_changed` identifies the event type.
+
+### Delivery Model
+
+```mermaid
+flowchart TD
+    StoreNotify["Store.notify() emits<br/>SequencedDelta"] --> WN["WebhookNotifier.handleDelta()"]
+    WN --> StatusCheck{"Status changed<br/>since last seen?"}
+    StatusCheck -->|no| Drop[Drop duplicate]
+    StatusCheck -->|yes| Record["Record new status<br/>in lastStatus map"]
+    Record --> Goroutine["wn.wg.Add(1)<br/>go wn.Send(payload)"]
+    Goroutine --> Attempt0["POST to webhookURL<br/>(immediate)"]
+    Attempt0 --> Success{"2xx?"}
+    Success -->|yes| Done["wn.wg.Done()"]
+    Success -->|no| Retry1["Sleep 2s, retry"]
+    Retry1 --> Retry2["Sleep 5s, retry"]
+    Retry2 --> Retry3["Sleep 10s, retry"]
+    Retry3 --> Fail["Log error<br/>wn.wg.Done()"]
+```
+
+Key implementation details:
+
+- **Deduplication**: The notifier maintains a `lastStatus` map keyed by task UUID. Only transitions to a genuinely new status trigger a delivery — repeated notifications for the same status (e.g., from a position-only update) are silently dropped.
+- **Async goroutine pool**: Each delivery runs in its own goroutine, tracked by `wn.wg` (`sync.WaitGroup`). There is no fixed pool size; goroutines are spawned per-event.
+- **Retry schedule**: 4 attempts total — immediate, then 2s, 5s, 10s delays. The backoff durations are configurable via `SetRetryBackoffs()`. Inter-attempt sleeps respect context cancellation.
+- **HTTP client**: 10-second timeout per request (`http.Client{Timeout: 10 * time.Second}`).
+
+### Graceful Shutdown
+
+During server shutdown, after the HTTP server stops and `Runner.Shutdown()` completes, `wn.Wait()` blocks until all in-flight deliveries finish. This ensures no webhook is silently dropped on process exit.
+
+### Workspace-Aware Notifier
+
+`NewWorkspaceWebhookNotifier(wsMgr, cfg)` creates a notifier that re-subscribes to the active store whenever the workspace manager switches workspaces. It listens on both the workspace manager's channel (for workspace switches) and the current store's delta channel (for task changes).
+
+### Test Webhook
+
+`POST /api/env/test-webhook` constructs a synthetic `WebhookPayload` with a fake task ID and delivers it to the configured URL, returning the HTTP status code and any error to the caller. Useful for verifying endpoint connectivity and signature verification before relying on it in production.
+
+---
+
+## Container Runtime Details
+
+### Auto-Detection Order
+
+`detectContainerRuntime()` in `main.go` probes for a container runtime in this order:
+
+1. `CONTAINER_CMD` environment variable — if set, used verbatim (highest priority).
+2. `/opt/podman/bin/podman` — checks for the file with `os.Stat`.
+3. `podman` on `$PATH` — found via `exec.LookPath`.
+4. `docker` on `$PATH` — found via `exec.LookPath`.
+5. Falls back to `/opt/podman/bin/podman` as a hardcoded default (so the error message is clear when nothing is found).
+
+The `-container` CLI flag can also override the detected runtime.
+
+### Podman vs Docker Format Differences
+
+The server handles format differences transparently in `parseContainerList()` (`internal/runner/runner.go`):
+
+| Aspect | Podman | Docker |
+|---|---|---|
+| `ps --format json` output | JSON array (`[{...}, ...]`) | NDJSON (one `{...}` per line) |
+| `Names` field | `[]string` | `string` |
+| `Created` field | `int64` (unix timestamp) | `string` (formatted datetime) |
+
+The `containerJSON` struct uses `json.RawMessage` for `Names` and `any` for `Created`, then tries both formats in sequence.
+
+### Image Pull Logic
+
+`ensureImage()` in `server.go` runs at startup:
+
+1. **Check local**: `<runtime> images -q <image>` — if output is non-empty, the image exists locally and is used as-is.
+2. **Pull from registry**: `<runtime> pull <image>` — streams stdout/stderr to the terminal. The default image is `ghcr.io/changkun/wallfacer:latest`.
+3. **Fallback to local**: If the pull fails and the requested image differs from `wallfacer:latest`, check whether `wallfacer:latest` exists locally. If so, use it instead.
+4. **No image**: If neither the remote nor local fallback is available, the server starts anyway but warns that tasks may fail.
+
+### Container Labels
+
+Every task container is labeled with metadata for monitoring and correlation:
+
+```
+--label wallfacer.task.id=<uuid>
+--label wallfacer.task.prompt=<first 80 chars>
+```
+
+These labels are set in `buildContainerArgsForSandbox()` (`internal/runner/container.go`). The `ListContainers()` method reads these labels to correlate containers to tasks without relying on container name parsing — this is the primary lookup path, with name-based UUID extraction as a legacy fallback.
+
+### Resource Limits
+
+Container resource limits follow a three-tier resolution order (in `resolvedContainerCPUs()`, `resolvedContainerMemory()`, `resolvedContainerNetwork()`):
+
+1. Explicit `RunnerConfig` value passed at construction time.
+2. Value from `~/.wallfacer/.env` (re-read on each container launch).
+3. Default: no CPU/memory limit; `host` network.
+
+```
+[--cpus 2.0]       # from WALLFACER_CONTAINER_CPUS
+[--memory 4g]      # from WALLFACER_CONTAINER_MEMORY
+[--network mynet]   # from WALLFACER_CONTAINER_NETWORK, default "host"
+```
+
+---
+
+## SSE Implementation Details
+
+### Task Stream (`GET /api/tasks/stream`)
+
+Implemented in `Handler.StreamTasks()` (`internal/handler/stream.go`).
+
+#### Subscriber Registration
+
+On each SSE connection, the handler calls `store.Subscribe()`, which allocates a buffered channel of size 64 (`make(chan SequencedDelta, 64)`) and registers it in the store's `subscribers` map under a monotonically increasing integer ID.
+
+The subscription is created **before** reading any state, ensuring no events are missed between the initial snapshot and the live loop.
+
+#### Event Types
+
+Three SSE event types are emitted:
+
+| SSE `event:` | When | `data:` payload |
+|---|---|---|
+| `snapshot` | Initial connection or gap-too-old reconnect | Full `[]Task` JSON array |
+| `task-updated` | Task created or mutated | Single `Task` JSON object |
+| `task-deleted` | Task soft-deleted | `{"id": "<uuid>"}` |
+
+Every SSE frame includes an `id:` field set to the delta sequence number, enabling the browser's built-in `Last-Event-ID` reconnection mechanism.
+
+#### Reconnection and Replay
+
+On reconnect, the client provides its last seen sequence via the `?last_event_id` query parameter or the `Last-Event-ID` HTTP header. The store's `DeltasSince(seq)` method binary-searches the replay buffer (up to 512 entries, `replayBufMax`) for deltas newer than the given sequence:
+
+- **Buffer covers the gap**: Missed deltas are replayed individually as `task-updated` / `task-deleted` events. No full snapshot is needed.
+- **Gap too old** (oldest buffered delta's Seq > requested seq + 1): Falls back to a full `snapshot` event via `ListTasksAndSeq()`, which reads both the task list and current sequence under the same read lock to guarantee consistency.
+
+#### Backpressure and Dropped Events
+
+`notify()` uses a non-blocking send to each subscriber channel:
+
+```go
+select {
+case ch <- cloneSequencedDelta(sd):
+default:  // channel full — drop this delta for this subscriber
+}
+```
+
+If a subscriber's buffer (64 slots) is full, the delta is silently dropped for that subscriber. The subscriber will eventually receive a later delta; if it reconnects, the replay buffer provides catch-up. All deltas sent to subscribers are deep clones of the task state, preventing data races.
+
+#### Connection Cleanup
+
+When the client disconnects, `r.Context().Done()` fires in the SSE loop. The deferred `store.Unsubscribe(subID)` removes the channel from the subscribers map and drains any buffered deltas to free memory. The channel is **not** closed — `StreamTasks` is always the caller of `Unsubscribe`, so there is no blocked receiver to wake.
+
+### Wake-Only Subscribers
+
+In addition to the full-delta channel, the store provides a lightweight `SubscribeWake()` mechanism: a `chan struct{}` with capacity 1. Rapid bursts of notifications coalesce — once the channel is full, subsequent sends are no-ops. This is used by watchers (auto-promoter, auto-retrier, etc.) that only need a "something changed" signal, not the full delta payload.
+
+### Git Status Stream (`GET /api/git/stream`)
+
+Implemented in `Handler.GitStatusStream()` (`internal/handler/git.go`). Unlike the task stream, git status uses a **polling ticker** (every 5 seconds) rather than store-driven pub/sub. On each tick, the handler collects `git status` for all workspaces, JSON-marshals the result, compares it byte-for-byte with the previous emission, and only sends an SSE frame if the data has changed.
+
+### Live Container Logs (`GET /api/tasks/{id}/logs`)
+
+Not SSE in the strict sense — this endpoint streams raw `text/plain` output. It spawns `<runtime> logs -f --tail 100 <containerName>` as a subprocess, pipes stdout and stderr through a scanner, and writes lines to the HTTP response. A 15-second keepalive ticker sends empty newlines to keep the connection alive and detect client disconnects.
+
+---
+
+## Watcher Initialization and Startup
+
+### Startup Sequence in `server.go`
+
+The server starts watchers and recovery routines in a specific order after constructing the `Runner` and `Handler`:
+
+```mermaid
+flowchart TD
+    subgraph "Runner Construction (NewRunner)"
+        A1["Initialize circuit breaker<br/>(DefaultCBThreshold=5, 30s open)"]
+        A2["Start board subscription loop<br/>(cache invalidation)"]
+    end
+
+    subgraph "Pre-watcher Recovery"
+        B1["r.PruneUnknownWorktrees()"]
+        B2["runner.RecoverOrphanedTasks(ctx, s, r)"]
+        B3["go r.StartWorktreeGC(ctx)"]
+        B4["go r.StartWorktreeHealthWatcher(ctx)"]
+    end
+
+    subgraph "Handler Watchers"
+        C1["h.StartAutoPromoter(ctx)"]
+        C2["h.StartAutoRetrier(ctx)"]
+        C3["h.StartIdeationWatcher(ctx)"]
+        C4["h.StartWaitingSyncWatcher(ctx)"]
+        C5["h.StartAutoTester(ctx)"]
+        C6["h.StartAutoSubmitter(ctx)"]
+        C7["h.StartAutoRefiner(ctx)"]
+    end
+
+    subgraph "Webhook Notifier"
+        D1["runner.NewWorkspaceWebhookNotifier(wsMgr, cfg)"]
+        D2["go wn.Start(ctx)"]
+    end
+
+    A1 --> A2 --> B1 --> B2 --> B3 --> B4
+    B4 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6 --> C7
+    C7 --> D1 --> D2
+```
+
+### Recovery Scans
+
+Before watchers begin, two recovery operations run synchronously:
+
+- **`PruneUnknownWorktrees()`**: Scans the `worktrees/` directory and removes any worktree directories that do not correspond to a known task. Also runs `git worktree prune` on each workspace repository to clean up stale Git worktree references.
+- **`RecoverOrphanedTasks()`**: Scans all tasks in `in_progress` or `committing` status. For each, it checks whether a corresponding container is still running. If so, it starts a monitoring goroutine. If not (container crashed while the server was down), it transitions the task to `failed`.
+
+### Watcher Subscription Patterns
+
+All handler-level watchers follow one of two patterns:
+
+**Store-driven (SubscribeWake)**: The auto-promoter, auto-retrier, auto-tester, auto-submitter, and auto-refiner call `store.SubscribeWake()` to get a capacity-1 channel that signals "something changed." They react to the signal by scanning tasks and taking action if conditions are met.
+
+```go
+// Auto-promoter pattern
+subID, ch := h.store.SubscribeWake()
+ticker := time.NewTicker(60 * time.Second)
+go func() {
+    defer h.store.UnsubscribeWake(subID)
+    defer ticker.Stop()
+    for {
+        select {
+        case <-ctx.Done(): return
+        case <-ch:         h.tryAutoPromote(ctx)
+        case <-ticker.C:   h.tryAutoPromote(ctx)
+        }
+    }
+}()
+```
+
+The supplementary ticker (60 seconds for the promoter) ensures scheduled tasks are promoted even when no other state change occurs.
+
+**Startup recovery scan**: The auto-retrier additionally performs a startup scan — immediately after subscribing, it lists all failed tasks and attempts to retry any that match the transient failure categories (`container_crash`, `worktree`, `sync_error`). This catches tasks that failed while the server was down.
+
+### Circuit Breaker Initialization
+
+The container circuit breaker is initialized in `NewRunner()` with:
+- **Threshold**: `WALLFACER_CONTAINER_CB_THRESHOLD` (default: 5 consecutive failures).
+- **Open duration**: `WALLFACER_CONTAINER_CB_OPEN_SECONDS` (default: 30 seconds).
+
+After the threshold is exceeded, the circuit opens and rejects further launches. After the open duration, it enters half-open state and allows a single probe. A successful probe resets the breaker; a failed probe re-opens it.
+
+---
+
+## System Prompt Template System
+
+### Embedded Templates
+
+Seven prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`prompts/prompts.go`):
+
+| Embedded file | API name | Used for |
+|---|---|---|
+| `title.tmpl` | `title` | Auto-generating task titles from prompts |
+| `commit.tmpl` | `commit_message` | Generating commit messages during the commit pipeline |
+| `test.tmpl` | `test_verification` | Test verification agent prompt |
+| `refinement.tmpl` | `refinement` | Prompt refinement agent |
+| `oversight.tmpl` | `oversight` | Oversight summarization of task activity |
+| `ideation.tmpl` | `ideation` | Brainstorm/ideation agent |
+| `conflict.tmpl` | `conflict_resolution` | Rebase conflict resolution agent |
+
+### Override Storage
+
+User overrides are stored at `~/.wallfacer/prompts/<apiName>.tmpl`. The `Manager` checks this directory on every render call — no caching, so edits take effect immediately.
+
+### Render Pipeline
+
+```mermaid
+flowchart TD
+    Render["Manager.render(embeddedName, data)"] --> CheckDir{"userDir set?"}
+    CheckDir -->|no| Embedded["Execute embedded template"]
+    CheckDir -->|yes| ReadOverride["os.ReadFile(userDir/<apiName>.tmpl)"]
+    ReadOverride --> Found{"File exists?"}
+    Found -->|no| Embedded
+    Found -->|yes| ParseOverride["template.New().Funcs(funcMap).Parse(content)"]
+    ParseOverride --> ExecOverride["Execute override template with data"]
+    ExecOverride --> ExecOK{"Execution<br/>succeeded?"}
+    ExecOK -->|yes| Return["Return override result"]
+    ExecOK -->|no| LogWarn["Log warning"]
+    LogWarn --> Embedded
+    Embedded --> Return2["Return embedded result"]
+```
+
+Key design: a broken override never crashes the server. Parse or execution errors are logged as warnings and the embedded default is used instead.
+
+### Template Function Map
+
+All templates (embedded and override) share a single `FuncMap`:
+
+- `add(a, b int) int` — integer addition, used for 1-based indexing in templates (e.g., `{{add $i 1}}`).
+
+### Validation
+
+`Manager.Validate(apiName, content)` performs a two-phase check:
+1. **Parse**: verifies template syntax.
+2. **Dry-run execute**: runs the template against a mock context struct (`mockContextFor()`) specific to each API name. This catches field-access errors (e.g., referencing `.NonExistentField`) at write time rather than at runtime.
+
+`PUT /api/system-prompts/{name}` calls `Validate` before writing the override file.
+
+### API Endpoints
+
+| Method | Path | Behavior |
+|---|---|---|
+| `GET /api/system-prompts` | Lists all 7 templates with their content and override status |
+| `GET /api/system-prompts/{name}` | Returns a single template by API name |
+| `PUT /api/system-prompts/{name}` | Validates and writes override to `~/.wallfacer/prompts/<name>.tmpl` |
+| `DELETE /api/system-prompts/{name}` | Deletes the override file, restoring the embedded default |
+
+---
+
+## Prompt Template Storage
+
+Prompt templates are user-created reusable text fragments (distinct from the system prompt templates above). They are managed by `internal/handler/templates.go`.
+
+### Data Model
+
+```go
+type PromptTemplate struct {
+    ID        string    `json:"id"`
+    Name      string    `json:"name"`
+    Body      string    `json:"body"`
+    CreatedAt time.Time `json:"created_at"`
+}
+```
+
+- **ID**: UUID generated via `uuid.New().String()` on creation.
+- **CreatedAt**: set to `time.Now().UTC()` on creation.
+
+### Storage
+
+All templates are stored in a single JSON file at `~/.wallfacer/templates.json` as a JSON array. Reads and writes are protected by a package-level `sync.RWMutex` (`templatesMu`). Writes use the atomic temp-file-plus-rename pattern.
+
+### API Behavior
+
+| Endpoint | Notes |
+|---|---|
+| `GET /api/templates` | Returns all templates sorted by `created_at` descending (newest first). Returns `[]` when the file does not exist. |
+| `POST /api/templates` | Requires `name` and `body` (both non-empty). Returns 201 with the created template. |
+| `DELETE /api/templates/{id}` | Returns 404 if not found, 204 on success. |
