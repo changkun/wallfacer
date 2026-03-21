@@ -234,7 +234,7 @@ After the commit pipeline succeeds, `runCommitTransition` transitions the task t
 
 There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedWg`) tracks all fire-and-forget background work: title generation (`GenerateTitleBackground`), oversight generation (`GenerateOversightBackground`), worktree sync (`SyncWorktreesBackground`), and refinement (`RunRefinementBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"title:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
 
-Automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoRefiner`, `StartWaitingSyncWatcher`, `StartIdeationWatcher`) each run as a single long-lived goroutine started in `runServer` (`server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
+Automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoRefiner`, `StartWaitingSyncWatcher`, `StartIdeationWatcher`) each run as a single long-lived goroutine started in `RunServer` (`internal/cli/server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
 
 ### Pub/sub channels
 
@@ -269,7 +269,7 @@ sequenceDiagram
     Srv->>WH: wn.Wait()
 ```
 
-The shutdown sequence is driven by `signal.NotifyContext(ctx, SIGTERM, Interrupt)` in `runServer` (`server.go`). When a signal arrives, `ctx.Done()` fires. The HTTP server gets `srv.Shutdown(5s)` to drain in-flight requests; SSE handlers exit immediately because their request contexts derive from the now-cancelled base context. Then `Runner.Shutdown()` (`internal/runner/runner.go`) is called: it invokes `shutdownCancel()` to cancel `shutdownCtx` (which propagates to any container launches or store operations using it), closes `shutdownCh` to stop the board-cache subscription goroutine, waits on `boardSubscriptionWg`, then waits on `backgroundWg` with a 3-second ticker that logs still-pending goroutine labels. In-progress task containers are intentionally left running; they continue independently and are recovered by `RecoverOrphanedTasks` (`internal/runner/recovery.go`) on the next startup. Finally, the webhook notifier's `Wait()` drains any in-flight deliveries.
+The shutdown sequence is driven by `signal.NotifyContext(ctx, SIGTERM, Interrupt)` in `RunServer` (`internal/cli/server.go`). When a signal arrives, `ctx.Done()` fires. The HTTP server gets `srv.Shutdown(5s)` to drain in-flight requests; SSE handlers exit immediately because their request contexts derive from the now-cancelled base context. Then `Runner.Shutdown()` (`internal/runner/runner.go`) is called: it invokes `shutdownCancel()` to cancel `shutdownCtx` (which propagates to any container launches or store operations using it), closes `shutdownCh` to stop the board-cache subscription goroutine, waits on `boardSubscriptionWg`, then waits on `backgroundWg` with a 3-second ticker that logs still-pending goroutine labels. In-progress task containers are intentionally left running; they continue independently and are recovered by `RecoverOrphanedTasks` (`internal/runner/recovery.go`) on the next startup. Finally, the webhook notifier's `Wait()` drains any in-flight deliveries.
 
 ## Where to Look
 
@@ -299,6 +299,7 @@ Every `internal/` package and its role in the system:
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
 | `apicontract` | Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js` | `Route`, `Routes` (slice), `Route.FullPattern()` |
+| `cli` | CLI subcommand implementations (run, exec, status, env) and shared helpers | `RunServer()`, `RunExec()`, `RunStatus()`, `RunEnvCheck()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `gitutil` | Git utility operations: worktrees, rebase, merge, status | `RebaseOntoDefault()`, `FFMerge()`, `CommitsBehind()`, `WorkspaceStatus()`, `WorkspaceGitStatus` |
 | `handler` | HTTP API handlers organised by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |
