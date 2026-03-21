@@ -79,7 +79,6 @@
  * @property {string} execution_prompt
  * @property {Array.<string>} depends_on
  * @property {string|null} scheduled_at - ISO 8601 timestamp
- * @property {string|null} forked_from
  * @property {string} failure_category
  * @property {Array.<number>} truncated_turns
  */
