@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -164,7 +165,22 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	resp["sandbox_reasons"] = sandboxReasons
 	resp["activity_sandboxes"] = cfg.SandboxByActivity()
 	resp["default_model"] = cfg.DefaultModel
+	resp["image_cached"] = h.sandboxImageCached()
 	return resp
+}
+
+// sandboxImageCached reports whether the sandbox image is available locally.
+func (h *Handler) sandboxImageCached() bool {
+	if h.runner == nil {
+		return false
+	}
+	cmd := h.runner.Command()
+	image := h.runner.SandboxImage()
+	if cmd == "" || image == "" {
+		return false
+	}
+	out, err := exec.Command(cmd, "images", "-q", image).Output()
+	return err == nil && strings.TrimSpace(string(out)) != ""
 }
 
 // ideationRunning returns true if any idea-agent task is currently in_progress.
