@@ -360,6 +360,14 @@ function restoreWorkspaceGroupTab(index) {
 function hideHeaderWorkspaceGroups() {}
 function toggleHeaderWorkspaceGroups() {}
 
+function _shortenPath(path) {
+  // Detect home directory from the workspace browser starting path.
+  // Matches /Users/x, /home/x, or C:\Users\x patterns.
+  var m = path.match(/^(\/(?:Users|home)\/[^/]+|[A-Z]:\\Users\\[^\\]+)/);
+  if (m) return '~' + path.substring(m[1].length);
+  return path;
+}
+
 function renderWorkspaceSelectionDraft() {
   var el = document.getElementById('workspace-selection-list');
   if (!el) return;
@@ -368,8 +376,8 @@ function renderWorkspaceSelectionDraft() {
     return;
   }
   el.innerHTML = workspaceSelectionDraft.map(function(path) {
-    return '<div class="ws-selected-item">' +
-      '<span class="ws-selected-item__path">' + escapeHtml(path) + '</span>' +
+    return '<div class="ws-selected-item" title="' + escapeHtml(path) + '">' +
+      '<span class="ws-selected-item__path">' + escapeHtml(_shortenPath(path)) + '</span>' +
       '<button type="button" class="btn-ghost ws-selected-item__remove" data-workspace-path="' + escapeHtml(path) + '" onclick="removeWorkspaceSelection(this.dataset.workspacePath)">&times;</button>' +
       '</div>';
   }).join('');
