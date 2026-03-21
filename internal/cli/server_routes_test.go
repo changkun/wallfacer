@@ -21,12 +21,7 @@ import (
 
 // serverRoutesRepoRoot returns the repository root directory from this file's location.
 func serverRoutesRepoRoot(t *testing.T) string {
-	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	return filepath.Dir(thisFile)
+	return repoRoot(t)
 }
 
 // TestContractRoutes_AllRegisteredInMux verifies that every route declared in

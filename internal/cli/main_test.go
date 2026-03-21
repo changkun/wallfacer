@@ -14,7 +14,7 @@ import (
 
 func TestPrintUsage(t *testing.T) {
 	out := captureStderr(func() {
-		printUsage()
+		PrintUsage()
 	})
 	for _, want := range []string{"Usage: wallfacer <command> [arguments]", "Commands:", "run          start the task board server"} {
 		if !strings.Contains(out, want) {
@@ -88,7 +88,7 @@ func TestRunEnvCheck_MissingEnvFile(t *testing.T) {
 	t.Setenv("SANDBOX_IMAGE", "wallfacer-test:latest")
 
 	out := captureStdout(func() {
-		runEnvCheck(configDir)
+		RunEnvCheck(configDir)
 	})
 	for _, want := range []string{"Config directory:  " + configDir, "Env file:          " + envFile, "[!] Env file not found"} {
 		if !strings.Contains(out, want) {
@@ -115,7 +115,7 @@ func TestRunEnvCheck_WithCredentials(t *testing.T) {
 	t.Setenv("SANDBOX_IMAGE", "wallfacer-test:latest")
 
 	out := captureStdout(func() {
-		runEnvCheck(configDir)
+		RunEnvCheck(configDir)
 	})
 	for _, want := range []string{"[ok] CLAUDE_CODE_OAUTH_TOKEN is set", "[ok] OPENAI_API_KEY is set", "[ok] ANTHROPIC_BASE_URL = https://api.anthropic.com", "[ok] OPENAI_BASE_URL = https://api.openai.com/v1"} {
 		if !strings.Contains(out, want) {
@@ -131,7 +131,7 @@ func TestRunEnvCheck_ConfigDirMissing(t *testing.T) {
 	t.Setenv("CONTAINER_CMD", "printf")
 
 	out := captureStdout(func() {
-		runEnvCheck(missing)
+		RunEnvCheck(missing)
 	})
 	expected := "[!] Config directory does not exist"
 	if !strings.Contains(out, expected) {
@@ -195,7 +195,7 @@ func TestRunStatusJsonOutput(t *testing.T) {
 	defer ts.Close()
 
 	out := captureStdout(func() {
-		runStatus("", []string{"-addr", ts.URL, "--json"})
+		RunStatus("", []string{"-addr", ts.URL, "--json"})
 	})
 	if !strings.Contains(out, response) {
 		t.Fatalf("expected raw JSON output, got: %s", out)

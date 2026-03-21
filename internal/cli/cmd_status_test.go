@@ -231,14 +231,14 @@ func TestRunStatus(t *testing.T) {
 	defer ts.Close()
 
 	output := captureStdout(func() {
-		runStatus("", []string{"--addr", ts.URL})
+		RunStatus("", []string{"--addr", ts.URL})
 	})
 	if !bytes.Contains([]byte(output), []byte("Done")) || !bytes.Contains([]byte(output), []byte("11111111")) {
 		t.Fatalf("expected board output, got: %s", output)
 	}
 
 	jsonOutput := captureStdout(func() {
-		runStatus("", []string{"--addr", ts.URL, "--json"})
+		RunStatus("", []string{"--addr", ts.URL, "--json"})
 	})
 	if !bytes.Contains([]byte(jsonOutput), []byte("\"id\":\"11111111-1111-1111-1111-111111111111\"")) {
 		t.Fatalf("expected raw JSON output, got: %s", jsonOutput)

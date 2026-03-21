@@ -18,9 +18,9 @@ func TestRunExec_Helper(t *testing.T) {
 
 	switch os.Getenv("WALLFACER_EXEC_MODE") {
 	case "task":
-		runExec(configDir, []string{os.Getenv("WALLFACER_EXEC_PREFIX"), "bash"})
+		RunExec(configDir, []string{os.Getenv("WALLFACER_EXEC_PREFIX"), "bash"})
 	case "sandbox":
-		runExec(configDir, []string{"--sandbox", os.Getenv("WALLFACER_EXEC_SANDBOX"), "bash"})
+		RunExec(configDir, []string{"--sandbox", os.Getenv("WALLFACER_EXEC_SANDBOX"), "bash"})
 	default:
 		panic("WALLFACER_EXEC_MODE must be task or sandbox")
 	}

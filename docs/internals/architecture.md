@@ -443,7 +443,7 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 | Target | Description |
 |---|---|
 | `make build` | Build binary + both sandbox images |
-| `make build-binary` | Build just the Go binary |
+| `make build-binary` | Build just the Go binary (accepts optional `VERSION=`) |
 | `make build-claude` | Build Claude Code sandbox image |
 | `make build-codex` | Build OpenAI Codex sandbox image |
 | `make server` | Build and run the server |
@@ -452,6 +452,8 @@ make test-frontend  # Frontend JS tests: cd ui && npx vitest@2 run
 | `make ui-css` | Regenerate Tailwind CSS |
 | `make api-contract` | Regenerate API route artifacts from `apicontract/routes.go` |
 | `make run PROMPT="…"` | Headless one-shot Claude execution |
+| `make release-notes` | Generate an LLM prompt for release notes (requires `RELEASE_VERSION=`) |
+| `make release` | Commit release notes, tag, push, create GitHub release (requires `RELEASE_VERSION=` and `RELEASE_NOTES=`) |
 
 ### Verifying the Sandbox Image
 
@@ -460,6 +462,40 @@ podman images wallfacer   # or: docker images wallfacer
 ```
 
 The Dockerfiles (`sandbox/claude/Dockerfile`, `sandbox/codex/Dockerfile`) build Ubuntu 24.04 images bundling Go 1.25, Node.js 22, Python 3, and the respective agent CLI (Claude Code or Codex). Multi-arch images (amd64 + arm64) are published to `ghcr.io/changkun/wallfacer` and `ghcr.io/changkun/wallfacer-codex` on version tags via GitHub Actions.
+
+### Release Workflow
+
+Releases are triggered by pushing a version tag (`v*`). Three GitHub Actions workflows run in parallel:
+
+| Workflow | Artifact | Registry |
+|---|---|---|
+| `release-binary.yml` | `wallfacer-{linux,darwin}-{amd64,arm64}` binaries | GitHub Release assets |
+| `release-claude.yml` | Claude Code sandbox image | `ghcr.io/changkun/wallfacer` |
+| `release-codex.yml` | Codex sandbox image | `ghcr.io/changkun/wallfacer-codex` |
+
+**Version embedding.** Release binaries are built with `-ldflags "-X main.version=X.Y.Z"`. This makes the binary pull the sandbox image tagged with the matching version (e.g. `ghcr.io/changkun/wallfacer:0.0.6`) instead of `:latest`. Dev builds without a version set fall back to `:latest`.
+
+**Image tagging.** Each release produces three image tags: `<version>` (e.g. `0.0.6`), `<major>.<minor>` (e.g. `0.0`), and `latest`.
+
+**Creating a release:**
+
+```bash
+# 1. Generate a release notes prompt and pipe to an LLM
+make release-notes RELEASE_VERSION=v0.0.6 | claude > notes.md
+
+# 2. Review and edit notes.md
+
+# 3. Commit notes to docs/releases/, tag, push, and create GitHub release
+make release RELEASE_VERSION=v0.0.6 RELEASE_NOTES=notes.md
+```
+
+The `make release` target:
+1. Copies the notes to `docs/releases/v0.0.6.md` (with a `# v0.0.6` header) and commits
+2. Creates an annotated git tag
+3. Pushes the commit and tag to origin
+4. Creates a GitHub release via `gh release create`
+
+The pushed tag triggers the three CI workflows above. Previous release notes are archived in `docs/releases/`.
 
 ## See Also
 
