@@ -184,7 +184,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		diffCache:        newDiffCache(),
 		fileIndex:        newFileIndex(),
 		startTime:        time.Now(),
-		ideationEnabled:  true,
+		ideationEnabled:  false,
 		ideationInterval: 60 * time.Minute,
 		reg:              reg,
 		sandboxTestPassed: map[sandbox.Type]bool{
