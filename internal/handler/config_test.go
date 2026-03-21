@@ -173,10 +173,10 @@ func TestGetConfig_ExposesIdeationCategories(t *testing.T) {
 		t.Fatalf("expected ideation_categories to be an array, got %T", resp["ideation_categories"])
 	}
 	need := map[string]struct{}{
-		"accessibility":         {},
-		"documentation update":  {},
-		"architecture / design": {},
-		"dependency management": {},
+		"product feature":          {},
+		"performance optimization": {},
+		"architecture / design":    {},
+		"security hardening":       {},
 	}
 	found := map[string]bool{}
 	for _, c := range cats {
