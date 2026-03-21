@@ -4,29 +4,12 @@ This guide walks through installing Wallfacer, connecting it to credentials, and
 
 ## Prerequisites
 
-- **Go 1.25+** — [go.dev](https://go.dev/) (only needed if building from source; pre-built binaries are available)
 - **Podman** or **Docker** — Wallfacer auto-detects whichever is available
-- **A Claude credential** — either a Claude Pro/Max OAuth token or an Anthropic API key (see below)
-- **Optional Codex credential** — either host Codex auth cache (`~/.codex/auth.json`) or `OPENAI_API_KEY`
+- **A Claude credential** — either a Claude Pro/Max OAuth token or an Anthropic API key (configured after install)
 - **Git** — recommended; non-git directories work as workspaces but git features (worktrees, diff, auto-push) are unavailable
+- **Go 1.25+** — [go.dev](https://go.dev/) (only needed if building from source; pre-built binaries are available)
 
-## Step 1 — Get a Claude Credential
-
-You need one of:
-
-**Option A — OAuth token (Claude Pro or Max subscription)**
-
-```bash
-claude setup-token
-```
-
-This prints a token; copy it. If you do not have the `claude` CLI, install it first via [claude.ai/download](https://claude.ai/download) or `npm install -g @anthropic-ai/claude-code`.
-
-**Option B — Anthropic API key**
-
-Generate one at [console.anthropic.com](https://console.anthropic.com/) → API Keys. Keys start with `sk-ant-...`.
-
-## Step 2 — Get the Binary
+## Step 1 — Install Wallfacer
 
 **Option A — Install script (no Go required)**
 
@@ -64,42 +47,47 @@ cd wallfacer
 go build -o wallfacer .
 ```
 
-## Step 3 — Start Wallfacer
+## Step 2 — Start Wallfacer
 
 Pass the directories of the projects you want to work on:
 
 ```bash
-./wallfacer run ~/projects/myapp
+wallfacer run ~/projects/myapp
 ```
 
 Multiple workspaces:
 
 ```bash
-./wallfacer run ~/projects/myapp ~/projects/mylib
+wallfacer run ~/projects/myapp ~/projects/mylib
 ```
 
 No argument defaults to the current directory:
 
 ```bash
-./wallfacer run
+wallfacer run
 ```
 
 Start with no active workspaces (configure them later in the UI):
 
 ```bash
-./wallfacer run -no-workspaces
+wallfacer run -no-workspaces
 ```
 
-The browser opens automatically to `http://localhost:8080`. You should see a task board with four columns.
+On first run, Wallfacer auto-creates `~/.wallfacer/` and a template `.env` file. The browser opens automatically to `http://localhost:8080` showing a task board with four columns.
 
 The sandbox image (`ghcr.io/changkun/wallfacer:latest`) is pulled automatically the first time a task runs. This is a one-time download (~1 GB).
 
-## Step 4 — Configure Your Credential
+## Step 3 — Configure Your Credential
 
 Open **Settings → API Configuration** in the browser and enter your credential:
 
-- Paste your OAuth token into `CLAUDE_CODE_OAUTH_TOKEN`, or
-- Paste your API key into `ANTHROPIC_API_KEY`
+**Option A — OAuth token (Claude Pro or Max subscription)**
+
+Paste your OAuth token into `CLAUDE_CODE_OAUTH_TOKEN`. To obtain a token, run `claude setup-token` in the `claude` CLI ([claude.ai/download](https://claude.ai/download) or `npm install -g @anthropic-ai/claude-code`).
+
+**Option B — Anthropic API key**
+
+Paste your API key into `ANTHROPIC_API_KEY`. Generate one at [console.anthropic.com](https://console.anthropic.com/) → API Keys. Keys start with `sk-ant-...`.
 
 You only need one of the two. Changes take effect on the next task without a server restart.
 
@@ -114,11 +102,17 @@ Wallfacer supports two Codex auth modes:
 2. **API key fallback**
    Set `OPENAI_API_KEY` in **Settings → API Configuration** and run **Test (Codex)** once.
 
-## Verify the Setup
+## Step 4 — Verify the Setup
 
-1. Open **Settings → API Configuration** and confirm your credential is listed (tokens are masked).
-2. Create a test task: click **+ New Task**, enter a short prompt, and click Add.
-3. Drag the card to **In Progress**. A sandbox container starts; live log output appears in the task detail panel.
+Run the doctor command to check that everything is configured correctly:
+
+```bash
+wallfacer doctor
+```
+
+This checks configuration paths, credentials, container runtime, sandbox images, and Git. Items marked `[ok]` are ready, `[!]` need attention, and `[ ]` are optional.
+
+Once all required checks pass, create a test task: click **+ New Task**, enter a short prompt, click Add, and drag the card to **In Progress**. A sandbox container starts and live log output appears in the task detail panel.
 
 If the task fails immediately, check:
 
