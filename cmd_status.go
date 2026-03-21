@@ -104,7 +104,7 @@ func truncate(s string, n int) string {
 // matchContainers builds a map from task UUID → container name.
 // The /api/containers response already exposes the wallfacer.task.id label
 // as the task_id field, so no extra label-parsing is required.
-func matchContainers(_ []taskSummary, containers []containerSummary) map[string]string {
+func matchContainers(containers []containerSummary) map[string]string {
 	result := make(map[string]string, len(containers))
 	for _, c := range containers {
 		if c.TaskID != "" {
@@ -241,7 +241,7 @@ func runStatus(_ string, args []string) {
 			return false
 		}
 		containers, _ := fetchContainers(serverAddr) // non-fatal if unavailable
-		containerMap := matchContainers(tasks, containers)
+		containerMap := matchContainers(containers)
 		printBoard(serverAddr, tasks, containerMap)
 		return true
 	}

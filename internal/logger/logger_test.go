@@ -58,11 +58,7 @@ func TestInit_UnknownFormat(t *testing.T) {
 func TestFatal(t *testing.T) {
 	if os.Getenv("TEST_LOGGER_FATAL") == "1" {
 		// Running inside the subprocess: call Fatal and expect os.Exit(1).
-		var buf bytes.Buffer
-		opts := &slog.HandlerOptions{Level: slog.LevelDebug}
-		h := newPrettyHandler(&buf, opts)
-		l := slog.New(h)
-		Fatal(l, "fatal test message", "key", "value")
+		Fatal("fatal test message", "key", "value")
 		return // unreachable
 	}
 

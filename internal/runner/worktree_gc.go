@@ -178,7 +178,7 @@ func (r *Runner) ScanOrphanedWorktrees(ctx context.Context) ([]uuid.UUID, error)
 // registered worktree subdirectory, then falls back to os.RemoveAll.
 // Errors are logged as warnings; the function proceeds to the next ID.
 // Returns count of successfully removed task directories.
-func (r *Runner) PruneOrphanedWorktrees(_ context.Context, orphans []uuid.UUID) int {
+func (r *Runner) PruneOrphanedWorktrees(ctx context.Context, orphans []uuid.UUID) int {
 	r.worktreeMu.Lock()
 	defer r.worktreeMu.Unlock()
 
@@ -191,6 +191,9 @@ func (r *Runner) PruneOrphanedWorktrees(_ context.Context, orphans []uuid.UUID) 
 
 	removed := 0
 	for _, id := range orphans {
+		if ctx.Err() != nil {
+			break
+		}
 		taskDir := filepath.Join(r.worktreesDir, id.String())
 
 		subdirs, err := os.ReadDir(taskDir)
@@ -208,7 +211,7 @@ func (r *Runner) PruneOrphanedWorktrees(_ context.Context, orphans []uuid.UUID) 
 			subdirPath := filepath.Join(taskDir, sub.Name())
 			if wsPath, ok := basenames[sub.Name()]; ok {
 				// Best-effort: unregister the worktree from git's internal index.
-				if err := runGit(wsPath, "worktree", "remove", "--force", subdirPath); err != nil {
+				if err := runGitContext(ctx, wsPath, "worktree", "remove", "--force", subdirPath); err != nil {
 					logger.Runner.Warn("worktree GC: git worktree remove", "task", id, "subdir", subdirPath, "error", err)
 				}
 			}

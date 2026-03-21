@@ -78,7 +78,7 @@ func countRegularInProgress(tasks []store.Task) int {
 // in-progress concurrency limit, and calls store.UpdateTaskStatus. It writes
 // the appropriate HTTP error response and returns false on any failure;
 // on success it returns true with the mutex already released.
-func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.ResponseWriter, id uuid.UUID, _, newStatus store.TaskStatus) bool {
+func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.ResponseWriter, id uuid.UUID, newStatus store.TaskStatus) bool {
 	promoteMu.Lock()
 	defer promoteMu.Unlock()
 

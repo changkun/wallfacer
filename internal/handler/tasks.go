@@ -721,7 +721,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		}
 		// Enforce concurrency limit for manual backlog → in_progress transitions.
 		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog && !task.IsTestRun {
-			if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
+			if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, newStatus) {
 				return
 			}
 			h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
@@ -745,7 +745,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		// a test run. This protects API callers that PATCH waiting/failed →
 		// in_progress from bypassing the concurrency limit.
 		if newStatus == store.TaskStatusInProgress && !task.IsTestRun {
-			if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
+			if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, newStatus) {
 				return
 			}
 			h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,

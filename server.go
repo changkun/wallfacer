@@ -70,7 +70,7 @@ func runServer(configDir string, args []string) {
 	workspaces := resolveStartupWorkspaces(*noWorkspaces, fs.Args(), *envFile)
 	wsMgr, err := workspace.NewManager(configDir, *dataDir, *envFile, workspaces)
 	if err != nil {
-		logger.Fatal(logger.Main, "workspace manager", "error", err)
+		logger.Fatal("workspace manager", "error", err)
 	}
 	snapshot := wsMgr.Snapshot()
 	s := snapshot.Store
@@ -87,7 +87,7 @@ func runServer(configDir string, args []string) {
 
 	worktreesDir := filepath.Join(configDir, "worktrees")
 	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
-		logger.Fatal(logger.Main, "create worktrees dir", "error", err)
+		logger.Fatal("create worktrees dir", "error", err)
 	}
 
 	if snapshot.InstructionsPath != "" {
@@ -298,7 +298,7 @@ func runServer(configDir string, args []string) {
 		logger.Main.Warn("requested address unavailable, finding free port", "addr", *addr, "error", err)
 		ln, err = net.Listen("tcp", net.JoinHostPort(host, "0"))
 		if err != nil {
-			logger.Fatal(logger.Main, "listen", "error", err)
+			logger.Fatal("listen", "error", err)
 		}
 	}
 
@@ -331,7 +331,7 @@ func runServer(configDir string, args []string) {
 		logger.Main.Info("received shutdown signal, shutting down gracefully")
 	case err := <-srvErr:
 		if err != nil && err != http.ErrServerClosed {
-			logger.Fatal(logger.Main, "server", "error", err)
+			logger.Fatal("server", "error", err)
 		}
 		return
 	}
@@ -370,11 +370,11 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// Static files (task board UI).
 	uiFS, err := fsLib.Sub(uiFiles, "ui")
 	if err != nil {
-		logger.Fatal(logger.Main, "sub ui fs", "error", err)
+		logger.Fatal("sub ui fs", "error", err)
 	}
 	indexTemplates, err := template.New("index.html").ParseFS(uiFS, "index.html", "partials/*.html")
 	if err != nil {
-		logger.Fatal(logger.Main, "parse ui templates", "error", err)
+		logger.Fatal("parse ui templates", "error", err)
 	}
 	serveIndex := func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
@@ -736,7 +736,7 @@ func resolveStartupWorkspaces(noWorkspaces bool, cliArgs []string, envFile strin
 func mustResolveWorkspaces(paths []string) []string {
 	resolved, err := tryResolveWorkspaces(paths)
 	if err != nil {
-		logger.Fatal(logger.Main, "resolve workspaces", "error", err)
+		logger.Fatal("resolve workspaces", "error", err)
 	}
 	return resolved
 }

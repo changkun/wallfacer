@@ -38,7 +38,7 @@ func printUsage() {
 func main() {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		logger.Fatal(logger.Main, "home dir", "error", err)
+		logger.Fatal("home dir", "error", err)
 	}
 	configDir := filepath.Join(home, ".wallfacer")
 
@@ -203,7 +203,7 @@ func runEnvCheck(configDir string) {
 
 func initConfigDir(configDir, envFile string) {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		logger.Fatal(logger.Main, "create config dir", "error", err)
+		logger.Fatal("create config dir", "error", err)
 	}
 
 	if _, err := os.Stat(envFile); os.IsNotExist(err) {
@@ -233,7 +233,7 @@ func initConfigDir(configDir, envFile string) {
 			"# Optional: enable fast-mode sandbox hints by default (set to false to disable).\n" +
 			"WALLFACER_SANDBOX_FAST=true\n"
 		if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
-			logger.Fatal(logger.Main, "create env file", "error", err)
+			logger.Fatal("create env file", "error", err)
 		}
 		logger.Main.Info("created env file — edit it and set your token", "path", envFile)
 	}

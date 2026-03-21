@@ -668,7 +668,7 @@ func TestCheckConcurrencyAndUpdateStatus_Success(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	w := httptest.NewRecorder()
-	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, task.ID, store.TaskStatusBacklog, store.TaskStatusInProgress)
+	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, task.ID, store.TaskStatusInProgress)
 	if !ok {
 		t.Errorf("expected success, got %d: %s", w.Code, w.Body.String())
 	}
@@ -689,7 +689,7 @@ func TestCheckConcurrencyAndUpdateStatus_InvalidTransition(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	w := httptest.NewRecorder()
-	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, task.ID, store.TaskStatusBacklog, store.TaskStatusDone)
+	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, task.ID, store.TaskStatusDone)
 	if ok {
 		t.Error("expected failure for invalid transition")
 	}
@@ -713,7 +713,7 @@ func TestCheckConcurrencyAndUpdateStatus_MaxConcurrency(t *testing.T) {
 	// Try to promote one more backlog task — must be rejected.
 	backlog, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog", Timeout: 15})
 	w := httptest.NewRecorder()
-	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, backlog.ID, store.TaskStatusBacklog, store.TaskStatusInProgress)
+	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, backlog.ID, store.TaskStatusInProgress)
 	if ok {
 		t.Error("expected concurrency limit rejection")
 	}

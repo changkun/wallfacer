@@ -86,17 +86,12 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestMatchContainers(t *testing.T) {
-	tasks := []taskSummary{
-		{ID: "uuid-1"},
-		{ID: "uuid-2"},
-		{ID: "uuid-3"},
-	}
 	containers := []containerSummary{
 		{Name: "wallfacer-impl-uuid-1", TaskID: "uuid-1"},
 		{Name: "wallfacer-impl-uuid-3", TaskID: "uuid-3"},
 		{Name: "wallfacer-unrelated", TaskID: ""},
 	}
-	result := matchContainers(tasks, containers)
+	result := matchContainers(containers)
 
 	if got := result["uuid-1"]; got != "wallfacer-impl-uuid-1" {
 		t.Errorf("uuid-1: got %q, want %q", got, "wallfacer-impl-uuid-1")
@@ -113,7 +108,7 @@ func TestMatchContainers(t *testing.T) {
 }
 
 func TestMatchContainersEmpty(t *testing.T) {
-	result := matchContainers(nil, nil)
+	result := matchContainers(nil)
 	if len(result) != 0 {
 		t.Errorf("expected empty map, got %v", result)
 	}
@@ -125,7 +120,7 @@ func TestMatchContainersDuplicateTaskID(t *testing.T) {
 		{Name: "first", TaskID: "uuid-1"},
 		{Name: "second", TaskID: "uuid-1"},
 	}
-	result := matchContainers(nil, containers)
+	result := matchContainers(containers)
 	if result["uuid-1"] != "second" {
 		t.Errorf("expected last-write-wins, got %q", result["uuid-1"])
 	}
