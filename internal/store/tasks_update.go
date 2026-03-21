@@ -290,17 +290,25 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 	return true, nil
 }
 
-// UpdateTaskBacklog edits prompt, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[SandboxActivity]sandbox.Type, maxCostUSD *float64, maxInputTokens *int) error {
-	// Compute the lowercased prompt before acquiring the lock so that
+// UpdateTaskBacklog edits prompt, goal, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, goal *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[SandboxActivity]sandbox.Type, maxCostUSD *float64, maxInputTokens *int) error {
+	// Compute the lowercased fields before acquiring the lock so that
 	// strings.ToLower does not extend the critical section.
 	var loweredPrompt string
 	if prompt != nil {
 		loweredPrompt = strings.ToLower(*prompt)
 	}
+	var loweredGoal string
+	if goal != nil {
+		loweredGoal = strings.ToLower(*goal)
+	}
 	return s.mutateTask(id, func(t *Task) error {
 		if prompt != nil {
 			t.Prompt = *prompt
+		}
+		if goal != nil {
+			t.Goal = *goal
+			t.GoalManuallySet = true
 		}
 		if timeout != nil {
 			t.Timeout = clampTimeout(*timeout)
@@ -328,9 +336,14 @@ func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *strin
 			}
 			t.MaxInputTokens = v
 		}
-		if prompt != nil {
+		if prompt != nil || goal != nil {
 			if entry, ok := s.searchIndex[id]; ok {
-				entry.prompt = loweredPrompt
+				if prompt != nil {
+					entry.prompt = loweredPrompt
+				}
+				if goal != nil {
+					entry.goal = loweredGoal
+				}
 				s.searchIndex[id] = entry
 			}
 		}

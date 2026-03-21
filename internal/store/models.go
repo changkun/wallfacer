@@ -102,6 +102,7 @@ type RefinementJob struct {
 	CreatedAt time.Time           `json:"created_at"`
 	Status    RefinementJobStatus `json:"status"`
 	Result    string              `json:"result,omitempty"`
+	Goal      string              `json:"goal,omitempty"` // extracted goal summary from refinement output
 	Error     string              `json:"error,omitempty"`
 	// source indicates who created the job. "runner" jobs originate from the
 	// UI-triggered refinement flow and may be briefly treated as in-flight while
@@ -279,6 +280,8 @@ type Task struct {
 	SchemaVersion     int                     `json:"schema_version"`
 	ID                uuid.UUID               `json:"id"`
 	Title             string                  `json:"title,omitempty"`
+	Goal              string                  `json:"goal,omitempty"`            // 1-3 sentence human-readable summary for card display
+	GoalManuallySet   bool                    `json:"goal_manually_set,omitempty"` // true when user explicitly edited the goal
 	Prompt            string                  `json:"prompt"`
 	PromptHistory     []string                `json:"prompt_history,omitempty"`
 	RetryHistory      []RetryRecord           `json:"retry_history,omitempty"`

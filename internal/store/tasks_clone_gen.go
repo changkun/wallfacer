@@ -18,10 +18,10 @@ func deepCloneTask(t *Task) Task {
 	cp.PromptHistory = slices.Clone(t.PromptHistory)
 	cp.RetryHistory = slices.Clone(t.RetryHistory)
 	cp.RefineSessions = cloneRefinementSessionSlice(t.RefineSessions)
-	cp.Tags = slices.Clone(t.Tags)
-	cp.DependsOn = slices.Clone(t.DependsOn)
 	cp.CustomPassPatterns = slices.Clone(t.CustomPassPatterns)
 	cp.CustomFailPatterns = slices.Clone(t.CustomFailPatterns)
+	cp.Tags = slices.Clone(t.Tags)
+	cp.DependsOn = slices.Clone(t.DependsOn)
 	cp.TruncatedTurns = slices.Clone(t.TruncatedTurns)
 	cp.SandboxByActivity = maps.Clone(t.SandboxByActivity)
 	cp.UsageBreakdown = maps.Clone(t.UsageBreakdown)
@@ -50,13 +50,13 @@ func deepCloneTask(t *Task) Task {
 		environment := *t.Environment
 		cp.Environment = &environment
 	}
-	if t.ModelOverride != nil {
-		modelOverride := *t.ModelOverride
-		cp.ModelOverride = &modelOverride
-	}
 	if t.StartedAt != nil {
 		startedAt := *t.StartedAt
 		cp.StartedAt = &startedAt
+	}
+	if t.ModelOverride != nil {
+		modelOverride := *t.ModelOverride
+		cp.ModelOverride = &modelOverride
 	}
 	if t.ScheduledAt != nil {
 		scheduledAt := *t.ScheduledAt

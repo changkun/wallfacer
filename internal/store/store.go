@@ -21,6 +21,7 @@ import (
 // in-memory matching without per-query disk I/O or repeated lowercasing.
 type indexedTaskText struct {
 	title        string // strings.ToLower(task.Title)
+	goal         string // strings.ToLower(task.Goal)
 	prompt       string // strings.ToLower(task.Prompt)
 	tags         string // strings.ToLower(strings.Join(task.Tags, " "))
 	oversight    string // strings.ToLower(oversightRaw)
@@ -32,6 +33,7 @@ type indexedTaskText struct {
 func buildIndexEntry(t *Task, oversightRaw string) indexedTaskText {
 	return indexedTaskText{
 		title:        strings.ToLower(t.Title),
+		goal:         strings.ToLower(t.Goal),
 		prompt:       strings.ToLower(t.Prompt),
 		tags:         strings.ToLower(strings.Join(t.Tags, " ")),
 		oversight:    strings.ToLower(oversightRaw),

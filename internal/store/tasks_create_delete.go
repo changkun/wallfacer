@@ -29,6 +29,7 @@ type TaskCreateOptions struct {
 	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
 	ID                uuid.UUID
 	Prompt            string
+	Goal              string
 	Timeout           int
 	MountWorktrees    bool
 	Kind              TaskKind
@@ -59,9 +60,18 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	}
 
 	now := time.Now()
+	// Default Goal to the user's original prompt text so the card shows
+	// their own words before any refinement takes place.
+	goal := opts.Goal
+	if goal == "" {
+		goal = opts.Prompt
+	}
+
 	task := &Task{
 		SchemaVersion:  CurrentTaskSchemaVersion,
 		ID:             id,
+		Goal:           goal,
+		GoalManuallySet: opts.Goal != "",
 		Prompt:         opts.Prompt,
 		Status:         TaskStatusBacklog,
 		Turns:          0,

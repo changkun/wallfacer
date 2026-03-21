@@ -60,8 +60,11 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	if getErr != nil || cur.CurrentRefinement == nil {
 		return
 	}
+	cleaned := cleanRefinementResult(output.Result)
+	goal, spec := extractGoalFromRefinement(cleaned)
 	cur.CurrentRefinement.Status = store.RefinementJobStatusDone
-	cur.CurrentRefinement.Result = cleanRefinementResult(output.Result)
+	cur.CurrentRefinement.Result = spec
+	cur.CurrentRefinement.Goal = goal
 	_ = r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
 
 
@@ -310,4 +313,26 @@ func cleanRefinementResult(result string) string {
 		return strings.TrimSpace(result[idx:])
 	}
 	return result
+}
+
+// extractGoalFromRefinement splits a cleaned refinement result into a goal
+// summary and the remaining implementation spec. It looks for a "# Goal"
+// section at the start; everything between that heading and the next top-level
+// heading is the goal. If no "# Goal" section is found, goal is empty and
+// spec is the full text.
+func extractGoalFromRefinement(result string) (goal, spec string) {
+	const goalHeading = "# Goal"
+	if !strings.HasPrefix(result, goalHeading) {
+		return "", result
+	}
+	// Find the next top-level heading after "# Goal".
+	rest := result[len(goalHeading):]
+	nextH1 := strings.Index(rest, "\n# ")
+	if nextH1 == -1 {
+		// No further heading — entire text is goal (unusual but safe).
+		return strings.TrimSpace(rest), ""
+	}
+	goal = strings.TrimSpace(rest[:nextH1])
+	spec = strings.TrimSpace(rest[nextH1+1:]) // skip the leading newline
+	return goal, spec
 }
