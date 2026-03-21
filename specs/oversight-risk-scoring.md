@@ -38,6 +38,16 @@ RiskScore float64 `json:"risk_score,omitempty"`
 RiskLevel string  `json:"risk_level,omitempty"`
 ```
 
+Add per-task risk policy override field (follows `CustomPassPatterns`/`CustomFailPatterns` pattern):
+
+```go
+// RiskPolicyRules are per-task risk rule overrides. Each string is a
+// JSON-encoded rule: {"id":"x","tool":"Bash","input_pattern":"rm -rf","risk":0.9,"label":"..."}
+// When non-nil, these rules are prepended to (and can override) the global policy.
+// nil means use the global policy as-is.
+RiskPolicyRules []string `json:"risk_policy_rules,omitempty"`
+```
+
 Define `RiskAction` for the per-action log (stored separately in `risk.json`, not in `task.json`):
 
 ```go
@@ -178,7 +188,77 @@ type Policy struct {
 
 **Policy loading:** `LoadPolicy(path string) (*Policy, error)` loads from YAML. `DefaultPolicy() *Policy` returns embedded default. The runner loads the policy at startup and re-reads on file change (stat mtime check, same pattern as `oversightIntervalFromEnv()`).
 
-Optional user override: `~/.wallfacer/risk-policy.yaml` takes precedence over embedded default when present.
+Optional global user override: `~/.wallfacer/risk-policy.yaml` takes precedence over embedded default when present.
+
+### Per-Task Policy Customization
+
+Risk policy rules can be overridden on a per-task basis. This follows the same `CustomPassPatterns`/`CustomFailPatterns` pattern already used for test result matching.
+
+**Resolution order** (first-match wins within the merged rule list):
+
+1. **Per-task rules** (`task.RiskPolicyRules`) — prepended first, highest priority
+2. **Global user override** (`~/.wallfacer/risk-policy.yaml`) — if present
+3. **Embedded default** (`internal/risk/default_policy.yaml`)
+
+Per-task rules are **prepended** to the global rules. Since `ScoreAction` returns the first matching rule, per-task rules naturally override globals for the same tool/pattern. A per-task rule with `risk: 0` effectively disables a global rule for that task.
+
+**Rule format** (each element of `RiskPolicyRules` is a JSON string):
+
+```json
+{"id": "custom-allow-rm", "tool": "Bash", "input_pattern": "rm -rf /tmp/cache", "risk": 0.0, "label": "Allow cache cleanup"}
+```
+
+**Merging function** (`internal/risk/policy.go`):
+
+```go
+// MergeTaskRules prepends per-task rule overrides to a copy of the global policy.
+// Each taskRule string is parsed as JSON. Invalid rules are silently skipped
+// (they were validated at API ingest time).
+func MergeTaskRules(global *Policy, taskRules []string) *Policy
+```
+
+Returns a new `*Policy` with the merged rule list. The global policy is not mutated.
+
+**Validation** (`internal/handler/tasks.go`):
+
+```go
+// validateRiskPolicyRules checks each JSON-encoded rule string:
+// - Valid JSON with "tool" (non-empty string) and "risk" (float64 in [0.0, 1.0])
+// - "input_pattern" compiles as a valid regex
+// Returns the first validation error encountered, or nil.
+func validateRiskPolicyRules(rules []string) error
+```
+
+Called in both `CreateTask` and `UpdateTask` handlers, same position as `validateCustomPatterns`.
+
+**API surface:**
+
+- `POST /api/tasks` — accepts `risk_policy_rules` in request body.
+- `PATCH /api/tasks/{id}` — accepts `risk_policy_rules` for backlog tasks.
+- `TaskCreateOptions` gains `RiskPolicyRules []string`.
+- `UpdateTaskBacklog` gains `riskPolicyRules *[]string` parameter.
+
+**Runner integration:**
+
+In `scoreTurnActions`, the effective policy is built once at the start of `Run()`:
+
+```go
+globalPolicy := r.riskPolicy // loaded at startup
+effectivePolicy := globalPolicy
+if len(task.RiskPolicyRules) > 0 {
+    effectivePolicy = risk.MergeTaskRules(globalPolicy, task.RiskPolicyRules)
+}
+```
+
+The merged policy is cached for the duration of the task execution (no re-merge per turn).
+
+**UI:**
+
+In the task creation/edit modal, add a collapsible "Risk Policy Rules" section:
+- List of current custom rules, each showing tool, pattern, score, label.
+- "Add rule" button → inline form with: tool (dropdown: Bash/Write/Edit/Read/Glob), input pattern (text), risk score (number input 0-1), label (text).
+- "Remove" button per rule.
+- Rules serialized as JSON strings in the PATCH request.
 
 ### Action Collection
 
@@ -354,7 +434,7 @@ Poll every 3 seconds during `in_progress` status (same pattern as oversight "gen
 
 | File | Change |
 |------|--------|
-| `internal/risk/policy.go` (new) | `Rule`, `Policy`, `Thresholds` types; `LoadPolicy`, `DefaultPolicy` |
+| `internal/risk/policy.go` (new) | `Rule`, `Policy`, `Thresholds` types; `LoadPolicy`, `DefaultPolicy`, `MergeTaskRules` |
 | `internal/risk/score.go` (new) | `ScoreAction`, `LevelFromScore`, `AggregateScore` |
 | `internal/risk/default_policy.yaml` (new) | Embedded default risk rules |
 | `internal/risk/policy_test.go` (new) | Unit tests for each default rule, edge cases |
@@ -366,10 +446,13 @@ Poll every 3 seconds during `in_progress` status (same pattern as oversight "gen
 
 | File | Change |
 |------|--------|
-| `internal/store/models.go` | Add `RiskScore float64`, `RiskLevel string` to `Task`; define `RiskAction`, `TaskRisk` |
+| `internal/store/models.go` | Add `RiskScore float64`, `RiskLevel string`, `RiskPolicyRules []string` to `Task`; define `RiskAction`, `TaskRisk` |
 | `internal/store/risk.go` (new) | `SaveRiskScore`, `GetRiskScore`, `UpdateTaskRisk` |
+| `internal/store/tasks_create_delete.go` | Accept `RiskPolicyRules` in `TaskCreateOptions` |
+| `internal/store/tasks_update.go` | Handle `RiskPolicyRules` in `UpdateTaskBacklog` |
+| `internal/handler/tasks.go` | Accept + validate `risk_policy_rules` in `CreateTask`/`UpdateTask` |
 | `internal/store/risk_test.go` (new) | Round-trip tests, capping, notify verification |
-| `cmd/gen-clone/` | Regenerate `tasks_clone_gen.go` (no new slice in Task itself — `RiskActions` is in `risk.json`) |
+| `cmd/gen-clone/` | Regenerate `tasks_clone_gen.go` (`RiskPolicyRules` slice needs cloning) |
 
 **Effort:** Low. Additive fields, `omitempty` for backward compatibility.
 
@@ -377,7 +460,7 @@ Poll every 3 seconds during `in_progress` status (same pattern as oversight "gen
 
 | File | Change |
 |------|--------|
-| `internal/runner/risk.go` (new) | `scoreTurnActions` method on Runner; reuses `parseTurnActivity` |
+| `internal/runner/risk.go` (new) | `scoreTurnActions` method on Runner; reuses `parseTurnActivity`; merges per-task policy via `risk.MergeTaskRules` |
 | `internal/runner/execute.go` | Call `scoreTurnActions` after `SaveTurnOutput` (~line 402); add Codex TODO |
 | `internal/runner/runner.go` | Load risk policy in constructor; store as `riskPolicy *risk.Policy` field |
 
@@ -437,6 +520,8 @@ Poll every 3 seconds during `in_progress` status (same pattern as oversight "gen
 | `buildBaseContainerSpec` | `internal/runner/container.go:267` | Adding hook volume mounts |
 | `backgroundWg` goroutine tracking | `internal/runner/runner.go:516` | Risk update worker lifecycle |
 | `oversightIntervalFromEnv` re-read | `internal/runner/oversight.go` | Policy file hot-reload via mtime check |
+| `CustomPassPatterns`/`CustomFailPatterns` | `internal/store/models.go:325-329` | Per-task `RiskPolicyRules` — same `[]string` pattern on Task struct |
+| `validateCustomPatterns` | `internal/handler/tasks.go` | `validateRiskPolicyRules` — same validation-at-ingest pattern |
 
 ---
 
@@ -480,7 +565,6 @@ Between-turn scoring via `parseTurnActivity` works for Codex today — it alread
 
 1. **Auto-pause on high risk?** The `RiskAssessment` could include a `ShouldPause bool` for future automatic task pausing on extreme risk scores (e.g., >0.9). Deferred to v2 — display-only in v1.
 2. **Risk score persistence across retries?** When a task is retried, should the risk score reset to 0 or carry forward? Recommend reset (fresh execution = fresh risk assessment).
-3. **Custom user policies?** The spec supports `~/.wallfacer/risk-policy.yaml` override. Should there also be a UI editor for policies? Deferred.
 
 ---
 
