@@ -40,9 +40,19 @@ chmod +x wallfacer
 
 Available binaries: `wallfacer-darwin-arm64`, `wallfacer-darwin-amd64`, `wallfacer-linux-arm64`, `wallfacer-linux-amd64`.
 
-**Option B — Build from source (requires Go 1.25+)**
+**Option B — Install via Go (requires Go 1.25+)**
 
 ```bash
+go install changkun.de/x/wallfacer@latest
+```
+
+The binary is installed to `$GOPATH/bin` (or `$HOME/go/bin` by default).
+
+**Option C — Build from source (requires Go 1.25+)**
+
+```bash
+git clone https://github.com/changkun/wallfacer.git
+cd wallfacer
 go build -o wallfacer .
 ```
 
