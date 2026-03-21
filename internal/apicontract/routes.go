@@ -81,6 +81,27 @@ var Routes = []Route{
 		Tags:        []string{"containers"},
 	},
 
+	// --- Sandbox image management ---
+
+	{
+		Method: http.MethodGet, Pattern: "/api/images", Name: "GetImageStatus",
+		JSName:      "status",
+		Description: "Check which sandbox images are cached locally, with size and creation time.",
+		Tags:        []string{"images"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/images/pull", Name: "PullImage",
+		JSName:      "pull",
+		Description: "Start an async pull for a sandbox image; returns a pull ID.",
+		Tags:        []string{"images"},
+	},
+	{
+		Method: http.MethodGet, Pattern: "/api/images/pull/stream", Name: "StreamImagePull",
+		JSName:      "pullStream",
+		Description: "SSE stream of pull progress for a given pull ID.",
+		Tags:        []string{"images"},
+	},
+
 	// --- File listing ---
 
 	{

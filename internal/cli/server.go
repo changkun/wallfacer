@@ -579,6 +579,11 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// Container monitoring.
 		"GetContainers": h.GetContainers,
 
+		// Sandbox image management.
+		"GetImageStatus":  h.GetImageStatus,
+		"PullImage":       h.PullImage,
+		"StreamImagePull": h.StreamImagePull,
+
 		// File listing.
 		"GetFiles": h.GetFiles,
 

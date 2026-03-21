@@ -51,6 +51,9 @@ function setSettingsTab(tabName) {
   if (tabName === 'trash' && typeof loadDeletedTasks === 'function') {
     loadDeletedTasks();
   }
+  if (tabName === 'sandbox' && typeof loadImageStatus === 'function') {
+    loadImageStatus();
+  }
 
   return didSetActive;
 }

@@ -27,6 +27,15 @@ var Routes = {
     list: function() { return "/api/containers"; },
   },
 
+  images: {
+    // GET /api/images
+    status: function() { return "/api/images"; },
+    // POST /api/images/pull
+    pull: function() { return "/api/images/pull"; },
+    // GET /api/images/pull/stream
+    pullStream: function() { return "/api/images/pull/stream"; },
+  },
+
   files: {
     // GET /api/files
     list: function() { return "/api/files"; },

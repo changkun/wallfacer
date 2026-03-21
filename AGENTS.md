@@ -173,6 +173,11 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `GET /api/containers` — List running containers
 - `GET /api/files` — File listing for @ mention autocomplete
 
+### Sandbox Images
+- `GET /api/images` — Check which sandbox images are cached locally
+- `POST /api/images/pull` — Start async pull for a sandbox image
+- `GET /api/images/pull/stream` — SSE stream of pull progress
+
 ### Admin
 - `POST /api/admin/rebuild-index` — Rebuild the in-memory search index from disk
 

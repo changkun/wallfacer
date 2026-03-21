@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 74,
+  "route_count": 77,
   "routes": [
     {
       "method": "GET",
@@ -55,6 +55,33 @@
       "description": "List running sandbox containers.",
       "tags": [
         "containers"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/images",
+      "name": "GetImageStatus",
+      "description": "Check which sandbox images are cached locally, with size and creation time.",
+      "tags": [
+        "images"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/images/pull",
+      "name": "PullImage",
+      "description": "Start an async pull for a sandbox image; returns a pull ID.",
+      "tags": [
+        "images"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/images/pull/stream",
+      "name": "StreamImagePull",
+      "description": "SSE stream of pull progress for a given pull ID.",
+      "tags": [
+        "images"
       ]
     },
     {

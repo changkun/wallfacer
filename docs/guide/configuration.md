@@ -27,6 +27,16 @@ At minimum, you need one of these credentials configured in **Settings > Sandbox
 
 All changes are written to `~/.wallfacer/.env` and take effect on the next task run. Leave token fields blank to preserve the existing value.
 
+### Container Images
+
+The **Container Images** section at the top of **Settings > Sandbox** shows whether each sandbox image (Claude and Codex) is cached locally. Images are pulled automatically on first task run, but you can also manage them manually:
+
+- **Pull** -- Download a missing image from the registry (~1 GB).
+- **Re-pull** -- Update a cached image to the latest version.
+- Pull progress streams live in the settings panel.
+
+You can also check image status from the command line with `wallfacer doctor`.
+
 ### Key Environment Variables
 
 All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). The server re-reads this file before each container launch, so changes take effect on the next task without a server restart.
