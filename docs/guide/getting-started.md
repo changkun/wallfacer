@@ -249,4 +249,4 @@ The task ID prefix is the first few characters of the task UUID (shown on the ca
 ## Next Steps
 
 - [Usage Guide](usage.md) — how to create tasks, handle feedback, use autopilot, and manage results
-- [Architecture](internals/architecture.md) — system design and internals for contributors
+- [Architecture](../internals/architecture.md) — system design and internals for contributors

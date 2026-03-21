@@ -135,6 +135,6 @@ flowchart LR
 
 **Security** — API key auth, SSRF-hardened gateway URLs, path traversal guards, CSRF protection, request body size limits.
 
-**Circuit breakers** — Per-watcher exponential backoff suppresses individual automation loops on failure; container-level circuit breaker blocks launches when the runtime is unavailable. See [Circuit Breakers](../circuit-breakers.md).
+**Circuit breakers** — Per-watcher exponential backoff suppresses individual automation loops on failure; container-level circuit breaker blocks launches when the runtime is unavailable. See [Circuit Breakers](../guide/circuit-breakers.md).
 
 **Observability** — SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics, webhook notifications.

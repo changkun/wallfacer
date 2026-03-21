@@ -250,4 +250,4 @@ Wallfacer includes circuit breakers that automatically pause automation when rep
 ---
 
 For setup instructions, see [Getting Started](getting-started.md).
-For system internals, see the [internals documentation](internals/).
+For system internals, see the [internals documentation](../internals/).

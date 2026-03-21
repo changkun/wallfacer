@@ -175,7 +175,7 @@ Override with `CONTAINER_CMD` env var or `-container` flag. Both Podman and Dock
 
 ### Circuit Breaker
 
-Container launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`), the circuit opens and rejects further launches until it resets. This prevents cascading failures when the container runtime is unhealthy. See [Circuit Breakers](../circuit-breakers.md) for full details.
+Container launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`), the circuit opens and rejects further launches until it resets. This prevents cascading failures when the container runtime is unhealthy. See [Circuit Breakers](../guide/circuit-breakers.md) for full details.
 
 ### Board Context
 
