@@ -1,0 +1,46 @@
+name: Release Binary
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-binary:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: go build -trimpath -o wallfacer-${{ matrix.goos }}-${{ matrix.goarch }} .
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wallfacer-${{ matrix.goos }}-${{ matrix.goarch }}
