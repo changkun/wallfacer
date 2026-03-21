@@ -1,4 +1,4 @@
-# Automation Pipeline
+# ⚡ Automation Pipeline
 
 Wallfacer can operate anywhere on the spectrum from fully manual to fully
 hands-off. At one extreme, you drag individual cards between columns and
@@ -89,12 +89,12 @@ flowchart LR
     Failed -->|auto-retry| Implement
 ```
 
-1. **Refine** -- sharpen prompts for unrefined backlog tasks.
-2. **Implement** (Autopilot) -- promote backlog tasks to In Progress.
-3. **Tip-sync** -- rebase waiting tasks onto the latest default branch.
-4. **Test** -- run the verification agent on waiting tasks.
-5. **Submit** -- move verified, conflict-free tasks to Done.
-6. **Push** -- push committed changes to the remote repository.
+1. 🔄 **Refine** -- sharpen prompts for unrefined backlog tasks.
+2. 🤖 **Implement** (Autopilot) -- promote backlog tasks to In Progress.
+3. 🔗 **Tip-sync** -- rebase waiting tasks onto the latest default branch.
+4. 🧪 **Test** -- run the verification agent on waiting tasks.
+5. ✅ **Submit** -- move verified, conflict-free tasks to Done.
+6. 📤 **Push** -- push committed changes to the remote repository.
 
 Auto-retry sits alongside the pipeline: when a task fails with a
 transient error, it is automatically returned to the backlog for another
@@ -106,7 +106,7 @@ attempt.
 
 ### Stage Reference (Deep Dive)
 
-#### Refine (Auto-refine)
+#### 🔄 Refine (Auto-refine)
 
 When enabled, the auto-refiner scans the backlog every 30 seconds. For
 each task that has never been refined and does not have a refinement
@@ -120,7 +120,7 @@ Tasks created by the brainstorm agent (idea-agent tasks) are skipped.
 before execution, especially useful when combined with Autopilot so
 that tasks enter execution with well-specified prompts.
 
-#### Implement (Autopilot)
+#### 🤖 Implement (Autopilot)
 
 When enabled, the auto-promoter watches for available capacity and
 promotes the highest-priority eligible backlog task to In Progress.
@@ -156,7 +156,7 @@ Waiting for manual intervention.
 container runtime circuit breaker is open, preventing cascading failures
 when Docker or Podman is temporarily unavailable.
 
-#### Tip-sync (Auto-sync)
+#### 🔗 Tip-sync (Auto-sync)
 
 When enabled, the tip-sync watcher polls every 30 seconds for waiting
 tasks whose worktrees have fallen behind the default branch. For each
@@ -176,7 +176,7 @@ completed tasks merge into the default branch, waiting tasks
 automatically pick up those changes, reducing merge conflicts at submit
 time.
 
-#### Test (Auto-test)
+#### 🧪 Test (Auto-test)
 
 When enabled, the auto-tester scans for waiting tasks that:
 
@@ -200,7 +200,7 @@ halts. The task remains in Waiting until you intervene.
 auto-tester waits until the task's worktrees are fully up to date before
 triggering a test. This prevents testing against stale code.
 
-#### Submit (Auto-submit)
+#### ✅ Submit (Auto-submit)
 
 When enabled, the auto-submitter scans for waiting tasks that meet all
 of the following criteria:
@@ -219,7 +219,7 @@ pipeline (committing state) and then to Done.
 automated test-and-submit cycle. If you want to review diffs before
 committing, leave this toggle off.
 
-#### Push (Auto-push)
+#### 📤 Push (Auto-push)
 
 When enabled, completed tasks are automatically pushed to the remote
 repository after their changes are committed to the default branch.
@@ -235,7 +235,7 @@ env file (`WALLFACER_AUTO_PUSH=true`). It survives server restarts.
 remote automatically. Disable it if you prefer to review the local
 branch before pushing.
 
-### Auto-Retry
+### 🔁 Auto-Retry
 
 Auto-retry operates alongside the main pipeline. When a task fails, the
 runner classifies the failure into one of seven categories:
@@ -295,7 +295,7 @@ create multiple tasks atomically with symbolic dependency wiring. Tasks
 in the batch can reference each other by position, and the dependency
 edges are resolved as part of the same atomic operation.
 
-### Scheduled Execution
+### ⏰ Scheduled Execution
 
 Set the `ScheduledAt` field on a task to delay its execution until a
 specific time. The auto-promoter checks this field and skips tasks whose
@@ -306,7 +306,7 @@ Scheduled execution works with dependencies: a task must satisfy both
 its schedule and its dependency requirements before it is eligible for
 promotion.
 
-### Circuit Breakers
+### 🛡️ Circuit Breakers
 
 Each automation watcher has its own circuit breaker that provides fault
 isolation. When a watcher encounters an error, its breaker opens with

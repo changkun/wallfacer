@@ -4,15 +4,15 @@ Wallfacer includes two AI-powered features that help you work with tasks before 
 
 ---
 
-## Essentials
+## 📋 Essentials
 
-### Prompt Refinement
+### ✨ Prompt Refinement
 
 Prompt refinement launches a sandbox agent that reads your codebase, understands the existing patterns and constraints, and rewrites your task prompt into a detailed implementation specification. The agent mounts your workspaces read-only and produces a structured spec with an objective, background context, implementation plan, files to change, and edge cases.
 
 Refinement is only available for tasks in the **Backlog** column. Once a task moves to In Progress, it can no longer be refined.
 
-#### Starting a Refinement
+#### ▶️ Starting a Refinement
 
 1. Click a Backlog task card to open its detail panel.
 2. Switch to the **Refine** tab.
@@ -30,7 +30,7 @@ While the refinement agent runs, its output streams into the Refine tab. Two dis
 
 Switch between them using the tabs above the log area. The view auto-scrolls to follow new output.
 
-#### Reviewing the Result
+#### 🔬 Reviewing the Result
 
 When the agent finishes, the refined prompt appears in an editable text area. The spec typically includes:
 
@@ -43,7 +43,7 @@ When the agent finishes, the refined prompt appears in an editable text area. Th
 
 You can freely edit the text before deciding what to do with it.
 
-#### Applying or Dismissing
+#### ✅ Applying or Dismissing
 
 After reviewing (and optionally editing) the refined prompt, choose one of two actions:
 
@@ -52,11 +52,11 @@ After reviewing (and optionally editing) the refined prompt, choose one of two a
 | **Apply as Prompt** | Replaces the task's original prompt with the refined version. The task title is regenerated to match. The original prompt is saved to the refinement history. |
 | **Dismiss** | Discards the refinement result. The task prompt remains unchanged and you can start a new refinement or run the task as-is. |
 
-#### Canceling a Running Refinement
+#### ❌ Canceling a Running Refinement
 
 Click the **Cancel** button that appears while the agent is running. The sandbox container is killed immediately and the refinement job is marked as failed (cancelled). You can start a new refinement at any time.
 
-### Ideation / Brainstorm Agent
+### 💡 Ideation / Brainstorm Agent
 
 The ideation agent analyzes your workspace -- reading source files, project manifests, recent git history, churn hotspots, TODO/FIXME comments, and failed task signals -- and proposes up to three high-impact improvement ideas as new backlog cards.
 
@@ -115,7 +115,7 @@ This kills the container and marks the idea-agent task as cancelled.
 
 ---
 
-## Advanced Topics
+## 🧠 Advanced Topics
 
 ### Refinement History
 
@@ -127,7 +127,7 @@ Each time you apply a refinement, the session is recorded. The Refine tab shows 
 - A **Show diff** button to see a line-level diff between the starting prompt and the applied prompt
 - A **Revert to this version** button to load a previous prompt back into the result area for re-application
 
-### Auto-Refine
+### ⚡ Auto-Refine
 
 When **Auto-Refine** is enabled in the Automation menu, Wallfacer automatically refines any backlog task that has not yet been refined. This runs in the background as tasks are created, so they arrive at execution time with a detailed spec rather than a short prompt.
 
@@ -144,7 +144,7 @@ If the Claude sandbox hits a token or rate limit during refinement, Wallfacer au
 
 The refinement container has a fixed 30-minute timeout.
 
-### Automatic Interval
+### ⏱️ Automatic Interval
 
 When ideation is enabled, you can set an automatic repeat interval so brainstorm runs happen periodically without manual intervention. Available intervals:
 
@@ -160,7 +160,7 @@ Configure the interval from the Automation menu or Settings > Execution. When an
 
 The ideation agent defaults to the Claude sandbox. Configure it globally with the `WALLFACER_SANDBOX_IDEA_AGENT` environment variable. Like refinement, if the Claude sandbox hits a token limit, the agent automatically retries with the Codex sandbox.
 
-### System Prompt Customization
+### 📝 System Prompt Customization
 
 Both refinement and ideation use built-in system prompt templates that control how the agents behave:
 

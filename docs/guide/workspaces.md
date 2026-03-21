@@ -1,12 +1,12 @@
-# Workspaces & Git
+# 📁 Workspaces & Git
 
 Workspaces are the directories containing your source code that Wallfacer mounts into task containers. Each workspace is an independent project directory on your host machine. Wallfacer supports mounting multiple workspaces simultaneously, organising them into switchable groups, and providing full git integration -- branch management, sync, push, worktree isolation, and automatic conflict resolution -- all from the web UI.
 
 ---
 
-## Essentials
+## ⚡ Essentials
 
-### Key Concepts
+### 🔑 Key Concepts
 
 | Concept | Description |
 |---|---|
@@ -14,7 +14,7 @@ Workspaces are the directories containing your source code that Wallfacer mounts
 | **Workspace group** | A saved combination of one or more workspaces. Groups appear as tabs in the header bar, similar to VS Code workspace tabs. Switching groups switches the entire task board. |
 | **Default branch** | The branch currently checked out in a workspace (e.g. `main`, `develop`). Task branches are created from the default branch HEAD and merged back into it when the task completes. |
 
-### Setting Up Workspaces
+### ⚙️ Setting Up Workspaces
 
 #### From the command line
 
@@ -49,7 +49,7 @@ Features:
 
 Click **Apply** to switch to the selected workspaces. The server validates every path and creates the necessary data directories and instructions file.
 
-### Git Status and Basic Operations
+### 🔄 Git Status and Basic Operations
 
 #### Git status display
 
@@ -80,15 +80,15 @@ Click the branch name in a workspace chip to open the branch dropdown. Select a 
 
 Click a workspace name (when no remote URL is configured) or use the context menu to open the workspace directory in your OS file manager (Finder on macOS, `xdg-open` on Linux).
 
-### Reviewing Task Changes
+### 📋 Reviewing Task Changes
 
 Each task works on an isolated branch named `task/<id>`, created from the default branch HEAD. The task's agent makes changes on this branch inside a dedicated git worktree. When a task reaches **Done**, its changes are automatically committed, rebased onto the default branch, and merged via fast-forward. You can view the diff of any task's changes against the default branch from the task detail panel.
 
 ---
 
-## Advanced Topics
+## 🔧 Advanced Topics
 
-### Workspace Groups
+### 🗂️ Workspace Groups
 
 Workspace groups let you save and switch between different combinations of workspaces without restarting the server.
 
@@ -113,7 +113,7 @@ Groups are saved automatically to `~/.wallfacer/workspace-groups.json` whenever 
 
 You cannot switch workspace groups while any task is in the **In Progress** or **Committing** state. Complete or cancel running tasks before switching.
 
-### Branch Management
+### 🌿 Branch Management
 
 Click the branch name in a workspace chip to open the branch dropdown:
 
@@ -131,7 +131,7 @@ When you are on a feature branch, a **Rebase on main** button appears. It fetche
 
 Like Sync, this operation is blocked while tasks depend on the workspace's git state.
 
-### Git Worktrees
+### 🌳 Git Worktrees
 
 Every task runs on an isolated git branch and worktree, so multiple tasks can work on the same repository simultaneously without conflicts.
 
@@ -153,7 +153,7 @@ For non-git workspaces, a snapshot copy is created instead, with a local git rep
 
 If the server restarts while tasks are in progress, it recovers worktrees by reattaching to existing branches.
 
-### The Commit Pipeline
+### 📤 The Commit Pipeline
 
 When a task reaches **Done** (either by the agent finishing its work or by the user clicking "Mark Done"), Wallfacer runs a three-phase commit pipeline:
 
@@ -181,7 +181,7 @@ If a rebase conflict occurs, Wallfacer invokes a conflict-resolution agent (see 
 2. The task branch is deleted
 3. The task's worktree directory is removed from disk
 
-### Conflict Resolution
+### 🔀 Conflict Resolution
 
 When the rebase in Phase 2 encounters a merge conflict, Wallfacer handles it automatically:
 
@@ -197,7 +197,7 @@ Conflict resolution is triggered in two contexts:
 - **Commit pipeline** -- when a completed task's branch conflicts with the default branch during the final merge
 - **Task sync** -- when rebasing a waiting or failed task's worktree onto the latest default branch (see below)
 
-### Syncing Tasks
+### 🔄 Syncing Tasks
 
 While a task is in the **Waiting** or **Failed** state, you can sync its worktrees to incorporate changes that other tasks have merged into the default branch since this task started. Click **Sync** in the task detail panel.
 
@@ -205,7 +205,7 @@ Syncing runs `git rebase` on the task's worktree against the default branch. If 
 
 The **Tip-sync** automation toggle (in the Automation menu) can automatically sync waiting tasks whenever the default branch advances.
 
-### Auto-Push
+### 🚀 Auto-Push
 
 After the commit pipeline completes, Wallfacer can optionally push each workspace to its remote. Auto-push is controlled by:
 
@@ -216,7 +216,7 @@ After the commit pipeline completes, Wallfacer can optionally push each workspac
 
 Auto-push can also be toggled from the **Automation** menu in the header.
 
-### Workspace Instructions (AGENTS.md)
+### 📝 Workspace Instructions (AGENTS.md)
 
 Each workspace group has its own `AGENTS.md` file that provides instructions to every agent running in that group. The file is identified by a SHA-256 fingerprint of the sorted workspace paths, so `wallfacer run ~/a ~/b` and `wallfacer run ~/b ~/a` share the same instructions file.
 
