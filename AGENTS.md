@@ -280,7 +280,18 @@ Every implementation task MUST complete all three steps before finishing:
 
 1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. Run `go test ./...` (backend) or `npx vitest@2 run` (frontend) to confirm they pass before committing.
 
-2. **Update docs** — If your change adds, removes, or modifies any API route, CLI flag, env variable, data model field, or user-visible behavior, update the corresponding documentation (`AGENTS.md`, `docs/getting-started.md`, `docs/usage.md`, `docs/internals/*.md`). Do not skip this step.
+2. **Update docs** — If your change adds, removes, or modifies any API route, CLI flag, env variable, data model field, or user-visible behavior, update the corresponding documentation. Do not skip this step. The user manual lives in `docs/guide/` with these focused guides:
+   - `docs/guide/usage.md` — Index page with reading order (update if adding a new guide)
+   - `docs/guide/getting-started.md` — Installation and first run
+   - `docs/guide/board-and-tasks.md` — Task board, lifecycle, creation, dependencies, search
+   - `docs/guide/workspaces.md` — Workspaces, workspace groups, git integration
+   - `docs/guide/automation.md` — Automation pipeline toggles, auto-retry, circuit breakers
+   - `docs/guide/refinement-and-ideation.md` — Prompt refinement and brainstorm agents
+   - `docs/guide/oversight-and-analytics.md` — Oversight, usage tracking, costs, timeline
+   - `docs/guide/configuration.md` — Settings, env vars, sandboxes, CLI, webhooks, security
+   - `docs/guide/circuit-breakers.md` — Fault isolation reference
+
+   Each guide has an **Essentials** section (core usage) and an **Advanced Topics** section (power-user features). Place new content in the appropriate section. If a new feature doesn't fit any existing guide, create a new guide file and add it to the reading order in `usage.md`. Also update `AGENTS.md`, `CLAUDE.md`, and `docs/internals/*.md` as needed.
 
 3. **Reflect on codebase health** — After implementing, review the files you touched and their immediate surroundings. If you spot a small, safe refactoring opportunity (dead code, unclear naming, duplicated logic, missing error handling) that is directly related to your change, include it. Keep refactoring changes minimal and scoped — do not redesign unrelated subsystems.
 
