@@ -343,6 +343,82 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
     expect(tabsEl.innerHTML).toContain('workspace-group-tab--switching');
     expect(tabsEl.innerHTML).toContain('spinner');
   });
+
+  it('hides a tab and restores it', () => {
+    const tabsEl = { innerHTML: '' };
+    const ctx = makeContext({
+      elements: [
+        ['workspace-group-tabs', tabsEl],
+      ],
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'workspace.js');
+
+    vm.runInContext(`
+      activeWorkspaces = ["/Users/test/repo-a"];
+      workspaceGroups = [
+        { workspaces: ["/Users/test/repo-a"] },
+        { workspaces: ["/Users/test/repo-b"] }
+      ];
+    `, ctx);
+
+    ctx.renderHeaderWorkspaceGroupTabs();
+    expect(tabsEl.innerHTML).toContain('repo-b');
+
+    // Hide the second tab.
+    ctx.hideWorkspaceGroupTab(1);
+    expect(tabsEl.innerHTML).not.toContain('repo-b');
+
+    // Restore it.
+    ctx.restoreWorkspaceGroupTab(1);
+    expect(tabsEl.innerHTML).toContain('repo-b');
+  });
+
+  it('does not show close button on active tab', () => {
+    const tabsEl = { innerHTML: '' };
+    const ctx = makeContext({
+      elements: [
+        ['workspace-group-tabs', tabsEl],
+      ],
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'workspace.js');
+
+    vm.runInContext(`
+      activeWorkspaces = ["/Users/test/repo-a"];
+      workspaceGroups = [
+        { workspaces: ["/Users/test/repo-a"] },
+        { workspaces: ["/Users/test/repo-b"] }
+      ];
+    `, ctx);
+
+    ctx.renderHeaderWorkspaceGroupTabs();
+
+    // Active tab should not have a close button, inactive should.
+    const activeMatch = tabsEl.innerHTML.match(/workspace-group-tab--active[^>]*>.*?<\/button>/);
+    expect(activeMatch[0]).not.toContain('workspace-group-tab__close');
+    // Inactive tab should have close button.
+    expect(tabsEl.innerHTML).toContain('workspace-group-tab__close');
+  });
+
+  it('always renders the + button', () => {
+    const tabsEl = { innerHTML: '' };
+    const ctx = makeContext({
+      elements: [
+        ['workspace-group-tabs', tabsEl],
+      ],
+    });
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'workspace.js');
+
+    vm.runInContext(`
+      activeWorkspaces = [];
+      workspaceGroups = [];
+    `, ctx);
+
+    ctx.renderHeaderWorkspaceGroupTabs();
+    expect(tabsEl.innerHTML).toContain('workspace-group-tab--add');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -257,11 +257,16 @@ function renderWorkspaceGroups() {
 function renderHeaderWorkspaceGroupTabs() {
   var el = document.getElementById('workspace-group-tabs');
   if (!el) return;
-  if (!workspaceGroups.length) {
-    el.innerHTML = '';
-    return;
-  }
-  el.innerHTML = workspaceGroups.map(function(group, index) {
+  // Ensure the active group is never hidden.
+  workspaceGroups.forEach(function(group, index) {
+    var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
+    if (workspaceGroupsEqual(paths, activeWorkspaces)) {
+      hiddenGroupIndices.delete(index);
+    }
+  });
+  var tabs = '';
+  workspaceGroups.forEach(function(group, index) {
+    if (hiddenGroupIndices.has(index)) return;
     var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
     var active = workspaceGroupsEqual(paths, activeWorkspaces);
     var switching = workspaceGroupSwitching && workspaceGroupSwitchingIndex === index;
@@ -272,8 +277,68 @@ function renderHeaderWorkspaceGroupTabs() {
       ? workspaceSwitchSpinnerHtml() + ' ' + escapeHtml(workspaceGroupLabel(group))
       : escapeHtml(workspaceGroupLabel(group));
     var title = paths.join('\n');
-    return '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (active || workspaceGroupSwitching ? ' disabled' : '') + '>' + label + '</button>';
-  }).join('');
+    var closeBtn = active
+      ? ''
+      : '<span class="workspace-group-tab__close" onclick="event.stopPropagation();hideWorkspaceGroupTab(' + index + ')" title="Hide tab">&times;</span>';
+    tabs += '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (active || workspaceGroupSwitching ? ' disabled' : '') + '>' + label + closeBtn + '</button>';
+  });
+  // "+" button to add a workspace group tab.
+  tabs += '<button type="button" class="workspace-group-tab workspace-group-tab--add" onclick="addWorkspaceGroupTab()" title="Add workspace group">+</button>';
+  el.innerHTML = tabs;
+}
+
+function hideWorkspaceGroupTab(index) {
+  hiddenGroupIndices.add(index);
+  renderHeaderWorkspaceGroupTabs();
+}
+
+function addWorkspaceGroupTab() {
+  // If there are hidden groups, show a picker; otherwise open the workspace picker.
+  var hiddenGroups = [];
+  workspaceGroups.forEach(function(group, index) {
+    if (hiddenGroupIndices.has(index)) {
+      hiddenGroups.push({ group: group, index: index });
+    }
+  });
+  if (hiddenGroups.length === 0) {
+    showWorkspacePicker(false);
+    return;
+  }
+  // Show a small popover to restore hidden groups or create new.
+  var existing = document.getElementById('workspace-group-add-menu');
+  if (existing) { existing.remove(); return; }
+  var menu = document.createElement('div');
+  menu.id = 'workspace-group-add-menu';
+  menu.style.cssText = 'position:absolute;top:100%;right:0;z-index:40;min-width:200px;max-width:320px;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);box-shadow:0 8px 24px rgba(0,0,0,0.18);';
+  var html = '';
+  hiddenGroups.forEach(function(item) {
+    html += '<button type="button" onclick="restoreWorkspaceGroupTab(' + item.index + ')" style="width:100%;text-align:left;padding:6px 8px;border:none;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font-size:11px;" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'transparent\'">' + escapeHtml(workspaceGroupLabel(item.group)) + '</button>';
+  });
+  html += '<div style="border-top:1px solid var(--border);margin:4px 0;"></div>';
+  html += '<button type="button" onclick="document.getElementById(\'workspace-group-add-menu\').remove();showWorkspacePicker(false)" style="width:100%;text-align:left;padding:6px 8px;border:none;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font-size:11px;" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'transparent\'">New workspace group...</button>';
+  menu.innerHTML = html;
+  // Position relative to the tabs container.
+  var tabsEl = document.getElementById('workspace-group-tabs');
+  if (tabsEl) {
+    tabsEl.style.position = 'relative';
+    tabsEl.appendChild(menu);
+    // Close on outside click.
+    setTimeout(function() {
+      document.addEventListener('click', function closeMenu(e) {
+        if (!menu.contains(e.target)) {
+          menu.remove();
+          document.removeEventListener('click', closeMenu);
+        }
+      });
+    }, 0);
+  }
+}
+
+function restoreWorkspaceGroupTab(index) {
+  hiddenGroupIndices.delete(index);
+  var menu = document.getElementById('workspace-group-add-menu');
+  if (menu) menu.remove();
+  renderHeaderWorkspaceGroupTabs();
 }
 
 // Keep these as no-ops for callers that still reference them.

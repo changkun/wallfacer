@@ -46,6 +46,7 @@ let workspaceBrowserFilterQuery = '';
 let workspaceSelectionDraft = [];
 let workspaceGroupSwitchingIndex = -1;
 let workspaceGroupSwitching = false;
+let hiddenGroupIndices = new Set();
 
 // Automation toggle state
 let autopilot = false;
