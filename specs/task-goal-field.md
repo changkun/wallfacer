@@ -63,10 +63,11 @@ Reuse the same `GenerateTitleBackground` pattern. After task creation and after 
 
 1. Add a new prompt template `GoalGeneration` (parallel to `TitleGeneration`) that instructs the LLM: *"Summarize the following task spec into 1-3 sentences describing what the task achieves and why. Do not include implementation details."*
 2. Add `Runner.GenerateGoalBackground(taskID, prompt)` — spawns a goroutine, calls the LLM, stores the result via `Store.UpdateTaskGoal(id, goal)`.
-3. Call sites:
-   - `CreateTask` handler: after `GenerateTitleBackground`, also call `GenerateGoalBackground`.
-   - `RefineApply` handler: after `GenerateTitleBackground`, also call `GenerateGoalBackground`.
-   - `BatchCreateTasks`: same.
+3. Call sites (all in `internal/handler/`):
+   - `CreateTask` (`tasks.go:208`): after `GenerateTitleBackground`, also call `GenerateGoalBackground`.
+   - `RefineApply` (`refine.go:176`): after `GenerateTitleBackground`, also call `GenerateGoalBackground` (conditional on `!GoalManuallySet`).
+   - `BatchCreateTasks` (`tasks.go:494`): same as `CreateTask`.
+   - `tasks_events.go:217` (title backfill endpoint): add parallel goal backfill or expose a separate goal backfill endpoint.
 
 ### Manual editing
 
@@ -104,7 +105,7 @@ No change. `ExecutionPrompt` remains the agent-facing override for idea-agent ta
 
 ### Search integration
 
-Add `goal` to the search index alongside `prompt` and `title`. In `buildSearchEntry`, include `strings.ToLower(t.Goal)` so that searching by goal text works.
+Add a `goal` field to the `indexedTaskText` struct in `internal/store/store.go` and include `strings.ToLower(t.Goal)` in `buildIndexEntry`. Update `matchTask` in `internal/store/tasks_worktree.go` to also match against the `goal` field, following the same priority pattern as `title` > `prompt` > `tags` > `oversight`.
 
 ### History
 
@@ -122,8 +123,8 @@ Add `goal` to the search index alongside `prompt` and `title`. In `buildSearchEn
 |------|--------|
 | `internal/store/models.go` | Add `Goal string` and `GoalManuallySet bool` fields to `Task` |
 | `internal/store/tasks_create_delete.go` | Accept `Goal` in `TaskCreateOptions`; pass through |
-| `internal/store/tasks_worktree.go` | No change to `ApplyRefinement` (goal stays untouched) |
-| `internal/store/search.go` or equivalent | Index `goal` field in search entries |
+| `internal/store/store.go` | Add `goal` field to `indexedTaskText` struct and `buildIndexEntry` |
+| `internal/store/tasks_worktree.go` | No change to `ApplyRefinement`; update `matchTask` for goal search |
 | `internal/handler/tasks.go` | Accept `goal` in `CreateTask` and `UpdateTask` request structs |
 | `internal/handler/refine.go` | After apply, call `GenerateGoalBackground` if `!GoalManuallySet` |
 | `internal/apicontract/` | Regenerate contract artifacts with new field |
@@ -136,8 +137,14 @@ Add `goal` to the search index alongside `prompt` and `title`. In `buildSearchEn
 
 | File | Change |
 |------|--------|
-| `internal/prompts/` | Add `GoalGeneration` template |
-| `internal/runner/title.go` or new `goal.go` | Add `GenerateGoalBackground` + `UpdateTaskGoal` store method |
+| `internal/store/models.go` | Add `SandboxActivityGoal SandboxActivity = "goal"` constant and register in `AllSandboxActivities` |
+| `internal/runner/container.go` | Add `activityGoal` alias and model-selection case |
+| `prompts/` | Add `goal.tmpl` template; register in `embeddedToAPI` map in `prompts/prompts.go` |
+| `internal/runner/goal.go` (new) | Add `GenerateGoal` (mirrors `title.go` pattern) |
+| `internal/runner/runner.go` | Add `GenerateGoalBackground` wrapper using `backgroundWg` (same as title) |
+| `internal/runner/interface.go` | Add `GenerateGoalBackground(taskID uuid.UUID, prompt string)` to runner interface |
+| `internal/runner/mock.go` | Add `GenerateGoalBackground` stub + `GenerateGoalCalls` tracking slice |
+| `internal/store/tasks_update.go` | Add `UpdateTaskGoal` method (update `Goal` field + `indexedTaskText.goal`) |
 | `internal/handler/tasks.go` | Call `GenerateGoalBackground` after create |
 | `internal/handler/refine.go` | Call `GenerateGoalBackground` after apply (conditional) |
 
