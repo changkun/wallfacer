@@ -20,7 +20,7 @@ build: build-binary build-claude build-codex
 VERSION ?=
 LDFLAGS := -s -w
 ifneq ($(VERSION),)
-LDFLAGS += -X main.version=$(VERSION)
+LDFLAGS += -X changkun.de/x/wallfacer/internal/cli.Version=$(VERSION)
 endif
 
 build-binary:
@@ -142,7 +142,8 @@ endif
 	@./scripts/release-notes.sh "$(RELEASE_VERSION)"
 
 # Create a GitHub release with binaries and notes.
-# This tags, pushes, and lets GitHub Actions build the binaries and images.
+# This commits the release notes to docs/releases/, tags, pushes, and
+# lets GitHub Actions build the binaries and images.
 # Usage:
 #   make release RELEASE_VERSION=v0.0.6 RELEASE_NOTES=notes.md
 release:
@@ -152,6 +153,11 @@ endif
 ifndef RELEASE_NOTES
 	$(error RELEASE_NOTES is required (path to release notes markdown file))
 endif
+	@echo "# $(RELEASE_VERSION)" > docs/releases/$(RELEASE_VERSION).md
+	@echo "" >> docs/releases/$(RELEASE_VERSION).md
+	@cat "$(RELEASE_NOTES)" >> docs/releases/$(RELEASE_VERSION).md
+	git add docs/releases/$(RELEASE_VERSION).md
+	git commit -m "docs: add $(RELEASE_VERSION) release notes"
 	git tag -a "$(RELEASE_VERSION)" -m "$(RELEASE_VERSION)"
-	git push origin "$(RELEASE_VERSION)"
+	git push origin main "$(RELEASE_VERSION)"
 	gh release create "$(RELEASE_VERSION)" --title "$(RELEASE_VERSION)" --notes-file "$(RELEASE_NOTES)"
