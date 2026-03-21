@@ -291,26 +291,36 @@ async function applyRefinement() {
   }
 
   const taskId = getOpenModalTaskId();
+  const applyBtn = document.getElementById('refine-apply-btn');
+  if (applyBtn) {
+    applyBtn.disabled = true;
+    applyBtn.textContent = 'Applying…';
+  }
   try {
-    // Save settings changes (sandbox, timeout, mount_worktrees) alongside the apply.
+    // Save settings changes and apply refinement in parallel.
     const sandbox = document.getElementById('modal-edit-sandbox')?.value || '';
     const sandboxByActivity = collectSandboxByActivity('modal-edit-sandbox-');
     const timeout = parseInt(document.getElementById('modal-edit-timeout')?.value, 10) || DEFAULT_TASK_TIMEOUT;
     const mountWorktrees = document.getElementById('modal-edit-mount-worktrees')?.checked || false;
-    await api(task(taskId).update(), {
-      method: 'PATCH',
-      body: JSON.stringify({ sandbox, sandbox_by_activity: sandboxByActivity, timeout, mount_worktrees: mountWorktrees }),
-    });
-
-    await api(task(taskId).refineApply(), {
-      method: 'POST',
-      body: JSON.stringify({ prompt: newPrompt }),
-    });
+    await Promise.all([
+      api(task(taskId).update(), {
+        method: 'PATCH',
+        body: JSON.stringify({ sandbox, sandbox_by_activity: sandboxByActivity, timeout, mount_worktrees: mountWorktrees }),
+      }),
+      api(task(taskId).refineApply(), {
+        method: 'POST',
+        body: JSON.stringify({ prompt: newPrompt }),
+      }),
+    ]);
 
     await waitForTaskDelta(taskId);
     openModal(taskId);
   } catch (e) {
     showAlert('Error applying refinement: ' + e.message);
+    if (applyBtn) {
+      applyBtn.disabled = false;
+      applyBtn.textContent = 'Apply as Prompt';
+    }
   }
 }
 
