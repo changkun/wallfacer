@@ -398,35 +398,82 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	mux.Handle("GET /js/", http.FileServer(http.FS(uiFS)))
 
 	// Docs API — list and serve embedded documentation.
+	//
+	// Guide docs are returned in a defined reading order so the UI can
+	// present a numbered, progressive learning path.
+	var guideOrder = []string{
+		"getting-started",
+		"board-and-tasks",
+		"workspaces",
+		"automation",
+		"refinement-and-ideation",
+		"oversight-and-analytics",
+		"configuration",
+		"circuit-breakers",
+		"usage",
+	}
 	mux.HandleFunc("GET /api/docs", func(w http.ResponseWriter, _ *http.Request) {
 		type docEntry struct {
 			Slug     string `json:"slug"`
 			Title    string `json:"title"`
 			Category string `json:"category"`
+			Order    int    `json:"order"` // 1-based reading order; 0 = unordered
 		}
+
+		// Helper: read title from first "# " line in a markdown file.
+		readTitle := func(path, fallback string) string {
+			data, _ := docsFiles.ReadFile(path)
+			for _, line := range strings.SplitN(string(data), "\n", 10) {
+				if title, ok := strings.CutPrefix(line, "# "); ok {
+					return title
+				}
+			}
+			return fallback
+		}
+
 		var entries []docEntry
-		for _, cat := range []string{"guide", "internals"} {
-			dir, err := docsFiles.ReadDir("docs/" + cat)
-			if err != nil {
+
+		// Guide: emit in the defined reading order first, then any
+		// remaining guide files that are not in the order list.
+		ordered := make(map[string]bool, len(guideOrder))
+		for i, name := range guideOrder {
+			ordered[name] = true
+			path := "docs/guide/" + name + ".md"
+			if _, err := docsFiles.ReadFile(path); err != nil {
 				continue
 			}
+			slug := "guide/" + name
+			title := readTitle(path, name)
+			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Order: i + 1})
+		}
+		// Append any guide docs not in the explicit order.
+		if dir, err := docsFiles.ReadDir("docs/guide"); err == nil {
 			for _, f := range dir {
 				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
 					continue
 				}
-				slug := cat + "/" + strings.TrimSuffix(f.Name(), ".md")
-				// Extract title from first "# " line.
-				data, _ := docsFiles.ReadFile("docs/" + cat + "/" + f.Name())
-				title := strings.TrimSuffix(f.Name(), ".md")
-				for _, line := range strings.SplitN(string(data), "\n", 10) {
-					if strings.HasPrefix(line, "# ") {
-						title = strings.TrimPrefix(line, "# ")
-						break
-					}
+				name := strings.TrimSuffix(f.Name(), ".md")
+				if ordered[name] {
+					continue
 				}
-				entries = append(entries, docEntry{Slug: slug, Title: title, Category: cat})
+				slug := "guide/" + name
+				title := readTitle("docs/guide/"+f.Name(), name)
+				entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Order: 0})
 			}
 		}
+
+		// Internals: no specific order.
+		if dir, err := docsFiles.ReadDir("docs/internals"); err == nil {
+			for _, f := range dir {
+				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
+					continue
+				}
+				slug := "internals/" + strings.TrimSuffix(f.Name(), ".md")
+				title := readTitle("docs/internals/"+f.Name(), strings.TrimSuffix(f.Name(), ".md"))
+				entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals"})
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(entries) //nolint:errcheck
 	})

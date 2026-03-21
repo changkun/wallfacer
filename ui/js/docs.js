@@ -263,7 +263,8 @@ async function openDocs(slug) {
     }
   }
   renderDocsNav();
-  var target = slug || (_docsEntries.length ? _docsEntries[0].slug : '');
+  // Default to the index page (usage) when no specific slug is requested.
+  var target = slug || 'guide/usage';
   if (target) loadDoc(target);
 }
 
@@ -296,12 +297,24 @@ function renderDocsNav() {
   });
   var html = '';
   var catLabels = { guide: 'User Guide', internals: 'Technical Reference' };
-  Object.keys(categories).forEach(function(cat) {
+  // Render categories in a fixed order: guide first, then internals.
+  var catOrder = ['guide', 'internals'];
+  catOrder.forEach(function(cat) {
+    if (!categories[cat]) return;
     html += '<div style="margin-bottom:12px;">';
     html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:6px;">' + escapeHtml(catLabels[cat] || cat) + '</div>';
     categories[cat].forEach(function(entry) {
       var active = entry.slug === _docsCurrentSlug;
-      html += '<button type="button" onclick="loadDoc(\'' + escapeHtml(entry.slug) + '\')" style="display:block;width:100%;text-align:left;padding:4px 8px;margin-bottom:2px;border:none;border-radius:4px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:' + (active ? 'var(--text-primary)' : 'inherit') + ';font-size:12px;cursor:pointer;font-weight:' + (active ? '600' : '400') + ';" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'' + (active ? 'var(--bg-input)' : 'transparent') + '\'">' + escapeHtml(entry.title) + '</button>';
+      // Show step number for ordered guide docs (skip the index page which is usage.md, order=9).
+      var prefix = '';
+      if (entry.order && entry.slug !== 'guide/usage') {
+        prefix = '<span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:var(--bg-raised);color:var(--text-muted);font-size:9px;font-weight:700;margin-right:4px;flex-shrink:0;">' + entry.order + '</span>';
+      }
+      // Mark the index page distinctly.
+      if (entry.slug === 'guide/usage') {
+        prefix = '<span style="font-size:10px;margin-right:4px;">&#9776;</span>';
+      }
+      html += '<button type="button" onclick="loadDoc(\'' + escapeHtml(entry.slug) + '\')" style="display:flex;align-items:center;width:100%;text-align:left;padding:4px 8px;margin-bottom:2px;border:none;border-radius:4px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:' + (active ? 'var(--text-primary)' : 'inherit') + ';font-size:12px;cursor:pointer;font-weight:' + (active ? '600' : '400') + ';" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'' + (active ? 'var(--bg-input)' : 'transparent') + '\'">' + prefix + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(entry.title) + '</span></button>';
     });
     html += '</div>';
   });
@@ -319,6 +332,8 @@ async function loadDoc(slug) {
     if (!res.ok) throw new Error('Not found');
     var md = await res.text();
     content.innerHTML = renderMarkdown(md);
+    // Append prev/next navigation for ordered guide docs.
+    _appendDocNav(content, slug);
     content.scrollTop = 0;
     _rewriteDocLinks(content, slug);
     await _ensureMermaid();
@@ -326,6 +341,46 @@ async function loadDoc(slug) {
   } catch (e) {
     content.innerHTML = '<div style="color:var(--text-muted);">Failed to load document.</div>';
   }
+}
+
+// Append previous/next navigation bar for ordered guide docs.
+function _appendDocNav(container, currentSlug) {
+  // Build ordered list of guide entries (exclude the index page).
+  var ordered = _docsEntries
+    .filter(function(e) { return e.category === 'guide' && e.order && e.slug !== 'guide/usage'; })
+    .sort(function(a, b) { return a.order - b.order; });
+  var idx = -1;
+  for (var i = 0; i < ordered.length; i++) {
+    if (ordered[i].slug === currentSlug) { idx = i; break; }
+  }
+  if (idx === -1) return; // Not an ordered guide doc.
+
+  var prev = idx > 0 ? ordered[idx - 1] : null;
+  var next = idx < ordered.length - 1 ? ordered[idx + 1] : null;
+  if (!prev && !next) return;
+
+  var nav = document.createElement('div');
+  nav.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:13px;';
+
+  var linkStyle = 'color:var(--accent);cursor:pointer;text-decoration:none;';
+  var leftHtml = '';
+  var rightHtml = '';
+  if (prev) {
+    leftHtml = '<a href="#" style="' + linkStyle + '" data-doc-slug="' + escapeHtml(prev.slug) + '">&larr; ' + prev.order + '. ' + escapeHtml(prev.title) + '</a>';
+  }
+  if (next) {
+    rightHtml = '<a href="#" style="' + linkStyle + '" data-doc-slug="' + escapeHtml(next.slug) + '">' + next.order + '. ' + escapeHtml(next.title) + ' &rarr;</a>';
+  }
+  nav.innerHTML = '<div>' + leftHtml + '</div><div>' + rightHtml + '</div>';
+
+  // Wire click handlers.
+  var links = nav.querySelectorAll('a[data-doc-slug]');
+  for (var j = 0; j < links.length; j++) {
+    links[j].onclick = (function(slug) {
+      return function(e) { e.preventDefault(); loadDoc(slug); };
+    })(links[j].getAttribute('data-doc-slug'));
+  }
+  container.appendChild(nav);
 }
 
 // Rewrite relative .md links to navigate within the docs viewer.
