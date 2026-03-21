@@ -17,6 +17,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// closeFeedbackWaitingSpan emits a span_end event to close the feedback_waiting
+// span that was opened when the task entered the waiting state. This must be
+// called on every path that transitions a task out of waiting (complete, cancel,
+// test run, auto-submit, etc.) so the timeline doesn't show an ever-growing
+// "Waiting for Feedback" bar.
+func (h *Handler) closeFeedbackWaitingSpan(ctx context.Context, taskID uuid.UUID) {
+	_ = h.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd,
+		store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
+}
+
 func validateTaskWorktreesForCommit(task *store.Task) error {
 	if len(task.WorktreePaths) == 0 {
 		return httpErrorf(http.StatusConflict, "task has no worktrees to commit")
@@ -242,6 +252,8 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 		return
 	}
 
+	h.closeFeedbackWaitingSpan(r.Context(), id)
+
 	// Idea-agent tasks held at waiting: create backlog tasks on approval.
 	if task.Kind == store.TaskKindIdeaAgent {
 		if createErr := h.runner.CreateIdeaBacklogTasks(r.Context(), id); createErr != nil {
@@ -315,6 +327,9 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	oldStatus := task.Status
+	if oldStatus == store.TaskStatusWaiting {
+		h.closeFeedbackWaitingSpan(r.Context(), id)
+	}
 
 	// Kill any active containers for this task before persisting the new status.
 	// KillRefineContainer is a no-op when no refinement container is registered.
@@ -487,6 +502,8 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	diff := generateWorktreeDiff(task.WorktreePaths)
 
 	testPrompt := buildTestPrompt(task.Prompt, req.Criteria, implResult, diff)
+
+	h.closeFeedbackWaitingSpan(r.Context(), id)
 
 	// Mark task as a test run and clear any previous verdict.
 	if err := h.store.UpdateTaskTestRun(r.Context(), id, true, ""); err != nil {

@@ -746,6 +746,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 					}
 					continue
 				}
+				h.closeFeedbackWaitingSpan(ctx, c.task.ID)
 				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeStateChange,
 					store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusInProgress, store.TriggerAutoTest, nil))
 				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeSystem, map[string]string{
@@ -921,6 +922,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
 					"result": autoSubmitMsg,
 				})
+				h.closeFeedbackWaitingSpan(ctx, t.ID)
 
 				if t.SessionID != nil && *t.SessionID != "" {
 					if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusCommitting); err != nil {
