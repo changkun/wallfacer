@@ -74,7 +74,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/tasks/deleted` | List soft-deleted (tombstoned) tasks within retention window |
 | **Task instance operations ({id})** | |
 | `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, sandbox, dependencies, fresh_start |
-| `DELETE /api/tasks/{id}` | Soft-delete a task (tombstone); data retained within retention window |
+| `DELETE /api/tasks/{id}` | Permanently delete a task and its data |
 | `GET /api/tasks/{id}/events` | Task event timeline; supports cursor pagination (`after`, `limit`) and type filtering (`types`) |
 | `POST /api/tasks/{id}/feedback` | Submit a feedback message to a waiting task |
 | `POST /api/tasks/{id}/done` | Mark a waiting task as done and trigger commit-and-push |
@@ -138,12 +138,11 @@ Each turn launches an ephemeral container via the configured runtime (Podman or 
 
 ```
 <podman|docker> run --rm \
-  --name wallfacer-<uuid> \
+  --name wallfacer-<slug>-<uuid8> \
   --env-file ~/.wallfacer/.env \
   -v claude-config:/home/claude/.claude \
   -v <worktree-path>:/workspace/<repo-name> \
-  -v ~/.gitconfig:/home/claude/.gitconfig:ro \
-  [--cpus <limit>] [--memory <limit>] [--network <name>] \
+  [--cpus <limit>] [--memory <limit>] --network host \
   wallfacer:latest \
   claude -p "<prompt>" \
          --model <model> \
@@ -157,12 +156,12 @@ Each turn launches an ephemeral container via the configured runtime (Podman or 
 - `--model` — per-task model override takes priority; falls back to `CLAUDE_DEFAULT_MODEL` from the env file; the server re-reads the file on every container launch so changes take effect immediately without a restart
 - `--resume` — omitted on the first turn or when `FreshStart` is set
 - `--cpus` / `--memory` — set from `WALLFACER_CONTAINER_CPUS` / `WALLFACER_CONTAINER_MEMORY` if configured
-- `--network` — set from `WALLFACER_CONTAINER_NETWORK` if configured
+- `--network` — defaults to `host`; override with `WALLFACER_CONTAINER_NETWORK`
 - Output is captured as NDJSON, parsed, and saved to disk
 - Stderr is saved separately if non-empty
 - Output size is limited by `WALLFACER_MAX_TURN_OUTPUT_BYTES` (default 8 MB)
 
-The container name `wallfacer-<uuid>` lets the server stream logs with `<runtime> logs -f wallfacer-<uuid>` while the container is running.
+The container name `wallfacer-<slug>-<uuid8>` lets the server stream logs with `<runtime> logs -f wallfacer-<slug>-<uuid8>` while the container is running.
 
 ### Container Runtime Auto-Detection
 
@@ -176,7 +175,7 @@ Override with `CONTAINER_CMD` env var or `-container` flag. Both Podman and Dock
 
 ### Circuit Breaker
 
-Container launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`), the circuit opens and rejects further launches until it resets. This prevents cascading failures when the container runtime is unhealthy.
+Container launches are protected by a circuit breaker. After a configurable number of consecutive failures (`WALLFACER_CONTAINER_CB_THRESHOLD`), the circuit opens and rejects further launches until it resets. This prevents cascading failures when the container runtime is unhealthy. See [Circuit Breakers](../circuit-breakers.md) for full details.
 
 ### Board Context
 
@@ -204,12 +203,12 @@ sequenceDiagram
     Handler->>Handler: Serialise full task list as JSON
     Handler-->>UI: SSE: data: {json}
 
-    Note over Handler: Buffered channel (size 1)
-    Note over Handler: Duplicate signals dropped,
-    Note over Handler: subscriber gets latest state
+    Note over Handler: Buffered channel (size 64)
+    Note over Handler: Incremental deltas sent,
+    Note over Handler: with replay buffer for reconnection
 ```
 
-`notify()` uses a buffered channel of size 1. If a signal is already pending (UI hasn't drained yet), the new signal is dropped — the subscriber will still get the latest state on the next drain. This coalesces bursts of rapid state changes into a single UI update.
+`notify()` uses buffered channels of size 64. Each state change produces a `SequencedDelta` that is fanned out to all subscribers. A replay buffer (up to 512 entries) enables reconnecting clients to catch up on missed deltas.
 
 The same pattern applies to `GET /api/git/stream`, except the source is a time-based ticker (polling `git status` every few seconds) rather than a store write signal.
 
@@ -217,7 +216,7 @@ Live container logs use a different mechanism: `GET /api/tasks/{id}/logs` opens 
 
 ## Store Concurrency
 
-`store.go` manages an in-memory `map[string]*Task` behind a `sync.RWMutex`:
+`store.go` manages an in-memory `map[uuid.UUID]*Task` behind a `sync.RWMutex`:
 
 - Reads (`List`, `Get`) acquire a read lock
 - Writes (`Create`, `Update`, `UpdateStatus`) acquire a write lock, mutate memory, then atomically persist to disk (temp file + `os.Rename`)

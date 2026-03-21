@@ -12,8 +12,7 @@ stateDiagram-v2
     backlog --> cancelled : cancel
 
     in_progress --> in_progress : max_tokens / pause_turn (auto-continue)
-    in_progress --> committing : end_turn
-    in_progress --> waiting : empty stop_reason
+    in_progress --> waiting : end_turn / empty stop_reason
     in_progress --> failed : error / timeout / budget
 
     committing --> done : commit success
@@ -24,7 +23,6 @@ stateDiagram-v2
     waiting --> committing : mark done
     waiting --> cancelled : cancel
 
-    failed --> in_progress : resume (same session)
     failed --> backlog : retry / auto_retry
     failed --> cancelled : cancel
 
@@ -70,7 +68,7 @@ Each pass through the loop in `runner.go` `Run()`:
 
 | `stop_reason` | `is_error` | Result |
 |---|---|---|
-| `end_turn` | false | Exit loop → trigger commit pipeline → `done` (or → `waiting` with verdict if this is a test run) |
+| `end_turn` | false | Exit loop → `waiting` (awaiting review; auto-submit or user marks done to trigger commit pipeline) |
 | `max_tokens` | false | Auto-continue (next iteration, same session) |
 | `pause_turn` | false | Auto-continue (next iteration, same session) |
 | empty / unknown | false | Set `waiting`; block until user provides feedback |
@@ -289,9 +287,9 @@ Timeout            int                         // per-turn timeout in minutes
 MaxCostUSD         float64                     // cost budget limit (0 = unlimited)
 MaxInputTokens     int                         // input+cache token budget (0 = unlimited)
 Usage              TaskUsage                   // accumulated token counts and cost (all activities)
-UsageBreakdown     map[string]TaskUsage        // token/cost per sub-agent activity key
+UsageBreakdown     map[SandboxActivity]TaskUsage // token/cost per sub-agent activity key
 Sandbox            sandbox.Type                // container sandbox type for this task
-SandboxByActivity  map[string]sandbox.Type     // per-activity sandbox overrides
+SandboxByActivity  map[SandboxActivity]sandbox.Type // per-activity sandbox overrides
 Environment        *ExecutionEnvironment       // runtime environment snapshot at execution start
 Position           int                         // sort order within column
 CreatedAt          time.Time
@@ -307,6 +305,11 @@ Tags               []string                    // labels for categorisation
 ExecutionPrompt    string                      // overrides Prompt when invoking the sandbox agent
 DependsOn          []string                    // UUIDs of prerequisite tasks
 ScheduledAt        *time.Time                  // optional future auto-promotion time
+StartedAt          *time.Time                  // timestamp when task execution started
+CommitMessage      string                      // generated commit message from commit pipeline
+CustomPassPatterns []string                    // user-supplied regex patterns for test pass detection
+CustomFailPatterns []string                    // user-supplied regex patterns for test fail detection
+TestFailCount      int                         // consecutive test failure count for auto-resume capping
 
 FailureCategory    FailureCategory             // root cause of last failure
 TruncatedTurns     []int                       // turns whose output was truncated
@@ -342,7 +345,7 @@ CacheCreationTokens  int
 CostUSD              float64
 StopReason           string
 Sandbox              sandbox.Type
-SubAgent             string       // "implementation", "test", "refinement", etc.
+SubAgent             SandboxActivity // "implementation", "test", "refinement", etc.
 ```
 
 **RetryRecord** (one failed attempt before retry)
@@ -403,9 +406,10 @@ Status          TaskStatus
 CompletedAt     time.Time
 CreatedAt       time.Time
 DurationSeconds float64
+ExecutionDurationSeconds float64
 TotalTurns      int
 TotalCostUSD    float64
-ByActivity      map[string]TaskUsage
+ByActivity      map[SandboxActivity]TaskUsage
 TestResult      string
 PhaseCount      int
 FailureCategory FailureCategory
@@ -524,7 +528,7 @@ The UI shows the oversight in the Oversight tab (logical phases with tools/comma
 
 ## Ideation / Brainstorm Agent
 
-The ideation feature creates a task with `Kind = "idea-agent"`. The agent runs in a sandbox container, reads the configured workspaces, and calls the wallfacer API to create backlog tasks.
+The ideation feature creates a task with `Kind = "idea-agent"`. Ideation is disabled by default and must be explicitly enabled via the Automation menu or Settings. The agent runs in a sandbox container, reads the configured workspaces, and calls the wallfacer API to create backlog tasks.
 
 - Each created task gets relevant `Tags` and an `ExecutionPrompt` (full instructions) separate from `Prompt` (the short card label).
 - Triggered via `POST /api/ideate`; cancelled via `DELETE /api/ideate`.

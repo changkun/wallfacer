@@ -2,7 +2,7 @@
 
 ## Board Overview
 
-Wallfacer presents a five-column task board. Every task card moves through these columns as it progresses:
+Wallfacer presents a four-column task board. Every task card moves through these columns as it progresses:
 
 | Column | Meaning |
 |---|---|
@@ -10,7 +10,8 @@ Wallfacer presents a five-column task board. Every task card moves through these
 | **In Progress** | Container running; agent executing |
 | **Waiting** | Agent paused, awaiting your feedback |
 | **Done** | Completed; changes committed to your repo |
-| **Archived** | Done or cancelled tasks moved off the active board (tasks with `archived=true`) |
+
+Archived tasks appear in the Done column when the "Show archived tasks" toggle is enabled in Settings.
 
 ## Creating Tasks
 
@@ -41,7 +42,7 @@ Set to 0 (default) for unlimited.
 
 ## Ideation
 
-Click the **Ideate** button (lightbulb icon) in the toolbar to launch the brainstorm agent. The agent analyses your workspace, identifies opportunities, and automatically creates backlog cards for each idea. Each generated card is tagged so you can identify and filter it. Cards created by ideation have a short display title (`Prompt`) and a more detailed `ExecutionPrompt` passed to the container at runtime. Cancel a running ideation session by clicking the button again.
+Ideation is disabled by default. Enable it from the **Automation** menu (lightning bolt icon) in the header. Once enabled, clicking **Ideate** launches the brainstorm agent. The agent analyses your workspace, identifies opportunities, and automatically creates backlog cards for each idea. Each generated card is tagged so you can identify and filter it. Cards created by ideation have a short display title (`Prompt`) and a more detailed `ExecutionPrompt` passed to the container at runtime. Cancel a running ideation session by clicking the button again.
 
 ## Running Tasks
 
@@ -63,14 +64,14 @@ Click a card to open the detail panel, which shows:
 
 ### Autopilot
 
-Enable **Autopilot** from the toolbar to automatically promote Backlog tasks to In Progress as capacity becomes available. The concurrency limit defaults to 5 and is controlled by `WALLFACER_MAX_PARALLEL` in your env file. Autopilot is off by default and resets to off on server restart.
+Enable **Autopilot** from the **Automation** menu (lightning bolt icon) in the header to automatically promote Backlog tasks to In Progress as capacity becomes available. The concurrency limit defaults to 5 and is controlled by `WALLFACER_MAX_PARALLEL` in your env file. Autopilot is off by default and resets to off on server restart.
 
 ### Auto-Test and Auto-Submit
 
 - **Auto-Test** — automatically runs the test verification agent on tasks that reach Waiting
 - **Auto-Submit** — automatically promotes verified waiting tasks to Done when conflict-free and up-to-date
 
-Both are toggled via the toolbar or `PUT /api/config`.
+Both are toggled via the **Automation** menu or `PUT /api/config`. Additional automation toggles include **Tip-sync** (auto-rebase waiting tasks) and **Auto-Refine** (auto-refine unrefined backlog tasks).
 
 ### Task Dependencies
 
@@ -156,13 +157,11 @@ To rebase your current workspace branch onto the latest upstream, use the sync b
 
 ### Auto-Push
 
-Enable auto-push via `WALLFACER_AUTO_PUSH=true` to automatically push to the remote after tasks complete. `WALLFACER_AUTO_PUSH_THRESHOLD` controls the minimum number of completed tasks before a push is triggered.
+Auto-push is disabled by default. Enable it from Settings > Execution or via `WALLFACER_AUTO_PUSH=true` in the env file. `WALLFACER_AUTO_PUSH_THRESHOLD` controls the minimum number of completed tasks before a push is triggered.
 
 ## Workspace Management
 
-### Runtime Workspace Switching
-
-Workspaces can be changed at runtime without restarting the server. Use the workspace switcher in the UI or `PUT /api/workspaces` to replace the active workspace set. The task board automatically scopes to the new workspace key.
+Workspaces are managed via VS Code-style tabs in the header bar. Each tab represents a saved workspace group. Click a tab to switch to that group, use the + button to add a new group or restore a hidden one, and click the x on a tab to hide it from the bar. Groups are saved automatically when they become active.
 
 ### Workspace Browser
 
@@ -188,10 +187,12 @@ Overrides are validated before saving to ensure template syntax is correct.
 
 Open **Settings** (gear icon) to access:
 
-- **API Configuration** — credential, base URL, model selection, concurrency limit, container resource limits, webhook settings; changes take effect on the next task run without restarting
-- **Workspace Instructions** — the `AGENTS.md` content for each workspace
-- **System Prompts** — customize built-in prompt templates for background agents
-- **Prompt Templates** — reusable prompt patterns for task creation
+- **Appearance** — theme, archived task visibility
+- **Execution** — parallel task limits, oversight interval, auto-push, brainstorm/ideation settings
+- **Sandbox** — credentials, base URLs, model selection, sandbox routing, container resource limits, webhook settings
+- **Workspace** — active workspaces, saved workspace groups, workspace instructions (AGENTS.md), system prompts, prompt templates
+- **Trash** — view and restore soft-deleted tasks
+- **About** — version and server information
 
 Codex availability rules:
 - If host Codex auth cache exists and is valid at `~/.codex/auth.json`, Codex is available automatically.
@@ -241,6 +242,10 @@ Create multiple Backlog tasks, enable Autopilot, and let Wallfacer run them conc
 1. Enable Autopilot + Auto-Test + Auto-Submit
 2. Create backlog tasks with dependencies
 3. Tasks are automatically promoted, tested, and submitted as they complete
+
+## Circuit Breakers
+
+Wallfacer includes circuit breakers that automatically pause automation when repeated failures are detected. Each automation watcher has its own breaker that self-heals via exponential backoff. See [Circuit Breakers](circuit-breakers.md) for details.
 
 ---
 

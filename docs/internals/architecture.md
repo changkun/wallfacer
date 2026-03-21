@@ -14,7 +14,7 @@ graph TB
         Handler["Handler<br/>REST API + SSE"]
         Runner["Runner<br/>orchestration + commit"]
         Store["Store<br/>state + persistence"]
-        Automation["Automation Loops<br/>promote / test / submit<br/>sync / retry / ideation"]
+        Automation["Automation Loops<br/>promote / test / submit<br/>sync / retry / refine / ideation"]
 
         Handler --> Runner
         Runner --> Store
@@ -54,7 +54,7 @@ stateDiagram-v2
     backlog --> cancelled : cancel
 
     in_progress --> in_progress : max_tokens / pause_turn (auto-continue)
-    in_progress --> committing : end_turn
+    in_progress --> waiting : end_turn
     in_progress --> waiting : empty stop_reason
     in_progress --> failed : error / timeout / budget
 
@@ -66,7 +66,6 @@ stateDiagram-v2
     waiting --> committing : mark done
     waiting --> cancelled : cancel
 
-    failed --> in_progress : resume (same session)
     failed --> backlog : retry / auto_retry
     failed --> cancelled : cancel
 
@@ -90,10 +89,10 @@ flowchart TD
     Save --> Usage["Accumulate<br/>usage/cost"]
     Usage --> Budget{"Check budgets<br/>MaxCost / MaxTokens"}
 
-    Budget -->|over budget| FailedBudget["FAILED<br/>(budget_exceeded)"]
+    Budget -->|over budget| WaitingBudget["WAITING<br/>(budget_exceeded)"]
     Budget -->|within budget| Parse{"Parse stop_reason"}
 
-    Parse -->|end_turn| Commit["COMMITTING<br/>git add, commit,<br/>rebase, push, DONE"]
+    Parse -->|end_turn| Waiting2["WAITING<br/>awaiting review"]
     Parse -->|"max_tokens / pause_turn"| Start
     Parse -->|"empty / unknown"| Waiting["WAITING<br/>blocks until<br/>user feedback"]
     Parse -->|"error / timeout"| FailedError["FAILED<br/>(classify failure<br/>category)"]
@@ -112,6 +111,7 @@ flowchart LR
     PubSub --> Submitter["Auto-submitter<br/>waiting to done<br/>when test passed<br/>+ conflict-free"]
     PubSub --> Sync["Waiting-sync<br/>rebase worktrees<br/>behind default branch"]
     PubSub --> Retry["Auto-retry<br/>failed to backlog<br/>if retry budget > 0"]
+    PubSub --> Refiner["Auto-refiner<br/>launch refinement agent<br/>on unrefined backlog tasks"]
     PubSub --> Ideation["Ideation watcher<br/>launch idea-agent<br/>on interval"]
 ```
 
@@ -125,6 +125,8 @@ flowchart LR
 
 **Frontend** (`ui/`) — Vanilla JS modules. Task board, modals, timeline/flamegraph, diff viewer, usage dashboard. All live updates via SSE.
 
+**Workspace Manager** (`internal/workspace/`) — Manages workspace configuration, workspace groups, and hot-swapping between workspace sets without server restart.
+
 ## Cross-Cutting Concerns
 
 **Concurrency** — `Store.mu` for task map integrity; `Runner.worktreeMu` for filesystem ops; per-repo mutex for rebase serialization; per-task mutex for oversight generation.
@@ -132,5 +134,7 @@ flowchart LR
 **Recovery** — On startup, `RecoverOrphanedTasks` inspects `in_progress` and `committing` tasks against actual container and worktree state, recovering or failing them as appropriate.
 
 **Security** — API key auth, SSRF-hardened gateway URLs, path traversal guards, CSRF protection, request body size limits.
+
+**Circuit breakers** — Per-watcher exponential backoff suppresses individual automation loops on failure; container-level circuit breaker blocks launches when the runtime is unavailable. See [Circuit Breakers](../circuit-breakers.md).
 
 **Observability** — SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics, webhook notifications.

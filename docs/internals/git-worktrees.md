@@ -2,7 +2,7 @@
 
 ## Core Principle
 
-Every task gets its own git worktree. The agent operates in an isolated copy of each repository on a dedicated branch, leaving the main working tree untouched and allowing multiple tasks to run concurrently without interfering with each other.
+Every task gets its own isolated copy of each workspace. Git repositories use git worktrees; non-git directories use snapshot copies. The agent operates in an isolated copy of each repository on a dedicated branch, leaving the main working tree untouched and allowing multiple tasks to run concurrently without interfering with each other.
 
 ```mermaid
 graph LR
@@ -43,26 +43,22 @@ Multiple workspaces → multiple worktrees, all grouped under `~/.wallfacer/work
 The sandbox container sees worktrees, not the live main working directory:
 
 ```
-~/.wallfacer/worktrees/<uuid>/<repo>  →  /workspace/<repo>   (read-write)
-~/.wallfacer/.env                      →  /run/secrets/.env   (read-only)
-~/.gitconfig                           →  /home/claude/.gitconfig (read-only)
+~/.wallfacer/worktrees/<uuid>/<repo>  →  /workspace/<repo>:z   (read-write)
+AGENTS.md (or CLAUDE.md)               →  /workspace/AGENTS.md  (read-only)
 claude-config (named volume)           →  /home/claude/.claude
 ```
+
+The `.env` file is passed via `--env-file`, not as a bind mount.
 
 The agent operates on `/workspace/<repo>` — the isolated worktree branch — so all edits land on `task/<uuid8>` and never touch `main`.
 
 ## Commit Pipeline
 
-Triggered automatically after `end_turn`, or manually when a user marks a `waiting` task as done. Runs four sequential phases in `runner.go`.
+Triggered automatically after `end_turn`, or manually when a user marks a `waiting` task as done. Runs three sequential phases in `runner.go`.
 
 ### Phase 1 — Claude Commits (in container)
 
-A new container run is launched with a commit prompt. Claude executes:
-```
-git add -A
-git commit -m "<meaningful message>"
-```
-in each worktree. This happens inside the sandbox with the same user identity as the main run.
+Staging and committing happen on the host. A container is launched only to generate the commit message, which is then used by the host-side `git commit`.
 
 ### Phase 2 — Rebase & Merge (host-side, `git.go`)
 
@@ -80,8 +76,8 @@ flowchart TD
 ```
 
 `defaultBranch()` resolves the target branch by checking, in order:
-1. `origin/HEAD` (remote default)
-2. Current `HEAD` branch name
+1. Current local HEAD branch
+2. `origin/HEAD` (remote default)
 3. Falls back to `"main"`
 
 **Conflict resolution loop:** If `git rebase` exits non-zero, Wallfacer invokes the agent again — using the original task's session ID — passing it the conflict details. The agent resolves the conflicts and stages the result. The rebase is then continued and retried. Up to 3 attempts are made before the task is marked `failed`.
@@ -101,7 +97,7 @@ Cleanup is idempotent and safe to call multiple times (errors are logged, not fa
 
 ## Orphan Pruning
 
-`pruneOrphanedWorktrees()` runs on every server startup:
+`PruneUnknownWorktrees()` runs on every server startup:
 
 1. Scan `~/.wallfacer/worktrees/` for subdirectories
 2. For each directory, check if a task with matching UUID exists in the store
@@ -136,6 +132,7 @@ This is useful when other tasks have merged changes to the default branch and yo
 - **Active worktrees** — uses `merge-base` to diff only the task's changes since it diverged, including untracked files
 - **Merged tasks** (worktree cleaned up) — falls back to stored commit hashes or branch names to reconstruct the diff
 - Returns `behind_counts` per repo indicating how many commits the default branch has advanced since the task branched off
+- **Non-git workspaces** — silently skipped (no diff to compute)
 
 ## Git Helper Functions (`internal/gitutil/`)
 
@@ -144,8 +141,8 @@ Git operations are organized in the `internal/gitutil` package:
 | File | Purpose |
 |---|---|
 | `repo.go` | Repository queries: `IsGitRepo`, `DefaultBranch`, `MergeBase`, `CommitsBehind` |
-| `worktree.go` | Worktree lifecycle: `CreateWorktree`, `RemoveWorktree`, `PruneWorktrees` |
-| `ops.go` | Git operations: `RebaseOnto`, `FFMerge`, `HasCommitsAheadOf`, `GetCommitHash` |
+| `worktree.go` | Worktree lifecycle: `CreateWorktree`, `CreateWorktreeAt`, `RemoveWorktree`, `ResolveHead` |
+| `ops.go` | Git operations: `RebaseOntoDefault`, `FFMerge`, `HasCommitsAheadOf`, `GetCommitHash` |
 | `stash.go` | Stash operations for conflict resolution |
 | `status.go` | Workspace git status for the UI header bar |
 
@@ -160,6 +157,10 @@ The server exposes git status and branch management for the UI header bar. See [
 - `GET /api/git/branches?workspace=<path>` — list all local branches for a workspace; returns `{branches: [...], current: "main"}`
 - `POST /api/git/checkout` — switch the active branch (`{workspace, branch}`); refuses while tasks are in progress
 - `POST /api/git/create-branch` — create and checkout a new branch (`{workspace, branch}`); refuses while tasks are in progress
+- `POST /api/git/rebase-on-main` — fetch origin/main and rebase the current branch on top
+- `POST /api/git/open-folder` — open a workspace directory in the OS file manager
+
+All git mutation endpoints (`push`, `sync`, `rebase-on-main`, `branches`, `checkout`, `create-branch`) return a 400 error for non-git workspaces.
 
 ### Branch Switching
 

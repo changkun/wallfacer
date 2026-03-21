@@ -8,7 +8,7 @@ This guide walks through installing Wallfacer, connecting it to credentials, and
 - **Podman** or **Docker** — Wallfacer auto-detects whichever is available
 - **A Claude credential** — either a Claude Pro/Max OAuth token or an Anthropic API key (see below)
 - **Optional Codex credential** — either host Codex auth cache (`~/.codex/auth.json`) or `OPENAI_API_KEY`
-- **Git** — the projects you mount must be git repositories
+- **Git** — recommended; non-git directories work as workspaces but git features (worktrees, diff, auto-push) are unavailable
 
 ## Step 1 — Get a Claude Credential
 
@@ -119,7 +119,7 @@ Start with no active workspaces (configure them later in the UI):
 ./wallfacer run -no-workspaces
 ```
 
-The browser opens automatically to `http://localhost:8080`. You should see a task board with five columns.
+The browser opens automatically to `http://localhost:8080`. You should see a task board with four columns.
 
 ## Verify the Setup
 
@@ -180,6 +180,8 @@ Requires building the Codex image (`make build-codex`) and selecting Codex as ta
 | `WALLFACER_WORKSPACES` | — | Workspace paths (OS path-list separated); alternative to CLI arguments |
 | `WALLFACER_ARCHIVED_TASKS_PER_PAGE` | (default) | Pagination size for archived tasks |
 | `WALLFACER_TOMBSTONE_RETENTION_DAYS` | `7` | Days to retain soft-deleted task data before permanent removal |
+| `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive container runtime failures before the circuit breaker opens |
+| `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the container circuit breaker stays open before probing |
 
 ### Sandbox Routing Variables
 
