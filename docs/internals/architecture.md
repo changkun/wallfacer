@@ -128,7 +128,171 @@ flowchart LR
 
 **Workspace Manager** (`internal/workspace/`) — Manages workspace configuration, workspace groups, and hot-swapping between workspace sets without server restart.
 
-## 📦 Package Map
+## End-to-End Walkthrough: Task Creation to Merge
+
+This section traces a single task through every component from browser click to merged commit. The sequence diagram shows the full flow; the prose below explains each step.
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant H as Handler
+    participant S as Store
+    participant SSE as SSE Subscribers
+    participant R as Runner
+    participant C as Container
+    participant G as Git
+
+    B->>H: POST /api/tasks {prompt, goal}
+    H->>S: CreateTaskWithOptions()
+    S->>S: saveTask() + notify()
+    S-->>SSE: SequencedDelta (new task)
+    H->>R: GenerateTitleBackground()
+
+    B->>H: PATCH /api/tasks/{id} {status: in_progress}
+    H->>S: UpdateTaskStatus()
+    S-->>SSE: SequencedDelta (status change)
+    H->>R: RunBackground()
+
+    R->>R: setupWorktrees() under worktreeMu
+    R->>G: CreateWorktree per workspace
+    R->>S: UpdateTaskWorktrees()
+
+    loop Turn loop
+        R->>R: generateBoardContextAndMounts()
+        R->>C: buildContainerArgsForSandbox() + executor.RunArgs()
+        C-->>R: NDJSON stdout (agentOutput)
+        R->>S: SaveTurnOutput() + AccumulateSubAgentUsage()
+        R->>R: parse stop_reason
+    end
+
+    alt end_turn
+        R->>S: UpdateTaskStatus(waiting)
+        R->>R: GenerateOversightBackground()
+    end
+
+    B->>H: POST /api/tasks/{id}/done
+    H->>H: CompleteTask()
+    H->>S: ForceUpdateTaskStatus(committing)
+    H->>H: runCommitTransition()
+
+    R->>R: commit() — Phase 1: hostStageAndCommit()
+    R->>C: generateCommitMessage() container
+    R->>G: git add + git commit in worktree
+
+    R->>R: commit() — Phase 2: rebaseAndMerge()
+    R->>G: RebaseOntoDefault() + FFMerge()
+
+    R->>R: commit() — Phase 3: cleanup
+    R->>R: cleanupWorktrees() under worktreeMu
+    R->>G: RemoveWorktree + delete branch
+
+    R->>S: UpdateTaskStatus(done)
+    S-->>SSE: SequencedDelta (done)
+```
+
+### 1. Task creation
+
+The browser sends `POST /api/tasks` with a prompt and optional goal. `Handler.CreateTask` (`internal/handler/tasks.go`) decodes the request, validates sandbox availability, and calls `Store.CreateTaskWithOptions` (`internal/store/tasks_create_delete.go`). The store assigns a UUID, writes `task.json` atomically (temp file + rename), adds the task to the in-memory map, and calls `notify()` which fans the new `SequencedDelta` to all SSE subscribers. Back in the handler, `Runner.GenerateTitleBackground` (`internal/runner/runner.go`) fires a background goroutine tracked by `backgroundWg` that runs a lightweight container to generate a short title from the prompt.
+
+### 2. Move to in_progress
+
+The browser sends `PATCH /api/tasks/{id}` with `{status: "in_progress"}`. `Handler.UpdateTask` (`internal/handler/tasks.go`) checks concurrency limits via `checkConcurrencyAndUpdateStatus`, transitions the store status, inserts a `state_change` event, and calls `Runner.RunBackground` (`internal/runner/runner.go`). `RunBackground` registers the goroutine label with `backgroundWg.Add` and launches `Runner.Run` in a new goroutine. Inside `Run` (`internal/runner/execute.go`), the first thing is worktree setup: `setupWorktrees` (`internal/runner/worktree.go`) acquires `worktreeMu`, creates one git worktree per workspace via `gitutil.CreateWorktree`, and returns the worktree-path map and branch name (e.g. `task/abcd1234`). The runner persists these paths via `Store.UpdateTaskWorktrees`.
+
+### 3. Turn loop
+
+The turn loop in `Run` increments the turn counter, refreshes the board context via `generateBoardContextAndMounts` (`internal/runner/board.go`), and calls `runContainer` (`internal/runner/container.go`). That function builds the container spec via `buildContainerArgsForSandbox`, resolves the sandbox type per activity, checks the circuit breaker, and invokes `executor.RunArgs` which runs `podman/docker run` via `os/exec`. The NDJSON stdout is parsed into an `agentOutput` struct. The runner saves raw output via `Store.SaveTurnOutput`, accumulates token usage via `Store.AccumulateSubAgentUsage` and `Store.AppendTurnUsage`, then inspects `output.StopReason` to decide the next step.
+
+### 4. Waiting state
+
+When `stop_reason` is `"end_turn"`, the runner transitions the task to `waiting` via `Store.UpdateTaskStatus`, inserts a `state_change` event, and opens a `feedback_waiting` span. `GenerateOversightBackground` fires an asynchronous oversight summary generation. The `notify()` call inside the status update fans a delta to SSE subscribers and wakes automation watchers (auto-tester, auto-submitter) via the `SubscribeWake` channels. If `stop_reason` is `"max_tokens"` or `"pause_turn"`, the loop auto-continues by setting `prompt = ""` and resuming the same session.
+
+### 5. Mark done and commit pipeline
+
+The user clicks "Mark as Done", sending `POST /api/tasks/{id}/done`. `Handler.CompleteTask` (`internal/handler/execute.go`) verifies the task is in `waiting`, restores any missing worktrees, transitions to `committing` via `Store.ForceUpdateTaskStatus`, and calls `runCommitTransition` which launches `Runner.Commit` (`internal/runner/commit.go`) in a background goroutine. The commit pipeline has three phases: **Phase 1** (`hostStageAndCommit`) runs `git add -A` and `git commit` in each worktree using a commit message generated by `generateCommitMessage` (a lightweight container invocation). **Phase 2** (`rebaseAndMerge`) acquires the per-repo mutex via `repoLock()`, calls `gitutil.RebaseOntoDefault` with up to 3 conflict-resolution retries (each retry runs a conflict-resolver container), then `gitutil.FFMerge` to fast-forward the default branch. **Phase 3** persists commit hashes, cleans up worktrees via `cleanupWorktrees` (under `worktreeMu`), and optionally auto-pushes.
+
+### 6. Done
+
+After the commit pipeline succeeds, `runCommitTransition` transitions the task to `done` via `Store.ForceUpdateTaskStatus`. The store persists the status, notifies SSE subscribers, and wakes watchers. The worktree directories and task branch have already been removed in Phase 3. A `TaskSummary` is written to `summary.json` for the cost dashboard.
+
+## Concurrency Model
+
+### Mutex domains
+
+| Mutex | Location | Protects | Lock pattern | Typical hold |
+|---|---|---|---|---|
+| `Store.mu` | `internal/store/store.go` | In-memory task map, status index, search index, event maps | Write lock for all mutations (`mutateTask`, `CreateTaskWithOptions`, status updates); read lock for queries (`ListTasks`, `GetTask`) | Microseconds (in-memory map ops + atomic file write) |
+| `Runner.worktreeMu` | `internal/runner/runner.go` | All worktree filesystem operations on `worktreesDir` | Exclusive lock in `setupWorktrees`, `ensureTaskWorktrees`, `cleanupWorktrees`, `CleanupWorktrees`, `PruneUnknownWorktrees` | Milliseconds to seconds (git worktree create/remove) |
+| `Runner.repoMu` (per-repo) | `internal/runner/runner.go` | Rebase + merge serialization per repository | Exclusive lock via `repoLock(repoPath)` in `rebaseAndMerge`; tasks on different repos run concurrently | Seconds (rebase + merge + optional conflict resolution) |
+| `Runner.oversightMu` (per-task) | `internal/runner/runner.go` | Serializes oversight generation per task | Exclusive lock via `oversightLock(taskID)` in `GenerateOversight` | Seconds (container invocation) |
+| `Store.subMu` | `internal/store/subscribe.go` | SSE subscriber map | Exclusive lock during `Subscribe`, `Unsubscribe`, and the fan-out in `notify()` | Microseconds |
+| `Store.wakeSubMu` | `internal/store/subscribe.go` | Wake-only subscriber map | Exclusive lock during `SubscribeWake`, `UnsubscribeWake`, and the fan-out in `notify()` | Microseconds |
+| `Store.replayMu` | `internal/store/subscribe.go` | Replay buffer (ring of recent deltas) | Write lock in `notify()`; read lock in `DeltasSince()` | Microseconds |
+| `Runner.boardCache.mu` | `internal/runner/runner.go` | Board context JSON cache and mount cache | Exclusive lock for cache read/write in `generateBoardContextAndMounts` | Microseconds |
+| `Runner.storeMu` | `internal/runner/runner.go` | Runner's pointer to the active `*store.Store` (swapped on workspace switch) | Write lock in `applyWorkspaceSnapshot`; read lock in `currentStore` | Microseconds |
+
+### Goroutine model
+
+There is no worker pool. Each task execution gets its own goroutine via `Runner.RunBackground`, which calls `backgroundWg.Add(label)` before launching `go r.Run(...)` and `backgroundWg.Done(label)` in a deferred cleanup. The same `backgroundWg` (`trackedWg`) tracks all fire-and-forget background work: title generation (`GenerateTitleBackground`), oversight generation (`GenerateOversightBackground`), worktree sync (`SyncWorktreesBackground`), and refinement (`RunRefinementBackground`). Each goroutine registers with a human-readable label (e.g. `"run:abcd1234"`, `"title:abcd1234"`). `Runner.PendingGoroutines()` returns the sorted list of outstanding labels for diagnostics.
+
+Automation watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoRefiner`, `StartWaitingSyncWatcher`, `StartIdeationWatcher`) each run as a single long-lived goroutine started in `runServer` (`server.go`). They block on `SubscribeWake` channels and wake when any task mutates, then inspect the current task list to decide whether to act.
+
+### Pub/sub channels
+
+The store provides two subscriber tiers:
+
+- **Full-delta channels** (`Subscribe`): returns `(int, <-chan SequencedDelta)`. Channels are buffered at 64. Each mutation calls `notify()` which stamps a monotonic `deltaSeq`, appends to a bounded replay buffer (512 entries), and fans out a deep-copied `SequencedDelta` to every subscriber. If a subscriber's buffer is full, the delta is silently dropped. SSE reconnection uses `DeltasSince(seq)` to replay missed deltas from the buffer before falling back to a full snapshot.
+
+- **Wake-only channels** (`SubscribeWake`): returns `(int, <-chan struct{})`. Channels are buffered at 1. The capacity-1 design coalesces rapid bursts: once a signal is pending, further sends are no-ops. Automation watchers use this tier to avoid allocating full `SequencedDelta` copies when they only need a "something changed" signal.
+
+Both fan-outs happen inside `notify()` (`internal/store/subscribe.go`), which is always called while `Store.mu` is held, ensuring the delta sequence is consistent with the in-memory state.
+
+### Shutdown coordination
+
+```mermaid
+sequenceDiagram
+    participant Sig as OS Signal
+    participant Srv as HTTP Server
+    participant R as Runner
+    participant BG as Background Goroutines
+    participant WH as WebhookNotifier
+
+    Sig->>Srv: SIGTERM / SIGINT (signal.NotifyContext)
+    Srv->>Srv: ctx.Done() → srv.Shutdown(5s timeout)
+    Note over Srv: SSE handlers exit via cancelled base context
+    Srv->>R: r.Shutdown()
+    R->>R: shutdownCancel() → cancel shutdownCtx
+    R->>R: close(shutdownCh) → board subscription exits
+    R->>R: boardSubscriptionWg.Wait()
+    R->>BG: backgroundWg.Wait()
+    Note over R: Logs pending goroutines every 3s while waiting
+    R-->>Srv: Shutdown() returns
+    Srv->>WH: wn.Wait()
+```
+
+The shutdown sequence is driven by `signal.NotifyContext(ctx, SIGTERM, Interrupt)` in `runServer` (`server.go`). When a signal arrives, `ctx.Done()` fires. The HTTP server gets `srv.Shutdown(5s)` to drain in-flight requests; SSE handlers exit immediately because their request contexts derive from the now-cancelled base context. Then `Runner.Shutdown()` (`internal/runner/runner.go`) is called: it invokes `shutdownCancel()` to cancel `shutdownCtx` (which propagates to any container launches or store operations using it), closes `shutdownCh` to stop the board-cache subscription goroutine, waits on `boardSubscriptionWg`, then waits on `backgroundWg` with a 3-second ticker that logs still-pending goroutine labels. In-progress task containers are intentionally left running; they continue independently and are recovered by `RecoverOrphanedTasks` (`internal/runner/recovery.go`) on the next startup. Finally, the webhook notifier's `Wait()` drains any in-flight deliveries.
+
+## Where to Look
+
+Quick-reference for common maintenance tasks. Each entry names the starting file and the typical next steps.
+
+| If you need to... | Start here |
+|---|---|
+| Add a new API endpoint | `internal/apicontract/routes.go` → `internal/handler/<concern>.go` → run `make api-contract` |
+| Add a field to Task | `internal/store/models.go` → `internal/store/migrate.go` |
+| Change the turn loop | `internal/runner/execute.go` (`Run()`) |
+| Change the commit pipeline | `internal/runner/commit.go` (`commit()`, `hostStageAndCommit()`, `rebaseAndMerge()`) + `internal/gitutil/ops.go` |
+| Add a new automation watcher | `internal/handler/tasks_autopilot.go` (follow `SubscribeWake` pattern) |
+| Change container arguments | `internal/runner/container.go` (`buildContainerArgsForSandbox()`) |
+| Add a new env config variable | `internal/envconfig/envconfig.go` |
+| Change workspace switching | `internal/workspace/manager.go` (`Switch()`) |
+| Debug a failing rebase | `internal/gitutil/ops.go` + `internal/gitutil/stash.go` |
+| Understand why a task failed | `data/<key>/<uuid>/traces/` + `outputs/turn-NNNN.json` |
+| Add a new system prompt | `prompts/` dir + `prompts/prompts.go` |
+| Change the UI | `ui/js/` (vanilla JS modules) + `ui/index.html` |
+| Debug startup recovery | `internal/runner/recovery.go` (`RecoverOrphanedTasks()`) |
+| Change pub/sub behaviour | `internal/store/subscribe.go` (`notify()`, `Subscribe()`, `SubscribeWake()`) |
+
+## Package Map
 
 Every `internal/` package and its role in the system:
 
@@ -147,7 +311,7 @@ Every `internal/` package and its role in the system:
 | `workspace` | Workspace lifecycle manager; scoped data directories; hot-swap support | `Manager`, `Snapshot`, `NewManager()`, `NewStatic()` |
 | `workspacegroups` | Persistent named workspace group configurations | `Group`, `Load()`, `Save()` |
 
-## 🗂️ Handler Organisation
+## Handler Organisation
 
 Each handler file in `internal/handler/` owns a specific concern area. The table below lists every non-test `.go` file:
 
@@ -184,217 +348,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `file_index.go` | Background file indexing for `@` mention | — (internal) |
 | `event_helpers.go` | Shared helpers for inserting task events | — (internal) |
 
-## 🔒 Concurrency Model
-
-Wallfacer has several layers of concurrent access that must be coordinated carefully.
-
-### Lock ordering
-
-To prevent deadlocks, locks are always acquired in this order when multiple are needed:
-
-1. **`Store.mu`** (`sync.RWMutex`) — Guards the in-memory task map (`tasks`), deleted tasks, events, status index, and search index. All task reads take a read lock; all mutations take a write lock. The `notify()` method that fans out pub/sub deltas is called while `mu` is write-locked so that the delta sequence is consistent with the task state.
-
-2. **`Runner.worktreeMu`** (`sync.Mutex`) — Serialises all worktree filesystem operations (create, remove, prune, GC) under `~/.wallfacer/worktrees/`. Never held while `Store.mu` is held.
-
-3. **`Runner.repoMu`** (`sync.Map` of per-repo `*sync.Mutex`) — One mutex per repository path, loaded-or-stored lazily via `sync.Map.LoadOrStore`. Serialises rebase and merge operations on a given repo so that concurrent tasks targeting the same repo do not corrupt git state. Independent repos can proceed in parallel.
-
-4. **`Runner.oversightMu`** (`sync.Map` of per-task `*sync.Mutex`) — One mutex per task ID for serialising oversight generation so that concurrent oversight requests for the same task do not race.
-
-5. **`Store.subMu`** / **`Store.wakeSubMu`** (`sync.Mutex`) — Guard the subscriber maps for SSE and wake-only channels. Held only briefly during subscribe/unsubscribe/fan-out.
-
-6. **`Handler.*Mu`** (various `sync.RWMutex`) — Per-toggle mutexes (`autopilotMu`, `autotestMu`, `autosubmitMu`, etc.) for automation boolean flags. Each is independent and fine-grained.
-
-### Background goroutine lifecycle via `trackedWg`
-
-The `trackedWg` type (in `internal/runner/runner.go`) wraps `sync.WaitGroup` with a label registry. Every fire-and-forget background goroutine (task execution, oversight generation, title generation, worktree sync) calls `backgroundWg.Add(label)` before launch and `backgroundWg.Done(label)` on completion.
-
-This enables:
-- **Graceful shutdown**: `Runner.Shutdown()` calls `backgroundWg.Wait()` and logs pending labels every 3 seconds so operators know what is still running.
-- **Test safety**: `Runner.WaitBackground()` lets tests drain all background work before cleanup.
-- **Observability**: `Runner.PendingGoroutines()` returns a sorted slice of outstanding labels, exposed via `GET /api/debug/runtime` and the `wallfacer_background_goroutines` gauge.
-
-### Channel-based pub/sub for store change notifications
-
-The `Store` provides two subscription mechanisms:
-
-1. **Delta subscribers** (`Store.Subscribe() → (int, <-chan SequencedDelta)`) — Buffered channels (capacity 64) that receive a `SequencedDelta` on every task mutation. Each delta carries a monotonic sequence number and a deep-cloned `Task` snapshot. Used by the SSE `StreamTasks` handler for live UI updates. A bounded replay buffer (`replayBufMax = 512`) allows reconnecting clients to catch up without a full snapshot.
-
-2. **Wake subscribers** (`Store.SubscribeWake() → (int, <-chan struct{})`) — Capacity-1 channels that coalesce rapid bursts into a single wake signal. Used by automation watchers (auto-promoter, auto-tester, etc.) that only need to know "something changed" and then re-scan the task list themselves.
-
-Both use non-blocking sends: if a subscriber's channel is full, the notification is dropped (the subscriber already has a pending signal to process).
-
-### How deadlocks are prevented
-
-- **Lock ordering is strict**: `Store.mu` is never acquired while holding `worktreeMu` or `repoMu`. Handler toggle mutexes are independent and never held across store calls.
-- **Non-blocking pub/sub**: `notify()` uses `select/default` sends, so a slow subscriber cannot block the store mutex.
-- **`sync.Map` for per-entity mutexes**: `repoMu` and `oversightMu` use `sync.Map` to avoid a global lock for lazy initialisation.
-- **Context-based cancellation**: All automation watchers receive a `context.Context` from `signal.NotifyContext` and exit promptly on cancellation rather than blocking on channel reads.
-
-## 📊 Metrics Reference
-
-All metrics are served at `GET /metrics` in Prometheus text exposition format via `metrics.Registry.WritePrometheus()`.
-
-### Counters
-
-| Metric | Labels | Description |
-|---|---|---|
-| `wallfacer_http_requests_total` | `method`, `route`, `status` | Total HTTP requests. Route uses `r.Pattern` (Go 1.22+) to collapse parameterised paths. |
-| `wallfacer_autopilot_actions_total` | `watcher`, `outcome` | Autonomous actions taken by autopilot watchers (e.g. promote, retry, test, submit, refine). |
-
-### Histograms
-
-| Metric | Labels | Buckets | Description |
-|---|---|---|---|
-| `wallfacer_http_request_duration_seconds` | `method`, `route` | 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s | HTTP request latency distribution. |
-
-### Gauges (scrape-time)
-
-These are computed on each `/metrics` scrape via registered collector functions:
-
-| Metric | Labels | Description |
-|---|---|---|
-| `wallfacer_tasks_total` | `status`, `archived` | Number of tasks grouped by status and archived flag. |
-| `wallfacer_running_containers` | — | Number of sandbox containers currently tracked by the container runtime. |
-| `wallfacer_background_goroutines` | — | Number of outstanding background goroutines tracked by the runner's `trackedWg`. |
-| `wallfacer_store_subscribers` | — | Number of active SSE subscribers listening for task state changes. |
-| `wallfacer_failed_tasks_by_category` | `category` | Number of currently-failed (non-archived) tasks grouped by failure category. |
-| `wallfacer_circuit_breaker_open` | — | 1 when the container launch circuit breaker is open (runtime unavailable), 0 when closed. |
-
-## 🔧 Request Middleware Chain
-
-The HTTP server wraps the `ServeMux` in a layered middleware chain. Each request passes through these layers in order:
-
-```mermaid
-flowchart LR
-    Request --> Logging["loggingMiddleware<br/>(server.go)"]
-    Logging --> CSRF["CSRFMiddleware<br/>(handler/middleware.go)"]
-    CSRF --> Auth["BearerAuthMiddleware<br/>(handler/middleware.go)"]
-    Auth --> Mux["ServeMux route matching"]
-    Mux --> BodyLimit["MaxBytesMiddleware<br/>(per-route, handler/middleware.go)"]
-    BodyLimit --> StoreGuard["RequireStoreMiddleware<br/>(per-route, handler/handler.go)"]
-    StoreGuard --> Handler["Handler method"]
-```
-
-The chain is assembled in `server.go` line 320:
-```go
-srv := &http.Server{
-    Handler: loggingMiddleware(
-        CSRFMiddleware(actualHostPort)(
-            BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
-        ), reg),
-}
-```
-
-### What each middleware does
-
-| Layer | Location | Behaviour |
-|---|---|---|
-| **Logging** | `server.go` `loggingMiddleware()` | Wraps the response writer to capture status codes. Logs every API request with method, path, status, and duration. Records `wallfacer_http_requests_total` counter and `wallfacer_http_request_duration_seconds` histogram. Uses `r.Pattern` for route labels. |
-| **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |
-| **Auth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the root page (`GET /`), and SSE paths (`/api/tasks/stream`, `/api/git/stream`, `*/logs`) which accept `?token=<key>` as a query parameter instead. No-op when no API key is configured. |
-| **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Instructions: 5 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
-| **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `UpdateWorkspaces`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `TestWebhook`, `GitStatus`, `GitStatusStream`. |
-
-## 📦 Sandbox Type System
-
-### Claude vs Codex sandbox types
-
-The `internal/sandbox` package defines two sandbox types as `Type` constants:
-
-- **`Claude`** (`"claude"`) — Runs Claude Code in a container built from the `wallfacer` image. Authenticates via `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`.
-- **`Codex`** (`"codex"`) — Runs OpenAI Codex CLI in a container built from the `wallfacer-codex` image. Authenticates via `OPENAI_API_KEY` or host `~/.codex/auth.json`.
-
-`sandbox.Default(value)` returns the parsed type or falls back to `Claude` for unknown values.
-
-### Activity routing
-
-Each task can override its sandbox type per-activity via `Task.SandboxByActivity` (a `map[SandboxActivity]sandbox.Type`). The resolution chain in `Runner.sandboxForTaskActivity()` is:
-
-1. **Per-task per-activity override** — `task.SandboxByActivity[activity]` if set and valid.
-2. **Per-task default** — `task.Sandbox` if set and valid.
-3. **Global per-activity env config** — `WALLFACER_SANDBOX_<ACTIVITY>` environment variable (e.g. `WALLFACER_SANDBOX_TESTING=codex`).
-4. **Global default** — `WALLFACER_DEFAULT_SANDBOX` environment variable.
-5. **Hardcoded fallback** — `Claude`.
-
-The seven routable activities (defined as `SandboxActivity` constants in `internal/store/models.go`):
-
-| Activity | Env variable | Purpose |
-|---|---|---|
-| `implementation` | `WALLFACER_SANDBOX_IMPLEMENTATION` | Main task execution |
-| `testing` | `WALLFACER_SANDBOX_TESTING` | Test verification agent |
-| `refinement` | `WALLFACER_SANDBOX_REFINEMENT` | Prompt refinement agent |
-| `title` | `WALLFACER_SANDBOX_TITLE` | Auto title generation |
-| `oversight` | `WALLFACER_SANDBOX_OVERSIGHT` | Oversight summary generation |
-| `commit_message` | `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Commit message generation |
-| `idea_agent` | `WALLFACER_SANDBOX_IDEA_AGENT` | Brainstorm/ideation agent |
-
-Two additional activities (`test`, `oversight-test`) are usage-attribution-only and not used for sandbox routing.
-
-### Container image selection
-
-`Runner.sandboxImageForSandbox()` selects the container image:
-
-- For **Claude**: uses the configured `--image` flag value (default: `ghcr.io/changkun/wallfacer:latest`).
-- For **Codex**: derives the image by replacing `wallfacer` with `wallfacer-codex` in the image name, preserving the registry prefix and tag/digest. Falls back to `wallfacer-codex:latest` if the base image is empty.
-
-### Model selection
-
-`Runner.modelFromEnvForSandbox()` reads the model from the env file:
-
-- Claude: `CLAUDE_DEFAULT_MODEL` (title generation uses `CLAUDE_TITLE_MODEL` with fallback to the default).
-- Codex: `CODEX_DEFAULT_MODEL` (title generation uses `CODEX_TITLE_MODEL` with fallback to the default).
-
-### Sandbox gate
-
-Before launching any task, `Handler.sandboxUsable()` validates that the selected sandbox has valid credentials. For Codex, this checks (in order): host `~/.codex/auth.json`, then `OPENAI_API_KEY` in the env file, and requires a successful sandbox test (`POST /api/env/test`). Tasks are rejected with an error if credentials are missing.
-
-## 🛑 Graceful Shutdown
-
-The server handles `SIGTERM` and `SIGINT` via `signal.NotifyContext`, which creates a cancellable context shared by all background goroutines and the HTTP server's `BaseContext`.
-
-```mermaid
-sequenceDiagram
-    participant OS as OS Signal
-    participant Ctx as signal.NotifyContext
-    participant Srv as http.Server
-    participant Watchers as Automation Watchers
-    participant Runner as Runner
-    participant Webhook as WebhookNotifier
-
-    OS->>Ctx: SIGTERM / SIGINT
-    Ctx->>Ctx: cancel context
-    Note over Ctx: All SSE handlers exit<br/>(request contexts derived from base)
-    Note over Ctx: All automation watchers exit<br/>(select on ctx.Done())
-
-    Ctx->>Srv: srv.Shutdown(5s timeout)
-    Note over Srv: Stop accepting new connections<br/>Wait up to 5s for in-flight requests
-
-    Srv->>Runner: r.Shutdown()
-    Note over Runner: 1. Cancel shutdownCtx<br/>2. Close shutdownCh<br/>3. Wait for board-cache goroutine<br/>4. Wait for backgroundWg<br/>   (logs pending labels every 3s)
-
-    Runner->>Webhook: wn.Wait()
-    Note over Webhook: Drain in-flight webhook deliveries
-
-    Note over Srv: "shutdown complete" logged
-```
-
-### Shutdown sequence in detail
-
-1. **Signal received** — `signal.NotifyContext` cancels the base context. All SSE handlers and automation watchers detect `ctx.Done()` and exit their loops.
-
-2. **HTTP server shutdown** — `srv.Shutdown()` is called with a 5-second timeout. This stops accepting new connections and waits for in-flight requests to complete. SSE handlers exit promptly because their request contexts (derived from `BaseContext`) are already cancelled.
-
-3. **Runner shutdown** — `r.Shutdown()` performs:
-   - Cancels `shutdownCtx` via `shutdownCancel()`.
-   - Closes `shutdownCh` to signal the board-cache-invalidator goroutine to exit.
-   - Waits for the board subscription goroutine via `boardSubscriptionWg.Wait()`.
-   - Waits for all tracked background goroutines via `backgroundWg.Wait()`, logging pending labels every 3 seconds so operators can see what is still running.
-
-4. **Webhook drain** — If a `WebhookNotifier` is active, `wn.Wait()` blocks until all in-flight deliveries complete.
-
-5. **In-progress tasks survive** — Running task containers are intentionally left alive. They continue to completion independently and will be recovered on the next server start via `RecoverOrphanedTasks`.
-
-## 📝 Structured Logging
+## Structured Logging
 
 The `internal/logger` package provides named loggers built on `log/slog`:
 
@@ -416,7 +370,7 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 ## Cross-Cutting Concerns
 
-**Concurrency** — `Store.mu` for task map integrity; `Runner.worktreeMu` for filesystem ops; per-repo mutex for rebase serialization; per-task mutex for oversight generation.
+**Concurrency** — `Store.mu` for task map integrity; `Runner.worktreeMu` for filesystem ops; per-repo mutex for rebase serialization; per-task mutex for oversight generation. See [Data & Storage](data-and-storage.md) for the concurrency model.
 
 **Recovery** — On startup, `RecoverOrphanedTasks` inspects `in_progress` and `committing` tasks against actual container and worktree state, recovering or failing them as appropriate.
 
@@ -424,4 +378,19 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 **Circuit breakers** — Per-watcher exponential backoff suppresses individual automation loops on failure; container-level circuit breaker blocks launches when the runtime is unavailable. See [Circuit Breakers](../guide/circuit-breakers.md).
 
-**Observability** — SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics, webhook notifications.
+**Observability** — SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics, webhook notifications. See [API & Transport](api-and-transport.md) for the metrics reference.
+
+**Middleware** — See [API & Transport](api-and-transport.md) for the middleware chain.
+
+**Sandbox routing** — See [Workspaces & Configuration](workspaces-and-config.md) for sandbox routing.
+
+**Graceful shutdown** — See [API & Transport](api-and-transport.md) for the shutdown sequence.
+
+## See Also
+
+- [Data & Storage](data-and-storage.md) — persistence, models, migrations, search index
+- [Task Lifecycle](task-lifecycle.md) — states, turn loop, dependencies, board context
+- [Git Operations](git-worktrees.md) — worktrees, commit pipeline, branch management
+- [Workspaces & Configuration](workspaces-and-config.md) — workspace manager, AGENTS.md, sandboxes, templates
+- [API & Transport](api-and-transport.md) — HTTP routes, SSE, webhooks, metrics, middleware
+- [Automation](automation.md) — watchers, auto-retry, circuit breakers
