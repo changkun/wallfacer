@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/envconfig"
 )
 
 func writeEnvFile(t *testing.T, content string) string {

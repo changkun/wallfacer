@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"changkun.de/wallfacer/internal/gitutil"
-	"changkun.de/wallfacer/internal/logger"
-	runnerpkg "changkun.de/wallfacer/internal/runner"
-	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/prompts"
+	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/logger"
+	runnerpkg "changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 

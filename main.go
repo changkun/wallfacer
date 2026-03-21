@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"strings"
 
-	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/logger"
 )
 
 // defaultSandboxImage is the published container image pulled automatically

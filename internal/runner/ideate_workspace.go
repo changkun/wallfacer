@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"changkun.de/wallfacer/prompts"
+	"changkun.de/x/wallfacer/prompts"
 )
 
 // ignoredChurnPrefixes lists path prefixes (relative to the workspace root) that

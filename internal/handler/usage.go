@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // usageResponse is the JSON body returned by GET /api/usage.

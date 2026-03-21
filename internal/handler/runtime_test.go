@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // TestGetRuntimeStatus_StatusOK verifies that GET /api/debug/runtime returns 200.

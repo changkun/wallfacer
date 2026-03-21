@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"unicode"
 
-	"changkun.de/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
 type execMode int

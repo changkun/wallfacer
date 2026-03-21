@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"testing"
 
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // TestCaptureExecutionEnvironment_ModelFromEnvconfig verifies that ModelName is

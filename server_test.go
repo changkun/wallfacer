@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/wallfacer/internal/handler"
-	"changkun.de/wallfacer/internal/metrics"
-	"changkun.de/wallfacer/internal/runner"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/handler"
+	"changkun.de/x/wallfacer/internal/metrics"
+	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 func TestStatusResponseWriter_WriteHeaderAndFlush(t *testing.T) {

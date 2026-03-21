@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"os"
 
-	"changkun.de/wallfacer/internal/instructions"
+	"changkun.de/x/wallfacer/internal/instructions"
 )
 
 // GetInstructions returns the current workspace AGENTS.md content.

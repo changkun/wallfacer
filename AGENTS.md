@@ -45,7 +45,7 @@ The Makefile uses Podman (`/opt/podman/bin/podman`) by default. Adjust `PODMAN` 
 
 ## Server Development
 
-The Go source lives at the top level. Module path: `changkun.de/wallfacer`. Go version: 1.25.7.
+The Go source lives at the top level. Module path: `changkun.de/x/wallfacer`. Go version: 1.25.7.
 
 ```bash
 go build -o wallfacer .   # Build server binary

@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/internal/workspace"
-	"changkun.de/wallfacer/prompts"
+	"changkun.de/x/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/workspace"
+	"changkun.de/x/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 

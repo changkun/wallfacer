@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/logger"
 )
 
 // setupNonGitSnapshot copies ws into snapshotPath and initialises a local git

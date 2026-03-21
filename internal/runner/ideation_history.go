@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/logger"
 )
 
 // ideationHistoryTTL is how long rejected-idea records are retained.

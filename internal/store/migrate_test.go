@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 

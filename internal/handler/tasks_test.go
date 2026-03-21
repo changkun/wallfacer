@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/wallfacer/internal/gitutil"
-	"changkun.de/wallfacer/internal/runner"
-	"changkun.de/wallfacer/internal/sandbox"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

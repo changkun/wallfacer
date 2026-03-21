@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	"changkun.de/wallfacer/internal/envconfig"
-	"changkun.de/wallfacer/internal/gitutil"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 type workspaceBrowseEntry struct {

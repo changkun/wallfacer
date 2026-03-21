@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

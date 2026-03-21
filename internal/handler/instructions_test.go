@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/wallfacer/internal/instructions"
-	"changkun.de/wallfacer/internal/runner"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/instructions"
+	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // newTestHandlerWithInstructions creates a Handler with a configDir that has a

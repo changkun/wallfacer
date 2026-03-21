@@ -10,14 +10,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"changkun.de/wallfacer/internal/envconfig"
-	"changkun.de/wallfacer/internal/instructions"
-	"changkun.de/wallfacer/internal/logger"
-	"changkun.de/wallfacer/internal/metrics"
-	"changkun.de/wallfacer/internal/runner"
-	"changkun.de/wallfacer/internal/sandbox"
-	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/internal/workspace"
+	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/instructions"
+	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/metrics"
+	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
 )
 

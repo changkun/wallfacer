@@ -17,7 +17,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/logger"
 )
 
 //go:embed *.tmpl

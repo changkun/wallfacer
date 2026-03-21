@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/prompts"
+	"changkun.de/x/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/prompts"
 )
 
 // testRunnerForPrompts returns a minimal Runner suitable for prompt-rendering

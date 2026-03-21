@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // TestGenerateBoardContext_Basic verifies that generateBoardContext produces

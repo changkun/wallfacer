@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/wallfacer/internal/logger"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 

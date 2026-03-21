@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"changkun.de/wallfacer/internal/logger"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // TwoPhaseWatcherConfig parameterises one auto-watcher loop.

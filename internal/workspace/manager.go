@@ -9,10 +9,10 @@ import (
 	"strings"
 	"sync"
 
-	"changkun.de/wallfacer/internal/envconfig"
-	"changkun.de/wallfacer/internal/instructions"
-	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/internal/workspacegroups"
+	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/instructions"
+	"changkun.de/x/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/workspacegroups"
 )
 
 // Snapshot holds the immutable state of a workspace configuration at a point in time.

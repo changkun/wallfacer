@@ -4,7 +4,7 @@ package handler
 import (
 	"net/http"
 
-	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/logger"
 )
 
 // rebuildIndexResponse is the JSON shape returned by POST /api/admin/rebuild-index.

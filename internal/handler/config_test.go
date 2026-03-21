@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/wallfacer/internal/envconfig"
-	"changkun.de/wallfacer/internal/runner"
-	"changkun.de/wallfacer/internal/sandbox"
-	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/internal/workspace"
+	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/workspace"
 )
 
 // newTestHandlerWithWorkspaces creates a Handler with real workspace directories

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/wallfacer/internal/envconfig"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // captureExecutionEnvironment snapshots the runtime environment at the start of

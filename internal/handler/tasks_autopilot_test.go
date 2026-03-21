@@ -16,9 +16,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"changkun.de/wallfacer/internal/envconfig"
-	"changkun.de/wallfacer/internal/logger"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 type autopilotPhase1Store struct {

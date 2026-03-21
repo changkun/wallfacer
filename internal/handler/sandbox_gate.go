@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/wallfacer/internal/envconfig"
-	"changkun.de/wallfacer/internal/sandbox"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 func normalizeSandbox(s string) sandbox.Type {

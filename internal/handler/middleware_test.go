@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 func oversizedBody(fieldName string, size int) io.Reader {

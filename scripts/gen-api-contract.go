@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"changkun.de/wallfacer/internal/apicontract"
+	"changkun.de/x/wallfacer/internal/apicontract"
 )
 
 func main() {

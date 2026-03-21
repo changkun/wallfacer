@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/logger"
 )
 
 // fileIndexTTL is the default time-to-live for a cached workspace file list.

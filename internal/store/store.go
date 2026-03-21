@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"changkun.de/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/logger"
 	"github.com/google/uuid"
 )
 

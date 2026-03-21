@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/wallfacer/internal/sandbox"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // newRunnerForArgTest creates a Runner for testing arg-building functions.

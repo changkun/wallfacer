@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/wallfacer/internal/metrics"
-	"changkun.de/wallfacer/internal/runner"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/metrics"
+	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // --- currentWorkspaces fallback path ---

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // fakeCmdScriptWithStderr creates a temporary executable shell script that

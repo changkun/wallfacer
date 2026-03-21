@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/wallfacer/internal/envconfig"
-	"changkun.de/wallfacer/internal/gitutil"
-	"changkun.de/wallfacer/internal/logger"
-	"changkun.de/wallfacer/internal/sandbox"
-	"changkun.de/wallfacer/internal/store"
-	"changkun.de/wallfacer/prompts"
+	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 

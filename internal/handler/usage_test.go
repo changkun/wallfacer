@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 func TestGetUsageStats_EmptyStore(t *testing.T) {

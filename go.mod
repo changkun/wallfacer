@@ -1,4 +1,4 @@
-module changkun.de/wallfacer
+module changkun.de/x/wallfacer
 
 go 1.25.7
 

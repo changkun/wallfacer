@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // containerCircuitStatus is the JSON shape for the container circuit breaker

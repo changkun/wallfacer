@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"changkun.de/wallfacer/internal/logger"
-	"changkun.de/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // ideaAgentDefaultTimeout is the default timeout (minutes) for idea-agent task cards.
