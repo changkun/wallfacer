@@ -10,7 +10,7 @@ function _ensureMermaid() {
   if (_mermaidLoaded) return Promise.resolve();
   return new Promise(function(resolve, reject) {
     var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+    script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
     script.onload = function() {
       if (typeof mermaid !== 'undefined') {
         var cs = getComputedStyle(document.documentElement);
@@ -62,20 +62,35 @@ function _ensureMermaid() {
 
 async function _renderMermaidBlocks(container) {
   if (typeof mermaid === 'undefined') return;
-  var blocks = container.querySelectorAll('pre code.language-mermaid');
+  // Find mermaid blocks by multiple selectors to handle different marked versions.
+  var blocks = container.querySelectorAll(
+    'pre code.language-mermaid, pre code.mermaid, div.mermaid-raw'
+  );
+  if (!blocks.length) {
+    // Fallback: scan all <code> elements for mermaid content heuristic.
+    var allCodes = container.querySelectorAll('pre code');
+    var mermaidCodes = [];
+    for (var j = 0; j < allCodes.length; j++) {
+      var text = allCodes[j].textContent.trim();
+      if (/^(graph|flowchart|sequenceDiagram|stateDiagram|classDiagram|gantt|pie|erDiagram|journey)\b/.test(text)) {
+        mermaidCodes.push(allCodes[j]);
+      }
+    }
+    blocks = mermaidCodes;
+  }
   for (var i = 0; i < blocks.length; i++) {
-    var code = blocks[i];
-    var pre = code.parentElement;
+    var el = blocks[i];
+    var pre = el.tagName === 'PRE' ? el : el.parentElement;
+    var source = el.textContent;
     var id = 'mermaid-' + (++_mermaidRenderSeq);
     try {
-      var result = await mermaid.render(id, code.textContent);
+      var result = await mermaid.render(id, source);
       var div = document.createElement('div');
       div.className = 'mermaid-diagram';
       div.innerHTML = result.svg;
       div.title = 'Click to expand';
-      div.style.cursor = 'pointer';
-      div.addEventListener('click', (function(el) {
-        return function() { _expandDiagram(el); };
+      div.addEventListener('click', (function(d) {
+        return function() { _expandDiagram(d); };
       })(div));
       pre.replaceWith(div);
     } catch (e) {
