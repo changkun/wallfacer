@@ -49,9 +49,20 @@ func Init(format string) {
 	Prompts = base.With("component", "prompts")
 }
 
-// Fatal logs at error level and exits with code 1.
+// Fatal prints a user-friendly error to stderr and exits with code 1.
 func Fatal(l *slog.Logger, msg string, args ...any) {
-	l.Error(msg, args...)
+	var errVal string
+	for i := 0; i+1 < len(args); i += 2 {
+		if k, ok := args[i].(string); ok && k == "error" {
+			errVal = fmt.Sprint(args[i+1])
+			break
+		}
+	}
+	if errVal != "" {
+		fmt.Fprintf(os.Stderr, "fatal: %s: %s\n", msg, errVal)
+	} else {
+		fmt.Fprintf(os.Stderr, "fatal: %s\n", msg)
+	}
 	os.Exit(1)
 }
 
