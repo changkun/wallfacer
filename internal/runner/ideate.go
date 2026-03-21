@@ -271,8 +271,8 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt string, sb san
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
 
 	var basenames []string
-	if r.workspaces != "" {
-		for _, ws := range strings.Fields(r.workspaces) {
+	if len(r.workspaces) > 0 {
+		for _, ws := range r.workspaces {
 			ws = strings.TrimSpace(ws)
 			if ws == "" {
 				continue

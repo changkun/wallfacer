@@ -261,7 +261,7 @@ func newTestHandlerWithTwoWorkspaces(t *testing.T) (*Handler, string, string) {
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		EnvFile:    envPath,
-		Workspaces: ws1 + " " + ws2,
+		Workspaces: []string{ws1, ws2},
 	})
 	t.Cleanup(r.WaitBackground)
 	h := NewHandler(s, r, configDir, []string{ws1, ws2}, nil)

@@ -69,7 +69,7 @@ func setupTestRunner(t *testing.T, workspaces []string) (*store.Store, *Runner) 
 		Command:      "echo", // dummy — not used for host-side operations
 		SandboxImage: "test:latest",
 		EnvFile:      "",
-		Workspaces:   strings.Join(workspaces, " "),
+		Workspaces:   workspaces,
 		WorktreesDir: worktreesDir,
 	})
 	return s, runner
@@ -204,7 +204,7 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 		Command:          "podman",
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instructionsFile,
-		Workspaces:       ws,
+		Workspaces:       []string{ws},
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
@@ -243,7 +243,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 		Command:          "podman",
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instructionsFile,
-		Workspaces:       ws1 + " " + ws2,
+		Workspaces:       []string{ws1, ws2},
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
@@ -391,7 +391,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 		Command:          "podman",
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instructionsFile,
-		Workspaces:       ws,
+		Workspaces:       []string{ws},
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 

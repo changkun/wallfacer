@@ -286,7 +286,7 @@ type RunnerConfig struct {
 	Command          string
 	SandboxImage     string
 	EnvFile          string
-	Workspaces       string // space-separated workspace paths
+	Workspaces       []string // workspace directory paths
 	WorktreesDir     string
 	InstructionsPath string
 	CodexAuthPath    string           // host path to codex auth cache directory (default: ~/.codex)
@@ -306,7 +306,7 @@ type Runner struct {
 	command          string
 	sandboxImage     string
 	envFile          string
-	workspaces       string
+	workspaces       []string
 	worktreesDir     string
 	instructionsPath string
 	workspaceManager *workspace.Manager
@@ -594,7 +594,7 @@ func (r *Runner) WorkspaceManager() *workspace.Manager {
 func (r *Runner) applyWorkspaceSnapshot(s workspace.Snapshot) {
 	r.storeMu.Lock()
 	r.store = s.Store
-	r.workspaces = strings.Join(s.Workspaces, " ")
+	r.workspaces = s.Workspaces
 	r.instructionsPath = s.InstructionsPath
 	r.storeMu.Unlock()
 }
@@ -783,10 +783,10 @@ func (r *Runner) Workspaces() []string {
 	if r.workspaceManager != nil {
 		return r.workspaceManager.Workspaces()
 	}
-	if r.workspaces == "" {
+	if len(r.workspaces) == 0 {
 		return nil
 	}
-	return strings.Fields(r.workspaces)
+	return r.workspaces
 }
 
 func (r *Runner) hostCodexAuthPath() string {

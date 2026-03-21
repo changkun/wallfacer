@@ -89,13 +89,14 @@ func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		EnvFile:    envPath,
-		Workspaces: strings.Join(workspaces, " "),
+		Workspaces: workspaces,
 	})
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
 
 	return NewHandler(s, r, t.TempDir(), workspaces, nil)
+
 }
 
 // diffResponse is the JSON shape returned by TaskDiff.

@@ -99,8 +99,8 @@ func (r *Runner) buildContainerArgsForSandbox(
 
 	// Mount workspaces, substituting per-task worktree paths where available.
 	var basenames []string
-	if r.workspaces != "" {
-		for _, ws := range strings.Fields(r.workspaces) {
+	if len(r.workspaces) > 0 {
+		for _, ws := range r.workspaces {
 			ws = strings.TrimSpace(ws)
 			if ws == "" {
 				continue

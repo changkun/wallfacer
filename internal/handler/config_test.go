@@ -38,7 +38,7 @@ func newTestHandlerWithWorkspaces(t *testing.T) (*Handler, string) {
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		EnvFile:    envPath,
-		Workspaces: ws,
+		Workspaces: []string{ws},
 	})
 	t.Cleanup(r.WaitBackground)
 	h := NewHandler(s, r, configDir, []string{ws}, nil)
@@ -919,7 +919,7 @@ func newTestHandlerWithWorkspacesFromRepo(t *testing.T, repo string) (*Handler, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := runner.NewRunner(s, runner.RunnerConfig{Workspaces: repo})
+	r := runner.NewRunner(s, runner.RunnerConfig{Workspaces: []string{repo}})
 	t.Cleanup(r.WaitBackground)
 	return NewHandler(s, r, configDir, []string{repo}, nil), repo
 }

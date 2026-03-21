@@ -316,7 +316,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		Command:          h.runner.Command(),
 		SandboxImage:     sandboxImageForTest(sb, h.runner.SandboxImage()),
 		EnvFile:          tempEnvFile,
-		Workspaces:       strings.Join(h.currentWorkspaces(), " "),
+		Workspaces:       h.currentWorkspaces(),
 		WorktreesDir:     h.runner.WorktreesDir(),
 		InstructionsPath: h.currentInstructionsPath(),
 		CodexAuthPath:    h.runner.CodexAuthPath(),

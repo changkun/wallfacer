@@ -51,7 +51,7 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
-		Workspaces:   workdir,
+		Workspaces:   []string{workdir},
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()

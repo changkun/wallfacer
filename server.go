@@ -122,7 +122,7 @@ func runServer(configDir string, args []string) {
 		Command:          *containerCmd,
 		SandboxImage:     resolvedImage,
 		EnvFile:          *envFile,
-		Workspaces:       strings.Join(workspaces, " "),
+		Workspaces:       workspaces,
 		WorktreesDir:     worktreesDir,
 		InstructionsPath: snapshot.InstructionsPath,
 		CodexAuthPath:    codexAuthPath,

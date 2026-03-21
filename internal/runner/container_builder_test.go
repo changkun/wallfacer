@@ -267,7 +267,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				return RunnerConfig{
 					Command:      "podman",
 					SandboxImage: "wallfacer:latest",
-					Workspaces:   ws,
+					Workspaces:   []string{ws},
 				}
 			},
 			sandbox: "claude",
@@ -291,7 +291,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				return RunnerConfig{
 					Command:      "podman",
 					SandboxImage: "wallfacer:latest",
-					Workspaces:   ws1 + " " + ws2,
+					Workspaces:   []string{ws1, ws2},
 				}
 			},
 			sandbox: "claude",
@@ -412,7 +412,7 @@ func TestBuildIdeationContainerArgsSingleWorkspaceReadOnly(t *testing.T) {
 	r := newRunnerForArgTest(t, RunnerConfig{
 		Command:      "podman",
 		SandboxImage: "wallfacer:latest",
-		Workspaces:   ws,
+		Workspaces:   []string{ws},
 	})
 	args := r.buildIdeationContainerArgs("ideate-test", "prompt", "claude")
 

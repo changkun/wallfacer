@@ -89,7 +89,7 @@ func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.S
 	r := NewRunner(s, RunnerConfig{
 		Command:      cmd,
 		SandboxImage: "test:latest",
-		Workspaces:   strings.Join(workspaces, " "),
+		Workspaces:   workspaces,
 		WorktreesDir: worktreesDir,
 	})
 	// Cleanups are called in LIFO order. Register WaitBackground first so it

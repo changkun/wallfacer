@@ -77,7 +77,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: worktrees,
-		Workspaces:   workdir,
+		Workspaces:   []string{workdir},
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
@@ -235,7 +235,7 @@ func TestGauge_CircuitBreakerOpen(t *testing.T) {
 		Command:      "true",
 		EnvFile:      filepath.Join(workdir, ".env"),
 		WorktreesDir: filepath.Join(workdir, "worktrees"),
-		Workspaces:   workdir,
+		Workspaces:   []string{workdir},
 	})
 
 	// Circuit should be closed initially.

@@ -199,7 +199,7 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 	runner := NewRunner(s, RunnerConfig{
 		Command:      cmd,
 		SandboxImage: "test:latest",
-		Workspaces:   repo,
+		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
 
@@ -248,7 +248,7 @@ func TestHostStageAndCommitFallsBackOnCommitMessageFailure(t *testing.T) {
 	runner := NewRunner(s, RunnerConfig{
 		Command:      cmd,
 		SandboxImage: "test:latest",
-		Workspaces:   repo,
+		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
 
@@ -336,7 +336,7 @@ func TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing(t *testing.T) {
 	runner := NewRunner(s, RunnerConfig{
 		Command:      "echo",
 		SandboxImage: "test:latest",
-		Workspaces:   repo,
+		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
 
@@ -407,7 +407,7 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 	runner := NewRunner(s, RunnerConfig{
 		Command:      cmd,
 		SandboxImage: "test:latest",
-		Workspaces:   repo,
+		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
 
@@ -574,7 +574,7 @@ func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
 	runner := NewRunner(s, RunnerConfig{
 		Command:      "echo", // dummy — not used for git operations
 		SandboxImage: "test:latest",
-		Workspaces:   repo,
+		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
 

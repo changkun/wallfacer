@@ -53,7 +53,7 @@ func TestWorkspacesMultiple(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{
 		Command:    "echo",
-		Workspaces: "/a /b /c",
+		Workspaces: []string{"/a", "/b", "/c"},
 	})
 	ws := r.Workspaces()
 	if len(ws) != 3 {
@@ -61,6 +61,32 @@ func TestWorkspacesMultiple(t *testing.T) {
 	}
 	if ws[0] != "/a" || ws[1] != "/b" || ws[2] != "/c" {
 		t.Fatalf("unexpected workspaces: %v", ws)
+	}
+}
+
+// TestWorkspacesMethod_PathsWithSpaces verifies that workspace paths containing
+// spaces are preserved intact through the Runner (regression test for the
+// strings.Fields roundtrip bug).
+func TestWorkspacesMethod_PathsWithSpaces(t *testing.T) {
+	s, err := store.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	pathWithSpaces := "/home/user/My Project/repo"
+	r := NewRunner(s, RunnerConfig{
+		Command:    "echo",
+		Workspaces: []string{pathWithSpaces, "/normal/path"},
+	})
+	ws := r.Workspaces()
+	if len(ws) != 2 {
+		t.Fatalf("expected 2 workspaces, got %d: %v", len(ws), ws)
+	}
+	if ws[0] != pathWithSpaces {
+		t.Errorf("workspace[0] = %q, want %q", ws[0], pathWithSpaces)
+	}
+	if ws[1] != "/normal/path" {
+		t.Errorf("workspace[1] = %q, want %q", ws[1], "/normal/path")
 	}
 }
 
@@ -520,7 +546,7 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 	r := NewRunner(s, RunnerConfig{
 		Command:      "podman",
 		SandboxImage: "test:latest",
-		Workspaces:   ws,
+		Workspaces:   []string{ws},
 	})
 	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{ws: wt}, "", nil, "")
 	basename := filepath.Base(ws)
@@ -554,7 +580,7 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 	r := NewRunner(s, RunnerConfig{
 		Command:      "podman",
 		SandboxImage: "test:latest",
-		Workspaces:   repo,
+		Workspaces:   []string{repo},
 	})
 	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{repo: wt}, "", nil, "")
 
@@ -581,7 +607,7 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 	r := NewRunner(s, RunnerConfig{
 		Command:      "podman",
 		SandboxImage: "test:latest",
-		Workspaces:   repo,
+		Workspaces:   []string{repo},
 	})
 	// No worktree override — direct mount of workspace.
 	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")

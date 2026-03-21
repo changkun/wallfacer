@@ -123,7 +123,7 @@ function renderWorkspaces() {
     const httpsUrl = remoteUrlToHttps(ws.remote_url);
     const nameEl = httpsUrl
       ? `<a href="${escapeHtml(httpsUrl)}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;" title="Open ${escapeHtml(httpsUrl)}">${escapeHtml(ws.name)}</a>`
-      : `<button onclick="openWorkspaceFolder(${JSON.stringify(ws.path)})" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;font:inherit;" title="Open in file manager">${escapeHtml(ws.name)}</button>`;
+      : `<button onclick="openWorkspaceFolder(${escapeHtml(JSON.stringify(ws.path))})" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;font:inherit;" title="Open in file manager">${escapeHtml(ws.name)}</button>`;
 
     if (!ws.is_git_repo) {
       return `<span title="${escapeHtml(ws.path)}" style="display:inline-flex;align-items:center;gap:4px;font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border);">${nameEl} <span style="font-size:9px;opacity:0.7;">(not a git repo)</span></span>`;

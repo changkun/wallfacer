@@ -2217,7 +2217,7 @@ func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing
 
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:    cmdPath,
-		Workspaces: repo,
+		Workspaces: []string{repo},
 	})
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
@@ -3809,7 +3809,7 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 	r := runner.NewRunner(s, runner.RunnerConfig{
 		Command:      cmd,
 		SandboxImage: "test:latest",
-		Workspaces:   repo,
+		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
 	t.Cleanup(r.WaitBackground)

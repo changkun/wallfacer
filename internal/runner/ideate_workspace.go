@@ -522,7 +522,7 @@ func (r *Runner) runWorkspaceGitCommand(parentCtx context.Context, workspace str
 
 func (r *Runner) workspacesForRunner() []string {
 	var ws []string
-	for _, raw := range strings.Fields(r.workspaces) {
+	for _, raw := range r.workspaces {
 		clean := strings.TrimSpace(raw)
 		if clean == "" {
 			continue
