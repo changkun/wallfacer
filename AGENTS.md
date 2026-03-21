@@ -34,7 +34,7 @@ wallfacer run ~/project1 ~/project2          # Mount workspaces, open browser
 wallfacer run                                # Defaults to current directory
 wallfacer run -addr :9090 -no-browser        # Custom port, no browser
 wallfacer run -no-workspaces                 # Start with no active workspaces
-wallfacer env                                # Show config and env status
+wallfacer doctor                             # Check prerequisites and config
 wallfacer status                             # Print board state to terminal
 wallfacer status -watch                      # Live-updating board state
 wallfacer exec <task-id-prefix>              # Attach to running task container

@@ -212,13 +212,13 @@ Run `./wallfacer run -help` for the full flag list.
 
 The container runtime defaults to auto-detection: Wallfacer checks `/opt/podman/bin/podman`, then `podman` on `$PATH`, then `docker` on `$PATH`. Override with the `-container` flag or `CONTAINER_CMD` env var.
 
-### Inspecting Configuration
+### Checking Prerequisites
 
 ```bash
-./wallfacer env
+./wallfacer doctor
 ```
 
-Prints all recognized configuration variables and whether they are set, with credential values masked.
+Checks configuration paths, credentials, container runtime, sandbox images, and Git. Items marked `[ok]` are ready, `[!]` need attention, and `[ ]` are optional.
 
 ### Checking Board Status
 

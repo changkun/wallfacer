@@ -299,7 +299,7 @@ Every `internal/` package and its role in the system:
 | Package | Purpose | Key exported types / functions |
 |---|---|---|
 | `apicontract` | Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js` | `Route`, `Routes` (slice), `Route.FullPattern()` |
-| `cli` | CLI subcommand implementations (run, exec, status, env) and shared helpers | `RunServer()`, `RunExec()`, `RunStatus()`, `RunEnvCheck()`, `BuildMux()`, `ConfigDir()` |
+| `cli` | CLI subcommand implementations (run, exec, status, doctor) and shared helpers | `RunServer()`, `RunExec()`, `RunStatus()`, `RunDoctor()`, `BuildMux()`, `ConfigDir()` |
 | `envconfig` | `.env` file parsing and atomic update | `Config`, `Parse()`, `Update()` |
 | `gitutil` | Git utility operations: worktrees, rebase, merge, status | `RebaseOntoDefault()`, `FFMerge()`, `CommitsBehind()`, `WorkspaceStatus()`, `WorkspaceGitStatus` |
 | `handler` | HTTP API handlers organised by concern; automation watchers | `Handler`, `NewHandler()`, `CSRFMiddleware()`, `BearerAuthMiddleware()`, `MaxBytesMiddleware()` |

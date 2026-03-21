@@ -80,7 +80,7 @@ func TestDetectContainerRuntime(t *testing.T) {
 	}
 }
 
-func TestRunEnvCheck_MissingEnvFile(t *testing.T) {
+func TestRunDoctor_MissingEnvFile(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	t.Setenv("ENV_FILE", envFile)
@@ -88,7 +88,7 @@ func TestRunEnvCheck_MissingEnvFile(t *testing.T) {
 	t.Setenv("SANDBOX_IMAGE", "wallfacer-test:latest")
 
 	out := captureStdout(func() {
-		RunEnvCheck(configDir)
+		RunDoctor(configDir)
 	})
 	for _, want := range []string{"Config directory:  " + configDir, "Env file:          " + envFile, "[!] Env file not found"} {
 		if !strings.Contains(out, want) {
@@ -97,7 +97,7 @@ func TestRunEnvCheck_MissingEnvFile(t *testing.T) {
 	}
 }
 
-func TestRunEnvCheck_WithCredentials(t *testing.T) {
+func TestRunDoctor_WithCredentials(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
 	content := strings.Join([]string{
@@ -115,7 +115,7 @@ func TestRunEnvCheck_WithCredentials(t *testing.T) {
 	t.Setenv("SANDBOX_IMAGE", "wallfacer-test:latest")
 
 	out := captureStdout(func() {
-		RunEnvCheck(configDir)
+		RunDoctor(configDir)
 	})
 	for _, want := range []string{"[ok] CLAUDE_CODE_OAUTH_TOKEN is set", "[ok] OPENAI_API_KEY is set", "[ok] ANTHROPIC_BASE_URL = https://api.anthropic.com", "[ok] OPENAI_BASE_URL = https://api.openai.com/v1"} {
 		if !strings.Contains(out, want) {
@@ -124,18 +124,17 @@ func TestRunEnvCheck_WithCredentials(t *testing.T) {
 	}
 }
 
-func TestRunEnvCheck_ConfigDirMissing(t *testing.T) {
+func TestRunDoctor_ConfigDirMissing(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing-dir")
 	envFile := filepath.Join(missing, ".env")
 	t.Setenv("ENV_FILE", envFile)
 	t.Setenv("CONTAINER_CMD", "printf")
 
 	out := captureStdout(func() {
-		RunEnvCheck(missing)
+		RunDoctor(missing)
 	})
-	expected := "[!] Config directory does not exist"
-	if !strings.Contains(out, expected) {
-		t.Fatalf("expected output to contain %q, got: %s", expected, out)
+	if !strings.Contains(out, "[!] Config directory missing") {
+		t.Fatalf("expected config dir warning, got: %s", out)
 	}
 	if !strings.Contains(out, "[!] Env file not found") {
 		t.Fatalf("expected env-file warning, got: %s", out)

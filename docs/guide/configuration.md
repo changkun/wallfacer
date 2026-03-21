@@ -45,7 +45,7 @@ wallfacer run                           # Default to current directory
 wallfacer run -addr :9090 -no-browser   # Custom port, no browser
 wallfacer status                        # Print board state to terminal
 wallfacer status -watch                 # Live-updating board state
-wallfacer env                           # Show config and env status
+wallfacer doctor                        # Check prerequisites and config
 ```
 
 ---
@@ -325,15 +325,15 @@ wallfacer status -json            # Machine-readable JSON output
 wallfacer status -addr :9090      # Connect to a different server
 ```
 
-#### wallfacer env
+#### wallfacer doctor
 
-Print all recognized configuration variables and whether they are set. Credential values are masked.
+Check prerequisites and configuration. Displays config paths, then verifies credentials, container runtime (including responsiveness), sandbox images, and Git.
 
 ```
-wallfacer env
+wallfacer doctor
 ```
 
-Output includes: config directory, data directory, env file path, prompts directory, container runtime, sandbox image, credential status for both Claude and Codex, and sandbox image availability.
+Output uses `[ok]` for passing checks, `[!]` for issues that need fixing, and `[ ]` for optional items that are not configured. Credential values are masked.
 
 #### wallfacer exec
 

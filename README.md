@@ -87,8 +87,8 @@ Codex can be enabled either by:
 # Custom port, skip auto-opening the browser
 ./wallfacer run -addr :9090 -no-browser ~/myapp
 
-# Show configuration and env file status
-./wallfacer env
+# Check prerequisites and configuration
+./wallfacer doctor
 ```
 
 For all available `make` targets (build, test, release, etc.), see [Technical Internals: Architecture](docs/internals/architecture.md#development-setup).

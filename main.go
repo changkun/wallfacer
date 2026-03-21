@@ -24,8 +24,8 @@ func main() {
 	}
 
 	switch os.Args[1] {
-	case "env":
-		cli.RunEnvCheck(configDir)
+	case "doctor", "env":
+		cli.RunDoctor(configDir)
 	case "exec":
 		cli.RunExec(configDir, os.Args[2:])
 	case "run":
