@@ -10,25 +10,11 @@ This guide walks through installing Wallfacer, connecting it to credentials, and
 
 ## Step 1 — Install Wallfacer
 
-**Option A — Install script**
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
 ```
 
 This detects your OS and architecture, downloads the latest binary, and places it in `/usr/local/bin` (or `~/.local/bin`). Set `WALLFACER_INSTALL_DIR` to override the location, or `WALLFACER_VERSION=v0.0.5` for a specific version.
-
-**Option B — Manual binary download**
-
-Download the binary for your platform from the [latest release](https://github.com/changkun/wallfacer/releases/latest):
-
-```bash
-# Example for macOS ARM (Apple Silicon)
-curl -L https://github.com/changkun/wallfacer/releases/latest/download/wallfacer-darwin-arm64 -o wallfacer
-chmod +x wallfacer
-```
-
-Available binaries: `wallfacer-darwin-arm64`, `wallfacer-darwin-amd64`, `wallfacer-linux-arm64`, `wallfacer-linux-amd64`.
 
 > **Building from source?** See [Development Setup](../internals/development.md) for `go install`, `go build`, `make` targets, and sandbox image builds.
 
