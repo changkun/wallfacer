@@ -8,6 +8,11 @@ The guides below are numbered in recommended reading order. Each guide has an **
 
 ## Reading Order
 
+<!-- NOTE: The server parses this section to build the docs sidebar.
+     The first markdown link [Title](file.md) under each heading becomes
+     a numbered sidebar entry, in the order listed here.
+     To add a new guide: add a new ### heading with a link below. -->
+
 ### 1. Getting Started
 
 [Getting Started](getting-started.md)
