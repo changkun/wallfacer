@@ -63,9 +63,8 @@ Track token usage and cost by task/activity so operations stay measurable as aut
 
 ```bash
 # 1. Install (pick one)
-go install changkun.de/x/wallfacer@latest                # if you have Go 1.25+
-# — or download a pre-built binary:
-# curl -L https://github.com/changkun/wallfacer/releases/latest/download/wallfacer-$(uname -s | tr A-Z a-z)-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') -o wallfacer && chmod +x wallfacer
+curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
+# — or: go install changkun.de/x/wallfacer@latest       # requires Go 1.25+
 
 # 2. Start with the project directories you want to work on
 ./wallfacer run ~/projects/myapp
