@@ -30,7 +30,7 @@ Create tasks, run them in isolated sandboxes, review diffs, and keep shipping wi
 - **Repo operations**: branch switching, sync/rebase helpers, auto commit and push, task forking, webhook notifications
 - **Flexible runtime**: Podman/Docker support, workspace-level instructions, Claude + Codex backends, system prompt customization
 
-For a complete walkthrough of workflows and controls, see [Usage Guide](docs/usage.md).
+For a complete walkthrough of workflows and controls, see [Usage Guide](docs/guide/usage.md).
 
 ## Product Tour
 
@@ -77,7 +77,7 @@ Codex can be enabled either by:
 - host auth cache at `~/.codex/auth.json` (auto-detected at bootstrap), or
 - `OPENAI_API_KEY` in `~/.wallfacer/.env` / **Settings → API Configuration** (plus one successful Codex test).
 
-**See [Getting Started](docs/getting-started.md) for the full setup walkthrough**, including credential setup, configuration options, and troubleshooting.
+**See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough**, including credential setup, configuration options, and troubleshooting.
 
 ### Common Commands
 
@@ -110,10 +110,18 @@ Codex can be enabled either by:
 
 ## Documentation
 
-**User guides**
+**[User Manual](docs/guide/usage.md)** — start here for the full reading order.
 
-- [Getting Started](docs/getting-started.md) — installation, credentials, configuration reference, first run
-- [Usage Guide](docs/usage.md) — creating tasks, handling feedback, autopilot, test verification, git branch management
+| # | Guide | Topics |
+|---|-------|--------|
+| 1 | [Getting Started](docs/guide/getting-started.md) | Installation, credentials, first run |
+| 2 | [Board & Tasks](docs/guide/board-and-tasks.md) | Kanban board, task lifecycle, dependencies, search |
+| 3 | [Workspaces & Git](docs/guide/workspaces.md) | Workspace management, git integration, branches |
+| 4 | [Automation](docs/guide/automation.md) | Autopilot, auto-test, auto-submit, auto-retry |
+| 5 | [Refinement & Ideation](docs/guide/refinement-and-ideation.md) | Prompt refinement, brainstorm agent |
+| 6 | [Oversight & Analytics](docs/guide/oversight-and-analytics.md) | Oversight summaries, costs, timeline |
+| 7 | [Configuration](docs/guide/configuration.md) | Settings, env vars, sandboxes, CLI, webhooks |
+| 8 | [Circuit Breakers](docs/guide/circuit-breakers.md) | Fault isolation, self-healing automation |
 
 **Internals**
 
