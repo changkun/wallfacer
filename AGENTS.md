@@ -115,9 +115,9 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 
 ### Tasks
 - `GET /api/tasks` — List all tasks (optionally including archived)
-- `POST /api/tasks` — Create task (JSON: `{prompt, timeout}`)
+- `POST /api/tasks` — Create task (JSON: `{prompt, goal, timeout}`)
 - `POST /api/tasks/batch` — Create multiple tasks atomically with symbolic dependency wiring
-- `PATCH /api/tasks/{id}` — Update status/position/prompt/timeout/sandbox/dependencies/fresh_start
+- `PATCH /api/tasks/{id}` — Update status/position/prompt/goal/timeout/sandbox/dependencies/fresh_start
 - `DELETE /api/tasks/{id}` — Soft-delete task (tombstone); data retained within retention window
 - `POST /api/tasks/{id}/feedback` — Submit feedback for waiting tasks
 - `POST /api/tasks/{id}/done` — Mark waiting task as done (triggers commit-and-push)

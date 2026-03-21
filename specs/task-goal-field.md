@@ -19,8 +19,8 @@ Introduce a `Goal` field on every task that:
 
 1. Gives humans a scannable, meaningful card preview (replacing the raw prompt preview).
 2. Preserves the full spec in `Prompt` for agent execution — no behavioral change to the runner.
-3. Integrates cleanly with refinement: refinement rewrites the spec but the goal stays stable.
-4. Is auto-generated from the prompt at creation time (like `Title`) so users don't have to write it manually.
+3. Integrates cleanly with refinement: the refinement agent produces both a goal summary and a full spec.
+4. Requires no additional LLM sandbox — goal comes directly from user input or refinement output.
 
 ---
 
@@ -41,6 +41,18 @@ Goal string `json:"goal,omitempty"`  // 1-3 sentence human-readable summary
 | `Goal` | 1-3 sentences | Card preview | "Add JWT-based authentication to the WebSocket upgrade handler so that unauthenticated clients are rejected before the connection is established." |
 | `Prompt` | Unbounded | Agent | Full spec with acceptance criteria, files to touch, constraints… |
 
+### Goal lifecycle
+
+**At task creation:** The user's original prompt text is copied into `Goal`. Both `Goal` and `Prompt` start with the same value. The card shows `Goal` (the user's own words).
+
+**After refinement:** The refinement agent produces two outputs:
+1. A full implementation spec → written to `Prompt`.
+2. A concise goal summary (1-3 sentences) → written to `Goal`.
+
+The card continues to show the goal (now a refinement-derived summary), while agents receive the full spec from `Prompt`.
+
+**Agent execution:** The runner uses `Prompt` for execution. If `Prompt` is empty (edge case), it falls back to `Goal`. This is the same priority as today except `Goal` replaces the old prompt-as-display role.
+
 ### Card rendering change
 
 `cardDisplayPrompt(t)` currently returns `t.prompt` (or `t.execution_prompt` for idea-agent tasks). Change it to prefer `t.goal` when present:
@@ -57,18 +69,6 @@ function cardDisplayPrompt(t) {
 
 This is fully backward-compatible: tasks without a goal fall back to showing the prompt as today.
 
-### Auto-generation
-
-Reuse the same `GenerateTitleBackground` pattern. After task creation and after refinement-apply, fire a background job that produces the goal from the current prompt. Concretely:
-
-1. Add a new prompt template `GoalGeneration` (parallel to `TitleGeneration`) that instructs the LLM: *"Summarize the following task spec into 1-3 sentences describing what the task achieves and why. Do not include implementation details."*
-2. Add `Runner.GenerateGoalBackground(taskID, prompt)` — spawns a goroutine, calls the LLM, stores the result via `Store.UpdateTaskGoal(id, goal)`.
-3. Call sites (all in `internal/handler/`):
-   - `CreateTask` (`tasks.go:208`): after `GenerateTitleBackground`, also call `GenerateGoalBackground`.
-   - `RefineApply` (`refine.go:176`): after `GenerateTitleBackground`, also call `GenerateGoalBackground` (conditional on `!GoalManuallySet`).
-   - `BatchCreateTasks` (`tasks.go:494`): same as `CreateTask`.
-   - `tasks_events.go:217` (title backfill endpoint): add parallel goal backfill or expose a separate goal backfill endpoint.
-
 ### Manual editing
 
 The goal should be editable through the same PATCH endpoint that handles prompt edits:
@@ -82,17 +82,15 @@ When the user edits the goal via the UI, PATCH updates it. The API accepts `goal
 
 ### Refinement interaction
 
-Refinement's core behavior is unchanged — it still rewrites the **prompt** (the full spec). The key design decision:
+Refinement's behavior changes to produce both a spec and a goal. The refinement agent's output format is extended:
 
-- **Refinement does NOT overwrite the goal.** The goal captures the user's original intent and should remain stable across spec rewrites. If the user wants to change the goal, they edit it directly.
-- `ApplyRefinement` continues to update `t.Prompt` only. No change to `ApplyRefinement` logic.
-- After apply, `GenerateGoalBackground` is called to re-derive the goal from the new spec — but only if the goal was auto-generated (not manually edited). Track this with a boolean:
+- The refinement prompt template instructs the agent to return a structured response containing both a `goal` (1-3 sentence summary) and the full `spec` (implementation details with acceptance criteria).
+- `ApplyRefinement` writes the spec to `t.Prompt` and the goal to `t.Goal`.
+- If the user has manually edited the goal before applying refinement, the refinement-derived goal is ignored and the manual goal is preserved. Track this with:
 
 ```go
 GoalManuallySet bool `json:"goal_manually_set,omitempty"`
 ```
-
-If `GoalManuallySet` is true, skip re-generation after refinement. If false, regenerate to keep the auto-summary in sync with the updated spec.
 
 ### ExecutionPrompt (idea-agent) interaction
 
@@ -109,7 +107,7 @@ Add a `goal` field to the `indexedTaskText` struct in `internal/store/store.go` 
 
 ### History
 
-`Goal` does not need its own history array. The prompt history already captures spec evolution. If needed, the goal at each refinement point can be derived from the `RefinementSession.StartPrompt`.
+`Goal` does not need its own history array. The prompt history already captures spec evolution. The goal at each refinement point is captured in the refinement session output.
 
 ---
 
@@ -122,33 +120,27 @@ Add a `goal` field to the `indexedTaskText` struct in `internal/store/store.go` 
 | File | Change |
 |------|--------|
 | `internal/store/models.go` | Add `Goal string` and `GoalManuallySet bool` fields to `Task` |
-| `internal/store/tasks_create_delete.go` | Accept `Goal` in `TaskCreateOptions`; pass through |
+| `internal/store/tasks_create_delete.go` | Accept `Goal` in `TaskCreateOptions`; default `Goal = Prompt` at creation |
 | `internal/store/store.go` | Add `goal` field to `indexedTaskText` struct and `buildIndexEntry` |
-| `internal/store/tasks_worktree.go` | No change to `ApplyRefinement`; update `matchTask` for goal search |
-| `internal/handler/tasks.go` | Accept `goal` in `CreateTask` and `UpdateTask` request structs |
-| `internal/handler/refine.go` | After apply, call `GenerateGoalBackground` if `!GoalManuallySet` |
+| `internal/store/tasks_worktree.go` | Update `matchTask` for goal search |
+| `internal/store/tasks_update.go` | Add `UpdateTaskGoal` method (update `Goal` field + `indexedTaskText.goal`) |
+| `internal/handler/tasks.go` | Accept `goal` in `CreateTask` and `UpdateTask` request structs; set `GoalManuallySet` when user explicitly provides a goal |
 | `internal/apicontract/` | Regenerate contract artifacts with new field |
 
 **Effort:** Low — additive field, no breaking changes.
 
-### Phase 2 — Auto-generation
+### Phase 2 — Refinement goal output
 
 **Files touched:**
 
 | File | Change |
 |------|--------|
-| `internal/store/models.go` | Add `SandboxActivityGoal SandboxActivity = "goal"` constant and register in `AllSandboxActivities` |
-| `internal/runner/container.go` | Add `activityGoal` alias and model-selection case |
-| `prompts/` | Add `goal.tmpl` template; register in `embeddedToAPI` map in `prompts/prompts.go` |
-| `internal/runner/goal.go` (new) | Add `GenerateGoal` (mirrors `title.go` pattern) |
-| `internal/runner/runner.go` | Add `GenerateGoalBackground` wrapper using `backgroundWg` (same as title) |
-| `internal/runner/interface.go` | Add `GenerateGoalBackground(taskID uuid.UUID, prompt string)` to runner interface |
-| `internal/runner/mock.go` | Add `GenerateGoalBackground` stub + `GenerateGoalCalls` tracking slice |
-| `internal/store/tasks_update.go` | Add `UpdateTaskGoal` method (update `Goal` field + `indexedTaskText.goal`) |
-| `internal/handler/tasks.go` | Call `GenerateGoalBackground` after create |
-| `internal/handler/refine.go` | Call `GenerateGoalBackground` after apply (conditional) |
+| `prompts/refine.tmpl` (or equivalent) | Update refinement prompt to instruct agent to produce both a goal summary and a full spec |
+| `internal/runner/refine.go` | Parse refinement output to extract both goal and spec |
+| `internal/store/tasks_worktree.go` | `ApplyRefinement` writes both `Prompt` (spec) and `Goal` (summary), respecting `GoalManuallySet` |
+| `internal/handler/refine.go` | Pass goal through apply flow |
 
-**Effort:** Low-Medium — mirrors existing title generation pattern.
+**Effort:** Low-Medium — requires updating the refinement prompt template and parsing the structured output.
 
 ### Phase 3 — UI
 
@@ -164,12 +156,11 @@ Add a `goal` field to the `indexedTaskText` struct in `internal/store/store.go` 
 
 ### Phase 4 — Backfill
 
-For existing tasks that have a `prompt` but no `goal`, run a one-time backfill:
+For existing tasks that have a `prompt` but no `goal`, backfill `Goal = Prompt` (the original user text). Since pre-existing tasks were never refined through the new flow, their prompt IS their goal:
 - On server startup, scan tasks where `goal == ""` and `prompt != ""`.
-- Queue `GenerateGoalBackground` for each (rate-limited to avoid LLM burst).
-- Or: expose a `POST /api/admin/backfill-goals` endpoint for manual trigger.
+- Set `Goal = Prompt` for each (no LLM call needed).
 
-**Effort:** Low.
+**Effort:** Trivial.
 
 ---
 
@@ -179,20 +170,21 @@ For existing tasks that have a `prompt` but no `goal`, run a one-time backfill:
 - `cardDisplayPrompt` falls back to `prompt` when `goal` is empty, so no UI regression.
 - The API accepts but does not require `goal` on create/update — existing clients work unchanged.
 - No schema version bump needed (additive field).
+- Backfill is a simple copy (`Goal = Prompt`), not an LLM call.
 
 ---
 
 ## Open Questions
 
 1. **Goal length limit?** Should we enforce a max length (e.g., 500 chars) to keep cards compact, or let the CSS `max-height` truncation handle it?
-2. **Goal in refinement review panel:** Should the refine-apply UI show the current goal and let the user edit it inline, or keep it as a separate edit after apply?
+2. **Refinement output format:** What structured format should the refinement agent use to separate goal from spec? Options: JSON with `goal`/`spec` keys, XML-style tags, or a delimiter-based format.
 3. **Idea-agent card display:** Should idea-agent tasks prefer `goal` over `execution_prompt` for card display, or keep the current behavior?
 
 ---
 
 ## What This Does NOT Require
 
+- No new LLM sandbox activity — goal generation does not need a separate container or model call.
 - No changes to container execution logic (`runner/execute.go`) — agents still receive `Prompt` or `ExecutionPrompt`.
 - No changes to worktree, commit, or test-verification pipelines.
 - No new database or file-format migration — `Goal` is just another JSON field in `task.json`.
-- No changes to the refinement sandbox agent's behavior — it still produces specs, not goals.

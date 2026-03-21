@@ -73,7 +73,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/tasks/summaries` | List immutable task summaries for completed tasks (cost dashboard) |
 | `GET /api/tasks/deleted` | List soft-deleted (tombstoned) tasks within retention window |
 | **Task instance operations ({id})** | |
-| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, timeout, sandbox, dependencies, fresh_start |
+| `PATCH /api/tasks/{id}` | Update task fields: status, prompt, goal, timeout, sandbox, dependencies, fresh_start |
 | `DELETE /api/tasks/{id}` | Permanently delete a task and its data |
 | `GET /api/tasks/{id}/events` | Task event timeline; supports cursor pagination (`after`, `limit`) and type filtering (`types`) |
 | `POST /api/tasks/{id}/feedback` | Submit a feedback message to a waiting task |
@@ -99,7 +99,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `POST /api/tasks/{id}/refine` | Start the refinement sandbox agent for a backlog task |
 | `DELETE /api/tasks/{id}/refine` | Cancel an in-progress refinement agent |
 | `GET /api/tasks/{id}/refine/logs` | Stream live logs from the refinement agent |
-| `POST /api/tasks/{id}/refine/apply` | Apply the refined prompt as the new task prompt |
+| `POST /api/tasks/{id}/refine/apply` | Apply the refined prompt and goal as the new task spec |
 | `POST /api/tasks/{id}/refine/dismiss` | Dismiss the refinement result without applying it |
 
 ### Triggering Task Execution

@@ -159,7 +159,7 @@ When a task is created, a background goroutine (`runner.GenerateTitle`) launches
 
 ## Prompt Refinement
 
-Before running a task, users can have an AI agent analyse the codebase and produce a detailed implementation spec (the refined prompt). Only `backlog` tasks can be refined.
+Before running a task, users can have an AI agent analyse the codebase and produce a detailed implementation spec (the refined prompt) plus a concise goal summary. Only `backlog` tasks can be refined.
 
 ```mermaid
 sequenceDiagram
@@ -178,7 +178,7 @@ sequenceDiagram
     Handler-->>User: SSE events
 
     alt Container succeeds
-        Container-->>Runner: Result = spec text
+        Container-->>Runner: Result = goal + spec
         Runner->>Runner: Status = "done"
     else Container fails
         Container-->>Runner: Error
@@ -189,7 +189,7 @@ sequenceDiagram
         User->>Handler: POST /api/tasks/{id}/refine/apply
         Handler->>Handler: Save RefinementSession
         Handler->>Handler: Move Prompt to PromptHistory
-        Handler->>Handler: Set Prompt = refined prompt
+        Handler->>Handler: Set Prompt = spec, Goal = summary (unless manually set)
         Handler->>Runner: Trigger title regeneration
     else User dismisses
         User->>Handler: POST /api/tasks/{id}/refine/dismiss
@@ -272,7 +272,9 @@ Defined in `internal/store/models.go`:
 SchemaVersion      int                         // on-disk schema version for migrations
 ID                 uuid.UUID                   // UUID
 Title              string                      // auto-generated short title
-Prompt             string                      // current task description (short card label)
+Goal               string                      // 1-3 sentence human-readable summary for card display
+GoalManuallySet    bool                        // true when user explicitly edited the goal
+Prompt             string                      // current task description (full spec for agents)
 PromptHistory      []string                    // previous prompt versions (before refinements)
 RetryHistory       []RetryRecord               // history of failed attempts before retry
 RefineSessions     []RefinementSession         // history of completed sandbox refinement sessions
