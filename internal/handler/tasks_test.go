@@ -1839,7 +1839,7 @@ func TestTryAutoRefine_SkipsAlreadyRefined(t *testing.T) {
 
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "build a widget", Timeout: 15})
 	// Mark as having a completed refinement session.
-	_ = h.store.ApplyRefinement(ctx, task.ID, "refined prompt", store.RefinementSession{
+	_ = h.store.ApplyRefinement(ctx, task.ID, "refined prompt", "", store.RefinementSession{
 
 		ID:          "session-1",
 		StartPrompt: "build a widget",

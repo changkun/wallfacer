@@ -59,8 +59,9 @@ func TestSearchTasks_MatchPrompt(t *testing.T) {
 	if results[0].ID != task.ID {
 		t.Errorf("expected task %s, got %s", task.ID, results[0].ID)
 	}
-	if results[0].MatchedField != "prompt" {
-		t.Errorf("expected matched_field=prompt, got %q", results[0].MatchedField)
+	// Goal is backfilled from prompt at creation, so goal matches first.
+	if results[0].MatchedField != "goal" {
+		t.Errorf("expected matched_field=goal, got %q", results[0].MatchedField)
 	}
 }
 
@@ -163,8 +164,9 @@ func TestSearchTasks_MissingOversight(t *testing.T) {
 	if results[0].ID != task.ID {
 		t.Errorf("expected task %s, got %s", task.ID, results[0].ID)
 	}
-	if results[0].MatchedField != "prompt" {
-		t.Errorf("expected matched_field=prompt, got %q", results[0].MatchedField)
+	// Goal is backfilled from prompt, so goal matches first.
+	if results[0].MatchedField != "goal" {
+		t.Errorf("expected matched_field=goal, got %q", results[0].MatchedField)
 	}
 }
 
@@ -215,8 +217,9 @@ func TestSearchTasks_CaseInsensitive(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	if results[0].MatchedField != "prompt" {
-		t.Errorf("expected matched_field=prompt, got %q", results[0].MatchedField)
+	// Goal is backfilled from Prompt at creation, so goal matches first.
+	if results[0].MatchedField != "goal" {
+		t.Errorf("expected matched_field=goal, got %q", results[0].MatchedField)
 	}
 }
 
@@ -463,11 +466,12 @@ func TestSearchIndex_UpdateTaskBacklog(t *testing.T) {
 	}
 
 	newPrompt := "completely-different-backlog-prompt"
-	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil, nil); err != nil {
+	newGoal := "completely-different-backlog-goal"
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, &newGoal, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 
-	// Old prompt must not match.
+	// Old prompt must not match (goal was also updated, so no hit via goal either).
 	results, err := s.SearchTasks(bg(), "original prompt content")
 	if err != nil {
 		t.Fatalf("SearchTasks: %v", err)
@@ -476,7 +480,7 @@ func TestSearchIndex_UpdateTaskBacklog(t *testing.T) {
 		t.Fatalf("expected 0 results for old prompt, got %d", len(results))
 	}
 
-	// New prompt must match.
+	// New prompt must match via prompt (goal is a different string).
 	results, err = s.SearchTasks(bg(), "completely-different-backlog-prompt")
 	if err != nil {
 		t.Fatalf("SearchTasks: %v", err)
@@ -499,11 +503,11 @@ func TestSearchIndex_ApplyRefinement(t *testing.T) {
 	}
 
 	session := RefinementSession{}
-	if err := s.ApplyRefinement(bg(), task.ID, "post-refinement-prompt", session); err != nil {
+	if err := s.ApplyRefinement(bg(), task.ID, "post-refinement-prompt", "post-refinement-goal", session); err != nil {
 		t.Fatalf("ApplyRefinement: %v", err)
 	}
 
-	// Old prompt must not match.
+	// Old prompt must not match (goal was also updated).
 	results, err := s.SearchTasks(bg(), "pre-refinement-prompt")
 	if err != nil {
 		t.Fatalf("SearchTasks: %v", err)

@@ -85,3 +85,36 @@ func TestCleanRefinementResult_Empty(t *testing.T) {
 		t.Errorf("cleanRefinementResult(%q) = %q, want %q", "", got, "")
 	}
 }
+
+func TestExtractGoalFromRefinement_WithGoal(t *testing.T) {
+	input := "# Goal\nAdd JWT auth to WebSocket handler.\n\n# Implementation Spec\n\n## Objective\nDetails here..."
+	goal, spec := extractGoalFromRefinement(input)
+	if goal != "Add JWT auth to WebSocket handler." {
+		t.Errorf("goal = %q, want %q", goal, "Add JWT auth to WebSocket handler.")
+	}
+	if spec != "# Implementation Spec\n\n## Objective\nDetails here..." {
+		t.Errorf("spec = %q", spec)
+	}
+}
+
+func TestExtractGoalFromRefinement_NoGoal(t *testing.T) {
+	input := "# Implementation Spec\n\n## Objective\nDetails..."
+	goal, spec := extractGoalFromRefinement(input)
+	if goal != "" {
+		t.Errorf("goal = %q, want empty", goal)
+	}
+	if spec != input {
+		t.Errorf("spec should be unchanged")
+	}
+}
+
+func TestExtractGoalFromRefinement_GoalOnly(t *testing.T) {
+	input := "# Goal\nJust a goal, no spec."
+	goal, spec := extractGoalFromRefinement(input)
+	if goal != "Just a goal, no spec." {
+		t.Errorf("goal = %q", goal)
+	}
+	if spec != "" {
+		t.Errorf("spec = %q, want empty", spec)
+	}
+}

@@ -776,7 +776,7 @@ func TestApplyRefinement(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "old prompt", Timeout: 5})
 
 	session := RefinementSession{ID: "session-1", Result: "suggested", StartPrompt: "old prompt"}
-	if err := s.ApplyRefinement(bg(), task.ID, "new prompt", session); err != nil {
+	if err := s.ApplyRefinement(bg(), task.ID, "new prompt", "", session); err != nil {
 		t.Fatalf("ApplyRefinement: %v", err)
 	}
 
@@ -844,7 +844,7 @@ func TestUpdateTaskBacklog_UpdatesPrompt(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 	newPrompt := "updated prompt"
 
-	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -858,7 +858,7 @@ func TestUpdateTaskBacklog_UpdatesTimeout(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	newTimeout := 30
 
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &newTimeout, nil, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &newTimeout, nil, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 30 {
@@ -871,7 +871,7 @@ func TestUpdateTaskBacklog_ClampsTimeout(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	big := 9999
 
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &big, nil, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &big, nil, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 1440 {
@@ -884,7 +884,7 @@ func TestUpdateTaskBacklog_UpdatesFreshStart(t *testing.T) {
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	fresh := true
 
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fresh, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &fresh, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.FreshStart {
@@ -896,7 +896,7 @@ func TestUpdateTaskBacklog_NilFieldsAreNoOps(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 
-	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog with all nils: %v", err)
 	}
 	got, _ := s.GetTask(bg(), task.ID)
@@ -907,7 +907,7 @@ func TestUpdateTaskBacklog_NilFieldsAreNoOps(t *testing.T) {
 
 func TestUpdateTaskBacklog_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.UpdateTaskBacklog(bg(), uuid.New(), nil, nil, nil, nil, nil, nil, nil); err == nil {
+	if err := s.UpdateTaskBacklog(bg(), uuid.New(), nil, nil, nil, nil, nil, nil, nil, nil); err == nil {
 		t.Error("expected error for unknown task")
 	}
 }
@@ -938,7 +938,7 @@ func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
 
 	// Enable mount_worktrees.
 	enable := true
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &enable, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, &enable, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.MountWorktrees {
@@ -947,11 +947,108 @@ func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
 
 	// Disable mount_worktrees.
 	disable := false
-	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &disable, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, &disable, nil, nil, nil)
 
 	got, _ = s.GetTask(bg(), task.ID)
 	if got.MountWorktrees {
 		t.Error("expected MountWorktrees=false after toggle off")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Goal field
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestCreateTask_GoalDefaultsToPrompt(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "build a login page", Timeout: 5})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if task.Goal != "build a login page" {
+		t.Errorf("Goal = %q, want %q", task.Goal, "build a login page")
+	}
+	if task.GoalManuallySet {
+		t.Error("GoalManuallySet should be false when goal defaults to prompt")
+	}
+}
+
+func TestCreateTask_GoalExplicit(t *testing.T) {
+	s := newTestStore(t)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "detailed spec...", Goal: "Add JWT auth to WebSocket", Timeout: 5})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if task.Goal != "Add JWT auth to WebSocket" {
+		t.Errorf("Goal = %q, want %q", task.Goal, "Add JWT auth to WebSocket")
+	}
+	if !task.GoalManuallySet {
+		t.Error("GoalManuallySet should be true when goal is explicitly provided")
+	}
+}
+
+func TestUpdateTaskBacklog_UpdatesGoal(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
+	newGoal := "updated goal summary"
+	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, &newGoal, nil, nil, nil, nil, nil, nil); err != nil {
+		t.Fatalf("UpdateTaskBacklog: %v", err)
+	}
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.Goal != "updated goal summary" {
+		t.Errorf("Goal = %q, want %q", got.Goal, "updated goal summary")
+	}
+	if !got.GoalManuallySet {
+		t.Error("GoalManuallySet should be true after manual goal update")
+	}
+}
+
+func TestApplyRefinement_UpdatesGoalWhenNotManuallySet(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "old prompt", Timeout: 5})
+	session := RefinementSession{ID: "s1", StartPrompt: "old prompt"}
+	if err := s.ApplyRefinement(bg(), task.ID, "new spec", "refined goal", session); err != nil {
+		t.Fatalf("ApplyRefinement: %v", err)
+	}
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.Goal != "refined goal" {
+		t.Errorf("Goal = %q, want %q", got.Goal, "refined goal")
+	}
+}
+
+func TestApplyRefinement_PreservesManualGoal(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "old prompt", Goal: "my custom goal", Timeout: 5})
+	session := RefinementSession{ID: "s1", StartPrompt: "old prompt"}
+	if err := s.ApplyRefinement(bg(), task.ID, "new spec", "refined goal", session); err != nil {
+		t.Fatalf("ApplyRefinement: %v", err)
+	}
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.Goal != "my custom goal" {
+		t.Errorf("Goal = %q, want %q (manual goal should be preserved)", got.Goal, "my custom goal")
+	}
+}
+
+func TestSearchTasks_MatchGoal(t *testing.T) {
+	s := newTestStore(t)
+	_, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
+		Prompt: "some unrelated prompt text",
+		Goal:   "unique-goal-keyword",
+		Timeout: 60,
+		Kind:    TaskKindTask,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	results, err := s.SearchTasks(bg(), "unique-goal-keyword")
+	if err != nil {
+		t.Fatalf("SearchTasks: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].MatchedField != "goal" {
+		t.Errorf("expected matched_field=goal, got %q", results[0].MatchedField)
 	}
 }
 
