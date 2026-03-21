@@ -368,16 +368,22 @@ function _renderDocToc(content) {
   }
   toc.innerHTML = html;
 
-  // Click handler: scroll heading into view within the content pane.
+  // Click handler: scroll heading into view and highlight immediately.
   var tocLinks = toc.querySelectorAll('a[data-toc-target]');
   for (var k = 0; k < tocLinks.length; k++) {
-    tocLinks[k].onclick = (function(id) {
+    tocLinks[k].onclick = (function(id, allLinks) {
       return function(e) {
         e.preventDefault();
         var el = document.getElementById(id);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Immediately highlight this entry — scrollIntoView may not
+        // trigger a scroll event if the target is already in view.
+        for (var m = 0; m < allLinks.length; m++) {
+          allLinks[m].classList.toggle('docs-toc-link--active',
+            allLinks[m].getAttribute('data-toc-target') === id);
+        }
       };
-    })(tocLinks[k].getAttribute('data-toc-target'));
+    })(tocLinks[k].getAttribute('data-toc-target'), tocLinks);
   }
 
   // Highlight current section on scroll.
