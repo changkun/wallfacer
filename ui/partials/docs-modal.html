@@ -1,9 +1,19 @@
 <!-- Docs Modal -->
 <div id="docs-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
-  <div class="modal-card" style="max-width: 900px; width: 100%; height: 80vh; display: flex; flex-direction: column;">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">
+  <div id="docs-modal-card" class="modal-card docs-modal-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">
       <h3 style="margin:0;font-size:16px;font-weight:700;">Documentation</h3>
-      <button type="button" class="btn-ghost" onclick="closeDocs()" style="font-size:18px;padding:4px 8px;">&times;</button>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button type="button" class="btn-ghost" onclick="toggleDocsFullscreen()" title="Toggle fullscreen" style="font-size:14px;padding:4px 8px;">
+          <svg id="docs-expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <polyline points="9 21 3 21 3 15"></polyline>
+            <line x1="21" y1="3" x2="14" y2="10"></line>
+            <line x1="3" y1="21" x2="10" y2="14"></line>
+          </svg>
+        </button>
+        <button type="button" class="btn-ghost" onclick="closeDocs()" style="font-size:18px;padding:4px 8px;">&times;</button>
+      </div>
     </div>
     <div style="display:flex;flex:1;min-height:0;">
       <nav id="docs-nav" style="width:200px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;padding:12px;font-size:12px;"></nav>
