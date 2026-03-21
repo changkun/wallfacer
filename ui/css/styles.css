@@ -76,17 +76,15 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 /* --- Layout --- */
 .app-header {
   display: flex;
-  flex-direction: column;
-  padding: 12px 24px 0;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 24px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
 }
 
 .app-header__primary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  display: contents;
 }
 
 .app-header__identity {
@@ -108,8 +106,9 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   display: flex;
   align-items: center;
   min-width: 0;
+  flex: 1 1 0;
   overflow-x: auto;
-  margin: 8px 0 0;
+  position: relative;
 }
 
 .workspace-group-tab {
@@ -2014,23 +2013,17 @@ pre.result-entry-body {
 
   /* --- Header: compact on mobile --- */
   .app-header {
-    gap: 10px;
-    padding: 12px 14px;
-  }
-  .app-header__primary {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-  .app-header__identity {
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
   }
   .app-header__brand {
     width: 100%;
     justify-content: space-between;
   }
   .workspace-group-tabs {
-    margin: 6px -8px 0;
+    order: 10;
+    flex-basis: 100%;
   }
   .workspace-group-tab__workspaces {
     display: none;

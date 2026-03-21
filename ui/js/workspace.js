@@ -286,7 +286,7 @@ function renderHeaderWorkspaceGroupTabs() {
     tabs += '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (active || workspaceGroupSwitching ? ' disabled' : '') + '>' + label + closeBtn + wsContainer + '</button>';
   });
   // "+" button to add a workspace group tab.
-  tabs += '<button type="button" class="workspace-group-tab workspace-group-tab--add" onclick="addWorkspaceGroupTab()" title="Add workspace group">+</button>';
+  tabs += '<button type="button" class="workspace-group-tab workspace-group-tab--add" onclick="addWorkspaceGroupTab(event)" title="Add workspace group">+</button>';
   el.innerHTML = tabs;
   // Re-render workspace chips into the active tab's container.
   if (typeof renderWorkspaces === 'function') renderWorkspaces();
@@ -297,7 +297,7 @@ function hideWorkspaceGroupTab(index) {
   renderHeaderWorkspaceGroupTabs();
 }
 
-function addWorkspaceGroupTab() {
+function addWorkspaceGroupTab(event) {
   // If there are hidden groups, show a picker; otherwise open the workspace picker.
   var hiddenGroups = [];
   workspaceGroups.forEach(function(group, index) {
@@ -309,12 +309,15 @@ function addWorkspaceGroupTab() {
     showWorkspacePicker(false);
     return;
   }
-  // Show a small popover to restore hidden groups or create new.
+  // Show a popover positioned below the "+" button.
   var existing = document.getElementById('workspace-group-add-menu');
   if (existing) { existing.remove(); return; }
+
+  // Find the "+" button that triggered this.
+  var btn = event && event.currentTarget;
   var menu = document.createElement('div');
   menu.id = 'workspace-group-add-menu';
-  menu.style.cssText = 'position:absolute;top:100%;right:0;z-index:40;min-width:200px;max-width:320px;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);box-shadow:0 8px 24px rgba(0,0,0,0.18);';
+  menu.style.cssText = 'position:fixed;z-index:50;min-width:200px;max-width:320px;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);box-shadow:0 8px 24px rgba(0,0,0,0.18);';
   var html = '';
   hiddenGroups.forEach(function(item) {
     html += '<button type="button" onclick="restoreWorkspaceGroupTab(' + item.index + ')" style="width:100%;text-align:left;padding:6px 8px;border:none;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font-size:11px;" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'transparent\'">' + escapeHtml(workspaceGroupLabel(item.group)) + '</button>';
@@ -322,21 +325,24 @@ function addWorkspaceGroupTab() {
   html += '<div style="border-top:1px solid var(--border);margin:4px 0;"></div>';
   html += '<button type="button" onclick="document.getElementById(\'workspace-group-add-menu\').remove();showWorkspacePicker(false)" style="width:100%;text-align:left;padding:6px 8px;border:none;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font-size:11px;" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'transparent\'">New workspace group...</button>';
   menu.innerHTML = html;
-  // Position relative to the tabs container.
-  var tabsEl = document.getElementById('workspace-group-tabs');
-  if (tabsEl) {
-    tabsEl.style.position = 'relative';
-    tabsEl.appendChild(menu);
-    // Close on outside click.
-    setTimeout(function() {
-      document.addEventListener('click', function closeMenu(e) {
-        if (!menu.contains(e.target)) {
-          menu.remove();
-          document.removeEventListener('click', closeMenu);
-        }
-      });
-    }, 0);
+  document.body.appendChild(menu);
+
+  // Position below the "+" button.
+  if (btn) {
+    var rect = btn.getBoundingClientRect();
+    menu.style.top = rect.bottom + 4 + 'px';
+    menu.style.left = rect.left + 'px';
   }
+
+  // Close on outside click.
+  setTimeout(function() {
+    document.addEventListener('click', function closeMenu(e) {
+      if (!menu.contains(e.target)) {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+      }
+    });
+  }, 0);
 }
 
 function restoreWorkspaceGroupTab(index) {
