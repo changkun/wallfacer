@@ -78,7 +78,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 8px 24px;
+  padding: 8px 24px 0;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
 }
@@ -95,11 +95,13 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  margin-bottom: 8px;
 }
 
 .workspace-group-tabs {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  align-self: stretch;
   flex-wrap: wrap;
   flex: 1 1 0;
   min-width: 0;
@@ -111,6 +113,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   align-items: center;
   gap: 6px;
   padding: 4px 10px 6px;
+  margin-bottom: -1px;
   border: none;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -186,6 +189,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   gap: 8px;
   min-width: 0;
   flex-shrink: 0;
+  margin-bottom: 8px;
 }
 
 .app-header__search {
