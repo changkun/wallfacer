@@ -280,11 +280,16 @@ function renderHeaderWorkspaceGroupTabs() {
     var closeBtn = active
       ? ''
       : '<span class="workspace-group-tab__close" onclick="event.stopPropagation();hideWorkspaceGroupTab(' + index + ')" title="Hide tab">&times;</span>';
-    tabs += '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (active || workspaceGroupSwitching ? ' disabled' : '') + '>' + label + closeBtn + '</button>';
+    var wsContainer = active
+      ? '<span id="workspace-group-tab-workspaces" class="workspace-group-tab__workspaces"></span>'
+      : '';
+    tabs += '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (active || workspaceGroupSwitching ? ' disabled' : '') + '>' + label + closeBtn + wsContainer + '</button>';
   });
   // "+" button to add a workspace group tab.
   tabs += '<button type="button" class="workspace-group-tab workspace-group-tab--add" onclick="addWorkspaceGroupTab()" title="Add workspace group">+</button>';
   el.innerHTML = tabs;
+  // Re-render workspace chips into the active tab's container.
+  if (typeof renderWorkspaces === 'function') renderWorkspaces();
 }
 
 function hideWorkspaceGroupTab(index) {

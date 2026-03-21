@@ -77,7 +77,7 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .app-header {
   display: flex;
   flex-direction: column;
-  padding: 12px 24px 10px;
+  padding: 12px 24px 0;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
 }
@@ -104,30 +104,19 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   flex-shrink: 0;
 }
 
-.workspace-group-bar {
-  display: flex;
-  flex-direction: column;
-  min-width: min(380px, 100%);
-  max-width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
-  overflow: hidden;
-}
-
 .workspace-group-tabs {
   display: flex;
+  align-items: center;
   min-width: 0;
   overflow-x: auto;
-  border-bottom: 1px solid var(--border);
+  margin: 8px 0 0;
 }
 
 .workspace-group-tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -187,16 +176,13 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
 .workspace-group-tab--add:hover {
   color: var(--text-primary);
 }
-
-.workspace-group-bar__list {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  min-width: 0;
-  padding: 6px 9px;
-}
-.workspace-group-bar__list:empty {
-  display: none;
+.workspace-group-tab__workspaces {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
 }
 
 .app-header__actions {
@@ -2043,13 +2029,11 @@ pre.result-entry-body {
     width: 100%;
     justify-content: space-between;
   }
-  .workspace-group-bar {
-    min-width: 0;
-    width: 100%;
+  .workspace-group-tabs {
+    margin: 6px -8px 0;
   }
-  .workspace-group-bar__list {
-    flex-wrap: nowrap;
-    overflow: hidden;
+  .workspace-group-tab__workspaces {
+    display: none;
   }
   .app-header__actions {
     width: 100%;
