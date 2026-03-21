@@ -114,8 +114,16 @@ function _expandDiagram(sourceDiv) {
   var surface = document.createElement('div');
   surface.className = 'diagram-overlay__surface';
   var clone = svg.cloneNode(true);
-  clone.removeAttribute('width');
-  clone.removeAttribute('height');
+  // Ensure the SVG has explicit dimensions from its viewBox so it
+  // doesn't collapse to 0x0 inside the transform surface.
+  var vb = clone.getAttribute('viewBox');
+  if (vb) {
+    var parts = vb.split(/[\s,]+/);
+    var vbW = parseFloat(parts[2]) || 800;
+    var vbH = parseFloat(parts[3]) || 600;
+    clone.setAttribute('width', vbW);
+    clone.setAttribute('height', vbH);
+  }
   clone.removeAttribute('style');
   surface.appendChild(clone);
   viewport.appendChild(surface);
