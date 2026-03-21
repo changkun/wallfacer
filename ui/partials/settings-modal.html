@@ -13,7 +13,7 @@
           <button id="settings-tab-execution" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="execution">Execution</button>
           <button id="settings-tab-sandbox" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="sandbox">Sandbox</button>
           <button id="settings-tab-workspace" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="workspace">Workspace</button>
-          <button id="settings-tab-insights" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="insights">Insights</button>
+
           <button id="settings-tab-trash" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="trash">Trash</button>
           <button id="settings-tab-about" type="button" class="settings-tab" role="tab" aria-selected="false" data-settings-tab="about">About</button>
         </div>
@@ -115,6 +115,36 @@
             <button onclick="event.preventDefault();triggerIdeation()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Run now</button>
           </div>
           <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">The brainstorm agent analyses repositories and proposes tasks at the configured interval. Tasks are tagged <em>idea-agent</em>.</div>
+        </div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Task Titles</div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <select id="generate-titles-limit" class="select" style="font-size: 12px; padding: 3px 6px; height: auto;" title="Max tasks to generate titles for">
+              <option value="5">5 tasks</option>
+              <option value="10" selected>10 tasks</option>
+              <option value="25">25 tasks</option>
+              <option value="50">50 tasks</option>
+              <option value="0">All</option>
+            </select>
+            <button onclick="generateMissingTitles()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Generate Missing</button>
+          </div>
+          <div id="generate-titles-status" style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em;"></div>
+        </div>
+
+        <div class="settings-section">
+          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Trace Oversight</div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <select id="generate-oversight-limit" class="select" style="font-size: 12px; padding: 3px 6px; height: auto;" title="Max tasks to generate oversight for">
+              <option value="5">5 tasks</option>
+              <option value="10" selected>10 tasks</option>
+              <option value="25">25 tasks</option>
+              <option value="50">50 tasks</option>
+              <option value="0">All</option>
+            </select>
+            <button onclick="generateMissingOversight()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Generate Missing</button>
+          </div>
+          <div id="generate-oversight-status" style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em;"></div>
         </div>
       </div>
 
@@ -311,35 +341,6 @@
         </div>
       </div>
 
-      <div class="settings-tab-content" data-settings-tab="insights">
-        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Task Titles</div>
-        <div style="display: flex; gap: 6px; align-items: center;">
-          <select id="generate-titles-limit" class="select" style="font-size: 12px; padding: 3px 6px; height: auto;" title="Max tasks to generate titles for">
-            <option value="5">5 tasks</option>
-            <option value="10" selected>10 tasks</option>
-            <option value="25">25 tasks</option>
-            <option value="50">50 tasks</option>
-            <option value="0">All</option>
-          </select>
-          <button onclick="generateMissingTitles()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Generate Missing</button>
-        </div>
-        <div id="generate-titles-status" style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em;"></div>
-
-        <div class="settings-section">
-          <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Trace Oversight</div>
-          <div style="display: flex; gap: 6px; align-items: center;">
-            <select id="generate-oversight-limit" class="select" style="font-size: 12px; padding: 3px 6px; height: auto;" title="Max tasks to generate oversight for">
-              <option value="5">5 tasks</option>
-              <option value="10" selected>10 tasks</option>
-              <option value="25">25 tasks</option>
-              <option value="50">50 tasks</option>
-              <option value="0">All</option>
-            </select>
-            <button onclick="generateMissingOversight()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Generate Missing</button>
-          </div>
-          <div id="generate-oversight-status" style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4; min-height: 1em;"></div>
-        </div>
-      </div>
 
       <div class="settings-tab-content" data-settings-tab="trash">
         <div style="margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Deleted Tasks</div>
