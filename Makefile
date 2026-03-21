@@ -10,14 +10,21 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary build-claude build-codex server run shell clean ui-css api-contract lint test test-backend test-frontend commit-seq push-once
+.PHONY: build build-binary build-claude build-codex server run shell clean ui-css api-contract lint test test-backend test-frontend commit-seq push-once release-notes release
 
 # Build the wallfacer binary and both sandbox images.
 build: build-binary build-claude build-codex
 
 # Build the wallfacer Go binary.
+# Pass VERSION= to embed a version (e.g., make build-binary VERSION=0.0.6).
+VERSION ?=
+LDFLAGS := -s -w
+ifneq ($(VERSION),)
+LDFLAGS += -X main.version=$(VERSION)
+endif
+
 build-binary:
-	go build -o wallfacer .
+	go build -trimpath -ldflags "$(LDFLAGS)" -o wallfacer .
 
 # Build the Claude Code sandbox image and tag it with both the local name and the ghcr.io
 # name so that 'wallfacer run' finds it under the default image reference.
@@ -122,3 +129,29 @@ REMOTE ?= origin
 BRANCH ?= $(shell git branch --show-current)
 push-once:
 	./scripts/push-once.sh "$(REMOTE)" "$(BRANCH)"
+
+# Generate an LLM prompt for release notes.
+# Pipe the output to Claude or another LLM to produce the final notes.
+# Usage:
+#   make release-notes RELEASE_VERSION=v0.0.6 | claude
+#   make release-notes RELEASE_VERSION=v0.0.6 > notes-prompt.md
+release-notes:
+ifndef RELEASE_VERSION
+	$(error RELEASE_VERSION is required. Usage: make release-notes RELEASE_VERSION=v0.0.6)
+endif
+	@./scripts/release-notes.sh "$(RELEASE_VERSION)"
+
+# Create a GitHub release with binaries and notes.
+# This tags, pushes, and lets GitHub Actions build the binaries and images.
+# Usage:
+#   make release RELEASE_VERSION=v0.0.6 RELEASE_NOTES=notes.md
+release:
+ifndef RELEASE_VERSION
+	$(error RELEASE_VERSION is required. Usage: make release RELEASE_VERSION=v0.0.6)
+endif
+ifndef RELEASE_NOTES
+	$(error RELEASE_NOTES is required (path to release notes markdown file))
+endif
+	git tag -a "$(RELEASE_VERSION)" -m "$(RELEASE_VERSION)"
+	git push origin "$(RELEASE_VERSION)"
+	gh release create "$(RELEASE_VERSION)" --title "$(RELEASE_VERSION)" --notes-file "$(RELEASE_NOTES)"
