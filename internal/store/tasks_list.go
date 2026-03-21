@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 
 	"changkun.de/wallfacer/internal/logger"
 	"github.com/google/uuid"
 )
 
+// ListTasksByStatus returns all tasks with the given status, sorted by position then creation time.
 func (s *Store) ListTasksByStatus(_ context.Context, status TaskStatus) ([]Task, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -60,7 +60,7 @@ func (s *Store) CountRegularInProgress() int {
 // without loading the full task.json. Tasks that completed before summary.json
 // was introduced will simply have no entry in the returned slice.
 func (s *Store) ListSummaries() ([]TaskSummary, error) {
-	entries, err := os.ReadDir(filepath.Join(s.dir))
+	entries, err := os.ReadDir(s.dir)
 	if err != nil {
 		return nil, fmt.Errorf("read data dir: %w", err)
 	}
@@ -89,6 +89,7 @@ func (s *Store) ListSummaries() ([]TaskSummary, error) {
 // ErrRefinementAlreadyRunning is returned by StartRefinementJobIfIdle when a
 // refinement job is already in "running" state for the given task.
 
+// ListTasks returns all tasks, optionally including archived ones.
 func (s *Store) ListTasks(_ context.Context, includeArchived bool) ([]Task, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

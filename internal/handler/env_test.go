@@ -126,7 +126,7 @@ func TestTestWebhook_Success(t *testing.T) {
 
 func TestTestWebhook_DownstreamFailure(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
@@ -179,7 +179,8 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 	// cancelled before WaitBackground drains remaining work.
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	t.Cleanup(func() { os.RemoveAll(storeDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+
 	h := NewHandler(s, r, t.TempDir(), nil, nil)
 	return h, envPath
 }
@@ -218,7 +219,7 @@ func TestUpdateEnvConfig_TriggersAutoPromote(t *testing.T) {
 
 	// Create a backlog task.
 	ctx := context.Background()
-	_, err := h.store.CreateTask(ctx, "backlog task", 15, false, "", "")
+	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +269,7 @@ func TestUpdateEnvConfig_NoAutoPromoteWhenAutopilotOff(t *testing.T) {
 	// autopilot is false by default.
 
 	ctx := context.Background()
-	_, err := h.store.CreateTask(ctx, "backlog task", 15, false, "", "")
+	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}

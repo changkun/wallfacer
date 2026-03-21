@@ -223,13 +223,13 @@ func TestRunTwoPhase_Phase2MissCallbackFired(t *testing.T) {
 
 	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
 		Name: "test-miss",
-		Phase1: func(ctx context.Context) (*store.Task, error) {
+		Phase1: func(_ context.Context) (*store.Task, error) {
 			return &candidate, nil
 		},
-		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+		Phase2: func(_ context.Context, _ *store.Task) (bool, error) {
 			return false, nil
 		},
-		OnPhase2Miss: func(c *store.Task) {
+		OnPhase2Miss: func(_ *store.Task) {
 			missCallbackFired = true
 		},
 	})
@@ -246,13 +246,13 @@ func TestRunTwoPhase_Phase2MissCallbackNotFiredOnSuccess(t *testing.T) {
 
 	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
 		Name: "test-success",
-		Phase1: func(ctx context.Context) (*store.Task, error) {
+		Phase1: func(_ context.Context) (*store.Task, error) {
 			return &candidate, nil
 		},
-		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+		Phase2: func(_ context.Context, _ *store.Task) (bool, error) {
 			return true, nil
 		},
-		OnPhase2Miss: func(c *store.Task) {
+		OnPhase2Miss: func(_ *store.Task) {
 			missCallbackFired = true
 		},
 	})
@@ -269,13 +269,13 @@ func TestRunTwoPhase_Phase2MissCallbackNotFiredOnError(t *testing.T) {
 
 	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
 		Name: "test-error",
-		Phase1: func(ctx context.Context) (*store.Task, error) {
+		Phase1: func(_ context.Context) (*store.Task, error) {
 			return &candidate, nil
 		},
-		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+		Phase2: func(_ context.Context, _ *store.Task) (bool, error) {
 			return false, errors.New("phase2 error")
 		},
-		OnPhase2Miss: func(c *store.Task) {
+		OnPhase2Miss: func(_ *store.Task) {
 			missCallbackFired = true
 		},
 	})
@@ -297,13 +297,13 @@ func TestRunTwoPhase_Phase1Error_CallsOnPhase1Error(t *testing.T) {
 
 	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
 		Name: "test-phase1-error",
-		Phase1: func(ctx context.Context) (*store.Task, error) {
+		Phase1: func(_ context.Context) (*store.Task, error) {
 			return nil, sentinelErr
 		},
 		OnPhase1Error: func(err error) {
 			gotErr = err
 		},
-		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+		Phase2: func(_ context.Context, _ *store.Task) (bool, error) {
 			phase2Called = true
 			return true, nil
 		},
@@ -329,13 +329,13 @@ func TestRunTwoPhase_Phase1Error_CircuitBreakerRecordsFailure(t *testing.T) {
 
 	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
 		Name: "auto-promote",
-		Phase1: func(ctx context.Context) (*store.Task, error) {
+		Phase1: func(_ context.Context) (*store.Task, error) {
 			return nil, sentinelErr
 		},
 		OnPhase1Error: func(err error) {
 			wb.recordFailure(nil, err.Error())
 		},
-		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+		Phase2: func(_ context.Context, _ *store.Task) (bool, error) {
 			phase2Called = true
 			return true, nil
 		},
@@ -358,13 +358,13 @@ func TestRunTwoPhase_Phase1Error_OnPhase1ErrorNotCalledOnSuccess(t *testing.T) {
 
 	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
 		Name: "test-no-error",
-		Phase1: func(ctx context.Context) (*store.Task, error) {
+		Phase1: func(_ context.Context) (*store.Task, error) {
 			return &candidate, nil
 		},
-		OnPhase1Error: func(err error) {
+		OnPhase1Error: func(_ error) {
 			onPhase1ErrorCalled = true
 		},
-		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+		Phase2: func(_ context.Context, _ *store.Task) (bool, error) {
 			return true, nil
 		},
 	})
@@ -383,13 +383,13 @@ func TestRunTwoPhase_Phase1Error_OnPhase1ErrorNotCalledOnNilCandidate(t *testing
 
 	runTwoPhase(ctx, nil, TwoPhaseWatcherConfig{
 		Name: "test-nil-candidate",
-		Phase1: func(ctx context.Context) (*store.Task, error) {
+		Phase1: func(_ context.Context) (*store.Task, error) {
 			return nil, nil
 		},
-		OnPhase1Error: func(err error) {
+		OnPhase1Error: func(_ error) {
 			onPhase1ErrorCalled = true
 		},
-		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+		Phase2: func(_ context.Context, _ *store.Task) (bool, error) {
 			return true, nil
 		},
 	})

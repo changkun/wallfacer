@@ -21,7 +21,7 @@ func TestParseEnvLinePreservesHashesInsideQuotes(t *testing.T) {
 		t.Fatalf("value = %q, want %q", value, "Improve # parser behavior")
 	}
 
-	key, value, ok = parseEnvLine(`PROMPT='A#b # inner comment should stay' # keep outer comment`)
+	_, value, ok = parseEnvLine(`PROMPT='A#b # inner comment should stay' # keep outer comment`)
 	if !ok {
 		t.Fatal("expected single-quoted env line to parse")
 	}

@@ -170,7 +170,7 @@ func TestResolveConflictsSuccess(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "conflict resolve test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "conflict resolve test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +213,7 @@ func TestResolveConflictsContainerError(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "conflict error test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "conflict error test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestResolveConflictsIsError(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "conflict is_error test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "conflict is_error test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +292,7 @@ func TestPruneUnknownWorktrees(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "known task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "known task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +362,8 @@ func TestPruneUnknownWorktreesRunsGitWorktreePrune(t *testing.T) {
 func TestCommitNonExistentTask(t *testing.T) {
 	_, r := setupRunnerWithCmd(t, nil, "echo")
 	// Should return early without panicking.
-	r.Commit(uuid.New(), "")
+	_ = r.Commit(uuid.New(), "")
+
 }
 
 // ---------------------------------------------------------------------------
@@ -617,7 +618,7 @@ func TestGenerateTitleSuccess(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Fix the login bug in the authentication module", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Fix the login bug in the authentication module", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -638,7 +639,7 @@ func TestGenerateTitleAcceptsValidOutputOnNonZeroExit(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Fix the login bug in the authentication module", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Fix the login bug in the authentication module", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -659,7 +660,7 @@ func TestGenerateTitleSkipsExistingTitle(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "test prompt", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -683,7 +684,7 @@ func TestGenerateTitleFallbackOnContainerError(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "test prompt", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -704,7 +705,7 @@ func TestGenerateTitleBlankResult(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "test prompt", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -727,7 +728,7 @@ func TestGenerateTitleNDJSONOutput(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "add authentication feature", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "add authentication feature", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

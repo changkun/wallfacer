@@ -11,7 +11,7 @@ func TestRebuildSearchIndex(t *testing.T) {
 	s := newTestStore(t)
 
 	// Create a task with oversight so both prompt and oversight are indexed.
-	task, err := s.CreateTask(bg(), "rebuild-index-prompt-needle", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "rebuild-index-prompt-needle", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

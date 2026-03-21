@@ -100,7 +100,7 @@ func TestRecoverOrphanedTasks(t *testing.T) {
 			defer cancel()
 
 			// 2. Create a task and set its initial status.
-			task, err := s.CreateTask(ctx, "test task", 5, false, "", "")
+			task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 5})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -169,7 +169,7 @@ func TestRecoverOrphanedTasks_InProgressMissingWorktreeBecomesFailed(t *testing.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	task, err := s.CreateTask(ctx, "test task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func TestRecoverOrphanedTasks_CommittingGitCheck(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewStore: %v", err)
 		}
-		task, err := s.CreateTask(ctx, "test prompt", 0, false, "", store.TaskKindTask)
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 0, Kind: store.TaskKindTask})
 		if err != nil {
 			t.Fatalf("CreateTask: %v", err)
 		}
@@ -351,7 +351,7 @@ func setupInProgressTask(t *testing.T) (*store.Store, *store.Task) {
 	t.Cleanup(func() { s.Close() })
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "monitor test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "monitor test", Timeout: 5})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

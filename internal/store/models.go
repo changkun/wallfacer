@@ -85,16 +85,18 @@ type RetryRecord struct {
 	FailureCategory FailureCategory `json:"failure_category,omitempty"` // root cause of the retired run
 }
 
-// RefinementJob tracks the state of an active or recently completed
-// sandbox refinement run for a backlog task.
+// RefinementJobStatus represents the lifecycle state of a refinement job.
 type RefinementJobStatus string
 
+// RefinementJobStatus constants.
 const (
 	RefinementJobStatusRunning RefinementJobStatus = "running"
 	RefinementJobStatusDone    RefinementJobStatus = "done"
 	RefinementJobStatusFailed  RefinementJobStatus = "failed"
 )
 
+// RefinementJob tracks the state of an active or recently completed
+// sandbox refinement run for a backlog task.
 type RefinementJob struct {
 	ID        string              `json:"id"`
 	CreatedAt time.Time           `json:"created_at"`
@@ -113,6 +115,7 @@ type RefinementJob struct {
 // the workspaces, proposes ideas, and creates backlog tasks from the results.
 type TaskKind string
 
+// TaskKind constants.
 const (
 	TaskKindTask      TaskKind = ""           // default; regular implementation task
 	TaskKindIdeaAgent TaskKind = "idea-agent" // brainstorm / ideation task
@@ -124,9 +127,11 @@ const (
 // usage-attribution-only values that appear in UsageBreakdown and turn logs.
 type SandboxActivity string
 
+// SandboxActivity constants for routing and usage attribution.
 const (
-	// Sandbox-routing activities (also used for usage attribution).
+	// SandboxActivityImplementation is the main implementation phase.
 	SandboxActivityImplementation SandboxActivity = "implementation"
+	// SandboxActivityTesting is the test-execution phase.
 	SandboxActivityTesting        SandboxActivity = "testing"
 	SandboxActivityRefinement     SandboxActivity = "refinement"
 	SandboxActivityTitle          SandboxActivity = "title"
@@ -134,7 +139,7 @@ const (
 	SandboxActivityCommitMessage  SandboxActivity = "commit_message"
 	SandboxActivityIdeaAgent      SandboxActivity = "idea_agent"
 
-	// Usage-attribution-only activities (not used for sandbox routing).
+	// SandboxActivityTest is a usage-attribution-only activity (not used for sandbox routing).
 	SandboxActivityTest         SandboxActivity = "test"
 	SandboxActivityOversightTest SandboxActivity = "oversight-test"
 )
@@ -153,6 +158,7 @@ var SandboxActivities = []SandboxActivity{
 // TaskStatus represents the lifecycle state of a task.
 type TaskStatus string
 
+// TaskStatus constants.
 const (
 	TaskStatusBacklog    TaskStatus = "backlog"
 	TaskStatusInProgress TaskStatus = "in_progress"
@@ -166,6 +172,7 @@ const (
 // FailureCategory identifies the root cause of a task failure.
 type FailureCategory string
 
+// FailureCategory constants.
 const (
 	FailureCategoryTimeout        FailureCategory = "timeout"
 	FailureCategoryBudget         FailureCategory = "budget_exceeded"
@@ -449,6 +456,7 @@ type TaskSearchResult struct {
 // OversightStatus represents the generation state of a task's aggregated oversight summary.
 type OversightStatus string
 
+// OversightStatus constants.
 const (
 	OversightStatusPending    OversightStatus = "pending"
 	OversightStatusGenerating OversightStatus = "generating"
@@ -478,6 +486,7 @@ type TaskOversight struct {
 // EventType identifies the kind of event stored in a task's audit trail.
 type EventType string
 
+// EventType constants.
 const (
 	EventTypeStateChange EventType = "state_change"
 	EventTypeOutput      EventType = "output"
@@ -491,6 +500,7 @@ const (
 // Trigger identifies what caused a state_change event.
 type Trigger string
 
+// Trigger constants.
 const (
 	TriggerUser        Trigger = "user"
 	TriggerAutoPromote Trigger = "auto_promote"

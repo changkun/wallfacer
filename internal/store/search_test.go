@@ -12,7 +12,7 @@ import (
 // createTaskWithTitle is a helper that creates a task and sets its title.
 func createTaskWithTitle(t *testing.T, s *Store, prompt, title string) *Task {
 	t.Helper()
-	task, err := s.CreateTask(bg(), prompt, 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: prompt, Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestSearchTasks_MatchTitle(t *testing.T) {
 
 func TestSearchTasks_MatchPrompt(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "find-me-in-prompt unique content", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "find-me-in-prompt unique content", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestSearchTasks_MatchPrompt(t *testing.T) {
 
 func TestSearchTasks_MatchTags(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "irrelevant prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "irrelevant prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestSearchTasks_MatchTags(t *testing.T) {
 
 func TestSearchTasks_MatchOversight(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "ordinary prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "ordinary prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestSearchTasks_MatchOversight(t *testing.T) {
 
 func TestSearchTasks_NoMatch(t *testing.T) {
 	s := newTestStore(t)
-	_, err := s.CreateTask(bg(), "completely different content", 60, false, "", TaskKindTask)
+	_, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "completely different content", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestSearchTasks_NoMatch(t *testing.T) {
 
 func TestSearchTasks_MissingOversight(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "matchable-prompt-text", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "matchable-prompt-text", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestSearchTasks_SnippetTruncation(t *testing.T) {
 	left := strings.Repeat("a", 200)
 	right := strings.Repeat("b", 200)
 	longPrompt := left + "NEEDLE" + right
-	_, err := s.CreateTask(bg(), longPrompt, 60, false, "", TaskKindTask)
+	_, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: longPrompt, Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestSearchTasks_SnippetTruncation(t *testing.T) {
 
 func TestSearchTasks_CaseInsensitive(t *testing.T) {
 	s := newTestStore(t)
-	_, err := s.CreateTask(bg(), "lowercase-needle content", 60, false, "", TaskKindTask)
+	_, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "lowercase-needle content", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestSearchTasks_Cap(t *testing.T) {
 	s := newTestStore(t)
 	// Create 60 tasks that all match the query.
 	for i := 0; i < 60; i++ {
-		if _, err := s.CreateTask(bg(), "captest-match content", 60, false, "", TaskKindTask); err != nil {
+		if _, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "captest-match content", Timeout: 60, Kind: TaskKindTask}); err != nil {
 			t.Fatalf("CreateTask %d: %v", i, err)
 		}
 	}
@@ -240,7 +240,7 @@ func TestSearchTasks_Cap(t *testing.T) {
 
 func TestLoadOversightText_Missing(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "some prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "some prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestLoadOversightText_Missing(t *testing.T) {
 
 func TestLoadOversightText_Content(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "some prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "some prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestLoadOversightText_Content(t *testing.T) {
 
 func TestLoadOversightText_InvalidJSON(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "some prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "some prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestSearchTasks_TitleBeatsPrompt(t *testing.T) {
 
 func TestSearchTasks_MatchOversightPhaseTitle(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "ordinary prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "ordinary prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -355,7 +355,7 @@ func TestSearchTasks_MatchOversightPhaseTitle(t *testing.T) {
 
 func TestSearchTasks_SnippetHTMLEscaping(t *testing.T) {
 	s := newTestStore(t)
-	_, err := s.CreateTask(bg(), `prompt with <script>alert("xss")</script> content`, 60, false, "", TaskKindTask)
+	_, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: `prompt with <script>alert("xss")</script> content`, Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -380,7 +380,7 @@ func TestSearchTasks_SnippetHTMLEscaping(t *testing.T) {
 // TestSearchTasks_ArchiveIncluded verifies that archived tasks are returned.
 func TestSearchTasks_ArchiveIncluded(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "archived-task-needle", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "archived-task-needle", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -423,7 +423,7 @@ func TestBuildSnippet_NoEllipsis(t *testing.T) {
 // task's title changes via UpdateTaskTitle.
 func TestSearchIndex_UpdateTaskTitle(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "some prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "some prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestSearchIndex_UpdateTaskTitle(t *testing.T) {
 // task's prompt changes via UpdateTaskBacklog.
 func TestSearchIndex_UpdateTaskBacklog(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "original prompt content", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original prompt content", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -493,7 +493,7 @@ func TestSearchIndex_UpdateTaskBacklog(t *testing.T) {
 // task's prompt changes via ApplyRefinement.
 func TestSearchIndex_ApplyRefinement(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "pre-refinement-prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "pre-refinement-prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -529,7 +529,7 @@ func TestSearchIndex_ApplyRefinement(t *testing.T) {
 // oversight is saved via SaveOversight without requiring a store restart.
 func TestSearchIndex_SaveOversight(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "ordinary prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "ordinary prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -577,7 +577,7 @@ func TestSearchIndex_LoadAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
-	task, err := s1.CreateTask(bg(), "loadall-prompt", 60, false, "", TaskKindTask)
+	task, err := s1.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "loadall-prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -614,7 +614,7 @@ func TestSearchIndex_LoadAll(t *testing.T) {
 // from the search index.
 func TestSearchIndex_DeleteTask(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "delete-me-needle", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "delete-me-needle", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -661,7 +661,7 @@ func BenchmarkSearchTasks_Indexed(b *testing.B) {
 
 	// Create 500 tasks, half with oversight, to simulate a loaded board.
 	for i := 0; i < 500; i++ {
-		task, err := s.CreateTask(bg(), fmt.Sprintf("benchmark task prompt number %d with various keywords", i), 60, false, "", TaskKindTask)
+		task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: fmt.Sprintf("benchmark task prompt number %d with various keywords", i), Timeout: 60, Kind: TaskKindTask})
 		if err != nil {
 			b.Fatalf("CreateTask: %v", err)
 		}
@@ -698,7 +698,7 @@ func BenchmarkSearchTasks_OversightDisk(b *testing.B) {
 
 	// Same setup as the indexed benchmark.
 	for i := 0; i < 200; i++ {
-		task, err := s.CreateTask(bg(), fmt.Sprintf("benchmark task prompt number %d with various keywords", i), 60, false, "", TaskKindTask)
+		task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: fmt.Sprintf("benchmark task prompt number %d with various keywords", i), Timeout: 60, Kind: TaskKindTask})
 		if err != nil {
 			b.Fatalf("CreateTask: %v", err)
 		}

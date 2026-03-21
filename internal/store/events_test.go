@@ -122,7 +122,7 @@ func TestComputeSpans_UnclosedSpanIncluded(t *testing.T) {
 
 func TestInsertEvent_Basic(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.InsertEvent(bg(), task.ID, EventTypeStateChange, map[string]string{"status": "in_progress"}); err != nil {
 		t.Fatalf("InsertEvent: %v", err)
@@ -145,7 +145,7 @@ func TestInsertEvent_Basic(t *testing.T) {
 
 func TestInsertEvent_SequentialIDs(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	for i := 0; i < 5; i++ {
 		if err := s.InsertEvent(bg(), task.ID, EventTypeOutput, i); err != nil {
@@ -174,8 +174,8 @@ func TestInsertEvent_NotFound(t *testing.T) {
 func TestInsertEvent_PersistsAndReloads(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
-	s.InsertEvent(bg(), task.ID, EventTypeOutput, "hello world")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, "hello world")
 
 	s2, _ := NewStore(dir)
 	events, _ := s2.GetEvents(bg(), task.ID)
@@ -184,7 +184,7 @@ func TestInsertEvent_PersistsAndReloads(t *testing.T) {
 	}
 
 	var data string
-	json.Unmarshal(events[0].Data, &data)
+	_ = json.Unmarshal(events[0].Data, &data)
 	if data != "hello world" {
 		t.Errorf("event data = %q, want 'hello world'", data)
 	}
@@ -192,8 +192,8 @@ func TestInsertEvent_PersistsAndReloads(t *testing.T) {
 
 func TestGetEvents_ReturnsCopy(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
-	s.InsertEvent(bg(), task.ID, EventTypeStateChange, "test")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "test")
 
 	events, _ := s.GetEvents(bg(), task.ID)
 	events[0].EventType = "mutated"
@@ -207,10 +207,10 @@ func TestGetEvents_ReturnsCopy(t *testing.T) {
 func TestGetEvents_SortedByIDAfterReload(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	for i := 0; i < 5; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	s2, _ := NewStore(dir)
@@ -228,10 +228,10 @@ func TestGetEvents_SortedByIDAfterReload(t *testing.T) {
 func TestLoadEvents_SkipsNonJSONFiles(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
-	os.WriteFile(filepath.Join(tracesDir, "README.txt"), []byte("not json"), 0644)
+	_ = os.WriteFile(filepath.Join(tracesDir, "README.txt"), []byte("not json"), 0644)
 
 	s2, err := NewStore(dir)
 	if err != nil {
@@ -246,11 +246,11 @@ func TestLoadEvents_SkipsNonJSONFiles(t *testing.T) {
 func TestLoadEvents_SkipsCorruptTraceFiles(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
-	s.InsertEvent(bg(), task.ID, EventTypeStateChange, "good")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "good")
 
 	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
-	os.WriteFile(filepath.Join(tracesDir, "0001.json"), []byte("{bad json}"), 0644)
+	_ = os.WriteFile(filepath.Join(tracesDir, "0001.json"), []byte("{bad json}"), 0644)
 
 	s2, err := NewStore(dir)
 	if err != nil {
@@ -264,7 +264,7 @@ func TestLoadEvents_SkipsCorruptTraceFiles(t *testing.T) {
 
 func TestConcurrentInsertEvent(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	var wg sync.WaitGroup
 	const n = 10
@@ -272,7 +272,7 @@ func TestConcurrentInsertEvent(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			s.InsertEvent(bg(), task.ID, EventTypeOutput, idx)
+			_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, idx)
 		}(i)
 	}
 	wg.Wait()
@@ -285,7 +285,7 @@ func TestConcurrentInsertEvent(t *testing.T) {
 
 func TestCompactTaskEvents_Basic(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	task, _ := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p", Timeout: 5, Kind: TaskKindTask})
 	insertOutputEvents(t, s, task.ID, 10)
 
 	if err := s.compactTaskEvents(task.ID, math.MaxInt64); err != nil {
@@ -324,7 +324,7 @@ func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
-	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	task, _ := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p", Timeout: 5, Kind: TaskKindTask})
 	insertOutputEvents(t, s, task.ID, 10)
 	if err := s.compactTaskEvents(task.ID, math.MaxInt64); err != nil {
 		t.Fatalf("compactTaskEvents: %v", err)
@@ -357,7 +357,7 @@ func TestCompactTaskEvents_HybridLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
-	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	task, _ := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p", Timeout: 5, Kind: TaskKindTask})
 	insertOutputEvents(t, s, task.ID, 8)
 	if err := s.compactTaskEvents(task.ID, math.MaxInt64); err != nil {
 		t.Fatalf("compactTaskEvents: %v", err)
@@ -400,7 +400,7 @@ func TestCompactTaskEvents_HybridLoad(t *testing.T) {
 
 func TestCompactTaskEvents_Idempotent(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	task, _ := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p", Timeout: 5, Kind: TaskKindTask})
 	insertOutputEvents(t, s, task.ID, 10)
 
 	if err := s.compactTaskEvents(task.ID, math.MaxInt64); err != nil {
@@ -433,9 +433,9 @@ func TestCompactTaskEvents_Idempotent(t *testing.T) {
 
 func TestGetEventsPage_AllEventsNoFilter(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	for i := 0; i < 5; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	page, err := s.GetEventsPage(bg(), task.ID, 0, 0, nil)
@@ -455,9 +455,9 @@ func TestGetEventsPage_AllEventsNoFilter(t *testing.T) {
 
 func TestGetEventsPage_OrderedByID(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	for i := 0; i < 5; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	page, err := s.GetEventsPage(bg(), task.ID, 0, 0, nil)
@@ -474,9 +474,9 @@ func TestGetEventsPage_OrderedByID(t *testing.T) {
 
 func TestGetEventsPage_CursorAfterExclusive(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	for i := 0; i < 5; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	// Get the first 3 events to find the cursor.
@@ -507,9 +507,9 @@ func TestGetEventsPage_CursorAfterExclusive(t *testing.T) {
 
 func TestGetEventsPage_CursorNextAfterIsLastID(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	for i := 0; i < 5; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	page, _ := s.GetEventsPage(bg(), task.ID, 0, 3, nil)
@@ -521,7 +521,7 @@ func TestGetEventsPage_CursorNextAfterIsLastID(t *testing.T) {
 
 func TestGetEventsPage_NextAfterZeroWhenEmpty(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	page, err := s.GetEventsPage(bg(), task.ID, 0, 10, nil)
 	if err != nil {
@@ -534,11 +534,11 @@ func TestGetEventsPage_NextAfterZeroWhenEmpty(t *testing.T) {
 
 func TestGetEventsPage_TypeFilter(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
-	s.InsertEvent(bg(), task.ID, EventTypeStateChange, "a")
-	s.InsertEvent(bg(), task.ID, EventTypeOutput, "b")
-	s.InsertEvent(bg(), task.ID, EventTypeError, "c")
-	s.InsertEvent(bg(), task.ID, EventTypeOutput, "d")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "a")
+	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, "b")
+	_ = s.InsertEvent(bg(), task.ID, EventTypeError, "c")
+	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, "d")
 
 	typeSet := map[EventType]struct{}{EventTypeOutput: {}}
 	page, err := s.GetEventsPage(bg(), task.ID, 0, 100, typeSet)
@@ -560,11 +560,11 @@ func TestGetEventsPage_TypeFilter(t *testing.T) {
 
 func TestGetEventsPage_MultiTypeFilter(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
-	s.InsertEvent(bg(), task.ID, EventTypeStateChange, "s")
-	s.InsertEvent(bg(), task.ID, EventTypeOutput, "o")
-	s.InsertEvent(bg(), task.ID, EventTypeError, "e")
-	s.InsertEvent(bg(), task.ID, EventTypeFeedback, "f")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "s")
+	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, "o")
+	_ = s.InsertEvent(bg(), task.ID, EventTypeError, "e")
+	_ = s.InsertEvent(bg(), task.ID, EventTypeFeedback, "f")
 
 	typeSet := map[EventType]struct{}{
 		EventTypeStateChange: {},
@@ -586,9 +586,9 @@ func TestGetEventsPage_MultiTypeFilter(t *testing.T) {
 
 func TestGetEventsPage_LimitDefault(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	for i := 0; i < 5; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	// limit=0 should default to 200, returning all 5.
@@ -603,9 +603,9 @@ func TestGetEventsPage_LimitDefault(t *testing.T) {
 
 func TestGetEventsPage_LimitCappedAt1000(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	for i := 0; i < 10; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	// limit=5000 should be capped to 1000, returning all 10 events.
@@ -620,9 +620,9 @@ func TestGetEventsPage_LimitCappedAt1000(t *testing.T) {
 
 func TestGetEventsPage_LimitTruncatesPage(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	for i := 0; i < 10; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	page, err := s.GetEventsPage(bg(), task.ID, 0, 4, nil)
@@ -642,9 +642,9 @@ func TestGetEventsPage_LimitTruncatesPage(t *testing.T) {
 
 func TestGetEventsPage_HasMoreFalseWhenExact(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	for i := 0; i < 5; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	page, err := s.GetEventsPage(bg(), task.ID, 0, 5, nil)
@@ -658,11 +658,11 @@ func TestGetEventsPage_HasMoreFalseWhenExact(t *testing.T) {
 
 func TestGetEventsPage_TypeFilterWithCursor(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
-	s.InsertEvent(bg(), task.ID, EventTypeOutput, 1)      // ID 1
-	s.InsertEvent(bg(), task.ID, EventTypeStateChange, 2) // ID 2
-	s.InsertEvent(bg(), task.ID, EventTypeOutput, 3)      // ID 3
-	s.InsertEvent(bg(), task.ID, EventTypeOutput, 4)      // ID 4
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, 1)      // ID 1
+	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, 2) // ID 2
+	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, 3)      // ID 3
+	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, 4)      // ID 4
 
 	// After ID=2, output only → should get IDs 3 and 4.
 	typeSet := map[EventType]struct{}{EventTypeOutput: {}}
@@ -685,7 +685,7 @@ func TestGetEventsPage_TypeFilterWithCursor(t *testing.T) {
 
 func TestGetEventsPage_EmptyTask(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	page, err := s.GetEventsPage(bg(), task.ID, 0, 10, nil)
 	if err != nil {
@@ -714,7 +714,7 @@ func TestCompactTaskEvents_SessionBoundary(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 
-	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	task, _ := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p", Timeout: 5, Kind: TaskKindTask})
 
 	// Session 1: insert 5 events (seqs 1-5).
 	insertOutputEvents(t, s, task.ID, 5)
@@ -782,46 +782,46 @@ func TestCompactTaskEvents_SessionBoundary(t *testing.T) {
 // sequence number among numbered trace files in the traces directory.
 func TestCurrentMaxEventSeq(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(context.Background(), "p", 5, false, "", TaskKindTask)
+	task, _ := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p", Timeout: 5, Kind: TaskKindTask})
 
 	// No events yet: should return 0.
-	max, err := s.currentMaxEventSeq(task.ID)
+	maxSeq, err := s.currentMaxEventSeq(task.ID)
 	if err != nil {
 		t.Fatalf("currentMaxEventSeq (empty): %v", err)
 	}
-	if max != 0 {
-		t.Errorf("empty traces: got %d, want 0", max)
+	if maxSeq != 0 {
+		t.Errorf("empty traces: got %d, want 0", maxSeq)
 	}
 
 	// Insert 7 events; highest seq should be 7.
 	insertOutputEvents(t, s, task.ID, 7)
-	max, err = s.currentMaxEventSeq(task.ID)
+	maxSeq, err = s.currentMaxEventSeq(task.ID)
 	if err != nil {
 		t.Fatalf("currentMaxEventSeq (7 events): %v", err)
 	}
-	if max != 7 {
-		t.Errorf("7 events: got %d, want 7", max)
+	if maxSeq != 7 {
+		t.Errorf("7 events: got %d, want 7", maxSeq)
 	}
 
 	// After compacting events 1-4, numbered files 5-7 remain; max should still be 7.
 	if err := s.compactTaskEvents(task.ID, 4); err != nil {
 		t.Fatalf("compactTaskEvents(maxSeq=4): %v", err)
 	}
-	max, err = s.currentMaxEventSeq(task.ID)
+	maxSeq, err = s.currentMaxEventSeq(task.ID)
 	if err != nil {
 		t.Fatalf("currentMaxEventSeq (after partial compact): %v", err)
 	}
-	if max != 7 {
-		t.Errorf("after compact(4): got %d, want 7", max)
+	if maxSeq != 7 {
+		t.Errorf("after compact(4): got %d, want 7", maxSeq)
 	}
 }
 
 func TestGetEventsPage_FullPaginationWalk(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	const total = 7
 	for i := 0; i < total; i++ {
-		s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
+		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
 	// Walk pages of size 3.

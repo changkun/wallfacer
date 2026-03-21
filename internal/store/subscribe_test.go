@@ -11,7 +11,7 @@ func TestSubscribe_ReceivesNotificationOnCreate(t *testing.T) {
 	id, ch := s.Subscribe()
 	defer s.Unsubscribe(id)
 
-	s.CreateTask(bg(), "p", 5, false, "", "")
+	_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	select {
 	case delta := <-ch:
@@ -28,12 +28,12 @@ func TestSubscribe_ReceivesNotificationOnCreate(t *testing.T) {
 
 func TestSubscribe_ReceivesNotificationOnStatusUpdate(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	id, ch := s.Subscribe()
 	defer s.Unsubscribe(id)
 
-	s.UpdateTaskStatus(bg(), task.ID, "in_progress")
+	_ = s.UpdateTaskStatus(bg(), task.ID, "in_progress")
 
 	select {
 	case delta := <-ch:
@@ -47,12 +47,12 @@ func TestSubscribe_ReceivesNotificationOnStatusUpdate(t *testing.T) {
 
 func TestSubscribe_DeleteSendsDeletedDelta(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	id, ch := s.Subscribe()
 	defer s.Unsubscribe(id)
 
-	s.DeleteTask(bg(), task.ID, "")
+	_ = s.DeleteTask(bg(), task.ID, "")
 
 	select {
 	case delta := <-ch:
@@ -72,7 +72,7 @@ func TestUnsubscribe_StopsNotifications(t *testing.T) {
 	id, ch := s.Subscribe()
 	s.Unsubscribe(id)
 
-	s.CreateTask(bg(), "p", 5, false, "", "")
+	_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	select {
 	case <-ch:
@@ -89,7 +89,7 @@ func TestSubscribe_MultipleSubscribersAllNotified(t *testing.T) {
 	defer s.Unsubscribe(id1)
 	defer s.Unsubscribe(id2)
 
-	s.CreateTask(bg(), "p", 5, false, "", "")
+	_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	for i, ch := range []<-chan SequencedDelta{ch1, ch2} {
 		select {
@@ -165,7 +165,7 @@ func TestNotify_DeltaContainsCorrectTask(t *testing.T) {
 	s := newTestStore(t)
 	_, ch := s.Subscribe()
 
-	task, _ := s.CreateTask(bg(), "hello", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "hello", Timeout: 5})
 
 	select {
 	case delta := <-ch:
@@ -188,7 +188,7 @@ func TestNotify_DeltaContainsCorrectTask(t *testing.T) {
 
 func TestSubscribe_DeltaPayloadIsIsolatedFromStoreAndReplay(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "hello", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "hello", Timeout: 5})
 
 	s.mu.Lock()
 	want := setTaskCloneFixture(t, s.tasks[task.ID])
@@ -528,7 +528,7 @@ func TestReplayBuf_BoundedToMax(t *testing.T) {
 // returned must be >= the seq of that mutation.
 func TestListTasksAndSeq_ConsistentView(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "hi", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "hi", Timeout: 5})
 
 	tasks, seq, err := s.ListTasksAndSeq(bg(), false)
 	if err != nil {
@@ -543,7 +543,7 @@ func TestListTasksAndSeq_ConsistentView(t *testing.T) {
 	}
 
 	// Update the task; the new seq must be higher.
-	s.UpdateTaskStatus(bg(), task.ID, "in_progress")
+	_ = s.UpdateTaskStatus(bg(), task.ID, "in_progress")
 	_, seq2, _ := s.ListTasksAndSeq(bg(), false)
 	if seq2 <= seq {
 		t.Errorf("expected seq2 (%d) > seq (%d) after status update", seq2, seq)

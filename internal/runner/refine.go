@@ -36,9 +36,11 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 
 	prompt := r.buildRefinementPrompt(task, userInstructions, time.Now())
 
-	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "refinement", Label: "refinement"})
+	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "refinement", Label: "refinement"})
+
 	output, _, _, err := r.runRefinementContainer(ctx, taskID, prompt, "", r.sandboxForTaskActivity(task, activityRefinement))
-	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "refinement", Label: "refinement"})
+	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "refinement", Label: "refinement"})
+
 	if err != nil {
 		logger.Runner.Error("refinement container error", "task", taskID, "error", err)
 
@@ -49,7 +51,8 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 		}
 		cur.CurrentRefinement.Status = store.RefinementJobStatusFailed
 		cur.CurrentRefinement.Error = err.Error()
-		r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
+		_ = r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
+
 		return
 	}
 
@@ -59,7 +62,8 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	}
 	cur.CurrentRefinement.Status = store.RefinementJobStatusDone
 	cur.CurrentRefinement.Result = cleanRefinementResult(output.Result)
-	r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
+	_ = r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
+
 
 	logger.Runner.Info("refinement complete", "task", taskID)
 }
@@ -177,7 +181,8 @@ func (r *Runner) runRefinementContainer(
 	defer r.refineContainers.Delete(taskID)
 
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
-		exec.Command(r.command, "rm", "-f", containerName).Run()
+		_ = exec.Command(r.command, "rm", "-f", containerName).Run()
+
 
 		args := r.buildRefinementContainerArgs(containerName, taskID.String(), prompt, modelOverride, selectedSandbox)
 
@@ -190,8 +195,10 @@ func (r *Runner) runRefinementContainer(
 		runErr := cmd.Run()
 
 		if ctx.Err() != nil {
-			exec.Command(r.command, "kill", containerName).Run()
-			exec.Command(r.command, "rm", "-f", containerName).Run()
+			_ = exec.Command(r.command, "kill", containerName).Run()
+
+			_ = exec.Command(r.command, "rm", "-f", containerName).Run()
+
 			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("refinement container terminated: %w", ctx.Err())
 		}
 
@@ -241,11 +248,11 @@ func (r *Runner) runRefinementContainer(
 	if err != nil {
 		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
 			logger.Runner.Warn("refinement: claude token limit hit; retrying with codex", "task", taskID)
-			r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during refinement)",
 			})
 			output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
-			sb = sandbox.Codex
 		}
 		if err != nil {
 			return nil, rawStdout, rawStderr, err
@@ -254,11 +261,11 @@ func (r *Runner) runRefinementContainer(
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("refinement: claude output reported token limit; retrying with codex", "task", taskID)
-		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+
 			"result": "Sandbox fallback: claude → codex (token/rate limit in refinement output)",
 		})
 		output, rawStdout, rawStderr, err = runWithSandbox(sandbox.Codex)
-		sb = sandbox.Codex
 		if err != nil {
 			return nil, rawStdout, rawStderr, err
 		}
@@ -266,7 +273,8 @@ func (r *Runner) runRefinementContainer(
 
 	// Accumulate usage attributed to refinement sub-agent.
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 {
-		r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityRefinement, store.TaskUsage{
+		_ = r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityRefinement, store.TaskUsage{
+
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,

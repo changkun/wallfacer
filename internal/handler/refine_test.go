@@ -34,8 +34,9 @@ func TestStartRefinement_NotFound(t *testing.T) {
 func TestStartRefinement_NotBacklog(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -50,14 +51,15 @@ func TestStartRefinement_NotBacklog(t *testing.T) {
 func TestStartRefinement_AlreadyRunning(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 
 	job := &store.RefinementJob{
 		ID:        uuid.New().String(),
 		CreatedAt: time.Now(),
 		Status:    "running",
 	}
-	h.store.UpdateRefinementJob(ctx, task.ID, job)
+	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -73,7 +75,7 @@ func TestStartRefinement_AlreadyRunning(t *testing.T) {
 func TestStartRefinement_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "implement feature X", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "implement feature X", Timeout: 15})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -108,7 +110,7 @@ func TestStartRefinement_Success(t *testing.T) {
 func TestStartRefinement_PreviousNonRunningAllowed(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 
 	// Set a previously failed job.
 	job := &store.RefinementJob{
@@ -117,7 +119,8 @@ func TestStartRefinement_PreviousNonRunningAllowed(t *testing.T) {
 		Status:    "failed",
 		Error:     "previous error",
 	}
-	h.store.UpdateRefinementJob(ctx, task.ID, job)
+	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -147,7 +150,7 @@ func TestCancelRefinement_NotFound(t *testing.T) {
 func TestCancelRefinement_NoRefinementRunning(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -162,7 +165,7 @@ func TestCancelRefinement_NoRefinementRunning(t *testing.T) {
 func TestCancelRefinement_NonRunningJobRejected(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 
 	// A completed (done) job should not be cancellable.
 	job := &store.RefinementJob{
@@ -170,7 +173,8 @@ func TestCancelRefinement_NonRunningJobRejected(t *testing.T) {
 		CreatedAt: time.Now(),
 		Status:    "done",
 	}
-	h.store.UpdateRefinementJob(ctx, task.ID, job)
+	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
+
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -186,14 +190,15 @@ func TestCancelRefinement_NonRunningJobRejected(t *testing.T) {
 func TestCancelRefinement_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 
 	job := &store.RefinementJob{
 		ID:        uuid.New().String(),
 		CreatedAt: time.Now(),
 		Status:    "running",
 	}
-	h.store.UpdateRefinementJob(ctx, task.ID, job)
+	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
+
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -243,8 +248,9 @@ func TestRefineApply_NotFound(t *testing.T) {
 func TestRefineApply_NotBacklog(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
 
 	body := `{"prompt": "new prompt"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))
@@ -260,7 +266,7 @@ func TestRefineApply_NotBacklog(t *testing.T) {
 func TestRefineApply_InvalidJSON(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader("{bad"))
 	w := httptest.NewRecorder()
@@ -275,7 +281,7 @@ func TestRefineApply_InvalidJSON(t *testing.T) {
 func TestRefineApply_EmptyPrompt(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 
 	body := `{"prompt": "   "}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))
@@ -292,7 +298,7 @@ func TestRefineApply_EmptyPrompt(t *testing.T) {
 func TestRefineApply_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original prompt", Timeout: 15})
 
 	// Attach a completed refinement job so its result is captured in the session.
 	job := &store.RefinementJob{
@@ -301,7 +307,8 @@ func TestRefineApply_Success(t *testing.T) {
 		Status:    "done",
 		Result:    "detailed implementation spec from sandbox",
 	}
-	h.store.UpdateRefinementJob(ctx, task.ID, job)
+	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
+
 
 	body := `{"prompt": "detailed refined prompt"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))
@@ -341,7 +348,7 @@ func TestRefineApply_Success(t *testing.T) {
 func TestRefineApply_NoCurrentRefinement(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original prompt", Timeout: 15})
 
 	body := `{"prompt": "manually written detailed prompt"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))
@@ -352,7 +359,8 @@ func TestRefineApply_NoCurrentRefinement(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var updated store.Task
-	json.NewDecoder(w.Body).Decode(&updated)
+	_ = json.NewDecoder(w.Body).Decode(&updated)
+
 	if updated.Prompt != "manually written detailed prompt" {
 		t.Errorf("expected 'manually written detailed prompt', got %q", updated.Prompt)
 	}
@@ -362,7 +370,7 @@ func TestRefineApply_NoCurrentRefinement(t *testing.T) {
 func TestRefineApply_UpdatesStorePrompt(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "original prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original prompt", Timeout: 15})
 
 	body := `{"prompt": "store-verified prompt"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))
@@ -394,7 +402,7 @@ func TestRefineApply_UpdatesStorePrompt(t *testing.T) {
 func TestStartRefinement_ConcurrentRequestsOnlyOneSucceeds(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "concurrent test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "concurrent test prompt", Timeout: 15})
 
 	var wg sync.WaitGroup
 	codes := make([]int, 2)
@@ -436,7 +444,7 @@ func TestStartRefinement_ConcurrentRequestsOnlyOneSucceeds(t *testing.T) {
 func TestStartRefinementJobIfIdle_AtomicGuard(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "atomic guard prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "atomic guard prompt", Timeout: 15})
 
 	makeJob := func() *store.RefinementJob {
 		return &store.RefinementJob{
@@ -460,11 +468,12 @@ func TestStartRefinementJobIfIdle_AtomicGuard(t *testing.T) {
 	nilCount := 0
 	alreadyRunningCount := 0
 	for _, err := range errs {
-		if err == nil {
+		switch {
+		case err == nil:
 			nilCount++
-		} else if errors.Is(err, store.ErrRefinementAlreadyRunning) {
+		case errors.Is(err, store.ErrRefinementAlreadyRunning):
 			alreadyRunningCount++
-		} else {
+		default:
 			t.Errorf("unexpected error: %v", err)
 		}
 	}
@@ -483,7 +492,7 @@ func TestStartRefinementJobIfIdle_AtomicGuard(t *testing.T) {
 func TestStartRefinement_RejectsUnknownFieldsInBody(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 
 	body := `{"user_instructions": "be careful", "unknown_field": true}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", strings.NewReader(body))
@@ -499,7 +508,7 @@ func TestStartRefinement_RejectsUnknownFieldsInBody(t *testing.T) {
 func TestStartRefinement_AcceptsEmptyBody(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test prompt", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 
 	// No body — must not return 400 from the decode step.
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
@@ -534,7 +543,7 @@ func TestRefineDismiss_NotBacklog(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -557,7 +566,7 @@ func TestRefineDismiss_NoRefinement(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -578,7 +587,7 @@ func TestRefineDismiss_RunningRefinementRejected(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -607,7 +616,7 @@ func TestRefineDismiss_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "test task", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

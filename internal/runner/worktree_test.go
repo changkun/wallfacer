@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"changkun.de/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -18,7 +19,7 @@ func TestWorktreeConcurrency(t *testing.T) {
 
 	// Pre-create a known task so PruneUnknownWorktrees has something to
 	// preserve, making it do meaningful read+compare work during the race.
-	knownTask, err := s.CreateTask(ctx, "known task for concurrency test", 5, false, "", "")
+	knownTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "known task for concurrency test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

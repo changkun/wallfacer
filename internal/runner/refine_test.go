@@ -21,7 +21,7 @@ func TestRunRefinement_NoopsAfterTaskReset(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "original prompt", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original prompt", Timeout: 5})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestRunRefinementContainerFallsBackToCodexOnTokenLimit(t *testing.T) {
 	cmd := fakeStatefulCmd(t, []string{tokenLimit, refinementOutput})
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 
-	task, err := s.CreateTask(context.Background(), "Refine this task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "Refine this task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

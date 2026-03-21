@@ -278,6 +278,7 @@ func (h *Handler) hasStore() bool {
 	return ok
 }
 
+// RequireStoreMiddleware rejects requests with 503 when no store is configured.
 func (h *Handler) RequireStoreMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !h.hasStore() {

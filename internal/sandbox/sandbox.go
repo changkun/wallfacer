@@ -1,9 +1,12 @@
+// Package sandbox defines the supported sandbox runtime types.
 package sandbox
 
 import "strings"
 
+// Type identifies a sandbox runtime (e.g. "claude", "codex").
 type Type string
 
+// Sandbox runtime constants.
 const (
 	Claude Type = "claude"
 	Codex  Type = "codex"
@@ -11,12 +14,14 @@ const (
 
 var all = []Type{Claude, Codex}
 
+// All returns a copy of all known sandbox types.
 func All() []Type {
 	out := make([]Type, len(all))
 	copy(out, all)
 	return out
 }
 
+// Parse attempts to parse value into a known sandbox Type.
 func Parse(value string) (Type, bool) {
 	switch Type(strings.ToLower(strings.TrimSpace(value))) {
 	case Claude:
@@ -28,6 +33,7 @@ func Parse(value string) (Type, bool) {
 	}
 }
 
+// Normalize returns the canonical lowercase Type, even for unknown values.
 func Normalize(value string) Type {
 	if parsed, ok := Parse(value); ok {
 		return parsed
@@ -35,6 +41,7 @@ func Normalize(value string) Type {
 	return Type(strings.ToLower(strings.TrimSpace(value)))
 }
 
+// Default returns the parsed Type or Claude if the value is unrecognised.
 func Default(value string) Type {
 	if parsed, ok := Parse(value); ok {
 		return parsed
@@ -42,11 +49,13 @@ func Default(value string) Type {
 	return Claude
 }
 
+// IsValid reports whether t is a known sandbox type.
 func (t Type) IsValid() bool {
 	_, ok := Parse(string(t))
 	return ok
 }
 
+// OrDefault returns t if valid, otherwise Claude.
 func (t Type) OrDefault() Type {
 	if t.IsValid() {
 		return t

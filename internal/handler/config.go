@@ -241,7 +241,7 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			if *req.Autopush {
 				v = "true"
 			}
-			envconfig.Update(h.envFile, envconfig.Updates{AutoPush: &v})
+			_ = envconfig.Update(h.envFile, envconfig.Updates{AutoPush: &v})
 		}
 	}
 	if req.IdeationInterval != nil {

@@ -1,3 +1,4 @@
+// Package workspace manages workspace lifecycle and scoped store switching.
 package workspace
 
 import (
@@ -14,6 +15,7 @@ import (
 	"changkun.de/wallfacer/internal/workspacegroups"
 )
 
+// Snapshot holds the immutable state of a workspace configuration at a point in time.
 type Snapshot struct {
 	Workspaces       []string
 	Store            *store.Store
@@ -32,6 +34,7 @@ type pendingSwap struct {
 	cleanup  func() // closes next.Store; set to a no-op after successful commit
 }
 
+// Manager coordinates workspace switching, store lifecycle, and change subscriptions.
 type Manager struct {
 	configDir string
 	dataDir   string
@@ -49,6 +52,7 @@ type Manager struct {
 	newStore func(dir string) (*store.Store, error)
 }
 
+// NewManager creates a Manager and switches to the initial workspace set.
 func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager, error) {
 	m := &Manager{
 		configDir: configDir,
@@ -75,6 +79,7 @@ func (m *Manager) startupWorkspaces(initial []string) []string {
 	return cloneStrings(groups[0].Workspaces)
 }
 
+// NewStatic creates a Manager with a fixed workspace set, useful for testing.
 func NewStatic(store *store.Store, workspaces []string, instructionsPath string) *Manager {
 	m := &Manager{subs: make(map[int]chan Snapshot)}
 	ws := cloneStrings(workspaces)
@@ -94,36 +99,42 @@ func NewStatic(store *store.Store, workspaces []string, instructionsPath string)
 	return m
 }
 
+// Snapshot returns a copy of the current workspace state.
 func (m *Manager) Snapshot() Snapshot {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return cloneSnapshot(m.current)
 }
 
+// Store returns the current scoped store, if any.
 func (m *Manager) Store() (*store.Store, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.current.Store, m.current.Store != nil
 }
 
+// Workspaces returns a copy of the current workspace paths.
 func (m *Manager) Workspaces() []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return cloneStrings(m.current.Workspaces)
 }
 
+// InstructionsPath returns the path to the merged instructions file.
 func (m *Manager) InstructionsPath() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.current.InstructionsPath
 }
 
+// HasStore reports whether a scoped store is currently available.
 func (m *Manager) HasStore() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.current.Store != nil
 }
 
+// Subscribe returns a channel that receives snapshots on workspace changes.
 func (m *Manager) Subscribe() (int, <-chan Snapshot) {
 	m.subsMu.Lock()
 	defer m.subsMu.Unlock()
@@ -134,6 +145,7 @@ func (m *Manager) Subscribe() (int, <-chan Snapshot) {
 	return id, ch
 }
 
+// Unsubscribe removes a subscription and closes its channel.
 func (m *Manager) Unsubscribe(id int) {
 	m.subsMu.Lock()
 	ch, ok := m.subs[id]

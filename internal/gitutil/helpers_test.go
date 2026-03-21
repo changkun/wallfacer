@@ -1,3 +1,4 @@
+// Package gitutil provides git helper utilities.
 package gitutil
 
 import (

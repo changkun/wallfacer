@@ -73,7 +73,7 @@ func TestScanOrphanedWorktrees_SkipsInProgressTask(t *testing.T) {
 	}
 
 	// Create an in_progress task in the store and a matching worktree directory.
-	task, err := s.CreateTask(ctx, "active task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "active task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestScanOrphanedWorktrees_TerminalStatesAreOrphans(t *testing.T) {
 
 	createTaskInStatus := func(status store.TaskStatus) uuid.UUID {
 		t.Helper()
-		task, err := s.CreateTask(ctx, "task for "+string(status), 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task for "+string(status), Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -158,7 +158,7 @@ func TestScanOrphanedWorktrees_SkipsNonTerminalStates(t *testing.T) {
 
 	createTaskInStatus := func(status store.TaskStatus) uuid.UUID {
 		t.Helper()
-		task, err := s.CreateTask(ctx, "task for "+string(status), 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task for "+string(status), Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -225,7 +225,7 @@ func TestScanMissingTaskWorktrees_DetectsMissing(t *testing.T) {
 	s, r := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "missing worktree task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "missing worktree task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestScanMissingTaskWorktrees_SkipsTerminalTasks(t *testing.T) {
 
 	createTerminal := func(status store.TaskStatus) *store.Task {
 		t.Helper()
-		task, err := s.CreateTask(ctx, "terminal task "+string(status), 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "terminal task "+string(status), Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}

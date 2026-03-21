@@ -58,7 +58,7 @@ func (h *Handler) saveTemplates(templates []PromptTemplate) error {
 
 // ListTemplates handles GET /api/templates.
 // Returns all templates sorted by created_at descending; empty array when file absent.
-func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListTemplates(w http.ResponseWriter, _ *http.Request) {
 	templatesMu.RLock()
 	templates, err := h.loadTemplates()
 	templatesMu.RUnlock()

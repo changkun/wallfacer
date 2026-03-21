@@ -10,7 +10,7 @@ func TestSaveAndGetOversight(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "test prompt", 30, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "test prompt", Timeout: 30, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestGetOversight_NotExist_ReturnsPending(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "test prompt", 30, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "test prompt", Timeout: 30, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestSaveAndGetTestOversight(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "test prompt", 30, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "test prompt", Timeout: 30, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestGetTestOversight_NotExist_ReturnsPending(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "test prompt", 30, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "test prompt", Timeout: 30, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestLoadOversightText_NotExist_ReturnsEmpty(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "test prompt", 30, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "test prompt", Timeout: 30, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestLoadOversightText_WithPhases(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "test prompt", 30, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "test prompt", Timeout: 30, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestSaveOversight_UpdatesSearchIndex(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "searchable test prompt", 30, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "searchable test prompt", Timeout: 30, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

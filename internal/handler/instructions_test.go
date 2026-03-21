@@ -78,7 +78,8 @@ func TestGetInstructions_ReturnsContent(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["content"] != expected {
 		t.Errorf("expected %q, got %q", expected, resp["content"])
 	}
@@ -136,7 +137,8 @@ func TestUpdateInstructions_ReturnsOK(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["status"] != "ok" {
 		t.Errorf("expected status=ok, got %q", resp["status"])
 	}
@@ -154,7 +156,8 @@ func TestReinitInstructions_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["content"] == "" {
 		t.Error("expected non-empty content after reinit")
 	}
@@ -206,7 +209,8 @@ func TestUpdateInstructions_WriteError(t *testing.T) {
 		t.Fatalf("chmod: %v", err)
 	}
 	// Restore permissions after test so TempDir cleanup works.
-	t.Cleanup(func() { os.Chmod(instDir, 0755) })
+	t.Cleanup(func() { _ = os.Chmod(instDir, 0755) })
+
 
 	body := `{"content": "some content"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/instructions", strings.NewReader(body))
@@ -228,7 +232,8 @@ func TestReinitInstructions_WriteError(t *testing.T) {
 	if err := os.Chmod(instDir, 0555); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
-	t.Cleanup(func() { os.Chmod(instDir, 0755) })
+	t.Cleanup(func() { _ = os.Chmod(instDir, 0755) })
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/instructions/reinit", nil)
 	w := httptest.NewRecorder()

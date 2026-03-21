@@ -54,7 +54,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 	}{
 		{
 			name:    "claude, no envfile, no model",
-			cfgFn:   func(t *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"} },
+			cfgFn:   func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"} },
 			model:   "",
 			sandbox: "claude",
 			wantPairs: []pair{
@@ -66,7 +66,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 		},
 		{
 			name: "claude, with envfile and model",
-			cfgFn: func(t *testing.T) RunnerConfig {
+			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest", EnvFile: "/home/user/.env"}
 			},
 			model:   "claude-opus-4-6",
@@ -81,7 +81,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 		},
 		{
 			name:    "codex sandbox, no auth path configured",
-			cfgFn:   func(t *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"} },
+			cfgFn:   func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"} },
 			model:   "",
 			sandbox: "codex",
 			wantPairs: []pair{
@@ -110,7 +110,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 		},
 		{
 			name:    "codex sandbox, auth path does not exist",
-			cfgFn:   func(t *testing.T) RunnerConfig {
+			cfgFn:   func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest", CodexAuthPath: "/nonexistent/path/to/codex"}
 			},
 			model:       "",
@@ -120,14 +120,14 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 		},
 		{
 			name:    "codex sandbox, empty sandbox image falls back to wallfacer-codex:latest",
-			cfgFn:   func(t *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: ""} },
+			cfgFn:   func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: ""} },
 			model:   "",
 			sandbox: "codex",
 			wantArgs: []string{"wallfacer-codex:latest"},
 		},
 		{
 			name:    "network is always host",
-			cfgFn:   func(t *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"} },
+			cfgFn:   func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"} },
 			model:   "",
 			sandbox: "claude",
 			// --network=host is emitted as a single token, not two consecutive args.
@@ -135,7 +135,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 		},
 		{
 			name:    "fixed prefix: run --rm",
-			cfgFn:   func(t *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "img:v1"} },
+			cfgFn:   func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "img:v1"} },
 			model:   "",
 			sandbox: "claude",
 			wantPairs: []pair{
@@ -333,7 +333,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 		},
 		{
 			name: "instructions file absent: no instructions mount",
-			cfgFn: func(t *testing.T) RunnerConfig {
+			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{
 					Command:          "podman",
 					SandboxImage:     "wallfacer:latest",
@@ -345,7 +345,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 		},
 		{
 			name: "no instructions path: no instructions mount",
-			cfgFn: func(t *testing.T) RunnerConfig {
+			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{
 					Command:      "podman",
 					SandboxImage: "wallfacer:latest",
@@ -356,7 +356,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 		},
 		{
 			name: "prompt is passed after image in Cmd",
-			cfgFn: func(t *testing.T) RunnerConfig {
+			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
 			},
 			sandbox: "claude",
@@ -366,7 +366,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 		},
 		{
 			name: "claude and codex produce different images",
-			cfgFn: func(t *testing.T) RunnerConfig {
+			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
 			},
 			sandbox:  "codex",
@@ -641,7 +641,7 @@ func TestAppendInstructionsMount(t *testing.T) {
 		},
 		{
 			name: "missing file: no mount added",
-			cfgFn: func(t *testing.T) RunnerConfig {
+			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{
 					Command:          "podman",
 					SandboxImage:     "img",
@@ -653,7 +653,7 @@ func TestAppendInstructionsMount(t *testing.T) {
 		},
 		{
 			name: "empty path: no mount added",
-			cfgFn: func(t *testing.T) RunnerConfig {
+			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{Command: "podman", SandboxImage: "img"}
 			},
 			sandbox:  "claude",
@@ -1036,7 +1036,7 @@ func TestExecutorRunArgsClaudeSandbox(t *testing.T) {
 	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "executor args claude test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "executor args claude test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1081,7 +1081,7 @@ func TestExecutorRunArgsCodexSandbox(t *testing.T) {
 	r.sandboxImage = "wallfacer:latest"
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "executor args codex test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "executor args codex test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

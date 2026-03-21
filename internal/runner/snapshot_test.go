@@ -169,7 +169,7 @@ func TestCommitPipelineNonGitWorkspace(t *testing.T) {
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Non-git commit test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Non-git commit test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,8 @@ func TestCommitPipelineNonGitWorkspace(t *testing.T) {
 
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, task.ID, "", 1, wt, br)
+	_ = runner.commit(commitCtx, task.ID, "", 1, wt, br)
+
 
 	// Verify modifications were extracted back to the original workspace.
 	content, err := os.ReadFile(filepath.Join(ws, "app.txt"))
@@ -227,7 +228,7 @@ func TestRunEndToEndNonGitWorkspace(t *testing.T) {
 	t.Cleanup(r.WaitBackground)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Non-git E2E test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Non-git E2E test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

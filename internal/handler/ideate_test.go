@@ -164,7 +164,8 @@ func TestUpdateConfig_SetsIdeationInterval(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 
 	got, ok := resp["ideation_interval"].(float64)
 	if !ok {
@@ -206,7 +207,8 @@ func TestUpdateConfig_ReturnsIdeationIntervalByDefault(t *testing.T) {
 	h.UpdateConfig(w, req)
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if _, ok := resp["ideation_interval"]; !ok {
 		t.Error("expected ideation_interval in UpdateConfig response")
 	}
@@ -226,7 +228,8 @@ func TestGetConfig_ReturnsIdeationInterval(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 
 	got, ok := resp["ideation_interval"].(float64)
 	if !ok {
@@ -245,7 +248,8 @@ func TestGetConfig_IdeationNextRunAbsentWhenNotPending(t *testing.T) {
 	h.GetConfig(w, req)
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 
 	if _, ok := resp["ideation_next_run"]; ok {
 		t.Error("expected ideation_next_run to be absent when no timer is pending")
@@ -256,11 +260,11 @@ func TestCreateIdeaAgentTask_PopulatesExecutionPrompt(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	_, err := h.store.CreateTask(ctx, "Refactor auth handler", 5, false, "", "")
+	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Refactor auth handler", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	existingDone, err := h.store.CreateTask(ctx, "Write tests for sync", 5, false, "", "")
+	existingDone, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Write tests for sync", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -353,7 +357,7 @@ func TestCancelIdeation_CancelsBacklogIdeaAgentTask(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "brainstorm prompt", 15, false, "", store.TaskKindIdeaAgent)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm prompt", Timeout: 15, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -385,7 +389,7 @@ func TestCancelIdeation_IgnoresNonIdeaAgentTasks(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	_, err := h.store.CreateTask(ctx, "regular task", 15, false, "", store.TaskKindTask)
+	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "regular task", Timeout: 15, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -437,7 +441,7 @@ func TestGetIdeationStatus_RunningWhenIdeaAgentInProgress(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "brainstorm", 15, false, "", store.TaskKindIdeaAgent)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 15, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -537,7 +541,7 @@ func TestMaybeScheduleNextIdeation_ActiveBacklogTask(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a backlogged idea-agent task.
-	_, err := h.store.CreateTask(ctx, "brainstorm prompt", 60, false, "", store.TaskKindIdeaAgent)
+	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm prompt", Timeout: 60, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -565,7 +569,7 @@ func TestMaybeScheduleNextIdeation_ActiveInProgressTask(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an idea-agent task and move it to in_progress.
-	task, err := h.store.CreateTask(ctx, "brainstorm running", 60, false, "", store.TaskKindIdeaAgent)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm running", Timeout: 60, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -597,7 +601,7 @@ func TestMaybeScheduleNextIdeation_DoneTaskDoesNotBlock(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an idea-agent task and advance it to done (terminal state).
-	task, err := h.store.CreateTask(ctx, "old brainstorm", 60, false, "", store.TaskKindIdeaAgent)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "old brainstorm", Timeout: 60, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

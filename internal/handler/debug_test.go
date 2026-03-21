@@ -92,10 +92,10 @@ func TestHealth_TasksByStatusCounts(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	if _, err := h.store.CreateTask(ctx, "backlog task one", 15, false, "", store.TaskKindTask); err != nil {
+	if _, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task one", Timeout: 15, Kind: store.TaskKindTask}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.store.CreateTask(ctx, "backlog task two", 15, false, "", store.TaskKindTask); err != nil {
+	if _, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task two", Timeout: 15, Kind: store.TaskKindTask}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -149,7 +149,7 @@ func TestGetSpanStats_KnownSpanPairs(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "test", 15, false, "", store.TaskKindTask)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,12 +157,14 @@ func TestGetSpanStats_KnownSpanPairs(t *testing.T) {
 	// Insert three agent_turn spans with fixed durations by sleeping between events.
 	// We sleep at least 10ms per span so DurationMs is reliably > 0.
 	for i := 0; i < 3; i++ {
-		h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{
+		_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{
+
 			Phase: "agent_turn",
 			Label: "agent_turn_" + string(rune('1'+i)),
 		})
 		time.Sleep(10 * time.Millisecond)
-		h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{
+		_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{
+
 			Phase: "agent_turn",
 			Label: "agent_turn_" + string(rune('1'+i)),
 		})
@@ -210,17 +212,19 @@ func TestGetSpanStats_IncludesArchived(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "archived task", 15, false, "", store.TaskKindTask)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "archived task", Timeout: 15, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{
+
 		Phase: "worktree_setup",
 		Label: "worktree_setup",
 	})
 	time.Sleep(5 * time.Millisecond)
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{
+
 		Phase: "worktree_setup",
 		Label: "worktree_setup",
 	})
@@ -314,15 +318,16 @@ func TestBoardManifest_ContainsBothTasks(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	t1, _ := h.store.CreateTask(ctx, "first task", 15, false, "", store.TaskKindTask)
-	t2, _ := h.store.CreateTask(ctx, "second task", 15, false, "", store.TaskKindTask)
+	t1, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "first task", Timeout: 15, Kind: store.TaskKindTask})
+	t2, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "second task", Timeout: 15, Kind: store.TaskKindTask})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/debug/board", nil)
 	w := httptest.NewRecorder()
 	h.BoardManifest(w, req)
 
 	var resp boardManifestResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 
 	ids := map[string]bool{}
 	for _, bt := range resp.Manifest.Tasks {
@@ -358,8 +363,8 @@ func TestTaskBoardManifest_IsSelfTrue(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	t1, _ := h.store.CreateTask(ctx, "self task", 15, false, "", store.TaskKindTask)
-	t2, _ := h.store.CreateTask(ctx, "sibling task", 15, false, "", store.TaskKindTask)
+	t1, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "self task", Timeout: 15, Kind: store.TaskKindTask})
+	t2, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "sibling task", Timeout: 15, Kind: store.TaskKindTask})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+t1.ID.String()+"/board", nil)
 	w := httptest.NewRecorder()
@@ -369,7 +374,8 @@ func TestTaskBoardManifest_IsSelfTrue(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp boardManifestResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 
 	if resp.Manifest.SelfTaskID != t1.ID.String() {
 		t.Errorf("SelfTaskID: got %s, want %s", resp.Manifest.SelfTaskID, t1.ID)
@@ -426,7 +432,7 @@ func TestGetSpanStats_ThroughputWithDoneAndFailed(t *testing.T) {
 
 	// Create 2 done tasks and 1 failed task.
 	for i := 0; i < 2; i++ {
-		task, err := h.store.CreateTask(ctx, "done task", 15, false, "", store.TaskKindTask)
+		task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task", Timeout: 15, Kind: store.TaskKindTask})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -438,7 +444,7 @@ func TestGetSpanStats_ThroughputWithDoneAndFailed(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	failedTask, err := h.store.CreateTask(ctx, "failed task", 15, false, "", store.TaskKindTask)
+	failedTask, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "failed task", Timeout: 15, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,7 +501,7 @@ func TestGetSpanStats_ThroughputDailyCompletionsAlways30(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "task", 15, false, "", store.TaskKindTask)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task", Timeout: 15, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -529,7 +535,8 @@ func TestBoardManifest_SizeMetadata(t *testing.T) {
 	h.BoardManifest(w, req)
 
 	var resp boardManifestResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 
 	if resp.SizeBytes <= 0 {
 		t.Errorf("expected SizeBytes > 0, got %d", resp.SizeBytes)

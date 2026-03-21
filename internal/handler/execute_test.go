@@ -16,7 +16,7 @@ import (
 // createWaitingTask creates a task in the store and moves it to waiting status.
 func createWaitingTask(t *testing.T, h *Handler, prompt string) uuid.UUID {
 	t.Helper()
-	task, err := h.store.CreateTask(context.Background(), prompt, 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: prompt, Timeout: 15})
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}
@@ -29,7 +29,7 @@ func createWaitingTask(t *testing.T, h *Handler, prompt string) uuid.UUID {
 func TestTestTask_RejectsNonWaiting(t *testing.T) {
 	h := newTestHandler(t)
 
-	task, err := h.store.CreateTask(context.Background(), "build a widget", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "build a widget", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}

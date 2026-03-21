@@ -199,7 +199,6 @@ func TestListTemplates_SortedByCreatedAtDesc(t *testing.T) {
 	h := newTestHandler(t)
 
 	names := []string{"Alpha", "Beta", "Gamma"}
-	var ids []string
 	for _, name := range names {
 		body := `{"name":"` + name + `","body":"body of ` + name + `"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/templates", strings.NewReader(body))
@@ -208,9 +207,6 @@ func TestListTemplates_SortedByCreatedAtDesc(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Fatalf("create %s: expected 201, got %d", name, w.Code)
 		}
-		var tmpl PromptTemplate
-		json.NewDecoder(w.Body).Decode(&tmpl)
-		ids = append(ids, tmpl.ID)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/templates", nil)

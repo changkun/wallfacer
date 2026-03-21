@@ -29,7 +29,7 @@ func BenchmarkUpdateTaskTitle(b *testing.B) {
 	s := newBenchStore(b)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "benchmark prompt", 60, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "benchmark prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		b.Fatalf("CreateTask: %v", err)
 	}
@@ -94,7 +94,7 @@ func BenchmarkCreateTask_LargeOversight(b *testing.B) {
 	}
 
 	// Pre-create the task in the deleted state with the large oversight on disk.
-	task0, err := s.CreateTask(ctx, "bench prompt", 60, false, "", TaskKindTask)
+	task0, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "bench prompt", Timeout: 60, Kind: TaskKindTask})
 	if err != nil {
 		b.Fatalf("initial CreateTask: %v", err)
 	}

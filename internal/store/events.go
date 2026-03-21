@@ -234,7 +234,7 @@ func (s *Store) currentMaxEventSeq(taskID uuid.UUID) (int64, error) {
 		}
 		return 0, err
 	}
-	var max int64
+	var maxSeq int64
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -243,11 +243,11 @@ func (s *Store) currentMaxEventSeq(taskID uuid.UUID) (int64, error) {
 		if !ok {
 			continue
 		}
-		if int64(tf.seq) > max {
-			max = int64(tf.seq)
+		if int64(tf.seq) > maxSeq {
+			maxSeq = int64(tf.seq)
 		}
 	}
-	return max, nil
+	return maxSeq, nil
 }
 
 // compactTaskEvents merges all numbered trace files whose sequence number is

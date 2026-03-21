@@ -26,22 +26,6 @@ func commitFileInRepo(t *testing.T, repoDir, relPath, content, message string) {
 	gitRun(t, repoDir, "commit", "-m", message)
 }
 
-// commitFilesInRepo creates several files and commits them in a single commit.
-func commitFilesInRepo(t *testing.T, repoDir string, files map[string]string, message string) {
-	t.Helper()
-	for relPath, content := range files {
-		fullPath := filepath.Join(repoDir, filepath.FromSlash(relPath))
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-			t.Fatalf("commitFilesInRepo: mkdir: %v", err)
-		}
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-			t.Fatalf("commitFilesInRepo: write %s: %v", relPath, err)
-		}
-		gitRun(t, repoDir, "add", relPath)
-	}
-	gitRun(t, repoDir, "commit", "-m", message)
-}
-
 // ---------------------------------------------------------------------------
 // isIgnoredChurnPath / isIgnoredTodoPath unit tests
 // ---------------------------------------------------------------------------
@@ -417,7 +401,7 @@ func TestTodoSignalsPromptFilesExcluded(t *testing.T) {
 	// Prompt template with many TODO markers.
 	var promptContent strings.Builder
 	for i := 0; i < 10; i++ {
-		promptContent.WriteString(fmt.Sprintf("// TODO: placeholder text %d\n", i))
+		fmt.Fprintf(&promptContent, "// TODO: placeholder text %d\n", i)
 	}
 	commitFileInRepo(t, repo, "prompts/ideation.tmpl", promptContent.String(), "add prompt with TODOs")
 

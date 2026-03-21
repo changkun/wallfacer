@@ -104,7 +104,7 @@ func truncate(s string, n int) string {
 // matchContainers builds a map from task UUID → container name.
 // The /api/containers response already exposes the wallfacer.task.id label
 // as the task_id field, so no extra label-parsing is required.
-func matchContainers(tasks []taskSummary, containers []containerSummary) map[string]string {
+func matchContainers(_ []taskSummary, containers []containerSummary) map[string]string {
 	result := make(map[string]string, len(containers))
 	for _, c := range containers {
 		if c.TaskID != "" {
@@ -120,7 +120,8 @@ func fetchTasks(addr string) ([]taskSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close()
+ }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -138,7 +139,8 @@ func fetchContainers(addr string) ([]containerSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close()
+ }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -210,7 +212,8 @@ func runStatus(_ string, args []string) {
 	addr := fs.String("addr", defaultAddr, "wallfacer server address (or ADDR env var)")
 	watch := fs.Bool("watch", false, "re-render every 2 seconds until Ctrl-C")
 	jsonOut := fs.Bool("json", false, "emit raw JSON from /api/tasks for scripting")
-	fs.Parse(args)
+	_ = fs.Parse(args)
+
 
 	serverAddr := strings.TrimRight(*addr, "/")
 
@@ -220,8 +223,9 @@ func runStatus(_ string, args []string) {
 			fmt.Fprintf(os.Stderr, "wallfacer: server not reachable at %s\n", serverAddr)
 			os.Exit(1)
 		}
-		defer resp.Body.Close()
 		body, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "wallfacer: read response: %v\n", err)
 			os.Exit(1)

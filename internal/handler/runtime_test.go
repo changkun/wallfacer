@@ -83,10 +83,10 @@ func TestGetRuntimeStatus_TaskStatesBacklogCount(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	if _, err := h.store.CreateTask(ctx, "task one", 15, false, "", store.TaskKindTask); err != nil {
+	if _, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task one", Timeout: 15, Kind: store.TaskKindTask}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.store.CreateTask(ctx, "task two", 15, false, "", store.TaskKindTask); err != nil {
+	if _, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task two", Timeout: 15, Kind: store.TaskKindTask}); err != nil {
 		t.Fatal(err)
 	}
 

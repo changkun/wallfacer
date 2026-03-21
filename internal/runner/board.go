@@ -319,7 +319,8 @@ func writeBoardDir(data []byte) (string, error) {
 		return "", err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "board.json"), data, 0644); err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
+
 		return "", err
 	}
 	return dir, nil
@@ -337,13 +338,15 @@ func streamBoardJSON(ctx context.Context, st *store.Store, selfTaskID uuid.UUID,
 
 	f, ferr := os.Create(filepath.Join(dir, "board.json"))
 	if ferr != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
+
 		return "", 0, ferr
 	}
 	defer func() {
 		if closeErr := f.Close(); closeErr != nil && err == nil {
 			err = fmt.Errorf("close board.json: %w", closeErr)
-			os.RemoveAll(dir)
+			_ = os.RemoveAll(dir)
+
 			dir = ""
 			written = 0
 		}
@@ -353,13 +356,15 @@ func streamBoardJSON(ctx context.Context, st *store.Store, selfTaskID uuid.UUID,
 
 	if _, err = fmt.Fprintf(cw, "{\"generated_at\":%q,\"self_task_id\":%q,\"tasks\":[\n",
 		time.Now().UTC().Format(time.RFC3339Nano), selfTaskID.String()); err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
+
 		return "", 0, err
 	}
 
 	tasks, err := st.ListTasks(ctx, false)
 	if err != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
+
 		return "", 0, err
 	}
 
@@ -414,7 +419,8 @@ func streamBoardJSON(ctx context.Context, st *store.Store, selfTaskID uuid.UUID,
 
 		b, merr := json.Marshal(bt)
 		if merr != nil {
-			os.RemoveAll(dir)
+			_ = os.RemoveAll(dir)
+
 			return "", 0, merr
 		}
 
@@ -425,18 +431,21 @@ func streamBoardJSON(ctx context.Context, st *store.Store, selfTaskID uuid.UUID,
 
 		if i > 0 {
 			if _, werr := fmt.Fprint(cw, ",\n"); werr != nil {
-				os.RemoveAll(dir)
+				_ = os.RemoveAll(dir)
+
 				return "", 0, werr
 			}
 		}
 		if _, werr := cw.Write(b); werr != nil {
-			os.RemoveAll(dir)
+			_ = os.RemoveAll(dir)
+
 			return "", 0, werr
 		}
 	}
 
 	if _, werr := fmt.Fprint(cw, "]\n}"); werr != nil {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
+
 		return "", 0, werr
 	}
 

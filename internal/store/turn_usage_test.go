@@ -15,7 +15,7 @@ func TestAppendAndGetTurnUsages(t *testing.T) {
 	s := newTestStore(t)
 
 	// Create a task so the task directory exists.
-	task, err := s.CreateTask(bg(), "test prompt", 0, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test prompt", Timeout: 0, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestGetTurnUsages_NoFile(t *testing.T) {
 	s := newTestStore(t)
 
 	// Create a task so the task directory exists, but never call AppendTurnUsage.
-	task, err := s.CreateTask(bg(), "test prompt", 0, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test prompt", Timeout: 0, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestGetTurnUsages_NonExistentTask(t *testing.T) {
 func TestTurnUsageFileIsValidJSONL(t *testing.T) {
 	s := newTestStore(t)
 
-	task, err := s.CreateTask(bg(), "jsonl test", 0, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "jsonl test", Timeout: 0, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestAppendTurnUsage_NonExistentDir(t *testing.T) {
 func TestGetTurnUsages_CorruptedLineSkipped(t *testing.T) {
 	s := newTestStore(t)
 
-	task, err := s.CreateTask(bg(), "test prompt", 0, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test prompt", Timeout: 0, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -175,8 +175,8 @@ func TestGetTurnUsages_CorruptedLineSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open file: %v", err)
 	}
-	f.WriteString("not-valid-json\n")
-	f.Close()
+	_, _ = f.WriteString("not-valid-json\n")
+	_ = f.Close()
 
 	// Write another valid record.
 	if err := s.AppendTurnUsage(task.ID, TurnUsageRecord{Turn: 2, CostUSD: 0.002}); err != nil {

@@ -72,7 +72,8 @@ func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.S
 	var dataDir string
 	if dir, err := os.MkdirTemp("/dev/shm", "wallfacer-test-*"); err == nil {
 		dataDir = dir
-		t.Cleanup(func() { os.RemoveAll(dataDir) })
+		t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
+
 	} else {
 		dataDir = t.TempDir()
 	}
@@ -123,7 +124,7 @@ func TestRunEndTurnTransitionsToDone(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test end_turn", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Test end_turn", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +151,7 @@ func TestRunWaitingTransitionsToWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test waiting", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Test waiting", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +175,7 @@ func TestRunIsErrorTransitionsToFailed(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test is_error", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Test is_error", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +199,7 @@ func TestRunContainerErrorTransitionsToFailed(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test container error", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Test container error", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +224,7 @@ func TestRunMaxTokensAutoContinues(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test max_tokens auto-continue", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Test max_tokens auto-continue", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +249,7 @@ func TestRunMaxTokensTriggersStopReasonHandler(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Stop reason handler test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Stop reason handler test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +289,7 @@ func TestRunWorktreeSetupFailureTransitionsToFailed(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{nonExistent}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Worktree fail task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Worktree fail task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +313,7 @@ func TestRunEndTurnRecordsResult(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Result recording test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Result recording test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +343,7 @@ func TestSyncWorktreesAlreadyUpToDate(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "sync up-to-date test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "sync up-to-date test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +377,7 @@ func TestSyncWorktreesBehindMain(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "sync behind test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "sync behind test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +426,7 @@ func TestSyncWorktreesNonGitWorkspaceSkipped(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{nonGitDir})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "non-git sync test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "non-git sync test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -459,7 +460,7 @@ func TestSyncWorktreesNoWorktreePaths(t *testing.T) {
 	s, runner := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "no worktrees sync test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "no worktrees sync test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +487,7 @@ func TestFailSync(t *testing.T) {
 	s, runner := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "fail sync test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "fail sync test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +515,7 @@ func TestFailSyncRecordsErrorEvent(t *testing.T) {
 	s, runner := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "failSync event test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "failSync event test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -542,7 +543,7 @@ func TestRunWithPreexistingWorktrees(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "preexisting worktrees test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "preexisting worktrees test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -590,7 +591,7 @@ func TestRunUsageAccumulation(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Usage test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Usage test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -624,7 +625,7 @@ func TestRunCostMultiTurn(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Multi-turn cost test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Multi-turn cost test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -671,7 +672,7 @@ func TestRunCostResumedFromWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Waiting resume cost test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Waiting resume cost test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -717,19 +718,15 @@ func TestRunCostResumedFromWaiting(t *testing.T) {
 	}
 	if impl, ok := bd["implementation"]; !ok {
 		t.Error("missing implementation breakdown")
-	} else {
+	} else if impl.CostUSD < 0.069 || impl.CostUSD > 0.071 {
 		// Turn 1 (0.03) + Turn 2 (0.04) = 0.07.
-		if impl.CostUSD < 0.069 || impl.CostUSD > 0.071 {
-			t.Errorf("implementation CostUSD = %f, want ~0.07", impl.CostUSD)
-		}
+		t.Errorf("implementation CostUSD = %f, want ~0.07", impl.CostUSD)
 	}
 	if ov, ok := bd["oversight"]; !ok {
 		t.Error("missing oversight breakdown")
-	} else {
+	} else if ov.CostUSD < 0.079 || ov.CostUSD > 0.081 {
 		// Waiting oversight (0.04) + waiting oversight2 (0.04) = 0.08.
-		if ov.CostUSD < 0.079 || ov.CostUSD > 0.081 {
-			t.Errorf("oversight CostUSD = %f, want ~0.08", ov.CostUSD)
-		}
+		t.Errorf("oversight CostUSD = %f, want ~0.08", ov.CostUSD)
 	}
 }
 
@@ -741,7 +738,7 @@ func TestSyncWorktreesPrevStatusRestored(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "status restore test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "status restore test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -780,7 +777,7 @@ func TestRunWaitingFeedbackDonePreservesChanges(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Waiting→Done test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Waiting→Done test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -844,7 +841,7 @@ func TestRunTestRunPreservesImplementationResult(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Preserve impl result test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Preserve impl result test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -912,7 +909,7 @@ func TestRunTestRunFailStoresPendingFeedback(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Store test failure feedback", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Store test failure feedback", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -961,7 +958,7 @@ func TestRunTestRunFailVerdictWhenNoMarker(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "No marker verdict test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "No marker verdict test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1013,7 +1010,7 @@ func TestRunTestRunDefaultStopReasonSetsFail(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Default stop_reason test run", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Default stop_reason test run", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1064,7 +1061,7 @@ func TestRunTestRunMultiTurnContinuesWithTestSession(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Multi-turn test run", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Multi-turn test run", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1113,7 +1110,7 @@ func TestRunOversightTerminalBeforeWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Oversight before waiting test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Oversight before waiting test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1153,7 +1150,7 @@ func TestRunTestRunOversightTerminalBeforeWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test run oversight before waiting", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Test run oversight before waiting", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1210,7 +1207,7 @@ func TestRunTestRunDefaultStopReasonTestOversightTerminal(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Test run default stop_reason test oversight", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Test run default stop_reason test oversight", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1254,7 +1251,7 @@ func TestSyncWorktreesBehindMainDirtyWorktree(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "dirty stash sync test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "dirty stash sync test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1314,7 +1311,7 @@ func TestSyncWorktreesConflictHandedOffToAgent(t *testing.T) {
 	s, runner := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "conflict handoff test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "conflict handoff test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1371,7 +1368,7 @@ func TestRunBudgetCostExceededTransitionsToWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Budget cost exceeded test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Budget cost exceeded test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1428,7 +1425,7 @@ func TestRunBudgetTokensExceededTransitionsToWaiting(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Budget tokens exceeded test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Budget tokens exceeded test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1480,7 +1477,7 @@ func TestSyncWorktrees_PreservesTestVerdictAfterCleanSync(t *testing.T) {
 	s, runner := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Sync preserves test verdict on clean rebase", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Sync preserves test verdict on clean rebase", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1547,7 +1544,7 @@ func TestMockMaxTokensAutoContinue(t *testing.T) {
 	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "mock max_tokens test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "mock max_tokens test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1583,7 +1580,7 @@ func TestMockPauseTurnAutoContinue(t *testing.T) {
 	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "mock pause_turn test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "mock pause_turn test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1624,7 +1621,7 @@ func TestMockIdeaAgentJSONParsing(t *testing.T) {
 	s, r := setupRunnerWithMockExecutor(t, nil, mock)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "brainstorm via mock", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm via mock", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1668,7 +1665,7 @@ func TestMockDeferredPanicRecovery(t *testing.T) {
 	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "panic recovery test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "panic recovery test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1702,7 +1699,7 @@ func TestMockFailureCategoryContainerCrash(t *testing.T) {
 	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "container crash test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "container crash test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1740,7 +1737,7 @@ func TestMockSessionIDPassedToResume(t *testing.T) {
 	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "session id resume test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "session id resume test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1779,7 +1776,7 @@ func TestAutoRetry_ContainerCrash(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "crash retry test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "crash retry test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1819,7 +1816,7 @@ func TestAutoRetry_BudgetCategoryDoesNotRetry(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "budget exceeded test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "budget exceeded test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1847,7 +1844,7 @@ func TestAutoRetry_MaxTotalCap(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "total cap test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "total cap test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

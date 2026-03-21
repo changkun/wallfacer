@@ -22,11 +22,12 @@ import (
 // WebhookEventType identifies the kind of webhook notification.
 type WebhookEventType string
 
+// WebhookEventType constants.
 const (
 	WebhookEventTaskStateChanged WebhookEventType = "task.state_changed"
-	maxWebhookPromptLen                           = 200
-	maxWebhookResultLen                           = 500
-	maxWebhookTitleLen                            = 80
+	maxWebhookPromptLen          int              = 200
+	maxWebhookResultLen          int              = 500
+	maxWebhookTitleLen           int              = 80
 )
 
 // WebhookPayload is the JSON body posted to the configured webhook URL on every
@@ -53,6 +54,7 @@ type WebhookNotifier struct {
 	wg            sync.WaitGroup
 }
 
+// NewWorkspaceWebhookNotifier constructs a WebhookNotifier that uses a workspace manager.
 func NewWorkspaceWebhookNotifier(m *workspace.Manager, cfg envconfig.Config) *WebhookNotifier {
 	return &WebhookNotifier{
 		workspace:     m,
@@ -74,6 +76,7 @@ func NewWebhookNotifier(s *store.Store, cfg envconfig.Config) *WebhookNotifier {
 	}
 }
 
+// SetRetryBackoffs overrides the default retry backoff schedule.
 func (wn *WebhookNotifier) SetRetryBackoffs(backoffs []time.Duration) {
 	wn.backoffs = append([]time.Duration(nil), backoffs...)
 }
@@ -174,6 +177,7 @@ func (wn *WebhookNotifier) handleDelta(ctx context.Context, delta store.Sequence
 // Wait blocks until all in-flight webhook deliveries have completed.
 func (wn *WebhookNotifier) Wait() { wn.wg.Wait() }
 
+// NewTaskStateChangedPayload builds a webhook payload for a task state change event.
 func NewTaskStateChangedPayload(taskID string, status store.TaskStatus, title, prompt, result string, occurredAt time.Time) WebhookPayload {
 	title = truncateWebhookField(title, maxWebhookTitleLen)
 	if title == "" {
@@ -243,7 +247,8 @@ func (wn *WebhookNotifier) Send(ctx context.Context, payload WebhookPayload) err
 			lastErr = fmt.Errorf("attempt %d POST failed: %w", attempt+1, err)
 			continue
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
+
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return nil
 		}

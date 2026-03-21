@@ -68,7 +68,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
-	task, err := s.CreateTask(context.Background(), "task prompt", 10, false, "", "")
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "task prompt", Timeout: 10})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestGauge_FailedTasksByCategory(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 
-	task, err := s.CreateTask(context.Background(), "test prompt", 10, false, "", "")
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "test prompt", Timeout: 10})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

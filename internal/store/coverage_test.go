@@ -118,7 +118,7 @@ func TestStore_SubscriberCount(t *testing.T) {
 
 func TestPurgeTask_PurgesDeletedTask(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "to purge", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "to purge", Timeout: 5})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestPurgeTask_PurgesDeletedTask(t *testing.T) {
 
 func TestPurgeTask_FailsForNonDeletedTask(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "alive", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "alive", Timeout: 5})
 
 	if err := s.PurgeTask(bg(), task.ID); err == nil {
 		t.Error("expected error when purging non-tombstoned task, got nil")
@@ -169,7 +169,7 @@ func TestListArchivedTasksPage_FirstPage(t *testing.T) {
 	s := newTestStore(t)
 
 	for range 5 {
-		task, err := s.CreateTask(bg(), "task", 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "task", Timeout: 5})
 		if err != nil {
 			t.Fatalf("CreateTask: %v", err)
 		}
@@ -193,7 +193,7 @@ func TestListArchivedTasksPage_BeforeCursor(t *testing.T) {
 	s := newTestStore(t)
 
 	for range 4 {
-		task, err := s.CreateTask(bg(), "task", 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "task", Timeout: 5})
 		if err != nil {
 			t.Fatalf("CreateTask: %v", err)
 		}
@@ -233,7 +233,7 @@ func TestListArchivedTasksPage_MutuallyExclusiveCursors(t *testing.T) {
 
 func TestListArchivedTasksPage_InvalidBeforeCursor(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "t", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "t", Timeout: 5})
 	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone) //nolint:errcheck
 	s.SetTaskArchived(bg(), task.ID, true)                 //nolint:errcheck
 
@@ -246,7 +246,7 @@ func TestListArchivedTasksPage_InvalidBeforeCursor(t *testing.T) {
 
 func TestListArchivedTasksPage_InvalidAfterCursor(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "t", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "t", Timeout: 5})
 	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone) //nolint:errcheck
 	s.SetTaskArchived(bg(), task.ID, true)                 //nolint:errcheck
 
@@ -259,7 +259,7 @@ func TestListArchivedTasksPage_InvalidAfterCursor(t *testing.T) {
 
 func TestUpdateTaskBudget_SetAndClear(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "budget task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "budget task", Timeout: 5})
 
 	cost := 10.0
 	tokens := 50000
@@ -278,7 +278,7 @@ func TestUpdateTaskBudget_SetAndClear(t *testing.T) {
 
 func TestUpdateTaskBudget_ClampsNegative(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "budget task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "budget task", Timeout: 5})
 
 	neg := -5.0
 	negTokens := -100
@@ -297,7 +297,7 @@ func TestUpdateTaskBudget_ClampsNegative(t *testing.T) {
 
 func TestUpdateTaskBudget_NilFieldsPreserved(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "budget task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "budget task", Timeout: 5})
 
 	cost := 7.5
 	if err := s.UpdateTaskBudget(bg(), task.ID, &cost, nil); err != nil {
@@ -322,7 +322,7 @@ func TestUpdateTaskBudget_UnknownID(t *testing.T) {
 
 func TestUpdateTaskModelOverride_SetAndClear(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "model task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "model task", Timeout: 5})
 
 	if err := s.UpdateTaskModelOverride(bg(), task.ID, "claude-opus-4-5"); err != nil {
 		t.Fatalf("UpdateTaskModelOverride set: %v", err)
@@ -343,7 +343,7 @@ func TestUpdateTaskModelOverride_SetAndClear(t *testing.T) {
 
 func TestUpdateTaskModelOverride_TrimsWhitespace(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "model task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "model task", Timeout: 5})
 
 	if err := s.UpdateTaskModelOverride(bg(), task.ID, "  "); err != nil {
 		t.Fatalf("UpdateTaskModelOverride whitespace: %v", err)
@@ -363,7 +363,7 @@ func TestUpdateTaskModelOverride_UnknownID(t *testing.T) {
 
 func TestUpdateTaskCustomPatterns_SetAndClear(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "pattern task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "pattern task", Timeout: 5})
 
 	pass := []string{"PASS", "OK"}
 	fail := []string{"FAIL", "ERROR"}
@@ -392,7 +392,7 @@ func TestUpdateTaskCustomPatterns_SetAndClear(t *testing.T) {
 
 func TestUpdateTaskCustomPatterns_EmptySliceClearsField(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "pattern task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "pattern task", Timeout: 5})
 
 	s.UpdateTaskCustomPatterns(bg(), task.ID, []string{"PASS"}, []string{"FAIL"}) //nolint:errcheck
 
@@ -415,10 +415,10 @@ func TestUpdateTaskCustomPatterns_UnknownID(t *testing.T) {
 func TestArchiveAllDone_ArchivesDoneAndCancelled(t *testing.T) {
 	s := newTestStore(t)
 
-	done1, _ := s.CreateTask(bg(), "done 1", 5, false, "", "")
-	done2, _ := s.CreateTask(bg(), "done 2", 5, false, "", "")
-	cancelled, _ := s.CreateTask(bg(), "cancelled", 5, false, "", "")
-	backlog, _ := s.CreateTask(bg(), "still backlog", 5, false, "", "")
+	done1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "done 1", Timeout: 5})
+	done2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "done 2", Timeout: 5})
+	cancelled, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "cancelled", Timeout: 5})
+	backlog, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "still backlog", Timeout: 5})
 
 	s.ForceUpdateTaskStatus(bg(), done1.ID, TaskStatusDone)          //nolint:errcheck
 	s.ForceUpdateTaskStatus(bg(), done2.ID, TaskStatusDone)          //nolint:errcheck
@@ -448,7 +448,7 @@ func TestArchiveAllDone_ArchivesDoneAndCancelled(t *testing.T) {
 
 func TestArchiveAllDone_SkipsAlreadyArchived(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "done", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "done", Timeout: 5})
 	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone) //nolint:errcheck
 	s.SetTaskArchived(bg(), task.ID, true)                 //nolint:errcheck
 
@@ -463,7 +463,7 @@ func TestArchiveAllDone_SkipsAlreadyArchived(t *testing.T) {
 
 func TestUpdateTaskPendingTestFeedback_SetAndClear(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "feedback task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "feedback task", Timeout: 5})
 
 	if err := s.UpdateTaskPendingTestFeedback(bg(), task.ID, "tests failed: assert eq"); err != nil {
 		t.Fatalf("UpdateTaskPendingTestFeedback set: %v", err)
@@ -491,7 +491,7 @@ func TestUpdateTaskPendingTestFeedback_UnknownID(t *testing.T) {
 
 func TestIncrementAutoRetryCount_BasicIncrement(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "retry task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
 
 	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryTimeout); err != nil {
 		t.Fatalf("IncrementAutoRetryCount: %v", err)
@@ -504,7 +504,7 @@ func TestIncrementAutoRetryCount_BasicIncrement(t *testing.T) {
 
 func TestIncrementAutoRetryCount_DecrementsBudget(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "retry task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
 
 	s.mu.Lock()
 	s.tasks[task.ID].AutoRetryBudget = map[FailureCategory]int{
@@ -527,7 +527,7 @@ func TestIncrementAutoRetryCount_DecrementsBudget(t *testing.T) {
 
 func TestIncrementAutoRetryCount_BudgetFloorAtZero(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "retry task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
 
 	s.mu.Lock()
 	s.tasks[task.ID].AutoRetryBudget = map[FailureCategory]int{
@@ -547,7 +547,7 @@ func TestIncrementAutoRetryCount_BudgetFloorAtZero(t *testing.T) {
 
 func TestIncrementAutoRetryCount_InitializesNilBudget(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "retry task", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry task", Timeout: 5})
 
 	if err := s.IncrementAutoRetryCount(bg(), task.ID, FailureCategoryAgentError); err != nil {
 		t.Fatalf("IncrementAutoRetryCount: %v", err)

@@ -624,7 +624,7 @@ func TestCommitPipelineBasic(t *testing.T) {
 
 	// Create a task.
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "Add a greeting file", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add a greeting file", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -651,7 +651,8 @@ func TestCommitPipelineBasic(t *testing.T) {
 	// Run the commit pipeline.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+
 
 	// Verify a new commit exists on the default branch.
 	finalHash := gitRun(t, repo, "rev-parse", "HEAD")
@@ -689,7 +690,7 @@ func TestCommitPipelineDivergedBranch(t *testing.T) {
 	enableCommitMessageGeneration(t, runner)
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "Add feature", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add feature", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -723,7 +724,8 @@ func TestCommitPipelineDivergedBranch(t *testing.T) {
 	// Run the commit pipeline.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+
 
 	// Verify BOTH files exist on main (task changes rebased on top of main).
 	for _, f := range []string{"feature.txt", "other.txt"} {
@@ -748,7 +750,7 @@ func TestCommitPipelineNoChanges(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "No changes task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "No changes task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -768,7 +770,8 @@ func TestCommitPipelineNoChanges(t *testing.T) {
 
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+
 
 	// There should be no new commits at all.
 	currentHash := gitRun(t, repo, "rev-parse", "HEAD")
@@ -792,7 +795,7 @@ func TestCompleteTaskE2E(t *testing.T) {
 	ctx := context.Background()
 
 	// Step 1: Create the task.
-	task, err := s.CreateTask(ctx, "Add greeting feature", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add greeting feature", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -831,7 +834,8 @@ func TestCompleteTaskE2E(t *testing.T) {
 	}
 
 	// Run the exact same code path as CompleteTask handler.
-	runner.Commit(task.ID, sessionID)
+	_ = runner.Commit(task.ID, sessionID)
+
 
 	// Step 6: Verify the changes are on the default branch.
 	content, err := os.ReadFile(filepath.Join(repo, "greeting.txt"))
@@ -863,7 +867,7 @@ func TestCommitOnTopOfLatestMain(t *testing.T) {
 	enableCommitMessageGeneration(t, runner)
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "Task on stale branch", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task on stale branch", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -905,7 +909,8 @@ func TestCommitOnTopOfLatestMain(t *testing.T) {
 	// Run the commit pipeline.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+
 
 	// Verify the task commit is a descendant of the latest main.
 	if _, err := gitRunMayFail(repo, "merge-base", "--is-ancestor", mainHashBefore, "HEAD"); err != nil {
@@ -930,11 +935,11 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two tasks.
-	taskA, err := s.CreateTask(ctx, "Add file A", 5, false, "", "")
+	taskA, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add file A", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	taskB, err := s.CreateTask(ctx, "Add file B", 5, false, "", "")
+	taskB, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add file B", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -985,10 +990,12 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	// Commit task A first.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, taskA.ID, "", 1, wtA, brA)
+	_ = runner.commit(commitCtx, taskA.ID, "", 1, wtA, brA)
+
 
 	// Then commit task B — must rebase on top of A's merge.
-	runner.commit(commitCtx, taskB.ID, "", 1, wtB, brB)
+	_ = runner.commit(commitCtx, taskB.ID, "", 1, wtB, brB)
+
 
 	// Verify both files exist on main.
 	for _, f := range []string{"fileA.txt", "fileB.txt"} {
@@ -1022,7 +1029,7 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Change both repos", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Change both repos", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1052,7 +1059,8 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, task.ID, "", 1, wtPaths, brName)
+	_ = runner.commit(commitCtx, task.ID, "", 1, wtPaths, brName)
+
 
 	// Verify each file landed in the correct repo.
 	if _, err := os.Stat(filepath.Join(repoX, "x.txt")); err != nil {
@@ -1079,11 +1087,11 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
-	taskA, err := s.CreateTask(ctx, "Add line to README", 5, false, "", "")
+	taskA, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add line to README", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	taskB, err := s.CreateTask(ctx, "Add another line to README", 5, false, "", "")
+	taskB, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add another line to README", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1130,10 +1138,12 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	// Commit A first.
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, taskA.ID, "", 1, wtA, brA)
+	_ = runner.commit(commitCtx, taskA.ID, "", 1, wtA, brA)
+
 
 	// Commit B — rebase should succeed since changes don't conflict.
-	runner.commit(commitCtx, taskB.ID, "", 1, wtB, brB)
+	_ = runner.commit(commitCtx, taskB.ID, "", 1, wtB, brB)
+
 
 	// Verify A's README change persists after B's merge.
 	readmeFinal, err := os.ReadFile(filepath.Join(repo, "README.md"))
@@ -1240,7 +1250,7 @@ func TestRunDetectsMissingWorktreePaths(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "Test feedback resume", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Test feedback resume", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1394,11 +1404,11 @@ func TestConcurrentCompleteTaskSameRepo(t *testing.T) {
 	ctx := context.Background()
 
 	// Create two tasks.
-	taskA, err := s.CreateTask(ctx, "Concurrent file A", 5, false, "", "")
+	taskA, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Concurrent file A", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	taskB, err := s.CreateTask(ctx, "Concurrent file B", 5, false, "", "")
+	taskB, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Concurrent file B", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1484,7 +1494,7 @@ func TestConcurrentCompleteTaskCommitErrorPropagated(t *testing.T) {
 	enableCommitMessageGeneration(t, runner)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Conflict task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Conflict task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1549,7 +1559,7 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 	gitRun(t, repo, "checkout", "main")
 
 	// Create task and worktree.
-	task, err := s.CreateTask(ctx, "Base hash test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Base hash test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1571,7 +1581,8 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+
 
 	updated, _ := s.GetTask(ctx, task.ID)
 
@@ -1693,7 +1704,7 @@ func TestCommitPipelineNoChangesStoresBaseHash(t *testing.T) {
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "No changes base hash test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "No changes base hash test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1713,7 +1724,8 @@ func TestCommitPipelineNoChangesStoresBaseHash(t *testing.T) {
 
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
+
 
 	updated, _ := s.GetTask(ctx, task.ID)
 	base := updated.BaseCommitHashes[repo]

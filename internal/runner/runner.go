@@ -1,3 +1,4 @@
+// Package runner orchestrates sandbox containers for task execution.
 package runner
 
 import (
@@ -245,7 +246,7 @@ func isUUID(s string) bool {
 			if c != '-' {
 				return false
 			}
-		} else if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		} else if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 			return false
 		}
 	}
@@ -279,6 +280,8 @@ const (
 )
 
 // RunnerConfig holds all configuration needed to construct a Runner.
+//
+//nolint:revive // name stutters but renaming would be too invasive
 type RunnerConfig struct {
 	Command          string
 	SandboxImage     string
@@ -583,6 +586,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	return r
 }
 
+// WorkspaceManager returns the runner's workspace manager.
 func (r *Runner) WorkspaceManager() *workspace.Manager {
 	return r.workspaceManager
 }
@@ -849,7 +853,8 @@ func (r *Runner) KillContainer(taskID uuid.UUID) {
 	if name == "" {
 		return
 	}
-	exec.Command(r.command, "kill", name).Run()
+	_ = exec.Command(r.command, "kill", name).Run()
+
 }
 
 // KillRefineContainer sends a kill signal to the running refinement container.
@@ -859,7 +864,8 @@ func (r *Runner) KillRefineContainer(taskID uuid.UUID) {
 	if name == "" {
 		return
 	}
-	exec.Command(r.command, "kill", name).Run()
+	_ = exec.Command(r.command, "kill", name).Run()
+
 }
 
 // IdeateContainerName returns the name of the currently running ideation container,
@@ -878,5 +884,6 @@ func (r *Runner) KillIdeateContainer() {
 	if name == "" {
 		return
 	}
-	exec.Command(r.command, "kill", name).Run()
+	_ = exec.Command(r.command, "kill", name).Run()
+
 }

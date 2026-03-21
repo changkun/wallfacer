@@ -9,7 +9,7 @@ import (
 func TestUpdateTaskCommitMessage(t *testing.T) {
 	s := newTestStore(t)
 
-	task, err := s.CreateTask(bg(), "test prompt", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test prompt", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestUpdateTaskCommitMessage(t *testing.T) {
 func TestUpdateTaskCommitMessage_Overwrite(t *testing.T) {
 	s := newTestStore(t)
 
-	task, err := s.CreateTask(bg(), "overwrite test", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "overwrite test", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestUpdateTaskCommitMessage_Overwrite(t *testing.T) {
 func TestUpdateTaskCommitMessage_Empty(t *testing.T) {
 	s := newTestStore(t)
 
-	task, err := s.CreateTask(bg(), "empty msg test", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "empty msg test", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

@@ -149,7 +149,7 @@ type sandboxTestRequest struct {
 }
 
 // GetEnvConfig returns the current env configuration with tokens masked.
-func (h *Handler) GetEnvConfig(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	cfg, err := envconfig.Parse(h.envFile)
 	if err != nil {
 		http.Error(w, "failed to read env file: "+err.Error(), http.StatusInternalServerError)
@@ -281,7 +281,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to prepare test env: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer os.Remove(tempEnvFile)
+	defer func() { _ = os.Remove(tempEnvFile) }()
 
 	timeout := 3
 	if req.Timeout != nil {
@@ -376,7 +376,7 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer tempFile.Close()
+	defer func() { _ = tempFile.Close() }()
 
 	if h.envFile != "" {
 		raw, err := os.ReadFile(h.envFile)

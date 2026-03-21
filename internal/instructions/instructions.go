@@ -1,3 +1,4 @@
+// Package instructions manages workspace instruction files and their keys.
 package instructions
 
 import (
@@ -131,7 +132,7 @@ func BuildContent(workspaces []string) string {
 	sb.WriteString(workspaceLayoutSection)
 	for _, ws := range workspaces {
 		name := filepath.Base(ws)
-		sb.WriteString(fmt.Sprintf("- `/workspace/%s/`\n", name))
+		fmt.Fprintf(&sb, "- `/workspace/%s/`\n", name)
 	}
 	sb.WriteByte('\n')
 

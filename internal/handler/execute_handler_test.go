@@ -37,8 +37,9 @@ func setTaskSessionID(t *testing.T, h *Handler, id uuid.UUID, sessionID string) 
 func TestSubmitFeedback_RejectsInvalidJSON(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/feedback", strings.NewReader("{bad"))
 	w := httptest.NewRecorder()
@@ -52,8 +53,9 @@ func TestSubmitFeedback_RejectsInvalidJSON(t *testing.T) {
 func TestSubmitFeedback_RejectsEmptyMessage(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/feedback",
 		strings.NewReader(`{"message": "   "}`))
@@ -81,7 +83,7 @@ func TestSubmitFeedback_NotFound(t *testing.T) {
 func TestSubmitFeedback_RejectsNonWaiting(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	// Task is in "backlog", not "waiting".
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/feedback",
@@ -97,8 +99,9 @@ func TestSubmitFeedback_RejectsNonWaiting(t *testing.T) {
 func TestSubmitFeedback_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/feedback",
 		strings.NewReader(`{"message": "please continue"}`))
@@ -109,7 +112,8 @@ func TestSubmitFeedback_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["status"] != "resumed" {
 		t.Errorf("expected status=resumed, got %q", resp["status"])
 	}
@@ -154,7 +158,7 @@ func TestCompleteTask_NotFound(t *testing.T) {
 func TestCompleteTask_RejectsNonWaiting(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	// In backlog — not waiting.
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
@@ -169,8 +173,9 @@ func TestCompleteTask_RejectsNonWaiting(t *testing.T) {
 func TestCompleteTask_NoSession_GoesToDone(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 	// No session ID set, so CompleteTask should go directly to done.
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
@@ -194,9 +199,11 @@ func TestCompleteTask_WithSession_GoesToCommitting(t *testing.T) {
 	t.Cleanup(func() { waitForBackground(200) })
 	ctx := context.Background()
 	repo := setupRepo(t)
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
+
 	setTaskSessionID(t, h, task.ID, "sess-123")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
@@ -218,8 +225,9 @@ func TestCompleteTask_WithSession_GoesToCommitting(t *testing.T) {
 func TestCompleteTask_WithSessionRejectsMissingWorktrees(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 	setTaskSessionID(t, h, task.ID, "sess-123")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
@@ -246,9 +254,11 @@ func TestCompleteTask_WithSessionRestoresMissingWorktreeDir(t *testing.T) {
 	if err := os.RemoveAll(wt); err != nil {
 		t.Fatal(err)
 	}
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
 	setTaskSessionID(t, h, task.ID, "sess-123")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
@@ -280,8 +290,9 @@ func TestCompleteTask_WithSessionRestoresMissingWorktreeDir(t *testing.T) {
 func TestWaitingToDone_PATCHBlocked(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 
 	body := `{"status":"done"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(),
@@ -305,8 +316,9 @@ func TestWaitingToDone_PATCHBlocked(t *testing.T) {
 func TestWaitingToDone_StateMachineBlocked(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 
 	err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 	if err == nil {
@@ -327,9 +339,11 @@ func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 	t.Cleanup(func() { waitForBackground(200) })
 	ctx := context.Background()
 	repo := setupRepo(t)
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
+
 	setTaskSessionID(t, h, task.ID, "sess-abc")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
@@ -367,9 +381,11 @@ func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-commit-fail")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-commit-fail")
+
 	setTaskSessionID(t, h, task.ID, "sess-fail")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/done", nil)
@@ -416,8 +432,9 @@ func TestCancelTask_NotFound(t *testing.T) {
 func TestCancelTask_RejectsDone(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
 	w := httptest.NewRecorder()
@@ -431,7 +448,7 @@ func TestCancelTask_RejectsDone(t *testing.T) {
 func TestCancelTask_BacklogTask(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
 	w := httptest.NewRecorder()
@@ -450,8 +467,9 @@ func TestCancelTask_BacklogTask(t *testing.T) {
 func TestCancelTask_WaitingTask(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
 	w := httptest.NewRecorder()
@@ -469,8 +487,9 @@ func TestCancelTask_WaitingTask(t *testing.T) {
 func TestCancelTask_FailedTask(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
 	w := httptest.NewRecorder()
@@ -488,7 +507,7 @@ func TestCancelTask_FailedTask(t *testing.T) {
 func TestCancelTask_InsertsCancelledEvent(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
 	w := httptest.NewRecorder()
@@ -517,7 +536,7 @@ func TestCancelTask_KillsRefineContainer(t *testing.T) {
 	h, s := newTestHandlerWithMockRunner(t, m)
 	ctx := context.Background()
 
-	task, _ := s.CreateTask(ctx, "backlog with refinement", 15, false, "", "")
+	task, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog with refinement", Timeout: 15})
 	// Task is in backlog (default) — no need to change status.
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/cancel", nil)
@@ -540,7 +559,7 @@ func TestCancelTask_MarksRunningRefinementFailed(t *testing.T) {
 	h, s := newTestHandlerWithMockRunner(t, m)
 	ctx := context.Background()
 
-	task, _ := s.CreateTask(ctx, "backlog with running refinement", 15, false, "", "")
+	task, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog with running refinement", Timeout: 15})
 
 	// Attach a running refinement job.
 	job := &store.RefinementJob{
@@ -592,7 +611,7 @@ func TestResumeTask_NotFound(t *testing.T) {
 func TestResumeTask_RejectsNonFailed(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	// Task is in backlog, not failed.
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/resume", nil)
@@ -607,8 +626,9 @@ func TestResumeTask_RejectsNonFailed(t *testing.T) {
 func TestResumeTask_RejectsNoSession(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+
 	// No session ID set.
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/resume", nil)
@@ -623,11 +643,13 @@ func TestResumeTask_RejectsNoSession(t *testing.T) {
 func TestResumeTask_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+
 	setTaskSessionID(t, h, task.ID, "session-xyz")
 	// ResumeTask requires status to be "failed" after session is set.
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/resume", strings.NewReader(`{}`))
 	w := httptest.NewRecorder()
@@ -637,7 +659,8 @@ func TestResumeTask_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["status"] != "resumed" {
 		t.Errorf("expected status=resumed, got %q", resp["status"])
 	}
@@ -658,7 +681,7 @@ func TestResumeTask_Success(t *testing.T) {
 func createInProgressTask(t *testing.T, h *Handler, prompt string) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
-	task, err := h.store.CreateTask(ctx, prompt, 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: prompt, Timeout: 15})
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}
@@ -673,7 +696,7 @@ func createInProgressTask(t *testing.T, h *Handler, prompt string) uuid.UUID {
 func createFailedTaskWithSession(t *testing.T, h *Handler, prompt, sessionID string) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
-	task, err := h.store.CreateTask(ctx, prompt, 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: prompt, Timeout: 15})
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}
@@ -710,7 +733,8 @@ func TestResumeTask_SucceedsAtFullCapacity(t *testing.T) {
 		t.Fatalf("expected 200 (resume should bypass capacity), got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["status"] != "resumed" {
 		t.Errorf("expected status=resumed, got %q", resp["status"])
 	}
@@ -728,7 +752,7 @@ func TestSubmitFeedback_SucceedsAtFullCapacity(t *testing.T) {
 	createInProgressTask(t, h, "occupying slot")
 
 	// Create a waiting task that needs feedback.
-	task, err := h.store.CreateTask(context.Background(), "needs feedback", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "needs feedback", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -745,7 +769,8 @@ func TestSubmitFeedback_SucceedsAtFullCapacity(t *testing.T) {
 		t.Fatalf("expected 200 (feedback should bypass capacity), got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["status"] != "resumed" {
 		t.Errorf("expected status=resumed, got %q", resp["status"])
 	}
@@ -763,7 +788,8 @@ func TestArchiveAllDone_NoTasks(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if archived, ok := resp["archived"].(float64); !ok || archived != 0 {
 		t.Errorf("expected archived=0, got %v", resp["archived"])
 	}
@@ -772,11 +798,13 @@ func TestArchiveAllDone_NoTasks(t *testing.T) {
 func TestArchiveAllDone_ArchivesDoneTasks(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task1, _ := h.store.CreateTask(ctx, "done task 1", 15, false, "", "")
-	task2, _ := h.store.CreateTask(ctx, "done task 2", 15, false, "", "")
-	backlogTask, _ := h.store.CreateTask(ctx, "backlog task", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task1.ID, store.TaskStatusDone)
-	h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusDone)
+	task1, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task 1", Timeout: 15})
+	task2, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task 2", Timeout: 15})
+	backlogTask, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task1.ID, store.TaskStatusDone)
+
+	_ = h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusDone)
+
 	_ = backlogTask
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/archive-all-done", nil)
@@ -787,7 +815,8 @@ func TestArchiveAllDone_ArchivesDoneTasks(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if archived, ok := resp["archived"].(float64); !ok || archived != 2 {
 		t.Errorf("expected archived=2, got %v", resp["archived"])
 	}
@@ -802,15 +831,17 @@ func TestArchiveAllDone_ArchivesDoneTasks(t *testing.T) {
 func TestArchiveAllDone_ArchivesCancelledTasks(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "cancelled task", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cancelled task", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/archive-all-done", nil)
 	w := httptest.NewRecorder()
 	h.ArchiveAllDone(w, req)
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if archived, ok := resp["archived"].(float64); !ok || archived != 1 {
 		t.Errorf("expected archived=1, got %v", resp["archived"])
 	}
@@ -833,7 +864,7 @@ func TestArchiveTask_NotFound(t *testing.T) {
 func TestArchiveTask_RejectsNonDone(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	// Task is in backlog.
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/archive", nil)
@@ -848,8 +879,9 @@ func TestArchiveTask_RejectsNonDone(t *testing.T) {
 func TestArchiveTask_ArchivesDoneTask(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "done task", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/archive", nil)
 	w := httptest.NewRecorder()
@@ -869,8 +901,9 @@ func TestArchiveTask_ArchivesDoneTask(t *testing.T) {
 func TestArchiveTask_ArchivesCancelledTask(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "cancelled", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cancelled", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/archive", nil)
 	w := httptest.NewRecorder()
@@ -898,9 +931,11 @@ func TestUnarchiveTask_NotFound(t *testing.T) {
 func TestUnarchiveTask_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "done task", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-	h.store.SetTaskArchived(ctx, task.ID, true)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
+	_ = h.store.SetTaskArchived(ctx, task.ID, true)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/unarchive", nil)
 	w := httptest.NewRecorder()
@@ -920,9 +955,11 @@ func TestUnarchiveTask_Success(t *testing.T) {
 func TestUnarchiveTask_InsertsEvent(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "done task", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-	h.store.SetTaskArchived(ctx, task.ID, true)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
+	_ = h.store.SetTaskArchived(ctx, task.ID, true)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/unarchive", nil)
 	w := httptest.NewRecorder()
@@ -963,7 +1000,7 @@ func TestSyncTask_NotFound(t *testing.T) {
 func TestSyncTask_RejectsBacklog(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/sync", nil)
 	w := httptest.NewRecorder()
@@ -977,8 +1014,9 @@ func TestSyncTask_RejectsBacklog(t *testing.T) {
 func TestSyncTask_RejectsNoWorktrees(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/sync", nil)
 	w := httptest.NewRecorder()
@@ -993,10 +1031,12 @@ func TestSyncTask_WaitingWithWorktrees(t *testing.T) {
 	repo := setupRepo(t)
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 	// Provide a worktree path (repo itself, as a stand-in).
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/sync", nil)
 	w := httptest.NewRecorder()
@@ -1006,7 +1046,8 @@ func TestSyncTask_WaitingWithWorktrees(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["status"] != "syncing" {
 		t.Errorf("expected status=syncing, got %q", resp["status"])
 	}
@@ -1016,9 +1057,11 @@ func TestSyncTask_FailedWithWorktrees(t *testing.T) {
 	repo := setupRepo(t)
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
+
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "main")
+
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/sync", nil)
 	w := httptest.NewRecorder()
@@ -1028,7 +1071,8 @@ func TestSyncTask_FailedWithWorktrees(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["status"] != "syncing" {
 		t.Errorf("expected status=syncing, got %q", resp["status"])
 	}
@@ -1045,7 +1089,7 @@ func TestSyncTask_SucceedsAtFullCapacity(t *testing.T) {
 
 	createInProgressTask(t, h, "occupying slot")
 
-	task, err := h.store.CreateTask(ctx, "sync me", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "sync me", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1064,7 +1108,8 @@ func TestSyncTask_SucceedsAtFullCapacity(t *testing.T) {
 		t.Fatalf("expected 200 (sync should bypass capacity), got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]string
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["status"] != "syncing" {
 		t.Errorf("expected status=syncing, got %q", resp["status"])
 	}
@@ -1079,7 +1124,7 @@ func TestRunCommitTransition_SuccessWithMock(t *testing.T) {
 	h, s := newTestHandlerWithMockRunner(t, m)
 	ctx := context.Background()
 
-	task, _ := s.CreateTask(ctx, "test", 30, false, "", "")
+	task, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 30})
 	// Manually drive the task to committing status (bypassing the state machine).
 	s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting) //nolint:errcheck
 

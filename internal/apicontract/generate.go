@@ -185,7 +185,7 @@ func GenerateJSTypes() string {
 			for _, f := range td.Fields {
 				jsType := f.JSType
 				if f.Nullable {
-					jsType = jsType + "|null"
+					jsType += "|null"
 				}
 				if f.Comment != "" {
 					fmt.Fprintf(&b, " * @property {%s} %s - %s\n", jsType, f.JSONName, f.Comment)
@@ -344,7 +344,7 @@ func GenerateRoutesJS() string {
 // (i.e. it is not a valid bare JavaScript identifier).
 func needsQuoting(s string) bool {
 	for _, r := range s {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '$') {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '_' && r != '$' {
 			return true
 		}
 	}

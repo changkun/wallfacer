@@ -1,3 +1,4 @@
+// Package handler implements HTTP handlers for the wallfacer server.
 package handler
 
 import (

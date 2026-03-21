@@ -40,7 +40,7 @@ func (h *Handler) SearchTasks(w http.ResponseWriter, r *http.Request) {
 // Unlike ListTasks, it reads summary.json files directly without loading the
 // full task.json, making it efficient for cost dashboards and analytics.
 // Tasks that completed before summary.json was introduced are omitted.
-func (h *Handler) ListSummaries(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListSummaries(w http.ResponseWriter, _ *http.Request) {
 	summaries, err := h.store.ListSummaries()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -718,47 +718,46 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			}
 			writeJSON(w, http.StatusOK, updated)
 			return
-		} else {
-			// Enforce concurrency limit for manual backlog → in_progress transitions.
-			if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog && !task.IsTestRun {
-				if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
-					return
-				}
-				h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
-					store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
-				h.diffCache.invalidate(id)
-				sessionID := ""
-				if !task.FreshStart && task.SessionID != nil {
-					sessionID = *task.SessionID
-				}
-				h.runner.RunBackground(id, task.Prompt, sessionID, false)
-				updated, err := h.store.GetTask(r.Context(), id)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				writeJSON(w, http.StatusOK, updated)
+		}
+		// Enforce concurrency limit for manual backlog → in_progress transitions.
+		if newStatus == store.TaskStatusInProgress && oldStatus == store.TaskStatusBacklog && !task.IsTestRun {
+			if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
 				return
 			}
+			h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
+				store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
+			h.diffCache.invalidate(id)
+			sessionID := ""
+			if !task.FreshStart && task.SessionID != nil {
+				sessionID = *task.SessionID
+			}
+			h.runner.RunBackground(id, task.Prompt, sessionID, false)
+			updated, err := h.store.GetTask(r.Context(), id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, updated)
+			return
+		}
 
-			// Also block any direct in_progress transition that is not marked as
-			// a test run. This protects API callers that PATCH waiting/failed →
-			// in_progress from bypassing the concurrency limit.
-			if newStatus == store.TaskStatusInProgress && !task.IsTestRun {
-				if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
-					return
-				}
-				h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
-					store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
-				h.diffCache.invalidate(id)
-				updated, err := h.store.GetTask(r.Context(), id)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				writeJSON(w, http.StatusOK, updated)
+		// Also block any direct in_progress transition that is not marked as
+		// a test run. This protects API callers that PATCH waiting/failed →
+		// in_progress from bypassing the concurrency limit.
+		if newStatus == store.TaskStatusInProgress && !task.IsTestRun {
+			if !h.checkConcurrencyAndUpdateStatus(r.Context(), w, id, oldStatus, newStatus) {
 				return
 			}
+			h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
+				store.NewStateChangeData(oldStatus, newStatus, store.TriggerUser, nil))
+			h.diffCache.invalidate(id)
+			updated, err := h.store.GetTask(r.Context(), id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, updated)
+			return
 		}
 
 		if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {

@@ -129,7 +129,7 @@ func TestCircuitBreaker_ClosesOnSuccess(t *testing.T) {
 // TestCircuitBreaker_ConcurrentSafe launches 100 goroutines that concurrently
 // call Allow, RecordFailure, and RecordSuccess. With -race it verifies there
 // are no data races.
-func TestCircuitBreaker_ConcurrentSafe(t *testing.T) {
+func TestCircuitBreaker_ConcurrentSafe(_ *testing.T) {
 	cb := NewCircuitBreaker(5, 10*time.Millisecond)
 
 	const goroutines = 100

@@ -61,7 +61,8 @@ func (r *Runner) ensureTaskWorktrees(taskID uuid.UUID, existing map[string]strin
 			}
 			logger.Runner.Warn("worktree directory exists but is not a valid git repo, removing",
 				"workspace", ws, "path", worktreePath)
-			os.RemoveAll(worktreePath)
+			_ = os.RemoveAll(worktreePath)
+
 		}
 
 		if err := os.MkdirAll(filepath.Dir(worktreePath), 0755); err != nil {
@@ -115,7 +116,8 @@ func (r *Runner) CleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 // the public API). Safe to call multiple times — errors are logged as warnings.
 func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]string, branchName string) {
 	bgCtx := r.shutdownCtx
-	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
+	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
+
 	for repoPath, wt := range worktreePaths {
 		if !gitutil.IsGitRepo(repoPath) || !gitutil.HasCommits(repoPath) {
 			// Non-git snapshots and empty-repo snapshots are cleaned by
@@ -130,7 +132,8 @@ func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 	if err := os.RemoveAll(taskWorktreeDir); err != nil && !os.IsNotExist(err) {
 		logger.Runner.Warn("remove worktree dir", "task", taskID, "error", err)
 	}
-	r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
+	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
+
 }
 
 // PruneUnknownWorktrees scans worktreesDir for directories whose UUID does not
@@ -167,7 +170,8 @@ func (r *Runner) PruneUnknownWorktrees() {
 		}
 		orphanDir := filepath.Join(r.worktreesDir, entry.Name())
 		logger.Runner.Warn("pruning orphaned worktree dir", "dir", orphanDir)
-		os.RemoveAll(orphanDir)
+		_ = os.RemoveAll(orphanDir)
+
 	}
 
 	// Run `git worktree prune` on all workspaces to clean stale references.

@@ -206,8 +206,10 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	cmd.Stderr = pw
 
 	if err := cmd.Start(); err != nil {
-		pr.Close()
-		pw.Close()
+		_ = pr.Close()
+
+		_ = pw.Close()
+
 		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
 		return
 	}
@@ -217,7 +219,8 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		if err := cmd.Wait(); err != nil {
 			logger.Handler.Debug("container log stream process exited", "error", err)
 		}
-		pw.Close()
+		_ = pw.Close()
+
 	}()
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -247,20 +250,23 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	for {
 		select {
 		case <-r.Context().Done():
-			pr.Close()
+			_ = pr.Close()
+
 			return
 		case line, ok := <-lines:
 			if !ok {
 				return
 			}
 			if _, err := w.Write([]byte(line + "\n")); err != nil {
-				pr.Close()
+				_ = pr.Close()
+
 				return
 			}
 			flusher.Flush()
 		case <-keepalive.C:
 			if _, err := w.Write([]byte("\n")); err != nil {
-				pr.Close()
+				_ = pr.Close()
+
 				return
 			}
 			flusher.Flush()
@@ -295,10 +301,14 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 	cmd.Stderr = stderrPW
 
 	if err := cmd.Start(); err != nil {
-		pr.Close()
-		pw.Close()
-		stderrPR.Close()
-		stderrPW.Close()
+		_ = pr.Close()
+
+		_ = pw.Close()
+
+		_ = stderrPR.Close()
+
+		_ = stderrPW.Close()
+
 		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
 		return
 	}
@@ -306,14 +316,17 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 	go func() {
 		// Drain stderr so the process is not blocked writing to it.
 		io.Copy(io.Discard, stderrPR) //nolint:errcheck
-		stderrPR.Close()
+		_ = stderrPR.Close()
+
 	}()
 	go func() {
 		if err := cmd.Wait(); err != nil {
 			logger.Handler.Debug("refine log stream process exited", "error", err)
 		}
-		pw.Close()
-		stderrPW.Close()
+		_ = pw.Close()
+
+		_ = stderrPW.Close()
+
 	}()
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -342,20 +355,23 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 	for {
 		select {
 		case <-r.Context().Done():
-			pr.Close()
+			_ = pr.Close()
+
 			return
 		case line, ok := <-lines:
 			if !ok {
 				return
 			}
 			if _, err := w.Write([]byte(line + "\n")); err != nil {
-				pr.Close()
+				_ = pr.Close()
+
 				return
 			}
 			flusher.Flush()
 		case <-keepalive.C:
 			if _, err := w.Write([]byte("\n")); err != nil {
-				pr.Close()
+				_ = pr.Close()
+
 				return
 			}
 			flusher.Flush()
@@ -382,7 +398,7 @@ func (h *Handler) serveStoredLogsFrom(w http.ResponseWriter, r *http.Request, id
 
 // serveStoredLogsRange serves saved turn files in the range (fromTurn, maxTurn].
 // fromTurn=0 means no lower bound; maxTurn=0 means no upper bound.
-func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, r *http.Request, id uuid.UUID, fromTurn, maxTurn int) {
+func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, _ *http.Request, id uuid.UUID, fromTurn, maxTurn int) {
 	outputsDir := h.store.OutputsDir(id)
 	entries, err := os.ReadDir(outputsDir)
 	if err != nil {

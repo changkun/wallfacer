@@ -18,23 +18,26 @@ func TestGenerateBoardContext_Basic(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := bg()
 
-	t1, err := s.CreateTask(ctx, "Task one", 5, false, "", "")
+	t1, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task one", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t2, err := s.CreateTask(ctx, "Task two", 10, true, "", "")
+	t2, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task two", Timeout: 10, MountWorktrees: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t3, err := s.CreateTask(ctx, "Task three", 15, false, "", "")
+	t3, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task three", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Put tasks in different statuses.
-	s.UpdateTaskStatus(ctx, t1.ID, "in_progress")
-	s.UpdateTaskResult(ctx, t1.ID, "working", "sess-secret", "max_tokens", 2)
-	s.ForceUpdateTaskStatus(ctx, t2.ID, "done")
+	_ = s.UpdateTaskStatus(ctx, t1.ID, "in_progress")
+
+	_ = s.UpdateTaskResult(ctx, t1.ID, "working", "sess-secret", "max_tokens", 2)
+
+	_ = s.ForceUpdateTaskStatus(ctx, t2.ID, "done")
+
 	// t3 stays in backlog.
 
 	data, err := r.generateBoardContext(context.Background(), t2.ID, false)
@@ -144,7 +147,7 @@ func TestPrepareBoardContext(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "test task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +156,8 @@ func TestPrepareBoardContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepareBoardContext: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir)
+ }()
 
 	boardPath := filepath.Join(dir, "board.json")
 	data, err := os.ReadFile(boardPath)
@@ -176,14 +180,16 @@ func TestBuildSiblingMounts(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := bg()
 
-	t1, _ := s.CreateTask(ctx, "self task", 5, true, "", "")
-	t2, _ := s.CreateTask(ctx, "waiting task", 5, false, "", "")
-	t3, _ := s.CreateTask(ctx, "backlog task", 5, false, "", "")
+	t1, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "self task", Timeout: 5, MountWorktrees: true})
+	t2, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "waiting task", Timeout: 5})
+	t3, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 5})
 
 	// Set t2 to waiting with worktree paths.
-	s.ForceUpdateTaskStatus(ctx, t2.ID, "waiting")
+	_ = s.ForceUpdateTaskStatus(ctx, t2.ID, "waiting")
+
 	wtDir := t.TempDir()
-	s.UpdateTaskWorktrees(ctx, t2.ID, map[string]string{"/myrepo": wtDir}, "task/"+t2.ID.String()[:8])
+	_ = s.UpdateTaskWorktrees(ctx, t2.ID, map[string]string{"/myrepo": wtDir}, "task/"+t2.ID.String()[:8])
+
 
 	// t3 stays in backlog (no worktrees).
 	_ = t3
@@ -225,7 +231,7 @@ func TestGenerateBoardContext_AllStatuses(t *testing.T) {
 
 	idByStatus := make(map[store.TaskStatus]string)
 	for _, st := range statuses {
-		task, err := s.CreateTask(ctx, "task for "+string(st), 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task for "+string(st), Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,9 +239,11 @@ func TestGenerateBoardContext_AllStatuses(t *testing.T) {
 		case store.TaskStatusBacklog:
 			// Default status after creation; no update needed.
 		case store.TaskStatusInProgress:
-			s.UpdateTaskStatus(ctx, task.ID, st)
+			_ = s.UpdateTaskStatus(ctx, task.ID, st)
+
 		default:
-			s.ForceUpdateTaskStatus(ctx, task.ID, st)
+			_ = s.ForceUpdateTaskStatus(ctx, task.ID, st)
+
 		}
 		idByStatus[st] = task.ID.String()
 	}
@@ -283,17 +291,19 @@ func TestGenerateBoardContext_WorktreeMountPath(t *testing.T) {
 	ctx := bg()
 
 	// Create a sibling task in waiting status with a worktree directory.
-	sibling, err := s.CreateTask(ctx, "sibling task", 5, false, "", "")
+	sibling, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "sibling task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.ForceUpdateTaskStatus(ctx, sibling.ID, store.TaskStatusWaiting)
+	_ = s.ForceUpdateTaskStatus(ctx, sibling.ID, store.TaskStatusWaiting)
+
 	wtDir := t.TempDir()
 	repoPath := "/home/user/myrepo"
-	s.UpdateTaskWorktrees(ctx, sibling.ID, map[string]string{repoPath: wtDir}, "task/"+sibling.ID.String()[:8])
+	_ = s.UpdateTaskWorktrees(ctx, sibling.ID, map[string]string{repoPath: wtDir}, "task/"+sibling.ID.String()[:8])
+
 
 	// Create a self task (stays in backlog).
-	self, err := s.CreateTask(ctx, "self task", 5, false, "", "")
+	self, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "self task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,11 +344,11 @@ func TestGenerateBoardContext_ArchivedTaskExcluded(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, "echo")
 	ctx := bg()
 
-	normal, err := s.CreateTask(ctx, "normal task", 5, false, "", "")
+	normal, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "normal task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	archived, err := s.CreateTask(ctx, "archived task", 5, false, "", "")
+	archived, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "archived task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +390,7 @@ func TestStreamBoardJSON(t *testing.T) {
 	var selfID [16]byte
 	var selfIDStr string
 	for i := 0; i < 5; i++ {
-		task, err := s.CreateTask(ctx, longPrompt, 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: longPrompt, Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -388,15 +398,18 @@ func TestStreamBoardJSON(t *testing.T) {
 			selfID = task.ID
 			selfIDStr = task.ID.String()
 		}
-		s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-		s.UpdateTaskResult(ctx, task.ID, longResult, "sess", "end_turn", 3)
+		_ = s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
+		_ = s.UpdateTaskResult(ctx, task.ID, longResult, "sess", "end_turn", 3)
+
 	}
 
 	dir, written, err := streamBoardJSON(ctx, s, selfID, false)
 	if err != nil {
 		t.Fatalf("streamBoardJSON: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir)
+ }()
 
 	if written == 0 {
 		t.Error("written bytes should be > 0")
@@ -552,7 +565,7 @@ func TestBoardCacheHit(t *testing.T) {
 	ctx := context.Background()
 	var selfID [16]byte
 	for i := 0; i < 100; i++ {
-		task, err := s.CreateTask(ctx, "task prompt", 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task prompt", Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -593,7 +606,7 @@ func BenchmarkGenerateBoardContext(b *testing.B) {
 	ctx := context.Background()
 	var selfID [16]byte
 	for i := 0; i < 100; i++ {
-		task, err := s.CreateTask(ctx, "task prompt", 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task prompt", Timeout: 5})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -681,21 +694,25 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 	// Create several sibling tasks with long text so the manifest would be huge
 	// without truncation.
 	for i := 0; i < 5; i++ {
-		task, err := s.CreateTask(ctx, longPrompt, 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: longPrompt, Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
-		s.ForceUpdateTaskStatus(ctx, task.ID, "done")
-		s.UpdateTaskResult(ctx, task.ID, longResult, "sess", "end_turn", 3)
+		_ = s.ForceUpdateTaskStatus(ctx, task.ID, "done")
+
+		_ = s.UpdateTaskResult(ctx, task.ID, longResult, "sess", "end_turn", 3)
+
 	}
 
 	// Create the self task with a long prompt and result too.
-	selfTask, err := s.CreateTask(ctx, longPrompt, 5, false, "", "")
+	selfTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: longPrompt, Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.UpdateTaskStatus(ctx, selfTask.ID, "in_progress")
-	s.UpdateTaskResult(ctx, selfTask.ID, longResult, "sess-self", "max_tokens", 7)
+	_ = s.UpdateTaskStatus(ctx, selfTask.ID, "in_progress")
+
+	_ = s.UpdateTaskResult(ctx, selfTask.ID, longResult, "sess-self", "max_tokens", 7)
+
 
 	data, err := r.generateBoardContext(context.Background(), selfTask.ID, false)
 	if err != nil {
@@ -752,7 +769,7 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 
 // TestLogBoardManifestSizeWarning_LessThan5 verifies that the function does
 // not panic when the number of size entries is fewer than 5.
-func TestLogBoardManifestSizeWarning_LessThan5(t *testing.T) {
+func TestLogBoardManifestSizeWarning_LessThan5(_ *testing.T) {
 	sizes := []struct {
 		id    string
 		bytes int
@@ -766,7 +783,7 @@ func TestLogBoardManifestSizeWarning_LessThan5(t *testing.T) {
 
 // TestLogBoardManifestSizeWarning_MoreThan5 verifies that the function does
 // not panic when there are more than 5 entries and only logs the top 5.
-func TestLogBoardManifestSizeWarning_MoreThan5(t *testing.T) {
+func TestLogBoardManifestSizeWarning_MoreThan5(_ *testing.T) {
 	sizes := []struct {
 		id    string
 		bytes int
@@ -815,7 +832,8 @@ func TestWriteBoardDir_CreatesFileWithContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writeBoardDir: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir)
+ }()
 
 	content, err := os.ReadFile(filepath.Join(dir, "board.json"))
 	if err != nil {
@@ -832,7 +850,8 @@ func TestWriteBoardDir_EmptyData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writeBoardDir empty: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir)
+ }()
 	if _, err := os.Stat(filepath.Join(dir, "board.json")); err != nil {
 		t.Fatalf("board.json should exist: %v", err)
 	}
@@ -845,7 +864,8 @@ func TestWriteBoardDir_ReturnsDirPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writeBoardDir: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir)
+ }()
 
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -875,11 +895,12 @@ func TestStreamBoardJSON_LargeDataTriggersWarning(t *testing.T) {
 	prompt := strings.Repeat("A", 500)
 	var selfID [16]byte
 	for i := 0; i < 80; i++ {
-		task, err := s.CreateTask(ctx, prompt, 5, false, "", "")
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: prompt, Timeout: 5})
 		if err != nil {
 			t.Fatalf("CreateTask %d: %v", i, err)
 		}
-		s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+		_ = s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
 		if i == 0 {
 			selfID = task.ID
 		}
@@ -889,7 +910,8 @@ func TestStreamBoardJSON_LargeDataTriggersWarning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("streamBoardJSON: %v", err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir)
+ }()
 
 	t.Logf("streamBoardJSON wrote %d bytes", written)
 

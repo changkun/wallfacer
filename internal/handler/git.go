@@ -117,7 +117,7 @@ func (h *Handler) refuseWorkspaceMutationIfBlocked(w http.ResponseWriter, r *htt
 }
 
 // GitStatus returns git status for every configured workspace.
-func (h *Handler) GitStatus(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GitStatus(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, collectWorkspaceStatuses(h.currentWorkspaces()))
 }
 

@@ -104,7 +104,8 @@ func (r *Runner) emitIdeationRejectionEvents(ctx context.Context, taskID uuid.UU
 		if label == "" {
 			label = "(untitled)"
 		}
-		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+
 			"result": fmt.Sprintf("Idea filtered (%s): %q (score: %d)", rejection.Reason, label, rejection.Score),
 		})
 	}

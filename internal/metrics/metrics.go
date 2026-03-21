@@ -127,8 +127,8 @@ func (r *Registry) WritePrometheus(w io.Writer) {
 		if len(vals) == 0 {
 			continue
 		}
-		fmt.Fprintf(w, "# HELP %s %s\n", g.name, g.help)
-		fmt.Fprintf(w, "# TYPE %s gauge\n", g.name)
+		_, _ = fmt.Fprintf(w, "# HELP %s %s\n", g.name, g.help)
+		_, _ = fmt.Fprintf(w, "# TYPE %s gauge\n", g.name)
 		for _, v := range vals {
 			writeMetricLine(w, g.name, v.Labels, v.Value)
 		}
@@ -186,8 +186,8 @@ func (c *Counter) Add(labels map[string]string, delta uint64) {
 }
 
 func (c *Counter) writeTo(w io.Writer) {
-	fmt.Fprintf(w, "# HELP %s %s\n", c.name, c.help)
-	fmt.Fprintf(w, "# TYPE %s counter\n", c.name)
+	_, _ = fmt.Fprintf(w, "# HELP %s %s\n", c.name, c.help)
+	_, _ = fmt.Fprintf(w, "# TYPE %s counter\n", c.name)
 
 	c.mu.Lock()
 	keys := make([]string, 0, len(c.obs))
@@ -271,8 +271,8 @@ func (h *Histogram) Observe(labels map[string]string, value float64) {
 }
 
 func (h *Histogram) writeTo(w io.Writer) {
-	fmt.Fprintf(w, "# HELP %s %s\n", h.name, h.help)
-	fmt.Fprintf(w, "# TYPE %s histogram\n", h.name)
+	_, _ = fmt.Fprintf(w, "# HELP %s %s\n", h.name, h.help)
+	_, _ = fmt.Fprintf(w, "# TYPE %s histogram\n", h.name)
 
 	h.mu.Lock()
 	keys := make([]string, 0, len(h.obs))
@@ -334,23 +334,23 @@ func canonicalLabelKey(labels map[string]string) string {
 //
 //	name{label="value",...} value\n
 func writeMetricLine(w io.Writer, name string, labels map[string]string, value float64) {
-	fmt.Fprint(w, name)
+	_, _ = fmt.Fprint(w, name)
 	if len(labels) > 0 {
 		keys := make([]string, 0, len(labels))
 		for k := range labels {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		fmt.Fprint(w, "{")
+		_, _ = fmt.Fprint(w, "{")
 		for i, k := range keys {
 			if i > 0 {
-				fmt.Fprint(w, ",")
+				_, _ = fmt.Fprint(w, ",")
 			}
-			fmt.Fprintf(w, `%s="%s"`, k, escapeLabel(labels[k]))
+			_, _ = fmt.Fprintf(w, `%s="%s"`, k, escapeLabel(labels[k]))
 		}
-		fmt.Fprint(w, "}")
+		_, _ = fmt.Fprint(w, "}")
 	}
-	fmt.Fprintf(w, " %s\n", formatMetricValue(value))
+	_, _ = fmt.Fprintf(w, " %s\n", formatMetricValue(value))
 }
 
 // escapeLabel escapes special characters in label values per the Prometheus

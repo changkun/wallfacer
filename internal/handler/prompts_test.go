@@ -72,7 +72,8 @@ func TestListSystemPrompts_NoOverrideByDefault(t *testing.T) {
 	h.ListSystemPrompts(w, req)
 
 	var result []map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&result)
+	_ = json.NewDecoder(w.Body).Decode(&result)
+
 	for _, item := range result {
 		if hasOverride, _ := item["has_override"].(bool); hasOverride {
 			t.Errorf("expected has_override=false for %v, got true", item["name"])
@@ -93,7 +94,8 @@ func TestGetSystemPrompt_KnownName(t *testing.T) {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
 	var result map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&result)
+	_ = json.NewDecoder(w.Body).Decode(&result)
+
 	if result["name"] != "title" {
 		t.Errorf("name = %v, want title", result["name"])
 	}

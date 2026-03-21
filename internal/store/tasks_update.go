@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// UpdateTaskStatus transitions the task identified by id to the given status.
 func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskStatus) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

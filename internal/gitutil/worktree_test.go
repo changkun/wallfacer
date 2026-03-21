@@ -16,7 +16,7 @@ func TestCreateWorktree(t *testing.T) {
 		if _, err := os.Stat(wtDir); os.IsNotExist(err) {
 			t.Error("worktree directory was not created")
 		}
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "new-branch") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "new-branch") })
 	})
 
 	t.Run("existing branch is reused without deleting commits", func(t *testing.T) {
@@ -36,7 +36,7 @@ func TestCreateWorktree(t *testing.T) {
 		if wtHead != staleHead {
 			t.Fatalf("expected existing branch head %q, got %q", staleHead, wtHead)
 		}
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "stale") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "stale") })
 	})
 
 	t.Run("directory deleted externally recovers via --force", func(t *testing.T) {
@@ -45,11 +45,11 @@ func TestCreateWorktree(t *testing.T) {
 		if err := CreateWorktree(repo, wtDir, "orphan"); err != nil {
 			t.Fatalf("initial CreateWorktree failed: %v", err)
 		}
-		os.RemoveAll(wtDir)
+		_ = os.RemoveAll(wtDir)
 		if err := CreateWorktree(repo, wtDir, "orphan"); err != nil {
 			t.Fatalf("CreateWorktree after dir removal failed: %v", err)
 		}
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "orphan") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "orphan") })
 	})
 }
 
@@ -82,7 +82,7 @@ func TestRemoveWorktree(t *testing.T) {
 		if err := CreateWorktree(repo, wtDir, "del-branch"); err != nil {
 			t.Fatalf("setup: %v", err)
 		}
-		os.RemoveAll(wtDir)
+		_ = os.RemoveAll(wtDir)
 		if err := RemoveWorktree(repo, wtDir, "del-branch"); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -101,7 +101,7 @@ func TestCreateWorktreeAt(t *testing.T) {
 		if _, err := os.Stat(wtDir); os.IsNotExist(err) {
 			t.Error("worktree directory was not created")
 		}
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "at-branch") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "at-branch") })
 	})
 
 	t.Run("handles existing branch by delete and recreate", func(t *testing.T) {
@@ -113,10 +113,10 @@ func TestCreateWorktreeAt(t *testing.T) {
 		if err := CreateWorktreeAt(repo, wtDir, "at-branch2", baseCommit); err != nil {
 			t.Fatalf("first CreateWorktreeAt: %v", err)
 		}
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "at-branch2") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "at-branch2") })
 
 		// Remove dir but keep branch — simulates server restart.
-		os.RemoveAll(wtDir)
+		_ = os.RemoveAll(wtDir)
 
 		// Create again at same commit.
 		if err := CreateWorktreeAt(repo, wtDir, "at-branch2", baseCommit); err != nil {

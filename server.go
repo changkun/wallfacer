@@ -38,10 +38,6 @@ type IndexViewData struct {
 	ServerAPIKey string
 }
 
-// indexViewData is a backward-compatible alias kept for the few internal
-// callers that were written before the type was exported.
-type indexViewData = IndexViewData
-
 func runServer(configDir string, args []string) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
@@ -62,7 +58,8 @@ func runServer(configDir string, args []string) {
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		fs.PrintDefaults()
 	}
-	fs.Parse(args)
+	_ = fs.Parse(args)
+
 
 	// Re-initialize loggers with the format chosen by the user.
 	logger.Init(*logFormat)
@@ -147,7 +144,7 @@ func runServer(configDir string, args []string) {
 	go r.StartWorktreeHealthWatcher(ctx)
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
-	r.SetStopReasonHandler(func(taskID uuid.UUID, stopReason string) {
+	r.SetStopReasonHandler(func(_ uuid.UUID, stopReason string) {
 		if stopReason == "max_tokens" {
 			h.SetAutopilot(false)
 		}
@@ -603,7 +600,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	}
 
 	// Prometheus metrics endpoint (not an API route; excluded from the contract).
-	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 		reg.WritePrometheus(w)
 	})

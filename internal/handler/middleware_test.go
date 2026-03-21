@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"changkun.de/wallfacer/internal/store"
 )
 
 func oversizedBody(fieldName string, size int) io.Reader {
@@ -170,7 +172,7 @@ func TestUpdateEnvConfig_BodyTooLarge(t *testing.T) {
 
 func TestRefineApply_BodyTooLarge(t *testing.T) {
 	h := newTestHandler(t)
-	task, err := h.store.CreateTask(context.Background(), "test", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	if err != nil {
 		t.Fatalf("create task: %v", err)
 	}
@@ -201,7 +203,7 @@ func TestDecodeJSONBody_Returns413ForMaxBytesError(t *testing.T) {
 
 // TestMaxBytesMiddleware_AllowsSmallBody verifies that small bodies pass through.
 func TestMaxBytesMiddleware_AllowsSmallBody(t *testing.T) {
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	mw := MaxBytesMiddleware(1024)(next)

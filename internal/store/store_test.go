@@ -92,7 +92,7 @@ func TestNewStore_SkipsCorruptTaskJSON(t *testing.T) {
 func TestNewStore_LoadsExistingTask(t *testing.T) {
 	dir := t.TempDir()
 	s1, _ := NewStore(dir)
-	task, _ := s1.CreateTask(bg(), "hello", 10, false, "", "")
+	task, _ := s1.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "hello", Timeout: 10})
 
 	s2, err := NewStore(dir)
 	if err != nil {
@@ -129,13 +129,13 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
 
-	task, _ := s.CreateTask(bg(), "round trip prompt", 15, false, "", "")
-	s.UpdateTaskStatus(bg(), task.ID, "in_progress")
-	s.UpdateTaskTitle(bg(), task.ID, "Round Trip Title")
-	s.AccumulateTaskUsage(bg(), task.ID, TaskUsage{InputTokens: 100, CostUSD: 0.5})
-	s.UpdateTaskWorktrees(bg(), task.ID, map[string]string{"/repo": "/wt"}, "task/rt")
-	s.InsertEvent(bg(), task.ID, EventTypeStateChange, "in_progress")
-	s.InsertEvent(bg(), task.ID, EventTypeOutput, "some output")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "round trip prompt", Timeout: 15})
+	_ = s.UpdateTaskStatus(bg(), task.ID, "in_progress")
+	_ = s.UpdateTaskTitle(bg(), task.ID, "Round Trip Title")
+	_ = s.AccumulateTaskUsage(bg(), task.ID, TaskUsage{InputTokens: 100, CostUSD: 0.5})
+	_ = s.UpdateTaskWorktrees(bg(), task.ID, map[string]string{"/repo": "/wt"}, "task/rt")
+	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "in_progress")
+	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, "some output")
 
 	s2, err := NewStore(dir)
 	if err != nil {
@@ -174,8 +174,8 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 func TestPersistence_DeletedTaskGoneAfterReload(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "delete me", 5, false, "", "")
-	s.DeleteTask(bg(), task.ID, "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "delete me", Timeout: 5})
+	_ = s.DeleteTask(bg(), task.ID, "")
 
 	s2, _ := NewStore(dir)
 	if _, err := s2.GetTask(bg(), task.ID); err == nil {
@@ -203,12 +203,12 @@ func transitionToDone(t *testing.T, s *Store, id uuid.UUID) {
 func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 	s := newTestStore(t)
 
-	task, _ := s.CreateTask(bg(), "summary test", 10, false, "", "")
-	s.UpdateTaskTitle(bg(), task.ID, "Summary Test")
-	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "summary test", Timeout: 10})
+	_ = s.UpdateTaskTitle(bg(), task.ID, "Summary Test")
+	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.42})
-	s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
-	s.UpdateTaskTurns(bg(), task.ID, 3)
+	_ = s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
+	_ = s.UpdateTaskTurns(bg(), task.ID, 3)
 
 	transitionToDone(t, s, task.ID)
 
@@ -256,12 +256,12 @@ func TestSummary_WrittenOnDoneTransition(t *testing.T) {
 func TestSummary_WrittenOnForceDoneTransition(t *testing.T) {
 	s := newTestStore(t)
 
-	task, _ := s.CreateTask(bg(), "force done task", 10, false, "", "")
-	s.UpdateTaskTitle(bg(), task.ID, "Force Done Task")
-	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "force done task", Timeout: 10})
+	_ = s.UpdateTaskTitle(bg(), task.ID, "Force Done Task")
+	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 50, OutputTokens: 25, CostUSD: 0.21})
-	s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
-	s.UpdateTaskTurns(bg(), task.ID, 2)
+	_ = s.UpdateTaskTestRun(bg(), task.ID, false, "pass")
+	_ = s.UpdateTaskTurns(bg(), task.ID, 2)
 
 	// Skip straight to done via ForceUpdateTaskStatus (no state machine check).
 	if err := s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone); err != nil {
@@ -294,7 +294,7 @@ func TestSummary_WrittenOnForceDoneTransition(t *testing.T) {
 func TestSummary_NotWrittenOnFailedTransition(t *testing.T) {
 	s := newTestStore(t)
 
-	task, _ := s.CreateTask(bg(), "will fail", 10, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "will fail", Timeout: 10})
 	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus(in_progress): %v", err)
 	}
@@ -317,10 +317,10 @@ func TestListSummaries_ReturnsOnlyDoneTasks(t *testing.T) {
 	s := newTestStore(t)
 
 	// Create one done task and one in-progress task.
-	done, _ := s.CreateTask(bg(), "done task", 10, false, "", "")
+	done, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "done task", Timeout: 10})
 	transitionToDone(t, s, done.ID)
 
-	inProg, _ := s.CreateTask(bg(), "in progress task", 10, false, "", "")
+	inProg, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "in progress task", Timeout: 10})
 	if err := s.UpdateTaskStatus(bg(), inProg.ID, TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus: %v", err)
 	}
@@ -529,7 +529,7 @@ func TestLoadAll_MigratesLegacyJSON(t *testing.T) {
 // SchemaVersion = CurrentTaskSchemaVersion both in memory and on disk.
 func TestCreateTask_StampsSchemaVersion(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "versioned task", 10, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "versioned task", Timeout: 10})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -602,7 +602,7 @@ func TestMutationMethods_StampSchemaVersion(t *testing.T) {
 func TestSetTaskFailureCategory(t *testing.T) {
 	s := newTestStore(t)
 
-	task, err := s.CreateTask(bg(), "test failure category", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test failure category", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -646,7 +646,7 @@ func TestSetTaskFailureCategory(t *testing.T) {
 func TestResetTaskForRetry_ClearsFailureCategory(t *testing.T) {
 	s := newTestStore(t)
 
-	task, err := s.CreateTask(bg(), "retry clears category", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "retry clears category", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -712,7 +712,7 @@ func TestStatusIndex_CountsAndContents(t *testing.T) {
 	totals := map[TaskStatus]int{}
 	for status, n := range want {
 		for i := 0; i < n; i++ {
-			task, err := s.CreateTask(bg(), fmt.Sprintf("task-%s-%d", status, i), 10, false, "", "")
+			task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: fmt.Sprintf("task-%s-%d", status, i), Timeout: 10})
 			if err != nil {
 				t.Fatalf("CreateTask: %v", err)
 			}
@@ -765,7 +765,7 @@ func TestStatusIndex_CountsAndContents(t *testing.T) {
 func TestStatusIndex_UpdatedOnStatusChange(t *testing.T) {
 	s := newTestStore(t)
 
-	task, _ := s.CreateTask(bg(), "index sync test", 10, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "index sync test", Timeout: 10})
 	if s.CountByStatus(TaskStatusBacklog) != 1 {
 		t.Fatalf("expected 1 backlog task after create")
 	}
@@ -789,7 +789,7 @@ func TestStatusIndex_UpdatedOnStatusChange(t *testing.T) {
 func TestStatusIndex_DeleteRemovesFromIndex(t *testing.T) {
 	s := newTestStore(t)
 
-	task, _ := s.CreateTask(bg(), "to be deleted", 10, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "to be deleted", Timeout: 10})
 	if s.CountByStatus(TaskStatusBacklog) != 1 {
 		t.Fatalf("expected 1 backlog task")
 	}
@@ -807,9 +807,9 @@ func TestStatusIndex_ReloadRebuildsIndex(t *testing.T) {
 	dir := t.TempDir()
 	s1, _ := NewStore(dir)
 
-	t1, _ := s1.CreateTask(bg(), "backlog task", 10, false, "", "")
-	t2, _ := s1.CreateTask(bg(), "in_progress task", 10, false, "", "")
-	s1.UpdateTaskStatus(bg(), t2.ID, TaskStatusInProgress)
+	t1, _ := s1.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "backlog task", Timeout: 10})
+	t2, _ := s1.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "in_progress task", Timeout: 10})
+	_ = s1.UpdateTaskStatus(bg(), t2.ID, TaskStatusInProgress)
 	_ = t1
 
 	// Reload from disk.
@@ -833,11 +833,11 @@ func TestStatusIndex_SortedByPositionThenCreatedAt(t *testing.T) {
 
 	ids := make([]uuid.UUID, 3)
 	for i := range ids {
-		task, _ := s.CreateTask(bg(), fmt.Sprintf("task-%d", i), 10, false, "", "")
+		task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: fmt.Sprintf("task-%d", i), Timeout: 10})
 		ids[i] = task.ID
 		// Give each task a distinct position: 10, 5, 0 (decreasing creation order
 		// so the index must sort them rather than return them in map iteration order).
-		s.UpdateTaskPosition(bg(), task.ID, (2-i)*5)
+		_ = s.UpdateTaskPosition(bg(), task.ID, (2-i)*5)
 	}
 
 	tasks, err := s.ListTasksByStatus(bg(), TaskStatusBacklog)
@@ -865,13 +865,13 @@ func TestCountRegularInProgress(t *testing.T) {
 	s := newTestStore(t)
 
 	// One regular in-progress task.
-	t1, _ := s.CreateTask(bg(), "regular", 10, false, "", "")
-	s.UpdateTaskStatus(bg(), t1.ID, TaskStatusInProgress)
+	t1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "regular", Timeout: 10})
+	_ = s.UpdateTaskStatus(bg(), t1.ID, TaskStatusInProgress)
 
 	// One test-run in-progress task.
-	t2, _ := s.CreateTask(bg(), "test run", 10, false, "", "")
-	s.UpdateTaskStatus(bg(), t2.ID, TaskStatusInProgress)
-	s.UpdateTaskTestRun(bg(), t2.ID, true, "")
+	t2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test run", Timeout: 10})
+	_ = s.UpdateTaskStatus(bg(), t2.ID, TaskStatusInProgress)
+	_ = s.UpdateTaskTestRun(bg(), t2.ID, true, "")
 
 	if got := s.CountRegularInProgress(); got != 1 {
 		t.Errorf("CountRegularInProgress() = %d, want 1", got)
@@ -908,7 +908,7 @@ func seedBenchmarkStore(b *testing.B, n int) *Store {
 
 	for i := 0; i < n; i++ {
 		target := statuses[i%len(statuses)]
-		task, err := s.CreateTask(bg(), fmt.Sprintf("bench-task-%d", i), 10, false, "", "")
+		task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: fmt.Sprintf("bench-task-%d", i), Timeout: 10})
 		if err != nil {
 			b.Fatalf("CreateTask: %v", err)
 		}

@@ -32,9 +32,8 @@ func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 		cfg, err := envconfig.Parse(h.envFile)
 		if err != nil {
 			return false, "Codex unavailable: failed to read env configuration."
-		} else {
-			hasAPIKey = strings.TrimSpace(cfg.OpenAIAPIKey) != ""
 		}
+		hasAPIKey = strings.TrimSpace(cfg.OpenAIAPIKey) != ""
 	}
 	if !hasAPIKey {
 		reason := "Codex unavailable: configure OPENAI_API_KEY or sign in via host Codex auth cache (~/.codex/auth.json)."

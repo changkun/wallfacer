@@ -55,7 +55,7 @@ func TestMergeBase(t *testing.T) {
 		// Create worktree with a task branch.
 		wtDir := filepath.Join(t.TempDir(), "wt")
 		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "task") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "task") })
 
 		// Advance main.
 		writeFile(t, filepath.Join(repo, "m.txt"), "main\n")
@@ -90,7 +90,7 @@ func TestCommitsBehind(t *testing.T) {
 		repo := setupRepo(t)
 		wtDir := filepath.Join(t.TempDir(), "wt")
 		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "task") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "task") })
 
 		n, err := CommitsBehind(repo, wtDir)
 		if err != nil || n != 0 {
@@ -102,7 +102,7 @@ func TestCommitsBehind(t *testing.T) {
 		repo := setupRepo(t)
 		wtDir := filepath.Join(t.TempDir(), "wt")
 		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "task") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "task") })
 
 		for _, f := range []string{"m1.txt", "m2.txt"} {
 			writeFile(t, filepath.Join(repo, f), f+"\n")
@@ -132,7 +132,7 @@ func TestCommitsBehind(t *testing.T) {
 
 		wtDir := filepath.Join(t.TempDir(), "wt")
 		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "task") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "task") })
 
 		writeFile(t, filepath.Join(repo, "m1.txt"), "main\n")
 		gitRun(t, repo, "add", ".")
@@ -169,7 +169,7 @@ func TestHasCommitsAheadOf(t *testing.T) {
 		repo := setupRepo(t)
 		wtDir := filepath.Join(t.TempDir(), "wt")
 		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "task") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "task") })
 
 		writeFile(t, filepath.Join(wtDir, "task.txt"), "task\n")
 		gitRun(t, wtDir, "add", ".")
@@ -193,7 +193,7 @@ func TestRebaseOntoDefault(t *testing.T) {
 		repo := setupRepo(t)
 		wtDir := filepath.Join(t.TempDir(), "wt")
 		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "task") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "task") })
 
 		writeFile(t, filepath.Join(repo, "main-only.txt"), "main\n")
 		gitRun(t, repo, "add", ".")
@@ -212,7 +212,7 @@ func TestRebaseOntoDefault(t *testing.T) {
 		repo := setupRepo(t)
 		wtDir := filepath.Join(t.TempDir(), "wt")
 		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-		t.Cleanup(func() { RemoveWorktree(repo, wtDir, "task") })
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "task") })
 
 		writeFile(t, filepath.Join(repo, "file.txt"), "main version\n")
 		gitRun(t, repo, "add", ".")
@@ -390,7 +390,7 @@ func createMergeConflict(t *testing.T, files []string) string {
 	gitRun(t, repo, "commit", "-m", "main changes")
 
 	// Merge branch-a into main, which will conflict.
-	exec.Command("git", "-C", repo, "merge", "--no-ff", "branch-a").Run()
+	_ = exec.Command("git", "-C", repo, "merge", "--no-ff", "branch-a").Run()
 	return repo
 }
 
@@ -404,7 +404,7 @@ func TestClearConflictedPaths(t *testing.T) {
 
 	t.Run("single conflicted file is cleared", func(t *testing.T) {
 		repo := createMergeConflict(t, []string{"file.txt"})
-		t.Cleanup(func() { exec.Command("git", "-C", repo, "merge", "--abort").Run() })
+		t.Cleanup(func() { _ = exec.Command("git", "-C", repo, "merge", "--abort").Run() })
 
 		has, _ := HasConflicts(repo)
 		if !has {
@@ -426,7 +426,7 @@ func TestClearConflictedPaths(t *testing.T) {
 
 	t.Run("multiple conflicted files are cleared", func(t *testing.T) {
 		repo := createMergeConflict(t, []string{"file.txt", "file2.txt"})
-		t.Cleanup(func() { exec.Command("git", "-C", repo, "merge", "--abort").Run() })
+		t.Cleanup(func() { _ = exec.Command("git", "-C", repo, "merge", "--abort").Run() })
 
 		has, _ := HasConflicts(repo)
 		if !has {
@@ -496,7 +496,7 @@ func TestRecoverRebaseState(t *testing.T) {
 
 		// Attempt rebase from task — will stop at conflict.
 		gitRun(t, repo, "checkout", "task")
-		exec.Command("git", "-C", repo, "rebase", "main").Run()
+		_ = exec.Command("git", "-C", repo, "rebase", "main").Run()
 
 		has, _ := hasRebaseOrMergeState(repo)
 		if !has {
@@ -564,8 +564,8 @@ func TestHasRebaseMergeState(t *testing.T) {
 		gitRun(t, repo, "commit", "-m", "main change")
 
 		gitRun(t, repo, "checkout", "task")
-		exec.Command("git", "-C", repo, "rebase", "main").Run()
-		t.Cleanup(func() { exec.Command("git", "-C", repo, "rebase", "--abort").Run() })
+		_ = exec.Command("git", "-C", repo, "rebase", "main").Run()
+		t.Cleanup(func() { _ = exec.Command("git", "-C", repo, "rebase", "--abort").Run() })
 
 		got, err := hasRebaseOrMergeState(repo)
 		if err != nil {
@@ -578,7 +578,7 @@ func TestHasRebaseMergeState(t *testing.T) {
 
 	t.Run("MERGE_HEAD set via conflicting merge returns true", func(t *testing.T) {
 		repo := createMergeConflict(t, []string{"file.txt"})
-		t.Cleanup(func() { exec.Command("git", "-C", repo, "merge", "--abort").Run() })
+		t.Cleanup(func() { _ = exec.Command("git", "-C", repo, "merge", "--abort").Run() })
 
 		got, err := hasRebaseOrMergeState(repo)
 		if err != nil {
@@ -606,8 +606,8 @@ func TestHasRebaseMergeState(t *testing.T) {
 		gitRun(t, repo, "commit", "-m", "main change")
 
 		// Cherry-pick the feature commit — it will conflict and set CHERRY_PICK_HEAD.
-		exec.Command("git", "-C", repo, "cherry-pick", featureCommit).Run()
-		t.Cleanup(func() { exec.Command("git", "-C", repo, "cherry-pick", "--abort").Run() })
+		_ = exec.Command("git", "-C", repo, "cherry-pick", featureCommit).Run()
+		t.Cleanup(func() { _ = exec.Command("git", "-C", repo, "cherry-pick", "--abort").Run() })
 
 		got, err := hasRebaseOrMergeState(repo)
 		if err != nil {

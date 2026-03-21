@@ -38,7 +38,7 @@ func TestListSummaries_WithSavedSummary(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "summary task", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "summary task", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestListDeletedTasks_AfterSoftDelete(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "to be deleted", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "to be deleted", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestRestoreTask_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "restore me", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "restore me", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -242,11 +242,11 @@ func TestFilterByFailureCategory_ViaListTasksHandler(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task1, err := h.store.CreateTask(ctx, "timeout task", 15, false, "", "")
+	task1, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "timeout task", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
-	task2, err := h.store.CreateTask(ctx, "budget task", 15, false, "", "")
+	task2, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "budget task", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestListTasks_ArchivedPaginationSuccess(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a task, force it to done, then archive it.
-	task, err := h.store.CreateTask(ctx, "archived task", 30, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "archived task", Timeout: 30})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

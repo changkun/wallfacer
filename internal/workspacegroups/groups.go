@@ -1,3 +1,4 @@
+// Package workspacegroups manages persistent workspace group configurations.
 package workspacegroups
 
 import (
@@ -9,6 +10,7 @@ import (
 	"strings"
 )
 
+// Group represents a named set of workspace paths.
 type Group struct {
 	Workspaces []string `json:"workspaces"`
 }
@@ -17,6 +19,7 @@ func filePath(configDir string) string {
 	return filepath.Join(configDir, "workspace-groups.json")
 }
 
+// Load reads workspace groups from the config directory.
 func Load(configDir string) ([]Group, error) {
 	raw, err := os.ReadFile(filePath(configDir))
 	if errors.Is(err, os.ErrNotExist) {
@@ -32,6 +35,7 @@ func Load(configDir string) ([]Group, error) {
 	return Normalize(groups), nil
 }
 
+// Save writes workspace groups to the config directory atomically.
 func Save(configDir string, groups []Group) error {
 	path := filePath(configDir)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -48,6 +52,7 @@ func Save(configDir string, groups []Group) error {
 	return os.Rename(tmp, path)
 }
 
+// Upsert adds or promotes a workspace group to the front of the list.
 func Upsert(configDir string, workspaces []string) error {
 	workspaces = normalizePaths(workspaces)
 	if len(workspaces) == 0 {
@@ -72,6 +77,7 @@ func Upsert(configDir string, workspaces []string) error {
 	return Save(configDir, groups)
 }
 
+// Normalize deduplicates and cleans workspace groups.
 func Normalize(groups []Group) []Group {
 	if len(groups) == 0 {
 		return nil

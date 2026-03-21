@@ -56,7 +56,8 @@ func newTestHandler(t *testing.T) *Handler {
 	}
 	s, err := store.NewStore(storeDir)
 	if err != nil {
-		os.RemoveAll(storeDir)
+		_ = os.RemoveAll(storeDir)
+
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{})
@@ -65,7 +66,8 @@ func newTestHandler(t *testing.T) *Handler {
 	// goroutine exits cleanly before WaitBackground drains remaining work.
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	t.Cleanup(func() { os.RemoveAll(storeDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+
 	return NewHandler(s, r, t.TempDir(), nil, nil)
 }
 
@@ -77,7 +79,8 @@ func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 	}
 	s, err := store.NewStore(storeDir)
 	if err != nil {
-		os.RemoveAll(storeDir)
+		_ = os.RemoveAll(storeDir)
+
 		t.Fatal(err)
 	}
 	envPath := filepath.Join(t.TempDir(), ".env")
@@ -90,7 +93,8 @@ func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 	})
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	t.Cleanup(func() { os.RemoveAll(storeDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+
 	return NewHandler(s, r, t.TempDir(), workspaces, nil)
 }
 
@@ -139,12 +143,14 @@ func TestTaskDiffShowsOnlyTaskChanges(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-b", wtB, "HEAD")
 
 	// Task A makes a change and commits.
-	os.WriteFile(filepath.Join(wtA, "a.txt"), []byte("from task A\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtA, "a.txt"), []byte("from task A\n"), 0644)
+
 	gitRun(t, wtA, "add", ".")
 	gitRun(t, wtA, "commit", "-m", "task A commit")
 
 	// Task B makes a different change and commits.
-	os.WriteFile(filepath.Join(wtB, "b.txt"), []byte("from task B\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtB, "b.txt"), []byte("from task B\n"), 0644)
+
 	gitRun(t, wtB, "add", ".")
 	gitRun(t, wtB, "commit", "-m", "task B commit")
 
@@ -152,8 +158,9 @@ func TestTaskDiffShowsOnlyTaskChanges(t *testing.T) {
 	gitRun(t, repo, "merge", "--ff-only", "task-a")
 
 	// Create store tasks with worktree paths.
-	taskB, _ := h.store.CreateTask(ctx, "task B", 5, false, "", "")
-	h.store.UpdateTaskWorktrees(ctx, taskB.ID, map[string]string{repo: wtB}, "task-b")
+	taskB, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task B", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, taskB.ID, map[string]string{repo: wtB}, "task-b")
+
 
 	// Get diff for task B — should only show b.txt, NOT the inverse of a.txt.
 	resp := callTaskDiff(t, h, taskB.ID)
@@ -175,10 +182,12 @@ func TestTaskDiffIncludesUncommittedChanges(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
 
 	// Make uncommitted change.
-	os.WriteFile(filepath.Join(wtDir, "file.txt"), []byte("modified\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtDir, "file.txt"), []byte("modified\n"), 0644)
 
-	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -196,10 +205,12 @@ func TestTaskDiffIncludesUntrackedFiles(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
 
 	// Add an untracked file.
-	os.WriteFile(filepath.Join(wtDir, "new-file.txt"), []byte("new content\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtDir, "new-file.txt"), []byte("new content\n"), 0644)
 
-	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -216,8 +227,9 @@ func TestTaskDiffEmptyWhenNoChanges(t *testing.T) {
 	wtDir := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
 
-	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -235,17 +247,21 @@ func TestTaskDiffFallbackToCommitHashes(t *testing.T) {
 	baseHash := gitRun(t, repo, "rev-parse", "HEAD")
 
 	// Make a commit to simulate task work.
-	os.WriteFile(filepath.Join(repo, "task-work.txt"), []byte("task\n"), 0644)
+	_ = os.WriteFile(filepath.Join(repo, "task-work.txt"), []byte("task\n"), 0644)
+
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "task work")
 	commitHash := gitRun(t, repo, "rev-parse", "HEAD")
 
 	// Create task pointing to a non-existent worktree path, with commit hashes set.
-	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	nonexistent := filepath.Join(t.TempDir(), "gone")
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task")
-	h.store.UpdateTaskCommitHashes(ctx, task.ID, map[string]string{repo: commitHash})
-	h.store.UpdateTaskBaseCommitHashes(ctx, task.ID, map[string]string{repo: baseHash})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task")
+
+	_ = h.store.UpdateTaskCommitHashes(ctx, task.ID, map[string]string{repo: commitHash})
+
+	_ = h.store.UpdateTaskBaseCommitHashes(ctx, task.ID, map[string]string{repo: baseHash})
+
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -261,20 +277,23 @@ func TestTaskDiffFallbackBranchUseMergeBase(t *testing.T) {
 
 	// Create a task branch with commits, then advance main.
 	gitRun(t, repo, "checkout", "-b", "task-x")
-	os.WriteFile(filepath.Join(repo, "task-x.txt"), []byte("task X\n"), 0644)
+	_ = os.WriteFile(filepath.Join(repo, "task-x.txt"), []byte("task X\n"), 0644)
+
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "task X commit")
 	gitRun(t, repo, "checkout", "main")
 
 	// Advance main with a different change.
-	os.WriteFile(filepath.Join(repo, "main-advance.txt"), []byte("main\n"), 0644)
+	_ = os.WriteFile(filepath.Join(repo, "main-advance.txt"), []byte("main\n"), 0644)
+
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "main advance")
 
 	// Task with worktree gone, but branch exists with commits ahead.
-	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	nonexistent := filepath.Join(t.TempDir(), "gone")
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task-x")
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task-x")
+
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -302,13 +321,15 @@ func TestTaskDiffAfterCommitPipeline(t *testing.T) {
 
 	// Create a feature branch and switch to it (simulates user not being on main).
 	gitRun(t, repo, "checkout", "-b", "user-feature")
-	os.WriteFile(filepath.Join(repo, "user-work.txt"), []byte("user work\n"), 0644)
+	_ = os.WriteFile(filepath.Join(repo, "user-work.txt"), []byte("user work\n"), 0644)
+
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "user feature commit")
 
 	// Go back to main and simulate a task commit.
 	gitRun(t, repo, "checkout", "main")
-	os.WriteFile(filepath.Join(repo, "task-work.txt"), []byte("task output\n"), 0644)
+	_ = os.WriteFile(filepath.Join(repo, "task-work.txt"), []byte("task output\n"), 0644)
+
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "wallfacer: task work")
 	commitHash := gitRun(t, repo, "rev-parse", "HEAD")
@@ -318,11 +339,14 @@ func TestTaskDiffAfterCommitPipeline(t *testing.T) {
 
 	// Create a task with worktree gone (cleaned up after commit pipeline),
 	// but with correct commit hashes stored using the defBranch ref.
-	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	nonexistent := filepath.Join(t.TempDir(), "cleaned-up")
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task-branch")
-	h.store.UpdateTaskCommitHashes(ctx, task.ID, map[string]string{repo: commitHash})
-	h.store.UpdateTaskBaseCommitHashes(ctx, task.ID, map[string]string{repo: baseHash})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task-branch")
+
+	_ = h.store.UpdateTaskCommitHashes(ctx, task.ID, map[string]string{repo: commitHash})
+
+	_ = h.store.UpdateTaskBaseCommitHashes(ctx, task.ID, map[string]string{repo: baseHash})
+
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -387,9 +411,11 @@ func TestGitRebaseOnMain_RejectsWhenTasksInProgress(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
+
 
 	body := `{"workspace": "` + repo + `"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
@@ -414,7 +440,7 @@ func TestGitSyncWorkspace_DoesNotBlockForUnrelatedWorkspaceTask(t *testing.T) {
 	h := newStaticWorkspaceHandler(t, []string{repoA, repoB})
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "other workspace task", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "other workspace task", Timeout: 15})
 	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
 	}
@@ -440,7 +466,7 @@ func TestGitCheckout_BlocksWaitingTaskWithWorkspaceWorktree(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "waiting task", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "waiting task", Timeout: 15})
 	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
 	}
@@ -476,7 +502,7 @@ func TestGitCreateBranch_DoesNotBlockFailedTaskWithoutWorktree(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "failed task", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "failed task", Timeout: 15})
 	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
 	}
@@ -499,7 +525,7 @@ func TestGitCreateBranch_DoesNotBlockFailedTaskWithMissingWorktreeDir(t *testing
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "failed task", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "failed task", Timeout: 15})
 	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
 	}
@@ -527,7 +553,7 @@ func TestGitRebaseOnMain_BlocksOnlyTargetedWorkspace(t *testing.T) {
 	h := newStaticWorkspaceHandler(t, []string{repoA, repoB})
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "repo B task", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "repo B task", Timeout: 15})
 	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
 	}
@@ -603,7 +629,8 @@ func TestGitBranches_IncludesMultipleBranches(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	branches, _ := resp["branches"].([]any)
 	if len(branches) < 3 {
 		t.Errorf("expected at least 3 branches (main + feature-a + feature-b), got %d: %v", len(branches), branches)
@@ -701,10 +728,12 @@ func TestDiffCacheHit(t *testing.T) {
 
 	wtDir := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-	os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("hello\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("hello\n"), 0644)
 
-	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
 
 	// First request — cache miss, expect 200 with ETag.
 	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
@@ -753,11 +782,14 @@ func TestDiffCacheImmutable(t *testing.T) {
 
 			wtDir := filepath.Join(t.TempDir(), "wt")
 			gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-			os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("done\n"), 0644)
+			_ = os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("done\n"), 0644)
 
-			task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
-			h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
-			h.store.ForceUpdateTaskStatus(ctx, task.ID, status)
+
+			task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+			_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
+			_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, status)
+
 
 			req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
 			w := httptest.NewRecorder()
@@ -784,12 +816,16 @@ func TestDiffCacheImmutable(t *testing.T) {
 
 		wtDir := filepath.Join(t.TempDir(), "wt")
 		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-		os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("archived\n"), 0644)
+		_ = os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("archived\n"), 0644)
 
-		task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
-		h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
-		h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-		h.store.SetTaskArchived(ctx, task.ID, true)
+
+		task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+		_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
+		_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
+		_ = h.store.SetTaskArchived(ctx, task.ID, true)
+
 
 		req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
 		w := httptest.NewRecorder()
@@ -814,10 +850,12 @@ func TestDiffCacheInvalidation(t *testing.T) {
 
 	wtDir := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-	os.WriteFile(filepath.Join(wtDir, "file1.txt"), []byte("first\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtDir, "file1.txt"), []byte("first\n"), 0644)
 
-	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
 
 	// First diff — populate cache.
 	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
@@ -829,7 +867,8 @@ func TestDiffCacheInvalidation(t *testing.T) {
 	etag1 := w1.Header().Get("ETag")
 
 	// Add a new untracked file (diff content changes).
-	os.WriteFile(filepath.Join(wtDir, "file2.txt"), []byte("second\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtDir, "file2.txt"), []byte("second\n"), 0644)
+
 
 	// Without a status change, the cache is still valid — second request with
 	// If-None-Match should return 304.
@@ -881,10 +920,12 @@ func TestDiffCacheTTLExpiry(t *testing.T) {
 
 	wtDir := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
-	os.WriteFile(filepath.Join(wtDir, "file1.txt"), []byte("first\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtDir, "file1.txt"), []byte("first\n"), 0644)
 
-	task, _ := h.store.CreateTask(ctx, "test", 5, false, "", "")
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+
 	// Leave task in backlog (non-terminal) so the cache entry has a TTL.
 
 	// First diff — populate cache.
@@ -897,7 +938,8 @@ func TestDiffCacheTTLExpiry(t *testing.T) {
 	etag1 := w1.Header().Get("ETag")
 
 	// Add a new untracked file while still within the TTL.
-	os.WriteFile(filepath.Join(wtDir, "file2.txt"), []byte("second\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtDir, "file2.txt"), []byte("second\n"), 0644)
+
 
 	// Within TTL — same ETag should still produce 304.
 	req2 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
@@ -940,19 +982,23 @@ func TestTaskDiffIsolationConcurrent(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task-b", wtB, "HEAD")
 
 	// Each task makes different changes.
-	os.WriteFile(filepath.Join(wtA, "only-a.txt"), []byte("A\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtA, "only-a.txt"), []byte("A\n"), 0644)
+
 	gitRun(t, wtA, "add", ".")
 	gitRun(t, wtA, "commit", "-m", "A")
 
-	os.WriteFile(filepath.Join(wtB, "only-b.txt"), []byte("B\n"), 0644)
+	_ = os.WriteFile(filepath.Join(wtB, "only-b.txt"), []byte("B\n"), 0644)
+
 	gitRun(t, wtB, "add", ".")
 	gitRun(t, wtB, "commit", "-m", "B")
 
-	taskA, _ := h.store.CreateTask(ctx, "A", 5, false, "", "")
-	h.store.UpdateTaskWorktrees(ctx, taskA.ID, map[string]string{repo: wtA}, "task-a")
+	taskA, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "A", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, taskA.ID, map[string]string{repo: wtA}, "task-a")
 
-	taskB, _ := h.store.CreateTask(ctx, "B", 5, false, "", "")
-	h.store.UpdateTaskWorktrees(ctx, taskB.ID, map[string]string{repo: wtB}, "task-b")
+
+	taskB, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "B", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, taskB.ID, map[string]string{repo: wtB}, "task-b")
+
 
 	// Query diffs concurrently.
 	var wg sync.WaitGroup
@@ -1175,7 +1221,7 @@ func TestTaskBlocksWorkspaceMutation_FailedTaskWithExistingWorktree(t *testing.T
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "failed task with worktree", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "failed task with worktree", Timeout: 15})
 	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
 	}

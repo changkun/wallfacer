@@ -67,9 +67,10 @@ func TestParseTurnNumber_Invalid(t *testing.T) {
 func TestStreamLogs_TaskNotFound(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	// Immediately cancel — non-running task with no logs.
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -86,11 +87,12 @@ func TestStreamLogs_TaskNotFound(t *testing.T) {
 func TestServeStoredLogs_ShowsNoOutputMessage(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	// Create an empty outputs directory but no turn files.
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
+	_ = os.MkdirAll(outputsDir, 0755)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -107,12 +109,15 @@ func TestServeStoredLogs_ShowsNoOutputMessage(t *testing.T) {
 func TestServeStoredLogs_ServesTurnFiles(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result": "ok"}`), 0644)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"result": "done"}`), 0644)
+	_ = os.MkdirAll(outputsDir, 0755)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result": "ok"}`), 0644)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"result": "done"}`), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -133,13 +138,17 @@ func TestServeStoredLogs_ServesTurnFiles(t *testing.T) {
 func TestServeStoredLogsUpTo_FiltersHigherTurns(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn": 2}`), 0644)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0003.json"), []byte(`{"turn": 3}`), 0644)
+	_ = os.MkdirAll(outputsDir, 0755)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn": 2}`), 0644)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0003.json"), []byte(`{"turn": 3}`), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -160,13 +169,17 @@ func TestServeStoredLogsUpTo_FiltersHigherTurns(t *testing.T) {
 func TestServeStoredLogsFrom_FiltersLowerTurns(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn": 2}`), 0644)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0003.json"), []byte(`{"turn": 3}`), 0644)
+	_ = os.MkdirAll(outputsDir, 0755)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn": 2}`), 0644)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0003.json"), []byte(`{"turn": 3}`), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -187,13 +200,16 @@ func TestServeStoredLogsFrom_FiltersLowerTurns(t *testing.T) {
 func TestServeStoredLogs_SkipsEmptyFiles(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
+	_ = os.MkdirAll(outputsDir, 0755)
+
 	// Empty file — should be skipped.
-	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(""), 0644)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte("  \n  "), 0644)
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(""), 0644)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte("  \n  "), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -207,13 +223,16 @@ func TestServeStoredLogs_SkipsEmptyFiles(t *testing.T) {
 func TestServeStoredLogs_SkipsNonTurnFiles(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
+	_ = os.MkdirAll(outputsDir, 0755)
+
 	// Non-turn file — should be skipped.
-	os.WriteFile(filepath.Join(outputsDir, "metadata.json"), []byte(`{"meta": true}`), 0644)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
+	_ = os.WriteFile(filepath.Join(outputsDir, "metadata.json"), []byte(`{"meta": true}`), 0644)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -233,7 +252,7 @@ func TestServeStoredLogs_SkipsNonTurnFiles(t *testing.T) {
 func TestStreamTasks_InitialSnapshot(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "my task", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "my task", Timeout: 15})
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
@@ -264,9 +283,10 @@ func TestStreamTasks_InitialSnapshot(t *testing.T) {
 func TestStreamTasks_DeltaOnUpdate(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "delta test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "delta test", Timeout: 15})
 	// Create a second task so the full list has >1 entry; the delta must carry only 1.
-	h.store.CreateTask(ctx, "other task", 15, false, "", "")
+	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "other task", Timeout: 15})
+
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
@@ -280,7 +300,8 @@ func TestStreamTasks_DeltaOnUpdate(t *testing.T) {
 
 	// Wait for the snapshot to be written, then trigger a mutation.
 	time.Sleep(20 * time.Millisecond)
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
 	time.Sleep(20 * time.Millisecond)
 	cancel()
 	<-done
@@ -311,7 +332,7 @@ func TestStreamTasks_DeltaOnUpdate(t *testing.T) {
 func TestStreamTasks_DeleteEmitsTaskDeleted(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "to delete", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "to delete", Timeout: 15})
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
@@ -324,7 +345,8 @@ func TestStreamTasks_DeleteEmitsTaskDeleted(t *testing.T) {
 	}()
 
 	time.Sleep(20 * time.Millisecond)
-	h.store.DeleteTask(ctx, task.ID, "")
+	_ = h.store.DeleteTask(ctx, task.ID, "")
+
 	time.Sleep(20 * time.Millisecond)
 	cancel()
 	<-done
@@ -369,7 +391,8 @@ func (w *nonFlushingWriter) Body() string                { return w.body.String(
 func TestStreamTasks_SnapshotCarriesID(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	h.store.CreateTask(ctx, "task1", 15, false, "", "")
+	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task1", Timeout: 15})
+
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
@@ -399,7 +422,7 @@ func TestStreamTasks_SnapshotCarriesID(t *testing.T) {
 func TestStreamTasks_DeltaCarriesID(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "id test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "id test", Timeout: 15})
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
@@ -412,7 +435,8 @@ func TestStreamTasks_DeltaCarriesID(t *testing.T) {
 	}()
 
 	time.Sleep(20 * time.Millisecond)
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
 	time.Sleep(20 * time.Millisecond)
 	cancel()
 	<-done
@@ -435,7 +459,7 @@ func TestStreamTasks_DeltaCarriesID(t *testing.T) {
 func TestStreamTasks_MonotonicIDs(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "mono", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "mono", Timeout: 15})
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
@@ -449,8 +473,10 @@ func TestStreamTasks_MonotonicIDs(t *testing.T) {
 
 	time.Sleep(20 * time.Millisecond)
 	// Use two valid transitions to generate two delta events after the snapshot.
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 	time.Sleep(30 * time.Millisecond)
 	cancel()
 	<-done
@@ -485,7 +511,7 @@ func TestStreamTasks_MonotonicIDs(t *testing.T) {
 func TestStreamTasks_ReplaySuccess(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "replay me", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "replay me", Timeout: 15})
 
 	// First connection: get a snapshot and record the last sequence ID.
 	reqCtx1, cancel1 := context.WithCancel(context.Background())
@@ -499,7 +525,8 @@ func TestStreamTasks_ReplaySuccess(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 
 	// Trigger a mutation while still connected so the delta goes into the replay buffer.
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
 	time.Sleep(20 * time.Millisecond)
 	cancel1()
 	<-done1
@@ -518,7 +545,8 @@ func TestStreamTasks_ReplaySuccess(t *testing.T) {
 
 	// Trigger another mutation while disconnected — this will be in the replay buffer.
 	// in_progress → waiting is a valid transition.
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 
 	// Second connection: reconnect with last_event_id — should get only the delta, no snapshot.
 	reqCtx2, cancel2 := context.WithCancel(context.Background())
@@ -553,7 +581,8 @@ func TestStreamTasks_ReplaySuccess(t *testing.T) {
 func TestStreamTasks_GapFallbackToSnapshot(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	h.store.CreateTask(ctx, "gap test", 15, false, "", "")
+	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "gap test", Timeout: 15})
+
 
 	// Reconnect with a very old sequence ID that will never be in the buffer.
 	reqCtx, cancel := context.WithCancel(context.Background())
@@ -583,7 +612,8 @@ func TestStreamTasks_GapFallbackToSnapshot(t *testing.T) {
 func TestStreamTasks_NoLastEventID_AlwaysSnapshot(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	h.store.CreateTask(ctx, "fresh", 15, false, "", "")
+	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "fresh", Timeout: 15})
+
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
@@ -609,17 +639,19 @@ func TestStreamTasks_NoLastEventID_AlwaysSnapshot(t *testing.T) {
 func TestStreamTasks_ReplayViaLastEventIDHeader(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "header replay", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "header replay", Timeout: 15})
 
 	// Trigger a mutation so the replay buffer has at least one entry.
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
 
 	// Record the current seq (after the mutation).
 	seqBefore := h.store.LatestDeltaSeq()
 
 	// Trigger another mutation that the client will have "missed".
 	// in_progress → waiting is a valid transition.
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+
 
 	// Reconnect using the Last-Event-ID header (as a native EventSource would).
 	reqCtx, cancel := context.WithCancel(context.Background())
@@ -658,10 +690,12 @@ func newTestHandlerWithMockRunner(t *testing.T, mock *runner.MockRunner) (*Handl
 	}
 	s, err := store.NewStore(storeDir)
 	if err != nil {
-		os.RemoveAll(storeDir)
+		_ = os.RemoveAll(storeDir)
+
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.RemoveAll(storeDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+
 	h := &Handler{runner: mock, store: s}
 	return h, s
 }
@@ -682,13 +716,16 @@ func TestStreamLogs_UnknownTask(t *testing.T) {
 func TestStreamLogs_DoneTaskServesStoredLogs(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
 
 	// Write a turn file so serveStoredLogs returns 200 instead of 404.
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result":"ok"}`), 0644)
+	_ = os.MkdirAll(outputsDir, 0755)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result":"ok"}`), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -707,8 +744,9 @@ func TestStreamLogs_DoneTaskServesStoredLogs(t *testing.T) {
 func TestStreamLogs_CancelledTaskServesStoredLogs(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "cancel test", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cancel test", Timeout: 15})
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
+
 
 	// No turn files; serveStoredLogs will return 404 "no logs saved".
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
@@ -727,13 +765,17 @@ func TestStreamLogs_CancelledTaskServesStoredLogs(t *testing.T) {
 func TestStreamLogs_PhaseImplQueryParam(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "impl phase test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "impl phase test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
 
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
+	_ = os.MkdirAll(outputsDir, 0755)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=impl", nil)
 	w := httptest.NewRecorder()
@@ -756,13 +798,17 @@ func TestStreamLogs_PhaseImplQueryParam(t *testing.T) {
 func TestStreamLogs_PhaseTestQueryParam(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test phase test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test phase test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
+
 
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
+	_ = os.MkdirAll(outputsDir, 0755)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=test", nil)
 	w := httptest.NewRecorder()
@@ -786,8 +832,9 @@ func TestStreamLogs_PhaseTestQueryParam(t *testing.T) {
 func TestStreamLogs_InProgressNoContainerExitsOnContextCancel(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "in progress no container", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "in progress no container", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
 
 	// The mock runner always returns "" for ContainerName, so StreamLogs
 	// falls back to serveStoredLogs (no turn files → 404).
@@ -827,7 +874,7 @@ func TestStreamLogs_InProgress_NoFlusher(t *testing.T) {
 	h, s := newTestHandlerWithMockRunner(t, mock)
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "no-flusher test", 15, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "no-flusher test", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -893,7 +940,7 @@ func TestStreamLogs_InProgress_ContainerExitsCleanly(t *testing.T) {
 	h, s := newTestHandlerWithMockRunner(t, mock)
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "live stream test", 15, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "live stream test", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -929,7 +976,7 @@ func TestStreamLogs_InProgress_CommandStartFails(t *testing.T) {
 	h, s := newTestHandlerWithMockRunner(t, mock)
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "start-fail test", 15, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "start-fail test", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -969,7 +1016,7 @@ func TestStreamLogs_InProgress_ContextCancellation(t *testing.T) {
 	h, s := newTestHandlerWithMockRunner(t, mock)
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "cancellation test", 15, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cancellation test", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1104,8 +1151,9 @@ func TestStreamRefineLogs_ContextCancellation(t *testing.T) {
 func TestStreamLogs_PhaseTest_InProgress(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "phase-test in-progress", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "phase-test in-progress", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
 
 	// No container (real runner returns ""), so falls back to serveStoredLogs.
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=test", nil)
@@ -1123,12 +1171,15 @@ func TestStreamLogs_PhaseTest_InProgress(t *testing.T) {
 func TestStreamLogs_Committing_ServesStoredLogs(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "committing test", 15, false, "", "")
-	h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting)
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "committing test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting)
+
 
 	outputsDir := h.store.OutputsDir(task.ID)
-	os.MkdirAll(outputsDir, 0755)
-	os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"status":"committing"}`), 0644)
+	_ = os.MkdirAll(outputsDir, 0755)
+
+	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"status":"committing"}`), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -1147,7 +1198,7 @@ func TestStreamLogs_Committing_ServesStoredLogs(t *testing.T) {
 func TestServeStoredLogsRange_DirectoryMissing(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "missing dir", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "missing dir", Timeout: 15})
 
 	// Do NOT create the outputs directory.
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)

@@ -47,7 +47,8 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	}
 	runWithSandbox := func(selected sandbox.Type) titleResult {
 		mdl := r.titleModelFromEnvForSandbox(selected)
-		exec.Command(r.command, "rm", "-f", containerName).Run()
+		_ = exec.Command(r.command, "rm", "-f", containerName).Run()
+
 
 		spec := r.buildBaseContainerSpec(containerName, mdl, selected)
 		spec.Cmd = buildAgentCmd(titlePrompt, mdl)
@@ -57,9 +58,11 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 
-		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+
 		runErr := cmd.Run()
-		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+
 
 		if ctx.Err() != nil {
 			return titleResult{err: fmt.Errorf("container terminated: %w", ctx.Err()), model: mdl, sb: selected}
@@ -103,7 +106,8 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		isLikelyTokenLimitError(res.err.Error()) {
 		logger.Runner.Warn("title generation: claude sandbox token limit hit; retrying with codex",
 			"task", taskID)
-		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+
 			"result": "Sandbox fallback: claude → codex (token/rate limit hit during title generation)",
 		})
 		sb = sandbox.Codex
@@ -113,7 +117,8 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		isLikelyTokenLimitError(res.output.Result, res.output.Subtype) {
 		logger.Runner.Warn("title generation: claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID)
-		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+
 			"result": "Sandbox fallback: claude → codex (token/rate limit in title output)",
 		})
 		sb = sandbox.Codex

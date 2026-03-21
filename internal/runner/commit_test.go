@@ -412,7 +412,7 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "test commit spans", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test commit spans", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -760,7 +760,7 @@ func TestMaybeAutoPush_NonGitDir(t *testing.T) {
 	}
 	r := NewRunner(s, RunnerConfig{EnvFile: envFile, WorktreesDir: worktreesDir})
 
-	task, err := s.CreateTask(context.Background(), "test", 30, false, "", "")
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "test", Timeout: 30})
 	if err != nil {
 		t.Fatal(err)
 	}

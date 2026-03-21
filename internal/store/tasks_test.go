@@ -46,7 +46,7 @@ func TestClampTimeout(t *testing.T) {
 
 func TestCreateTask_Basic(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "my prompt", 10, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "my prompt", Timeout: 10})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -72,9 +72,9 @@ func TestCreateTask_Basic(t *testing.T) {
 
 func TestCreateTask_PositionIncrements(t *testing.T) {
 	s := newTestStore(t)
-	t1, _ := s.CreateTask(bg(), "first", 5, false, "", "")
-	t2, _ := s.CreateTask(bg(), "second", 5, false, "", "")
-	t3, _ := s.CreateTask(bg(), "third", 5, false, "", "")
+	t1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "first", Timeout: 5})
+	t2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "second", Timeout: 5})
+	t3, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "third", Timeout: 5})
 	// Each newer task should have a strictly lower position so it sorts to the top.
 	if t2.Position >= t1.Position {
 		t.Errorf("t2.Position = %d should be less than t1.Position = %d", t2.Position, t1.Position)
@@ -86,7 +86,7 @@ func TestCreateTask_PositionIncrements(t *testing.T) {
 
 func TestCreateTask_TimeoutClampedDefault(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 0, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 0})
 	if task.Timeout != 60 {
 		t.Errorf("expected default timeout 60, got %d", task.Timeout)
 	}
@@ -94,7 +94,7 @@ func TestCreateTask_TimeoutClampedDefault(t *testing.T) {
 
 func TestCreateTask_TimeoutClampedMax(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 9999, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 9999})
 	if task.Timeout != 1440 {
 		t.Errorf("expected clamped timeout 1440, got %d", task.Timeout)
 	}
@@ -103,7 +103,7 @@ func TestCreateTask_TimeoutClampedMax(t *testing.T) {
 func TestCreateTask_PersistsToDisk(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "persist me", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "persist me", Timeout: 5})
 
 	s2, _ := NewStore(dir)
 	got, err := s2.GetTask(bg(), task.ID)
@@ -117,9 +117,9 @@ func TestCreateTask_PersistsToDisk(t *testing.T) {
 
 func TestCreateTask_PositionOnlyCountsBacklog(t *testing.T) {
 	s := newTestStore(t)
-	t1, _ := s.CreateTask(bg(), "a", 5, false, "", "")
-	s.ForceUpdateTaskStatus(bg(), t1.ID, TaskStatusDone)
-	t2, _ := s.CreateTask(bg(), "b", 5, false, "", "")
+	t1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 5})
+	_ = s.ForceUpdateTaskStatus(bg(), t1.ID, TaskStatusDone)
+	t2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "b", Timeout: 5})
 	// No backlog tasks exist, so maxPos = -1 and t2 gets position 0.
 	if t2.Position != 0 {
 		t.Errorf("expected position 0 when no backlog tasks exist, got %d", t2.Position)
@@ -139,7 +139,7 @@ func TestGetTask_NotFound(t *testing.T) {
 
 func TestGetTask_ReturnsCopy(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "original", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 
 	got, _ := s.GetTask(bg(), task.ID)
 	got.Prompt = "mutated"
@@ -152,7 +152,7 @@ func TestGetTask_ReturnsCopy(t *testing.T) {
 
 func TestGetTask_ReturnsDeepCloneForNestedFields(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "original", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 
 	s.mu.Lock()
 	want := setTaskCloneFixture(t, s.tasks[task.ID])
@@ -177,9 +177,9 @@ func TestGetTask_ReturnsDeepCloneForNestedFields(t *testing.T) {
 
 func TestListTasks_SortedByPosition(t *testing.T) {
 	s := newTestStore(t)
-	s.CreateTask(bg(), "a", 5, false, "", "")
-	s.CreateTask(bg(), "b", 5, false, "", "")
-	s.CreateTask(bg(), "c", 5, false, "", "")
+	_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 5})
+	_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "b", Timeout: 5})
+	_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "c", Timeout: 5})
 
 	tasks, _ := s.ListTasks(bg(), false)
 	if len(tasks) != 3 {
@@ -194,12 +194,12 @@ func TestListTasks_SortedByPosition(t *testing.T) {
 
 func TestListTasks_SamePositionSortedByCreatedAt(t *testing.T) {
 	s := newTestStore(t)
-	t1, _ := s.CreateTask(bg(), "first", 5, false, "", "")
-	t2, _ := s.CreateTask(bg(), "second", 5, false, "", "")
+	t1, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "first", Timeout: 5})
+	t2, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "second", Timeout: 5})
 
 	// Force both to the same position.
-	s.UpdateTaskPosition(bg(), t1.ID, 10)
-	s.UpdateTaskPosition(bg(), t2.ID, 10)
+	_ = s.UpdateTaskPosition(bg(), t1.ID, 10)
+	_ = s.UpdateTaskPosition(bg(), t2.ID, 10)
 
 	tasks, _ := s.ListTasks(bg(), false)
 	if len(tasks) != 2 {
@@ -212,8 +212,8 @@ func TestListTasks_SamePositionSortedByCreatedAt(t *testing.T) {
 
 func TestListTasks_ExcludesArchivedByDefault(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "archive me", 5, false, "", "")
-	s.SetTaskArchived(bg(), task.ID, true)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "archive me", Timeout: 5})
+	_ = s.SetTaskArchived(bg(), task.ID, true)
 
 	visible, _ := s.ListTasks(bg(), false)
 	if len(visible) != 0 {
@@ -223,8 +223,8 @@ func TestListTasks_ExcludesArchivedByDefault(t *testing.T) {
 
 func TestListTasks_IncludesArchivedWhenRequested(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "archive me", 5, false, "", "")
-	s.SetTaskArchived(bg(), task.ID, true)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "archive me", Timeout: 5})
+	_ = s.SetTaskArchived(bg(), task.ID, true)
 
 	all, _ := s.ListTasks(bg(), true)
 	if len(all) != 1 {
@@ -234,7 +234,7 @@ func TestListTasks_IncludesArchivedWhenRequested(t *testing.T) {
 
 func TestListTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "listed", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "listed", Timeout: 5})
 
 	s.mu.Lock()
 	want := setTaskCloneFixture(t, s.tasks[task.ID])
@@ -258,7 +258,7 @@ func TestListTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
 
 func TestListTasksAndSeq_ReturnsDeepCloneForNestedFields(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "listed", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "listed", Timeout: 5})
 
 	s.mu.Lock()
 	want := setTaskCloneFixture(t, s.tasks[task.ID])
@@ -282,7 +282,7 @@ func TestListTasksAndSeq_ReturnsDeepCloneForNestedFields(t *testing.T) {
 
 func TestListDeletedTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "deleted", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "deleted", Timeout: 5})
 
 	s.mu.Lock()
 	_ = setTaskCloneFixture(t, s.tasks[task.ID])
@@ -321,7 +321,7 @@ func TestListDeletedTasks_ReturnsDeepCloneForNestedFields(t *testing.T) {
 
 func TestDeleteTask_Basic(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "delete me", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "delete me", Timeout: 5})
 
 	if err := s.DeleteTask(bg(), task.ID, ""); err != nil {
 		t.Fatalf("DeleteTask: %v", err)
@@ -335,10 +335,10 @@ func TestDeleteTask_Basic(t *testing.T) {
 func TestDeleteTask_RetainsDiskData(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "delete me", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "delete me", Timeout: 5})
 	taskDir := dir + "/" + task.ID.String()
 
-	s.DeleteTask(bg(), task.ID, "")
+	_ = s.DeleteTask(bg(), task.ID, "")
 
 	// Soft delete keeps the directory on disk.
 	if _, err := os.Stat(taskDir); os.IsNotExist(err) {
@@ -359,9 +359,9 @@ func TestDeleteTask_NotFound(t *testing.T) {
 
 func TestDeleteTask_PreservesEvents(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
-	s.InsertEvent(bg(), task.ID, "state_change", "test")
-	s.DeleteTask(bg(), task.ID, "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+	_ = s.InsertEvent(bg(), task.ID, "state_change", "test")
+	_ = s.DeleteTask(bg(), task.ID, "")
 
 	// Events must remain accessible for tombstoned tasks.
 	events, _ := s.GetEvents(bg(), task.ID)
@@ -376,7 +376,7 @@ func TestDeleteTask_PreservesEvents(t *testing.T) {
 
 func TestUpdateTaskStatus(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus: %v", err)
@@ -431,7 +431,7 @@ func TestValidateTransition_InvalidTransitions(t *testing.T) {
 
 func TestUpdateTaskStatus_RejectsInvalidTransition(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusDone)
 	if err == nil {
@@ -444,7 +444,7 @@ func TestUpdateTaskStatus_RejectsInvalidTransition(t *testing.T) {
 
 func TestUpdateTaskStatus_AllowsValidTransitions(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	// backlog → in_progress → waiting → in_progress → waiting → committing → done
 	steps := []TaskStatus{
@@ -468,7 +468,7 @@ func TestUpdateTaskStatus_AllowsValidTransitions(t *testing.T) {
 
 func TestForceUpdateTaskStatus_BypassesValidation(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	// backlog → done is invalid per the state machine
 	if err := s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone); err != nil {
@@ -486,7 +486,7 @@ func TestForceUpdateTaskStatus_BypassesValidation(t *testing.T) {
 
 func TestUpdateTaskTitle(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.UpdateTaskTitle(bg(), task.ID, "New Title"); err != nil {
 		t.Fatalf("UpdateTaskTitle: %v", err)
@@ -510,7 +510,7 @@ func TestUpdateTaskTitle_NotFound(t *testing.T) {
 
 func TestUpdateTaskResult(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	err := s.UpdateTaskResult(bg(), task.ID, "the output", "sess-xyz", "end_turn", 3)
 	if err != nil {
@@ -545,7 +545,7 @@ func TestUpdateTaskResult_NotFound(t *testing.T) {
 
 func TestUpdateTaskTurns_OnlyUpdatesTurns(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	// Store an implementation result first.
 	if err := s.UpdateTaskResult(bg(), task.ID, "impl output", "impl-sess", "end_turn", 3); err != nil {
@@ -588,7 +588,7 @@ func TestUpdateTaskTurns_NotFound(t *testing.T) {
 
 func TestAccumulateTaskUsage(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	delta := TaskUsage{
 		InputTokens:          100,
@@ -597,8 +597,8 @@ func TestAccumulateTaskUsage(t *testing.T) {
 		CacheCreationTokens:  5,
 		CostUSD:              0.01,
 	}
-	s.AccumulateTaskUsage(bg(), task.ID, delta)
-	s.AccumulateTaskUsage(bg(), task.ID, delta)
+	_ = s.AccumulateTaskUsage(bg(), task.ID, delta)
+	_ = s.AccumulateTaskUsage(bg(), task.ID, delta)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Usage.InputTokens != 200 {
@@ -627,7 +627,7 @@ func TestAccumulateTaskUsage_NotFound(t *testing.T) {
 
 func TestUpdateTaskExecutionPrompt(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.UpdateTaskExecutionPrompt(bg(), task.ID, "implementation prompt"); err != nil {
 		t.Fatalf("UpdateTaskExecutionPrompt: %v", err)
@@ -641,7 +641,7 @@ func TestUpdateTaskExecutionPrompt(t *testing.T) {
 
 func TestUpdateTaskSandboxByActivity_NormalizesAndClears(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	updates := map[SandboxActivity]sandbox.Type{
 		"implementation": sandbox.Type("CLAUDE"),
@@ -679,7 +679,7 @@ func TestUpdateTaskSandboxByActivity_NormalizesAndClears(t *testing.T) {
 
 func TestUpdateTaskSandbox_TrimsWhitespace(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.UpdateTaskSandbox(bg(), task.ID, "  codex "); err != nil {
 		t.Fatalf("UpdateTaskSandbox: %v", err)
@@ -693,7 +693,7 @@ func TestUpdateTaskSandbox_TrimsWhitespace(t *testing.T) {
 
 func TestUpdateTaskTestRun(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	if err := s.UpdateTaskTurns(bg(), task.ID, 4); err != nil {
 		t.Fatalf("seed turns: %v", err)
 	}
@@ -723,7 +723,7 @@ func TestUpdateTaskTestRun(t *testing.T) {
 
 func TestUpdateRefinementJob_UpdatesAndClears(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	job := &RefinementJob{ID: "job-1", Status: "running", Result: "draft"}
 	if err := s.UpdateRefinementJob(bg(), task.ID, job); err != nil {
@@ -745,7 +745,7 @@ func TestUpdateRefinementJob_UpdatesAndClears(t *testing.T) {
 
 func TestStartRefinementJobIfIdle(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.StartRefinementJobIfIdle(bg(), task.ID, &RefinementJob{ID: "job-1", Status: "running"}); err != nil {
 		t.Fatalf("StartRefinementJobIfIdle first start: %v", err)
@@ -773,7 +773,7 @@ func TestStartRefinementJobIfIdle(t *testing.T) {
 
 func TestApplyRefinement(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "old prompt", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "old prompt", Timeout: 5})
 
 	session := RefinementSession{ID: "session-1", Result: "suggested", StartPrompt: "old prompt"}
 	if err := s.ApplyRefinement(bg(), task.ID, "new prompt", session); err != nil {
@@ -797,7 +797,7 @@ func TestApplyRefinement(t *testing.T) {
 
 func TestDismissRefinement(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	if err := s.UpdateRefinementJob(bg(), task.ID, &RefinementJob{ID: "job-1", Status: "running"}); err != nil {
 		t.Fatalf("seed refinement job: %v", err)
 	}
@@ -817,7 +817,7 @@ func TestDismissRefinement(t *testing.T) {
 
 func TestUpdateTaskPosition(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.UpdateTaskPosition(bg(), task.ID, 42); err != nil {
 		t.Fatalf("UpdateTaskPosition: %v", err)
@@ -841,7 +841,7 @@ func TestUpdateTaskPosition_NotFound(t *testing.T) {
 
 func TestUpdateTaskBacklog_UpdatesPrompt(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "original", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 	newPrompt := "updated prompt"
 
 	if err := s.UpdateTaskBacklog(bg(), task.ID, &newPrompt, nil, nil, nil, nil, nil, nil); err != nil {
@@ -855,10 +855,10 @@ func TestUpdateTaskBacklog_UpdatesPrompt(t *testing.T) {
 
 func TestUpdateTaskBacklog_UpdatesTimeout(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	newTimeout := 30
 
-	s.UpdateTaskBacklog(bg(), task.ID, nil, &newTimeout, nil, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &newTimeout, nil, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 30 {
@@ -868,10 +868,10 @@ func TestUpdateTaskBacklog_UpdatesTimeout(t *testing.T) {
 
 func TestUpdateTaskBacklog_ClampsTimeout(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	big := 9999
 
-	s.UpdateTaskBacklog(bg(), task.ID, nil, &big, nil, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, &big, nil, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 1440 {
@@ -881,10 +881,10 @@ func TestUpdateTaskBacklog_ClampsTimeout(t *testing.T) {
 
 func TestUpdateTaskBacklog_UpdatesFreshStart(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	fresh := true
 
-	s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fresh, nil, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, &fresh, nil, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.FreshStart {
@@ -894,7 +894,7 @@ func TestUpdateTaskBacklog_UpdatesFreshStart(t *testing.T) {
 
 func TestUpdateTaskBacklog_NilFieldsAreNoOps(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "original", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
 
 	if err := s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("UpdateTaskBacklog with all nils: %v", err)
@@ -918,7 +918,7 @@ func TestUpdateTaskBacklog_NotFound(t *testing.T) {
 
 func TestCreateTask_MountWorktrees(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "mount test", 5, true, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "mount test", Timeout: 5, MountWorktrees: true})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -934,11 +934,11 @@ func TestCreateTask_MountWorktrees(t *testing.T) {
 
 func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	// Enable mount_worktrees.
 	enable := true
-	s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &enable, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &enable, nil, nil, nil)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.MountWorktrees {
@@ -947,7 +947,7 @@ func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
 
 	// Disable mount_worktrees.
 	disable := false
-	s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &disable, nil, nil, nil)
+	_ = s.UpdateTaskBacklog(bg(), task.ID, nil, nil, nil, &disable, nil, nil, nil)
 
 	got, _ = s.GetTask(bg(), task.ID)
 	if got.MountWorktrees {
@@ -957,8 +957,8 @@ func TestUpdateTaskBacklog_MountWorktrees(t *testing.T) {
 
 func TestResetTaskForRetry_PreservesMountWorktrees(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "mount retry", 5, true, "", "")
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "mount retry", Timeout: 5, MountWorktrees: true})
+	_ = s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "retry prompt", true); err != nil {
 		t.Fatalf("ResetTaskForRetry: %v", err)
@@ -976,9 +976,9 @@ func TestResetTaskForRetry_PreservesMountWorktrees(t *testing.T) {
 
 func TestResetTaskForRetry(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "original prompt", 5, false, "", "")
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)
-	s.UpdateTaskResult(bg(), task.ID, "some result", "sess", "end_turn", 2)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original prompt", Timeout: 5})
+	_ = s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusDone)
+	_ = s.UpdateTaskResult(bg(), task.ID, "some result", "sess", "end_turn", 2)
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "new prompt", true); err != nil {
 		t.Fatalf("ResetTaskForRetry: %v", err)
@@ -1019,9 +1019,9 @@ func TestResetTaskForRetry(t *testing.T) {
 
 func TestResetTaskForRetry_AccumulatesHistory(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "prompt1", 5, false, "", "")
-	s.ResetTaskForRetry(bg(), task.ID, "prompt2", false)
-	s.ResetTaskForRetry(bg(), task.ID, "prompt3", false)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "prompt1", Timeout: 5})
+	_ = s.ResetTaskForRetry(bg(), task.ID, "prompt2", false)
+	_ = s.ResetTaskForRetry(bg(), task.ID, "prompt3", false)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if len(got.PromptHistory) != 2 {
@@ -1034,11 +1034,11 @@ func TestResetTaskForRetry_AccumulatesHistory(t *testing.T) {
 
 func TestResetTaskForRetry_ClearsBaseCommitHashes(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "original", 5, false, "", "")
-	s.UpdateTaskCommitHashes(bg(), task.ID, map[string]string{"/repo": "abc"})
-	s.UpdateTaskBaseCommitHashes(bg(), task.ID, map[string]string{"/repo": "def"})
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original", Timeout: 5})
+	_ = s.UpdateTaskCommitHashes(bg(), task.ID, map[string]string{"/repo": "abc"})
+	_ = s.UpdateTaskBaseCommitHashes(bg(), task.ID, map[string]string{"/repo": "def"})
 
-	s.ResetTaskForRetry(bg(), task.ID, "retry prompt", true)
+	_ = s.ResetTaskForRetry(bg(), task.ID, "retry prompt", true)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.BaseCommitHashes != nil {
@@ -1064,10 +1064,10 @@ func TestResetTaskForRetryAccumulatesHistory(t *testing.T) {
 	}
 
 	// Step 1: Create task, force to failed, set result and usage.
-	task, _ := s.CreateTask(bg(), "first prompt", 5, false, "", "")
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
-	s.UpdateTaskResult(bg(), task.ID, "first result", "sess-1", "end_turn", 3)
-	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "first prompt", Timeout: 5})
+	_ = s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
+	_ = s.UpdateTaskResult(bg(), task.ID, "first result", "sess-1", "end_turn", 3)
+	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 100, OutputTokens: 50, CostUSD: 0.42})
 
 	// First retry: snapshot pre-reset state.
@@ -1105,9 +1105,9 @@ func TestResetTaskForRetryAccumulatesHistory(t *testing.T) {
 	// Step 3: Force to failed again with different values; second retry.
 	// AccumulateSubAgentUsage is cumulative: adding 0.57 on top of the existing
 	// 0.42 gives a running total of 0.99, which is what the RetryRecord captures.
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
-	s.UpdateTaskResult(bg(), task.ID, "second result", "sess-2", "end_turn", 7)
-	s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
+	_ = s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
+	_ = s.UpdateTaskResult(bg(), task.ID, "second result", "sess-2", "end_turn", 7)
+	_ = s.AccumulateSubAgentUsage(bg(), task.ID, SandboxActivityImplementation,
 		TaskUsage{InputTokens: 200, OutputTokens: 100, CostUSD: 0.57})
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "third prompt", true); err != nil {
@@ -1170,9 +1170,9 @@ func TestResetTaskForRetryAccumulatesHistory(t *testing.T) {
 
 func TestResetTaskForRetry_PreservesFailureCategoryInRecord(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "crash prompt", 5, false, "", "")
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
-	s.SetTaskFailureCategory(bg(), task.ID, FailureCategoryContainerCrash)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "crash prompt", Timeout: 5})
+	_ = s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
+	_ = s.SetTaskFailureCategory(bg(), task.ID, FailureCategoryContainerCrash)
 
 	if err := s.ResetTaskForRetry(bg(), task.ID, "retry prompt", true); err != nil {
 		t.Fatalf("ResetTaskForRetry: %v", err)
@@ -1198,15 +1198,15 @@ func TestResetTaskForRetry_PreservesFailureCategoryInRecord(t *testing.T) {
 
 func TestSetTaskArchived_TrueAndFalse(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
-	s.SetTaskArchived(bg(), task.ID, true)
+	_ = s.SetTaskArchived(bg(), task.ID, true)
 	got, _ := s.GetTask(bg(), task.ID)
 	if !got.Archived {
 		t.Error("expected Archived=true")
 	}
 
-	s.SetTaskArchived(bg(), task.ID, false)
+	_ = s.SetTaskArchived(bg(), task.ID, false)
 	got, _ = s.GetTask(bg(), task.ID)
 	if got.Archived {
 		t.Error("expected Archived=false")
@@ -1226,8 +1226,8 @@ func TestSetTaskArchived_NotFound(t *testing.T) {
 
 func TestResumeTask_SetsInProgress(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
-	s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+	_ = s.ForceUpdateTaskStatus(bg(), task.ID, TaskStatusFailed)
 
 	if err := s.ResumeTask(bg(), task.ID, nil); err != nil {
 		t.Fatalf("ResumeTask: %v", err)
@@ -1240,10 +1240,10 @@ func TestResumeTask_SetsInProgress(t *testing.T) {
 
 func TestResumeTask_WithTimeout(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	timeout := 60
 
-	s.ResumeTask(bg(), task.ID, &timeout)
+	_ = s.ResumeTask(bg(), task.ID, &timeout)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 60 {
@@ -1253,10 +1253,10 @@ func TestResumeTask_WithTimeout(t *testing.T) {
 
 func TestResumeTask_TimeoutClamped(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	timeout := 9999
 
-	s.ResumeTask(bg(), task.ID, &timeout)
+	_ = s.ResumeTask(bg(), task.ID, &timeout)
 
 	got, _ := s.GetTask(bg(), task.ID)
 	if got.Timeout != 1440 {
@@ -1277,7 +1277,7 @@ func TestResumeTask_NotFound(t *testing.T) {
 
 func TestUpdateTaskWorktrees(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	paths := map[string]string{"/repo/a": "/worktree/a"}
 
 	if err := s.UpdateTaskWorktrees(bg(), task.ID, paths, "task/abc123"); err != nil {
@@ -1306,7 +1306,7 @@ func TestUpdateTaskWorktrees_NotFound(t *testing.T) {
 
 func TestUpdateTaskCommitHashes(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	hashes := map[string]string{"/repo/a": "abc123def456"}
 	if err := s.UpdateTaskCommitHashes(bg(), task.ID, hashes); err != nil {
@@ -1328,7 +1328,7 @@ func TestUpdateTaskCommitHashes_NotFound(t *testing.T) {
 
 func TestUpdateTaskBaseCommitHashes(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	hashes := map[string]string{"/repo/a": "base456"}
 	if err := s.UpdateTaskBaseCommitHashes(bg(), task.ID, hashes); err != nil {
@@ -1360,7 +1360,7 @@ func TestConcurrentCreateTask(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			s.CreateTask(bg(), "concurrent", 5, false, "", "")
+			_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "concurrent", Timeout: 5})
 		}()
 	}
 	wg.Wait()
@@ -1373,14 +1373,14 @@ func TestConcurrentCreateTask(t *testing.T) {
 
 func TestConcurrentUpdateStatus(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	var wg sync.WaitGroup
 	for _, status := range []TaskStatus{TaskStatusInProgress, TaskStatusDone, TaskStatusFailed, TaskStatusBacklog, TaskStatusWaiting} {
 		wg.Add(1)
 		go func(st TaskStatus) {
 			defer wg.Done()
-			s.ForceUpdateTaskStatus(bg(), task.ID, st)
+			_ = s.ForceUpdateTaskStatus(bg(), task.ID, st)
 		}(status)
 	}
 	wg.Wait()
@@ -1400,7 +1400,7 @@ func TestConcurrentUpdateStatus(t *testing.T) {
 
 func TestUpdateTaskScheduledAt_SetAndClear(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	future := time.Now().Add(2 * time.Hour)
 	if err := s.UpdateTaskScheduledAt(bg(), task.ID, &future); err != nil {
@@ -1428,7 +1428,7 @@ func TestUpdateTaskScheduledAt_PersistsAndLoads(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
 
-	task, _ := s.CreateTask(bg(), "persist-scheduled", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "persist-scheduled", Timeout: 5})
 	future := time.Now().Add(3 * time.Hour).Truncate(time.Second)
 	if err := s.UpdateTaskScheduledAt(bg(), task.ID, &future); err != nil {
 		t.Fatalf("UpdateTaskScheduledAt: %v", err)
@@ -1462,7 +1462,7 @@ func TestUpdateTaskScheduledAt_NotFound(t *testing.T) {
 
 func TestSoftDelete(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "soft delete me", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "soft delete me", Timeout: 5})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -1503,7 +1503,7 @@ func TestSoftDelete(t *testing.T) {
 
 func TestRestoreRoundtrip(t *testing.T) {
 	s := newTestStore(t)
-	task, _ := s.CreateTask(bg(), "restore me", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "restore me", Timeout: 5})
 
 	if err := s.DeleteTask(bg(), task.ID, ""); err != nil {
 		t.Fatalf("DeleteTask: %v", err)
@@ -1543,8 +1543,8 @@ func TestPurgeExpired(t *testing.T) {
 	s := newTestStore(t)
 
 	// Create two tasks and soft-delete them.
-	old, _ := s.CreateTask(bg(), "old task", 5, false, "", "")
-	recent, _ := s.CreateTask(bg(), "recent task", 5, false, "", "")
+	old, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "old task", Timeout: 5})
+	recent, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "recent task", Timeout: 5})
 
 	if err := s.DeleteTask(bg(), old.ID, ""); err != nil {
 		t.Fatalf("DeleteTask old: %v", err)
@@ -1604,7 +1604,7 @@ func TestStorePersistsTombstone(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 
-	task, _ := s.CreateTask(bg(), "tombstone persist", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "tombstone persist", Timeout: 5})
 	if err := s.DeleteTask(bg(), task.ID, "persistence test"); err != nil {
 		t.Fatalf("DeleteTask: %v", err)
 	}
@@ -1642,7 +1642,7 @@ func TestStorePersistsTombstone(t *testing.T) {
 
 func TestUpdateTaskEnvironment_RoundTrip(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "env test", 60, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "env test", Timeout: 60})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -1696,7 +1696,7 @@ func TestUpdateTaskEnvironment_PersistsAcrossLoad(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 
-	task, err := s.CreateTask(bg(), "persist test", 60, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "persist test", Timeout: 60})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

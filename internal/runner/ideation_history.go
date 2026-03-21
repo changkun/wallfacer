@@ -57,7 +57,8 @@ func LoadHistory(dataDir string) (*IdeationHistory, error) {
 		}
 		return nil, fmt.Errorf("open ideation history: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close()
+ }()
 
 	cutoff := time.Now().Add(-ideationHistoryTTL)
 	scanner := bufio.NewScanner(f)
@@ -104,7 +105,8 @@ func (h *IdeationHistory) Append(e HistoryEntry) error {
 	}
 
 	if _, err := fmt.Fprintf(f, "%s\n", data); err != nil {
-		f.Close()
+		_ = f.Close()
+
 		return fmt.Errorf("write ideation history entry: %w", err)
 	}
 	if err := f.Close(); err != nil {

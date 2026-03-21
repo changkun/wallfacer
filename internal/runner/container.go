@@ -479,9 +479,11 @@ func (r *Runner) runContainer(
 		args := r.buildContainerArgsForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
 
 		logger.Runner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
-		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(activity)})
+		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(activity)})
+
 		rawStdout, rawStderr, runErr := r.executor.RunArgs(ctx, containerName, args)
-		r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
+		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
+
 
 		// Detect container runtime failures (daemon/binary unavailable).
 		// Only trip the breaker for runtime-level errors, not for Claude
@@ -549,7 +551,8 @@ func (r *Runner) runContainer(
 		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
 			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
 				"task", taskID, "activity", activity)
-			r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit)",
 			})
 			return runWithSandbox(sandbox.Codex)
@@ -561,7 +564,8 @@ func (r *Runner) runContainer(
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID, "activity", activity)
-		r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+
 			"result": "Sandbox fallback: claude → codex (token/rate limit in output)",
 		})
 		return runWithSandbox(sandbox.Codex)

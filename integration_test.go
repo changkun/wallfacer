@@ -87,7 +87,8 @@ func postJSON(t *testing.T, url, body string) *http.Response {
 func mustCreateTask(t *testing.T, srvURL string) uuid.UUID {
 	t.Helper()
 	resp := postJSON(t, srvURL+"/api/tasks", `{"prompt":"test task"}`)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close()
+ }()
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("create task: status %d, body: %s", resp.StatusCode, body)
@@ -106,7 +107,8 @@ func TestCreateAndListTask(t *testing.T) {
 
 	// Create a task.
 	resp := postJSON(t, srv.URL+"/api/tasks", `{"prompt":"hello"}`)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close()
+ }()
 	if resp.StatusCode != http.StatusCreated {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("POST /api/tasks: status %d, body: %s", resp.StatusCode, b)
@@ -127,7 +129,8 @@ func TestCreateAndListTask(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /api/tasks: %v", err)
 	}
-	defer listResp.Body.Close()
+	defer func() { _ = listResp.Body.Close()
+ }()
 	if listResp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/tasks: status %d", listResp.StatusCode)
 	}
@@ -165,7 +168,8 @@ func TestPatchTaskToInProgress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PATCH task: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close()
+ }()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("PATCH task status: status %d, body: %s", resp.StatusCode, b)
@@ -190,7 +194,8 @@ func TestCancelTask(t *testing.T) {
 
 	// Cancel the task.
 	resp := postJSON(t, fmt.Sprintf("%s/api/tasks/%s/cancel", srv.URL, taskID), "")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close()
+ }()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("POST cancel: status %d, body: %s", resp.StatusCode, b)
@@ -201,7 +206,8 @@ func TestCancelTask(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /api/tasks: %v", err)
 	}
-	defer listResp.Body.Close()
+	defer func() { _ = listResp.Body.Close()
+ }()
 	var tasks []store.Task
 	if err := json.NewDecoder(listResp.Body).Decode(&tasks); err != nil {
 		t.Fatalf("decode task list: %v", err)
@@ -227,7 +233,8 @@ func TestGetTaskEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET events: %v", err)
 	}
-	defer evResp.Body.Close()
+	defer func() { _ = evResp.Body.Close()
+ }()
 	if evResp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(evResp.Body)
 		t.Fatalf("GET events: status %d, body: %s", evResp.StatusCode, b)
@@ -264,7 +271,8 @@ func TestEnvRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PUT /api/env: %v", err)
 	}
-	defer putResp.Body.Close()
+	defer func() { _ = putResp.Body.Close()
+ }()
 	if putResp.StatusCode != http.StatusNoContent {
 		b, _ := io.ReadAll(putResp.Body)
 		t.Fatalf("PUT /api/env: status %d, want 204, body: %s", putResp.StatusCode, b)
@@ -275,7 +283,8 @@ func TestEnvRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /api/env: %v", err)
 	}
-	defer getResp.Body.Close()
+	defer func() { _ = getResp.Body.Close()
+ }()
 	if getResp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(getResp.Body)
 		t.Fatalf("GET /api/env: status %d, body: %s", getResp.StatusCode, b)
@@ -307,7 +316,8 @@ func TestSSETaskStream(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /api/tasks/stream: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close()
+ }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /api/tasks/stream: status %d", resp.StatusCode)
 	}
@@ -326,7 +336,8 @@ func TestUnknownTaskID(t *testing.T) {
 
 	nonExistent := uuid.MustParse("00000000-0000-0000-0000-000000000000")
 	resp := postJSON(t, fmt.Sprintf("%s/api/tasks/%s/cancel", srv.URL, nonExistent), "")
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close()
+ }()
 	if resp.StatusCode != http.StatusNotFound {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("cancel unknown task: status %d, want 404, body: %s", resp.StatusCode, b)
@@ -338,7 +349,8 @@ func TestInvalidJSON(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 
 	resp := postJSON(t, srv.URL+"/api/tasks", `{bad json`)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close()
+ }()
 	if resp.StatusCode != http.StatusBadRequest {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("invalid JSON: status %d, want 400, body: %s", resp.StatusCode, b)

@@ -167,8 +167,9 @@ func TestFetchTasks(t *testing.T) {
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte(`not-json`))
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`not-json`))
+
 		}))
 		defer ts.Close()
 
@@ -252,14 +253,17 @@ func TestRunStatus(t *testing.T) {
 func captureStdout(fn func()) string {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
-	defer r.Close()
-	defer w.Close()
+	defer func() { _ = r.Close()
+ }()
+	defer func() { _ = w.Close()
+ }()
 	defer func() { os.Stdout = old }()
 	os.Stdout = w
 
 	fn()
 
-	w.Close()
+	_ = w.Close()
+
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)
 	return buf.String()
@@ -268,14 +272,17 @@ func captureStdout(fn func()) string {
 func captureStderr(fn func()) string {
 	old := os.Stderr
 	r, w, _ := os.Pipe()
-	defer r.Close()
-	defer w.Close()
+	defer func() { _ = r.Close()
+ }()
+	defer func() { _ = w.Close()
+ }()
 	defer func() { os.Stderr = old }()
 	os.Stderr = w
 
 	fn()
 
-	w.Close()
+	_ = w.Close()
+
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)
 	return buf.String()

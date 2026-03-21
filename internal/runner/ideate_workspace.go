@@ -314,11 +314,11 @@ func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(ctx context.Context, w
 			}
 			return items[i].path < items[j].path
 		})
-		max := 3
-		if max > len(items) {
-			max = len(items)
+		maxItems := 3
+		if maxItems > len(items) {
+			maxItems = len(items)
 		}
-		for i := 0; i < max; i++ {
+		for i := 0; i < maxItems; i++ {
 			counts[items[i].path] = items[i].count
 		}
 		// Reset filteredCount: we're surfacing fallback paths, not hiding them.
@@ -467,11 +467,11 @@ func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(ctx context.Context, wo
 			}
 			return items[i].path < items[j].path
 		})
-		max := 3
-		if max > len(items) {
-			max = len(items)
+		maxItems := 3
+		if maxItems > len(items) {
+			maxItems = len(items)
 		}
-		for i := 0; i < max; i++ {
+		for i := 0; i < maxItems; i++ {
 			counts[items[i].path] = items[i].count
 		}
 		filteredCount = 0

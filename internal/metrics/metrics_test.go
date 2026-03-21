@@ -236,7 +236,7 @@ func TestHistogram_BucketsAreSorted(t *testing.T) {
 	if idx01 < 0 || idx05 < 0 || idx10 < 0 {
 		t.Fatalf("expected all three bucket lines; got:\n%s", body)
 	}
-	if !(idx01 < idx05 && idx05 < idx10) {
+	if idx01 >= idx05 || idx05 >= idx10 {
 		t.Errorf("bucket lines out of order; got:\n%s", body)
 	}
 }
@@ -344,7 +344,7 @@ func TestWritePrometheus_CountersBeforeHistogramsBeforeGauges(t *testing.T) {
 	if idxCounter < 0 || idxHist < 0 || idxGauge < 0 {
 		t.Fatalf("missing metric families; got:\n%s", body)
 	}
-	if !(idxCounter < idxHist && idxHist < idxGauge) {
+	if idxCounter >= idxHist || idxHist >= idxGauge {
 		t.Errorf("expected counters < histograms < gauges; indices: counter=%d hist=%d gauge=%d\nbody:\n%s",
 			idxCounter, idxHist, idxGauge, body)
 	}

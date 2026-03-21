@@ -37,7 +37,7 @@ func TestGetUsageStats_DefaultSevenDays(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "test task", 30, false, "", store.TaskKindTask)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 30, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestGetUsageStats_AllTime_Days0(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "old task", 30, false, "", store.TaskKindTask)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "old task", Timeout: 30, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestGetUsageStats_ByStatus(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	backlog, err := h.store.CreateTask(ctx, "backlog task", 30, false, "", store.TaskKindTask)
+	backlog, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 30, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask backlog: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestGetUsageStats_ByStatus(t *testing.T) {
 		t.Fatalf("AccumulateSubAgentUsage backlog: %v", err)
 	}
 
-	done, err := h.store.CreateTask(ctx, "done task", 30, false, "", store.TaskKindTask)
+	done, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task", Timeout: 30, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask done: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestGetUsageStats_BySubAgent(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "task with breakdown", 30, false, "", store.TaskKindTask)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task with breakdown", Timeout: 30, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestGetUsageStats_MultipleTasksAggregated(t *testing.T) {
 	ctx := context.Background()
 
 	for i := 0; i < 3; i++ {
-		task, err := h.store.CreateTask(ctx, "task", 30, false, "", store.TaskKindTask)
+		task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task", Timeout: 30, Kind: store.TaskKindTask})
 		if err != nil {
 			t.Fatalf("CreateTask %d: %v", i, err)
 		}

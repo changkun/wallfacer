@@ -14,7 +14,7 @@ func TestTryAutoRetry_BudgetAllows(t *testing.T) {
 	s, r := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "budget allows test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "budget allows test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestTryAutoRetry_TotalCapPreventsRetry(t *testing.T) {
 	s, r := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "total cap test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "total cap test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -44,7 +44,8 @@ func (r *Runner) ScanMissingTaskWorktrees(ctx context.Context) ([]store.Task, er
 					// ensureTaskWorktrees can recreate it cleanly.
 					logger.Runner.Warn("worktree health: directory exists but is not a valid git repo, removing",
 						"task", task.ID, "path", path)
-					os.RemoveAll(path)
+					_ = os.RemoveAll(path)
+
 					missing = append(missing, task)
 					break
 				}
@@ -177,7 +178,7 @@ func (r *Runner) ScanOrphanedWorktrees(ctx context.Context) ([]uuid.UUID, error)
 // registered worktree subdirectory, then falls back to os.RemoveAll.
 // Errors are logged as warnings; the function proceeds to the next ID.
 // Returns count of successfully removed task directories.
-func (r *Runner) PruneOrphanedWorktrees(ctx context.Context, orphans []uuid.UUID) int {
+func (r *Runner) PruneOrphanedWorktrees(_ context.Context, orphans []uuid.UUID) int {
 	r.worktreeMu.Lock()
 	defer r.worktreeMu.Unlock()
 

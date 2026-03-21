@@ -11,7 +11,7 @@ import (
 // dependencies is always satisfied.
 func TestAreDependenciesSatisfied_NoDependencies(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "task", 15, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "task", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestAreDependenciesSatisfied_NoDependencies(t *testing.T) {
 // empty slice is treated as no dependencies.
 func TestAreDependenciesSatisfied_EmptySlice(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "task", 15, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "task", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,12 +48,12 @@ func TestAreDependenciesSatisfied_EmptySlice(t *testing.T) {
 // are reported as satisfied.
 func TestAreDependenciesSatisfied_AllDone(t *testing.T) {
 	s := newTestStore(t)
-	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
-	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
-	c, _ := s.CreateTask(bg(), "c", 15, false, "", "")
-	s.ForceUpdateTaskStatus(bg(), a.ID, TaskStatusDone)
-	s.ForceUpdateTaskStatus(bg(), b.ID, TaskStatusDone)
-	s.UpdateTaskDependsOn(bg(), c.ID, []string{a.ID.String(), b.ID.String()})
+	a, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "b", Timeout: 15})
+	c, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "c", Timeout: 15})
+	_ = s.ForceUpdateTaskStatus(bg(), a.ID, TaskStatusDone)
+	_ = s.ForceUpdateTaskStatus(bg(), b.ID, TaskStatusDone)
+	_ = s.UpdateTaskDependsOn(bg(), c.ID, []string{a.ID.String(), b.ID.String()})
 
 	ok, err := s.AreDependenciesSatisfied(bg(), c.ID)
 	if err != nil {
@@ -68,12 +68,12 @@ func TestAreDependenciesSatisfied_AllDone(t *testing.T) {
 // dependency makes the result unsatisfied.
 func TestAreDependenciesSatisfied_OneNotDone(t *testing.T) {
 	s := newTestStore(t)
-	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
-	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
-	c, _ := s.CreateTask(bg(), "c", 15, false, "", "")
-	s.ForceUpdateTaskStatus(bg(), a.ID, TaskStatusDone)
-	s.UpdateTaskStatus(bg(), b.ID, TaskStatusInProgress)
-	s.UpdateTaskDependsOn(bg(), c.ID, []string{a.ID.String(), b.ID.String()})
+	a, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "b", Timeout: 15})
+	c, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "c", Timeout: 15})
+	_ = s.ForceUpdateTaskStatus(bg(), a.ID, TaskStatusDone)
+	_ = s.UpdateTaskStatus(bg(), b.ID, TaskStatusInProgress)
+	_ = s.UpdateTaskDependsOn(bg(), c.ID, []string{a.ID.String(), b.ID.String()})
 
 	ok, err := s.AreDependenciesSatisfied(bg(), c.ID)
 	if err != nil {
@@ -88,9 +88,9 @@ func TestAreDependenciesSatisfied_OneNotDone(t *testing.T) {
 // reported as unsatisfied.
 func TestAreDependenciesSatisfied_NoDone(t *testing.T) {
 	s := newTestStore(t)
-	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
-	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
-	s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
+	a, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "b", Timeout: 15})
+	_ = s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
 
 	ok, err := s.AreDependenciesSatisfied(bg(), b.ID)
 	if err != nil {
@@ -105,10 +105,10 @@ func TestAreDependenciesSatisfied_NoDone(t *testing.T) {
 // is treated as unsatisfied.
 func TestAreDependenciesSatisfied_DeletedDep(t *testing.T) {
 	s := newTestStore(t)
-	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
-	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
-	s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
-	s.DeleteTask(bg(), a.ID, "")
+	a, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "b", Timeout: 15})
+	_ = s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
+	_ = s.DeleteTask(bg(), a.ID, "")
 
 	ok, err := s.AreDependenciesSatisfied(bg(), b.ID)
 	if err != nil {
@@ -123,11 +123,11 @@ func TestAreDependenciesSatisfied_DeletedDep(t *testing.T) {
 // task is treated as satisfied.
 func TestAreDependenciesSatisfied_ArchivedDone(t *testing.T) {
 	s := newTestStore(t)
-	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
-	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
-	s.ForceUpdateTaskStatus(bg(), a.ID, TaskStatusDone)
-	s.SetTaskArchived(bg(), a.ID, true)
-	s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
+	a, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "b", Timeout: 15})
+	_ = s.ForceUpdateTaskStatus(bg(), a.ID, TaskStatusDone)
+	_ = s.SetTaskArchived(bg(), a.ID, true)
+	_ = s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
 
 	ok, err := s.AreDependenciesSatisfied(bg(), b.ID)
 	if err != nil {
@@ -152,9 +152,9 @@ func TestAreDependenciesSatisfied_TaskNotFound(t *testing.T) {
 // and reloaded correctly.
 func TestUpdateTaskDependsOn_Persists(t *testing.T) {
 	s := newTestStore(t)
-	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
-	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
-	s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
+	a, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "b", Timeout: 15})
+	_ = s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
 
 	// Reload from the same directory.
 	s2, err := NewStore(s.dir)
@@ -174,10 +174,10 @@ func TestUpdateTaskDependsOn_Persists(t *testing.T) {
 // stores nil (omitempty) so the JSON field is absent.
 func TestUpdateTaskDependsOn_ClearsToNil(t *testing.T) {
 	s := newTestStore(t)
-	a, _ := s.CreateTask(bg(), "a", 15, false, "", "")
-	b, _ := s.CreateTask(bg(), "b", 15, false, "", "")
-	s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
-	s.UpdateTaskDependsOn(bg(), b.ID, []string{}) // clear
+	a, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "b", Timeout: 15})
+	_ = s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
+	_ = s.UpdateTaskDependsOn(bg(), b.ID, []string{}) // clear
 
 	// Reload from disk to check persisted JSON.
 	s2, err := NewStore(s.dir)

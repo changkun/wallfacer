@@ -8,7 +8,7 @@ import (
 
 func TestUpdateTaskTags_Persists(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "task", 15, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "task", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestUpdateTaskTags_Persists(t *testing.T) {
 
 func TestUpdateTaskTags_ClearsToNil(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "task", 15, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "task", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

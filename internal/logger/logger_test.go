@@ -97,7 +97,7 @@ func TestIsColorEnabled(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer f.Close()
+		defer f.Close() //nolint:errcheck
 		if isColorEnabled(f) {
 			t.Error("expected false when NO_COLOR is set")
 		}
@@ -110,7 +110,7 @@ func TestIsColorEnabled(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer f.Close()
+		defer f.Close() //nolint:errcheck
 		if isColorEnabled(f) {
 			t.Error("expected false when TERM=dumb")
 		}
@@ -123,7 +123,7 @@ func TestIsColorEnabled(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer f.Close()
+		defer f.Close() //nolint:errcheck
 		// A regular temp file is not a char device, so should return false.
 		if isColorEnabled(f) {
 			t.Error("expected false for regular file (not a terminal)")

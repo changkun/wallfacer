@@ -213,6 +213,7 @@ func FormatWorkspaces(workspaces []string) string {
 	return strings.Join(workspaces, string(os.PathListSeparator))
 }
 
+// SandboxByActivity returns the per-activity sandbox type overrides derived from config.
 func (c Config) SandboxByActivity() map[store.SandboxActivity]sandbox.Type {
 	out := map[store.SandboxActivity]sandbox.Type{}
 	if c.ImplementationSandbox != "" {

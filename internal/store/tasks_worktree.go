@@ -19,6 +19,7 @@ const refinementRecentCompleteWindow = 500 * time.Millisecond
 
 // ListTasks returns all tasks sorted by position then creation time.
 
+// UpdateTaskWorktrees updates the worktree paths and branch name for a task.
 func (s *Store) UpdateTaskWorktrees(_ context.Context, id uuid.UUID, worktreePaths map[string]string, branchName string) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.WorktreePaths = worktreePaths

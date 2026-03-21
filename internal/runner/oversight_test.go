@@ -612,7 +612,7 @@ func TestGenerateOversightSuccess(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Add feature X", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add feature X", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -652,7 +652,7 @@ func TestGenerateOversightAcceptsValidOutputOnNonZeroExit(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Add feature X", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add feature X", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -690,7 +690,7 @@ func TestGenerateOversightContainerError(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Task with failing oversight", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task with failing oversight", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -725,7 +725,7 @@ func TestGenerateOversightFallsBackToCodexOnTokenLimit(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Task with codex fallback oversight", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task with codex fallback oversight", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -768,7 +768,7 @@ func TestGenerateOversightEmptyResult(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Task with empty oversight result", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task with empty oversight result", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -806,7 +806,7 @@ func TestGenerateOversightNoTurns(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Task with no turns", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Task with no turns", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -837,7 +837,7 @@ func TestGetOversightPendingWhenMissing(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 
-	task, err := s.CreateTask(context.Background(), "test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -860,7 +860,7 @@ func TestSaveAndGetOversight(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 
-	task, err := s.CreateTask(context.Background(), "test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1044,7 +1044,7 @@ func TestPeriodicOversightWorkerSkipsWhenLocked(t *testing.T) {
 	r.envFile = envPath
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "test task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1087,7 +1087,7 @@ func TestPeriodicOversightWorkerSkipsEmptyOutputsDir(t *testing.T) {
 	r.envFile = envPath
 
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "no outputs task", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "no outputs task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

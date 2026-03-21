@@ -94,7 +94,7 @@ func (h *Handler) CancelRefinement(w http.ResponseWriter, r *http.Request, id uu
 	writeJSON(w, http.StatusOK, updated)
 }
 
-// RefineDissmiss clears a completed refinement result without applying it.
+// RefineDismiss clears a completed refinement result without applying it.
 // The task prompt remains unchanged; the CurrentRefinement field is cleared so
 // the task can be started normally again.
 // POST /api/tasks/{id}/refine/dismiss

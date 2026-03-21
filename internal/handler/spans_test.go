@@ -43,7 +43,7 @@ func TestGetTaskSpans_NotFound(t *testing.T) {
 func TestGetTaskSpans_EmptyWhenNoSpanEvents(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
 	w := httptest.NewRecorder()
@@ -64,11 +64,13 @@ func TestGetTaskSpans_EmptyWhenNoSpanEvents(t *testing.T) {
 func TestGetTaskSpans_PairsSingleSpan(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
+
 	time.Sleep(5 * time.Millisecond) // ensure measurable duration
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
 	w := httptest.NewRecorder()
@@ -98,20 +100,28 @@ func TestGetTaskSpans_PairsSingleSpan(t *testing.T) {
 func TestGetTaskSpans_MultipleSpansSortedByStartTime(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	// Insert spans for two turns in chronological order.
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
 
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
 
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: "agent_turn_2"})
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: "agent_turn_2"})
 
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "commit"})
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
+
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
+
+
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: "agent_turn_2"})
+
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: "agent_turn_2"})
+
+
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
+
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "commit"})
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
 	w := httptest.NewRecorder()
@@ -156,12 +166,14 @@ func TestGetTaskSpans_MultipleSpansSortedByStartTime(t *testing.T) {
 func TestGetTaskSpans_DurationMSCorrect(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	before := time.Now()
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
+
 	time.Sleep(10 * time.Millisecond)
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "commit"})
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "commit"})
+
 	after := time.Now()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
@@ -169,7 +181,8 @@ func TestGetTaskSpans_DurationMSCorrect(t *testing.T) {
 	h.GetTaskSpans(w, req, task.ID)
 
 	var env spansEnvelope
-	json.NewDecoder(w.Body).Decode(&env)
+	_ = json.NewDecoder(w.Body).Decode(&env)
+
 	if len(env.Spans) != 1 {
 		t.Fatalf("expected 1 span, got %d", len(env.Spans))
 	}
@@ -182,17 +195,19 @@ func TestGetTaskSpans_DurationMSCorrect(t *testing.T) {
 func TestGetTaskSpans_UnclosedSpanIncluded(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	// Start without end.
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
 	w := httptest.NewRecorder()
 	h.GetTaskSpans(w, req, task.ID)
 
 	var env spansEnvelope
-	json.NewDecoder(w.Body).Decode(&env)
+	_ = json.NewDecoder(w.Body).Decode(&env)
+
 	if len(env.Spans) != 1 {
 		t.Errorf("expected 1 span for unclosed start, got %d", len(env.Spans))
 	}
@@ -241,20 +256,25 @@ func TestComputeSpans_AllSandboxActivities(t *testing.T) {
 func TestGetTaskSpans_NonSpanEventsIgnored(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	// Mix span events with non-span events.
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{"to": "in_progress"})
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, map[string]string{"result": "done"})
-	h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeStateChange, map[string]string{"to": "in_progress"})
+
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
+
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, map[string]string{"result": "done"})
+
+	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
 	w := httptest.NewRecorder()
 	h.GetTaskSpans(w, req, task.ID)
 
 	var env spansEnvelope
-	json.NewDecoder(w.Body).Decode(&env)
+	_ = json.NewDecoder(w.Body).Decode(&env)
+
 	if len(env.Spans) != 1 {
 		t.Errorf("expected 1 span (non-span events ignored), got %d", len(env.Spans))
 	}

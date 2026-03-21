@@ -94,7 +94,7 @@ func runExec(configDir string, args []string) {
 		// used, retry with "sh" before giving up — some minimal images only
 		// ship sh.
 		if len(cfg.command) == 1 && cfg.command[0] == "bash" {
-			shArgs := append(execArgs[:len(execArgs)-1], "sh")
+			shArgs := append(execArgs[:len(execArgs)-1:len(execArgs)-1], "sh") //nolint:gocritic // intentionally assigned to new slice
 			if err2 := syscall.Exec(runtimePath, shArgs, os.Environ()); err2 != nil {
 				fmt.Fprintf(os.Stderr, "wallfacer exec: %v\n", err2)
 				os.Exit(1)

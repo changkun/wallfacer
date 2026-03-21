@@ -13,7 +13,7 @@ import (
 // the change is visible both in-memory and after a fresh store reload from disk.
 func TestMutateTask_UpdatedAtPersistedAfterRefactoredMethod(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "mutate test", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "mutate test", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestMutateTask_ErrorOnTaskNotFound(t *testing.T) {
 // is not saved and UpdatedAt is not changed.
 func TestMutateTask_AbortOnFnError(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "abort test", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "abort test", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestMutateTask_AbortOnFnError(t *testing.T) {
 // populated when a task transitions to in_progress for the first time.
 func TestUpdateTaskStatus_StartedAtSetOnFirstInProgress(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "test task", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test task", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestUpdateTaskStatus_StartedAtSetOnFirstInProgress(t *testing.T) {
 // StartedAt is preserved across multiple in_progress transitions (e.g. resume cycles).
 func TestUpdateTaskStatus_StartedAtNotOverwrittenOnSecondInProgress(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "test task", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test task", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestUpdateTaskStatus_StartedAtNotOverwrittenOnSecondInProgress(t *testing.T
 // ForceUpdateTaskStatus also captures StartedAt on first in_progress.
 func TestForceUpdateTaskStatus_StartedAtSetOnInProgress(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "test task", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "test task", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestForceUpdateTaskStatus_StartedAtSetOnInProgress(t *testing.T) {
 // (UpdatedAt - StartedAt) rather than wall-clock from creation.
 func TestBuildAndSaveSummary_ExecutionDurationUsesStartedAt(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "timing test", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "timing test", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestBuildAndSaveSummary_ExecutionDurationUsesStartedAt(t *testing.T) {
 // that old tasks without StartedAt fall back to DurationSeconds.
 func TestBuildAndSaveSummary_ExecutionDurationFallbackWithoutStartedAt(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "no started_at task", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "no started_at task", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestResetTaskForRetry_ResetsAutoRetryCountAndBudget(t *testing.T) {
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "retry reset test", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "retry reset test", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -356,7 +356,7 @@ func TestResetTaskForRetry_ResetsAutoRetryCountAndBudget_Persisted(t *testing.T)
 	s := newTestStore(t)
 	ctx := bg()
 
-	task, err := s.CreateTask(ctx, "persist retry reset test", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{Prompt: "persist retry reset test", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -400,7 +400,7 @@ func TestResetTaskForRetry_ClearsCurrentRefinement(t *testing.T) {
 		freshStart := freshStart
 		t.Run(fmt.Sprintf("freshStart=%v", freshStart), func(t *testing.T) {
 			s := newTestStore(t)
-			task, err := s.CreateTask(bg(), "original prompt", 15, false, "", TaskKindTask)
+			task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original prompt", Timeout: 15, Kind: TaskKindTask})
 			if err != nil {
 				t.Fatalf("CreateTask: %v", err)
 			}
@@ -436,7 +436,7 @@ func TestResetTaskForRetry_ClearsCurrentRefinement(t *testing.T) {
 // RefineSessions is cleared when freshStart=true but preserved when freshStart=false.
 func TestResetTaskForRetry_ClearsRefinementSessionsOnFreshStart(t *testing.T) {
 	s := newTestStore(t)
-	task, err := s.CreateTask(bg(), "original prompt", 15, false, "", TaskKindTask)
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original prompt", Timeout: 15, Kind: TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -458,7 +458,7 @@ func TestResetTaskForRetry_ClearsRefinementSessionsOnFreshStart(t *testing.T) {
 
 	t.Run("freshStart=false preserves sessions", func(t *testing.T) {
 		s2 := newTestStore(t)
-		task2, _ := s2.CreateTask(bg(), "original prompt", 15, false, "", TaskKindTask)
+		task2, _ := s2.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "original prompt", Timeout: 15, Kind: TaskKindTask})
 		s2.ApplyRefinement(bg(), task2.ID, "refined prompt", session) //nolint:errcheck
 
 		if err := s2.ResetTaskForRetry(bg(), task2.ID, "same prompt", false); err != nil {

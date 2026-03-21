@@ -57,7 +57,7 @@ func TestWebhookNotifier_DeliverOnStateChange(t *testing.T) {
 
 	// Create a task; the store calls notify() with status=backlog.
 	longPrompt := strings.Repeat("p", 220)
-	task, err := s.CreateTask(context.Background(), longPrompt, 30, false, "", store.TaskKindTask)
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: longPrompt, Timeout: 30, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestWebhookNotifier_DeliverOnStateChange(t *testing.T) {
 
 func TestWebhookNotifier_NoDeliveryWhenStatusUnchanged(t *testing.T) {
 	reqCh := make(chan struct{}, 4)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		reqCh <- struct{}{}
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -166,7 +166,7 @@ func TestWebhookNotifier_NoDeliveryWhenStatusUnchanged(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Create task → one delivery (backlog).
-	task, err := s.CreateTask(context.Background(), "test prompt", 5, false, "", store.TaskKindTask)
+	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "test prompt", Timeout: 5, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestWebhookNotifier_NoDeliveryWhenStatusUnchanged(t *testing.T) {
 func TestSend_ContextCancelledDuringRetry(t *testing.T) {
 	// Server always returns 503 so Send keeps retrying.
 	attempts := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
@@ -240,7 +240,7 @@ func TestWebhookNotifier_RetriesOnFailure(t *testing.T) {
 	// First request fails; second succeeds.
 	attempts := 0
 	reqCh := make(chan struct{}, 4)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		attempts++
 		if attempts == 1 {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -269,7 +269,7 @@ func TestWebhookNotifier_RetriesOnFailure(t *testing.T) {
 	go wn.Start(ctx)
 	time.Sleep(10 * time.Millisecond)
 
-	if _, err := s.CreateTask(context.Background(), "retry test", 5, false, "", store.TaskKindTask); err != nil {
+	if _, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "retry test", Timeout: 5, Kind: store.TaskKindTask}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 

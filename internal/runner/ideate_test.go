@@ -56,7 +56,7 @@ func TestIdeationTaskTransitionsToDone(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestIdeationTaskCreatesChildTasks(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestIdeationTaskTagsChildTasksWithCategory(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestIdeationTaskSavesTurnOutput(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +230,7 @@ func TestIdeationTaskRecordsTurns(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestIdeationTaskEmitsOutputEvent(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func TestIdeationTaskOversightGeneratedAfterDone(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +342,7 @@ func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 	ctx := context.Background()
 
 	const staticPlaceholder = "Analyzes the workspace and proposes 3 actionable improvements."
-	task, err := s.CreateTask(ctx, staticPlaceholder, 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: staticPlaceholder, Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,12 +398,6 @@ func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
 
 // TestBuildIdeationPromptNoExistingTasks verifies that when there are no active
 // tasks the prompt does not include the "Existing active tasks" section, and
@@ -497,7 +491,7 @@ func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 	ctx := context.Background()
 
 	// Pre-create sibling tasks in different active states.
-	backlogTask, err := s.CreateTask(ctx, "Add dark mode toggle", 10, false, "", store.TaskKindTask)
+	backlogTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Add dark mode toggle", Timeout: 10, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -505,7 +499,7 @@ func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	inProgressTask, err := s.CreateTask(ctx, "Fix login authentication bug", 10, false, "", store.TaskKindTask)
+	inProgressTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Fix login authentication bug", Timeout: 10, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,7 +511,7 @@ func TestIdeationTaskPromptIncludesExistingTasks(t *testing.T) {
 	}
 
 	// Create and run the brainstorm task.
-	brainstormTask, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	brainstormTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -585,7 +579,7 @@ func TestIdeationTaskExcludesDoneAndFailedFromContext(t *testing.T) {
 	ctx := context.Background()
 
 	// Create tasks in terminal states — these should NOT appear in the prompt.
-	doneTask, err := s.CreateTask(ctx, "Completed feature prompt", 10, false, "", store.TaskKindTask)
+	doneTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Completed feature prompt", Timeout: 10, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -596,7 +590,7 @@ func TestIdeationTaskExcludesDoneAndFailedFromContext(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	failedTask, err := s.CreateTask(ctx, "Failed feature prompt", 10, false, "", store.TaskKindTask)
+	failedTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Failed feature prompt", Timeout: 10, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -607,7 +601,7 @@ func TestIdeationTaskExcludesDoneAndFailedFromContext(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	brainstormTask, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	brainstormTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -761,7 +755,7 @@ func TestIdeationTaskFailsWhenAllPromptsEqualTitles(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "Analyzes the workspace and proposes 3 actionable improvements.", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Analyzes the workspace and proposes 3 actionable improvements.", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -802,7 +796,7 @@ func TestIdeationTaskContainerErrorTransitionsToFailed(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "brainstorm", 5, false, "", store.TaskKindIdeaAgent)
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1057,10 +1051,12 @@ func TestIdeationHistoryTruncatedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := f.WriteString(`{"title":"truncated`); err != nil {
-		f.Close()
+		_ = f.Close()
+
 		t.Fatal(err)
 	}
-	f.Close()
+	_ = f.Close()
+
 
 	h2, err := LoadHistory(dir)
 	if err != nil {

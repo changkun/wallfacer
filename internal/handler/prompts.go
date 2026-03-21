@@ -17,7 +17,7 @@ type systemPromptResponse struct {
 // ListSystemPrompts returns all 7 built-in prompt templates with their
 // current content (user override when present, embedded default otherwise)
 // and override status.
-func (h *Handler) ListSystemPrompts(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListSystemPrompts(w http.ResponseWriter, _ *http.Request) {
 	mgr := h.runner.Prompts()
 	names := mgr.KnownNames()
 	result := make([]systemPromptResponse, 0, len(names))

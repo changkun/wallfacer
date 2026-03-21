@@ -27,7 +27,7 @@ func TestPruneTaskPayload(t *testing.T) {
 	}
 
 	// Create a task so the on-disk directory exists.
-	task, err := s.CreateTask(bg(), "prune test", 10, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "prune test", Timeout: 10})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestPruneTaskPayload_ZeroLimitDisablesPruning(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 
-	task, err := s.CreateTask(bg(), "no-prune test", 10, false, "", "")
+	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "no-prune test", Timeout: 10})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

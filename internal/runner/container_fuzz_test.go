@@ -42,7 +42,7 @@ func FuzzParseOutput(f *testing.F) {
 	f.Add([]byte(`{"stop_reason":""}`))
 	f.Add([]byte("\x00\x01\x02\x03"))
 
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		// Must never panic on any input.
 		out, _ := parseOutput(string(data))
 
@@ -98,7 +98,7 @@ func FuzzExtractSessionID(f *testing.F) {
 	// Seed: binary-ish data.
 	f.Add([]byte("\x00\x01\x02{\"session_id\":\"x\"}"))
 
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		// Must never panic on any input.
 		result := extractSessionID(data)
 

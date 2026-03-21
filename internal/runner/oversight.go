@@ -597,11 +597,13 @@ func parseRawInput(raw json.RawMessage) map[string]interface{} {
 	var s string
 	if json.Unmarshal(raw, &s) == nil {
 		var m map[string]interface{}
-		json.Unmarshal([]byte(s), &m)
+		_ = json.Unmarshal([]byte(s), &m)
+
 		return m
 	}
 	var m map[string]interface{}
-	json.Unmarshal(raw, &m)
+	_ = json.Unmarshal(raw, &m)
+
 	return m
 }
 
@@ -684,7 +686,8 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	defer cancel()
 
 	containerName := "wallfacer-oversight-" + taskID.String()[:8]
-	exec.Command(r.command, "rm", "-f", containerName).Run()
+	_ = exec.Command(r.command, "rm", "-f", containerName).Run()
+
 
 	task, err := r.store.GetTask(r.shutdownCtx, taskID)
 	if err != nil {
@@ -716,9 +719,11 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 		cmd.Stdout = &stdout
 		cmd.Stderr = &stderr
 
-		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
+		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
+
 		runErr := cmd.Run()
-		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
+		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
+
 		if runCtx.Err() != nil {
 			return oversightRunResult{
 				err:   fmt.Errorf("container terminated: %w", runCtx.Err()),
@@ -768,7 +773,8 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	if res.err != nil {
 		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(res.err.Error()) {
 			logger.Runner.Warn("oversight: claude token limit hit; retrying with codex", "task", taskID, "agent", agent)
-			r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during oversight)",
 			})
 			res = runWithSandbox(sandbox.Codex)
@@ -778,13 +784,13 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 				"task", taskID, "agent", agent, "sandbox", res.sb, "model", res.model, "error", res.err)
 			return nil, res.err
 		}
-		sb = res.sb
 	}
 	output := res.output
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("oversight: claude output reported token limit; retrying with codex", "task", taskID, "agent", agent)
-		r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+
 			"result": "Sandbox fallback: claude → codex (token/rate limit in oversight output)",
 		})
 		res = runWithSandbox(sandbox.Codex)
@@ -794,7 +800,6 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 			return nil, res.err
 		}
 		output = res.output
-		sb = res.sb
 	}
 
 	// Accumulate token/cost usage for this oversight sub-agent.

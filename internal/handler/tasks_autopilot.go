@@ -78,7 +78,7 @@ func countRegularInProgress(tasks []store.Task) int {
 // in-progress concurrency limit, and calls store.UpdateTaskStatus. It writes
 // the appropriate HTTP error response and returns false on any failure;
 // on success it returns true with the mutex already released.
-func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.ResponseWriter, id uuid.UUID, oldStatus, newStatus store.TaskStatus) bool {
+func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.ResponseWriter, id uuid.UUID, _, newStatus store.TaskStatus) bool {
 	promoteMu.Lock()
 	defer promoteMu.Unlock()
 
@@ -320,7 +320,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			return &best, nil
 		},
 		AfterPhase1: h.testPhase1Done,
-		OnPhase2Miss: func(candidate *store.Task) {
+		OnPhase2Miss: func(_ *store.Task) {
 			h.incAutopilotPhase2Miss("auto_promoter")
 		},
 		Phase2: func(ctx context.Context, candidate *store.Task) (bool, error) {
@@ -623,7 +623,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 		OnPhase1Error: func(err error) {
 			h.breakers["auto-test"].recordFailure(nil, err.Error())
 		},
-		OnPhase2Miss: func(candidate *store.Task) {
+		OnPhase2Miss: func(_ *store.Task) {
 			h.incAutopilotPhase2Miss("auto_tester")
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
@@ -830,7 +830,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 		OnPhase1Error: func(err error) {
 			h.breakers["auto-submit"].recordFailure(nil, err.Error())
 		},
-		OnPhase2Miss: func(candidate *store.Task) {
+		OnPhase2Miss: func(_ *store.Task) {
 			h.incAutopilotPhase2Miss("auto_submitter")
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {

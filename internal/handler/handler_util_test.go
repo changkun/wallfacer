@@ -74,7 +74,8 @@ func TestIncAutopilotPhase2Miss_WithRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.RemoveAll(storeDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+
 
 	s, err := store.NewStore(storeDir)
 	if err != nil {
@@ -161,7 +162,8 @@ func TestBrowseWorkspaces_HiddenFilesFiltering(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp1 map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&resp1)
+	_ = json.NewDecoder(w.Body).Decode(&resp1)
+
 	entries1 := resp1["entries"].([]interface{})
 	if len(entries1) != 1 {
 		t.Errorf("expected 1 entry without hidden, got %d: %v", len(entries1), entries1)
@@ -175,7 +177,8 @@ func TestBrowseWorkspaces_HiddenFilesFiltering(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w2.Code)
 	}
 	var resp2 map[string]interface{}
-	json.NewDecoder(w2.Body).Decode(&resp2)
+	_ = json.NewDecoder(w2.Body).Decode(&resp2)
+
 	entries2 := resp2["entries"].([]interface{})
 	if len(entries2) != 2 {
 		t.Errorf("expected 2 entries with hidden, got %d: %v", len(entries2), entries2)
@@ -201,7 +204,8 @@ func TestBrowseWorkspaces_FilesNotIncluded(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	entries := resp["entries"].([]interface{})
 	if len(entries) != 1 {
 		t.Errorf("expected only directory entry, got %d entries", len(entries))
@@ -220,7 +224,8 @@ func TestBrowseWorkspaces_EmptyDirReturnsEmptyEntries(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if resp["path"] != dir {
 		t.Errorf("expected path=%q in response, got %q", dir, resp["path"])
 	}

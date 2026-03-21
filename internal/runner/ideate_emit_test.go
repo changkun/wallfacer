@@ -23,7 +23,7 @@ func TestEmitIdeationRejectionEvents_EmptySlice(t *testing.T) {
 	r := NewRunner(s, RunnerConfig{})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "test task", 30, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 30})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestEmitIdeationRejectionEvents_WithRejections(t *testing.T) {
 	r := NewRunner(s, RunnerConfig{})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "test task", 30, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 30})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestEmitIdeationRejectionEvents_EmptyTitle(t *testing.T) {
 	r := NewRunner(s, RunnerConfig{})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "test task", 30, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 30})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestEmitIdeationRejectionEvents_AllReasonTypes(t *testing.T) {
 	r := NewRunner(s, RunnerConfig{})
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "all reason types", 30, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "all reason types", Timeout: 30})
 	if err != nil {
 		t.Fatal(err)
 	}

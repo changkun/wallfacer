@@ -1,3 +1,4 @@
+// Package main implements the wallfacer CLI.
 package main
 
 import (
@@ -279,5 +280,6 @@ func openBrowser(url string) {
 	default:
 		return
 	}
-	exec.Command(cmd, url).Start()
+	_ = exec.Command(cmd, url).Start()
+
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// GetTurnUsage returns token usage for a specific task turn.
 func (h *Handler) GetTurnUsage(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -168,15 +169,15 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UU
 					w.Header().Set("X-Wallfacer-Truncated", "true")
 				}
 			}
-			f.Close()
+			_ = f.Close()
+
 		}
 	}
 
-	if strings.HasSuffix(filename, ".json") {
+	switch {
+	case strings.HasSuffix(filename, ".json"):
 		w.Header().Set("Content-Type", "application/json")
-	} else if strings.HasSuffix(filename, ".stderr.txt") {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	} else {
+	default:
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	http.ServeFile(w, r, path)

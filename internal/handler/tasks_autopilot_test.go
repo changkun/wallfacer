@@ -170,7 +170,7 @@ func TestTryAutoRetry_EligibleAfterManualRetryReset(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a task and bring it to failed state with an exhausted budget.
-	task, err := h.store.CreateTask(ctx, "retry-reset integration", 15, false, "", store.TaskKindTask)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "retry-reset integration", Timeout: 15, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun(t *testing.T) {
 	repo := setupRepo(t)
 
 	// Create and advance the task to waiting status with a valid worktree.
-	task, err := h.store.CreateTask(ctx, "rollback test", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "rollback test", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -324,7 +324,8 @@ func TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun(t *testing.T) {
 	if err := os.Chmod(taskDir, 0555); err != nil {
 		t.Fatalf("chmod read-only: %v", err)
 	}
-	t.Cleanup(func() { os.Chmod(taskDir, 0755) })
+	t.Cleanup(func() { _ = os.Chmod(taskDir, 0755) })
+
 
 	h.tryAutoTest(ctx)
 
@@ -350,7 +351,7 @@ func TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker(t *testing.T) {
 	repo := setupRepo(t)
 
 	// Create and advance the task to waiting status.
-	task, err := h.store.CreateTask(ctx, "auto-test candidate", 15, false, "", "")
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "auto-test candidate", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -372,7 +373,8 @@ func TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker(t *testing.T) {
 	}
 	// Restore write permission before cleanup (os.RemoveAll) runs; t.Cleanup
 	// callbacks execute in LIFO order, so this runs before newTestHandler's cleanup.
-	t.Cleanup(func() { os.Chmod(taskDir, 0755) })
+	t.Cleanup(func() { _ = os.Chmod(taskDir, 0755) })
+
 
 	h.tryAutoTest(ctx)
 
@@ -664,7 +666,7 @@ func TestStartAutoRefiner_ExitsOnCancel(t *testing.T) {
 func TestCheckConcurrencyAndUpdateStatus_Success(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	w := httptest.NewRecorder()
 	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, task.ID, store.TaskStatusBacklog, store.TaskStatusInProgress)
 	if !ok {
@@ -685,7 +687,7 @@ func TestCheckConcurrencyAndUpdateStatus_Success(t *testing.T) {
 func TestCheckConcurrencyAndUpdateStatus_InvalidTransition(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	w := httptest.NewRecorder()
 	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, task.ID, store.TaskStatusBacklog, store.TaskStatusDone)
 	if ok {
@@ -702,14 +704,14 @@ func TestCheckConcurrencyAndUpdateStatus_InvalidTransition(t *testing.T) {
 func TestCheckConcurrencyAndUpdateStatus_MaxConcurrency(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
-	max := h.maxConcurrentTasks()
+	maxConc := h.maxConcurrentTasks()
 	// Saturate the concurrency limit with in-progress regular tasks.
-	for i := 0; i < max; i++ {
-		task, _ := h.store.CreateTask(ctx, "running", 15, false, "", "")
+	for i := 0; i < maxConc; i++ {
+		task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "running", Timeout: 15})
 		h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress) //nolint:errcheck
 	}
 	// Try to promote one more backlog task — must be rejected.
-	backlog, _ := h.store.CreateTask(ctx, "backlog", 15, false, "", "")
+	backlog, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog", Timeout: 15})
 	w := httptest.NewRecorder()
 	ok := h.checkConcurrencyAndUpdateStatus(ctx, w, backlog.ID, store.TaskStatusBacklog, store.TaskStatusInProgress)
 	if ok {
@@ -863,7 +865,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 		h := newTestHandler(t)
 		ctx := context.Background()
 
-		created, err := h.store.CreateTask(ctx, "regression test prompt", 5, false, "", "")
+		created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "regression test prompt", Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -911,7 +913,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 		h := newTestHandler(t)
 		ctx := context.Background()
 
-		created, err := h.store.CreateTask(ctx, "cap test prompt", 5, false, "", "")
+		created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cap test prompt", Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -947,7 +949,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 		h := newTestHandler(t)
 		ctx := context.Background()
 
-		created, err := h.store.CreateTask(ctx, "budget test prompt", 5, false, "", "")
+		created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "budget test prompt", Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -983,7 +985,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 		h := newTestHandler(t)
 		ctx := context.Background()
 
-		created, err := h.store.CreateTask(ctx, "agent error prompt", 5, false, "", "")
+		created, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "agent error prompt", Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1033,7 +1035,7 @@ func TestStartAutoRetrier_StartupScan(t *testing.T) {
 	defer cancel()
 
 	// (a) Eligible failed task.
-	taskA, err := h.store.CreateTask(ctx, "crash task", 5, false, "", "")
+	taskA, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "crash task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1045,7 +1047,7 @@ func TestStartAutoRetrier_StartupScan(t *testing.T) {
 	}
 
 	// (b) Non-retryable failed task.
-	taskB, err := h.store.CreateTask(ctx, "agent error task", 5, false, "", "")
+	taskB, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "agent error task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1057,7 +1059,7 @@ func TestStartAutoRetrier_StartupScan(t *testing.T) {
 	}
 
 	// (c) In-progress task (not in the failed list; included to confirm no side-effects).
-	taskC, err := h.store.CreateTask(ctx, "in progress task", 5, false, "", "")
+	taskC, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "in progress task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1118,7 +1120,7 @@ func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 	// categories so that the container_crash budget is only spent once:
 	//   Inc(sync_error):      count=1, sync_error budget=1, container_crash budget=2
 	//   Inc(container_crash): count=2, container_crash budget=1
-	task1, err := h.store.CreateTask(ctx, "restart task one", 5, false, "", "")
+	task1, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "restart task one", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1149,7 +1151,7 @@ func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 	// ── task2: count=3 (cap already hit), container_crash budget=2 ──────────
 	// Build count=3 by incrementing sync_error three times, leaving the
 	// container_crash budget at its default of 2 to isolate the count guard.
-	task2, err := h.store.CreateTask(ctx, "restart task two", 5, false, "", "")
+	task2, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "restart task two", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

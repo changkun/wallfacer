@@ -14,7 +14,7 @@ import (
 func TestSaveTurnOutput_StdoutOnly(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	stdout := []byte(`{"hello":"world"}`)
 	if err := s.SaveTurnOutput(task.ID, 1, stdout, nil); err != nil {
@@ -40,7 +40,7 @@ func TestSaveTurnOutput_StdoutOnly(t *testing.T) {
 func TestSaveTurnOutput_WithStderr(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.SaveTurnOutput(task.ID, 2, []byte("stdout"), []byte("error output")); err != nil {
 		t.Fatalf("SaveTurnOutput: %v", err)
@@ -59,7 +59,7 @@ func TestSaveTurnOutput_WithStderr(t *testing.T) {
 func TestSaveTurnOutput_TurnNumberFormatted(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore(dir)
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	if err := s.SaveTurnOutput(task.ID, 42, []byte("data"), nil); err != nil {
 		t.Fatalf("SaveTurnOutput: %v", err)
@@ -103,7 +103,7 @@ func TestSaveTurnOutput_Truncation(t *testing.T) {
 	// Override the default limit with a small test value.
 	s.maxTurnOutputBytes = limit
 
-	task, _ := s.CreateTask(bg(), "trunctest", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "trunctest", Timeout: 5})
 
 	// Build ~4 KB of valid NDJSON (8 lines of 512 bytes each).
 	const lineSize = 512
@@ -189,7 +189,7 @@ func TestSaveTurnOutput_NoTruncationUnderLimit(t *testing.T) {
 	s, _ := NewStore(dir)
 	s.maxTurnOutputBytes = 4096
 
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	stdout := []byte(`{"type":"result","value":"small"}` + "\n")
 
 	if err := s.SaveTurnOutput(task.ID, 1, stdout, nil); err != nil {
@@ -213,7 +213,7 @@ func TestSaveTurnOutput_UnlimitedWhenZero(t *testing.T) {
 	s, _ := NewStore(dir)
 	s.maxTurnOutputBytes = 0 // 0 = unlimited
 
-	task, _ := s.CreateTask(bg(), "p", 5, false, "", "")
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	// Build 2 KB of data.
 	big := bytes.Repeat([]byte(`{"x":1}`+"\n"), 300)
 

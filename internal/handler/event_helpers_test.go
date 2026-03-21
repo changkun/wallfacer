@@ -51,7 +51,7 @@ func TestInsertEventOrLog_ErrorNoPanic(t *testing.T) {
 
 	// Create a task so we have a valid ID, then delete it to force
 	// InsertEvent to return "task not found".
-	task, err := h.store.CreateTask(ctx, "probe", 30, false, "", store.TaskKindTask)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "probe", Timeout: 30, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestInsertEventOrLog_SuccessNoCounter(t *testing.T) {
 	h, reg := newTestHandlerWithRegistry(t)
 	ctx := context.Background()
 
-	task, err := h.store.CreateTask(ctx, "probe", 30, false, "", store.TaskKindTask)
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "probe", Timeout: 30, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

@@ -139,7 +139,7 @@ func TestGetConfig_AutopilotFalseByDefault(t *testing.T) {
 	h.GetConfig(w, req)
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
 	if autopilot, ok := resp["autopilot"].(bool); !ok || autopilot {
 		t.Errorf("expected autopilot=false by default, got %v", resp["autopilot"])
 	}
@@ -152,7 +152,8 @@ func TestGetConfig_ReturnsInstructionsPath(t *testing.T) {
 	h.GetConfig(w, req)
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if _, ok := resp["instructions_path"]; !ok {
 		t.Error("expected instructions_path in response")
 	}
@@ -165,7 +166,8 @@ func TestGetConfig_ExposesIdeationCategories(t *testing.T) {
 	h.GetConfig(w, req)
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	cats, ok := resp["ideation_categories"].([]any)
 	if !ok {
 		t.Fatalf("expected ideation_categories to be an array, got %T", resp["ideation_categories"])
@@ -434,7 +436,8 @@ func TestUpdateConfig_EnableAutopilot(t *testing.T) {
 	}
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if enabled, ok := resp["autopilot"].(bool); !ok || !enabled {
 		t.Errorf("expected autopilot=true in response, got %v", resp["autopilot"])
 	}
@@ -490,7 +493,8 @@ func TestGetFiles_EmptyWorkspace(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	files, ok := resp["files"].([]any)
 	if !ok {
 		t.Fatalf("expected files array, got %v", resp["files"])
@@ -504,8 +508,10 @@ func TestGetFiles_ListsWorkspaceFiles(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 
 	// Create some files in the workspace.
-	os.WriteFile(filepath.Join(ws, "main.go"), []byte("package main"), 0644)
-	os.WriteFile(filepath.Join(ws, "README.md"), []byte("# readme"), 0644)
+	_ = os.WriteFile(filepath.Join(ws, "main.go"), []byte("package main"), 0644)
+
+	_ = os.WriteFile(filepath.Join(ws, "README.md"), []byte("# readme"), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 	w := httptest.NewRecorder()
@@ -515,7 +521,8 @@ func TestGetFiles_ListsWorkspaceFiles(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	files, ok := resp["files"].([]any)
 	if !ok {
 		t.Fatalf("expected files array, got %v", resp["files"])
@@ -538,18 +545,22 @@ func TestGetFiles_SkipsHiddenDirs(t *testing.T) {
 
 	// Create files in a hidden dir (should be skipped).
 	hiddenDir := filepath.Join(ws, ".git")
-	os.MkdirAll(hiddenDir, 0755)
-	os.WriteFile(filepath.Join(hiddenDir, "config"), []byte("git config"), 0644)
+	_ = os.MkdirAll(hiddenDir, 0755)
+
+	_ = os.WriteFile(filepath.Join(hiddenDir, "config"), []byte("git config"), 0644)
+
 
 	// Create a visible file.
-	os.WriteFile(filepath.Join(ws, "visible.txt"), []byte("visible"), 0644)
+	_ = os.WriteFile(filepath.Join(ws, "visible.txt"), []byte("visible"), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 	w := httptest.NewRecorder()
 	h.GetFiles(w, req)
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	files, _ := resp["files"].([]any)
 
 	for _, f := range files {
@@ -563,16 +574,20 @@ func TestGetFiles_SkipsNodeModules(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 
 	nodeModules := filepath.Join(ws, "node_modules")
-	os.MkdirAll(nodeModules, 0755)
-	os.WriteFile(filepath.Join(nodeModules, "package.js"), []byte("module"), 0644)
-	os.WriteFile(filepath.Join(ws, "index.js"), []byte("main"), 0644)
+	_ = os.MkdirAll(nodeModules, 0755)
+
+	_ = os.WriteFile(filepath.Join(nodeModules, "package.js"), []byte("module"), 0644)
+
+	_ = os.WriteFile(filepath.Join(ws, "index.js"), []byte("main"), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 	w := httptest.NewRecorder()
 	h.GetFiles(w, req)
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	files, _ := resp["files"].([]any)
 
 	for _, f := range files {
@@ -608,7 +623,8 @@ func TestGitStatus_NoWorkspaces(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var statuses []any
-	json.NewDecoder(w.Body).Decode(&statuses)
+	_ = json.NewDecoder(w.Body).Decode(&statuses)
+
 	if len(statuses) != 0 {
 		t.Errorf("expected 0 statuses (no workspaces), got %d", len(statuses))
 	}
@@ -702,7 +718,8 @@ func TestGitBranches_ValidRepo(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	if _, ok := resp["branches"]; !ok {
 		t.Error("expected branches in response")
 	}
@@ -765,9 +782,11 @@ func TestGitCheckout_RejectsWhenTasksInProgress(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a task and move it to in_progress.
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
+
 
 	body := `{"workspace": "` + repo + `", "branch": "main"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
@@ -823,9 +842,11 @@ func TestGitCreateBranch_RejectsWhenTasksInProgress(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 	ctx := context.Background()
 
-	task, _ := h.store.CreateTask(ctx, "test", 15, false, "", "")
-	h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
-	h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
+
 
 	body := `{"workspace": "` + repo + `", "branch": "new-branch"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
@@ -917,7 +938,8 @@ func newTestHandlerWithRealWorkspaceManager(t *testing.T) (*Handler, *workspace.
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.RemoveAll(storeDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+
 
 	s, err := store.NewStore(storeDir)
 	if err != nil {
@@ -986,7 +1008,7 @@ func TestUpdateWorkspaces_RejectsInProgressTasks(t *testing.T) {
 		t.Fatal("expected store to be available")
 	}
 	ctx := context.Background()
-	task, err := s.CreateTask(ctx, "test task", 15, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}

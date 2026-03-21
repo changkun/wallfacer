@@ -18,6 +18,7 @@ type workspaceBrowseEntry struct {
 	IsGitRepo bool   `json:"is_git_repo"`
 }
 
+// BrowseWorkspaces lists directories at a given path for workspace selection.
 func (h *Handler) BrowseWorkspaces(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimSpace(r.URL.Query().Get("path"))
 	includeHidden := r.URL.Query().Get("include_hidden") == "true"
@@ -64,6 +65,7 @@ func (h *Handler) BrowseWorkspaces(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// UpdateWorkspaces switches the active workspace set.
 func (h *Handler) UpdateWorkspaces(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Workspaces []string `json:"workspaces"`

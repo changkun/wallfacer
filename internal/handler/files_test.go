@@ -313,15 +313,18 @@ func TestGetFiles_MaxCapEnforcedAcrossWorkspaces(t *testing.T) {
 func TestGetFiles_PathsPrefixedByBasename(t *testing.T) {
 	h, ws1, ws2 := newTestHandlerWithTwoWorkspaces(t)
 
-	os.WriteFile(filepath.Join(ws1, "a.go"), []byte("a"), 0644)
-	os.WriteFile(filepath.Join(ws2, "b.go"), []byte("b"), 0644)
+	_ = os.WriteFile(filepath.Join(ws1, "a.go"), []byte("a"), 0644)
+
+	_ = os.WriteFile(filepath.Join(ws2, "b.go"), []byte("b"), 0644)
+
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 	w := httptest.NewRecorder()
 	h.GetFiles(w, req)
 
 	var resp map[string]any
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	files, _ := resp["files"].([]any)
 
 	base1 := filepath.Base(ws1)
@@ -352,7 +355,8 @@ func TestGetFiles_ConcurrentSafe(t *testing.T) {
 
 	// Populate workspace so the index has something to cache.
 	for i := 0; i < 10; i++ {
-		os.WriteFile(filepath.Join(ws, fmt.Sprintf("f%d.go", i)), []byte("x"), 0644)
+		_ = os.WriteFile(filepath.Join(ws, fmt.Sprintf("f%d.go", i)), []byte("x"), 0644)
+
 	}
 
 	var wg sync.WaitGroup

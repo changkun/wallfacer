@@ -308,7 +308,7 @@ func (s *Store) loadEvents(id uuid.UUID, dirName string) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer f.Close() //nolint:errcheck
 
 		scanner := bufio.NewScanner(f)
 		buf := make([]byte, 0, 64*1024)

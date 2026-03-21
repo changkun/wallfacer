@@ -53,7 +53,7 @@ func TestRunEmitsSystemEventForNonEmptyStderr(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "stderr event test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "stderr event test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestRunNoSystemEventWhenStderrEmpty(t *testing.T) {
 	s, r := setupRunnerWithCmd(t, []string{repo}, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTask(ctx, "no stderr event test", 5, false, "", "")
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "no stderr event test", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}

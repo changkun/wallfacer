@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// BodyLimitDefault and related constants define request body size limits.
 const (
 	BodyLimitDefault      int64 = 1 << 20   // 1 MiB
 	BodyLimitInstructions int64 = 5 << 20   // 5 MiB
@@ -22,6 +23,7 @@ func MaxBytesMiddleware(limit int64) func(http.Handler) http.Handler {
 	}
 }
 
+// CSRFMiddleware validates the Origin/Referer header against the expected host.
 func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 	allowedHost := strings.TrimSpace(serverHostPort)
 	return func(next http.Handler) http.Handler {
@@ -55,6 +57,7 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 	}
 }
 
+// BearerAuthMiddleware enforces bearer-token authentication on non-SSE routes.
 func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	key := strings.TrimSpace(apiKey)
 	if key == "" {

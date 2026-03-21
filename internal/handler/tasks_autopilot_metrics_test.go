@@ -25,13 +25,15 @@ func newTestHandlerWithRegistry(t *testing.T) (*Handler, *metrics.Registry) {
 	}
 	s, err := store.NewStore(storeDir)
 	if err != nil {
-		os.RemoveAll(storeDir)
+		_ = os.RemoveAll(storeDir)
+
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{})
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	t.Cleanup(func() { os.RemoveAll(storeDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+
 	reg := metrics.NewRegistry()
 	// Pre-register the counter so it appears in exposition even before any
 	// increments occur.
@@ -85,7 +87,7 @@ func TestTryAutoPromote_PromotedCounterIncrements(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a single backlog task.
-	if _, err := h.store.CreateTask(ctx, "test task", 30, false, "", store.TaskKindTask); err != nil {
+	if _, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 30, Kind: store.TaskKindTask}); err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 

@@ -145,9 +145,6 @@ func TestRunEnvCheck_ConfigDirMissing(t *testing.T) {
 func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 	root := t.TempDir()
 	marker := filepath.Join(root, "called")
-	script := filepath.Join(root, "xdg-open")
-	scriptBody := "#!/bin/sh\n" +
-		"echo \"$1\" > " + marker
 	cmd := "xdg-open"
 	switch runtime.GOOS {
 	case "darwin":
@@ -159,8 +156,8 @@ func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 	default:
 		cmd = "open"
 	}
-	script = filepath.Join(root, cmd)
-	scriptBody = "#!/bin/sh\n" +
+	script := filepath.Join(root, cmd)
+	scriptBody := "#!/bin/sh\n" +
 		"echo \"$1\" > " + marker
 	if err := os.WriteFile(script, []byte(scriptBody+"\n"), 0o755); err != nil {
 		t.Fatal(err)

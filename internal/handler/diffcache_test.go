@@ -331,7 +331,7 @@ func TestDiffCacheLRUResetOnDuplicateSet(t *testing.T) {
 	}
 }
 
-func TestDiffCacheConcurrentAccess(t *testing.T) {
+func TestDiffCacheConcurrentAccess(_ *testing.T) {
 	c := newDiffCache()
 	id := uuid.New()
 

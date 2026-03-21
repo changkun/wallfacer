@@ -24,6 +24,7 @@ var defaultAutoRetryBudget = map[FailureCategory]int{
 	FailureCategoryWorktree:       1,
 }
 
+// TaskCreateOptions holds parameters for creating a new task.
 type TaskCreateOptions struct {
 	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
 	ID                uuid.UUID

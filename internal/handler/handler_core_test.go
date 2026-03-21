@@ -174,7 +174,8 @@ func TestGetEnvConfig_DefaultMaxParallel(t *testing.T) {
 	h.GetEnvConfig(w, req)
 
 	var resp envConfigResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+
 	// When not configured, should fall back to defaultMaxConcurrentTasks.
 	if resp.MaxParallelTasks != defaultMaxConcurrentTasks {
 		t.Errorf("expected default %d, got %d", defaultMaxConcurrentTasks, resp.MaxParallelTasks)
@@ -228,7 +229,8 @@ func TestUpdateEnvConfig_ClampsMinParallel(t *testing.T) {
 	w2 := httptest.NewRecorder()
 	h.GetEnvConfig(w2, req2)
 	var resp envConfigResponse
-	json.NewDecoder(w2.Body).Decode(&resp)
+	_ = json.NewDecoder(w2.Body).Decode(&resp)
+
 	if resp.MaxParallelTasks != 1 {
 		t.Errorf("expected clamped value of 1, got %d", resp.MaxParallelTasks)
 	}
@@ -287,7 +289,7 @@ func TestTryAutoPromote_SkipsIdeaAgentKindTasks(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a brainstorm runner task (Kind=TaskKindIdeaAgent).
-	_, err := h.store.CreateTask(ctx, "brainstorm runner", 30, false, "", store.TaskKindIdeaAgent)
+	_, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm runner", Timeout: 30, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatalf("CreateTask (idea-agent kind): %v", err)
 	}
@@ -313,7 +315,7 @@ func TestTryAutoPromote_PromotesIdeaAgentTaggedTasks(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a task tagged "idea-agent" (created by brainstorm, Kind=TaskKindTask).
-	ideaTask, err := h.store.CreateTask(ctx, "brainstorm idea", 30, false, "", store.TaskKindTask, "idea-agent")
+	ideaTask, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm idea", Timeout: 30, Kind: store.TaskKindTask, Tags: []string{"idea-agent"}})
 	if err != nil {
 		t.Fatalf("CreateTask (idea-agent tagged): %v", err)
 	}
@@ -345,13 +347,13 @@ func TestTryAutoPromote_PromotesManualTaskButNotIdeaAgentKind(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a manual backlog task first (lower position).
-	manual, err := h.store.CreateTask(ctx, "manual task", 30, false, "", store.TaskKindTask)
+	manual, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "manual task", Timeout: 30, Kind: store.TaskKindTask})
 	if err != nil {
 		t.Fatalf("CreateTask (manual): %v", err)
 	}
 
 	// Create a brainstorm runner task (Kind=TaskKindIdeaAgent).
-	ideaTask, err := h.store.CreateTask(ctx, "brainstorm runner", 30, false, "", store.TaskKindIdeaAgent)
+	ideaTask, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm runner", Timeout: 30, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatalf("CreateTask (idea-agent kind): %v", err)
 	}
@@ -447,7 +449,7 @@ func TestRequireStore_WithoutStore(t *testing.T) {
 func TestRequireStoreMiddleware_WithStore(t *testing.T) {
 	h := newTestHandler(t)
 	called := false
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
 	})
@@ -468,7 +470,7 @@ func TestRequireStoreMiddleware_WithStore(t *testing.T) {
 func TestRequireStoreMiddleware_WithoutStore(t *testing.T) {
 	h := &Handler{} // no store
 	called := false
-	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	next := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		called = true
 	})
 	mw := h.RequireStoreMiddleware(next)

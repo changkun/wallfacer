@@ -1,3 +1,4 @@
+// Package logger provides structured logging utilities.
 package logger
 
 import (
@@ -50,7 +51,7 @@ func Init(format string) {
 }
 
 // Fatal prints a user-friendly error to stderr and exits with code 1.
-func Fatal(l *slog.Logger, msg string, args ...any) {
+func Fatal(_ *slog.Logger, msg string, args ...any) {
 	var errVal string
 	for i := 0; i+1 < len(args); i += 2 {
 		if k, ok := args[i].(string); ok && k == "error" {
@@ -261,7 +262,7 @@ func isUUID(s string) bool {
 				return false
 			}
 		default:
-			if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
 				return false
 			}
 		}

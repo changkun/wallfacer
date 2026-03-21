@@ -15,15 +15,15 @@ import (
 func TestCriticalPathScore(t *testing.T) {
 	s := newTestStore(t)
 
-	taskA, _ := s.CreateTask(bg(), "A", 15, false, "", "")
-	taskB, _ := s.CreateTask(bg(), "B", 15, false, "", "")
-	taskC, _ := s.CreateTask(bg(), "C", 15, false, "", "")
-	taskD, _ := s.CreateTask(bg(), "D", 15, false, "", "")
+	taskA, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "A", Timeout: 15})
+	taskB, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "B", Timeout: 15})
+	taskC, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "C", Timeout: 15})
+	taskD, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "D", Timeout: 15})
 
 	// B depends on A, C depends on B, D depends on A.
-	s.UpdateTaskDependsOn(bg(), taskB.ID, []string{taskA.ID.String()})
-	s.UpdateTaskDependsOn(bg(), taskC.ID, []string{taskB.ID.String()})
-	s.UpdateTaskDependsOn(bg(), taskD.ID, []string{taskA.ID.String()})
+	_ = s.UpdateTaskDependsOn(bg(), taskB.ID, []string{taskA.ID.String()})
+	_ = s.UpdateTaskDependsOn(bg(), taskC.ID, []string{taskB.ID.String()})
+	_ = s.UpdateTaskDependsOn(bg(), taskD.ID, []string{taskA.ID.String()})
 
 	tests := []struct {
 		name string
@@ -57,12 +57,12 @@ func TestCriticalPathScore_UnknownTask(t *testing.T) {
 func TestCriticalPathScore_Cycle(t *testing.T) {
 	s := newTestStore(t)
 
-	taskA, _ := s.CreateTask(bg(), "A", 15, false, "", "")
-	taskC, _ := s.CreateTask(bg(), "C", 15, false, "", "")
+	taskA, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "A", Timeout: 15})
+	taskC, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "C", Timeout: 15})
 
 	// Create a cycle: A depends on C, C depends on A.
-	s.UpdateTaskDependsOn(bg(), taskA.ID, []string{taskC.ID.String()})
-	s.UpdateTaskDependsOn(bg(), taskC.ID, []string{taskA.ID.String()})
+	_ = s.UpdateTaskDependsOn(bg(), taskA.ID, []string{taskC.ID.String()})
+	_ = s.UpdateTaskDependsOn(bg(), taskC.ID, []string{taskA.ID.String()})
 
 	scoreA := s.CriticalPathScore(taskA.ID)
 	scoreC := s.CriticalPathScore(taskC.ID)
