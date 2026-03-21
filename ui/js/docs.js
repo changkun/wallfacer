@@ -358,12 +358,13 @@ function _renderDocToc(content) {
     }
   }
 
+  // Header label — matches the left nav category labels.
   var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:8px;">On this page</div>';
   for (var j = 0; j < headings.length; j++) {
     var h = headings[j];
-    var level = h.tagName === 'H3' ? 1 : 0;
-    var indent = level * 10;
-    html += '<a href="#' + h.id + '" data-toc-target="' + h.id + '" style="display:block;padding:2px 0 2px ' + indent + 'px;color:var(--text-muted);text-decoration:none;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onmouseover="this.style.color=\'var(--text)\'" onmouseout="this.style.color=\'var(--text-muted)\'">' + escapeHtml(h.textContent) + '</a>';
+    var isH3 = h.tagName === 'H3';
+    // h2 = top-level section, h3 = subsection (indented, smaller).
+    html += '<a href="#' + h.id + '" class="docs-toc-link' + (isH3 ? ' docs-toc-link--sub' : '') + '" data-toc-target="' + h.id + '">' + escapeHtml(h.textContent) + '</a>';
   }
   toc.innerHTML = html;
 
@@ -385,12 +386,10 @@ function _renderDocToc(content) {
 
 // Highlight the TOC entry corresponding to the visible section.
 function _setupTocScrollSpy(content, headings, tocLinks) {
-  // Remove previous listener if any.
   if (content._tocScrollHandler) {
     content.removeEventListener('scroll', content._tocScrollHandler);
   }
   var handler = function() {
-    // Find the last heading that has scrolled past the top.
     var activeId = '';
     for (var i = 0; i < headings.length; i++) {
       var rect = headings[i].getBoundingClientRect();
@@ -401,13 +400,11 @@ function _setupTocScrollSpy(content, headings, tocLinks) {
     }
     for (var j = 0; j < tocLinks.length; j++) {
       var isActive = tocLinks[j].getAttribute('data-toc-target') === activeId;
-      tocLinks[j].style.color = isActive ? 'var(--text)' : 'var(--text-muted)';
-      tocLinks[j].style.fontWeight = isActive ? '600' : '400';
+      tocLinks[j].classList.toggle('docs-toc-link--active', isActive);
     }
   };
   content._tocScrollHandler = handler;
   content.addEventListener('scroll', handler, { passive: true });
-  // Run once immediately.
   handler();
 }
 

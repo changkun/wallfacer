@@ -2943,6 +2943,36 @@ mark.search-highlight {
 .markdown-body .mermaid-diagram:hover { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
 .markdown-body .mermaid-diagram svg { max-width: 100%; height: auto; }
 
+/* --- Docs TOC (right sidebar) --- */
+.docs-toc-link {
+  display: block;
+  padding: 3px 8px;
+  margin-bottom: 1px;
+  border-left: 2px solid transparent;
+  border-radius: 0 4px 4px 0;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.docs-toc-link:hover {
+  color: var(--text);
+  background: var(--bg-input);
+}
+.docs-toc-link--sub {
+  padding-left: 16px;
+  font-size: 10.5px;
+}
+.docs-toc-link--active {
+  color: var(--text);
+  font-weight: 600;
+  border-left-color: var(--accent);
+}
+
 .diagram-overlay {
   position: fixed; inset: 0; z-index: 60;
   background: var(--bg-card);
