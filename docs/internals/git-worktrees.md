@@ -129,108 +129,9 @@ Note: `data/<uuid>/` (task record, traces, outputs, oversights, summary) is **pr
 
 Cleanup is idempotent and safe to call multiple times (errors are logged, not fatal). Span events (`worktree_cleanup`) are recorded in the task's audit trail.
 
-## Workspace Manager
+> **Workspace management** has moved. See [Workspaces & Configuration](workspaces-and-config.md) for workspace management.
 
-The workspace manager (`internal/workspace/manager.go`) coordinates workspace switching, store lifecycle, and change notification.
-
-### Data Model
-
-```go
-type Snapshot struct {
-    Workspaces       []string       // sorted, deduplicated absolute paths
-    Store            *store.Store   // scoped store for this workspace set
-    InstructionsPath string         // path to merged AGENTS.md
-    ScopedDataDir    string         // data/<workspace-key>/
-    Key              string         // 16-char hex SHA-256 fingerprint
-    Generation       uint64         // monotonically increasing version
-}
-```
-
-### Workspace Key Hashing
-
-Each unique combination of workspace directories is identified by a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This is computed by `instructions.Key()` (`internal/instructions/instructions.go`):
-
-```go
-func Key(workspaces []string) string {
-    sorted := make([]string, len(workspaces))
-    copy(sorted, workspaces)
-    sort.Strings(sorted)
-    h := sha256.Sum256([]byte(strings.Join(sorted, ":")))
-    return fmt.Sprintf("%x", h[:8]) // 16 hex chars
-}
-```
-
-Because paths are sorted before hashing, `wallfacer run ~/a ~/b` and `wallfacer run ~/b ~/a` produce the same key and share the same data directory and instructions file.
-
-### Workspace Groups
-
-Workspace groups are persisted in `~/.wallfacer/workspace-groups.json` by the `workspacegroups` package (`internal/workspacegroups/groups.go`). Each group is a `Group{Workspaces: []string}` entry. The file is a JSON array of groups, ordered by recency (most recently used first).
-
-Key operations:
-- **`Load(configDir)`** -- reads and normalizes groups from disk
-- **`Save(configDir, groups)`** -- atomic write via temp file + rename
-- **`Upsert(configDir, workspaces)`** -- adds a new group or promotes an existing one to the front of the list (MRU ordering)
-- **`Normalize(groups)`** -- deduplicates groups, sorts paths within each group, removes empty entries
-
-On startup, if no workspaces are provided on the command line, `Manager.startupWorkspaces()` loads the first group from `workspace-groups.json` as the default.
-
-### Workspace Scoping
-
-The store is scoped by workspace key. Each unique workspace set gets its own data directory at `data/<workspace-key>/`, containing all task records, events, and outputs for that workspace combination. When workspaces change, a new `store.Store` is opened for the new data directory.
-
-### Hot-Swap via `PUT /api/workspaces`
-
-`Manager.Switch(paths)` handles runtime workspace switching:
-
-```mermaid
-flowchart TD
-    Validate["Validate & normalize paths<br/>(absolute, clean, exist, deduplicated, sorted)"] --> Same{"Same set as<br/>current?"}
-    Same -->|yes| NoOp["Return current snapshot"]
-    Same -->|no| Build["Build candidate snapshot"]
-    Build --> OpenStore["Open new scoped store<br/>(data/<key>/)"]
-    OpenStore --> Instructions["Ensure AGENTS.md exists<br/>(instructions.Ensure)"]
-    Instructions --> Groups["Upsert workspace group<br/>(workspace-groups.json)"]
-    Groups --> Env["Persist WALLFACER_WORKSPACES<br/>to .env file"]
-    Env --> Swap["Atomic swap under write lock:<br/>increment generation, install snapshot"]
-    Swap --> Publish["Notify subscribers via channels"]
-    Publish --> Close["Close previous store"]
-```
-
-All external side effects (store creation, instructions file, workspace groups, env file) are applied before the atomic swap. Every failure path closes the candidate store so it does not accumulate. After a successful swap, the previous store is closed outside the lock.
-
-Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams, the runner) to react to workspace switches.
-
-## AGENTS.md Lifecycle
-
-### Storage Location
-
-Workspace instruction files live in `~/.wallfacer/instructions/`. Each unique workspace combination gets its own file, named by the 16-char hex workspace key: `~/.wallfacer/instructions/<key>.md`.
-
-### Fingerprinting
-
-The filename is derived from the same SHA-256 fingerprint used for workspace scoping (see Workspace Key Hashing above). This means `wallfacer run ~/a ~/b` and `wallfacer run ~/b ~/a` share the same instructions file.
-
-### Default Template Generation
-
-When `instructions.Ensure()` is called and no file exists yet, `BuildContent()` (`internal/instructions/instructions.go`) assembles the initial content from:
-
-1. **Default template** -- general guidance for agents (complete tasks as described, make focused changes, run tests, write clear commit messages, etc.). Also includes board context documentation explaining `/workspace/.tasks/board.json` and sibling worktree paths.
-
-2. **Workspace layout section** -- lists each workspace as `/workspace/<basename>/` and instructs agents to keep all file operations within these directories.
-
-3. **Repo-specific instruction references** -- scans each workspace for `AGENTS.md` or legacy `CLAUDE.md` files and appends a "Repo-Specific Instructions" section with paths like `/workspace/myapp/AGENTS.md` so the agent can read them on demand.
-
-### Re-init Logic
-
-`instructions.Reinit()` regenerates the file from scratch using `BuildContent()`, overwriting any user edits. This is triggered by **Settings > AGENTS.md > Re-init** in the UI, which calls `POST /api/instructions/reinit`. The re-init picks up any new `AGENTS.md` / `CLAUDE.md` files that may have appeared in the workspaces since the last generation.
-
-### Mount Path
-
-The instructions file is mounted read-only into every task container. The mount filename depends on the sandbox type:
-- **Claude sandbox**: `/workspace/CLAUDE.md` (legacy filename that Claude Code auto-discovers)
-- **Codex sandbox**: `/workspace/AGENTS.md`
-
-This is handled by `appendInstructionsMount()` in `container.go`, which selects the filename via `instructionsFilenameForSandbox()`.
+> **AGENTS.md lifecycle** has moved. See [Workspaces & Configuration](workspaces-and-config.md) for AGENTS.md lifecycle.
 
 ## Sibling Worktree Mounting
 
@@ -434,7 +335,7 @@ Git operations are organized in the `internal/gitutil` package:
 
 ## Git Status & Branch Management API
 
-The server exposes git status and branch management for the UI header bar. See [Orchestration](orchestration.md) for the full API route list.
+The server exposes git status and branch management for the UI header bar. See [API & Transport](api-and-transport.md) for the full API route list.
 
 - `GET /api/git/status` -- current branch, remote tracking, ahead/behind counts per workspace
 - `GET /api/git/stream` -- SSE endpoint pushing git status updates (5-second poll interval)
@@ -456,3 +357,9 @@ The UI header displays a branch switcher dropdown for each workspace. Users can:
 2. **Create branches** -- type a new branch name in the search field and select "Create branch". The server runs `git checkout -b` on the workspace.
 
 Both operations are blocked while any task is `in_progress`, `waiting`, `committing`, or `failed` (with existing worktrees) to prevent worktree conflicts.
+
+## See Also
+
+- [Workspaces & Configuration](workspaces-and-config.md) -- workspace manager, workspace key hashing, hot-swap, AGENTS.md lifecycle
+- [API & Transport](api-and-transport.md) -- HTTP routes, SSE, webhooks, metrics, middleware
+- [Task Lifecycle](task-lifecycle.md) -- task state machine and execution loop
