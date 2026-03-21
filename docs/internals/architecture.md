@@ -386,6 +386,81 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 **Graceful shutdown** — See [API & Transport](api-and-transport.md) for the shutdown sequence.
 
+## Development Setup
+
+This section is for contributors who want to build everything from source.
+
+### Prerequisites
+
+- **Go 1.25+** — [go.dev](https://go.dev/)
+- **Podman** or **Docker** — container runtime for sandbox images
+- **Node.js 22+** — for frontend tests and Tailwind CSS regeneration
+- **A Claude credential** — OAuth token (`claude setup-token`) or API key from [console.anthropic.com](https://console.anthropic.com/)
+
+### Build from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/changkun/wallfacer.git
+cd wallfacer
+
+# Build the server binary
+go build -o wallfacer .
+
+# Build sandbox images locally (optional — auto-pulled from ghcr.io at runtime)
+make build-claude   # Claude Code sandbox image
+make build-codex    # OpenAI Codex sandbox image
+```
+
+`make build` builds the binary and both sandbox images in one step. Building images locally is only necessary when modifying the Dockerfiles in `sandbox/`; for normal development the server pulls `ghcr.io/changkun/wallfacer:latest` automatically on first task run.
+
+### Configure Credentials
+
+```bash
+# Start the server once to create ~/.wallfacer/.env
+./wallfacer run
+# Stop with Ctrl-C, then edit the env file:
+```
+
+```bash
+# ~/.wallfacer/.env — set one of:
+CLAUDE_CODE_OAUTH_TOKEN=<your-token>
+# ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Alternatively, start the server and configure via **Settings → API Configuration** in the browser.
+
+### Run Tests
+
+```bash
+make test           # All tests (backend + frontend)
+make test-backend   # Go unit tests: go test ./...
+make test-frontend  # Frontend JS tests: npx vitest@2 run
+```
+
+### Other Make Targets
+
+| Target | Description |
+|---|---|
+| `make build` | Build binary + both sandbox images |
+| `make build-binary` | Build just the Go binary |
+| `make build-claude` | Build Claude Code sandbox image |
+| `make build-codex` | Build OpenAI Codex sandbox image |
+| `make server` | Build and run the server |
+| `make shell` | Open a bash shell in a sandbox container |
+| `make clean` | Remove all sandbox images |
+| `make ui-css` | Regenerate Tailwind CSS |
+| `make api-contract` | Regenerate API route artifacts from `apicontract/routes.go` |
+| `make run PROMPT="…"` | Headless one-shot Claude execution |
+
+### Verifying the Sandbox Image
+
+```bash
+podman images wallfacer   # or: docker images wallfacer
+```
+
+The Dockerfiles (`sandbox/claude/Dockerfile`, `sandbox/codex/Dockerfile`) build Ubuntu 24.04 images bundling Go 1.25, Node.js 22, Python 3, and the respective agent CLI (Claude Code or Codex). Multi-arch images (amd64 + arm64) are published to `ghcr.io/changkun/wallfacer` and `ghcr.io/changkun/wallfacer-codex` on version tags via GitHub Actions.
+
 ## See Also
 
 - [Data & Storage](data-and-storage.md) — persistence, models, migrations, search index
