@@ -49,7 +49,7 @@ func runServer(configDir string, args []string) {
 	addr := fs.String("addr", envOrDefault("ADDR", ":8080"), "listen address")
 	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
 	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", detectContainerRuntime()), "container runtime command (podman or docker)")
-	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage), "sandbox container image")
+	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), "sandbox container image")
 	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
 	noWorkspaces := fs.Bool("no-workspaces", false, "start with no active workspaces")

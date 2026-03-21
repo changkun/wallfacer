@@ -150,7 +150,7 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, comman
 		return nil, fmt.Errorf("getwd: %w", err)
 	}
 	base := sanitizeContainerBasename(filepath.Base(cwd))
-	image := resolveSandboxImageForExec(envOrDefault("SANDBOX_IMAGE", defaultSandboxImage), sb)
+	image := resolveSandboxImageForExec(envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), sb)
 	envFile := envOrDefault("ENV_FILE", filepath.Join(configDir, ".env"))
 	runtimeBin := filepath.Base(runtimePath)
 

@@ -12,14 +12,32 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 )
 
-// defaultSandboxImage is the published container image pulled automatically
-// when the image is not already present locally.
-const defaultSandboxImage = "ghcr.io/changkun/wallfacer:latest"
+// version is set at build time via -ldflags. When empty (dev build),
+// the binary pulls the :latest sandbox image.
+var version = ""
+
+// sandboxImageBase is the registry path for the published sandbox image.
+const sandboxImageBase = "ghcr.io/changkun/wallfacer"
+
+// defaultSandboxImage returns the tagged sandbox image reference.
+// Release builds (version set via ldflags) pull the matching version tag;
+// dev builds fall back to :latest.
+func defaultSandboxImage() string {
+	if version != "" {
+		return sandboxImageBase + ":" + version
+	}
+	return sandboxImageBase + ":latest"
+}
 
 // fallbackSandboxImage is used when the remote image cannot be pulled.
 const fallbackSandboxImage = "wallfacer:latest"
 
 func printUsage() {
+	v := version
+	if v == "" {
+		v = "dev"
+	}
+	fmt.Fprintf(os.Stderr, "wallfacer %s\n\n", v)
 	fmt.Fprintf(os.Stderr, "Usage: wallfacer <command> [arguments]\n\n")
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  run          start the task board server\n")
@@ -73,7 +91,7 @@ func runEnvCheck(configDir string) {
 	fmt.Printf("Env file:          %s\n", envFile)
 	fmt.Printf("Prompts dir:       %s\n", filepath.Join(configDir, "prompts"))
 	fmt.Printf("Container command: %s\n", envOrDefault("CONTAINER_CMD", detectContainerRuntime()))
-	fmt.Printf("Sandbox image:     %s\n", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage))
+	fmt.Printf("Sandbox image:     %s\n", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()))
 	fmt.Println()
 
 	if info, err := os.Stat(configDir); err != nil {
@@ -178,7 +196,7 @@ func runEnvCheck(configDir string) {
 	} else {
 		fmt.Printf("[ok] Container runtime found: %s\n", containerCmd)
 
-		image := envOrDefault("SANDBOX_IMAGE", defaultSandboxImage)
+		image := envOrDefault("SANDBOX_IMAGE", defaultSandboxImage())
 		out, err := exec.Command(containerCmd, "images", "-q", image).Output()
 		if err != nil || strings.TrimSpace(string(out)) == "" {
 			fmt.Printf("[!] Sandbox image not found locally: %s\n", image)
@@ -193,7 +211,7 @@ func runEnvCheck(configDir string) {
 				}
 			} else {
 				fmt.Printf("    Run 'make build' to build it, or manually:\n")
-				fmt.Printf("    %s pull %s\n", containerCmd, defaultSandboxImage)
+				fmt.Printf("    %s pull %s\n", containerCmd, defaultSandboxImage())
 			}
 		} else {
 			fmt.Printf("[ok] Sandbox image found: %s\n", image)
