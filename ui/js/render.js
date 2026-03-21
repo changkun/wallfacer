@@ -802,7 +802,7 @@ card.style.opacity = isArchived ? '0.55' : '';
         : '';
       return `<div class="tag-chip-row">${chips}${overflowChip}</div>`;
     })() : ''}
-    <div class="text-sm card-prose overflow-hidden" style="max-height:4.5em;">${_cachedMarkdown(cardDisplayPrompt(t))}</div>
+    <div class="text-xs card-prose overflow-hidden" style="max-height:4.5em;">${_cachedMarkdown(cardDisplayPrompt(t))}</div>
     ${t.status === 'failed' && t.result ? `
     <div class="card-error-reason">
       <span class="card-error-label">Error</span><span class="card-error-text">${escapeHtml(t.result.length > 160 ? t.result.slice(0, 160) + '\u2026' : t.result)}</span>
