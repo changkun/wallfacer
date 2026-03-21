@@ -217,7 +217,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	// Close the write end once the subprocess exits.
 	go func() {
 		if err := cmd.Wait(); err != nil {
-			logger.Handler.Debug("container log stream process exited", "error", err)
+			logger.Handler.Debug("container log stream ended (process killed or container removed)", "detail", err)
 		}
 		_ = pw.Close()
 
@@ -240,7 +240,7 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			lines <- scanner.Text()
 		}
 		if err := scanner.Err(); err != nil {
-			logger.Handler.Warn("container log stream scanner error", "error", err)
+			logger.Handler.Debug("container log stream reader closed", "detail", err)
 		}
 	}()
 
@@ -321,7 +321,7 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 	}()
 	go func() {
 		if err := cmd.Wait(); err != nil {
-			logger.Handler.Debug("refine log stream process exited", "error", err)
+			logger.Handler.Debug("refine log stream ended (process killed or container removed)", "detail", err)
 		}
 		_ = pw.Close()
 
@@ -345,7 +345,7 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 			lines <- scanner.Text()
 		}
 		if err := scanner.Err(); err != nil {
-			logger.Handler.Warn("refine log stream scanner error", "error", err)
+			logger.Handler.Debug("refine log stream reader closed", "detail", err)
 		}
 	}()
 
