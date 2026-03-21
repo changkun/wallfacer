@@ -183,6 +183,18 @@ func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// requireGitRepo checks that workspace is a git repository and writes a
+// 400 error if it is not. Returns true when the caller should proceed.
+func requireGitRepo(w http.ResponseWriter, workspace string) bool {
+	if !gitutil.IsGitRepo(workspace) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": filepath.Base(workspace) + " is not a git repository",
+		})
+		return false
+	}
+	return true
+}
+
 // GitPush runs `git push` for the requested workspace.
 func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -194,6 +206,9 @@ func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 
 	if !h.isAllowedWorkspace(req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
+		return
+	}
+	if !requireGitRepo(w, req.Workspace) {
 		return
 	}
 
@@ -219,6 +234,9 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 
 	if !h.isAllowedWorkspace(req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
+		return
+	}
+	if !requireGitRepo(w, req.Workspace) {
 		return
 	}
 	if h.refuseWorkspaceMutationIfBlocked(w, r, req.Workspace, "sync") {
@@ -261,6 +279,9 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 
 	if !h.isAllowedWorkspace(req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
+		return
+	}
+	if !requireGitRepo(w, req.Workspace) {
 		return
 	}
 	if h.refuseWorkspaceMutationIfBlocked(w, r, req.Workspace, "rebase") {
@@ -332,6 +353,10 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	behindCounts := make(map[string]int)
 
 	for repoPath, worktreePath := range task.WorktreePaths {
+		// Skip non-git workspaces silently — no diff to compute.
+		if !gitutil.IsGitRepo(repoPath) {
+			continue
+		}
 		// If the worktree directory no longer exists, fall back to stored commit hashes.
 		if _, statErr := os.Stat(worktreePath); statErr != nil {
 			commitHash := task.CommitHashes[repoPath]
@@ -466,6 +491,9 @@ func (h *Handler) GitBranches(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
+	if !requireGitRepo(w, ws) {
+		return
+	}
 
 	out, err := exec.CommandContext(r.Context(), "git", "-C", ws,
 		"branch", "--list", "--format=%(refname:short)").Output()
@@ -508,6 +536,9 @@ func (h *Handler) GitCheckout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
 		return
 	}
+	if !requireGitRepo(w, req.Workspace) {
+		return
+	}
 
 	// Validate branch name: must not contain "..", spaces, or control characters.
 	if req.Branch == "" || strings.Contains(req.Branch, "..") || strings.ContainsAny(req.Branch, " \t\n\r") {
@@ -541,6 +572,9 @@ func (h *Handler) GitCreateBranch(w http.ResponseWriter, r *http.Request) {
 
 	if !h.isAllowedWorkspace(req.Workspace) {
 		http.Error(w, "workspace not configured", http.StatusBadRequest)
+		return
+	}
+	if !requireGitRepo(w, req.Workspace) {
 		return
 	}
 
