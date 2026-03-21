@@ -52,9 +52,9 @@ curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh 
 
 `wallfacer doctor` now checks whether the container runtime is installed and responsive, with actionable messages (e.g. "podman machine start" or "Ensure Docker Desktop is running"). Remaining: the server startup error when no runtime is found could still be more user-friendly.
 
-### ~~4. First-task sandbox image pull is opaque~~ — Solved
+### ~~4. First-task sandbox image pull is opaque~~ — Partially solved
 
-The server now reports `image_cached` in the `GET /api/config` response. When the sandbox image is not cached locally, the UI shows a dismissible warning banner above the board: "Sandbox image not cached yet. It will be pulled automatically (~1 GB) when you run your first task."
+`GET /api/config` now returns `image_cached` (boolean) reporting whether the sandbox image is available locally. `wallfacer doctor` also checks image availability. No UI banner — the doctor command is the right place for first-run diagnostics, not the board UI.
 
 ### 5. Go 1.25+ is bleeding-edge
 
@@ -72,7 +72,7 @@ Given what's already been implemented, the remaining work in priority order:
 
 3. **Verify `go install` from module proxy** (Option 1 above) — Trivial effort, just needs testing after next release.
 
-4. ~~**Surface image pull progress in UI**~~ — **Done.** `GET /api/config` returns `image_cached`; UI shows a dismissible warning banner when false.
+4. ~~**Surface image status**~~ — **Done.** `GET /api/config` returns `image_cached`; `wallfacer doctor` reports image availability.
 
 ## Ideal First-Run Experience
 
