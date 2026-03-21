@@ -224,6 +224,7 @@ async function openModal(id) {
 
     // Right panel: settings + edit + refinement
     backlogRight.classList.remove('hidden');
+    document.getElementById('modal-edit-goal').value = task.goal || '';
     document.getElementById('modal-edit-prompt').value = task.prompt;
     document.getElementById('modal-edit-timeout').value = String(task.timeout || 60);
     document.getElementById('modal-edit-mount-worktrees').checked = !!task.mount_worktrees;

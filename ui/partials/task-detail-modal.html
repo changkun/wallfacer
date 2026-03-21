@@ -129,9 +129,11 @@
             <span id="modal-edit-status" class="text-xs text-v-muted"></span>
           </div>
 
-          <!-- Editable prompt for backlog tasks (hidden for non-backlog) -->
+          <!-- Editable goal and prompt for backlog tasks (hidden for non-backlog) -->
           <div id="modal-backlog-edit" class="hidden mb-4">
-            <h3 class="section-title">Edit Prompt</h3>
+            <h3 class="section-title">Goal</h3>
+            <textarea id="modal-edit-goal" rows="2" class="field" style="font-size:13px;" placeholder="1-3 sentence summary of what this task achieves"></textarea>
+            <h3 class="section-title mt-3">Edit Prompt</h3>
             <textarea id="modal-edit-prompt" rows="6" class="field" style="font-family:monospace;font-size:12px;"></textarea>
             <div class="mt-2">
               <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Tags</label>
@@ -377,6 +379,8 @@
                 <button id="refine-apply-btn" onclick="applyRefinement()" class="btn btn-accent">Apply as Prompt</button>
               </div>
             </div>
+            <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Goal summary</label>
+            <textarea id="refine-result-goal" rows="2" class="field" style="font-size:13px;margin-bottom:8px;" placeholder="Auto-generated goal from refinement"></textarea>
             <textarea id="refine-result-prompt" rows="22" class="field refine-prompt-textarea"></textarea>
           </div>
 

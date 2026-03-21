@@ -671,7 +671,7 @@ function _cardFingerprint(t, rank) {
   }).join(',');
   return [
     t.status, t.kind, !!t.archived, !!t.is_test_run, t.title || '',
-    t.prompt, t.execution_prompt || '', t.result || '', t.updated_at, t.session_id || '',
+    t.goal || '', t.prompt, t.execution_prompt || '', t.result || '', t.updated_at, t.session_id || '',
     !!t.fresh_start, t.timeout, t.stop_reason || '', t.last_test_result || '',
     t.sandbox || '', JSON.stringify(t.sandbox_by_activity || {}),
     !!t.mount_worktrees, JSON.stringify(t.tags || []),
@@ -690,6 +690,7 @@ function _cardFingerprint(t, rank) {
 function cardDisplayPrompt(t) {
   if (typeof taskDisplayPrompt === 'function') return taskDisplayPrompt(t);
   if (t && t.kind === 'idea-agent' && t.execution_prompt) return t.execution_prompt;
+  if (t && t.goal) return t.goal;
   return t ? t.prompt : '';
 }
 

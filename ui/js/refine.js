@@ -61,10 +61,12 @@ function updateRefineUI(task) {
     if (instrSec) instrSec.classList.add('hidden');
     stopRefineLogStream();
 
-    // Only populate the textarea if it is empty or this is the first population.
+    // Only populate the textareas if this is the first population for this job.
     if (resultTA.dataset.jobId !== job.id) {
       resultTA.value = job.result || '';
       resultTA.dataset.jobId = job.id;
+      const goalTA = document.getElementById('refine-result-goal');
+      if (goalTA) goalTA.value = job.goal || '';
     }
 
     // Show the dismiss button so user can skip applying the refinement.
@@ -289,6 +291,8 @@ async function applyRefinement() {
     showAlert('The refined prompt cannot be empty.');
     return;
   }
+  const goalTA = document.getElementById('refine-result-goal');
+  const newGoal = goalTA ? goalTA.value.trim() : '';
 
   const taskId = getOpenModalTaskId();
   const applyBtn = document.getElementById('refine-apply-btn');
@@ -309,7 +313,7 @@ async function applyRefinement() {
       }),
       api(task(taskId).refineApply(), {
         method: 'POST',
-        body: JSON.stringify({ prompt: newPrompt }),
+        body: JSON.stringify({ prompt: newPrompt, goal: newGoal }),
       }),
     ]);
 
