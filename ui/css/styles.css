@@ -110,25 +110,25 @@ h1, h2, h3, h4, h5, h6 { margin: 0; font-size: inherit; font-weight: inherit; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 4px 10px 6px;
   border: none;
-  border-radius: 6px;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.12s, background 0.12s;
+  transition: color 0.12s, border-color 0.12s;
   flex-shrink: 0;
 }
 .workspace-group-tab:hover {
   color: var(--text-primary);
-  background: var(--bg-input);
+  border-bottom-color: var(--border);
 }
 .workspace-group-tab--active {
   color: var(--text-primary);
-  background: var(--bg-input);
+  border-bottom-color: var(--accent);
   font-weight: 600;
 }
 .workspace-group-tab--switching {
