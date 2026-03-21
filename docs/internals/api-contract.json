@@ -555,15 +555,7 @@
         "tasks"
       ]
     },
-    {
-      "method": "POST",
-      "pattern": "/api/tasks/{id}/fork",
-      "name": "ForkTask",
-      "description": "Create a new backlog task branched from the source task's current worktree state.",
-      "tags": [
-        "tasks"
-      ]
-    },
+
     {
       "method": "GET",
       "pattern": "/api/tasks/{id}/diff",

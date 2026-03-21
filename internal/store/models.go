@@ -345,8 +345,6 @@ type Task struct {
 	// capacity" (the existing default behaviour).
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 
-	// ForkedFrom is the UUID of the source task this task was branched from, if any.
-	ForkedFrom *uuid.UUID `json:"forked_from,omitempty"`
 
 	// FailureCategory records the machine-readable root cause of the last
 	// failure transition. Set automatically by the runner at every

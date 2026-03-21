@@ -19,7 +19,6 @@ type Interface interface {
 	Commit(taskID uuid.UUID, sessionID string) error
 	SyncWorktreesBackground(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus, onDone ...func())
 	RunRefinementBackground(taskID uuid.UUID, userInstructions string)
-	Fork(ctx context.Context, sourceID, newTaskID uuid.UUID) error
 
 	// Worktree management.
 	EnsureTaskWorktrees(taskID uuid.UUID, existing map[string]string, branchName string) (map[string]string, string, error)

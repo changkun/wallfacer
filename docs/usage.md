@@ -96,12 +96,9 @@ When the agent needs clarification or is blocked, the card moves to **Waiting**.
 | **Mark done** | Skip any remaining agent turns and commit the current changes as-is |
 | **Run test** | Launch a separate verification agent to check whether the work meets requirements (see below) |
 | **Sync** | Rebase the task branch onto the latest default branch — useful when other tasks have merged since this one started |
-| **Fork** | Create a new backlog task branched from the current worktree state — useful for exploring alternative approaches |
+
 | **Cancel** | Discard all changes and delete the task branch; execution history is preserved |
 
-## Task Forking
-
-From a **Waiting**, **Failed**, or **Done** task, click **Fork** to create a new backlog task that inherits the current worktree state. The forked task starts with the source task's code changes already applied, allowing you to continue work from that point in a separate branch. The fork records its lineage via `ForkedFrom`.
 
 ## Test Verification
 
@@ -238,12 +235,6 @@ Create multiple Backlog tasks, enable Autopilot, and let Wallfacer run them conc
 3. If it fails, send feedback with the test output; re-run until passing
 4. Mark Done to commit
 
-### Fork-and-explore
-
-1. Run a task to the Waiting state
-2. Fork the task to create an alternative approach
-3. Compare the diffs of both tasks
-4. Mark the better one as Done; cancel the other
 
 ### Fully automated pipeline
 

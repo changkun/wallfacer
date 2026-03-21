@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"changkun.de/wallfacer/internal/sandbox"
-	"github.com/google/uuid"
+
 )
 
 // bg returns a background context for use in tests.
@@ -32,7 +32,7 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	result := "result-1"
 	stopReason := "stop-1"
 	scheduledAt := time.Unix(1_700_000_000, 0).UTC()
-	forkedFrom := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+
 	messageTime := time.Unix(1_700_000_010, 0).UTC()
 
 	task.PromptHistory = []string{"prompt-old"}
@@ -94,7 +94,7 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	task.Tags = []string{"tag-1"}
 	task.DependsOn = []string{"dep-1"}
 	task.ScheduledAt = &scheduledAt
-	task.ForkedFrom = &forkedFrom
+
 
 	return deepCloneTask(task)
 }
@@ -116,7 +116,6 @@ func mutateTaskCloneForIsolation(task *Task) {
 	*task.Result = "mutated-result"
 	*task.StopReason = "mutated-stop"
 	*task.ScheduledAt = time.Unix(1_800_000_000, 0).UTC()
-	*task.ForkedFrom = uuid.MustParse("22222222-2222-2222-2222-222222222222")
 }
 
 func assertTaskMatchesSnapshot(t *testing.T, got *Task, want Task) {

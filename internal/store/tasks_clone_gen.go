@@ -62,10 +62,6 @@ func deepCloneTask(t *Task) Task {
 		scheduledAt := *t.ScheduledAt
 		cp.ScheduledAt = &scheduledAt
 	}
-	if t.ForkedFrom != nil {
-		forkedFrom := *t.ForkedFrom
-		cp.ForkedFrom = &forkedFrom
-	}
 
 	return cp
 }

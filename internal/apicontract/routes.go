@@ -418,11 +418,7 @@ var Routes = []Route{
 		Description: "Trigger the test agent for a task.",
 		Tags:        []string{"tasks"},
 	},
-	{
-		Method: http.MethodPost, Pattern: "/api/tasks/{id}/fork", Name: "ForkTask",
-		Description: "Create a new backlog task branched from the source task's current worktree state.",
-		Tags:        []string{"tasks"},
-	},
+
 	{
 		Method: http.MethodGet, Pattern: "/api/tasks/{id}/diff", Name: "TaskDiff",
 		Description: "Git diff of task worktrees versus the default branch.",

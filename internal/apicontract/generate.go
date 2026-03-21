@@ -105,7 +105,7 @@ var jsTypeRegistry = []jsTypeDef{
 			{JSONName: "execution_prompt", JSType: "string"},
 			{JSONName: "depends_on", JSType: "Array.<string>"},
 			{JSONName: "scheduled_at", JSType: "string", Nullable: true, Comment: "ISO 8601 timestamp"},
-			{JSONName: "forked_from", JSType: "string", Nullable: true},
+
 			{JSONName: "failure_category", JSType: "string"},
 			{JSONName: "truncated_turns", JSType: "Array.<number>"},
 		},

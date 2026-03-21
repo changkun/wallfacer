@@ -86,7 +86,6 @@ func (m *MockRunner) SyncWorktreesBackground(_ uuid.UUID, _ string, _ store.Task
 
 func (m *MockRunner) RunRefinementBackground(_ uuid.UUID, _ string) {}
 
-func (m *MockRunner) Fork(_ context.Context, _, _ uuid.UUID) error { return nil }
 
 func (m *MockRunner) EnsureTaskWorktrees(_ uuid.UUID, existing map[string]string, branchName string) (map[string]string, string, error) {
 	return existing, branchName, nil

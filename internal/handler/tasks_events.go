@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -183,69 +182,6 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UU
 	http.ServeFile(w, r, path)
 }
 
-// ForkTask creates a new backlog task branched from the source task's current
-// worktree state. The source must be in done, waiting, or failed status and
-// must have established worktrees. Responds 201 Created with the new task.
-func (h *Handler) ForkTask(w http.ResponseWriter, r *http.Request, sourceID uuid.UUID) {
-	var req struct {
-		Prompt  string `json:"prompt"`
-		Timeout int    `json:"timeout"`
-	}
-	if !decodeJSONBody(w, r, &req) {
-		return
-	}
-	if strings.TrimSpace(req.Prompt) == "" {
-		http.Error(w, "prompt is required", http.StatusBadRequest)
-		return
-	}
-
-	source, err := h.store.GetTask(r.Context(), sourceID)
-	if err != nil {
-		http.Error(w, "source task not found", http.StatusNotFound)
-		return
-	}
-	if source.Status != store.TaskStatusDone &&
-		source.Status != store.TaskStatusWaiting &&
-		source.Status != store.TaskStatusFailed {
-		http.Error(w, "can only fork done, waiting, or failed tasks", http.StatusUnprocessableEntity)
-		return
-	}
-	if len(source.WorktreePaths) == 0 {
-		http.Error(w, "source task has no worktrees to fork from", http.StatusUnprocessableEntity)
-		return
-	}
-
-	timeout := req.Timeout
-	if timeout == 0 {
-		timeout = source.Timeout
-	}
-
-	newTask, err := h.store.CreateForkedTask(r.Context(), sourceID, req.Prompt, timeout)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := h.runner.Fork(r.Context(), sourceID, newTask.ID); err != nil {
-		// Clean up the orphaned task record on worktree setup failure.
-		h.store.DeleteTask(r.Context(), newTask.ID, "fork setup failed")
-		http.Error(w, fmt.Sprintf("fork setup failed: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	h.insertEventOrLog(r.Context(), newTask.ID, store.EventTypeSystem, map[string]string{
-		"message": fmt.Sprintf("forked from task %s", sourceID.String()[:8]),
-	})
-	h.runner.GenerateTitleBackground(newTask.ID, newTask.Prompt)
-
-	// Re-fetch to include WorktreePaths and BranchName set by Fork.
-	newTask, err = h.store.GetTask(r.Context(), newTask.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, http.StatusCreated, newTask)
-}
 
 // GenerateMissingTitles triggers background title generation for untitled tasks.
 func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) {

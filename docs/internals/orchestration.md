@@ -85,7 +85,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `POST /api/tasks/{id}/unarchive` | Restore an archived task |
 | `POST /api/tasks/{id}/sync` | Rebase task worktrees onto the latest default branch |
 | `POST /api/tasks/{id}/test` | Trigger the test agent for a task |
-| `POST /api/tasks/{id}/fork` | Create a new backlog task branched from the source task's current worktree state |
+
 | `GET /api/tasks/{id}/diff` | Git diff of task worktrees versus the default branch |
 | `GET /api/tasks/{id}/logs` | SSE stream of live container logs for a running task |
 | `GET /api/tasks/{id}/outputs/{filename}` | Raw Claude Code output file for a single agent turn |

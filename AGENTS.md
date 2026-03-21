@@ -65,7 +65,7 @@ Key server files:
 - `exec.go` — Attach to running task containers
 - `internal/apicontract/` — Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js`
 - `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream, execute, files, oversight, refine, ideate, templates, stats, admin, workspace, runtime)
-- `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; forking; auto-retry; circuit breaker
+- `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; auto-retry; circuit breaker
 - `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TurnUsageRecord, TaskEvent, TaskOversight, TaskSummary, Tombstone, RetryRecord, FailureCategory), event sourcing, soft delete, search index
 - `internal/envconfig/` — `.env` file parsing and atomic update; exposes `Parse` and `Update` for the handler and runner
 - `internal/instructions/` — Workspace-level AGENTS.md management (`~/.wallfacer/instructions/`)
@@ -128,7 +128,7 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `POST /api/tasks/{id}/restore` — Restore a soft-deleted task by removing its tombstone
 - `POST /api/tasks/{id}/sync` — Rebase task worktrees onto latest default branch
 - `POST /api/tasks/{id}/test` — Run test verification on task worktrees
-- `POST /api/tasks/{id}/fork` — Create a new backlog task branched from the source task's worktree state
+
 - `POST /api/tasks/{id}/archive` — Move done/cancelled task to archived
 - `POST /api/tasks/{id}/unarchive` — Restore archived task
 - `POST /api/tasks/archive-done` — Archive all done tasks
@@ -199,7 +199,7 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - "Retry" on Failed/Done/Waiting/Cancelled → resets to Backlog (via PATCH with status change)
 - "Sync" on Waiting/Failed → rebases worktrees onto latest default branch without merging
 - "Test" on Waiting/Done/Failed → runs test verification agent on task worktrees
-- "Fork" on Waiting/Failed/Done → creates a new backlog task branched from current worktree state
+
 - Auto-promoter watches for capacity and promotes backlog tasks to in_progress
 - Auto-retry automatically retries failed tasks based on failure category and budget
 
@@ -218,7 +218,7 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - **Task refinement** via sandbox agent: refines prompts before execution
 - **System prompt templates** are overridable built-in prompts (`prompts/*.tmpl`); users can customize via the UI or API
 - **Prompt templates** for reusable task creation patterns
-- **Task forking** creates a new task branched from an existing task's worktree state
+
 - **Auto-retry** with per-failure-category budget; failed tasks can be automatically retried
 - **Cost/token budgets** via `MaxCostUSD` and `MaxInputTokens` per task
 - **Failure categorization** classifies failures (timeout, budget_exceeded, worktree_setup, container_crash, agent_error, sync_error, unknown)

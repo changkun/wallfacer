@@ -32,11 +32,9 @@ stateDiagram-v2
     cancelled --> backlog : retry
 
     note right of waiting
-        fork: creates new backlog task
         sync: rebase onto default branch
     end note
     note right of failed
-        fork: creates new backlog task
         sync: rebase onto default branch
     end note
     note right of done
@@ -236,16 +234,6 @@ After reviewing the verdict, the user can:
 - Provide feedback to fix issues, then re-test
 - Cancel the task
 
-## Task Forking
-
-`POST /api/tasks/{id}/fork` creates a new backlog task branched from the source task's current worktree state. The forked task:
-
-- Gets a new UUID and branch
-- Inherits the source task's code changes (worktree is copied)
-- Records `ForkedFrom = source_task_uuid` for lineage tracking
-- Starts as a fresh backlog task that can be independently executed
-
-Forking is available from `waiting`, `failed`, or `done` tasks.
 
 ## Autopilot
 
@@ -319,7 +307,7 @@ Tags               []string                    // labels for categorisation
 ExecutionPrompt    string                      // overrides Prompt when invoking the sandbox agent
 DependsOn          []string                    // UUIDs of prerequisite tasks
 ScheduledAt        *time.Time                  // optional future auto-promotion time
-ForkedFrom         *uuid.UUID                  // UUID of the source task if forked
+
 FailureCategory    FailureCategory             // root cause of last failure
 TruncatedTurns     []int                       // turns whose output was truncated
 AutoRetryBudget    map[FailureCategory]int     // remaining auto-retries per failure category

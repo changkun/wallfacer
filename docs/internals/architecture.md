@@ -74,10 +74,7 @@ stateDiagram-v2
     cancelled --> backlog : retry
 
     note right of waiting
-        fork: creates new backlog task
-    end note
-    note right of failed
-        fork: creates new backlog task
+        sync: rebase onto default branch
     end note
 ```
 

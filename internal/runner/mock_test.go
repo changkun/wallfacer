@@ -143,9 +143,6 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 	m.SyncWorktreesBackground(id, "sess", store.TaskStatusWaiting)
 	m.RunRefinementBackground(id, "sess")
 
-	if err := m.Fork(ctx, id, id); err != nil {
-		t.Errorf("Fork returned unexpected error: %v", err)
-	}
 
 	paths, branch, err := m.EnsureTaskWorktrees(id, nil, "mybranch")
 	if err != nil {

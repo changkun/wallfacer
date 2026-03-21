@@ -183,8 +183,7 @@ var Routes = {
         sync: function() { return "/api/tasks/" + id + "/sync"; },
         // POST /api/tasks/{id}/test
         test: function() { return "/api/tasks/" + id + "/test"; },
-        // POST /api/tasks/{id}/fork
-        fork: function() { return "/api/tasks/" + id + "/fork"; },
+
         // GET /api/tasks/{id}/diff
         diff: function() { return "/api/tasks/" + id + "/diff"; },
         // GET /api/tasks/{id}/logs

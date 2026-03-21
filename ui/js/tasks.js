@@ -663,12 +663,6 @@ async function syncTask(id) {
   }
 }
 
-async function forkTask(taskId, prompt, timeout) {
-  return api(`/api/tasks/${taskId}/fork`, {
-    method: 'POST',
-    body: JSON.stringify({ prompt, timeout }),
-  });
-}
 
 // --- Bulk title generation for tasks without a title ---
 
