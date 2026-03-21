@@ -114,6 +114,106 @@ function ensureArchivedScrollBinding() {
   archivedScrollHandlerBound = true;
 }
 
+// --- Tasks SSE event handlers (shared between leader and follower paths) ---
+
+function _handleTasksSnapshot(data, lastEventId) {
+  tasksRetryDelay = 1000;
+  if (lastEventId) lastTasksEventId = lastEventId;
+  try {
+    const next = applyTasksSnapshot({
+      tasks: tasks,
+      archivedTasks: archivedTasks,
+      archivedPage: archivedPage,
+    }, data);
+    tasks = next.tasks;
+    if (showArchived) {
+      loadArchivedTasksPage('initial');
+    } else {
+      resetArchivedWindow(false);
+    }
+    scheduleRender();
+    _handleInitialHash();
+  } catch (err) {
+    console.error('tasks SSE snapshot parse error:', err);
+  }
+}
+
+function _handleTaskUpdated(data, lastEventId) {
+  tasksRetryDelay = 1000;
+  if (lastEventId) lastTasksEventId = lastEventId;
+  try {
+    const task = data;
+    const reduced = applyTaskUpdated({
+      tasks: tasks,
+      archivedTasks: archivedTasks,
+      archivedPage: archivedPage,
+    }, task, {
+      showArchived: showArchived,
+      pageSize: archivedTasksPageSize,
+    });
+    tasks = reduced.state.tasks;
+    archivedTasks = reduced.state.archivedTasks;
+    archivedPage = reduced.state.archivedPage;
+    if (task.archived) {
+      if (!showArchived) invalidateDiffBehindCounts(task.id);
+      scheduleRender();
+      return;
+    }
+    if (typeof cardOversightCache !== 'undefined' && cardOversightCache && typeof cardOversightCache.delete === 'function') {
+      cardOversightCache.delete(task.id);
+    }
+    if (reduced.previousTask && reduced.previousTask.status !== task.status) {
+      announceBoardStatus(`Task "${getTaskAccessibleTitle(task)}" is now ${formatTaskStatusLabel(task.status)}`);
+    }
+    invalidateDiffBehindCounts(task.id);
+    scheduleRender();
+    if (typeof getOpenModalTaskId === 'function' && typeof renderModalDependencies === 'function') {
+      var openId = getOpenModalTaskId();
+      if (openId) {
+        var openTask = findTaskById(openId);
+        var openDeps = typeof getTaskDependencyIds === 'function'
+          ? getTaskDependencyIds(openTask)
+          : (openTask && Array.isArray(openTask.depends_on) ? openTask.depends_on : []);
+        if (openTask && (openId === task.id || openDeps.indexOf(task.id) !== -1)) {
+          renderModalDependencies(openTask);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('tasks SSE task-updated parse error:', err);
+  }
+}
+
+function _handleTaskDeleted(data, lastEventId) {
+  tasksRetryDelay = 1000;
+  if (lastEventId) lastTasksEventId = lastEventId;
+  try {
+    const deleted = data;
+    const next = applyTaskDeleted({
+      tasks: tasks,
+      archivedTasks: archivedTasks,
+      archivedPage: archivedPage,
+    }, deleted);
+    tasks = next.tasks;
+    archivedTasks = next.archivedTasks;
+    scheduleRender();
+    if (typeof getOpenModalTaskId === 'function' && typeof renderModalDependencies === 'function') {
+      var openId = getOpenModalTaskId();
+      if (openId) {
+        var openTask = findTaskById(openId);
+        var openDeps = typeof getTaskDependencyIds === 'function'
+          ? getTaskDependencyIds(openTask)
+          : (openTask && Array.isArray(openTask.depends_on) ? openTask.depends_on : []);
+        if (openTask && deleted && openDeps.indexOf(deleted.id) !== -1) {
+          renderModalDependencies(openTask);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('tasks SSE task-deleted parse error:', err);
+  }
+}
+
 function startTasksStream() {
   if (!activeWorkspaces || activeWorkspaces.length === 0) {
     return;
@@ -121,116 +221,37 @@ function startTasksStream() {
   if (tasksSource) tasksSource.close();
   ensureArchivedScrollBinding();
 
-  // Build the stream URL. On reconnect, pass the last received event ID so
-  // the server can replay only missed deltas instead of sending a full snapshot.
+  // Follower tab: receive task events via BroadcastChannel relay instead of
+  // opening a real SSE connection. Seed initial state with an HTTP fetch.
+  if (!_sseIsLeader()) {
+    tasksSource = null;
+    _sseOnFollowerEvent('tasks-snapshot', _handleTasksSnapshot);
+    _sseOnFollowerEvent('tasks-updated', _handleTaskUpdated);
+    _sseOnFollowerEvent('tasks-deleted', _handleTaskDeleted);
+    fetchTasks();
+    return;
+  }
+
+  // Leader tab: open real EventSource and relay events to followers.
   const url = buildTasksStreamUrl(Routes.tasks.stream(), lastTasksEventId);
   tasksSource = new EventSource(url);
 
-  // Initial full snapshot — replace the local tasks array and re-render.
-  // Also received when the server cannot replay (gap too old).
   tasksSource.addEventListener('snapshot', function(e) {
-    tasksRetryDelay = 1000;
-    if (e.lastEventId) lastTasksEventId = e.lastEventId;
-    try {
-      const next = applyTasksSnapshot({
-        tasks: tasks,
-        archivedTasks: archivedTasks,
-        archivedPage: archivedPage,
-      }, JSON.parse(e.data));
-      tasks = next.tasks;
-      if (showArchived) {
-        loadArchivedTasksPage('initial');
-      } else {
-        resetArchivedWindow(false);
-      }
-      scheduleRender();
-      _handleInitialHash();
-    } catch (err) {
-      console.error('tasks SSE snapshot parse error:', err);
-    }
+    var data = JSON.parse(e.data);
+    _handleTasksSnapshot(data, e.lastEventId);
+    _sseRelay('tasks-snapshot', data, e.lastEventId);
   });
 
-  // Single-task update — find by ID and replace in-place (or append if new).
-  // Received both from live stream and delta replay on reconnect.
   tasksSource.addEventListener('task-updated', function(e) {
-    tasksRetryDelay = 1000;
-    if (e.lastEventId) lastTasksEventId = e.lastEventId;
-    try {
-      const task = JSON.parse(e.data);
-      const reduced = applyTaskUpdated({
-        tasks: tasks,
-        archivedTasks: archivedTasks,
-        archivedPage: archivedPage,
-      }, task, {
-        showArchived: showArchived,
-        pageSize: archivedTasksPageSize,
-      });
-      tasks = reduced.state.tasks;
-      archivedTasks = reduced.state.archivedTasks;
-      archivedPage = reduced.state.archivedPage;
-      if (task.archived) {
-        if (!showArchived) invalidateDiffBehindCounts(task.id);
-        scheduleRender();
-        return;
-      }
-      if (typeof cardOversightCache !== 'undefined' && cardOversightCache && typeof cardOversightCache.delete === 'function') {
-        cardOversightCache.delete(task.id);
-      }
-      if (reduced.previousTask && reduced.previousTask.status !== task.status) {
-        announceBoardStatus(`Task "${getTaskAccessibleTitle(task)}" is now ${formatTaskStatusLabel(task.status)}`);
-      }
-      invalidateDiffBehindCounts(task.id);
-      scheduleRender();
-      // If the modal is open and this updated task is a dependency of the open
-      // task, refresh the modal's dependency section immediately so status
-      // badges update without waiting for the next full render cycle.
-      if (typeof getOpenModalTaskId === 'function' && typeof renderModalDependencies === 'function') {
-        var openId = getOpenModalTaskId();
-        if (openId) {
-          var openTask = findTaskById(openId);
-          var openDeps = typeof getTaskDependencyIds === 'function'
-            ? getTaskDependencyIds(openTask)
-            : (openTask && Array.isArray(openTask.depends_on) ? openTask.depends_on : []);
-          if (openTask && (openId === task.id || openDeps.indexOf(task.id) !== -1)) {
-            renderModalDependencies(openTask);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('tasks SSE task-updated parse error:', err);
-    }
+    var data = JSON.parse(e.data);
+    _handleTaskUpdated(data, e.lastEventId);
+    _sseRelay('tasks-updated', data, e.lastEventId);
   });
 
-  // Single-task deletion — remove from local array.
-  // Received both from live stream and delta replay on reconnect.
   tasksSource.addEventListener('task-deleted', function(e) {
-    tasksRetryDelay = 1000;
-    if (e.lastEventId) lastTasksEventId = e.lastEventId;
-    try {
-      const deleted = JSON.parse(e.data);
-      const next = applyTaskDeleted({
-        tasks: tasks,
-        archivedTasks: archivedTasks,
-        archivedPage: archivedPage,
-      }, deleted);
-      tasks = next.tasks;
-      archivedTasks = next.archivedTasks;
-      scheduleRender();
-      if (typeof getOpenModalTaskId === 'function' && typeof renderModalDependencies === 'function') {
-        var openId = getOpenModalTaskId();
-        if (openId) {
-          var openTask = findTaskById(openId);
-          var openDeps = typeof getTaskDependencyIds === 'function'
-            ? getTaskDependencyIds(openTask)
-            : (openTask && Array.isArray(openTask.depends_on) ? openTask.depends_on : []);
-          if (openTask && deleted && openDeps.indexOf(deleted.id) !== -1) {
-            renderModalDependencies(openTask);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('tasks SSE task-deleted parse error:', err);
-    }
+    var data = JSON.parse(e.data);
+    _handleTaskDeleted(data, e.lastEventId);
+    _sseRelay('tasks-deleted', data, e.lastEventId);
   });
 
   tasksSource.onerror = function() {

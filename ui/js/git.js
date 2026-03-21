@@ -6,12 +6,36 @@ function startGitStream() {
     return;
   }
   if (gitStatusSource) gitStatusSource.close();
+
+  // Follower tab: receive git status via BroadcastChannel relay.
+  // Seed initial state with an HTTP fetch.
+  if (!_sseIsLeader()) {
+    gitStatusSource = null;
+    _sseOnFollowerEvent('git-status', function(data) {
+      gitRetryDelay = 1000;
+      gitStatuses = data;
+      renderWorkspaces();
+    });
+    api(Routes.git.status()).then(function(data) {
+      if (Array.isArray(data)) {
+        gitStatuses = data;
+        renderWorkspaces();
+      }
+    }).catch(function(err) {
+      console.error('git status fetch:', err);
+    });
+    return;
+  }
+
+  // Leader tab: open real EventSource and relay events to followers.
   gitStatusSource = new EventSource(withAuthToken(Routes.git.stream()));
   gitStatusSource.onmessage = function(e) {
     gitRetryDelay = 1000;
     try {
-      gitStatuses = JSON.parse(e.data);
+      var data = JSON.parse(e.data);
+      gitStatuses = data;
       renderWorkspaces();
+      _sseRelay('git-status', data);
     } catch (err) {
       console.error('git SSE parse error:', err);
     }

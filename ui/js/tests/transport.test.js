@@ -226,6 +226,9 @@ describe('SSE stream token injection (via startTasksStream)', () => {
       formatTaskStatusLabel: vi.fn(() => 'done'),
       location: { hash: '' },
       localStorage: { getItem: vi.fn(), setItem: vi.fn() },
+      _sseIsLeader: () => true,
+      _sseRelay: vi.fn(),
+      _sseOnFollowerEvent: vi.fn(),
     });
 
     const code = readFileSync(join(jsDir, 'state.js'), 'utf8');
