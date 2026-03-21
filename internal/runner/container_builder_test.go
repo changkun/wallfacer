@@ -106,7 +106,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 				{"-v", "claude-config:/home/claude/.claude"},
 				{"-e", "CLAUDE_CODE_MODEL=codex-model"},
 			},
-			wantArgs: []string{"wallfacer-codex:latest", "/home/codex/.codex:z,ro"},
+			wantArgs: []string{"wallfacer-codex:latest", "dst=/home/codex/.codex,z,readonly"},
 		},
 		{
 			name:    "codex sandbox, auth path does not exist",
@@ -214,7 +214,7 @@ func TestBuildBaseContainerSpecVolumeOrder(t *testing.T) {
 		if args[i] == "-v" && args[i+1] == "claude-config:/home/claude/.claude" {
 			claudeIdx = i
 		}
-		if args[i] == "-v" && strings.Contains(args[i+1], "/home/codex/.codex") {
+		if args[i] == "--mount" && strings.Contains(args[i+1], "/home/codex/.codex") {
 			codexIdx = i
 		}
 	}
@@ -225,7 +225,7 @@ func TestBuildBaseContainerSpecVolumeOrder(t *testing.T) {
 		t.Fatal("codex auth volume not found")
 	}
 	if claudeIdx >= codexIdx {
-		t.Errorf("claude-config (-v at %d) should appear before codex auth (-v at %d)", claudeIdx, codexIdx)
+		t.Errorf("claude-config (-v at %d) should appear before codex auth (--mount at %d)", claudeIdx, codexIdx)
 	}
 }
 
@@ -313,7 +313,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				}
 			},
 			sandbox:  "claude",
-			wantArgs: []string{"/workspace/CLAUDE.md:z,ro"},
+			wantArgs: []string{"dst=/workspace/CLAUDE.md,z,readonly"},
 		},
 		{
 			name: "instructions file mounted as AGENTS.md for codex",
@@ -329,7 +329,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				}
 			},
 			sandbox:  "codex",
-			wantArgs: []string{"/workspace/AGENTS.md:z,ro"},
+			wantArgs: []string{"dst=/workspace/AGENTS.md,z,readonly"},
 		},
 		{
 			name: "instructions file absent: no instructions mount",
@@ -417,7 +417,7 @@ func TestBuildIdeationContainerArgsSingleWorkspaceReadOnly(t *testing.T) {
 	args := r.buildIdeationContainerArgs("ideate-test", "prompt", "claude")
 
 	// The workspace mount must be read-only.
-	wantMount := ws + ":/workspace/" + basename + ":z,ro"
+	wantMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename + ",z,readonly"
 	if !argsContainSubstring(args, wantMount) {
 		t.Errorf("expected read-only mount %q; args: %v", wantMount, args)
 	}
@@ -428,8 +428,8 @@ func TestBuildIdeationContainerArgsSingleWorkspaceReadOnly(t *testing.T) {
 		t.Errorf("expected -w %q; args: %v", wantWorkdir, args)
 	}
 
-	// No plain :z mount (read-write) for the workspace.
-	rwMount := ws + ":/workspace/" + basename + ":z"
+	// No plain ,z mount (read-write) for the workspace.
+	rwMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename + ",z"
 	for _, a := range args {
 		if a == rwMount {
 			t.Errorf("workspace should not be mounted read-write; found %q in args: %v", rwMount, args)
@@ -663,7 +663,7 @@ func TestAppendInstructionsMount(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRunnerForArgTest(t, tc.cfgFn(t))
-			initial := []VolumeMount{{Host: "claude-config", Container: "/home/claude/.claude"}}
+			initial := []VolumeMount{{Host: "claude-config", Container: "/home/claude/.claude", Named: true}}
 			result := r.appendInstructionsMount(initial, sandbox.Normalize(tc.sandbox))
 
 			if tc.wantNone {

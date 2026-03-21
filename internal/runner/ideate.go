@@ -277,11 +277,7 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt string, sb san
 			if ws == "" {
 				continue
 			}
-			parts := strings.Split(ws, "/")
-			basename := parts[len(parts)-1]
-			if basename == "" && len(parts) > 1 {
-				basename = parts[len(parts)-2]
-			}
+			basename := sanitizeBasename(ws)
 			basenames = append(basenames, basename)
 			// Read-only mount: ideation should only read, not modify.
 			spec.Volumes = append(spec.Volumes, VolumeMount{

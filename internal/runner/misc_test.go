@@ -90,6 +90,31 @@ func TestWorkspacesMethod_PathsWithSpaces(t *testing.T) {
 	}
 }
 
+func TestSanitizeBasename(t *testing.T) {
+	cases := []struct {
+		input, want string
+	}{
+		{"/home/user/my-repo", "my-repo"},
+		{"/home/user/My Project", "My_Project"},
+		{"/home/user/我的项目", "我的项目"},
+		{"/path/to/café-code", "café-code"},
+		{"/path/to/repo:special", "repo_special"},
+		{"/path/to/dir with $vars", "dir_with__vars"},
+		{"/path/with/trailing/", "trailing"},
+		{"", "workspace"},
+		{"/", "workspace"},
+		{".", "workspace"},
+		{"/path/to/a`b\"c'd", "a_b_c_d"},
+		{"/path/to/🚀rocket", "_rocket"},
+	}
+	for _, tc := range cases {
+		got := sanitizeBasename(tc.input)
+		if got != tc.want {
+			t.Errorf("sanitizeBasename(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
 // TestKillContainer verifies that KillContainer does not panic when no
 // container is running (error from exec is silently ignored).
 func TestKillContainer(t *testing.T) {
@@ -550,13 +575,13 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 	})
 	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{ws: wt}, "", nil, "")
 	basename := filepath.Base(ws)
-	expectedMount := wt + ":/workspace/" + basename + ":z"
-	if !containsConsecutive(args, "-v", expectedMount) {
+	expectedMount := "type=bind,src=" + wt + ",dst=/workspace/" + basename + ",z"
+	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("expected worktree override mount %q; got: %v", expectedMount, args)
 	}
 	// Original workspace path must NOT appear as the host path.
-	unexpectedMount := ws + ":/workspace/" + basename + ":z"
-	if containsConsecutive(args, "-v", unexpectedMount) {
+	unexpectedMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename + ",z"
+	if containsConsecutive(args, "--mount", unexpectedMount) {
 		t.Fatalf("original workspace path should be replaced by worktree, but found %q", unexpectedMount)
 	}
 }
@@ -586,8 +611,8 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 
 	// The main repo's .git should be mounted at the same host path.
 	gitDir := filepath.Join(repo, ".git")
-	expectedGitMount := gitDir + ":" + gitDir + ":z"
-	if !containsConsecutive(args, "-v", expectedGitMount) {
+	expectedGitMount := "type=bind,src=" + gitDir + ",dst=" + gitDir + ",z"
+	if !containsConsecutive(args, "--mount", expectedGitMount) {
 		t.Fatalf("expected .git dir mount %q; got: %v", expectedGitMount, args)
 	}
 }
@@ -613,8 +638,8 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
 
 	gitDir := filepath.Join(repo, ".git")
-	gitMount := gitDir + ":" + gitDir + ":z"
-	if containsConsecutive(args, "-v", gitMount) {
+	gitMount := "type=bind,src=" + gitDir + ",dst=" + gitDir + ",z"
+	if containsConsecutive(args, "--mount", gitMount) {
 		t.Fatalf("should NOT mount .git dir separately when no worktree override; found %q", gitMount)
 	}
 }

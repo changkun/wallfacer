@@ -1,12 +1,16 @@
 package runner
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
-// VolumeMount describes a single -v HOST:CONTAINER[:OPTIONS] bind mount.
+// VolumeMount describes a single bind mount passed to the container runtime.
 type VolumeMount struct {
 	Host      string // host path or named volume (e.g. "claude-config")
 	Container string // container path
 	Options   string // e.g. "z,ro" or "z"; empty means no options suffix
+	Named     bool   // true for named volumes (use -v); false for bind mounts (use --mount)
 }
 
 // ContainerSpec is a declarative description of a container run invocation.
@@ -84,11 +88,30 @@ func (s ContainerSpec) Build() []string {
 	}
 
 	for _, v := range s.Volumes {
-		mount := v.Host + ":" + v.Container
-		if v.Options != "" {
-			mount += ":" + v.Options
+		if v.Named {
+			// Named volumes (e.g. "claude-config:/home/...") use -v syntax.
+			mount := v.Host + ":" + v.Container
+			if v.Options != "" {
+				mount += ":" + v.Options
+			}
+			args = append(args, "-v", mount)
+		} else {
+			// Bind mounts use --mount syntax which handles colons and
+			// unicode characters in host paths without ambiguity.
+			var parts []string
+			parts = append(parts, "type=bind", "src="+v.Host, "dst="+v.Container)
+			if v.Options != "" {
+				for _, opt := range strings.Split(v.Options, ",") {
+					opt = strings.TrimSpace(opt)
+					if opt == "ro" {
+						parts = append(parts, "readonly")
+					} else if opt != "" {
+						parts = append(parts, opt)
+					}
+				}
+			}
+			args = append(args, "--mount", strings.Join(parts, ","))
 		}
-		args = append(args, "-v", mount)
 	}
 
 	if s.WorkDir != "" {

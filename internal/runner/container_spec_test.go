@@ -64,8 +64,8 @@ func TestContainerSpecEmptyVolumesProducesNoFlags(t *testing.T) {
 	spec := ContainerSpec{Name: "n", Image: "img", Volumes: nil}
 	args := spec.Build()
 	for _, a := range args {
-		if a == "-v" {
-			t.Errorf("expected no -v flags for nil Volumes; got args: %v", args)
+		if a == "-v" || a == "--mount" {
+			t.Errorf("expected no -v or --mount flags for nil Volumes; got args: %v", args)
 			break
 		}
 	}
@@ -118,8 +118,8 @@ func TestContainerSpecVolumeWithOptions(t *testing.T) {
 		},
 	}
 	args := spec.Build()
-	if !containsConsecutive(args, "-v", "/host/path:/container/path:z,ro") {
-		t.Errorf("expected -v /host/path:/container/path:z,ro; got %v", args)
+	if !containsConsecutive(args, "--mount", "type=bind,src=/host/path,dst=/container/path,z,readonly") {
+		t.Errorf("expected --mount type=bind,src=/host/path,dst=/container/path,z,readonly; got %v", args)
 	}
 }
 
@@ -132,14 +132,37 @@ func TestContainerSpecVolumeWithoutOptions(t *testing.T) {
 		},
 	}
 	args := spec.Build()
-	if !containsConsecutive(args, "-v", "/host/path:/container/path") {
-		t.Errorf("expected -v /host/path:/container/path (no options); got %v", args)
+	if !containsConsecutive(args, "--mount", "type=bind,src=/host/path,dst=/container/path") {
+		t.Errorf("expected --mount type=bind,src=/host/path,dst=/container/path (no options); got %v", args)
 	}
-	// Ensure no trailing colon.
-	for _, a := range args {
-		if a == "/host/path:/container/path:" {
-			t.Errorf("unexpected trailing colon in mount: %q", a)
-		}
+}
+
+func TestContainerSpecVolumeWithColonInPath(t *testing.T) {
+	spec := ContainerSpec{
+		Name:  "n",
+		Image: "img",
+		Volumes: []VolumeMount{
+			{Host: "/path/with:colon", Container: "/workspace/myrepo", Options: "z"},
+		},
+	}
+	args := spec.Build()
+	// --mount syntax handles colons in paths without ambiguity (unlike -v).
+	if !containsConsecutive(args, "--mount", "type=bind,src=/path/with:colon,dst=/workspace/myrepo,z") {
+		t.Errorf("expected --mount with colon in path; got %v", args)
+	}
+}
+
+func TestContainerSpecVolumeWithUnicodePath(t *testing.T) {
+	spec := ContainerSpec{
+		Name:  "n",
+		Image: "img",
+		Volumes: []VolumeMount{
+			{Host: "/home/user/我的项目", Container: "/workspace/我的项目", Options: "z"},
+		},
+	}
+	args := spec.Build()
+	if !containsConsecutive(args, "--mount", "type=bind,src=/home/user/我的项目,dst=/workspace/我的项目,z") {
+		t.Errorf("expected --mount with unicode path; got %v", args)
 	}
 }
 
@@ -299,7 +322,7 @@ func TestContainerSpecFullArgs(t *testing.T) {
 		EnvFile: "/home/user/.wallfacer/.env",
 		Env:     map[string]string{"CLAUDE_CODE_MODEL": "claude-opus-4-6"},
 		Volumes: []VolumeMount{
-			{Host: "claude-config", Container: "/home/claude/.claude"},
+			{Host: "claude-config", Container: "/home/claude/.claude", Named: true},
 			{Host: "/repos/myproject", Container: "/workspace/myproject", Options: "z"},
 			{Host: "/instructions/CLAUDE.md", Container: "/workspace/CLAUDE.md", Options: "z,ro"},
 		},
@@ -323,8 +346,8 @@ func TestContainerSpecFullArgs(t *testing.T) {
 		"--env-file", "/home/user/.wallfacer/.env",
 		"-e", "CLAUDE_CODE_MODEL=claude-opus-4-6",
 		"-v", "claude-config:/home/claude/.claude",
-		"-v", "/repos/myproject:/workspace/myproject:z",
-		"-v", "/instructions/CLAUDE.md:/workspace/CLAUDE.md:z,ro",
+		"--mount", "type=bind,src=/repos/myproject,dst=/workspace/myproject,z",
+		"--mount", "type=bind,src=/instructions/CLAUDE.md,dst=/workspace/CLAUDE.md,z,readonly",
 		"-w", "/workspace/myproject",
 		"wallfacer:latest",
 		"-p", "fix the bug", "--verbose", "--output-format", "stream-json",

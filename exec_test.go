@@ -195,7 +195,7 @@ func TestBuildSandboxExecArgs_UsesDefaultWorkspaceMount(t *testing.T) {
 	if !strings.Contains(got, "-v claude-config:/home/claude/.claude") {
 		t.Fatalf("expected claude config mount, got %q", got)
 	}
-	if !strings.Contains(got, "-v "+tmp+":/workspace/"+base+":z") {
+	if !strings.Contains(got, "--mount type=bind,src="+tmp+",dst=/workspace/"+base+",z") {
 		t.Fatalf("expected repository workspace mount, got %q", got)
 	}
 }
@@ -222,14 +222,14 @@ func TestBuildSandboxExecArgs_UsesCodexAuthWhenAvailable(t *testing.T) {
 	}
 
 	got := strings.Join(args, " ")
-	expectedWorkspaceMount := "-v " + tmp + ":/workspace/" + filepath.Base(tmp) + ":z"
+	expectedWorkspaceMount := "--mount type=bind,src=" + tmp + ",dst=/workspace/" + filepath.Base(tmp) + ",z"
 	if !strings.Contains(got, expectedWorkspaceMount) {
 		t.Fatalf("expected workspace mount, got %q", got)
 	}
-	if !strings.Contains(got, "-v "+authDir+":/home/codex/.codex:z,ro") {
+	if !strings.Contains(got, "--mount type=bind,src="+authDir+",dst=/home/codex/.codex,readonly,z") {
 		t.Fatalf("expected codex auth mount, got %q", got)
 	}
-	if !strings.Contains(got, "-v "+tmp+":/workspace/"+base+":z") {
+	if !strings.Contains(got, "--mount type=bind,src="+tmp+",dst=/workspace/"+base+",z") {
 		t.Fatalf("expected repository workspace mount, got %q", got)
 	}
 }

@@ -124,9 +124,9 @@ func TestContainerArgsMountsCLAUDEMD(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, instructionsFile)
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := instructionsFile + ":/workspace/CLAUDE.md:z,ro"
-	if !containsConsecutive(args, "-v", expectedMount) {
-		t.Fatalf("args should contain -v %q; got: %v", expectedMount, args)
+	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md,z,readonly"
+	if !containsConsecutive(args, "--mount", expectedMount) {
+		t.Fatalf("args should contain --mount %q; got: %v", expectedMount, args)
 	}
 }
 
@@ -170,16 +170,15 @@ func TestContainerArgsCLAUDEMDMountIsReadOnly(t *testing.T) {
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	for i, a := range args {
-		if a == "-v" && i+1 < len(args) && strings.Contains(args[i+1], "CLAUDE.md") {
+		if a == "--mount" && i+1 < len(args) && strings.Contains(args[i+1], "CLAUDE.md") {
 			mount := args[i+1]
-			// Accept both ":ro" and ",ro" (SELinux label adds ":z,ro").
-			if !strings.HasSuffix(mount, ":ro") && !strings.HasSuffix(mount, ",ro") {
+			if !strings.Contains(mount, "readonly") {
 				t.Fatalf("CLAUDE.md mount should be read-only, got: %q", mount)
 			}
 			return
 		}
 	}
-	t.Fatal("CLAUDE.md -v mount not found in args")
+	t.Fatal("CLAUDE.md --mount not found in args")
 }
 
 // TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace verifies that when
@@ -208,15 +207,15 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := instructionsFile + ":/workspace/CLAUDE.md:z,ro"
-	if !containsConsecutive(args, "-v", expectedMount) {
+	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md,z,readonly"
+	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("single workspace: CLAUDE.md should be mounted at /workspace/CLAUDE.md; got args: %v", args)
 	}
 
 	// Must NOT be mounted inside the workspace subdirectory.
 	basename := filepath.Base(ws)
-	wrongMount := instructionsFile + ":/workspace/" + basename + "/CLAUDE.md:z,ro"
-	if containsConsecutive(args, "-v", wrongMount) {
+	wrongMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/" + basename + "/CLAUDE.md,z,readonly"
+	if containsConsecutive(args, "--mount", wrongMount) {
 		t.Fatalf("single workspace: CLAUDE.md should NOT be at /workspace/%s/CLAUDE.md", basename)
 	}
 }
@@ -247,8 +246,8 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := instructionsFile + ":/workspace/CLAUDE.md:z,ro"
-	if !containsConsecutive(args, "-v", expectedMount) {
+	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md,z,readonly"
+	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("multi workspace: CLAUDE.md should be at /workspace/CLAUDE.md; got args: %v", args)
 	}
 }
@@ -264,8 +263,8 @@ func TestContainerArgsCodexMountsAGENTSMD(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, instructionsFile)
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
 
-	expectedMount := instructionsFile + ":/workspace/AGENTS.md:z,ro"
-	if !containsConsecutive(args, "-v", expectedMount) {
+	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/AGENTS.md,z,readonly"
+	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("codex sandbox: AGENTS.md should be mounted at /workspace/AGENTS.md; got args: %v", args)
 	}
 }
@@ -295,8 +294,8 @@ func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
 	})
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
 
-	expectedMount := codexAuthDir + ":/home/codex/.codex:z,ro"
-	if !containsConsecutive(args, "-v", expectedMount) {
+	expectedMount := "type=bind,src=" + codexAuthDir + ",dst=/home/codex/.codex,z,readonly"
+	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("codex sandbox: expected host codex auth cache mount %q; got args: %v", expectedMount, args)
 	}
 }
@@ -428,8 +427,8 @@ func TestBuildContainerArgs_BoardMount(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, "")
 	boardDir := t.TempDir()
 	args := runner.buildContainerArgs("name", "", "prompt", "", nil, boardDir, nil, "")
-	expected := boardDir + ":/workspace/.tasks:z,ro"
-	if !containsConsecutive(args, "-v", expected) {
+	expected := "type=bind,src=" + boardDir + ",dst=/workspace/.tasks,z,readonly"
+	if !containsConsecutive(args, "--mount", expected) {
 		t.Fatalf("expected board mount %q in args; got: %v", expected, args)
 	}
 }
@@ -455,8 +454,8 @@ func TestBuildContainerArgs_SiblingMounts(t *testing.T) {
 		"abcd1234": {"/home/user/myrepo": siblingDir},
 	}
 	args := runner.buildContainerArgs("name", "", "prompt", "", nil, "", siblingMounts, "")
-	expected := siblingDir + ":/workspace/.tasks/worktrees/abcd1234/myrepo:z,ro"
-	if !containsConsecutive(args, "-v", expected) {
+	expected := "type=bind,src=" + siblingDir + ",dst=/workspace/.tasks/worktrees/abcd1234/myrepo,z,readonly"
+	if !containsConsecutive(args, "--mount", expected) {
 		t.Fatalf("expected sibling mount %q in args; got: %v", expected, args)
 	}
 }

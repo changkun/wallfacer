@@ -1,6 +1,10 @@
 package runner
 
-import "strings"
+import (
+	"path/filepath"
+	"strings"
+	"unicode"
+)
 
 // truncate returns s truncated to n bytes, with "..." appended if truncation occurred.
 func truncate(s string, n int) string {
@@ -8,6 +12,31 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+// sanitizeBasename returns a filesystem- and container-path-safe version of
+// the last component of a workspace path. It replaces characters that are
+// problematic in container mount paths (colons, control chars, etc.) with
+// underscores and preserves unicode letters/digits so paths like "我的项目"
+// remain human-readable. Falls back to "workspace" if the result is empty.
+func sanitizeBasename(path string) string {
+	base := filepath.Base(path)
+	if base == "." || base == "/" || base == "" {
+		return "workspace"
+	}
+	var b strings.Builder
+	for _, r := range base {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' || r == '.' {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('_')
+		}
+	}
+	result := b.String()
+	if result == "" {
+		return "workspace"
+	}
+	return result
 }
 
 // slugifyPrompt creates a container-name-safe slug from s.

@@ -109,11 +109,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 			if wt, ok := worktreeOverrides[ws]; ok {
 				hostPath = wt
 			}
-			parts := strings.Split(ws, "/")
-			basename := parts[len(parts)-1]
-			if basename == "" && len(parts) > 1 {
-				basename = parts[len(parts)-2]
-			}
+			basename := sanitizeBasename(ws)
 			basenames = append(basenames, basename)
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      hostPath,
@@ -168,7 +164,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 		sort.Strings(repoPaths)
 		for _, repoPath := range repoPaths {
 			wtPath := repos[repoPath]
-			basename := filepath.Base(repoPath)
+			basename := sanitizeBasename(repoPath)
 			containerPath := "/workspace/.tasks/worktrees/" + shortID + "/" + basename
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      wtPath,
@@ -279,6 +275,7 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.
 	spec.Volumes = append(spec.Volumes, VolumeMount{
 		Host:      "claude-config",
 		Container: "/home/claude/.claude",
+		Named:     true,
 	})
 	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)
 	spec.Network = r.resolvedContainerNetwork()
