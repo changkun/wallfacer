@@ -1,164 +1,140 @@
 # Streamlined First-Run Experience
 
-## Problem
+## Status Update (2026-03-21)
 
-The current getting-started flow requires too many steps and prerequisites for a first-time user:
+The original spec was written when the getting-started flow required cloning the repo, building from source, manually building sandbox images, and editing `.env` files by hand. Most of those pain points have since been resolved:
 
-1. **Go 1.25+ must be installed** just to compile the server binary — no pre-built binaries are published.
-2. **Docs tell users to `make build`**, which builds sandbox images locally from scratch (~minutes, downloads Go/Node/Python into Ubuntu). But the server already auto-pulls `ghcr.io/changkun/wallfacer:latest` on first run — so building is unnecessary for most users.
-3. **Must clone the repo** before doing anything.
-4. **Credential setup is 4 steps**: run server → stop server → edit `~/.wallfacer/.env` → restart server.
-5. **Podman/Docker** is a genuine prerequisite (no way around it for sandboxing), but discovery of which is available could be smoother.
+| Original Problem | Status | What Changed |
+|---|---|---|
+| No pre-built binaries | **Solved** | `.github/workflows/release-binary.yml` publishes binaries for linux/darwin × amd64/arm64 on each version tag |
+| Docs say `make build` | **Solved** | Getting-started docs now show three install paths (binary download, `go install`, build from source); `make build` is contributor-only |
+| Must clone the repo | **Solved** | Binary download and `go install` both work without cloning |
+| Credential setup is 4 steps | **Solved** | Docs point users to Settings → API Configuration in the UI; no restart needed |
+| Sandbox image auto-pull | **Already existed** | `ensureImage()` in `internal/cli/server.go` pulls from ghcr.io on first run |
 
-Net effect: a user who just wants to try Wallfacer must install Go, clone a repo, build a binary, wait for image builds, then do a start-stop-edit-restart dance. This is developer-contributor friction, not user friction.
-
-## Current Auto-Pull Mechanism (Already Exists)
-
-The server already handles image availability gracefully (`server.go`, `ensureImage`):
-
-1. Check if image exists locally.
-2. If not, pull `ghcr.io/changkun/wallfacer:latest` automatically.
-3. If pull fails, fall back to local `wallfacer:latest`.
-4. Warn if nothing is available.
-
-Published images exist at `ghcr.io/changkun/wallfacer:latest` and `ghcr.io/changkun/wallfacer-codex:latest` (multi-arch: amd64 + arm64), built by GitHub Actions on version tags.
-
-## Options
-
-### Option 1: Publish Pre-Built Binaries via GitHub Releases
-
-**Effort:** Medium
-**Impact:** High — eliminates Go installation requirement entirely
-
-Add a GitHub Actions workflow that builds the `wallfacer` binary for common platforms on each version tag and attaches them to the GitHub Release:
-
-- `wallfacer-linux-amd64`
-- `wallfacer-linux-arm64`
-- `wallfacer-darwin-amd64`
-- `wallfacer-darwin-arm64`
-
-Users download one file and run it. Could use GoReleaser or a simple matrix build workflow.
-
-**New quick-start:**
-```bash
-# Download the binary for your platform
-curl -L https://github.com/changkun/wallfacer/releases/latest/download/wallfacer-darwin-arm64 -o wallfacer
-chmod +x wallfacer
-
-# Run (auto-pulls sandbox image on first start)
-./wallfacer run ~/projects/myapp
+**Current first-run flow (as documented):**
+```
+Step 1: Get credential (OAuth token or API key)
+Step 2: Download binary / go install / build from source
+Step 3: wallfacer run ~/project
+Step 4: Configure credential in browser UI
+Step 5: Create first task
 ```
 
-### Option 2: `go install` Support
+This is already a reasonable experience. The remaining friction points are different from what the original spec targeted.
 
-**Effort:** Low
-**Impact:** Medium — still requires Go, but eliminates clone step
+## Remaining Friction
 
-Ensure the module path and `main.go` support:
-```bash
-go install changkun.de/wallfacer@latest
-wallfacer run ~/projects/myapp
+### 1. `go install` silently fails due to `//go:embed`
+
+`main.go` embeds `ui/` and `docs/` directories:
+```go
+//go:embed ui
+var uiFiles embed.FS
+
+//go:embed docs
+var docsFiles embed.FS
 ```
 
-This may already work if the module is publicly accessible and Go version compatibility is met. Needs verification and documentation.
+When `go install changkun.de/x/wallfacer@latest` fetches the module from the proxy, these directories are included in the module zip, so the install **should work** (Go's module system includes non-Go files in embedded directories). However, this depends on the module being properly published and the proxy having the correct version cached. If it fails, the error message ("pattern ui: no matching files found") is confusing. This needs verification with a real published version.
 
-**Limitation:** Still requires Go 1.25+, which is a bleeding-edge version (not yet widely installed).
+**Recommendation:** Test `go install` from a clean environment after the next release. If it works, no action needed. If the embed fails via module proxy, consider either (a) removing the embed in favor of a separate asset download, or (b) documenting the limitation clearly.
 
-### Option 3: Update Docs to Skip Image Building
+### 2. No install script for binary download
 
-**Effort:** Low
-**Impact:** High — removes the slowest step from the getting-started flow
-
-The docs currently say `make build` as step 2, which builds images locally. Since the server auto-pulls from ghcr.io, docs should reflect the simpler path:
-
-**Before (current):**
-```
-Prerequisites: Go 1.25+, Podman/Docker, credential
-Step 1: Get credential
-Step 2: make build              ← builds images locally (~minutes)
-Step 3: go build -o wallfacer . ← builds binary
-Step 4: Run, stop, edit .env, restart
-Step 5: Run for real
-```
-
-**After:**
-```
-Prerequisites: Go 1.25+, Podman/Docker, credential
-Step 1: Get credential
-Step 2: go build -o wallfacer . ← builds binary only
-Step 3: ./wallfacer run ~/project
-        (sandbox image auto-pulled on first task)
-Step 4: Add credential via Settings → API Configuration in the UI
-```
-
-Key changes:
-- Remove `make build` from the happy path entirely; mention it only as "Development" or "Building from source" for contributors.
-- Reorder: credential can be entered via the UI after the server starts (Settings → API Configuration), removing the start-stop-edit-restart dance.
-- Add a note that first task execution pulls the sandbox image (~1 GB, takes a minute).
-
-### Option 4: Homebrew Tap
-
-**Effort:** Medium
-**Impact:** Medium — familiar install mechanism for macOS/Linux users
-
-Create a Homebrew tap (`changkun/tap`) with a formula that downloads the pre-built binary:
-
-```bash
-brew install changkun/tap/wallfacer
-wallfacer run ~/projects/myapp
-```
-
-Depends on Option 1 (pre-built binaries) being implemented first.
-
-### Option 5: Curl-to-Install Script
-
-**Effort:** Low-Medium
-**Impact:** Medium — one-liner install
-
-Provide an install script that detects OS/arch, downloads the right binary, and puts it in `$PATH`:
-
+Users must manually construct the download URL with their OS/arch. A one-liner install script would reduce this to:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | bash
 ```
 
-Depends on Option 1. Common pattern (similar to Homebrew, Rust, Deno installs).
+**Effort:** Low
+**Impact:** Medium — removes the manual OS/arch URL construction step
 
-### Option 6: Streamline Credential Setup
+The script would:
+- Detect `uname -s` / `uname -m` → map to release artifact names
+- Download from GitHub Releases latest
+- Place in a sensible location (`/usr/local/bin` or `~/.local/bin`)
+- Print next-steps instructions
+
+### 3. No Homebrew tap
+
+For macOS users, `brew install` is the most familiar installation pattern. A tap formula is straightforward once pre-built binaries exist (which they do).
+
+**Effort:** Medium (create `changkun/homebrew-tap` repo with formula)
+**Impact:** Medium — familiar for macOS/Linux users
+
+### 4. Container runtime prerequisite discovery
+
+Podman or Docker must be installed, but the current flow doesn't help users who have neither. The server detects the runtime at startup and logs it, but:
+- If neither is found, the error message could be more actionable
+- Users on macOS may not realize they need Podman Desktop or Docker Desktop running (not just installed)
+- No guidance on which to choose
 
 **Effort:** Low
-**Impact:** Medium — reduces cognitive steps
+**Impact:** Low-Medium — helps the subset of users who don't already have a container runtime
 
-Currently: run server → stop → edit `.env` → restart. Instead, allow configuring credentials through the UI on first run (Settings → API Configuration already exists and calls `PUT /api/env`). The docs just need to point users there instead of the manual file-editing flow.
+Possible improvements:
+- Add a `wallfacer doctor` subcommand that checks all prerequisites (container runtime, image availability, credentials) and prints actionable guidance
+- Improve the startup error message when no runtime is found
 
-The server already creates `~/.wallfacer/.env` on first run and the UI already has the configuration panel. This is purely a documentation change.
+### 5. First-task sandbox image pull is opaque
 
-## Recommended Approach
+The ~1 GB image pull on first task execution happens silently in the background. Users see their task stuck in "In Progress" with no visible progress for 1-2 minutes. The image pull logs appear in the server terminal but not in the UI.
 
-Implement in priority order:
+**Effort:** Medium
+**Impact:** Medium — reduces confusion during first run
 
-1. **Option 3 + Option 6** (docs-only, immediate) — Update getting-started docs and README quick-start to remove `make build`, point to UI for credential entry. Zero code changes, maximum impact on perceived complexity.
+Possible improvements:
+- Show image pull progress in the UI task logs
+- Add a startup banner or notification when the image isn't cached yet
+- Pre-pull the image at server startup (current behavior) but surface the pull progress in the UI
 
-2. **Option 1** (binary releases) — Add a release workflow to publish pre-built binaries. Eliminates the Go prerequisite entirely.
+### 6. Go 1.25+ is bleeding-edge
 
-3. **Option 2** (`go install`) — Verify and document. Quick win for Go users.
+Go 1.25 is very new. Users who want to build from source or use `go install` likely have Go 1.23 or 1.24 installed. The binary download path avoids this entirely, but users who reach for `go install` first will hit a confusing version error.
 
-4. **Option 5** (install script) — Once binaries are published, add a one-liner installer.
+**Recommendation:** This is self-resolving as Go 1.25 becomes mainstream. In the meantime, the docs already list binary download as the primary path. No action needed beyond keeping the version requirement visible.
 
-5. **Option 4** (Homebrew) — Nice-to-have after binaries are published.
+## Revised Priority
 
-## Ideal First-Run Experience (After All Changes)
+Given what's already been implemented, the remaining work in priority order:
 
+1. **Install script** (Option 2 above) — Low effort, removes the most common remaining friction for new users. Depends on nothing new.
+
+2. **`wallfacer doctor` command** (Option 4 above) — Low effort, catches misconfiguration early. Checks: container runtime available and running, sandbox image cached, credentials configured, Git installed.
+
+3. **Homebrew tap** (Option 3 above) — Medium effort, familiar install path for macOS users.
+
+4. **Verify `go install` from module proxy** (Option 1 above) — Trivial effort, just needs testing after next release.
+
+5. **Surface image pull progress in UI** (Option 5 above) — Medium effort, improves first-run UX but not a blocker.
+
+## Ideal First-Run Experience (Current vs Target)
+
+**Current (already good):**
 ```bash
-# Install (pick one)
-curl -fsSL https://wallfacer.dev/install.sh | bash   # Option 5
-brew install changkun/tap/wallfacer                    # Option 4
-go install changkun.de/wallfacer@latest                # Option 2
-
-# Run — sandbox image auto-pulls on first task
-wallfacer run ~/projects/myapp
-
-# Configure credential in browser UI (Settings → API Configuration)
-# Create first task
+# Download binary (must know OS/arch)
+curl -L https://github.com/changkun/wallfacer/releases/latest/download/wallfacer-darwin-arm64 -o wallfacer
+chmod +x wallfacer
+./wallfacer run ~/project
+# Configure credential in browser → create task
 ```
 
-Three steps. No clone. No Go required (except Option 2). No image building. No file editing.
+**Target (with remaining improvements):**
+```bash
+# One-liner install (detects OS/arch automatically)
+curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | bash
+
+# OR: Homebrew
+brew install changkun/tap/wallfacer
+
+# Check prerequisites
+wallfacer doctor
+
+# Run
+wallfacer run ~/project
+# Configure credential in browser → create task
+# (image pull progress visible in UI)
+```
+
+The delta is small. The biggest wins are the install script and the doctor command.
