@@ -128,6 +128,28 @@ When a task is in the Waiting state, open its detail modal to see the agent's la
 | **Test** | Expand the test section, optionally enter acceptance criteria, and click "Run Test Agent" to launch a verification agent on the current code state. |
 | **Cancel** | Discard all prepared changes, clean up the container and worktrees, and move the task to Cancelled. History and logs are preserved. |
 
+### Test Verification
+
+Test verification lets you check whether a task's changes actually work before committing them. It is available on tasks in the **Waiting**, **Done**, or **Failed** states.
+
+**Running a test:**
+
+1. Open the task detail modal.
+2. Expand the **Test** section in the left panel.
+3. Optionally enter acceptance criteria -- specific requirements the agent should verify beyond running the project's existing test suite.
+4. Click **Run Test Agent**.
+
+A separate verification agent launches in its own container. It inspects the task's code changes, runs relevant tests, and reports a **Pass** or **Fail** verdict. The verdict appears as a badge on the task card.
+
+**After reviewing the verdict:**
+
+- **Pass** -- click **Mark Done** to commit the changes.
+- **Fail** -- send feedback to the agent describing what went wrong, let it fix the issues, then re-test.
+
+You can run tests multiple times; each run overwrites the previous verdict. Test logs are visible in the **Testing** tab of the right panel. The test agent uses a customizable system prompt (`test.tmpl`) and can run on a different sandbox than the implementation agent (see [Configuration](configuration.md)).
+
+For automated testing, see [Auto-Test](automation.md).
+
 ### Search
 
 The search bar in the board header filters visible cards in real time. Type any text to filter by title, prompt content, or tags. Use `#tagname` to filter by specific tags. Press `/` to focus the search bar from anywhere on the board. Press Escape to clear and blur.
