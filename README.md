@@ -31,6 +31,7 @@ Create tasks, run them in isolated sandboxes, review diffs, and keep shipping wi
 - **Flexible runtime**: Podman/Docker support, workspace-level instructions, Claude + Codex backends, system prompt customization
 
 For a complete walkthrough of workflows and controls, see [Usage Guide](docs/guide/usage.md).
+For implementation details and architecture, see [Technical Internals](docs/internals/internals.md).
 
 ## Product Tour
 
@@ -123,12 +124,15 @@ Codex can be enabled either by:
 | 7 | [Configuration](docs/guide/configuration.md) | Settings, env vars, sandboxes, CLI, webhooks |
 | 8 | [Circuit Breakers](docs/guide/circuit-breakers.md) | Fault isolation, self-healing automation |
 
-**Internals**
+**[Technical Internals](docs/internals/internals.md)** — start here for implementation details and architecture.
 
-- [Architecture](docs/internals/architecture.md) — system overview, tech stack, project structure
-- [Task Lifecycle](docs/internals/task-lifecycle.md) — states, turn loop, feedback, data models, persistence
-- [Git Worktrees](docs/internals/git-worktrees.md) — per-task isolation, commit pipeline, conflict resolution
-- [Orchestration](docs/internals/orchestration.md) — API routes, container execution, SSE, concurrency
+- [Architecture](docs/internals/architecture.md) — system design, end-to-end walkthrough, concurrency model, "where to look" guide
+- [Data & Storage](docs/internals/data-and-storage.md) — data models, persistence, event sourcing, search
+- [Task Lifecycle](docs/internals/task-lifecycle.md) — states, turn loop, dependencies, board context
+- [Git Worktrees](docs/internals/git-worktrees.md) — worktrees, commit pipeline, branch management
+- [API & Transport](docs/internals/api-and-transport.md) — HTTP routes, SSE, webhooks, metrics, middleware
+- [Automation](docs/internals/automation.md) — background watchers, autopilot, circuit breakers
+- [Workspaces & Config](docs/internals/workspaces-and-config.md) — workspace manager, sandboxes, templates, env config
 
 ## Origin Story
 

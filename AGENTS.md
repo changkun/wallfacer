@@ -6,7 +6,7 @@ Wallfacer is a task-board runner for Claude Code. It provides a web UI where tas
 
 **Architecture:** Browser → Go server (:8080) → per-task directory storage (`data/<uuid>/`). The server runs natively on the host and launches ephemeral sandbox containers via `os/exec` (podman/docker). Each task gets its own git worktree for isolation.
 
-For detailed documentation see `docs/`.
+For detailed documentation see `docs/`. The user manual is at `docs/guide/usage.md` and the technical internals index is at `docs/internals/internals.md`.
 
 ## Build & Run Commands
 
@@ -64,7 +64,7 @@ Key server files:
 - `internal/apicontract/` — Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js`
 - `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream, execute, files, oversight, refine, ideate, templates, stats, admin, workspace, runtime)
 - `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; auto-retry; circuit breaker
-- `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TurnUsageRecord, TaskEvent, TaskOversight, TaskSummary, Tombstone, RetryRecord, FailureCategory), event sourcing, soft delete, search index
+- `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TurnUsageRecord, TaskEvent, TaskOversight, TaskSummary, Tombstone, RetryRecord, FailureCategory), event sourcing, soft delete, search index; see `docs/internals/data-and-storage.md` for full data model documentation
 - `internal/envconfig/` — `.env` file parsing and atomic update; exposes `Parse` and `Update` for the handler and runner
 - `internal/instructions/` — Workspace-level AGENTS.md management (`~/.wallfacer/instructions/`)
 - `internal/gitutil/` — Git utility operations (ops, repo, status, stash, worktree)
@@ -77,7 +77,7 @@ Key server files:
 
 ## API Routes
 
-All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/orchestration.md` for full details.
+All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/api-and-transport.md` for full details.
 
 ### Debug & Monitoring
 - `GET /api/debug/health` — Operational health check
