@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1128,10 +1129,12 @@ func TestRunCommitTransition_SuccessWithMock(t *testing.T) {
 	// Manually drive the task to committing status (bypassing the state machine).
 	s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting) //nolint:errcheck
 
-	// Set up a real worktree path so validateTaskWorktreesForCommit does not
-	// reject the task and transition it back to waiting.
+	// Set up a real worktree path (must be a git repo) so
+	// validateTaskWorktreesForCommit does not reject the task.
 	worktreeDir := t.TempDir()
-	s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{worktreeDir: worktreeDir}, "task/branch") //nolint:errcheck
+	_ = exec.Command("git", "init", worktreeDir).Run()
+	_ = exec.Command("git", "-C", worktreeDir, "commit", "--allow-empty", "-m", "init").Run()
+	_ = s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{worktreeDir: worktreeDir}, "task/branch")
 
 	h.runCommitTransition(task.ID, "session-1", store.TriggerUser, "commit error: ")
 	// Give the goroutine time to complete.
