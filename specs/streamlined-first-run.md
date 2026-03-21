@@ -52,17 +52,9 @@ curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh 
 
 `wallfacer doctor` now checks whether the container runtime is installed and responsive, with actionable messages (e.g. "podman machine start" or "Ensure Docker Desktop is running"). Remaining: the server startup error when no runtime is found could still be more user-friendly.
 
-### 4. First-task sandbox image pull is opaque
+### ~~4. First-task sandbox image pull is opaque~~ — Solved
 
-The ~1 GB image pull on first task execution happens silently in the background. Users see their task stuck in "In Progress" with no visible progress for 1-2 minutes. The image pull logs appear in the server terminal but not in the UI.
-
-**Effort:** Medium
-**Impact:** Medium — reduces confusion during first run
-
-Possible improvements:
-- Show image pull progress in the UI task logs
-- Add a startup banner or notification when the image isn't cached yet
-- Pre-pull the image at server startup (current behavior) but surface the pull progress in the UI
+The server now reports `image_cached` in the `GET /api/config` response. When the sandbox image is not cached locally, the UI shows a dismissible warning banner above the board: "Sandbox image not cached yet. It will be pulled automatically (~1 GB) when you run your first task."
 
 ### 5. Go 1.25+ is bleeding-edge
 
@@ -80,16 +72,15 @@ Given what's already been implemented, the remaining work in priority order:
 
 3. **Verify `go install` from module proxy** (Option 1 above) — Trivial effort, just needs testing after next release.
 
-4. **Surface image pull progress in UI** (Option 4 above) — Medium effort, improves first-run UX but not a blocker.
+4. ~~**Surface image pull progress in UI**~~ — **Done.** `GET /api/config` returns `image_cached`; UI shows a dismissible warning banner when false.
 
-## Ideal First-Run Experience (Current vs Target)
+## Ideal First-Run Experience
 
-**Current:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
 wallfacer doctor
 wallfacer run ~/project
-# Configure credential in browser → create task
+# UI warns if image not cached; configure credential in browser → create task
 ```
 
-The install script and doctor command cover the main first-run friction. Remaining items (`go install` verification, image pull progress in UI) are incremental improvements.
+The only remaining item is verifying `go install` from the module proxy after the next release.

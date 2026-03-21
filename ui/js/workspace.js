@@ -141,15 +141,6 @@ async function fetchConfig() {
       hideWorkspacePicker();
       restartActiveStreams();
     }
-    // Show banner when sandbox image is not cached.
-    var imgBanner = document.getElementById('image-pull-banner');
-    if (imgBanner) {
-      if (cfg.image_cached === false) {
-        imgBanner.classList.remove('hidden');
-      } else {
-        imgBanner.classList.add('hidden');
-      }
-    }
     // Sync ideation toggle and spinner state.
     if (typeof updateIdeationConfig === 'function') updateIdeationConfig(cfg);
     updateAutomationActiveCount();
