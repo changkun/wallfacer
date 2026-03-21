@@ -39,6 +39,7 @@ function makeContext(overrides = {}) {
     Math,
     Promise,
     alert: vi.fn(),
+    showAlert: vi.fn(),
     window: {
       alert: vi.fn(),
     },
@@ -107,11 +108,12 @@ describe('openTemplatesManagerFromSettings', () => {
       Object.assign(ctx, { calls }),
     );
     ctx.openTemplatesManagerFromSettings();
-    await Promise.resolve();
+    // Flush microtasks: rejection + .catch() handler need multiple ticks.
+    await new Promise(r => setTimeout(r, 10));
 
     expect(calls).toEqual(['close', 'open']); // sync path executes both
     expect(ctx.closeSettings).toHaveBeenCalledTimes(1);
-    expect(ctx.alert).toHaveBeenCalledWith('Failed to open Templates: network down');
+    expect(ctx.showAlert).toHaveBeenCalledWith('Failed to open Templates: network down');
     expect(ctx.console.error).toHaveBeenCalledWith(
       'Failed to open templates manager:',
       expect.anything(),
