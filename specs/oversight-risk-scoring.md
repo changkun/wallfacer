@@ -55,10 +55,11 @@ type RiskAction struct {
     Timestamp time.Time `json:"timestamp"`
     Turn      int       `json:"turn"`
     ToolName  string    `json:"tool_name"`
-    Input     string    `json:"input"`    // truncated to 200 chars
-    Score     float64   `json:"score"`    // [0.0, 1.0]
-    RuleID    string    `json:"rule_id"`  // which policy rule matched
-    Label     string    `json:"label"`    // human-readable rule description
+    Input     string    `json:"input"`         // truncated to 200 chars
+    Output    string    `json:"output,omitempty"` // truncated to 500 chars; only stored when an output rule matched
+    Score     float64   `json:"score"`         // [0.0, 1.0]
+    RuleID    string    `json:"rule_id"`       // which policy rule matched
+    Label     string    `json:"label"`         // human-readable rule description
 }
 ```
 
@@ -154,17 +155,45 @@ rules:
     input_pattern: '.*'
     risk: 0.05
     label: File read
+
+  # Output-based rules (second line of defense for indirect execution).
+  # These catch destructive operations inside scripts, Makefiles, etc.
+  # by scanning tool_output from PostToolUse.
+  - id: output-rm-detected
+    tool: Bash
+    output_pattern: 'rm\s+-[a-zA-Z]*r[a-zA-Z]*f|removed\s+.*directory'
+    risk: 0.7
+    label: Destructive delete detected in output
+
+  - id: output-force-push-detected
+    tool: Bash
+    output_pattern: 'forced\s+update|force-pushed'
+    risk: 0.7
+    label: Force push detected in output
+
+  - id: output-permission-denied
+    tool: Bash
+    output_pattern: 'permission\s+denied|access\s+denied|unauthorized'
+    risk: 0.5
+    label: Permission error in output
+
+  - id: output-secret-leak
+    tool: Bash
+    output_pattern: 'BEGIN\s+(RSA|EC|OPENSSH)\s+PRIVATE\s+KEY|AKIA[0-9A-Z]{16}'
+    risk: 0.9
+    label: Secret/credential detected in output
 ```
 
 **Go types** (`internal/risk/policy.go`):
 
 ```go
 type Rule struct {
-    ID           string         `yaml:"id"`
-    Tool         string         `yaml:"tool"`
-    InputPattern *regexp.Regexp // compiled from YAML string field
-    Risk         float64        `yaml:"risk"`
-    Label        string         `yaml:"label"`
+    ID            string         `yaml:"id"`
+    Tool          string         `yaml:"tool"`
+    InputPattern  *regexp.Regexp // compiled from YAML "input_pattern" field
+    OutputPattern *regexp.Regexp // compiled from YAML "output_pattern" field; nil = don't check output
+    Risk          float64        `yaml:"risk"`
+    Label         string         `yaml:"label"`
 }
 
 type Thresholds struct {
@@ -182,7 +211,7 @@ type Policy struct {
 
 **Scoring functions** (`internal/risk/score.go`):
 
-- `ScoreAction(policy *Policy, toolName, toolInput string) (score float64, ruleID, label string)` — iterates rules in order, returns first match. Unmatched → `default_risk`.
+- `ScoreAction(policy *Policy, toolName, toolInput, toolOutput string) (score float64, ruleID, label string)` — iterates rules in order, returns first match. A rule matches when: tool name matches AND `InputPattern` matches `toolInput` (if set) AND `OutputPattern` matches `toolOutput` (if set). Rules with only `OutputPattern` (no `InputPattern`) act as output-only scanners. Unmatched → `default_risk`.
 - `LevelFromScore(thresholds Thresholds, score float64) string` — returns "low"/"medium"/"elevated"/"high".
 - `AggregateScore(actions []RiskAction) float64` — returns `max(all action.Score)`.
 
@@ -206,7 +235,10 @@ Per-task rules are **prepended** to the global rules. Since `ScoreAction` return
 
 ```json
 {"id": "custom-allow-rm", "tool": "Bash", "input_pattern": "rm -rf /tmp/cache", "risk": 0.0, "label": "Allow cache cleanup"}
+{"id": "custom-output-scan", "tool": "Bash", "output_pattern": "DROP TABLE", "risk": 0.9, "label": "Database table drop detected"}
 ```
+
+Rules can specify `input_pattern`, `output_pattern`, or both. When both are set, both must match.
 
 **Merging function** (`internal/risk/policy.go`):
 
@@ -224,7 +256,9 @@ Returns a new `*Policy` with the merged rule list. The global policy is not muta
 ```go
 // validateRiskPolicyRules checks each JSON-encoded rule string:
 // - Valid JSON with "tool" (non-empty string) and "risk" (float64 in [0.0, 1.0])
-// - "input_pattern" compiles as a valid regex
+// - "input_pattern" (if set) compiles as a valid regex
+// - "output_pattern" (if set) compiles as a valid regex
+// - At least one of "input_pattern" or "output_pattern" must be set
 // Returns the first validation error encountered, or nil.
 func validateRiskPolicyRules(rules []string) error
 ```
@@ -275,11 +309,12 @@ r.scoreTurnActions(bgCtx, taskID, turns, rawStdout)
 
 Flow:
 1. Call `parseTurnActivity(rawStdout, turnNum)` to get `turnActivity.ToolCalls`.
-2. For each tool call, parse `"ToolName(input)"` format, call `risk.ScoreAction()`.
-3. Append new `RiskAction` entries to the task's risk log.
-4. Compute new aggregate `max(scores)`, derive level.
-5. Call `store.UpdateTaskRisk()` → updates Task fields → `notify()` → SSE delta.
-6. Call `store.SaveRiskScore()` → writes `risk.json`.
+2. For each tool call, parse `"ToolName(input)"` format. For output-based rules, extract tool output from the NDJSON `tool_result` / `aggregated_output` blocks that follow each `tool_use` block (already present in the turn NDJSON stream — see `ndjsonLine.AggregatedOutput` at `oversight.go:326`).
+3. Call `risk.ScoreAction(policy, toolName, input, output)` — matches against both input and output patterns.
+4. Append new `RiskAction` entries to the task's risk log.
+5. Compute new aggregate `max(scores)`, derive level.
+6. Call `store.UpdateTaskRisk()` → updates Task fields → `notify()` → SSE delta.
+7. Call `store.SaveRiskScore()` → writes `risk.json`.
 
 **Codex support:** Works out of the box because `parseTurnActivity` already handles Codex's `command_execution` items (lines 344-374 of oversight.go). Between-turn granularity only.
 
@@ -301,7 +336,7 @@ Before the turn loop in `Run()`, for `sandbox.Claude`:
       "matcher": {},
       "hooks": [{
         "type": "command",
-        "command": "cat /dev/stdin | jq -c '{ts: (now | todate), tool: .tool_name, input: (.tool_input | tostring | .[0:500])}' >> /workspace/.wallfacer/actions.ndjson"
+        "command": "cat /dev/stdin | jq -c '{ts: (now | todate), tool: .tool_name, input: (.tool_input | tostring | .[0:500]), output: (.tool_output | tostring | .[0:1000])}' >> /workspace/.wallfacer/actions.ndjson"
       }]
     }]
   }
@@ -318,8 +353,8 @@ Before the turn loop in `Run()`, for `sandbox.Claude`:
 Start `tailActionLog(ctx, actionsPath, scoreCh)` before the turn loop. This goroutine:
 1. Opens `actions.ndjson` with `os.Open` + seeks to end.
 2. Polls for new lines every 500ms (or uses `fsnotify` if available).
-3. Parses each line as `{ts, tool, input}`.
-4. Calls `risk.ScoreAction()` and sends result to `scoreCh`.
+3. Parses each line as `{ts, tool, input, output}`.
+4. Calls `risk.ScoreAction(policy, tool, input, output)` and sends result to `scoreCh`.
 
 **Risk update worker:**
 
@@ -541,7 +576,7 @@ Between-turn scoring via `parseTurnActivity` works for Codex today — it alread
 
 1. **Named volume overlay**: The `claude-config` volume is mounted at `/home/claude/.claude`. A file-level bind mount for `settings.json` overlays it. Both Docker and Podman support this — the bind mount takes precedence. Verified by the existing `appendCodexAuthMount` pattern which does the same for `/home/codex/.codex`.
 
-2. **Hook output atomicity**: Concurrent tool calls within a turn could append to `actions.ndjson` simultaneously. Using `jq -c` (compact, single-line) + `>>` (append) is safe on Linux/macOS for lines under PIPE_BUF (4096 bytes). The 500-char input truncation keeps lines well under this limit.
+2. **Hook output atomicity**: Concurrent tool calls within a turn could append to `actions.ndjson` simultaneously. Using `jq -c` (compact, single-line) + `>>` (append) is safe on Linux/macOS for lines under PIPE_BUF (4096 bytes). The input (500 chars) + output (1000 chars) truncation keeps each line under ~2KB, well within the limit.
 
 3. **SSE delta frequency**: Each `UpdateTaskRisk` triggers `notify()`. The risk update worker debounces with a 500ms window, so at most 2 deltas/second from risk scoring. This is comparable to existing turn-change deltas.
 
