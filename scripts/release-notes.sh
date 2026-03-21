@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Generate release notes for a new version by analyzing the diff since
-# the last tag. Outputs a markdown document to stdout.
+# the last tag. Pipes a prompt through claude and writes the result to
+# docs/releases/<version>.md.
 #
 # Usage:
-#   ./scripts/release-notes.sh           # auto-detect next version from tags
-#   ./scripts/release-notes.sh v0.0.6    # specify version explicitly
+#   ./scripts/release-notes.sh v0.0.6
 set -euo pipefail
 
 VERSION="${1:-}"
@@ -21,6 +21,9 @@ if [[ -z "$VERSION" ]]; then
   exit 1
 fi
 
+REPO_ROOT=$(git rev-parse --show-toplevel)
+OUTFILE="${REPO_ROOT}/docs/releases/${VERSION}.md"
+
 PREV_DATE=$(git log -1 --format=%cs "$PREV_TAG")
 TODAY=$(date +%Y-%m-%d)
 COMMIT_COUNT=$(git rev-list "${PREV_TAG}..HEAD" --count)
@@ -30,6 +33,7 @@ echo "Generating release notes for $VERSION (${PREV_TAG}..HEAD)..." >&2
 echo "  Previous: $PREV_TAG ($PREV_DATE)" >&2
 echo "  Commits:  $COMMIT_COUNT" >&2
 echo "  Diff:     $DIFFSTAT" >&2
+echo "  Output:   $OUTFILE" >&2
 echo "" >&2
 
 # Collect raw data for the LLM prompt
@@ -37,7 +41,14 @@ COMMIT_LOG=$(git log --oneline "${PREV_TAG}..HEAD")
 DIFF_SUMMARY=$(git diff --stat "${PREV_TAG}..HEAD")
 FILE_CHANGES=$(git diff --name-only "${PREV_TAG}..HEAD" | sort)
 
-cat <<PROMPT
+# Read previous release notes for style reference
+PREV_NOTES=""
+PREV_NOTES_FILE="${REPO_ROOT}/docs/releases/${PREV_TAG}.md"
+if [[ -f "$PREV_NOTES_FILE" ]]; then
+  PREV_NOTES=$(cat "$PREV_NOTES_FILE")
+fi
+
+PROMPT=$(cat <<ENDPROMPT
 You are writing release notes for wallfacer $VERSION.
 
 ## Context
@@ -65,27 +76,9 @@ $DIFF_SUMMARY
 
 $FILE_CHANGES
 
-## Writing style
+## Previous release notes (for style reference)
 
-Write in the same style as this example release note from v0.0.5:
-
----
-## 🚀 v0.0.5 — The "It Thinks While You Sleep" Release
-
-### What if your engineering team never stopped working?
-
-Wallfacer v0.0.5 takes autonomous software engineering from "impressive demo"
-to **daily driver**.
-
-## 🧠 Autonomous Ideation — Your AI Now Has Ideas
-...energetic, inspiring bullet points...
-
-## 💰 Cost & Budget Controls — Spend Wisely, Ship More
-...
-
-**149 commits. 27k lines. One release.** Wallfacer is becoming the engineering
-team that never sleeps.
----
+$PREV_NOTES
 
 ## Instructions
 
@@ -101,4 +94,21 @@ team that never sleeps.
 10. Use **bold** for emphasis on key features
 
 Output ONLY the release notes markdown, nothing else.
-PROMPT
+ENDPROMPT
+)
+
+# Check for claude CLI
+if ! command -v claude &>/dev/null; then
+  echo "Error: claude CLI not found. Install it or pipe the prompt manually:" >&2
+  echo "  ./scripts/release-notes.sh $VERSION --prompt-only > prompt.txt" >&2
+  echo "  Then feed prompt.txt to your preferred LLM and save output to $OUTFILE" >&2
+  exit 1
+fi
+
+echo "# ${VERSION}" > "$OUTFILE"
+echo "" >> "$OUTFILE"
+echo "$PROMPT" | claude --print >> "$OUTFILE"
+
+echo "" >&2
+echo "Release notes written to $OUTFILE" >&2
+echo "Review and edit before running: make release RELEASE_VERSION=$VERSION" >&2

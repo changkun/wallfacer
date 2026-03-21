@@ -480,22 +480,24 @@ Releases are triggered by pushing a version tag (`v*`). Three GitHub Actions wor
 **Creating a release:**
 
 ```bash
-# 1. Generate a release notes prompt and pipe to an LLM
-make release-notes RELEASE_VERSION=v0.0.6 | claude > notes.md
+# 1. Generate release notes (pipes git diff through claude, writes to docs/releases/)
+make release-notes RELEASE_VERSION=v0.0.6
 
-# 2. Review and edit notes.md
+# 2. Review and edit docs/releases/v0.0.6.md
 
-# 3. Commit notes to docs/releases/, tag, push, and create GitHub release
-make release RELEASE_VERSION=v0.0.6 RELEASE_NOTES=notes.md
+# 3. Commit notes, tag, push, and create GitHub release
+make release RELEASE_VERSION=v0.0.6
 ```
 
+The `make release-notes` target runs `scripts/release-notes.sh`, which collects the commit log and diffstat since the previous tag, pipes them through the `claude` CLI with style instructions derived from the previous release notes, and writes the result to `docs/releases/v0.0.6.md`.
+
 The `make release` target:
-1. Copies the notes to `docs/releases/v0.0.6.md` (with a `# v0.0.6` header) and commits
+1. Commits `docs/releases/v0.0.6.md`
 2. Creates an annotated git tag
 3. Pushes the commit and tag to origin
-4. Creates a GitHub release via `gh release create`
+4. Creates a GitHub release via `gh release create` using the same notes file
 
-The pushed tag triggers the three CI workflows above. Previous release notes are archived in `docs/releases/`.
+The pushed tag triggers the three CI workflows above. All release notes are archived in `docs/releases/`.
 
 ## See Also
 

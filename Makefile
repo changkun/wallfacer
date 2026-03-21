@@ -130,34 +130,30 @@ BRANCH ?= $(shell git branch --show-current)
 push-once:
 	./scripts/push-once.sh "$(REMOTE)" "$(BRANCH)"
 
-# Generate an LLM prompt for release notes.
-# Pipe the output to Claude or another LLM to produce the final notes.
+# Generate release notes via LLM and save to docs/releases/.
+# The script builds a prompt from the git diff, pipes it through claude,
+# and writes the result to docs/releases/<version>.md.
 # Usage:
-#   make release-notes RELEASE_VERSION=v0.0.6 | claude
-#   make release-notes RELEASE_VERSION=v0.0.6 > notes-prompt.md
+#   make release-notes RELEASE_VERSION=v0.0.6
 release-notes:
 ifndef RELEASE_VERSION
 	$(error RELEASE_VERSION is required. Usage: make release-notes RELEASE_VERSION=v0.0.6)
 endif
 	@./scripts/release-notes.sh "$(RELEASE_VERSION)"
 
-# Create a GitHub release with binaries and notes.
-# This commits the release notes to docs/releases/, tags, pushes, and
-# lets GitHub Actions build the binaries and images.
+# Create a GitHub release.
+# Expects docs/releases/<version>.md to exist (run make release-notes first).
+# Commits the notes, tags, pushes, and creates the GitHub release.
 # Usage:
-#   make release RELEASE_VERSION=v0.0.6 RELEASE_NOTES=notes.md
+#   make release-notes RELEASE_VERSION=v0.0.6   # step 1: generate + review
+#   make release RELEASE_VERSION=v0.0.6          # step 2: publish
 release:
 ifndef RELEASE_VERSION
 	$(error RELEASE_VERSION is required. Usage: make release RELEASE_VERSION=v0.0.6)
 endif
-ifndef RELEASE_NOTES
-	$(error RELEASE_NOTES is required (path to release notes markdown file))
-endif
-	@echo "# $(RELEASE_VERSION)" > docs/releases/$(RELEASE_VERSION).md
-	@echo "" >> docs/releases/$(RELEASE_VERSION).md
-	@cat "$(RELEASE_NOTES)" >> docs/releases/$(RELEASE_VERSION).md
+	@test -f docs/releases/$(RELEASE_VERSION).md || (echo "Error: docs/releases/$(RELEASE_VERSION).md not found. Run 'make release-notes' first." >&2; exit 1)
 	git add docs/releases/$(RELEASE_VERSION).md
 	git commit -m "docs: add $(RELEASE_VERSION) release notes"
 	git tag -a "$(RELEASE_VERSION)" -m "$(RELEASE_VERSION)"
 	git push origin main "$(RELEASE_VERSION)"
-	gh release create "$(RELEASE_VERSION)" --title "$(RELEASE_VERSION)" --notes-file "$(RELEASE_NOTES)"
+	gh release create "$(RELEASE_VERSION)" --title "$(RELEASE_VERSION)" --notes-file docs/releases/$(RELEASE_VERSION).md
