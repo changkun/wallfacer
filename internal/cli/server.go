@@ -467,15 +467,17 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		}
 		ordered := make(map[string]bool, len(guideOrder)+1)
 		ordered["usage"] = true
-		for i, name := range guideOrder {
+		seq := 0
+		for _, name := range guideOrder {
 			ordered[name] = true
 			path := "docs/guide/" + name + ".md"
 			if _, err := fs.ReadFile(docsFS,path); err != nil {
 				continue
 			}
+			seq++
 			slug := "guide/" + name
 			title := readTitle(path, name)
-			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Order: i + 1})
+			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Order: seq})
 		}
 		// Append any guide docs not in the explicit order.
 		if dir, err := fs.ReadDir(docsFS,"docs/guide"); err == nil {
@@ -500,15 +502,17 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		}
 		intOrdered := make(map[string]bool, len(internalsOrder)+1)
 		intOrdered["internals"] = true
-		for i, name := range internalsOrder {
+		intSeq := 0
+		for _, name := range internalsOrder {
 			intOrdered[name] = true
 			path := "docs/internals/" + name + ".md"
 			if _, err := fs.ReadFile(docsFS,path); err != nil {
 				continue
 			}
+			intSeq++
 			slug := "internals/" + name
 			title := readTitle(path, name)
-			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals", Order: i + 1})
+			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals", Order: intSeq})
 		}
 		// Append any internals docs not in the explicit order.
 		if dir, err := fs.ReadDir(docsFS,"docs/internals"); err == nil {
