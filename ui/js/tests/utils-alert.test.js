@@ -20,6 +20,8 @@ function createElement(overrides = {}) {
     textContent: '',
     focus: vi.fn(),
     scrollIntoView: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
     ...overrides,
   };
 }
@@ -30,6 +32,8 @@ function makeContext(overrides = {}) {
     console,
     document: {
       getElementById: (id) => elements.get(id) || null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
     },
     ...overrides,
   });

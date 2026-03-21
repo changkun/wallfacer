@@ -12,11 +12,14 @@ function openSystemPromptsFromSettings(event) {
   });
 }
 
+var _systemPromptsDismiss = null;
 async function showSystemPromptsEditor() {
   var modal = document.getElementById('system-prompts-modal');
   if (!modal) return;
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
+  if (_systemPromptsDismiss) _systemPromptsDismiss();
+  _systemPromptsDismiss = bindModalDismiss(modal, closeSystemPromptsEditor);
 
   // Show prompts dir from config.
   try {
@@ -40,6 +43,7 @@ function closeSystemPromptsEditor() {
   _systemPromptCurrent = '';
   var list = document.getElementById('system-prompts-list');
   if (list) list.innerHTML = '';
+  if (_systemPromptsDismiss) { _systemPromptsDismiss(); _systemPromptsDismiss = null; }
 }
 
 async function loadSystemPrompts() {

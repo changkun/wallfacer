@@ -213,6 +213,8 @@ async function openModal(id) {
   modalEl.classList.add('flex');
   _attachModalFocusTrap(modalEl);
   _focusModalEntry(modalEl);
+  modalEl._onBackdropClick = function(e) { if (e.target === modalEl) closeModal(); };
+  modalEl.addEventListener('click', modalEl._onBackdropClick);
   history.replaceState(null, '', '#' + id);
 
   document.getElementById('modal-badge').className = `badge badge-${task.status}`;
@@ -864,6 +866,10 @@ function closeModal() {
   // (innerHTML, classList, style) do not trigger visible reflows.
   modalEl.classList.add('hidden');
   modalEl.classList.remove('flex');
+  if (modalEl._onBackdropClick) {
+    modalEl.removeEventListener('click', modalEl._onBackdropClick);
+    modalEl._onBackdropClick = null;
+  }
   _detachModalFocusTrap(modalEl);
   _invalidateFocusableCache();
   if (_modalState.abort) { _modalState.abort.abort(); _modalState.abort = null; }

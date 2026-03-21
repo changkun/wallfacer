@@ -69,6 +69,7 @@ function initSettingsTabs() {
   settingsTabsInitialized = true;
 }
 
+var _settingsDismiss = null;
 function openSettings() {
   var modal = document.getElementById('settings-modal');
   modal.classList.remove('hidden');
@@ -82,6 +83,8 @@ function openSettings() {
   if (typeof showEnvConfigEditor === 'function') {
     showEnvConfigEditor(null);
   }
+  if (_settingsDismiss) _settingsDismiss();
+  _settingsDismiss = bindModalDismiss(modal, closeSettings);
 }
 
 function closeSettings() {
@@ -89,4 +92,5 @@ function closeSettings() {
   if (!modal) return;
   modal.classList.add('hidden');
   modal.style.display = '';
+  if (_settingsDismiss) { _settingsDismiss(); _settingsDismiss = null; }
 }

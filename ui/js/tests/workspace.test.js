@@ -58,6 +58,7 @@ function makeContext(overrides = {}) {
       },
       querySelector: () => null,
       addEventListener: () => {},
+      removeEventListener: () => {},
       documentElement: { setAttribute: () => {} },
       readyState: 'complete',
       createElement: () => ({
@@ -83,6 +84,7 @@ describe('sandboxDisplayName', () => {
   it('formats sandbox labels consistently', () => {
     const ctx = makeContext();
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
     expect(ctx.sandboxDisplayName('')).toBe('Default');
     expect(ctx.sandboxDisplayName('claude')).toBe('Claude');
@@ -100,6 +102,7 @@ describe('collectSandboxByActivity / applySandboxByActivity', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
     expect(ctx.collectSandboxByActivity('env-sandbox-')).toEqual({ implementation: 'claude', testing: 'codex' });
   });
@@ -114,6 +117,7 @@ describe('collectSandboxByActivity / applySandboxByActivity', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
     ctx.applySandboxByActivity('env-sandbox-', { implementation: 'custom', oversight: 'codex' });
     expect(impl.value).toBe('custom');
@@ -156,6 +160,7 @@ describe('fetchConfig', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
     const populateSpy = vi.spyOn(ctx, 'populateSandboxSelects');
 
@@ -180,6 +185,7 @@ describe('fetchConfig', () => {
     });
     const ctx = makeContext({ api: apiFn });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     await ctx.fetchConfig();
@@ -204,6 +210,7 @@ describe('fetchConfig', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
     // browseWorkspaces is called from showWorkspacePicker — stub it out.
     ctx.browseWorkspaces = vi.fn();
@@ -221,7 +228,7 @@ describe('fetchConfig', () => {
 
 describe('showWorkspacePicker', () => {
   it('refreshes the workspace browser every time the picker opens', () => {
-    const modal = { classList: { remove: vi.fn(), add: vi.fn() } };
+    const modal = { classList: { remove: vi.fn(), add: vi.fn() }, addEventListener: vi.fn(), removeEventListener: vi.fn() };
     const closeBtn = { style: {} };
     const filterInput = { value: 'repo' };
     const ctx = makeContext({
@@ -232,6 +239,7 @@ describe('showWorkspacePicker', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     const browseSpy = vi.spyOn(ctx, 'browseWorkspaces').mockImplementation(() => {});
@@ -257,6 +265,7 @@ describe('renderWorkspaceSelectionDraft', () => {
       elements: [['workspace-selection-list', listEl]],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     vm.runInContext('workspaceSelectionDraft = ["/Users/test/dev/repo"];', ctx);
@@ -278,6 +287,7 @@ describe('renderWorkspaceGroups', () => {
       elements: [['settings-workspace-groups', groupsEl]],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     vm.runInContext(`
@@ -305,6 +315,7 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     vm.runInContext(`
@@ -326,6 +337,7 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     vm.runInContext(`
@@ -352,6 +364,7 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     vm.runInContext(`
@@ -382,6 +395,7 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     vm.runInContext(`
@@ -409,6 +423,7 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     vm.runInContext(`
@@ -442,6 +457,7 @@ describe('browseWorkspaces', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     await ctx.browseWorkspaces();
@@ -465,6 +481,7 @@ describe('browseWorkspaces', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     await ctx.browseWorkspaces();
@@ -489,6 +506,7 @@ describe('workspace browser filter', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     vm.runInContext(`
@@ -512,6 +530,7 @@ describe('workspace browser filter', () => {
   it('adds the highlighted folder on Enter', () => {
     const ctx = makeContext();
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     vm.runInContext(`
@@ -554,6 +573,7 @@ describe('useWorkspaceGroup — spinner lifecycle', () => {
       ],
     });
     loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'workspace.js');
 
     // Intercept renderHeaderWorkspaceGroupTabs to capture switching state.

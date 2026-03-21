@@ -1,5 +1,6 @@
 // --- Workspace AGENTS.md (Instructions) ---
 
+var _instructionsDismiss = null;
 async function showInstructionsEditor(event, preloadedContent) {
   if (event) event.stopPropagation();
   closeSettings();
@@ -11,6 +12,8 @@ async function showInstructionsEditor(event, preloadedContent) {
 
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
+  if (_instructionsDismiss) _instructionsDismiss();
+  _instructionsDismiss = bindModalDismiss(modal, closeInstructionsEditor);
   textarea.value = preloadedContent != null ? preloadedContent : '';
   pathEl.textContent = '';
 
@@ -43,6 +46,7 @@ function closeInstructionsEditor() {
   var modal = document.getElementById('instructions-modal');
   modal.classList.add('hidden');
   modal.style.display = '';
+  if (_instructionsDismiss) { _instructionsDismiss(); _instructionsDismiss = null; }
 }
 
 async function saveInstructions() {

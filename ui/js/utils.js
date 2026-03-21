@@ -1,17 +1,21 @@
 // --- Utility helpers ---
 
+var _alertDismiss = null;
 function showAlert(message) {
   document.getElementById('alert-message').textContent = message;
   const modal = document.getElementById('alert-modal');
   modal.classList.remove('hidden');
   modal.classList.add('flex');
   document.getElementById('alert-ok-btn').focus();
+  if (_alertDismiss) _alertDismiss();
+  _alertDismiss = bindModalDismiss(modal, closeAlert);
 }
 
 function closeAlert() {
   const modal = document.getElementById('alert-modal');
   modal.classList.add('hidden');
   modal.classList.remove('flex');
+  if (_alertDismiss) { _alertDismiss(); _alertDismiss = null; }
 }
 
 function escapeHtml(s) {
@@ -47,11 +51,22 @@ function closeModalPanel(modal) {
   modal.style.display = '';
 }
 
+// bindModalDismiss adds click-outside and Escape-to-close behavior to a
+// modal overlay. Call the returned function to remove the listeners.
+function bindModalDismiss(modal, onClose) {
+  if (!modal || typeof onClose !== 'function') return function() {};
+  function onBackdropClick(e) { if (e.target === modal) onClose(); }
+  function onEsc(e) { if (e.key === 'Escape') onClose(); }
+  modal.addEventListener('click', onBackdropClick);
+  document.addEventListener('keydown', onEsc);
+  return function unbind() {
+    modal.removeEventListener('click', onBackdropClick);
+    document.removeEventListener('keydown', onEsc);
+  };
+}
+
 function bindModalBackdropClose(modal, onClose) {
-  if (!modal || typeof onClose !== 'function') return;
-  modal.addEventListener('click', function (e) {
-    if (e.target === modal) onClose();
-  });
+  bindModalDismiss(modal, onClose);
 }
 
 function loadJsonEndpoint(url, onSuccess, setState, options) {

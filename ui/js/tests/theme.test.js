@@ -32,6 +32,7 @@ function createElement(overrides = {}) {
     setAttribute: vi.fn(),
     className: '',
     addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
     ...overrides,
   };
 }
@@ -72,6 +73,7 @@ function makeContext(overrides = {}) {
       },
       getElementById: (id) => elements.get(id) || null,
       addEventListener: () => {},
+      removeEventListener: () => {},
     },
     window: {
       matchMedia: vi.fn(() => ({
@@ -130,6 +132,7 @@ describe('theme helpers', () => {
       loadArchivedTasksPerPage: vi.fn(),
       loadAutoPush: vi.fn(),
     });
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'theme.js');
 
     expect(darkButton.classList.contains('active')).toBe(true);
@@ -172,6 +175,7 @@ describe('theme helpers', () => {
       _setThemeChangeHandler: () => {},
     });
 
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'theme.js');
     ctx.setTheme('light');
 
@@ -195,6 +199,7 @@ describe('theme helpers', () => {
       loadArchivedTasksPerPage: vi.fn(),
       loadAutoPush: vi.fn(),
     });
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'theme.js');
 
     ctx.openSettings();
@@ -229,6 +234,7 @@ describe('theme helpers', () => {
       loadArchivedTasksPerPage: vi.fn(),
       loadAutoPush: vi.fn(),
     });
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'theme.js');
 
     ctx.initSettingsTabs();
@@ -255,6 +261,7 @@ describe('theme helpers', () => {
       loadArchivedTasksPerPage: vi.fn(),
       loadAutoPush: vi.fn(),
     });
+    loadScript(ctx, 'utils.js');
     loadScript(ctx, 'theme.js');
 
     ctx.initSettingsTabs();

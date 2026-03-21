@@ -154,6 +154,7 @@ async function fetchConfig() {
 // Workspace picker modal
 // ---------------------------------------------------------------------------
 
+var _workspacePickerDismiss = null;
 function showWorkspacePicker(required) {
   var modal = document.getElementById('workspace-picker');
   var closeBtn = document.getElementById('workspace-picker-close');
@@ -170,6 +171,8 @@ function showWorkspacePicker(required) {
   }
   renderWorkspaceSelectionDraft();
   browseWorkspaces(workspaceBrowserPath || '');
+  if (_workspacePickerDismiss) _workspacePickerDismiss();
+  _workspacePickerDismiss = bindModalDismiss(modal, hideWorkspacePicker);
 }
 
 function hideWorkspacePicker() {
@@ -178,6 +181,7 @@ function hideWorkspacePicker() {
   if (!modal) return;
   modal.classList.add('hidden');
   modal.classList.remove('flex');
+  if (_workspacePickerDismiss) { _workspacePickerDismiss(); _workspacePickerDismiss = null; }
 }
 
 // ---------------------------------------------------------------------------
