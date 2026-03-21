@@ -57,10 +57,8 @@ cd ui && npx --yes vitest@2 run    # Run frontend tests
 The server uses `net/http` stdlib routing (Go 1.22+ pattern syntax) with no framework.
 
 Key server files:
-- `main.go` — Subcommand dispatch, CLI flags, workspace resolution, browser launch
-- `server.go` — HTTP server setup, mux construction, route registration, container recovery
-- `cmd_status.go` — Terminal-based board status display
-- `exec.go` — Attach to running task containers
+- `main.go` — Tiny entry point: embed FS declarations and subcommand dispatch
+- `internal/cli/` — CLI subcommand implementations (server, exec, status, env) and shared helpers
 - `internal/apicontract/` — Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js`
 - `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream, execute, files, oversight, refine, ideate, templates, stats, admin, workspace, runtime)
 - `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; auto-retry; circuit breaker
