@@ -49,7 +49,7 @@ printf 'final answer from codex' > "$LAST_MSG"
 	// lives in the repo root package, the default working directory is correct
 	// when running via `go test`. We avoid hardcoding /workspace/wallfacer
 	// which only exists inside containers.
-	cmd := exec.Command("/bin/bash", "sandbox/codex/entrypoint.sh", "-p", "test prompt", "--verbose", "--output-format", "stream-json")
+	cmd := exec.Command("/bin/bash", filepath.Join(repoRoot(t), "sandbox/codex/entrypoint.sh"), "-p", "test prompt", "--verbose", "--output-format", "stream-json")
 	cmd.Env = append(os.Environ(), "PATH="+tempDir+":"+os.Getenv("PATH"))
 	out, err := cmd.Output()
 	if err != nil {
@@ -141,7 +141,7 @@ printf '{"type":"turn.completed","session_id":"sess","stop_reason":"end_turn","u
 		t.Fatalf("write fake codex: %v", err)
 	}
 
-	cmd := exec.Command("/bin/bash", "sandbox/codex/entrypoint.sh", "-p", "test prompt")
+	cmd := exec.Command("/bin/bash", filepath.Join(repoRoot(t), "sandbox/codex/entrypoint.sh"), "-p", "test prompt")
 	cmd.Env = append(os.Environ(),
 		"PATH="+tempDir+":"+os.Getenv("PATH"),
 		"WALLFACER_SANDBOX_FAST=false",
