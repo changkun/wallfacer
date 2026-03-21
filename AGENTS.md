@@ -291,7 +291,7 @@ Every implementation task MUST complete all three steps before finishing:
    - `docs/guide/configuration.md` — Settings, env vars, sandboxes, CLI, webhooks, security
    - `docs/guide/circuit-breakers.md` — Fault isolation reference
 
-   Each guide has an **Essentials** section (core usage) and an **Advanced Topics** section (power-user features). Place new content in the appropriate section. If a new feature doesn't fit any existing guide, create a new guide file and add it to the reading order in `usage.md`. Also update `AGENTS.md`, `CLAUDE.md`, and `docs/internals/*.md` as needed.
+   Each guide has an **Essentials** section (core usage) and an **Advanced Topics** section (power-user features). Place new content in the appropriate section. If a new feature doesn't fit any existing guide, create a new guide file and add it to the `## Reading Order` section in `usage.md` — the server parses the first `[Title](file.md)` link under each `###` heading to build the numbered docs sidebar. Also update `AGENTS.md`, `CLAUDE.md`, and `docs/internals/*.md` as needed.
 
 3. **Reflect on codebase health** — After implementing, review the files you touched and their immediate surroundings. If you spot a small, safe refactoring opportunity (dead code, unclear naming, duplicated logic, missing error handling) that is directly related to your change, include it. Keep refactoring changes minimal and scoped — do not redesign unrelated subsystems.
 

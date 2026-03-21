@@ -130,7 +130,7 @@ When a task is in the Waiting state, open its detail modal to see the agent's la
 
 ### Test Verification
 
-Test verification lets you check whether a task's changes actually work before committing them. It is available on tasks in the **Waiting**, **Done**, or **Failed** states.
+Test verification lets you check whether a task's changes actually work before committing them. You can trigger a test from a **Waiting** task (the most common case), or from **Done** or **Failed** tasks to verify their state.
 
 **Running a test:**
 
@@ -139,7 +139,7 @@ Test verification lets you check whether a task's changes actually work before c
 3. Optionally enter acceptance criteria -- specific requirements the agent should verify beyond running the project's existing test suite.
 4. Click **Run Test Agent**.
 
-A separate verification agent launches in its own container. It inspects the task's code changes, runs relevant tests, and reports a **Pass** or **Fail** verdict. The verdict appears as a badge on the task card.
+While the test runs, the task moves back to **In Progress** (the card shows a test indicator to distinguish it from normal execution). A separate verification agent launches in its own container, inspects the task's code changes, runs relevant tests, and reports a **Pass** or **Fail** verdict. When the test finishes, the task returns to **Waiting** with the verdict displayed as a badge on the card.
 
 **After reviewing the verdict:**
 
