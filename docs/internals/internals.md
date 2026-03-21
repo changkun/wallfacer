@@ -45,3 +45,9 @@ Background watchers, the autopilot promotion loop, auto-test, auto-submit, circu
 [Workspaces & Configuration](workspaces-and-config.md)
 
 Workspace manager, sandbox routing, system prompt templates, environment configuration, and runtime workspace switching.
+
+### 8. Development Setup
+
+[Development Setup](development.md)
+
+Building from source, running tests, make targets, sandbox images, and the release workflow.

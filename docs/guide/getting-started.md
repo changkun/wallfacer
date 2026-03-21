@@ -7,11 +7,10 @@ This guide walks through installing Wallfacer, connecting it to credentials, and
 - **Podman** or **Docker** — Wallfacer auto-detects whichever is available
 - **A Claude credential** — either a Claude Pro/Max OAuth token or an Anthropic API key (configured after install)
 - **Git** — recommended; non-git directories work as workspaces but git features (worktrees, diff, auto-push) are unavailable
-- **Go 1.25+** — [go.dev](https://go.dev/) (only needed if building from source; pre-built binaries are available)
 
 ## Step 1 — Install Wallfacer
 
-**Option A — Install script (no Go required)**
+**Option A — Install script**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
@@ -19,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh 
 
 This detects your OS and architecture, downloads the latest binary, and places it in `/usr/local/bin` (or `~/.local/bin`). Set `WALLFACER_INSTALL_DIR` to override the location, or `WALLFACER_VERSION=v0.0.5` for a specific version.
 
-**Option B — Manual binary download (no Go required)**
+**Option B — Manual binary download**
 
 Download the binary for your platform from the [latest release](https://github.com/changkun/wallfacer/releases/latest):
 
@@ -31,21 +30,7 @@ chmod +x wallfacer
 
 Available binaries: `wallfacer-darwin-arm64`, `wallfacer-darwin-amd64`, `wallfacer-linux-arm64`, `wallfacer-linux-amd64`.
 
-**Option C — Install via Go (requires Go 1.25+)**
-
-```bash
-go install changkun.de/x/wallfacer@latest
-```
-
-The binary is installed to `$GOPATH/bin` (or `$HOME/go/bin` by default).
-
-**Option D — Build from source (requires Go 1.25+)**
-
-```bash
-git clone https://github.com/changkun/wallfacer.git
-cd wallfacer
-go build -o wallfacer .
-```
+> **Building from source?** See [Development Setup](../internals/development.md) for `go install`, `go build`, `make` targets, and sandbox image builds.
 
 ## Step 2 — Start Wallfacer
 
@@ -79,7 +64,7 @@ The sandbox image (`ghcr.io/changkun/wallfacer:latest`) is pulled automatically 
 
 ## Step 3 — Configure Your Credential
 
-Open **Settings → API Configuration** in the browser and enter your credential:
+Open **Settings → Sandbox** in the browser and enter your credential:
 
 **Option A — OAuth token (Claude Pro or Max subscription)**
 
@@ -100,7 +85,7 @@ Wallfacer supports two Codex auth modes:
 1. **Host auth cache (recommended)**
    If `~/.codex/auth.json` exists on your host machine, Wallfacer validates it at startup and enables Codex automatically.
 2. **API key fallback**
-   Set `OPENAI_API_KEY` in **Settings → API Configuration** and run **Test (Codex)** once.
+   Set `OPENAI_API_KEY` in **Settings → Sandbox** and run **Test (Codex)** once.
 
 ## Step 4 — Verify the Setup
 
@@ -116,124 +101,36 @@ Once all required checks pass, create a test task: click **+ New Task**, enter a
 
 If the task fails immediately, check:
 
-- The credential is correct (re-check in **Settings → API Configuration**)
+- The credential is correct (re-check in **Settings → Sandbox**)
 - The container runtime (Podman or Docker) is running and accessible to your user
 - Network access is available (the sandbox image is pulled from `ghcr.io` on first use)
 
-## Configuration Reference
-
-All configuration lives in `~/.wallfacer/.env`, which is auto-generated on first run. The server re-reads this file before each container launch, so changes take effect on the next task without a server restart. You can edit variables directly in the file or from **Settings → API Configuration** in the web UI.
-
-### Claude Code Variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `CLAUDE_CODE_OAUTH_TOKEN` | one of these two | OAuth token from `claude setup-token` (Claude Pro/Max) |
-| `ANTHROPIC_API_KEY` | one of these two | API key from console.anthropic.com |
-| `ANTHROPIC_BASE_URL` | no | Custom API endpoint (proxy, alternative provider). When set, Wallfacer queries `{base_url}/v1/models` to populate the model selection dropdown |
-| `ANTHROPIC_AUTH_TOKEN` | no | Bearer token for LLM gateway proxy authentication |
-| `CLAUDE_DEFAULT_MODEL` | no | Default model passed to task containers; omit to use the Claude Code default |
-| `CLAUDE_TITLE_MODEL` | no | Model for background title generation; falls back to `CLAUDE_DEFAULT_MODEL` |
-
-### OpenAI Codex Variables (Optional)
-
-Requires selecting Codex as the task sandbox. The Codex sandbox image is pulled automatically on first use.
-
-| Variable | Required | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | no* | OpenAI API key. Not required when valid host auth cache exists at `~/.codex/auth.json` |
-| `OPENAI_BASE_URL` | no | Custom OpenAI-compatible base URL (default: `https://api.openai.com/v1`) |
-| `CODEX_DEFAULT_MODEL` | no | Default model for Codex tasks (e.g. `codex-mini-latest`) |
-| `CODEX_TITLE_MODEL` | no | Title generation model; falls back to `CODEX_DEFAULT_MODEL` |
-
-\* If host auth cache is unavailable or invalid, `OPENAI_API_KEY` + successful **Test (Codex)** is required.
-
-### Server & Operational Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `WALLFACER_SERVER_API_KEY` | — | Bearer token for server API authentication. When set, all API requests must include `Authorization: Bearer <key>` |
-| `WALLFACER_MAX_PARALLEL` | `5` | Maximum concurrent tasks in autopilot mode |
-| `WALLFACER_MAX_TEST_PARALLEL` | (inherits) | Maximum concurrent test runs |
-| `WALLFACER_OVERSIGHT_INTERVAL` | `0` | Minutes between periodic oversight generation while a task runs (0 = only at completion) |
-| `WALLFACER_AUTO_PUSH` | `false` | Enable automatic `git push` after task completion |
-| `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum completed tasks before auto-push triggers |
-| `WALLFACER_SANDBOX_FAST` | `true` | Enable fast-mode sandbox hints by default |
-| `WALLFACER_CONTAINER_NETWORK` | — | Container network name |
-| `WALLFACER_CONTAINER_CPUS` | — | Container CPU limit (e.g. `"2.0"`, empty = no limit) |
-| `WALLFACER_CONTAINER_MEMORY` | — | Container memory limit (e.g. `"4g"`, empty = no limit) |
-| `WALLFACER_WEBHOOK_URL` | — | Webhook URL for task state change notifications |
-| `WALLFACER_WEBHOOK_SECRET` | — | HMAC secret for webhook signature verification |
-| `WALLFACER_WORKSPACES` | — | Workspace paths (OS path-list separated); alternative to CLI arguments |
-| `WALLFACER_ARCHIVED_TASKS_PER_PAGE` | (default) | Pagination size for archived tasks |
-| `WALLFACER_TOMBSTONE_RETENTION_DAYS` | `7` | Days to retain soft-deleted task data before permanent removal |
-| `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive container runtime failures before the circuit breaker opens |
-| `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the container circuit breaker stays open before probing |
-
-### Sandbox Routing Variables
-
-Route specific agent activities to different sandbox types (claude or codex):
-
-| Variable | Description |
-|---|---|
-| `WALLFACER_DEFAULT_SANDBOX` | Default sandbox for all activities |
-| `WALLFACER_SANDBOX_IMPLEMENTATION` | Sandbox for task implementation |
-| `WALLFACER_SANDBOX_TESTING` | Sandbox for test verification |
-| `WALLFACER_SANDBOX_REFINEMENT` | Sandbox for prompt refinement |
-| `WALLFACER_SANDBOX_TITLE` | Sandbox for title generation |
-| `WALLFACER_SANDBOX_OVERSIGHT` | Sandbox for oversight generation |
-| `WALLFACER_SANDBOX_COMMIT_MESSAGE` | Sandbox for commit message generation |
-| `WALLFACER_SANDBOX_IDEA_AGENT` | Sandbox for ideation agent |
-
-### Server Flags
+## CLI Reference
 
 ```bash
-./wallfacer run [flags] [workspace...]
+wallfacer run [flags] [workspace...]     # Start the task board server
+wallfacer doctor                         # Check prerequisites and config
+wallfacer status                         # Print board state to terminal
+wallfacer status -watch                  # Live-updating board state
+wallfacer status -json                   # Machine-readable JSON output
+wallfacer exec <task-id-prefix>          # Attach to a running task container
+wallfacer exec --sandbox claude          # Open shell in a new sandbox
 ```
 
-| Flag | Env Var | Default | Description |
-|------|---------|---------|-------------|
-| `-addr` | `ADDR` | `:8080` | Listen address |
-| `-data` | `DATA_DIR` | `~/.wallfacer/data` | Task data directory |
-| `-container` | `CONTAINER_CMD` | auto-detected | Container runtime command (`podman` or `docker`) |
-| `-image` | `SANDBOX_IMAGE` | `ghcr.io/changkun/wallfacer:latest` | Sandbox image name |
-| `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file passed to containers |
-| `-no-browser` | — | `false` | Skip auto-opening the browser on start |
-| `-no-workspaces` | — | `false` | Start with no active workspaces |
-| `-log-format` | `LOG_FORMAT` | `text` | Log output format: `text` or `json` |
+Common `run` flags:
 
-Run `./wallfacer run -help` for the full flag list.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-addr` | `:8080` | Listen address |
+| `-no-browser` | `false` | Skip auto-opening the browser |
+| `-no-workspaces` | `false` | Start with no active workspaces |
+| `-container` | auto-detected | Container runtime (`podman` or `docker`) |
+| `-log-format` | `text` | Log format: `text` or `json` |
 
-The container runtime defaults to auto-detection: Wallfacer checks `/opt/podman/bin/podman`, then `podman` on `$PATH`, then `docker` on `$PATH`. Override with the `-container` flag or `CONTAINER_CMD` env var.
-
-### Checking Prerequisites
-
-```bash
-./wallfacer doctor
-```
-
-Checks configuration paths, credentials, container runtime, sandbox images, and Git. Items marked `[ok]` are ready, `[!]` need attention, and `[ ]` are optional.
-
-### Checking Board Status
-
-```bash
-./wallfacer status                          # Snapshot of current board state
-./wallfacer status -watch                   # Live-updating view
-./wallfacer status -json                    # Machine-readable JSON output
-./wallfacer status -addr :9090              # Connect to a different server
-```
-
-### Attaching to a Running Task Container
-
-```bash
-./wallfacer exec <task-id-prefix>           # Attach an interactive shell to a running task container
-./wallfacer exec <task-id-prefix> -- bash   # Explicit shell
-./wallfacer exec --sandbox claude           # Open shell in a new sandbox container (no task)
-```
-
-The task ID prefix is the first few characters of the task UUID (shown on the card or in the detail panel).
+Run `wallfacer run -help` for the full flag list. For the complete configuration reference (env vars, sandbox routing, webhooks, etc.), see [Configuration](configuration.md).
 
 ## Next Steps
 
 - [Usage Guide](usage.md) — how to create tasks, handle feedback, use autopilot, and manage results
+- [Configuration](configuration.md) — env vars, sandbox routing, webhooks, and advanced settings
 - [Architecture](../internals/architecture.md) — system design and internals for contributors
