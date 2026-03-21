@@ -2,141 +2,388 @@
 
 ## Context
 
-Currently, wallfacer has a **single active workspace group** model. The workspace manager holds one `Snapshot` (store + workspaces + instructions) at a time. When switching workspace groups, `UpdateWorkspaces` returns HTTP 409 if any tasks are `InProgress` or `Committing`. The old store is **closed** on switch. This prevents users from running tasks across multiple workspace groups simultaneously.
+Wallfacer uses a **single active workspace group** model. The workspace
+manager (`internal/workspace/manager.go`) holds one `Snapshot` at a time
+containing a `Store`, workspace paths, instructions path, scoped data
+directory, and a deterministic key. When the user switches groups:
 
-**Goal**: Allow multiple workspace groups to have running tasks simultaneously. Switching the "viewed" workspace group in the UI should not stop tasks in other groups.
+- `Handler.UpdateWorkspaces()` (`workspace.go:74-86`) returns HTTP 409 if
+  any task is `InProgress` or `Committing`.
+- `Manager.Switch()` atomically swaps `m.current`, then **closes the
+  previous store** (`lines 234-240`). The store's `Close()` sets an atomic
+  `closed` flag but does not interrupt in-flight operations.
+- The subscription goroutines in both Runner (`runner.go:604-656`) and
+  Handler (`handler.go:211-218`) call `applyWorkspaceSnapshot()` /
+  `applySnapshot()`, which replace `r.store` / `h.store` with the new
+  store reference.
 
-## Approach: Hybrid Multi-Store
+This means switching groups stops all watchers from seeing the old group's
+tasks (stale store reference) and prevents users from running tasks across
+multiple workspace groups simultaneously.
 
-The Manager holds multiple open stores (one per group with active tasks), while the Handler and Runner maintain a "viewed" pointer for the UI and API. This minimizes changes while achieving full concurrency.
+**Goal**: Allow multiple workspace groups to have running tasks
+simultaneously. Switching the "viewed" workspace group in the UI should not
+stop tasks in other groups.
 
 ### Key Insight
 
-Stores are already scoped by workspace-key (`dataDir/<key>/`). Tasks already use isolated worktrees. The only blocking issue is that `Switch()` closes the old store and the watchers/handlers lose reference to it.
+Stores are already scoped by workspace key (`dataDir/<key>/`). Tasks
+already use isolated worktrees. The only blocking issues are:
+
+1. `Switch()` closes the old store immediately.
+2. The 409 guard in `UpdateWorkspaces()` prevents switching entirely.
+3. Watchers subscribe to a single store's `SubscribeWake()` at startup and
+   never re-subscribe when the store changes.
+4. `Runner.Run()` (`execute.go:132+`) reads `r.store` at entry and uses it
+   throughout — if a workspace switch occurs mid-execution the reference
+   becomes stale.
 
 ---
 
-## Phase 1: Multi-Store Manager (`internal/workspace/manager.go`)
+## Current Architecture (as of 2026-03-21)
+
+### Manager
+
+```go
+// internal/workspace/manager.go
+type Manager struct {
+    mu        sync.RWMutex
+    current   Snapshot            // single active group
+    nextGen   uint64
+    subsMu    sync.Mutex
+    subs      map[int]chan Snapshot
+    nextSubID int
+    newStore  func(dir string) (*store.Store, error)
+    // ...
+}
+
+type Snapshot struct {
+    Workspaces       []string
+    Store            *store.Store
+    InstructionsPath string
+    ScopedDataDir    string
+    Key              string       // deterministic hash of sorted workspaces
+    Generation       uint64
+}
+```
+
+`Switch()` flow: validate → create new store at `dataDir/<key>` → atomic
+swap under `mu.Lock` → publish to subscribers → close previous store.
+
+### Runner
+
+```go
+// internal/runner/runner.go (lines 300-343)
+type Runner struct {
+    store            *store.Store        // swapped via applyWorkspaceSnapshot
+    storeMu          sync.RWMutex        // guards store + workspace fields
+    workspaces       string              // space-separated paths
+    workspaceManager *workspace.Manager
+    // ...
+}
+```
+
+- `RunBackground(taskID, prompt, sessionID, resumedFromWaiting)` — spawns
+  `Run()` in a goroutine tracked by `backgroundWg`.
+- `Run()` reads `r.store` at entry (`execute.go:137,163`) and uses it for
+  all operations without re-checking.
+- `startBoardSubscriptionLoop()` (`runner.go:604-656`) subscribes to both
+  workspace changes (via `wsMgr.Subscribe()`) and store changes (via
+  `store.SubscribeWake()`). On workspace change it calls
+  `applyWorkspaceSnapshot()` and re-subscribes to the new store.
+- `currentStore()` (`runner.go:598-602`) returns `r.store` under `storeMu`
+  read lock but is rarely used — most code reads `r.store` directly.
+
+### Handler
+
+```go
+// internal/handler/handler.go (lines 98-166)
+type Handler struct {
+    snapshotMu sync.RWMutex
+    store      *store.Store     // mirrors workspace.Manager.current.Store
+    workspace  *workspace.Manager
+    runner     runner.Interface
+    workspaces []string
+    // ...
+}
+```
+
+- `currentStore()` reads from `h.workspace.Store()` (manager) directly.
+- Six watchers (`tasks_autopilot.go`) each call `h.store.SubscribeWake()`
+  at startup and reference `h.store` directly (~1000+ total references
+  across the handler package).
+
+| Watcher               | Start Line | Subscription |
+|-----------------------|-----------|--------------|
+| StartAutoPromoter     | 114       | `h.store.SubscribeWake()` |
+| StartAutoRetrier      | 145       | `h.store.SubscribeWake()` |
+| StartWaitingSyncWatcher| 455      | `h.store.SubscribeWake()` |
+| StartAutoTester       | 568       | `h.store.SubscribeWake()` |
+| StartAutoSubmitter    | 776       | `h.store.SubscribeWake()` |
+| StartAutoRefiner      | 961       | `h.store.SubscribeWake()` |
+
+### Store
+
+```go
+// internal/store/store.go
+type Store struct {
+    dir     string
+    closed  atomic.Bool
+    tasks   map[uuid.UUID]*Task
+    // wake subscribers: capacity-1 channels (coalescing)
+    wakeSubscribers map[int]chan struct{}
+    // ...
+}
+```
+
+`Close()` sets `closed` flag atomically. Does NOT interrupt in-flight
+reads/writes. `SubscribeWake()` returns a capacity-1 channel that coalesces
+burst signals.
+
+### Server Initialization (`server.go`)
+
+```
+wsMgr  = workspace.NewManager(...)
+s      = wsMgr.Snapshot().Store
+runner = runner.NewRunner(s, RunnerConfig{WorkspaceManager: wsMgr, ...})
+handler= handler.NewHandler(s, runner, ...)
+    → handler subscribes to wsMgr changes (goroutine: applySnapshot on each)
+    → runner subscribes to wsMgr + store changes (startBoardSubscriptionLoop)
+    → handler starts 6 watchers (each subscribes to s.SubscribeWake)
+```
+
+---
+
+## Phase 1: Multi-Store Manager
+
+**File**: `internal/workspace/manager.go` (~120 lines added)
 
 ### Changes
 
-1. **Add `activeStores` map** to Manager:
+1. **Add `activeGroups` map** to Manager:
+
    ```go
    type activeGroup struct {
        snapshot  Snapshot
-       taskCount int32 // atomic: in-progress + committing tasks
+       taskCount atomic.Int32 // in-progress + committing tasks
    }
 
-   // New fields in Manager:
-   activeStores map[string]*activeGroup // key = workspace key
+   // New fields in Manager (guarded by mu):
+   activeGroups map[string]*activeGroup // key = Snapshot.Key
    ```
 
 2. **Modify `Switch()`**:
-   - Still set `m.current` to the new snapshot (the "viewed" group)
-   - Do NOT close the old store if it has `taskCount > 0`; keep it in `activeStores`
-   - Always add the new store to `activeStores`
-   - Close and remove stores with `taskCount == 0` that are NOT the viewed group
+   - Set `m.current` to the new snapshot (the "viewed" group).
+   - Do NOT close the old store if `activeGroups[oldKey].taskCount > 0`.
+     Keep it in `activeGroups`.
+   - Always add the new snapshot to `activeGroups`.
+   - Close and remove groups with `taskCount == 0` that are not the viewed
+     group.
 
 3. **New methods**:
-   - `AllActiveStores() []Snapshot` — returns snapshots for all groups with open stores
-   - `StoreForKey(key string) (*store.Store, bool)` — lookup by workspace key
-   - `IncrementTaskCount(key string)` / `DecrementTaskCount(key string)` — track running tasks
-   - `CleanupIdleStores()` — close non-viewed stores with zero running tasks
 
-4. **Store lifecycle rule**: A store stays open if `taskCount > 0` OR it is the viewed group.
-
-### Files
-- `internal/workspace/manager.go` (~100 lines added)
-- `internal/workspace/manager_test.go` (new tests)
-
----
-
-## Phase 2: Runner Multi-Store Awareness (`internal/runner/`)
-
-### Changes
-
-1. **Store registry** — Replace single `r.store` with:
    ```go
-   storeRegistry map[string]*store.Store // key = workspace key
-   viewedKey     string
-   taskStoreKey  sync.Map // task UUID -> workspace key
+   // AllActiveSnapshots returns snapshots for all groups with open stores
+   // (viewed group + groups with running tasks).
+   func (m *Manager) AllActiveSnapshots() []Snapshot
+
+   // StoreForKey returns the store for a workspace key, if still active.
+   func (m *Manager) StoreForKey(key string) (*store.Store, bool)
+
+   // IncrementTaskCount marks a new running task in the given group.
+   // Called by Runner at task start.
+   func (m *Manager) IncrementTaskCount(key string)
+
+   // DecrementAndCleanup decrements the task count and closes the group's
+   // store if it reaches zero and the group is not currently viewed.
+   // Called by Runner at task completion.
+   func (m *Manager) DecrementAndCleanup(key string)
    ```
 
-2. **Task-store mapping** — When `RunBackground` is called, record which workspace key the task belongs to. Resolve the correct store in `Run()` via this mapping.
+4. **Store lifecycle rule**: A store stays open when
+   `taskCount > 0 OR key == m.current.Key`.
 
-3. **`RunBackground` signature change**:
-   - Add `wsKey string` parameter (the workspace key for the task's store)
-   - Call `manager.IncrementTaskCount(wsKey)` at start
-   - Call `manager.DecrementTaskCount(wsKey)` + `manager.CleanupIdleStores()` on completion
+### Tests
 
-4. **`applyWorkspaceSnapshot()`** — Add store to `storeRegistry` instead of replacing. Update `viewedKey`.
-
-5. **Board subscription loop** — Subscribe to wake events from ALL stores in registry, not just the viewed one.
-
-### Files
-- `internal/runner/runner.go` (~80 lines modified)
-- `internal/runner/execute.go` (~20 lines — store resolution at Run entry)
-- `internal/runner/interface.go` (~5 lines — RunBackground signature)
-- `internal/runner/mock.go` (update mock)
+- `TestManagerMultiStoreLifecycle` — switch away from group A with running
+  tasks; verify store stays open; decrement to zero; verify cleanup.
+- `TestManagerSwitchBackReuseStore` — switch A→B→A; verify store A is
+  reused (not re-created) if still in `activeGroups`.
+- `TestManagerSingleGroupUnchanged` — single group, verify `activeGroups`
+  has exactly one entry.
 
 ---
 
-## Phase 3: Handler Changes (`internal/handler/`)
+## Phase 2: Runner Multi-Store Awareness
+
+**Files**: `runner.go` (~80 lines), `execute.go` (~30 lines),
+`interface.go` (~5 lines), `mock.go` (~5 lines)
 
 ### Changes
 
-1. **Remove the 409 blocking check** in `UpdateWorkspaces()` (`workspace.go:74-86`). This is the user-facing fix.
+1. **Capture store at task start** — `Run()` must resolve the correct store
+   from the workspace manager at entry and use that reference throughout,
+   rather than reading `r.store` which may have changed.
 
-2. **Auto-watchers** — The watchers (`StartAutoPromoter`, `StartAutoRetrier`, `StartAutoTester`, `StartAutoSubmitter`, `StartAutoRefiner`, `StartIdeationWatcher`) currently subscribe to `h.store.SubscribeWake()` at startup. This is already broken across workspace switches (they stay subscribed to the initial store).
+   ```go
+   func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumed bool) {
+       // Resolve store for this task's workspace group.
+       wsKey := r.taskWSKey.Load(taskID)
+       s, ok := r.workspaceManager.StoreForKey(wsKey)
+       if !ok {
+           s = r.currentStore() // fallback to viewed store
+       }
+       // Use s (not r.store) for all operations in this execution.
+       // ...
+   }
+   ```
 
-   **Fix**: Replace direct store subscription with workspace-manager-aware subscription:
-   - Add `h.forEachActiveStore(fn func(s *store.Store, ws []string))` helper
-   - Each watcher's `try*` method iterates all active stores instead of using `h.store` directly
-   - Use the ticker-based fallback polling (already present as 60s ticker in `StartAutoPromoter`) instead of trying to merge wake channels from multiple stores
-   - Alternative: subscribe to workspace manager for new-store events and dynamically add wake subscriptions
+   This is the most invasive change in the runner — `Run()` and the
+   functions it calls (`executeTask`, `commitAndPush`, `runIdeationTask`,
+   etc.) reference `r.store` extensively. Options:
 
-   **Pragmatic approach**: Since watchers already have ticker fallbacks (60s), simplify to:
-   - Watchers subscribe to workspace manager for view changes
-   - On each tick or wake, iterate `manager.AllActiveStores()` and run checks against each
+   **Option A — per-execution context struct**: Wrap `s *store.Store` in a
+   struct passed through the call chain. Clean but touches many signatures.
 
-3. **`tryAutoPromote` and similar** — Change from `h.store.ListTasksByStatus(...)` to iterating all active stores.
+   **Option B — task-scoped store accessor**: Add a `taskStore(taskID)`
+   method that checks `taskWSKey` then falls back to `currentStore()`.
+   Replace `r.store` references with `r.taskStore(taskID)` calls. Less
+   invasive but adds indirection.
 
-4. **`buildConfigResponse`** — Add `active_group_keys` field listing workspace keys with running tasks.
+   **Recommended**: Option B — smaller diff, same correctness.
 
-5. **`currentStore()` / `currentWorkspaces()`** — Continue returning the viewed group (for API requests, git operations, etc.).
+2. **Track task-to-group mapping**:
 
-### Files
-- `internal/handler/workspace.go` (~10 lines removed)
-- `internal/handler/tasks_autopilot.go` (~100 lines refactored)
-- `internal/handler/ideate.go` (~20 lines)
-- `internal/handler/config.go` (~15 lines)
-- `internal/handler/handler.go` (~20 lines — forEachActiveStore helper)
+   ```go
+   // New fields in Runner:
+   taskWSKey sync.Map // uuid.UUID → string (workspace key)
+   ```
+
+3. **`RunBackground` changes**:
+
+   ```go
+   func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resumed bool) {
+       // Capture current workspace key at dispatch time.
+       wsKey := r.currentWSKey()
+       r.taskWSKey.Store(taskID, wsKey)
+       r.workspaceManager.IncrementTaskCount(wsKey)
+
+       label := "run:" + taskID.String()[:8]
+       r.backgroundWg.Add(label)
+       go func() {
+           defer r.backgroundWg.Done(label)
+           defer r.taskWSKey.Delete(taskID)
+           defer r.workspaceManager.DecrementAndCleanup(wsKey)
+           r.Run(taskID, prompt, sessionID, resumed)
+       }()
+   }
+   ```
+
+4. **`applyWorkspaceSnapshot()`** — Continue updating `r.store` (the
+   "viewed" store). In-flight tasks use their captured store via
+   `taskStore()`.
+
+5. **Board subscription loop** — No change needed. The loop already
+   re-subscribes to the new store on workspace change. Board context only
+   needs the viewed store.
 
 ---
 
-## Phase 4: Frontend (`ui/js/`)
+## Phase 3: Handler and Watcher Changes
+
+**Files**: `workspace.go` (~10 lines removed), `tasks_autopilot.go` (~120
+lines refactored), `handler.go` (~30 lines), `config.go` (~10 lines)
 
 ### Changes
 
-1. **`workspace.js`** — `applyWorkspaceSelection()`:
-   - Remove expectation of 409 errors (switch always succeeds now)
-   - Keep stream restart logic (correct — board should show new group)
+1. **Remove 409 blocking check** in `UpdateWorkspaces()`
+   (`workspace.go:74-86`). This is the user-facing fix. Switches always
+   succeed.
 
-2. **`workspace.js`** — `renderWorkspaceGroups()` / `renderHeaderWorkspaceGroupsMenu()`:
-   - Show activity indicator (spinner/badge) next to groups with running tasks
-   - Info comes from new `active_group_keys` in config response
+2. **Watcher store subscription** — The six watchers currently subscribe to
+   `h.store.SubscribeWake()` at startup. When the viewed workspace changes,
+   these subscriptions become stale (they still listen to the old store).
 
-3. **`state.js`** — Add `backgroundGroupActivity` state variable.
+   **Fix**: Each watcher re-subscribes when the workspace snapshot changes.
+   Add a helper:
 
-### Files
-- `ui/js/workspace.js` (~20 lines)
-- `ui/js/state.js` (~5 lines)
+   ```go
+   // storeWakeChan returns a channel that fires on store changes,
+   // automatically re-subscribing when the workspace group changes.
+   // Caller must call cancel() on shutdown.
+   func (h *Handler) storeWakeChan(ctx context.Context) (<-chan struct{}, func()) {
+       // Subscribe to workspace changes.
+       // On each change, unsubscribe old store wake, subscribe new.
+       // Merge into single output channel.
+   }
+   ```
+
+   Each `StartAuto*` method replaces its `h.store.SubscribeWake()` call
+   with `h.storeWakeChan(ctx)`.
+
+3. **Multi-store watcher iteration** — Watchers that scan for eligible
+   tasks (promote, retry, test, submit, refine) must check ALL active
+   stores, not just the viewed one. Add:
+
+   ```go
+   func (h *Handler) forEachActiveStore(fn func(s *store.Store, ws []string)) {
+       for _, snap := range h.workspace.AllActiveSnapshots() {
+           fn(snap.Store, snap.Workspaces)
+       }
+   }
+   ```
+
+   Replace direct `h.store.ListTasksByStatus(...)` calls in watcher
+   `try*` methods with `h.forEachActiveStore(...)` iteration.
+
+   **Scope**: The `try*` methods reference `h.store` or
+   `h.currentStore()` in the following patterns:
+   - `ListTasksByStatus` / `ListTasks` — task scanning
+   - `CountRegularInProgress` — concurrency limit checks
+   - `UpdateTaskStatus` / `ResetTaskForRetry` — state transitions
+   - `InsertEvent` — event recording
+
+   For state transitions and event writes, the correct store is the one
+   that owns the task. Since `forEachActiveStore` iterates all stores, each
+   task is found in its owning store naturally.
+
+4. **`buildConfigResponse`** — Add `active_group_keys` field:
+
+   ```go
+   "active_group_keys": h.workspace.ActiveGroupKeys(),
+   ```
+
+5. **`currentStore()` / `currentWorkspaces()`** — No change. Continue
+   returning the viewed group for API requests, git operations, SSE
+   streams.
 
 ---
 
-## Phase 5: Server Initialization (`server.go`)
+## Phase 4: Frontend
 
-Minor adjustments to pass workspace manager references correctly. The `.env` file continues storing the viewed workspace set for startup recovery. No fundamental changes.
+**Files**: `ui/js/workspace.js` (~25 lines), `ui/js/state.js` (~5 lines)
+
+### Changes
+
+1. **Remove 409 handling** in `applyWorkspaceSelection()` — switch always
+   succeeds now. Remove the error path that shows "tasks in progress"
+   message.
+
+2. **Activity indicator** — `renderWorkspaceGroups()` and
+   `renderHeaderWorkspaceGroupsMenu()`: show a dot/badge next to groups
+   that appear in `active_group_keys` from the config response.
+
+3. **State** — Add `activeGroupKeys` to `state.js`, populated from
+   config polling or SSE.
+
+---
+
+## Phase 5: Server Initialization
+
+No fundamental changes. `server.go` already wires `wsMgr` into both
+runner and handler. The `.env` file continues storing the viewed workspace
+set for startup recovery. On startup only one store (the viewed group) is
+open; `activeGroups` has one entry.
 
 ---
 
@@ -147,27 +394,57 @@ Phase 1 (Manager)    — foundation, no dependencies
 Phase 2 (Runner)     — depends on Phase 1
 Phase 3 (Handler)    — depends on Phase 1 & 2
 Phase 4 (Frontend)   — depends on Phase 3
-Phase 5 (Server)     — parallel with Phase 3
+Phase 5 (Server)     — parallel with Phase 3, minimal changes
 ```
 
 ---
 
 ## Risk Areas
 
-1. **Auto-watcher multi-store iteration** — Most complex change. The watchers use `h.store` directly ~30 times across `tasks_autopilot.go`. Each needs refactoring to iterate all active stores.
+1. **Watcher refactoring scope** — The handler references `h.store`
+   ~1000+ times across the package. Only the watcher `try*` methods need
+   multi-store iteration (~6 methods, ~200 store references). Other
+   handler methods (API endpoints) correctly use `currentStore()` for the
+   viewed group. Careful scoping is needed to avoid changing API endpoint
+   behavior.
 
-2. **Store reference in `Run()`** — The `Run` method references `r.store` extensively. Need to resolve the correct store at entry and thread it through. A per-execution context struct would be cleanest.
+2. **Runner store threading** — `Run()` and its callees (`executeTask`,
+   `commitAndPush`, `runIdeationTask`, `runRefinement`, etc.) reference
+   `r.store` extensively. The `taskStore(taskID)` accessor approach
+   minimizes signature changes but every `r.store` reference in the
+   execution path must be audited and replaced.
 
-3. **Race between task completion and store cleanup** — After `DecrementTaskCount`, before `CleanupIdleStores`, another task could start. Must use proper locking in the Manager.
+3. **Race between completion and cleanup** — After
+   `DecrementAndCleanup`, before the store is actually closed, a new task
+   could be created in that group (e.g. an idea-agent creating backlog
+   tasks). The decrement and close must be atomic under `mu.Lock`, and
+   task creation must check `activeGroups` before writing.
 
-4. **Wake subscription management** — Dynamically adding/removing store subscriptions as groups become active/idle requires careful lifecycle management.
+4. **Wake channel lifecycle** — When a store is closed, its wake
+   subscribers receive no further signals. Watchers using `storeWakeChan`
+   must handle the case where the channel becomes dead (the helper
+   re-subscribes on workspace change, but a background group's store
+   closing mid-scan needs graceful handling).
+
+5. **Concurrency limit across groups** — `CountRegularInProgress()` is
+   used to enforce the max parallel tasks limit. With multi-store, this
+   count must span ALL active stores, not just the viewed one, to prevent
+   exceeding the global limit.
 
 ---
 
 ## Verification
 
-1. **Unit tests**: Manager multi-store lifecycle (open, reference count, cleanup)
-2. **Integration test**: Start tasks in group A, switch to group B, verify group A tasks continue running
-3. **Manual test**: Open UI, create tasks in group A, switch to group B, create tasks there, verify both boards work independently
-4. **Regression**: Verify single-group usage is unchanged (activeStores has exactly one entry)
-5. Run existing test suite: `go test ./...`
+1. **Unit tests**: Manager multi-store lifecycle (open, reference count,
+   cleanup, switch-back reuse).
+2. **Unit tests**: Runner `taskStore()` resolution — correct store for
+   in-flight task after workspace switch.
+3. **Integration test**: Start tasks in group A, switch to group B,
+   verify group A tasks continue running and reach `done`.
+4. **Integration test**: Verify concurrency limit is enforced across
+   groups.
+5. **Manual test**: Open UI, create tasks in group A, switch to group B,
+   create tasks there, verify both boards work independently.
+6. **Regression**: Single-group usage unchanged (`activeGroups` has
+   exactly one entry throughout).
+7. Run existing test suite: `go test ./...`
