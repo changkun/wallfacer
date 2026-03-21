@@ -2830,6 +2830,80 @@ mark.search-highlight {
   }
 }
 
+/* --- Workspace picker --- */
+.ws-picker { max-width: 860px; width: 100%; padding: 0; }
+.ws-picker__header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.ws-picker__title { margin: 0; font-size: 15px; font-weight: 700; }
+.ws-picker__subtitle { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
+.ws-picker__body {
+  display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 0;
+  font-size: 12px; min-height: 380px;
+}
+.ws-picker__browser {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 16px; border-right: 1px solid var(--border);
+}
+.ws-picker__path-row { display: flex; gap: 6px; align-items: center; }
+.ws-picker__path-input { font-family: monospace; font-size: 12px; flex: 1; }
+.ws-picker__go-btn { font-size: 12px; padding: 4px 12px; flex-shrink: 0; }
+.ws-picker__breadcrumb { font-size: 12px; min-height: 1.2em; display: flex; align-items: center; flex-wrap: wrap; gap: 1px; }
+.ws-picker__status { font-size: 11px; color: var(--text-muted); min-height: 1em; }
+.ws-picker__list {
+  flex: 1; overflow: auto; border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px; background: var(--bg-elevated);
+}
+.ws-picker__filter-wrap { position: sticky; top: 0; z-index: 1; padding: 0 0 4px; background: var(--bg-elevated); }
+.ws-picker__filter { font-size: 12px; width: 100%; }
+.ws-picker__browser-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; color: var(--text-muted); padding-top: 2px;
+}
+.ws-picker__toggle { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 11px; color: var(--text-muted); }
+.ws-picker__toggle input { accent-color: var(--accent); cursor: pointer; }
+.ws-picker__add-folder-btn { font-size: 11px; padding: 2px 6px; }
+.ws-picker__selection { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; }
+.ws-picker__selection-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ws-picker__selection-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--text-muted);
+}
+.ws-picker__clear-btn { font-size: 11px; padding: 2px 6px; }
+.ws-picker__selection-list { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.ws-picker__selection-footer { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
+.ws-picker__apply-status { font-size: 11px; color: var(--text-muted); }
+
+/* Workspace picker: browser entries (rendered by JS) */
+.ws-entry { display: flex; align-items: center; gap: 4px; padding: 2px 2px 2px 0; border-radius: 4px; }
+.ws-entry__name {
+  flex: 1; display: flex; align-items: center; gap: 5px;
+  border: none; background: none; color: inherit; cursor: pointer;
+  text-align: left; padding: 4px 6px; border-radius: 4px; font-size: 12px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ws-entry__name:hover { background: var(--bg-input); }
+.ws-entry__badge {
+  font-size: 9px; color: var(--accent); border: 1px solid var(--accent);
+  border-radius: 3px; padding: 0 4px; flex-shrink: 0; line-height: 1.4;
+}
+.ws-entry__add { font-size: 11px; padding: 2px 8px; flex-shrink: 0; }
+.ws-entry__added { font-size: 10px; color: var(--text-muted); padding: 2px 8px; flex-shrink: 0; }
+.ws-entry--parent { padding: 4px 6px; border: none; background: none; color: var(--text-muted); cursor: pointer; font-size: 12px; width: 100%; text-align: left; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
+.ws-entry--parent:hover { background: var(--bg-input); }
+
+/* Workspace picker: selection items (rendered by JS) */
+.ws-selected-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+  background: var(--bg-elevated);
+}
+.ws-selected-item__path { font-family: monospace; font-size: 11px; word-break: break-all; min-width: 0; }
+.ws-selected-item__remove { font-size: 11px; padding: 1px 6px; flex-shrink: 0; }
+
 /* --- Docs modal --- */
 .docs-modal-card {
   max-width: 1100px;

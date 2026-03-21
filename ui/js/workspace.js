@@ -368,9 +368,9 @@ function renderWorkspaceSelectionDraft() {
     return;
   }
   el.innerHTML = workspaceSelectionDraft.map(function(path) {
-    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--bg-elevated);">' +
-      '<span style="font-family:monospace;font-size:11px;word-break:break-all;">' + escapeHtml(path) + '</span>' +
-      '<button type="button" class="btn-ghost" data-workspace-path="' + escapeHtml(path) + '" onclick="removeWorkspaceSelection(this.dataset.workspacePath)">Remove</button>' +
+    return '<div class="ws-selected-item">' +
+      '<span class="ws-selected-item__path">' + escapeHtml(path) + '</span>' +
+      '<button type="button" class="btn-ghost ws-selected-item__remove" data-workspace-path="' + escapeHtml(path) + '" onclick="removeWorkspaceSelection(this.dataset.workspacePath)">&times;</button>' +
       '</div>';
   }).join('');
 }
@@ -384,19 +384,48 @@ function renderWorkspaceBrowser() {
   var list = document.getElementById('workspace-browser-list');
   var entriesEl = document.getElementById('workspace-browser-entries');
   var visibleEntries = getVisibleWorkspaceBrowserEntries();
-  if (crumb) crumb.textContent = workspaceBrowserPath || '';
+  // Render clickable breadcrumb path.
+  if (crumb) {
+    if (!workspaceBrowserPath) {
+      crumb.innerHTML = '';
+    } else {
+      var sep = workspaceBrowserPath.includes('\\') ? '\\' : '/';
+      var segments = workspaceBrowserPath.split(sep).filter(Boolean);
+      var html = '<span style="color:var(--text-muted);">' + escapeHtml(sep) + '</span>';
+      for (var s = 0; s < segments.length; s++) {
+        var partial = sep + segments.slice(0, s + 1).join(sep);
+        if (s > 0) html += '<span style="color:var(--text-muted);">' + escapeHtml(sep) + '</span>';
+        var isLast = s === segments.length - 1;
+        html += '<button type="button" onclick="browseWorkspaces(\'' + escapeHtml(partial) + '\')" style="border:none;background:none;color:' + (isLast ? 'var(--text)' : 'var(--accent)') + ';cursor:pointer;font-size:12px;padding:0;font-weight:' + (isLast ? '600' : '400') + ';">' + escapeHtml(segments[s]) + '</button>';
+      }
+      crumb.innerHTML = html;
+    }
+  }
   if (!list || !entriesEl) return;
-  if (!visibleEntries.length) {
-    entriesEl.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:8px;">' + (workspaceBrowserFilterQuery ? 'No matching directories found.' : 'No directories found.') + '</div>';
+  // Build entries with parent (..) at top.
+  var rows = '';
+  if (workspaceBrowserPath && workspaceBrowserPath !== '/') {
+    var parentPath = workspaceBrowserPath.replace(/[\\/][^\\/]+[\\/]?$/, '') || '/';
+    rows += '<button type="button" class="ws-entry--parent" onclick="browseWorkspaces(\'' + escapeHtml(parentPath) + '\')"><span>..</span></button>';
+  }
+  if (!visibleEntries.length && !rows) {
+    entriesEl.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:8px;">' + (workspaceBrowserFilterQuery ? 'No matches.' : 'Empty.') + '</div>';
     return;
   }
-  entriesEl.innerHTML = visibleEntries.map(function(entry, index) {
-    var active = index === workspaceBrowserFocusIndex;
-    return '<button type="button" data-workspace-entry-index="' + index + '" onclick="selectWorkspaceBrowserEntry(' + index + ')" ondblclick="openWorkspaceBrowserEntry(' + index + ')" style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:none;border-radius:6px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:inherit;cursor:pointer;text-align:left;">' +
-      '<span style="font-size:12px;">' + escapeHtml(entry.name) + '</span>' +
-      '<span style="font-size:10px;color:var(--text-muted);">' + (entry.is_git_repo ? 'git repo' : 'folder') + '</span>' +
-      '</button>';
+  rows += visibleEntries.map(function(entry) {
+    var alreadySelected = workspaceSelectionDraft.includes(entry.path);
+    var badge = entry.is_git_repo ? '<span class="ws-entry__badge">git</span>' : '';
+    var addBtn = alreadySelected
+      ? '<span class="ws-entry__added">added</span>'
+      : '<button type="button" class="btn-ghost ws-entry__add" onclick="event.stopPropagation();addWorkspaceSelection(\'' + escapeHtml(entry.path) + '\')">+ Add</button>';
+    return '<div class="ws-entry">' +
+      '<button type="button" class="ws-entry__name" onclick="openWorkspaceBrowserEntry2(\'' + escapeHtml(entry.path) + '\')">' +
+      '<span>' + escapeHtml(entry.name) + '</span>' + badge +
+      '</button>' +
+      addBtn +
+      '</div>';
   }).join('');
+  entriesEl.innerHTML = rows;
 }
 
 function getVisibleWorkspaceBrowserEntries() {
@@ -441,7 +470,7 @@ async function browseWorkspaces(path) {
     workspaceBrowserEntries = Array.isArray(resp.entries) ? resp.entries : [];
     workspaceBrowserFocusIndex = getVisibleWorkspaceBrowserEntries().length ? 0 : -1;
     if (pathInput) pathInput.value = workspaceBrowserPath;
-    if (status) status.textContent = workspaceBrowserEntries.length ? 'Double-click a folder to enter it. Filter to narrow the list; press Enter to add the selected folder.' : 'No subdirectories found.';
+    if (status) status.textContent = workspaceBrowserEntries.length ? '' : 'No subdirectories found.';
     renderWorkspaceBrowser();
   } catch (e) {
     if (status) status.textContent = e.message;
@@ -494,6 +523,10 @@ function openWorkspaceBrowserEntry(index) {
   browseWorkspaces(entry.path);
 }
 
+function openWorkspaceBrowserEntry2(path) {
+  browseWorkspaces(path);
+}
+
 function addCurrentWorkspaceFolder() {
   if (!workspaceBrowserPath) return;
   addWorkspaceSelection(workspaceBrowserPath);
@@ -505,11 +538,13 @@ function addWorkspaceSelection(path) {
     workspaceSelectionDraft.push(path);
   }
   renderWorkspaceSelectionDraft();
+  renderWorkspaceBrowser();
 }
 
 function removeWorkspaceSelection(path) {
   workspaceSelectionDraft = workspaceSelectionDraft.filter(function(item) { return item !== path; });
   renderWorkspaceSelectionDraft();
+  renderWorkspaceBrowser();
 }
 
 function clearWorkspaceSelection() {
