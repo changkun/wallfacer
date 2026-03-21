@@ -89,12 +89,17 @@ ui-css:
 	npx tailwindcss@3 -i ui/tailwind.input.css -o ui/css/tailwind.css \
 		--content './ui/**/*.{html,js}' --minify
 
-# Run golangci-lint
+# Run Go linters (golangci-lint if available, otherwise go vet)
 lint:
-	golangci-lint run ./...
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run ./...; \
+	else \
+		echo "golangci-lint not found, falling back to go vet"; \
+		go vet ./...; \
+	fi
 
-# Run all tests (backend + frontend)
-test: test-backend test-frontend
+# Run all checks (lint + backend tests + frontend tests)
+test: lint test-backend test-frontend
 
 # Run Go unit tests
 test-backend:
