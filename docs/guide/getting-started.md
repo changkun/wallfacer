@@ -26,74 +26,13 @@ This prints a token; copy it. If you do not have the `claude` CLI, install it fi
 
 Generate one at [console.anthropic.com](https://console.anthropic.com/) → API Keys. Keys start with `sk-ant-...`.
 
-## Step 2 — Build the Sandbox Image
-
-The sandbox image bundles Claude Code CLI, Go, Node, and Python inside an Ubuntu container. Build it once; rebuilding is only needed when the image definition changes.
-
-```bash
-make build
-```
-
-This builds both the Claude (`wallfacer:latest`) and OpenAI Codex (`wallfacer-codex:latest`) images. To build only the Claude image:
-
-```bash
-make build-claude
-```
-
-To run all tests (backend and frontend):
-
-```bash
-make test           # Run all tests (backend + frontend)
-make test-backend   # Run Go unit tests (go test ./...)
-make test-frontend  # Run frontend JS unit tests (npx vitest@2 run)
-```
-
-Building takes a few minutes the first time. Confirm the image exists afterward:
-
-```bash
-podman images wallfacer   # or: docker images wallfacer
-```
-
-## Step 3 — Build the Binary
+## Step 2 — Build the Binary
 
 ```bash
 go build -o wallfacer .
 ```
 
-## Step 4 — Configure Your Credential
-
-Run Wallfacer once to create the configuration directory and env file:
-
-```bash
-./wallfacer run
-```
-
-This creates `~/.wallfacer/.env` with placeholders. Stop the server (`Ctrl-C`) and edit the file:
-
-```bash
-# ~/.wallfacer/.env
-
-# Option A — OAuth token (Claude Pro/Max)
-CLAUDE_CODE_OAUTH_TOKEN=<your-token>
-
-# Option B — API key
-# ANTHROPIC_API_KEY=sk-ant-...
-```
-
-You only need to set one of the two credential variables. When both are set, the OAuth token takes precedence.
-
-> You can also set credentials directly from the web UI under **Settings → API Configuration** — no file editing required.
-
-### Optional: Enable Codex Sandbox
-
-Wallfacer supports two Codex auth modes:
-
-1. **Host auth cache (recommended)**
-   If `~/.codex/auth.json` exists on your host machine, Wallfacer validates it at startup and enables Codex automatically.
-2. **API key fallback**
-   Set `OPENAI_API_KEY` in `~/.wallfacer/.env` (or in **Settings → API Configuration**) and run **Test (Codex)** once.
-
-## Step 5 — Start Wallfacer
+## Step 3 — Start Wallfacer
 
 Pass the directories of the projects you want to work on:
 
@@ -121,6 +60,28 @@ Start with no active workspaces (configure them later in the UI):
 
 The browser opens automatically to `http://localhost:8080`. You should see a task board with four columns.
 
+The sandbox image (`ghcr.io/changkun/wallfacer:latest`) is pulled automatically the first time a task runs. This is a one-time download (~1 GB).
+
+## Step 4 — Configure Your Credential
+
+Open **Settings → API Configuration** in the browser and enter your credential:
+
+- Paste your OAuth token into `CLAUDE_CODE_OAUTH_TOKEN`, or
+- Paste your API key into `ANTHROPIC_API_KEY`
+
+You only need one of the two. Changes take effect on the next task without a server restart.
+
+> You can also edit `~/.wallfacer/.env` directly if you prefer.
+
+### Optional: Enable Codex Sandbox
+
+Wallfacer supports two Codex auth modes:
+
+1. **Host auth cache (recommended)**
+   If `~/.codex/auth.json` exists on your host machine, Wallfacer validates it at startup and enables Codex automatically.
+2. **API key fallback**
+   Set `OPENAI_API_KEY` in **Settings → API Configuration** and run **Test (Codex)** once.
+
 ## Verify the Setup
 
 1. Open **Settings → API Configuration** and confirm your credential is listed (tokens are masked).
@@ -129,9 +90,9 @@ The browser opens automatically to `http://localhost:8080`. You should see a tas
 
 If the task fails immediately, check:
 
-- The credential in `~/.wallfacer/.env` is correct
-- The sandbox image was built (`wallfacer:latest` appears in `podman images` or `docker images`)
+- The credential is correct (re-check in **Settings → API Configuration**)
 - The container runtime (Podman or Docker) is running and accessible to your user
+- Network access is available (the sandbox image is pulled from `ghcr.io` on first use)
 
 ## Configuration Reference
 
@@ -150,7 +111,7 @@ All configuration lives in `~/.wallfacer/.env`. The server re-reads this file be
 
 ### OpenAI Codex Variables (Optional)
 
-Requires building the Codex image (`make build-codex`) and selecting Codex as task sandbox.
+Requires selecting Codex as the task sandbox. The Codex sandbox image is pulled automatically on first use.
 
 | Variable | Required | Description |
 |---|---|---|

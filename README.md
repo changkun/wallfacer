@@ -62,17 +62,14 @@ Track token usage and cost by task/activity so operations stay measurable as aut
 ## Quick Start
 
 ```bash
-# 1. Build the sandbox image (once)
-make build
-
-# 2. Build the binary
+# 1. Build the binary
 go build -o wallfacer .
 
-# 3. Start with the project directories you want to work on
+# 2. Start with the project directories you want to work on
 ./wallfacer run ~/projects/myapp
 ```
 
-On first launch, `~/.wallfacer/.env` is created. Edit it to add your Claude credential (OAuth token or API key), then restart. The browser opens to `http://localhost:8080`.
+The browser opens to `http://localhost:8080`. Add your Claude credential (OAuth token or API key) in **Settings → API Configuration**. The sandbox image is pulled automatically on first task run.
 
 Codex can be enabled either by:
 - host auth cache at `~/.codex/auth.json` (auto-detected at bootstrap), or
