@@ -145,6 +145,26 @@ func TestGetConfig_AutopilotFalseByDefault(t *testing.T) {
 	}
 }
 
+func TestGetConfig_IncludesImageCached(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	var resp map[string]any
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+	// The test handler has no real container runtime, so image_cached should
+	// be present as a boolean (false for empty runner config).
+	if _, ok := resp["image_cached"]; !ok {
+		t.Error("expected image_cached in config response")
+	}
+	if cached, ok := resp["image_cached"].(bool); !ok {
+		t.Errorf("expected image_cached to be bool, got %T", resp["image_cached"])
+	} else if cached {
+		t.Error("expected image_cached=false for test handler with no container runtime")
+	}
+}
+
 func TestGetConfig_ReturnsInstructionsPath(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspaces(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
