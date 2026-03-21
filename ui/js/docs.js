@@ -14,7 +14,7 @@ function _ensureMermaid() {
     script.onload = function() {
       if (typeof mermaid !== 'undefined') {
         var cs = getComputedStyle(document.documentElement);
-        mermaid.initialize({
+        try { mermaid.initialize({
           startOnLoad: false,
           theme: 'base',
           themeVariables: {
@@ -50,12 +50,12 @@ function _ensureMermaid() {
             fontFamily: 'inherit',
             fontSize: '13px',
           }
-        });
+        }); } catch(initErr) { console.error('mermaid init:', initErr); }
       }
       _mermaidLoaded = true;
       resolve();
     };
-    script.onerror = function() { resolve(); }; // fail silently
+    script.onerror = function() { resolve(); };
     document.head.appendChild(script);
   });
 }
