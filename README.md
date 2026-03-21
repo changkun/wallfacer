@@ -9,7 +9,7 @@
 [![Stars](https://img.shields.io/github/stars/changkun/wallfacer?style=social)](https://github.com/changkun/wallfacer/stargazers)
 [![Last Commit](https://img.shields.io/github/last-commit/changkun/wallfacer)](https://github.com/changkun/wallfacer/commits/main)
 
-Wallfacer is a task-board orchestration system for autonomous coding agents.  
+Wallfacer is a task-board orchestration system for autonomous coding agents.
 Create tasks, run them in isolated sandboxes, review diffs, and keep shipping with minimal manual overhead.
 
 ![Wallfacer teaser](./images/overview.png)
@@ -92,21 +92,7 @@ Codex can be enabled either by:
 ./wallfacer env
 ```
 
-### Make Targets
-
-| Target | Description |
-|---|---|
-| `make build` | Build binary + both sandbox images (Claude + Codex) |
-| `make build-binary` | Build just the Go binary |
-| `make build-claude` | Build the Claude sandbox image only |
-| `make build-codex` | Build the OpenAI Codex sandbox image only |
-| `make server` | Build and run the Go server |
-| `make run PROMPT="..."` | Headless one-shot agent execution |
-| `make shell` | Debug shell inside a sandbox container |
-| `make test` | Run all tests (backend + frontend) |
-| `make ui-css` | Regenerate Tailwind CSS from UI sources |
-| `make api-contract` | Regenerate API route artifacts |
-| `make clean` | Remove both sandbox images |
+For all available `make` targets (build, test, release, etc.), see [Technical Internals: Architecture](docs/internals/architecture.md#development-setup).
 
 ## Documentation
 
