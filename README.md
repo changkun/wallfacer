@@ -126,13 +126,15 @@ Codex can be enabled either by:
 
 **[Technical Internals](docs/internals/internals.md)** — start here for implementation details and architecture.
 
-- [Architecture](docs/internals/architecture.md) — system design, end-to-end walkthrough, concurrency model, "where to look" guide
-- [Data & Storage](docs/internals/data-and-storage.md) — data models, persistence, event sourcing, search
-- [Task Lifecycle](docs/internals/task-lifecycle.md) — states, turn loop, dependencies, board context
-- [Git Worktrees](docs/internals/git-worktrees.md) — worktrees, commit pipeline, branch management
-- [API & Transport](docs/internals/api-and-transport.md) — HTTP routes, SSE, webhooks, metrics, middleware
-- [Automation](docs/internals/automation.md) — background watchers, autopilot, circuit breakers
-- [Workspaces & Config](docs/internals/workspaces-and-config.md) — workspace manager, sandboxes, templates, env config
+| # | Reference | Topics |
+|---|-----------|--------|
+| 1 | [Architecture](docs/internals/architecture.md) | System design, end-to-end walkthrough, concurrency model, where to look |
+| 2 | [Data & Storage](docs/internals/data-and-storage.md) | Data models, persistence, event sourcing, search index |
+| 3 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, board context |
+| 4 | [Git Worktrees](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
+| 5 | [API & Transport](docs/internals/api-and-transport.md) | HTTP routes, SSE, webhooks, metrics, middleware |
+| 6 | [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers |
+| 7 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, sandboxes, templates, env config |
 
 ## Origin Story
 
