@@ -307,11 +307,12 @@ function renderDocsNav() {
       var active = entry.slug === _docsCurrentSlug;
       // Show step number for ordered guide docs (skip the index page which is usage.md, order=9).
       var prefix = '';
-      if (entry.order && entry.slug !== 'guide/usage') {
+      var isIndex = entry.slug === 'guide/usage' || entry.slug === 'internals/internals';
+      if (entry.order && !isIndex) {
         prefix = '<span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:var(--bg-raised);color:var(--text-muted);font-size:9px;font-weight:700;margin-right:4px;flex-shrink:0;">' + entry.order + '</span>';
       }
-      // Mark the index page distinctly.
-      if (entry.slug === 'guide/usage') {
+      // Mark index pages distinctly.
+      if (isIndex) {
         prefix = '<span style="font-size:10px;margin-right:4px;">&#9776;</span>';
       }
       html += '<button type="button" onclick="loadDoc(\'' + escapeHtml(entry.slug) + '\')" style="display:flex;align-items:center;width:100%;text-align:left;padding:4px 8px;margin-bottom:2px;border:none;border-radius:4px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:' + (active ? 'var(--text-primary)' : 'inherit') + ';font-size:12px;cursor:pointer;font-weight:' + (active ? '600' : '400') + ';" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'' + (active ? 'var(--bg-input)' : 'transparent') + '\'">' + prefix + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(entry.title) + '</span></button>';
@@ -414,17 +415,20 @@ function _setupTocScrollSpy(content, headings, tocLinks) {
   handler();
 }
 
-// Append previous/next navigation bar for ordered guide docs.
+// Append previous/next navigation bar for ordered docs (guide or internals).
 function _appendDocNav(container, currentSlug) {
-  // Build ordered list of guide entries (exclude the index page).
+  // Determine the category of the current slug.
+  var cat = currentSlug.startsWith('internals/') ? 'internals' : 'guide';
+  var indexSlug = cat === 'guide' ? 'guide/usage' : 'internals/internals';
+  // Build ordered list of entries in this category (exclude the index page).
   var ordered = _docsEntries
-    .filter(function(e) { return e.category === 'guide' && e.order && e.slug !== 'guide/usage'; })
+    .filter(function(e) { return e.category === cat && e.order && e.slug !== indexSlug; })
     .sort(function(a, b) { return a.order - b.order; });
   var idx = -1;
   for (var i = 0; i < ordered.length; i++) {
     if (ordered[i].slug === currentSlug) { idx = i; break; }
   }
-  if (idx === -1) return; // Not an ordered guide doc.
+  if (idx === -1) return; // Not an ordered doc.
 
   var prev = idx > 0 ? ordered[idx - 1] : null;
   var next = idx < ordered.length - 1 ? ordered[idx + 1] : null;
