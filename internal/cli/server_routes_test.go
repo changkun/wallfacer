@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bufio"
@@ -58,7 +58,7 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 
 	// BuildMux panics if any route in the contract lacks a handler entry, so
 	// getting past this call already validates the handlers map is complete.
-	mux := BuildMux(h, reg, IndexViewData{})
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
 
 	// Substitute path parameters with concrete values so the mux can match the
 	// pattern. We only need the matched pattern string — we do not execute handlers.

@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ type execConfig struct {
 	command []string
 }
 
-func runExec(configDir string, args []string) {
+func RunExec(configDir string, args []string) {
 	// Split args on "--": everything before is positional, after is the command.
 	sepIdx := -1
 	for i, a := range args {

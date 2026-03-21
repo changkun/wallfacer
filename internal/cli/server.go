@@ -1,13 +1,12 @@
-package main
+package cli
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
-	fsLib "io/fs"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -31,18 +30,15 @@ import (
 	"github.com/google/uuid"
 )
 
-//go:embed ui
-var uiFiles embed.FS
-
-//go:embed docs
-var docsFiles embed.FS
-
 // IndexViewData holds the data passed to the index.html template.
 type IndexViewData struct {
 	ServerAPIKey string
 }
 
-func runServer(configDir string, args []string) {
+// RunServer implements the `wallfacer run` subcommand.
+// uiFS and docsFS are the embedded (or on-disk) filesystems containing the
+// ui/ and docs/ directory trees respectively.
+func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 
 	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
@@ -294,7 +290,7 @@ func runServer(configDir string, args []string) {
 		"Total number of autonomous actions taken by autopilot watchers, by watcher and outcome.",
 	)
 
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey})
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS)
 
 	host, _, _ := net.SplitHostPort(*addr)
 	ln, err := net.Listen("tcp", *addr)
@@ -368,15 +364,15 @@ func runServer(configDir string, args []string) {
 // applying per-route middleware (e.g. UUID parsing via withID) at map
 // construction time. A startup panic is triggered if a route in the contract
 // has no corresponding handler entry, preventing silent drift.
-func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData) *http.ServeMux {
+func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData, uiFS, docsFS fs.FS) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Static files (task board UI).
-	uiFS, err := fsLib.Sub(uiFiles, "ui")
+	uiSub, err := fs.Sub(uiFS, "ui")
 	if err != nil {
 		logger.Fatal("sub ui fs", "error", err)
 	}
-	indexTemplates, err := template.New("index.html").ParseFS(uiFS, "index.html", "partials/*.html")
+	indexTemplates, err := template.New("index.html").ParseFS(uiSub, "index.html", "partials/*.html")
 	if err != nil {
 		logger.Fatal("parse ui templates", "error", err)
 	}
@@ -394,8 +390,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	mux.HandleFunc("GET /", serveIndex)
 
 	// Static asset directories served from the embedded filesystem.
-	mux.Handle("GET /css/", http.FileServer(http.FS(uiFS)))
-	mux.Handle("GET /js/", http.FileServer(http.FS(uiFS)))
+	mux.Handle("GET /css/", http.FileServer(http.FS(uiSub)))
+	mux.Handle("GET /js/", http.FileServer(http.FS(uiSub)))
 
 	// Docs API — list and serve embedded documentation.
 	//
@@ -409,7 +405,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// in order. This is used for both guide and internals indexes.
 	parseReadingOrder := func(path string) []string {
 		var order []string
-		indexData, err := docsFiles.ReadFile(path)
+		indexData, err := fs.ReadFile(docsFS,path)
 		if err != nil {
 			return order
 		}
@@ -453,7 +449,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Helper: read title from first "# " line in a markdown file.
 		readTitle := func(path, fallback string) string {
-			data, _ := docsFiles.ReadFile(path)
+			data, _ := fs.ReadFile(docsFS,path)
 			for _, line := range strings.SplitN(string(data), "\n", 10) {
 				if title, ok := strings.CutPrefix(line, "# "); ok {
 					return title
@@ -474,7 +470,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		for i, name := range guideOrder {
 			ordered[name] = true
 			path := "docs/guide/" + name + ".md"
-			if _, err := docsFiles.ReadFile(path); err != nil {
+			if _, err := fs.ReadFile(docsFS,path); err != nil {
 				continue
 			}
 			slug := "guide/" + name
@@ -482,7 +478,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Order: i + 1})
 		}
 		// Append any guide docs not in the explicit order.
-		if dir, err := docsFiles.ReadDir("docs/guide"); err == nil {
+		if dir, err := fs.ReadDir(docsFS,"docs/guide"); err == nil {
 			for _, f := range dir {
 				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
 					continue
@@ -507,7 +503,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		for i, name := range internalsOrder {
 			intOrdered[name] = true
 			path := "docs/internals/" + name + ".md"
-			if _, err := docsFiles.ReadFile(path); err != nil {
+			if _, err := fs.ReadFile(docsFS,path); err != nil {
 				continue
 			}
 			slug := "internals/" + name
@@ -515,7 +511,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals", Order: i + 1})
 		}
 		// Append any internals docs not in the explicit order.
-		if dir, err := docsFiles.ReadDir("docs/internals"); err == nil {
+		if dir, err := fs.ReadDir(docsFS,"docs/internals"); err == nil {
 			for _, f := range dir {
 				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
 					continue
@@ -540,7 +536,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			http.Error(w, "invalid path", http.StatusBadRequest)
 			return
 		}
-		data, err := docsFiles.ReadFile("docs/" + slug + ".md")
+		data, err := fs.ReadFile(docsFS,"docs/" + slug + ".md")
 		if err != nil {
 			http.Error(w, "not found", http.StatusNotFound)
 			return

@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"encoding/json"
@@ -205,8 +205,8 @@ func printBoard(addr string, tasks []taskSummary, containerMap map[string]string
 	fmt.Printf("Total: %d tasks   Aggregate cost: %s\n", len(tasks), formatCost(totalCost))
 }
 
-// runStatus implements the `wallfacer status` subcommand.
-func runStatus(_ string, args []string) {
+// RunStatus implements the `wallfacer status` subcommand.
+func RunStatus(_ string, args []string) {
 	fs := flag.NewFlagSet("status", flag.ExitOnError)
 	defaultAddr := envOrDefault("ADDR", "http://localhost:8080")
 	addr := fs.String("addr", defaultAddr, "wallfacer server address (or ADDR env var)")

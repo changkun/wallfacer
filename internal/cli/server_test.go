@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -81,7 +81,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	})
 	h := handler.NewHandler(s, r, workdir, []string{workdir}, nil)
 	reg := metrics.NewRegistry()
-	mux := BuildMux(h, reg, IndexViewData{})
+	mux := BuildMux(h, reg, IndexViewData{}, testFS(t), testFS(t))
 
 	paths := []struct {
 		method string
