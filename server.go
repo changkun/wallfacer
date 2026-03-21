@@ -453,9 +453,13 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		var entries []docEntry
 
-		// Guide: emit in the defined reading order first, then any
-		// remaining guide files that are not in the order list.
-		ordered := make(map[string]bool, len(guideOrder))
+		// Guide: emit usage.md (the index page) first, then the
+		// defined reading order, then any remaining guide files.
+		if title := readTitle("docs/guide/usage.md", "User Manual"); true {
+			entries = append(entries, docEntry{Slug: "guide/usage", Title: title, Category: "guide"})
+		}
+		ordered := make(map[string]bool, len(guideOrder)+1)
+		ordered["usage"] = true
 		for i, name := range guideOrder {
 			ordered[name] = true
 			path := "docs/guide/" + name + ".md"
