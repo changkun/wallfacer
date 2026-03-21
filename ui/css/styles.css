@@ -2829,3 +2829,22 @@ mark.search-highlight {
     max-height: calc(100vh - 170px);
   }
 }
+
+/* --- Markdown body (docs viewer) --- */
+.markdown-body h1 { font-size: 20px; font-weight: 700; margin: 0 0 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.markdown-body h2 { font-size: 16px; font-weight: 700; margin: 24px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.markdown-body h3 { font-size: 14px; font-weight: 600; margin: 20px 0 8px; }
+.markdown-body h4 { font-size: 13px; font-weight: 600; margin: 16px 0 6px; }
+.markdown-body p { margin: 0 0 12px; }
+.markdown-body ul, .markdown-body ol { margin: 0 0 12px; padding-left: 24px; }
+.markdown-body li { margin-bottom: 4px; }
+.markdown-body code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9em; background: var(--bg-input); padding: 1px 5px; border-radius: 3px; }
+.markdown-body pre { background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; padding: 12px; overflow-x: auto; margin: 0 0 12px; }
+.markdown-body pre code { background: none; padding: 0; font-size: 12px; }
+.markdown-body table { border-collapse: collapse; width: 100%; margin: 0 0 12px; font-size: 12px; }
+.markdown-body th, .markdown-body td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+.markdown-body th { background: var(--bg-input); font-weight: 600; }
+.markdown-body blockquote { border-left: 3px solid var(--accent); margin: 0 0 12px; padding: 4px 12px; color: var(--text-muted); }
+.markdown-body a { color: var(--accent); text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }
+.markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }

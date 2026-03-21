@@ -1,0 +1,13 @@
+<!-- Docs Modal -->
+<div id="docs-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+  <div class="modal-card" style="max-width: 900px; width: 100%; height: 80vh; display: flex; flex-direction: column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <h3 style="margin:0;font-size:16px;font-weight:700;">Documentation</h3>
+      <button type="button" class="btn-ghost" onclick="closeDocs()" style="font-size:18px;padding:4px 8px;">&times;</button>
+    </div>
+    <div style="display:flex;flex:1;min-height:0;">
+      <nav id="docs-nav" style="width:200px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;padding:12px;font-size:12px;"></nav>
+      <div id="docs-content" class="markdown-body" style="flex:1;overflow-y:auto;padding:20px;font-size:13px;line-height:1.7;"></div>
+    </div>
+  </div>
+</div>

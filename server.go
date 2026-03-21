@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html/template"
@@ -32,6 +33,9 @@ import (
 
 //go:embed ui
 var uiFiles embed.FS
+
+//go:embed docs
+var docsFiles embed.FS
 
 // IndexViewData holds the data passed to the index.html template.
 type IndexViewData struct {
@@ -392,6 +396,55 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// Static asset directories served from the embedded filesystem.
 	mux.Handle("GET /css/", http.FileServer(http.FS(uiFS)))
 	mux.Handle("GET /js/", http.FileServer(http.FS(uiFS)))
+
+	// Docs API — list and serve embedded documentation.
+	mux.HandleFunc("GET /api/docs", func(w http.ResponseWriter, _ *http.Request) {
+		type docEntry struct {
+			Slug     string `json:"slug"`
+			Title    string `json:"title"`
+			Category string `json:"category"`
+		}
+		var entries []docEntry
+		for _, cat := range []string{"guide", "internals"} {
+			dir, err := docsFiles.ReadDir("docs/" + cat)
+			if err != nil {
+				continue
+			}
+			for _, f := range dir {
+				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
+					continue
+				}
+				slug := cat + "/" + strings.TrimSuffix(f.Name(), ".md")
+				// Extract title from first "# " line.
+				data, _ := docsFiles.ReadFile("docs/" + cat + "/" + f.Name())
+				title := strings.TrimSuffix(f.Name(), ".md")
+				for _, line := range strings.SplitN(string(data), "\n", 10) {
+					if strings.HasPrefix(line, "# ") {
+						title = strings.TrimPrefix(line, "# ")
+						break
+					}
+				}
+				entries = append(entries, docEntry{Slug: slug, Title: title, Category: cat})
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(entries) //nolint:errcheck
+	})
+	mux.HandleFunc("GET /api/docs/{slug...}", func(w http.ResponseWriter, r *http.Request) {
+		slug := r.PathValue("slug")
+		// Prevent path traversal.
+		if strings.Contains(slug, "..") {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
+		data, err := docsFiles.ReadFile("docs/" + slug + ".md")
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Write(data) //nolint:errcheck
+	})
 
 	// withID wraps a handler that needs a parsed task UUID from the {id} path
 	// segment, converting the UUID-accepting signature to http.HandlerFunc.
