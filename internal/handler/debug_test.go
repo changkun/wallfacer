@@ -328,7 +328,6 @@ func TestBoardManifest_ContainsBothTasks(t *testing.T) {
 	var resp boardManifestResponse
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 
-
 	ids := map[string]bool{}
 	for _, bt := range resp.Manifest.Tasks {
 		ids[bt.ID] = true
@@ -375,7 +374,6 @@ func TestTaskBoardManifest_IsSelfTrue(t *testing.T) {
 	}
 	var resp boardManifestResponse
 	_ = json.NewDecoder(w.Body).Decode(&resp)
-
 
 	if resp.Manifest.SelfTaskID != t1.ID.String() {
 		t.Errorf("SelfTaskID: got %s, want %s", resp.Manifest.SelfTaskID, t1.ID)
@@ -536,7 +534,6 @@ func TestBoardManifest_SizeMetadata(t *testing.T) {
 
 	var resp boardManifestResponse
 	_ = json.NewDecoder(w.Body).Decode(&resp)
-
 
 	if resp.SizeBytes <= 0 {
 		t.Errorf("expected SizeBytes > 0, got %d", resp.SizeBytes)

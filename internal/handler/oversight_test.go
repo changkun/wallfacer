@@ -164,7 +164,6 @@ func TestGenerateMissingOversight_NoEligible(t *testing.T) {
 	// Backlog task with 0 turns — not eligible.
 	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
 
-
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-oversight", nil)
 	w := httptest.NewRecorder()
 	h.GenerateMissingOversight(w, req)
@@ -187,7 +186,6 @@ func TestGenerateMissingOversight_SkipsAlreadyReady(t *testing.T) {
 	_ = h.store.UpdateTaskResult(ctx, task.ID, "done", "sess", "end_turn", 1)
 
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-
 
 	// Set oversight to ready.
 	_ = h.store.SaveOversight(task.ID, store.TaskOversight{
@@ -218,12 +216,10 @@ func TestGenerateMissingOversight_QueuesEligibleTasks(t *testing.T) {
 
 	_ = h.store.ForceUpdateTaskStatus(ctx, task1.ID, store.TaskStatusDone)
 
-
 	task2, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task 2", Timeout: 15})
 	_ = h.store.UpdateTaskResult(ctx, task2.ID, "done", "sess2", "end_turn", 1)
 
 	_ = h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusWaiting)
-
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-oversight", nil)
 	w := httptest.NewRecorder()

@@ -116,7 +116,7 @@ func TestScanOrphanedWorktrees_TerminalStatesAreOrphans(t *testing.T) {
 
 	createTaskInStatus := func(status store.TaskStatus) uuid.UUID {
 		t.Helper()
-		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task for "+string(status), Timeout: 5})
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task for " + string(status), Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -158,7 +158,7 @@ func TestScanOrphanedWorktrees_SkipsNonTerminalStates(t *testing.T) {
 
 	createTaskInStatus := func(status store.TaskStatus) uuid.UUID {
 		t.Helper()
-		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task for "+string(status), Timeout: 5})
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task for " + string(status), Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -263,7 +263,7 @@ func TestScanMissingTaskWorktrees_SkipsTerminalTasks(t *testing.T) {
 
 	createTerminal := func(status store.TaskStatus) *store.Task {
 		t.Helper()
-		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "terminal task "+string(status), Timeout: 5})
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "terminal task " + string(status), Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}

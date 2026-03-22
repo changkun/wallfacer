@@ -37,6 +37,6 @@ func (e *osContainerExecutor) RunArgs(ctx context.Context, name string, args []s
 
 // Kill forcibly stops and removes the named container.
 func (e *osContainerExecutor) Kill(name string) {
-	exec.Command(e.command, "kill", name).Run()      //nolint:errcheck
+	exec.Command(e.command, "kill", name).Run()     //nolint:errcheck
 	exec.Command(e.command, "rm", "-f", name).Run() //nolint:errcheck
 }

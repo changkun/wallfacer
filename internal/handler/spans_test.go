@@ -71,7 +71,6 @@ func TestGetTaskSpans_PairsSingleSpan(t *testing.T) {
 	time.Sleep(5 * time.Millisecond) // ensure measurable duration
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
 	w := httptest.NewRecorder()
 	h.GetTaskSpans(w, req, task.ID)
@@ -107,21 +106,17 @@ func TestGetTaskSpans_MultipleSpansSortedByStartTime(t *testing.T) {
 
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
 
-
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
 
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
-
 
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: "agent_turn_2"})
 
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: "agent_turn_2"})
 
-
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
 
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "commit"})
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
 	w := httptest.NewRecorder()
@@ -200,7 +195,6 @@ func TestGetTaskSpans_UnclosedSpanIncluded(t *testing.T) {
 	// Start without end.
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "commit"})
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
 	w := httptest.NewRecorder()
 	h.GetTaskSpans(w, req, task.ID)
@@ -266,7 +260,6 @@ func TestGetTaskSpans_NonSpanEventsIgnored(t *testing.T) {
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, map[string]string{"result": "done"})
 
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: "agent_turn_1"})
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/spans", nil)
 	w := httptest.NewRecorder()

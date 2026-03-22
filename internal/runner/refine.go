@@ -67,7 +67,6 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	cur.CurrentRefinement.Goal = goal
 	_ = r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
 
-
 	logger.Runner.Info("refinement complete", "task", taskID)
 }
 
@@ -182,7 +181,6 @@ func (r *Runner) runRefinementContainer(
 
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
 		_ = exec.Command(r.command, "rm", "-f", containerName).Run()
-
 
 		args := r.buildRefinementContainerArgs(containerName, taskID.String(), prompt, modelOverride, selectedSandbox)
 

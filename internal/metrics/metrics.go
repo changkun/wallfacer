@@ -224,10 +224,10 @@ type Histogram struct {
 }
 
 type histogramCell struct {
-	labels  map[string]string
-	counts  []uint64 // len == len(Histogram.buckets)+1; last slot is +Inf
-	sum     float64
-	count   uint64
+	labels map[string]string
+	counts []uint64 // len == len(Histogram.buckets)+1; last slot is +Inf
+	sum    float64
+	count  uint64
 }
 
 func newHistogram(name, help string, buckets []float64) *Histogram {

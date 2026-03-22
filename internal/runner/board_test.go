@@ -156,8 +156,9 @@ func TestPrepareBoardContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("prepareBoardContext: %v", err)
 	}
-	defer func() { _ = os.RemoveAll(dir)
- }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 
 	boardPath := filepath.Join(dir, "board.json")
 	data, err := os.ReadFile(boardPath)
@@ -189,7 +190,6 @@ func TestBuildSiblingMounts(t *testing.T) {
 
 	wtDir := t.TempDir()
 	_ = s.UpdateTaskWorktrees(ctx, t2.ID, map[string]string{"/myrepo": wtDir}, "task/"+t2.ID.String()[:8])
-
 
 	// t3 stays in backlog (no worktrees).
 	_ = t3
@@ -231,7 +231,7 @@ func TestGenerateBoardContext_AllStatuses(t *testing.T) {
 
 	idByStatus := make(map[store.TaskStatus]string)
 	for _, st := range statuses {
-		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task for "+string(st), Timeout: 5})
+		task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task for " + string(st), Timeout: 5})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -300,7 +300,6 @@ func TestGenerateBoardContext_WorktreeMountPath(t *testing.T) {
 	wtDir := t.TempDir()
 	repoPath := "/home/user/myrepo"
 	_ = s.UpdateTaskWorktrees(ctx, sibling.ID, map[string]string{repoPath: wtDir}, "task/"+sibling.ID.String()[:8])
-
 
 	// Create a self task (stays in backlog).
 	self, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "self task", Timeout: 5})
@@ -408,8 +407,9 @@ func TestStreamBoardJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("streamBoardJSON: %v", err)
 	}
-	defer func() { _ = os.RemoveAll(dir)
- }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 
 	if written == 0 {
 		t.Error("written bytes should be > 0")
@@ -713,7 +713,6 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 
 	_ = s.UpdateTaskResult(ctx, selfTask.ID, longResult, "sess-self", "max_tokens", 7)
 
-
 	data, err := r.generateBoardContext(context.Background(), selfTask.ID, false)
 	if err != nil {
 		t.Fatalf("generateBoardContext: %v", err)
@@ -832,8 +831,9 @@ func TestWriteBoardDir_CreatesFileWithContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writeBoardDir: %v", err)
 	}
-	defer func() { _ = os.RemoveAll(dir)
- }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 
 	content, err := os.ReadFile(filepath.Join(dir, "board.json"))
 	if err != nil {
@@ -850,8 +850,9 @@ func TestWriteBoardDir_EmptyData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writeBoardDir empty: %v", err)
 	}
-	defer func() { _ = os.RemoveAll(dir)
- }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 	if _, err := os.Stat(filepath.Join(dir, "board.json")); err != nil {
 		t.Fatalf("board.json should exist: %v", err)
 	}
@@ -864,8 +865,9 @@ func TestWriteBoardDir_ReturnsDirPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("writeBoardDir: %v", err)
 	}
-	defer func() { _ = os.RemoveAll(dir)
- }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -910,8 +912,9 @@ func TestStreamBoardJSON_LargeDataTriggersWarning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("streamBoardJSON: %v", err)
 	}
-	defer func() { _ = os.RemoveAll(dir)
- }()
+	defer func() {
+		_ = os.RemoveAll(dir)
+	}()
 
 	t.Logf("streamBoardJSON wrote %d bytes", written)
 

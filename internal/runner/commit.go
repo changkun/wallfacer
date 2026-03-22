@@ -134,7 +134,6 @@ func (r *Runner) commit(
 	r.cleanupWorktrees(taskID, worktreePaths, branchName)
 	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "cleanup"})
 
-
 	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": "Commit pipeline completed.",
@@ -386,7 +385,6 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, error) {
 		selectedModel := r.modelFromEnvForSandbox(selectedSandbox)
 		_ = exec.Command(r.command, "rm", "-f", containerName).Run()
-
 
 		spec := r.buildBaseContainerSpec(containerName, selectedModel, selectedSandbox)
 		spec.Cmd = buildAgentCmd(commitPrompt, selectedModel)

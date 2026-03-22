@@ -1032,8 +1032,8 @@ func TestApplyRefinement_PreservesManualGoal(t *testing.T) {
 func TestSearchTasks_MatchGoal(t *testing.T) {
 	s := newTestStore(t)
 	_, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{
-		Prompt: "some unrelated prompt text",
-		Goal:   "unique-goal-keyword",
+		Prompt:  "some unrelated prompt text",
+		Goal:    "unique-goal-keyword",
 		Timeout: 60,
 		Kind:    TaskKindTask,
 	})
@@ -1837,4 +1837,3 @@ func TestUpdateTaskEnvironment_NotFound(t *testing.T) {
 		t.Error("expected error for unknown task ID")
 	}
 }
-

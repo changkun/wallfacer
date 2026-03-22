@@ -9,16 +9,16 @@ import (
 
 // WorkspaceGitStatus holds the git state for a single workspace directory.
 type WorkspaceGitStatus struct {
-	Path             string `json:"path"`
-	Name             string `json:"name"`
-	IsGitRepo        bool   `json:"is_git_repo"`
-	Branch           string `json:"branch,omitempty"`
-	RemoteURL        string `json:"remote_url,omitempty"`
-	HasRemote        bool   `json:"has_remote"`
-	AheadCount       int    `json:"ahead_count"`
-	BehindCount      int    `json:"behind_count"`
-	MainBranch       string `json:"main_branch,omitempty"`
-	BehindMainCount  int    `json:"behind_main_count"`
+	Path            string `json:"path"`
+	Name            string `json:"name"`
+	IsGitRepo       bool   `json:"is_git_repo"`
+	Branch          string `json:"branch,omitempty"`
+	RemoteURL       string `json:"remote_url,omitempty"`
+	HasRemote       bool   `json:"has_remote"`
+	AheadCount      int    `json:"ahead_count"`
+	BehindCount     int    `json:"behind_count"`
+	MainBranch      string `json:"main_branch,omitempty"`
+	BehindMainCount int    `json:"behind_main_count"`
 }
 
 // WorkspaceStatus inspects a directory and returns its git status.

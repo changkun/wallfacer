@@ -879,12 +879,12 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			)
 			if stashPopErr != nil {
 				conflictPrompt += fmt.Sprintf(
-					"\n\nIMPORTANT: You had uncommitted changes before the sync that could not "+
-						"be automatically restored. They are saved in the git stash.\n"+
-						"After resolving the conflict above:\n"+
-						"1. Run `git stash show -p` to see what was stashed\n"+
-						"2. Run `git stash pop` to restore the uncommitted changes\n"+
-						"3. Resolve any conflicts from the stash pop\n"+
+					"\n\nIMPORTANT: You had uncommitted changes before the sync that could not " +
+						"be automatically restored. They are saved in the git stash.\n" +
+						"After resolving the conflict above:\n" +
+						"1. Run `git stash show -p` to see what was stashed\n" +
+						"2. Run `git stash pop` to restore the uncommitted changes\n" +
+						"3. Resolve any conflicts from the stash pop\n" +
 						"Do NOT discard the stash — it contains your work in progress.",
 				)
 			}

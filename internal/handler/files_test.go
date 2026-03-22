@@ -317,7 +317,6 @@ func TestGetFiles_PathsPrefixedByBasename(t *testing.T) {
 
 	_ = os.WriteFile(filepath.Join(ws2, "b.go"), []byte("b"), 0644)
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 	w := httptest.NewRecorder()
 	h.GetFiles(w, req)

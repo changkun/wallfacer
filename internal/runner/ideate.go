@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	maxIdeationIdeas           = 3
-	defaultIdeationImpactScore = 60
+	maxIdeationIdeas            = 3
+	defaultIdeationImpactScore  = 60
 	maxIdeationChurnSignals     = 6
 	maxIdeationTodoSignals      = 6
 	workspaceIdeationCommandTTL = 2 * time.Second
@@ -339,7 +339,6 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// Set a human-readable title on the idea-agent card.
 	title := "Brainstorm " + time.Now().Format("Jan 2, 2006 15:04")
 	_ = r.store.UpdateTaskTitle(bgCtx, taskID, title)
-
 
 	// Collect tasks currently in backlog, in_progress, or waiting so the
 	// brainstorm agent can avoid proposing duplicates or conflicting ideas.

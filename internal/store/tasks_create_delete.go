@@ -27,17 +27,17 @@ var defaultAutoRetryBudget = map[FailureCategory]int{
 // TaskCreateOptions holds parameters for creating a new task.
 type TaskCreateOptions struct {
 	// ID is an optional pre-assigned UUID. When zero, a new UUID is generated.
-	ID                uuid.UUID
-	Prompt            string
-	Goal              string
-	Timeout           int
-	MountWorktrees    bool
-	Kind              TaskKind
-	Tags              []string
-	Sandbox           sandbox.Type
-	SandboxByActivity map[SandboxActivity]sandbox.Type
-	MaxCostUSD        float64
-	MaxInputTokens    int
+	ID                 uuid.UUID
+	Prompt             string
+	Goal               string
+	Timeout            int
+	MountWorktrees     bool
+	Kind               TaskKind
+	Tags               []string
+	Sandbox            sandbox.Type
+	SandboxByActivity  map[SandboxActivity]sandbox.Type
+	MaxCostUSD         float64
+	MaxInputTokens     int
 	ScheduledAt        *time.Time
 	DependsOn          []string
 	ModelOverride      string
@@ -68,16 +68,16 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	}
 
 	task := &Task{
-		SchemaVersion:  CurrentTaskSchemaVersion,
-		ID:             id,
-		Goal:           goal,
+		SchemaVersion:   CurrentTaskSchemaVersion,
+		ID:              id,
+		Goal:            goal,
 		GoalManuallySet: opts.Goal != "",
-		Prompt:         opts.Prompt,
-		Status:         TaskStatusBacklog,
-		Turns:          0,
-		Timeout:        clampTimeout(opts.Timeout),
-		MountWorktrees: opts.MountWorktrees,
-		Kind:           opts.Kind,
+		Prompt:          opts.Prompt,
+		Status:          TaskStatusBacklog,
+		Turns:           0,
+		Timeout:         clampTimeout(opts.Timeout),
+		MountWorktrees:  opts.MountWorktrees,
+		Kind:            opts.Kind,
 		// Position is set under the lock after scanning existing backlog tasks.
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -202,7 +202,6 @@ func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, moun
 		Tags:           tags,
 	})
 }
-
 
 func normalizeSandboxByActivity(input map[SandboxActivity]sandbox.Type) map[SandboxActivity]sandbox.Type {
 	if len(input) == 0 {

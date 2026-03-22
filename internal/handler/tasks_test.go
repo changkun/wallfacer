@@ -94,7 +94,6 @@ func TestListTasks_ExcludesArchivedByDefault(t *testing.T) {
 
 	_ = h.store.SetTaskArchived(ctx, task.ID, true)
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
 	w := httptest.NewRecorder()
 	h.ListTasks(w, req)
@@ -118,7 +117,6 @@ func TestListTasks_IncludeArchived(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
 	_ = h.store.SetTaskArchived(ctx, task.ID, true)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks?include_archived=true", nil)
 	w := httptest.NewRecorder()
@@ -417,7 +415,6 @@ func TestUpdateTask_RetryFromDone(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
-
 	body := `{"status": "backlog"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
 	w := httptest.NewRecorder()
@@ -441,7 +438,6 @@ func TestUpdateTask_RetryFromFailed(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed)
 
-
 	body := `{"status": "backlog"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
 	w := httptest.NewRecorder()
@@ -464,7 +460,6 @@ func TestUpdateTask_RetryWithNewPrompt(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "old prompt", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
-
 
 	body := `{"status": "backlog", "prompt": "new retry prompt"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
@@ -584,7 +579,6 @@ func TestGetEvents_BackwardCompatNoParams(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, "hello")
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/events", nil)
 	w := httptest.NewRecorder()
 	h.GetEvents(w, req, task.ID)
@@ -650,7 +644,6 @@ func TestGetEvents_PagedAfterCursor(t *testing.T) {
 	var page1 eventsPageResponse
 	_ = json.NewDecoder(w1.Body).Decode(&page1)
 
-
 	// Use cursor from page1 to get page2.
 	url2 := fmt.Sprintf("/api/tasks/%s/events?after=%d&limit=10", task.ID.String(), page1.NextAfter)
 	req2 := httptest.NewRequest(http.MethodGet, url2, nil)
@@ -662,7 +655,6 @@ func TestGetEvents_PagedAfterCursor(t *testing.T) {
 	}
 	var page2 eventsPageResponse
 	_ = json.NewDecoder(w2.Body).Decode(&page2)
-
 
 	// All events in page2 must have IDs strictly greater than the cursor.
 	for _, ev := range page2.Events {
@@ -688,7 +680,6 @@ func TestGetEvents_TypeFilter(t *testing.T) {
 
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, "out2")
 
-
 	req := httptest.NewRequest(http.MethodGet,
 		"/api/tasks/"+task.ID.String()+"/events?types=output", nil)
 	w := httptest.NewRecorder()
@@ -699,7 +690,6 @@ func TestGetEvents_TypeFilter(t *testing.T) {
 	}
 	var resp eventsPageResponse
 	_ = json.NewDecoder(w.Body).Decode(&resp)
-
 
 	for _, ev := range resp.Events {
 		if ev.EventType != store.EventTypeOutput {
@@ -722,7 +712,6 @@ func TestGetEvents_MultiTypeFilter(t *testing.T) {
 
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeError, "err")
 
-
 	req := httptest.NewRequest(http.MethodGet,
 		"/api/tasks/"+task.ID.String()+"/events?types=state_change,error", nil)
 	w := httptest.NewRecorder()
@@ -733,7 +722,6 @@ func TestGetEvents_MultiTypeFilter(t *testing.T) {
 	}
 	var resp eventsPageResponse
 	_ = json.NewDecoder(w.Body).Decode(&resp)
-
 
 	if resp.TotalFiltered != 2 {
 		t.Errorf("TotalFiltered = %d, want 2", resp.TotalFiltered)
@@ -879,7 +867,6 @@ func TestGetEvents_EmptyTypesParamNoFilter(t *testing.T) {
 
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeOutput, "o")
 
-
 	req := httptest.NewRequest(http.MethodGet,
 		"/api/tasks/"+task.ID.String()+"/events?types=", nil)
 	w := httptest.NewRecorder()
@@ -930,7 +917,6 @@ func TestGetEvents_TotalFilteredAccountsForTypeFilter(t *testing.T) {
 
 	}
 	_ = h.store.InsertEvent(ctx, task.ID, store.EventTypeError, "e")
-
 
 	req := httptest.NewRequest(http.MethodGet,
 		"/api/tasks/"+task.ID.String()+"/events?types=output&limit=2", nil)
@@ -1032,7 +1018,6 @@ func TestGenerateMissingTitles_NoUntitled(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	_ = h.store.UpdateTaskTitle(ctx, task.ID, "My Task Title")
 
-
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-titles", nil)
 	w := httptest.NewRecorder()
 	h.GenerateMissingTitles(w, req)
@@ -1055,7 +1040,6 @@ func TestGenerateMissingTitles_WithUntitled(t *testing.T) {
 	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task without title", Timeout: 15})
 
 	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "another without title", Timeout: 15})
-
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/generate-titles", nil)
 	w := httptest.NewRecorder()
@@ -1154,7 +1138,6 @@ func TestUpdateTask_SetDependsOn_ClearsWithEmpty(t *testing.T) {
 	b, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task", Timeout: 15})
 	_ = h.store.UpdateTaskDependsOn(ctx, b.ID, []string{a.ID.String()})
 
-
 	body := `{"depends_on": []}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+b.ID.String(), strings.NewReader(body))
 	w := httptest.NewRecorder()
@@ -1229,7 +1212,6 @@ func TestUpdateTask_SetDependsOn_DirectCycle(t *testing.T) {
 	// Set A depends on B.
 	_ = h.store.UpdateTaskDependsOn(ctx, a.ID, []string{b.ID.String()})
 
-
 	// Now try to set B depends on A (would be a direct cycle).
 	body := `{"depends_on": ["` + a.ID.String() + `"]}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+b.ID.String(), strings.NewReader(body))
@@ -1253,7 +1235,6 @@ func TestUpdateTask_SetDependsOn_TransitiveCycle(t *testing.T) {
 
 	_ = h.store.UpdateTaskDependsOn(ctx, b.ID, []string{c.ID.String()})
 
-
 	// Now try to set C depends on A (transitive cycle A→B→C→A).
 	body := `{"depends_on": ["` + a.ID.String() + `"]}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+c.ID.String(), strings.NewReader(body))
@@ -1273,7 +1254,6 @@ func TestUpdateTask_SetDependsOn_AbsentFieldNoOp(t *testing.T) {
 	a, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "dep", Timeout: 15})
 	b, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task", Timeout: 15})
 	_ = h.store.UpdateTaskDependsOn(ctx, b.ID, []string{a.ID.String()})
-
 
 	// PATCH with position only — no depends_on key.
 	body := `{"position": 5}`
@@ -1310,18 +1290,15 @@ func TestTryAutoPromote_SkipsBlockedTask(t *testing.T) {
 	dep, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "dep", Timeout: 15})
 	_ = h.store.UpdateTaskStatus(ctx, dep.ID, store.TaskStatusInProgress)
 
-
 	// blocked: lowest position (0), but depends on dep (in_progress, not done).
 	blocked, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "blocked", Timeout: 15})
 	_ = h.store.UpdateTaskDependsOn(ctx, blocked.ID, []string{dep.ID.String()})
 
 	_ = h.store.UpdateTaskPosition(ctx, blocked.ID, 0)
 
-
 	// eligible: higher position (1), no dependencies.
 	eligible, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "eligible", Timeout: 15})
 	_ = h.store.UpdateTaskPosition(ctx, eligible.ID, 1)
-
 
 	h.tryAutoPromote(ctx)
 
@@ -1357,10 +1334,8 @@ func TestTryAutoPromote_PromotesWhenDepsSatisfied(t *testing.T) {
 	dep, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "dep", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, dep.ID, store.TaskStatusDone)
 
-
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task", Timeout: 15})
 	_ = h.store.UpdateTaskDependsOn(ctx, task.ID, []string{dep.ID.String()})
-
 
 	h.tryAutoPromote(ctx)
 
@@ -1393,7 +1368,6 @@ func TestTryAutoPromote_DoesNotCountTestRuns(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, testTask.ID, store.TaskStatusInProgress)
 
 	_ = h.store.UpdateTaskTestRun(ctx, testTask.ID, true, "")
-
 
 	// One backlog task that should be promoted.
 	backlog, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 15})
@@ -1605,7 +1579,6 @@ func TestCheckAndSyncWaitingTasks_SkipsNonWaiting(t *testing.T) {
 	// Leave the task in backlog (not waiting).
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
-
 	// Add a commit to main so the worktree would be behind — but task isn't waiting.
 	_ = os.WriteFile(filepath.Join(repo, "new.txt"), []byte("upstream\n"), 0644)
 
@@ -1683,7 +1656,6 @@ func TestCheckAndSyncWaitingTasks_SyncsWhenBehind(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
-
 	// Add a commit to main — now the worktree is behind by 1.
 	_ = os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
 
@@ -1723,7 +1695,6 @@ func TestCheckAndSyncWaitingTasks_SyncsAtFullCapacity(t *testing.T) {
 	regular, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "regular task", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, regular.ID, store.TaskStatusInProgress)
 
-
 	repo := setupRepo(t)
 	wt := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
@@ -1732,7 +1703,6 @@ func TestCheckAndSyncWaitingTasks_SyncsAtFullCapacity(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
 
 	if err := os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -1772,7 +1742,6 @@ func TestCheckAndSyncWaitingTasks_DisabledNoOp(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
 
 	// Add a commit to main so the worktree is behind.
 	_ = os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
@@ -1921,7 +1890,6 @@ func TestTryAutoTest_DisabledNoOp(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
-
 	// autotest is disabled by default.
 	h.tryAutoTest(ctx)
 
@@ -1944,7 +1912,6 @@ func TestTryAutoTest_SkipsNonWaiting(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
 	// Leave the task in backlog (not waiting).
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
 
 	h.tryAutoTest(ctx)
 
@@ -1972,7 +1939,6 @@ func TestTryAutoTest_SkipsAlreadyTested(t *testing.T) {
 	// Simulate a previous test run that passed.
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
 
-
 	h.tryAutoTest(ctx)
 
 	got, _ := h.store.GetTask(ctx, task.ID)
@@ -1998,7 +1964,6 @@ func TestTryAutoTest_SkipsCurrentlyTesting(t *testing.T) {
 
 	// Mark the task as currently running a test.
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, true, "")
-
 
 	h.tryAutoTest(ctx)
 
@@ -2038,7 +2003,6 @@ func TestTryAutoTest_SkipsMissingWorktreeDir(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "missing-wt")}, "task-branch")
 
-
 	h.tryAutoTest(ctx)
 
 	got, _ := h.store.GetTask(ctx, task.ID)
@@ -2065,7 +2029,6 @@ func TestTryAutoTest_SkipsBehindTip(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
 
 	// Add a commit to main so the worktree is behind by 1.
 	_ = os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
@@ -2157,12 +2120,10 @@ func TestTryAutoTest_RespectsMaxTestConcurrencyLimit(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task1.ID, map[string]string{repo: wt1}, "branch-1")
 
-
 	task2, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task 2", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusWaiting)
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task2.ID, map[string]string{repo: wt2}, "branch-2")
-
 
 	h.tryAutoTest(ctx)
 
@@ -2208,7 +2169,6 @@ func TestTryAutoTest_RegularTasksDoNotConsumeTestSlots(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
-
 
 	h.tryAutoTest(ctx)
 
@@ -2265,7 +2225,6 @@ func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "fail")
 
 	_ = h.store.UpdateTaskPendingTestFeedback(ctx, task.ID, "Automated test verification failed.\n\n- fix the broken assertion")
-
 
 	h.tryAutoPromote(ctx)
 
@@ -2358,7 +2317,6 @@ func TestTryAutoSubmit_DisabledNoOp(t *testing.T) {
 
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
 
-
 	// autosubmit is disabled by default.
 	h.tryAutoSubmit(ctx)
 
@@ -2383,7 +2341,6 @@ func TestTryAutoSubmit_SkipsNonWaiting(t *testing.T) {
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
-
 
 	h.tryAutoSubmit(ctx)
 
@@ -2412,14 +2369,12 @@ func TestTryAutoSubmit_ProcessesOnlyWaitingTasks(t *testing.T) {
 
 	_ = h.store.UpdateTaskTestRun(ctx, waitingTask.ID, false, "pass")
 
-
 	doneTask, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "verified done task", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, doneTask.ID, store.TaskStatusDone)
 
 	_ = h.store.UpdateTaskWorktrees(ctx, doneTask.ID, map[string]string{repo: doneWT}, "done-branch")
 
 	_ = h.store.UpdateTaskTestRun(ctx, doneTask.ID, false, "pass")
-
 
 	h.tryAutoSubmit(ctx)
 
@@ -2495,7 +2450,6 @@ func TestTryAutoSubmit_SkipsAmbiguousVerdict(t *testing.T) {
 
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "fail")
 
-
 	h.tryAutoSubmit(ctx)
 
 	got, _ := h.store.GetTask(ctx, task.ID)
@@ -2520,7 +2474,6 @@ func TestTryAutoSubmit_SkipsFailedVerification(t *testing.T) {
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "fail")
-
 
 	h.tryAutoSubmit(ctx)
 
@@ -2548,7 +2501,6 @@ func TestTryAutoSubmit_SkipsCurrentlyTesting(t *testing.T) {
 	// IsTestRun=true means the test agent is currently running.
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, true, "pass")
 
-
 	h.tryAutoSubmit(ctx)
 
 	got, _ := h.store.GetTask(ctx, task.ID)
@@ -2569,7 +2521,6 @@ func TestTryAutoSubmit_SkipsMissingWorktreeDir(t *testing.T) {
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "missing-wt")}, "task-branch")
 
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
-
 
 	h.tryAutoSubmit(ctx)
 
@@ -2596,7 +2547,6 @@ func TestTryAutoSubmit_SkipsBehindTip(t *testing.T) {
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
 	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
-
 
 	// Add a commit to main so the worktree is behind by 1.
 	_ = os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
@@ -2753,7 +2703,6 @@ func TestSubmitFeedback_EventHasFeedbackTrigger(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
 
 	body := `{"message": "please continue"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/feedback", strings.NewReader(body))
@@ -3115,7 +3064,6 @@ func TestBatchCreateTasks_CrossBatchDep(t *testing.T) {
 	}
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 
-
 	newID := resp.RefToID["new"]
 	newTask, err := h.store.GetTask(ctx, uuid.MustParse(newID))
 	if err != nil {
@@ -3226,7 +3174,6 @@ func TestTryAutoPromote_SkipsFutureButPromotesUnscheduled(t *testing.T) {
 	unscheduled, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "unscheduled", Timeout: 15})
 	_ = h.store.UpdateTaskPosition(ctx, unscheduled.ID, 1)
 
-
 	h.tryAutoPromote(ctx)
 
 	scheduledGot, _ := h.store.GetTask(ctx, scheduled.ID)
@@ -3281,7 +3228,6 @@ func TestUpdateTask_ClearScheduledAt(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "sched clear", Timeout: 15})
 	future := time.Now().Add(2 * time.Hour)
 	_ = h.store.UpdateTaskScheduledAt(ctx, task.ID, &future)
-
 
 	body := `{"scheduled_at":null}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
@@ -4232,7 +4178,6 @@ func TestUpdateTask_SetTagsEmpty(t *testing.T) {
 	// First, set some tags.
 	_ = h.store.UpdateTaskTags(ctx, task.ID, []string{"old-tag"})
 
-
 	body := `{"tags": []}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
 	w := httptest.NewRecorder()
@@ -4257,7 +4202,6 @@ func TestUpdateTask_WaitingBudgetUpdate(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "waiting task", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 
-
 	maxCost := 10.0
 	body := fmt.Sprintf(`{"max_cost_usd": %g}`, maxCost)
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
@@ -4281,7 +4225,6 @@ func TestUpdateTask_RetryFromWaiting(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "waiting task", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
 
 	body := `{"status": "backlog"}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))
@@ -4382,7 +4325,6 @@ func TestUpdateTask_FreshStartRetry(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "original", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-
 
 	body := `{"status": "backlog", "fresh_start": true}`
 	req := httptest.NewRequest(http.MethodPatch, "/api/tasks/"+task.ID.String(), strings.NewReader(body))

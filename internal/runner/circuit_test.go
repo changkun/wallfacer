@@ -160,9 +160,9 @@ func TestCircuitBreaker_ConcurrentSafe(_ *testing.T) {
 // container runtime errors vs. normal agent exit codes.
 func TestIsContainerRuntimeError(t *testing.T) {
 	tests := []struct {
-		name    string
-		err     error
-		want    bool
+		name string
+		err  error
+		want bool
 	}{
 		{
 			name: "nil error",

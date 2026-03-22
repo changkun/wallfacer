@@ -149,10 +149,10 @@ func TestSaveTurnOutput_Truncation(t *testing.T) {
 
 	// --- Last line must be the truncation_notice sentinel ---
 	var sentinel struct {
-		Type       string `json:"type"`
-		Subtype    string `json:"subtype"`
-		TotalBytes int    `json:"total_bytes"`
-		TruncatedAt int   `json:"truncated_at"`
+		Type        string `json:"type"`
+		Subtype     string `json:"subtype"`
+		TotalBytes  int    `json:"total_bytes"`
+		TruncatedAt int    `json:"truncated_at"`
 	}
 	if err := json.Unmarshal([]byte(lastLine), &sentinel); err != nil {
 		t.Fatalf("last line is not valid JSON: %v — line: %q", err, lastLine)

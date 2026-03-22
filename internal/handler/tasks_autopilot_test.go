@@ -330,7 +330,6 @@ func TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(taskDir, 0755) })
 
-
 	h.tryAutoTest(ctx)
 
 	if !h.breakers["auto-test"].isOpen() {
@@ -381,7 +380,6 @@ func TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker(t *testing.T) {
 	// Restore write permission before cleanup (os.RemoveAll) runs; t.Cleanup
 	// callbacks execute in LIFO order, so this runs before newTestHandler's cleanup.
 	t.Cleanup(func() { _ = os.Chmod(taskDir, 0755) })
-
 
 	h.tryAutoTest(ctx)
 

@@ -183,7 +183,6 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UU
 	http.ServeFile(w, r, path)
 }
 
-
 // GenerateMissingTitles triggers background title generation for untitled tasks.
 func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) {
 	limit := 10

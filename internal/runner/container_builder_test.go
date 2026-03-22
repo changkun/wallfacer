@@ -45,17 +45,19 @@ func argsContainSubstring(args []string, sub string) bool {
 func TestBuildBaseContainerSpec(t *testing.T) {
 	type pair struct{ flag, value string }
 	tests := []struct {
-		name         string
-		cfgFn        func(t *testing.T) RunnerConfig
-		model        string
-		sandbox      string
-		wantPairs    []pair   // consecutive [flag, value] that must appear
-		wantArgs     []string // exact args that must appear somewhere
-		wantNotArgs  []string // substrings that must NOT appear in any arg
+		name        string
+		cfgFn       func(t *testing.T) RunnerConfig
+		model       string
+		sandbox     string
+		wantPairs   []pair   // consecutive [flag, value] that must appear
+		wantArgs    []string // exact args that must appear somewhere
+		wantNotArgs []string // substrings that must NOT appear in any arg
 	}{
 		{
-			name:    "claude, no envfile, no model",
-			cfgFn:   func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"} },
+			name: "claude, no envfile, no model",
+			cfgFn: func(_ *testing.T) RunnerConfig {
+				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
+			},
 			model:   "",
 			sandbox: "claude",
 			wantPairs: []pair{
@@ -81,8 +83,10 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 			wantNotArgs: []string{"/home/codex"},
 		},
 		{
-			name:    "codex sandbox, no auth path configured",
-			cfgFn:   func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"} },
+			name: "codex sandbox, no auth path configured",
+			cfgFn: func(_ *testing.T) RunnerConfig {
+				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
+			},
 			model:   "",
 			sandbox: "codex",
 			wantPairs: []pair{
@@ -110,8 +114,8 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 			wantArgs: []string{"wallfacer-codex:latest", "dst=/home/codex/.codex," + expectedBuildROSuffix()},
 		},
 		{
-			name:    "codex sandbox, auth path does not exist",
-			cfgFn:   func(_ *testing.T) RunnerConfig {
+			name: "codex sandbox, auth path does not exist",
+			cfgFn: func(_ *testing.T) RunnerConfig {
 				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest", CodexAuthPath: "/nonexistent/path/to/codex"}
 			},
 			model:       "",
@@ -120,15 +124,17 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 			wantNotArgs: []string{"/home/codex"},
 		},
 		{
-			name:    "codex sandbox, empty sandbox image falls back to wallfacer-codex:latest",
-			cfgFn:   func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: ""} },
-			model:   "",
-			sandbox: "codex",
+			name:     "codex sandbox, empty sandbox image falls back to wallfacer-codex:latest",
+			cfgFn:    func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: ""} },
+			model:    "",
+			sandbox:  "codex",
 			wantArgs: []string{"wallfacer-codex:latest"},
 		},
 		{
-			name:    "network is always host",
-			cfgFn:   func(_ *testing.T) RunnerConfig { return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"} },
+			name: "network is always host",
+			cfgFn: func(_ *testing.T) RunnerConfig {
+				return RunnerConfig{Command: "podman", SandboxImage: "wallfacer:latest"}
+			},
 			model:   "",
 			sandbox: "claude",
 			// --network=host is emitted as a single token, not two consecutive args.
@@ -273,8 +279,8 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 			},
 			sandbox: "claude",
 			wantPairs: []pair{
-				{"-v", ""},  // checked separately below
-				{"-w", ""},  // checked separately below
+				{"-v", ""}, // checked separately below
+				{"-w", ""}, // checked separately below
 			},
 			wantNotArgs: []string{":z\x00"}, // no non-readonly workspace mounts
 		},

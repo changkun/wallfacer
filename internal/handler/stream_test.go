@@ -72,7 +72,6 @@ func TestStreamLogs_TaskNotFound(t *testing.T) {
 	// Immediately cancel — non-running task with no logs.
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
 
@@ -93,7 +92,6 @@ func TestServeStoredLogs_ShowsNoOutputMessage(t *testing.T) {
 	// Create an empty outputs directory but no turn files.
 	outputsDir := h.store.OutputsDir(task.ID)
 	_ = os.MkdirAll(outputsDir, 0755)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -118,7 +116,6 @@ func TestServeStoredLogs_ServesTurnFiles(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result": "ok"}`), 0644)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"result": "done"}`), 0644)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -150,7 +147,6 @@ func TestServeStoredLogsUpTo_FiltersHigherTurns(t *testing.T) {
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0003.json"), []byte(`{"turn": 3}`), 0644)
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
 	h.serveStoredLogsUpTo(w, req, task.ID, 2)
@@ -181,7 +177,6 @@ func TestServeStoredLogsFrom_FiltersLowerTurns(t *testing.T) {
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0003.json"), []byte(`{"turn": 3}`), 0644)
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
 	h.serveStoredLogsFrom(w, req, task.ID, 2)
@@ -211,7 +206,6 @@ func TestServeStoredLogs_SkipsEmptyFiles(t *testing.T) {
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte("  \n  "), 0644)
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
 	h.serveStoredLogs(w, req, task.ID)
@@ -233,7 +227,6 @@ func TestServeStoredLogs_SkipsNonTurnFiles(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(outputsDir, "metadata.json"), []byte(`{"meta": true}`), 0644)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -287,7 +280,6 @@ func TestStreamTasks_DeltaOnUpdate(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "delta test", Timeout: 15})
 	// Create a second task so the full list has >1 entry; the delta must carry only 1.
 	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "other task", Timeout: 15})
-
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
@@ -393,7 +385,6 @@ func TestStreamTasks_SnapshotCarriesID(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
 	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task1", Timeout: 15})
-
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
@@ -548,7 +539,6 @@ func TestStreamTasks_ReplaySuccess(t *testing.T) {
 	// in_progress → waiting is a valid transition.
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 
-
 	// Second connection: reconnect with last_event_id — should get only the delta, no snapshot.
 	reqCtx2, cancel2 := context.WithCancel(context.Background())
 	req2 := httptest.NewRequest(http.MethodGet, "/api/tasks/stream?last_event_id="+lastID, nil).WithContext(reqCtx2)
@@ -584,7 +574,6 @@ func TestStreamTasks_GapFallbackToSnapshot(t *testing.T) {
 	ctx := context.Background()
 	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "gap test", Timeout: 15})
 
-
 	// Reconnect with a very old sequence ID that will never be in the buffer.
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream?last_event_id=-1", nil).WithContext(reqCtx)
@@ -615,7 +604,6 @@ func TestStreamTasks_NoLastEventID_AlwaysSnapshot(t *testing.T) {
 	ctx := context.Background()
 	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "fresh", Timeout: 15})
 
-
 	reqCtx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
 	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
@@ -645,14 +633,12 @@ func TestStreamTasks_ReplayViaLastEventIDHeader(t *testing.T) {
 	// Trigger a mutation so the replay buffer has at least one entry.
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
-
 	// Record the current seq (after the mutation).
 	seqBefore := h.store.LatestDeltaSeq()
 
 	// Trigger another mutation that the client will have "missed".
 	// in_progress → waiting is a valid transition.
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
-
 
 	// Reconnect using the Last-Event-ID header (as a native EventSource would).
 	reqCtx, cancel := context.WithCancel(context.Background())
@@ -722,13 +708,11 @@ func TestStreamLogs_DoneTaskServesStoredLogs(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
-
 	// Write a turn file so serveStoredLogs returns 200 instead of 404.
 	outputsDir := h.store.OutputsDir(task.ID)
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result":"ok"}`), 0644)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -750,7 +734,6 @@ func TestStreamLogs_CancelledTaskServesStoredLogs(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cancel test", Timeout: 15})
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
 
-
 	// No turn files; serveStoredLogs will return 404 "no logs saved".
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
@@ -771,14 +754,12 @@ func TestStreamLogs_PhaseImplQueryParam(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "impl phase test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
-
 	outputsDir := h.store.OutputsDir(task.ID)
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=impl", nil)
 	w := httptest.NewRecorder()
@@ -804,14 +785,12 @@ func TestStreamLogs_PhaseTestQueryParam(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test phase test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
-
 	outputsDir := h.store.OutputsDir(task.ID)
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0002.json"), []byte(`{"turn":2}`), 0644)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=test", nil)
 	w := httptest.NewRecorder()
@@ -837,7 +816,6 @@ func TestStreamLogs_InProgressNoContainerExitsOnContextCancel(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "in progress no container", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
-
 
 	// The mock runner always returns "" for ContainerName, so StreamLogs
 	// falls back to serveStoredLogs (no turn files → 404).
@@ -871,7 +849,7 @@ func TestStreamRefineLogs_NoContainerReturns204(t *testing.T) {
 // the http.Flusher interface.
 func TestStreamLogs_InProgress_NoFlusher(t *testing.T) {
 	mock := &runner.MockRunner{
-		Cmd: "echo",
+		Cmd:             "echo",
 		ContainerNameFn: func(_ uuid.UUID) string { return "test-container" },
 	}
 	h, s := newTestHandlerWithMockRunner(t, mock)
@@ -900,7 +878,7 @@ func TestStreamLogs_InProgress_NoFlusher(t *testing.T) {
 // container is active. Uses nonFlushingWriter which deliberately omits Flusher.
 func TestStreamRefineLogs_NoFlusher(t *testing.T) {
 	mock := &runner.MockRunner{
-		Cmd: "echo",
+		Cmd:                   "echo",
 		RefineContainerNameFn: func(_ uuid.UUID) string { return "refine-container" },
 	}
 	h, _ := newTestHandlerWithMockRunner(t, mock)
@@ -1163,7 +1141,6 @@ func TestStreamLogs_PhaseTest_InProgress(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "phase-test in-progress", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
-
 	// No container (real runner returns ""), so falls back to serveStoredLogs.
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs?phase=test", nil)
 	w := httptest.NewRecorder()
@@ -1183,12 +1160,10 @@ func TestStreamLogs_Committing_ServesStoredLogs(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "committing test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting)
 
-
 	outputsDir := h.store.OutputsDir(task.ID)
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"status":"committing"}`), 0644)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()

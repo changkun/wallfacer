@@ -37,7 +37,6 @@ func TestStartRefinement_NotBacklog(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
-
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
 	h.StartRefinement(w, req, task.ID)
@@ -59,7 +58,6 @@ func TestStartRefinement_AlreadyRunning(t *testing.T) {
 		Status:    "running",
 	}
 	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
-
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -121,7 +119,6 @@ func TestStartRefinement_PreviousNonRunningAllowed(t *testing.T) {
 	}
 	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
 
-
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
 	h.StartRefinement(w, req, task.ID)
@@ -175,7 +172,6 @@ func TestCancelRefinement_NonRunningJobRejected(t *testing.T) {
 	}
 	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
 
-
 	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
 	h.CancelRefinement(w, req, task.ID)
@@ -198,7 +194,6 @@ func TestCancelRefinement_Success(t *testing.T) {
 		Status:    "running",
 	}
 	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
-
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+task.ID.String()+"/refine", nil)
 	w := httptest.NewRecorder()
@@ -250,7 +245,6 @@ func TestRefineApply_NotBacklog(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test prompt", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
-
 
 	body := `{"prompt": "new prompt"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))
@@ -308,7 +302,6 @@ func TestRefineApply_Success(t *testing.T) {
 		Result:    "detailed implementation spec from sandbox",
 	}
 	_ = h.store.UpdateRefinementJob(ctx, task.ID, job)
-
 
 	body := `{"prompt": "detailed refined prompt"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/refine/apply", strings.NewReader(body))

@@ -28,7 +28,7 @@ func (h *logCaptureHandler) Handle(_ context.Context, r slog.Record) error {
 }
 
 func (h *logCaptureHandler) WithAttrs(_ []slog.Attr) slog.Handler { return h }
-func (h *logCaptureHandler) WithGroup(_ string) slog.Handler       { return h }
+func (h *logCaptureHandler) WithGroup(_ string) slog.Handler      { return h }
 
 func (h *logCaptureHandler) hasError(msg string) bool {
 	h.mu.Lock()

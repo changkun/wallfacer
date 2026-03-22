@@ -25,7 +25,7 @@ var ideationHistoryTTL = func() time.Duration {
 
 // HistoryEntry records the outcome of a single idea evaluated during ideation.
 type HistoryEntry struct {
-	Title      string    `json:"title"`
+	Title string `json:"title"`
 	// Reason is one of: "accepted", "rejected_threshold", "rejected_duplicate", "rejected_degenerate"
 	Reason     string    `json:"reason"`
 	TaskID     string    `json:"task_id,omitempty"` // set for accepted entries
@@ -57,8 +57,9 @@ func LoadHistory(dataDir string) (*IdeationHistory, error) {
 		}
 		return nil, fmt.Errorf("open ideation history: %w", err)
 	}
-	defer func() { _ = f.Close()
- }()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	cutoff := time.Now().Add(-ideationHistoryTTL)
 	scanner := bufio.NewScanner(f)

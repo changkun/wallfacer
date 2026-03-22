@@ -398,7 +398,6 @@ func TestIdeationTaskStoresActualPrompt(t *testing.T) {
 	}
 }
 
-
 // TestBuildIdeationPromptNoExistingTasks verifies that when there are no active
 // tasks the prompt does not include the "Existing active tasks" section, and
 // that it still contains suggested focus areas for the agent.
@@ -1006,7 +1005,6 @@ func TestIdeationHistoryTruncatedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = f.Close()
-
 
 	h2, err := LoadHistory(dir)
 	if err != nil {

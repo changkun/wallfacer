@@ -169,7 +169,7 @@ func TestParseOutputEdgeCases(t *testing.T) {
 			// A line with stop_reason explicitly set to "" must NOT be treated
 			// as the canonical result line; the line with a non-empty stop_reason
 			// must win.  Regression for the correctness bug fixed in 9603f10.
-			name:  "empty stop_reason string is not selected over non-empty stop_reason",
+			name: "empty stop_reason string is not selected over non-empty stop_reason",
 			input: `{"result":"first","session_id":"s1","stop_reason":""}` + "\n" +
 				`{"result":"second","session_id":"s2","stop_reason":"end_turn"}`,
 			wantResult:  "second",

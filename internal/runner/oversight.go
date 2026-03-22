@@ -688,7 +688,6 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	containerName := "wallfacer-oversight-" + taskID.String()[:8]
 	_ = exec.Command(r.command, "rm", "-f", containerName).Run()
 
-
 	task, err := r.store.GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Warn("oversight: get task", "task", taskID, "error", err)

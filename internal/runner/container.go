@@ -497,7 +497,6 @@ func (r *Runner) runContainer(
 		rawStdout, rawStderr, runErr := r.executor.RunArgs(ctx, containerName, args)
 		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
 
-
 		// Detect container runtime failures (daemon/binary unavailable).
 		// Only trip the breaker for runtime-level errors, not for Claude
 		// exiting non-zero (exit codes 1–124).

@@ -21,8 +21,8 @@ type imagePull struct {
 	ID      string        `json:"pull_id"`
 	Image   string        `json:"image"`
 	Sandbox sandbox.Type  `json:"sandbox"`
-	Lines   chan string    `json:"-"`
-	Done    chan struct{}  `json:"-"`
+	Lines   chan string   `json:"-"`
+	Done    chan struct{} `json:"-"`
 	Err     error         `json:"-"`
 	Success bool          `json:"-"`
 	DoneAt  time.Time     `json:"-"`
@@ -91,7 +91,7 @@ func (pt *pullTracker) cleanup(retention time.Duration) {
 // pullProgress describes structured progress for a single pull output line.
 type pullProgress struct {
 	Line       string `json:"line"`
-	Phase      string `json:"phase"`       // resolving, copying, manifest, done, error, unknown
+	Phase      string `json:"phase"` // resolving, copying, manifest, done, error, unknown
 	LayersDone int    `json:"layers_done"`
 }
 

@@ -115,12 +115,12 @@ func FuzzExtractSessionID(f *testing.F) {
 // parseOutput when multiple JSON objects are present in the output.
 func TestParseOutputStopReasonPrecedence(t *testing.T) {
 	cases := []struct {
-		name            string
-		input           string
-		wantNil         bool
-		wantStopReason  string
-		wantSessionID   string
-		wantIsError     bool
+		name           string
+		input          string
+		wantNil        bool
+		wantStopReason string
+		wantSessionID  string
+		wantIsError    bool
 	}{
 		{
 			// (a) Multiple valid JSON objects; the one with stop_reason must win

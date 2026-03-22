@@ -166,7 +166,6 @@ func TestUpdateConfig_SetsIdeationInterval(t *testing.T) {
 	var resp map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 
-
 	got, ok := resp["ideation_interval"].(float64)
 	if !ok {
 		t.Fatalf("expected ideation_interval in response, got %v", resp["ideation_interval"])
@@ -230,7 +229,6 @@ func TestGetConfig_ReturnsIdeationInterval(t *testing.T) {
 	var resp map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 
-
 	got, ok := resp["ideation_interval"].(float64)
 	if !ok {
 		t.Fatalf("expected ideation_interval in GetConfig response, got %v", resp["ideation_interval"])
@@ -249,7 +247,6 @@ func TestGetConfig_IdeationNextRunAbsentWhenNotPending(t *testing.T) {
 
 	var resp map[string]any
 	_ = json.NewDecoder(w.Body).Decode(&resp)
-
 
 	if _, ok := resp["ideation_next_run"]; ok {
 		t.Error("expected ideation_next_run to be absent when no timer is pending")

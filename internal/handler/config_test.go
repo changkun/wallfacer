@@ -586,7 +586,6 @@ func TestGetFiles_ListsWorkspaceFiles(t *testing.T) {
 
 	_ = os.WriteFile(filepath.Join(ws, "README.md"), []byte("# readme"), 0644)
 
-
 	req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 	w := httptest.NewRecorder()
 	h.GetFiles(w, req)
@@ -623,10 +622,8 @@ func TestGetFiles_SkipsHiddenDirs(t *testing.T) {
 
 	_ = os.WriteFile(filepath.Join(hiddenDir, "config"), []byte("git config"), 0644)
 
-
 	// Create a visible file.
 	_ = os.WriteFile(filepath.Join(ws, "visible.txt"), []byte("visible"), 0644)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 	w := httptest.NewRecorder()
@@ -653,7 +650,6 @@ func TestGetFiles_SkipsNodeModules(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(nodeModules, "package.js"), []byte("module"), 0644)
 
 	_ = os.WriteFile(filepath.Join(ws, "index.js"), []byte("main"), 0644)
-
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files", nil)
 	w := httptest.NewRecorder()
@@ -861,7 +857,6 @@ func TestGitCheckout_RejectsWhenTasksInProgress(t *testing.T) {
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
 
-
 	body := jsonObj("workspace", repo, "branch", "main")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
 	w := httptest.NewRecorder()
@@ -920,7 +915,6 @@ func TestGitCreateBranch_RejectsWhenTasksInProgress(t *testing.T) {
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
-
 
 	body := jsonObj("workspace", repo, "branch", "new-branch")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
@@ -1013,7 +1007,6 @@ func newTestHandlerWithRealWorkspaceManager(t *testing.T) (*Handler, *workspace.
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
-
 
 	s, err := store.NewStore(storeDir)
 	if err != nil {

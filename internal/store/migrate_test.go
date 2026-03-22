@@ -208,11 +208,11 @@ func TestMigrateTaskJSON_NoChangesWhenAlreadyCurrent(t *testing.T) {
 	}
 	now := time.Now().UTC()
 	raw := buildMinimalTaskJSON(t, map[string]any{
-		"status":    string(TaskStatusBacklog),
-		"timeout":   60,
-		"created_at": now,
-		"updated_at": now,
-		"sandbox":    string(sandbox.Claude),
+		"status":         string(TaskStatusBacklog),
+		"timeout":        60,
+		"created_at":     now,
+		"updated_at":     now,
+		"sandbox":        string(sandbox.Claude),
 		"schema_version": CurrentTaskSchemaVersion,
 		"auto_retry_budget": map[string]int{
 			string(FailureCategoryContainerCrash): 2,

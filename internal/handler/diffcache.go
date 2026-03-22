@@ -30,7 +30,7 @@ type diffCacheEntry struct {
 type diffCache struct {
 	mu            sync.Mutex
 	entries       map[uuid.UUID]diffCacheEntry
-	immutableKeys []uuid.UUID // insertion order, for oldest-first eviction
+	immutableKeys []uuid.UUID      // insertion order, for oldest-first eviction
 	now           func() time.Time // injectable clock for testing
 }
 

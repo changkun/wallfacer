@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	inputFile  = "models.go"        // read from CWD (= internal/store/)
+	inputFile  = "models.go"          // read from CWD (= internal/store/)
 	outputFile = "tasks_clone_gen.go" // written to CWD
 )
 

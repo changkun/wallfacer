@@ -176,7 +176,6 @@ func TestTaskDiffShowsOnlyTaskChanges(t *testing.T) {
 	taskB, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task B", Timeout: 5})
 	_ = h.store.UpdateTaskWorktrees(ctx, taskB.ID, map[string]string{repo: wtB}, "task-b")
 
-
 	// Get diff for task B — should only show b.txt, NOT the inverse of a.txt.
 	resp := callTaskDiff(t, h, taskB.ID)
 
@@ -199,10 +198,8 @@ func TestTaskDiffIncludesUncommittedChanges(t *testing.T) {
 	// Make uncommitted change.
 	_ = os.WriteFile(filepath.Join(wtDir, "file.txt"), []byte("modified\n"), 0644)
 
-
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
-
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -222,10 +219,8 @@ func TestTaskDiffIncludesUntrackedFiles(t *testing.T) {
 	// Add an untracked file.
 	_ = os.WriteFile(filepath.Join(wtDir, "new-file.txt"), []byte("new content\n"), 0644)
 
-
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
-
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -244,7 +239,6 @@ func TestTaskDiffEmptyWhenNoChanges(t *testing.T) {
 
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
-
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -277,7 +271,6 @@ func TestTaskDiffFallbackToCommitHashes(t *testing.T) {
 
 	_ = h.store.UpdateTaskBaseCommitHashes(ctx, task.ID, map[string]string{repo: baseHash})
 
-
 	resp := callTaskDiff(t, h, task.ID)
 
 	if !strings.Contains(resp.Diff, "task-work.txt") {
@@ -308,7 +301,6 @@ func TestTaskDiffFallbackBranchUseMergeBase(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	nonexistent := filepath.Join(t.TempDir(), "gone")
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: nonexistent}, "task-x")
-
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -361,7 +353,6 @@ func TestTaskDiffAfterCommitPipeline(t *testing.T) {
 	_ = h.store.UpdateTaskCommitHashes(ctx, task.ID, map[string]string{repo: commitHash})
 
 	_ = h.store.UpdateTaskBaseCommitHashes(ctx, task.ID, map[string]string{repo: baseHash})
-
 
 	resp := callTaskDiff(t, h, task.ID)
 
@@ -430,7 +421,6 @@ func TestGitRebaseOnMain_RejectsWhenTasksInProgress(t *testing.T) {
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
-
 
 	body := jsonObj("workspace", repo)
 	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
@@ -745,10 +735,8 @@ func TestDiffCacheHit(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
 	_ = os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("hello\n"), 0644)
 
-
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
-
 
 	// First request — cache miss, expect 200 with ETag.
 	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
@@ -799,12 +787,10 @@ func TestDiffCacheImmutable(t *testing.T) {
 			gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
 			_ = os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("done\n"), 0644)
 
-
 			task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 			_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
 
 			_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, status)
-
 
 			req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
 			w := httptest.NewRecorder()
@@ -833,14 +819,12 @@ func TestDiffCacheImmutable(t *testing.T) {
 		gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
 		_ = os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("archived\n"), 0644)
 
-
 		task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 		_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
 
 		_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
 		_ = h.store.SetTaskArchived(ctx, task.ID, true)
-
 
 		req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
 		w := httptest.NewRecorder()
@@ -867,10 +851,8 @@ func TestDiffCacheInvalidation(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
 	_ = os.WriteFile(filepath.Join(wtDir, "file1.txt"), []byte("first\n"), 0644)
 
-
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
-
 
 	// First diff — populate cache.
 	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
@@ -883,7 +865,6 @@ func TestDiffCacheInvalidation(t *testing.T) {
 
 	// Add a new untracked file (diff content changes).
 	_ = os.WriteFile(filepath.Join(wtDir, "file2.txt"), []byte("second\n"), 0644)
-
 
 	// Without a status change, the cache is still valid — second request with
 	// If-None-Match should return 304.
@@ -937,7 +918,6 @@ func TestDiffCacheTTLExpiry(t *testing.T) {
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
 	_ = os.WriteFile(filepath.Join(wtDir, "file1.txt"), []byte("first\n"), 0644)
 
-
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
 
@@ -954,7 +934,6 @@ func TestDiffCacheTTLExpiry(t *testing.T) {
 
 	// Add a new untracked file while still within the TTL.
 	_ = os.WriteFile(filepath.Join(wtDir, "file2.txt"), []byte("second\n"), 0644)
-
 
 	// Within TTL — same ETag should still produce 304.
 	req2 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
@@ -1010,10 +989,8 @@ func TestTaskDiffIsolationConcurrent(t *testing.T) {
 	taskA, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "A", Timeout: 5})
 	_ = h.store.UpdateTaskWorktrees(ctx, taskA.ID, map[string]string{repo: wtA}, "task-a")
 
-
 	taskB, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "B", Timeout: 5})
 	_ = h.store.UpdateTaskWorktrees(ctx, taskB.ID, map[string]string{repo: wtB}, "task-b")
-
 
 	// Query diffs concurrently.
 	var wg sync.WaitGroup
@@ -1139,7 +1116,7 @@ type minimalWriter struct {
 
 func (m *minimalWriter) Header() http.Header         { return m.headers }
 func (m *minimalWriter) Write(b []byte) (int, error) { return m.body.Write(b) }
-func (m *minimalWriter) WriteHeader(code int)         { m.code = code }
+func (m *minimalWriter) WriteHeader(code int)        { m.code = code }
 
 // TestGitStatusStream_NoFlusher verifies that GitStatusStream returns 500 when
 // the ResponseWriter does not implement http.Flusher.

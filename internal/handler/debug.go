@@ -56,7 +56,7 @@ type spanStatsCache struct {
 
 // DayCount holds the number of completed tasks for a single UTC calendar day.
 type DayCount struct {
-	Date  string `json:"date"`  // "2006-01-02"
+	Date  string `json:"date"` // "2006-01-02"
 	Count int    `json:"count"`
 }
 

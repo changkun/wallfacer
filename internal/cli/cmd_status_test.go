@@ -74,8 +74,8 @@ func TestTruncate(t *testing.T) {
 		{"", 5, ""},
 		{"exact", 5, "exact"},
 		{"toolong", 4, "tool…"},
-		{"αβγδε", 3, "αβγ…"},    // multi-byte rune handling
-		{"αβγ", 3, "αβγ"},       // exact rune count, no ellipsis
+		{"αβγδε", 3, "αβγ…"}, // multi-byte rune handling
+		{"αβγ", 3, "αβγ"},    // exact rune count, no ellipsis
 	}
 	for _, tc := range tests {
 		got := truncate(tc.input, tc.n)
@@ -248,10 +248,12 @@ func TestRunStatus(t *testing.T) {
 func captureStdout(fn func()) string {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
-	defer func() { _ = r.Close()
- }()
-	defer func() { _ = w.Close()
- }()
+	defer func() {
+		_ = r.Close()
+	}()
+	defer func() {
+		_ = w.Close()
+	}()
 	defer func() { os.Stdout = old }()
 	os.Stdout = w
 
@@ -267,10 +269,12 @@ func captureStdout(fn func()) string {
 func captureStderr(fn func()) string {
 	old := os.Stderr
 	r, w, _ := os.Pipe()
-	defer func() { _ = r.Close()
- }()
-	defer func() { _ = w.Close()
- }()
+	defer func() {
+		_ = r.Close()
+	}()
+	defer func() {
+		_ = w.Close()
+	}()
 	defer func() { os.Stderr = old }()
 	os.Stderr = w
 

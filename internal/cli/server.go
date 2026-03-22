@@ -59,7 +59,6 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	}
 	_ = fs.Parse(args)
 
-
 	// Re-initialize loggers with the format chosen by the user.
 	logger.Init(*logFormat)
 
@@ -405,7 +404,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// in order. This is used for both guide and internals indexes.
 	parseReadingOrder := func(path string) []string {
 		var order []string
-		indexData, err := fs.ReadFile(docsFS,path)
+		indexData, err := fs.ReadFile(docsFS, path)
 		if err != nil {
 			return order
 		}
@@ -449,7 +448,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Helper: read title from first "# " line in a markdown file.
 		readTitle := func(path, fallback string) string {
-			data, _ := fs.ReadFile(docsFS,path)
+			data, _ := fs.ReadFile(docsFS, path)
 			for _, line := range strings.SplitN(string(data), "\n", 10) {
 				if title, ok := strings.CutPrefix(line, "# "); ok {
 					return title
@@ -471,7 +470,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		for _, name := range guideOrder {
 			ordered[name] = true
 			path := "docs/guide/" + name + ".md"
-			if _, err := fs.ReadFile(docsFS,path); err != nil {
+			if _, err := fs.ReadFile(docsFS, path); err != nil {
 				continue
 			}
 			seq++
@@ -480,7 +479,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "guide", Order: seq})
 		}
 		// Append any guide docs not in the explicit order.
-		if dir, err := fs.ReadDir(docsFS,"docs/guide"); err == nil {
+		if dir, err := fs.ReadDir(docsFS, "docs/guide"); err == nil {
 			for _, f := range dir {
 				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
 					continue
@@ -506,7 +505,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		for _, name := range internalsOrder {
 			intOrdered[name] = true
 			path := "docs/internals/" + name + ".md"
-			if _, err := fs.ReadFile(docsFS,path); err != nil {
+			if _, err := fs.ReadFile(docsFS, path); err != nil {
 				continue
 			}
 			intSeq++
@@ -515,7 +514,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			entries = append(entries, docEntry{Slug: slug, Title: title, Category: "internals", Order: intSeq})
 		}
 		// Append any internals docs not in the explicit order.
-		if dir, err := fs.ReadDir(docsFS,"docs/internals"); err == nil {
+		if dir, err := fs.ReadDir(docsFS, "docs/internals"); err == nil {
 			for _, f := range dir {
 				if f.IsDir() || !strings.HasSuffix(f.Name(), ".md") {
 					continue
@@ -540,7 +539,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			http.Error(w, "invalid path", http.StatusBadRequest)
 			return
 		}
-		data, err := fs.ReadFile(docsFS,"docs/" + slug + ".md")
+		data, err := fs.ReadFile(docsFS, "docs/"+slug+".md")
 		if err != nil {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
@@ -661,8 +660,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"SyncTask":       withID(h.SyncTask),
 		"TestTask":       withID(h.TestTask),
 
-		"TaskDiff":       withID(h.TaskDiff),
-		"StreamLogs":     withID(h.StreamLogs),
+		"TaskDiff":   withID(h.TaskDiff),
+		"StreamLogs": withID(h.StreamLogs),
 
 		// GetTurnUsage reads {id} internally (not via withID).
 		"GetTurnUsage": h.GetTurnUsage,
@@ -734,7 +733,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"CompleteTask":   handler.BodyLimitDefault,
 		"ResumeTask":     handler.BodyLimitDefault,
 		"TestTask":       handler.BodyLimitDefault,
-
 
 		// Refinement agent.
 		"StartRefinement": handler.BodyLimitDefault,

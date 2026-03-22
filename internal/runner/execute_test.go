@@ -1811,7 +1811,6 @@ func TestMockSessionIDPassedToResume(t *testing.T) {
 	}
 }
 
-
 // ---------------------------------------------------------------------------
 // Auto-retry tests
 // ---------------------------------------------------------------------------
@@ -1922,11 +1921,11 @@ func TestAutoRetry_MaxTotalCap(t *testing.T) {
 // are evaluated before the built-in heuristics.
 func TestParseTestVerdictCustomPatterns(t *testing.T) {
 	cases := []struct {
-		name        string
-		input       string
-		customPass  []string
-		customFail  []string
-		expected    string
+		name       string
+		input      string
+		customPass []string
+		customFail []string
+		expected   string
 	}{
 		{
 			name:       "custom fail pattern matches",

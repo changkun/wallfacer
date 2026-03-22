@@ -10,11 +10,11 @@ import (
 
 // usageResponse is the JSON body returned by GET /api/usage.
 type usageResponse struct {
-	Total      store.TaskUsage                      `json:"total"`
-	ByStatus   map[store.TaskStatus]store.TaskUsage `json:"by_status"`
+	Total      store.TaskUsage                           `json:"total"`
+	ByStatus   map[store.TaskStatus]store.TaskUsage      `json:"by_status"`
 	BySubAgent map[store.SandboxActivity]store.TaskUsage `json:"by_sub_agent"`
-	TaskCount  int                                  `json:"task_count"`
-	PeriodDays int                                  `json:"period_days"`
+	TaskCount  int                                       `json:"task_count"`
+	PeriodDays int                                       `json:"period_days"`
 }
 
 func addUsage(dst *store.TaskUsage, src store.TaskUsage) {

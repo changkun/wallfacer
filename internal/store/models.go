@@ -38,15 +38,15 @@ type ExecutionEnvironment struct {
 
 // TurnUsageRecord captures token consumption and stop reason for a single agent turn.
 type TurnUsageRecord struct {
-	Turn                 int          `json:"turn"`
-	Timestamp            time.Time    `json:"timestamp"`
-	InputTokens          int          `json:"input_tokens"`
-	OutputTokens         int          `json:"output_tokens"`
-	CacheReadInputTokens int          `json:"cache_read_input_tokens"`
-	CacheCreationTokens  int          `json:"cache_creation_tokens"`
-	CostUSD              float64      `json:"cost_usd"`
-	StopReason           string       `json:"stop_reason,omitempty"`
-	Sandbox              sandbox.Type `json:"sandbox,omitempty"`
+	Turn                 int             `json:"turn"`
+	Timestamp            time.Time       `json:"timestamp"`
+	InputTokens          int             `json:"input_tokens"`
+	OutputTokens         int             `json:"output_tokens"`
+	CacheReadInputTokens int             `json:"cache_read_input_tokens"`
+	CacheCreationTokens  int             `json:"cache_creation_tokens"`
+	CostUSD              float64         `json:"cost_usd"`
+	StopReason           string          `json:"stop_reason,omitempty"`
+	Sandbox              sandbox.Type    `json:"sandbox,omitempty"`
 	SubAgent             SandboxActivity `json:"sub_agent,omitempty"`
 }
 
@@ -133,15 +133,15 @@ const (
 	// SandboxActivityImplementation is the main implementation phase.
 	SandboxActivityImplementation SandboxActivity = "implementation"
 	// SandboxActivityTesting is the test-execution phase.
-	SandboxActivityTesting        SandboxActivity = "testing"
-	SandboxActivityRefinement     SandboxActivity = "refinement"
-	SandboxActivityTitle          SandboxActivity = "title"
-	SandboxActivityOversight      SandboxActivity = "oversight"
-	SandboxActivityCommitMessage  SandboxActivity = "commit_message"
-	SandboxActivityIdeaAgent      SandboxActivity = "idea_agent"
+	SandboxActivityTesting       SandboxActivity = "testing"
+	SandboxActivityRefinement    SandboxActivity = "refinement"
+	SandboxActivityTitle         SandboxActivity = "title"
+	SandboxActivityOversight     SandboxActivity = "oversight"
+	SandboxActivityCommitMessage SandboxActivity = "commit_message"
+	SandboxActivityIdeaAgent     SandboxActivity = "idea_agent"
 
 	// SandboxActivityTest is a usage-attribution-only activity (not used for sandbox routing).
-	SandboxActivityTest         SandboxActivity = "test"
+	SandboxActivityTest          SandboxActivity = "test"
 	SandboxActivityOversightTest SandboxActivity = "oversight-test"
 )
 
@@ -277,28 +277,28 @@ type PayloadLimits struct {
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {
-	SchemaVersion     int                     `json:"schema_version"`
-	ID                uuid.UUID               `json:"id"`
-	Title             string                  `json:"title,omitempty"`
-	Goal              string                  `json:"goal,omitempty"`            // 1-3 sentence human-readable summary for card display
-	GoalManuallySet   bool                    `json:"goal_manually_set,omitempty"` // true when user explicitly edited the goal
-	Prompt            string                  `json:"prompt"`
-	PromptHistory     []string                `json:"prompt_history,omitempty"`
-	RetryHistory      []RetryRecord           `json:"retry_history,omitempty"`
-	RefineSessions    []RefinementSession     `json:"refine_sessions,omitempty"`
-	CurrentRefinement *RefinementJob          `json:"current_refinement,omitempty"`
-	Status            TaskStatus              `json:"status"`
-	Archived          bool                    `json:"archived,omitempty"`
-	SessionID         *string                 `json:"session_id"`
-	FreshStart        bool                    `json:"fresh_start,omitempty"`
-	Result            *string                 `json:"result"`
-	StopReason        *string                 `json:"stop_reason"`
-	Turns             int                     `json:"turns"`
-	Timeout           int                     `json:"timeout"`
-	MaxCostUSD        float64                 `json:"max_cost_usd,omitempty"`     // 0 = unlimited
-	MaxInputTokens    int                     `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
-	Usage             TaskUsage               `json:"usage"`
-	Sandbox           sandbox.Type            `json:"sandbox,omitempty"`
+	SchemaVersion     int                              `json:"schema_version"`
+	ID                uuid.UUID                        `json:"id"`
+	Title             string                           `json:"title,omitempty"`
+	Goal              string                           `json:"goal,omitempty"`              // 1-3 sentence human-readable summary for card display
+	GoalManuallySet   bool                             `json:"goal_manually_set,omitempty"` // true when user explicitly edited the goal
+	Prompt            string                           `json:"prompt"`
+	PromptHistory     []string                         `json:"prompt_history,omitempty"`
+	RetryHistory      []RetryRecord                    `json:"retry_history,omitempty"`
+	RefineSessions    []RefinementSession              `json:"refine_sessions,omitempty"`
+	CurrentRefinement *RefinementJob                   `json:"current_refinement,omitempty"`
+	Status            TaskStatus                       `json:"status"`
+	Archived          bool                             `json:"archived,omitempty"`
+	SessionID         *string                          `json:"session_id"`
+	FreshStart        bool                             `json:"fresh_start,omitempty"`
+	Result            *string                          `json:"result"`
+	StopReason        *string                          `json:"stop_reason"`
+	Turns             int                              `json:"turns"`
+	Timeout           int                              `json:"timeout"`
+	MaxCostUSD        float64                          `json:"max_cost_usd,omitempty"`     // 0 = unlimited
+	MaxInputTokens    int                              `json:"max_input_tokens,omitempty"` // 0 = unlimited; counts input+cache_read+cache_creation
+	Usage             TaskUsage                        `json:"usage"`
+	Sandbox           sandbox.Type                     `json:"sandbox,omitempty"`
 	SandboxByActivity map[SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
 	// UsageBreakdown tracks token/cost per sub-agent activity.
 	UsageBreakdown map[SandboxActivity]TaskUsage `json:"usage_breakdown,omitempty"`
@@ -354,7 +354,6 @@ type Task struct {
 	// be auto-promoted from backlog. Nil means "run as soon as there is
 	// capacity" (the existing default behaviour).
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
-
 
 	// FailureCategory records the machine-readable root cause of the last
 	// failure transition. Set automatically by the runner at every
@@ -434,19 +433,19 @@ type Tombstone struct {
 // and key metadata so that analytics endpoints can avoid re-reading the full
 // task.json for completed tasks.
 type TaskSummary struct {
-	TaskID          uuid.UUID            `json:"task_id"`
-	Title           string               `json:"title"`
-	Status          TaskStatus           `json:"status"`
-	CompletedAt              time.Time            `json:"completed_at"`
-	CreatedAt                time.Time            `json:"created_at"`
-	DurationSeconds          float64              `json:"duration_seconds"`
-	ExecutionDurationSeconds float64              `json:"execution_duration_seconds"`
-	TotalTurns      int                  `json:"total_turns"`
-	TotalCostUSD    float64              `json:"total_cost_usd"`
-	ByActivity      map[SandboxActivity]TaskUsage `json:"by_activity"`
-	TestResult      string               `json:"test_result"`
-	PhaseCount      int                  `json:"phase_count"`
-	FailureCategory FailureCategory      `json:"failure_category,omitempty"`
+	TaskID                   uuid.UUID                     `json:"task_id"`
+	Title                    string                        `json:"title"`
+	Status                   TaskStatus                    `json:"status"`
+	CompletedAt              time.Time                     `json:"completed_at"`
+	CreatedAt                time.Time                     `json:"created_at"`
+	DurationSeconds          float64                       `json:"duration_seconds"`
+	ExecutionDurationSeconds float64                       `json:"execution_duration_seconds"`
+	TotalTurns               int                           `json:"total_turns"`
+	TotalCostUSD             float64                       `json:"total_cost_usd"`
+	ByActivity               map[SandboxActivity]TaskUsage `json:"by_activity"`
+	TestResult               string                        `json:"test_result"`
+	PhaseCount               int                           `json:"phase_count"`
+	FailureCategory          FailureCategory               `json:"failure_category,omitempty"`
 }
 
 // TaskSearchResult wraps a Task with search match metadata.

@@ -225,13 +225,13 @@ func TestBuildTurnTimestampsIgnoresNewInstrumentedPhases(t *testing.T) {
 	agentSpan, _ := json.Marshal(store.SpanData{Phase: "agent_turn", Label: "implementation_1"})
 
 	events := []store.TaskEvent{
-		{EventType: store.EventTypeSpanStart, Data: boardSpan, CreatedAt: t0},                           // not counted
-		{EventType: store.EventTypeSpanEnd, Data: boardSpan, CreatedAt: t0.Add(100 * time.Millisecond)}, // not counted
+		{EventType: store.EventTypeSpanStart, Data: boardSpan, CreatedAt: t0},                                    // not counted
+		{EventType: store.EventTypeSpanEnd, Data: boardSpan, CreatedAt: t0.Add(100 * time.Millisecond)},          // not counted
 		{EventType: store.EventTypeSpanStart, Data: boardRefreshSpan, CreatedAt: t0.Add(200 * time.Millisecond)}, // not counted
-		{EventType: store.EventTypeSpanStart, Data: agentSpan, CreatedAt: t1},                           // counted: turn 1
-		{EventType: store.EventTypeSpanStart, Data: feedbackSpan, CreatedAt: t1.Add(30 * time.Second)},  // not counted
-		{EventType: store.EventTypeSpanEnd, Data: feedbackSpan, CreatedAt: t2},                          // not counted
-		{EventType: store.EventTypeSpanStart, Data: cleanupSpan, CreatedAt: t2.Add(1 * time.Second)},    // not counted
+		{EventType: store.EventTypeSpanStart, Data: agentSpan, CreatedAt: t1},                                    // counted: turn 1
+		{EventType: store.EventTypeSpanStart, Data: feedbackSpan, CreatedAt: t1.Add(30 * time.Second)},           // not counted
+		{EventType: store.EventTypeSpanEnd, Data: feedbackSpan, CreatedAt: t2},                                   // not counted
+		{EventType: store.EventTypeSpanStart, Data: cleanupSpan, CreatedAt: t2.Add(1 * time.Second)},             // not counted
 	}
 	ts := buildTurnTimestamps(events)
 	if len(ts) != 1 {

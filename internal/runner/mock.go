@@ -30,11 +30,11 @@ type MockRunner struct {
 	CodexPath   string
 
 	// Recorded call arguments (mutex-protected for race-safety).
-	RunBackgroundCalls        []uuid.UUID
-	KillContainerCalls        []uuid.UUID
-	KillRefineContainerCalls  []uuid.UUID
-	CleanupWorktreesCalls     []uuid.UUID
-	GenerateTitleCalls        []uuid.UUID
+	RunBackgroundCalls       []uuid.UUID
+	KillContainerCalls       []uuid.UUID
+	KillRefineContainerCalls []uuid.UUID
+	CleanupWorktreesCalls    []uuid.UUID
+	GenerateTitleCalls       []uuid.UUID
 
 	// Optional overrides for ContainerName / RefineContainerName return values.
 	// When nil the methods return "" (no container active), matching the default
@@ -89,7 +89,6 @@ func (m *MockRunner) SyncWorktreesBackground(_ uuid.UUID, _ string, _ store.Task
 
 // RunRefinementBackground is a no-op mock.
 func (m *MockRunner) RunRefinementBackground(_ uuid.UUID, _ string) {}
-
 
 // EnsureTaskWorktrees returns the provided worktrees unchanged.
 func (m *MockRunner) EnsureTaskWorktrees(_ uuid.UUID, existing map[string]string, branchName string) (map[string]string, string, error) {

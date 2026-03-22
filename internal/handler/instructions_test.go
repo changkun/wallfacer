@@ -215,7 +215,6 @@ func TestUpdateInstructions_WriteError(t *testing.T) {
 	// Restore permissions after test so TempDir cleanup works.
 	t.Cleanup(func() { _ = os.Chmod(instDir, 0755) })
 
-
 	body := `{"content": "some content"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/instructions", strings.NewReader(body))
 	w := httptest.NewRecorder()
@@ -240,7 +239,6 @@ func TestReinitInstructions_WriteError(t *testing.T) {
 		t.Fatalf("chmod: %v", err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(instDir, 0755) })
-
 
 	req := httptest.NewRequest(http.MethodPost, "/api/instructions/reinit", nil)
 	w := httptest.NewRecorder()

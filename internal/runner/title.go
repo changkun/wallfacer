@@ -49,7 +49,6 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		mdl := r.titleModelFromEnvForSandbox(selected)
 		_ = exec.Command(r.command, "rm", "-f", containerName).Run()
 
-
 		spec := r.buildBaseContainerSpec(containerName, mdl, selected)
 		spec.Cmd = buildAgentCmd(titlePrompt, mdl)
 
@@ -62,7 +61,6 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 
 		runErr := cmd.Run()
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
-
 
 		if ctx.Err() != nil {
 			return titleResult{err: fmt.Errorf("container terminated: %w", ctx.Err()), model: mdl, sb: selected}

@@ -111,8 +111,9 @@ func TestNoRawAPILiterals_InUISourceFiles(t *testing.T) {
 			if err != nil {
 				t.Fatalf("open %s: %v", src, err)
 			}
-			defer func() { _ = f.Close()
- }()
+			defer func() {
+				_ = f.Close()
+			}()
 
 			scanner := bufio.NewScanner(f)
 			lineNum := 0

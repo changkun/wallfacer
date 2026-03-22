@@ -41,13 +41,13 @@ const (
 
 // statusColors maps status names to ANSI foreground color codes.
 var statusColors = map[string]string{
-	"backlog":     "\033[37m",   // white
-	"in_progress": "\033[34m",   // blue
-	"waiting":     "\033[33m",   // yellow
-	"committing":  "\033[36m",   // cyan
-	"done":        "\033[32m",   // green
-	"failed":      "\033[31m",   // red
-	"cancelled":   "\033[90m",   // dark gray
+	"backlog":     "\033[37m", // white
+	"in_progress": "\033[34m", // blue
+	"waiting":     "\033[33m", // yellow
+	"committing":  "\033[36m", // cyan
+	"done":        "\033[32m", // green
+	"failed":      "\033[31m", // red
+	"cancelled":   "\033[90m", // dark gray
 }
 
 // statusOrder controls the top-to-bottom display order of sections.
@@ -120,8 +120,9 @@ func fetchTasks(addr string) ([]taskSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close()
- }()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -139,8 +140,9 @@ func fetchContainers(addr string) ([]containerSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close()
- }()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -213,7 +215,6 @@ func RunStatus(_ string, args []string) {
 	watch := fs.Bool("watch", false, "re-render every 2 seconds until Ctrl-C")
 	jsonOut := fs.Bool("json", false, "emit raw JSON from /api/tasks for scripting")
 	_ = fs.Parse(args)
-
 
 	serverAddr := strings.TrimRight(*addr, "/")
 

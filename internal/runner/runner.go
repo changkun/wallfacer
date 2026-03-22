@@ -301,33 +301,33 @@ type RunnerConfig struct {
 // Runner orchestrates agent container execution for tasks.
 // It manages worktree isolation, container lifecycle, and the commit pipeline.
 type Runner struct {
-	store            *store.Store
-	storeMu          sync.RWMutex
-	command          string
-	sandboxImage     string
-	envFile          string
-	workspaces       []string
-	worktreesDir     string
-	instructionsPath string
-	workspaceManager *workspace.Manager
-	codexAuthPath    string
-	containerNetwork string             // --network override; empty = read from env file
-	containerCPUs    string             // --cpus override; empty = read from env file
-	containerMemory  string             // --memory override; empty = read from env file
-	promptsMgr       *prompts.Manager   // prompt template manager
-	worktreeMu       sync.Mutex         // serializes all worktree filesystem operations on worktreesDir
-	repoMu           sync.Map           // per-repo *sync.Mutex for serializing rebase+merge
-	taskContainers   *containerRegistry // taskID → container name
-	refineContainers *containerRegistry // taskID → refinement container name
-	ideateContainer  *containerRegistry // singleton: ideation container name
-	oversightMu      sync.Map           // taskID (string) → *sync.Mutex for serializing oversight generation
-	containerCB      *CircuitBreaker    // circuit breaker for container launch operations
-	executor         ContainerExecutor  // abstracts container runtime calls for testing
-	backgroundWg     trackedWg          // tracks fire-and-forget background goroutines
-	stopReasonMu     sync.RWMutex
-	onStopReason     func(taskID uuid.UUID, stopReason string)
-	autosubmitFn            func() bool    // returns true when auto-submit is enabled
-	ideationExploitRatioFn  func() float64 // returns the current exploitation ratio (0–1)
+	store                  *store.Store
+	storeMu                sync.RWMutex
+	command                string
+	sandboxImage           string
+	envFile                string
+	workspaces             []string
+	worktreesDir           string
+	instructionsPath       string
+	workspaceManager       *workspace.Manager
+	codexAuthPath          string
+	containerNetwork       string             // --network override; empty = read from env file
+	containerCPUs          string             // --cpus override; empty = read from env file
+	containerMemory        string             // --memory override; empty = read from env file
+	promptsMgr             *prompts.Manager   // prompt template manager
+	worktreeMu             sync.Mutex         // serializes all worktree filesystem operations on worktreesDir
+	repoMu                 sync.Map           // per-repo *sync.Mutex for serializing rebase+merge
+	taskContainers         *containerRegistry // taskID → container name
+	refineContainers       *containerRegistry // taskID → refinement container name
+	ideateContainer        *containerRegistry // singleton: ideation container name
+	oversightMu            sync.Map           // taskID (string) → *sync.Mutex for serializing oversight generation
+	containerCB            *CircuitBreaker    // circuit breaker for container launch operations
+	executor               ContainerExecutor  // abstracts container runtime calls for testing
+	backgroundWg           trackedWg          // tracks fire-and-forget background goroutines
+	stopReasonMu           sync.RWMutex
+	onStopReason           func(taskID uuid.UUID, stopReason string)
+	autosubmitFn           func() bool    // returns true when auto-submit is enabled
+	ideationExploitRatioFn func() float64 // returns the current exploitation ratio (0–1)
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation.

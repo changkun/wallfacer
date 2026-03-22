@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/sandbox"
-
 )
 
 // bg returns a background context for use in tests.
@@ -94,7 +93,6 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	task.Tags = []string{"tag-1"}
 	task.DependsOn = []string{"dep-1"}
 	task.ScheduledAt = &scheduledAt
-
 
 	return deepCloneTask(task)
 }

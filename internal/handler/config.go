@@ -111,23 +111,23 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 
 	resp := map[string]any{
-		"workspaces":             workspaces,
-		"workspace_browser_path": workspaceBrowserPath,
-		"workspace_groups":       groups,
-		"instructions_path":      instructionsPath,
-		"prompts_dir":            promptsDir,
-		"sandbox_activities":     store.SandboxActivities,
-		"sandboxes":              []sandbox.Type{sandbox.Claude, sandbox.Codex},
-		"default_sandbox":        sandbox.Claude,
-		"sandbox_usable":         map[sandbox.Type]bool{sandbox.Claude: true, sandbox.Codex: true},
-		"sandbox_reasons":        map[string]string{},
-		"activity_sandboxes":     map[string]string{},
-		"autopilot":              h.AutopilotEnabled(),
-		"autorefine":             h.AutorefineEnabled(),
-		"autotest":               h.AutotestEnabled(),
-		"autosubmit":             h.AutosubmitEnabled(),
-		"autosync":               h.AutosyncEnabled(),
-		"autopush":               h.AutopushEnabled(),
+		"workspaces":               workspaces,
+		"workspace_browser_path":   workspaceBrowserPath,
+		"workspace_groups":         groups,
+		"instructions_path":        instructionsPath,
+		"prompts_dir":              promptsDir,
+		"sandbox_activities":       store.SandboxActivities,
+		"sandboxes":                []sandbox.Type{sandbox.Claude, sandbox.Codex},
+		"default_sandbox":          sandbox.Claude,
+		"sandbox_usable":           map[sandbox.Type]bool{sandbox.Claude: true, sandbox.Codex: true},
+		"sandbox_reasons":          map[string]string{},
+		"activity_sandboxes":       map[string]string{},
+		"autopilot":                h.AutopilotEnabled(),
+		"autorefine":               h.AutorefineEnabled(),
+		"autotest":                 h.AutotestEnabled(),
+		"autosubmit":               h.AutosubmitEnabled(),
+		"autosync":                 h.AutosyncEnabled(),
+		"autopush":                 h.AutopushEnabled(),
 		"ideation":                 h.IdeationEnabled(),
 		"ideation_running":         h.ideationRunning(ctx),
 		"ideation_interval":        int(h.IdeationInterval().Minutes()),
@@ -200,12 +200,12 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // UpdateConfig handles PUT /api/config to update server-level settings.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Autopilot        *bool                   `json:"autopilot"`
-		Autorefine       *bool                   `json:"autorefine"`
-		Autotest         *bool                   `json:"autotest"`
-		Autosubmit       *bool                   `json:"autosubmit"`
-		Autosync         *bool                   `json:"autosync"`
-		Autopush         *bool                   `json:"autopush"`
+		Autopilot            *bool                   `json:"autopilot"`
+		Autorefine           *bool                   `json:"autorefine"`
+		Autotest             *bool                   `json:"autotest"`
+		Autosubmit           *bool                   `json:"autosubmit"`
+		Autosync             *bool                   `json:"autosync"`
+		Autopush             *bool                   `json:"autopush"`
 		Ideation             *bool                   `json:"ideation"`
 		IdeationInterval     *int                    `json:"ideation_interval"`      // minutes; 0 = run immediately on completion
 		IdeationExploitRatio *float64                `json:"ideation_exploit_ratio"` // 0.0–1.0; fraction of exploitation ideas
@@ -269,17 +269,17 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	resp := map[string]any{
-		"autopilot":           h.AutopilotEnabled(),
-		"autorefine":          h.AutorefineEnabled(),
-		"autotest":            h.AutotestEnabled(),
-		"autosubmit":          h.AutosubmitEnabled(),
-		"autosync":            h.AutosyncEnabled(),
-		"autopush":            h.AutopushEnabled(),
-		"ideation":              h.IdeationEnabled(),
-		"ideation_running":      h.ideationRunning(r.Context()),
-		"ideation_interval":     int(h.IdeationInterval().Minutes()),
+		"autopilot":              h.AutopilotEnabled(),
+		"autorefine":             h.AutorefineEnabled(),
+		"autotest":               h.AutotestEnabled(),
+		"autosubmit":             h.AutosubmitEnabled(),
+		"autosync":               h.AutosyncEnabled(),
+		"autopush":               h.AutopushEnabled(),
+		"ideation":               h.IdeationEnabled(),
+		"ideation_running":       h.ideationRunning(r.Context()),
+		"ideation_interval":      int(h.IdeationInterval().Minutes()),
 		"ideation_exploit_ratio": h.IdeationExploitRatio(),
-		"ideation_categories":   h.runner.IdeationCategories(),
+		"ideation_categories":    h.runner.IdeationCategories(),
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun

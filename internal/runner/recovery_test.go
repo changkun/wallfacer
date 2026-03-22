@@ -556,8 +556,8 @@ func TestMonitorContainerUntilStoppedWithConfig_IntermittentErrors(t *testing.T)
 		seq: []listerResponse{
 			{err: errors.New("runtime unavailable")}, // call 1: error → continue
 			{err: errors.New("runtime unavailable")}, // call 2: error → continue
-			runningEntry,                              // call 3: running → continue
-			stoppedEntry,                              // call 4: stopped → transition
+			runningEntry,                             // call 3: running → continue
+			stoppedEntry,                             // call 4: stopped → transition
 		},
 	}
 

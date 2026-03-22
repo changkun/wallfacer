@@ -33,10 +33,10 @@ type ContainerSpec struct {
 	//   "slirp4netns" — Podman user-mode networking: allows outbound connections
 	//                   but blocks inbound connections and host loopback access
 	// An empty string falls back to "host" for backward compatibility.
-	Network string   // --network (defaults to "host" when empty)
+	Network string // --network (defaults to "host" when empty)
 	// Resource limits — zero values mean no limit is passed to the runtime.
-	CPUs   string // e.g. "2.0" → --cpus 2.0
-	Memory string // e.g. "4g"  → --memory 4g
+	CPUs   string   // e.g. "2.0" → --cpus 2.0
+	Memory string   // e.g. "4g"  → --memory 4g
 	Cmd    []string // appended after image
 }
 

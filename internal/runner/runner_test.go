@@ -653,7 +653,6 @@ func TestCommitPipelineBasic(t *testing.T) {
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
 
-
 	// Verify a new commit exists on the default branch.
 	finalHash := gitRun(t, repo, "rev-parse", "HEAD")
 	if finalHash == initialHash {
@@ -726,7 +725,6 @@ func TestCommitPipelineDivergedBranch(t *testing.T) {
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
 
-
 	// Verify BOTH files exist on main (task changes rebased on top of main).
 	for _, f := range []string{"feature.txt", "other.txt"} {
 		if _, err := os.Stat(filepath.Join(repo, f)); err != nil {
@@ -771,7 +769,6 @@ func TestCommitPipelineNoChanges(t *testing.T) {
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
-
 
 	// There should be no new commits at all.
 	currentHash := gitRun(t, repo, "rev-parse", "HEAD")
@@ -835,7 +832,6 @@ func TestCompleteTaskE2E(t *testing.T) {
 
 	// Run the exact same code path as CompleteTask handler.
 	_ = runner.Commit(task.ID, sessionID)
-
 
 	// Step 6: Verify the changes are on the default branch.
 	content, err := os.ReadFile(filepath.Join(repo, "greeting.txt"))
@@ -910,7 +906,6 @@ func TestCommitOnTopOfLatestMain(t *testing.T) {
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
-
 
 	// Verify the task commit is a descendant of the latest main.
 	if _, err := gitRunMayFail(repo, "merge-base", "--is-ancestor", mainHashBefore, "HEAD"); err != nil {
@@ -992,10 +987,8 @@ func TestParallelTasksSameRepo(t *testing.T) {
 	defer cancel()
 	_ = runner.commit(commitCtx, taskA.ID, "", 1, wtA, brA)
 
-
 	// Then commit task B — must rebase on top of A's merge.
 	_ = runner.commit(commitCtx, taskB.ID, "", 1, wtB, brB)
-
 
 	// Verify both files exist on main.
 	for _, f := range []string{"fileA.txt", "fileB.txt"} {
@@ -1060,7 +1053,6 @@ func TestParallelTasksTwoRepos(t *testing.T) {
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, wtPaths, brName)
-
 
 	// Verify each file landed in the correct repo.
 	if _, err := os.Stat(filepath.Join(repoX, "x.txt")); err != nil {
@@ -1140,10 +1132,8 @@ func TestParallelTasksConflictingChanges(t *testing.T) {
 	defer cancel()
 	_ = runner.commit(commitCtx, taskA.ID, "", 1, wtA, brA)
 
-
 	// Commit B — rebase should succeed since changes don't conflict.
 	_ = runner.commit(commitCtx, taskB.ID, "", 1, wtB, brB)
-
 
 	// Verify A's README change persists after B's merge.
 	readmeFinal, err := os.ReadFile(filepath.Join(repo, "README.md"))
@@ -1583,7 +1573,6 @@ func TestCommitPipelineBaseHashUsesDefBranch(t *testing.T) {
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
 
-
 	updated, _ := s.GetTask(ctx, task.ID)
 
 	// BaseCommitHashes must contain main's HEAD, not the feature branch HEAD.
@@ -1725,7 +1714,6 @@ func TestCommitPipelineNoChangesStoresBaseHash(t *testing.T) {
 	commitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, worktreePaths, branchName)
-
 
 	updated, _ := s.GetTask(ctx, task.ID)
 	base := updated.BaseCommitHashes[repo]

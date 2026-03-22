@@ -30,8 +30,8 @@ type fileIndex struct {
 	entries    map[string]fileCacheEntry
 	refreshing map[string]bool
 
-	ttl  time.Duration
-	now  func() time.Time
+	ttl time.Duration
+	now func() time.Time
 
 	// buildFn builds the file list for a workspace. Injectable for testing.
 	buildFn func(ws string) ([]string, time.Time)

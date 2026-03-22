@@ -66,7 +66,7 @@ func TestIsIgnoredChurnPath(t *testing.T) {
 		{"some/custom.lock", true},
 		// Non-ignored source paths
 		{"internal/runner/ideate.go", false},
-		{"ui/js/board.js", false},           // ui/js/ but not vendor/generated
+		{"ui/js/board.js", false}, // ui/js/ but not vendor/generated
 		{"ui/partials/card.html", false},
 		{"main.go", false},
 		{"server.go", false},

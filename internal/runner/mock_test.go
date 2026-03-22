@@ -127,11 +127,11 @@ func TestMockRunner_ContainerName_Default(t *testing.T) {
 // safe zero values.
 func TestMockRunner_NoOpMethods(t *testing.T) {
 	m := &MockRunner{
-		Cmd:       "echo",
-		Image:     "test:latest",
-		WtDir:     "/tmp/wt",
+		Cmd:         "echo",
+		Image:       "test:latest",
+		WtDir:       "/tmp/wt",
 		EnvFilePath: "/tmp/env",
-		CodexPath: "/tmp/codex",
+		CodexPath:   "/tmp/codex",
 	}
 	id := uuid.New()
 	ctx := context.Background()
@@ -142,7 +142,6 @@ func TestMockRunner_NoOpMethods(t *testing.T) {
 
 	m.SyncWorktreesBackground(id, "sess", store.TaskStatusWaiting)
 	m.RunRefinementBackground(id, "sess")
-
 
 	paths, branch, err := m.EnsureTaskWorktrees(id, nil, "mybranch")
 	if err != nil {

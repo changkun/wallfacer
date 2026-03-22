@@ -199,7 +199,6 @@ func TestCommitPipelineNonGitWorkspace(t *testing.T) {
 	defer cancel()
 	_ = runner.commit(commitCtx, task.ID, "", 1, wt, br)
 
-
 	// Verify modifications were extracted back to the original workspace.
 	content, err := os.ReadFile(filepath.Join(ws, "app.txt"))
 	if err != nil {
