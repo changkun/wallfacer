@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"unicode"
 
 	"changkun.de/x/wallfacer/internal/sandbox"
@@ -90,14 +89,14 @@ func RunExec(configDir string, args []string) {
 
 	// Replace the current process with the container exec so the terminal
 	// (PTY, signals, window-resize) is fully inherited.
-	if err := syscall.Exec(runtimePath, execArgs, os.Environ()); err != nil {
-		// syscall.Exec only fails when the OS cannot exec the binary itself
+	if err := execReplace(runtimePath, execArgs); err != nil {
+		// execReplace only fails when the OS cannot exec the binary itself
 		// (e.g. ENOENT or EACCES on runtimePath). If the default "bash" was
 		// used, retry with "sh" before giving up — some minimal images only
 		// ship sh.
 		if len(cfg.command) == 1 && cfg.command[0] == "bash" {
 			shArgs := append(execArgs[:len(execArgs)-1:len(execArgs)-1], "sh") //nolint:gocritic // intentionally assigned to new slice
-			if err2 := syscall.Exec(runtimePath, shArgs, os.Environ()); err2 != nil {
+			if err2 := execReplace(runtimePath, shArgs); err2 != nil {
 				fmt.Fprintf(os.Stderr, "wallfacer exec: %v\n", err2)
 				os.Exit(1)
 			}

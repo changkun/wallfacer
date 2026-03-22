@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/apicontract"
@@ -134,7 +133,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 
 	// Set up signal-based context so background workers stop on SIGTERM/Interrupt.
 	// Created before recovery so orphan monitors can be cancelled on shutdown.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer stop()
 
 	if s != nil {
