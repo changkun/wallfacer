@@ -2655,7 +2655,7 @@ func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	h.SetAutopilot(true)
 	h.SetAutotest(true)
 	h.SetAutosubmit(true)
-	t.Cleanup(func() { waitForBackground(200) })
+	t.Cleanup(func() { waitForBackground(2000) })
 	ctx := context.Background()
 
 	repo := setupRepo(t)

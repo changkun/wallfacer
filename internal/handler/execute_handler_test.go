@@ -197,7 +197,7 @@ func TestCompleteTask_WithSession_GoesToCommitting(t *testing.T) {
 	h := newTestHandler(t)
 	// The background commit goroutine writes events to disk; wait for it to finish
 	// before TempDir cleanup removes the store directory (LIFO: sleep runs first).
-	t.Cleanup(func() { waitForBackground(200) })
+	t.Cleanup(func() { waitForBackground(2000) })
 	ctx := context.Background()
 	repo := setupRepo(t)
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
@@ -247,7 +247,7 @@ func TestCompleteTask_WithSessionRejectsMissingWorktrees(t *testing.T) {
 
 func TestCompleteTask_WithSessionRestoresMissingWorktreeDir(t *testing.T) {
 	h := newTestHandler(t)
-	t.Cleanup(func() { waitForBackground(200) })
+	t.Cleanup(func() { waitForBackground(2000) })
 	ctx := context.Background()
 	repo := setupRepo(t)
 	wt := filepath.Join(t.TempDir(), "wt-missing")
@@ -337,7 +337,7 @@ func TestWaitingToDone_StateMachineBlocked(t *testing.T) {
 // rather than skipping directly to done.
 func TestWaitingToDone_CompleteTaskCommits(t *testing.T) {
 	h := newTestHandler(t)
-	t.Cleanup(func() { waitForBackground(200) })
+	t.Cleanup(func() { waitForBackground(2000) })
 	ctx := context.Background()
 	repo := setupRepo(t)
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
@@ -372,7 +372,7 @@ func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	h.SetAutopilot(true)
 	h.SetAutotest(true)
 	h.SetAutosubmit(true)
-	t.Cleanup(func() { waitForBackground(200) })
+	t.Cleanup(func() { waitForBackground(2000) })
 	ctx := context.Background()
 
 	repo := setupRepo(t)
