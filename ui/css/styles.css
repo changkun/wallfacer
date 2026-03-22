@@ -4375,10 +4375,24 @@ mark.search-highlight {
   background: none;
   padding: 0;
 }
+.status-bar-panel-resize {
+  flex-shrink: 0;
+  height: 4px;
+  cursor: ns-resize;
+  background: transparent;
+  border-top: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.status-bar-panel-resize:hover,
+.status-bar-panel-resize--active {
+  background: var(--accent, #4e8cff);
+}
+.status-bar-panel-resize.hidden {
+  display: none;
+}
 .status-bar-panel {
   flex-shrink: 0;
   height: 260px;
-  border-top: 1px solid var(--border);
   background: var(--bg-card);
   overflow: hidden;
   display: flex;
@@ -4389,7 +4403,8 @@ mark.search-highlight {
 }
 @media (max-width: 768px) {
   #status-bar,
-  #status-bar-panel {
+  #status-bar-panel,
+  #status-bar-panel-resize {
     display: none;
   }
 }
