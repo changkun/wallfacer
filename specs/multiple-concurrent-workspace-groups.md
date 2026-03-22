@@ -7,13 +7,13 @@ manager (`internal/workspace/manager.go`) holds one `Snapshot` at a time
 containing a `Store`, workspace paths, instructions path, scoped data
 directory, and a deterministic key. When the user switches groups:
 
-- `Handler.UpdateWorkspaces()` (`workspace.go:74-86`) returns HTTP 409 if
+- `Handler.UpdateWorkspaces()` (`workspace.go:76-88`) returns HTTP 409 if
   any task is `InProgress` or `Committing`.
 - `Manager.Switch()` atomically swaps `m.current`, then **closes the
-  previous store** (`lines 234-240`). The store's `Close()` sets an atomic
+  previous store** (`lines 249-253`). The store's `Close()` sets an atomic
   `closed` flag but does not interrupt in-flight operations.
-- The subscription goroutines in both Runner (`runner.go:604-656`) and
-  Handler (`handler.go:211-218`) call `applyWorkspaceSnapshot()` /
+- The subscription goroutines in both Runner (`runner.go:622+`) and
+  Handler (`handler.go:222-228`) call `applyWorkspaceSnapshot()` /
   `applySnapshot()`, which replace `r.store` / `h.store` with the new
   store reference.
 
@@ -34,13 +34,13 @@ already use isolated worktrees. The only blocking issues are:
 2. The 409 guard in `UpdateWorkspaces()` prevents switching entirely.
 3. Watchers subscribe to a single store's `SubscribeWake()` at startup and
    never re-subscribe when the store changes.
-4. `Runner.Run()` (`execute.go:132+`) reads `r.store` at entry and uses it
+4. `Runner.Run()` (`execute.go:134+`) reads `r.store` at entry and uses it
    throughout — if a workspace switch occurs mid-execution the reference
    becomes stale.
 
 ---
 
-## Current Architecture (as of 2026-03-21)
+## Current Architecture (as of 2026-03-22)
 
 ### Manager
 
@@ -73,11 +73,11 @@ swap under `mu.Lock` → publish to subscribers → close previous store.
 ### Runner
 
 ```go
-// internal/runner/runner.go (lines 300-343)
+// internal/runner/runner.go (lines 303-346)
 type Runner struct {
     store            *store.Store        // swapped via applyWorkspaceSnapshot
     storeMu          sync.RWMutex        // guards store + workspace fields
-    workspaces       string              // space-separated paths
+    workspaces       []string            // workspace paths
     workspaceManager *workspace.Manager
     // ...
 }
@@ -85,19 +85,21 @@ type Runner struct {
 
 - `RunBackground(taskID, prompt, sessionID, resumedFromWaiting)` — spawns
   `Run()` in a goroutine tracked by `backgroundWg`.
-- `Run()` reads `r.store` at entry (`execute.go:137,163`) and uses it for
+- `Run()` reads `r.store` at entry (`execute.go:134+`) and uses it for
   all operations without re-checking.
-- `startBoardSubscriptionLoop()` (`runner.go:604-656`) subscribes to both
+- `startBoardSubscriptionLoop()` (`runner.go:622+`) subscribes to both
   workspace changes (via `wsMgr.Subscribe()`) and store changes (via
   `store.SubscribeWake()`). On workspace change it calls
   `applyWorkspaceSnapshot()` and re-subscribes to the new store.
-- `currentStore()` (`runner.go:598-602`) returns `r.store` under `storeMu`
+- `RunBackground()` (`runner.go:482-489`) spawns `Run()` without workspace
+  key capture or task count management.
+- `currentStore()` (`runner.go:596-600`) returns `r.store` under `storeMu`
   read lock but is rarely used — most code reads `r.store` directly.
 
 ### Handler
 
 ```go
-// internal/handler/handler.go (lines 98-166)
+// internal/handler/handler.go (lines 98-173)
 type Handler struct {
     snapshotMu sync.RWMutex
     store      *store.Store     // mirrors workspace.Manager.current.Store
@@ -115,12 +117,12 @@ type Handler struct {
 
 | Watcher               | Start Line | Subscription |
 |-----------------------|-----------|--------------|
-| StartAutoPromoter     | 114       | `h.store.SubscribeWake()` |
-| StartAutoRetrier      | 145       | `h.store.SubscribeWake()` |
-| StartWaitingSyncWatcher| 455      | `h.store.SubscribeWake()` |
-| StartAutoTester       | 568       | `h.store.SubscribeWake()` |
-| StartAutoSubmitter    | 776       | `h.store.SubscribeWake()` |
-| StartAutoRefiner      | 961       | `h.store.SubscribeWake()` |
+| StartAutoPromoter     | 116       | `h.store.SubscribeWake()` |
+| StartAutoRetrier      | 177       | `h.store.SubscribeWake()` |
+| StartWaitingSyncWatcher| 504      | `h.store.SubscribeWake()` |
+| StartAutoTester       | 662       | `h.store.SubscribeWake()` |
+| StartAutoSubmitter    | 878       | `h.store.SubscribeWake()` |
+| StartAutoRefiner      | 1079      | `h.store.SubscribeWake()` |
 
 ### Store
 
@@ -297,7 +299,7 @@ lines refactored), `handler.go` (~30 lines), `config.go` (~10 lines)
 ### Changes
 
 1. **Remove 409 blocking check** in `UpdateWorkspaces()`
-   (`workspace.go:74-86`). This is the user-facing fix. Switches always
+   (`workspace.go:76-88`). This is the user-facing fix. Switches always
    succeed.
 
 2. **Watcher store subscription** — The six watchers currently subscribe to
@@ -361,19 +363,22 @@ lines refactored), `handler.go` (~30 lines), `config.go` (~10 lines)
 
 ## Phase 4: Frontend
 
-**Files**: `ui/js/workspace.js` (~25 lines), `ui/js/state.js` (~5 lines)
+**Files**: `ui/js/workspace.js` (~20 lines), `ui/js/state.js` (~5 lines)
+
+### Already Done
+
+- `applyWorkspaceSelection()` (`workspace.js:856-880`) has no 409
+  handling — the generic catch block shows errors but does not check
+  status codes. No removal needed.
 
 ### Changes
 
-1. **Remove 409 handling** in `applyWorkspaceSelection()` — switch always
-   succeeds now. Remove the error path that shows "tasks in progress"
-   message.
+1. **Activity indicator** — `renderWorkspaceGroups()` (lines 272-330)
+   and `renderHeaderWorkspaceGroupTabs()` (lines 334-405): show a
+   dot/badge next to groups that appear in `active_group_keys` from the
+   config response.
 
-2. **Activity indicator** — `renderWorkspaceGroups()` and
-   `renderHeaderWorkspaceGroupTabs()`: show a dot/badge next to groups
-   that appear in `active_group_keys` from the config response.
-
-3. **State** — Add `activeGroupKeys` to `state.js`, populated from
+2. **State** — Add `activeGroupKeys` to `state.js`, populated from
    config polling or SSE.
 
 ---
