@@ -2087,8 +2087,30 @@ func TestTryAutoTest_TriggersForEligibleTask(t *testing.T) {
 	h.SetAutotest(true)
 	ctx := context.Background()
 
-	repo := setupRepo(t)
-	wt := filepath.Join(t.TempDir(), "wt")
+	// Use os.MkdirTemp instead of t.TempDir so that the directories survive
+	// until r.Shutdown drains the background goroutine started by RunBackground.
+	// t.TempDir cleanups run in LIFO order before the handler's Shutdown/WaitBackground
+	// cleanups, causing races where the background goroutine accesses removed dirs.
+	repo, err := os.MkdirTemp("", "wallfacer-test-repo-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(repo) })
+	gitRun(t, repo, "init", "-b", "main")
+	gitRun(t, repo, "config", "user.email", "test@example.com")
+	gitRun(t, repo, "config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(repo, "file.txt"), []byte("initial\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "initial commit")
+
+	wtParent, err := os.MkdirTemp("", "wallfacer-test-wt-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(wtParent) })
+	wt := filepath.Join(wtParent, "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
