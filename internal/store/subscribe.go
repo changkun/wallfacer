@@ -27,7 +27,7 @@ func (s *Store) subscribe() (int, <-chan SequencedDelta) {
 	defer s.subMu.Unlock()
 	id := s.nextSubID
 	s.nextSubID++
-	ch := make(chan SequencedDelta, 64)
+	ch := make(chan SequencedDelta, 256)
 	s.subscribers[id] = ch
 	return id, ch
 }
@@ -46,8 +46,14 @@ func (s *Store) SubscriberCount() int {
 }
 
 // Unsubscribe removes the subscriber and drains any buffered deltas to free memory.
-// The channel is NOT closed: StreamTasks is always the one calling Unsubscribe (via
-// defer) after its own goroutine exits, so there is no blocked receiver to wake.
+// The channel is NOT closed here: StreamTasks is always the one calling Unsubscribe
+// (via defer) after its own goroutine exits, so there is no blocked receiver to wake.
+//
+// Safety note: notify() may have already evicted and closed this subscriber's channel
+// due to overflow. In that case, notify() deletes the ID from s.subscribers under
+// s.subMu before releasing the lock. When Unsubscribe subsequently acquires s.subMu,
+// s.subscribers[id] returns ok=false, so the drain loop is skipped entirely — no
+// double-close and no spin-read on a closed channel.
 func (s *Store) Unsubscribe(id int) {
 	s.subMu.Lock()
 	ch, ok := s.subscribers[id]
@@ -97,7 +103,9 @@ func (s *Store) UnsubscribeWake(id int) {
 
 // notify stamps a TaskDelta with a sequence number, appends it to the bounded
 // replay buffer, and pushes it to all SSE subscribers. Non-blocking: if a
-// subscriber's buffer is already full, the delta is dropped for that subscriber.
+// subscriber's buffer is already full the channel is closed and the subscriber
+// is evicted so its SSE handler goroutine unblocks and returns, causing the
+// browser's EventSource to reconnect and receive a full snapshot.
 // Must be called with s.mu held (at least read-locked) so that the task pointer
 // is stable while we copy it.
 func (s *Store) notify(task *Task, deleted bool) {
@@ -120,13 +128,23 @@ func (s *Store) notify(task *Task, deleted bool) {
 	}
 	s.replayMu.Unlock()
 
-	// Fan out to live subscribers.
+	// Fan out to live subscribers. If a subscriber's buffer is full, close and
+	// evict it so the SSE handler goroutine (which does `sd, ok := <-ch`) exits
+	// cleanly and the browser's EventSource reconnects for a fresh snapshot.
+	// Overflowed IDs are collected first, then deleted after the loop — all
+	// under the same lock — to prevent concurrent subscribe/unsubscribe races.
+	var overflowed []int
 	s.subMu.Lock()
-	for _, ch := range s.subscribers {
+	for id, ch := range s.subscribers {
 		select {
 		case ch <- cloneSequencedDelta(sd):
 		default:
+			close(ch)
+			overflowed = append(overflowed, id)
 		}
+	}
+	for _, id := range overflowed {
+		delete(s.subscribers, id)
 	}
 	s.subMu.Unlock()
 

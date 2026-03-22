@@ -126,7 +126,7 @@ func TestNotify_BufferHoldsMultipleItems(t *testing.T) {
 	_, ch := s.Subscribe()
 	dummy := &Task{}
 
-	// The channel buffer is 64; fire fewer than that so all are delivered.
+	// The channel buffer is 256; fire fewer than that so all are delivered.
 	const n = 10
 	for i := 0; i < n; i++ {
 		s.notify(dummy, false)
@@ -520,6 +520,104 @@ func TestReplayBuf_BoundedToMax(t *testing.T) {
 
 	if n > replayBufMax {
 		t.Errorf("replay buffer length %d exceeds max %d", n, replayBufMax)
+	}
+}
+
+// TestNotify_OverflowClosesChannel verifies that when a subscriber's buffer is
+// exhausted, the 257th notify call closes the channel (ok=false on receive),
+// decrements SubscriberCount to 0, and a fresh Subscribe still works.
+func TestNotify_OverflowClosesChannel(t *testing.T) {
+	s := newTestStore(t)
+	_, ch := s.Subscribe()
+	dummy := &Task{}
+
+	// Fill the buffer (256 items) and trigger one overflow — must not block.
+	const total = 257 // one beyond the 256-item buffer
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < total; i++ {
+			s.notify(dummy, false)
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("notify calls blocked unexpectedly on overflow")
+	}
+
+	// The channel must have been closed by the overflow eviction.
+	// Drain buffered items first, then confirm the close.
+	closed := false
+	timeout := time.After(time.Second)
+	for !closed {
+		select {
+		case _, ok := <-ch:
+			if !ok {
+				closed = true
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for channel to be closed after overflow")
+		}
+	}
+
+	// The subscriber must have been removed from the store.
+	if count := s.SubscriberCount(); count != 0 {
+		t.Errorf("expected SubscriberCount=0 after eviction, got %d", count)
+	}
+
+	// A brand-new Subscribe must return a working open channel.
+	id2, ch2 := s.Subscribe()
+	defer s.Unsubscribe(id2)
+	s.notify(dummy, false)
+	select {
+	case sd, ok := <-ch2:
+		if !ok {
+			t.Error("fresh subscriber channel closed unexpectedly")
+		}
+		if sd.Task == nil {
+			t.Error("expected non-nil task in delta on fresh subscriber")
+		}
+	case <-time.After(time.Second):
+		t.Error("fresh subscriber did not receive notification after overflow eviction")
+	}
+}
+
+// TestNotify_OverflowUnsubscribeIsNoop verifies that calling Unsubscribe on an
+// already-evicted subscriber ID is safe and does not panic or block.
+func TestNotify_OverflowUnsubscribeIsNoop(t *testing.T) {
+	s := newTestStore(t)
+	id, ch := s.Subscribe()
+	dummy := &Task{}
+
+	// Overflow the channel to trigger eviction.
+	for i := 0; i < 257; i++ {
+		s.notify(dummy, false)
+	}
+
+	// Wait for the channel to be closed.
+	timeout := time.After(time.Second)
+	for {
+		select {
+		case _, ok := <-ch:
+			if !ok {
+				goto evicted
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for eviction")
+		}
+	}
+evicted:
+	// Calling Unsubscribe on the already-evicted ID must not panic or spin.
+	done := make(chan struct{})
+	go func() {
+		s.Unsubscribe(id)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("Unsubscribe blocked on already-evicted subscriber")
 	}
 }
 
