@@ -79,7 +79,7 @@ Otherwise, Output ONLY a JSON array with exactly 3 objects — your top 3 picks 
     "impact_score": 0-100,
     "scope": "specific files/subsystems this idea touches",
     "rationale": "why this is higher impact than the candidates you cut — reference the impact criteria above",
-    "prompt": "Detailed implementation prompt referencing specific files, functions, and patterns found during exploration."
+    "prompt": "A concise goal statement describing WHAT should be achieved and WHY, without prescribing specific implementation steps. Focus on the objective, the problem being solved, and the desired outcome. Do NOT include file paths, function names, code snippets, or step-by-step instructions — those details belong in the later refinement stage."
   },
   ...
 ]
@@ -87,7 +87,6 @@ Otherwise, Output ONLY a JSON array with exactly 3 objects — your top 3 picks 
 Requirements for each improvement:
 - Prioritize the objective signals above and generate the highest-impact suggestions first.
 - Include an objective impact estimate and confidence level so the runner can make backlog decisions.
-- Technically precise: name the specific files, functions, data structures, or API endpoints you observed during exploration — do not stay generic
-- Actionable end-to-end: write a prompt detailed enough for an AI coding agent to implement the full change without asking follow-up questions
+- Goal-oriented: describe the desired outcome and the problem it solves, not how to implement it. The prompt should read as a clear objective, not a technical spec. The refinement process will add implementation details later.
 - Non-duplicating: do not propose ideas that overlap or conflict with the existing active tasks listed above
 - The "so what?" test: every idea must clearly state the concrete user-visible or developer-visible benefit. If you cannot articulate who benefits and how, the idea is not impactful enough.
