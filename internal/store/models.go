@@ -378,6 +378,11 @@ type Task struct {
 	// Used to cap the auto-resume cycle and prevent infinite test-fail loops.
 	// Reset when the user manually provides feedback or when a test passes.
 	TestFailCount int `json:"test_fail_count,omitempty"`
+
+	// LastFetchError is the most recent git fetch error message, cleared on success.
+	LastFetchError string `json:"last_fetch_error,omitempty"`
+	// LastFetchErrorAt is when the last fetch failure was recorded.
+	LastFetchErrorAt *time.Time `json:"last_fetch_error_at,omitempty"`
 }
 
 // MaxAutoRetries is the global cap on automatic retries per task across all

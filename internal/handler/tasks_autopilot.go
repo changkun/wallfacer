@@ -551,6 +551,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		}
 
 		behind := false
+		fetchFailed := false
 		for repoPath, worktreePath := range t.WorktreePaths {
 			if _, err := os.Stat(worktreePath); err != nil {
 				// Worktree directory no longer exists on disk; skip silently.
@@ -562,8 +563,14 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			}
 			// Fetch from remote so CommitsBehind operates on up-to-date refs.
 			if fetchErr := gitutil.FetchOrigin(repoPath); fetchErr != nil {
-				logger.Handler.Warn("auto-sync: git fetch failed, continuing with local refs",
+				logger.Handler.Warn("auto-sync: git fetch failed; skipping CommitsBehind for this task",
 					"task", t.ID, "repo", repoPath, "error", fetchErr)
+				if recErr := h.store.RecordFetchFailure(ctx, t.ID, fetchErr.Error()); recErr != nil {
+					logger.Handler.Warn("auto-sync: record fetch failure",
+						"task", t.ID, "error", recErr)
+				}
+				fetchFailed = true
+				break
 			}
 			// Invalidate any cached pre-fetch result so we always observe the
 			// post-fetch remote ref state. The fresh result is then cached for
@@ -579,6 +586,17 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 				behind = true
 				break
 			}
+		}
+
+		// Skip sync-eligibility when fetch failed; local refs may be stale.
+		if fetchFailed {
+			continue
+		}
+
+		// All fetches succeeded: clear any previously recorded failure so that
+		// tryAutoSubmit's stale-fetch guard does not block this task.
+		if err := h.store.ClearFetchFailure(ctx, t.ID); err != nil {
+			logger.Handler.Warn("auto-sync: clear fetch failure", "task", t.ID, "error", err)
 		}
 
 		if !behind {
@@ -950,6 +968,14 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 					continue
 				}
 				if len(t.WorktreePaths) == 0 || len(missingTaskWorktrees(t)) > 0 {
+					continue
+				}
+
+				// Skip if the last git fetch failed recently — local refs may be
+				// stale and CommitsBehind could return 0 for a task that is actually
+				// behind. The sync watcher will retry the fetch on its next cycle.
+				if t.LastFetchErrorAt != nil && time.Since(*t.LastFetchErrorAt) < 5*time.Minute {
+					h.incAutopilotAction("auto_submitter", "skipped_stale_fetch")
 					continue
 				}
 

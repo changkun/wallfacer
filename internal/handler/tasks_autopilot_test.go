@@ -1339,3 +1339,105 @@ func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 		t.Errorf("task2: AutoRetryCount=%d, want %d (unchanged)", got2.AutoRetryCount, store.MaxAutoRetries)
 	}
 }
+
+// TestTryAutoSubmit_SkipsTaskWithRecentFetchError verifies that a waiting task
+// whose LastFetchErrorAt is within the 5-minute window is NOT selected for
+// auto-submission, even when it has passed testing and its worktrees are up to date.
+func TestTryAutoSubmit_SkipsTaskWithRecentFetchError(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+	h.SetAutosubmit(true)
+
+	ctx := context.Background()
+
+	// Use a real git repo so CommitsBehind returns 0 (if we ever reach that check).
+	repo := setupRepo(t)
+
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "fetch-error guard test", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus waiting: %v", err)
+	}
+	// Mark as passing verification.
+	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass"); err != nil {
+		t.Fatalf("UpdateTaskTestRun pass: %v", err)
+	}
+	// Set worktree paths so the task passes the worktree eligibility checks.
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	// Simulate a recent git fetch failure on this task.
+	if err := h.store.RecordFetchFailure(ctx, task.ID, "dial tcp: connection refused"); err != nil {
+		t.Fatalf("RecordFetchFailure: %v", err)
+	}
+
+	h.tryAutoSubmit(ctx)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	// The stale-fetch guard must keep the task in waiting.
+	if got.Status != store.TaskStatusWaiting {
+		t.Errorf("expected task still waiting after stale fetch guard, got %s", got.Status)
+	}
+}
+
+// TestTryAutoSubmit_AllowsTaskAfterFetchErrorCleared verifies that once
+// ClearFetchFailure is called (simulating a successful subsequent fetch), the
+// previously blocked task becomes eligible and is auto-submitted.
+func TestTryAutoSubmit_AllowsTaskAfterFetchErrorCleared(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+	h.SetAutosubmit(true)
+
+	ctx := context.Background()
+
+	repo := setupRepo(t)
+
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "fetch-error cleared test", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus waiting: %v", err)
+	}
+	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass"); err != nil {
+		t.Fatalf("UpdateTaskTestRun pass: %v", err)
+	}
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	// Record then clear the fetch failure to simulate a successful subsequent fetch.
+	if err := h.store.RecordFetchFailure(ctx, task.ID, "network unreachable"); err != nil {
+		t.Fatalf("RecordFetchFailure: %v", err)
+	}
+	if err := h.store.ClearFetchFailure(ctx, task.ID); err != nil {
+		t.Fatalf("ClearFetchFailure: %v", err)
+	}
+
+	// Confirm the failure fields are nil after clearing.
+	snapshot, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after clear: %v", err)
+	}
+	if snapshot.LastFetchError != "" || snapshot.LastFetchErrorAt != nil {
+		t.Errorf("expected fetch error fields cleared, got error=%q errorAt=%v",
+			snapshot.LastFetchError, snapshot.LastFetchErrorAt)
+	}
+
+	h.tryAutoSubmit(ctx)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask after tryAutoSubmit: %v", err)
+	}
+	// No session → task should go directly to done.
+	if got.Status != store.TaskStatusDone {
+		t.Errorf("expected task done after fetch error cleared, got %s", got.Status)
+	}
+}

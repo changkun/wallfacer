@@ -317,6 +317,38 @@ func (s *Store) IncrementAutoRetryCount(_ context.Context, id uuid.UUID, categor
 	})
 }
 
+// RecordFetchFailure sets LastFetchError and LastFetchErrorAt on a task to
+// record the most recent git fetch failure. While a recent fetch failure is
+// recorded the task is excluded from CommitsBehind checks and auto-submission
+// until ClearFetchFailure is called or the failure timestamp becomes stale.
+func (s *Store) RecordFetchFailure(_ context.Context, id uuid.UUID, msg string) error {
+	return s.mutateTask(id, func(t *Task) error {
+		now := time.Now()
+		t.LastFetchError = msg
+		t.LastFetchErrorAt = &now
+		return nil
+	})
+}
+
+// ClearFetchFailure clears a previously recorded fetch failure. Called after
+// a successful git fetch so that CommitsBehind checks and auto-submission can
+// proceed normally. It is a no-op (does not write to disk) when no failure
+// is currently recorded.
+func (s *Store) ClearFetchFailure(_ context.Context, id uuid.UUID) error {
+	s.mu.RLock()
+	t, ok := s.tasks[id]
+	if !ok || (t.LastFetchError == "" && t.LastFetchErrorAt == nil) {
+		s.mu.RUnlock()
+		return nil
+	}
+	s.mu.RUnlock()
+	return s.mutateTask(id, func(t *Task) error {
+		t.LastFetchError = ""
+		t.LastFetchErrorAt = nil
+		return nil
+	})
+}
+
 // clampTimeout ensures timeout stays in [1, 1440] minutes with a default of 60.
 func clampTimeout(v int) int {
 	if v <= 0 {

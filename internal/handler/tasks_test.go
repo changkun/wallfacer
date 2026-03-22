@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -1696,6 +1697,16 @@ func TestCheckAndSyncWaitingTasks_SyncsAtFullCapacity(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, regular.ID, store.TaskStatusInProgress)
 
 	repo := setupRepo(t)
+
+	// Create a bare clone to serve as "origin" so that FetchOrigin succeeds.
+	// Without a remote, FetchOrigin fails and the stale-fetch guard skips the
+	// task, so the sync check never runs.
+	bare := filepath.Join(t.TempDir(), "bare.git")
+	if out, err := exec.Command("git", "clone", "--bare", repo, bare).CombinedOutput(); err != nil {
+		t.Fatalf("git clone --bare: %v\n%s", err, out)
+	}
+	gitRun(t, repo, "remote", "add", "origin", bare)
+
 	wt := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
@@ -1709,6 +1720,8 @@ func TestCheckAndSyncWaitingTasks_SyncsAtFullCapacity(t *testing.T) {
 	}
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-m", "upstream commit")
+	// Push the new commit to origin so FetchOrigin has something to fetch.
+	gitRun(t, repo, "push", "origin", "main")
 
 	h.checkAndSyncWaitingTasks(ctx)
 	h.runner.WaitBackground()
