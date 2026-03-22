@@ -433,3 +433,86 @@ describe('openRaiseLimitInline — uses task(id).update() route helper', () => {
     expect(fetchTasks).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test 4 — Regression: syncTask calls waitForTaskDelta so the UI updates
+// ---------------------------------------------------------------------------
+
+describe('syncTask — calls waitForTaskDelta so the UI reflects sync progress', () => {
+  it('calls waitForTaskDelta(id) after a successful sync POST', async () => {
+    const TASK_ID = 'cccccccc-0000-0000-0000-000000000001';
+
+    const apiMock = vi.fn().mockResolvedValue({ status: 'syncing' });
+    const waitForTaskDelta = vi.fn().mockResolvedValue(undefined);
+    const fetchTasks = vi.fn().mockResolvedValue(undefined);
+
+    const ctx = makeContext({
+      api: apiMock,
+      waitForTaskDelta,
+      fetchTasks,
+    });
+
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    // Provide minimal stubs required by tasks.js module-level code.
+    ctx.document.getElementById = (id) => {
+      if (id === 'modal-edit-prompt') return makeElement({ addEventListener: vi.fn() });
+      if (id === 'modal-edit-goal') return makeElement({ addEventListener: vi.fn() });
+      if (id === 'modal-edit-timeout') return makeElement({ addEventListener: vi.fn() });
+      return null;
+    };
+
+    loadScript(ctx, 'render.js');
+    loadScript(ctx, 'tasks.js');
+
+    // Replace mocks after loading so calls from within the script scope hit our spies.
+    ctx.waitForTaskDelta = waitForTaskDelta;
+    ctx.fetchTasks = fetchTasks;
+
+    await ctx.syncTask(TASK_ID);
+
+    // The POST must target the per-task sync URL.
+    expect(apiMock).toHaveBeenCalledWith(
+      `/api/tasks/${TASK_ID}/sync`,
+      expect.objectContaining({ method: 'POST' }),
+    );
+
+    // waitForTaskDelta must be called so the UI processes the SSE state change.
+    expect(waitForTaskDelta).toHaveBeenCalledWith(TASK_ID);
+  });
+
+  it('does not call waitForTaskDelta when the POST fails', async () => {
+    const TASK_ID = 'cccccccc-0000-0000-0000-000000000002';
+
+    const apiMock = vi.fn().mockRejectedValue(new Error('network error'));
+    const waitForTaskDelta = vi.fn().mockResolvedValue(undefined);
+
+    const ctx = makeContext({
+      api: apiMock,
+      waitForTaskDelta,
+    });
+
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    ctx.document.getElementById = (id) => {
+      if (id === 'modal-edit-prompt') return makeElement({ addEventListener: vi.fn() });
+      if (id === 'modal-edit-goal') return makeElement({ addEventListener: vi.fn() });
+      if (id === 'modal-edit-timeout') return makeElement({ addEventListener: vi.fn() });
+      return null;
+    };
+
+    loadScript(ctx, 'render.js');
+    loadScript(ctx, 'tasks.js');
+
+    ctx.waitForTaskDelta = waitForTaskDelta;
+
+    await ctx.syncTask(TASK_ID);
+
+    // On error, waitForTaskDelta should NOT be called (no state change to wait for).
+    expect(waitForTaskDelta).not.toHaveBeenCalled();
+    // The error should be shown to the user.
+    expect(ctx.showAlert).toHaveBeenCalled();
+  });
+});
