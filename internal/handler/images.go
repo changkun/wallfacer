@@ -88,6 +88,29 @@ func (pt *pullTracker) cleanup(retention time.Duration) {
 	}
 }
 
+// scanLinesOrCR is a bufio.SplitFunc that splits on \n, \r\n, or \r.
+// This handles container runtimes that use \r for in-place progress updates.
+func scanLinesOrCR(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	for i := 0; i < len(data); i++ {
+		if data[i] == '\n' {
+			return i + 1, data[:i], nil
+		}
+		if data[i] == '\r' {
+			if i+1 < len(data) && data[i+1] == '\n' {
+				return i + 2, data[:i], nil
+			}
+			return i + 1, data[:i], nil
+		}
+	}
+	if atEOF {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
+}
+
 // GetImageStatus returns the availability of sandbox images.
 func (h *Handler) GetImageStatus(w http.ResponseWriter, _ *http.Request) {
 	cmd := h.runner.Command()
@@ -201,8 +224,14 @@ func (h *Handler) runPull(_ context.Context, cmd string, p *imagePull) {
 	}
 
 	scanner := bufio.NewScanner(stdout)
+	// Container runtimes use \r for in-place progress updates.
+	// Split on both \n and \r so progress lines stream individually.
+	scanner.Split(scanLinesOrCR)
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
 		select {
 		case p.Lines <- line:
 		default:

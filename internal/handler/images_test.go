@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bufio"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -59,6 +60,38 @@ func TestStreamImagePull_UnknownPullID(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestScanLinesOrCR(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{"a\nb\nc", []string{"a", "b", "c"}},
+		{"a\r\nb\r\nc", []string{"a", "b", "c"}},
+		{"a\rb\rc", []string{"a", "b", "c"}},
+		{"progress 50%\rprogress 100%\ndone\n", []string{"progress 50%", "progress 100%", "done"}},
+		{"", nil},
+	}
+	for _, tt := range tests {
+		scanner := bufio.NewScanner(strings.NewReader(tt.input))
+		scanner.Split(scanLinesOrCR)
+		var got []string
+		for scanner.Scan() {
+			if t := scanner.Text(); t != "" {
+				got = append(got, t)
+			}
+		}
+		if len(got) != len(tt.want) {
+			t.Errorf("input %q: got %v, want %v", tt.input, got, tt.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Errorf("input %q: token %d = %q, want %q", tt.input, i, got[i], tt.want[i])
+			}
+		}
 	}
 }
 
