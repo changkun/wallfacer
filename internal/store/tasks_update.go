@@ -481,8 +481,10 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.StopReason = nil
 	t.Turns = 0
 	t.Status = TaskStatusBacklog
-	t.WorktreePaths = nil
-	t.BranchName = ""
+	if freshStart {
+		t.WorktreePaths = nil
+		t.BranchName = ""
+	}
 	t.CommitHashes = nil
 	t.BaseCommitHashes = nil
 	t.IsTestRun = false

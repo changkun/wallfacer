@@ -21,17 +21,36 @@ func CreateWorktree(repoPath, worktreePath, branchName string) error {
 		return ErrEmptyRepo
 	}
 
+	// Check if the branch already exists. If it does, reattach it directly
+	// rather than trying "add -b ... HEAD" which would either fail (branch
+	// exists) or — if the branch was deleted by a race — create a fresh
+	// branch from HEAD and silently lose all committed work on the old branch.
+	if exec.Command("git", "-C", repoPath, "rev-parse", "--verify", branchName).Run() == nil {
+		// Prune stale worktree tracking so the --force add below doesn't
+		// fail with "already registered worktree" for a directory that no
+		// longer exists.
+		_ = exec.Command("git", "-C", repoPath, "worktree", "prune").Run()
+		out, err := exec.Command(
+			"git", "-C", repoPath,
+			"worktree", "add", "--force", worktreePath, branchName,
+		).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git worktree add (existing branch) in %s: %w\n%s", repoPath, err, out)
+		}
+		return nil
+	}
+
 	out, err := exec.Command(
 		"git", "-C", repoPath,
 		"worktree", "add", "-b", branchName, worktreePath, "HEAD",
 	).CombinedOutput()
 	if err != nil {
-		// Branch may already exist when the worktree directory was deleted but the
-		// git branch survived (e.g. server restart). The stale worktree entry in
-		// .git/worktrees/ also triggers "missing but already registered". Reattach
-		// the existing branch with --force so in-progress commits are preserved.
+		// Branch may have been created between the check and the add, or
+		// a stale worktree entry triggers "already registered worktree".
+		// Reattach so in-progress commits are preserved.
 		if strings.Contains(string(out), "already exists") ||
 			strings.Contains(string(out), "already registered worktree") {
+			_ = exec.Command("git", "-C", repoPath, "worktree", "prune").Run()
 			out2, err2 := exec.Command(
 				"git", "-C", repoPath,
 				"worktree", "add", "--force", worktreePath, branchName,

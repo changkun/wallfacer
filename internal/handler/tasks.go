@@ -693,10 +693,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 		// Handle retry: done/failed/waiting/cancelled → backlog
 		if newStatus == store.TaskStatusBacklog && (oldStatus == store.TaskStatusDone || oldStatus == store.TaskStatusFailed || oldStatus == store.TaskStatusCancelled || oldStatus == store.TaskStatusWaiting) {
-			// Clean up any existing worktrees before resetting.
-			if len(task.WorktreePaths) > 0 {
-				h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
-			}
 			newPrompt := task.Prompt
 			if req.Prompt != nil {
 				newPrompt = *req.Prompt
@@ -705,6 +701,12 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 			freshStart := false
 			if req.FreshStart != nil {
 				freshStart = *req.FreshStart
+			}
+			// Only delete the worktree directory and branch on fresh_start.
+			// For normal retries the branch holds Claude's committed work;
+			// ensureTaskWorktrees will reattach it on the next run.
+			if freshStart && len(task.WorktreePaths) > 0 {
+				h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
 			}
 			if err := h.store.ResetTaskForRetry(r.Context(), id, newPrompt, freshStart); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)

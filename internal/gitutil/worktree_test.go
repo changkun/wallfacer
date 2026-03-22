@@ -51,6 +51,42 @@ func TestCreateWorktree(t *testing.T) {
 		}
 		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "orphan") })
 	})
+
+	t.Run("branch with commits survives worktree tracking loss", func(t *testing.T) {
+		// Regression: if worktree tracking in .git/worktrees/ is lost (e.g.
+		// git worktree prune ran while the directory was temporarily
+		// unavailable), CreateWorktree must reattach the existing branch
+		// rather than creating a fresh one from HEAD and losing commits.
+		repo := setupRepo(t)
+		wtDir := filepath.Join(t.TempDir(), "wt")
+		if err := CreateWorktree(repo, wtDir, "survivor"); err != nil {
+			t.Fatalf("initial CreateWorktree: %v", err)
+		}
+
+		// Commit on the task branch so it has work ahead of main.
+		writeFile(t, filepath.Join(wtDir, "work.txt"), "important work\n")
+		gitRun(t, wtDir, "add", ".")
+		gitRun(t, wtDir, "commit", "-m", "task commit")
+		commitHash := gitRun(t, wtDir, "rev-parse", "HEAD")
+
+		// Simulate tracking loss: remove the worktree directory and prune.
+		_ = os.RemoveAll(wtDir)
+		gitRun(t, repo, "worktree", "prune")
+
+		// Recreate — must reattach the existing branch, preserving commits.
+		if err := CreateWorktree(repo, wtDir, "survivor"); err != nil {
+			t.Fatalf("CreateWorktree after tracking loss: %v", err)
+		}
+
+		newHead := gitRun(t, wtDir, "rev-parse", "HEAD")
+		if newHead != commitHash {
+			t.Fatalf("branch commits lost: expected HEAD=%s, got %s", commitHash, newHead)
+		}
+		if _, err := os.Stat(filepath.Join(wtDir, "work.txt")); err != nil {
+			t.Fatal("work.txt should be present after worktree recreation:", err)
+		}
+		t.Cleanup(func() { _ = RemoveWorktree(repo, wtDir, "survivor") })
+	})
 }
 
 func TestRemoveWorktree(t *testing.T) {
