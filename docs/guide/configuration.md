@@ -33,7 +33,7 @@ The **Container Images** section at the top of **Settings > Sandbox** shows whet
 
 - **Pull** -- Download a missing image from the registry (~1 GB).
 - **Re-pull** -- Update a cached image to the latest version.
-- Pull progress streams live in the settings panel.
+- Pull progress streams live in the settings panel with a phase summary (resolving, downloading layers, writing manifest) and a layer counter.
 
 You can also check image status from the command line with `wallfacer doctor`.
 

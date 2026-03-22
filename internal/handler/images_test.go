@@ -109,6 +109,78 @@ func TestScanLinesOrCR(t *testing.T) {
 	}
 }
 
+func TestParsePullLine(t *testing.T) {
+	tests := []struct {
+		line           string
+		prevLayers     int
+		wantPhase      string
+		wantLayersDone int
+	}{
+		{"Trying to pull ghcr.io/foo/bar:latest...", 0, "resolving", 0},
+		{"Getting image source signatures", 0, "resolving", 0},
+		{"Copying blob sha256:abc123", 0, "copying", 1},
+		{"Copying blob sha256:def456", 1, "copying", 2},
+		{"Copying config sha256:789abc", 2, "copying", 3},
+		{"Writing manifest to image destination", 3, "manifest", 3},
+		{"Storing signatures", 3, "done", 3},
+		{"Pull complete: ghcr.io/foo/bar:latest", 3, "done", 3},
+		{"error: connection refused", 0, "error", 0},
+		{"some random output", 0, "unknown", 0},
+	}
+	for _, tt := range tests {
+		prog := parsePullLine(tt.line, tt.prevLayers)
+		if prog.Phase != tt.wantPhase {
+			t.Errorf("line %q: phase = %q, want %q", tt.line, prog.Phase, tt.wantPhase)
+		}
+		if prog.LayersDone != tt.wantLayersDone {
+			t.Errorf("line %q: layers_done = %d, want %d", tt.line, prog.LayersDone, tt.wantLayersDone)
+		}
+		if prog.Line != tt.line {
+			t.Errorf("line %q: Line = %q, want %q", tt.line, prog.Line, tt.line)
+		}
+	}
+}
+
+func TestStreamImagePull_StructuredProgress(t *testing.T) {
+	h := newTestHandler(t)
+	p := &imagePull{
+		ID:    "test-structured",
+		Image: "test:latest",
+		Lines: make(chan string, 16),
+		Done:  make(chan struct{}),
+	}
+	h.pulls.store(p)
+
+	// Send structured progress lines (as runPull would).
+	prog1 := pullProgress{Line: "Trying to pull test:latest...", Phase: "resolving", LayersDone: 0}
+	prog2 := pullProgress{Line: "Copying blob sha256:abc", Phase: "copying", LayersDone: 1}
+	data1, _ := json.Marshal(prog1)
+	data2, _ := json.Marshal(prog2)
+	p.Lines <- string(data1)
+	p.Lines <- string(data2)
+	p.Success = true
+	close(p.Done)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/images/pull/stream?pull_id=test-structured", nil)
+	w := httptest.NewRecorder()
+	h.StreamImagePull(w, req)
+
+	body := w.Body.String()
+	// Should contain both progress events with structured fields.
+	if !strings.Contains(body, `"phase":"resolving"`) {
+		t.Errorf("expected resolving phase in SSE output, got:\n%s", body)
+	}
+	if !strings.Contains(body, `"phase":"copying"`) {
+		t.Errorf("expected copying phase in SSE output, got:\n%s", body)
+	}
+	if !strings.Contains(body, `"layers_done":1`) {
+		t.Errorf("expected layers_done:1 in SSE output, got:\n%s", body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Errorf("expected done event in SSE output, got:\n%s", body)
+	}
+}
+
 func TestPullTracker_Deduplication(t *testing.T) {
 	pt := newPullTracker()
 	p := &imagePull{

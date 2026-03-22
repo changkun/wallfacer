@@ -1,7 +1,19 @@
 // --- Sandbox Image Management ---
 
 // Track active pulls so we can reconnect when the settings panel reopens.
-var _activePulls = {}; // { sandbox: { pullId, source } }
+var _activePulls = {}; // { sandbox: { pullId, source, log, lastPhaseText } }
+
+// Maps a pull phase to human-readable text.
+function _pullPhaseText(phase, layersDone) {
+  switch (phase) {
+    case 'resolving': return 'Resolving image\u2026';
+    case 'copying':   return 'Downloading layers (' + layersDone + ' copied)\u2026';
+    case 'manifest':  return 'Writing manifest\u2026';
+    case 'done':      return 'Pull complete';
+    case 'error':     return 'Error';
+    default:          return phase;
+  }
+}
 
 // Loads and renders sandbox image status in Settings > Sandbox > Container Images.
 async function loadImageStatus() {
@@ -54,6 +66,17 @@ async function loadImageStatus() {
         + deleteBtn;
 
       container.appendChild(row);
+
+      // Progress summary (phase + layer count).
+      var summaryId = 'pull-summary-' + sb;
+      var summaryEl = document.createElement('div');
+      summaryEl.id = summaryId;
+      summaryEl.style.cssText = (isPulling ? 'display:block;' : 'display:none;')
+        + 'margin:4px 0 0;padding:4px 8px;font-size:11px;color:var(--text-muted);font-weight:600;';
+      if (isPulling && active.lastPhaseText) {
+        summaryEl.textContent = active.lastPhaseText;
+      }
+      container.appendChild(summaryEl);
 
       // Progress area.
       var progressEl = document.createElement('pre');
@@ -114,7 +137,7 @@ async function pullSandboxImage(sandboxType) {
     var pullId = resp.pull_id;
     if (!pullId) throw new Error('No pull_id returned');
 
-    _activePulls[sandboxType] = { pullId: pullId, log: '', source: null };
+    _activePulls[sandboxType] = { pullId: pullId, log: '', source: null, lastPhaseText: '' };
     _connectPullStream(pullId, sandboxType, progressEl, btn);
   } catch (e) {
     progressEl.textContent = 'Error: ' + e.message;
@@ -135,7 +158,8 @@ function _connectPullStream(pullId, sandboxType, progressEl, btn) {
   source.addEventListener('progress', function(e) {
     try {
       var data = JSON.parse(e.data);
-      var line = data.line + '\n';
+      var rawLine = data.line || '';
+      var line = rawLine + '\n';
       if (_activePulls[sandboxType]) _activePulls[sandboxType].log += line;
       // progressEl may have been removed if settings closed and reopened;
       // write to the current DOM element by ID.
@@ -143,6 +167,14 @@ function _connectPullStream(pullId, sandboxType, progressEl, btn) {
       if (el) {
         el.textContent += line;
         el.scrollTop = el.scrollHeight;
+      }
+      // Update structured progress summary.
+      var sumEl = document.getElementById('pull-summary-' + sandboxType);
+      if (sumEl && data.phase) {
+        sumEl.style.display = 'block';
+        var phaseText = _pullPhaseText(data.phase, data.layers_done || 0);
+        sumEl.textContent = phaseText;
+        if (_activePulls[sandboxType]) _activePulls[sandboxType].lastPhaseText = phaseText;
       }
     } catch (_) {}
   });

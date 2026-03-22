@@ -88,6 +88,41 @@ func (pt *pullTracker) cleanup(retention time.Duration) {
 	}
 }
 
+// pullProgress describes structured progress for a single pull output line.
+type pullProgress struct {
+	Line       string `json:"line"`
+	Phase      string `json:"phase"`       // resolving, copying, manifest, done, error, unknown
+	LayersDone int    `json:"layers_done"`
+}
+
+// parsePullLine classifies a pull output line into a phase and tracks layer count.
+func parsePullLine(line string, prevLayersDone int) pullProgress {
+	p := pullProgress{Line: line, LayersDone: prevLayersDone}
+	switch {
+	case strings.HasPrefix(line, "Trying to pull"):
+		p.Phase = "resolving"
+	case strings.HasPrefix(line, "Getting image source"):
+		p.Phase = "resolving"
+	case strings.HasPrefix(line, "Copying blob"):
+		p.Phase = "copying"
+		p.LayersDone = prevLayersDone + 1
+	case strings.HasPrefix(line, "Copying config"):
+		p.Phase = "copying"
+		p.LayersDone = prevLayersDone + 1
+	case strings.HasPrefix(line, "Writing manifest"):
+		p.Phase = "manifest"
+	case strings.HasPrefix(line, "Storing signatures"):
+		p.Phase = "done"
+	case strings.HasPrefix(line, "Pull complete:"):
+		p.Phase = "done"
+	case strings.HasPrefix(line, "error:"):
+		p.Phase = "error"
+	default:
+		p.Phase = "unknown"
+	}
+	return p
+}
+
 // scanLinesOrCR is a bufio.SplitFunc that splits on \n, \r\n, or \r.
 // This handles container runtimes that use \r for in-place progress updates.
 func scanLinesOrCR(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -257,13 +292,17 @@ func (h *Handler) runPull(_ context.Context, cmd string, p *imagePull) {
 	// Container runtimes use \r for in-place progress updates.
 	// Split on both \n and \r so progress lines stream individually.
 	scanner.Split(scanLinesOrCR)
+	var layersDone int
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
 		}
+		prog := parsePullLine(line, layersDone)
+		layersDone = prog.LayersDone
+		data, _ := json.Marshal(prog)
 		select {
-		case p.Lines <- line:
+		case p.Lines <- string(data):
 		default:
 			// Drop line if consumer is too slow.
 		}
@@ -271,10 +310,14 @@ func (h *Handler) runPull(_ context.Context, cmd string, p *imagePull) {
 
 	if err := c.Wait(); err != nil {
 		p.Err = err
-		p.Lines <- "error: " + err.Error()
+		prog := parsePullLine("error: "+err.Error(), layersDone)
+		data, _ := json.Marshal(prog)
+		p.Lines <- string(data)
 	} else {
 		p.Success = true
-		p.Lines <- "Pull complete: " + p.Image
+		prog := parsePullLine("Pull complete: "+p.Image, layersDone)
+		data, _ := json.Marshal(prog)
+		p.Lines <- string(data)
 	}
 }
 
@@ -307,8 +350,8 @@ func (h *Handler) StreamImagePull(w http.ResponseWriter, r *http.Request) {
 				// Channel closed unexpectedly.
 				return
 			}
-			data, _ := json.Marshal(map[string]string{"line": line})
-			if _, err := fmt.Fprintf(w, "event: progress\ndata: %s\n\n", data); err != nil {
+			// Lines are already JSON-encoded pullProgress structs.
+			if _, err := fmt.Fprintf(w, "event: progress\ndata: %s\n\n", line); err != nil {
 				return
 			}
 			flusher.Flush()
@@ -317,8 +360,7 @@ func (h *Handler) StreamImagePull(w http.ResponseWriter, r *http.Request) {
 			for {
 				select {
 				case line := <-p.Lines:
-					data, _ := json.Marshal(map[string]string{"line": line})
-					if _, err := fmt.Fprintf(w, "event: progress\ndata: %s\n\n", data); err != nil {
+					if _, err := fmt.Fprintf(w, "event: progress\ndata: %s\n\n", line); err != nil {
 						return
 					}
 				default:
