@@ -325,14 +325,20 @@ func extractGoalFromRefinement(result string) (goal, spec string) {
 	if !strings.HasPrefix(result, goalHeading) {
 		return "", result
 	}
-	// Find the next top-level heading after "# Goal".
 	rest := result[len(goalHeading):]
-	nextH1 := strings.Index(rest, "\n# ")
-	if nextH1 == -1 {
+	// Find the next heading (H1 or H2) after "# Goal".
+	// The spec may start with "## Objective" (no wrapping H1).
+	nextHeading := -1
+	for _, marker := range []string{"\n# ", "\n## "} {
+		if idx := strings.Index(rest, marker); idx != -1 && (nextHeading == -1 || idx < nextHeading) {
+			nextHeading = idx
+		}
+	}
+	if nextHeading == -1 {
 		// No further heading — entire text is goal (unusual but safe).
 		return strings.TrimSpace(rest), ""
 	}
-	goal = strings.TrimSpace(rest[:nextH1])
-	spec = strings.TrimSpace(rest[nextH1+1:]) // skip the leading newline
+	goal = strings.TrimSpace(rest[:nextHeading])
+	spec = strings.TrimSpace(rest[nextHeading+1:]) // skip the leading newline
 	return goal, spec
 }

@@ -86,7 +86,7 @@ func TestCleanRefinementResult_Empty(t *testing.T) {
 	}
 }
 
-func TestExtractGoalFromRefinement_WithGoal(t *testing.T) {
+func TestExtractGoalFromRefinement_WithGoalH1Spec(t *testing.T) {
 	input := "# Goal\nAdd JWT auth to WebSocket handler.\n\n# Implementation Spec\n\n## Objective\nDetails here..."
 	goal, spec := extractGoalFromRefinement(input)
 	if goal != "Add JWT auth to WebSocket handler." {
@@ -94,6 +94,18 @@ func TestExtractGoalFromRefinement_WithGoal(t *testing.T) {
 	}
 	if spec != "# Implementation Spec\n\n## Objective\nDetails here..." {
 		t.Errorf("spec = %q", spec)
+	}
+}
+
+func TestExtractGoalFromRefinement_WithGoalH2Spec(t *testing.T) {
+	input := "# Goal\nAdd JWT auth to WebSocket handler.\n\n## Objective\nDetails here...\n\n## Files to Change\nfoo.go"
+	goal, spec := extractGoalFromRefinement(input)
+	if goal != "Add JWT auth to WebSocket handler." {
+		t.Errorf("goal = %q, want %q", goal, "Add JWT auth to WebSocket handler.")
+	}
+	wantSpec := "## Objective\nDetails here...\n\n## Files to Change\nfoo.go"
+	if spec != wantSpec {
+		t.Errorf("spec = %q, want %q", spec, wantSpec)
 	}
 }
 
