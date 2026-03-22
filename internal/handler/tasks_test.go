@@ -3812,20 +3812,25 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 	t.Helper()
 	repo := setupRepo(t)
 
-	var dataDir string
-	if d, err := os.MkdirTemp("/dev/shm", "wallfacer-ar-*"); err == nil {
-		dataDir = d
-		t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
-
-	} else {
-		dataDir = t.TempDir()
-	}
-	s, err := store.NewStore(dataDir)
+	// Use os.MkdirTemp for the store directory so that background compaction
+	// goroutines (fired on status transitions) do not race with t.TempDir
+	// cleanup. On Linux /dev/shm is preferred for speed; on macOS it falls
+	// back to the default tmp dir.
+	dataDir, err := os.MkdirTemp("/dev/shm", "wallfacer-ar-*")
 	if err != nil {
-		t.Fatal(err)
+		dataDir, err = os.MkdirTemp("", "wallfacer-ar-*")
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	worktreesDir := filepath.Join(t.TempDir(), "worktrees")
-	if err := os.MkdirAll(worktreesDir, 0o755); err != nil {
+	s, storeErr := store.NewStore(dataDir)
+	if storeErr != nil {
+		_ = os.RemoveAll(dataDir)
+		t.Fatal(storeErr)
+	}
+
+	worktreesDir, err := os.MkdirTemp("", "wallfacer-ar-wt-*")
+	if err != nil {
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{
@@ -3834,6 +3839,11 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
+	// Cleanups run LIFO: first drain background goroutines and compaction,
+	// then remove temp directories.
+	t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
+	t.Cleanup(func() { _ = os.RemoveAll(worktreesDir) })
+	t.Cleanup(s.WaitCompaction)
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 	return s, r

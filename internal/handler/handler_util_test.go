@@ -74,16 +74,17 @@ func TestIncAutopilotPhase2Miss_WithRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
-
-
 	s, err := store.NewStore(storeDir)
 	if err != nil {
+		_ = os.RemoveAll(storeDir)
 		t.Fatal(err)
 	}
 
 	reg := metrics.NewRegistry()
 	r := runner.NewRunner(s, runner.RunnerConfig{})
+	// Cleanups run LIFO: remove store dir last, after compaction and background work finish.
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+	t.Cleanup(s.WaitCompaction)
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
 

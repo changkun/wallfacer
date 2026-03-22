@@ -46,7 +46,9 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 		// to the session that just finished. If the task is immediately retried,
 		// new events (higher seqs) will be left as numbered files.
 		maxSeq, seqErr := s.currentMaxEventSeq(id)
+		s.compactWg.Add(1)
 		go func(taskID uuid.UUID, maxSeq int64, seqErr error) {
+			defer s.compactWg.Done()
 			if seqErr != nil {
 				logger.Store.Warn("skipping compaction: failed to read event horizon", "task", taskID, "error", seqErr)
 				return

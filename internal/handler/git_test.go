@@ -61,12 +61,12 @@ func newTestHandler(t *testing.T) *Handler {
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{})
-	// Cleanups run in LIFO order. Register WaitBackground first (runs second);
-	// register Shutdown second (runs first) so the board-cache subscription
-	// goroutine exits cleanly before WaitBackground drains remaining work.
+	// Cleanups run in LIFO order (last registered runs first).
+	// Order: remove store dir → wait compaction → wait background → shutdown.
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+	t.Cleanup(s.WaitCompaction)
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
 
 	return NewHandler(s, r, t.TempDir(), nil, nil)
 }
@@ -91,9 +91,11 @@ func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 		EnvFile:    envPath,
 		Workspaces: workspaces,
 	})
+	// Cleanups run LIFO: remove store dir last, after compaction and background work finish.
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+	t.Cleanup(s.WaitCompaction)
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
 
 	return NewHandler(s, r, t.TempDir(), workspaces, nil)
 

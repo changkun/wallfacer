@@ -694,7 +694,9 @@ func newTestHandlerWithMockRunner(t *testing.T, mock *runner.MockRunner) (*Handl
 
 		t.Fatal(err)
 	}
+	// Wait for any background compaction before removing the store dir.
 	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+	t.Cleanup(s.WaitCompaction)
 
 	h := &Handler{runner: mock, store: s}
 	return h, s

@@ -30,9 +30,11 @@ func newTestHandlerWithRegistry(t *testing.T) (*Handler, *metrics.Registry) {
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{})
+	// Cleanups run LIFO: remove store dir last, after compaction and background work finish.
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+	t.Cleanup(s.WaitCompaction)
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
 
 	reg := metrics.NewRegistry()
 	// Pre-register the counter so it appears in exposition even before any

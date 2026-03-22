@@ -174,12 +174,11 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 		t.Fatal(err)
 	}
 	r := runner.NewRunner(s, runner.RunnerConfig{EnvFile: envPath})
-	// Cleanups run in LIFO order. Register WaitBackground first (runs second);
-	// register Shutdown second (runs first) so background goroutines are
-	// cancelled before WaitBackground drains remaining work.
+	// Cleanups run LIFO: remove store dir last, after compaction and background work finish.
+	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
+	t.Cleanup(s.WaitCompaction)
 	t.Cleanup(r.WaitBackground)
 	t.Cleanup(r.Shutdown)
-	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
 
 	h := NewHandler(s, r, t.TempDir(), nil, nil)
 	return h, envPath

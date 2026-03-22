@@ -92,6 +92,10 @@ type Store struct {
 	// maxTurnOutputBytes is the effective per-turn output size limit read from
 	// WALLFACER_MAX_TURN_OUTPUT_BYTES. 0 means unlimited.
 	maxTurnOutputBytes int
+
+	// compactWg tracks background compaction goroutines so tests can wait
+	// for them to finish before cleaning up temp directories.
+	compactWg sync.WaitGroup
 }
 
 // readEnvInt reads an integer from an environment variable. If the variable is
@@ -145,6 +149,9 @@ func (s *Store) Close() { s.closed.Store(true) }
 
 // IsClosed reports whether Close has been called on this store.
 func (s *Store) IsClosed() bool { return s.closed.Load() }
+
+// WaitCompaction blocks until all background compaction goroutines finish.
+func (s *Store) WaitCompaction() { s.compactWg.Wait() }
 
 // addToStatusIndex inserts id into tasksByStatus[status].
 // Must be called while s.mu is held for writing.
