@@ -32,8 +32,7 @@ function _updateConnDot() {
   if (!dot || !label) return;
 
   // _sseConnState is maintained by api.js for both leader and follower tabs.
-  var state =
-    typeof _sseConnState !== "undefined" ? _sseConnState : "closed";
+  var state = typeof _sseConnState !== "undefined" ? _sseConnState : "closed";
 
   dot.className = "status-bar-conn-dot status-bar-conn-dot--" + state;
 
@@ -150,7 +149,10 @@ function _initPanelResize() {
   function onMouseMove(e) {
     // Panel grows upward: mouse moving up (smaller clientY) = larger panel
     var delta = startY - e.clientY;
-    var newH = Math.min(_panelMaxHeight, Math.max(_panelMinHeight, startH + delta));
+    var newH = Math.min(
+      _panelMaxHeight,
+      Math.max(_panelMinHeight, startH + delta),
+    );
     panel.style.height = newH + "px";
   }
 

@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import vm from "vm";
+import { readAllCSS } from "./read-css.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -44,7 +45,7 @@ describe("status-bar layout", () => {
   });
 
   it("CSS defines required status bar selectors", () => {
-    const css = readFileSync(join(repoRoot, "ui/css/styles.css"), "utf8");
+    const css = readAllCSS(join(repoRoot, "ui/css/styles.css"));
     expect(css).toContain(".status-bar");
     expect(css).toContain(".status-bar-panel");
     expect(css).toContain(".status-bar-panel-resize");
@@ -59,12 +60,10 @@ describe("status-bar layout", () => {
   });
 
   it("CSS hides status bar on mobile via media query", () => {
-    const css = readFileSync(join(repoRoot, "ui/css/styles.css"), "utf8");
-    // The @media (max-width: 768px) block should include #status-bar
-    const mediaIdx = css.lastIndexOf("@media (max-width: 768px)");
-    expect(mediaIdx).toBeGreaterThan(-1);
-    const afterMedia = css.slice(mediaIdx);
-    expect(afterMedia).toContain("#status-bar");
+    const css = readAllCSS(join(repoRoot, "ui/css/styles.css"));
+    // Some @media (max-width: 768px) block should include #status-bar
+    const re = /@media\s*\(max-width:\s*768px\)\s*\{[^}]*#status-bar/;
+    expect(css).toMatch(re);
   });
 });
 
@@ -157,8 +156,12 @@ function makeStatusBarContext(extra = {}) {
     },
     window: {},
     localStorage: {
-      getItem(k) { return _storage[k] || null; },
-      setItem(k, v) { _storage[k] = String(v); },
+      getItem(k) {
+        return _storage[k] || null;
+      },
+      setItem(k, v) {
+        _storage[k] = String(v);
+      },
     },
     // Default global state
     tasks: [],
@@ -293,11 +296,19 @@ describe("toggleTerminalPanel", () => {
   it("removes 'hidden' class from panel and resize handle when initially hidden", () => {
     const { ctx, elements } = makeStatusBarContext();
     loadStatusBar(ctx);
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(true);
-    expect(elements["status-bar-panel-resize"].classList.contains("hidden")).toBe(true);
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
+      true,
+    );
+    expect(
+      elements["status-bar-panel-resize"].classList.contains("hidden"),
+    ).toBe(true);
     ctx.toggleTerminalPanel();
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(false);
-    expect(elements["status-bar-panel-resize"].classList.contains("hidden")).toBe(false);
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
+      false,
+    );
+    expect(
+      elements["status-bar-panel-resize"].classList.contains("hidden"),
+    ).toBe(false);
     expect(elements["status-bar-terminal-btn"]._ariaExpanded).toBe("true");
   });
 
@@ -305,10 +316,16 @@ describe("toggleTerminalPanel", () => {
     const { ctx, elements } = makeStatusBarContext();
     loadStatusBar(ctx);
     ctx.toggleTerminalPanel();
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(false);
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
+      false,
+    );
     ctx.toggleTerminalPanel();
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(true);
-    expect(elements["status-bar-panel-resize"].classList.contains("hidden")).toBe(true);
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
+      true,
+    );
+    expect(
+      elements["status-bar-panel-resize"].classList.contains("hidden"),
+    ).toBe(true);
     expect(elements["status-bar-terminal-btn"]._ariaExpanded).toBe("false");
   });
 });

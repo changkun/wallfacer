@@ -1,0 +1,123 @@
+/* ===== Status Bar ===== */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 16px;
+  height: 26px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
+  font-size: 11px;
+  color: var(--text-muted);
+  user-select: none;
+}
+.status-bar__left,
+.status-bar__center,
+.status-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-bar__right {
+  margin-left: auto;
+}
+.status-bar-conn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+  transition: background 0.3s;
+}
+.status-bar-conn-dot--ok {
+  background: #45b87a;
+}
+.status-bar-conn-dot--reconnecting {
+  background: #e0a020;
+}
+.status-bar-conn-dot--closed {
+  background: var(--text-muted);
+}
+.status-bar-conn-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.status-bar-workspace {
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 5px;
+  line-height: 16px;
+}
+.status-bar-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.status-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 18px;
+}
+.status-bar-btn:hover {
+  background: var(--bg-raised);
+  color: var(--text);
+}
+.status-bar-kbd {
+  font-family: inherit;
+  font-size: 10px;
+  opacity: 0.7;
+  border: none;
+  background: none;
+  padding: 0;
+}
+.status-bar-panel-resize {
+  flex-shrink: 0;
+  height: 4px;
+  cursor: ns-resize;
+  background: transparent;
+  border-top: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.status-bar-panel-resize:hover,
+.status-bar-panel-resize--active {
+  background: var(--accent, #4e8cff);
+}
+.status-bar-panel-resize.hidden {
+  display: none;
+}
+.status-bar-panel {
+  flex-shrink: 0;
+  height: 260px;
+  background: var(--bg-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.status-bar-panel.hidden {
+  display: none;
+}
+@media (max-width: 768px) {
+  #status-bar,
+  #status-bar-panel,
+  #status-bar-panel-resize {
+    display: none;
+  }
+}

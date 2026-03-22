@@ -1,0 +1,319 @@
+/* --- Cards --- */
+.card {
+  cursor: grab;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 280px;
+}
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+.card.sortable-ghost {
+  opacity: 0.4;
+}
+.card.sortable-chosen {
+  box-shadow: var(--shadow-lg);
+}
+.card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.card-meta-right {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.card-action-btn {
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  line-height: 1.5;
+  transition: opacity 0.1s;
+}
+.card-action-btn:hover {
+  opacity: 0.75;
+}
+.card-action-btn:disabled {
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  border-color: var(--border);
+  cursor: not-allowed;
+  opacity: 1;
+}
+.card-action-start {
+  background: #d0ebdc;
+  color: #1a6030;
+  border-color: #a8d9bb;
+}
+.card-action-done {
+  background: #d0ebdc;
+  color: #1a6030;
+  border-color: #a8d9bb;
+}
+.card-action-resume {
+  background: #dceaf7;
+  color: #2c5f98;
+  border-color: #a8c8ef;
+}
+.card-action-retry {
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+.card-action-test {
+  background: #ede8f7;
+  color: #5a3fa0;
+  border-color: #c4b0e8;
+}
+[data-theme="dark"] .card-action-start {
+  background: #0e2a1a;
+  color: #45b87a;
+  border-color: #1e4a2e;
+}
+[data-theme="dark"] .card-action-done {
+  background: #0e2a1a;
+  color: #45b87a;
+  border-color: #1e4a2e;
+}
+[data-theme="dark"] .card-action-resume {
+  background: #1a2d42;
+  color: #6da0dc;
+  border-color: #2a4460;
+}
+[data-theme="dark"] .card-action-test {
+  background: #1e1535;
+  color: #a07fe0;
+  border-color: #3a2860;
+}
+
+/* --- Column headers --- */
+.col-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.col-header-backlog {
+  color: var(--text-muted);
+}
+.col-header-progress {
+  color: #3a6db3;
+}
+.col-header-waiting {
+  color: #a07020;
+}
+.col-header-done {
+  color: #28804a;
+}
+.col-header-failed {
+  color: #a02828;
+}
+.col-header-cancelled {
+  color: #5a3d8a;
+}
+[data-theme="dark"] .col-header-progress {
+  color: #6da0dc;
+}
+[data-theme="dark"] .col-header-waiting {
+  color: #d4a030;
+}
+[data-theme="dark"] .col-header-done {
+  color: #45b87a;
+}
+[data-theme="dark"] .col-header-failed {
+  color: #d46868;
+}
+[data-theme="dark"] .col-header-cancelled {
+  color: #a07ad4;
+}
+
+/* --- Failed tasks displayed in Waiting column --- */
+/* --- Idea-agent task cards --- */
+.card-idea-agent {
+  border-left: 3px solid #1a7a4a;
+}
+[data-theme="dark"] .card-idea-agent {
+  border-left-color: #3db87a;
+}
+
+.card-failed-waiting {
+  border-left: 3px solid #a02828;
+}
+[data-theme="dark"] .card-failed-waiting {
+  border-left-color: #d46868;
+}
+
+/* --- Cancelled tasks displayed in Done column --- */
+.card-cancelled-done {
+  border-left: 3px solid #5a3d8a;
+}
+[data-theme="dark"] .card-cancelled-done {
+  border-left-color: #a07ad4;
+}
+.card-error-reason {
+  margin-top: 6px;
+  padding: 4px 6px;
+  background: rgba(140, 32, 32, 0.07);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  word-break: break-word;
+}
+[data-theme="dark"] .card-error-reason {
+  background: rgba(212, 104, 104, 0.1);
+}
+.card-error-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8c2020;
+  margin-right: 6px;
+}
+[data-theme="dark"] .card-error-label {
+  color: #d46868;
+}
+.card-error-text {
+  color: #7a2c2c;
+}
+[data-theme="dark"] .card-error-text {
+  color: #c47070;
+}
+
+/* --- Output reason (waiting tasks) --- */
+.card-output-reason {
+  margin-top: 6px;
+  padding: 4px 6px;
+  background: rgba(100, 100, 140, 0.07);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  word-break: break-word;
+}
+[data-theme="dark"] .card-output-reason {
+  background: rgba(160, 160, 200, 0.1);
+}
+.card-output-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #555;
+  margin-right: 6px;
+}
+[data-theme="dark"] .card-output-label {
+  color: #aaa;
+}
+.card-output-text {
+  color: #444;
+}
+[data-theme="dark"] .card-output-text {
+  color: #bbb;
+}
+
+/* --- Error result in live output --- */
+.cc-final-error {
+  color: #d46868;
+  border-top-color: #341414;
+}
+
+/* --- Task title (auto-generated 2-5 word summary) --- */
+.card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Markdown in card previews (compact overrides) --- */
+.card-prose {
+}
+.card-prose p {
+  margin: 0 !important;
+}
+.card-prose h1,
+.card-prose h2,
+.card-prose h3,
+.card-prose h4,
+.card-prose h5,
+.card-prose h6 {
+  margin: 0 0 0.1em !important;
+  font-size: 1em !important;
+}
+.card-prose ul {
+  list-style-type: disc !important;
+  margin: 0 !important;
+  padding-left: 1.2em !important;
+}
+.card-prose ol {
+  list-style-type: decimal !important;
+  margin: 0 !important;
+  padding-left: 1.2em !important;
+}
+.card-prose li {
+  margin: 0 !important;
+}
+.card-prose pre {
+  margin: 0 !important;
+  padding: 2px 6px !important;
+  font-size: 0.85em !important;
+}
+.card-prose blockquote {
+  margin: 0 !important;
+}
+
+/* --- Refinement state badges on cards --- */
+.badge-refining {
+  background: #ede8f5;
+  color: #5c3d8a;
+  border: 1px solid #c8b8e880;
+  animation: badge-pulse 1.5s ease-in-out infinite;
+}
+.badge-refine-review {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc10760;
+}
+[data-theme="dark"] .badge-refining {
+  background: #2a1e3d;
+  color: #c0a0e8;
+  border-color: #4a306080;
+}
+[data-theme="dark"] .badge-refine-review {
+  background: #2a2000;
+  color: #d4a030;
+  border-color: #a0780040;
+}
+@keyframes badge-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge-pulse,
+  .refine-typing-spinner {
+    animation: none;
+  }
+}

@@ -1,0 +1,180 @@
+/* --- Refine button on cards --- */
+.card-action-refine {
+  background: #ede8f5;
+  color: #5c3d8a;
+  border-color: #c8b8e8;
+}
+[data-theme="dark"] .card-action-refine {
+  background: #2a1e3d;
+  color: #c0a0e8;
+  border-color: #4a3060;
+}
+
+/* Chat section: intent clarification */
+.refine-chat-section {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#refine-chat-area {
+  display: flex;
+  flex-direction: column;
+}
+.refine-messages {
+  overflow-y: auto;
+  max-height: 220px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.refine-typing-bar {
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px 6px;
+}
+.refine-typing-bar:not(.hidden) {
+  display: flex;
+}
+.refine-typing-spinner {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+  flex-shrink: 0;
+}
+.refine-chat-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg-raised);
+}
+.refine-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.refine-chat-textarea {
+  flex: 1;
+  resize: none;
+}
+.refine-send-btn {
+  align-self: flex-end;
+  flex-shrink: 0;
+}
+.refine-send-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* Spec section: refined prompt as primary output */
+.refine-spec-section {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-raised);
+  flex-shrink: 0;
+}
+.refine-spec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.refine-spec-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--accent);
+}
+.refine-proposal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(217, 119, 87, 0.12);
+  border: 1px solid rgba(217, 119, 87, 0.3);
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+.refine-prompt-textarea {
+  resize: vertical;
+  font-family: monospace;
+  font-size: 12px;
+  min-height: 140px;
+}
+
+/* History area */
+.refine-history-area {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.refine-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* --- Refine modal chat messages --- */
+.refine-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 88%;
+}
+.refine-msg-assistant {
+  align-self: flex-start;
+}
+.refine-msg-user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.refine-msg-role {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0 6px;
+}
+.refine-msg-body {
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 10px 14px;
+  border-radius: 4px 14px 14px 14px;
+  word-break: break-word;
+}
+.refine-msg-assistant .refine-msg-body {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.refine-msg-user .refine-msg-body {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 14px 14px 4px 14px;
+}
+
+/* --- Refine history entries --- */
+.refine-history-entry {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  background: var(--bg-card);
+}
+.refine-history-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.refine-history-summary::-webkit-details-marker {
+  display: none;
+}

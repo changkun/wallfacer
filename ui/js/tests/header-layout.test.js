@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { readAllCSS } from "./read-css.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -27,7 +28,7 @@ describe("header layout", () => {
   });
 
   it("defines automation menu and toggle chip styles", () => {
-    const css = readFileSync(join(repoRoot, "ui/css/styles.css"), "utf8");
+    const css = readAllCSS(join(repoRoot, "ui/css/styles.css"));
 
     expect(css).toContain(".automation-menu");
     expect(css).toContain(".automation-menu-wrap");

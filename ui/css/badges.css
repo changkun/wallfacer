@@ -1,0 +1,308 @@
+/* --- Badges --- */
+.badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  border-left: 3px solid currentColor;
+  padding-left: 5px;
+}
+.badge-backlog {
+  background: #e4e0d8;
+  color: #6b6560;
+}
+.badge-in_progress {
+  background: #dceaf7;
+  color: #2c5f98;
+}
+.badge-waiting {
+  background: #f5e6ce;
+  color: #5c3a08;
+}
+.badge-committing {
+  background: #f5e6ce;
+  color: #5c3a08;
+}
+.badge-done {
+  background: #d0ebdc;
+  color: #1a6030;
+}
+.badge-failed {
+  background: #f5d5d5;
+  color: #6b1111;
+}
+.badge-archived {
+  background: #e4e0d8;
+  color: #6b6560;
+  font-style: italic;
+}
+.badge-cancelled {
+  background: #e8ddf5;
+  color: #5a3d8a;
+}
+.badge-priority {
+  background: linear-gradient(180deg, #d7e2f7 0%, #bfd0eb 100%);
+  color: #26355a;
+  border: 1px solid #a8bde8;
+  font-weight: 700;
+  font-size: 9px;
+  padding: 2px 5px;
+  min-width: 18px;
+  text-align: center;
+}
+.badge-testing {
+  background: #e0e8ff;
+  color: #2040c0;
+}
+.badge-test-pass {
+  background: #d0ebdc;
+  color: #1a6030;
+}
+.badge-test-fail {
+  background: #f5d5d5;
+  color: #8c2020;
+}
+.badge-test-none {
+  background: #eae8e4;
+  color: #888078;
+}
+.badge-blocked {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #92400e40;
+}
+[data-theme="dark"] .badge-blocked {
+  background: #2a1a00;
+  color: #d97316;
+  border: 1px solid #d9731640;
+}
+.badge-deps-met {
+  background: #d0ebdc;
+  color: #1a6030;
+  border: 1px solid #1a603040;
+}
+[data-theme="dark"] .badge-deps-met {
+  background: #0e2a1a;
+  color: #45b87a;
+  border: 1px solid #45b87a40;
+}
+.badge-scheduled {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #1d4ed840;
+}
+[data-theme="dark"] .badge-scheduled {
+  background: #0e1a35;
+  color: #60a5fa;
+  border: 1px solid #60a5fa40;
+}
+.badge-deps-ok {
+  background: #d0ebdc;
+  color: #1a6030;
+  border: 1px solid #1a603040;
+}
+[data-theme="dark"] .badge-deps-ok {
+  background: #0e2a1a;
+  color: #45b87a;
+  border: 1px solid #45b87a40;
+}
+[data-theme="dark"] .badge-backlog {
+  background: #2a2820;
+  color: #7a7770;
+}
+[data-theme="dark"] .badge-in_progress {
+  background: #1a2d42;
+  color: #6da0dc;
+}
+[data-theme="dark"] .badge-waiting {
+  background: #352a10;
+  color: #d4a030;
+}
+[data-theme="dark"] .badge-committing {
+  background: #352a10;
+  color: #d4a030;
+}
+[data-theme="dark"] .badge-done {
+  background: #0e2a1a;
+  color: #45b87a;
+}
+[data-theme="dark"] .badge-failed {
+  background: #341414;
+  color: #d46868;
+}
+[data-theme="dark"] .badge-archived {
+  background: #2a2820;
+  color: #7a7770;
+  font-style: italic;
+}
+[data-theme="dark"] .badge-cancelled {
+  background: #2a1e3d;
+  color: #a07ad4;
+}
+[data-theme="dark"] .badge-priority {
+  background: #1e2535;
+  color: #8095c0;
+}
+[data-theme="dark"] .badge-testing {
+  background: #1a2050;
+  color: #7090e8;
+}
+[data-theme="dark"] .badge-test-pass {
+  background: #0e2a1a;
+  color: #45b87a;
+}
+[data-theme="dark"] .badge-test-fail {
+  background: #341414;
+  color: #d46868;
+}
+[data-theme="dark"] .badge-test-none {
+  background: #252320;
+  color: #6a6560;
+}
+
+/* Brainstorm / idea-agent tag badge */
+.badge-idea-agent {
+  background: #e8f0ff;
+  color: #3050b0;
+  font-size: 9px;
+  font-style: italic;
+}
+[data-theme="dark"] .badge-idea-agent {
+  background: #1a2548;
+  color: #7090e0;
+}
+
+/* Brainstorm category badge (topic domain of a brainstorm-generated task) */
+.badge-category {
+  background: #f0eaff;
+  color: #5a30a0;
+  font-size: 9px;
+}
+[data-theme="dark"] .badge-category {
+  background: #251840;
+  color: #b090e8;
+}
+
+.tag-chip {
+  display: inline-block;
+  border-radius: 9999px;
+  font-size: 0.62rem;
+  font-weight: 500;
+  padding: 1px 7px;
+  margin: 1px 2px;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  vertical-align: middle;
+}
+.tag-chip-overflow {
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.tag-chip-overflow:hover {
+  color: var(--text-secondary);
+}
+.tag-chip-extra {
+  display: none;
+}
+.tag-chip-row.expanded .tag-chip-extra {
+  display: inline-block;
+}
+.tag-chip-row.expanded .tag-chip-overflow {
+  display: none;
+}
+.tag-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 2px 0 3px;
+  min-height: 0;
+}
+.tag-chip-edit {
+  position: relative;
+  padding-right: 18px;
+  max-width: 100px;
+}
+.tag-chip-remove {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.tag-chip-remove:hover {
+  color: #fff;
+}
+.tag-chip-input-row {
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: var(--bg-input);
+  min-height: 28px;
+}
+.tag-chip-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.75rem;
+  min-width: 80px;
+  flex: 1;
+  padding: 0;
+}
+.tag-chip-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Brainstorm metadata tag badges (generated by idea-agent tasks) */
+.badge-tag {
+  background: #e4e0d8;
+  color: #5c5750;
+}
+.badge-impact {
+  background: linear-gradient(180deg, #efe7ff 0%, #d9c7ff 100%);
+  color: #39216f;
+  border: 1px solid #c6a7fb;
+}
+[data-theme="dark"] .badge-tag {
+  background: #292522;
+  color: #8f8780;
+}
+[data-theme="dark"] .badge-priority {
+  background: linear-gradient(180deg, #242f4a 0%, #1d273f 100%);
+  border-color: #2d4a82;
+  color: #7fa2dd;
+}
+[data-theme="dark"] .badge-impact {
+  background: linear-gradient(180deg, #2b2345 0%, #211638 100%);
+  border-color: #4b3c74;
+  color: #ccb0ff;
+}
+
+/* --- Max Parallel Tag --- */
+.max-parallel-tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  background: #dceaf7;
+  color: #2c5f98;
+  white-space: nowrap;
+}
+[data-theme="dark"] .max-parallel-tag {
+  background: #1a2d42;
+  color: #6da0dc;
+}

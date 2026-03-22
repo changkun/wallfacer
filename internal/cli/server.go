@@ -872,7 +872,6 @@ func ensureImage(containerCmd, image string) string {
 	return image
 }
 
-
 func requiresStore(name string) bool {
 	switch name {
 	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "TestWebhook", "GitStatus", "GitStatusStream":

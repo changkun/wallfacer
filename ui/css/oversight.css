@@ -1,0 +1,120 @@
+/* --- Aggregated oversight view --- */
+/* Switch logs-block from terminal style to card style when oversight tab is active */
+.logs-block.oversight-mode {
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+}
+.oversight-view {
+  padding: 4px 0;
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  white-space: normal;
+}
+.oversight-phase {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: var(--bg-raised);
+}
+.oversight-phase-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.oversight-phase-num {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.oversight-phase-title {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 13px;
+}
+.oversight-phase-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.oversight-summary {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+.oversight-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.oversight-tool {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-size: 11px;
+  color: var(--accent);
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+[data-theme="light"] .oversight-tool {
+  color: #a02870;
+}
+.oversight-commands {
+  margin: 4px 0 6px;
+  padding: 5px 8px;
+  padding-left: 20px;
+  background: var(--bg-input);
+  border-radius: 4px;
+  border-left: 2px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.oversight-command {
+  font-family: "SF Mono", "Fira Code", monospace;
+  margin: 0;
+  word-break: break-all;
+}
+.oversight-actions {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.oversight-action {
+  margin: 0;
+}
+.oversight-action::marker {
+  color: var(--accent);
+}
+.oversight-loading {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 12px 0;
+  font-style: italic;
+  white-space: normal;
+}
+.oversight-error {
+  color: #d46868;
+  font-size: 12px;
+  padding: 12px 0;
+  white-space: normal;
+}
+.oversight-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 12px 0;
+  font-style: italic;
+  white-space: normal;
+}
