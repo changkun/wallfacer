@@ -44,11 +44,11 @@ async function loadImageStatus() {
 
       var deleteBtn = '';
       if (img.cached && !isPulling) {
-        deleteBtn = ' <button type="button" class="btn-sm" style="white-space:nowrap;color:var(--text-error,#dc2626);" onclick="deleteSandboxImage(\'' + escapeHtml(sb) + '\')">Delete</button>';
+        deleteBtn = ' <button type="button" class="btn-icon" style="font-size:12px;padding:4px 10px;white-space:nowrap;color:var(--text-error,#dc2626);" onclick="deleteSandboxImage(\'' + escapeHtml(sb) + '\')">Delete</button>';
       }
 
       row.innerHTML = info + badge
-        + ' <button id="' + btnId + '" type="button" class="btn-sm" style="white-space:nowrap;"'
+        + ' <button id="' + btnId + '" type="button" class="btn-icon" style="font-size:12px;padding:4px 10px;white-space:nowrap;"'
         + (isPulling ? ' disabled' : '')
         + ' onclick="pullSandboxImage(\'' + escapeHtml(sb) + '\')">' + btnLabel + '</button>'
         + deleteBtn;
