@@ -688,7 +688,6 @@ function _cardFingerprint(t, rank) {
 }
 
 function cardDisplayPrompt(t) {
-  if (typeof taskDisplayPrompt === 'function') return taskDisplayPrompt(t);
   if (t && t.kind === 'idea-agent' && t.execution_prompt) return t.execution_prompt;
   if (t && t.goal) return t.goal;
   return t ? t.prompt : '';

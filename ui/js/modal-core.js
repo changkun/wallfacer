@@ -244,28 +244,37 @@ async function openModal(id) {
 
   const backlogRight = document.getElementById('modal-backlog-right');
   const backlogSettings = document.getElementById('modal-backlog-settings');
-  const backlogEdit = document.getElementById('modal-backlog-edit');
+  const backlogTags = document.getElementById('modal-backlog-tags');
 
-  // Render prompt in left panel (shared for all statuses)
-  const displayPrompt = (typeof taskDisplayPrompt === 'function') ? taskDisplayPrompt(task) : (task.prompt || '');
+  // --- Goal + Spec sections ---
+  const goalSection = document.getElementById('modal-goal-section');
+  const goalRendered = document.getElementById('modal-goal-rendered');
+  const goalTextarea = document.getElementById('modal-edit-goal');
   const promptRaw = document.getElementById('modal-prompt');
   const promptRendered = document.getElementById('modal-prompt-rendered');
-  promptRaw.textContent = displayPrompt;
-  promptRendered.innerHTML = renderMarkdown(displayPrompt);
-  promptRendered.classList.remove('hidden');
-  promptRaw.classList.add('hidden');
-  document.getElementById('modal-prompt-actions').classList.remove('hidden');
-  document.getElementById('toggle-prompt-btn').textContent = 'Raw';
+  const promptTextarea = document.getElementById('modal-edit-prompt');
+  const promptActions = document.getElementById('modal-prompt-actions');
 
   if (task.status === 'backlog') {
+    // Backlog: show editable goal + editable spec
+    const goalVal = task.goal || '';
+    goalSection.classList.remove('hidden');
+    goalRendered.classList.add('hidden');
+    goalTextarea.classList.remove('hidden');
+    goalTextarea.value = goalVal;
+
+    promptRendered.classList.add('hidden');
+    promptRaw.classList.add('hidden');
+    promptActions.classList.add('hidden');
+    promptTextarea.classList.remove('hidden');
+    promptTextarea.value = task.prompt || '';
+
     // Show right refinement panel and left backlog-specific sections
     backlogRight.classList.remove('hidden');
     backlogSettings.classList.remove('hidden');
-    backlogEdit.classList.remove('hidden');
+    backlogTags.classList.remove('hidden');
 
-    // Populate settings (now in left panel)
-    document.getElementById('modal-edit-goal').value = task.goal || '';
-    document.getElementById('modal-edit-prompt').value = task.prompt;
+    // Populate settings
     document.getElementById('modal-edit-timeout').value = String(task.timeout || 60);
     document.getElementById('modal-edit-mount-worktrees').checked = !!task.mount_worktrees;
     document.getElementById('modal-edit-sandbox').value = task.sandbox || '';
@@ -318,9 +327,32 @@ async function openModal(id) {
     modalBody.style.display = 'flex';
     modalBody.style.gap = '0';
   } else {
+    // Non-backlog: show rendered goal (if distinct) + rendered spec (read-only)
+    const goalVal = task.goal || '';
+    const specVal = (typeof taskDisplayPrompt === 'function') ? taskDisplayPrompt(task) : (task.prompt || '');
+    const hasDistinctGoal = goalVal && goalVal !== task.prompt;
+
+    if (hasDistinctGoal) {
+      goalSection.classList.remove('hidden');
+      goalRendered.innerHTML = renderMarkdown(goalVal);
+      goalRendered.classList.remove('hidden');
+    } else {
+      goalSection.classList.add('hidden');
+      goalRendered.classList.add('hidden');
+    }
+    goalTextarea.classList.add('hidden');
+
+    promptRaw.textContent = specVal;
+    promptRendered.innerHTML = renderMarkdown(specVal);
+    promptRendered.classList.remove('hidden');
+    promptRaw.classList.add('hidden');
+    promptActions.classList.remove('hidden');
+    document.getElementById('toggle-prompt-btn').textContent = 'Raw';
+    promptTextarea.classList.add('hidden');
+
     backlogRight.classList.add('hidden');
     backlogSettings.classList.add('hidden');
-    backlogEdit.classList.add('hidden');
+    backlogTags.classList.add('hidden');
   }
 
   // Reset left panel tabs; content populated below once events load
@@ -908,7 +940,11 @@ function closeModal() {
   if (_depsSection) _depsSection.classList.add('hidden');
   document.getElementById('modal-backlog-right').classList.add('hidden');
   document.getElementById('modal-backlog-settings').classList.add('hidden');
-  document.getElementById('modal-backlog-edit').classList.add('hidden');
+  var _backlogTags = document.getElementById('modal-backlog-tags');
+  if (_backlogTags) _backlogTags.classList.add('hidden');
+  document.getElementById('modal-goal-section').classList.add('hidden');
+  document.getElementById('modal-edit-goal').classList.add('hidden');
+  document.getElementById('modal-edit-prompt').classList.add('hidden');
   document.querySelector('#modal .modal-card').classList.remove('modal-wide');
   const modalBody = document.getElementById('modal-body');
   modalBody.style.display = '';

@@ -16,8 +16,18 @@
 
       <div id="modal-body">
         <div id="modal-left">
+          <!-- Goal section -->
+          <div id="modal-goal-section" class="hidden mb-4">
+            <h3 class="section-title" style="margin-bottom:0;">Goal</h3>
+            <!-- Read-only goal (non-backlog) -->
+            <div id="modal-goal-rendered" class="code-block prose-content hidden"></div>
+            <!-- Editable goal (backlog) -->
+            <textarea id="modal-edit-goal" rows="2" class="field hidden" style="font-size:13px;" placeholder="1-3 sentence summary of what this task achieves"></textarea>
+          </div>
+
+          <!-- Spec / Prompt section -->
           <div class="flex items-center justify-between mb-2">
-            <h3 class="section-title" style="margin-bottom:0;">Prompt</h3>
+            <h3 class="section-title" style="margin-bottom:0;">Spec</h3>
             <div id="modal-prompt-actions" class="flex items-center gap-1.5 hidden">
               <button id="copy-prompt-btn" onclick="copyModalText('prompt')" class="btn-icon" title="Copy to clipboard">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -26,8 +36,11 @@
               <button id="toggle-prompt-btn" onclick="toggleModalSection('prompt')" class="btn-icon">Raw</button>
             </div>
           </div>
+          <!-- Read-only spec (non-backlog) -->
           <div id="modal-prompt-rendered" class="code-block mb-4 prose-content hidden"></div>
           <pre id="modal-prompt" class="code-block mb-4 hidden"></pre>
+          <!-- Editable spec (backlog) -->
+          <textarea id="modal-edit-prompt" rows="10" class="field mb-4 hidden" style="font-family:monospace;font-size:12px;"></textarea>
 
           <!-- Prompt history (collapsible) -->
           <div id="modal-history-section" class="hidden mb-4">
@@ -129,16 +142,10 @@
             <span id="modal-edit-status" class="text-xs text-v-muted"></span>
           </div>
 
-          <!-- Editable goal and prompt for backlog tasks (hidden for non-backlog) -->
-          <div id="modal-backlog-edit" class="hidden mb-4">
-            <h3 class="section-title">Goal</h3>
-            <textarea id="modal-edit-goal" rows="2" class="field" style="font-size:13px;" placeholder="1-3 sentence summary of what this task achieves"></textarea>
-            <h3 class="section-title mt-3">Edit Prompt</h3>
-            <textarea id="modal-edit-prompt" rows="6" class="field" style="font-family:monospace;font-size:12px;"></textarea>
-            <div class="mt-2">
-              <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Tags</label>
-              <div id="modal-edit-tag-input" data-onchange="scheduleBacklogSave"></div>
-            </div>
+          <!-- Tags (backlog only, inside settings) -->
+          <div id="modal-backlog-tags" class="hidden mb-4">
+            <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Tags</label>
+            <div id="modal-edit-tag-input" data-onchange="scheduleBacklogSave"></div>
           </div>
 
           <!-- Start section (backlog only) -->
