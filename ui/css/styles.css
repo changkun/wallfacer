@@ -1300,6 +1300,10 @@ details.settings-card[open] > summary svg {
   margin-bottom: 12px;
   border-bottom: 1px solid var(--border);
   padding-bottom: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-card);
 }
 .right-tab {
   background: none;
