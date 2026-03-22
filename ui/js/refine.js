@@ -121,11 +121,13 @@ async function startRefinement() {
 
   try {
     const userInstructions = document.getElementById('refine-user-instructions')?.value.trim() || '';
-    await api(task(getOpenModalTaskId()).refine(), {
+    const updatedTask = await api(task(getOpenModalTaskId()).refine(), {
       method: 'POST',
       body: JSON.stringify({ user_instructions: userInstructions }),
     });
-    // SSE task stream will push the updated task; updateRefineUI handles the rest.
+    // Immediately show the running state from the 202 response.
+    // SSE will also deliver updates, but this avoids a visual gap.
+    if (updatedTask) updateRefineUI(updatedTask);
   } catch (e) {
     const errorSec = document.getElementById('refine-error-section');
     const errorMsg = document.getElementById('refine-error-msg');
