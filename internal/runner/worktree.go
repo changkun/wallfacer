@@ -187,4 +187,3 @@ func (r *Runner) PruneUnknownWorktrees() {
 	// Stale worktree entries are cleaned up by the periodic GC
 	// (StartWorktreeGC) and by RemoveWorktree during normal task cleanup.
 }
-
