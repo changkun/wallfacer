@@ -1,0 +1,41 @@
+<div class="settings-tab-content" data-settings-tab="trash">
+  <div
+    style="
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    "
+  >
+    Deleted Tasks
+  </div>
+  <div
+    style="
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 12px;
+    "
+  >
+    Soft-deleted tasks remain recoverable for 7 days.
+  </div>
+  <div id="trash-bin-error" class="trash-bin-banner hidden" role="alert">
+    <span id="trash-bin-error-message"></span>
+    <button
+      id="trash-bin-error-dismiss"
+      type="button"
+      class="trash-bin-banner__dismiss"
+      aria-label="Dismiss trash error"
+    >
+      &times;
+    </button>
+  </div>
+  <div id="trash-bin-loading" class="trash-bin-loading hidden">
+    <span class="spinner" aria-hidden="true"></span>
+    <span>Loading deleted tasks...</span>
+  </div>
+  <div id="trash-bin-empty" class="trash-bin-empty hidden">Trash is empty</div>
+  <div id="trash-bin-list" class="trash-bin-list" role="list"></div>
+</div>

@@ -1,0 +1,77 @@
+<div class="settings-tab-content" data-settings-tab="workspace">
+  <div class="settings-section">
+    <div
+      style="
+        margin-bottom: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      "
+    >
+      Active Workspaces
+    </div>
+    <div
+      id="settings-workspace-list"
+      style="
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+      "
+    ></div>
+    <div style="display: flex; gap: 8px; align-items: center">
+      <button
+        type="button"
+        onclick="showWorkspacePicker(false)"
+        class="btn-icon"
+        style="font-size: 12px; padding: 4px 10px"
+      >
+        Change
+      </button>
+      <span
+        id="settings-workspace-status"
+        style="font-size: 11px; color: var(--text-muted)"
+      ></span>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div
+      style="
+        margin-bottom: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      "
+    >
+      Saved Workspace Groups
+    </div>
+    <div
+      id="settings-workspace-groups"
+      style="
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-secondary);
+      "
+    ></div>
+    <div
+      style="
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.4;
+      "
+    >
+      Workspace groups are saved automatically when they become active, so you
+      can switch back without rebuilding the same folder set.
+    </div>
+  </div>
+</div>

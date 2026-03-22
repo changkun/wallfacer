@@ -1,0 +1,33 @@
+<div class="settings-tab-content active" data-settings-tab="appearance">
+  <div class="settings-card">
+    <div class="settings-card-head">
+      <h4>Theme</h4>
+      <p>Choose the interface color mode for the current session.</p>
+    </div>
+    <div
+      class="theme-switch settings-theme-switch"
+      id="theme-switch"
+      role="group"
+      aria-label="Theme mode"
+    >
+      <button data-mode="light" onclick="setTheme('light')">Light</button>
+      <button data-mode="dark" onclick="setTheme('dark')">Dark</button>
+      <button data-mode="auto" onclick="setTheme('auto')">Auto</button>
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-card-head">
+      <h4>Done Column</h4>
+      <p>Toggle visibility of archived completed tasks on the board.</p>
+    </div>
+    <label class="settings-toggle">
+      <input
+        type="checkbox"
+        id="show-archived-toggle"
+        onchange="toggleShowArchived()"
+      />
+      Show archived tasks
+    </label>
+  </div>
+</div>
