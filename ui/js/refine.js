@@ -260,6 +260,8 @@ function resetRefinePanel() {
   if (resultTA) delete resultTA.dataset.jobId;
   const dismissBtn = document.getElementById('refine-dismiss-btn');
   if (dismissBtn) dismissBtn.classList.add('hidden');
+  const applyBtn = document.getElementById('refine-apply-btn');
+  if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = 'Apply as Prompt'; }
   refineRawLogBuffer = '';
   refineLogsMode = 'pretty';
   ['pretty', 'raw'].forEach(function(m) {
