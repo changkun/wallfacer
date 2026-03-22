@@ -573,7 +573,7 @@ func TestParseWorkspaces_SinglePath(t *testing.T) {
 }
 
 func TestParseWorkspaces_MultiplePaths(t *testing.T) {
-	input := "/a:/b:/c"
+	input := strings.Join([]string{"/a", "/b", "/c"}, string(os.PathListSeparator))
 	got := envconfig.ParseWorkspaces(input)
 	if len(got) != 3 {
 		t.Fatalf("ParseWorkspaces(%q) len = %d, want 3", input, len(got))
@@ -585,14 +585,15 @@ func TestParseWorkspaces_MultiplePaths(t *testing.T) {
 
 func TestParseWorkspaces_FiltersEmptyEntries(t *testing.T) {
 	// Leading/trailing/double separators produce empty parts.
-	got := envconfig.ParseWorkspaces(":/a::/b:")
+	sep := string(os.PathListSeparator)
+	got := envconfig.ParseWorkspaces(sep + "/a" + sep + sep + "/b" + sep)
 	if len(got) != 2 {
 		t.Errorf("ParseWorkspaces with empty entries = %v (len %d), want 2 entries", got, len(got))
 	}
 }
 
 func TestParseWorkspaces_AllEmptyEntriesReturnsNil(t *testing.T) {
-	if got := envconfig.ParseWorkspaces(":::"); got != nil {
+	if got := envconfig.ParseWorkspaces(strings.Repeat(string(os.PathListSeparator), 3)); got != nil {
 		t.Errorf("ParseWorkspaces(all separators) = %v, want nil", got)
 	}
 }
