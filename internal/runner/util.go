@@ -21,7 +21,7 @@ func truncate(s string, n int) string {
 // remain human-readable. Falls back to "workspace" if the result is empty.
 func sanitizeBasename(path string) string {
 	base := filepath.Base(path)
-	if base == "." || base == "/" || base == "" {
+	if base == "." || base == "/" || base == `\` || base == "" {
 		return "workspace"
 	}
 	var b strings.Builder
