@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 77,
+  "route_count": 78,
   "routes": [
     {
       "method": "GET",
@@ -71,6 +71,15 @@
       "pattern": "/api/images/pull",
       "name": "PullImage",
       "description": "Start an async pull for a sandbox image; returns a pull ID.",
+      "tags": [
+        "images"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/images",
+      "name": "DeleteImage",
+      "description": "Remove a cached sandbox image.",
       "tags": [
         "images"
       ]

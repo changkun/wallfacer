@@ -42,10 +42,16 @@ async function loadImageStatus() {
       var btnId = 'pull-btn-' + sb;
       var progressId = 'pull-progress-' + sb;
 
+      var deleteBtn = '';
+      if (img.cached && !isPulling) {
+        deleteBtn = ' <button type="button" class="btn-sm" style="white-space:nowrap;color:var(--text-error,#dc2626);" onclick="deleteSandboxImage(\'' + escapeHtml(sb) + '\')">Delete</button>';
+      }
+
       row.innerHTML = info + badge
         + ' <button id="' + btnId + '" type="button" class="btn-sm" style="white-space:nowrap;"'
         + (isPulling ? ' disabled' : '')
-        + ' onclick="pullSandboxImage(\'' + escapeHtml(sb) + '\')">' + btnLabel + '</button>';
+        + ' onclick="pullSandboxImage(\'' + escapeHtml(sb) + '\')">' + btnLabel + '</button>'
+        + deleteBtn;
 
       container.appendChild(row);
 
@@ -72,6 +78,20 @@ async function loadImageStatus() {
   } catch (e) {
     container.innerHTML = '<div style="font-size:12px; color:var(--text-error,red);">Failed to load image status.</div>';
     console.error('loadImageStatus:', e);
+  }
+}
+
+// Deletes a cached sandbox image.
+async function deleteSandboxImage(sandboxType) {
+  if (!confirm('Remove the ' + sandboxType + ' sandbox image? You can re-pull it later.')) return;
+  try {
+    await api(Routes.images.remove(), {
+      method: 'DELETE',
+      body: JSON.stringify({ sandbox: sandboxType }),
+    });
+    loadImageStatus();
+  } catch (e) {
+    showAlert('Failed to remove image: ' + e.message);
   }
 }
 

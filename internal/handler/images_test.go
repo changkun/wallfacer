@@ -63,6 +63,20 @@ func TestStreamImagePull_UnknownPullID(t *testing.T) {
 	}
 }
 
+func TestDeleteImage_NeedsRuntime(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodDelete, "/api/images",
+		strings.NewReader(`{"sandbox":"claude"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.DeleteImage(w, req)
+
+	// Test runner has no container command, so this should fail.
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing runtime, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestScanLinesOrCR(t *testing.T) {
 	tests := []struct {
 		input string

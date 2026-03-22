@@ -153,6 +153,36 @@ func (h *Handler) inspectImage(cmd string, sb sandbox.Type, image string) imageS
 	return status
 }
 
+// DeleteImage removes a cached sandbox image.
+func (h *Handler) DeleteImage(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Sandbox string `json:"sandbox"`
+	}
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+
+	sb := sandbox.Default(req.Sandbox)
+	claudeImage := h.runner.SandboxImage()
+	image := claudeImage
+	if sb == sandbox.Codex {
+		image = testCodexImage(claudeImage)
+	}
+
+	cmd := h.runner.Command()
+	if cmd == "" || image == "" {
+		http.Error(w, "no container runtime or image configured", http.StatusBadRequest)
+		return
+	}
+
+	out, err := exec.Command(cmd, "rmi", image).CombinedOutput()
+	if err != nil {
+		http.Error(w, strings.TrimSpace(string(out)), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"removed": image})
+}
+
 // PullImage starts an async image pull.
 func (h *Handler) PullImage(w http.ResponseWriter, r *http.Request) {
 	var req struct {

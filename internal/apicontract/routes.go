@@ -96,6 +96,12 @@ var Routes = []Route{
 		Tags:        []string{"images"},
 	},
 	{
+		Method: http.MethodDelete, Pattern: "/api/images", Name: "DeleteImage",
+		JSName:      "remove",
+		Description: "Remove a cached sandbox image.",
+		Tags:        []string{"images"},
+	},
+	{
 		Method: http.MethodGet, Pattern: "/api/images/pull/stream", Name: "StreamImagePull",
 		JSName:      "pullStream",
 		Description: "SSE stream of pull progress for a given pull ID.",

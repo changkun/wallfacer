@@ -32,6 +32,8 @@ var Routes = {
     status: function() { return "/api/images"; },
     // POST /api/images/pull
     pull: function() { return "/api/images/pull"; },
+    // DELETE /api/images
+    remove: function() { return "/api/images"; },
     // GET /api/images/pull/stream
     pullStream: function() { return "/api/images/pull/stream"; },
   },
