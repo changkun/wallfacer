@@ -841,6 +841,46 @@ func TestDiffCacheImmutable(t *testing.T) {
 	})
 }
 
+// TestDiffCacheSkipsInProgress verifies that diff results for in_progress tasks
+// are not cached, preventing stale behind_counts from being served after sync.
+func TestDiffCacheSkipsInProgress(t *testing.T) {
+	repo := setupRepo(t)
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	wtDir := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")
+	_ = os.WriteFile(filepath.Join(wtDir, "change.txt"), []byte("hello\n"), 0644)
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wtDir}, "task")
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	// Fetch diff while task is in_progress — should return 200 but NOT cache.
+	req1 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	w1 := httptest.NewRecorder()
+	h.TaskDiff(w1, req1, task.ID)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w1.Code)
+	}
+	etag1 := w1.Header().Get("ETag")
+
+	// The diff cache should NOT have an entry for this task.
+	if _, ok := h.diffCache.get(task.ID); ok {
+		t.Error("diff result for in_progress task should not be cached")
+	}
+
+	// A second request with If-None-Match should get 200 (not 304) since
+	// there is no cached entry.
+	req2 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)
+	req2.Header.Set("If-None-Match", etag1)
+	w2 := httptest.NewRecorder()
+	h.TaskDiff(w2, req2, task.ID)
+	if w2.Code != http.StatusOK {
+		t.Errorf("second call: expected 200 (no cache), got %d", w2.Code)
+	}
+}
+
 // TestDiffCacheInvalidation verifies that a PATCH status change causes the next
 // diff request to be a cache miss (fresh git output) rather than stale data.
 func TestDiffCacheInvalidation(t *testing.T) {

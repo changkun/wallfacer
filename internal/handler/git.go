@@ -459,12 +459,17 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 
 	etag := diffETag(payload)
 	immutable := (task.Status == store.TaskStatusDone || task.Status == store.TaskStatusCancelled) || task.Archived
-	entry := diffCacheEntry{
-		payload:   payload,
-		etag:      etag,
-		immutable: immutable,
+	// Don't cache diff results for in_progress tasks: their worktrees are
+	// actively being modified (sync, execution) so the computed diff/behind
+	// counts are ephemeral and would become stale when the operation finishes.
+	if task.Status != store.TaskStatusInProgress {
+		entry := diffCacheEntry{
+			payload:   payload,
+			etag:      etag,
+			immutable: immutable,
+		}
+		h.diffCache.set(id, entry)
 	}
-	h.diffCache.set(id, entry)
 
 	cacheControl := "max-age=10"
 	if immutable {
