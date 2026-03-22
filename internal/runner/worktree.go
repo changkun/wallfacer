@@ -136,9 +136,10 @@ func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 
 }
 
-// PruneUnknownWorktrees scans worktreesDir for directories whose UUID does not
-// match any known task, removes them, and runs `git worktree prune` on all
-// git workspaces to clean up stale internal references.
+// PruneUnknownWorktrees scans worktreesDir for directories whose task is in a
+// terminal state (archived or deleted) and removes them. Directories whose
+// task UUID is not found in the current store are left alone — they may belong
+// to a different workspace scope and must not be destroyed.
 func (r *Runner) PruneUnknownWorktrees() {
 	r.worktreeMu.Lock()
 	defer r.worktreeMu.Unlock()
@@ -151,27 +152,41 @@ func (r *Runner) PruneUnknownWorktrees() {
 		return
 	}
 
+	if r.store == nil {
+		return
+	}
+
 	ctx := r.shutdownCtx
-	knownIDs := map[string]bool{}
-	if r.store != nil {
-		tasks, _ := r.store.ListTasks(ctx, true)
-		knownIDs = make(map[string]bool, len(tasks))
-		for _, t := range tasks {
-			knownIDs[t.ID.String()] = true
+
+	// Build a map of task IDs to their pruning eligibility.
+	// Only tasks that are archived or deleted (tombstoned) should have
+	// their worktrees removed. Tasks not in the store are left alone
+	// because they may belong to a different workspace scope.
+	pruneIDs := map[string]bool{}
+	tasks, _ := r.store.ListTasks(ctx, true)
+	for _, t := range tasks {
+		if t.Archived ||
+			t.Status == store.TaskStatusDone ||
+			t.Status == store.TaskStatusCancelled {
+			pruneIDs[t.ID.String()] = true
 		}
+	}
+	// Also include soft-deleted (tombstoned) tasks.
+	deleted, _ := r.store.ListDeletedTasks(ctx)
+	for _, t := range deleted {
+		pruneIDs[t.ID.String()] = true
 	}
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		if knownIDs[entry.Name()] {
+		if !pruneIDs[entry.Name()] {
 			continue
 		}
 		orphanDir := filepath.Join(r.worktreesDir, entry.Name())
 		logger.Runner.Warn("pruning orphaned worktree dir", "dir", orphanDir)
 		_ = os.RemoveAll(orphanDir)
-
 	}
 
 	// NOTE: do NOT run `git worktree prune` here. Pruning removes

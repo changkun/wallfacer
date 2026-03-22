@@ -11,14 +11,15 @@ import (
 )
 
 // TestScanOrphanedWorktrees_UnknownTask verifies that a worktree directory
-// whose UUID is not present in the store is returned as an orphan.
+// whose UUID is not present in the store is NOT returned as an orphan,
+// because it may belong to a different workspace scope.
 func TestScanOrphanedWorktrees_UnknownTask(t *testing.T) {
 	_, r := setupTestRunner(t, nil)
 
 	// Create a directory with a UUID that does not correspond to any task.
-	orphanID := uuid.New()
-	orphanDir := filepath.Join(r.worktreesDir, orphanID.String())
-	if err := os.MkdirAll(orphanDir, 0755); err != nil {
+	unknownID := uuid.New()
+	unknownDir := filepath.Join(r.worktreesDir, unknownID.String())
+	if err := os.MkdirAll(unknownDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -27,15 +28,10 @@ func TestScanOrphanedWorktrees_UnknownTask(t *testing.T) {
 		t.Fatalf("ScanOrphanedWorktrees: %v", err)
 	}
 
-	found := false
 	for _, id := range orphans {
-		if id == orphanID {
-			found = true
-			break
+		if id == unknownID {
+			t.Errorf("unknown task %s should NOT be in orphans (may belong to another workspace)", unknownID)
 		}
-	}
-	if !found {
-		t.Errorf("expected orphanID %s in orphans %v", orphanID, orphans)
 	}
 }
 
@@ -61,14 +57,15 @@ func TestPruneOrphanedWorktrees_RemovesOrphanDir(t *testing.T) {
 }
 
 // TestScanOrphanedWorktrees_SkipsInProgressTask verifies that a worktree
-// directory whose task is still in_progress is NOT returned as an orphan.
+// directory whose task is still in_progress is NOT returned as an orphan,
+// and that unknown UUIDs (not in store) are also skipped.
 func TestScanOrphanedWorktrees_SkipsInProgressTask(t *testing.T) {
 	s, r := setupTestRunner(t, nil)
 	ctx := context.Background()
 
-	// Create an orphaned directory (UUID not in store).
-	orphanID := uuid.New()
-	if err := os.MkdirAll(filepath.Join(r.worktreesDir, orphanID.String()), 0755); err != nil {
+	// Create a directory with a UUID not in store (may belong to another workspace).
+	unknownID := uuid.New()
+	if err := os.MkdirAll(filepath.Join(r.worktreesDir, unknownID.String()), 0755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,22 +86,13 @@ func TestScanOrphanedWorktrees_SkipsInProgressTask(t *testing.T) {
 		t.Fatalf("ScanOrphanedWorktrees: %v", err)
 	}
 
-	foundOrphan := false
-	foundInProgress := false
 	for _, id := range orphans {
-		if id == orphanID {
-			foundOrphan = true
+		if id == unknownID {
+			t.Errorf("unknown UUID %s should NOT be in orphans", unknownID)
 		}
 		if id == task.ID {
-			foundInProgress = true
+			t.Errorf("in_progress task %s should NOT be in orphans", task.ID)
 		}
-	}
-
-	if !foundOrphan {
-		t.Errorf("expected orphanID %s to be in orphans, got %v", orphanID, orphans)
-	}
-	if foundInProgress {
-		t.Errorf("in_progress task %s should NOT be in orphans", task.ID)
 	}
 }
 

@@ -156,8 +156,9 @@ func (r *Runner) ScanOrphanedWorktrees(ctx context.Context) ([]uuid.UUID, error)
 
 		task, getErr := r.store.GetTask(ctx, id)
 		if getErr != nil {
-			// Task not found in store => orphan.
-			orphans = append(orphans, id)
+			// Task not found in the current store — it may belong to a
+			// different workspace scope. Leave it alone; the next prune
+			// cycle after a workspace switch will clean it up if needed.
 			continue
 		}
 

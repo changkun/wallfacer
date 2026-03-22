@@ -336,22 +336,37 @@ func TestCleanupWorktreesExported(t *testing.T) {
 // PruneUnknownWorktrees
 // ---------------------------------------------------------------------------
 
-// TestPruneUnknownWorktrees verifies that directories not matching any known
-// task UUID are removed, while known-task directories are preserved.
+// TestPruneUnknownWorktrees verifies that directories for unknown task UUIDs
+// (not in store) are preserved, while archived/done/cancelled task directories
+// are removed.
 func TestPruneUnknownWorktrees(t *testing.T) {
 	repo := setupTestRepo(t)
 	s, runner := setupTestRunner(t, []string{repo})
 	ctx := context.Background()
 
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "known task", Timeout: 5})
+	// A backlog task — should be preserved.
+	backlogTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "backlog task", Timeout: 5})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	knownDir := filepath.Join(runner.worktreesDir, task.ID.String())
-	orphanDir := filepath.Join(runner.worktreesDir, uuid.New().String())
+	// A done task — should be pruned.
+	doneTask, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "done task", Timeout: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, doneTask.ID, store.TaskStatusDone); err != nil {
+		t.Fatal(err)
+	}
 
-	for _, d := range []string{knownDir, orphanDir} {
+	// An unknown UUID (not in store) — should be preserved (may belong to
+	// another workspace scope).
+	unknownDir := filepath.Join(runner.worktreesDir, uuid.New().String())
+
+	backlogDir := filepath.Join(runner.worktreesDir, backlogTask.ID.String())
+	doneDir := filepath.Join(runner.worktreesDir, doneTask.ID.String())
+
+	for _, d := range []string{backlogDir, doneDir, unknownDir} {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			t.Fatal(err)
 		}
@@ -359,11 +374,14 @@ func TestPruneUnknownWorktrees(t *testing.T) {
 
 	runner.PruneUnknownWorktrees()
 
-	if _, err := os.Stat(knownDir); err != nil {
-		t.Fatal("known task worktree dir should be preserved:", err)
+	if _, err := os.Stat(backlogDir); err != nil {
+		t.Fatal("backlog task worktree dir should be preserved:", err)
 	}
-	if _, err := os.Stat(orphanDir); !os.IsNotExist(err) {
-		t.Fatal("orphan worktree dir should be pruned")
+	if _, err := os.Stat(unknownDir); err != nil {
+		t.Fatal("unknown UUID worktree dir should be preserved:", err)
+	}
+	if _, err := os.Stat(doneDir); !os.IsNotExist(err) {
+		t.Fatal("done task worktree dir should be pruned")
 	}
 }
 
@@ -389,8 +407,9 @@ func TestPruneUnknownWorktreesNilStore(t *testing.T) {
 
 	runner.PruneUnknownWorktrees()
 
-	if _, err := os.Stat(orphanDir); !os.IsNotExist(err) {
-		t.Fatal("orphan worktree dir should be pruned even when store is nil")
+	// With nil store we cannot determine task status, so nothing is pruned.
+	if _, err := os.Stat(orphanDir); err != nil {
+		t.Fatal("worktree dir should be preserved when store is nil:", err)
 	}
 }
 
@@ -402,6 +421,36 @@ func TestPruneUnknownWorktreesRunsGitWorktreePrune(t *testing.T) {
 
 	// Just verify it completes without panicking when the workspace is a git repo.
 	runner.PruneUnknownWorktrees()
+}
+
+// TestPruneUnknownWorktrees_PreservesWaitingTasks is a regression test for a
+// bug where PruneUnknownWorktrees destroyed worktrees for tasks in waiting
+// status, losing all committed work.
+func TestPruneUnknownWorktrees_PreservesWaitingTasks(t *testing.T) {
+	repo := setupTestRepo(t)
+	s, runner := setupTestRunner(t, []string{repo})
+	ctx := context.Background()
+
+	// Create a task and move it to waiting status (simulating a task that
+	// paused for user feedback).
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "waiting task", Timeout: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatal(err)
+	}
+
+	waitingDir := filepath.Join(runner.worktreesDir, task.ID.String())
+	if err := os.MkdirAll(waitingDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	runner.PruneUnknownWorktrees()
+
+	if _, err := os.Stat(waitingDir); err != nil {
+		t.Fatal("waiting task worktree dir must be preserved:", err)
+	}
 }
 
 // ---------------------------------------------------------------------------
