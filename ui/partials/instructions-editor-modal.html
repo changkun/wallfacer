@@ -1,27 +1,119 @@
 <!-- Instructions Editor Modal -->
-<div id="instructions-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
-  <div class="modal-card" style="max-width: 720px; width: 100%; max-height: 90vh; display: flex; flex-direction: column;">
-    <div class="p-6" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Workspace AGENTS.md</h3>
-        <button onclick="closeInstructionsEditor()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
+<div
+  id="instructions-modal"
+  class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4"
+>
+  <div
+    class="modal-card"
+    style="
+      max-width: 720px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+    "
+  >
+    <div
+      class="p-6"
+      style="display: flex; flex-direction: column; flex: 1; min-height: 0"
+    >
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        "
+      >
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0">
+          Workspace AGENTS.md
+        </h3>
+        <button
+          onclick="closeInstructionsEditor()"
+          style="
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            color: var(--text-muted);
+            line-height: 1;
+          "
+        >
+          &times;
+        </button>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div id="instructions-path" style="font-size: 11px; color: var(--text-muted); font-family: monospace; word-break: break-all;"></div>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        "
+      >
+        <div
+          id="instructions-path"
+          style="
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: monospace;
+            word-break: break-all;
+          "
+        ></div>
         <div id="instructions-tabs" class="logs-tabs">
-          <button class="logs-tab" onclick="switchEditTab('instructions','edit')">Edit</button>
-          <button class="logs-tab active" onclick="switchEditTab('instructions','preview')">Preview</button>
+          <button
+            class="logs-tab"
+            onclick="switchEditTab('instructions', 'edit')"
+          >
+            Edit
+          </button>
+          <button
+            class="logs-tab active"
+            onclick="switchEditTab('instructions', 'preview')"
+          >
+            Preview
+          </button>
         </div>
       </div>
-      <textarea id="instructions-content" rows="22" class="field hidden" style="font-family: 'SF Mono','Fira Code','Consolas',monospace; font-size: 12px; flex: 1; min-height: 0; resize: none;"></textarea>
-      <div id="instructions-content-preview" class="code-block prose-content editable-preview" style="flex: 1; min-height: 0;"></div>
-      <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
-        <button onclick="saveInstructions()" class="btn btn-accent">Save</button>
-        <button onclick="closeInstructionsEditor()" class="btn-ghost">Cancel</button>
-        <button onclick="reinitInstructionsFromEditor()" class="btn-icon" style="margin-left: 8px; font-size: 12px; padding: 4px 10px;">Re-init from repos</button>
-        <span id="instructions-status" style="font-size: 12px; color: var(--text-muted); margin-left: auto;"></span>
+      <textarea
+        id="instructions-content"
+        rows="22"
+        class="field hidden"
+        style="
+          font-family:
+            &quot;SF Mono&quot;, &quot;Fira Code&quot;, &quot;Consolas&quot;,
+            monospace;
+          font-size: 12px;
+          flex: 1;
+          min-height: 0;
+          resize: none;
+        "
+      ></textarea>
+      <div
+        id="instructions-content-preview"
+        class="code-block prose-content editable-preview"
+        style="flex: 1; min-height: 0"
+      ></div>
+      <div
+        style="display: flex; align-items: center; gap: 8px; margin-top: 12px"
+      >
+        <button onclick="saveInstructions()" class="btn btn-accent">
+          Save
+        </button>
+        <button onclick="closeInstructionsEditor()" class="btn-ghost">
+          Cancel
+        </button>
+        <button
+          onclick="reinitInstructionsFromEditor()"
+          class="btn-icon"
+          style="margin-left: 8px; font-size: 12px; padding: 4px 10px"
+        >
+          Re-init from repos
+        </button>
+        <span
+          id="instructions-status"
+          style="font-size: 12px; color: var(--text-muted); margin-left: auto"
+        ></span>
       </div>
     </div>
   </div>
 </div>
-

@@ -10,7 +10,7 @@ async function _mentionLoadFiles() {
   if (_mentionFiles.loading) return [];
   _mentionFiles.loading = true;
   try {
-    const res = await api('/api/files');
+    const res = await api("/api/files");
     _mentionFiles.list = res.files || [];
   } catch (e) {
     _mentionFiles.list = [];
@@ -24,7 +24,7 @@ async function _mentionLoadFiles() {
 function _mentionGetQuery(textarea) {
   const pos = textarea.selectionStart;
   const text = textarea.value.substring(0, pos);
-  const atIdx = text.lastIndexOf('@');
+  const atIdx = text.lastIndexOf("@");
   if (atIdx === -1) return null;
   // The "@" must be at the start of the text or preceded by whitespace.
   if (atIdx > 0 && !/\s/.test(text[atIdx - 1])) return null;
@@ -42,11 +42,11 @@ function _mentionFilter(files, query) {
   for (const f of files) {
     const fl = f.toLowerCase();
     if (!fl.includes(lower)) continue;
-    const base = fl.split('/').pop();
+    const base = fl.split("/").pop();
     scored.push({ f, score: base.includes(lower) ? 0 : 1 });
   }
   scored.sort((a, b) => a.score - b.score);
-  return scored.slice(0, 20).map(s => s.f);
+  return scored.slice(0, 20).map((s) => s.f);
 }
 
 // Attach @-mention autocomplete to a single textarea element.
@@ -70,40 +70,43 @@ function attachMentionAutocomplete(textarea) {
 
   function selectFile(file) {
     const info = _mentionGetQuery(textarea);
-    if (!info) { closeDropdown(); return; }
+    if (!info) {
+      closeDropdown();
+      return;
+    }
     const { atIdx } = info;
     const cursorPos = textarea.selectionStart;
     const before = textarea.value.substring(0, atIdx);
     const after = textarea.value.substring(cursorPos);
-    const insert = '@' + file;
+    const insert = "@" + file;
     textarea.value = before + insert + after;
     const newPos = before.length + insert.length;
     textarea.setSelectionRange(newPos, newPos);
     // Notify listeners (e.g. auto-save in tasks.js).
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
     closeDropdown();
     textarea.focus();
   }
 
   function renderItems(matches) {
     if (!dropdown) {
-      dropdown = document.createElement('div');
-      dropdown.className = 'mention-dropdown';
+      dropdown = document.createElement("div");
+      dropdown.className = "mention-dropdown";
       document.body.appendChild(dropdown);
     }
 
     // Position fixed, just below the textarea.
     const rect = textarea.getBoundingClientRect();
-    dropdown.style.top  = (rect.bottom + 4) + 'px';
-    dropdown.style.left = rect.left + 'px';
-    dropdown.style.width = Math.max(320, rect.width) + 'px';
+    dropdown.style.top = rect.bottom + 4 + "px";
+    dropdown.style.left = rect.left + "px";
+    dropdown.style.width = Math.max(320, rect.width) + "px";
 
-    dropdown.innerHTML = '';
+    dropdown.innerHTML = "";
 
     if (matches.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'mention-item mention-empty';
-      empty.textContent = 'No matching files';
+      const empty = document.createElement("div");
+      empty.className = "mention-item mention-empty";
+      empty.textContent = "No matching files";
       dropdown.appendChild(empty);
       currentMatches = [];
       return;
@@ -114,26 +117,27 @@ function attachMentionAutocomplete(textarea) {
     if (selectedIndex < 0) selectedIndex = 0;
     selectedIndex = Math.min(selectedIndex, matches.length - 1);
     matches.forEach((file, i) => {
-      const item = document.createElement('div');
-      item.className = 'mention-item' + (i === selectedIndex ? ' mention-item-selected' : '');
+      const item = document.createElement("div");
+      item.className =
+        "mention-item" + (i === selectedIndex ? " mention-item-selected" : "");
       item.dataset.index = i;
 
-      const parts = file.split('/');
+      const parts = file.split("/");
       const basename = parts.pop();
-      const dir = parts.join('/');
+      const dir = parts.join("/");
 
-      const nameEl = document.createElement('span');
-      nameEl.className = 'mention-filename';
+      const nameEl = document.createElement("span");
+      nameEl.className = "mention-filename";
       nameEl.textContent = basename;
 
-      const pathEl = document.createElement('span');
-      pathEl.className = 'mention-path';
-      pathEl.textContent = dir ? dir + '/' : '';
+      const pathEl = document.createElement("span");
+      pathEl.className = "mention-path";
+      pathEl.textContent = dir ? dir + "/" : "";
 
       item.appendChild(pathEl);
       item.appendChild(nameEl);
 
-      item.addEventListener('mousedown', e => {
+      item.addEventListener("mousedown", (e) => {
         e.preventDefault(); // Keep textarea focused.
         selectFile(file);
       });
@@ -143,7 +147,10 @@ function attachMentionAutocomplete(textarea) {
 
   async function update() {
     const info = _mentionGetQuery(textarea);
-    if (!info) { closeDropdown(); return; }
+    if (!info) {
+      closeDropdown();
+      return;
+    }
 
     const gen = ++renderGeneration;
     const files = await _mentionLoadFiles();
@@ -153,45 +160,45 @@ function attachMentionAutocomplete(textarea) {
     renderItems(matches);
   }
 
-  textarea.addEventListener('input', update);
+  textarea.addEventListener("input", update);
 
   // Also re-evaluate on cursor movement (keyboard nav, click inside textarea).
-  textarea.addEventListener('keyup', e => {
-    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) update();
+  textarea.addEventListener("keyup", (e) => {
+    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) update();
   });
-  textarea.addEventListener('click', update);
+  textarea.addEventListener("click", update);
 
-  textarea.addEventListener('keydown', e => {
+  textarea.addEventListener("keydown", (e) => {
     if (!dropdown) return;
 
-    if (e.key === 'ArrowDown') {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       selectedIndex = Math.min(selectedIndex + 1, currentMatches.length - 1);
       renderItems(currentMatches);
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === "ArrowUp") {
       e.preventDefault();
       selectedIndex = Math.max(selectedIndex - 1, -1);
       renderItems(currentMatches);
-    } else if ((e.key === 'Enter' || e.key === 'Tab') && selectedIndex >= 0) {
+    } else if ((e.key === "Enter" || e.key === "Tab") && selectedIndex >= 0) {
       e.preventDefault();
       selectFile(currentMatches[selectedIndex]);
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       e.stopPropagation();
       closeDropdown();
     }
   });
 
-  textarea.addEventListener('blur', () => {
+  textarea.addEventListener("blur", () => {
     // Delay slightly so a mousedown on a dropdown item fires first.
     setTimeout(closeDropdown, 150);
   });
 
   // Reposition or close on window scroll/resize.
-  window.addEventListener('scroll', closeDropdown, { passive: true });
-  window.addEventListener('resize', closeDropdown, { passive: true });
+  window.addEventListener("scroll", closeDropdown, { passive: true });
+  window.addEventListener("resize", closeDropdown, { passive: true });
 }
 
 // Attach to all prompt textareas that exist at load time.
-attachMentionAutocomplete(document.getElementById('new-prompt'));
-attachMentionAutocomplete(document.getElementById('modal-edit-prompt'));
-attachMentionAutocomplete(document.getElementById('modal-retry-prompt'));
+attachMentionAutocomplete(document.getElementById("new-prompt"));
+attachMentionAutocomplete(document.getElementById("modal-edit-prompt"));
+attachMentionAutocomplete(document.getElementById("modal-retry-prompt"));

@@ -1,52 +1,189 @@
 <!-- System Prompts Editor Modal -->
-<div id="system-prompts-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
-  <div class="modal-card" style="max-width: 860px; width: 100%; max-height: 92vh; display: flex; flex-direction: column;">
-    <div class="p-6" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-
+<div
+  id="system-prompts-modal"
+  class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4"
+>
+  <div
+    class="modal-card"
+    style="
+      max-width: 860px;
+      width: 100%;
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+    "
+  >
+    <div
+      class="p-6"
+      style="display: flex; flex-direction: column; flex: 1; min-height: 0"
+    >
       <!-- Header -->
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">System Prompt Templates</h3>
-        <button onclick="closeSystemPromptsEditor()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 4px;
+        "
+      >
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0">
+          System Prompt Templates
+        </h3>
+        <button
+          onclick="closeSystemPromptsEditor()"
+          style="
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            color: var(--text-muted);
+            line-height: 1;
+          "
+        >
+          &times;
+        </button>
       </div>
-      <div id="system-prompts-dir" style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; font-family: monospace; word-break: break-all;"></div>
+      <div
+        id="system-prompts-dir"
+        style="
+          font-size: 11px;
+          color: var(--text-muted);
+          margin-bottom: 12px;
+          font-family: monospace;
+          word-break: break-all;
+        "
+      ></div>
 
       <!-- Two-column layout: list on left, editor on right -->
-      <div style="display: flex; gap: 12px; flex: 1; min-height: 0; overflow: hidden;">
-
+      <div
+        style="
+          display: flex;
+          gap: 12px;
+          flex: 1;
+          min-height: 0;
+          overflow: hidden;
+        "
+      >
         <!-- Template list -->
-        <div id="system-prompts-list" style="width: 190px; flex-shrink: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+        <div
+          id="system-prompts-list"
+          style="
+            width: 190px;
+            flex-shrink: 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+          "
+        >
           <!-- Populated by JS -->
         </div>
 
         <!-- Editor pane -->
-        <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
-          <div id="system-prompt-editor-wrap" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-              <div id="system-prompt-name-label" style="font-size: 12px; font-weight: 600; color: var(--text-secondary);"></div>
+        <div
+          style="flex: 1; display: flex; flex-direction: column; min-height: 0"
+        >
+          <div
+            id="system-prompt-editor-wrap"
+            style="
+              display: flex;
+              flex-direction: column;
+              flex: 1;
+              min-height: 0;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 6px;
+              "
+            >
+              <div
+                id="system-prompt-name-label"
+                style="
+                  font-size: 12px;
+                  font-weight: 600;
+                  color: var(--text-secondary);
+                "
+              ></div>
               <div id="sysprompt-tabs" class="logs-tabs">
-                <button class="logs-tab" onclick="switchEditTab('sysprompt','edit')">Edit</button>
-                <button class="logs-tab active" onclick="switchEditTab('sysprompt','preview')">Preview</button>
+                <button
+                  class="logs-tab"
+                  onclick="switchEditTab('sysprompt', 'edit')"
+                >
+                  Edit
+                </button>
+                <button
+                  class="logs-tab active"
+                  onclick="switchEditTab('sysprompt', 'preview')"
+                >
+                  Preview
+                </button>
               </div>
             </div>
             <textarea
               id="system-prompt-content"
               rows="22"
               class="field hidden"
-              style="font-family: 'SF Mono','Fira Code','Consolas',monospace; font-size: 12px; flex: 1; min-height: 0; resize: none;"
-              placeholder="Select a template on the left to edit it."></textarea>
-            <div id="system-prompt-content-preview" class="code-block prose-content editable-preview" style="flex: 1; min-height: 0;"></div>
+              style="
+                font-family:
+                  &quot;SF Mono&quot;, &quot;Fira Code&quot;,
+                  &quot;Consolas&quot;, monospace;
+                font-size: 12px;
+                flex: 1;
+                min-height: 0;
+                resize: none;
+              "
+              placeholder="Select a template on the left to edit it."
+            ></textarea>
+            <div
+              id="system-prompt-content-preview"
+              class="code-block prose-content editable-preview"
+              style="flex: 1; min-height: 0"
+            ></div>
           </div>
 
           <!-- Actions -->
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
-            <button onclick="saveSystemPrompt()" class="btn btn-accent" id="system-prompt-save-btn">Save override</button>
-            <button onclick="resetSystemPromptToDefault()" class="btn-icon" id="system-prompt-reset-btn" style="font-size: 12px; padding: 4px 10px;">Reset to default</button>
-            <button onclick="closeSystemPromptsEditor()" class="btn-ghost">Close</button>
-            <span id="system-prompt-status" style="font-size: 12px; color: var(--text-muted); margin-left: auto; min-height: 1em;"></span>
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-top: 12px;
+            "
+          >
+            <button
+              onclick="saveSystemPrompt()"
+              class="btn btn-accent"
+              id="system-prompt-save-btn"
+            >
+              Save override
+            </button>
+            <button
+              onclick="resetSystemPromptToDefault()"
+              class="btn-icon"
+              id="system-prompt-reset-btn"
+              style="font-size: 12px; padding: 4px 10px"
+            >
+              Reset to default
+            </button>
+            <button onclick="closeSystemPromptsEditor()" class="btn-ghost">
+              Close
+            </button>
+            <span
+              id="system-prompt-status"
+              style="
+                font-size: 12px;
+                color: var(--text-muted);
+                margin-left: auto;
+                min-height: 1em;
+              "
+            ></span>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 </div>

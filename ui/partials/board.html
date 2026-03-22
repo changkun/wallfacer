@@ -1,7 +1,18 @@
 <!-- Board -->
-<div id="trash-bin-toast" class="trash-bin-toast hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+<div
+  id="trash-bin-toast"
+  class="trash-bin-toast hidden"
+  role="status"
+  aria-live="polite"
+  aria-atomic="true"
+></div>
 <main class="board-grid flex-1 min-h-0" id="board" tabindex="-1">
-  <div class="flex flex-col min-h-0" id="col-wrapper-backlog" role="region" aria-label="Backlog column">
+  <div
+    class="flex flex-col min-h-0"
+    id="col-wrapper-backlog"
+    role="region"
+    aria-label="Backlog column"
+  >
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-backlog">Backlog</h2>
       <span id="count-backlog" class="text-xs text-v-muted">0</span>
@@ -9,31 +20,75 @@
         id="backlog-sort-btn"
         type="button"
         class="btn-icon"
-        style="margin-left:auto;font-size:11px;padding:2px 8px;"
+        style="margin-left: auto; font-size: 11px; padding: 2px 8px"
         onclick="toggleBacklogSort()"
         title="Toggle backlog sorting between manual priority and idea impact score"
-      >Sort: Manual</button>
+      >
+        Sort: Manual
+      </button>
     </div>
     <div class="column col-bg flex flex-col">
-      <button id="new-task-btn" onclick="showNewTaskForm()" class="btn-dashed mb-2">+ New Task</button>
+      <button
+        id="new-task-btn"
+        onclick="showNewTaskForm()"
+        class="btn-dashed mb-2"
+      >
+        + New Task
+      </button>
       <div id="new-task-form" class="hidden mb-2">
-        <textarea id="new-prompt" rows="6" placeholder="Describe your task (Markdown supported)..." class="field"></textarea>
+        <textarea
+          id="new-prompt"
+          rows="6"
+          placeholder="Describe your task (Markdown supported)..."
+          class="field"
+        ></textarea>
         <div class="mt-2">
-          <label class="text-xs text-v-muted" style="display:block;margin-bottom:4px;">Tags</label>
+          <label
+            class="text-xs text-v-muted"
+            style="display: block; margin-bottom: 4px"
+            >Tags</label
+          >
           <div id="new-task-tag-input"></div>
         </div>
         <!-- Templates toolbar -->
         <div class="flex justify-end mt-1">
-          <button type="button" onclick="openTemplatesPicker(function(body){var ta=document.getElementById('new-prompt');ta.value=body;ta.focus();})" class="btn-icon" style="font-size:11px;padding:2px 8px;" title="Insert a saved prompt template">Templates</button>
+          <button
+            type="button"
+            onclick="
+              openTemplatesPicker(function (body) {
+                var ta = document.getElementById('new-prompt');
+                ta.value = body;
+                ta.focus();
+              })
+            "
+            class="btn-icon"
+            style="font-size: 11px; padding: 2px 8px"
+            title="Insert a saved prompt template"
+          >
+            Templates
+          </button>
         </div>
         <!-- Execution card -->
-        <div class="settings-card" style="margin-top:8px;">
-          <div class="settings-card-head" style="margin-bottom:6px;"><h4>Execution</h4></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <select id="new-sandbox" class="select" title="Sandbox" data-sandbox-select="true" style="max-width:none;">
+        <div class="settings-card" style="margin-top: 8px">
+          <div class="settings-card-head" style="margin-bottom: 6px">
+            <h4>Execution</h4>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+            <select
+              id="new-sandbox"
+              class="select"
+              title="Sandbox"
+              data-sandbox-select="true"
+              style="max-width: none"
+            >
               <option value="">Default</option>
             </select>
-            <select id="new-timeout" class="select" title="Timeout" style="max-width:none;">
+            <select
+              id="new-timeout"
+              class="select"
+              title="Timeout"
+              style="max-width: none"
+            >
               <option value="5">5 min</option>
               <option value="15">15 min</option>
               <option value="30">30 min</option>
@@ -44,59 +99,301 @@
               <option value="1440">24 hours</option>
             </select>
           </div>
-          <label class="settings-toggle" style="margin-top:8px;">
-            <input type="checkbox" id="new-mount-worktrees">
+          <label class="settings-toggle" style="margin-top: 8px">
+            <input type="checkbox" id="new-mount-worktrees" />
             Share code with siblings
-            <span class="hint-trigger" style="margin-left:4px;cursor:help;font-size:11px;color:var(--text-muted);">?<span class="hint-tooltip">Mount other in-progress worktrees into this task's container as read-only paths, so the agent can reference their code without modifying it.</span></span>
+            <span
+              class="hint-trigger"
+              style="
+                margin-left: 4px;
+                cursor: help;
+                font-size: 11px;
+                color: var(--text-muted);
+              "
+              >?<span class="hint-tooltip"
+                >Mount other in-progress worktrees into this task's container as
+                read-only paths, so the agent can reference their code without
+                modifying it.</span
+              ></span
+            >
           </label>
-          <div style="display:flex;flex-direction:column;gap:3px;margin-top:8px;">
-            <label for="new-scheduled-at" class="text-xs text-v-muted">Schedule start (optional)</label>
-            <input type="datetime-local" id="new-scheduled-at" class="field text-xs" style="width:100%;" title="Leave empty to run immediately">
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 3px;
+              margin-top: 8px;
+            "
+          >
+            <label for="new-scheduled-at" class="text-xs text-v-muted"
+              >Schedule start (optional)</label
+            >
+            <input
+              type="datetime-local"
+              id="new-scheduled-at"
+              class="field text-xs"
+              style="width: 100%"
+              title="Leave empty to run immediately"
+            />
           </div>
         </div>
         <!-- Budget Limits card (collapsible) -->
-        <details class="settings-card" style="margin-top:8px;">
-          <summary style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;font-weight:600;color:var(--text);list-style:none;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.15s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        <details class="settings-card" style="margin-top: 8px">
+          <summary
+            style="
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              font-size: 11px;
+              letter-spacing: 0.04em;
+              text-transform: uppercase;
+              font-weight: 600;
+              color: var(--text);
+              list-style: none;
+            "
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="transition: transform 0.15s; flex-shrink: 0"
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
             Budget Limits
           </summary>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-            <div style="display:flex;flex-direction:column;gap:3px;">
+          <div
+            style="
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8px;
+              margin-top: 8px;
+            "
+          >
+            <div style="display: flex; flex-direction: column; gap: 3px">
               <label class="text-xs text-v-muted">Cost limit (USD)</label>
-              <input type="number" id="new-max-cost-usd" min="0" step="0.01" placeholder="0 = unlimited" class="field text-xs" style="width:100%;">
+              <input
+                type="number"
+                id="new-max-cost-usd"
+                min="0"
+                step="0.01"
+                placeholder="0 = unlimited"
+                class="field text-xs"
+                style="width: 100%"
+              />
             </div>
-            <div style="display:flex;flex-direction:column;gap:3px;">
+            <div style="display: flex; flex-direction: column; gap: 3px">
               <label class="text-xs text-v-muted">Input token limit</label>
-              <input type="number" id="new-max-input-tokens" min="0" step="1000" placeholder="0 = unlimited" class="field text-xs" style="width:100%;">
+              <input
+                type="number"
+                id="new-max-input-tokens"
+                min="0"
+                step="1000"
+                placeholder="0 = unlimited"
+                class="field text-xs"
+                style="width: 100%"
+              />
             </div>
           </div>
         </details>
         <!-- Sandbox Overrides card (collapsible) -->
-        <details class="settings-card" style="margin-top:8px;">
-          <summary style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;font-weight:600;color:var(--text);list-style:none;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.15s;flex-shrink:0;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        <details class="settings-card" style="margin-top: 8px">
+          <summary
+            style="
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              font-size: 11px;
+              letter-spacing: 0.04em;
+              text-transform: uppercase;
+              font-weight: 600;
+              color: var(--text);
+              list-style: none;
+            "
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="transition: transform 0.15s; flex-shrink: 0"
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
             Sandbox Overrides
           </summary>
-          <div style="display:grid;gap:6px;margin-top:8px;">
-            <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Implementation</span><select id="new-sandbox-implementation" class="select text-xs" title="Implementation sandbox" data-sandbox-select="true" style="max-width:none;"></select></div>
-            <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Testing</span><select id="new-sandbox-testing" class="select text-xs" title="Testing sandbox" data-sandbox-select="true" style="max-width:none;"></select></div>
-            <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Refinement</span><select id="new-sandbox-refinement" class="select text-xs" title="Refinement sandbox" data-sandbox-select="true" style="max-width:none;"></select></div>
-            <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Title generation</span><select id="new-sandbox-title" class="select text-xs" title="Title sandbox" data-sandbox-select="true" style="max-width:none;"></select></div>
-            <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Oversight summary</span><select id="new-sandbox-oversight" class="select text-xs" title="Oversight sandbox" data-sandbox-select="true" style="max-width:none;"></select></div>
-            <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Commit message</span><select id="new-sandbox-commit_message" class="select text-xs" title="Commit message sandbox" data-sandbox-select="true" style="max-width:none;"></select></div>
-            <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;"><span class="text-xs text-v-muted">Idea agent</span><select id="new-sandbox-idea_agent" class="select text-xs" title="Idea agent sandbox" data-sandbox-select="true" style="max-width:none;"></select></div>
+          <div style="display: grid; gap: 6px; margin-top: 8px">
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 100px 1fr;
+                gap: 8px;
+                align-items: center;
+              "
+            >
+              <span class="text-xs text-v-muted">Implementation</span
+              ><select
+                id="new-sandbox-implementation"
+                class="select text-xs"
+                title="Implementation sandbox"
+                data-sandbox-select="true"
+                style="max-width: none"
+              ></select>
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 100px 1fr;
+                gap: 8px;
+                align-items: center;
+              "
+            >
+              <span class="text-xs text-v-muted">Testing</span
+              ><select
+                id="new-sandbox-testing"
+                class="select text-xs"
+                title="Testing sandbox"
+                data-sandbox-select="true"
+                style="max-width: none"
+              ></select>
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 100px 1fr;
+                gap: 8px;
+                align-items: center;
+              "
+            >
+              <span class="text-xs text-v-muted">Refinement</span
+              ><select
+                id="new-sandbox-refinement"
+                class="select text-xs"
+                title="Refinement sandbox"
+                data-sandbox-select="true"
+                style="max-width: none"
+              ></select>
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 100px 1fr;
+                gap: 8px;
+                align-items: center;
+              "
+            >
+              <span class="text-xs text-v-muted">Title generation</span
+              ><select
+                id="new-sandbox-title"
+                class="select text-xs"
+                title="Title sandbox"
+                data-sandbox-select="true"
+                style="max-width: none"
+              ></select>
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 100px 1fr;
+                gap: 8px;
+                align-items: center;
+              "
+            >
+              <span class="text-xs text-v-muted">Oversight summary</span
+              ><select
+                id="new-sandbox-oversight"
+                class="select text-xs"
+                title="Oversight sandbox"
+                data-sandbox-select="true"
+                style="max-width: none"
+              ></select>
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 100px 1fr;
+                gap: 8px;
+                align-items: center;
+              "
+            >
+              <span class="text-xs text-v-muted">Commit message</span
+              ><select
+                id="new-sandbox-commit_message"
+                class="select text-xs"
+                title="Commit message sandbox"
+                data-sandbox-select="true"
+                style="max-width: none"
+              ></select>
+            </div>
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 100px 1fr;
+                gap: 8px;
+                align-items: center;
+              "
+            >
+              <span class="text-xs text-v-muted">Idea agent</span
+              ><select
+                id="new-sandbox-idea_agent"
+                class="select text-xs"
+                title="Idea agent sandbox"
+                data-sandbox-select="true"
+                style="max-width: none"
+              ></select>
+            </div>
           </div>
         </details>
         <!-- Depends On card (conditionally shown) -->
-        <div id="new-depends-on-row" class="settings-card" style="margin-top:8px;display:none;">
-          <div class="settings-card-head" style="margin-bottom:6px;"><h4>Depends On</h4></div>
+        <div
+          id="new-depends-on-row"
+          class="settings-card"
+          style="margin-top: 8px; display: none"
+        >
+          <div class="settings-card-head" style="margin-bottom: 6px">
+            <h4>Depends On</h4>
+          </div>
           <div id="new-depends-on-picker" class="dep-picker">
-            <button type="button" class="dep-picker-trigger" onclick="toggleDepPicker('new-depends-on-picker')">
-              <div class="dep-picker-chips"><span class="dep-picker-placeholder">None</span></div>
-              <svg class="dep-picker-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            <button
+              type="button"
+              class="dep-picker-trigger"
+              onclick="toggleDepPicker('new-depends-on-picker')"
+            >
+              <div class="dep-picker-chips">
+                <span class="dep-picker-placeholder">None</span>
+              </div>
+              <svg
+                class="dep-picker-chevron"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
             </button>
-            <div class="dep-picker-dropdown" style="display:none">
-              <input class="dep-picker-search" type="text" placeholder="Filter tasks…" oninput="filterDepPicker(this)">
+            <div class="dep-picker-dropdown" style="display: none">
+              <input
+                class="dep-picker-search"
+                type="text"
+                placeholder="Filter tasks…"
+                oninput="filterDepPicker(this)"
+              />
               <div class="dep-picker-list"></div>
             </div>
           </div>
@@ -107,36 +404,175 @@
           <button onclick="hideNewTaskForm()" class="btn-ghost">Cancel</button>
         </div>
       </div>
-      <button type="button" onclick="focusFirstCardInColumn('backlog')" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Jump to Backlog column</button>
-      <div id="col-backlog" class="space-y-2" data-status="backlog" role="list"></div>
+      <button
+        type="button"
+        onclick="focusFirstCardInColumn('backlog')"
+        style="
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+        "
+      >
+        Jump to Backlog column
+      </button>
+      <div
+        id="col-backlog"
+        class="space-y-2"
+        data-status="backlog"
+        role="list"
+      ></div>
     </div>
   </div>
-  <div class="flex flex-col min-h-0" id="col-wrapper-in_progress" role="region" aria-label="In Progress column">
+  <div
+    class="flex flex-col min-h-0"
+    id="col-wrapper-in_progress"
+    role="region"
+    aria-label="In Progress column"
+  >
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-progress">In Progress</h2>
       <span id="count-in_progress" class="text-xs text-v-muted">0</span>
-      <span id="max-parallel-tag" class="max-parallel-tag hidden" title="Max parallel tasks"></span>
-      <button onclick="showContainerMonitor(event)" title="Sandbox Monitor" style="margin-left:auto;background:none;border:none;padding:2px 4px;cursor:pointer;color:var(--text-muted);display:inline-flex;align-items:center;border-radius:4px;" onmouseover="this.style.color='var(--text-secondary)'" onmouseout="this.style.color='var(--text-muted)'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></button>
+      <span
+        id="max-parallel-tag"
+        class="max-parallel-tag hidden"
+        title="Max parallel tasks"
+      ></span>
+      <button
+        onclick="showContainerMonitor(event)"
+        title="Sandbox Monitor"
+        style="
+          margin-left: auto;
+          background: none;
+          border: none;
+          padding: 2px 4px;
+          cursor: pointer;
+          color: var(--text-muted);
+          display: inline-flex;
+          align-items: center;
+          border-radius: 4px;
+        "
+        onmouseover="this.style.color = 'var(--text-secondary)'"
+        onmouseout="this.style.color = 'var(--text-muted)'"
+      >
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="4 17 10 11 4 5"></polyline>
+          <line x1="12" y1="19" x2="20" y2="19"></line>
+        </svg>
+      </button>
     </div>
-    <button type="button" onclick="focusFirstCardInColumn('in_progress')" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Jump to In Progress column</button>
-    <div id="col-in_progress" class="column col-bg space-y-2" data-status="in_progress" role="list"></div>
+    <button
+      type="button"
+      onclick="focusFirstCardInColumn('in_progress')"
+      style="
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+      "
+    >
+      Jump to In Progress column
+    </button>
+    <div
+      id="col-in_progress"
+      class="column col-bg space-y-2"
+      data-status="in_progress"
+      role="list"
+    ></div>
   </div>
-  <div class="flex flex-col min-h-0" id="col-wrapper-waiting" role="region" aria-label="Waiting column">
+  <div
+    class="flex flex-col min-h-0"
+    id="col-wrapper-waiting"
+    role="region"
+    aria-label="Waiting column"
+  >
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-waiting">Waiting</h2>
       <span id="count-waiting" class="text-xs text-v-muted">0</span>
     </div>
-    <button type="button" onclick="focusFirstCardInColumn('waiting')" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Jump to Waiting column</button>
-    <div id="col-waiting" class="column col-bg space-y-2" data-status="waiting" role="list"></div>
+    <button
+      type="button"
+      onclick="focusFirstCardInColumn('waiting')"
+      style="
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+      "
+    >
+      Jump to Waiting column
+    </button>
+    <div
+      id="col-waiting"
+      class="column col-bg space-y-2"
+      data-status="waiting"
+      role="list"
+    ></div>
   </div>
-  <div class="flex flex-col min-h-0" id="col-wrapper-done" role="region" aria-label="Done column">
+  <div
+    class="flex flex-col min-h-0"
+    id="col-wrapper-done"
+    role="region"
+    aria-label="Done column"
+  >
     <div class="flex items-center gap-2 mb-3 px-1">
       <h2 class="col-header col-header-done">Done</h2>
       <span id="count-done" class="text-xs text-v-muted">0</span>
       <span id="done-stats" class="text-[10px] text-v-muted hidden"></span>
-      <button id="archive-all-btn" onclick="archiveAllDone()" class="hidden" style="margin-left: auto; background: none; border: none; padding: 0; cursor: pointer; font-size: 11px; color: var(--text-muted);" onmouseover="this.style.color='var(--text-secondary)'" onmouseout="this.style.color='var(--text-muted)'" title="Archive all done tasks">Archive all</button>
+      <button
+        id="archive-all-btn"
+        onclick="archiveAllDone()"
+        class="hidden"
+        style="
+          margin-left: auto;
+          background: none;
+          border: none;
+          padding: 0;
+          cursor: pointer;
+          font-size: 11px;
+          color: var(--text-muted);
+        "
+        onmouseover="this.style.color = 'var(--text-secondary)'"
+        onmouseout="this.style.color = 'var(--text-muted)'"
+        title="Archive all done tasks"
+      >
+        Archive all
+      </button>
     </div>
-    <button type="button" onclick="focusFirstCardInColumn('done')" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Jump to Done column</button>
-    <div id="col-done" class="column col-bg space-y-2" data-status="done" role="list"></div>
+    <button
+      type="button"
+      onclick="focusFirstCardInColumn('done')"
+      style="
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+      "
+    >
+      Jump to Done column
+    </button>
+    <div
+      id="col-done"
+      class="column col-bg space-y-2"
+      data-status="done"
+      role="list"
+    ></div>
   </div>
 </main>

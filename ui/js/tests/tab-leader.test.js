@@ -1,11 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import vm from 'vm';
+import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const jsDir = join(__dirname, '..');
+const jsDir = join(__dirname, "..");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -29,7 +29,11 @@ function createBroadcastChannelMock() {
       const peers = channels.get(this._name);
       if (!peers) return;
       for (const peer of peers) {
-        if (peer !== this && !peer._closed && typeof peer.onmessage === 'function') {
+        if (
+          peer !== this &&
+          !peer._closed &&
+          typeof peer.onmessage === "function"
+        ) {
           peer.onmessage({ data });
         }
       }
@@ -54,12 +58,12 @@ function createContext(BroadcastChannel) {
     console,
     Math,
     BroadcastChannel,
-    setTimeout: function(fn, ms) {
+    setTimeout: function (fn, ms) {
       const id = timers.length;
       timers.push({ fn, ms, cleared: false });
       return id;
     },
-    clearTimeout: function(id) {
+    clearTimeout: function (id) {
       if (timers[id]) timers[id].cleared = true;
     },
     restartActiveStreams: vi.fn(),
@@ -67,8 +71,8 @@ function createContext(BroadcastChannel) {
 
   // window === ctx so that window._sseIsLeader is accessible as ctx._sseIsLeader
   ctx.window = ctx;
-  ctx.window.addEventListener = function(event, handler) {
-    if (event === 'beforeunload') beforeUnloadHandlers.push(handler);
+  ctx.window.addEventListener = function (event, handler) {
+    if (event === "beforeunload") beforeUnloadHandlers.push(handler);
   };
   ctx._beforeUnloadHandlers = beforeUnloadHandlers;
   ctx._timers = timers;
@@ -88,8 +92,8 @@ function createContextNoBroadcast() {
 }
 
 function loadTabLeader(ctx) {
-  const code = readFileSync(join(jsDir, 'tab-leader.js'), 'utf8');
-  vm.runInContext(code, ctx, { filename: join(jsDir, 'tab-leader.js') });
+  const code = readFileSync(join(jsDir, "tab-leader.js"), "utf8");
+  vm.runInContext(code, ctx, { filename: join(jsDir, "tab-leader.js") });
 }
 
 /** Flush all pending (non-cleared) timers synchronously. */
@@ -111,20 +115,20 @@ function fireBeforeUnload(ctx) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('tab-leader: BroadcastChannel unavailable', () => {
-  it('makes every tab a leader when BroadcastChannel is missing', () => {
+describe("tab-leader: BroadcastChannel unavailable", () => {
+  it("makes every tab a leader when BroadcastChannel is missing", () => {
     const ctx = createContextNoBroadcast();
     loadTabLeader(ctx);
 
     expect(ctx._sseIsLeader()).toBe(true);
     // Relay and follower registration should be no-ops (no throw).
-    ctx._sseRelay('test', { x: 1 });
-    ctx._sseOnFollowerEvent('test', () => {});
+    ctx._sseRelay("test", { x: 1 });
+    ctx._sseOnFollowerEvent("test", () => {});
   });
 });
 
-describe('tab-leader: single tab becomes leader', () => {
-  it('claims leadership after election timeout with no peers', () => {
+describe("tab-leader: single tab becomes leader", () => {
+  it("claims leadership after election timeout with no peers", () => {
     const { MockBroadcastChannel } = createBroadcastChannelMock();
     const ctx = createContext(MockBroadcastChannel);
     loadTabLeader(ctx);
@@ -137,7 +141,7 @@ describe('tab-leader: single tab becomes leader', () => {
     expect(ctx._sseIsLeader()).toBe(true);
   });
 
-  it('calls restartActiveStreams after becoming leader', () => {
+  it("calls restartActiveStreams after becoming leader", () => {
     const { MockBroadcastChannel } = createBroadcastChannelMock();
     const ctx = createContext(MockBroadcastChannel);
     loadTabLeader(ctx);
@@ -147,8 +151,8 @@ describe('tab-leader: single tab becomes leader', () => {
   });
 });
 
-describe('tab-leader: two tabs', () => {
-  it('second tab becomes follower when first is already leader', () => {
+describe("tab-leader: two tabs", () => {
+  it("second tab becomes follower when first is already leader", () => {
     const { MockBroadcastChannel } = createBroadcastChannelMock();
 
     // Tab 1: becomes leader.
@@ -163,7 +167,7 @@ describe('tab-leader: two tabs', () => {
     expect(ctx2._sseIsLeader()).toBe(false);
   });
 
-  it('leader relays events to follower', () => {
+  it("leader relays events to follower", () => {
     const { MockBroadcastChannel } = createBroadcastChannelMock();
 
     const ctx1 = createContext(MockBroadcastChannel);
@@ -174,18 +178,18 @@ describe('tab-leader: two tabs', () => {
     loadTabLeader(ctx2);
 
     const received = [];
-    ctx2._sseOnFollowerEvent('tasks-snapshot', function(data, lastEventId) {
+    ctx2._sseOnFollowerEvent("tasks-snapshot", function (data, lastEventId) {
       received.push({ data, lastEventId });
     });
 
-    ctx1._sseRelay('tasks-snapshot', [{ id: '1' }], '42');
+    ctx1._sseRelay("tasks-snapshot", [{ id: "1" }], "42");
 
     expect(received).toHaveLength(1);
-    expect(received[0].data).toEqual([{ id: '1' }]);
-    expect(received[0].lastEventId).toBe('42');
+    expect(received[0].data).toEqual([{ id: "1" }]);
+    expect(received[0].lastEventId).toBe("42");
   });
 
-  it('follower does not relay events', () => {
+  it("follower does not relay events", () => {
     const { MockBroadcastChannel } = createBroadcastChannelMock();
 
     const ctx1 = createContext(MockBroadcastChannel);
@@ -196,18 +200,18 @@ describe('tab-leader: two tabs', () => {
     loadTabLeader(ctx2);
 
     const received = [];
-    ctx1._sseOnFollowerEvent('tasks-snapshot', function(data) {
+    ctx1._sseOnFollowerEvent("tasks-snapshot", function (data) {
       received.push(data);
     });
 
     // Follower tries to relay — should be a no-op.
-    ctx2._sseRelay('tasks-snapshot', [{ id: '1' }], '42');
+    ctx2._sseRelay("tasks-snapshot", [{ id: "1" }], "42");
     expect(received).toHaveLength(0);
   });
 });
 
-describe('tab-leader: leader handoff', () => {
-  it('follower becomes leader after leader tab closes', () => {
+describe("tab-leader: leader handoff", () => {
+  it("follower becomes leader after leader tab closes", () => {
     const { MockBroadcastChannel } = createBroadcastChannelMock();
 
     // Tab 1: leader.

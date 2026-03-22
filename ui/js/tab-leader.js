@@ -9,19 +9,21 @@
 // connections and relays events to "follower" tabs via BroadcastChannel.
 // When the leader tab closes, a follower takes over automatically.
 
-(function() {
-  'use strict';
+(function () {
+  "use strict";
 
   // Fallback: if BroadcastChannel is unsupported, every tab is its own leader.
-  if (typeof BroadcastChannel === 'undefined') {
-    window._sseIsLeader = function() { return true; };
-    window._sseRelay = function() {};
-    window._sseOnFollowerEvent = function() {};
+  if (typeof BroadcastChannel === "undefined") {
+    window._sseIsLeader = function () {
+      return true;
+    };
+    window._sseRelay = function () {};
+    window._sseOnFollowerEvent = function () {};
     return;
   }
 
   var ELECTION_MS = 250;
-  var channel = new BroadcastChannel('wallfacer-sse-relay');
+  var channel = new BroadcastChannel("wallfacer-sse-relay");
   var isLeader = false;
   var electionDone = false;
   var electionTimer = null;
@@ -33,40 +35,43 @@
 
   function runElection() {
     electionDone = false;
-    channel.postMessage({ type: 'who-is-leader' });
-    electionTimer = setTimeout(function() {
+    channel.postMessage({ type: "who-is-leader" });
+    electionTimer = setTimeout(function () {
       if (!electionDone) {
         isLeader = true;
         electionDone = true;
         // If streams were already started as follower, restart as leader.
-        if (typeof restartActiveStreams === 'function') {
+        if (typeof restartActiveStreams === "function") {
           restartActiveStreams();
         }
       }
     }, ELECTION_MS);
   }
 
-  channel.onmessage = function(e) {
+  channel.onmessage = function (e) {
     var msg = e.data;
     if (!msg || !msg.type) return;
 
     switch (msg.type) {
-      case 'who-is-leader':
+      case "who-is-leader":
         if (isLeader) {
-          channel.postMessage({ type: 'i-am-leader' });
+          channel.postMessage({ type: "i-am-leader" });
         }
         break;
 
-      case 'i-am-leader':
+      case "i-am-leader":
         if (!electionDone) {
           // A leader exists; become follower.
           isLeader = false;
           electionDone = true;
-          if (electionTimer) { clearTimeout(electionTimer); electionTimer = null; }
+          if (electionTimer) {
+            clearTimeout(electionTimer);
+            electionTimer = null;
+          }
         }
         break;
 
-      case 'leader-leaving':
+      case "leader-leaving":
         if (!isLeader) {
           // Re-elect after a short random delay to avoid simultaneous claims.
           setTimeout(runElection, Math.floor(Math.random() * 150));
@@ -74,7 +79,7 @@
         break;
 
       // Relayed SSE events from the leader tab.
-      case 'sse':
+      case "sse":
         if (!isLeader) {
           var handler = followerHandlers[msg.event];
           if (handler) handler(msg.data, msg.lastEventId);
@@ -83,9 +88,9 @@
     }
   };
 
-  window.addEventListener('beforeunload', function() {
+  window.addEventListener("beforeunload", function () {
     if (isLeader) {
-      channel.postMessage({ type: 'leader-leaving' });
+      channel.postMessage({ type: "leader-leaving" });
     }
     channel.close();
   });
@@ -93,16 +98,18 @@
   // --- Public API ---
 
   /** Returns true if this tab should open real SSE connections. */
-  window._sseIsLeader = function() { return isLeader; };
+  window._sseIsLeader = function () {
+    return isLeader;
+  };
 
   /**
    * Relay an SSE event to follower tabs. Called by the leader after processing
    * an event locally.
    */
-  window._sseRelay = function(eventName, data, lastEventId) {
+  window._sseRelay = function (eventName, data, lastEventId) {
     if (!isLeader) return;
     channel.postMessage({
-      type: 'sse',
+      type: "sse",
       event: eventName,
       data: data,
       lastEventId: lastEventId || null,
@@ -112,7 +119,7 @@
   /**
    * Register a handler for a relayed SSE event type on follower tabs.
    */
-  window._sseOnFollowerEvent = function(eventName, handler) {
+  window._sseOnFollowerEvent = function (eventName, handler) {
     followerHandlers[eventName] = handler;
   };
 

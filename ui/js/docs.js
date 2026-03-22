@@ -2,77 +2,87 @@
 
 var _docsDismiss = null;
 var _docsEntries = [];
-var _docsCurrentSlug = '';
+var _docsCurrentSlug = "";
 var _mermaidLoaded = false;
 var _mermaidRenderSeq = 0;
 
 function _ensureMermaid() {
   if (_mermaidLoaded) return Promise.resolve();
-  return new Promise(function(resolve, reject) {
-    var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
-    script.onload = function() {
-      if (typeof mermaid !== 'undefined') {
+  return new Promise(function (resolve, reject) {
+    var script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js";
+    script.onload = function () {
+      if (typeof mermaid !== "undefined") {
         var cs = getComputedStyle(document.documentElement);
-        try { mermaid.initialize({
-          startOnLoad: false,
-          theme: 'base',
-          themeVariables: {
-            primaryColor: cs.getPropertyValue('--bg-input').trim(),
-            primaryTextColor: cs.getPropertyValue('--text').trim(),
-            primaryBorderColor: cs.getPropertyValue('--border').trim(),
-            lineColor: cs.getPropertyValue('--text-muted').trim(),
-            secondaryColor: cs.getPropertyValue('--bg-card').trim(),
-            tertiaryColor: cs.getPropertyValue('--bg-raised').trim(),
-            background: cs.getPropertyValue('--bg-card').trim(),
-            mainBkg: cs.getPropertyValue('--bg-input').trim(),
-            nodeBorder: cs.getPropertyValue('--border').trim(),
-            clusterBkg: cs.getPropertyValue('--bg-card').trim(),
-            clusterBorder: cs.getPropertyValue('--border').trim(),
-            titleColor: cs.getPropertyValue('--text').trim(),
-            edgeLabelBackground: cs.getPropertyValue('--bg-card').trim(),
-            nodeTextColor: cs.getPropertyValue('--text').trim(),
-            actorTextColor: cs.getPropertyValue('--text').trim(),
-            actorBkg: cs.getPropertyValue('--bg-input').trim(),
-            actorBorder: cs.getPropertyValue('--border').trim(),
-            signalColor: cs.getPropertyValue('--text').trim(),
-            signalTextColor: cs.getPropertyValue('--text').trim(),
-            labelBoxBkgColor: cs.getPropertyValue('--bg-input').trim(),
-            labelBoxBorderColor: cs.getPropertyValue('--border').trim(),
-            labelTextColor: cs.getPropertyValue('--text').trim(),
-            loopTextColor: cs.getPropertyValue('--text').trim(),
-            noteBkgColor: cs.getPropertyValue('--bg-input').trim(),
-            noteTextColor: cs.getPropertyValue('--text').trim(),
-            noteBorderColor: cs.getPropertyValue('--border').trim(),
-            activationBkgColor: cs.getPropertyValue('--bg-input').trim(),
-            activationBorderColor: cs.getPropertyValue('--border').trim(),
-            sequenceNumberColor: cs.getPropertyValue('--text').trim(),
-            fontFamily: 'inherit',
-            fontSize: '13px',
-          }
-        }); } catch(initErr) { console.error('mermaid init:', initErr); }
+        try {
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: "base",
+            themeVariables: {
+              primaryColor: cs.getPropertyValue("--bg-input").trim(),
+              primaryTextColor: cs.getPropertyValue("--text").trim(),
+              primaryBorderColor: cs.getPropertyValue("--border").trim(),
+              lineColor: cs.getPropertyValue("--text-muted").trim(),
+              secondaryColor: cs.getPropertyValue("--bg-card").trim(),
+              tertiaryColor: cs.getPropertyValue("--bg-raised").trim(),
+              background: cs.getPropertyValue("--bg-card").trim(),
+              mainBkg: cs.getPropertyValue("--bg-input").trim(),
+              nodeBorder: cs.getPropertyValue("--border").trim(),
+              clusterBkg: cs.getPropertyValue("--bg-card").trim(),
+              clusterBorder: cs.getPropertyValue("--border").trim(),
+              titleColor: cs.getPropertyValue("--text").trim(),
+              edgeLabelBackground: cs.getPropertyValue("--bg-card").trim(),
+              nodeTextColor: cs.getPropertyValue("--text").trim(),
+              actorTextColor: cs.getPropertyValue("--text").trim(),
+              actorBkg: cs.getPropertyValue("--bg-input").trim(),
+              actorBorder: cs.getPropertyValue("--border").trim(),
+              signalColor: cs.getPropertyValue("--text").trim(),
+              signalTextColor: cs.getPropertyValue("--text").trim(),
+              labelBoxBkgColor: cs.getPropertyValue("--bg-input").trim(),
+              labelBoxBorderColor: cs.getPropertyValue("--border").trim(),
+              labelTextColor: cs.getPropertyValue("--text").trim(),
+              loopTextColor: cs.getPropertyValue("--text").trim(),
+              noteBkgColor: cs.getPropertyValue("--bg-input").trim(),
+              noteTextColor: cs.getPropertyValue("--text").trim(),
+              noteBorderColor: cs.getPropertyValue("--border").trim(),
+              activationBkgColor: cs.getPropertyValue("--bg-input").trim(),
+              activationBorderColor: cs.getPropertyValue("--border").trim(),
+              sequenceNumberColor: cs.getPropertyValue("--text").trim(),
+              fontFamily: "inherit",
+              fontSize: "13px",
+            },
+          });
+        } catch (initErr) {
+          console.error("mermaid init:", initErr);
+        }
       }
       _mermaidLoaded = true;
       resolve();
     };
-    script.onerror = function() { resolve(); };
+    script.onerror = function () {
+      resolve();
+    };
     document.head.appendChild(script);
   });
 }
 
 async function _renderMermaidBlocks(container) {
-  if (typeof mermaid === 'undefined') return;
+  if (typeof mermaid === "undefined") return;
   // Find mermaid blocks by multiple selectors to handle different marked versions.
   var blocks = container.querySelectorAll(
-    'pre code.language-mermaid, pre code.mermaid, div.mermaid-raw'
+    "pre code.language-mermaid, pre code.mermaid, div.mermaid-raw",
   );
   if (!blocks.length) {
     // Fallback: scan all <code> elements for mermaid content heuristic.
-    var allCodes = container.querySelectorAll('pre code');
+    var allCodes = container.querySelectorAll("pre code");
     var mermaidCodes = [];
     for (var j = 0; j < allCodes.length; j++) {
       var text = allCodes[j].textContent.trim();
-      if (/^(graph|flowchart|sequenceDiagram|stateDiagram|classDiagram|gantt|pie|erDiagram|journey)\b/.test(text)) {
+      if (
+        /^(graph|flowchart|sequenceDiagram|stateDiagram|classDiagram|gantt|pie|erDiagram|journey)\b/.test(
+          text,
+        )
+      ) {
         mermaidCodes.push(allCodes[j]);
       }
     }
@@ -80,18 +90,23 @@ async function _renderMermaidBlocks(container) {
   }
   for (var i = 0; i < blocks.length; i++) {
     var el = blocks[i];
-    var pre = el.tagName === 'PRE' ? el : el.parentElement;
+    var pre = el.tagName === "PRE" ? el : el.parentElement;
     var source = el.textContent;
-    var id = 'mermaid-' + (++_mermaidRenderSeq);
+    var id = "mermaid-" + ++_mermaidRenderSeq;
     try {
       var result = await mermaid.render(id, source);
-      var div = document.createElement('div');
-      div.className = 'mermaid-diagram';
+      var div = document.createElement("div");
+      div.className = "mermaid-diagram";
       div.innerHTML = result.svg;
-      div.title = 'Click to expand';
-      div.addEventListener('click', (function(d) {
-        return function() { _expandDiagram(d); };
-      })(div));
+      div.title = "Click to expand";
+      div.addEventListener(
+        "click",
+        (function (d) {
+          return function () {
+            _expandDiagram(d);
+          };
+        })(div),
+      );
       pre.replaceWith(div);
     } catch (e) {
       // Leave the code block as-is on render failure.
@@ -100,37 +115,37 @@ async function _renderMermaidBlocks(container) {
 }
 
 function _expandDiagram(sourceDiv) {
-  var svg = sourceDiv.querySelector('svg');
+  var svg = sourceDiv.querySelector("svg");
   if (!svg) return;
 
-  var overlay = document.createElement('div');
-  overlay.className = 'diagram-overlay';
+  var overlay = document.createElement("div");
+  overlay.className = "diagram-overlay";
 
   // Viewport that clips the pannable/zoomable content.
-  var viewport = document.createElement('div');
-  viewport.className = 'diagram-overlay__viewport';
+  var viewport = document.createElement("div");
+  viewport.className = "diagram-overlay__viewport";
 
   // Inner surface that receives transforms.
-  var surface = document.createElement('div');
-  surface.className = 'diagram-overlay__surface';
+  var surface = document.createElement("div");
+  surface.className = "diagram-overlay__surface";
   var clone = svg.cloneNode(true);
   // Ensure the SVG has explicit dimensions from its viewBox so it
   // doesn't collapse to 0x0 inside the transform surface.
-  var vb = clone.getAttribute('viewBox');
+  var vb = clone.getAttribute("viewBox");
   if (vb) {
     var parts = vb.split(/[\s,]+/);
     var vbW = parseFloat(parts[2]) || 800;
     var vbH = parseFloat(parts[3]) || 600;
-    clone.setAttribute('width', vbW);
-    clone.setAttribute('height', vbH);
+    clone.setAttribute("width", vbW);
+    clone.setAttribute("height", vbH);
   }
-  clone.removeAttribute('style');
+  clone.removeAttribute("style");
   surface.appendChild(clone);
   viewport.appendChild(surface);
 
   // Toolbar.
-  var toolbar = document.createElement('div');
-  toolbar.className = 'diagram-overlay__toolbar';
+  var toolbar = document.createElement("div");
+  toolbar.className = "diagram-overlay__toolbar";
   toolbar.innerHTML =
     '<button type="button" onclick="this._zoomIn()" title="Zoom in">+</button>' +
     '<button type="button" onclick="this._zoomOut()" title="Zoom out">&minus;</button>' +
@@ -142,11 +157,18 @@ function _expandDiagram(sourceDiv) {
   overlay.appendChild(toolbar);
 
   // --- Pan & zoom state ---
-  var scale = 1, tx = 0, ty = 0;
-  var dragging = false, dragStartX = 0, dragStartY = 0, txStart = 0, tyStart = 0;
+  var scale = 1,
+    tx = 0,
+    ty = 0;
+  var dragging = false,
+    dragStartX = 0,
+    dragStartY = 0,
+    txStart = 0,
+    tyStart = 0;
 
   function applyTransform() {
-    surface.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+    surface.style.transform =
+      "translate(" + tx + "px," + ty + "px) scale(" + scale + ")";
   }
 
   function zoomTo(newScale, cx, cy) {
@@ -159,42 +181,58 @@ function _expandDiagram(sourceDiv) {
   }
 
   function resetView() {
-    scale = 1; tx = 0; ty = 0;
+    scale = 1;
+    tx = 0;
+    ty = 0;
     applyTransform();
   }
 
   // Wire toolbar buttons.
-  var btns = toolbar.querySelectorAll('button');
-  btns[0]._zoomIn = function() { zoomTo(scale * 1.3, viewport.clientWidth / 2, viewport.clientHeight / 2); };
-  btns[0].onclick = function() { btns[0]._zoomIn(); };
-  btns[1]._zoomOut = function() { zoomTo(scale / 1.3, viewport.clientWidth / 2, viewport.clientHeight / 2); };
-  btns[1].onclick = function() { btns[1]._zoomOut(); };
+  var btns = toolbar.querySelectorAll("button");
+  btns[0]._zoomIn = function () {
+    zoomTo(scale * 1.3, viewport.clientWidth / 2, viewport.clientHeight / 2);
+  };
+  btns[0].onclick = function () {
+    btns[0]._zoomIn();
+  };
+  btns[1]._zoomOut = function () {
+    zoomTo(scale / 1.3, viewport.clientWidth / 2, viewport.clientHeight / 2);
+  };
+  btns[1].onclick = function () {
+    btns[1]._zoomOut();
+  };
   btns[2]._reset = resetView;
   btns[2].onclick = resetView;
   btns[3]._close = removeOverlay;
   btns[3].onclick = removeOverlay;
 
   // Mouse wheel zoom.
-  viewport.addEventListener('wheel', function(e) {
-    e.preventDefault();
-    var rect = viewport.getBoundingClientRect();
-    var cx = e.clientX - rect.left;
-    var cy = e.clientY - rect.top;
-    var factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    zoomTo(Math.max(0.1, Math.min(10, scale * factor)), cx, cy);
-  }, { passive: false });
+  viewport.addEventListener(
+    "wheel",
+    function (e) {
+      e.preventDefault();
+      var rect = viewport.getBoundingClientRect();
+      var cx = e.clientX - rect.left;
+      var cy = e.clientY - rect.top;
+      var factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      zoomTo(Math.max(0.1, Math.min(10, scale * factor)), cx, cy);
+    },
+    { passive: false },
+  );
 
   // Mouse drag to pan.
-  viewport.addEventListener('mousedown', function(e) {
+  viewport.addEventListener("mousedown", function (e) {
     if (e.button !== 0) return;
     dragging = true;
-    dragStartX = e.clientX; dragStartY = e.clientY;
-    txStart = tx; tyStart = ty;
-    viewport.style.cursor = 'grabbing';
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    txStart = tx;
+    tyStart = ty;
+    viewport.style.cursor = "grabbing";
     e.preventDefault();
   });
-  window.addEventListener('mousemove', onMouseMove);
-  window.addEventListener('mouseup', onMouseUp);
+  window.addEventListener("mousemove", onMouseMove);
+  window.addEventListener("mouseup", onMouseUp);
   function onMouseMove(e) {
     if (!dragging) return;
     tx = txStart + (e.clientX - dragStartX);
@@ -204,41 +242,66 @@ function _expandDiagram(sourceDiv) {
   function onMouseUp() {
     if (!dragging) return;
     dragging = false;
-    viewport.style.cursor = '';
+    viewport.style.cursor = "";
   }
 
   // Keyboard: +/- to zoom, arrow keys to pan.
   function onKey(e) {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       e.stopImmediatePropagation();
       removeOverlay();
       return;
     }
-    var cx = viewport.clientWidth / 2, cy = viewport.clientHeight / 2;
-    if (e.key === '=' || e.key === '+') { zoomTo(scale * 1.3, cx, cy); e.preventDefault(); }
-    else if (e.key === '-') { zoomTo(scale / 1.3, cx, cy); e.preventDefault(); }
-    else if (e.key === '0') { resetView(); e.preventDefault(); }
-    else if (e.key === 'ArrowLeft') { tx += 50; applyTransform(); e.preventDefault(); }
-    else if (e.key === 'ArrowRight') { tx -= 50; applyTransform(); e.preventDefault(); }
-    else if (e.key === 'ArrowUp') { ty += 50; applyTransform(); e.preventDefault(); }
-    else if (e.key === 'ArrowDown') { ty -= 50; applyTransform(); e.preventDefault(); }
+    var cx = viewport.clientWidth / 2,
+      cy = viewport.clientHeight / 2;
+    if (e.key === "=" || e.key === "+") {
+      zoomTo(scale * 1.3, cx, cy);
+      e.preventDefault();
+    } else if (e.key === "-") {
+      zoomTo(scale / 1.3, cx, cy);
+      e.preventDefault();
+    } else if (e.key === "0") {
+      resetView();
+      e.preventDefault();
+    } else if (e.key === "ArrowLeft") {
+      tx += 50;
+      applyTransform();
+      e.preventDefault();
+    } else if (e.key === "ArrowRight") {
+      tx -= 50;
+      applyTransform();
+      e.preventDefault();
+    } else if (e.key === "ArrowUp") {
+      ty += 50;
+      applyTransform();
+      e.preventDefault();
+    } else if (e.key === "ArrowDown") {
+      ty -= 50;
+      applyTransform();
+      e.preventDefault();
+    }
   }
 
   function removeOverlay() {
     overlay.remove();
-    document.removeEventListener('keydown', onKey, true);
-    window.removeEventListener('mousemove', onMouseMove);
-    window.removeEventListener('mouseup', onMouseUp);
+    document.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("mousemove", onMouseMove);
+    window.removeEventListener("mouseup", onMouseUp);
   }
 
-  document.addEventListener('keydown', onKey, true);
+  document.addEventListener("keydown", onKey, true);
   document.body.appendChild(overlay);
   // Start fitted: scale SVG to fill viewport.
-  requestAnimationFrame(function() {
+  requestAnimationFrame(function () {
     var svgRect = clone.getBoundingClientRect();
     var vpRect = viewport.getBoundingClientRect();
     if (svgRect.width > 0 && svgRect.height > 0) {
-      var fitScale = Math.min(vpRect.width / svgRect.width, vpRect.height / svgRect.height, 2) * 0.9;
+      var fitScale =
+        Math.min(
+          vpRect.width / svgRect.width,
+          vpRect.height / svgRect.height,
+          2,
+        ) * 0.9;
       scale = fitScale;
       tx = (vpRect.width - svgRect.width * fitScale) / 2;
       ty = (vpRect.height - svgRect.height * fitScale) / 2;
@@ -248,76 +311,104 @@ function _expandDiagram(sourceDiv) {
 }
 
 async function openDocs(slug) {
-  var modal = document.getElementById('docs-modal');
+  var modal = document.getElementById("docs-modal");
   if (!modal) return;
-  modal.classList.remove('hidden');
-  modal.style.display = 'flex';
+  modal.classList.remove("hidden");
+  modal.style.display = "flex";
   if (_docsDismiss) _docsDismiss();
   _docsDismiss = bindModalDismiss(modal, closeDocs);
 
   if (!_docsEntries.length) {
     try {
-      _docsEntries = await api('/api/docs');
+      _docsEntries = await api("/api/docs");
     } catch (e) {
       _docsEntries = [];
     }
   }
   renderDocsNav();
   // Default to the index page (usage) when no specific slug is requested.
-  var target = slug || 'guide/usage';
+  var target = slug || "guide/usage";
   if (target) loadDoc(target);
 }
 
 function closeDocs() {
-  var modal = document.getElementById('docs-modal');
+  var modal = document.getElementById("docs-modal");
   if (!modal) return;
-  modal.classList.add('hidden');
-  modal.style.display = '';
-  if (_docsDismiss) { _docsDismiss(); _docsDismiss = null; }
+  modal.classList.add("hidden");
+  modal.style.display = "";
+  if (_docsDismiss) {
+    _docsDismiss();
+    _docsDismiss = null;
+  }
 }
 
 function toggleDocsFullscreen() {
-  var card = document.getElementById('docs-modal-card');
+  var card = document.getElementById("docs-modal-card");
   if (!card) return;
-  card.classList.toggle('docs-modal-card--fullscreen');
+  card.classList.toggle("docs-modal-card--fullscreen");
   // Also remove padding from overlay when fullscreen.
-  var modal = document.getElementById('docs-modal');
+  var modal = document.getElementById("docs-modal");
   if (modal) {
-    modal.style.padding = card.classList.contains('docs-modal-card--fullscreen') ? '0' : '';
+    modal.style.padding = card.classList.contains("docs-modal-card--fullscreen")
+      ? "0"
+      : "";
   }
 }
 
 function renderDocsNav() {
-  var nav = document.getElementById('docs-nav');
+  var nav = document.getElementById("docs-nav");
   if (!nav) return;
   var categories = {};
-  _docsEntries.forEach(function(entry) {
+  _docsEntries.forEach(function (entry) {
     if (!categories[entry.category]) categories[entry.category] = [];
     categories[entry.category].push(entry);
   });
-  var html = '';
-  var catLabels = { guide: 'User Guide', internals: 'Technical Reference' };
+  var html = "";
+  var catLabels = { guide: "User Guide", internals: "Technical Reference" };
   // Render categories in a fixed order: guide first, then internals.
-  var catOrder = ['guide', 'internals'];
-  catOrder.forEach(function(cat) {
+  var catOrder = ["guide", "internals"];
+  catOrder.forEach(function (cat) {
     if (!categories[cat]) return;
     html += '<div style="margin-bottom:12px;">';
-    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:6px;">' + escapeHtml(catLabels[cat] || cat) + '</div>';
-    categories[cat].forEach(function(entry) {
+    html +=
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:6px;">' +
+      escapeHtml(catLabels[cat] || cat) +
+      "</div>";
+    categories[cat].forEach(function (entry) {
       var active = entry.slug === _docsCurrentSlug;
       // Show step number for ordered guide docs (skip the index page which is usage.md, order=9).
-      var prefix = '';
-      var isIndex = entry.slug === 'guide/usage' || entry.slug === 'internals/internals';
+      var prefix = "";
+      var isIndex =
+        entry.slug === "guide/usage" || entry.slug === "internals/internals";
       if (entry.order && !isIndex) {
-        prefix = '<span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:var(--bg-raised);color:var(--text-muted);font-size:9px;font-weight:700;margin-right:4px;flex-shrink:0;">' + entry.order + '</span>';
+        prefix =
+          '<span style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;background:var(--bg-raised);color:var(--text-muted);font-size:9px;font-weight:700;margin-right:4px;flex-shrink:0;">' +
+          entry.order +
+          "</span>";
       }
       // Mark index pages distinctly.
       if (isIndex) {
-        prefix = '<span style="font-size:10px;margin-right:4px;">&#9776;</span>';
+        prefix =
+          '<span style="font-size:10px;margin-right:4px;">&#9776;</span>';
       }
-      html += '<button type="button" onclick="loadDoc(\'' + escapeHtml(entry.slug) + '\')" style="display:flex;align-items:center;width:100%;text-align:left;padding:4px 8px;margin-bottom:2px;border:none;border-radius:4px;background:' + (active ? 'var(--bg-input)' : 'transparent') + ';color:' + (active ? 'var(--text-primary)' : 'inherit') + ';font-size:12px;cursor:pointer;font-weight:' + (active ? '600' : '400') + ';" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'' + (active ? 'var(--bg-input)' : 'transparent') + '\'">' + prefix + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(entry.title) + '</span></button>';
+      html +=
+        '<button type="button" onclick="loadDoc(\'' +
+        escapeHtml(entry.slug) +
+        '\')" style="display:flex;align-items:center;width:100%;text-align:left;padding:4px 8px;margin-bottom:2px;border:none;border-radius:4px;background:' +
+        (active ? "var(--bg-input)" : "transparent") +
+        ";color:" +
+        (active ? "var(--text-primary)" : "inherit") +
+        ";font-size:12px;cursor:pointer;font-weight:" +
+        (active ? "600" : "400") +
+        ';" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'' +
+        (active ? "var(--bg-input)" : "transparent") +
+        "'\">" +
+        prefix +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        escapeHtml(entry.title) +
+        "</span></button>";
     });
-    html += '</div>';
+    html += "</div>";
   });
   nav.innerHTML = html;
 }
@@ -325,12 +416,13 @@ function renderDocsNav() {
 async function loadDoc(slug) {
   _docsCurrentSlug = slug;
   renderDocsNav();
-  var content = document.getElementById('docs-content');
+  var content = document.getElementById("docs-content");
   if (!content) return;
-  content.innerHTML = '<div style="color:var(--text-muted);font-size:12px;">Loading...</div>';
+  content.innerHTML =
+    '<div style="color:var(--text-muted);font-size:12px;">Loading...</div>';
   try {
-    var res = await fetch(withAuthToken('/api/docs/' + slug));
-    if (!res.ok) throw new Error('Not found');
+    var res = await fetch(withAuthToken("/api/docs/" + slug));
+    if (!res.ok) throw new Error("Not found");
     var md = await res.text();
     content.innerHTML = renderMarkdown(md);
     // Append prev/next navigation for ordered guide docs.
@@ -341,50 +433,66 @@ async function loadDoc(slug) {
     await _ensureMermaid();
     await _renderMermaidBlocks(content);
   } catch (e) {
-    content.innerHTML = '<div style="color:var(--text-muted);">Failed to load document.</div>';
+    content.innerHTML =
+      '<div style="color:var(--text-muted);">Failed to load document.</div>';
   }
 }
 
 // Build a table-of-contents from headings in the rendered content.
 function _renderDocToc(content) {
-  var toc = document.getElementById('docs-toc');
+  var toc = document.getElementById("docs-toc");
   if (!toc) return;
-  var headings = content.querySelectorAll('h2, h3');
-  if (headings.length === 0) { toc.innerHTML = ''; return; }
+  var headings = content.querySelectorAll("h2, h3");
+  if (headings.length === 0) {
+    toc.innerHTML = "";
+    return;
+  }
 
   // Ensure each heading has an id for anchor links.
   for (var i = 0; i < headings.length; i++) {
     if (!headings[i].id) {
-      headings[i].id = 'heading-' + i;
+      headings[i].id = "heading-" + i;
     }
   }
 
   // Header label — matches the left nav category labels.
-  var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:8px;">On this page</div>';
+  var html =
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);margin-bottom:8px;">On this page</div>';
   for (var j = 0; j < headings.length; j++) {
     var h = headings[j];
-    var isH3 = h.tagName === 'H3';
+    var isH3 = h.tagName === "H3";
     // h2 = top-level section, h3 = subsection (indented, smaller).
-    html += '<a href="#' + h.id + '" class="docs-toc-link' + (isH3 ? ' docs-toc-link--sub' : '') + '" data-toc-target="' + h.id + '">' + escapeHtml(h.textContent) + '</a>';
+    html +=
+      '<a href="#' +
+      h.id +
+      '" class="docs-toc-link' +
+      (isH3 ? " docs-toc-link--sub" : "") +
+      '" data-toc-target="' +
+      h.id +
+      '">' +
+      escapeHtml(h.textContent) +
+      "</a>";
   }
   toc.innerHTML = html;
 
   // Click handler: scroll heading into view and highlight immediately.
-  var tocLinks = toc.querySelectorAll('a[data-toc-target]');
+  var tocLinks = toc.querySelectorAll("a[data-toc-target]");
   for (var k = 0; k < tocLinks.length; k++) {
-    tocLinks[k].onclick = (function(id, allLinks) {
-      return function(e) {
+    tocLinks[k].onclick = (function (id, allLinks) {
+      return function (e) {
         e.preventDefault();
         var el = document.getElementById(id);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
         // Immediately highlight this entry — scrollIntoView may not
         // trigger a scroll event if the target is already in view.
         for (var m = 0; m < allLinks.length; m++) {
-          allLinks[m].classList.toggle('docs-toc-link--active',
-            allLinks[m].getAttribute('data-toc-target') === id);
+          allLinks[m].classList.toggle(
+            "docs-toc-link--active",
+            allLinks[m].getAttribute("data-toc-target") === id,
+          );
         }
       };
-    })(tocLinks[k].getAttribute('data-toc-target'), tocLinks);
+    })(tocLinks[k].getAttribute("data-toc-target"), tocLinks);
   }
 
   // Highlight current section on scroll.
@@ -394,10 +502,10 @@ function _renderDocToc(content) {
 // Highlight the TOC entry corresponding to the visible section.
 function _setupTocScrollSpy(content, headings, tocLinks) {
   if (content._tocScrollHandler) {
-    content.removeEventListener('scroll', content._tocScrollHandler);
+    content.removeEventListener("scroll", content._tocScrollHandler);
   }
-  var handler = function() {
-    var activeId = '';
+  var handler = function () {
+    var activeId = "";
     for (var i = 0; i < headings.length; i++) {
       var rect = headings[i].getBoundingClientRect();
       var containerRect = content.getBoundingClientRect();
@@ -406,27 +514,34 @@ function _setupTocScrollSpy(content, headings, tocLinks) {
       }
     }
     for (var j = 0; j < tocLinks.length; j++) {
-      var isActive = tocLinks[j].getAttribute('data-toc-target') === activeId;
-      tocLinks[j].classList.toggle('docs-toc-link--active', isActive);
+      var isActive = tocLinks[j].getAttribute("data-toc-target") === activeId;
+      tocLinks[j].classList.toggle("docs-toc-link--active", isActive);
     }
   };
   content._tocScrollHandler = handler;
-  content.addEventListener('scroll', handler, { passive: true });
+  content.addEventListener("scroll", handler, { passive: true });
   handler();
 }
 
 // Append previous/next navigation bar for ordered docs (guide or internals).
 function _appendDocNav(container, currentSlug) {
   // Determine the category of the current slug.
-  var cat = currentSlug.startsWith('internals/') ? 'internals' : 'guide';
-  var indexSlug = cat === 'guide' ? 'guide/usage' : 'internals/internals';
+  var cat = currentSlug.startsWith("internals/") ? "internals" : "guide";
+  var indexSlug = cat === "guide" ? "guide/usage" : "internals/internals";
   // Build ordered list of entries in this category (exclude the index page).
   var ordered = _docsEntries
-    .filter(function(e) { return e.category === cat && e.order && e.slug !== indexSlug; })
-    .sort(function(a, b) { return a.order - b.order; });
+    .filter(function (e) {
+      return e.category === cat && e.order && e.slug !== indexSlug;
+    })
+    .sort(function (a, b) {
+      return a.order - b.order;
+    });
   var idx = -1;
   for (var i = 0; i < ordered.length; i++) {
-    if (ordered[i].slug === currentSlug) { idx = i; break; }
+    if (ordered[i].slug === currentSlug) {
+      idx = i;
+      break;
+    }
   }
   if (idx === -1) return; // Not an ordered doc.
 
@@ -434,66 +549,94 @@ function _appendDocNav(container, currentSlug) {
   var next = idx < ordered.length - 1 ? ordered[idx + 1] : null;
   if (!prev && !next) return;
 
-  var nav = document.createElement('div');
-  nav.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:13px;';
+  var nav = document.createElement("div");
+  nav.style.cssText =
+    "display:flex;justify-content:space-between;align-items:center;margin-top:32px;padding-top:16px;border-top:1px solid var(--border);font-size:13px;";
 
-  var linkStyle = 'color:var(--accent);cursor:pointer;text-decoration:none;';
-  var leftHtml = '';
-  var rightHtml = '';
+  var linkStyle = "color:var(--accent);cursor:pointer;text-decoration:none;";
+  var leftHtml = "";
+  var rightHtml = "";
   if (prev) {
-    leftHtml = '<a href="#" style="' + linkStyle + '" data-doc-slug="' + escapeHtml(prev.slug) + '">&larr; ' + prev.order + '. ' + escapeHtml(prev.title) + '</a>';
+    leftHtml =
+      '<a href="#" style="' +
+      linkStyle +
+      '" data-doc-slug="' +
+      escapeHtml(prev.slug) +
+      '">&larr; ' +
+      prev.order +
+      ". " +
+      escapeHtml(prev.title) +
+      "</a>";
   }
   if (next) {
-    rightHtml = '<a href="#" style="' + linkStyle + '" data-doc-slug="' + escapeHtml(next.slug) + '">' + next.order + '. ' + escapeHtml(next.title) + ' &rarr;</a>';
+    rightHtml =
+      '<a href="#" style="' +
+      linkStyle +
+      '" data-doc-slug="' +
+      escapeHtml(next.slug) +
+      '">' +
+      next.order +
+      ". " +
+      escapeHtml(next.title) +
+      " &rarr;</a>";
   }
-  nav.innerHTML = '<div>' + leftHtml + '</div><div>' + rightHtml + '</div>';
+  nav.innerHTML = "<div>" + leftHtml + "</div><div>" + rightHtml + "</div>";
 
   // Wire click handlers.
-  var links = nav.querySelectorAll('a[data-doc-slug]');
+  var links = nav.querySelectorAll("a[data-doc-slug]");
   for (var j = 0; j < links.length; j++) {
-    links[j].onclick = (function(slug) {
-      return function(e) { e.preventDefault(); loadDoc(slug); };
-    })(links[j].getAttribute('data-doc-slug'));
+    links[j].onclick = (function (slug) {
+      return function (e) {
+        e.preventDefault();
+        loadDoc(slug);
+      };
+    })(links[j].getAttribute("data-doc-slug"));
   }
   container.appendChild(nav);
 }
 
 // Rewrite relative .md links to navigate within the docs viewer.
 function _rewriteDocLinks(container, currentSlug) {
-  var links = container.querySelectorAll('a[href]');
-  var currentDir = currentSlug.substring(0, currentSlug.lastIndexOf('/') + 1);
+  var links = container.querySelectorAll("a[href]");
+  var currentDir = currentSlug.substring(0, currentSlug.lastIndexOf("/") + 1);
   for (var i = 0; i < links.length; i++) {
     var a = links[i];
-    var href = a.getAttribute('href');
-    if (!href || href.startsWith('http') || href.startsWith('#')) continue;
-    if (!href.endsWith('.md') && !href.includes('.md#')) continue;
+    var href = a.getAttribute("href");
+    if (!href || href.startsWith("http") || href.startsWith("#")) continue;
+    if (!href.endsWith(".md") && !href.includes(".md#")) continue;
     // Resolve relative path against current doc directory.
     var resolved = _resolveDocPath(currentDir, href);
     // Strip .md extension and any anchor.
-    var anchor = '';
-    var hashIdx = resolved.indexOf('#');
+    var anchor = "";
+    var hashIdx = resolved.indexOf("#");
     if (hashIdx !== -1) {
       anchor = resolved.substring(hashIdx);
       resolved = resolved.substring(0, hashIdx);
     }
-    resolved = resolved.replace(/\.md$/, '');
+    resolved = resolved.replace(/\.md$/, "");
     // Remove trailing / from directory references.
-    resolved = resolved.replace(/\/$/, '');
-    a.setAttribute('href', '#');
-    a.setAttribute('data-doc-slug', resolved);
-    a.onclick = (function(slug) {
-      return function(e) { e.preventDefault(); loadDoc(slug); };
+    resolved = resolved.replace(/\/$/, "");
+    a.setAttribute("href", "#");
+    a.setAttribute("data-doc-slug", resolved);
+    a.onclick = (function (slug) {
+      return function (e) {
+        e.preventDefault();
+        loadDoc(slug);
+      };
     })(resolved);
   }
 }
 
 function _resolveDocPath(base, rel) {
   // Handle ../ and ./ in relative paths.
-  var parts = (base + rel).split('/');
+  var parts = (base + rel).split("/");
   var resolved = [];
   for (var i = 0; i < parts.length; i++) {
-    if (parts[i] === '..') { resolved.pop(); }
-    else if (parts[i] !== '.' && parts[i] !== '') { resolved.push(parts[i]); }
+    if (parts[i] === "..") {
+      resolved.pop();
+    } else if (parts[i] !== "." && parts[i] !== "") {
+      resolved.push(parts[i]);
+    }
   }
-  return resolved.join('/');
+  return resolved.join("/");
 }

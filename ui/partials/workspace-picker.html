@@ -1,31 +1,81 @@
-<div id="workspace-picker" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4" style="background: rgba(15, 23, 42, 0.55);">
+<div
+  id="workspace-picker"
+  class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4"
+  style="background: rgba(15, 23, 42, 0.55)"
+>
   <div class="modal-card ws-picker">
     <div class="ws-picker__header">
-      <div style="flex:1;min-width:0;">
+      <div style="flex: 1; min-width: 0">
         <h3 class="ws-picker__title">Select Workspaces</h3>
-        <p class="ws-picker__subtitle">Choose directories to activate a task board.</p>
+        <p class="ws-picker__subtitle">
+          Choose directories to activate a task board.
+        </p>
       </div>
-      <button id="workspace-picker-close" type="button" class="btn-ghost" style="display:none;font-size:18px;padding:2px 8px;flex-shrink:0;" onclick="hideWorkspacePicker()">&times;</button>
+      <button
+        id="workspace-picker-close"
+        type="button"
+        class="btn-ghost"
+        style="display: none; font-size: 18px; padding: 2px 8px; flex-shrink: 0"
+        onclick="hideWorkspacePicker()"
+      >
+        &times;
+      </button>
     </div>
 
     <div class="ws-picker__body">
       <div class="ws-picker__browser">
         <div class="ws-picker__path-row">
-          <input id="workspace-browser-path" class="field ws-picker__path-input" type="text" placeholder="/absolute/path" onkeydown="workspaceBrowserPathKeydown(event)">
-          <button type="button" class="btn-icon ws-picker__go-btn" onclick="browseWorkspaces()">Go</button>
+          <input
+            id="workspace-browser-path"
+            class="field ws-picker__path-input"
+            type="text"
+            placeholder="/absolute/path"
+            onkeydown="workspaceBrowserPathKeydown(event)"
+          />
+          <button
+            type="button"
+            class="btn-icon ws-picker__go-btn"
+            onclick="browseWorkspaces()"
+          >
+            Go
+          </button>
         </div>
-        <div id="workspace-browser-breadcrumb" class="ws-picker__breadcrumb"></div>
+        <div
+          id="workspace-browser-breadcrumb"
+          class="ws-picker__breadcrumb"
+        ></div>
         <div class="ws-picker__browser-toolbar">
           <label class="ws-picker__toggle">
-            <input id="workspace-browser-include-hidden" type="checkbox" onchange="toggleWorkspaceBrowserHidden()">
+            <input
+              id="workspace-browser-include-hidden"
+              type="checkbox"
+              onchange="toggleWorkspaceBrowserHidden()"
+            />
             Show hidden
           </label>
-          <button type="button" class="btn-ghost ws-picker__add-folder-btn" onclick="addCurrentWorkspaceFolder()">+ Add current folder</button>
+          <button
+            type="button"
+            class="btn-ghost ws-picker__add-folder-btn"
+            onclick="addCurrentWorkspaceFolder()"
+          >
+            + Add current folder
+          </button>
         </div>
         <div id="workspace-browser-status" class="ws-picker__status"></div>
-        <div id="workspace-browser-list" class="ws-picker__list" tabindex="0" onkeydown="workspaceBrowserListKeydown(event)">
+        <div
+          id="workspace-browser-list"
+          class="ws-picker__list"
+          tabindex="0"
+          onkeydown="workspaceBrowserListKeydown(event)"
+        >
           <div class="ws-picker__filter-wrap">
-            <input id="workspace-browser-filter" class="field ws-picker__filter" type="search" placeholder="Filter..." oninput="setWorkspaceBrowserFilter(this.value)">
+            <input
+              id="workspace-browser-filter"
+              class="field ws-picker__filter"
+              type="search"
+              placeholder="Filter..."
+              oninput="setWorkspaceBrowserFilter(this.value)"
+            />
           </div>
           <div id="workspace-browser-entries"></div>
         </div>
@@ -34,12 +84,30 @@
       <div class="ws-picker__selection">
         <div class="ws-picker__selection-header">
           <span class="ws-picker__selection-label">Selected</span>
-          <button type="button" class="btn-ghost ws-picker__clear-btn" onclick="clearWorkspaceSelection()">Clear</button>
+          <button
+            type="button"
+            class="btn-ghost ws-picker__clear-btn"
+            onclick="clearWorkspaceSelection()"
+          >
+            Clear
+          </button>
         </div>
-        <div id="workspace-selection-list" class="ws-picker__selection-list"></div>
+        <div
+          id="workspace-selection-list"
+          class="ws-picker__selection-list"
+        ></div>
         <div class="ws-picker__selection-footer">
-          <button type="button" class="btn btn-accent" onclick="applyWorkspaceSelection()">Apply</button>
-          <span id="workspace-apply-status" class="ws-picker__apply-status"></span>
+          <button
+            type="button"
+            class="btn btn-accent"
+            onclick="applyWorkspaceSelection()"
+          >
+            Apply
+          </button>
+          <span
+            id="workspace-apply-status"
+            class="ws-picker__apply-status"
+          ></span>
         </div>
       </div>
     </div>

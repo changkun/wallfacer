@@ -1,24 +1,24 @@
 // --- Global state ---
 let tasks = [];
 let logsAbort = null;
-let rawLogBuffer = '';
+let rawLogBuffer = "";
 // logsMode: 'pretty' | 'raw' | 'oversight'
-let logsMode = 'pretty';
+let logsMode = "pretty";
 // logSearchQuery: active filter string for the implementation log viewer
-let logSearchQuery = '';
+let logSearchQuery = "";
 
 // Test agent monitor state (shown alongside impl logs when is_test_run=true)
 let testLogsAbort = null;
-let testRawLogBuffer = '';
+let testRawLogBuffer = "";
 // testLogsMode: 'pretty' | 'raw' | 'oversight'
-let testLogsMode = 'pretty';
-let showArchived = localStorage.getItem('wallfacer-show-archived') === 'true';
+let testLogsMode = "pretty";
+let showArchived = localStorage.getItem("wallfacer-show-archived") === "true";
 let archivedTasks = [];
 let archivedTasksPageSize = 20;
 var archivedPage = {
   // Invariant: at most one direction loads at a time.
   // 'idle' | 'loading-before' | 'loading-after'
-  loadState: 'idle',
+  loadState: "idle",
   hasMoreBefore: false,
   hasMoreAfter: false,
 };
@@ -39,10 +39,10 @@ let gitRetryDelay = 1000;
 let activeWorkspaces = [];
 let workspaceGroups = [];
 let workspacePickerRequired = false;
-let workspaceBrowserPath = '';
+let workspaceBrowserPath = "";
 let workspaceBrowserEntries = [];
 let workspaceBrowserFocusIndex = -1;
-let workspaceBrowserFilterQuery = '';
+let workspaceBrowserFilterQuery = "";
 let workspaceSelectionDraft = [];
 let workspaceGroupSwitchingIndex = -1;
 let workspaceGroupSwitching = false;
@@ -60,9 +60,9 @@ let autopush = false;
 let maxParallelTasks = 0;
 
 // Refine logs state
-let refineRawLogBuffer = '';
+let refineRawLogBuffer = "";
 // refineLogsMode: 'pretty' | 'raw'
-let refineLogsMode = 'pretty';
+let refineLogsMode = "pretty";
 
 // Debounce timer for backlog prompt auto-save
 let editDebounce = null;
@@ -71,8 +71,11 @@ let editDebounce = null;
 let timelineRefreshTimer = null;
 
 // Search / filter state
-let filterQuery = '';
-let backlogSortMode = localStorage.getItem('wallfacer-backlog-sort-mode') === 'impact' ? 'impact' : 'manual';
+let filterQuery = "";
+let backlogSortMode =
+  localStorage.getItem("wallfacer-backlog-sort-mode") === "impact"
+    ? "impact"
+    : "manual";
 
 // Deep-link hash handling: true once the initial URL hash has been processed.
 let _hashHandled = false;

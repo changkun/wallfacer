@@ -1,7 +1,7 @@
 const DEFAULT_TASK_TIMEOUT = 60; // minutes
 
 function setActivityOverrideDefaultSandbox(prefix, sandbox) {
-  SANDBOX_ACTIVITY_KEYS.forEach(function(key) {
+  SANDBOX_ACTIVITY_KEYS.forEach(function (key) {
     var el = document.getElementById(prefix + key);
     if (!el) return;
     if (sandbox) {
@@ -15,10 +15,10 @@ function setActivityOverrideDefaultSandbox(prefix, sandbox) {
 
 function bindTaskSandboxInheritance(selectId, prefix) {
   var el = document.getElementById(selectId);
-  if (!el || el.dataset.inheritanceBound === 'true') return;
-  el.dataset.inheritanceBound = 'true';
-  el.addEventListener('change', function() {
-    setActivityOverrideDefaultSandbox(prefix, (el.value || '').trim());
+  if (!el || el.dataset.inheritanceBound === "true") return;
+  el.dataset.inheritanceBound = "true";
+  el.addEventListener("change", function () {
+    setActivityOverrideDefaultSandbox(prefix, (el.value || "").trim());
   });
 }
 
@@ -31,16 +31,20 @@ function bindTaskSandboxInheritance(selectId, prefix) {
 function updateDepPickerChips(wrapperId, fireCallback) {
   var wrap = document.getElementById(wrapperId);
   if (!wrap) return;
-  var chipsEl = wrap.querySelector('.dep-picker-chips');
-  var checked = wrap.querySelectorAll('.dep-picker-item input[type=checkbox]:checked');
+  var chipsEl = wrap.querySelector(".dep-picker-chips");
+  var checked = wrap.querySelectorAll(
+    ".dep-picker-item input[type=checkbox]:checked",
+  );
   if (checked.length === 0) {
     chipsEl.innerHTML = '<span class="dep-picker-placeholder">None</span>';
   } else {
-    chipsEl.innerHTML = '';
-    checked.forEach(function(cb) {
-      var text = cb.closest('.dep-picker-item').querySelector('.dep-picker-item-text').textContent;
-      var chip = document.createElement('span');
-      chip.className = 'dep-picker-chip';
+    chipsEl.innerHTML = "";
+    checked.forEach(function (cb) {
+      var text = cb
+        .closest(".dep-picker-item")
+        .querySelector(".dep-picker-item-text").textContent;
+      var chip = document.createElement("span");
+      chip.className = "dep-picker-chip";
       chip.title = text;
       chip.textContent = text;
       chipsEl.appendChild(chip);
@@ -48,7 +52,7 @@ function updateDepPickerChips(wrapperId, fireCallback) {
   }
   if (fireCallback) {
     var cbName = wrap.dataset.onchange;
-    if (cbName && typeof window[cbName] === 'function') window[cbName]();
+    if (cbName && typeof window[cbName] === "function") window[cbName]();
   }
 }
 
@@ -60,17 +64,21 @@ function updateDepPickerChips(wrapperId, fireCallback) {
 function populateDependsOnPicker(wrapperId, excludeId, selectedIds) {
   var wrap = document.getElementById(wrapperId);
   if (!wrap) return;
-  var list = wrap.querySelector('.dep-picker-list');
-  var search = wrap.querySelector('.dep-picker-search');
-  if (search) search.value = '';
-  list.innerHTML = '';
+  var list = wrap.querySelector(".dep-picker-list");
+  var search = wrap.querySelector(".dep-picker-search");
+  if (search) search.value = "";
+  list.innerHTML = "";
   var statusPriority = { in_progress: 0, waiting: 1, backlog: 2, done: 3 };
   var candidates = tasks
-    .filter(function(t) { return t.id !== excludeId; })
+    .filter(function (t) {
+      return t.id !== excludeId;
+    })
     .slice()
-    .sort(function(a, b) {
-      var pa = statusPriority[a.status] !== undefined ? statusPriority[a.status] : 4;
-      var pb = statusPriority[b.status] !== undefined ? statusPriority[b.status] : 4;
+    .sort(function (a, b) {
+      var pa =
+        statusPriority[a.status] !== undefined ? statusPriority[a.status] : 4;
+      var pb =
+        statusPriority[b.status] !== undefined ? statusPriority[b.status] : 4;
       return pa - pb;
     });
   if (candidates.length === 0) {
@@ -78,27 +86,30 @@ function populateDependsOnPicker(wrapperId, excludeId, selectedIds) {
     updateDepPickerChips(wrapperId, false);
     return;
   }
-  candidates.forEach(function(t) {
-    var label = t.title || (t.prompt.length > 60 ? t.prompt.slice(0, 60) + '\u2026' : t.prompt);
-    var status = t.status === 'in_progress' ? 'in progress' : t.status;
-    var isSelected = Array.isArray(selectedIds) && selectedIds.indexOf(t.id) !== -1;
-    var item = document.createElement('label');
-    item.className = 'dep-picker-item' + (isSelected ? ' selected' : '');
-    var cb = document.createElement('input');
-    cb.type = 'checkbox';
+  candidates.forEach(function (t) {
+    var label =
+      t.title ||
+      (t.prompt.length > 60 ? t.prompt.slice(0, 60) + "\u2026" : t.prompt);
+    var status = t.status === "in_progress" ? "in progress" : t.status;
+    var isSelected =
+      Array.isArray(selectedIds) && selectedIds.indexOf(t.id) !== -1;
+    var item = document.createElement("label");
+    item.className = "dep-picker-item" + (isSelected ? " selected" : "");
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
     cb.value = t.id;
     cb.checked = isSelected;
-    var textSpan = document.createElement('span');
-    textSpan.className = 'dep-picker-item-text';
+    var textSpan = document.createElement("span");
+    textSpan.className = "dep-picker-item-text";
     textSpan.textContent = label;
-    var badge = document.createElement('span');
-    badge.className = 'badge badge-' + t.status;
+    var badge = document.createElement("span");
+    badge.className = "badge badge-" + t.status;
     badge.textContent = status;
     item.appendChild(cb);
     item.appendChild(textSpan);
     item.appendChild(badge);
-    cb.addEventListener('change', function() {
-      item.classList.toggle('selected', cb.checked);
+    cb.addEventListener("change", function () {
+      item.classList.toggle("selected", cb.checked);
       updateDepPickerChips(wrapperId, true);
     });
     list.appendChild(item);
@@ -110,43 +121,53 @@ function populateDependsOnPicker(wrapperId, excludeId, selectedIds) {
 function getDepPickerValues(wrapperId) {
   var wrap = document.getElementById(wrapperId);
   if (!wrap) return [];
-  return Array.from(wrap.querySelectorAll('.dep-picker-item input[type=checkbox]:checked'))
-    .map(function(cb) { return cb.value; });
+  return Array.from(
+    wrap.querySelectorAll(".dep-picker-item input[type=checkbox]:checked"),
+  ).map(function (cb) {
+    return cb.value;
+  });
 }
 
 /** Toggles the dep-picker dropdown open/closed. */
 function toggleDepPicker(wrapperId) {
   var wrap = document.getElementById(wrapperId);
-  var isOpen = wrap.classList.contains('open');
+  var isOpen = wrap.classList.contains("open");
   // Close all open pickers
-  document.querySelectorAll('.dep-picker.open').forEach(function(p) {
-    p.classList.remove('open');
-    p.querySelector('.dep-picker-dropdown').style.display = 'none';
+  document.querySelectorAll(".dep-picker.open").forEach(function (p) {
+    p.classList.remove("open");
+    p.querySelector(".dep-picker-dropdown").style.display = "none";
   });
   if (!isOpen) {
-    wrap.classList.add('open');
-    wrap.querySelector('.dep-picker-dropdown').style.display = '';
-    var search = wrap.querySelector('.dep-picker-search');
-    if (search) { filterDepPicker(search); search.focus(); }
+    wrap.classList.add("open");
+    wrap.querySelector(".dep-picker-dropdown").style.display = "";
+    var search = wrap.querySelector(".dep-picker-search");
+    if (search) {
+      filterDepPicker(search);
+      search.focus();
+    }
   }
 }
 
 /** Filters dep-picker items based on search input. */
 function filterDepPicker(inputEl) {
   var search = inputEl.value.toLowerCase();
-  var list = inputEl.closest('.dep-picker-dropdown').querySelector('.dep-picker-list');
-  list.querySelectorAll('.dep-picker-item').forEach(function(item) {
-    var text = item.querySelector('.dep-picker-item-text').textContent.toLowerCase();
-    item.style.display = text.includes(search) ? '' : 'none';
+  var list = inputEl
+    .closest(".dep-picker-dropdown")
+    .querySelector(".dep-picker-list");
+  list.querySelectorAll(".dep-picker-item").forEach(function (item) {
+    var text = item
+      .querySelector(".dep-picker-item-text")
+      .textContent.toLowerCase();
+    item.style.display = text.includes(search) ? "" : "none";
   });
 }
 
 // Close any open dep-picker when clicking outside
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.dep-picker')) {
-    document.querySelectorAll('.dep-picker.open').forEach(function(p) {
-      p.classList.remove('open');
-      p.querySelector('.dep-picker-dropdown').style.display = 'none';
+document.addEventListener("click", function (e) {
+  if (!e.target.closest(".dep-picker")) {
+    document.querySelectorAll(".dep-picker.open").forEach(function (p) {
+      p.classList.remove("open");
+      p.querySelector(".dep-picker-dropdown").style.display = "none";
     });
   }
 });
@@ -157,19 +178,28 @@ function renderTagChips(containerId, tags) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container._tags = Array.isArray(tags) ? tags : [];
-  const chips = container._tags.map(function(tag, index) {
-    const style = typeof tagStyle === 'function' ? tagStyle(tag) : 'background:var(--tag-bg-0);color:var(--tag-text-0);';
-    return `<span class="tag-chip tag-chip-edit" style="${style}">${escapeHtml(tag)}<button class="tag-chip-remove" data-idx="${index}" title="Remove tag" onclick="event.preventDefault();event.stopPropagation();_removeTagAt(this.closest('[id]'), ${index})">×</button></span>`;
-  }).join('');
+  const chips = container._tags
+    .map(function (tag, index) {
+      const style =
+        typeof tagStyle === "function"
+          ? tagStyle(tag)
+          : "background:var(--tag-bg-0);color:var(--tag-text-0);";
+      return `<span class="tag-chip tag-chip-edit" style="${style}">${escapeHtml(tag)}<button class="tag-chip-remove" data-idx="${index}" title="Remove tag" onclick="event.preventDefault();event.stopPropagation();_removeTagAt(this.closest('[id]'), ${index})">×</button></span>`;
+    })
+    .join("");
   container.innerHTML = `<div class="tag-chip-row tag-chip-input-row">${chips}<input class="tag-chip-input" type="text" placeholder="Add tag…" maxlength="32"></div>`;
-  const input = container.querySelector('.tag-chip-input');
+  const input = container.querySelector(".tag-chip-input");
   if (!input) return;
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' || e.key === ',') {
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
       _addTag(container, input.value);
-      input.value = '';
-    } else if (e.key === 'Backspace' && input.value === '' && container._tags.length > 0) {
+      input.value = "";
+    } else if (
+      e.key === "Backspace" &&
+      input.value === "" &&
+      container._tags.length > 0
+    ) {
       e.preventDefault();
       _removeTagAt(container, container._tags.length - 1);
     }
@@ -179,20 +209,24 @@ function renderTagChips(containerId, tags) {
 function initTagInput(containerId, initialTags) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  container._tags = (initialTags || []).map(function(tag) {
-    return String(tag).trim().toLowerCase();
-  }).filter(Boolean);
+  container._tags = (initialTags || [])
+    .map(function (tag) {
+      return String(tag).trim().toLowerCase();
+    })
+    .filter(Boolean);
   renderTagChips(containerId, container._tags);
 }
 
 function _notifyTagInputChange(container) {
   if (!container) return;
   const cbName = container.dataset.onchange;
-  if (cbName && typeof window[cbName] === 'function') window[cbName]();
+  if (cbName && typeof window[cbName] === "function") window[cbName]();
 }
 
 function _addTag(container, rawValue) {
-  const tag = String(rawValue || '').trim().toLowerCase();
+  const tag = String(rawValue || "")
+    .trim()
+    .toLowerCase();
   if (!tag) return;
   if (!container._tags.includes(tag)) container._tags.push(tag);
   renderTagChips(container.id, container._tags);
@@ -208,100 +242,132 @@ function _removeTagAt(container, index) {
 
 function getTagValues(containerId) {
   const container = document.getElementById(containerId);
-  return container ? (container._tags || []) : [];
+  return container ? container._tags || [] : [];
 }
 
 // --- Task creation ---
 
 async function createTask() {
-  const textarea = document.getElementById('new-prompt');
+  const textarea = document.getElementById("new-prompt");
   const prompt = textarea.value.trim();
   if (!prompt) {
     textarea.focus();
-    textarea.style.borderColor = '#dc2626';
-    setTimeout(() => textarea.style.borderColor = '', 2000);
+    textarea.style.borderColor = "#dc2626";
+    setTimeout(() => (textarea.style.borderColor = ""), 2000);
     return;
   }
   try {
-    const timeout = parseInt(document.getElementById('new-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
-    const mount_worktrees = document.getElementById('new-mount-worktrees').checked;
-    const sandbox = document.getElementById('new-sandbox').value;
-    const sandbox_by_activity = collectSandboxByActivity('new-sandbox-');
-    const tags = getTagValues('new-task-tag-input');
-    const max_cost_usd = parseFloat(document.getElementById('new-max-cost-usd').value) || 0;
-    const max_input_tokens = parseInt(document.getElementById('new-max-input-tokens').value, 10) || 0;
-    const scheduledAtEl = document.getElementById('new-scheduled-at');
-    const scheduled_at = scheduledAtEl && scheduledAtEl.value ? new Date(scheduledAtEl.value).toISOString() : undefined;
-    const newTask = await api(Routes.tasks.create(), { method: 'POST', body: JSON.stringify({ prompt, timeout, mount_worktrees, sandbox, sandbox_by_activity, tags, max_cost_usd, max_input_tokens, scheduled_at }) });
-    const dependsOn = getDepPickerValues('new-depends-on-picker');
+    const timeout =
+      parseInt(document.getElementById("new-timeout").value, 10) ||
+      DEFAULT_TASK_TIMEOUT;
+    const mount_worktrees = document.getElementById(
+      "new-mount-worktrees",
+    ).checked;
+    const sandbox = document.getElementById("new-sandbox").value;
+    const sandbox_by_activity = collectSandboxByActivity("new-sandbox-");
+    const tags = getTagValues("new-task-tag-input");
+    const max_cost_usd =
+      parseFloat(document.getElementById("new-max-cost-usd").value) || 0;
+    const max_input_tokens =
+      parseInt(document.getElementById("new-max-input-tokens").value, 10) || 0;
+    const scheduledAtEl = document.getElementById("new-scheduled-at");
+    const scheduled_at =
+      scheduledAtEl && scheduledAtEl.value
+        ? new Date(scheduledAtEl.value).toISOString()
+        : undefined;
+    const newTask = await api(Routes.tasks.create(), {
+      method: "POST",
+      body: JSON.stringify({
+        prompt,
+        timeout,
+        mount_worktrees,
+        sandbox,
+        sandbox_by_activity,
+        tags,
+        max_cost_usd,
+        max_input_tokens,
+        scheduled_at,
+      }),
+    });
+    const dependsOn = getDepPickerValues("new-depends-on-picker");
     if (dependsOn.length > 0 && newTask && newTask.id) {
-      await api(task(newTask.id).update(), { method: 'PATCH', body: JSON.stringify({ depends_on: dependsOn }) });
+      await api(task(newTask.id).update(), {
+        method: "PATCH",
+        body: JSON.stringify({ depends_on: dependsOn }),
+      });
     }
-    localStorage.removeItem('wallfacer-new-task-draft');
+    localStorage.removeItem("wallfacer-new-task-draft");
     hideNewTaskForm();
     if (newTask && newTask.id) {
-      waitForTaskDelta(newTask.id).then(function() {
+      waitForTaskDelta(newTask.id).then(function () {
         return waitForTaskTitle(newTask.id);
       });
     } else {
       fetchTasks();
     }
   } catch (e) {
-    showAlert('Error creating task: ' + e.message);
+    showAlert("Error creating task: " + e.message);
   }
 }
 
 function showNewTaskForm() {
-  document.getElementById('new-task-btn').classList.add('hidden');
-  document.getElementById('new-task-form').classList.remove('hidden');
-  document.getElementById('new-timeout').value = DEFAULT_TASK_TIMEOUT;
-  const textarea = document.getElementById('new-prompt');
-  const draft = localStorage.getItem('wallfacer-new-task-draft') || '';
+  document.getElementById("new-task-btn").classList.add("hidden");
+  document.getElementById("new-task-form").classList.remove("hidden");
+  document.getElementById("new-timeout").value = DEFAULT_TASK_TIMEOUT;
+  const textarea = document.getElementById("new-prompt");
+  const draft = localStorage.getItem("wallfacer-new-task-draft") || "";
   textarea.value = draft;
-  textarea.style.height = draft ? textarea.scrollHeight + 'px' : '';
+  textarea.style.height = draft ? textarea.scrollHeight + "px" : "";
   textarea.focus();
-  const sandboxSelect = document.getElementById('new-sandbox');
-  bindTaskSandboxInheritance('new-sandbox', 'new-sandbox-');
+  const sandboxSelect = document.getElementById("new-sandbox");
+  bindTaskSandboxInheritance("new-sandbox", "new-sandbox-");
   if (sandboxSelect) {
-    sandboxSelect.value = defaultSandbox || '';
+    sandboxSelect.value = defaultSandbox || "";
   }
   // Do not prefill per-activity overrides on new tasks. Empty values inherit
   // from task default sandbox, preventing stale global overrides (e.g. claude)
   // from shadowing an explicit task sandbox (e.g. codex).
-  applySandboxByActivity('new-sandbox-', {});
-  setActivityOverrideDefaultSandbox('new-sandbox-', (sandboxSelect && sandboxSelect.value) ? sandboxSelect.value : '');
-  initTagInput('new-task-tag-input', []);
-  var depsRow = document.getElementById('new-depends-on-row');
-  populateDependsOnPicker('new-depends-on-picker', null, []);
-  if (depsRow) depsRow.style.display = tasks.length > 0 ? '' : 'none';
+  applySandboxByActivity("new-sandbox-", {});
+  setActivityOverrideDefaultSandbox(
+    "new-sandbox-",
+    sandboxSelect && sandboxSelect.value ? sandboxSelect.value : "",
+  );
+  initTagInput("new-task-tag-input", []);
+  var depsRow = document.getElementById("new-depends-on-row");
+  populateDependsOnPicker("new-depends-on-picker", null, []);
+  if (depsRow) depsRow.style.display = tasks.length > 0 ? "" : "none";
 }
 
 function hideNewTaskForm() {
-  document.getElementById('new-task-form').classList.add('hidden');
-  document.getElementById('new-task-btn').classList.remove('hidden');
-  const textarea = document.getElementById('new-prompt');
-  textarea.value = '';
-  textarea.style.height = '';
-  document.getElementById('new-mount-worktrees').checked = false;
-  const sandboxSelect = document.getElementById('new-sandbox');
+  document.getElementById("new-task-form").classList.add("hidden");
+  document.getElementById("new-task-btn").classList.remove("hidden");
+  const textarea = document.getElementById("new-prompt");
+  textarea.value = "";
+  textarea.style.height = "";
+  document.getElementById("new-mount-worktrees").checked = false;
+  const sandboxSelect = document.getElementById("new-sandbox");
   if (sandboxSelect) {
-    sandboxSelect.value = defaultSandbox || '';
+    sandboxSelect.value = defaultSandbox || "";
   }
-  applySandboxByActivity('new-sandbox-', {});
-  setActivityOverrideDefaultSandbox('new-sandbox-', (sandboxSelect && sandboxSelect.value) ? sandboxSelect.value : '');
-  const maxCostEl = document.getElementById('new-max-cost-usd');
-  if (maxCostEl) maxCostEl.value = '';
-  const maxTokensEl = document.getElementById('new-max-input-tokens');
-  if (maxTokensEl) maxTokensEl.value = '';
-  const scheduledAtEl = document.getElementById('new-scheduled-at');
-  if (scheduledAtEl) scheduledAtEl.value = '';
-  initTagInput('new-task-tag-input', []);
-  var depPicker = document.getElementById('new-depends-on-picker');
+  applySandboxByActivity("new-sandbox-", {});
+  setActivityOverrideDefaultSandbox(
+    "new-sandbox-",
+    sandboxSelect && sandboxSelect.value ? sandboxSelect.value : "",
+  );
+  const maxCostEl = document.getElementById("new-max-cost-usd");
+  if (maxCostEl) maxCostEl.value = "";
+  const maxTokensEl = document.getElementById("new-max-input-tokens");
+  if (maxTokensEl) maxTokensEl.value = "";
+  const scheduledAtEl = document.getElementById("new-scheduled-at");
+  if (scheduledAtEl) scheduledAtEl.value = "";
+  initTagInput("new-task-tag-input", []);
+  var depPicker = document.getElementById("new-depends-on-picker");
   if (depPicker) {
-    depPicker.querySelector('.dep-picker-list').innerHTML = '';
-    depPicker.querySelector('.dep-picker-chips').innerHTML = '<span class="dep-picker-placeholder">None</span>';
-    depPicker.classList.remove('open');
-    depPicker.querySelector('.dep-picker-dropdown').style.display = 'none';
+    depPicker.querySelector(".dep-picker-list").innerHTML = "";
+    depPicker.querySelector(".dep-picker-chips").innerHTML =
+      '<span class="dep-picker-placeholder">None</span>';
+    depPicker.classList.remove("open");
+    depPicker.querySelector(".dep-picker-dropdown").style.display = "none";
   }
 }
 
@@ -309,23 +375,37 @@ function hideNewTaskForm() {
 
 async function updateTaskStatus(id, status) {
   try {
-    const currentTask = (typeof findTaskById === 'function' ? findTaskById(id) : null) ||
-      tasks.find(function(t) { return t.id === id; }) ||
-      archivedTasks.find(function(t) { return t.id === id; });
-    await api(task(id).update(), { method: 'PATCH', body: JSON.stringify({ status }) });
-    if (currentTask) announceBoardStatus(`Task "${getTaskAccessibleTitle(currentTask)}" moved to ${formatTaskStatusLabel(status)}`);
+    const currentTask =
+      (typeof findTaskById === "function" ? findTaskById(id) : null) ||
+      tasks.find(function (t) {
+        return t.id === id;
+      }) ||
+      archivedTasks.find(function (t) {
+        return t.id === id;
+      });
+    await api(task(id).update(), {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+    if (currentTask)
+      announceBoardStatus(
+        `Task "${getTaskAccessibleTitle(currentTask)}" moved to ${formatTaskStatusLabel(status)}`,
+      );
     waitForTaskDelta(id);
   } catch (e) {
-    showAlert('Error updating task: ' + e.message);
+    showAlert("Error updating task: " + e.message);
     fetchTasks();
   }
 }
 
 async function toggleFreshStart(id, freshStart) {
   try {
-    await api(task(id).update(), { method: 'PATCH', body: JSON.stringify({ fresh_start: freshStart }) });
+    await api(task(id).update(), {
+      method: "PATCH",
+      body: JSON.stringify({ fresh_start: freshStart }),
+    });
   } catch (e) {
-    showAlert('Error updating task: ' + e.message);
+    showAlert("Error updating task: " + e.message);
   }
 }
 
@@ -333,16 +413,17 @@ async function toggleFreshStart(id, freshStart) {
 
 async function deleteTask(id) {
   try {
-    await api(task(id).delete(), { method: 'DELETE' });
+    await api(task(id).delete(), { method: "DELETE" });
     waitForTaskDelta(id);
   } catch (e) {
-    showAlert('Error deleting task: ' + e.message);
+    showAlert("Error deleting task: " + e.message);
   }
 }
 
 function deleteCurrentTask() {
   if (!getOpenModalTaskId()) return;
-  if (!confirm('This task will be recoverable for 7 days. Delete anyway?')) return;
+  if (!confirm("This task will be recoverable for 7 days. Delete anyway?"))
+    return;
   deleteTask(getOpenModalTaskId());
   closeModal();
 }
@@ -350,20 +431,20 @@ function deleteCurrentTask() {
 // --- Feedback & completion ---
 
 async function submitFeedback() {
-  const textarea = document.getElementById('modal-feedback');
+  const textarea = document.getElementById("modal-feedback");
   const message = textarea.value.trim();
   if (!message || !getOpenModalTaskId()) return;
   const taskId = getOpenModalTaskId();
   try {
     await api(task(taskId).feedback(), {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ message }),
     });
-    textarea.value = '';
+    textarea.value = "";
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error submitting feedback: ' + e.message);
+    showAlert("Error submitting feedback: " + e.message);
   }
 }
 
@@ -371,35 +452,35 @@ async function completeTask() {
   if (!getOpenModalTaskId()) return;
   const taskId = getOpenModalTaskId();
   try {
-    await api(task(taskId).done(), { method: 'POST' });
+    await api(task(taskId).done(), { method: "POST" });
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error completing task: ' + e.message);
+    showAlert("Error completing task: " + e.message);
   }
 }
 
 // --- Retry & resume ---
 
 async function retryTask() {
-  const textarea = document.getElementById('modal-retry-prompt');
+  const textarea = document.getElementById("modal-retry-prompt");
   const prompt = textarea.value.trim();
   if (!prompt || !getOpenModalTaskId()) return;
   const taskId = getOpenModalTaskId();
   try {
-    const body = { status: 'backlog', prompt };
-    const retryResumeRow = document.getElementById('modal-retry-resume-row');
-    if (retryResumeRow && !retryResumeRow.classList.contains('hidden')) {
-      body.fresh_start = !document.getElementById('modal-retry-resume').checked;
+    const body = { status: "backlog", prompt };
+    const retryResumeRow = document.getElementById("modal-retry-resume-row");
+    if (retryResumeRow && !retryResumeRow.classList.contains("hidden")) {
+      body.fresh_start = !document.getElementById("modal-retry-resume").checked;
     }
     await api(task(taskId).update(), {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(body),
     });
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error retrying task: ' + e.message);
+    showAlert("Error retrying task: " + e.message);
   }
 }
 
@@ -407,16 +488,18 @@ async function resumeTask() {
   if (!getOpenModalTaskId()) return;
   const taskId = getOpenModalTaskId();
   try {
-    const timeoutEl = document.getElementById('modal-resume-timeout');
-    const timeout = timeoutEl ? parseInt(timeoutEl.value, 10) || DEFAULT_TASK_TIMEOUT : DEFAULT_TASK_TIMEOUT;
+    const timeoutEl = document.getElementById("modal-resume-timeout");
+    const timeout = timeoutEl
+      ? parseInt(timeoutEl.value, 10) || DEFAULT_TASK_TIMEOUT
+      : DEFAULT_TASK_TIMEOUT;
     await api(task(taskId).resume(), {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ timeout }),
     });
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error resuming task: ' + e.message);
+    showAlert("Error resuming task: " + e.message);
   }
 }
 
@@ -424,63 +507,101 @@ async function resumeTask() {
 
 async function saveResumeOption(resume) {
   if (!getOpenModalTaskId()) return;
-  const statusEl = document.getElementById('modal-edit-status');
+  const statusEl = document.getElementById("modal-edit-status");
   try {
     await api(task(getOpenModalTaskId()).update(), {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify({ fresh_start: !resume }),
     });
-    statusEl.textContent = 'Saved';
-    setTimeout(() => { if (statusEl.textContent === 'Saved') statusEl.textContent = ''; }, 1500);
+    statusEl.textContent = "Saved";
+    setTimeout(() => {
+      if (statusEl.textContent === "Saved") statusEl.textContent = "";
+    }, 1500);
   } catch (e) {
-    statusEl.textContent = 'Save failed';
+    statusEl.textContent = "Save failed";
   }
 }
 
 function scheduleBacklogSave() {
-  const statusEl = document.getElementById('modal-edit-status');
-  statusEl.textContent = '';
+  const statusEl = document.getElementById("modal-edit-status");
+  statusEl.textContent = "";
   clearTimeout(editDebounce);
   editDebounce = setTimeout(async () => {
     if (!getOpenModalTaskId()) return;
-    const prompt = document.getElementById('modal-edit-prompt').value.trim();
+    const prompt = document.getElementById("modal-edit-prompt").value.trim();
     if (!prompt) return;
-    const goal = document.getElementById('modal-edit-goal').value.trim();
-    const timeout = parseInt(document.getElementById('modal-edit-timeout').value, 10) || DEFAULT_TASK_TIMEOUT;
-    const mount_worktrees = document.getElementById('modal-edit-mount-worktrees').checked;
-    const sandbox = document.getElementById('modal-edit-sandbox').value;
-    const sandbox_by_activity = collectSandboxByActivity('modal-edit-sandbox-');
-    const depends_on = getDepPickerValues('modal-edit-depends-on-picker');
-    const tags = getTagValues('modal-edit-tag-input');
-    const maxCostEl = document.getElementById('modal-edit-max-cost-usd');
-    const maxTokensEl = document.getElementById('modal-edit-max-input-tokens');
-    const max_cost_usd = maxCostEl ? (parseFloat(maxCostEl.value) || 0) : undefined;
-    const max_input_tokens = maxTokensEl ? (parseInt(maxTokensEl.value, 10) || 0) : undefined;
-    const scheduledAtEl = document.getElementById('modal-edit-scheduled-at');
-    const scheduled_at = scheduledAtEl ? (scheduledAtEl.value ? new Date(scheduledAtEl.value).toISOString() : null) : undefined;
-    const modelOverrideEl = document.getElementById('modal-edit-model-override');
+    const goal = document.getElementById("modal-edit-goal").value.trim();
+    const timeout =
+      parseInt(document.getElementById("modal-edit-timeout").value, 10) ||
+      DEFAULT_TASK_TIMEOUT;
+    const mount_worktrees = document.getElementById(
+      "modal-edit-mount-worktrees",
+    ).checked;
+    const sandbox = document.getElementById("modal-edit-sandbox").value;
+    const sandbox_by_activity = collectSandboxByActivity("modal-edit-sandbox-");
+    const depends_on = getDepPickerValues("modal-edit-depends-on-picker");
+    const tags = getTagValues("modal-edit-tag-input");
+    const maxCostEl = document.getElementById("modal-edit-max-cost-usd");
+    const maxTokensEl = document.getElementById("modal-edit-max-input-tokens");
+    const max_cost_usd = maxCostEl
+      ? parseFloat(maxCostEl.value) || 0
+      : undefined;
+    const max_input_tokens = maxTokensEl
+      ? parseInt(maxTokensEl.value, 10) || 0
+      : undefined;
+    const scheduledAtEl = document.getElementById("modal-edit-scheduled-at");
+    const scheduled_at = scheduledAtEl
+      ? scheduledAtEl.value
+        ? new Date(scheduledAtEl.value).toISOString()
+        : null
+      : undefined;
+    const modelOverrideEl = document.getElementById(
+      "modal-edit-model-override",
+    );
     const model = modelOverrideEl ? modelOverrideEl.value.trim() : undefined;
-    const patchBody = { prompt, goal, timeout, mount_worktrees, sandbox, sandbox_by_activity, depends_on, tags, max_cost_usd, max_input_tokens, scheduled_at, model };
+    const patchBody = {
+      prompt,
+      goal,
+      timeout,
+      mount_worktrees,
+      sandbox,
+      sandbox_by_activity,
+      depends_on,
+      tags,
+      max_cost_usd,
+      max_input_tokens,
+      scheduled_at,
+      model,
+    };
     try {
       await api(task(getOpenModalTaskId()).update(), {
-        method: 'PATCH',
+        method: "PATCH",
         body: JSON.stringify(patchBody),
       });
-      statusEl.textContent = 'Saved';
-      setTimeout(() => { if (statusEl.textContent === 'Saved') statusEl.textContent = ''; }, 1500);
+      statusEl.textContent = "Saved";
+      setTimeout(() => {
+        if (statusEl.textContent === "Saved") statusEl.textContent = "";
+      }, 1500);
       // Update rendered prompt on the left panel.
-      document.getElementById('modal-prompt-rendered').innerHTML = renderMarkdown(prompt);
-      document.getElementById('modal-prompt').textContent = prompt;
+      document.getElementById("modal-prompt-rendered").innerHTML =
+        renderMarkdown(prompt);
+      document.getElementById("modal-prompt").textContent = prompt;
       waitForTaskDelta(getOpenModalTaskId());
     } catch (e) {
-      statusEl.textContent = 'Save failed';
+      statusEl.textContent = "Save failed";
     }
   }, 500);
 }
 
-document.getElementById('modal-edit-prompt').addEventListener('input', scheduleBacklogSave);
-document.getElementById('modal-edit-goal').addEventListener('input', scheduleBacklogSave);
-document.getElementById('modal-edit-timeout').addEventListener('change', scheduleBacklogSave);
+document
+  .getElementById("modal-edit-prompt")
+  .addEventListener("input", scheduleBacklogSave);
+document
+  .getElementById("modal-edit-goal")
+  .addEventListener("input", scheduleBacklogSave);
+document
+  .getElementById("modal-edit-timeout")
+  .addEventListener("change", scheduleBacklogSave);
 
 // --- Start (backlog → in_progress) ---
 
@@ -488,11 +609,14 @@ async function startTask() {
   if (!getOpenModalTaskId()) return;
   const taskId = getOpenModalTaskId();
   try {
-    await api(task(taskId).update(), { method: 'PATCH', body: JSON.stringify({ status: 'in_progress' }) });
+    await api(task(taskId).update(), {
+      method: "PATCH",
+      body: JSON.stringify({ status: "in_progress" }),
+    });
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error starting task: ' + e.message);
+    showAlert("Error starting task: " + e.message);
   }
 }
 
@@ -500,14 +624,19 @@ async function startTask() {
 
 async function cancelTask() {
   if (!getOpenModalTaskId()) return;
-  if (!confirm('Cancel this task? The sandbox will be cleaned up and all prepared changes discarded. History and logs will be preserved.')) return;
+  if (
+    !confirm(
+      "Cancel this task? The sandbox will be cleaned up and all prepared changes discarded. History and logs will be preserved.",
+    )
+  )
+    return;
   const taskId = getOpenModalTaskId();
   try {
-    await api(task(taskId).cancel(), { method: 'POST' });
+    await api(task(taskId).cancel(), { method: "POST" });
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error cancelling task: ' + e.message);
+    showAlert("Error cancelling task: " + e.message);
   }
 }
 
@@ -517,26 +646,34 @@ async function cancelTask() {
 // on a task that was paused due to a budget guardrail.
 async function openRaiseLimitInline() {
   if (!getOpenModalTaskId()) return;
-  const currentTask = tasks.find(t => t.id === getOpenModalTaskId());
+  const currentTask = tasks.find((t) => t.id === getOpenModalTaskId());
   if (!currentTask) return;
-  const banner = document.getElementById('modal-budget-exceeded-banner');
+  const banner = document.getElementById("modal-budget-exceeded-banner");
   if (!banner) return;
 
   const newCost = prompt(
-    'New cost limit in USD (0 = unlimited):\nCurrent limit: ' + (currentTask.max_cost_usd > 0 ? '$' + currentTask.max_cost_usd.toFixed(2) : 'none'),
-    currentTask.max_cost_usd > 0 ? String(currentTask.max_cost_usd) : ''
+    "New cost limit in USD (0 = unlimited):\nCurrent limit: " +
+      (currentTask.max_cost_usd > 0
+        ? "$" + currentTask.max_cost_usd.toFixed(2)
+        : "none"),
+    currentTask.max_cost_usd > 0 ? String(currentTask.max_cost_usd) : "",
   );
   if (newCost === null) return; // cancelled
   const newTokens = prompt(
-    'New input token limit (0 = unlimited):\nCurrent limit: ' + (currentTask.max_input_tokens > 0 ? currentTask.max_input_tokens.toLocaleString() : 'none'),
-    currentTask.max_input_tokens > 0 ? String(currentTask.max_input_tokens) : ''
+    "New input token limit (0 = unlimited):\nCurrent limit: " +
+      (currentTask.max_input_tokens > 0
+        ? currentTask.max_input_tokens.toLocaleString()
+        : "none"),
+    currentTask.max_input_tokens > 0
+      ? String(currentTask.max_input_tokens)
+      : "",
   );
   if (newTokens === null) return; // cancelled
 
   const taskId = getOpenModalTaskId();
   try {
     await api(task(taskId).update(), {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify({
         max_cost_usd: parseFloat(newCost) || 0,
         max_input_tokens: parseInt(newTokens, 10) || 0,
@@ -544,7 +681,7 @@ async function openRaiseLimitInline() {
     });
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error updating budget: ' + e.message);
+    showAlert("Error updating budget: " + e.message);
   }
 }
 
@@ -552,10 +689,10 @@ async function openRaiseLimitInline() {
 
 async function archiveAllDone() {
   try {
-    const result = await api(Routes.tasks.archiveDone(), { method: 'POST' });
+    const result = await api(Routes.tasks.archiveDone(), { method: "POST" });
     fetchTasks();
   } catch (e) {
-    showAlert('Error archiving tasks: ' + e.message);
+    showAlert("Error archiving tasks: " + e.message);
   }
 }
 
@@ -563,11 +700,11 @@ async function archiveTask() {
   if (!getOpenModalTaskId()) return;
   const taskId = getOpenModalTaskId();
   try {
-    await api(task(taskId).archive(), { method: 'POST' });
+    await api(task(taskId).archive(), { method: "POST" });
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error archiving task: ' + e.message);
+    showAlert("Error archiving task: " + e.message);
   }
 }
 
@@ -575,11 +712,11 @@ async function unarchiveTask() {
   if (!getOpenModalTaskId()) return;
   const taskId = getOpenModalTaskId();
   try {
-    await api(task(taskId).unarchive(), { method: 'POST' });
+    await api(task(taskId).unarchive(), { method: "POST" });
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error unarchiving task: ' + e.message);
+    showAlert("Error unarchiving task: " + e.message);
   }
 }
 
@@ -587,70 +724,84 @@ async function unarchiveTask() {
 
 async function quickDoneTask(id) {
   try {
-    const currentTask = (typeof findTaskById === 'function' ? findTaskById(id) : null) ||
-      tasks.find(function(t) { return t.id === id; }) ||
-      archivedTasks.find(function(t) { return t.id === id; });
-    await api(task(id).done(), { method: 'POST' });
-    if (currentTask) announceBoardStatus(`Task "${getTaskAccessibleTitle(currentTask)}" moved to done`);
+    const currentTask =
+      (typeof findTaskById === "function" ? findTaskById(id) : null) ||
+      tasks.find(function (t) {
+        return t.id === id;
+      }) ||
+      archivedTasks.find(function (t) {
+        return t.id === id;
+      });
+    await api(task(id).done(), { method: "POST" });
+    if (currentTask)
+      announceBoardStatus(
+        `Task "${getTaskAccessibleTitle(currentTask)}" moved to done`,
+      );
     waitForTaskDelta(id);
   } catch (e) {
-    showAlert('Error completing task: ' + e.message);
+    showAlert("Error completing task: " + e.message);
   }
 }
 
 async function quickResumeTask(id, timeout) {
   try {
-    await api(task(id).resume(), { method: 'POST', body: JSON.stringify({ timeout }) });
+    await api(task(id).resume(), {
+      method: "POST",
+      body: JSON.stringify({ timeout }),
+    });
     waitForTaskDelta(id);
   } catch (e) {
-    showAlert('Error resuming task: ' + e.message);
+    showAlert("Error resuming task: " + e.message);
   }
 }
 
 async function quickRetryTask(id) {
   try {
-    await api(task(id).update(), { method: 'PATCH', body: JSON.stringify({ status: 'backlog' }) });
+    await api(task(id).update(), {
+      method: "PATCH",
+      body: JSON.stringify({ status: "backlog" }),
+    });
     waitForTaskDelta(id);
   } catch (e) {
-    showAlert('Error retrying task: ' + e.message);
+    showAlert("Error retrying task: " + e.message);
   }
 }
 
 // --- Test agent ---
 
 function toggleTestSection() {
-  const section = document.getElementById('modal-test-section');
-  section.classList.toggle('hidden');
-  if (!section.classList.contains('hidden')) {
-    document.getElementById('modal-test-criteria').focus();
+  const section = document.getElementById("modal-test-section");
+  section.classList.toggle("hidden");
+  if (!section.classList.contains("hidden")) {
+    document.getElementById("modal-test-criteria").focus();
   }
 }
 
 async function runTestTask() {
   if (!getOpenModalTaskId()) return;
   const taskId = getOpenModalTaskId();
-  const criteria = document.getElementById('modal-test-criteria').value.trim();
+  const criteria = document.getElementById("modal-test-criteria").value.trim();
   try {
     const res = await api(task(taskId).test(), {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ criteria }),
     });
     closeModal();
     waitForTaskDelta(taskId);
   } catch (e) {
-    showAlert('Error starting test verification: ' + e.message);
+    showAlert("Error starting test verification: " + e.message);
   }
 }
 
 async function quickTestTask(id) {
   try {
     await api(task(id).test(), {
-      method: 'POST',
-      body: JSON.stringify({ criteria: '' }),
+      method: "POST",
+      body: JSON.stringify({ criteria: "" }),
     });
     waitForTaskDelta(id);
   } catch (e) {
-    showAlert('Error starting test verification: ' + e.message);
+    showAlert("Error starting test verification: " + e.message);
   }
 }
 
@@ -661,45 +812,56 @@ async function syncTask(id) {
   if (_syncInFlight.has(id)) return;
   _syncInFlight.add(id);
   // Disable all sync buttons for this task while in flight.
-  document.querySelectorAll(`[onclick*="syncTask('${id}')"]`).forEach(function(btn) { btn.disabled = true; });
+  document
+    .querySelectorAll(`[onclick*="syncTask('${id}')"]`)
+    .forEach(function (btn) {
+      btn.disabled = true;
+    });
   try {
-    const res = await api(task(id).sync(), { method: 'POST' });
+    const res = await api(task(id).sync(), { method: "POST" });
     diffCache.delete(id);
-    if (res.status === 'already_syncing') {
-      showAlert('Sync is already in progress for this task.');
+    if (res.status === "already_syncing") {
+      showAlert("Sync is already in progress for this task.");
     }
     waitForTaskDelta(id);
   } catch (e) {
-    showAlert('Error syncing task: ' + e.message);
+    showAlert("Error syncing task: " + e.message);
   } finally {
     _syncInFlight.delete(id);
-    document.querySelectorAll(`[onclick*="syncTask('${id}')"]`).forEach(function(btn) { btn.disabled = false; });
+    document
+      .querySelectorAll(`[onclick*="syncTask('${id}')"]`)
+      .forEach(function (btn) {
+        btn.disabled = false;
+      });
   }
 }
-
 
 // --- Bulk title generation for tasks without a title ---
 
 async function generateMissingTitles() {
-  const statusEl = document.getElementById('generate-titles-status');
+  const statusEl = document.getElementById("generate-titles-status");
   const btn = document.querySelector('[onclick="generateMissingTitles()"]');
-  const limit = document.getElementById('generate-titles-limit').value;
+  const limit = document.getElementById("generate-titles-limit").value;
 
   btn.disabled = true;
-  statusEl.innerHTML = '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:4px;"></span>Checking tasks…';
-  statusEl.style.color = 'var(--text-muted)';
+  statusEl.innerHTML =
+    '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:4px;"></span>Checking tasks…';
+  statusEl.style.color = "var(--text-muted)";
 
   let interval = null;
 
   try {
     const params = new URLSearchParams({ limit });
-    const res = await api(Routes.tasks.generateTitles() + '?' + params, { method: 'POST' });
+    const res = await api(Routes.tasks.generateTitles() + "?" + params, {
+      method: "POST",
+    });
     const { queued, total_without_title, task_ids } = res;
 
     if (queued === 0) {
-      statusEl.textContent = total_without_title === 0
-        ? 'All tasks already have titles.'
-        : 'No tasks queued (limit reached or none found).';
+      statusEl.textContent =
+        total_without_title === 0
+          ? "All tasks already have titles."
+          : "No tasks queued (limit reached or none found).";
       btn.disabled = false;
       return;
     }
@@ -716,14 +878,16 @@ async function generateMissingTitles() {
       const inFlight = pending.size > 0;
       const spinnerHtml = inFlight
         ? '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:5px;"></span>'
-        : '';
-      const okHtml = succeeded > 0
-        ? ` <span style="color:#16a34a">${succeeded} ok</span>`
-        : '';
-      const failHtml = failed > 0
-        ? ` <span style="color:var(--danger,#dc2626)">${failed} failed</span>`
-        : '';
-      statusEl.style.color = 'var(--text-muted)';
+        : "";
+      const okHtml =
+        succeeded > 0
+          ? ` <span style="color:#16a34a">${succeeded} ok</span>`
+          : "";
+      const failHtml =
+        failed > 0
+          ? ` <span style="color:var(--danger,#dc2626)">${failed} failed</span>`
+          : "";
+      statusEl.style.color = "var(--text-muted)";
       statusEl.innerHTML = `${spinnerHtml}${done}/${total} generated${okHtml}${failHtml}`;
     }
 
@@ -731,7 +895,7 @@ async function generateMissingTitles() {
 
     interval = setInterval(() => {
       for (const id of [...pending]) {
-        const t = tasks.find(t => t.id === id);
+        const t = tasks.find((t) => t.id === id);
         if (t && t.title) {
           pending.delete(id);
           succeeded++;
@@ -754,11 +918,10 @@ async function generateMissingTitles() {
         btn.disabled = false;
       }
     }, 1000);
-
   } catch (e) {
     if (interval) clearInterval(interval);
-    statusEl.textContent = 'Error: ' + e.message;
-    statusEl.style.color = 'var(--danger, #dc2626)';
+    statusEl.textContent = "Error: " + e.message;
+    statusEl.style.color = "var(--danger, #dc2626)";
     btn.disabled = false;
   }
 }
@@ -766,25 +929,29 @@ async function generateMissingTitles() {
 // --- Bulk oversight generation for tasks without a summary ---
 
 async function generateMissingOversight() {
-  const statusEl = document.getElementById('generate-oversight-status');
+  const statusEl = document.getElementById("generate-oversight-status");
   const btn = document.querySelector('[onclick="generateMissingOversight()"]');
-  const limit = document.getElementById('generate-oversight-limit').value;
+  const limit = document.getElementById("generate-oversight-limit").value;
 
   btn.disabled = true;
-  statusEl.innerHTML = '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:4px;"></span>Checking tasks…';
-  statusEl.style.color = 'var(--text-muted)';
+  statusEl.innerHTML =
+    '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:4px;"></span>Checking tasks…';
+  statusEl.style.color = "var(--text-muted)";
 
   let interval = null;
 
   try {
     const params = new URLSearchParams({ limit });
-    const res = await api(Routes.tasks.generateOversight() + '?' + params, { method: 'POST' });
+    const res = await api(Routes.tasks.generateOversight() + "?" + params, {
+      method: "POST",
+    });
     const { queued, total_without_oversight, task_ids } = res;
 
     if (queued === 0) {
-      statusEl.textContent = total_without_oversight === 0
-        ? 'All eligible tasks already have oversight summaries.'
-        : 'No tasks queued (limit reached or none found).';
+      statusEl.textContent =
+        total_without_oversight === 0
+          ? "All eligible tasks already have oversight summaries."
+          : "No tasks queued (limit reached or none found).";
       btn.disabled = false;
       return;
     }
@@ -801,14 +968,16 @@ async function generateMissingOversight() {
       const inFlight = pending.size > 0;
       const spinnerHtml = inFlight
         ? '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;margin-right:5px;"></span>'
-        : '';
-      const okHtml = succeeded > 0
-        ? ` <span style="color:#16a34a">${succeeded} ok</span>`
-        : '';
-      const failHtml = failed > 0
-        ? ` <span style="color:var(--danger,#dc2626)">${failed} failed</span>`
-        : '';
-      statusEl.style.color = 'var(--text-muted)';
+        : "";
+      const okHtml =
+        succeeded > 0
+          ? ` <span style="color:#16a34a">${succeeded} ok</span>`
+          : "";
+      const failHtml =
+        failed > 0
+          ? ` <span style="color:var(--danger,#dc2626)">${failed} failed</span>`
+          : "";
+      statusEl.style.color = "var(--text-muted)";
       statusEl.innerHTML = `${spinnerHtml}${done}/${total} generated${okHtml}${failHtml}`;
     }
 
@@ -824,15 +993,17 @@ async function generateMissingOversight() {
         return;
       }
 
-      const checks = [...pending].map(id =>
-        api(task(id).oversight()).then(o => ({ id, status: o.status })).catch(() => ({ id, status: 'error' }))
+      const checks = [...pending].map((id) =>
+        api(task(id).oversight())
+          .then((o) => ({ id, status: o.status }))
+          .catch(() => ({ id, status: "error" })),
       );
       const results = await Promise.all(checks);
       for (const { id, status } of results) {
-        if (status === 'ready') {
+        if (status === "ready") {
           pending.delete(id);
           succeeded++;
-        } else if (status === 'failed' || status === 'error') {
+        } else if (status === "failed" || status === "error") {
           pending.delete(id);
           failed++;
         }
@@ -845,11 +1016,10 @@ async function generateMissingOversight() {
         btn.disabled = false;
       }
     }, 3000);
-
   } catch (e) {
     if (interval) clearInterval(interval);
-    statusEl.textContent = 'Error: ' + e.message;
-    statusEl.style.color = 'var(--danger, #dc2626)';
+    statusEl.textContent = "Error: " + e.message;
+    statusEl.style.color = "var(--danger, #dc2626)";
     btn.disabled = false;
   }
 }

@@ -10,14 +10,14 @@
  *     the non-existent Routes.tasks.update(id), so no TypeError is thrown and
  *     the PATCH reaches the correct URL.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import vm from 'vm';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const jsDir = join(__dirname, '..');
+const jsDir = join(__dirname, "..");
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -25,24 +25,38 @@ const jsDir = join(__dirname, '..');
 
 function makeElement(overrides = {}) {
   const el = {
-    value: overrides.value || '',
+    value: overrides.value || "",
     checked: overrides.checked || false,
-    textContent: '',
-    innerHTML: '',
+    textContent: "",
+    innerHTML: "",
     style: {},
     dataset: {},
     classList: {
       _set: new Set(),
-      add(c) { this._set.add(c); },
-      remove(c) { this._set.delete(c); },
-      contains(c) { return this._set.has(c); },
+      add(c) {
+        this._set.add(c);
+      },
+      remove(c) {
+        this._set.delete(c);
+      },
+      contains(c) {
+        return this._set.has(c);
+      },
       toggle(c, f) {
         if (f === undefined) {
-          if (this._set.has(c)) { this._set.delete(c); return false; }
-          this._set.add(c); return true;
+          if (this._set.has(c)) {
+            this._set.delete(c);
+            return false;
+          }
+          this._set.add(c);
+          return true;
         }
-        if (f) { this._set.add(c); return true; }
-        this._set.delete(c); return false;
+        if (f) {
+          this._set.add(c);
+          return true;
+        }
+        this._set.delete(c);
+        return false;
       },
     },
     addEventListener: vi.fn(),
@@ -70,10 +84,12 @@ function makeMockEventSource(readyState = 1) {
       if (!listeners[type]) return;
       listeners[type] = listeners[type].filter((f) => f !== fn);
     },
-    close() { this.readyState = 2; },
+    close() {
+      this.readyState = 2;
+    },
     /** Synchronously dispatch a fake SSE event to all registered listeners. */
     fire(type, data) {
-      const event = { data: JSON.stringify(data), lastEventId: '' };
+      const event = { data: JSON.stringify(data), lastEventId: "" };
       (listeners[type] || []).forEach((fn) => fn(event));
     },
   };
@@ -90,7 +106,7 @@ function makeContext(overrides = {}) {
     clearTimeout: overrides.clearTimeout || globalThis.clearTimeout,
     Promise,
     EventSource: function MockEventSource() {},
-    location: { hash: '' },
+    location: { hash: "" },
     fetch: overrides.fetch || vi.fn(),
     showAlert: vi.fn(),
     openModal: vi.fn().mockResolvedValue(undefined),
@@ -99,7 +115,7 @@ function makeContext(overrides = {}) {
     closeModal: vi.fn(),
     getOpenModalTaskId: vi.fn(),
     announceBoardStatus: vi.fn(),
-    getTaskAccessibleTitle: vi.fn((t) => t && (t.title || t.id) || ''),
+    getTaskAccessibleTitle: vi.fn((t) => (t && (t.title || t.id)) || ""),
     formatTaskStatusLabel: vi.fn((s) => s),
     scheduleRender: vi.fn(),
     invalidateDiffBehindCounts: vi.fn(),
@@ -115,38 +131,38 @@ function makeContext(overrides = {}) {
       querySelector: () => null,
       addEventListener: vi.fn(),
       documentElement: { setAttribute: vi.fn() },
-      readyState: 'complete',
+      readyState: "complete",
     },
     Routes: overrides.Routes || {
       tasks: {
-        list: () => '/api/tasks',
-        stream: () => '/api/tasks/stream',
-        archiveDone: () => '/api/tasks/archive-done',
-        generateTitles: () => '/api/tasks/generate-titles',
-        generateOversight: () => '/api/tasks/generate-oversight',
-        create: () => '/api/tasks',
-        task: function(id) {
+        list: () => "/api/tasks",
+        stream: () => "/api/tasks/stream",
+        archiveDone: () => "/api/tasks/archive-done",
+        generateTitles: () => "/api/tasks/generate-titles",
+        generateOversight: () => "/api/tasks/generate-oversight",
+        create: () => "/api/tasks",
+        task: function (id) {
           return {
-            update: () => '/api/tasks/' + id,
-            delete: () => '/api/tasks/' + id,
-            feedback: () => '/api/tasks/' + id + '/feedback',
-            done: () => '/api/tasks/' + id + '/done',
-            cancel: () => '/api/tasks/' + id + '/cancel',
-            resume: () => '/api/tasks/' + id + '/resume',
-            archive: () => '/api/tasks/' + id + '/archive',
-            unarchive: () => '/api/tasks/' + id + '/unarchive',
-            sync: () => '/api/tasks/' + id + '/sync',
-            test: () => '/api/tasks/' + id + '/test',
-            diff: () => '/api/tasks/' + id + '/diff',
-            refine: () => '/api/tasks/' + id + '/refine',
-            refineLogs: () => '/api/tasks/' + id + '/refine/logs',
-            refineApply: () => '/api/tasks/' + id + '/refine/apply',
-            refineDismiss: () => '/api/tasks/' + id + '/refine/dismiss',
-            oversight: () => '/api/tasks/' + id + '/oversight',
+            update: () => "/api/tasks/" + id,
+            delete: () => "/api/tasks/" + id,
+            feedback: () => "/api/tasks/" + id + "/feedback",
+            done: () => "/api/tasks/" + id + "/done",
+            cancel: () => "/api/tasks/" + id + "/cancel",
+            resume: () => "/api/tasks/" + id + "/resume",
+            archive: () => "/api/tasks/" + id + "/archive",
+            unarchive: () => "/api/tasks/" + id + "/unarchive",
+            sync: () => "/api/tasks/" + id + "/sync",
+            test: () => "/api/tasks/" + id + "/test",
+            diff: () => "/api/tasks/" + id + "/diff",
+            refine: () => "/api/tasks/" + id + "/refine",
+            refineLogs: () => "/api/tasks/" + id + "/refine/logs",
+            refineApply: () => "/api/tasks/" + id + "/refine/apply",
+            refineDismiss: () => "/api/tasks/" + id + "/refine/dismiss",
+            oversight: () => "/api/tasks/" + id + "/oversight",
           };
         },
       },
-      config: { get: () => '/api/config', update: () => '/api/config' },
+      config: { get: () => "/api/config", update: () => "/api/config" },
     },
     localStorage: {
       getItem: vi.fn(),
@@ -163,7 +179,7 @@ function makeContext(overrides = {}) {
 }
 
 function loadScript(ctx, filename) {
-  const code = readFileSync(join(jsDir, filename), 'utf8');
+  const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;
 }
@@ -172,12 +188,12 @@ function loadScript(ctx, filename) {
 // Test 1 — Happy path: SSE delta resolves the wait; fetchTasks is not called
 // ---------------------------------------------------------------------------
 
-describe('waitForTaskDelta — SSE delta resolves without fetchTasks', () => {
-  it('resolves from a task-updated SSE event and never calls fetchTasks', async () => {
+describe("waitForTaskDelta — SSE delta resolves without fetchTasks", () => {
+  it("resolves from a task-updated SSE event and never calls fetchTasks", async () => {
     const ctx = makeContext();
 
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'api.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "api.js");
 
     // Override the script-defined fetchTasks with a spy so we can assert on it.
     // api.js defines fetchTasks in the VM scope, so we reassign after loading.
@@ -186,13 +202,13 @@ describe('waitForTaskDelta — SSE delta resolves without fetchTasks', () => {
 
     // Plant a connected mock EventSource as tasksSource.
     const source = makeMockEventSource(1 /* OPEN */);
-    vm.runInContext('tasksSource = source;', Object.assign(ctx, { source }));
+    vm.runInContext("tasksSource = source;", Object.assign(ctx, { source }));
 
-    const taskId = 'aaaaaaaa-0000-0000-0000-000000000001';
+    const taskId = "aaaaaaaa-0000-0000-0000-000000000001";
     const deltaPromise = ctx.waitForTaskDelta(taskId, 5000);
 
     // Simulate the server broadcasting a task-updated event for our task.
-    source.fire('task-updated', { id: taskId, status: 'done' });
+    source.fire("task-updated", { id: taskId, status: "done" });
 
     await deltaPromise;
 
@@ -204,12 +220,12 @@ describe('waitForTaskDelta — SSE delta resolves without fetchTasks', () => {
 // Test 2 — Fallback: stream absent → fetchTasks is called immediately
 // ---------------------------------------------------------------------------
 
-describe('waitForTaskDelta — stream absent triggers fetchTasks fallback', () => {
-  it('calls fetchTasks when tasksSource is null', async () => {
+describe("waitForTaskDelta — stream absent triggers fetchTasks fallback", () => {
+  it("calls fetchTasks when tasksSource is null", async () => {
     const ctx = makeContext();
 
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'api.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "api.js");
 
     // Override the script-defined fetchTasks with a spy AFTER loading so that
     // waitForTaskDelta (also defined in api.js) looks up the spy at call time.
@@ -217,45 +233,48 @@ describe('waitForTaskDelta — stream absent triggers fetchTasks fallback', () =
     ctx.fetchTasks = fetchTasks;
 
     // Ensure tasksSource is null (no active stream).
-    vm.runInContext('tasksSource = null;', ctx);
+    vm.runInContext("tasksSource = null;", ctx);
 
-    await ctx.waitForTaskDelta('aaaaaaaa-0000-0000-0000-000000000002', 5000);
+    await ctx.waitForTaskDelta("aaaaaaaa-0000-0000-0000-000000000002", 5000);
 
     expect(fetchTasks).toHaveBeenCalledOnce();
   });
 
-  it('calls fetchTasks when tasksSource is CLOSED', async () => {
+  it("calls fetchTasks when tasksSource is CLOSED", async () => {
     const ctx = makeContext();
 
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'api.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "api.js");
 
     // Override the script-defined fetchTasks with a spy AFTER loading.
     const fetchTasks = vi.fn().mockResolvedValue(undefined);
     ctx.fetchTasks = fetchTasks;
 
     const closed = makeMockEventSource(2 /* CLOSED */);
-    vm.runInContext('tasksSource = source;', Object.assign(ctx, { source: closed }));
+    vm.runInContext(
+      "tasksSource = source;",
+      Object.assign(ctx, { source: closed }),
+    );
 
-    await ctx.waitForTaskDelta('aaaaaaaa-0000-0000-0000-000000000003', 5000);
+    await ctx.waitForTaskDelta("aaaaaaaa-0000-0000-0000-000000000003", 5000);
 
     expect(fetchTasks).toHaveBeenCalledOnce();
   });
 });
 
-describe('waitForTaskTitle — fetch fallback fills delayed titles', () => {
-  it('keeps polling the task until a later fetch returns a generated title', async () => {
-    const TASK_ID = 'aaaaaaaa-0000-0000-0000-000000000004';
+describe("waitForTaskTitle — fetch fallback fills delayed titles", () => {
+  it("keeps polling the task until a later fetch returns a generated title", async () => {
+    const TASK_ID = "aaaaaaaa-0000-0000-0000-000000000004";
     const ctx = makeContext();
 
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'api.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "api.js");
 
     vm.runInContext(
       `tasks = [{ id: "${TASK_ID}", title: "", prompt: "Implement title fallback" }];`,
       ctx,
     );
-    vm.runInContext('tasksSource = null;', ctx);
+    vm.runInContext("tasksSource = null;", ctx);
 
     let fetchCount = 0;
     ctx.fetchTasks = vi.fn().mockImplementation(async () => {
@@ -271,13 +290,13 @@ describe('waitForTaskTitle — fetch fallback fills delayed titles', () => {
     await ctx.waitForTaskTitle(TASK_ID, 5000);
 
     expect(ctx.fetchTasks).toHaveBeenCalledOnce();
-    expect(vm.runInContext(`tasks[0].title`, ctx)).toBe('Title Loaded');
+    expect(vm.runInContext(`tasks[0].title`, ctx)).toBe("Title Loaded");
   });
 });
 
-describe('waitForTaskTitle — throttles fetches when stream is absent', () => {
-  it('does not call fetchTasks more than once per second when tasksSource is null', async () => {
-    const TASK_ID = 'aaaaaaaa-0000-0000-0000-000000000005';
+describe("waitForTaskTitle — throttles fetches when stream is absent", () => {
+  it("does not call fetchTasks more than once per second when tasksSource is null", async () => {
+    const TASK_ID = "aaaaaaaa-0000-0000-0000-000000000005";
 
     // Use fake timers so we can control setTimeout precisely.
     vi.useFakeTimers();
@@ -288,14 +307,14 @@ describe('waitForTaskTitle — throttles fetches when stream is absent', () => {
       clearTimeout: globalThis.clearTimeout,
     });
 
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'api.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "api.js");
 
     vm.runInContext(
       `tasks = [{ id: "${TASK_ID}", title: "", prompt: "test" }];`,
       ctx,
     );
-    vm.runInContext('tasksSource = null;', ctx);
+    vm.runInContext("tasksSource = null;", ctx);
 
     let fetchCount = 0;
     ctx.fetchTasks = vi.fn().mockImplementation(async () => {
@@ -335,9 +354,9 @@ describe('waitForTaskTitle — throttles fetches when stream is absent', () => {
 //           longer crashes with a TypeError for the missing Routes.tasks.update
 // ---------------------------------------------------------------------------
 
-describe('openRaiseLimitInline — uses task(id).update() route helper', () => {
-  it('PATCHes /api/tasks/{id} and does not call a nonexistent Routes.tasks.update', async () => {
-    const TASK_ID = 'bbbbbbbb-0000-0000-0000-000000000001';
+describe("openRaiseLimitInline — uses task(id).update() route helper", () => {
+  it("PATCHes /api/tasks/{id} and does not call a nonexistent Routes.tasks.update", async () => {
+    const TASK_ID = "bbbbbbbb-0000-0000-0000-000000000001";
 
     const apiMock = vi.fn().mockResolvedValue(null);
     const waitForTaskDelta = vi.fn().mockResolvedValue(undefined);
@@ -347,38 +366,38 @@ describe('openRaiseLimitInline — uses task(id).update() route helper', () => {
     // to demonstrate the old code would have thrown.
     const RoutesWithoutCollectionUpdate = {
       tasks: {
-        list: () => '/api/tasks',
-        stream: () => '/api/tasks/stream',
-        archiveDone: () => '/api/tasks/archive-done',
-        generateTitles: () => '/api/tasks/generate-titles',
-        generateOversight: () => '/api/tasks/generate-oversight',
-        create: () => '/api/tasks',
+        list: () => "/api/tasks",
+        stream: () => "/api/tasks/stream",
+        archiveDone: () => "/api/tasks/archive-done",
+        generateTitles: () => "/api/tasks/generate-titles",
+        generateOversight: () => "/api/tasks/generate-oversight",
+        create: () => "/api/tasks",
         // NOTE: no update() at the collection level — the old bug
-        task: function(id) {
+        task: function (id) {
           return {
-            update: () => '/api/tasks/' + id,
-            delete: () => '/api/tasks/' + id,
-            feedback: () => '/api/tasks/' + id + '/feedback',
-            done: () => '/api/tasks/' + id + '/done',
-            cancel: () => '/api/tasks/' + id + '/cancel',
-            resume: () => '/api/tasks/' + id + '/resume',
-            archive: () => '/api/tasks/' + id + '/archive',
-            unarchive: () => '/api/tasks/' + id + '/unarchive',
-            sync: () => '/api/tasks/' + id + '/sync',
-            test: () => '/api/tasks/' + id + '/test',
-            diff: () => '/api/tasks/' + id + '/diff',
-            refine: () => '/api/tasks/' + id + '/refine',
-            refineLogs: () => '/api/tasks/' + id + '/refine/logs',
-            refineApply: () => '/api/tasks/' + id + '/refine/apply',
-            refineDismiss: () => '/api/tasks/' + id + '/refine/dismiss',
-            oversight: () => '/api/tasks/' + id + '/oversight',
+            update: () => "/api/tasks/" + id,
+            delete: () => "/api/tasks/" + id,
+            feedback: () => "/api/tasks/" + id + "/feedback",
+            done: () => "/api/tasks/" + id + "/done",
+            cancel: () => "/api/tasks/" + id + "/cancel",
+            resume: () => "/api/tasks/" + id + "/resume",
+            archive: () => "/api/tasks/" + id + "/archive",
+            unarchive: () => "/api/tasks/" + id + "/unarchive",
+            sync: () => "/api/tasks/" + id + "/sync",
+            test: () => "/api/tasks/" + id + "/test",
+            diff: () => "/api/tasks/" + id + "/diff",
+            refine: () => "/api/tasks/" + id + "/refine",
+            refineLogs: () => "/api/tasks/" + id + "/refine/logs",
+            refineApply: () => "/api/tasks/" + id + "/refine/apply",
+            refineDismiss: () => "/api/tasks/" + id + "/refine/dismiss",
+            oversight: () => "/api/tasks/" + id + "/oversight",
           };
         },
       },
-      config: { get: () => '/api/config', update: () => '/api/config' },
+      config: { get: () => "/api/config", update: () => "/api/config" },
     };
 
-    const banner = makeElement({ id: 'modal-budget-exceeded-banner' });
+    const banner = makeElement({ id: "modal-budget-exceeded-banner" });
     const ctx = makeContext({
       api: apiMock,
       waitForTaskDelta,
@@ -386,16 +405,15 @@ describe('openRaiseLimitInline — uses task(id).update() route helper', () => {
       Routes: RoutesWithoutCollectionUpdate,
       getOpenModalTaskId: vi.fn().mockReturnValue(TASK_ID),
       // prompt() is used by openRaiseLimitInline to ask for new limits.
-      prompt: vi.fn()
-        .mockReturnValueOnce('10.00')  // new cost limit
-        .mockReturnValueOnce('50000'), // new token limit
-      elements: [
-        ['modal-budget-exceeded-banner', banner],
-      ],
+      prompt: vi
+        .fn()
+        .mockReturnValueOnce("10.00") // new cost limit
+        .mockReturnValueOnce("50000"), // new token limit
+      elements: [["modal-budget-exceeded-banner", banner]],
     });
     ctx.task = RoutesWithoutCollectionUpdate.tasks.task;
 
-    loadScript(ctx, 'state.js');
+    loadScript(ctx, "state.js");
 
     // Seed tasks array so openRaiseLimitInline can find the task.
     vm.runInContext(
@@ -405,14 +423,17 @@ describe('openRaiseLimitInline — uses task(id).update() route helper', () => {
 
     // Provide minimal stubs required by tasks.js module-level code.
     ctx.document.getElementById = (id) => {
-      if (id === 'modal-budget-exceeded-banner') return banner;
-      if (id === 'modal-edit-prompt') return makeElement({ addEventListener: vi.fn() });
-      if (id === 'modal-edit-goal') return makeElement({ addEventListener: vi.fn() });
-      if (id === 'modal-edit-timeout') return makeElement({ addEventListener: vi.fn() });
+      if (id === "modal-budget-exceeded-banner") return banner;
+      if (id === "modal-edit-prompt")
+        return makeElement({ addEventListener: vi.fn() });
+      if (id === "modal-edit-goal")
+        return makeElement({ addEventListener: vi.fn() });
+      if (id === "modal-edit-timeout")
+        return makeElement({ addEventListener: vi.fn() });
       return null;
     };
 
-    loadScript(ctx, 'tasks.js');
+    loadScript(ctx, "tasks.js");
 
     // After loading tasks.js, replace fetchTasks and waitForTaskDelta with mocks
     // so we can observe calls made from within the script scope.
@@ -425,7 +446,7 @@ describe('openRaiseLimitInline — uses task(id).update() route helper', () => {
     // The PATCH must target the per-task update URL.
     expect(apiMock).toHaveBeenCalledWith(
       `/api/tasks/${TASK_ID}`,
-      expect.objectContaining({ method: 'PATCH' }),
+      expect.objectContaining({ method: "PATCH" }),
     );
 
     // The new code delegates state refresh to waitForTaskDelta, not fetchTasks.
@@ -438,11 +459,11 @@ describe('openRaiseLimitInline — uses task(id).update() route helper', () => {
 // Test 4 — Regression: syncTask calls waitForTaskDelta so the UI updates
 // ---------------------------------------------------------------------------
 
-describe('syncTask — calls waitForTaskDelta so the UI reflects sync progress', () => {
-  it('calls waitForTaskDelta(id) after a successful sync POST', async () => {
-    const TASK_ID = 'cccccccc-0000-0000-0000-000000000001';
+describe("syncTask — calls waitForTaskDelta so the UI reflects sync progress", () => {
+  it("calls waitForTaskDelta(id) after a successful sync POST", async () => {
+    const TASK_ID = "cccccccc-0000-0000-0000-000000000001";
 
-    const apiMock = vi.fn().mockResolvedValue({ status: 'syncing' });
+    const apiMock = vi.fn().mockResolvedValue({ status: "syncing" });
     const waitForTaskDelta = vi.fn().mockResolvedValue(undefined);
     const fetchTasks = vi.fn().mockResolvedValue(undefined);
 
@@ -452,19 +473,22 @@ describe('syncTask — calls waitForTaskDelta so the UI reflects sync progress',
       fetchTasks,
     });
 
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'api.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "api.js");
 
     // Provide minimal stubs required by tasks.js module-level code.
     ctx.document.getElementById = (id) => {
-      if (id === 'modal-edit-prompt') return makeElement({ addEventListener: vi.fn() });
-      if (id === 'modal-edit-goal') return makeElement({ addEventListener: vi.fn() });
-      if (id === 'modal-edit-timeout') return makeElement({ addEventListener: vi.fn() });
+      if (id === "modal-edit-prompt")
+        return makeElement({ addEventListener: vi.fn() });
+      if (id === "modal-edit-goal")
+        return makeElement({ addEventListener: vi.fn() });
+      if (id === "modal-edit-timeout")
+        return makeElement({ addEventListener: vi.fn() });
       return null;
     };
 
-    loadScript(ctx, 'render.js');
-    loadScript(ctx, 'tasks.js');
+    loadScript(ctx, "render.js");
+    loadScript(ctx, "tasks.js");
 
     // Replace mocks after loading so calls from within the script scope hit our spies.
     ctx.waitForTaskDelta = waitForTaskDelta;
@@ -475,17 +499,17 @@ describe('syncTask — calls waitForTaskDelta so the UI reflects sync progress',
     // The POST must target the per-task sync URL.
     expect(apiMock).toHaveBeenCalledWith(
       `/api/tasks/${TASK_ID}/sync`,
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({ method: "POST" }),
     );
 
     // waitForTaskDelta must be called so the UI processes the SSE state change.
     expect(waitForTaskDelta).toHaveBeenCalledWith(TASK_ID);
   });
 
-  it('does not call waitForTaskDelta when the POST fails', async () => {
-    const TASK_ID = 'cccccccc-0000-0000-0000-000000000002';
+  it("does not call waitForTaskDelta when the POST fails", async () => {
+    const TASK_ID = "cccccccc-0000-0000-0000-000000000002";
 
-    const apiMock = vi.fn().mockRejectedValue(new Error('network error'));
+    const apiMock = vi.fn().mockRejectedValue(new Error("network error"));
     const waitForTaskDelta = vi.fn().mockResolvedValue(undefined);
 
     const ctx = makeContext({
@@ -493,18 +517,21 @@ describe('syncTask — calls waitForTaskDelta so the UI reflects sync progress',
       waitForTaskDelta,
     });
 
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'api.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "api.js");
 
     ctx.document.getElementById = (id) => {
-      if (id === 'modal-edit-prompt') return makeElement({ addEventListener: vi.fn() });
-      if (id === 'modal-edit-goal') return makeElement({ addEventListener: vi.fn() });
-      if (id === 'modal-edit-timeout') return makeElement({ addEventListener: vi.fn() });
+      if (id === "modal-edit-prompt")
+        return makeElement({ addEventListener: vi.fn() });
+      if (id === "modal-edit-goal")
+        return makeElement({ addEventListener: vi.fn() });
+      if (id === "modal-edit-timeout")
+        return makeElement({ addEventListener: vi.fn() });
       return null;
     };
 
-    loadScript(ctx, 'render.js');
-    loadScript(ctx, 'tasks.js');
+    loadScript(ctx, "render.js");
+    loadScript(ctx, "tasks.js");
 
     ctx.waitForTaskDelta = waitForTaskDelta;
 

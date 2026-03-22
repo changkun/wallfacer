@@ -1,14 +1,14 @@
 /**
  * Tests for template manager helpers.
  */
-import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import vm from 'vm';
+import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const jsDir = join(__dirname, '..');
+const jsDir = join(__dirname, "..");
 
 function createClassList() {
   const set = new Set();
@@ -56,19 +56,19 @@ function makeContext(overrides = {}) {
 }
 
 function loadScript(ctx, filename) {
-  const code = readFileSync(join(jsDir, filename), 'utf8');
+  const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;
 }
 
-describe('openTemplatesManagerFromSettings', () => {
-  it('closes settings, prevents default, and opens templates manager', async () => {
-    const settingsModal = createElement({ id: 'settings-modal' });
+describe("openTemplatesManagerFromSettings", () => {
+  it("closes settings, prevents default, and opens templates manager", async () => {
+    const settingsModal = createElement({ id: "settings-modal" });
     const calls = [];
     const ctx = makeContext({
-      elements: [['settings-modal', settingsModal]],
+      elements: [["settings-modal", settingsModal]],
     });
-    loadScript(ctx, 'templates.js');
+    loadScript(ctx, "templates.js");
 
     // Rebind these helpers after load so we can assert call order.
     vm.runInContext(
@@ -89,17 +89,17 @@ describe('openTemplatesManagerFromSettings', () => {
     );
     await Promise.resolve();
 
-    expect(calls).toEqual(['pd', 'close', 'open']);
+    expect(calls).toEqual(["pd", "close", "open"]);
   });
 
-  it('alerts and logs when opening templates manager fails', async () => {
+  it("alerts and logs when opening templates manager fails", async () => {
     const calls = [];
-    const settingsModal = createElement({ id: 'settings-modal' });
+    const settingsModal = createElement({ id: "settings-modal" });
     const ctx = makeContext({
-      elements: [['settings-modal', settingsModal]],
-      closeSettings: vi.fn(() => calls.push('close')),
+      elements: [["settings-modal", settingsModal]],
+      closeSettings: vi.fn(() => calls.push("close")),
     });
-    loadScript(ctx, 'templates.js');
+    loadScript(ctx, "templates.js");
     vm.runInContext(
       `openTemplatesManager = function() {
          calls.push('open');
@@ -109,27 +109,31 @@ describe('openTemplatesManagerFromSettings', () => {
     );
     ctx.openTemplatesManagerFromSettings();
     // Flush microtasks: rejection + .catch() handler need multiple ticks.
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
 
-    expect(calls).toEqual(['close', 'open']); // sync path executes both
+    expect(calls).toEqual(["close", "open"]); // sync path executes both
     expect(ctx.closeSettings).toHaveBeenCalledTimes(1);
-    expect(ctx.showAlert).toHaveBeenCalledWith('Failed to open Templates: network down');
+    expect(ctx.showAlert).toHaveBeenCalledWith(
+      "Failed to open Templates: network down",
+    );
     expect(ctx.console.error).toHaveBeenCalledWith(
-      'Failed to open templates manager:',
+      "Failed to open templates manager:",
       expect.anything(),
     );
     const loggedError = ctx.console.error.mock.calls[0][1];
-    expect(String(loggedError && loggedError.message || loggedError)).toBe('network down');
+    expect(String((loggedError && loggedError.message) || loggedError)).toBe(
+      "network down",
+    );
   });
 
-  it('opens templates manager even when closeSettings is unavailable', async () => {
-    const settingsModal = createElement({ id: 'settings-modal' });
+  it("opens templates manager even when closeSettings is unavailable", async () => {
+    const settingsModal = createElement({ id: "settings-modal" });
     const calls = [];
     const ctx = makeContext({
-      elements: [['settings-modal', settingsModal]],
+      elements: [["settings-modal", settingsModal]],
       alert: vi.fn(),
     });
-    loadScript(ctx, 'templates.js');
+    loadScript(ctx, "templates.js");
     vm.runInContext(
       `openTemplatesManager = function() {
          calls.push('open');
@@ -141,6 +145,6 @@ describe('openTemplatesManagerFromSettings', () => {
     ctx.openTemplatesManagerFromSettings();
     await Promise.resolve();
 
-    expect(calls).toEqual(['open']);
+    expect(calls).toEqual(["open"]);
   });
 });

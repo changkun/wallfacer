@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import vm from 'vm';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const jsDir = join(__dirname, '..');
+const jsDir = join(__dirname, "..");
 
 function loadScript(filename, ctx) {
-  const code = readFileSync(join(jsDir, filename), 'utf8');
+  const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
 }
 
@@ -48,22 +48,22 @@ function createContext(options = {}) {
     },
     window: {
       depGraphEnabled: false,
-      location: { hash: '' },
+      location: { hash: "" },
     },
-    location: { hash: '' },
+    location: { hash: "" },
     document: {
       getElementById: () => null,
-      createElement: () => ({ innerHTML: '' }),
+      createElement: () => ({ innerHTML: "" }),
       querySelectorAll: () => [],
       addEventListener: () => {},
-      readyState: 'complete',
+      readyState: "complete",
     },
     tasks: [],
     archivedTasks: [],
-    activeWorkspaces: ['/workspace/test'],
+    activeWorkspaces: ["/workspace/test"],
     showArchived: false,
-    backlogSortMode: 'manual',
-    filterQuery: '',
+    backlogSortMode: "manual",
+    filterQuery: "",
     maxParallelTasks: 0,
     withAuthToken: (url) => url,
     _sseIsLeader: () => true,
@@ -77,7 +77,7 @@ function createContext(options = {}) {
     scheduleRender: vi.fn(),
     announceBoardStatus: vi.fn(),
     getTaskAccessibleTitle: (task) => task.title || task.prompt || task.id,
-    formatTaskStatusLabel: (status) => String(status || '').replace(/_/g, ' '),
+    formatTaskStatusLabel: (status) => String(status || "").replace(/_/g, " "),
     openModal: vi.fn(() => Promise.resolve()),
     setRightTab: vi.fn(),
     setLeftTab: vi.fn(),
@@ -85,19 +85,23 @@ function createContext(options = {}) {
     tasksRetryDelay: 1000,
     tasksSource: null,
     lastTasksEventId: null,
-    archivedPage: { loadState: 'idle', hasMoreBefore: false, hasMoreAfter: false },
+    archivedPage: {
+      loadState: "idle",
+      hasMoreBefore: false,
+      hasMoreAfter: false,
+    },
     archivedTasksPageSize: 20,
     archivedScrollHandlerBound: false,
     Routes: {
       tasks: {
-        stream: () => '/api/tasks/stream',
-        list: () => '/api/tasks',
+        stream: () => "/api/tasks/stream",
+        list: () => "/api/tasks",
       },
     },
     EventSource: MockEventSource,
     api: vi.fn(),
-    escapeHtml: (s) => String(s || ''),
-    renderMarkdown: (s) => String(s || ''),
+    escapeHtml: (s) => String(s || ""),
+    renderMarkdown: (s) => String(s || ""),
     matchesFilter: () => true,
     updateIdeationFromTasks: () => {},
     updateBacklogSortButton: () => {},
@@ -105,11 +109,11 @@ function createContext(options = {}) {
     renderRefineHistory: () => {},
     hideDependencyGraph: () => {},
     renderDependencyGraph: () => {},
-    sandboxDisplayName: (s) => s || 'Default',
+    sandboxDisplayName: (s) => s || "Default",
     formatTimeout: (m) => String(m || 5),
-    timeAgo: () => 'just now',
-    highlightMatch: (text) => text || '',
-    taskDisplayPrompt: (task) => (task ? task.prompt : ''),
+    timeAgo: () => "just now",
+    highlightMatch: (text) => text || "",
+    taskDisplayPrompt: (task) => (task ? task.prompt : ""),
     syncTask: vi.fn(),
     task: (id) => ({
       diff: () => `/api/tasks/${id}/diff`,
@@ -118,7 +122,7 @@ function createContext(options = {}) {
       done: () => `/api/tasks/${id}/done`,
       resume: () => `/api/tasks/${id}/resume`,
     }),
-    activeWorkspaces: ['~/project'],
+    activeWorkspaces: ["~/project"],
     getOpenModalTaskId: vi.fn(() => null),
     renderModalDependencies: vi.fn(),
     ...options,
@@ -129,20 +133,20 @@ function createContext(options = {}) {
 
 function loadRenderHarness(options = {}) {
   const harness = createContext(options);
-  loadScript('render.js', harness.ctx);
+  loadScript("render.js", harness.ctx);
   return { ...harness, renderExports: harness.ctx.module.exports };
 }
 
 function loadRenderAndApiHarness(options = {}) {
   const harness = createContext(options);
-  loadScript('render.js', harness.ctx);
+  loadScript("render.js", harness.ctx);
   const renderExports = harness.ctx.module.exports;
-  loadScript('task-stream.js', harness.ctx);
-  loadScript('api.js', harness.ctx);
+  loadScript("task-stream.js", harness.ctx);
+  loadScript("api.js", harness.ctx);
   return { ...harness, renderExports };
 }
 
-describe('render.js dependency helpers', () => {
+describe("render.js dependency helpers", () => {
   let ctx;
   let renderExports;
 
@@ -154,195 +158,324 @@ describe('render.js dependency helpers', () => {
     renderExports.cardOversightCache.clear();
   });
 
-  it('returns false when depends_on is absent', () => {
-    expect(renderExports.areDepsBlocked({ id: 'task-a' })).toBe(false);
+  it("returns false when depends_on is absent", () => {
+    expect(renderExports.areDepsBlocked({ id: "task-a" })).toBe(false);
   });
 
-  it('reads dependency ids from dependencies when depends_on is absent', () => {
-    ctx.tasks = [{ id: 'dep-1', status: 'in_progress' }];
+  it("reads dependency ids from dependencies when depends_on is absent", () => {
+    ctx.tasks = [{ id: "dep-1", status: "in_progress" }];
 
-    expect(renderExports.getTaskDependencyIds({ id: 'task-a', dependencies: ['dep-1'] })).toEqual(['dep-1']);
-    expect(renderExports.areDepsBlocked({ id: 'task-a', dependencies: ['dep-1'] })).toBe(true);
+    expect(
+      renderExports.getTaskDependencyIds({
+        id: "task-a",
+        dependencies: ["dep-1"],
+      }),
+    ).toEqual(["dep-1"]);
+    expect(
+      renderExports.areDepsBlocked({ id: "task-a", dependencies: ["dep-1"] }),
+    ).toBe(true);
   });
 
-  it('returns false when all dependencies are present and done', () => {
+  it("returns false when all dependencies are present and done", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done' },
-      { id: 'dep-2', status: 'done' },
+      { id: "dep-1", status: "done" },
+      { id: "dep-2", status: "done" },
     ];
 
-    expect(renderExports.areDepsBlocked({ id: 'task-a', depends_on: ['dep-1', 'dep-2'] })).toBe(false);
+    expect(
+      renderExports.areDepsBlocked({
+        id: "task-a",
+        depends_on: ["dep-1", "dep-2"],
+      }),
+    ).toBe(false);
   });
 
-  it('returns true when one dependency is still in progress', () => {
+  it("returns true when one dependency is still in progress", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done' },
-      { id: 'dep-2', status: 'in_progress' },
+      { id: "dep-1", status: "done" },
+      { id: "dep-2", status: "in_progress" },
     ];
 
-    expect(renderExports.areDepsBlocked({ id: 'task-a', depends_on: ['dep-1', 'dep-2'] })).toBe(true);
+    expect(
+      renderExports.areDepsBlocked({
+        id: "task-a",
+        depends_on: ["dep-1", "dep-2"],
+      }),
+    ).toBe(true);
   });
 
-  it('returns true when a dependency id is missing from the task list', () => {
-    ctx.tasks = [{ id: 'dep-1', status: 'done' }];
+  it("returns true when a dependency id is missing from the task list", () => {
+    ctx.tasks = [{ id: "dep-1", status: "done" }];
 
-    expect(renderExports.areDepsBlocked({ id: 'task-a', depends_on: ['dep-1', 'missing-dep'] })).toBe(true);
+    expect(
+      renderExports.areDepsBlocked({
+        id: "task-a",
+        depends_on: ["dep-1", "missing-dep"],
+      }),
+    ).toBe(true);
   });
 
-  it('returns only non-done dependency names', () => {
+  it("returns only non-done dependency names", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done', title: 'Finished task', prompt: 'done prompt' },
-      { id: 'dep-2', status: 'in_progress', title: 'Active task', prompt: 'active prompt' },
-      { id: 'dep-3', status: 'failed', title: '', prompt: 'Needs manual fix' },
+      {
+        id: "dep-1",
+        status: "done",
+        title: "Finished task",
+        prompt: "done prompt",
+      },
+      {
+        id: "dep-2",
+        status: "in_progress",
+        title: "Active task",
+        prompt: "active prompt",
+      },
+      { id: "dep-3", status: "failed", title: "", prompt: "Needs manual fix" },
     ];
 
-    const names = renderExports.getBlockingTaskNames({ id: 'task-a', depends_on: ['dep-1', 'dep-2', 'dep-3'] });
+    const names = renderExports.getBlockingTaskNames({
+      id: "task-a",
+      depends_on: ["dep-1", "dep-2", "dep-3"],
+    });
 
-    expect(names).toBe('Active task, Needs manual fix');
+    expect(names).toBe("Active task, Needs manual fix");
   });
 
-  it('counts unmet dependencies including removed tasks', () => {
+  it("counts unmet dependencies including removed tasks", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done' },
-      { id: 'dep-2', status: 'waiting' },
+      { id: "dep-1", status: "done" },
+      { id: "dep-2", status: "waiting" },
     ];
 
-    expect(renderExports.getUnmetDependencyCount({ id: 'task-a', depends_on: ['dep-1', 'dep-2', 'missing-dep'] })).toBe(2);
+    expect(
+      renderExports.getUnmetDependencyCount({
+        id: "task-a",
+        depends_on: ["dep-1", "dep-2", "missing-dep"],
+      }),
+    ).toBe(2);
   });
 
-  it('renders blocked backlog badges with the total dependency count', () => {
+  it("renders blocked backlog badges with the total dependency count", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done', title: 'Finished', prompt: 'finished prompt' },
-      { id: 'dep-2', status: 'in_progress', title: 'Running', prompt: 'running prompt' },
+      {
+        id: "dep-1",
+        status: "done",
+        title: "Finished",
+        prompt: "finished prompt",
+      },
+      {
+        id: "dep-2",
+        status: "in_progress",
+        title: "Running",
+        prompt: "running prompt",
+      },
     ];
 
     const badge = renderExports.renderDependencyBadge({
-      id: 'task-a',
-      status: 'backlog',
-      depends_on: ['dep-1', 'dep-2'],
+      id: "task-a",
+      status: "backlog",
+      depends_on: ["dep-1", "dep-2"],
     });
 
-    expect(badge).toContain('2 deps');
-    expect(badge).toContain('badge-blocked');
+    expect(badge).toContain("2 deps");
+    expect(badge).toContain("badge-blocked");
   });
 
-  it('renders a ready badge when all backlog dependencies are done', () => {
+  it("renders a ready badge when all backlog dependencies are done", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done', title: 'Finished', prompt: 'finished prompt' },
-      { id: 'dep-2', status: 'done', title: 'Also finished', prompt: 'done prompt' },
+      {
+        id: "dep-1",
+        status: "done",
+        title: "Finished",
+        prompt: "finished prompt",
+      },
+      {
+        id: "dep-2",
+        status: "done",
+        title: "Also finished",
+        prompt: "done prompt",
+      },
     ];
 
     const badge = renderExports.renderDependencyBadge({
-      id: 'task-a',
-      status: 'backlog',
-      depends_on: ['dep-1', 'dep-2'],
+      id: "task-a",
+      status: "backlog",
+      depends_on: ["dep-1", "dep-2"],
     });
 
-    expect(badge).toContain('ready');
-    expect(badge).toContain('badge-deps-met');
+    expect(badge).toContain("ready");
+    expect(badge).toContain("badge-deps-met");
   });
 
-  it('renders a dependency-cancelled chip when a dep has status cancelled', () => {
+  it("renders a dependency-cancelled chip when a dep has status cancelled", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done', title: 'Finished', prompt: 'finished prompt' },
-      { id: 'dep-2', status: 'cancelled', title: 'Cancelled', prompt: 'cancelled prompt' },
+      {
+        id: "dep-1",
+        status: "done",
+        title: "Finished",
+        prompt: "finished prompt",
+      },
+      {
+        id: "dep-2",
+        status: "cancelled",
+        title: "Cancelled",
+        prompt: "cancelled prompt",
+      },
     ];
 
     const badge = renderExports.renderDependencyBadge({
-      id: 'task-a',
-      status: 'backlog',
-      depends_on: ['dep-1', 'dep-2'],
+      id: "task-a",
+      status: "backlog",
+      depends_on: ["dep-1", "dep-2"],
     });
 
-    expect(badge).toContain('dependency cancelled');
-    expect(badge).toContain('badge-dep-cancelled');
+    expect(badge).toContain("dependency cancelled");
+    expect(badge).toContain("badge-dep-cancelled");
   });
 
-  it('renders a dependency-cancelled chip when a dep is absent from task list', () => {
+  it("renders a dependency-cancelled chip when a dep is absent from task list", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done', title: 'Finished', prompt: 'finished prompt' },
+      {
+        id: "dep-1",
+        status: "done",
+        title: "Finished",
+        prompt: "finished prompt",
+      },
     ];
 
     const badge = renderExports.renderDependencyBadge({
-      id: 'task-a',
-      status: 'backlog',
-      depends_on: ['dep-1', 'missing-dep'],
+      id: "task-a",
+      status: "backlog",
+      depends_on: ["dep-1", "missing-dep"],
     });
 
-    expect(badge).toContain('dependency cancelled');
-    expect(badge).toContain('badge-dep-cancelled');
+    expect(badge).toContain("dependency cancelled");
+    expect(badge).toContain("badge-dep-cancelled");
   });
 
-  it('suppresses dependency badges outside backlog', () => {
-    ctx.tasks = [{ id: 'dep-1', status: 'in_progress', title: 'Running', prompt: 'running prompt' }];
-
-    expect(renderExports.renderDependencyBadge({
-      id: 'task-a',
-      status: 'in_progress',
-      depends_on: ['dep-1'],
-    })).toBe('');
-  });
-
-  it('returns false when all dependencies are cancelled', () => {
+  it("suppresses dependency badges outside backlog", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'cancelled' },
-      { id: 'dep-2', status: 'cancelled' },
+      {
+        id: "dep-1",
+        status: "in_progress",
+        title: "Running",
+        prompt: "running prompt",
+      },
     ];
 
-    expect(renderExports.areDepsBlocked({ id: 'task-a', depends_on: ['dep-1', 'dep-2'] })).toBe(false);
+    expect(
+      renderExports.renderDependencyBadge({
+        id: "task-a",
+        status: "in_progress",
+        depends_on: ["dep-1"],
+      }),
+    ).toBe("");
   });
 
-  it('returns false when dependencies are a mix of done and cancelled', () => {
+  it("returns false when all dependencies are cancelled", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done' },
-      { id: 'dep-2', status: 'cancelled' },
+      { id: "dep-1", status: "cancelled" },
+      { id: "dep-2", status: "cancelled" },
     ];
 
-    expect(renderExports.areDepsBlocked({ id: 'task-a', depends_on: ['dep-1', 'dep-2'] })).toBe(false);
+    expect(
+      renderExports.areDepsBlocked({
+        id: "task-a",
+        depends_on: ["dep-1", "dep-2"],
+      }),
+    ).toBe(false);
   });
 
-  it('does not include cancelled dependency names in blocking names', () => {
+  it("returns false when dependencies are a mix of done and cancelled", () => {
     ctx.tasks = [
-      { id: 'dep-1', status: 'done', title: 'Finished task', prompt: 'done prompt' },
-      { id: 'dep-2', status: 'cancelled', title: 'Cancelled task', prompt: 'cancelled prompt' },
-      { id: 'dep-3', status: 'in_progress', title: 'Active task', prompt: 'active prompt' },
+      { id: "dep-1", status: "done" },
+      { id: "dep-2", status: "cancelled" },
     ];
 
-    const names = renderExports.getBlockingTaskNames({ id: 'task-a', depends_on: ['dep-1', 'dep-2', 'dep-3'] });
+    expect(
+      renderExports.areDepsBlocked({
+        id: "task-a",
+        depends_on: ["dep-1", "dep-2"],
+      }),
+    ).toBe(false);
+  });
 
-    expect(names).toBe('Active task');
+  it("does not include cancelled dependency names in blocking names", () => {
+    ctx.tasks = [
+      {
+        id: "dep-1",
+        status: "done",
+        title: "Finished task",
+        prompt: "done prompt",
+      },
+      {
+        id: "dep-2",
+        status: "cancelled",
+        title: "Cancelled task",
+        prompt: "cancelled prompt",
+      },
+      {
+        id: "dep-3",
+        status: "in_progress",
+        title: "Active task",
+        prompt: "active prompt",
+      },
+    ];
+
+    const names = renderExports.getBlockingTaskNames({
+      id: "task-a",
+      depends_on: ["dep-1", "dep-2", "dep-3"],
+    });
+
+    expect(names).toBe("Active task");
   });
 });
 
-describe('render.js isTestCard', () => {
+describe("render.js isTestCard", () => {
   let renderExports;
 
   beforeEach(() => {
     ({ renderExports } = loadRenderHarness());
   });
 
-  it('returns true for tasks with a last test result and positive start turn', () => {
-    expect(renderExports.isTestCard({ last_test_result: 'pass', test_run_start_turn: 1 })).toBe(true);
+  it("returns true for tasks with a last test result and positive start turn", () => {
+    expect(
+      renderExports.isTestCard({
+        last_test_result: "pass",
+        test_run_start_turn: 1,
+      }),
+    ).toBe(true);
   });
 
-  it('returns false when last_test_result is null', () => {
-    expect(renderExports.isTestCard({ last_test_result: null, test_run_start_turn: 1 })).toBe(false);
+  it("returns false when last_test_result is null", () => {
+    expect(
+      renderExports.isTestCard({
+        last_test_result: null,
+        test_run_start_turn: 1,
+      }),
+    ).toBe(false);
   });
 
-  it('returns false when test_run_start_turn is zero', () => {
-    expect(renderExports.isTestCard({ last_test_result: 'pass', test_run_start_turn: 0 })).toBe(false);
+  it("returns false when test_run_start_turn is zero", () => {
+    expect(
+      renderExports.isTestCard({
+        last_test_result: "pass",
+        test_run_start_turn: 0,
+      }),
+    ).toBe(false);
   });
 
-  it('does not gate on task status', () => {
-    expect(renderExports.isTestCard({
-      status: 'backlog',
-      last_test_result: 'pass',
-      test_run_start_turn: 2,
-    })).toBe(true);
+  it("does not gate on task status", () => {
+    expect(
+      renderExports.isTestCard({
+        status: "backlog",
+        last_test_result: "pass",
+        test_run_start_turn: 2,
+      }),
+    ).toBe(true);
   });
 });
 
-describe('render.js diffCache', () => {
+describe("render.js diffCache", () => {
   let ctx;
   let renderExports;
 
@@ -355,186 +488,243 @@ describe('render.js diffCache', () => {
     vi.useRealTimers();
   });
 
-  it('invalidates only the requested task cache entry', () => {
-    renderExports.diffCache.set('task-a', { diff: 'a', behindCounts: {}, updatedAt: 'u1', behindFetchedAt: 10 });
-    renderExports.diffCache.set('task-b', { diff: 'b', behindCounts: {}, updatedAt: 'u2', behindFetchedAt: 20 });
-
-    renderExports.invalidateDiffBehindCounts('task-a');
-
-    expect(renderExports.diffCache.get('task-a')).toEqual({
-      diff: 'a',
+  it("invalidates only the requested task cache entry", () => {
+    renderExports.diffCache.set("task-a", {
+      diff: "a",
       behindCounts: {},
-      updatedAt: 'u1',
+      updatedAt: "u1",
+      behindFetchedAt: 10,
+    });
+    renderExports.diffCache.set("task-b", {
+      diff: "b",
+      behindCounts: {},
+      updatedAt: "u2",
+      behindFetchedAt: 20,
+    });
+
+    renderExports.invalidateDiffBehindCounts("task-a");
+
+    expect(renderExports.diffCache.get("task-a")).toEqual({
+      diff: "a",
+      behindCounts: {},
+      updatedAt: "u1",
       behindFetchedAt: 0,
     });
-    expect(renderExports.diffCache.get('task-b')).toEqual({
-      diff: 'b',
+    expect(renderExports.diffCache.get("task-b")).toEqual({
+      diff: "b",
       behindCounts: {},
-      updatedAt: 'u2',
+      updatedAt: "u2",
       behindFetchedAt: 20,
     });
   });
 
-  it('treats behind-counts as stale after the TTL expires', async () => {
+  it("treats behind-counts as stale after the TTL expires", async () => {
     vi.useFakeTimers();
     ({ ctx, renderExports } = loadRenderHarness());
     renderExports.diffCache.clear();
 
-    const updatedAt = '2026-03-10T00:00:00Z';
-    renderExports.diffCache.set('task-a', {
-      diff: 'cached diff',
+    const updatedAt = "2026-03-10T00:00:00Z";
+    renderExports.diffCache.set("task-a", {
+      diff: "cached diff",
       behindCounts: { repo: 1 },
       updatedAt,
       behindFetchedAt: Date.now(),
     });
-    ctx.api.mockResolvedValue({ diff: 'fresh diff', behind_counts: { repo: 2 } });
+    ctx.api.mockResolvedValue({
+      diff: "fresh diff",
+      behind_counts: { repo: 2 },
+    });
 
     vi.advanceTimersByTime(renderExports.BEHIND_TTL_MS + 1);
 
-    await ctx.fetchDiff({ querySelector: () => null }, 'task-a', updatedAt);
+    await ctx.fetchDiff({ querySelector: () => null }, "task-a", updatedAt);
 
-    expect(ctx.api).toHaveBeenCalledWith('/api/tasks/task-a/diff');
-    expect(renderExports.diffCache.get('task-a')).toMatchObject({
-      diff: 'fresh diff',
+    expect(ctx.api).toHaveBeenCalledWith("/api/tasks/task-a/diff");
+    expect(renderExports.diffCache.get("task-a")).toMatchObject({
+      diff: "fresh diff",
       behindCounts: { repo: 2 },
       updatedAt,
     });
   });
 });
 
-describe('render.js cardOversightCache', () => {
+describe("render.js cardOversightCache", () => {
   let ctx;
   let renderExports;
 
   beforeEach(() => {
     ({ ctx, renderExports } = loadRenderAndApiHarness());
-    ctx.tasks = [{ id: 'task-a', status: 'waiting', title: 'Task A' }];
+    ctx.tasks = [{ id: "task-a", status: "waiting", title: "Task A" }];
     ctx.archivedTasks = [];
     renderExports.cardOversightCache.clear();
   });
 
-  it('evicts the updated task before the next render cycle on SSE updates', () => {
-    renderExports.cardOversightCache.set('task-a', { phase_count: 1, phases: [{ title: 'Cached' }] });
+  it("evicts the updated task before the next render cycle on SSE updates", () => {
+    renderExports.cardOversightCache.set("task-a", {
+      phase_count: 1,
+      phases: [{ title: "Cached" }],
+    });
     ctx.scheduleRender = vi.fn(() => {
-      expect(renderExports.cardOversightCache.has('task-a')).toBe(false);
+      expect(renderExports.cardOversightCache.has("task-a")).toBe(false);
     });
 
     ctx.startTasksStream();
-    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+    const handler = ctx.EventSource.instance.listeners["task-updated"][0];
     handler({
-      data: JSON.stringify({ id: 'task-a', status: 'done', title: 'Task A', updated_at: '2026-03-10T00:00:00Z' }),
-      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        id: "task-a",
+        status: "done",
+        title: "Task A",
+        updated_at: "2026-03-10T00:00:00Z",
+      }),
+      lastEventId: "evt-1",
     });
 
-    expect(renderExports.cardOversightCache.has('task-a')).toBe(false);
+    expect(renderExports.cardOversightCache.has("task-a")).toBe(false);
     expect(ctx.scheduleRender).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('api.js SSE modal dependency refresh', () => {
+describe("api.js SSE modal dependency refresh", () => {
   let ctx;
 
   beforeEach(() => {
     ({ ctx } = loadRenderAndApiHarness({
-      activeWorkspaces: ['~/project'],
-      getOpenModalTaskId: vi.fn(() => 'task-b'),
+      activeWorkspaces: ["~/project"],
+      getOpenModalTaskId: vi.fn(() => "task-b"),
       renderModalDependencies: vi.fn(),
     }));
     ctx.tasks = [
-      { id: 'task-a', status: 'in_progress', title: 'Task A' },
-      { id: 'task-b', status: 'backlog', title: 'Task B', depends_on: ['task-a'] },
+      { id: "task-a", status: "in_progress", title: "Task A" },
+      {
+        id: "task-b",
+        status: "backlog",
+        title: "Task B",
+        depends_on: ["task-a"],
+      },
     ];
     ctx.archivedTasks = [];
   });
 
-  it('calls renderModalDependencies when a dependency of the open task changes status', () => {
+  it("calls renderModalDependencies when a dependency of the open task changes status", () => {
     ctx.startTasksStream();
-    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+    const handler = ctx.EventSource.instance.listeners["task-updated"][0];
 
     handler({
-      data: JSON.stringify({ id: 'task-a', status: 'done', title: 'Task A', updated_at: '2026-03-10T00:00:00Z' }),
-      lastEventId: 'evt-1',
+      data: JSON.stringify({
+        id: "task-a",
+        status: "done",
+        title: "Task A",
+        updated_at: "2026-03-10T00:00:00Z",
+      }),
+      lastEventId: "evt-1",
     });
 
     expect(ctx.renderModalDependencies).toHaveBeenCalledTimes(1);
-    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe('task-b');
+    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe("task-b");
   });
 
-  it('does not call renderModalDependencies when the updated task is not a dependency of the open task', () => {
+  it("does not call renderModalDependencies when the updated task is not a dependency of the open task", () => {
     ctx.startTasksStream();
-    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+    const handler = ctx.EventSource.instance.listeners["task-updated"][0];
 
     handler({
-      data: JSON.stringify({ id: 'task-c', status: 'done', title: 'Task C', updated_at: '2026-03-10T00:00:00Z' }),
-      lastEventId: 'evt-2',
+      data: JSON.stringify({
+        id: "task-c",
+        status: "done",
+        title: "Task C",
+        updated_at: "2026-03-10T00:00:00Z",
+      }),
+      lastEventId: "evt-2",
     });
 
     expect(ctx.renderModalDependencies).not.toHaveBeenCalled();
   });
 
-  it('does not call renderModalDependencies when no modal is open', () => {
+  it("does not call renderModalDependencies when no modal is open", () => {
     ctx.getOpenModalTaskId = vi.fn(() => null);
     ctx.startTasksStream();
-    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+    const handler = ctx.EventSource.instance.listeners["task-updated"][0];
 
     handler({
-      data: JSON.stringify({ id: 'task-a', status: 'done', title: 'Task A', updated_at: '2026-03-10T00:00:00Z' }),
-      lastEventId: 'evt-3',
+      data: JSON.stringify({
+        id: "task-a",
+        status: "done",
+        title: "Task A",
+        updated_at: "2026-03-10T00:00:00Z",
+      }),
+      lastEventId: "evt-3",
     });
 
     expect(ctx.renderModalDependencies).not.toHaveBeenCalled();
   });
 
-  it('refreshes when the open task uses the dependencies field', () => {
+  it("refreshes when the open task uses the dependencies field", () => {
     ctx.tasks = [
-      { id: 'task-a', status: 'in_progress', title: 'Task A' },
-      { id: 'task-b', status: 'backlog', title: 'Task B', dependencies: ['task-a'] },
+      { id: "task-a", status: "in_progress", title: "Task A" },
+      {
+        id: "task-b",
+        status: "backlog",
+        title: "Task B",
+        dependencies: ["task-a"],
+      },
     ];
     ctx.startTasksStream();
-    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+    const handler = ctx.EventSource.instance.listeners["task-updated"][0];
 
     handler({
-      data: JSON.stringify({ id: 'task-a', status: 'done', title: 'Task A', updated_at: '2026-03-10T00:00:00Z' }),
-      lastEventId: 'evt-4',
+      data: JSON.stringify({
+        id: "task-a",
+        status: "done",
+        title: "Task A",
+        updated_at: "2026-03-10T00:00:00Z",
+      }),
+      lastEventId: "evt-4",
     });
 
     expect(ctx.renderModalDependencies).toHaveBeenCalledTimes(1);
-    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe('task-b');
+    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe("task-b");
   });
 
-  it('refreshes when the open task itself receives a dependency update', () => {
+  it("refreshes when the open task itself receives a dependency update", () => {
     ctx.tasks = [
-      { id: 'task-a', status: 'in_progress', title: 'Task A' },
-      { id: 'task-b', status: 'backlog', title: 'Task B', dependencies: [] },
+      { id: "task-a", status: "in_progress", title: "Task A" },
+      { id: "task-b", status: "backlog", title: "Task B", dependencies: [] },
     ];
-    ctx.getOpenModalTaskId = vi.fn(() => 'task-b');
+    ctx.getOpenModalTaskId = vi.fn(() => "task-b");
     ctx.startTasksStream();
-    const handler = ctx.EventSource.instance.listeners['task-updated'][0];
+    const handler = ctx.EventSource.instance.listeners["task-updated"][0];
 
     handler({
-      data: JSON.stringify({ id: 'task-b', status: 'backlog', title: 'Task B', dependencies: ['task-a'], updated_at: '2026-03-10T00:00:00Z' }),
-      lastEventId: 'evt-4b',
+      data: JSON.stringify({
+        id: "task-b",
+        status: "backlog",
+        title: "Task B",
+        dependencies: ["task-a"],
+        updated_at: "2026-03-10T00:00:00Z",
+      }),
+      lastEventId: "evt-4b",
     });
 
     expect(ctx.renderModalDependencies).toHaveBeenCalledTimes(1);
-    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe('task-b');
+    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe("task-b");
   });
 
-  it('refreshes when a dependency of the open task is deleted', () => {
+  it("refreshes when a dependency of the open task is deleted", () => {
     ctx.startTasksStream();
-    const handler = ctx.EventSource.instance.listeners['task-deleted'][0];
+    const handler = ctx.EventSource.instance.listeners["task-deleted"][0];
 
     handler({
-      data: JSON.stringify({ id: 'task-a' }),
-      lastEventId: 'evt-5',
+      data: JSON.stringify({ id: "task-a" }),
+      lastEventId: "evt-5",
     });
 
     expect(ctx.renderModalDependencies).toHaveBeenCalledTimes(1);
-    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe('task-b');
+    expect(ctx.renderModalDependencies.mock.calls[0][0].id).toBe("task-b");
   });
 });
 
-describe('render.js backlog dependency badge', () => {
+describe("render.js backlog dependency badge", () => {
   let ctx;
 
   beforeEach(() => {
@@ -557,84 +747,105 @@ describe('render.js backlog dependency badge', () => {
       removeAttribute: () => {},
       querySelector: () => null,
       appendChild: () => {},
-      innerHTML: '',
+      innerHTML: "",
     };
   }
 
-  it('renders an unmet dependency badge on backlog cards', () => {
-    ctx.tasks = [{ id: 'dep-1', status: 'in_progress', title: 'Dependency task', prompt: 'Dependency task' }];
+  it("renders an unmet dependency badge on backlog cards", () => {
+    ctx.tasks = [
+      {
+        id: "dep-1",
+        status: "in_progress",
+        title: "Dependency task",
+        prompt: "Dependency task",
+      },
+    ];
     const card = makeCard();
     const task = {
-      id: 'task-a',
-      status: 'backlog',
+      id: "task-a",
+      status: "backlog",
       position: 0,
-      prompt: 'Test task',
-      title: 'Test task',
-      depends_on: ['dep-1'],
+      prompt: "Test task",
+      title: "Test task",
+      depends_on: ["dep-1"],
       tags: [],
       sandbox_by_activity: {},
       worktree_paths: {},
-      created_at: '2026-03-10T00:00:00Z',
-      updated_at: '2026-03-10T00:00:00Z',
+      created_at: "2026-03-10T00:00:00Z",
+      updated_at: "2026-03-10T00:00:00Z",
     };
 
     ctx.updateCard(card, task, 0);
 
-    expect(card.innerHTML).toContain('badge-blocked');
-    expect(card.innerHTML).toContain('bg-amber-100');
-    expect(card.innerHTML).toContain('1 dep');
-    expect(card.innerHTML).toContain('<svg');
+    expect(card.innerHTML).toContain("badge-blocked");
+    expect(card.innerHTML).toContain("bg-amber-100");
+    expect(card.innerHTML).toContain("1 dep");
+    expect(card.innerHTML).toContain("<svg");
   });
 
-  it('renders a ready badge when all dependencies are satisfied', () => {
-    ctx.tasks = [{ id: 'dep-1', status: 'done', title: 'Dependency task', prompt: 'Dependency task' }];
+  it("renders a ready badge when all dependencies are satisfied", () => {
+    ctx.tasks = [
+      {
+        id: "dep-1",
+        status: "done",
+        title: "Dependency task",
+        prompt: "Dependency task",
+      },
+    ];
     const card = makeCard();
     const task = {
-      id: 'task-a',
-      status: 'backlog',
+      id: "task-a",
+      status: "backlog",
       position: 0,
-      prompt: 'Test task',
-      title: 'Test task',
-      depends_on: ['dep-1'],
+      prompt: "Test task",
+      title: "Test task",
+      depends_on: ["dep-1"],
       tags: [],
       sandbox_by_activity: {},
       worktree_paths: {},
-      created_at: '2026-03-10T00:00:00Z',
-      updated_at: '2026-03-10T00:00:00Z',
+      created_at: "2026-03-10T00:00:00Z",
+      updated_at: "2026-03-10T00:00:00Z",
     };
 
     ctx.updateCard(card, task, 0);
 
-    expect(card.innerHTML).toContain('badge-deps-met');
-    expect(card.innerHTML).toContain('bg-emerald-100');
-    expect(card.innerHTML).toContain('ready');
+    expect(card.innerHTML).toContain("badge-deps-met");
+    expect(card.innerHTML).toContain("bg-emerald-100");
+    expect(card.innerHTML).toContain("ready");
   });
 
-  it('does not render a dependency badge for non-backlog cards', () => {
-    ctx.tasks = [{ id: 'dep-1', status: 'in_progress', title: 'Dependency task', prompt: 'Dependency task' }];
+  it("does not render a dependency badge for non-backlog cards", () => {
+    ctx.tasks = [
+      {
+        id: "dep-1",
+        status: "in_progress",
+        title: "Dependency task",
+        prompt: "Dependency task",
+      },
+    ];
     const card = makeCard();
     const task = {
-      id: 'task-a',
-      status: 'waiting',
+      id: "task-a",
+      status: "waiting",
       position: 0,
-      prompt: 'Test task',
-      title: 'Test task',
-      depends_on: ['dep-1'],
+      prompt: "Test task",
+      title: "Test task",
+      depends_on: ["dep-1"],
       tags: [],
       sandbox_by_activity: {},
       worktree_paths: {},
-      created_at: '2026-03-10T00:00:00Z',
-      updated_at: '2026-03-10T00:00:00Z',
+      created_at: "2026-03-10T00:00:00Z",
+      updated_at: "2026-03-10T00:00:00Z",
     };
 
     ctx.updateCard(card, task, 0);
 
-    expect(card.innerHTML).not.toContain('badge-blocked');
-    expect(card.innerHTML).not.toContain('badge-deps-met');
+    expect(card.innerHTML).not.toContain("badge-blocked");
+    expect(card.innerHTML).not.toContain("badge-deps-met");
   });
 });
 
-describe('render.js column aria-live attributes', () => {
+describe("render.js column aria-live attributes", () => {
   let ctx;
 
   beforeEach(() => {
@@ -650,23 +861,37 @@ describe('render.js column aria-live attributes', () => {
       children: [],
       hasAttribute: (k) => k in attrs,
       getAttribute: (k) => attrs[k] ?? null,
-      setAttribute: (k, v) => { attrs[k] = v; },
+      setAttribute: (k, v) => {
+        attrs[k] = v;
+      },
       insertBefore: () => {},
-      appendChild(c) { return c; },
-      get textContent() { return ''; },
-      set textContent(_v) { this.children = []; },
+      appendChild(c) {
+        return c;
+      },
+      get textContent() {
+        return "";
+      },
+      set textContent(_v) {
+        this.children = [];
+      },
     };
     ctx.document = {
-      getElementById: (id) => id === 'col-backlog' ? mockEl : null,
-      createElement: () => ({ innerHTML: '' }),
-      createDocumentFragment: () => ({ children: [], appendChild(c) { this.children.push(c); return c; } }),
+      getElementById: (id) => (id === "col-backlog" ? mockEl : null),
+      createElement: () => ({ innerHTML: "" }),
+      createDocumentFragment: () => ({
+        children: [],
+        appendChild(c) {
+          this.children.push(c);
+          return c;
+        },
+      }),
       querySelectorAll: () => [],
       addEventListener: () => {},
-      readyState: 'complete',
+      readyState: "complete",
     };
     ctx.getOpenModalTaskId = () => null;
     ctx.getRenderableTasks = () => [];
     ctx.render();
-    expect(mockEl.getAttribute('aria-live')).toBe('polite');
+    expect(mockEl.getAttribute("aria-live")).toBe("polite");
   });
 });

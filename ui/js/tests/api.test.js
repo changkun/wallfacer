@@ -10,21 +10,21 @@
  *   - Archived pagination (loadArchivedTasksPage seam)
  *   - Deep-link hash handling (_handleInitialHash)
  */
-import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import vm from 'vm';
+import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const jsDir = join(__dirname, '..');
+const jsDir = join(__dirname, "..");
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
 function makeInput(initial = false) {
-  return { checked: initial, value: '' };
+  return { checked: initial, value: "" };
 }
 
 /** Build a vm context with all the globals api.js depends on at load time. */
@@ -38,7 +38,7 @@ function makeContext(overrides = {}) {
     clearTimeout,
     Promise,
     EventSource: function MockEventSource() {},
-    location: { hash: '' },
+    location: { hash: "" },
     // api() is provided by transport.js. Tests that want to control api()
     // outcomes should either (a) not load transport.js (so this stub is used)
     // or (b) override ctx.api after all scripts are loaded.
@@ -49,7 +49,7 @@ function makeContext(overrides = {}) {
     setRightTab: vi.fn(),
     setLeftTab: vi.fn(),
     announceBoardStatus: vi.fn(),
-    getTaskAccessibleTitle: vi.fn((t) => (t && (t.title || t.id)) || ''),
+    getTaskAccessibleTitle: vi.fn((t) => (t && (t.title || t.id)) || ""),
     formatTaskStatusLabel: vi.fn((s) => s),
     scheduleRender: vi.fn(),
     invalidateDiffBehindCounts: vi.fn(),
@@ -72,14 +72,14 @@ function makeContext(overrides = {}) {
       querySelector: () => null,
       addEventListener: vi.fn(),
       documentElement: { setAttribute: () => {} },
-      readyState: 'complete',
+      readyState: "complete",
     },
     Routes: overrides.Routes || {
-      config: { get: () => '/api/config', update: () => '/api/config' },
+      config: { get: () => "/api/config", update: () => "/api/config" },
       tasks: {
-        list: () => '/api/tasks',
-        stream: () => '/api/tasks/stream',
-        task: (id) => ({ update: () => '/api/tasks/' + id }),
+        list: () => "/api/tasks",
+        stream: () => "/api/tasks/stream",
+        task: (id) => ({ update: () => "/api/tasks/" + id }),
       },
     },
     ...overrides,
@@ -89,7 +89,7 @@ function makeContext(overrides = {}) {
 }
 
 function loadScript(ctx, filename) {
-  const code = readFileSync(join(jsDir, filename), 'utf8');
+  const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;
 }
@@ -101,10 +101,10 @@ function loadScript(ctx, filename) {
  * loadApiCoreStack() (skips transport) or reassign ctx.api afterwards.
  */
 function loadApiStack(ctx) {
-  loadScript(ctx, 'state.js');
-  loadScript(ctx, 'transport.js');
-  loadScript(ctx, 'task-stream.js');
-  loadScript(ctx, 'api.js');
+  loadScript(ctx, "state.js");
+  loadScript(ctx, "transport.js");
+  loadScript(ctx, "task-stream.js");
+  loadScript(ctx, "api.js");
   return ctx;
 }
 
@@ -114,9 +114,9 @@ function loadApiStack(ctx) {
  * control the fetch behaviour directly.
  */
 function loadApiCoreStack(ctx) {
-  loadScript(ctx, 'state.js');
-  loadScript(ctx, 'task-stream.js');
-  loadScript(ctx, 'api.js');
+  loadScript(ctx, "state.js");
+  loadScript(ctx, "task-stream.js");
+  loadScript(ctx, "api.js");
   return ctx;
 }
 
@@ -124,11 +124,11 @@ function task(id, fields = {}) {
   return {
     id,
     title: fields.title || id,
-    status: fields.status || 'backlog',
+    status: fields.status || "backlog",
     archived: !!fields.archived,
-    updated_at: fields.updated_at || '2026-03-10T00:00:00Z',
+    updated_at: fields.updated_at || "2026-03-10T00:00:00Z",
     position: fields.position || 0,
-    prompt: fields.prompt || '',
+    prompt: fields.prompt || "",
     ...fields,
   };
 }
@@ -137,8 +137,8 @@ function task(id, fields = {}) {
 // startTasksStream — SSE reconnect with lastTasksEventId
 // ---------------------------------------------------------------------------
 
-describe('startTasksStream', () => {
-  it('reconnects with lastTasksEventId preserved in the next stream URL', () => {
+describe("startTasksStream", () => {
+  it("reconnects with lastTasksEventId preserved in the next stream URL", () => {
     const instances = [];
     class MockEventSource {
       constructor(url) {
@@ -147,8 +147,12 @@ describe('startTasksStream', () => {
         this.listeners = {};
         instances.push(this);
       }
-      addEventListener(type, handler) { this.listeners[type] = handler; }
-      close() { this.closed = true; }
+      addEventListener(type, handler) {
+        this.listeners[type] = handler;
+      }
+      close() {
+        this.closed = true;
+      }
     }
     MockEventSource.CLOSED = 2;
 
@@ -156,23 +160,26 @@ describe('startTasksStream', () => {
     const ctx = makeContext({
       EventSource: MockEventSource,
       Routes: {
-        tasks: { stream: () => '/api/tasks/stream', list: () => '/api/tasks' },
-        config: { get: () => '/api/config', update: () => '/api/config' },
+        tasks: { stream: () => "/api/tasks/stream", list: () => "/api/tasks" },
+        config: { get: () => "/api/config", update: () => "/api/config" },
       },
-      setTimeout: vi.fn((fn, delay) => { scheduled.push({ fn, delay }); return 1; }),
+      setTimeout: vi.fn((fn, delay) => {
+        scheduled.push({ fn, delay });
+        return 1;
+      }),
     });
     loadApiStack(ctx);
     vm.runInContext('activeWorkspaces = ["/Users/test/repo"];', ctx);
 
     ctx.startTasksStream();
-    expect(instances[0].url).toBe('/api/tasks/stream');
+    expect(instances[0].url).toBe("/api/tasks/stream");
 
     // Simulate a snapshot event that delivers a lastEventId.
     instances[0].listeners.snapshot({
-      data: JSON.stringify([task('task-1')]),
-      lastEventId: 'evt-1',
+      data: JSON.stringify([task("task-1")]),
+      lastEventId: "evt-1",
     });
-    expect(vm.runInContext('lastTasksEventId', ctx)).toBe('evt-1');
+    expect(vm.runInContext("lastTasksEventId", ctx)).toBe("evt-1");
 
     // Simulate connection drop.
     instances[0].readyState = MockEventSource.CLOSED;
@@ -181,24 +188,28 @@ describe('startTasksStream', () => {
 
     // Let the reconnect timer fire.
     scheduled[0].fn();
-    expect(instances[1].url).toBe('/api/tasks/stream?last_event_id=evt-1');
+    expect(instances[1].url).toBe("/api/tasks/stream?last_event_id=evt-1");
   });
 
-  it('does not open a stream when activeWorkspaces is empty', () => {
+  it("does not open a stream when activeWorkspaces is empty", () => {
     const instances = [];
     class MockEventSource {
-      constructor(url) { instances.push(url); this.readyState = 1; this.listeners = {}; }
+      constructor(url) {
+        instances.push(url);
+        this.readyState = 1;
+        this.listeners = {};
+      }
       addEventListener() {}
       close() {}
     }
     const ctx = makeContext({ EventSource: MockEventSource });
     loadApiStack(ctx);
-    vm.runInContext('activeWorkspaces = [];', ctx);
+    vm.runInContext("activeWorkspaces = [];", ctx);
     ctx.startTasksStream();
     expect(instances).toHaveLength(0);
   });
 
-  it('refreshes modal dependencies when a dependency task receives an SSE update', () => {
+  it("refreshes modal dependencies when a dependency task receives an SSE update", () => {
     const instances = [];
     class MockEventSource {
       constructor(url) {
@@ -207,7 +218,9 @@ describe('startTasksStream', () => {
         this.listeners = {};
         instances.push(this);
       }
-      addEventListener(type, handler) { this.listeners[type] = handler; }
+      addEventListener(type, handler) {
+        this.listeners[type] = handler;
+      }
       close() {}
     }
     MockEventSource.CLOSED = 2;
@@ -216,33 +229,40 @@ describe('startTasksStream', () => {
     const ctx = makeContext({
       EventSource: MockEventSource,
       renderModalDependencies,
-      getOpenModalTaskId: vi.fn(() => 'task-1'),
+      getOpenModalTaskId: vi.fn(() => "task-1"),
       findTaskById: vi.fn((id) => {
-        const tasks = vm.runInContext('tasks', ctx);
-        const archived = vm.runInContext('archivedTasks', ctx);
-        return tasks.find((t) => t.id === id) || archived.find((t) => t.id === id) || null;
+        const tasks = vm.runInContext("tasks", ctx);
+        const archived = vm.runInContext("archivedTasks", ctx);
+        return (
+          tasks.find((t) => t.id === id) ||
+          archived.find((t) => t.id === id) ||
+          null
+        );
       }),
     });
     loadApiCoreStack(ctx);
-    vm.runInContext(`
+    vm.runInContext(
+      `
       activeWorkspaces = ["/Users/test/repo"];
       tasks = [
-        ${JSON.stringify(task('dep-1', { status: 'in_progress' }))},
-        ${JSON.stringify(task('task-1', { depends_on: ['dep-1'] }))},
+        ${JSON.stringify(task("dep-1", { status: "in_progress" }))},
+        ${JSON.stringify(task("task-1", { depends_on: ["dep-1"] }))},
       ];
-    `, ctx);
+    `,
+      ctx,
+    );
 
     ctx.startTasksStream();
-    instances[0].listeners['task-updated']({
-      data: JSON.stringify(task('dep-1', { status: 'done' })),
-      lastEventId: 'evt-2',
+    instances[0].listeners["task-updated"]({
+      data: JSON.stringify(task("dep-1", { status: "done" })),
+      lastEventId: "evt-2",
     });
 
     expect(renderModalDependencies).toHaveBeenCalledTimes(1);
-    expect(renderModalDependencies.mock.calls[0][0].id).toBe('task-1');
+    expect(renderModalDependencies.mock.calls[0][0].id).toBe("task-1");
   });
 
-  it('updates _lastSSEEventTime on heartbeat events', () => {
+  it("updates _lastSSEEventTime on heartbeat events", () => {
     const instances = [];
     class MockEventSource {
       constructor(url) {
@@ -255,7 +275,9 @@ describe('startTasksStream', () => {
         if (!this.listeners[type]) this.listeners[type] = [];
         this.listeners[type].push(handler);
       }
-      close() { this.closed = true; }
+      close() {
+        this.closed = true;
+      }
     }
     MockEventSource.CLOSED = 2;
 
@@ -267,13 +289,13 @@ describe('startTasksStream', () => {
     const es = instances[0];
 
     // Fire a heartbeat event.
-    const before = vm.runInContext('_lastSSEEventTime', ctx);
+    const before = vm.runInContext("_lastSSEEventTime", ctx);
     es.listeners.heartbeat[0]();
-    const after = vm.runInContext('_lastSSEEventTime', ctx);
+    const after = vm.runInContext("_lastSSEEventTime", ctx);
     expect(after).toBeGreaterThanOrEqual(before);
   });
 
-  it('updates _lastSSEEventTime on task-updated events', () => {
+  it("updates _lastSSEEventTime on task-updated events", () => {
     const instances = [];
     class MockEventSource {
       constructor(url) {
@@ -286,7 +308,9 @@ describe('startTasksStream', () => {
         if (!this.listeners[type]) this.listeners[type] = [];
         this.listeners[type].push(handler);
       }
-      close() { this.closed = true; }
+      close() {
+        this.closed = true;
+      }
     }
     MockEventSource.CLOSED = 2;
 
@@ -297,12 +321,12 @@ describe('startTasksStream', () => {
     ctx.startTasksStream();
     const es = instances[0];
 
-    vm.runInContext('_lastSSEEventTime = 0;', ctx);
-    es.listeners['task-updated'][0]({
-      data: JSON.stringify(task('t-1', { status: 'done' })),
-      lastEventId: 'seq-1',
+    vm.runInContext("_lastSSEEventTime = 0;", ctx);
+    es.listeners["task-updated"][0]({
+      data: JSON.stringify(task("t-1", { status: "done" })),
+      lastEventId: "seq-1",
     });
-    const after = vm.runInContext('_lastSSEEventTime', ctx);
+    const after = vm.runInContext("_lastSSEEventTime", ctx);
     expect(after).toBeGreaterThan(0);
   });
 });
@@ -311,17 +335,17 @@ describe('startTasksStream', () => {
 // toggleAutopilot — error-revert regression
 // ---------------------------------------------------------------------------
 
-describe('toggleAutopilot', () => {
-  it('reverts checkbox and calls showAlert on API failure', async () => {
+describe("toggleAutopilot", () => {
+  it("reverts checkbox and calls showAlert on API failure", async () => {
     const toggle = makeInput(true); // user flipped to true
-    const apiFn = vi.fn().mockRejectedValue(new Error('network error'));
+    const apiFn = vi.fn().mockRejectedValue(new Error("network error"));
     const ctx = makeContext({
-      elements: [['autopilot-toggle', toggle]],
+      elements: [["autopilot-toggle", toggle]],
       api: apiFn,
     });
     // Use the core stack so that ctx.api (the spy) is not overwritten by transport.js.
     loadApiCoreStack(ctx);
-    vm.runInContext('autopilot = false;', ctx);
+    vm.runInContext("autopilot = false;", ctx);
 
     await ctx.toggleAutopilot();
 
@@ -334,22 +358,28 @@ describe('toggleAutopilot', () => {
 // _handleInitialHash — smoke test (detailed coverage in hash-deeplink.test.js)
 // ---------------------------------------------------------------------------
 
-describe('_handleInitialHash', () => {
-  it('opens modal for a valid UUID hash', async () => {
-    const taskId = '11111111-1111-1111-1111-111111111111';
-    const ctx = makeContext({ location: { hash: '#' + taskId } });
+describe("_handleInitialHash", () => {
+  it("opens modal for a valid UUID hash", async () => {
+    const taskId = "11111111-1111-1111-1111-111111111111";
+    const ctx = makeContext({ location: { hash: "#" + taskId } });
     loadApiCoreStack(ctx);
-    vm.runInContext(`tasks = [{ id: "${taskId}", title: "T" }]; _hashHandled = false;`, ctx);
+    vm.runInContext(
+      `tasks = [{ id: "${taskId}", title: "T" }]; _hashHandled = false;`,
+      ctx,
+    );
 
     await ctx._handleInitialHash();
     expect(ctx.openModal).toHaveBeenCalledWith(taskId);
   });
 
-  it('is idempotent — ignores calls after the first', async () => {
-    const taskId = '22222222-2222-2222-2222-222222222222';
-    const ctx = makeContext({ location: { hash: '#' + taskId } });
+  it("is idempotent — ignores calls after the first", async () => {
+    const taskId = "22222222-2222-2222-2222-222222222222";
+    const ctx = makeContext({ location: { hash: "#" + taskId } });
     loadApiCoreStack(ctx);
-    vm.runInContext(`tasks = [{ id: "${taskId}", title: "T" }]; _hashHandled = false;`, ctx);
+    vm.runInContext(
+      `tasks = [{ id: "${taskId}", title: "T" }]; _hashHandled = false;`,
+      ctx,
+    );
 
     await ctx._handleInitialHash();
     await ctx._handleInitialHash();
@@ -361,36 +391,39 @@ describe('_handleInitialHash', () => {
 // loadArchivedTasksPage — pagination seam regression tests
 // ---------------------------------------------------------------------------
 
-describe('loadArchivedTasksPage', () => {
+describe("loadArchivedTasksPage", () => {
   // Use the core stack (no transport.js) so the api spy is not overwritten.
   function makeArchiveContext(apiFn) {
     const ctx = makeContext({ api: apiFn });
     loadApiCoreStack(ctx);
-    vm.runInContext('showArchived = true;', ctx);
+    vm.runInContext("showArchived = true;", ctx);
     return ctx;
   }
 
-  it('does nothing when showArchived is false', async () => {
+  it("does nothing when showArchived is false", async () => {
     const apiFn = vi.fn();
     const ctx = makeContext({ api: apiFn });
     loadApiCoreStack(ctx);
-    vm.runInContext('showArchived = false;', ctx);
+    vm.runInContext("showArchived = false;", ctx);
 
-    await ctx.loadArchivedTasksPage('initial');
+    await ctx.loadArchivedTasksPage("initial");
     expect(apiFn).not.toHaveBeenCalled();
   });
 
-  it('does nothing when loadState is not idle (concurrent guard)', async () => {
+  it("does nothing when loadState is not idle (concurrent guard)", async () => {
     const apiFn = vi.fn();
     const ctx = makeArchiveContext(apiFn);
     vm.runInContext('archivedPage.loadState = "loading-before";', ctx);
 
-    await ctx.loadArchivedTasksPage('initial');
+    await ctx.loadArchivedTasksPage("initial");
     expect(apiFn).not.toHaveBeenCalled();
   });
 
-  it('fetches the initial archived page and commits results to globals', async () => {
-    const archivedTask = task('arch-1', { archived: true, updated_at: '2026-03-10T10:00:00Z' });
+  it("fetches the initial archived page and commits results to globals", async () => {
+    const archivedTask = task("arch-1", {
+      archived: true,
+      updated_at: "2026-03-10T10:00:00Z",
+    });
     const apiFn = vi.fn().mockResolvedValue({
       tasks: [archivedTask],
       has_more_before: false,
@@ -398,57 +431,71 @@ describe('loadArchivedTasksPage', () => {
     });
     const ctx = makeArchiveContext(apiFn);
 
-    await ctx.loadArchivedTasksPage('initial');
+    await ctx.loadArchivedTasksPage("initial");
 
-    const storedIds = vm.runInContext('archivedTasks.map(t => t.id)', ctx);
-    expect(storedIds).toEqual(['arch-1']);
+    const storedIds = vm.runInContext("archivedTasks.map(t => t.id)", ctx);
+    expect(storedIds).toEqual(["arch-1"]);
   });
 
-  it('skips the before-page request when there are no existing archived tasks', async () => {
+  it("skips the before-page request when there are no existing archived tasks", async () => {
     const apiFn = vi.fn();
     const ctx = makeArchiveContext(apiFn);
-    vm.runInContext(`
+    vm.runInContext(
+      `
       archivedTasks = [];
       archivedPage = { loadState: 'idle', hasMoreBefore: true, hasMoreAfter: false };
-    `, ctx);
+    `,
+      ctx,
+    );
 
-    await ctx.loadArchivedTasksPage('before');
+    await ctx.loadArchivedTasksPage("before");
     // Guard: length === 0 prevents fetch even when hasMoreBefore is true.
     expect(apiFn).not.toHaveBeenCalled();
   });
 
-  it('appends cursor param when fetching the next before-page', async () => {
-    const apiFn = vi.fn().mockResolvedValue({ tasks: [], has_more_before: false, has_more_after: false });
+  it("appends cursor param when fetching the next before-page", async () => {
+    const apiFn = vi.fn().mockResolvedValue({
+      tasks: [],
+      has_more_before: false,
+      has_more_after: false,
+    });
     const ctx = makeArchiveContext(apiFn);
-    vm.runInContext(`
-      archivedTasks = [${JSON.stringify(task('arch-oldest', { archived: true }))}];
+    vm.runInContext(
+      `
+      archivedTasks = [${JSON.stringify(task("arch-oldest", { archived: true }))}];
       archivedPage = { loadState: 'idle', hasMoreBefore: true, hasMoreAfter: false };
-    `, ctx);
+    `,
+      ctx,
+    );
 
-    await ctx.loadArchivedTasksPage('before');
+    await ctx.loadArchivedTasksPage("before");
 
     const url = apiFn.mock.calls[0][0];
-    expect(url).toContain('archived_before=arch-oldest');
+    expect(url).toContain("archived_before=arch-oldest");
   });
 
-  it('resets loadState to idle after a successful fetch', async () => {
-    const apiFn = vi.fn().mockResolvedValue({ tasks: [], has_more_before: false, has_more_after: false });
+  it("resets loadState to idle after a successful fetch", async () => {
+    const apiFn = vi.fn().mockResolvedValue({
+      tasks: [],
+      has_more_before: false,
+      has_more_after: false,
+    });
     const ctx = makeArchiveContext(apiFn);
 
-    await ctx.loadArchivedTasksPage('initial');
+    await ctx.loadArchivedTasksPage("initial");
 
-    const loadState = vm.runInContext('archivedPage.loadState', ctx);
-    expect(loadState).toBe('idle');
+    const loadState = vm.runInContext("archivedPage.loadState", ctx);
+    expect(loadState).toBe("idle");
   });
 
-  it('resets loadState to idle even when the fetch throws', async () => {
-    const apiFn = vi.fn().mockRejectedValue(new Error('server error'));
+  it("resets loadState to idle even when the fetch throws", async () => {
+    const apiFn = vi.fn().mockRejectedValue(new Error("server error"));
     const ctx = makeArchiveContext(apiFn);
 
-    await ctx.loadArchivedTasksPage('initial');
+    await ctx.loadArchivedTasksPage("initial");
 
-    const loadState = vm.runInContext('archivedPage.loadState', ctx);
-    expect(loadState).toBe('idle');
+    const loadState = vm.runInContext("archivedPage.loadState", ctx);
+    expect(loadState).toBe("idle");
   });
 });
 
@@ -456,36 +503,49 @@ describe('loadArchivedTasksPage', () => {
 // toggleShowArchived — archived visibility seam
 // ---------------------------------------------------------------------------
 
-describe('toggleShowArchived', () => {
-  it('stores the preference in localStorage when enabled', async () => {
-    const apiFn = vi.fn().mockResolvedValue({ tasks: [], has_more_before: false, has_more_after: false });
+describe("toggleShowArchived", () => {
+  it("stores the preference in localStorage when enabled", async () => {
+    const apiFn = vi.fn().mockResolvedValue({
+      tasks: [],
+      has_more_before: false,
+      has_more_after: false,
+    });
     const toggle = { checked: true };
     const ctx = makeContext({
       api: apiFn,
-      elements: [['show-archived-toggle', toggle]],
+      elements: [["show-archived-toggle", toggle]],
     });
     loadApiCoreStack(ctx);
-    vm.runInContext('tasksSource = null;', ctx); // no active stream
+    vm.runInContext("tasksSource = null;", ctx); // no active stream
 
     ctx.toggleShowArchived();
 
-    expect(ctx.localStorage.setItem).toHaveBeenCalledWith('wallfacer-show-archived', 'true');
+    expect(ctx.localStorage.setItem).toHaveBeenCalledWith(
+      "wallfacer-show-archived",
+      "true",
+    );
   });
 
-  it('clears the archived window and triggers render when disabled', () => {
+  it("clears the archived window and triggers render when disabled", () => {
     const toggle = { checked: false };
-    const ctx = makeContext({ elements: [['show-archived-toggle', toggle]] });
+    const ctx = makeContext({ elements: [["show-archived-toggle", toggle]] });
     loadApiCoreStack(ctx);
-    vm.runInContext(`
-      archivedTasks = [${JSON.stringify(task('arch-1', { archived: true }))}];
+    vm.runInContext(
+      `
+      archivedTasks = [${JSON.stringify(task("arch-1", { archived: true }))}];
       showArchived = true;
       tasksSource = null;
-    `, ctx);
+    `,
+      ctx,
+    );
 
     ctx.toggleShowArchived();
 
-    expect(ctx.localStorage.setItem).toHaveBeenCalledWith('wallfacer-show-archived', 'false');
-    const remaining = vm.runInContext('archivedTasks.length', ctx);
+    expect(ctx.localStorage.setItem).toHaveBeenCalledWith(
+      "wallfacer-show-archived",
+      "false",
+    );
+    const remaining = vm.runInContext("archivedTasks.length", ctx);
     expect(remaining).toBe(0);
   });
 });
@@ -494,8 +554,8 @@ describe('toggleShowArchived', () => {
 // visibilitychange — re-fetches tasks when tab becomes visible
 // ---------------------------------------------------------------------------
 
-describe('visibilitychange handler', () => {
-  it('calls fetchTasks when the tab becomes visible and workspaces are active', () => {
+describe("visibilitychange handler", () => {
+  it("calls fetchTasks when the tab becomes visible and workspaces are active", () => {
     const apiFn = vi.fn().mockResolvedValue([]);
     const handlers = {};
     const ctx = makeContext({
@@ -504,10 +564,12 @@ describe('visibilitychange handler', () => {
         getElementById: () => null,
         querySelectorAll: () => [],
         querySelector: () => null,
-        addEventListener: (event, handler) => { handlers[event] = handler; },
+        addEventListener: (event, handler) => {
+          handlers[event] = handler;
+        },
         documentElement: { setAttribute: () => {} },
-        readyState: 'complete',
-        visibilityState: 'visible',
+        readyState: "complete",
+        visibilityState: "visible",
       },
     });
     loadApiCoreStack(ctx);
@@ -519,10 +581,10 @@ describe('visibilitychange handler', () => {
     expect(handlers.visibilitychange).toBeDefined();
     handlers.visibilitychange();
 
-    expect(apiFn).toHaveBeenCalledWith('/api/tasks');
+    expect(apiFn).toHaveBeenCalledWith("/api/tasks");
   });
 
-  it('does not fetch when no workspaces are active', () => {
+  it("does not fetch when no workspaces are active", () => {
     const apiFn = vi.fn().mockResolvedValue([]);
     const handlers = {};
     const ctx = makeContext({
@@ -531,16 +593,18 @@ describe('visibilitychange handler', () => {
         getElementById: () => null,
         querySelectorAll: () => [],
         querySelector: () => null,
-        addEventListener: (event, handler) => { handlers[event] = handler; },
+        addEventListener: (event, handler) => {
+          handlers[event] = handler;
+        },
         documentElement: { setAttribute: () => {} },
-        readyState: 'complete',
-        visibilityState: 'visible',
+        readyState: "complete",
+        visibilityState: "visible",
       },
     });
     loadApiCoreStack(ctx);
 
     // No active workspaces
-    vm.runInContext('activeWorkspaces = []', ctx);
+    vm.runInContext("activeWorkspaces = []", ctx);
 
     handlers.visibilitychange();
 

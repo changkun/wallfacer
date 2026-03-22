@@ -5,21 +5,21 @@
  * Each test loads only the minimal set of scripts it needs so failures are
  * localised to workspace.js rather than the full api.js bundle.
  */
-import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import vm from 'vm';
+import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const jsDir = join(__dirname, '..');
+const jsDir = join(__dirname, "..");
 
 // ---------------------------------------------------------------------------
 // Shared test infrastructure
 // ---------------------------------------------------------------------------
 
 function makeInput(initial = false) {
-  return { checked: initial, value: '' };
+  return { checked: initial, value: "" };
 }
 
 function makeContext(overrides = {}) {
@@ -43,28 +43,44 @@ function makeContext(overrides = {}) {
     updateAutomationActiveCount: vi.fn(),
     populateSandboxSelects: vi.fn(),
     updateIdeationConfig: vi.fn(),
-    escapeHtml: (s) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),
-    location: { hash: '' },
+    escapeHtml: (s) =>
+      String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;"),
+    location: { hash: "" },
     localStorage: { getItem: vi.fn(), setItem: vi.fn() },
     Routes: overrides.Routes || {
-      config: { get: () => '/api/config', update: () => '/api/config' },
-      workspaces: { browse: () => '/api/workspaces/browse', update: () => '/api/workspaces' },
+      config: { get: () => "/api/config", update: () => "/api/config" },
+      workspaces: {
+        browse: () => "/api/workspaces/browse",
+        update: () => "/api/workspaces",
+      },
     },
     requestAnimationFrame: (fn) => fn(),
-    ResizeObserver: class { observe() {} disconnect() {} },
+    ResizeObserver: class {
+      observe() {}
+      disconnect() {}
+    },
     document: {
       getElementById: (id) => elements.get(id) || null,
       querySelectorAll: (selector) => {
-        if (selector.includes('[data-sandbox-select]')) return elements.get('sandbox-selects') || [];
+        if (selector.includes("[data-sandbox-select]"))
+          return elements.get("sandbox-selects") || [];
         return [];
       },
       querySelector: () => null,
       addEventListener: () => {},
       removeEventListener: () => {},
       documentElement: { setAttribute: () => {} },
-      readyState: 'complete',
+      readyState: "complete",
       createElement: () => ({
-        value: '', textContent: '', disabled: false, title: '', appendChild: () => {},
+        value: "",
+        textContent: "",
+        disabled: false,
+        title: "",
+        appendChild: () => {},
       }),
     },
     ...overrides,
@@ -73,7 +89,7 @@ function makeContext(overrides = {}) {
 }
 
 function loadScript(ctx, filename) {
-  const code = readFileSync(join(jsDir, filename), 'utf8');
+  const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;
 }
@@ -82,48 +98,54 @@ function loadScript(ctx, filename) {
 // sandbox helpers
 // ---------------------------------------------------------------------------
 
-describe('sandboxDisplayName', () => {
-  it('formats sandbox labels consistently', () => {
+describe("sandboxDisplayName", () => {
+  it("formats sandbox labels consistently", () => {
     const ctx = makeContext();
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
-    expect(ctx.sandboxDisplayName('')).toBe('Default');
-    expect(ctx.sandboxDisplayName('claude')).toBe('Claude');
-    expect(ctx.sandboxDisplayName('codex')).toBe('Codex');
-    expect(ctx.sandboxDisplayName('custom')).toBe('Custom');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+    expect(ctx.sandboxDisplayName("")).toBe("Default");
+    expect(ctx.sandboxDisplayName("claude")).toBe("Claude");
+    expect(ctx.sandboxDisplayName("codex")).toBe("Codex");
+    expect(ctx.sandboxDisplayName("custom")).toBe("Custom");
   });
 });
 
-describe('collectSandboxByActivity / applySandboxByActivity', () => {
-  it('collects non-empty sandbox values by activity key', () => {
+describe("collectSandboxByActivity / applySandboxByActivity", () => {
+  it("collects non-empty sandbox values by activity key", () => {
     const ctx = makeContext({
       elements: [
-        ['env-sandbox-implementation', { value: 'claude' }],
-        ['env-sandbox-testing', { value: 'codex' }],
+        ["env-sandbox-implementation", { value: "claude" }],
+        ["env-sandbox-testing", { value: "codex" }],
       ],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
-    expect(ctx.collectSandboxByActivity('env-sandbox-')).toEqual({ implementation: 'claude', testing: 'codex' });
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+    expect(ctx.collectSandboxByActivity("env-sandbox-")).toEqual({
+      implementation: "claude",
+      testing: "codex",
+    });
   });
 
-  it('applies sandbox values to the matching elements', () => {
-    const impl = { value: '' };
-    const testing = { value: 'codex' };
+  it("applies sandbox values to the matching elements", () => {
+    const impl = { value: "" };
+    const testing = { value: "codex" };
     const ctx = makeContext({
       elements: [
-        ['env-sandbox-implementation', impl],
-        ['env-sandbox-testing', testing],
+        ["env-sandbox-implementation", impl],
+        ["env-sandbox-testing", testing],
       ],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
-    ctx.applySandboxByActivity('env-sandbox-', { implementation: 'custom', oversight: 'codex' });
-    expect(impl.value).toBe('custom');
-    expect(testing.value).toBe(''); // not in the values map → cleared
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+    ctx.applySandboxByActivity("env-sandbox-", {
+      implementation: "custom",
+      oversight: "codex",
+    });
+    expect(impl.value).toBe("custom");
+    expect(testing.value).toBe(""); // not in the values map → cleared
   });
 });
 
@@ -131,20 +153,20 @@ describe('collectSandboxByActivity / applySandboxByActivity', () => {
 // fetchConfig
 // ---------------------------------------------------------------------------
 
-describe('fetchConfig', () => {
-  it('hydrates client config state and applies sandbox selectors', async () => {
+describe("fetchConfig", () => {
+  it("hydrates client config state and applies sandbox selectors", async () => {
     const cfg = {
       autopilot: true,
       autotest: true,
       autosubmit: false,
-      workspaces: ['/Users/test/repo'],
-      workspace_browser_path: '/Users/test/repo',
-      workspace_groups: [{ workspaces: ['/Users/test/repo'] }],
-      sandboxes: ['claude', 'codex'],
-      default_sandbox: 'claude',
-      activity_sandboxes: { implementation: 'codex' },
+      workspaces: ["/Users/test/repo"],
+      workspace_browser_path: "/Users/test/repo",
+      workspace_groups: [{ workspaces: ["/Users/test/repo"] }],
+      sandboxes: ["claude", "codex"],
+      default_sandbox: "claude",
+      activity_sandboxes: { implementation: "codex" },
       sandbox_usable: { claude: true },
-      sandbox_reasons: { codex: 'Missing token' },
+      sandbox_reasons: { codex: "Missing token" },
     };
     const autopilotToggle = makeInput(false);
     const autotestToggle = makeInput(false);
@@ -153,18 +175,24 @@ describe('fetchConfig', () => {
     const ctx = makeContext({
       api: apiFn,
       elements: [
-        ['autopilot-toggle', autopilotToggle],
-        ['autotest-toggle', autotestToggle],
-        ['autosubmit-toggle', autosubmitToggle],
-        ['settings-workspace-groups', { innerHTML: '' }],
-        ['settings-workspace-list', { innerHTML: '' }],
-        ['workspace-group-switcher', { innerHTML: '', classList: { add: () => {}, remove: () => {}, toggle: () => {} } }],
+        ["autopilot-toggle", autopilotToggle],
+        ["autotest-toggle", autotestToggle],
+        ["autosubmit-toggle", autosubmitToggle],
+        ["settings-workspace-groups", { innerHTML: "" }],
+        ["settings-workspace-list", { innerHTML: "" }],
+        [
+          "workspace-group-switcher",
+          {
+            innerHTML: "",
+            classList: { add: () => {}, remove: () => {}, toggle: () => {} },
+          },
+        ],
       ],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
-    const populateSpy = vi.spyOn(ctx, 'populateSandboxSelects');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+    const populateSpy = vi.spyOn(ctx, "populateSandboxSelects");
 
     await ctx.fetchConfig();
 
@@ -173,54 +201,62 @@ describe('fetchConfig', () => {
     expect(autosubmitToggle.checked).toBe(false);
     expect(populateSpy).toHaveBeenCalled();
     expect(ctx.updateIdeationConfig).toHaveBeenCalledWith(cfg);
-    expect(vm.runInContext('autopilot', ctx)).toBe(true);
-    expect(vm.runInContext('autotest', ctx)).toBe(true);
-    expect(vm.runInContext('autosubmit', ctx)).toBe(false);
-    expect(vm.runInContext('workspaceBrowserPath', ctx)).toBe('/Users/test/repo');
-    expect(vm.runInContext('workspaceGroups.length', ctx)).toBe(1);
+    expect(vm.runInContext("autopilot", ctx)).toBe(true);
+    expect(vm.runInContext("autotest", ctx)).toBe(true);
+    expect(vm.runInContext("autosubmit", ctx)).toBe(false);
+    expect(vm.runInContext("workspaceBrowserPath", ctx)).toBe(
+      "/Users/test/repo",
+    );
+    expect(vm.runInContext("workspaceGroups.length", ctx)).toBe(1);
   });
 
-  it('prefers workspace_browser_path from config over an empty picker path', async () => {
+  it("prefers workspace_browser_path from config over an empty picker path", async () => {
     const apiFn = vi.fn().mockResolvedValue({
       workspaces: [],
-      workspace_browser_path: '/Users/test/current',
+      workspace_browser_path: "/Users/test/current",
     });
     const ctx = makeContext({ api: apiFn });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
     await ctx.fetchConfig();
 
-    expect(vm.runInContext('workspaceBrowserPath', ctx)).toBe('/Users/test/current');
+    expect(vm.runInContext("workspaceBrowserPath", ctx)).toBe(
+      "/Users/test/current",
+    );
   });
 
-  it('calls stopTasksStream and showWorkspacePicker when no workspaces are configured', async () => {
+  it("calls stopTasksStream and showWorkspacePicker when no workspaces are configured", async () => {
     const apiFn = vi.fn().mockResolvedValue({ workspaces: [] });
     const modal = {
       classList: {
-        _set: new Set(['hidden']),
-        remove(c) { this._set.delete(c); },
-        add(c) { this._set.add(c); },
+        _set: new Set(["hidden"]),
+        remove(c) {
+          this._set.delete(c);
+        },
+        add(c) {
+          this._set.add(c);
+        },
       },
     };
     const ctx = makeContext({
       api: apiFn,
       elements: [
-        ['workspace-picker', modal],
-        ['workspace-browser-filter', { value: '' }],
+        ["workspace-picker", modal],
+        ["workspace-browser-filter", { value: "" }],
       ],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
     // browseWorkspaces is called from showWorkspacePicker — stub it out.
     ctx.browseWorkspaces = vi.fn();
 
     await ctx.fetchConfig();
 
     expect(ctx.stopTasksStream).toHaveBeenCalled();
-    expect(modal.classList._set.has('hidden')).toBe(false); // picker is visible
+    expect(modal.classList._set.has("hidden")).toBe(false); // picker is visible
   });
 });
 
@@ -228,31 +264,40 @@ describe('fetchConfig', () => {
 // showWorkspacePicker
 // ---------------------------------------------------------------------------
 
-describe('showWorkspacePicker', () => {
-  it('refreshes the workspace browser every time the picker opens', () => {
-    const modal = { classList: { remove: vi.fn(), add: vi.fn() }, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+describe("showWorkspacePicker", () => {
+  it("refreshes the workspace browser every time the picker opens", () => {
+    const modal = {
+      classList: { remove: vi.fn(), add: vi.fn() },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
     const closeBtn = { style: {} };
-    const filterInput = { value: 'repo' };
+    const filterInput = { value: "repo" };
     const ctx = makeContext({
       elements: [
-        ['workspace-picker', modal],
-        ['workspace-picker-close', closeBtn],
-        ['workspace-browser-filter', filterInput],
+        ["workspace-picker", modal],
+        ["workspace-picker-close", closeBtn],
+        ["workspace-browser-filter", filterInput],
       ],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    const browseSpy = vi.spyOn(ctx, 'browseWorkspaces').mockImplementation(() => {});
-    vm.runInContext('workspaceBrowserPath = "/Users/test/dev"; workspaceBrowserFilterQuery = "repo"; activeWorkspaces = []; workspaceSelectionDraft = [];', ctx);
+    const browseSpy = vi
+      .spyOn(ctx, "browseWorkspaces")
+      .mockImplementation(() => {});
+    vm.runInContext(
+      'workspaceBrowserPath = "/Users/test/dev"; workspaceBrowserFilterQuery = "repo"; activeWorkspaces = []; workspaceSelectionDraft = [];',
+      ctx,
+    );
 
     ctx.showWorkspacePicker(true);
 
-    expect(browseSpy).toHaveBeenCalledWith('/Users/test/dev');
-    expect(closeBtn.style.display).toBe('none');
-    expect(filterInput.value).toBe('');
-    expect(vm.runInContext('workspaceBrowserFilterQuery', ctx)).toBe('');
+    expect(browseSpy).toHaveBeenCalledWith("/Users/test/dev");
+    expect(closeBtn.style.display).toBe("none");
+    expect(filterInput.value).toBe("");
+    expect(vm.runInContext("workspaceBrowserFilterQuery", ctx)).toBe("");
   });
 });
 
@@ -260,21 +305,25 @@ describe('showWorkspacePicker', () => {
 // renderWorkspaceSelectionDraft
 // ---------------------------------------------------------------------------
 
-describe('renderWorkspaceSelectionDraft', () => {
-  it('renders a safe remove button handler for selected paths', () => {
-    const listEl = { innerHTML: '' };
+describe("renderWorkspaceSelectionDraft", () => {
+  it("renders a safe remove button handler for selected paths", () => {
+    const listEl = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [['workspace-selection-list', listEl]],
+      elements: [["workspace-selection-list", listEl]],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
     vm.runInContext('workspaceSelectionDraft = ["/Users/test/dev/repo"];', ctx);
     ctx.renderWorkspaceSelectionDraft();
 
-    expect(listEl.innerHTML).toContain('data-workspace-path="/Users/test/dev/repo"');
-    expect(listEl.innerHTML).toContain('onclick="removeWorkspaceSelection(this.dataset.workspacePath)"');
+    expect(listEl.innerHTML).toContain(
+      'data-workspace-path="/Users/test/dev/repo"',
+    );
+    expect(listEl.innerHTML).toContain(
+      'onclick="removeWorkspaceSelection(this.dataset.workspacePath)"',
+    );
   });
 });
 
@@ -282,25 +331,28 @@ describe('renderWorkspaceSelectionDraft', () => {
 // renderWorkspaceGroups
 // ---------------------------------------------------------------------------
 
-describe('renderWorkspaceGroups', () => {
-  it('renders saved workspace groups in settings', () => {
-    const groupsEl = { innerHTML: '' };
+describe("renderWorkspaceGroups", () => {
+  it("renders saved workspace groups in settings", () => {
+    const groupsEl = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [['settings-workspace-groups', groupsEl]],
+      elements: [["settings-workspace-groups", groupsEl]],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       activeWorkspaces = ["/Users/test/repo-a", "/Users/test/repo-b"];
       workspaceGroups = [{ workspaces: ["/Users/test/repo-a", "/Users/test/repo-b"] }];
-    `, ctx);
+    `,
+      ctx,
+    );
     ctx.renderWorkspaceGroups();
 
-    expect(groupsEl.innerHTML).toContain('repo-a + repo-b');
-    expect(groupsEl.innerHTML).toContain('Current');
-    expect(groupsEl.innerHTML).toContain('Use');
+    expect(groupsEl.innerHTML).toContain("repo-a + repo-b");
+    expect(groupsEl.innerHTML).toContain("Current");
+    expect(groupsEl.innerHTML).toContain("Use");
   });
 });
 
@@ -308,41 +360,41 @@ describe('renderWorkspaceGroups', () => {
 // renderHeaderWorkspaceGroupTabs — tab rendering and switching state
 // ---------------------------------------------------------------------------
 
-describe('renderHeaderWorkspaceGroupTabs', () => {
-  it('renders saved groups as tabs with active group highlighted', () => {
-    const tabsEl = { innerHTML: '' };
+describe("renderHeaderWorkspaceGroupTabs", () => {
+  it("renders saved groups as tabs with active group highlighted", () => {
+    const tabsEl = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [
-        ['workspace-group-tabs', tabsEl],
-      ],
+      elements: [["workspace-group-tabs", tabsEl]],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       activeWorkspaces = ["/Users/test/repo-a", "/Users/test/repo-b"];
       workspaceGroups = [{ workspaces: ["/Users/test/repo-a", "/Users/test/repo-b"] }];
-    `, ctx);
+    `,
+      ctx,
+    );
 
     ctx.renderHeaderWorkspaceGroupTabs();
 
-    expect(tabsEl.innerHTML).toContain('repo-a + repo-b');
-    expect(tabsEl.innerHTML).toContain('workspace-group-tab--active');
+    expect(tabsEl.innerHTML).toContain("repo-a + repo-b");
+    expect(tabsEl.innerHTML).toContain("workspace-group-tab--active");
   });
 
-  it('shows a loading spinner on the switching tab', () => {
-    const tabsEl = { innerHTML: '' };
+  it("shows a loading spinner on the switching tab", () => {
+    const tabsEl = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [
-        ['workspace-group-tabs', tabsEl],
-      ],
+      elements: [["workspace-group-tabs", tabsEl]],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       activeWorkspaces = ["/Users/test/repo-a"];
       workspaceGroups = [
         { workspaces: ["/Users/test/repo-a"] },
@@ -350,97 +402,106 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
       ];
       workspaceGroupSwitching = true;
       workspaceGroupSwitchingIndex = 1;
-    `, ctx);
+    `,
+      ctx,
+    );
 
     ctx.renderHeaderWorkspaceGroupTabs();
 
-    expect(tabsEl.innerHTML).toContain('workspace-group-tab--switching');
-    expect(tabsEl.innerHTML).toContain('spinner');
+    expect(tabsEl.innerHTML).toContain("workspace-group-tab--switching");
+    expect(tabsEl.innerHTML).toContain("spinner");
   });
 
-  it('hides a tab and restores it', () => {
-    const tabsEl = { innerHTML: '' };
+  it("hides a tab and restores it", () => {
+    const tabsEl = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [
-        ['workspace-group-tabs', tabsEl],
-      ],
+      elements: [["workspace-group-tabs", tabsEl]],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       activeWorkspaces = ["/Users/test/repo-a"];
       workspaceGroups = [
         { workspaces: ["/Users/test/repo-a"] },
         { workspaces: ["/Users/test/repo-b"] }
       ];
-    `, ctx);
+    `,
+      ctx,
+    );
 
     ctx.renderHeaderWorkspaceGroupTabs();
-    expect(tabsEl.innerHTML).toContain('repo-b');
+    expect(tabsEl.innerHTML).toContain("repo-b");
 
     // Hide the second tab.
     ctx.hideWorkspaceGroupTab(1);
-    expect(tabsEl.innerHTML).not.toContain('repo-b');
+    expect(tabsEl.innerHTML).not.toContain("repo-b");
 
     // Restore it.
     ctx.restoreWorkspaceGroupTab(1);
-    expect(tabsEl.innerHTML).toContain('repo-b');
+    expect(tabsEl.innerHTML).toContain("repo-b");
   });
 
-  it('does not show close button on active tab', () => {
-    const tabsEl = { innerHTML: '' };
+  it("does not show close button on active tab", () => {
+    const tabsEl = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [
-        ['workspace-group-tabs', tabsEl],
-      ],
+      elements: [["workspace-group-tabs", tabsEl]],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       activeWorkspaces = ["/Users/test/repo-a"];
       workspaceGroups = [
         { workspaces: ["/Users/test/repo-a"] },
         { workspaces: ["/Users/test/repo-b"] }
       ];
-    `, ctx);
+    `,
+      ctx,
+    );
 
     ctx.renderHeaderWorkspaceGroupTabs();
 
     // Active tab should not have a close button, inactive should.
-    const activeMatch = tabsEl.innerHTML.match(/workspace-group-tab--active[^>]*>.*?<\/div>/);
-    expect(activeMatch[0]).not.toContain('workspace-group-tab__close');
+    const activeMatch = tabsEl.innerHTML.match(
+      /workspace-group-tab--active[^>]*>.*?<\/div>/,
+    );
+    expect(activeMatch[0]).not.toContain("workspace-group-tab__close");
     // Inactive tab should have close button.
-    expect(tabsEl.innerHTML).toContain('workspace-group-tab__close');
+    expect(tabsEl.innerHTML).toContain("workspace-group-tab__close");
   });
 
-  it('includes auto-collapsed groups in the + menu', () => {
-    const tabsEl = { innerHTML: '' };
-    const elements = new Map([['workspace-group-tabs', tabsEl]]);
+  it("includes auto-collapsed groups in the + menu", () => {
+    const tabsEl = { innerHTML: "" };
+    const elements = new Map([["workspace-group-tabs", tabsEl]]);
     const ctx = makeContext({
-      elements: [['workspace-group-tabs', tabsEl]],
+      elements: [["workspace-group-tabs", tabsEl]],
     });
     // Override document methods to support the menu.
-    let menuHtml = '';
+    let menuHtml = "";
     ctx.document.body = {
-      appendChild: function(el) { menuHtml = el.innerHTML || ''; },
+      appendChild: function (el) {
+        menuHtml = el.innerHTML || "";
+      },
     };
     const origGetById = ctx.document.getElementById;
-    ctx.document.getElementById = function(id) {
-      if (id === 'workspace-group-add-menu') return null;
+    ctx.document.getElementById = function (id) {
+      if (id === "workspace-group-add-menu") return null;
       return origGetById(id);
     };
-    ctx.document.createElement = function() {
-      return { id: '', style: { cssText: '' }, innerHTML: '', remove: vi.fn() };
+    ctx.document.createElement = function () {
+      return { id: "", style: { cssText: "" }, innerHTML: "", remove: vi.fn() };
     };
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       activeWorkspaces = ["/Users/test/repo-a"];
       workspaceGroups = [
         { workspaces: ["/Users/test/repo-a"] },
@@ -448,33 +509,40 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
         { workspaces: ["/Users/test/repo-c"] }
       ];
       _autoCollapsedGroupIndices = [2];
-    `, ctx);
+    `,
+      ctx,
+    );
 
-    ctx.addWorkspaceGroupTab({ currentTarget: { getBoundingClientRect: () => ({ bottom: 50, left: 10 }) } });
+    ctx.addWorkspaceGroupTab({
+      currentTarget: {
+        getBoundingClientRect: () => ({ bottom: 50, left: 10 }),
+      },
+    });
 
     // The auto-collapsed group (repo-c) should appear with useWorkspaceGroup action.
-    expect(menuHtml).toContain('repo-c');
-    expect(menuHtml).toContain('useWorkspaceGroup(2)');
+    expect(menuHtml).toContain("repo-c");
+    expect(menuHtml).toContain("useWorkspaceGroup(2)");
   });
 
-  it('always renders the + button', () => {
-    const tabsEl = { innerHTML: '' };
+  it("always renders the + button", () => {
+    const tabsEl = { innerHTML: "" };
     const ctx = makeContext({
-      elements: [
-        ['workspace-group-tabs', tabsEl],
-      ],
+      elements: [["workspace-group-tabs", tabsEl]],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       activeWorkspaces = [];
       workspaceGroups = [];
-    `, ctx);
+    `,
+      ctx,
+    );
 
     ctx.renderHeaderWorkspaceGroupTabs();
-    expect(tabsEl.innerHTML).toContain('workspace-group-tab--add');
+    expect(tabsEl.innerHTML).toContain("workspace-group-tab--add");
   });
 });
 
@@ -482,53 +550,61 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
 // browseWorkspaces
 // ---------------------------------------------------------------------------
 
-describe('browseWorkspaces', () => {
-  it('skips the include_hidden param by default', async () => {
-    const pathInput = { value: '/Users/test/dev' };
-    const statusEl = { textContent: '' };
-    const apiFn = vi.fn().mockResolvedValue({ path: '/Users/test/dev', entries: [] });
+describe("browseWorkspaces", () => {
+  it("skips the include_hidden param by default", async () => {
+    const pathInput = { value: "/Users/test/dev" };
+    const statusEl = { textContent: "" };
+    const apiFn = vi
+      .fn()
+      .mockResolvedValue({ path: "/Users/test/dev", entries: [] });
     const ctx = makeContext({
       api: apiFn,
       elements: [
-        ['workspace-browser-path', pathInput],
-        ['workspace-browser-status', statusEl],
-        ['workspace-browser-list', { innerHTML: '' }],
-        ['workspace-browser-entries', { innerHTML: '' }],
-        ['workspace-browser-breadcrumb', { textContent: '' }],
-        ['workspace-browser-include-hidden', { checked: false }],
+        ["workspace-browser-path", pathInput],
+        ["workspace-browser-status", statusEl],
+        ["workspace-browser-list", { innerHTML: "" }],
+        ["workspace-browser-entries", { innerHTML: "" }],
+        ["workspace-browser-breadcrumb", { textContent: "" }],
+        ["workspace-browser-include-hidden", { checked: false }],
       ],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
     await ctx.browseWorkspaces();
 
-    expect(apiFn).toHaveBeenCalledWith('/api/workspaces/browse?path=%2FUsers%2Ftest%2Fdev');
+    expect(apiFn).toHaveBeenCalledWith(
+      "/api/workspaces/browse?path=%2FUsers%2Ftest%2Fdev",
+    );
   });
 
-  it('appends include_hidden=true when the toggle is enabled', async () => {
-    const pathInput = { value: '/Users/test/dev' };
-    const statusEl = { textContent: '' };
-    const apiFn = vi.fn().mockResolvedValue({ path: '/Users/test/dev', entries: [] });
+  it("appends include_hidden=true when the toggle is enabled", async () => {
+    const pathInput = { value: "/Users/test/dev" };
+    const statusEl = { textContent: "" };
+    const apiFn = vi
+      .fn()
+      .mockResolvedValue({ path: "/Users/test/dev", entries: [] });
     const ctx = makeContext({
       api: apiFn,
       elements: [
-        ['workspace-browser-path', pathInput],
-        ['workspace-browser-status', statusEl],
-        ['workspace-browser-list', { innerHTML: '' }],
-        ['workspace-browser-entries', { innerHTML: '' }],
-        ['workspace-browser-breadcrumb', { textContent: '' }],
-        ['workspace-browser-include-hidden', { checked: true }],
+        ["workspace-browser-path", pathInput],
+        ["workspace-browser-status", statusEl],
+        ["workspace-browser-list", { innerHTML: "" }],
+        ["workspace-browser-entries", { innerHTML: "" }],
+        ["workspace-browser-breadcrumb", { textContent: "" }],
+        ["workspace-browser-include-hidden", { checked: true }],
       ],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
     await ctx.browseWorkspaces();
 
-    expect(apiFn).toHaveBeenCalledWith('/api/workspaces/browse?path=%2FUsers%2Ftest%2Fdev&include_hidden=true');
+    expect(apiFn).toHaveBeenCalledWith(
+      "/api/workspaces/browse?path=%2FUsers%2Ftest%2Fdev&include_hidden=true",
+    );
   });
 });
 
@@ -536,22 +612,23 @@ describe('browseWorkspaces', () => {
 // workspace browser filter
 // ---------------------------------------------------------------------------
 
-describe('workspace browser filter', () => {
-  it('filters the visible folder list client-side', () => {
-    const entriesEl = { innerHTML: '' };
-    const crumbEl = { textContent: '' };
+describe("workspace browser filter", () => {
+  it("filters the visible folder list client-side", () => {
+    const entriesEl = { innerHTML: "" };
+    const crumbEl = { textContent: "" };
     const ctx = makeContext({
       elements: [
-        ['workspace-browser-list', {}],
-        ['workspace-browser-entries', entriesEl],
-        ['workspace-browser-breadcrumb', crumbEl],
+        ["workspace-browser-list", {}],
+        ["workspace-browser-entries", entriesEl],
+        ["workspace-browser-breadcrumb", crumbEl],
       ],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       workspaceBrowserPath = "/Users/test/dev";
       workspaceBrowserEntries = [
         { name: "alpha-repo", path: "/Users/test/dev/alpha-repo", is_git_repo: true },
@@ -559,39 +636,46 @@ describe('workspace browser filter', () => {
         { name: "gamma-app", path: "/Users/test/dev/gamma-app", is_git_repo: true }
       ];
       workspaceBrowserFocusIndex = 0;
-    `, ctx);
+    `,
+      ctx,
+    );
 
-    ctx.setWorkspaceBrowserFilter('app');
+    ctx.setWorkspaceBrowserFilter("app");
 
-    expect(entriesEl.innerHTML).toContain('gamma-app');
-    expect(entriesEl.innerHTML).not.toContain('alpha-repo');
-    expect(entriesEl.innerHTML).not.toContain('beta-tools');
-    expect(vm.runInContext('workspaceBrowserFocusIndex', ctx)).toBe(0);
+    expect(entriesEl.innerHTML).toContain("gamma-app");
+    expect(entriesEl.innerHTML).not.toContain("alpha-repo");
+    expect(entriesEl.innerHTML).not.toContain("beta-tools");
+    expect(vm.runInContext("workspaceBrowserFocusIndex", ctx)).toBe(0);
   });
 
-  it('adds the highlighted folder on Enter', () => {
+  it("adds the highlighted folder on Enter", () => {
     const ctx = makeContext();
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       workspaceBrowserEntries = [
         { name: "alpha-repo", path: "/Users/test/dev/alpha-repo", is_git_repo: true },
         { name: "beta-tools", path: "/Users/test/dev/beta-tools", is_git_repo: false }
       ];
       workspaceBrowserFocusIndex = 1;
       workspaceSelectionDraft = [];
-    `, ctx);
+    `,
+      ctx,
+    );
 
     ctx.workspaceBrowserListKeydown({
-      key: 'Enter',
+      key: "Enter",
       preventDefault: vi.fn(),
       metaKey: false,
       ctrlKey: false,
     });
 
-    expect(vm.runInContext('workspaceSelectionDraft.slice()', ctx)).toEqual(['/Users/test/dev/beta-tools']);
+    expect(vm.runInContext("workspaceSelectionDraft.slice()", ctx)).toEqual([
+      "/Users/test/dev/beta-tools",
+    ]);
   });
 });
 
@@ -599,44 +683,47 @@ describe('workspace browser filter', () => {
 // workspace-group switching spinner — integration seam
 // ---------------------------------------------------------------------------
 
-describe('useWorkspaceGroup — spinner lifecycle', () => {
-  it('sets switching=true before applyWorkspaceSelection and false afterwards', async () => {
+describe("useWorkspaceGroup — spinner lifecycle", () => {
+  it("sets switching=true before applyWorkspaceSelection and false afterwards", async () => {
     const spinnerStates = [];
-    const tabsEl = { innerHTML: '' };
+    const tabsEl = { innerHTML: "" };
     const apiFn = vi.fn().mockResolvedValue({});
     const ctx = makeContext({
       api: apiFn,
       elements: [
-        ['workspace-group-tabs', tabsEl],
-        ['workspace-apply-status', { textContent: '' }],
-        ['settings-workspace-status', { textContent: '' }],
-        ['settings-workspace-groups', { innerHTML: '' }],
-        ['settings-workspace-list', { innerHTML: '' }],
+        ["workspace-group-tabs", tabsEl],
+        ["workspace-apply-status", { textContent: "" }],
+        ["settings-workspace-status", { textContent: "" }],
+        ["settings-workspace-groups", { innerHTML: "" }],
+        ["settings-workspace-list", { innerHTML: "" }],
       ],
     });
-    loadScript(ctx, 'state.js');
-    loadScript(ctx, 'utils.js');
-    loadScript(ctx, 'workspace.js');
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
 
     // Intercept renderHeaderWorkspaceGroupTabs to capture switching state.
     const origRender = ctx.renderHeaderWorkspaceGroupTabs.bind(ctx);
-    ctx.renderHeaderWorkspaceGroupTabs = function() {
-      spinnerStates.push(vm.runInContext('workspaceGroupSwitching', ctx));
+    ctx.renderHeaderWorkspaceGroupTabs = function () {
+      spinnerStates.push(vm.runInContext("workspaceGroupSwitching", ctx));
       origRender();
     };
 
     // Mock fetchConfig so we don't need a full server round-trip.
     ctx.fetchConfig = vi.fn().mockResolvedValue(undefined);
 
-    vm.runInContext(`
+    vm.runInContext(
+      `
       workspaceGroups = [{ workspaces: ["/Users/test/repo"] }];
       workspaceSelectionDraft = [];
-    `, ctx);
+    `,
+      ctx,
+    );
 
     await ctx.useWorkspaceGroup(0);
 
     // Switching should have been true at some point and false at the end.
     expect(spinnerStates.some(Boolean)).toBe(true);
-    expect(vm.runInContext('workspaceGroupSwitching', ctx)).toBe(false);
+    expect(vm.runInContext("workspaceGroupSwitching", ctx)).toBe(false);
   });
 });

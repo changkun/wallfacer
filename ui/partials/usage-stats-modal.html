@@ -1,48 +1,204 @@
 <!-- Usage Stats Modal -->
-<div id="usage-stats-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
-  <div class="modal-card" style="max-width: 760px; width: 100%; max-height: 85vh; display: flex; flex-direction: column;">
-    <div class="p-6" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-        <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Usage Statistics</h3>
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <label style="font-size: 12px; color: var(--text-muted);">Period:
-            <select id="usage-stats-period" class="select" style="margin-left: 6px; font-size: 12px; padding: 2px 6px;">
+<div
+  id="usage-stats-modal"
+  class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4"
+>
+  <div
+    class="modal-card"
+    style="
+      max-width: 760px;
+      width: 100%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+    "
+  >
+    <div
+      class="p-6"
+      style="display: flex; flex-direction: column; flex: 1; min-height: 0"
+    >
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 16px;
+        "
+      >
+        <h3 style="font-size: 16px; font-weight: 600; margin: 0">
+          Usage Statistics
+        </h3>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <label style="font-size: 12px; color: var(--text-muted)"
+            >Period:
+            <select
+              id="usage-stats-period"
+              class="select"
+              style="margin-left: 6px; font-size: 12px; padding: 2px 6px"
+            >
               <option value="7">Last 7 days</option>
               <option value="30">Last 30 days</option>
               <option value="90">Last 90 days</option>
               <option value="0">All time</option>
             </select>
           </label>
-          <button onclick="closeUsageStats()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
+          <button
+            onclick="closeUsageStats()"
+            style="
+              background: none;
+              border: none;
+              cursor: pointer;
+              font-size: 20px;
+              color: var(--text-muted);
+              line-height: 1;
+            "
+          >
+            &times;
+          </button>
         </div>
       </div>
 
-      <div style="flex: 1; min-height: 0; overflow-y: auto;">
+      <div style="flex: 1; min-height: 0; overflow-y: auto">
         <!-- Loading state -->
-        <div id="usage-stats-loading" style="display: flex; align-items: center; justify-content: center; padding: 32px; color: var(--text-muted); font-size: 13px;">
+        <div
+          id="usage-stats-loading"
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            color: var(--text-muted);
+            font-size: 13px;
+          "
+        >
           Loading…
         </div>
         <!-- Error state -->
-        <div id="usage-stats-error" class="hidden" style="padding: 12px; background: #f5d5d5; border-radius: 6px; font-size: 12px; color: #8c2020; font-family: monospace; white-space: pre-wrap;"></div>
+        <div
+          id="usage-stats-error"
+          class="hidden"
+          style="
+            padding: 12px;
+            background: #f5d5d5;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #8c2020;
+            font-family: monospace;
+            white-space: pre-wrap;
+          "
+        ></div>
         <!-- Empty state -->
-        <div id="usage-stats-empty" class="hidden" style="text-align: center; padding: 32px; color: var(--text-muted); font-size: 13px;">
+        <div
+          id="usage-stats-empty"
+          class="hidden"
+          style="
+            text-align: center;
+            padding: 32px;
+            color: var(--text-muted);
+            font-size: 13px;
+          "
+        >
           No usage data for the selected period.
         </div>
         <!-- Content -->
         <div id="usage-stats-content" class="hidden">
-          <div id="usage-stats-summary" style="padding: 4px 0 16px; font-size: 12px; color: var(--text-muted);"></div>
+          <div
+            id="usage-stats-summary"
+            style="
+              padding: 4px 0 16px;
+              font-size: 12px;
+              color: var(--text-muted);
+            "
+          ></div>
 
-          <div style="margin-bottom: 20px;">
-            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">By Status</div>
-            <div style="overflow-x: auto;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+          <div style="margin-bottom: 20px">
+            <div
+              style="
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 8px;
+              "
+            >
+              By Status
+            </div>
+            <div style="overflow-x: auto">
+              <table
+                style="width: 100%; border-collapse: collapse; font-size: 12px"
+              >
                 <thead>
-                  <tr style="border-bottom: 1px solid var(--border);">
-                    <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Status</th>
-                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Input</th>
-                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Output</th>
-                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Total Tokens</th>
-                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Cost</th>
+                  <tr style="border-bottom: 1px solid var(--border)">
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                      "
+                    >
+                      Status
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Input
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Output
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Total Tokens
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Cost
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="usage-stats-by-status-tbody"></tbody>
@@ -51,16 +207,93 @@
           </div>
 
           <div>
-            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">By Sub-Agent</div>
-            <div style="overflow-x: auto;">
-              <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <div
+              style="
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 8px;
+              "
+            >
+              By Sub-Agent
+            </div>
+            <div style="overflow-x: auto">
+              <table
+                style="width: 100%; border-collapse: collapse; font-size: 12px"
+              >
                 <thead>
-                  <tr style="border-bottom: 1px solid var(--border);">
-                    <th style="text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;">Agent</th>
-                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Input</th>
-                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Output</th>
-                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Total Tokens</th>
-                    <th style="text-align: right; padding: 6px 10px; font-weight: 600; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;">Cost</th>
+                  <tr style="border-bottom: 1px solid var(--border)">
+                    <th
+                      style="
+                        text-align: left;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                      "
+                    >
+                      Agent
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Input
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Output
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Total Tokens
+                    </th>
+                    <th
+                      style="
+                        text-align: right;
+                        padding: 6px 10px;
+                        font-weight: 600;
+                        color: var(--text-muted);
+                        font-size: 11px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.4px;
+                        white-space: nowrap;
+                      "
+                    >
+                      Cost
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="usage-stats-by-sub-agent-tbody"></tbody>
@@ -72,4 +305,3 @@
     </div>
   </div>
 </div>
-

@@ -3,68 +3,76 @@
 let backlogSortable = null;
 
 function currentBacklogSortMode() {
-  return typeof backlogSortMode === 'string' ? backlogSortMode : 'manual';
+  return typeof backlogSortMode === "string" ? backlogSortMode : "manual";
 }
 
 function syncBacklogSortableMode() {
-  if (!backlogSortable || typeof backlogSortable.option !== 'function') return;
-  backlogSortable.option('sort', currentBacklogSortMode() !== 'impact');
+  if (!backlogSortable || typeof backlogSortable.option !== "function") return;
+  backlogSortable.option("sort", currentBacklogSortMode() !== "impact");
 }
 
 function initSortable() {
-  const backlog = document.getElementById('col-backlog');
-  const inProgress = document.getElementById('col-in_progress');
+  const backlog = document.getElementById("col-backlog");
+  const inProgress = document.getElementById("col-in_progress");
 
   // Backlog: can reorder (sort) and drag out to In Progress
   backlogSortable = Sortable.create(backlog, {
-    group: { name: 'taskboard', pull: true, put: false },
+    group: { name: "taskboard", pull: true, put: false },
     animation: 150,
-    ghostClass: 'sortable-ghost',
-    chosenClass: 'sortable-chosen',
-    sort: currentBacklogSortMode() !== 'impact',
-    onSort: function() {
-      if (currentBacklogSortMode() === 'impact') return;
+    ghostClass: "sortable-ghost",
+    chosenClass: "sortable-chosen",
+    sort: currentBacklogSortMode() !== "impact",
+    onSort: function () {
+      if (currentBacklogSortMode() === "impact") return;
       // Persist new position order after drag-reorder within backlog.
-      const cards = backlog.querySelectorAll('.card[data-id]');
+      const cards = backlog.querySelectorAll(".card[data-id]");
       cards.forEach((card, idx) => {
         const id = card.dataset.id;
-        api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ position: idx }) });
+        api(`/api/tasks/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ position: idx }),
+        });
       });
     },
   });
 
   // In Progress: can receive from backlog
   Sortable.create(inProgress, {
-    group: { name: 'taskboard', pull: false, put: true },
+    group: { name: "taskboard", pull: false, put: true },
     animation: 150,
-    ghostClass: 'sortable-ghost',
-    chosenClass: 'sortable-chosen',
-    onAdd: function(evt) {
+    ghostClass: "sortable-ghost",
+    chosenClass: "sortable-chosen",
+    onAdd: function (evt) {
       const id = evt.item.dataset.id;
-      const task = tasks.find(t => t.id === id);
-      const refineStatus = task && task.current_refinement && task.current_refinement.status;
-      if (refineStatus === 'running' || refineStatus === 'done') {
+      const task = tasks.find((t) => t.id === id);
+      const refineStatus =
+        task && task.current_refinement && task.current_refinement.status;
+      if (refineStatus === "running" || refineStatus === "done") {
         // Return card to backlog and alert user.
         backlog.insertBefore(evt.item, backlog.children[evt.oldIndex] || null);
-        if (refineStatus === 'running') {
-          showAlert('Refinement is in progress. Please wait for it to complete before starting.');
+        if (refineStatus === "running") {
+          showAlert(
+            "Refinement is in progress. Please wait for it to complete before starting.",
+          );
         } else {
-          showAlert('This task has a refined prompt awaiting review. Open the task to apply or dismiss it before starting.');
+          showAlert(
+            "This task has a refined prompt awaiting review. Open the task to apply or dismiss it before starting.",
+          );
         }
         return;
       }
-      updateTaskStatus(id, 'in_progress');
+      updateTaskStatus(id, "in_progress");
     },
   });
 
   // Waiting, Done, and Cancelled: no drag interaction
-  Sortable.create(document.getElementById('col-waiting'), {
-    group: { name: 'taskboard', pull: false, put: false },
+  Sortable.create(document.getElementById("col-waiting"), {
+    group: { name: "taskboard", pull: false, put: false },
     animation: 150,
     sort: false,
   });
-  Sortable.create(document.getElementById('col-done'), {
-    group: { name: 'taskboard', pull: false, put: false },
+  Sortable.create(document.getElementById("col-done"), {
+    group: { name: "taskboard", pull: false, put: false },
     animation: 150,
     sort: false,
   });

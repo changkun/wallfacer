@@ -1,32 +1,38 @@
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import vm from 'vm';
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import vm from "vm";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const jsDir = join(__dirname, '..');
+const jsDir = join(__dirname, "..");
 
 function loadScript(filename, ctx) {
-  const code = readFileSync(join(jsDir, filename), 'utf8');
+  const code = readFileSync(join(jsDir, filename), "utf8");
   vm.runInContext(code, ctx, { filename: join(jsDir, filename) });
   return ctx;
 }
 
-function makeEl(id = '') {
+function makeEl(id = "") {
   return {
     id,
-    innerHTML: '',
-    textContent: '',
-    value: '',
+    innerHTML: "",
+    textContent: "",
+    value: "",
     checked: false,
     style: {},
     dataset: {},
     classList: {
       _classes: new Set(),
-      add(c) { this._classes.add(c); },
-      remove(c) { this._classes.delete(c); },
-      contains(c) { return this._classes.has(c); },
+      add(c) {
+        this._classes.add(c);
+      },
+      remove(c) {
+        this._classes.delete(c);
+      },
+      contains(c) {
+        return this._classes.has(c);
+      },
       toggle(c, force) {
         if (force !== undefined) {
           force ? this._classes.add(c) : this._classes.delete(c);
@@ -52,7 +58,7 @@ class MockAbortController {
     this.signal = {
       aborted: false,
       addEventListener(type, cb) {
-        if (type === 'abort') handlers.push(cb);
+        if (type === "abort") handlers.push(cb);
       },
     };
     this._handlers = handlers;
@@ -75,15 +81,15 @@ function makeRaceContext(overrides = {}) {
   const now = new Date().toISOString();
   const tasks = [
     {
-      id: 'task-1',
-      status: 'done',
-      prompt: 'p1',
+      id: "task-1",
+      status: "done",
+      prompt: "p1",
       created_at: now,
-      title: 'T1',
+      title: "T1",
       tags: [],
       usage: null,
       usage_breakdown: null,
-      worktree_paths: { repo: '/tmp/repo' },
+      worktree_paths: { repo: "/tmp/repo" },
       prompt_history: [],
       session_id: null,
       turns: 1,
@@ -94,15 +100,15 @@ function makeRaceContext(overrides = {}) {
       result: null,
     },
     {
-      id: 'task-2',
-      status: 'done',
-      prompt: 'p2',
+      id: "task-2",
+      status: "done",
+      prompt: "p2",
       created_at: now,
-      title: 'T2',
+      title: "T2",
       tags: [],
       usage: null,
       usage_breakdown: null,
-      worktree_paths: { repo: '/tmp/repo' },
+      worktree_paths: { repo: "/tmp/repo" },
       prompt_history: [],
       session_id: null,
       turns: 1,
@@ -115,55 +121,64 @@ function makeRaceContext(overrides = {}) {
   ];
 
   const delays = {
-    '/api/tasks/task-1/events': 70,
-    '/api/tasks/task-1/diff': 80,
-    '/api/tasks/task-2/events': 10,
-    '/api/tasks/task-2/diff': 15,
+    "/api/tasks/task-1/events": 70,
+    "/api/tasks/task-1/diff": 80,
+    "/api/tasks/task-2/events": 10,
+    "/api/tasks/task-2/diff": 15,
   };
 
   const payloads = {
-    '/api/tasks/task-1/events': {
-      events: [{
-        event_type: 'output',
-        created_at: now,
-        data: { result: 'result-from-task-1', stop_reason: 'end_turn' },
-      }],
+    "/api/tasks/task-1/events": {
+      events: [
+        {
+          event_type: "output",
+          created_at: now,
+          data: { result: "result-from-task-1", stop_reason: "end_turn" },
+        },
+      ],
       next_after: 1,
       has_more: false,
       total_filtered: 1,
     },
-    '/api/tasks/task-1/diff': { diff: 'diff-from-task-1', behind_counts: {} },
-    '/api/tasks/task-2/events': {
-      events: [{
-        event_type: 'output',
-        created_at: now,
-        data: { result: 'result-from-task-2', stop_reason: 'end_turn' },
-      }],
+    "/api/tasks/task-1/diff": { diff: "diff-from-task-1", behind_counts: {} },
+    "/api/tasks/task-2/events": {
+      events: [
+        {
+          event_type: "output",
+          created_at: now,
+          data: { result: "result-from-task-2", stop_reason: "end_turn" },
+        },
+      ],
       next_after: 1,
       has_more: false,
       total_filtered: 1,
     },
-    '/api/tasks/task-2/diff': { diff: 'diff-from-task-2', behind_counts: {} },
+    "/api/tasks/task-2/diff": { diff: "diff-from-task-2", behind_counts: {} },
     ...(overrides.payloads || {}),
   };
 
   function api(path, opts = {}) {
     // Strip query params for payload/delay lookup so cursor pagination params
     // (limit, types, after) don't break the test fixture matching.
-    const basePath = path.split('?')[0];
+    const basePath = path.split("?")[0];
     return new Promise((resolve, reject) => {
       if (opts.signal && opts.signal.aborted) {
-        const err = new Error('aborted');
-        err.name = 'AbortError';
+        const err = new Error("aborted");
+        err.name = "AbortError";
         reject(err);
         return;
       }
-      const timer = setTimeout(() => resolve(payloads[basePath]), (overrides.delays && overrides.delays[basePath]) || delays[basePath] || 0);
-      if (opts.signal && typeof opts.signal.addEventListener === 'function') {
-        opts.signal.addEventListener('abort', () => {
+      const timer = setTimeout(
+        () => resolve(payloads[basePath]),
+        (overrides.delays && overrides.delays[basePath]) ||
+          delays[basePath] ||
+          0,
+      );
+      if (opts.signal && typeof opts.signal.addEventListener === "function") {
+        opts.signal.addEventListener("abort", () => {
           clearTimeout(timer);
-          const err = new Error('aborted');
-          err.name = 'AbortError';
+          const err = new Error("aborted");
+          err.name = "AbortError";
           reject(err);
         });
       }
@@ -179,21 +194,22 @@ function makeRaceContext(overrides = {}) {
     tasks,
     logsAbort: null,
     testLogsAbort: null,
-    rawLogBuffer: '',
-    testRawLogBuffer: '',
-    logsMode: 'pretty',
-    logSearchQuery: '',
+    rawLogBuffer: "",
+    testRawLogBuffer: "",
+    logsMode: "pretty",
+    logSearchQuery: "",
     oversightData: null,
     oversightFetching: false,
     timelineRefreshTimer: null,
     refineTaskId: null,
-    refineRawLogBuffer: '',
-    refineLogsMode: 'pretty',
+    refineRawLogBuffer: "",
+    refineLogsMode: "pretty",
     history: { replaceState: () => {} },
-    location: { hash: '', pathname: '/', search: '' },
+    location: { hash: "", pathname: "/", search: "" },
     document: {
       getElementById: getEl,
-      querySelector: (sel) => (sel === '#modal .modal-card' ? getEl('modal-card') : null),
+      querySelector: (sel) =>
+        sel === "#modal .modal-card" ? getEl("modal-card") : null,
       querySelectorAll: () => ({ forEach: () => {} }),
       createElement: () => makeEl(),
       head: { appendChild: () => {} },
@@ -204,16 +220,16 @@ function makeRaceContext(overrides = {}) {
     setInterval: () => 0,
     clearInterval: () => {},
     requestAnimationFrame: (cb) => cb(),
-    renderMarkdown: (s) => s || '',
-    escapeHtml: (s) => String(s ?? ''),
+    renderMarkdown: (s) => s || "",
+    escapeHtml: (s) => String(s ?? ""),
     setLeftTab: () => {},
     setRightTab: () => {},
     startLogStream: () => {},
     startImplLogFetch: () => {},
     startTestLogStream: () => {},
     renderResultsFromEvents: (results) => {
-      getEl('modal-results-list').innerHTML = results.join('|');
-      getEl('modal-summary-section').classList.remove('hidden');
+      getEl("modal-results-list").innerHTML = results.join("|");
+      getEl("modal-summary-section").classList.remove("hidden");
     },
     renderTestResultsFromEvents: () => {},
     renderRefineHistory: () => {},
@@ -221,7 +237,9 @@ function makeRaceContext(overrides = {}) {
     resetRefinePanel: () => {},
     applySandboxByActivity: () => {},
     populateDependsOnPicker: () => {},
-    renderDiffFiles: (el, diff) => { el.innerHTML = diff || ''; },
+    renderDiffFiles: (el, diff) => {
+      el.innerHTML = diff || "";
+    },
     syncTask: () => {},
     loadFlamegraph: () => {},
     renderTimeline: () => {},
@@ -232,16 +250,16 @@ function makeRaceContext(overrides = {}) {
     DEFAULT_TASK_TIMEOUT: 60,
   });
 
-  ctx.findTaskById = function(taskId) {
+  ctx.findTaskById = function (taskId) {
     return (ctx.tasks || []).find((task) => task.id === taskId) || null;
   };
 
-  loadScript('modal-core.js', ctx);
+  loadScript("modal-core.js", ctx);
   return { ctx, elements };
 }
 
-describe('modal open race safety', () => {
-  it('keeps only the latest task data when openModal is called rapidly', async () => {
+describe("modal open race safety", () => {
+  it("keeps only the latest task data when openModal is called rapidly", async () => {
     const { ctx, elements } = makeRaceContext();
 
     const first = vm.runInContext("openModal('task-1')", ctx);
@@ -251,14 +269,22 @@ describe('modal open race safety', () => {
     await Promise.allSettled([first, second]);
     await new Promise((r) => setTimeout(r, 100));
 
-    expect(elements['modal-id'].textContent).toBe('ID: task-2');
-    expect(elements['modal-results-list'].innerHTML).toContain('result-from-task-2');
-    expect(elements['modal-results-list'].innerHTML).not.toContain('result-from-task-1');
-    expect(elements['modal-diff-files'].innerHTML).toContain('diff-from-task-2');
-    expect(elements['modal-diff-files'].innerHTML).not.toContain('diff-from-task-1');
+    expect(elements["modal-id"].textContent).toBe("ID: task-2");
+    expect(elements["modal-results-list"].innerHTML).toContain(
+      "result-from-task-2",
+    );
+    expect(elements["modal-results-list"].innerHTML).not.toContain(
+      "result-from-task-1",
+    );
+    expect(elements["modal-diff-files"].innerHTML).toContain(
+      "diff-from-task-2",
+    );
+    expect(elements["modal-diff-files"].innerHTML).not.toContain(
+      "diff-from-task-1",
+    );
   });
 
-  it('opens modal for tasks present only in archived window', async () => {
+  it("opens modal for tasks present only in archived window", async () => {
     const { ctx, elements } = makeRaceContext();
     vm.runInContext(
       `tasks = []; archivedTasks = [{
@@ -284,26 +310,29 @@ describe('modal open race safety', () => {
     );
 
     await vm.runInContext("openModal('archived-1')", ctx);
-    expect(elements['modal-id'].textContent).toBe('ID: archived-1');
+    expect(elements["modal-id"].textContent).toBe("ID: archived-1");
   });
 
-  it('renders structured conflict resolver events clearly', async () => {
+  it("renders structured conflict resolver events clearly", async () => {
     const { ctx, elements } = makeRaceContext({
       payloads: {
-        '/api/tasks/task-1/events': {
-          events: [{
-            event_type: 'system',
-            created_at: new Date().toISOString(),
-            data: {
-              phase: 'conflict_resolver',
-              status: 'handoff',
-              trigger: 'sync',
-              repo: 'repo-a',
-              attempt: 3,
-              max_attempts: 3,
-              result: 'Automatic conflict resolver exhausted retries for repo-a. Handing off to the main agent for interactive resolution.',
+        "/api/tasks/task-1/events": {
+          events: [
+            {
+              event_type: "system",
+              created_at: new Date().toISOString(),
+              data: {
+                phase: "conflict_resolver",
+                status: "handoff",
+                trigger: "sync",
+                repo: "repo-a",
+                attempt: 3,
+                max_attempts: 3,
+                result:
+                  "Automatic conflict resolver exhausted retries for repo-a. Handing off to the main agent for interactive resolution.",
+              },
             },
-          }],
+          ],
           next_after: 1,
           has_more: false,
           total_filtered: 1,
@@ -312,13 +341,13 @@ describe('modal open race safety', () => {
     });
 
     await vm.runInContext("openModal('task-1')", ctx);
-    expect(elements['modal-events'].innerHTML).toContain('Conflict Resolution');
-    expect(elements['modal-events'].innerHTML).toContain('resolver handoff');
-    expect(elements['modal-events'].innerHTML).toContain('repo-a');
-    expect(elements['modal-events'].innerHTML).toContain('attempt 3/3');
+    expect(elements["modal-events"].innerHTML).toContain("Conflict Resolution");
+    expect(elements["modal-events"].innerHTML).toContain("resolver handoff");
+    expect(elements["modal-events"].innerHTML).toContain("repo-a");
+    expect(elements["modal-events"].innerHTML).toContain("attempt 3/3");
   });
 
-  it('renders dependency rows with title fallback, removed entries, and summary text', () => {
+  it("renders dependency rows with title fallback, removed entries, and summary text", () => {
     const { ctx, elements } = makeRaceContext();
     vm.runInContext(
       `tasks = [
@@ -367,11 +396,21 @@ describe('modal open race safety', () => {
 
     vm.runInContext("renderModalDependencies(tasks[1])", ctx);
 
-    expect(elements['modal-dependencies'].classList.contains('hidden')).toBe(false);
-    expect(elements['modal-dependencies-list'].innerHTML).toContain('in progress');
-    expect(elements['modal-dependencies-list'].innerHTML).toContain("openModal('dep-1')");
-    expect(elements['modal-dependencies-list'].innerHTML).toContain('dep-1');
-    expect(elements['modal-dependencies-list'].innerHTML).toContain('[removed] missing-');
-    expect(elements['modal-dependencies-summary'].textContent).toBe('Waiting on 2 of 2 tasks');
+    expect(elements["modal-dependencies"].classList.contains("hidden")).toBe(
+      false,
+    );
+    expect(elements["modal-dependencies-list"].innerHTML).toContain(
+      "in progress",
+    );
+    expect(elements["modal-dependencies-list"].innerHTML).toContain(
+      "openModal('dep-1')",
+    );
+    expect(elements["modal-dependencies-list"].innerHTML).toContain("dep-1");
+    expect(elements["modal-dependencies-list"].innerHTML).toContain(
+      "[removed] missing-",
+    );
+    expect(elements["modal-dependencies-summary"].textContent).toBe(
+      "Waiting on 2 of 2 tasks",
+    );
   });
 });

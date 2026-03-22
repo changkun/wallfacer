@@ -8,22 +8,24 @@ function matchesFilter(t) {
   if (!filterQuery) return true;
   const q = filterQuery.toLowerCase();
   const tokens = q.split(/\s+/).filter(Boolean);
-  const tagTokens = tokens.filter(tok => tok.startsWith('#')).map(tok => tok.slice(1));
-  const textTokens = tokens.filter(tok => !tok.startsWith('#'));
+  const tagTokens = tokens
+    .filter((tok) => tok.startsWith("#"))
+    .map((tok) => tok.slice(1));
+  const textTokens = tokens.filter((tok) => !tok.startsWith("#"));
 
   if (tagTokens.length > 0) {
-    const taskTags = (t.tags || []).map(tag => String(tag).toLowerCase());
-    if (!tagTokens.every(tagToken => taskTags.includes(tagToken))) return false;
+    const taskTags = (t.tags || []).map((tag) => String(tag).toLowerCase());
+    if (!tagTokens.every((tagToken) => taskTags.includes(tagToken)))
+      return false;
     if (textTokens.length === 0) return true;
   }
 
-  const title = (t.title || '').toLowerCase();
-  const prompt = (t.prompt || '').toLowerCase();
-  const tagText = (t.tags || []).join(' ').toLowerCase();
-  return textTokens.every(tok =>
-    title.includes(tok) ||
-    prompt.includes(tok) ||
-    tagText.includes(tok)
+  const title = (t.title || "").toLowerCase();
+  const prompt = (t.prompt || "").toLowerCase();
+  const tagText = (t.tags || []).join(" ").toLowerCase();
+  return textTokens.every(
+    (tok) =>
+      title.includes(tok) || prompt.includes(tok) || tagText.includes(tok),
   );
 }
 
@@ -40,7 +42,7 @@ function highlightMatch(text, query) {
     escapeHtml(text.slice(0, idx)) +
     '<mark class="search-highlight">' +
     escapeHtml(text.slice(idx, idx + query.length)) +
-    '</mark>' +
+    "</mark>" +
     escapeHtml(text.slice(idx + query.length))
   );
 }
@@ -52,64 +54,84 @@ let _searchTimer = null;
 function triggerServerSearch(rawQuery) {
   const q = rawQuery.slice(1).trim(); // strip leading @
   clearTimeout(_searchTimer);
-  if (Array.from(q).length < 2) { hideSearchPanel(); return; }
+  if (Array.from(q).length < 2) {
+    hideSearchPanel();
+    return;
+  }
   _searchTimer = setTimeout(() => {
-    apiGet('/api/tasks/search?q=' + encodeURIComponent(q))
-      .then(results => renderSearchPanel(results, q))
+    apiGet("/api/tasks/search?q=" + encodeURIComponent(q))
+      .then((results) => renderSearchPanel(results, q))
       .catch(() => hideSearchPanel());
   }, 250);
 }
 
 function renderSearchPanel(results, q) {
-  const panel = document.getElementById('search-results-panel');
+  const panel = document.getElementById("search-results-panel");
   if (!panel) return;
   if (!results || results.length === 0) {
-    panel.innerHTML = '<div class="search-no-results">No results for <em>'
-      + escapeHtml(q) + '</em></div>';
+    panel.innerHTML =
+      '<div class="search-no-results">No results for <em>' +
+      escapeHtml(q) +
+      "</em></div>";
   } else {
-    panel.innerHTML = results.map(r => {
-      const badge = '<span class="search-field-badge search-field-badge--'
-        + escapeHtml(r.matched_field) + '">' + escapeHtml(r.matched_field) + '</span>';
-      const label = escapeHtml(r.title || r.id);
-      // r.snippet is already HTML-escaped by the server — embed as innerHTML directly.
-      return '<div class="search-result-item" data-id="' + escapeHtml(r.id) + '">'
-        + badge + ' <strong>' + label + '</strong>'
-        + '<div class="search-result-snippet">' + r.snippet + '</div>'
-        + '</div>';
-    }).join('');
-    panel.querySelectorAll('.search-result-item').forEach(el => {
-      el.addEventListener('click', () => {
+    panel.innerHTML = results
+      .map((r) => {
+        const badge =
+          '<span class="search-field-badge search-field-badge--' +
+          escapeHtml(r.matched_field) +
+          '">' +
+          escapeHtml(r.matched_field) +
+          "</span>";
+        const label = escapeHtml(r.title || r.id);
+        // r.snippet is already HTML-escaped by the server — embed as innerHTML directly.
+        return (
+          '<div class="search-result-item" data-id="' +
+          escapeHtml(r.id) +
+          '">' +
+          badge +
+          " <strong>" +
+          label +
+          "</strong>" +
+          '<div class="search-result-snippet">' +
+          r.snippet +
+          "</div>" +
+          "</div>"
+        );
+      })
+      .join("");
+    panel.querySelectorAll(".search-result-item").forEach((el) => {
+      el.addEventListener("click", () => {
         hideSearchPanel();
         openModal(el.dataset.id);
       });
     });
   }
-  panel.style.display = 'block';
+  panel.style.display = "block";
 }
 
 function hideSearchPanel() {
-  const panel = document.getElementById('search-results-panel');
-  if (panel) panel.style.display = 'none';
+  const panel = document.getElementById("search-results-panel");
+  if (panel) panel.style.display = "none";
 }
 
 // Wire up the search input and clear button once the DOM is ready.
 (function initSearch() {
   function setup() {
-    const input = document.getElementById('task-search');
-    const clearBtn = document.getElementById('task-search-clear');
+    const input = document.getElementById("task-search");
+    const clearBtn = document.getElementById("task-search-clear");
     if (!input) return;
 
     // Create the server-search results panel once.
-    const panel = document.createElement('div');
-    panel.id = 'search-results-panel';
-    panel.className = 'search-results-panel';
-    panel.style.display = 'none';
+    const panel = document.createElement("div");
+    panel.id = "search-results-panel";
+    panel.className = "search-results-panel";
+    panel.style.display = "none";
     input.parentElement.appendChild(panel);
 
-    input.addEventListener('input', function() {
+    input.addEventListener("input", function () {
       filterQuery = this.value;
-      if (clearBtn) clearBtn.style.display = filterQuery ? 'block' : 'none';
-      if (filterQuery.startsWith('@')) {
+      if (clearBtn) clearBtn.style.display = filterQuery ? "block" : "none";
+      if (filterQuery.startsWith("@")) {
         triggerServerSearch(filterQuery);
       } else {
         hideSearchPanel();
@@ -117,20 +139,23 @@ function hideSearchPanel() {
       }
     });
 
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { hideSearchPanel(); input.blur(); }
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        hideSearchPanel();
+        input.blur();
+      }
     });
 
-    document.addEventListener('click', e => {
-      const wrapper = document.querySelector('.task-search-wrapper');
+    document.addEventListener("click", (e) => {
+      const wrapper = document.querySelector(".task-search-wrapper");
       if (wrapper && !wrapper.contains(e.target)) hideSearchPanel();
     });
 
     if (clearBtn) {
-      clearBtn.addEventListener('click', function() {
-        input.value = '';
-        filterQuery = '';
-        this.style.display = 'none';
+      clearBtn.addEventListener("click", function () {
+        input.value = "";
+        filterQuery = "";
+        this.style.display = "none";
         hideSearchPanel();
         render();
         input.focus();
@@ -138,19 +163,19 @@ function hideSearchPanel() {
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setup);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setup);
   } else {
     setup();
   }
 })();
 
 // Press '/' to focus the search bar when no text input is active.
-document.addEventListener('keydown', e => {
+document.addEventListener("keydown", (e) => {
   const tag = document.activeElement.tagName;
-  if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+  if (e.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA") {
     e.preventDefault();
-    const input = document.getElementById('task-search');
+    const input = document.getElementById("task-search");
     if (input) input.focus();
   }
 });

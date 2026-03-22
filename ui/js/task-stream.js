@@ -17,7 +17,7 @@
 // ---------------------------------------------------------------------------
 
 function sortArchivedByUpdatedDesc(items) {
-  return items.sort(function(a, b) {
+  return items.sort(function (a, b) {
     const ad = new Date(a.updated_at).getTime();
     const bd = new Date(b.updated_at).getTime();
     if (bd !== ad) return bd - ad;
@@ -28,7 +28,7 @@ function sortArchivedByUpdatedDesc(items) {
 
 function cloneArchivedPage(page) {
   return {
-    loadState: page && page.loadState ? page.loadState : 'idle',
+    loadState: page && page.loadState ? page.loadState : "idle",
     hasMoreBefore: !!(page && page.hasMoreBefore),
     hasMoreAfter: !!(page && page.hasMoreAfter),
   };
@@ -46,7 +46,9 @@ function createTasksState(state) {
   const source = state || {};
   return {
     tasks: Array.isArray(source.tasks) ? source.tasks.slice() : [],
-    archivedTasks: Array.isArray(source.archivedTasks) ? source.archivedTasks.slice() : [],
+    archivedTasks: Array.isArray(source.archivedTasks)
+      ? source.archivedTasks.slice()
+      : [],
     archivedPage: cloneArchivedPage(source.archivedPage),
   };
 }
@@ -61,7 +63,7 @@ function trimArchivedWindowState(state, direction, pageSize) {
   const maxItems = size * 3;
   if (next.archivedTasks.length <= maxItems) return next;
   const overflow = next.archivedTasks.length - maxItems;
-  if (direction === 'before') {
+  if (direction === "before") {
     next.archivedTasks = next.archivedTasks.slice(overflow);
     next.archivedPage.hasMoreAfter = true;
     return next;
@@ -91,8 +93,12 @@ function applyTasksSnapshot(state, snapshot) {
 function applyTaskDeleted(state, payload) {
   const id = payload && payload.id;
   const next = createTasksState(state);
-  next.tasks = next.tasks.filter(function(t) { return t.id !== id; });
-  next.archivedTasks = next.archivedTasks.filter(function(t) { return t.id !== id; });
+  next.tasks = next.tasks.filter(function (t) {
+    return t.id !== id;
+  });
+  next.archivedTasks = next.archivedTasks.filter(function (t) {
+    return t.id !== id;
+  });
   return next;
 }
 
@@ -113,19 +119,28 @@ function applyTaskUpdated(state, task, opts) {
   const next = createTasksState(state);
   const showArchivedTasks = !!options.showArchived;
   const pageSize = Math.max(1, options.pageSize || 20);
-  const previousTask = next.tasks.find(function(t) { return t.id === task.id; }) ||
-    next.archivedTasks.find(function(t) { return t.id === task.id; }) ||
+  const previousTask =
+    next.tasks.find(function (t) {
+      return t.id === task.id;
+    }) ||
+    next.archivedTasks.find(function (t) {
+      return t.id === task.id;
+    }) ||
     null;
 
-  next.tasks = next.tasks.filter(function(t) { return t.id !== task.id; });
-  next.archivedTasks = next.archivedTasks.filter(function(t) { return t.id !== task.id; });
+  next.tasks = next.tasks.filter(function (t) {
+    return t.id !== task.id;
+  });
+  next.archivedTasks = next.archivedTasks.filter(function (t) {
+    return t.id !== task.id;
+  });
 
   if (task.archived) {
     if (showArchivedTasks) {
       next.archivedTasks.unshift(task);
       sortArchivedByUpdatedDesc(next.archivedTasks);
       return {
-        state: trimArchivedWindowState(next, 'after', pageSize),
+        state: trimArchivedWindowState(next, "after", pageSize),
         previousTask,
       };
     }
@@ -146,17 +161,23 @@ function applyTaskUpdated(state, task, opts) {
  * @param {number} [pageSize]
  */
 function mergeArchivedTasksPage(state, resp, direction, pageSize) {
-  const dir = direction || 'initial';
+  const dir = direction || "initial";
   const page = resp && Array.isArray(resp.tasks) ? resp.tasks : [];
   const next = createTasksState(state);
 
-  if (dir === 'initial') {
+  if (dir === "initial") {
     next.archivedTasks = page.slice();
   } else if (page.length > 0) {
-    const seen = new Set(next.archivedTasks.map(function(t) { return t.id; }));
-    const additions = page.filter(function(t) { return !seen.has(t.id); });
+    const seen = new Set(
+      next.archivedTasks.map(function (t) {
+        return t.id;
+      }),
+    );
+    const additions = page.filter(function (t) {
+      return !seen.has(t.id);
+    });
     if (additions.length > 0) {
-      if (dir === 'before') {
+      if (dir === "before") {
         next.archivedTasks = next.archivedTasks.concat(additions);
       } else {
         next.archivedTasks = additions.concat(next.archivedTasks);
@@ -182,7 +203,7 @@ function mergeArchivedTasksPage(state, resp, direction, pageSize) {
  */
 function buildTasksStreamUrl(baseUrl, eventId) {
   baseUrl = withAuthToken(baseUrl);
-  if (eventId === null || typeof eventId === 'undefined') return baseUrl;
-  const sep = baseUrl.includes('?') ? '&' : '?';
-  return baseUrl + sep + 'last_event_id=' + encodeURIComponent(eventId);
+  if (eventId === null || typeof eventId === "undefined") return baseUrl;
+  const sep = baseUrl.includes("?") ? "&" : "?";
+  return baseUrl + sep + "last_event_id=" + encodeURIComponent(eventId);
 }
