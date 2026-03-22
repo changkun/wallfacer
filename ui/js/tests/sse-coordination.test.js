@@ -275,6 +275,61 @@ describe('waitForTaskTitle — fetch fallback fills delayed titles', () => {
   });
 });
 
+describe('waitForTaskTitle — throttles fetches when stream is absent', () => {
+  it('does not call fetchTasks more than once per second when tasksSource is null', async () => {
+    const TASK_ID = 'aaaaaaaa-0000-0000-0000-000000000005';
+
+    // Use fake timers so we can control setTimeout precisely.
+    vi.useFakeTimers();
+
+    const ctx = makeContext({
+      // Use the fake setTimeout/clearTimeout from vitest.
+      setTimeout: globalThis.setTimeout,
+      clearTimeout: globalThis.clearTimeout,
+    });
+
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'api.js');
+
+    vm.runInContext(
+      `tasks = [{ id: "${TASK_ID}", title: "", prompt: "test" }];`,
+      ctx,
+    );
+    vm.runInContext('tasksSource = null;', ctx);
+
+    let fetchCount = 0;
+    ctx.fetchTasks = vi.fn().mockImplementation(async () => {
+      fetchCount++;
+      // Title appears on the 3rd fetch so the loop eventually stops.
+      if (fetchCount >= 3) {
+        vm.runInContext(
+          `tasks = [{ id: "${TASK_ID}", title: "Done", prompt: "test" }];`,
+          ctx,
+        );
+      }
+    });
+
+    // Start the title wait with a 10 s deadline.
+    const promise = ctx.waitForTaskTitle(TASK_ID, 10000);
+
+    // Advance 500 ms — first fetch should have happened but second should not yet.
+    await vi.advanceTimersByTimeAsync(500);
+    expect(fetchCount).toBeLessThanOrEqual(1);
+
+    // Advance to 1.5 s — second fetch should be allowed.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetchCount).toBeLessThanOrEqual(2);
+
+    // Advance to 3 s — third fetch returns title, loop stops.
+    await vi.advanceTimersByTimeAsync(1500);
+    await promise;
+
+    expect(fetchCount).toBe(3);
+
+    vi.useRealTimers();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Test 3 — Regression: openRaiseLimitInline uses task(id).update() and no
 //           longer crashes with a TypeError for the missing Routes.tasks.update

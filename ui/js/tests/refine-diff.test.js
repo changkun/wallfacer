@@ -5,7 +5,7 @@
  *   - renderRefineHistory(task)  — Show diff button presence
  *   - toggleRefineDiff(sessionIndex)  — lazy render + toggle
  */
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -363,5 +363,66 @@ describe('toggleRefineDiff', () => {
     // No elements injected — getElementById returns an empty mock.
     // Should not throw.
     expect(() => ctx.toggleRefineDiff(99)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// startRefinement — optimistic UI update after 202 response
+// ---------------------------------------------------------------------------
+
+describe('startRefinement — calls updateRefineUI with returned task', () => {
+  it('shows running state immediately after POST returns 202', async () => {
+    const TASK_ID = 'bbbbbbbb-0000-0000-0000-000000000001';
+    const runningTask = {
+      id: TASK_ID,
+      status: 'backlog',
+      current_refinement: { id: 'job-1', status: 'running' },
+    };
+
+    const ctx = makeRefineContext({
+      tasks: [{ id: TASK_ID, status: 'backlog', prompt: 'test' }],
+      getOpenModalTaskId: () => TASK_ID,
+      task: () => ({ refine: () => '/api/tasks/' + TASK_ID + '/refine' }),
+      api: vi.fn().mockResolvedValue(runningTask),
+    });
+
+    // Set initial hidden state matching the HTML defaults.
+    ctx._elements['refine-running'] = makeEl('refine-running', ['hidden']);
+    ctx._elements['refine-start-btn'] = makeEl('refine-start-btn');
+    ctx._elements['refine-cancel-btn'] = makeEl('refine-cancel-btn', ['hidden']);
+    ctx._elements['refine-result-section'] = makeEl('refine-result-section', ['hidden']);
+    ctx._elements['refine-error-section'] = makeEl('refine-error-section', ['hidden']);
+    ctx._elements['refine-idle-desc'] = makeEl('refine-idle-desc');
+    ctx._elements['refine-instructions-section'] = makeEl('refine-instructions-section');
+    ctx._elements['refine-user-instructions'] = { ...makeEl('refine-user-instructions'), value: '' };
+    ctx._elements['refine-result-prompt'] = { ...makeEl('refine-result-prompt'), value: '' };
+    ctx._elements['refine-logs'] = makeEl('refine-logs');
+
+    await ctx.startRefinement();
+
+    // After a successful 202, updateRefineUI should have been called with
+    // the running task, so the running panel is visible and idle is hidden.
+    expect(ctx._elements['refine-running'].classList.has('hidden')).toBe(false);
+    expect(ctx._elements['refine-idle-desc'].classList.has('hidden')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resetRefinePanel — re-enables the apply button after it was disabled
+// ---------------------------------------------------------------------------
+
+describe('resetRefinePanel — resets apply button disabled state', () => {
+  it('re-enables the apply button and restores its text', () => {
+    const ctx = makeRefineContext();
+
+    // Simulate: applyRefinement disabled the button and set "Applying…".
+    const applyBtn = ctx._elements['refine-apply-btn'] = makeEl('refine-apply-btn');
+    applyBtn.disabled = true;
+    applyBtn.textContent = 'Applying…';
+
+    ctx.resetRefinePanel();
+
+    expect(applyBtn.disabled).toBe(false);
+    expect(applyBtn.textContent).toBe('Apply as Prompt');
   });
 });
