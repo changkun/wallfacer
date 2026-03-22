@@ -18,6 +18,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// sseKeepaliveInterval controls how often SSE streams send keepalive comments
+// to prevent proxy and OS-level TCP idle timeouts from silently closing the
+// connection. Tests can lower this for faster verification.
+var sseKeepaliveInterval = 15 * time.Second
+
 // StreamTasks streams task changes as SSE with typed events.
 //
 // On first connect (no last_event_id) an initial "snapshot" event is sent
@@ -109,6 +114,9 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
+	keepalive := time.NewTicker(sseKeepaliveInterval)
+	defer keepalive.Stop()
+
 	for {
 		select {
 		case <-r.Context().Done():
@@ -127,6 +135,13 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 			}
 			eventType := deltaEventType(delta.TaskDelta)
 			if _, err := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", delta.Seq, eventType, payload); err != nil {
+				return
+			}
+			flusher.Flush()
+		case <-keepalive.C:
+			// SSE comment keepalive — prevents proxies and OS-level TCP
+			// idle timeouts from silently closing the connection.
+			if _, err := fmt.Fprint(w, ":keepalive\n\n"); err != nil {
 				return
 			}
 			flusher.Flush()

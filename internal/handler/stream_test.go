@@ -1202,6 +1202,39 @@ func TestStreamLogs_Committing_ServesStoredLogs(t *testing.T) {
 	}
 }
 
+// TestStreamTasks_Keepalive verifies that the tasks SSE stream sends
+// periodic keepalive comments to prevent the connection from going idle.
+func TestStreamTasks_Keepalive(t *testing.T) {
+	// Use a very short keepalive interval for the test.
+	orig := sseKeepaliveInterval
+	sseKeepaliveInterval = 20 * time.Millisecond
+	t.Cleanup(func() { sseKeepaliveInterval = orig })
+
+	h := newTestHandler(t)
+	ctx := context.Background()
+	_, _ = h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "keepalive test", Timeout: 15})
+
+	reqCtx, cancel := context.WithCancel(context.Background())
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/stream", nil).WithContext(reqCtx)
+	w := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		h.StreamTasks(w, req)
+	}()
+
+	// Wait long enough for at least one keepalive to fire.
+	time.Sleep(80 * time.Millisecond)
+	cancel()
+	<-done
+
+	body := w.Body.String()
+	if !strings.Contains(body, ":keepalive") {
+		t.Errorf("expected keepalive comment in response, got:\n%s", body)
+	}
+}
+
 // TestServeStoredLogsRange_DirectoryMissing verifies that serveStoredLogsRange
 // returns 404 when the outputs directory does not exist.
 func TestServeStoredLogsRange_DirectoryMissing(t *testing.T) {
