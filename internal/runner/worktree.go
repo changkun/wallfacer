@@ -188,7 +188,3 @@ func (r *Runner) PruneUnknownWorktrees() {
 	// (StartWorktreeGC) and by RemoveWorktree during normal task cleanup.
 }
 
-func gitPrune(repoPath string) {
-	// best-effort; errors are silently ignored
-	_ = runGit(repoPath, "worktree", "prune")
-}
