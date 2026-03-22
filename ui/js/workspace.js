@@ -258,6 +258,8 @@ function renderWorkspaceGroups() {
   }).join('');
 }
 
+var _tabOverflowObserver = null;
+
 function renderHeaderWorkspaceGroupTabs() {
   var el = document.getElementById('workspace-group-tabs');
   if (!el) return;
@@ -285,9 +287,9 @@ function renderHeaderWorkspaceGroupTabs() {
       ? ''
       : '<span class="workspace-group-tab__close" onclick="event.stopPropagation();hideWorkspaceGroupTab(' + index + ')" title="Hide tab">&times;</span>';
     if (active) {
-      tabs += '<div class="' + cls + '" title="' + escapeHtml(title) + '">' + label + '<span id="workspace-group-tab-workspaces" class="workspace-group-tab__workspaces"></span></div>';
+      tabs += '<div class="' + cls + '" data-group-index="' + index + '" title="' + escapeHtml(title) + '">' + label + '<span id="workspace-group-tab-workspaces" class="workspace-group-tab__workspaces"></span></div>';
     } else {
-      tabs += '<button type="button" class="' + cls + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (workspaceGroupSwitching ? ' disabled' : '') + '>' + label + closeBtn + '</button>';
+      tabs += '<button type="button" class="' + cls + '" data-group-index="' + index + '" title="' + escapeHtml(title) + '" onclick="useWorkspaceGroup(' + index + ')"' + (workspaceGroupSwitching ? ' disabled' : '') + '>' + label + closeBtn + '</button>';
     }
   });
   // "+" button to add a workspace group tab.
@@ -295,6 +297,62 @@ function renderHeaderWorkspaceGroupTabs() {
   el.innerHTML = tabs;
   // Re-render workspace chips into the active tab's container.
   if (typeof renderWorkspaces === 'function') renderWorkspaces();
+  // Auto-collapse overflowing tabs after layout.
+  requestAnimationFrame(function() {
+    _collapseOverflowingTabs();
+  });
+  _setupTabOverflowObserver();
+}
+
+// Detect and auto-hide tabs that overflow the container width.
+function _collapseOverflowingTabs() {
+  var el = document.getElementById('workspace-group-tabs');
+  if (!el) return;
+  if (!el.children) return;
+  var children = Array.from(el.children);
+  if (children.length <= 1) return;
+
+  _tabCollapseRunning = true;
+
+  // First, reset all non-manually-hidden tabs to visible.
+  children.forEach(function(child) { child.style.display = ''; });
+
+  if (typeof el.getBoundingClientRect !== 'function') { _tabCollapseRunning = false; return; }
+  var containerRight = el.getBoundingClientRect().right;
+  // The "+" button is always the last child; it must remain visible.
+  var addBtn = children[children.length - 1];
+  var collapsedIndices = [];
+
+  // Walk tabs in reverse (excluding active and "+") and hide those that overflow.
+  for (var i = children.length - 2; i >= 0; i--) {
+    var tab = children[i];
+    // Never hide the active tab.
+    if (tab.classList.contains('workspace-group-tab--active')) continue;
+    // Check if the "+" button overflows — if so, this tab needs to go.
+    if (addBtn.getBoundingClientRect().right <= containerRight + 1) break;
+    tab.style.display = 'none';
+    var idx = tab.dataset.groupIndex;
+    if (idx !== undefined) collapsedIndices.push(parseInt(idx, 10));
+  }
+
+  // Store auto-collapsed indices so the "+" menu can show them.
+  _autoCollapsedGroupIndices = collapsedIndices;
+  _tabCollapseRunning = false;
+}
+
+var _autoCollapsedGroupIndices = [];
+var _tabCollapseRunning = false;
+
+function _setupTabOverflowObserver() {
+  var el = document.getElementById('workspace-group-tabs');
+  if (!el) return;
+  if (_tabOverflowObserver) _tabOverflowObserver.disconnect();
+  if (typeof ResizeObserver === 'undefined') return;
+  _tabOverflowObserver = new ResizeObserver(function() {
+    if (_tabCollapseRunning) return;
+    _collapseOverflowingTabs();
+  });
+  _tabOverflowObserver.observe(el);
 }
 
 function hideWorkspaceGroupTab(index) {
@@ -303,11 +361,11 @@ function hideWorkspaceGroupTab(index) {
 }
 
 function addWorkspaceGroupTab(event) {
-  // If there are hidden groups, show a picker; otherwise open the workspace picker.
+  // If there are hidden or auto-collapsed groups, show a picker; otherwise open the workspace picker.
   var hiddenGroups = [];
   workspaceGroups.forEach(function(group, index) {
-    if (hiddenGroupIndices.has(index)) {
-      hiddenGroups.push({ group: group, index: index });
+    if (hiddenGroupIndices.has(index) || _autoCollapsedGroupIndices.indexOf(index) !== -1) {
+      hiddenGroups.push({ group: group, index: index, autoCollapsed: _autoCollapsedGroupIndices.indexOf(index) !== -1 });
     }
   });
   if (hiddenGroups.length === 0) {
@@ -325,7 +383,11 @@ function addWorkspaceGroupTab(event) {
   menu.style.cssText = 'position:fixed;z-index:50;min-width:200px;max-width:320px;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);box-shadow:0 8px 24px rgba(0,0,0,0.18);';
   var html = '';
   hiddenGroups.forEach(function(item) {
-    html += '<button type="button" onclick="restoreWorkspaceGroupTab(' + item.index + ')" style="width:100%;text-align:left;padding:6px 8px;border:none;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font-size:11px;" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'transparent\'">' + escapeHtml(workspaceGroupLabel(item.group)) + '</button>';
+    // Auto-collapsed tabs switch workspace; manually hidden tabs restore the tab.
+    var action = item.autoCollapsed
+      ? 'document.getElementById(\'workspace-group-add-menu\').remove();useWorkspaceGroup(' + item.index + ')'
+      : 'restoreWorkspaceGroupTab(' + item.index + ')';
+    html += '<button type="button" onclick="' + action + '" style="width:100%;text-align:left;padding:6px 8px;border:none;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font-size:11px;" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'transparent\'">' + escapeHtml(workspaceGroupLabel(item.group)) + '</button>';
   });
   html += '<div style="border-top:1px solid var(--border);margin:4px 0;"></div>';
   html += '<button type="button" onclick="document.getElementById(\'workspace-group-add-menu\').remove();showWorkspacePicker(false)" style="width:100%;text-align:left;padding:6px 8px;border:none;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font-size:11px;" onmouseover="this.style.background=\'var(--bg-input)\'" onmouseout="this.style.background=\'transparent\'">New workspace group...</button>';

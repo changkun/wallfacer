@@ -50,6 +50,8 @@ function makeContext(overrides = {}) {
       config: { get: () => '/api/config', update: () => '/api/config' },
       workspaces: { browse: () => '/api/workspaces/browse', update: () => '/api/workspaces' },
     },
+    requestAnimationFrame: (fn) => fn(),
+    ResizeObserver: class { observe() {} disconnect() {} },
     document: {
       getElementById: (id) => elements.get(id) || null,
       querySelectorAll: (selector) => {
@@ -413,6 +415,46 @@ describe('renderHeaderWorkspaceGroupTabs', () => {
     expect(activeMatch[0]).not.toContain('workspace-group-tab__close');
     // Inactive tab should have close button.
     expect(tabsEl.innerHTML).toContain('workspace-group-tab__close');
+  });
+
+  it('includes auto-collapsed groups in the + menu', () => {
+    const tabsEl = { innerHTML: '' };
+    const elements = new Map([['workspace-group-tabs', tabsEl]]);
+    const ctx = makeContext({
+      elements: [['workspace-group-tabs', tabsEl]],
+    });
+    // Override document methods to support the menu.
+    let menuHtml = '';
+    ctx.document.body = {
+      appendChild: function(el) { menuHtml = el.innerHTML || ''; },
+    };
+    const origGetById = ctx.document.getElementById;
+    ctx.document.getElementById = function(id) {
+      if (id === 'workspace-group-add-menu') return null;
+      return origGetById(id);
+    };
+    ctx.document.createElement = function() {
+      return { id: '', style: { cssText: '' }, innerHTML: '', remove: vi.fn() };
+    };
+    loadScript(ctx, 'state.js');
+    loadScript(ctx, 'utils.js');
+    loadScript(ctx, 'workspace.js');
+
+    vm.runInContext(`
+      activeWorkspaces = ["/Users/test/repo-a"];
+      workspaceGroups = [
+        { workspaces: ["/Users/test/repo-a"] },
+        { workspaces: ["/Users/test/repo-b"] },
+        { workspaces: ["/Users/test/repo-c"] }
+      ];
+      _autoCollapsedGroupIndices = [2];
+    `, ctx);
+
+    ctx.addWorkspaceGroupTab({ currentTarget: { getBoundingClientRect: () => ({ bottom: 50, left: 10 }) } });
+
+    // The auto-collapsed group (repo-c) should appear with useWorkspaceGroup action.
+    expect(menuHtml).toContain('repo-c');
+    expect(menuHtml).toContain('useWorkspaceGroup(2)');
   });
 
   it('always renders the + button', () => {

@@ -96,6 +96,8 @@ Workspace groups let you save and switch between different combinations of works
 
 Each saved group appears as a tab in the header bar. The currently active group is highlighted. Click a different tab to switch to that group. Wallfacer stops any active SSE streams, resets the board, loads the new group's task store, and reconnects the streams -- all within a few seconds.
 
+When the window is too narrow to fit all tabs, overflow tabs are automatically hidden and accessible via the **+** menu. The active tab is never auto-hidden.
+
 #### Managing tabs
 
 | Action | How |
