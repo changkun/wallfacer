@@ -307,7 +307,7 @@ func TestStartIdeationWatcher_ExitsOnCancel(t *testing.T) {
 // --- TriggerIdeation ---
 
 // TestTriggerIdeation_ReturnsAccepted verifies that POST /api/ideate returns
-// 202 with {"queued": true}.
+// 202 with {"queued": true} and includes the created task ID.
 func TestTriggerIdeation_ReturnsAccepted(t *testing.T) {
 	h := newTestHandler(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/ideate", nil)
@@ -317,12 +317,16 @@ func TestTriggerIdeation_ReturnsAccepted(t *testing.T) {
 	if w.Code != http.StatusAccepted {
 		t.Fatalf("expected 202, got %d: %s", w.Code, w.Body.String())
 	}
-	var resp map[string]bool
+	var resp map[string]any
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if !resp["queued"] {
+	if queued, _ := resp["queued"].(bool); !queued {
 		t.Errorf("expected queued=true, got %v", resp)
+	}
+	taskID, ok := resp["task_id"].(string)
+	if !ok || taskID == "" {
+		t.Errorf("expected non-empty task_id in response, got %v", resp)
 	}
 }
 

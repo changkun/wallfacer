@@ -156,10 +156,12 @@ func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
 // Creates an idea-agent task card and immediately starts it regardless of
 // whether autopilot is enabled.
 func (h *Handler) TriggerIdeation(w http.ResponseWriter, r *http.Request) {
-	h.createIdeaAgentTask(r.Context())
-	writeJSON(w, http.StatusAccepted, map[string]any{
-		"queued": true,
-	})
+	task := h.createIdeaAgentTask(r.Context())
+	resp := map[string]any{"queued": true}
+	if task != nil {
+		resp["task_id"] = task.ID.String()
+	}
+	writeJSON(w, http.StatusAccepted, resp)
 }
 
 // CancelIdeation handles DELETE /api/ideate.

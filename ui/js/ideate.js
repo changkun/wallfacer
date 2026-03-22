@@ -44,7 +44,12 @@ async function toggleIdeation() {
 // triggerIdeation creates an idea-agent task card immediately via POST /api/ideate.
 async function triggerIdeation() {
   try {
-    await api('/api/ideate', { method: 'POST' });
+    const res = await api('/api/ideate', { method: 'POST' });
+    if (res && res.task_id) {
+      waitForTaskDelta(res.task_id);
+    } else {
+      fetchTasks();
+    }
   } catch (e) {
     showAlert('Error triggering brainstorm: ' + e.message);
   }
