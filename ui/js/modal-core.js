@@ -410,7 +410,13 @@ async function openModal(id) {
     modalBody.style.display = 'flex';
     modalBody.style.gap = '0';
   } else {
-    // Non-backlog: show rendered goal (if distinct) + rendered spec (read-only)
+    // Non-backlog: hide backlog-only Edit/Preview tabs immediately
+    ['modal-goal-tabs', 'modal-spec-tabs'].forEach(function(tid) {
+      var el = document.getElementById(tid);
+      if (el) el.classList.add('hidden');
+    });
+
+    // Show rendered goal (if distinct) + rendered spec (read-only)
     const goalVal = task.goal || '';
     const specVal = (typeof taskDisplayPrompt === 'function') ? taskDisplayPrompt(task) : (task.prompt || '');
     const hasDistinctGoal = goalVal && goalVal !== task.prompt;
@@ -432,14 +438,10 @@ async function openModal(id) {
     promptActions.classList.remove('hidden');
     document.getElementById('toggle-prompt-btn').textContent = 'Raw';
     promptTextarea.classList.add('hidden');
-    var goalEditPreview = document.getElementById('modal-edit-goal-preview');
-    if (goalEditPreview) goalEditPreview.classList.add('hidden');
-    var specEditPreview = document.getElementById('modal-edit-prompt-preview');
-    if (specEditPreview) specEditPreview.classList.add('hidden');
-    var goalTabs = document.getElementById('modal-goal-tabs');
-    var specTabs = document.getElementById('modal-spec-tabs');
-    if (goalTabs) goalTabs.classList.add('hidden');
-    if (specTabs) specTabs.classList.add('hidden');
+    ['modal-edit-goal-preview', 'modal-edit-prompt-preview'].forEach(function(pid) {
+      var el = document.getElementById(pid);
+      if (el) el.classList.add('hidden');
+    });
 
     backlogRight.classList.add('hidden');
     backlogSettings.classList.add('hidden');
