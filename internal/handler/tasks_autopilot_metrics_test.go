@@ -79,6 +79,93 @@ func autopilotCounterValue(t *testing.T, reg *metrics.Registry, watcher, outcome
 	return 0
 }
 
+// TestAutoRetrySuppressedBudget verifies that when the per-category budget is
+// zero the auto_retrier emits a suppressed_budget counter and does not promote.
+func TestAutoRetrySuppressedBudget(t *testing.T) {
+	h, reg := newTestHandlerWithRegistry(t)
+	h.SetAutopilot(true)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "budget test", Timeout: 15, Kind: store.TaskKindTask})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus failed: %v", err)
+	}
+	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+
+	// Drain the category budget by incrementing until it hits zero.
+	for {
+		snap, _ := h.store.GetTask(ctx, task.ID)
+		if snap.AutoRetryBudget[store.FailureCategoryContainerCrash] <= 0 {
+			break
+		}
+		if err := h.store.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+			t.Fatalf("IncrementAutoRetryCount: %v", err)
+		}
+	}
+
+	snap, _ := h.store.GetTask(ctx, task.ID)
+	h.tryAutoRetry(ctx, *snap)
+
+	if got := autopilotCounterValue(t, reg, "auto_retrier", "suppressed_budget"); got != 1 {
+		t.Errorf("expected suppressed_budget=1, got %v", got)
+	}
+	after, _ := h.store.GetTask(ctx, task.ID)
+	if after.Status != store.TaskStatusFailed {
+		t.Errorf("expected task still failed, got %s", after.Status)
+	}
+}
+
+// TestAutoRetrySuppressedMaxCount verifies that when the global retry count cap
+// is reached the auto_retrier emits a suppressed_max_count counter and does not
+// promote, even when the per-category budget is non-zero.
+func TestAutoRetrySuppressedMaxCount(t *testing.T) {
+	h, reg := newTestHandlerWithRegistry(t)
+	h.SetAutopilot(true)
+	ctx := context.Background()
+
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "max count test", Timeout: 15, Kind: store.TaskKindTask})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus in_progress: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusFailed); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus failed: %v", err)
+	}
+	if err := h.store.SetTaskFailureCategory(ctx, task.ID, store.FailureCategoryContainerCrash); err != nil {
+		t.Fatalf("SetTaskFailureCategory: %v", err)
+	}
+
+	// Increment AutoRetryCount to the global cap using a different category so
+	// that the ContainerCrash budget (set as FailureCategory) remains non-zero.
+	// This isolates the count-cap path from the budget-exhausted path.
+	for i := 0; i < store.MaxAutoRetries; i++ {
+		if err := h.store.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategorySyncError); err != nil {
+			t.Fatalf("IncrementAutoRetryCount[%d]: %v", i, err)
+		}
+	}
+
+	snap, _ := h.store.GetTask(ctx, task.ID)
+	h.tryAutoRetry(ctx, *snap)
+
+	if got := autopilotCounterValue(t, reg, "auto_retrier", "suppressed_max_count"); got != 1 {
+		t.Errorf("expected suppressed_max_count=1, got %v", got)
+	}
+	after, _ := h.store.GetTask(ctx, task.ID)
+	if after.Status != store.TaskStatusFailed {
+		t.Errorf("expected task still failed, got %s", after.Status)
+	}
+}
+
 // TestTryAutoPromote_PromotedCounterIncrements verifies that successfully
 // promoting a backlog task increments the
 // wallfacer_autopilot_actions_total{watcher="auto_promoter",outcome="promoted"}

@@ -457,11 +457,18 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 	if h.breakers["auto-retry"].isOpen() {
 		return
 	}
-	if !store.IsAutoRetryEligible(task, task.FailureCategory) {
-		logger.Handler.Info("auto-retry suppressed: max retries reached",
+	if task.AutoRetryBudget[task.FailureCategory] <= 0 {
+		logger.Handler.Info("auto-retry suppressed: category budget exhausted",
+			"task", task.ID, "auto_retry_count", task.AutoRetryCount,
+			"category", task.FailureCategory)
+		h.incAutopilotAction("auto_retrier", "suppressed_budget")
+		return
+	}
+	if task.AutoRetryCount >= store.MaxAutoRetries {
+		logger.Handler.Info("auto-retry suppressed: global retry cap reached",
 			"task", task.ID, "auto_retry_count", task.AutoRetryCount,
 			"max", store.MaxAutoRetries, "category", task.FailureCategory)
-		h.incAutopilotAction("auto_retrier", "suppressed_budget")
+		h.incAutopilotAction("auto_retrier", "suppressed_max_count")
 		return
 	}
 	// For container-crash failures, honour the circuit breaker.
