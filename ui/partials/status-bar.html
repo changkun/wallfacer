@@ -1,27 +1,59 @@
 <!-- Status bar (hidden on mobile; mobile uses #mobile-col-nav) -->
-<footer id="status-bar" class="status-bar" role="contentinfo" aria-label="Status bar">
+<footer
+  id="status-bar"
+  class="status-bar"
+  role="contentinfo"
+  aria-label="Status bar"
+>
   <div class="status-bar__left">
     <span
       id="status-bar-conn-dot"
       class="status-bar-conn-dot status-bar-conn-dot--closed"
       aria-label="Disconnected"
     ></span>
-    <span id="status-bar-conn-label" class="status-bar-conn-label">Connecting…</span>
+    <span id="status-bar-conn-label" class="status-bar-conn-label"
+      >Connecting…</span
+    >
     <span id="status-bar-workspace" class="status-bar-workspace"></span>
   </div>
   <div class="status-bar__center">
     <span class="status-bar-count" title="In Progress">
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-        <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.5"/>
-        <polyline points="5,2.5 5,5 7,6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      <svg
+        width="10"
+        height="10"
+        viewBox="0 0 10 10"
+        fill="none"
+        aria-hidden="true"
+      >
+        <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.5" />
+        <polyline
+          points="5,2.5 5,5 7,6.5"
+          stroke="currentColor"
+          stroke-width="1.2"
+          stroke-linecap="round"
+        />
       </svg>
       <span id="status-bar-in-progress">0</span>
     </span>
     <span class="status-bar-count" title="Waiting">
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-        <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.5"/>
-        <line x1="5" y1="3" x2="5" y2="5.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        <circle cx="5" cy="7" r="0.6" fill="currentColor"/>
+      <svg
+        width="10"
+        height="10"
+        viewBox="0 0 10 10"
+        fill="none"
+        aria-hidden="true"
+      >
+        <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.5" />
+        <line
+          x1="5"
+          y1="3"
+          x2="5"
+          y2="5.5"
+          stroke="currentColor"
+          stroke-width="1.2"
+          stroke-linecap="round"
+        />
+        <circle cx="5" cy="7" r="0.6" fill="currentColor" />
       </svg>
       <span id="status-bar-waiting">0</span>
     </span>
@@ -34,8 +66,15 @@
       title="Toggle terminal panel (&#96;)"
       aria-expanded="false"
       aria-controls="status-bar-panel"
-    >Terminal <kbd class="status-bar-kbd">&#96;</kbd></button>
+    >
+      Terminal <kbd class="status-bar-kbd">&#96;</kbd>
+    </button>
   </div>
 </footer>
 <!-- Terminal stub panel (populated by future PRs) -->
-<div id="status-bar-panel" class="status-bar-panel hidden" role="region" aria-label="Terminal panel"></div>
+<div
+  id="status-bar-panel"
+  class="status-bar-panel hidden"
+  role="region"
+  aria-label="Terminal panel"
+></div>

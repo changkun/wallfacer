@@ -84,9 +84,15 @@ function makeStatusBarContext(extra = {}) {
       _ariaExpanded: "",
       classList: {
         _classes: new Set(),
-        contains(c) { return this._classes.has(c); },
-        add(c) { this._classes.add(c); },
-        remove(c) { this._classes.delete(c); },
+        contains(c) {
+          return this._classes.has(c);
+        },
+        add(c) {
+          this._classes.add(c);
+        },
+        remove(c) {
+          this._classes.delete(c);
+        },
         toggle(c, force) {
           if (force === undefined) {
             if (this._classes.has(c)) this._classes.delete(c);
@@ -129,7 +135,9 @@ function makeStatusBarContext(extra = {}) {
 
   const ctx = {
     document: {
-      getElementById(id) { return elements[id] || null; },
+      getElementById(id) {
+        return elements[id] || null;
+      },
       addEventListener() {},
       activeElement: { tagName: "BODY", getAttribute: () => null },
       readyState: "complete",
@@ -147,10 +155,7 @@ function makeStatusBarContext(extra = {}) {
 }
 
 function loadStatusBar(ctx) {
-  const code = readFileSync(
-    join(__dirname, "..", "status-bar.js"),
-    "utf8",
-  );
+  const code = readFileSync(join(__dirname, "..", "status-bar.js"), "utf8");
   vm.runInContext(code, ctx);
 }
 
@@ -214,11 +219,7 @@ describe("updateStatusBar logic", () => {
 
   it("counts waiting and failed tasks in the waiting count", () => {
     const { ctx, elements } = makeStatusBarContext({
-      tasks: [
-        { status: "waiting" },
-        { status: "failed" },
-        { status: "done" },
-      ],
+      tasks: [{ status: "waiting" }, { status: "failed" }, { status: "done" }],
     });
     loadStatusBar(ctx);
     ctx.updateStatusBar();
@@ -264,9 +265,13 @@ describe("toggleTerminalPanel", () => {
     const { ctx, elements } = makeStatusBarContext();
     loadStatusBar(ctx);
     // panel starts with hidden class
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(true);
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
+      true,
+    );
     ctx.toggleTerminalPanel();
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(false);
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
+      false,
+    );
     expect(elements["status-bar-terminal-btn"]._ariaExpanded).toBe("true");
   });
 
@@ -275,10 +280,14 @@ describe("toggleTerminalPanel", () => {
     loadStatusBar(ctx);
     // Open it first
     ctx.toggleTerminalPanel();
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(false);
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
+      false,
+    );
     // Close it
     ctx.toggleTerminalPanel();
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(true);
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
+      true,
+    );
     expect(elements["status-bar-terminal-btn"]._ariaExpanded).toBe("false");
   });
 });

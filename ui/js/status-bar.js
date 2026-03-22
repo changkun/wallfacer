@@ -43,10 +43,14 @@ function _updateConnDot() {
     state = "closed";
   }
 
-  dot.className =
-    "status-bar-conn-dot status-bar-conn-dot--" + state;
+  dot.className = "status-bar-conn-dot status-bar-conn-dot--" + state;
 
-  var labelText = state === "ok" ? "Connected" : state === "reconnecting" ? "Reconnecting…" : "Disconnected";
+  var labelText =
+    state === "ok"
+      ? "Connected"
+      : state === "reconnecting"
+        ? "Reconnecting…"
+        : "Disconnected";
   label.textContent = labelText;
   dot.setAttribute("aria-label", labelText);
 }
@@ -56,7 +60,8 @@ function _updateCounts() {
   var waitingEl = document.getElementById("status-bar-waiting");
   if (!inProgressEl || !waitingEl) return;
 
-  var taskList = (typeof tasks !== "undefined" && Array.isArray(tasks)) ? tasks : [];
+  var taskList =
+    typeof tasks !== "undefined" && Array.isArray(tasks) ? tasks : [];
   var inProgressCount = 0;
   var waitingCount = 0;
   for (var i = 0; i < taskList.length; i++) {
@@ -74,11 +79,11 @@ function _updateWorkspace() {
   if (!el) return;
 
   var workspaces =
-    (typeof activeWorkspaces !== "undefined" && Array.isArray(activeWorkspaces))
+    typeof activeWorkspaces !== "undefined" && Array.isArray(activeWorkspaces)
       ? activeWorkspaces
       : [];
   var groups =
-    (typeof workspaceGroups !== "undefined" && Array.isArray(workspaceGroups))
+    typeof workspaceGroups !== "undefined" && Array.isArray(workspaceGroups)
       ? workspaceGroups
       : [];
 
@@ -95,7 +100,9 @@ function _updateWorkspace() {
       return (
         Array.isArray(g.workspaces) &&
         g.workspaces.length === workspaces.length &&
-        g.workspaces.every(function (w, i) { return w === workspaces[i]; })
+        g.workspaces.every(function (w, i) {
+          return w === workspaces[i];
+        })
       );
     });
     if (activeGroup && activeGroup.name) {
