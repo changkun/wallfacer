@@ -28,14 +28,14 @@ type Hub[T any] struct {
 	replayBuf []Sequenced[T]
 	replayCap int
 
-	subMu         sync.Mutex
-	subscribers   map[int]chan Sequenced[T]
-	nextSubID     int
-	channelSize   int
+	subMu       sync.Mutex
+	subscribers map[int]chan Sequenced[T]
+	nextSubID   int
+	channelSize int
 
-	wakeSubMu         sync.Mutex
-	wakeSubscribers   map[int]chan struct{}
-	nextWakeSubID     int
+	wakeSubMu       sync.Mutex
+	wakeSubscribers map[int]chan struct{}
+	nextWakeSubID   int
 
 	clone func(T) T // optional deep-copy function
 }

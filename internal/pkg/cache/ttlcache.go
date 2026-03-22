@@ -22,7 +22,7 @@ type TTLCache[K comparable, V any] struct {
 	entries       map[K]entry[V]
 	permanentKeys []K // insertion order, for oldest-first eviction
 	defaultTTL    time.Duration
-	maxSize       int            // max permanent entries (0 = unlimited)
+	maxSize       int // max permanent entries (0 = unlimited)
 	now           func() time.Time
 }
 

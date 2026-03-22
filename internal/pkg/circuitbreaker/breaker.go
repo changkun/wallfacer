@@ -12,6 +12,7 @@ import (
 // State represents the three states of a circuit breaker.
 type State int32
 
+// Circuit breaker states.
 const (
 	Closed   State = 0 // normal: allow operations
 	Open     State = 1 // tripped: block operations

@@ -17,7 +17,7 @@ func Write(path string, data []byte, perm os.FileMode) error {
 		return err
 	}
 	if err := os.Rename(tmp, path); err != nil {
-		os.Remove(tmp) // best-effort cleanup
+		_ = os.Remove(tmp) // best-effort cleanup
 		return err
 	}
 	return nil

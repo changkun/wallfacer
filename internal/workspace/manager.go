@@ -10,8 +10,8 @@ import (
 	"sync"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/instructions"
+	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/store"
 )
 

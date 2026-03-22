@@ -14,13 +14,8 @@ type TaskDelta struct {
 	Deleted bool
 }
 
-// subscribe registers a channel that receives a SequencedDelta whenever task
+// Subscribe registers a channel that receives a SequencedDelta whenever task
 // state changes. The caller must call Unsubscribe with the returned ID when done.
-func (s *Store) subscribe() (int, <-chan SequencedDelta) {
-	return s.hub.Subscribe()
-}
-
-// Subscribe is the exported variant of subscribe for use outside the package.
 func (s *Store) Subscribe() (int, <-chan SequencedDelta) {
 	return s.hub.Subscribe()
 }

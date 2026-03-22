@@ -7,8 +7,8 @@ import (
 
 // BackoffConfig configures a [BackoffBreaker].
 type BackoffConfig struct {
-	BaseDelay time.Duration  // initial backoff delay (default: 30s)
-	MaxDelay  time.Duration  // maximum backoff delay cap (default: 5min)
+	BaseDelay time.Duration    // initial backoff delay (default: 30s)
+	MaxDelay  time.Duration    // maximum backoff delay cap (default: 5min)
 	Now       func() time.Time // injectable clock (default: time.Now)
 }
 

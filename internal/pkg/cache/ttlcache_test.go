@@ -118,7 +118,7 @@ func TestTTLCache_Invalidate_Permanent(t *testing.T) {
 	}
 }
 
-func TestTTLCache_Concurrent(t *testing.T) {
+func TestTTLCache_Concurrent(_ *testing.T) {
 	c := New[int, int](time.Minute)
 	const n = 50
 	var wg sync.WaitGroup
