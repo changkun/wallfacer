@@ -449,30 +449,6 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 // Context cancellation regression test
 // ---------------------------------------------------------------------------
 
-// fakeBlockingCmd creates a shell script that blocks indefinitely on "run"
-// subcommands and exits immediately (with 0) for "rm" and "kill".
-// Used to simulate a container that is running but has not yet produced output,
-// so tests can exercise context cancellation before the container finishes.
-func fakeBlockingCmd(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	// "exec sleep 300" replaces the shell process with sleep, ensuring there is
-// only one process for Go's exec.CommandContext to kill. Without exec, the
-// shell spawns sleep as a child; when Go kills the shell, sleep inherits the
-// stdout pipe and keeps it open, causing cmd.Wait() to hang indefinitely.
-script := `#!/bin/sh
-case "$1" in
-  rm|kill|inspect|ps) exit 0 ;;
-esac
-exec sleep 300
-`
-	scriptPath := dir + "/fake-blocking"
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-	return scriptPath
-}
-
 // ---------------------------------------------------------------------------
 // generateCommitMessage cancellation tests
 // ---------------------------------------------------------------------------

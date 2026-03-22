@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // runFakeCmd handles the re-exec mode where the test binary acts as a fake
@@ -24,7 +25,7 @@ func runFakeCmd(mode string) {
 	switch mode {
 	case "simple":
 		data, _ := os.ReadFile(filepath.Join(dir, "output.txt"))
-		os.Stdout.Write(data)
+		_, _ = os.Stdout.Write(data)
 		os.Exit(exitCode)
 
 	case "stateful":
@@ -45,7 +46,7 @@ func runFakeCmd(mode string) {
 			outFile = filepath.Join(dir, "last.txt")
 		}
 		data, _ := os.ReadFile(outFile)
-		os.Stdout.Write(data)
+		_, _ = os.Stdout.Write(data)
 		_ = os.WriteFile(counterFile, []byte(strconv.Itoa(count+1)), 0644)
 		os.Exit(exitCode)
 
@@ -60,9 +61,22 @@ func runFakeCmd(mode string) {
 
 		stdout, _ := os.ReadFile(filepath.Join(dir, "stdout.txt"))
 		stderr, _ := os.ReadFile(filepath.Join(dir, "stderr.txt"))
-		os.Stdout.Write(stdout)
-		os.Stderr.Write(stderr)
+		_, _ = os.Stdout.Write(stdout)
+		_, _ = os.Stderr.Write(stderr)
 		os.Exit(exitCode)
+
+	case "blocking":
+		// Skip container lifecycle subcommands.
+		if len(os.Args) > 1 {
+			switch os.Args[1] {
+			case "rm", "kill", "inspect", "ps":
+				os.Exit(0)
+			}
+		}
+		// Block until killed (context cancellation). Use a long sleep
+		// so the process stays alive for the test to verify registration.
+		time.Sleep(5 * time.Minute)
+		os.Exit(0)
 	}
 }
 
@@ -130,5 +144,15 @@ func fakeCmdScriptWithStderr(t *testing.T, stdout, stderr string, exitCode int) 
 	t.Setenv("WALLFACER_FAKE_MODE", "stderr")
 	t.Setenv("WALLFACER_FAKE_DIR", dir)
 	t.Setenv("WALLFACER_FAKE_EXIT", strconv.Itoa(exitCode))
+	return testBinary()
+}
+
+// fakeBlockingCmd creates a fake container command that blocks indefinitely
+// (until killed via context cancellation). Lifecycle calls are skipped.
+func fakeBlockingCmd(t *testing.T) string {
+	t.Helper()
+	t.Setenv("WALLFACER_FAKE_MODE", "blocking")
+	t.Setenv("WALLFACER_FAKE_DIR", t.TempDir())
+	t.Setenv("WALLFACER_FAKE_EXIT", "0")
 	return testBinary()
 }
