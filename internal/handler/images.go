@@ -249,7 +249,9 @@ func (h *Handler) StreamImagePull(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			data, _ := json.Marshal(map[string]string{"line": line})
-			fmt.Fprintf(w, "event: progress\ndata: %s\n\n", data)
+			if _, err := fmt.Fprintf(w, "event: progress\ndata: %s\n\n", data); err != nil {
+				return
+			}
 			flusher.Flush()
 		case <-p.Done:
 			// Drain remaining lines.
@@ -257,7 +259,9 @@ func (h *Handler) StreamImagePull(w http.ResponseWriter, r *http.Request) {
 				select {
 				case line := <-p.Lines:
 					data, _ := json.Marshal(map[string]string{"line": line})
-					fmt.Fprintf(w, "event: progress\ndata: %s\n\n", data)
+					if _, err := fmt.Fprintf(w, "event: progress\ndata: %s\n\n", data); err != nil {
+						return
+					}
 				default:
 					goto drained
 				}
@@ -265,10 +269,10 @@ func (h *Handler) StreamImagePull(w http.ResponseWriter, r *http.Request) {
 		drained:
 			if p.Err != nil {
 				data, _ := json.Marshal(map[string]string{"error": p.Err.Error()})
-				fmt.Fprintf(w, "event: error\ndata: %s\n\n", data)
+				_, _ = fmt.Fprintf(w, "event: error\ndata: %s\n\n", data)
 			} else {
 				data, _ := json.Marshal(map[string]any{"success": true, "image": p.Image})
-				fmt.Fprintf(w, "event: done\ndata: %s\n\n", data)
+				_, _ = fmt.Fprintf(w, "event: done\ndata: %s\n\n", data)
 			}
 			flusher.Flush()
 			return
