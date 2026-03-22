@@ -233,17 +233,20 @@ func normalizeSandboxByActivity(input map[SandboxActivity]sandbox.Type) map[Sand
 // The task directory is retained on disk; the task is moved from s.tasks to
 // s.deleted so it no longer appears in ListTasks but can be restored.
 // reason is optional human-readable context for why the task was deleted.
-func (s *Store) DeleteTask(_ context.Context, id uuid.UUID, reason string) error {
+// After the tombstone is written, any non-terminal tasks that depend on id have
+// id removed from their DependsOn list so they are no longer permanently blocked.
+func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID, reason string) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	t, ok := s.tasks[id]
 	if !ok {
+		s.mu.Unlock()
 		return fmt.Errorf("task not found: %s", id)
 	}
 	tomb := Tombstone{DeletedAt: time.Now(), Reason: reason}
 	tombPath := filepath.Join(s.dir, id.String(), "tombstone.json")
 	if err := atomicWriteJSON(tombPath, tomb); err != nil {
+		s.mu.Unlock()
 		return fmt.Errorf("write tombstone: %w", err)
 	}
 	s.removeFromStatusIndex(t.Status, id)
@@ -251,6 +254,57 @@ func (s *Store) DeleteTask(_ context.Context, id uuid.UUID, reason string) error
 	delete(s.searchIndex, id)
 	s.deleted[id] = t
 	s.notify(t, true) // task-deleted delta — SSE clients work unchanged
+	s.mu.Unlock()
+
+	// Clean up orphaned dependencies: any backlog/in_progress/waiting/failed task
+	// that listed id in DependsOn is now permanently blocked, so remove id from
+	// each dependent's DependsOn slice.
+	s.removeOrphanedDependents(ctx, id)
+	return nil
+}
+
+// removeOrphanedDependents finds all non-terminal tasks that depend on cancelledID
+// and removes cancelledID from their DependsOn slices. This unblocks tasks whose
+// only blocker was a task that is now cancelled or deleted.
+func (s *Store) removeOrphanedDependents(ctx context.Context, cancelledID uuid.UUID) {
+	deps, err := s.TasksDependingOn(ctx, cancelledID)
+	if err != nil {
+		logger.Store.Warn("orphan cleanup: list dependents", "task", cancelledID, "error", err)
+		return
+	}
+	cancelledIDStr := cancelledID.String()
+	for _, dep := range deps {
+		if err := s.mutateTask(dep.ID, func(t *Task) error {
+			updated := t.DependsOn[:0:0] // preserve nil if empty
+			for _, idStr := range t.DependsOn {
+				if idStr != cancelledIDStr {
+					updated = append(updated, idStr)
+				}
+			}
+			if len(updated) == 0 {
+				t.DependsOn = nil
+			} else {
+				t.DependsOn = updated
+			}
+			return nil
+		}); err != nil {
+			logger.Store.Warn("orphan cleanup: remove dep", "dependent", dep.ID, "cancelled", cancelledID, "error", err)
+		} else {
+			logger.Store.Warn("removed orphaned dependency", "dependent", dep.ID, "cancelled_dep", cancelledID)
+		}
+	}
+}
+
+// CancelTask moves a task to TaskStatusCancelled using ForceUpdateTaskStatus
+// (which bypasses the normal state-machine transitions) and then removes the
+// task's ID from the DependsOn list of any non-terminal tasks that reference it.
+// Cancelled tasks can never reach done, so their dependents would otherwise be
+// permanently blocked by the auto-promoter's dependency check.
+func (s *Store) CancelTask(ctx context.Context, id uuid.UUID) error {
+	if err := s.ForceUpdateTaskStatus(ctx, id, TaskStatusCancelled); err != nil {
+		return err
+	}
+	s.removeOrphanedDependents(ctx, id)
 	return nil
 }
 

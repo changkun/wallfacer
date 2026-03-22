@@ -101,8 +101,10 @@ func TestAreDependenciesSatisfied_NoDone(t *testing.T) {
 	}
 }
 
-// TestAreDependenciesSatisfied_DeletedDep verifies that a deleted dependency
-// is treated as unsatisfied.
+// TestAreDependenciesSatisfied_DeletedDep verifies that when a dependency is
+// deleted, it is removed from the dependent's DependsOn list so the dependent
+// is no longer permanently blocked. After deletion, B has no remaining deps and
+// AreDependenciesSatisfied reports true.
 func TestAreDependenciesSatisfied_DeletedDep(t *testing.T) {
 	s := newTestStore(t)
 	a, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "a", Timeout: 15})
@@ -110,12 +112,21 @@ func TestAreDependenciesSatisfied_DeletedDep(t *testing.T) {
 	_ = s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
 	_ = s.DeleteTask(bg(), a.ID, "")
 
+	// After deletion the orphaned dependency cleanup removes A from B.DependsOn.
+	bTask, err := s.GetTask(bg(), b.ID)
+	if err != nil {
+		t.Fatalf("GetTask B: %v", err)
+	}
+	if len(bTask.DependsOn) != 0 {
+		t.Errorf("expected B.DependsOn empty after A deleted, got %v", bTask.DependsOn)
+	}
+
 	ok, err := s.AreDependenciesSatisfied(bg(), b.ID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ok {
-		t.Error("expected unsatisfied (dep deleted), got true")
+	if !ok {
+		t.Error("expected satisfied (dep deleted and cleaned up), got false")
 	}
 }
 

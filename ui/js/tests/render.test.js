@@ -226,7 +226,23 @@ describe('render.js dependency helpers', () => {
     expect(badge).toContain('badge-blocked');
   });
 
-  it('renders a ready badge when all backlog dependencies are satisfied', () => {
+  it('renders a ready badge when all backlog dependencies are done', () => {
+    ctx.tasks = [
+      { id: 'dep-1', status: 'done', title: 'Finished', prompt: 'finished prompt' },
+      { id: 'dep-2', status: 'done', title: 'Also finished', prompt: 'done prompt' },
+    ];
+
+    const badge = renderExports.renderDependencyBadge({
+      id: 'task-a',
+      status: 'backlog',
+      depends_on: ['dep-1', 'dep-2'],
+    });
+
+    expect(badge).toContain('ready');
+    expect(badge).toContain('badge-deps-met');
+  });
+
+  it('renders a dependency-cancelled chip when a dep has status cancelled', () => {
     ctx.tasks = [
       { id: 'dep-1', status: 'done', title: 'Finished', prompt: 'finished prompt' },
       { id: 'dep-2', status: 'cancelled', title: 'Cancelled', prompt: 'cancelled prompt' },
@@ -238,8 +254,23 @@ describe('render.js dependency helpers', () => {
       depends_on: ['dep-1', 'dep-2'],
     });
 
-    expect(badge).toContain('ready');
-    expect(badge).toContain('badge-deps-met');
+    expect(badge).toContain('dependency cancelled');
+    expect(badge).toContain('badge-dep-cancelled');
+  });
+
+  it('renders a dependency-cancelled chip when a dep is absent from task list', () => {
+    ctx.tasks = [
+      { id: 'dep-1', status: 'done', title: 'Finished', prompt: 'finished prompt' },
+    ];
+
+    const badge = renderExports.renderDependencyBadge({
+      id: 'task-a',
+      status: 'backlog',
+      depends_on: ['dep-1', 'missing-dep'],
+    });
+
+    expect(badge).toContain('dependency cancelled');
+    expect(badge).toContain('badge-dep-cancelled');
   });
 
   it('suppresses dependency badges outside backlog', () => {

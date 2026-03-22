@@ -350,9 +350,10 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	// Persist the cancelled status BEFORE cleaning up worktrees.
-	// Use ForceUpdateTaskStatus to handle transitions not in the normal state
-	// machine (e.g. backlog → cancelled for tasks that never started).
-	if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusCancelled); err != nil {
+	// CancelTask uses ForceUpdateTaskStatus internally to handle transitions not
+	// in the normal state machine (e.g. backlog → cancelled for tasks that never
+	// started), and also cleans up orphaned DependsOn entries in dependent tasks.
+	if err := h.store.CancelTask(r.Context(), id); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

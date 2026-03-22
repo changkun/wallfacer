@@ -4402,3 +4402,121 @@ func TestUpdateTask_FreshStartRetry(t *testing.T) {
 		t.Error("expected FreshStart to be true after fresh_start retry")
 	}
 }
+
+// --- Orphaned dependency cleanup tests ---
+
+// TestCancelTask_ClearsOrphanedDependency verifies that cancelling task A via the
+// handler removes A from B.DependsOn so B is no longer permanently blocked.
+func TestCancelTask_ClearsOrphanedDependency(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	a, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "b", Timeout: 15, DependsOn: []string{a.ID.String()}})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+a.ID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, a.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("CancelTask: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	got, err := h.store.GetTask(ctx, b.ID)
+	if err != nil {
+		t.Fatalf("GetTask B: %v", err)
+	}
+	if len(got.DependsOn) != 0 {
+		t.Errorf("expected B.DependsOn to be empty after A cancelled, got %v", got.DependsOn)
+	}
+}
+
+// TestDeleteTask_ClearsOrphanedDependency verifies that deleting task A via the
+// handler removes A from B.DependsOn so B is no longer permanently blocked.
+func TestDeleteTask_ClearsOrphanedDependency(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	a, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "b", Timeout: 15, DependsOn: []string{a.ID.String()}})
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/tasks/"+a.ID.String(), nil)
+	w := httptest.NewRecorder()
+	h.DeleteTask(w, req, a.ID)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("DeleteTask: expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	got, err := h.store.GetTask(ctx, b.ID)
+	if err != nil {
+		t.Fatalf("GetTask B: %v", err)
+	}
+	if len(got.DependsOn) != 0 {
+		t.Errorf("expected B.DependsOn to be empty after A deleted, got %v", got.DependsOn)
+	}
+}
+
+// TestCancelTask_RemovesOnlyOrphanedEntry verifies that when C depends on both A
+// and B, cancelling A removes only A from C.DependsOn while leaving B intact.
+func TestCancelTask_RemovesOnlyOrphanedEntry(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	a, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "b", Timeout: 15})
+	c, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "c", Timeout: 15, DependsOn: []string{a.ID.String(), b.ID.String()}})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+a.ID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, a.ID)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("CancelTask: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	got, err := h.store.GetTask(ctx, c.ID)
+	if err != nil {
+		t.Fatalf("GetTask C: %v", err)
+	}
+	if len(got.DependsOn) != 1 || got.DependsOn[0] != b.ID.String() {
+		t.Errorf("expected C.DependsOn=[%s], got %v", b.ID, got.DependsOn)
+	}
+}
+
+// TestAutoPromote_PromotesAfterOrphanedDepCleared verifies that after A and B are
+// both cancelled (removing them from C.DependsOn), the auto-promoter promotes C.
+func TestAutoPromote_PromotesAfterOrphanedDepCleared(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+	ctx := context.Background()
+
+	a, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "a", Timeout: 15})
+	b, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "b", Timeout: 15})
+	c, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "c", Timeout: 15, DependsOn: []string{a.ID.String(), b.ID.String()}})
+
+	// Cancel A — C.DependsOn should become [B].
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+a.ID.String()+"/cancel", nil)
+	w := httptest.NewRecorder()
+	h.CancelTask(w, req, a.ID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("CancelTask A: expected 200, got %d", w.Code)
+	}
+
+	// Auto-promoter should NOT promote C yet because B is still blocking.
+	h.tryAutoPromote(ctx)
+	cTask, _ := h.store.GetTask(ctx, c.ID)
+	if cTask.Status != store.TaskStatusBacklog {
+		t.Errorf("expected C still in backlog (B not done), got %s", cTask.Status)
+	}
+
+	// Complete B.
+	_ = h.store.ForceUpdateTaskStatus(ctx, b.ID, store.TaskStatusDone)
+
+	// Auto-promoter should now promote C (no remaining deps).
+	h.tryAutoPromote(ctx)
+	cTask, _ = h.store.GetTask(ctx, c.ID)
+	if cTask.Status == store.TaskStatusBacklog {
+		t.Errorf("expected C promoted after B done, still in backlog")
+	}
+}
