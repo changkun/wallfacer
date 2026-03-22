@@ -110,7 +110,9 @@ var promoteMu sync.Mutex
 // promotes backlog tasks to in_progress when there are fewer than
 // maxConcurrentTasks running. A supplementary 60-second ticker fires
 // periodically so that scheduled tasks are promoted even when no other
-// state change occurs.
+// state change occurs. Additionally, ensureScheduledPromoteTrigger arms a
+// precise one-shot timer for the soonest scheduled task so promotion happens
+// within milliseconds of the due time rather than waiting up to 60 seconds.
 func (h *Handler) StartAutoPromoter(ctx context.Context) {
 	subID, ch := h.store.SubscribeWake()
 	ticker := time.NewTicker(60 * time.Second)
@@ -120,6 +122,11 @@ func (h *Handler) StartAutoPromoter(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
+				h.scheduledPromoteMu.Lock()
+				if h.scheduledPromoteTimer != nil {
+					h.scheduledPromoteTimer.Stop()
+				}
+				h.scheduledPromoteMu.Unlock()
 				return
 			case <-ch:
 				h.tryAutoPromote(ctx)
@@ -128,6 +135,31 @@ func (h *Handler) StartAutoPromoter(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+// ensureScheduledPromoteTrigger arms (or re-arms) a one-shot timer so that
+// tryAutoPromote is called at precisely the moment the soonest scheduled task
+// becomes due. If due is already in the past the timer is not set (the current
+// tryAutoPromote call handles it). Any existing timer is replaced so that we
+// always fire at the earliest due time.
+func (h *Handler) ensureScheduledPromoteTrigger(ctx context.Context, due time.Time) {
+	delay := time.Until(due)
+	if delay <= 0 {
+		return // already due; current tryAutoPromote call handles it
+	}
+	h.scheduledPromoteMu.Lock()
+	defer h.scheduledPromoteMu.Unlock()
+	if h.scheduledPromoteTimer != nil {
+		if !h.scheduledPromoteTimer.Stop() {
+			select {
+			case <-h.scheduledPromoteTimer.C:
+			default:
+			}
+		}
+	}
+	h.scheduledPromoteTimer = time.AfterFunc(delay, func() {
+		h.tryAutoPromote(ctx)
+	})
 }
 
 // retryableCategories lists FailureCategory values that represent transient
@@ -288,6 +320,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				score int
 			}
 			var cpCandidates []cpCandidate
+			var nextScheduled *time.Time
 			for i := range backlogTasks {
 				t := &backlogTasks[i]
 				if t.Kind == store.TaskKindIdeaAgent {
@@ -295,6 +328,9 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				}
 				if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
 					h.incAutopilotAction("auto_promoter", "skipped_scheduled")
+					if nextScheduled == nil || t.ScheduledAt.Before(*nextScheduled) {
+						nextScheduled = t.ScheduledAt
+					}
 					continue
 				}
 				satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
@@ -303,6 +339,12 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					continue
 				}
 				cpCandidates = append(cpCandidates, cpCandidate{task: *t, score: h.store.CriticalPathScore(t.ID)})
+			}
+			// Arm a precise timer for the soonest scheduled task so it is
+			// promoted within milliseconds of its due time rather than waiting
+			// for the next 60-second ticker tick.
+			if nextScheduled != nil {
+				h.ensureScheduledPromoteTrigger(ctx, *nextScheduled)
 			}
 			if len(cpCandidates) == 0 {
 				return nil, nil

@@ -220,6 +220,8 @@ The graph redraws automatically when you scroll the board columns.
 
 Set the **Schedule start** field on a backlog task to a future date and time. The auto-promoter will skip this task until the scheduled time arrives. Once the time passes, the task becomes eligible for promotion like any other backlog task (subject to capacity and dependency constraints).
 
+The auto-promoter arms a precise one-shot timer for the soonest scheduled task, so promotion happens within milliseconds of the due time rather than waiting for the next 60-second polling tick.
+
 The task card displays a relative time indicator (e.g. "in 3h") when a schedule is set and the time has not yet arrived.
 
 ### Task Budgets

@@ -161,6 +161,11 @@ type Handler struct {
 	sandboxTestPassed map[sandbox.Type]bool
 	webhookNotifier   func(envconfig.Config) *runner.WebhookNotifier
 
+	// scheduledPromoteMu guards scheduledPromoteTimer, which fires
+	// tryAutoPromote precisely when the soonest scheduled task becomes due.
+	scheduledPromoteMu    sync.Mutex
+	scheduledPromoteTimer *time.Timer
+
 	// testPhase1Done is called by tryAutoPromote after Phase 1 completes and
 	// before Phase 2 begins. It is nil in production; tests set it to
 	// coordinate goroutine timing and verify Phase 1 runs concurrently.
