@@ -180,6 +180,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	s.addToStatusIndex(task.Status, task.ID)
 	s.events[task.ID] = nil
 	s.nextSeq[task.ID] = 1
+	s.eventsLoaded[task.ID] = true
 	s.searchIndex[task.ID] = entry
 	s.notify(task, false)
 
@@ -382,6 +383,7 @@ func (s *Store) purgeTaskLocked(id uuid.UUID) error {
 	delete(s.deleted, id)
 	delete(s.events, id)
 	delete(s.nextSeq, id)
+	delete(s.eventsLoaded, id)
 	return nil
 }
 

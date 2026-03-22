@@ -96,6 +96,11 @@ type Store struct {
 	// compactWg tracks background compaction goroutines so tests can wait
 	// for them to finish before cleaning up temp directories.
 	compactWg sync.WaitGroup
+
+	// eventsLoaded tracks which tasks have had their events loaded into
+	// memory. Tasks in terminal states (done, failed, cancelled) skip
+	// event loading at startup and are loaded lazily on first access.
+	eventsLoaded map[uuid.UUID]bool
 }
 
 // readEnvInt reads an integer from an environment variable. If the variable is
@@ -117,6 +122,7 @@ func NewStore(dir string) (*Store, error) {
 		deleted:             make(map[uuid.UUID]*Task),
 		events:              make(map[uuid.UUID][]TaskEvent),
 		nextSeq:             make(map[uuid.UUID]int),
+		eventsLoaded:        make(map[uuid.UUID]bool),
 		tasksByStatus:       make(map[TaskStatus]map[uuid.UUID]struct{}),
 		searchIndex:         make(map[uuid.UUID]indexedTaskText),
 		subscribers:         make(map[int]chan SequencedDelta),
@@ -233,10 +239,8 @@ func (s *Store) loadAll() error {
 			var tomb Tombstone
 			if jsonUnmarshal(tombRaw, &tomb) == nil {
 				s.deleted[id] = &task
-				// Load events so deleted tasks' history remains accessible.
-				if err := s.loadEvents(id, entry.Name()); err != nil {
-					return err
-				}
+				// Defer event loading for deleted tasks; load lazily on access.
+				s.eventsLoaded[id] = false
 				continue
 			}
 		}
@@ -268,12 +272,32 @@ func (s *Store) loadAll() error {
 
 		s.searchIndex[id] = indexEntry
 
-		if err := s.loadEvents(id, entry.Name()); err != nil {
-			return err
+		// Eagerly load events only for tasks that may still be active.
+		// Terminal-state tasks (done, failed, cancelled) and archived tasks
+		// have their events loaded lazily on first access, which dramatically
+		// speeds up startup for workspaces with large histories.
+		if isTerminalStatus(task.Status) || task.Archived {
+			s.eventsLoaded[id] = false
+		} else {
+			if err := s.loadEvents(id, entry.Name()); err != nil {
+				return err
+			}
+			s.eventsLoaded[id] = true
 		}
 	}
 
 	return nil
+}
+
+// isTerminalStatus reports whether a task status indicates the task is
+// no longer executing and will not produce new events without explicit
+// user action (retry/resume).
+func isTerminalStatus(status TaskStatus) bool {
+	switch status {
+	case TaskStatusDone, TaskStatusFailed, TaskStatusCancelled:
+		return true
+	}
+	return false
 }
 
 // mutateTask acquires the write lock, finds the task by id, calls fn to mutate
@@ -295,6 +319,18 @@ func (s *Store) mutateTask(id uuid.UUID, fn func(t *Task) error) error {
 	}
 	s.notify(t, false)
 	return nil
+}
+
+// ensureEventsLoadedLocked lazily loads events for a task if they haven't been
+// loaded yet. Must be called while s.mu is held for writing.
+func (s *Store) ensureEventsLoadedLocked(id uuid.UUID) {
+	if s.eventsLoaded[id] {
+		return
+	}
+	if err := s.loadEvents(id, id.String()); err != nil {
+		logger.Store.Warn("lazy event load failed", "task", id, "error", err)
+	}
+	s.eventsLoaded[id] = true
 }
 
 // loadEvents reads trace files for a single task into memory.

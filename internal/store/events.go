@@ -29,6 +29,7 @@ func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType Event
 		return fmt.Errorf("task not found: %s", taskID)
 	}
 
+	s.ensureEventsLoadedLocked(taskID)
 	seq := s.nextSeq[taskID]
 	event := TaskEvent{
 		ID:        int64(seq),
@@ -50,6 +51,14 @@ func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType Event
 // GetEvents returns a copy of all events for a task in order.
 func (s *Store) GetEvents(_ context.Context, taskID uuid.UUID) ([]TaskEvent, error) {
 	s.mu.RLock()
+	if !s.eventsLoaded[taskID] {
+		// Events not yet loaded — upgrade to write lock and load them.
+		s.mu.RUnlock()
+		s.mu.Lock()
+		s.ensureEventsLoadedLocked(taskID)
+		s.mu.Unlock()
+		s.mu.RLock()
+	}
 	defer s.mu.RUnlock()
 
 	events := s.events[taskID]
@@ -88,6 +97,13 @@ func (s *Store) GetEventsPage(_ context.Context, taskID uuid.UUID, afterID int64
 	}
 
 	s.mu.RLock()
+	if !s.eventsLoaded[taskID] {
+		s.mu.RUnlock()
+		s.mu.Lock()
+		s.ensureEventsLoadedLocked(taskID)
+		s.mu.Unlock()
+		s.mu.RLock()
+	}
 	defer s.mu.RUnlock()
 
 	// Events are already sorted by ID (guaranteed by loadEvents and append order).

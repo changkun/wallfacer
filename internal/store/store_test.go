@@ -1025,3 +1025,116 @@ func TestIsClosed_TrueAfterClose(t *testing.T) {
 		t.Error("expected IsClosed to be true after Close")
 	}
 }
+
+// TestLazyEventLoading verifies that events for terminal-state tasks are not
+// loaded at startup, and are lazily loaded on first access.
+func TestLazyEventLoading(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+
+	ctx := bg()
+
+	// Create a task and add events, then mark it done.
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{
+		Prompt:  "lazy test",
+		Timeout: 60,
+		Kind:    TaskKindTask,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.InsertEvent(ctx, task.ID, EventTypeOutput, "event-1"); err != nil {
+		t.Fatalf("InsertEvent 1: %v", err)
+	}
+	if err := s.InsertEvent(ctx, task.ID, EventTypeOutput, "event-2"); err != nil {
+		t.Fatalf("InsertEvent 2: %v", err)
+	}
+	// Transition to done (force to skip state machine validation).
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, TaskStatusDone); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus: %v", err)
+	}
+	s.WaitCompaction()
+
+	// Re-open the store from the same directory.
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore reload: %v", err)
+	}
+
+	// Events should NOT be loaded yet for the done task.
+	s2.mu.RLock()
+	loaded := s2.eventsLoaded[task.ID]
+	_, hasEvents := s2.events[task.ID]
+	s2.mu.RUnlock()
+	if loaded {
+		t.Error("expected eventsLoaded=false for done task at startup")
+	}
+	if hasEvents {
+		t.Error("expected no events in memory for done task at startup")
+	}
+
+	// Accessing events should trigger lazy loading.
+	events, err := s2.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetEvents: %v", err)
+	}
+	if len(events) != 2 {
+		t.Errorf("expected 2 events after lazy load, got %d", len(events))
+	}
+
+	// Now eventsLoaded should be true.
+	s2.mu.RLock()
+	loaded = s2.eventsLoaded[task.ID]
+	s2.mu.RUnlock()
+	if !loaded {
+		t.Error("expected eventsLoaded=true after GetEvents")
+	}
+}
+
+// TestLazyEventLoading_ActiveTasksEager verifies that events for active
+// (non-terminal) tasks are loaded eagerly at startup.
+func TestLazyEventLoading_ActiveTasksEager(t *testing.T) {
+	dir := t.TempDir()
+	s, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	ctx := bg()
+
+	task, err := s.CreateTaskWithOptions(ctx, TaskCreateOptions{
+		Prompt:  "active test",
+		Timeout: 60,
+		Kind:    TaskKindTask,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := s.InsertEvent(ctx, task.ID, EventTypeOutput, "data"); err != nil {
+		t.Fatalf("InsertEvent: %v", err)
+	}
+	// Move to in_progress (active state).
+	if err := s.UpdateTaskStatus(ctx, task.ID, TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateStatus: %v", err)
+	}
+
+	// Re-open.
+	s2, err := NewStore(dir)
+	if err != nil {
+		t.Fatalf("NewStore reload: %v", err)
+	}
+
+	// Events should be loaded eagerly for in_progress task.
+	s2.mu.RLock()
+	loaded := s2.eventsLoaded[task.ID]
+	evts := s2.events[task.ID]
+	s2.mu.RUnlock()
+	if !loaded {
+		t.Error("expected eventsLoaded=true for in_progress task at startup")
+	}
+	if len(evts) != 1 {
+		t.Errorf("expected 1 event loaded eagerly, got %d", len(evts))
+	}
+}
