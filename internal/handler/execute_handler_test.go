@@ -1028,6 +1028,24 @@ func TestSyncTask_RejectsNoWorktrees(t *testing.T) {
 	}
 }
 
+func TestSyncTask_InProgressReturnsAlreadySyncing(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/tasks/"+task.ID.String()+"/sync", nil)
+	w := httptest.NewRecorder()
+	h.SyncTask(w, req, task.ID)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for in_progress task, got %d", w.Code)
+	}
+	if body := w.Body.String(); !strings.Contains(body, "already_syncing") {
+		t.Errorf("expected already_syncing in response body, got %s", body)
+	}
+}
+
 func TestSyncTask_WaitingWithWorktrees(t *testing.T) {
 	repo := setupRepo(t)
 	h := newTestHandler(t)

@@ -586,6 +586,10 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		http.Error(w, "task not found", http.StatusNotFound)
 		return
 	}
+	if task.Status == store.TaskStatusInProgress {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "already_syncing"})
+		return
+	}
 	if task.Status != store.TaskStatusWaiting && task.Status != store.TaskStatusFailed {
 		http.Error(w, "only waiting or failed tasks with worktrees can be synced", http.StatusBadRequest)
 		return

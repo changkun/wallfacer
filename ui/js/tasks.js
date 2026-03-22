@@ -656,12 +656,23 @@ async function quickTestTask(id) {
 
 // --- Sync with latest (rebase worktree onto default branch) ---
 
+const _syncInFlight = new Set();
 async function syncTask(id) {
+  if (_syncInFlight.has(id)) return;
+  _syncInFlight.add(id);
+  // Disable all sync buttons for this task while in flight.
+  document.querySelectorAll(`[onclick*="syncTask('${id}')"]`).forEach(function(btn) { btn.disabled = true; });
   try {
-    await api(task(id).sync(), { method: 'POST' });
+    const res = await api(task(id).sync(), { method: 'POST' });
     diffCache.delete(id);
+    if (res.status === 'already_syncing') {
+      showAlert('Sync is already in progress for this task.');
+    }
   } catch (e) {
     showAlert('Error syncing task: ' + e.message);
+  } finally {
+    _syncInFlight.delete(id);
+    document.querySelectorAll(`[onclick*="syncTask('${id}')"]`).forEach(function(btn) { btn.disabled = false; });
   }
 }
 
