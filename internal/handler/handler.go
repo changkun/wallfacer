@@ -150,11 +150,12 @@ type Handler struct {
 	// ideationNextRun is when the pending timer will fire (zero if not scheduled).
 	// ideationTimer is a non-nil pending AfterFunc timer while a delayed run is waiting.
 	// All fields are serialised by ideationMu.
-	ideationMu       sync.Mutex
-	ideationEnabled  bool
-	ideationInterval time.Duration
-	ideationNextRun  time.Time
-	ideationTimer    *time.Timer
+	ideationMu           sync.Mutex
+	ideationEnabled      bool
+	ideationInterval     time.Duration
+	ideationNextRun      time.Time
+	ideationTimer        *time.Timer
+	ideationExploitRatio float64 // 0.0–1.0; default 0.8 (80% exploitation)
 
 	sandboxTestMu     sync.RWMutex
 	sandboxTestPassed map[sandbox.Type]bool
@@ -186,8 +187,9 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		fileIndex:        newFileIndex(),
 		pulls:            newPullTracker(),
 		startTime:        time.Now(),
-		ideationEnabled:  false,
-		ideationInterval: 60 * time.Minute,
+		ideationEnabled:      false,
+		ideationInterval:     60 * time.Minute,
+		ideationExploitRatio: 0.8,
 		reg:              reg,
 		sandboxTestPassed: map[sandbox.Type]bool{
 			sandbox.Claude: false,
@@ -493,6 +495,26 @@ func (h *Handler) IdeationNextRun() time.Time {
 	h.ideationMu.Lock()
 	defer h.ideationMu.Unlock()
 	return h.ideationNextRun
+}
+
+// IdeationExploitRatio returns the exploitation fraction (0.0–1.0).
+func (h *Handler) IdeationExploitRatio() float64 {
+	h.ideationMu.Lock()
+	defer h.ideationMu.Unlock()
+	return h.ideationExploitRatio
+}
+
+// SetIdeationExploitRatio updates the exploitation fraction, clamped to [0,1].
+func (h *Handler) SetIdeationExploitRatio(r float64) {
+	if r < 0 {
+		r = 0
+	}
+	if r > 1 {
+		r = 1
+	}
+	h.ideationMu.Lock()
+	h.ideationExploitRatio = r
+	h.ideationMu.Unlock()
 }
 
 // cancelIdeationTimerLocked stops and clears the pending ideation timer.

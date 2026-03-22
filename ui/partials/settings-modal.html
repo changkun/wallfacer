@@ -116,6 +116,13 @@
             <button onclick="event.preventDefault();triggerIdeation()" class="btn-icon" style="font-size: 12px; padding: 4px 10px;">Run now</button>
           </div>
           <div style="margin-top: 6px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">The brainstorm agent analyses repositories and proposes tasks at the configured interval. Tasks are tagged <em>idea-agent</em>.</div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+            <span style="font-size: 11px; color: var(--text-muted); white-space: nowrap;">Explore</span>
+            <input type="range" id="ideation-exploit-ratio" min="0" max="100" step="5" value="80" onchange="updateIdeationExploitRatio(this.value)" oninput="updateExploitRatioLabel(this.value)" style="flex: 1; accent-color: var(--accent); cursor: pointer;">
+            <span style="font-size: 11px; color: var(--text-muted); white-space: nowrap;">Exploit</span>
+            <span id="ideation-exploit-ratio-label" style="font-size: 11px; color: var(--text-secondary); min-width: 40px; text-align: right;">80/20</span>
+          </div>
+          <div style="margin-top: 4px; font-size: 11px; color: var(--text-muted); line-height: 1.4;">Balance between <b>exploitation</b> (improving existing code) and <b>exploration</b> (new features/directions).</div>
         </div>
 
         <div class="settings-section">

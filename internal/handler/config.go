@@ -131,6 +131,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"ideation":                 h.IdeationEnabled(),
 		"ideation_running":         h.ideationRunning(ctx),
 		"ideation_interval":        int(h.IdeationInterval().Minutes()),
+		"ideation_exploit_ratio":   h.IdeationExploitRatio(),
 		"ideation_categories":      h.runner.IdeationCategories(),
 		"ideation_ignore_patterns": h.runner.IdeationIgnorePatterns(),
 		"default_model":            "",
@@ -205,9 +206,10 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Autosubmit       *bool                   `json:"autosubmit"`
 		Autosync         *bool                   `json:"autosync"`
 		Autopush         *bool                   `json:"autopush"`
-		Ideation         *bool                   `json:"ideation"`
-		IdeationInterval *int                    `json:"ideation_interval"` // minutes; 0 = run immediately on completion
-		WorkspaceGroups  []workspacegroups.Group `json:"workspace_groups"`
+		Ideation             *bool                   `json:"ideation"`
+		IdeationInterval     *int                    `json:"ideation_interval"`      // minutes; 0 = run immediately on completion
+		IdeationExploitRatio *float64                `json:"ideation_exploit_ratio"` // 0.0–1.0; fraction of exploitation ideas
+		WorkspaceGroups      []workspacegroups.Group `json:"workspace_groups"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -244,6 +246,9 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			_ = envconfig.Update(h.envFile, envconfig.Updates{AutoPush: &v})
 		}
 	}
+	if req.IdeationExploitRatio != nil {
+		h.SetIdeationExploitRatio(*req.IdeationExploitRatio)
+	}
 	if req.IdeationInterval != nil {
 		mins := *req.IdeationInterval
 		if mins < 0 {
@@ -270,10 +275,11 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		"autosubmit":          h.AutosubmitEnabled(),
 		"autosync":            h.AutosyncEnabled(),
 		"autopush":            h.AutopushEnabled(),
-		"ideation":            h.IdeationEnabled(),
-		"ideation_running":    h.ideationRunning(r.Context()),
-		"ideation_interval":   int(h.IdeationInterval().Minutes()),
-		"ideation_categories": h.runner.IdeationCategories(),
+		"ideation":              h.IdeationEnabled(),
+		"ideation_running":      h.ideationRunning(r.Context()),
+		"ideation_interval":     int(h.IdeationInterval().Minutes()),
+		"ideation_exploit_ratio": h.IdeationExploitRatio(),
+		"ideation_categories":   h.runner.IdeationCategories(),
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun

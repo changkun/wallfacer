@@ -115,6 +115,18 @@ func (h *IdeationHistory) Append(e HistoryEntry) error {
 	return nil
 }
 
+// Round returns the number of ideation rounds recorded in the history.
+// This counts distinct accepted entries as a proxy for past brainstorm runs.
+func (h *IdeationHistory) Round() int {
+	n := 0
+	for _, e := range h.entries {
+		if e.Reason == "accepted" {
+			n++
+		}
+	}
+	return n
+}
+
 // RejectedTitles returns the titles of all entries within the TTL whose reason
 // is not "accepted". The returned slice is deduplicated by lower-cased title.
 func (h *IdeationHistory) RejectedTitles() []string {

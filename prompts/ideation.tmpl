@@ -37,7 +37,9 @@ The following ideas were previously proposed and rejected. Do NOT re-propose any
 ## Step 1: Generate 6 candidate improvements
 
 Brainstorm 6 candidate improvements covering a wide range of the project. You may propose multiple ideas in the same domain if that's where the real problems are — do NOT force diversity across categories at the expense of impact.
-
+{{if .ExploitRatio}}
+Exploration/Exploitation balance: {{printf "%.0f" (mul .ExploitRatio 100)}}% of your final ideas should be **exploitation** (improving, fixing, or refining existing code, features, and patterns) and {{printf "%.0f" (mul (sub 1.0 .ExploitRatio) 100)}}% should be **exploration** (new features, new directions, experimental approaches, or capabilities the project doesn't have yet). Among your 3 final picks, aim for roughly {{exploitCount .ExploitRatio 3}} exploitation and {{exploreCount .ExploitRatio 3}} exploration idea(s). This is a guideline — if all high-impact ideas fall on one side, quality trumps quota.
+{{end}}
 Example focus areas (use as inspiration — you are NOT limited to these):
 {{range .Categories -}}
   - {{.}}
@@ -66,7 +68,9 @@ For each of the 6 candidates, write one sentence explaining why you would keep o
 
 ## Step 3: Output
 
-Output ONLY a JSON array with exactly 3 objects — your top 3 picks after self-critique. No preamble, no explanation, no markdown — just the JSON array:
+If the workspace contains no source code, no project files, and no meaningful content to analyse, output an empty JSON array: `[]`
+
+Otherwise, Output ONLY a JSON array with exactly 3 objects — your top 3 picks after self-critique. No preamble, no explanation, no markdown — just the JSON array:
 [
   {
     "title": "2-5 word title",

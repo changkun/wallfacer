@@ -5,6 +5,7 @@ let ideation = false;
 let ideationInterval = 0;  // minutes; 0 = run immediately on completion
 let ideationNextRun = null; // ISO timestamp string, or null
 let _ideationRunning = false;
+let ideationExploitRatio = 0.8; // 0.0–1.0; fraction of exploitation ideas
 
 // setIdeationRunning tracks whether a brainstorm task is currently in progress
 // and refreshes the header label accordingly.
@@ -111,6 +112,36 @@ function updateNextRunDisplay() {
   el.style.display = 'inline';
 }
 
+// updateExploitRatioLabel updates the label text while the slider is dragged (oninput).
+function updateExploitRatioLabel(pct) {
+  const label = document.getElementById('ideation-exploit-ratio-label');
+  if (label) label.textContent = `${pct}/${100 - parseInt(pct, 10)}`;
+}
+
+// updateIdeationExploitRatio persists the slider value via PUT /api/config.
+async function updateIdeationExploitRatio(pct) {
+  const ratio = parseInt(pct, 10) / 100;
+  try {
+    const res = await api('/api/config', {
+      method: 'PUT',
+      body: JSON.stringify({ ideation_exploit_ratio: ratio }),
+    });
+    ideationExploitRatio = res.ideation_exploit_ratio != null ? res.ideation_exploit_ratio : 0.8;
+    _syncExploitRatioSlider();
+  } catch (e) {
+    showAlert('Error updating exploit ratio: ' + e.message);
+  }
+}
+
+// _syncExploitRatioSlider updates the slider and label to match state.
+function _syncExploitRatioSlider() {
+  const pct = Math.round(ideationExploitRatio * 100);
+  const slider = document.getElementById('ideation-exploit-ratio');
+  if (slider) slider.value = String(pct);
+  const label = document.getElementById('ideation-exploit-ratio-label');
+  if (label) label.textContent = `${pct}/${100 - pct}`;
+}
+
 // _syncIdeationControls keeps the settings modal and header controls in sync with state.
 function _syncIdeationControls() {
   const toggle = document.getElementById('ideation-toggle');
@@ -119,6 +150,7 @@ function _syncIdeationControls() {
   if (headerToggle) headerToggle.checked = ideation;
   const sel = document.getElementById('ideation-interval');
   if (sel) sel.value = String(ideationInterval);
+  _syncExploitRatioSlider();
 }
 
 // toggleIdeationHeader is called by the header toggle chip.
@@ -148,6 +180,7 @@ function updateIdeationConfig(cfg) {
   ideation = !!cfg.ideation;
   ideationInterval = cfg.ideation_interval != null ? cfg.ideation_interval : 0;
   ideationNextRun = cfg.ideation_next_run || null;
+  ideationExploitRatio = cfg.ideation_exploit_ratio != null ? cfg.ideation_exploit_ratio : 0.8;
 
   _syncIdeationControls();
   updateNextRunDisplay();

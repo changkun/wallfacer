@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -19,7 +20,6 @@ import (
 
 const (
 	maxIdeationIdeas           = 3
-	ideationCandidateCount     = 6
 	defaultIdeationImpactScore = 60
 	maxIdeationChurnSignals     = 6
 	maxIdeationTodoSignals      = 6
@@ -28,6 +28,28 @@ const (
 	churnLookbackDays = 90  // only include commits newer than this many days
 	maxChurnCommits   = 200 // hard cap so very active repos don't scan unboundedly
 )
+
+// exploreScore returns a value in [0, 1] representing how exploratory the
+// ideation agent should be for a given round. Combines a sine wave with a
+// ~6-round cycle with random jitter so that successive brainstorm runs
+// naturally oscillate between exploitation and exploration.
+func exploreScore(round int) float64 {
+	wave := (math.Sin(float64(round)*2*math.Pi/6-math.Pi/2) + 1) / 2
+	jitter := (rand.Float64() - 0.5) * 0.4
+	return max(0, min(1, wave+jitter))
+}
+
+// modulateExploitRatio adjusts the base exploitation ratio using a cyclic
+// explore score. When explore score is high, the effective exploitation ratio
+// is pulled down; when low, it stays near the base. The result is clamped to
+// [0, 1].
+func modulateExploitRatio(baseExploit float64, round int) float64 {
+	es := exploreScore(round)
+	// Blend: shift the base ratio toward exploration proportionally to es.
+	// At es=0 → full base ratio; at es=1 → base ratio shifted down by up to 0.5.
+	effective := baseExploit - es*0.5
+	return max(0, min(1, effective))
+}
 
 type ideationContext struct {
 	FailureSignals     []string
@@ -125,13 +147,17 @@ func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ide
 	}
 
 	var rejectedTitles []string
+	round := 0
 	if r.store != nil {
 		if hist, err := LoadHistory(r.store.DataDir()); err == nil {
 			rejectedTitles = hist.RejectedTitles()
+			round = hist.Round()
 		} else {
 			logger.Runner.Warn("buildIdeationPrompt: load history", "error", err)
 		}
 	}
+
+	effectiveRatio := modulateExploitRatio(r.ideationExploitRatio(), round)
 
 	return r.promptsMgr.Ideation(prompts.IdeationData{
 		ExistingTasks:      tasks,
@@ -142,6 +168,7 @@ func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ide
 		FilteredChurnCount: signals.FilteredChurnCount,
 		FilteredTodoCount:  signals.FilteredTodoCount,
 		RejectedTitles:     rejectedTitles,
+		ExploitRatio:       effectiveRatio,
 	})
 }
 
@@ -251,6 +278,11 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 			rejections = recoveredRejections
 			err = nil
 		} else {
+			// When the agent explains that there is no code to analyse,
+			// surface a clear message instead of the raw JSON-parse error.
+			if looksLikeNoCodebaseOutput(output.Result) {
+				return nil, nil, output, rawStdout, rawStderr, fmt.Errorf("no source code found in workspace — the ideation agent cannot propose improvements for an empty project")
+			}
 			return nil, nil, output, rawStdout, rawStderr, fmt.Errorf("extract ideas: %w (result: %s)", err, truncate(output.Result, 300))
 		}
 	}

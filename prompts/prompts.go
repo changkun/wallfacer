@@ -13,6 +13,7 @@ import (
 	"embed"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -43,6 +44,22 @@ func init() {
 func templateFuncMap() template.FuncMap {
 	return template.FuncMap{
 		"add": func(a, b int) int { return a + b },
+		"mul": func(a, b float64) float64 { return a * b },
+		"sub": func(a, b float64) float64 { return a - b },
+		"exploitCount": func(ratio float64, total int) int {
+			n := int(math.Round(ratio * float64(total)))
+			if n > total {
+				n = total
+			}
+			return n
+		},
+		"exploreCount": func(ratio float64, total int) int {
+			n := int(math.Round(ratio * float64(total)))
+			if n > total {
+				n = total
+			}
+			return total - n
+		},
 	}
 }
 
@@ -352,6 +369,11 @@ type IdeationData struct {
 	FilteredTodoCount int
 
 	RejectedTitles []string // previously proposed but rejected idea titles (within TTL)
+
+	// ExploitRatio is the fraction (0.0–1.0) of ideas that should be
+	// exploitation-style (improve existing code) vs exploration-style (new
+	// features / new directions). Default 0.8 means 80% exploitation.
+	ExploitRatio float64
 }
 
 // CommitData holds template variables for the commit message prompt.

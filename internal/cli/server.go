@@ -149,6 +149,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		}
 	})
 	r.SetAutosubmitFunc(h.AutosubmitEnabled)
+	r.SetIdeationExploitRatioFunc(h.IdeationExploitRatio)
 
 	// Start the auto-promoter: watches for state changes and promotes
 	// backlog tasks to in_progress when capacity is available.

@@ -370,6 +370,60 @@ func TestExtractIdeas_InCodeBlock(t *testing.T) {
 	}
 }
 
+func TestExtractIdeas_EmptyJSONArray(t *testing.T) {
+	// An empty JSON array is a valid response when the workspace has no code.
+	ideas, rejections, err := extractIdeas("[]")
+	if err != nil {
+		t.Fatalf("extractIdeas([]) should not error, got: %v", err)
+	}
+	if len(ideas) != 0 {
+		t.Errorf("expected 0 ideas, got %d", len(ideas))
+	}
+	if len(rejections) != 0 {
+		t.Errorf("expected 0 rejections, got %d", len(rejections))
+	}
+}
+
+func TestExtractIdeas_EmptyJSONArrayInProse(t *testing.T) {
+	input := "There is no source code to analyse.\n\n[]"
+	ideas, _, err := extractIdeas(input)
+	if err != nil {
+		t.Fatalf("extractIdeas with prose + [] should not error, got: %v", err)
+	}
+	if len(ideas) != 0 {
+		t.Errorf("expected 0 ideas, got %d", len(ideas))
+	}
+}
+
+// --- looksLikeNoCodebaseOutput tests ---
+
+func TestLooksLikeNoCodebaseOutput_Positive(t *testing.T) {
+	cases := []string{
+		"there is no codebase to analyze",
+		"The workspace contains no source code or project files.",
+		"This is an empty project with nothing to review.",
+		"Cannot produce recommendations — no project files found.",
+	}
+	for _, c := range cases {
+		if !looksLikeNoCodebaseOutput(c) {
+			t.Errorf("expected true for: %q", c)
+		}
+	}
+}
+
+func TestLooksLikeNoCodebaseOutput_Negative(t *testing.T) {
+	cases := []string{
+		`[{"title":"Fix auth","prompt":"Fix the auth bug","impact_score":80}]`,
+		"Here are my top 3 improvement ideas for the codebase.",
+		"",
+	}
+	for _, c := range cases {
+		if looksLikeNoCodebaseOutput(c) {
+			t.Errorf("expected false for: %q", c)
+		}
+	}
+}
+
 // --- countIdeaRejections tests ---
 
 func TestCountIdeaRejections_Empty(t *testing.T) {

@@ -271,6 +271,11 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 		valid = valid[:maxIdeationIdeas]
 	}
 	if len(valid) == 0 {
+		if len(results) == 0 {
+			// The agent returned an empty JSON array — legitimate when
+			// the workspace has no source code to analyse.
+			return nil, rejections, nil
+		}
 		return nil, rejections, fmt.Errorf("no valid ideas in parsed output (all entries were malformed or had prompt equal to title)")
 	}
 	return valid, rejections, nil
@@ -351,6 +356,27 @@ func findJSONCodeBlock(text string) []string {
 		}
 		offset = contentStart + end + 3
 	}
+}
+
+// looksLikeNoCodebaseOutput returns true when the agent's result text
+// indicates there is no source code in the workspace to analyse.
+func looksLikeNoCodebaseOutput(result string) bool {
+	lower := strings.ToLower(result)
+	markers := []string{
+		"no codebase",
+		"no source code",
+		"empty project",
+		"no project files",
+		"cannot produce",
+		"there is no codebase to analyze",
+		"there is no codebase to analyse",
+	}
+	for _, m := range markers {
+		if strings.Contains(lower, m) {
+			return true
+		}
+	}
+	return false
 }
 
 func extractIdeasFromRunOutput(result string, rawStdout, rawStderr []byte) ([]IdeateResult, []ideaRejection, error) {

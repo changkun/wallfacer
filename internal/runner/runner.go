@@ -326,7 +326,8 @@ type Runner struct {
 	backgroundWg     trackedWg          // tracks fire-and-forget background goroutines
 	stopReasonMu     sync.RWMutex
 	onStopReason     func(taskID uuid.UUID, stopReason string)
-	autosubmitFn     func() bool // returns true when auto-submit is enabled
+	autosubmitFn            func() bool    // returns true when auto-submit is enabled
+	ideationExploitRatioFn  func() float64 // returns the current exploitation ratio (0–1)
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
 	// when no task has changed since the last generation.
@@ -426,6 +427,19 @@ func (r *Runner) isAutosubmitEnabled() bool {
 		return true // default to auto-create for backward compatibility
 	}
 	return r.autosubmitFn()
+}
+
+// SetIdeationExploitRatioFunc registers a callback that returns the current
+// exploitation ratio (0–1) for the ideation prompt. Default is 0.8.
+func (r *Runner) SetIdeationExploitRatioFunc(fn func() float64) {
+	r.ideationExploitRatioFn = fn
+}
+
+func (r *Runner) ideationExploitRatio() float64 {
+	if r.ideationExploitRatioFn == nil {
+		return 0.8
+	}
+	return r.ideationExploitRatioFn()
 }
 
 // Shutdown waits for all tracked background goroutines to complete before
