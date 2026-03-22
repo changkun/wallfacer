@@ -124,7 +124,7 @@ func TestContainerArgsMountsCLAUDEMD(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, instructionsFile)
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md,z,readonly"
+	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("args should contain --mount %q; got: %v", expectedMount, args)
 	}
@@ -207,14 +207,14 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md,z,readonly"
+	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("single workspace: CLAUDE.md should be mounted at /workspace/CLAUDE.md; got args: %v", args)
 	}
 
 	// Must NOT be mounted inside the workspace subdirectory.
 	basename := filepath.Base(ws)
-	wrongMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/" + basename + "/CLAUDE.md,z,readonly"
+	wrongMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/" + basename + "/CLAUDE.md," + expectedBuildROSuffix()
 	if containsConsecutive(args, "--mount", wrongMount) {
 		t.Fatalf("single workspace: CLAUDE.md should NOT be at /workspace/%s/CLAUDE.md", basename)
 	}
@@ -246,7 +246,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md,z,readonly"
+	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("multi workspace: CLAUDE.md should be at /workspace/CLAUDE.md; got args: %v", args)
 	}
@@ -263,7 +263,7 @@ func TestContainerArgsCodexMountsAGENTSMD(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, instructionsFile)
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
 
-	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/AGENTS.md,z,readonly"
+	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/AGENTS.md," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("codex sandbox: AGENTS.md should be mounted at /workspace/AGENTS.md; got args: %v", args)
 	}
@@ -294,7 +294,7 @@ func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
 	})
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
 
-	expectedMount := "type=bind,src=" + codexAuthDir + ",dst=/home/codex/.codex,z,readonly"
+	expectedMount := "type=bind,src=" + codexAuthDir + ",dst=/home/codex/.codex," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("codex sandbox: expected host codex auth cache mount %q; got args: %v", expectedMount, args)
 	}
@@ -427,7 +427,7 @@ func TestBuildContainerArgs_BoardMount(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, "")
 	boardDir := t.TempDir()
 	args := runner.buildContainerArgs("name", "", "prompt", "", nil, boardDir, nil, "")
-	expected := "type=bind,src=" + boardDir + ",dst=/workspace/.tasks,z,readonly"
+	expected := "type=bind,src=" + boardDir + ",dst=/workspace/.tasks," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expected) {
 		t.Fatalf("expected board mount %q in args; got: %v", expected, args)
 	}
@@ -454,7 +454,7 @@ func TestBuildContainerArgs_SiblingMounts(t *testing.T) {
 		"abcd1234": {"/home/user/myrepo": siblingDir},
 	}
 	args := runner.buildContainerArgs("name", "", "prompt", "", nil, "", siblingMounts, "")
-	expected := "type=bind,src=" + siblingDir + ",dst=/workspace/.tasks/worktrees/abcd1234/myrepo,z,readonly"
+	expected := "type=bind,src=" + siblingDir + ",dst=/workspace/.tasks/worktrees/abcd1234/myrepo," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expected) {
 		t.Fatalf("expected sibling mount %q in args; got: %v", expected, args)
 	}

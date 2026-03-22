@@ -575,12 +575,19 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 	})
 	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{ws: wt}, "", nil, "")
 	basename := filepath.Base(ws)
-	expectedMount := "type=bind,src=" + wt + ",dst=/workspace/" + basename + ",z"
+	zOpt := mountOpts("z")
+	expectedMount := "type=bind,src=" + wt + ",dst=/workspace/" + basename
+	if zOpt != "" {
+		expectedMount += "," + zOpt
+	}
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("expected worktree override mount %q; got: %v", expectedMount, args)
 	}
 	// Original workspace path must NOT appear as the host path.
-	unexpectedMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename + ",z"
+	unexpectedMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename
+	if zOpt != "" {
+		unexpectedMount += "," + zOpt
+	}
 	if containsConsecutive(args, "--mount", unexpectedMount) {
 		t.Fatalf("original workspace path should be replaced by worktree, but found %q", unexpectedMount)
 	}
@@ -611,7 +618,10 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 
 	// The main repo's .git should be mounted at the same host path.
 	gitDir := filepath.Join(repo, ".git")
-	expectedGitMount := "type=bind,src=" + gitDir + ",dst=" + gitDir + ",z"
+	expectedGitMount := "type=bind,src=" + gitDir + ",dst=" + gitDir
+	if z := mountOpts("z"); z != "" {
+		expectedGitMount += "," + z
+	}
 	if !containsConsecutive(args, "--mount", expectedGitMount) {
 		t.Fatalf("expected .git dir mount %q; got: %v", expectedGitMount, args)
 	}
@@ -638,7 +648,10 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
 
 	gitDir := filepath.Join(repo, ".git")
-	gitMount := "type=bind,src=" + gitDir + ",dst=" + gitDir + ",z"
+	gitMount := "type=bind,src=" + gitDir + ",dst=" + gitDir
+	if z := mountOpts("z"); z != "" {
+		gitMount += "," + z
+	}
 	if containsConsecutive(args, "--mount", gitMount) {
 		t.Fatalf("should NOT mount .git dir separately when no worktree override; found %q", gitMount)
 	}

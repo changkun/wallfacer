@@ -137,7 +137,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      ws,
 				Container: "/workspace/" + basename,
-				Options:   "z,ro",
+				Options:   mountOpts("z", "ro"),
 			})
 		}
 	}
@@ -147,7 +147,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      r.instructionsPath,
 				Container: "/workspace/" + instructionsFilenameForSandbox(sb),
-				Options:   "z,ro",
+				Options:   mountOpts("z", "ro"),
 			})
 		}
 	}

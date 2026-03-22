@@ -116,31 +116,53 @@ func detectContainerRuntime() string {
 		return override
 	}
 
-	// Preferred: explicit podman installation.
-	if _, err := os.Stat("/opt/podman/bin/podman"); err == nil {
-		return "/opt/podman/bin/podman"
+	// Unix: preferred explicit podman installation.
+	if runtime.GOOS != "windows" {
+		if _, err := os.Stat("/opt/podman/bin/podman"); err == nil {
+			return "/opt/podman/bin/podman"
+		}
 	}
-	// Fallback: podman on $PATH.
+	// Windows: check common install locations.
+	if runtime.GOOS == "windows" {
+		for _, candidate := range []string{
+			filepath.Join(os.Getenv("ProgramFiles"), "RedHat", "Podman", "podman.exe"),
+		} {
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate
+			}
+		}
+	}
+	// Cross-platform: podman on $PATH.
 	if p, err := exec.LookPath("podman"); err == nil {
 		return p
 	}
-	// Fallback: docker on $PATH.
+	// Cross-platform: docker on $PATH.
 	if p, err := exec.LookPath("docker"); err == nil {
 		return p
 	}
-	// Nothing found; return the traditional default so the error message is clear.
+	// Nothing found; return a platform-appropriate default.
+	if runtime.GOOS == "windows" {
+		return "podman.exe"
+	}
 	return "/opt/podman/bin/podman"
 }
 
+// isWSL reports whether the process is running inside Windows Subsystem for Linux.
+func isWSL() bool {
+	return os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != ""
+}
+
 func openBrowser(url string) {
-	var cmd string
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = "open"
+		_ = exec.Command("open", url).Start()
+	case "windows":
+		_ = exec.Command("cmd", "/c", "start", url).Start()
 	case "linux":
-		cmd = "xdg-open"
-	default:
-		return
+		if isWSL() {
+			_ = exec.Command("cmd.exe", "/c", "start", url).Start()
+		} else {
+			_ = exec.Command("xdg-open", url).Start()
+		}
 	}
-	_ = exec.Command(cmd, url).Start()
 }

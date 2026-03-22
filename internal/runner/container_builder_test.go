@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -106,7 +107,7 @@ func TestBuildBaseContainerSpec(t *testing.T) {
 				{"-v", "claude-config:/home/claude/.claude"},
 				{"-e", "CLAUDE_CODE_MODEL=codex-model"},
 			},
-			wantArgs: []string{"wallfacer-codex:latest", "dst=/home/codex/.codex,z,readonly"},
+			wantArgs: []string{"wallfacer-codex:latest", "dst=/home/codex/.codex," + expectedBuildROSuffix()},
 		},
 		{
 			name:    "codex sandbox, auth path does not exist",
@@ -313,7 +314,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				}
 			},
 			sandbox:  "claude",
-			wantArgs: []string{"dst=/workspace/CLAUDE.md,z,readonly"},
+			wantArgs: []string{"dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()},
 		},
 		{
 			name: "instructions file mounted as AGENTS.md for codex",
@@ -329,7 +330,7 @@ func TestBuildIdeationContainerArgs(t *testing.T) {
 				}
 			},
 			sandbox:  "codex",
-			wantArgs: []string{"dst=/workspace/AGENTS.md,z,readonly"},
+			wantArgs: []string{"dst=/workspace/AGENTS.md," + expectedBuildROSuffix()},
 		},
 		{
 			name: "instructions file absent: no instructions mount",
@@ -417,7 +418,7 @@ func TestBuildIdeationContainerArgsSingleWorkspaceReadOnly(t *testing.T) {
 	args := r.buildIdeationContainerArgs("ideate-test", "prompt", "claude")
 
 	// The workspace mount must be read-only.
-	wantMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename + ",z,readonly"
+	wantMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename + "," + expectedBuildROSuffix()
 	if !argsContainSubstring(args, wantMount) {
 		t.Errorf("expected read-only mount %q; args: %v", wantMount, args)
 	}
@@ -428,11 +429,12 @@ func TestBuildIdeationContainerArgsSingleWorkspaceReadOnly(t *testing.T) {
 		t.Errorf("expected -w %q; args: %v", wantWorkdir, args)
 	}
 
-	// No plain ,z mount (read-write) for the workspace.
-	rwMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename + ",z"
+	// No plain read-write mount for the workspace (must be read-only).
+	rwSuffix := "dst=/workspace/" + basename
+	roSuffix := rwSuffix + "," + expectedBuildROSuffix()
 	for _, a := range args {
-		if a == rwMount {
-			t.Errorf("workspace should not be mounted read-write; found %q in args: %v", rwMount, args)
+		if strings.Contains(a, rwSuffix) && !strings.Contains(a, roSuffix) {
+			t.Errorf("workspace should not be mounted read-write; found %q in args: %v", a, args)
 		}
 	}
 }
@@ -625,7 +627,7 @@ func TestAppendInstructionsMount(t *testing.T) {
 				return RunnerConfig{Command: "podman", SandboxImage: "img", InstructionsPath: p}
 			},
 			sandbox:         "claude",
-			wantMountSuffix: "/workspace/CLAUDE.md:z,ro",
+			wantMountSuffix: "/workspace/CLAUDE.md:" + expectedMountOpts("z", "ro"),
 		},
 		{
 			name: "codex sandbox: mounts as AGENTS.md",
@@ -637,7 +639,7 @@ func TestAppendInstructionsMount(t *testing.T) {
 				return RunnerConfig{Command: "podman", SandboxImage: "img", InstructionsPath: p}
 			},
 			sandbox:         "codex",
-			wantMountSuffix: "/workspace/AGENTS.md:z,ro",
+			wantMountSuffix: "/workspace/AGENTS.md:" + expectedMountOpts("z", "ro"),
 		},
 		{
 			name: "missing file: no mount added",
@@ -680,8 +682,8 @@ func TestAppendInstructionsMount(t *testing.T) {
 			if !strings.Contains(mountStr, tc.wantMountSuffix) {
 				t.Errorf("expected mount containing %q; got %q", tc.wantMountSuffix, mountStr)
 			}
-			if added.Options != "z,ro" {
-				t.Errorf("instructions mount must be read-only (z,ro); got %q", added.Options)
+			if added.Options != expectedMountOpts("z", "ro") {
+				t.Errorf("instructions mount must be read-only (%q); got %q", expectedMountOpts("z", "ro"), added.Options)
 			}
 		})
 	}
@@ -705,8 +707,8 @@ func TestAppendInstructionsMountReadOnly(t *testing.T) {
 			if len(result) != 1 {
 				t.Fatalf("expected 1 mount; got %d", len(result))
 			}
-			if result[0].Options != "z,ro" {
-				t.Errorf("expected Options=z,ro; got %q", result[0].Options)
+			if result[0].Options != expectedMountOpts("z", "ro") {
+				t.Errorf("expected Options=%q; got %q", expectedMountOpts("z", "ro"), result[0].Options)
 			}
 		})
 	}
@@ -1104,4 +1106,21 @@ func TestExecutorRunArgsCodexSandbox(t *testing.T) {
 	if !argsContainSubstring(calls[0].Args, "wallfacer-codex") {
 		t.Errorf("expected wallfacer-codex image in args; args: %v", calls[0].Args)
 	}
+}
+
+// expectedBuildROSuffix returns the suffix that Build() generates for a
+// read-only mount with SELinux relabeling. On Linux it is "z,readonly";
+// on other platforms mountOpts strips "z", producing just "readonly".
+func expectedBuildROSuffix() string {
+	if runtime.GOOS == "linux" {
+		return "z,readonly"
+	}
+	return "readonly"
+}
+
+// expectedMountOpts returns the expected Options string for a volume mount
+// created with mountOpts(opts...). On Linux "z" is preserved; on other
+// platforms it is stripped.
+func expectedMountOpts(opts ...string) string {
+	return mountOpts(opts...)
 }

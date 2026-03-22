@@ -283,7 +283,7 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt string, sb san
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      ws,
 				Container: "/workspace/" + basename,
-				Options:   "z,ro",
+				Options:   mountOpts("z", "ro"),
 			})
 		}
 	}

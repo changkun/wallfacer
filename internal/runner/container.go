@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -16,6 +17,21 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
+
+// mountOpts returns volume mount options appropriate for the host OS.
+// The "z" SELinux relabeling option is only included on Linux.
+func mountOpts(opts ...string) string {
+	if runtime.GOOS != "linux" {
+		filtered := make([]string, 0, len(opts))
+		for _, o := range opts {
+			if o != "z" {
+				filtered = append(filtered, o)
+			}
+		}
+		return strings.Join(filtered, ",")
+	}
+	return strings.Join(opts, ",")
+}
 
 // agentUsage mirrors the token-usage object in the agent's JSON output.
 type agentUsage struct {
@@ -114,7 +130,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      hostPath,
 				Container: "/workspace/" + basename,
-				Options:   "z",
+				Options:   mountOpts("z"),
 			})
 
 			// Git worktrees have a .git file (not directory) that references
@@ -127,7 +143,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 					spec.Volumes = append(spec.Volumes, VolumeMount{
 						Host:      gitDir,
 						Container: gitDir,
-						Options:   "z",
+						Options:   mountOpts("z"),
 					})
 				}
 			}
@@ -144,7 +160,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 		spec.Volumes = append(spec.Volumes, VolumeMount{
 			Host:      boardDir,
 			Container: "/workspace/.tasks",
-			Options:   "z,ro",
+			Options:   mountOpts("z", "ro"),
 		})
 	}
 
@@ -169,7 +185,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 			spec.Volumes = append(spec.Volumes, VolumeMount{
 				Host:      wtPath,
 				Container: containerPath,
-				Options:   "z,ro",
+				Options:   mountOpts("z", "ro"),
 			})
 		}
 	}
@@ -210,7 +226,7 @@ func (r *Runner) appendInstructionsMount(volumes []VolumeMount, sb sandbox.Type)
 	return append(volumes, VolumeMount{
 		Host:      r.instructionsPath,
 		Container: "/workspace/" + instructionsFilenameForSandbox(sb),
-		Options:   "z,ro",
+		Options:   mountOpts("z", "ro"),
 	})
 }
 
@@ -244,7 +260,7 @@ func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sb sandbox.Type) []
 		volumes = append(volumes, VolumeMount{
 			Host:      hostPath,
 			Container: "/home/codex/.codex",
-			Options:   "z,ro",
+			Options:   mountOpts("z", "ro"),
 		})
 	}
 	return volumes

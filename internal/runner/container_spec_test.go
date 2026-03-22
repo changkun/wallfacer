@@ -2,6 +2,7 @@ package runner
 
 import (
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -356,4 +357,36 @@ func TestContainerSpecFullArgs(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Build() mismatch:\ngot:  %v\nwant: %v", got, want)
 	}
+}
+
+func TestMountOptsOnCurrentOS(t *testing.T) {
+	// On Linux, "z" should be preserved. On other platforms, it should be stripped.
+	isLinux := runtime.GOOS == "linux"
+
+	tests := []struct {
+		name string
+		opts []string
+		want string
+	}{
+		{"z only", []string{"z"}, ternary(isLinux, "z", "")},
+		{"z and ro", []string{"z", "ro"}, ternary(isLinux, "z,ro", "ro")},
+		{"ro only", []string{"ro"}, "ro"},
+		{"empty", nil, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mountOpts(tt.opts...)
+			if got != tt.want {
+				t.Errorf("mountOpts(%v) = %q, want %q", tt.opts, got, tt.want)
+			}
+		})
+	}
+}
+
+func ternary(cond bool, a, b string) string {
+	if cond {
+		return a
+	}
+	return b
 }

@@ -616,6 +616,8 @@ func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
 	switch runtime.GOOS {
 	case "darwin":
 		cmd = exec.CommandContext(r.Context(), "open", req.Path)
+	case "windows":
+		cmd = exec.CommandContext(r.Context(), "explorer", req.Path)
 	default:
 		cmd = exec.CommandContext(r.Context(), "xdg-open", req.Path)
 	}
