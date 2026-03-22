@@ -333,7 +333,7 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 
 	// Serve from cache when available.
 	if entry, ok := h.diffCache.get(id); ok {
-		cacheControl := "max-age=10"
+		cacheControl := "no-cache"
 		if entry.immutable {
 			cacheControl = "immutable"
 		}
@@ -471,7 +471,12 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		h.diffCache.set(id, entry)
 	}
 
-	cacheControl := "max-age=10"
+	// Terminal tasks are immutable — browsers can cache forever. Active
+	// tasks use no-cache so the browser always revalidates via ETag; the
+	// server's in-memory diffCache handles repeat-request efficiency.
+	// Using max-age for active tasks would let the browser serve stale
+	// behind_counts after sync completes.
+	cacheControl := "no-cache"
 	if immutable {
 		cacheControl = "immutable"
 	}
