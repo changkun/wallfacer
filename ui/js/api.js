@@ -294,6 +294,16 @@ function restartActiveStreams() {
   }
 }
 
+// --- Visibility change fallback ---
+// When the tab returns to the foreground, fetch the latest task list so that
+// any SSE events missed while the tab was hidden (or due to a stale
+// connection) are picked up immediately.
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && activeWorkspaces && activeWorkspaces.length > 0) {
+    fetchTasks();
+  }
+});
+
 /**
  * Fetches the current non-archived task list from the server.
  * @returns {Promise<Array.<Task>>}

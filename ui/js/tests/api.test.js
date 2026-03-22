@@ -425,3 +425,61 @@ describe('toggleShowArchived', () => {
     expect(remaining).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// visibilitychange — re-fetches tasks when tab becomes visible
+// ---------------------------------------------------------------------------
+
+describe('visibilitychange handler', () => {
+  it('calls fetchTasks when the tab becomes visible and workspaces are active', () => {
+    const apiFn = vi.fn().mockResolvedValue([]);
+    const handlers = {};
+    const ctx = makeContext({
+      api: apiFn,
+      document: {
+        getElementById: () => null,
+        querySelectorAll: () => [],
+        querySelector: () => null,
+        addEventListener: (event, handler) => { handlers[event] = handler; },
+        documentElement: { setAttribute: () => {} },
+        readyState: 'complete',
+        visibilityState: 'visible',
+      },
+    });
+    loadApiCoreStack(ctx);
+
+    // Set active workspaces so the handler fires
+    vm.runInContext('activeWorkspaces = ["/ws"]', ctx);
+
+    // Simulate visibility change
+    expect(handlers.visibilitychange).toBeDefined();
+    handlers.visibilitychange();
+
+    expect(apiFn).toHaveBeenCalledWith('/api/tasks');
+  });
+
+  it('does not fetch when no workspaces are active', () => {
+    const apiFn = vi.fn().mockResolvedValue([]);
+    const handlers = {};
+    const ctx = makeContext({
+      api: apiFn,
+      document: {
+        getElementById: () => null,
+        querySelectorAll: () => [],
+        querySelector: () => null,
+        addEventListener: (event, handler) => { handlers[event] = handler; },
+        documentElement: { setAttribute: () => {} },
+        readyState: 'complete',
+        visibilityState: 'visible',
+      },
+    });
+    loadApiCoreStack(ctx);
+
+    // No active workspaces
+    vm.runInContext('activeWorkspaces = []', ctx);
+
+    handlers.visibilitychange();
+
+    expect(apiFn).not.toHaveBeenCalled();
+  });
+});
