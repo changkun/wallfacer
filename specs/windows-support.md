@@ -1,410 +1,142 @@
 # Windows Support
 
-**Date:** 2026-03-22
+**Date:** 2026-03-22 (revised)
 
 ## Problem
 
-Windows users cannot use Wallfacer today. The Go server fails to compile due to
-`syscall.SIGTERM` and `syscall.Exec()` usage, and even if patched to compile,
-multiple runtime paths assume Unix conventions (hardcoded `/opt/podman/bin/podman`,
-SELinux `,z` mount options, `xdg-open` for browser/file-manager launch). A Windows
-user who downloads the source and runs `go build` gets a build failure immediately.
+Windows users should be able to use Wallfacer. The primary supported path is
+running inside WSL2, which provides a full Linux environment. Native Windows
+support (running the Go server directly on the Windows host) is a future goal
+that depends on Claude Code having a Windows-compatible story.
 
-This spec covers the full Windows user experience — from installation through daily
-use. It does NOT re-analyze containerization backends; see
-`specs/native-containerization-windows.md` for that analysis. This spec focuses on:
-what changes are needed so a Windows user can `go build`, start the server, and
-run tasks.
+This spec covers both tiers and tracks what has been done and what remains.
+For containerization backend analysis, see `specs/native-containerization-windows.md`.
 
-## Scope
+## Support Tiers
 
-Two support tiers, implemented in order:
-
-| Tier | Description | Target user |
-|------|-------------|-------------|
-| **Tier 1: WSL2** | Run Wallfacer inside WSL2 with minimal code changes | Any Windows 10 2004+ / Windows 11 user |
-| **Tier 2: Native Windows** | Run the Go server on Windows host, containers via Docker Desktop or Podman Desktop | Power users; depends on Claude Code having Windows or WSL2-bridged support |
-
-Tier 1 is the recommended shipping path. Tier 2 is a future option documented here
-for completeness.
-
-## Current State: What Works and What Breaks
-
-### Already cross-platform (no changes needed)
-
-- Home directory: `os.UserHomeDir()`
-- Workspace path parsing: `filepath.SplitList()` + `os.PathListSeparator`
-- Path construction: `filepath.Join()` throughout
-- Git operations: `exec.Command("git", ...)`
-- Container termination: via runtime CLI (`podman kill`), not OS signals
-- Temp files: `os.MkdirTemp()`
-- Atomic writes: temp file + rename
-- Data storage: all relative to `~/.wallfacer/`
-
-### Compilation blockers (CRITICAL — build fails on Windows)
-
-| # | File | Line(s) | Issue |
-|---|------|---------|-------|
-| 1 | `internal/cli/server.go` | 137 | `syscall.SIGTERM` — not defined on Windows |
-| 2 | `internal/cli/exec.go` | 93, 100 | `syscall.Exec()` — Unix-only; does not exist on Windows |
-
-### Runtime failures (HIGH — server starts but features break)
-
-| # | File | Line(s) | Issue |
-|---|------|---------|-------|
-| 3 | `internal/cli/cli.go` | 135–146 | `openBrowser()` — `default: return` silently does nothing on Windows |
-| 4 | `internal/cli/cli.go` | 114–133 | `detectContainerRuntime()` — probes `/opt/podman/bin/podman`; no Windows paths |
-| 5 | `internal/runner/container.go` | 117, 130, 147, 172, 213, 247 | `Options: "z"` and `"z,ro"` — SELinux flag meaningless on non-Linux; may be rejected by Docker Desktop on Windows |
-| 5b | `internal/runner/refine.go` | 140, 150 | Same SELinux `"z,ro"` issue |
-| 5c | `internal/runner/ideate.go` | 286 | Same SELinux `"z,ro"` issue |
-| 6 | `internal/handler/git.go` | 616–621 | `openFolder()` — uses `xdg-open` for all non-macOS; should use `explorer.exe` on Windows |
-
-### Build system (MEDIUM — users cannot `make build`)
-
-| # | File | Issue |
-|---|------|-------|
-| 7 | `Makefile` | `SHELL := /bin/bash`, hardcoded `/opt/podman/bin/podman`, bash-only scripts |
-
-Items 8–9 below are NOT bugs: sandbox containers always run Linux regardless of
-host OS. The Dockerfiles and entrypoint scripts do not need Windows variants.
-
-| # | File | Note |
-|---|------|------|
-| 8 | `sandbox/claude/Dockerfile` | Ubuntu-based; Linux-only — **correct by design** |
-| 9 | `sandbox/*/entrypoint.sh` | Bash-only — **correct by design** (runs inside Linux container) |
+| Tier | Description | Target user | Status |
+|------|-------------|-------------|--------|
+| **Tier 1: WSL2** | Run Wallfacer inside WSL2 | Any Windows 10 2004+ / Windows 11 user | **Complete** |
+| **Tier 2: Native Windows** | Run the Go server on Windows host | Power users; depends on Claude Code Windows support | Future |
 
 ---
 
-## Tier 1: WSL2 Support
+## Tier 1: WSL2 Support — Complete
 
-### Goal
+All code changes, CI, and documentation for WSL2 support have been implemented.
 
-A Windows user can follow a documented path to run Wallfacer inside WSL2 with the
-same experience as a native Linux user, including browser launch from WSL2 into
-the Windows host browser.
+### Completed Changes
 
-### Required Code Changes
-
-All six changes below are small and isolated. They benefit both Tier 1 and Tier 2.
-
-#### Change 1: Signal handling — `server.go`
-
-**Current (line 137):**
-```go
-ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
-```
-
-**Problem:** `syscall.SIGTERM` does not exist on Windows. `os.Interrupt` works
-everywhere (maps to `SIGINT` on Unix and `Ctrl+C` on Windows).
-
-**Fix:** Use build tags to select the signal set.
-
-Create `internal/cli/signal_unix.go`:
-```go
-//go:build !windows
-
-package cli
-
-import (
-    "os"
-    "syscall"
-)
-
-var shutdownSignals = []os.Signal{syscall.SIGTERM, os.Interrupt}
-```
-
-Create `internal/cli/signal_windows.go`:
-```go
-//go:build windows
-
-package cli
-
-import "os"
-
-var shutdownSignals = []os.Signal{os.Interrupt}
-```
-
-Update `server.go` line 137:
-```go
-ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
-```
-
-#### Change 2: Replace `syscall.Exec` — `exec.go`
-
-**Current (lines 93, 100):** `syscall.Exec(runtimePath, execArgs, os.Environ())`
-replaces the current process with the container exec for PTY inheritance.
-
-**Problem:** `syscall.Exec` (execve) does not exist on Windows.
-
-**Fix:** Use build tags. On Windows, fall back to `exec.Command` with
-stdin/stdout/stderr forwarding and exit code propagation.
-
-Create `internal/cli/execve_unix.go`:
-```go
-//go:build !windows
-
-package cli
-
-import (
-    "os"
-    "syscall"
-)
-
-func execReplace(binary string, args []string) error {
-    return syscall.Exec(binary, args, os.Environ())
-}
-```
-
-Create `internal/cli/execve_windows.go`:
-```go
-//go:build windows
-
-package cli
-
-import (
-    "os"
-    "os/exec"
-)
-
-func execReplace(binary string, args []string) error {
-    cmd := exec.Command(binary, args[1:]...)
-    cmd.Stdin = os.Stdin
-    cmd.Stdout = os.Stdout
-    cmd.Stderr = os.Stderr
-    if err := cmd.Run(); err != nil {
-        if exitErr, ok := err.(*exec.ExitError); ok {
-            os.Exit(exitErr.ExitCode())
-        }
-        return err
-    }
-    os.Exit(0)
-    return nil // unreachable
-}
-```
-
-Update `exec.go` to call `execReplace(runtimePath, execArgs)` instead of the
-direct `syscall.Exec(...)` calls. Remove the `"syscall"` import from `exec.go`.
-
-**Trade-off:** On Windows, `wallfacer exec` creates a child process rather than
-replacing itself. PTY resize signals will not propagate automatically. This is
-acceptable: Tier 1 WSL2 users run the Linux binary so they get real execve.
-
-#### Change 3: Browser launch + WSL2 detection — `cli.go`
-
-**Current (lines 135–146):**
-```go
-func openBrowser(url string) {
-    switch runtime.GOOS {
-    case "darwin": cmd = "open"
-    case "linux":  cmd = "xdg-open"
-    default:       return  // silently does nothing on Windows
-    }
-}
-```
-
-**Fix:** Add Windows case and WSL2 detection:
-```go
-func isWSL() bool {
-    return os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != ""
-}
-
-func openBrowser(url string) {
-    switch runtime.GOOS {
-    case "darwin":
-        exec.Command("open", url).Start()
-    case "windows":
-        exec.Command("cmd", "/c", "start", url).Start()
-    case "linux":
-        if isWSL() {
-            exec.Command("cmd.exe", "/c", "start", url).Start()
-        } else {
-            exec.Command("xdg-open", url).Start()
-        }
-    }
-}
-```
-
-#### Change 4: Container runtime detection — `cli.go`
-
-**Current (lines 114–133):** Checks `/opt/podman/bin/podman` then
-`LookPath("podman")` then `LookPath("docker")`.
-
-**Fix:** Skip the Unix-only path on Windows; add Windows-specific install
-locations:
-```go
-func detectContainerRuntime() string {
-    if override := strings.TrimSpace(os.Getenv("CONTAINER_CMD")); override != "" {
-        return override
-    }
-    // Unix: preferred explicit podman installation.
-    if runtime.GOOS != "windows" {
-        if _, err := os.Stat("/opt/podman/bin/podman"); err == nil {
-            return "/opt/podman/bin/podman"
-        }
-    }
-    // Windows: check common install locations.
-    if runtime.GOOS == "windows" {
-        for _, candidate := range []string{
-            filepath.Join(os.Getenv("ProgramFiles"), "RedHat", "Podman", "podman.exe"),
-        } {
-            if _, err := os.Stat(candidate); err == nil {
-                return candidate
-            }
-        }
-    }
-    // Cross-platform: podman on $PATH.
-    if p, err := exec.LookPath("podman"); err == nil {
-        return p
-    }
-    // Cross-platform: docker on $PATH.
-    if p, err := exec.LookPath("docker"); err == nil {
-        return p
-    }
-    if runtime.GOOS == "windows" {
-        return "podman.exe"
-    }
-    return "/opt/podman/bin/podman"
-}
-```
-
-#### Change 5: SELinux mount options — `container.go`, `refine.go`, `ideate.go`
-
-**Current:** All `VolumeMount` entries use `Options: "z"` or `Options: "z,ro"`.
-The `z` flag is SELinux-specific and only meaningful on Linux hosts with SELinux
-enabled. Docker Desktop on Windows and macOS ignores or rejects it.
-
-**Affected files and lines:**
-- `internal/runner/container.go`: lines 117, 130, 147, 172, 213, 247
-- `internal/runner/refine.go`: lines 140, 150
-- `internal/runner/ideate.go`: line 286
-
-**Fix:** Introduce a helper that strips the `z` option on non-Linux hosts:
-```go
-// mountOpts returns volume mount options appropriate for the host OS.
-// The "z" SELinux relabeling option is only included on Linux.
-func mountOpts(opts ...string) string {
-    if runtime.GOOS != "linux" {
-        filtered := make([]string, 0, len(opts))
-        for _, o := range opts {
-            if o != "z" {
-                filtered = append(filtered, o)
-            }
-        }
-        return strings.Join(filtered, ",")
-    }
-    return strings.Join(opts, ",")
-}
-```
-
-Replace all hardcoded `"z"` with `mountOpts("z")` and `"z,ro"` with
-`mountOpts("z", "ro")` across all three files. Update tests in
-`container_spec_test.go` accordingly.
-
-**Bonus:** This also fixes macOS Docker Desktop users who may hit the same issue.
-
-#### Change 6: File manager launch — `git.go`
-
-**Current (lines 616–621):**
-```go
-switch runtime.GOOS {
-case "darwin": cmd = exec.CommandContext(r.Context(), "open", req.Path)
-default:       cmd = exec.CommandContext(r.Context(), "xdg-open", req.Path)
-}
-```
-
-**Fix:** Add Windows case:
-```go
-switch runtime.GOOS {
-case "darwin":
-    cmd = exec.CommandContext(r.Context(), "open", req.Path)
-case "windows":
-    cmd = exec.CommandContext(r.Context(), "explorer", req.Path)
-default:
-    cmd = exec.CommandContext(r.Context(), "xdg-open", req.Path)
-}
-```
-
-### Documentation for Tier 1
-
-Add a Windows/WSL2 section to `docs/guide/getting-started.md`:
-
-1. **Install WSL2:** `wsl --install` (requires Windows 10 2004+ or Windows 11)
-2. **Inside WSL2**, install Go 1.25+ and Podman (or Docker Engine)
-3. **Clone repo into the WSL2 filesystem** (not `/mnt/c/` — much slower due to
-   cross-filesystem overhead)
-4. `go build -o wallfacer . && ./wallfacer run ~/project`
-5. Browser opens automatically via `cmd.exe /c start`
-6. Note: keep workspace repos on the WSL2 filesystem for performance
-
-### Testing for Tier 1
-
-- **CI:** Add a GitHub Actions job with `runs-on: windows-latest` that:
-  1. Runs `go build ./...` to verify compilation succeeds on Windows
-  2. Runs `go vet ./...`
-  3. Runs `go test ./...` (unit tests only — no container runtime available)
-- **Manual:** Test WSL2 browser launch, runtime detection, and a full task cycle
-  inside WSL2 on a Windows machine
+| Change | Files | Notes |
+|--------|-------|-------|
+| Signal handling build tags | `internal/cli/signal_unix.go`, `signal_windows.go`, `server.go` | `shutdownSignals` variable selected by build tags |
+| `syscall.Exec` build tags | `internal/cli/execve_unix.go`, `execve_windows.go`, `exec.go` | Windows falls back to `exec.Command` with exit code propagation |
+| Browser launch + WSL2 detection | `internal/cli/cli.go` | `isWSL()` detects WSL2 env vars; uses `cmd.exe /c start` |
+| Container runtime detection | `internal/cli/cli.go` | Windows-specific paths (`ProgramFiles\RedHat\Podman`); `CONTAINER_CMD` override |
+| SELinux mount option stripping | `internal/runner/container.go`, `refine.go`, `ideate.go` | `mountOpts()` strips `z` on non-Linux; also benefits macOS |
+| File manager launch | `internal/handler/git.go` | Windows `explorer` case added |
+| Windows CI job | `.github/workflows/test.yml` | `test-windows` job: build + vet + unit tests |
+| WSL2 getting-started docs | `docs/guide/getting-started.md` | Windows (WSL2) section with setup instructions |
+| Windows compat tests | `internal/cli/cli_windows_compat_test.go` | Tests for WSL detection, runtime detection |
 
 ---
 
-## Tier 2: Native Windows (Future)
+## Tier 2: Native Windows — Remaining Work
 
 ### Prerequisites
 
-- All six code changes from Tier 1 (already done)
-- Claude Code must support Windows — either natively or via a WSL2 bridge where
-  the container runtime runs Linux containers through Docker Desktop's WSL2 backend
+- All Tier 1 code changes (done)
+- Claude Code must support Windows natively or via a WSL2 bridge where the
+  container runtime runs Linux containers through Docker Desktop's WSL2 backend
 
-### Additional changes needed
+### 2A: Windows Release Binaries
 
-#### Container path translation
+**Status:** Not started
 
-When the Go server runs on Windows host but containers run Linux (via Docker
-Desktop WSL2 backend), host paths like `C:\Users\alice\project` must be translated
-to `/mnt/c/Users/alice/project` for container volume mounts. This requires a path
-translation layer in `ContainerSpec.Build()`.
+The release workflow (`.github/workflows/release-binary.yml`) currently builds
+for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64. No Windows targets.
 
-#### Makefile alternative
+**Changes needed:**
+- Add `windows/amd64` (and optionally `windows/arm64`) to the build matrix
+- Output binary as `wallfacer-windows-amd64.exe` (`.exe` suffix)
+- Update `install.sh` or add a separate install mechanism for Windows (the
+  current script explicitly rejects Windows)
 
-Windows users without `make` need an alternative. Options:
+**Effort:** Small
 
-1. **Document `go build` directly** — the Makefile is mostly convenience;
-   `go build -o wallfacer.exe .` works on Windows (once compilation is fixed)
-2. **PowerShell script** (`build.ps1`) — lower friction for Windows users
-3. **`go run` task runner** — cross-platform, no extra tools
+### 2B: Container Path Translation
 
-Recommendation: Option 1 for Tier 1. Option 2 only if Windows usage grows.
+**Status:** Not started
 
-#### Windows service support
+When the Go server runs on a Windows host but containers run Linux (via Docker
+Desktop's WSL2 backend), host paths like `C:\Users\alice\project` must be
+translated to `/mnt/c/Users/alice/project` for container volume mounts.
+
+**Changes needed:**
+- Add a path translation layer in `ContainerSpec.Build()` that converts Windows
+  host paths to WSL2/Docker Desktop mount paths
+- Handle drive letter mapping (`C:` → `/mnt/c/`, `D:` → `/mnt/d/`)
+- Unit tests for path conversion edge cases (UNC paths, spaces, Unicode)
+
+**Effort:** Medium
+
+### 2C: Makefile Alternative
+
+**Status:** Not started
+
+Windows users without `make` need a build alternative. The Makefile uses
+`SHELL := /bin/bash` and bash-specific syntax.
+
+**Options (in priority order):**
+1. **Document `go build` directly** — `go build -o wallfacer.exe .` works once
+   compilation is fixed (already true). Sufficient for now.
+2. **PowerShell script** (`build.ps1`) — only if Windows usage grows
+3. **Cross-platform task runner** — only if maintaining two build systems
+   becomes a burden
+
+**Recommendation:** Document `go build` as the Windows build path. Defer
+scripts until there is demand.
+
+**Effort:** Small (documentation only)
+
+### 2D: End-to-End Testing on Windows
+
+**Status:** Not started
+
+Current Windows CI only runs `go build`, `go vet`, and unit tests. No
+container runtime is available in the CI environment.
+
+**Changes needed:**
+- Manual test protocol for Windows host + Docker Desktop
+- Verify: task creation, container launch, volume mounts, log streaming,
+  commit pipeline, browser launch
+- Optionally: CI job with Docker Desktop (complex setup, may not be worth it)
+
+**Effort:** Medium
+
+### 2E: Windows Service Support (Deferred)
+
+**Status:** Not planned
 
 For long-running server use, Wallfacer could register as a Windows Service.
-Out of scope for initial Windows support but noted for future work.
+Out of scope until there is demonstrated demand for native Windows deployment.
+
+**Effort:** Large
 
 ---
 
-## Implementation Order
+## Implementation Order for Tier 2
 
-### Phase 1: Compile and WSL2 (Tier 1)
+| Step | Change | Depends on | Effort |
+|------|--------|------------|--------|
+| 1 | Windows release binaries (2A) | — | Small |
+| 2 | Document `go build` for Windows (2C) | — | Small |
+| 3 | Container path translation (2B) | Claude Code Windows support | Medium |
+| 4 | End-to-end testing (2D) | 2B | Medium |
+| 5 | Windows service support (2E) | Demand | Large |
 
-| Step | Change | File(s) | Effort |
-|------|--------|---------|--------|
-| 1 | Signal handling build tags | `internal/cli/signal_unix.go` (new), `signal_windows.go` (new), `server.go` | Small |
-| 2 | `syscall.Exec` build tags | `internal/cli/execve_unix.go` (new), `execve_windows.go` (new), `exec.go` | Small |
-| 3 | Browser launch + WSL2 detection | `internal/cli/cli.go` | Small |
-| 4 | Container runtime detection | `internal/cli/cli.go` | Small |
-| 5 | SELinux mount option stripping | `internal/runner/container.go`, `refine.go`, `ideate.go`, `container_spec_test.go` | Small |
-| 6 | File manager launch | `internal/handler/git.go` | Small |
-| 7 | Windows CI job | `.github/workflows/test.yml` | Small |
-| 8 | WSL2 getting-started docs | `docs/guide/getting-started.md` | Small |
-
-### Phase 2: Native Windows (Tier 2) — future
-
-| Step | Change | Effort |
-|------|--------|--------|
-| 9 | Path translation for Docker Desktop WSL2 backend | Medium |
-| 10 | PowerShell build script or task runner | Medium |
-| 11 | End-to-end testing on Windows host + Docker Desktop | Medium |
-| 12 | Windows service support | Large |
+Steps 1–2 can be done immediately. Steps 3–4 are blocked on Claude Code
+having a Windows-compatible execution path.
 
 ---
 
@@ -412,11 +144,10 @@ Out of scope for initial Windows support but noted for future work.
 
 | Risk | Mitigation |
 |------|------------|
-| Claude Code does not support Windows natively | Tier 1 (WSL2) sidesteps this — Claude Code runs in a Linux container |
+| Claude Code does not support Windows natively | Tier 1 (WSL2) is complete and sidesteps this |
 | Docker Desktop license restrictions for commercial use | Podman Desktop is free; document both options |
-| SELinux option removal breaks Linux hosts | `mountOpts` only strips `z` on non-Linux; Linux behavior unchanged |
-| `syscall.Exec` replacement loses PTY on Windows | Only affects `wallfacer exec` on native Windows; WSL2 users run Linux binary |
-| Windows CI adds maintenance burden | Keep it build + vet + unit-test only; no container integration tests |
+| Path translation edge cases on Windows | Thorough unit tests for drive letters, UNC, Unicode, spaces |
+| Windows CI adds maintenance burden | Keep minimal: build + vet + unit tests only |
 
 ## Non-Goals
 
