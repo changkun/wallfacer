@@ -1,6 +1,6 @@
 # Native Containerization: Windows
 
-**Date:** 2026-03-13
+**Date:** 2026-03-22 (revised)
 
 ## Problem
 
@@ -11,18 +11,17 @@ containers inside a WSL2 or Hyper-V Linux VM, while Podman for Windows is early-
 This spec explores Windows-native isolation alternatives and the architectural changes
 needed to support them.
 
-## Additional Prerequisite: Go Server on Windows
+## Server Prerequisites (Complete)
 
-Before containerization is relevant, the Go server itself must build and run on
-Windows. The server uses `os/exec` with Linux-centric paths (`/opt/podman/bin/podman`)
-and `os/exec` signals (`SIGKILL`). A Windows port requires:
+The Go server builds and runs on Windows. All platform prerequisites are
+shipped:
 
-- Replace `syscall.SIGKILL` with `cmd.Process.Kill()` (already cross-platform in Go)
-- Make runtime detection probe Windows-native paths (`%ProgramFiles%\...`)
-- Replace `/tmp`-style tempfile paths with `os.TempDir()`
-- Replace `z` SELinux volume mount options (ignored on Windows runtimes)
-
-These are prerequisite changes regardless of which isolation backend is chosen.
+- Signal handling uses `os.Interrupt` on Windows (`signal_windows.go`)
+- `execve` replaced with `cmd.Run()` on Windows (`execve_windows.go`)
+- Runtime detection probes `%ProgramFiles%\RedHat\Podman\podman.exe` and `PATH`
+- `os.TempDir()` used throughout (no hardcoded `/tmp`)
+- SELinux `:z` mount option stripped on non-Linux (`mountOpts()`)
+- Windows CI job validates build + vet + unit tests
 
 ---
 
@@ -201,46 +200,16 @@ Claude Code image is created.
 
 ## Recommended Implementation Order
 
-| Priority | Option | Reason |
-|---|---|---|
-| 1 | **WSL2 (Option A)** | Zero container-code changes; ship Windows support quickly |
-| 2 | **Job Objects (Option D)** | True Windows-native; prerequisite is Claude Code for Windows binary |
-| 3 | **Hyper-V (Option C)** | Strong isolation for enterprise; high cost, defer |
-| 4 | **Windows Sandbox / containerd** | Not applicable without native Windows Claude Code image |
+| Priority | Option | Status | Notes |
+|---|---|---|---|
+| 1 | **WSL2 (Option A)** | **Complete** | Shipped; users run Wallfacer inside WSL2 today |
+| 2 | **Job Objects (Option D)** | Not started | True Windows-native; requires Claude Code for Windows |
+| 3 | **Hyper-V (Option C)** | Not started | Strong isolation for enterprise; high cost, defer |
+| 4 | **Windows Sandbox / containerd** | Not applicable | Requires native Windows Claude Code image |
 
-## Prerequisites Before Any Windows Container Work
+Server prerequisites (runtime detection, signal handling, temp paths, browser
+launch, SELinux mount opts, path separators) are all complete — see the
+"Server Prerequisites" section above.
 
-Before implementing any isolation backend, complete these server-level changes:
-
-| Item | File | Change |
-|---|---|---|
-| Runtime detection | `main.go` | Add Windows paths; skip `/opt/podman/bin/podman` on Windows |
-| Signal handling | `executor.go` | Replace `SIGKILL` with `cmd.Process.Kill()` |
-| Temp paths | `runner.go`, `container.go` | Use `os.TempDir()` instead of `/tmp` |
-| Browser launch | `main.go` | Use `cmd.exe /c start <url>` on Windows |
-| SELinux mount opts | `container_spec.go` | Skip `,z` option on non-Linux platforms |
-| Path separators | `container.go` | Use `filepath.Join` consistently |
-
-## WSL2 Detection and Fallthrough
-
-```go
-func isWSL() bool {
-    return os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != ""
-}
-
-// In browser launch:
-func openBrowser(url string) {
-    switch runtime.GOOS {
-    case "windows":
-        exec.Command("cmd", "/c", "start", url).Start()
-    case "darwin":
-        exec.Command("open", url).Start()
-    default:
-        if isWSL() {
-            exec.Command("cmd.exe", "/c", "start", url).Start()
-        } else {
-            exec.Command("xdg-open", url).Start()
-        }
-    }
-}
-```
+For remaining Tier 2 work (release binaries, path translation, e2e testing),
+see `specs/windows-support.md`.
