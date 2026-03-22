@@ -133,10 +133,11 @@ type Handler struct {
 	// affect the user-controlled toggle flags.
 	breakers map[string]*watcherBreaker
 
-	diffCache *diffCache
-	fileIndex *fileIndex
-	pulls     *pullTracker
-	spanCache spanStatsCache
+	diffCache          *diffCache
+	commitsBehindCache *commitsBehindCache
+	fileIndex          *fileIndex
+	pulls              *pullTracker
+	spanCache          spanStatsCache
 
 	// cachedMaxParallel and cachedMaxTestParallel cache the configured parallel
 	// task limits so that maxConcurrentTasks/maxTestConcurrentTasks do not
@@ -189,6 +190,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		workspaces:           workspaces,
 		envFile:              r.EnvFile(),
 		diffCache:            newDiffCache(),
+		commitsBehindCache:   newCommitsBehindCache(commitsBehindCacheTTL),
 		fileIndex:            newFileIndex(),
 		pulls:                newPullTracker(),
 		startTime:            time.Now(),

@@ -622,8 +622,15 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		sessionID = *task.SessionID
 	}
 	h.diffCache.invalidate(id)
+	for repoPath, worktreePath := range task.WorktreePaths {
+		h.commitsBehindCache.invalidate(repoPath, worktreePath)
+	}
+	worktreePaths := task.WorktreePaths
 	h.runner.SyncWorktreesBackground(id, sessionID, oldStatus, func() {
 		h.diffCache.invalidate(id)
+		for repoPath, worktreePath := range worktreePaths {
+			h.commitsBehindCache.invalidate(repoPath, worktreePath)
+		}
 	})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "syncing"})
 }

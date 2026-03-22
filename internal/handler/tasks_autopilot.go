@@ -517,6 +517,13 @@ func (h *Handler) StartWaitingSyncWatcher(ctx context.Context) {
 // Sync operations are lightweight host-side git rebases — they do not launch
 // containers and therefore bypass the regular task capacity check. This ensures
 // waiting tasks stay up to date even when the board is running at full capacity.
+//
+// Shared cache design: this watcher, tryAutoTest, and tryAutoSubmit all call
+// CommitsBehind for every waiting task on 30-second tickers. h.commitsBehindCache
+// deduplicates those calls (TTL=20s) so all three watchers share a single
+// post-fetch result per (repoPath, worktreePath) within each polling window.
+// checkAndSyncWaitingTasks always invalidates the cache entry before calling
+// CommitsBehind so the result reflects the just-fetched remote refs.
 func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 	if !h.AutosyncEnabled() {
 		return
@@ -551,7 +558,11 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 				logger.Handler.Warn("auto-sync: git fetch failed, continuing with local refs",
 					"task", t.ID, "repo", repoPath, "error", fetchErr)
 			}
-			n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+			// Invalidate any cached pre-fetch result so we always observe the
+			// post-fetch remote ref state. The fresh result is then cached for
+			// tryAutoTest and tryAutoSubmit to share within this polling window.
+			h.commitsBehindCache.invalidate(repoPath, worktreePath)
+			n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
 			if err != nil {
 				logger.Handler.Warn("auto-sync: check commits behind",
 					"task", t.ID, "repo", repoPath, "error", err)
@@ -589,10 +600,17 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			sessionID = *t.SessionID
 		}
 		h.diffCache.invalidate(t.ID)
+		for repoPath, worktreePath := range t.WorktreePaths {
+			h.commitsBehindCache.invalidate(repoPath, worktreePath)
+		}
 		taskID := t.ID
+		worktreePaths := t.WorktreePaths
 		promoteMu.Unlock()
 		h.runner.SyncWorktreesBackground(taskID, sessionID, store.TaskStatusWaiting, func() {
 			h.diffCache.invalidate(taskID)
+			for repoPath, worktreePath := range worktreePaths {
+				h.commitsBehindCache.invalidate(repoPath, worktreePath)
+			}
 		})
 	}
 	if !h.breakers["auto-sync"].isOpen() {
@@ -695,7 +713,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				// Only trigger if the worktree is up to date with the default branch.
 				behind := false
 				for repoPath, worktreePath := range t.WorktreePaths {
-					n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+					n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
 					if err != nil {
 						logger.Handler.Warn("auto-test: check commits behind",
 							"task", t.ID, "repo", repoPath, "error", err)
@@ -912,7 +930,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						skip = true
 						break
 					}
-					n, err := gitutil.CommitsBehind(repoPath, worktreePath)
+					n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
 					if err != nil {
 						logger.Handler.Warn("auto-submit: check commits behind",
 							"task", t.ID, "repo", repoPath, "error", err)
