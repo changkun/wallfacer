@@ -257,7 +257,8 @@ function startTasksStream() {
   tasksSource.onerror = function() {
     if (tasksSource.readyState === EventSource.CLOSED) {
       tasksSource = null;
-      setTimeout(startTasksStream, tasksRetryDelay);
+      var jittered = tasksRetryDelay * (1 + Math.random()); // uniform [base, 2×base]
+      setTimeout(startTasksStream, jittered);
       tasksRetryDelay = Math.min(tasksRetryDelay * 2, 30000);
     }
   };

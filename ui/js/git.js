@@ -43,7 +43,8 @@ function startGitStream() {
   gitStatusSource.onerror = function() {
     if (gitStatusSource.readyState === EventSource.CLOSED) {
       gitStatusSource = null;
-      setTimeout(startGitStream, gitRetryDelay);
+      var jittered = gitRetryDelay * (1 + Math.random()); // uniform [base, 2×base]
+      setTimeout(startGitStream, jittered);
       gitRetryDelay = Math.min(gitRetryDelay * 2, 30000);
     }
   };
