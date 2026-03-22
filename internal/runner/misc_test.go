@@ -853,15 +853,8 @@ func TestRunContainerParseErrorWithExitCode(t *testing.T) {
 // the container is running causes runContainer to return a "container terminated"
 // error immediately.
 func TestRunContainerContextCancelled(t *testing.T) {
-	// Script that handles lifecycle calls (rm/kill) quickly but sleeps on "run".
-	dir := t.TempDir()
-	scriptPath := filepath.Join(dir, "slow-cmd")
-	script := "#!/bin/sh\ncase \"$1\" in rm|kill) exit 0 ;; esac\nsleep 10\n"
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	r := runnerWithCmd(t, scriptPath)
+	cmd := fakeBlockingCmd(t)
+	r := runnerWithCmd(t, cmd)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
