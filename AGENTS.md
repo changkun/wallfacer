@@ -176,6 +176,7 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 ### Sandbox Images
 - `GET /api/images` — Check which sandbox images are cached locally
 - `POST /api/images/pull` — Start async pull for a sandbox image
+- `DELETE /api/images` — Remove a cached sandbox image
 - `GET /api/images/pull/stream` — SSE stream of pull progress
 
 ### Admin
