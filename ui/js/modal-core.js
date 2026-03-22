@@ -11,6 +11,37 @@ let _modalKeydownHandler = null;
 
 function getOpenModalTaskId() { return _modalState.taskId; }
 
+// switchEditTab toggles between 'edit' (textarea) and 'preview' (rendered markdown)
+// for the Goal and Spec sections in the backlog modal.
+// section: 'goal' | 'spec'
+// mode: 'edit' | 'preview'
+function switchEditTab(section, mode) {
+  var tabsId = section === 'goal' ? 'modal-goal-tabs' : 'modal-spec-tabs';
+  var textareaId = section === 'goal' ? 'modal-edit-goal' : 'modal-edit-prompt';
+  var previewId = textareaId + '-preview';
+  var tabs = document.getElementById(tabsId);
+  var textarea = document.getElementById(textareaId);
+  var preview = document.getElementById(previewId);
+  if (!tabs || !textarea || !preview) return;
+
+  // Update active tab
+  var buttons = tabs.querySelectorAll('.logs-tab');
+  buttons.forEach(function(btn) {
+    btn.classList.toggle('active', btn.textContent.trim().toLowerCase() === mode);
+  });
+
+  if (mode === 'edit') {
+    textarea.classList.remove('hidden');
+    preview.classList.add('hidden');
+    textarea.focus();
+  } else {
+    // Render markdown from the current textarea value
+    preview.innerHTML = renderMarkdown(textarea.value || '');
+    textarea.classList.add('hidden');
+    preview.classList.remove('hidden');
+  }
+}
+
 // Cache focusable elements to avoid expensive querySelectorAll on every Tab press.
 // The cache is time-limited so it stays fresh when async content loads into the modal.
 let _focusableCache = null;
@@ -256,18 +287,25 @@ async function openModal(id) {
   const promptActions = document.getElementById('modal-prompt-actions');
 
   if (task.status === 'backlog') {
-    // Backlog: show editable goal + editable spec
+    // Backlog: show goal + spec with Edit/Preview tabs (default: preview)
     const goalVal = task.goal || '';
     goalSection.classList.remove('hidden');
     goalRendered.classList.add('hidden');
-    goalTextarea.classList.remove('hidden');
     goalTextarea.value = goalVal;
 
     promptRendered.classList.add('hidden');
     promptRaw.classList.add('hidden');
     promptActions.classList.add('hidden');
-    promptTextarea.classList.remove('hidden');
     promptTextarea.value = task.prompt || '';
+    promptTextarea.classList.add('spec-field');
+
+    // Show Edit/Preview tabs and default to preview (rendered markdown)
+    var goalTabs = document.getElementById('modal-goal-tabs');
+    var specTabs = document.getElementById('modal-spec-tabs');
+    if (goalTabs) goalTabs.classList.remove('hidden');
+    if (specTabs) specTabs.classList.remove('hidden');
+    switchEditTab('goal', 'preview');
+    switchEditTab('spec', 'preview');
 
     // Show right refinement panel and left backlog-specific sections
     backlogRight.classList.remove('hidden');
@@ -349,6 +387,14 @@ async function openModal(id) {
     promptActions.classList.remove('hidden');
     document.getElementById('toggle-prompt-btn').textContent = 'Raw';
     promptTextarea.classList.add('hidden');
+    var goalEditPreview = document.getElementById('modal-edit-goal-preview');
+    if (goalEditPreview) goalEditPreview.classList.add('hidden');
+    var specEditPreview = document.getElementById('modal-edit-prompt-preview');
+    if (specEditPreview) specEditPreview.classList.add('hidden');
+    var goalTabs = document.getElementById('modal-goal-tabs');
+    var specTabs = document.getElementById('modal-spec-tabs');
+    if (goalTabs) goalTabs.classList.add('hidden');
+    if (specTabs) specTabs.classList.add('hidden');
 
     backlogRight.classList.add('hidden');
     backlogSettings.classList.add('hidden');
@@ -945,6 +991,14 @@ function closeModal() {
   document.getElementById('modal-goal-section').classList.add('hidden');
   document.getElementById('modal-edit-goal').classList.add('hidden');
   document.getElementById('modal-edit-prompt').classList.add('hidden');
+  var _goalPreview = document.getElementById('modal-edit-goal-preview');
+  if (_goalPreview) _goalPreview.classList.add('hidden');
+  var _specPreview = document.getElementById('modal-edit-prompt-preview');
+  if (_specPreview) _specPreview.classList.add('hidden');
+  var _goalTabs = document.getElementById('modal-goal-tabs');
+  if (_goalTabs) _goalTabs.classList.add('hidden');
+  var _specTabs = document.getElementById('modal-spec-tabs');
+  if (_specTabs) _specTabs.classList.add('hidden');
   document.querySelector('#modal .modal-card').classList.remove('modal-wide');
   const modalBody = document.getElementById('modal-body');
   modalBody.style.display = '';

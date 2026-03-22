@@ -1302,6 +1302,21 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .logs-tab:hover { color: var(--text); background: var(--bg-input); }
 .logs-tab.active { background: var(--bg-input); color: var(--text); font-weight: 600; }
 
+/* --- Editable field with preview (Goal / Spec in backlog modal) --- */
+.editable-field {
+  min-height: 3em;
+  max-height: 40vh;
+  resize: vertical;
+}
+.editable-field.spec-field {
+  min-height: 8em;
+}
+.editable-preview {
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
 /* --- Icon buttons (toggle/copy) --- */
 .btn-icon {
   background: none; border: 1px solid var(--border); color: var(--text-muted);

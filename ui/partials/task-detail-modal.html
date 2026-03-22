@@ -18,16 +18,27 @@
         <div id="modal-left">
           <!-- Goal section -->
           <div id="modal-goal-section" class="hidden mb-4">
-            <h3 class="section-title" style="margin-bottom:0;">Goal</h3>
+            <div class="flex items-center justify-between mb-1">
+              <h3 class="section-title" style="margin-bottom:0;">Goal</h3>
+              <div id="modal-goal-tabs" class="logs-tabs hidden">
+                <button class="logs-tab" onclick="switchEditTab('goal','edit')">Edit</button>
+                <button class="logs-tab active" onclick="switchEditTab('goal','preview')">Preview</button>
+              </div>
+            </div>
             <!-- Read-only goal (non-backlog) -->
             <div id="modal-goal-rendered" class="code-block prose-content hidden"></div>
-            <!-- Editable goal (backlog) -->
-            <textarea id="modal-edit-goal" rows="2" class="field hidden" style="font-size:13px;" placeholder="1-3 sentence summary of what this task achieves"></textarea>
+            <!-- Editable goal (backlog): edit + preview views -->
+            <textarea id="modal-edit-goal" rows="2" class="field hidden editable-field" style="font-size:13px;" placeholder="1-3 sentence summary of what this task achieves"></textarea>
+            <div id="modal-edit-goal-preview" class="code-block prose-content hidden editable-preview"></div>
           </div>
 
           <!-- Spec / Prompt section -->
           <div class="flex items-center justify-between mb-2">
             <h3 class="section-title" style="margin-bottom:0;">Spec</h3>
+            <div id="modal-spec-tabs" class="logs-tabs hidden">
+              <button class="logs-tab" onclick="switchEditTab('spec','edit')">Edit</button>
+              <button class="logs-tab active" onclick="switchEditTab('spec','preview')">Preview</button>
+            </div>
             <div id="modal-prompt-actions" class="flex items-center gap-1.5 hidden">
               <button id="copy-prompt-btn" onclick="copyModalText('prompt')" class="btn-icon" title="Copy to clipboard">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -39,8 +50,9 @@
           <!-- Read-only spec (non-backlog) -->
           <div id="modal-prompt-rendered" class="code-block mb-4 prose-content hidden"></div>
           <pre id="modal-prompt" class="code-block mb-4 hidden"></pre>
-          <!-- Editable spec (backlog) -->
-          <textarea id="modal-edit-prompt" rows="10" class="field mb-4 hidden" style="font-family:monospace;font-size:12px;"></textarea>
+          <!-- Editable spec (backlog): edit + preview views -->
+          <textarea id="modal-edit-prompt" rows="10" class="field mb-4 hidden editable-field" style="font-family:monospace;font-size:12px;"></textarea>
+          <div id="modal-edit-prompt-preview" class="code-block mb-4 prose-content hidden editable-preview"></div>
 
           <!-- Prompt history (collapsible) -->
           <div id="modal-history-section" class="hidden mb-4">
