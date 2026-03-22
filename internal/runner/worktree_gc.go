@@ -225,11 +225,13 @@ func (r *Runner) PruneOrphanedWorktrees(ctx context.Context, orphans []uuid.UUID
 		removed++
 	}
 
-	// Run `git worktree prune` on all workspaces to clean up any stale
-	// internal references that git worktree remove may have missed.
-	for _, ws := range r.Workspaces() {
-		gitPrune(ws)
-	}
+	// NOTE: do NOT run a blanket `git worktree prune` here. The targeted
+	// `git worktree remove --force` above already cleans each orphan's
+	// tracking entry individually. A blanket prune can destroy entries
+	// for active tasks whose worktree paths share a basename with the
+	// just-removed orphan (e.g. both named "wallfacer"), breaking the
+	// active task's .git link and causing the health watcher to recreate
+	// the worktree from HEAD — losing all committed work.
 
 	return removed
 }

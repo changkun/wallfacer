@@ -174,12 +174,18 @@ func (r *Runner) PruneUnknownWorktrees() {
 
 	}
 
-	// Run `git worktree prune` on all workspaces to clean stale references.
-	for _, ws := range r.Workspaces() {
-		if gitutil.IsGitRepo(ws) {
-			gitPrune(ws)
-		}
-	}
+	// NOTE: do NOT run `git worktree prune` here. Pruning removes
+	// .git/worktrees/<name>/ entries whose linked directories were just
+	// deleted above (orphan removal). However, an active task's worktree
+	// may share the same entry name (e.g. "wallfacer") if the entry was
+	// reused after a previous task completed. Pruning that entry breaks
+	// the active worktree's .git file (which references the now-deleted
+	// .git/worktrees/<name>/), causing the health watcher to detect a
+	// broken repo, delete the directory, and recreate the worktree from
+	// HEAD — destroying all committed work on the task branch.
+	//
+	// Stale worktree entries are cleaned up by the periodic GC
+	// (StartWorktreeGC) and by RemoveWorktree during normal task cleanup.
 }
 
 func gitPrune(repoPath string) {
