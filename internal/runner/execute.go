@@ -816,11 +816,13 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 				// Rebase succeeded — try to restore stashed changes on top.
 				stashPopErr = gitutil.StashPop(worktreePath)
 			} else {
-				// Rebase failed/aborted — restore stashed changes onto the
-				// unchanged task branch (should always succeed).
-				if popErr := gitutil.StashPop(worktreePath); popErr != nil {
+				// Rebase failed/aborted — try to restore stashed changes.
+				// The branch may have been modified by the conflict resolver,
+				// so the pop can fail even though the rebase was aborted.
+				stashPopErr = gitutil.StashPop(worktreePath)
+				if stashPopErr != nil {
 					logger.Runner.Error("sync: stash pop failed after aborted rebase",
-						"task", taskID, "repo", repoPath, "error", popErr)
+						"task", taskID, "repo", repoPath, "error", stashPopErr)
 				}
 			}
 		}
@@ -830,8 +832,11 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			if !conflictDetected {
 				// Non-conflict git error: fail the task so the user can see
 				// what went wrong (e.g. invalid ref, detached HEAD).
-				r.failSync(bgCtx, taskID, sessionID, task.Turns,
-					fmt.Sprintf("rebase in %s: %v", filepath.Base(worktreePath), rebaseErr))
+				msg := fmt.Sprintf("rebase in %s: %v", filepath.Base(worktreePath), rebaseErr)
+				if stashPopErr != nil {
+					msg += "; uncommitted changes are saved in git stash"
+				}
+				r.failSync(bgCtx, taskID, sessionID, task.Turns, msg)
 				return
 			}
 			// Conflict (or failed conflict resolution): keep the task
@@ -872,6 +877,17 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 					"Once your changes are committed and compatible, the sync will be retried.",
 				defBranch, filepath.Base(worktreePath), defBranch, defBranch,
 			)
+			if stashPopErr != nil {
+				conflictPrompt += fmt.Sprintf(
+					"\n\nIMPORTANT: You had uncommitted changes before the sync that could not "+
+						"be automatically restored. They are saved in the git stash.\n"+
+						"After resolving the conflict above:\n"+
+						"1. Run `git stash show -p` to see what was stashed\n"+
+						"2. Run `git stash pop` to restore the uncommitted changes\n"+
+						"3. Resolve any conflicts from the stash pop\n"+
+						"Do NOT discard the stash — it contains your work in progress.",
+				)
+			}
 			r.Run(taskID, conflictPrompt, sessionID, false)
 			return
 		}

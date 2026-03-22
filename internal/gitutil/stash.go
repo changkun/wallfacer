@@ -30,8 +30,11 @@ func StashPop(worktreePath string) error {
 	out, err := exec.Command("git", "-C", worktreePath, "stash", "pop").CombinedOutput()
 	if err != nil {
 		// Abort the conflicted pop so the stash entry is preserved and the
-		// worktree returns to a clean state.
-		_ = exec.Command("git", "-C", worktreePath, "checkout", "--", ".").Run()
+		// worktree returns to a clean state. A failed stash pop can leave
+		// unmerged (UU) entries that "git checkout -- ." alone cannot clear.
+		// Use "git reset --hard HEAD" to clear both the index conflict markers
+		// and working tree changes, then "git clean -fd" for untracked files.
+		_ = exec.Command("git", "-C", worktreePath, "reset", "--hard", "HEAD").Run()
 		_ = exec.Command("git", "-C", worktreePath, "clean", "-fd").Run()
 		slog.Default().With("component", "git").Warn("stash pop failed",
 			"path", worktreePath, "error", err, "output", string(out))

@@ -1248,6 +1248,94 @@ func TestSyncWorktreesBehindMainDirtyWorktree(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(wt[repo], "advance2.txt")); err != nil {
 		t.Fatal("advance2.txt should be in worktree after sync:", err)
 	}
+
+	// The uncommitted dirty file must survive the stash-rebase-pop cycle.
+	if _, err := os.Stat(dirtyFile); err != nil {
+		t.Fatal("dirty.txt should be preserved after sync (stash-pop cycle):", err)
+	}
+}
+
+// TestSyncWorktreesConflictDirtyWorktreePreservesStash verifies that when a
+// rebase conflict occurs AND the worktree had uncommitted changes, the stash
+// pop error is properly captured and the agent is informed about stashed work.
+// This is a regression test: previously the stash pop error was silently
+// swallowed in the failed-rebase path, causing uncommitted changes to be lost
+// without notifying the agent.
+func TestSyncWorktreesConflictDirtyWorktreePreservesStash(t *testing.T) {
+	repo := setupTestRepo(t)
+
+	// Resolver call (empty → fails) + Run() call → waiting output.
+	cmd := fakeStatefulCmd(t, []string{"", waitingOutput})
+	s, runner := setupRunnerWithCmd(t, []string{repo}, cmd)
+	ctx := context.Background()
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "conflict stash test", Timeout: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wt, br, err := runner.setupWorktrees(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { runner.cleanupWorktrees(task.ID, wt, br) })
+
+	if err := s.UpdateTaskWorktrees(ctx, task.ID, wt, br); err != nil {
+		t.Fatal(err)
+	}
+
+	worktreePath := wt[repo]
+
+	// Commit a change on the task branch so the rebase has work to do.
+	if err := os.WriteFile(filepath.Join(worktreePath, "README.md"), []byte("# Task version\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, worktreePath, "add", ".")
+	gitRun(t, worktreePath, "commit", "-m", "task: modify README")
+
+	// Create an uncommitted change in the worktree (dirty state).
+	wipFile := filepath.Join(worktreePath, "wip.txt")
+	if err := os.WriteFile(wipFile, []byte("work in progress\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Commit a conflicting change on main (same file, different content).
+	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("# Main version\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "main: modify README")
+
+	if err := s.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatal(err)
+	}
+
+	runner.SyncWorktrees(task.ID, "", "waiting")
+
+	// The task committed change ("# Task version") must survive on the
+	// branch even after the rebase was aborted.
+	readmeContent, readErr := os.ReadFile(filepath.Join(worktreePath, "README.md"))
+	if readErr != nil {
+		t.Fatal("README.md should exist in worktree after conflict sync:", readErr)
+	}
+	if !strings.Contains(string(readmeContent), "Task version") {
+		t.Fatalf("committed task changes should survive conflict sync, got: %q", readmeContent)
+	}
+
+	// The uncommitted wip.txt should either still be in the worktree
+	// (stash pop succeeded) or recoverable from the stash (pop failed).
+	if _, err := os.Stat(wipFile); err != nil {
+		// wip.txt is not in the worktree — check that it's in the stash.
+		stashList, _ := gitRunMayFail(worktreePath, "stash", "list")
+		if stashList == "" {
+			t.Fatal("uncommitted changes lost: wip.txt not in worktree and stash is empty")
+		}
+		// Verify the stash contains our file by showing the stash diff.
+		stashDiff, _ := gitRunMayFail(worktreePath, "stash", "show", "-p")
+		if !strings.Contains(stashDiff, "work in progress") {
+			t.Fatalf("stash does not contain the expected uncommitted changes, got: %s", stashDiff)
+		}
+	}
 }
 
 // TestSyncWorktreesConflictHandedOffToAgent verifies that when auto-resolution

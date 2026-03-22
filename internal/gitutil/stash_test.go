@@ -50,4 +50,36 @@ func TestStashPop(t *testing.T) {
 			t.Error("StashPop with no stash entry should return error")
 		}
 	})
+
+	t.Run("conflict preserves stash entry and cleans worktree", func(t *testing.T) {
+		repo := setupRepo(t) // file.txt = "initial\n"
+
+		// Create an uncommitted change to file.txt.
+		writeFile(t, filepath.Join(repo, "file.txt"), "uncommitted\n")
+		if !StashIfDirty(repo) {
+			t.Fatal("expected stash to be created")
+		}
+
+		// Modify the same file and commit, so popping the stash will conflict.
+		writeFile(t, filepath.Join(repo, "file.txt"), "modified after stash\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "diverge from stash")
+
+		// StashPop should fail due to the conflict.
+		if err := StashPop(repo); err == nil {
+			t.Fatal("expected StashPop to fail due to conflict")
+		}
+
+		// The stash entry must be preserved so data is recoverable.
+		out := gitRun(t, repo, "stash", "list")
+		if out == "" {
+			t.Error("stash entry should be preserved after failed pop")
+		}
+
+		// The worktree should be clean (StashPop cleans up on failure).
+		status := gitRun(t, repo, "status", "--porcelain")
+		if status != "" {
+			t.Errorf("worktree should be clean after StashPop conflict, got: %q", status)
+		}
+	})
 }
