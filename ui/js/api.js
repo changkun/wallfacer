@@ -235,23 +235,31 @@ function startTasksStream() {
   // Leader tab: open real EventSource and relay events to followers.
   const url = buildTasksStreamUrl(Routes.tasks.stream(), lastTasksEventId);
   tasksSource = new EventSource(url);
+  _lastSSEEventTime = Date.now();
 
   tasksSource.addEventListener('snapshot', function(e) {
+    _lastSSEEventTime = Date.now();
     var data = JSON.parse(e.data);
     _handleTasksSnapshot(data, e.lastEventId);
     _sseRelay('tasks-snapshot', data, e.lastEventId);
   });
 
   tasksSource.addEventListener('task-updated', function(e) {
+    _lastSSEEventTime = Date.now();
     var data = JSON.parse(e.data);
     _handleTaskUpdated(data, e.lastEventId);
     _sseRelay('tasks-updated', data, e.lastEventId);
   });
 
   tasksSource.addEventListener('task-deleted', function(e) {
+    _lastSSEEventTime = Date.now();
     var data = JSON.parse(e.data);
     _handleTaskDeleted(data, e.lastEventId);
     _sseRelay('tasks-deleted', data, e.lastEventId);
+  });
+
+  tasksSource.addEventListener('heartbeat', function() {
+    _lastSSEEventTime = Date.now();
   });
 
   tasksSource.onerror = function() {
@@ -267,6 +275,7 @@ function startTasksStream() {
 function stopTasksStream() {
   if (tasksSource) tasksSource.close();
   tasksSource = null;
+  _lastSSEEventTime = 0;
 }
 
 function stopGitStream() {
@@ -304,6 +313,24 @@ document.addEventListener('visibilitychange', function() {
     fetchTasks();
   }
 });
+
+// --- SSE heartbeat staleness detection ---
+// Track when the last SSE event (data or heartbeat) was received. The server
+// sends heartbeat events every 15 s. If nothing arrives for >35 s the
+// connection is likely dead — fetch the full task list so the UI recovers
+// without waiting for the browser's slow TCP timeout detection.
+var _lastSSEEventTime = 0;
+var _SSE_STALE_THRESHOLD_MS = 35000; // ~2× server heartbeat interval (15 s)
+if (typeof setInterval === 'function') {
+  setInterval(function() {
+    if (!_lastSSEEventTime || !activeWorkspaces || activeWorkspaces.length === 0) return;
+    if (Date.now() - _lastSSEEventTime > _SSE_STALE_THRESHOLD_MS) {
+      fetchTasks();
+      // Force-restart the stream so a fresh connection is established.
+      restartActiveStreams();
+    }
+  }, 10000);
+}
 
 /**
  * Fetches the current non-archived task list from the server.

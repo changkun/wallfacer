@@ -1203,7 +1203,7 @@ func TestStreamLogs_Committing_ServesStoredLogs(t *testing.T) {
 }
 
 // TestStreamTasks_Keepalive verifies that the tasks SSE stream sends
-// periodic keepalive comments to prevent the connection from going idle.
+// periodic heartbeat events to prevent the connection from going idle.
 func TestStreamTasks_Keepalive(t *testing.T) {
 	// Use a very short keepalive interval for the test.
 	orig := sseKeepaliveInterval
@@ -1224,14 +1224,14 @@ func TestStreamTasks_Keepalive(t *testing.T) {
 		h.StreamTasks(w, req)
 	}()
 
-	// Wait long enough for at least one keepalive to fire.
+	// Wait long enough for at least one heartbeat to fire.
 	time.Sleep(80 * time.Millisecond)
 	cancel()
 	<-done
 
 	body := w.Body.String()
-	if !strings.Contains(body, ":keepalive") {
-		t.Errorf("expected keepalive comment in response, got:\n%s", body)
+	if !strings.Contains(body, "event: heartbeat") {
+		t.Errorf("expected heartbeat event in response, got:\n%s", body)
 	}
 }
 

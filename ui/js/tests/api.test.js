@@ -241,6 +241,70 @@ describe('startTasksStream', () => {
     expect(renderModalDependencies).toHaveBeenCalledTimes(1);
     expect(renderModalDependencies.mock.calls[0][0].id).toBe('task-1');
   });
+
+  it('updates _lastSSEEventTime on heartbeat events', () => {
+    const instances = [];
+    class MockEventSource {
+      constructor(url) {
+        this.url = url;
+        this.readyState = 1;
+        this.listeners = {};
+        instances.push(this);
+      }
+      addEventListener(type, handler) {
+        if (!this.listeners[type]) this.listeners[type] = [];
+        this.listeners[type].push(handler);
+      }
+      close() { this.closed = true; }
+    }
+    MockEventSource.CLOSED = 2;
+
+    const ctx = makeContext({ EventSource: MockEventSource });
+    loadApiCoreStack(ctx);
+    vm.runInContext('activeWorkspaces = ["/Users/test/repo"];', ctx);
+
+    ctx.startTasksStream();
+    const es = instances[0];
+
+    // Fire a heartbeat event.
+    const before = vm.runInContext('_lastSSEEventTime', ctx);
+    es.listeners.heartbeat[0]();
+    const after = vm.runInContext('_lastSSEEventTime', ctx);
+    expect(after).toBeGreaterThanOrEqual(before);
+  });
+
+  it('updates _lastSSEEventTime on task-updated events', () => {
+    const instances = [];
+    class MockEventSource {
+      constructor(url) {
+        this.url = url;
+        this.readyState = 1;
+        this.listeners = {};
+        instances.push(this);
+      }
+      addEventListener(type, handler) {
+        if (!this.listeners[type]) this.listeners[type] = [];
+        this.listeners[type].push(handler);
+      }
+      close() { this.closed = true; }
+    }
+    MockEventSource.CLOSED = 2;
+
+    const ctx = makeContext({ EventSource: MockEventSource });
+    loadApiCoreStack(ctx);
+    vm.runInContext('activeWorkspaces = ["/Users/test/repo"];', ctx);
+
+    ctx.startTasksStream();
+    const es = instances[0];
+
+    vm.runInContext('_lastSSEEventTime = 0;', ctx);
+    es.listeners['task-updated'][0]({
+      data: JSON.stringify(task('t-1', { status: 'done' })),
+      lastEventId: 'seq-1',
+    });
+    const after = vm.runInContext('_lastSSEEventTime', ctx);
+    expect(after).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

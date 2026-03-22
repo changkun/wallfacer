@@ -139,9 +139,12 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 			}
 			flusher.Flush()
 		case <-keepalive.C:
-			// SSE comment keepalive — prevents proxies and OS-level TCP
-			// idle timeouts from silently closing the connection.
-			if _, err := fmt.Fprint(w, ":keepalive\n\n"); err != nil {
+			// SSE heartbeat event — prevents proxies and OS-level TCP
+			// idle timeouts from silently closing the connection. Sent as
+			// a real "heartbeat" event (not a comment) so the browser's
+			// EventSource dispatches it to JavaScript, allowing the client
+			// to detect stale connections and trigger a recovery fetch.
+			if _, err := fmt.Fprint(w, "event: heartbeat\ndata: \n\n"); err != nil {
 				return
 			}
 			flusher.Flush()
