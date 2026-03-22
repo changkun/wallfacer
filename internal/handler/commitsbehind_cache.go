@@ -48,14 +48,14 @@ func (c *commitsBehindCache) key(repoPath, worktreePath string) string {
 }
 
 // get returns a cached result if one exists and has not expired.
-func (c *commitsBehindCache) get(repoPath, worktreePath string) (int, error, bool) {
+func (c *commitsBehindCache) get(repoPath, worktreePath string) (int, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e, ok := c.entries[c.key(repoPath, worktreePath)]
 	if !ok || c.now().After(e.expiresAt) {
-		return 0, nil, false
+		return 0, false, nil
 	}
-	return e.n, e.err, true
+	return e.n, true, e.err
 }
 
 // set stores a result in the cache with the configured TTL.
@@ -75,7 +75,7 @@ func (c *commitsBehindCache) set(repoPath, worktreePath string, n int, err error
 // cachedCommitsBehind returns a cached result if available, otherwise calls
 // gitutil.CommitsBehind, caches the result, and returns it.
 func (c *commitsBehindCache) cachedCommitsBehind(repoPath, worktreePath string) (int, error) {
-	if n, err, ok := c.get(repoPath, worktreePath); ok {
+	if n, ok, err := c.get(repoPath, worktreePath); ok {
 		return n, err
 	}
 	n, err := gitutil.CommitsBehind(repoPath, worktreePath)
