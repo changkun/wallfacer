@@ -200,15 +200,15 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // UpdateConfig handles PUT /api/config to update server-level settings.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Autopilot            *bool                   `json:"autopilot"`
-		Autorefine           *bool                   `json:"autorefine"`
-		Autotest             *bool                   `json:"autotest"`
-		Autosubmit           *bool                   `json:"autosubmit"`
-		Autosync             *bool                   `json:"autosync"`
-		Autopush             *bool                   `json:"autopush"`
-		Ideation             *bool                   `json:"ideation"`
-		IdeationInterval     *int                    `json:"ideation_interval"`      // minutes; 0 = run immediately on completion
-		IdeationExploitRatio *float64                `json:"ideation_exploit_ratio"` // 0.0–1.0; fraction of exploitation ideas
+		Autopilot            *bool             `json:"autopilot"`
+		Autorefine           *bool             `json:"autorefine"`
+		Autotest             *bool             `json:"autotest"`
+		Autosubmit           *bool             `json:"autosubmit"`
+		Autosync             *bool             `json:"autosync"`
+		Autopush             *bool             `json:"autopush"`
+		Ideation             *bool             `json:"ideation"`
+		IdeationInterval     *int              `json:"ideation_interval"`      // minutes; 0 = run immediately on completion
+		IdeationExploitRatio *float64          `json:"ideation_exploit_ratio"` // 0.0–1.0; fraction of exploitation ideas
 		WorkspaceGroups      []workspace.Group `json:"workspace_groups"`
 	}
 	if !decodeJSONBody(w, r, &req) {
