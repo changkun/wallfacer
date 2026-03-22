@@ -109,6 +109,7 @@ function selectSystemPrompt(name) {
 
   var textarea = document.getElementById('system-prompt-content');
   if (textarea) textarea.value = tmpl.content;
+  switchEditTab('sysprompt', 'preview');
 
   var statusEl = document.getElementById('system-prompt-status');
   if (statusEl) statusEl.textContent = '';

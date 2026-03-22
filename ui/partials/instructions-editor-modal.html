@@ -6,8 +6,15 @@
         <h3 style="font-size: 16px; font-weight: 600; margin: 0;">Workspace AGENTS.md</h3>
         <button onclick="closeInstructionsEditor()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted); line-height:1;">&times;</button>
       </div>
-      <div id="instructions-path" style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; font-family: monospace; word-break: break-all;"></div>
-      <textarea id="instructions-content" rows="22" class="field" style="font-family: 'SF Mono','Fira Code','Consolas',monospace; font-size: 12px; flex: 1; min-height: 0; resize: none;"></textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div id="instructions-path" style="font-size: 11px; color: var(--text-muted); font-family: monospace; word-break: break-all;"></div>
+        <div id="instructions-tabs" class="logs-tabs">
+          <button class="logs-tab" onclick="switchEditTab('instructions','edit')">Edit</button>
+          <button class="logs-tab active" onclick="switchEditTab('instructions','preview')">Preview</button>
+        </div>
+      </div>
+      <textarea id="instructions-content" rows="22" class="field hidden" style="font-family: 'SF Mono','Fira Code','Consolas',monospace; font-size: 12px; flex: 1; min-height: 0; resize: none;"></textarea>
+      <div id="instructions-content-preview" class="code-block prose-content editable-preview" style="flex: 1; min-height: 0;"></div>
       <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
         <button onclick="saveInstructions()" class="btn btn-accent">Save</button>
         <button onclick="closeInstructionsEditor()" class="btn-ghost">Cancel</button>

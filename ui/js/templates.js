@@ -153,7 +153,15 @@ function _ensureTemplatesManagerModal() {
     '      <div id="tmpl-add-form" style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;">',
     '        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Add Template</div>',
     '        <input id="tmpl-new-name" type="text" placeholder="Name\u2026" class="field" style="font-size:12px;padding:5px 8px;margin-bottom:6px;width:100%;box-sizing:border-box;">',
-    '        <textarea id="tmpl-new-body" rows="4" placeholder="Prompt body\u2026" class="field" style="font-size:12px;padding:5px 8px;width:100%;box-sizing:border-box;resize:vertical;"></textarea>',
+    '        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">',
+    '          <span class="text-xs text-v-muted">Body</span>',
+    '          <div id="tmpl-body-tabs" class="logs-tabs">',
+    '            <button class="logs-tab active" onclick="switchEditTab(\'tmplbody\',\'edit\')">Edit</button>',
+    '            <button class="logs-tab" onclick="switchEditTab(\'tmplbody\',\'preview\')">Preview</button>',
+    '          </div>',
+    '        </div>',
+    '        <textarea id="tmpl-new-body" rows="4" placeholder="Prompt body\u2026" class="field editable-field" style="font-size:12px;padding:5px 8px;width:100%;box-sizing:border-box;resize:vertical;"></textarea>',
+    '        <div id="tmpl-new-body-preview" class="code-block prose-content hidden editable-preview" style="font-size:12px;"></div>',
     '        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">',
     '          <button onclick="saveNewTemplate()" class="btn btn-accent" style="font-size:12px;">Save</button>',
     '          <span id="tmpl-add-status" style="font-size:11px;color:var(--text-muted);"></span>',
@@ -181,17 +189,19 @@ function _ensureTemplatesManagerModal() {
 
 async function openTemplatesManager() {
   _ensureTemplatesManagerModal();
+  registerEditTabSection('tmplbody', 'tmpl-body-tabs', 'tmpl-new-body');
   var modal = document.getElementById('templates-manager-modal');
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
 
-  // Clear add form.
+  // Clear add form and default to edit mode for new template body.
   var nameInput = document.getElementById('tmpl-new-name');
   var bodyInput = document.getElementById('tmpl-new-body');
   var statusEl = document.getElementById('tmpl-add-status');
   if (nameInput) nameInput.value = '';
   if (bodyInput) bodyInput.value = '';
   if (statusEl) statusEl.textContent = '';
+  switchEditTab('tmplbody', 'edit');
 
   await _refreshTemplatesList();
 }

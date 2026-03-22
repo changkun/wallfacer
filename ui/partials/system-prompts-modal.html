@@ -21,13 +21,20 @@
         <!-- Editor pane -->
         <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
           <div id="system-prompt-editor-wrap" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-            <div id="system-prompt-name-label" style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <div id="system-prompt-name-label" style="font-size: 12px; font-weight: 600; color: var(--text-secondary);"></div>
+              <div id="sysprompt-tabs" class="logs-tabs">
+                <button class="logs-tab" onclick="switchEditTab('sysprompt','edit')">Edit</button>
+                <button class="logs-tab active" onclick="switchEditTab('sysprompt','preview')">Preview</button>
+              </div>
+            </div>
             <textarea
               id="system-prompt-content"
               rows="22"
-              class="field"
+              class="field hidden"
               style="font-family: 'SF Mono','Fira Code','Consolas',monospace; font-size: 12px; flex: 1; min-height: 0; resize: none;"
               placeholder="Select a template on the left to edit it."></textarea>
+            <div id="system-prompt-content-preview" class="code-block prose-content editable-preview" style="flex: 1; min-height: 0;"></div>
           </div>
 
           <!-- Actions -->

@@ -260,8 +260,15 @@
 
           <!-- Retry section for done/failed/cancelled tasks -->
           <div id="modal-retry-section" class="hidden mb-4">
-            <h3 class="section-title">Retry</h3>
-            <textarea id="modal-retry-prompt" rows="4" class="field"></textarea>
+            <div class="flex items-center justify-between mb-1">
+              <h3 class="section-title" style="margin-bottom:0;">Retry</h3>
+              <div id="modal-retry-tabs" class="logs-tabs">
+                <button class="logs-tab" onclick="switchEditTab('retry','edit')">Edit</button>
+                <button class="logs-tab active" onclick="switchEditTab('retry','preview')">Preview</button>
+              </div>
+            </div>
+            <textarea id="modal-retry-prompt" rows="4" class="field editable-field spec-field hidden"></textarea>
+            <div id="modal-retry-prompt-preview" class="code-block prose-content editable-preview"></div>
             <div id="modal-retry-resume-row" class="hidden flex items-center gap-2 mt-2">
               <input type="checkbox" id="modal-retry-resume" style="cursor:pointer;accent-color:var(--accent);">
               <label for="modal-retry-resume" class="text-xs text-v-secondary" style="cursor:pointer;">Resume previous session</label>

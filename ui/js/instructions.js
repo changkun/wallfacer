@@ -31,12 +31,16 @@ async function showInstructionsEditor(event, preloadedContent) {
     }
   } catch (e) { /* non-critical */ }
 
-  if (preloadedContent != null) return;
+  if (preloadedContent != null) {
+    switchEditTab('instructions', 'preview');
+    return;
+  }
 
   try {
     var data = await api('/api/instructions');
     textarea.value = data.content || '';
     statusEl.textContent = '';
+    switchEditTab('instructions', 'preview');
   } catch (e) {
     statusEl.textContent = 'Error loading: ' + e.message;
   }

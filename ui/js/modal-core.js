@@ -12,16 +12,34 @@ let _modalKeydownHandler = null;
 function getOpenModalTaskId() { return _modalState.taskId; }
 
 // switchEditTab toggles between 'edit' (textarea) and 'preview' (rendered markdown)
-// for the Goal and Spec sections in the backlog modal.
-// section: 'goal' | 'spec'
-// mode: 'edit' | 'preview'
+// for any section that follows the convention:
+//   tabs container:  id = "<prefix>-tabs"
+//   textarea:        id = "<textareaId>"
+//   preview div:     id = "<textareaId>-preview"
+//
+// Usage from HTML: onclick="switchEditTab('goal','edit')"
+// The mapping from section name → element IDs is in _editTabSections.
+// Call registerEditTabSection(name, tabsId, textareaId) to register new sections.
+
+var _editTabSections = {};
+
+function registerEditTabSection(name, tabsId, textareaId) {
+  _editTabSections[name] = { tabsId: tabsId, textareaId: textareaId };
+}
+
+// Register built-in sections.
+registerEditTabSection('goal', 'modal-goal-tabs', 'modal-edit-goal');
+registerEditTabSection('spec', 'modal-spec-tabs', 'modal-edit-prompt');
+registerEditTabSection('retry', 'modal-retry-tabs', 'modal-retry-prompt');
+registerEditTabSection('instructions', 'instructions-tabs', 'instructions-content');
+registerEditTabSection('sysprompt', 'sysprompt-tabs', 'system-prompt-content');
+
 function switchEditTab(section, mode) {
-  var tabsId = section === 'goal' ? 'modal-goal-tabs' : 'modal-spec-tabs';
-  var textareaId = section === 'goal' ? 'modal-edit-goal' : 'modal-edit-prompt';
-  var previewId = textareaId + '-preview';
-  var tabs = document.getElementById(tabsId);
-  var textarea = document.getElementById(textareaId);
-  var preview = document.getElementById(previewId);
+  var entry = _editTabSections[section];
+  if (!entry) return;
+  var tabs = document.getElementById(entry.tabsId);
+  var textarea = document.getElementById(entry.textareaId);
+  var preview = document.getElementById(entry.textareaId + '-preview');
   if (!tabs || !textarea || !preview) return;
 
   // Update active tab
@@ -39,6 +57,23 @@ function switchEditTab(section, mode) {
     preview.innerHTML = renderMarkdown(textarea.value || '');
     textarea.classList.add('hidden');
     preview.classList.remove('hidden');
+  }
+}
+
+// initEditPreviewTabs is a convenience helper for dynamically generated HTML.
+// Given a container element, it wires up Edit/Preview tabs for a textarea within it.
+// Returns { tabs, textarea, preview } element references.
+// tabsHtml is injected into the container, textarea must already exist inside it.
+function initEditPreviewTabs(sectionName, tabsId, textareaId) {
+  registerEditTabSection(sectionName, tabsId, textareaId);
+  // Create the preview div next to the textarea if it doesn't exist.
+  var textarea = document.getElementById(textareaId);
+  var previewId = textareaId + '-preview';
+  if (textarea && !document.getElementById(previewId)) {
+    var preview = document.createElement('div');
+    preview.id = previewId;
+    preview.className = 'code-block prose-content hidden editable-preview';
+    textarea.parentNode.insertBefore(preview, textarea.nextSibling);
   }
 }
 
@@ -675,6 +710,7 @@ async function openModal(id) {
   if (task.status === 'done' || task.status === 'failed' || task.status === 'waiting' || task.status === 'cancelled') {
     retrySection.classList.remove('hidden');
     document.getElementById('modal-retry-prompt').value = task.prompt;
+    switchEditTab('retry', 'preview');
     if (task.session_id) {
       retryResumeRow.classList.remove('hidden');
       document.getElementById('modal-retry-resume').checked = !task.fresh_start;
