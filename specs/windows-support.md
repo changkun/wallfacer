@@ -1,6 +1,6 @@
 # Windows Support
 
-**Date:** 2026-03-21
+**Date:** 2026-03-22
 
 ## Problem
 
@@ -46,16 +46,18 @@ for completeness.
 | # | File | Line(s) | Issue |
 |---|------|---------|-------|
 | 1 | `internal/cli/server.go` | 137 | `syscall.SIGTERM` — not defined on Windows |
-| 2 | `internal/cli/exec.go` | 92, 99 | `syscall.Exec()` — Unix-only; does not exist on Windows |
+| 2 | `internal/cli/exec.go` | 93, 100 | `syscall.Exec()` — Unix-only; does not exist on Windows |
 
 ### Runtime failures (HIGH — server starts but features break)
 
 | # | File | Line(s) | Issue |
 |---|------|---------|-------|
-| 3 | `internal/cli/cli.go` | 134–145 | `openBrowser()` — `default: return` silently does nothing on Windows |
-| 4 | `internal/cli/cli.go` | 113–132 | `detectContainerRuntime()` — probes `/opt/podman/bin/podman`; no Windows paths |
+| 3 | `internal/cli/cli.go` | 135–146 | `openBrowser()` — `default: return` silently does nothing on Windows |
+| 4 | `internal/cli/cli.go` | 114–133 | `detectContainerRuntime()` — probes `/opt/podman/bin/podman`; no Windows paths |
 | 5 | `internal/runner/container.go` | 117, 130, 147, 172, 213, 247 | `Options: "z"` and `"z,ro"` — SELinux flag meaningless on non-Linux; may be rejected by Docker Desktop on Windows |
-| 6 | `internal/handler/git.go` | 615–621 | `openFolder()` — uses `xdg-open` for all non-macOS; should use `explorer.exe` on Windows |
+| 5b | `internal/runner/refine.go` | 140, 150 | Same SELinux `"z,ro"` issue |
+| 5c | `internal/runner/ideate.go` | 286 | Same SELinux `"z,ro"` issue |
+| 6 | `internal/handler/git.go` | 616–621 | `openFolder()` — uses `xdg-open` for all non-macOS; should use `explorer.exe` on Windows |
 
 ### Build system (MEDIUM — users cannot `make build`)
 
@@ -87,7 +89,10 @@ All six changes below are small and isolated. They benefit both Tier 1 and Tier 
 
 #### Change 1: Signal handling — `server.go`
 
-**Current:** `signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)`
+**Current (line 137):**
+```go
+ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+```
 
 **Problem:** `syscall.SIGTERM` does not exist on Windows. `os.Interrupt` works
 everywhere (maps to `SIGINT` on Unix and `Ctrl+C` on Windows).
@@ -126,8 +131,8 @@ ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
 
 #### Change 2: Replace `syscall.Exec` — `exec.go`
 
-**Current:** `syscall.Exec(runtimePath, execArgs, os.Environ())` replaces the
-current process with the container exec for PTY inheritance.
+**Current (lines 93, 100):** `syscall.Exec(runtimePath, execArgs, os.Environ())`
+replaces the current process with the container exec for PTY inheritance.
 
 **Problem:** `syscall.Exec` (execve) does not exist on Windows.
 
@@ -178,7 +183,7 @@ func execReplace(binary string, args []string) error {
 ```
 
 Update `exec.go` to call `execReplace(runtimePath, execArgs)` instead of the
-direct `syscall.Exec(...)` calls.
+direct `syscall.Exec(...)` calls. Remove the `"syscall"` import from `exec.go`.
 
 **Trade-off:** On Windows, `wallfacer exec` creates a child process rather than
 replacing itself. PTY resize signals will not propagate automatically. This is
@@ -186,7 +191,7 @@ acceptable: Tier 1 WSL2 users run the Linux binary so they get real execve.
 
 #### Change 3: Browser launch + WSL2 detection — `cli.go`
 
-**Current:**
+**Current (lines 135–146):**
 ```go
 func openBrowser(url string) {
     switch runtime.GOOS {
@@ -221,8 +226,8 @@ func openBrowser(url string) {
 
 #### Change 4: Container runtime detection — `cli.go`
 
-**Current:** Checks `/opt/podman/bin/podman` then `LookPath("podman")` then
-`LookPath("docker")`.
+**Current (lines 114–133):** Checks `/opt/podman/bin/podman` then
+`LookPath("podman")` then `LookPath("docker")`.
 
 **Fix:** Skip the Unix-only path on Windows; add Windows-specific install
 locations:
@@ -262,11 +267,16 @@ func detectContainerRuntime() string {
 }
 ```
 
-#### Change 5: SELinux mount options — `container.go`
+#### Change 5: SELinux mount options — `container.go`, `refine.go`, `ideate.go`
 
 **Current:** All `VolumeMount` entries use `Options: "z"` or `Options: "z,ro"`.
 The `z` flag is SELinux-specific and only meaningful on Linux hosts with SELinux
 enabled. Docker Desktop on Windows and macOS ignores or rejects it.
+
+**Affected files and lines:**
+- `internal/runner/container.go`: lines 117, 130, 147, 172, 213, 247
+- `internal/runner/refine.go`: lines 140, 150
+- `internal/runner/ideate.go`: line 286
 
 **Fix:** Introduce a helper that strips the `z` option on non-Linux hosts:
 ```go
@@ -287,14 +297,14 @@ func mountOpts(opts ...string) string {
 ```
 
 Replace all hardcoded `"z"` with `mountOpts("z")` and `"z,ro"` with
-`mountOpts("z", "ro")` across `container.go`, `refine.go`, `ideate.go`, and
-`exec.go`.
+`mountOpts("z", "ro")` across all three files. Update tests in
+`container_spec_test.go` accordingly.
 
 **Bonus:** This also fixes macOS Docker Desktop users who may hit the same issue.
 
 #### Change 6: File manager launch — `git.go`
 
-**Current:**
+**Current (lines 616–621):**
 ```go
 switch runtime.GOOS {
 case "darwin": cmd = exec.CommandContext(r.Context(), "open", req.Path)
@@ -382,20 +392,19 @@ Out of scope for initial Windows support but noted for future work.
 | 2 | `syscall.Exec` build tags | `internal/cli/execve_unix.go` (new), `execve_windows.go` (new), `exec.go` | Small |
 | 3 | Browser launch + WSL2 detection | `internal/cli/cli.go` | Small |
 | 4 | Container runtime detection | `internal/cli/cli.go` | Small |
-| 5 | SELinux mount option stripping | `internal/runner/container.go`, `refine.go`, `ideate.go`, `internal/cli/exec.go` | Small |
+| 5 | SELinux mount option stripping | `internal/runner/container.go`, `refine.go`, `ideate.go`, `container_spec_test.go` | Small |
 | 6 | File manager launch | `internal/handler/git.go` | Small |
-| 7 | Windows CI job | `.github/workflows/` | Small |
+| 7 | Windows CI job | `.github/workflows/test.yml` | Small |
 | 8 | WSL2 getting-started docs | `docs/guide/getting-started.md` | Small |
-| 9 | Update `CLAUDE.md` and `AGENTS.md` | Root-level docs | Small |
 
 ### Phase 2: Native Windows (Tier 2) — future
 
 | Step | Change | Effort |
 |------|--------|--------|
-| 10 | Path translation for Docker Desktop WSL2 backend | Medium |
-| 11 | PowerShell build script or task runner | Medium |
-| 12 | End-to-end testing on Windows host + Docker Desktop | Medium |
-| 13 | Windows service support | Large |
+| 9 | Path translation for Docker Desktop WSL2 backend | Medium |
+| 10 | PowerShell build script or task runner | Medium |
+| 11 | End-to-end testing on Windows host + Docker Desktop | Medium |
+| 12 | Windows service support | Large |
 
 ---
 
