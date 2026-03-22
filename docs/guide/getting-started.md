@@ -115,6 +115,22 @@ Common `run` flags:
 
 Run `wallfacer run -help` for the full flag list. For the complete configuration reference (env vars, sandbox routing, webhooks, etc.), see [Configuration](configuration.md).
 
+## Windows (WSL2)
+
+Windows users can run Wallfacer inside WSL2 with the same experience as native Linux:
+
+1. **Install WSL2** — run `wsl --install` in an elevated PowerShell (requires Windows 10 2004+ or Windows 11)
+2. **Inside WSL2**, install Go 1.25+ and Podman (or Docker Engine)
+3. **Clone the repo into the WSL2 filesystem** (not `/mnt/c/` — cross-filesystem I/O is much slower)
+4. Build and run:
+   ```bash
+   go build -o wallfacer . && ./wallfacer run ~/project
+   ```
+5. The browser opens automatically on the Windows host via `cmd.exe /c start`
+6. Keep workspace repos on the WSL2 filesystem for best performance
+
+The container runtime override `CONTAINER_CMD` works on all platforms if the auto-detection picks the wrong binary.
+
 ## Next Steps
 
 - [Usage Guide](usage.md) — how to create tasks, handle feedback, use autopilot, and manage results
