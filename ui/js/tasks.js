@@ -668,6 +668,7 @@ async function syncTask(id) {
     if (res.status === 'already_syncing') {
       showAlert('Sync is already in progress for this task.');
     }
+    waitForTaskDelta(id);
   } catch (e) {
     showAlert('Error syncing task: ' + e.message);
   } finally {
