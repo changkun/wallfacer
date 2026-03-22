@@ -10,7 +10,7 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary build-claude build-codex server run shell clean ui-css api-contract fmt lint test test-backend test-frontend commit-seq push-once release-notes release
+.PHONY: build build-binary build-claude build-codex server run shell clean ui-css api-contract fmt fmt-go fmt-js lint test test-backend test-frontend commit-seq push-once release-notes release
 
 # Build the wallfacer binary and both sandbox images.
 build: build-binary build-claude build-codex
@@ -89,9 +89,16 @@ ui-css:
 	npx tailwindcss@3 -i ui/tailwind.input.css -o ui/css/tailwind.css \
 		--content './ui/**/*.{html,js}' --minify
 
+# Format all source files (Go + frontend)
+fmt: fmt-go fmt-js
+
 # Format all Go source files
-fmt:
+fmt-go:
 	gofmt -w .
+
+# Format frontend JS, HTML, and CSS files
+fmt-js:
+	npx --yes prettier@3 --write 'ui/**/*.{js,html,css}'
 
 # Run Go linters (golangci-lint if available, otherwise go vet)
 lint:
