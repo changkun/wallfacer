@@ -435,13 +435,25 @@ function hasExecutionTrail(t) {
 // Invalidate cached diff/behind-count state so that the next render re-fetches
 // data. Preserve the cached diff body so cards can continue rendering the last
 // known summary while forcing a behind-count refresh on the next fetch.
+// If a fetch is currently in-flight (sentinel object with loading: true), mark
+// it as invalidated so the fetch result is discarded when it completes.
 function invalidateDiffBehindCounts(taskId) {
   if (taskId) {
     const cached = diffCache.get(taskId);
-    if (cached && cached !== "loading") cached.behindFetchedAt = 0;
+    if (!cached) return;
+    if (cached.loading) {
+      cached.invalidated = true;
+    } else {
+      cached.behindFetchedAt = 0;
+    }
   } else {
     diffCache.forEach(function (cached) {
-      if (cached && cached !== "loading") cached.behindFetchedAt = 0;
+      if (!cached) return;
+      if (cached.loading) {
+        cached.invalidated = true;
+      } else {
+        cached.behindFetchedAt = 0;
+      }
     });
   }
 }
@@ -479,7 +491,7 @@ function renderDiffInto(el, diff) {
 
 async function fetchDiff(card, taskId, updatedAt) {
   const cached = diffCache.get(taskId);
-  if (cached === "loading") return;
+  if (cached && cached.loading) return;
   // Cache is valid if the task hasn't changed AND behind-counts are still fresh.
   // invalidateDiffBehindCounts() evicts stale entries explicitly for changed tasks,
   // and BEHIND_TTL_MS provides a fallback refresh window for slowly advancing
@@ -495,13 +507,22 @@ async function fetchDiff(card, taskId, updatedAt) {
       applyDiffToCard(diffEl, cached.diff, cached.behindCounts, taskId);
     return;
   }
-  diffCache.set(taskId, "loading");
+  const sentinel = { loading: true };
+  diffCache.set(taskId, sentinel);
   try {
     const diffPath =
       typeof task === "function"
         ? task(taskId).diff()
         : "/api/tasks/" + encodeURIComponent(taskId) + "/diff";
     const data = await api(diffPath);
+    // If an SSE invalidation arrived while the fetch was in-flight, the data
+    // is stale (e.g. sync completed during the request). Discard the result
+    // and schedule a fresh render that will re-fetch with current state.
+    if (sentinel.invalidated) {
+      diffCache.delete(taskId);
+      scheduleRender();
+      return;
+    }
     const behindCounts = data.behind_counts || {};
     diffCache.set(taskId, {
       diff: data.diff,

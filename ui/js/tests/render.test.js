@@ -546,6 +546,49 @@ describe("render.js diffCache", () => {
       updatedAt,
     });
   });
+
+  it("marks in-flight loading sentinel as invalidated", () => {
+    const sentinel = { loading: true };
+    renderExports.diffCache.set("task-c", sentinel);
+
+    renderExports.invalidateDiffBehindCounts("task-c");
+
+    expect(sentinel.invalidated).toBe(true);
+  });
+
+  it("discards stale fetch result when invalidated during in-flight request", async () => {
+    // Simulate a diff fetch that is in-flight when an SSE invalidation arrives.
+    // The fetch should discard the stale result and schedule a re-render.
+    let resolveApi;
+    ctx.api = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveApi = resolve;
+        }),
+    );
+
+    const card = { querySelector: () => null };
+    const fetchPromise = ctx.fetchDiff(card, "task-d", "u1");
+
+    // Cache should now be the loading sentinel.
+    const sentinel = renderExports.diffCache.get("task-d");
+    expect(sentinel).toBeTruthy();
+    expect(sentinel.loading).toBe(true);
+
+    // Simulate SSE invalidation arriving while fetch is in-flight.
+    renderExports.invalidateDiffBehindCounts("task-d");
+    expect(sentinel.invalidated).toBe(true);
+
+    // Resolve the API call with stale data.
+    ctx.scheduleRender = vi.fn();
+    resolveApi({ diff: "stale diff", behind_counts: { repo: 3 } });
+    await fetchPromise;
+
+    // The stale result should have been discarded.
+    expect(renderExports.diffCache.has("task-d")).toBe(false);
+    // A re-render should have been scheduled.
+    expect(ctx.scheduleRender).toHaveBeenCalled();
+  });
 });
 
 describe("render.js cardOversightCache", () => {
