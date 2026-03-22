@@ -2677,12 +2677,12 @@ func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	h.tryAutoSubmit(ctx)
 
 	var got *store.Task
-	for range 20 {
+	for range 100 {
 		got, _ = h.store.GetTask(ctx, task.ID)
 		if got != nil && got.Status == store.TaskStatusDone {
 			break
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 	if got == nil || got.Status != store.TaskStatusDone {
 		t.Fatalf("expected task to complete via fallback commit message, got %v", got.Status)

@@ -25,6 +25,7 @@ func setupRepo(t *testing.T) string {
 	gitRun(t, dir, "init", "-b", "main")
 	gitRun(t, dir, "config", "user.email", "test@example.com")
 	gitRun(t, dir, "config", "user.name", "Test")
+	gitRun(t, dir, "config", "core.autocrlf", "false")
 	if err := os.WriteFile(filepath.Join(dir, "file.txt"), []byte("initial\n"), 0644); err != nil {
 		t.Fatal(err)
 	}

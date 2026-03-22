@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -254,6 +255,9 @@ func TestTryAutoRetry_EligibleAfterManualRetryReset(t *testing.T) {
 //     Phase1 found the task and Phase2 attempted to process it (i.e., Phase1 did
 //     NOT skip it after the rollback).
 func TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Chmod cannot enforce read-only directories on Windows")
+	}
 	h := newTestHandler(t)
 	h.SetAutopilot(true)
 	h.SetAutotest(true)
@@ -341,6 +345,9 @@ func TestTryAutoTest_UpdateStatusFailure_RollsBackIsTestRun(t *testing.T) {
 // than pauseAllAutomation, so global autopilot remains enabled and no other
 // watcher breakers are affected.
 func TestTryAutoTest_Phase2StoreError_OpensOnlyAutoTestBreaker(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("os.Chmod cannot enforce read-only directories on Windows")
+	}
 	h := newTestHandler(t)
 	h.SetAutopilot(true)
 	h.SetAutotest(true)

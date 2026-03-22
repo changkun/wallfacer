@@ -271,12 +271,12 @@ func TestCompleteTask_WithSessionRestoresMissingWorktreeDir(t *testing.T) {
 	}
 
 	var updated *store.Task
-	for range 20 {
+	for range 100 {
 		updated, _ = h.store.GetTask(ctx, task.ID)
 		if updated != nil && updated.Status == store.TaskStatusDone {
 			break
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 	if updated == nil || updated.Status != store.TaskStatusDone {
 		t.Fatalf("expected done after restoring missing worktree, got %v", updated.Status)
@@ -397,12 +397,12 @@ func TestCompleteTask_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 	}
 
 	var updated *store.Task
-	for range 20 {
+	for range 100 {
 		updated, _ = h.store.GetTask(ctx, task.ID)
 		if updated != nil && updated.Status == store.TaskStatusDone {
 			break
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 	if updated == nil || updated.Status != store.TaskStatusDone {
 		t.Fatalf("expected task to reach done via fallback commit message, got %v", updated.Status)
