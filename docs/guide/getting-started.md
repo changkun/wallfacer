@@ -96,9 +96,19 @@ Common `run` flags:
 
 Run `wallfacer run -help` for the full flag list. For the complete configuration reference (env vars, sandbox routing, webhooks, etc.), see [Configuration](configuration.md).
 
-## Windows (WSL2)
+## Windows
 
-Windows users can run Wallfacer inside WSL2 with the same experience as native Linux:
+### Native Windows
+
+A pre-built `wallfacer-windows-amd64.exe` binary is available on the [releases page](https://github.com/changkun/wallfacer/releases). You can also install via Git Bash or MSYS2:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
+```
+
+### WSL2
+
+Windows users can also run Wallfacer inside WSL2 with the same experience as native Linux:
 
 1. **Install WSL2** — run `wsl --install` in an elevated PowerShell (requires Windows 10 2004+ or Windows 11)
 2. **Inside WSL2**, install Go 1.25+ and Podman (or Docker Engine)

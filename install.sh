@@ -15,11 +15,12 @@ REPO="changkun/wallfacer"
 # --- Detect OS ---
 OS="$(uname -s)"
 case "$OS" in
-  Linux)  OS="linux" ;;
-  Darwin) OS="darwin" ;;
+  Linux)   OS="linux" ;;
+  Darwin)  OS="darwin" ;;
+  MINGW*|MSYS*|CYGWIN*) OS="windows" ;;
   *)
     echo "Error: unsupported operating system: $OS" >&2
-    echo "Wallfacer supports Linux and macOS." >&2
+    echo "Wallfacer supports Linux, macOS, and Windows." >&2
     exit 1
     ;;
 esac
@@ -52,8 +53,18 @@ else
   INSTALL_DIR="$HOME/.local/bin"
 fi
 
+# --- Windows constraints ---
+EXT=""
+if [ "$OS" = "windows" ]; then
+  EXT=".exe"
+  if [ "$ARCH" != "amd64" ]; then
+    echo "Error: Windows builds are available for amd64 only." >&2
+    exit 1
+  fi
+fi
+
 # --- Build download URL ---
-BINARY="wallfacer-${OS}-${ARCH}"
+BINARY="wallfacer-${OS}-${ARCH}${EXT}"
 if [ "$VERSION" = "latest" ]; then
   URL="https://github.com/${REPO}/releases/latest/download/${BINARY}"
 else
@@ -79,11 +90,11 @@ fi
 # --- Install ---
 mkdir -p "$INSTALL_DIR"
 chmod +x "$TMPFILE"
-mv "$TMPFILE" "$INSTALL_DIR/wallfacer"
+mv "$TMPFILE" "$INSTALL_DIR/wallfacer${EXT}"
 trap - EXIT
 
 echo ""
-echo "Installed wallfacer to ${INSTALL_DIR}/wallfacer"
+echo "Installed wallfacer to ${INSTALL_DIR}/wallfacer${EXT}"
 
 # --- Check PATH ---
 case ":$PATH:" in
