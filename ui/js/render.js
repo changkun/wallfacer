@@ -720,6 +720,8 @@ function render() {
   if (window.depGraphEnabled && typeof renderDependencyGraph === "function")
     renderDependencyGraph(getRenderableTasks());
   else if (typeof hideDependencyGraph === "function") hideDependencyGraph();
+
+  if (typeof updateStatusBar === "function") updateStatusBar();
 }
 
 // --- Board render scheduler ---

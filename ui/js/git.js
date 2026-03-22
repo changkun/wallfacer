@@ -215,6 +215,8 @@ function renderWorkspaces() {
       return `<span title="${escapeHtml(ws.path)}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 6px 2px 8px;border-radius:4px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border);position:relative;">${nameEl}${branchBtn}${behindBadge}${aheadBadge}${syncBtn}${pushBtn}${rebaseMainBtn}</span>`;
     })
     .join("");
+
+  if (typeof updateStatusBar === "function") updateStatusBar();
 }
 
 // --- Branch dropdown ---
