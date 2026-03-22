@@ -50,8 +50,7 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 ### CLI Basics
 
 ```bash
-wallfacer run ~/project1 ~/project2     # Mount workspaces, open browser
-wallfacer run                           # Default to current directory
+wallfacer run                           # Start server, restore last workspace group
 wallfacer run -addr :9090 -no-browser   # Custom port, no browser
 wallfacer status                        # Print board state to terminal
 wallfacer status -watch                 # Live-updating board state
@@ -251,7 +250,7 @@ Each unique set of workspaces gets its own `AGENTS.md` file stored in `~/.wallfa
 
 #### How Fingerprinting Works
 
-The instructions file is identified by a SHA-256 hash of the sorted, absolute workspace paths. This means `wallfacer run ~/a ~/b` and `wallfacer run ~/b ~/a` share the same instructions file, while `wallfacer run ~/a ~/b ~/c` gets a separate one.
+The instructions file is identified by a SHA-256 hash of the sorted, absolute workspace paths. This means switching to workspaces `~/a` and `~/b` (in any order) shares the same instructions file, while `~/a`, `~/b`, and `~/c` together gets a separate one.
 
 #### Initial Generation
 
@@ -307,7 +306,6 @@ wallfacer run [flags] [workspace...]
 | `-image` | `SANDBOX_IMAGE` | `ghcr.io/changkun/wallfacer:latest` | Sandbox image name |
 | `-env-file` | `ENV_FILE` | `~/.wallfacer/.env` | Env file passed to containers |
 | `-no-browser` | -- | `false` | Skip auto-opening the browser |
-| `-no-workspaces` | -- | `false` | Start with no active workspaces |
 | `-log-format` | `LOG_FORMAT` | `text` | Log output format: `text` or `json` |
 
 Container runtime auto-detection order: `/opt/podman/bin/podman`, then `podman` on `$PATH`, then `docker` on `$PATH`.

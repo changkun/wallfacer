@@ -20,29 +20,11 @@ This detects your OS and architecture, downloads the latest binary, and places i
 
 ## Step 2 — Start Wallfacer
 
-Pass the directories of the projects you want to work on:
-
-```bash
-wallfacer run ~/projects/myapp
-```
-
-Multiple workspaces:
-
-```bash
-wallfacer run ~/projects/myapp ~/projects/mylib
-```
-
-No argument defaults to the current directory:
-
 ```bash
 wallfacer run
 ```
 
-Start with no active workspaces (configure them later in the UI):
-
-```bash
-wallfacer run -no-workspaces
-```
+On startup, Wallfacer restores the most recently used workspace group from your previous session. If no saved group exists, it starts with no active workspaces — select them from the UI workspace picker.
 
 On first run, Wallfacer auto-creates `~/.wallfacer/` and a template `.env` file. The browser opens automatically to `http://localhost:8080` showing a task board with four columns.
 
@@ -94,7 +76,7 @@ If the task fails immediately, check:
 ## CLI Reference
 
 ```bash
-wallfacer run [flags] [workspace...]     # Start the task board server
+wallfacer run [flags]                    # Start the task board server
 wallfacer doctor                         # Check prerequisites and config
 wallfacer status                         # Print board state to terminal
 wallfacer status -watch                  # Live-updating board state
@@ -109,7 +91,6 @@ Common `run` flags:
 |------|---------|-------------|
 | `-addr` | `:8080` | Listen address |
 | `-no-browser` | `false` | Skip auto-opening the browser |
-| `-no-workspaces` | `false` | Start with no active workspaces |
 | `-container` | auto-detected | Container runtime (`podman` or `docker`) |
 | `-log-format` | `text` | Log format: `text` or `json` |
 
@@ -124,7 +105,7 @@ Windows users can run Wallfacer inside WSL2 with the same experience as native L
 3. **Clone the repo into the WSL2 filesystem** (not `/mnt/c/` — cross-filesystem I/O is much slower)
 4. Build and run:
    ```bash
-   go build -o wallfacer . && ./wallfacer run ~/project
+   go build -o wallfacer . && ./wallfacer run
    ```
 5. The browser opens automatically on the Windows host via `cmd.exe /c start`
 6. Keep workspace repos on the WSL2 filesystem for best performance

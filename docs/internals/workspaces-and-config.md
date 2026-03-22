@@ -33,7 +33,7 @@ func Key(workspaces []string) string {
 }
 ```
 
-Because paths are sorted before hashing, `wallfacer run ~/a ~/b` and `wallfacer run ~/b ~/a` produce the same key and share the same data directory and instructions file.
+Because paths are sorted before hashing, switching to workspaces `~/a` and `~/b` (in any order) produces the same key and shares the same data directory and instructions file.
 
 ### 📂 Workspace Groups
 
@@ -45,7 +45,7 @@ Key operations:
 - **`Upsert(configDir, workspaces)`** -- adds a new group or promotes an existing one to the front of the list (MRU ordering)
 - **`Normalize(groups)`** -- deduplicates groups, sorts paths within each group, removes empty entries
 
-On startup, if no workspaces are provided on the command line, `Manager.startupWorkspaces()` loads the first group from `workspace-groups.json` as the default.
+On startup, `Manager.startupWorkspaces()` loads the first group from `workspace-groups.json` as the default. If no saved group exists, it starts with no active workspaces.
 
 ### 🔍 Workspace Scoping
 
@@ -81,7 +81,7 @@ Workspace instruction files live in `~/.wallfacer/instructions/`. Each unique wo
 
 ### 🔑 Fingerprinting
 
-The filename is derived from the same SHA-256 fingerprint used for workspace scoping (see Workspace Key Hashing above). This means `wallfacer run ~/a ~/b` and `wallfacer run ~/b ~/a` share the same instructions file.
+The filename is derived from the same SHA-256 fingerprint used for workspace scoping (see Workspace Key Hashing above). This means switching to workspaces `~/a` and `~/b` (in any order) shares the same instructions file.
 
 ### 📄 Default Template Generation
 

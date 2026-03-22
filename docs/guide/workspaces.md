@@ -18,20 +18,7 @@ Workspaces are the directories containing your source code that Wallfacer mounts
 
 #### From the command line
 
-The most common way to set workspaces is when launching the server:
-
-```bash
-# Mount two project directories
-wallfacer run ~/project1 ~/project2
-
-# Mount the current directory (default when no paths are given)
-wallfacer run
-
-# Start with no workspaces -- the UI will prompt you to select them
-wallfacer run -no-workspaces
-```
-
-Workspace paths must be absolute. Wallfacer validates that every path exists and is a directory before proceeding.
+On startup, Wallfacer restores the most recently used workspace group from your previous session. If no saved group exists, it starts with no active workspaces — select them from the UI workspace picker.
 
 #### Workspace browser
 
@@ -220,7 +207,7 @@ Auto-push can also be toggled from the **Automation** menu in the header.
 
 ### 📝 Workspace Instructions (AGENTS.md)
 
-Each workspace group has its own `AGENTS.md` file that provides instructions to every agent running in that group. The file is identified by a SHA-256 fingerprint of the sorted workspace paths, so `wallfacer run ~/a ~/b` and `wallfacer run ~/b ~/a` share the same instructions file.
+Each workspace group has its own `AGENTS.md` file that provides instructions to every agent running in that group. The file is identified by a SHA-256 fingerprint of the sorted workspace paths, so switching to workspaces `~/a` and `~/b` (in any order) shares the same instructions file.
 
 #### Where instructions are stored
 

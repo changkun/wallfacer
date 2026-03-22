@@ -30,10 +30,8 @@ CLI usage (after `go build -o wallfacer .`):
 
 ```bash
 wallfacer                                    # Print help
-wallfacer run ~/project1 ~/project2          # Mount workspaces, open browser
-wallfacer run                                # Defaults to current directory
+wallfacer run                                # Start server, restore last workspace group
 wallfacer run -addr :9090 -no-browser        # Custom port, no browser
-wallfacer run -no-workspaces                 # Start with no active workspaces
 wallfacer doctor                             # Check prerequisites and config
 wallfacer status                             # Print board state to terminal
 wallfacer status -watch                      # Live-updating board state
@@ -234,7 +232,7 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 ## Workspace AGENTS.md (Instructions)
 
 Each unique combination of workspace directories gets its own `AGENTS.md` in `~/.wallfacer/instructions/`.
-The file is identified by a SHA-256 fingerprint of the sorted workspace paths, so `wallfacer run ~/a ~/b` and `wallfacer run ~/b ~/a` share the same file.
+The file is identified by a SHA-256 fingerprint of the sorted workspace paths, so switching to workspaces `~/a` and `~/b` (in any order) shares the same file.
 
 On first run the file is created from:
 1. A default wallfacer template (defined in `instructions.go`).

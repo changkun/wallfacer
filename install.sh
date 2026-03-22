@@ -98,4 +98,4 @@ esac
 
 echo ""
 echo "Get started:"
-echo "  wallfacer run ~/your-project"
+echo "  wallfacer run"

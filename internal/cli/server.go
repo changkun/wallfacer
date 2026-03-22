@@ -47,13 +47,10 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), "sandbox container image")
 	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
 	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
-	noWorkspaces := fs.Bool("no-workspaces", false, "start with no active workspaces")
 
 	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags] [workspace ...]\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags]\n\n")
 		fmt.Fprintf(os.Stderr, "Start the task board server and open the web UI.\n\n")
-		fmt.Fprintf(os.Stderr, "Positional arguments:\n")
-		fmt.Fprintf(os.Stderr, "  workspace    directories to mount in the sandbox (default: current directory)\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		fs.PrintDefaults()
 	}
@@ -65,7 +62,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	// Auto-initialize config directory and .env template.
 	initConfigDir(configDir, *envFile)
 
-	workspaces := resolveStartupWorkspaces(*noWorkspaces, fs.Args(), *envFile)
+	var workspaces []string
 	wsMgr, err := workspace.NewManager(configDir, *dataDir, *envFile, workspaces)
 	if err != nil {
 		logger.Fatal("workspace manager", "error", err)
@@ -875,51 +872,6 @@ func ensureImage(containerCmd, image string) string {
 	return image
 }
 
-func resolveStartupWorkspaces(noWorkspaces bool, cliArgs []string, envFile string) []string {
-	if noWorkspaces {
-		return []string{}
-	}
-	if len(cliArgs) > 0 {
-		return mustResolveWorkspaces(cliArgs)
-	}
-	cfg, err := envconfig.Parse(envFile)
-	if err == nil && len(cfg.Workspaces) > 0 {
-		if resolved, err := tryResolveWorkspaces(cfg.Workspaces); err == nil {
-			return resolved
-		}
-		logger.Main.Warn("persisted workspaces invalid; starting without workspaces")
-		return nil
-	}
-	return nil
-}
-
-func mustResolveWorkspaces(paths []string) []string {
-	resolved, err := tryResolveWorkspaces(paths)
-	if err != nil {
-		logger.Fatal("resolve workspaces", "error", err)
-	}
-	return resolved
-}
-
-func tryResolveWorkspaces(paths []string) ([]string, error) {
-	resolved := make([]string, 0, len(paths))
-	for _, ws := range paths {
-		abs, err := filepath.Abs(ws)
-		if err != nil {
-			return nil, err
-		}
-		clean := filepath.Clean(abs)
-		info, err := os.Stat(clean)
-		if err != nil {
-			return nil, err
-		}
-		if !info.IsDir() {
-			return nil, fmt.Errorf("%s is not a directory", clean)
-		}
-		resolved = append(resolved, clean)
-	}
-	return resolved, nil
-}
 
 func requiresStore(name string) bool {
 	switch name {
