@@ -386,10 +386,10 @@ function _fetchTestLogs(id, retryDelay, seq) {
   if (!_isCurrentModalSeq(seq)) return;
   if (testLogsAbort) testLogsAbort.abort();
   testLogsAbort = new AbortController();
-  if (!retryDelay) {
-    testRawLogBuffer = '';
-    document.getElementById('modal-test-logs').innerHTML = '';
-  }
+  // Always clear the buffer — the server re-sends all logs from the start, so
+  // keeping stale data would produce duplicates in pretty mode.
+  testRawLogBuffer = '';
+  document.getElementById('modal-test-logs').innerHTML = '';
   const delay = retryDelay || 1000;
   const decoder = new TextDecoder();
   // For completed tasks use phase=test to serve only test-agent turns (those
@@ -443,11 +443,11 @@ function _fetchLogs(id, retryDelay, seq) {
   if (!_isCurrentModalSeq(seq)) return;
   if (logsAbort) logsAbort.abort();
   logsAbort = new AbortController();
-  if (!retryDelay) {
-    rawLogBuffer = '';
-    document.getElementById('modal-logs').innerHTML = '';
-    _renderedLogLen = 0; _renderedLogMode = ''; _renderedLogQuery = '';
-  }
+  // Always clear the buffer — the server re-sends all logs from the start, so
+  // keeping stale data would produce duplicates in pretty mode.
+  rawLogBuffer = '';
+  document.getElementById('modal-logs').innerHTML = '';
+  _renderedLogLen = 0; _renderedLogMode = ''; _renderedLogQuery = '';
   const delay = retryDelay || 1000;
   const decoder = new TextDecoder();
   const url = `/api/tasks/${id}/logs?raw=true`;

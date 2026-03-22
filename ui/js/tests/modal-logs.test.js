@@ -148,6 +148,9 @@ function makeLogsContext() {
     renderOversightInLogs: () => {},
     renderTestOversightInTestLogs: () => {},
     escapeHtml: (s) => String(s ?? ''),
+    // Auth helpers used by _fetchLogs / _fetchTestLogs
+    withAuthToken: (url) => url,
+    withBearerHeaders: () => ({}),
     // Timeline helpers called by setRightTab
     _stopTimelineRefresh: () => {},
     _startTimelineRefresh: () => {},
@@ -490,6 +493,39 @@ describe('renderLogs append-only', () => {
     // Clear the filter — full rebuild back to all lines.
     ctx.onLogSearchInput('');
     expect(elements['modal-logs'].children.length).toBe(3);
+  });
+
+  it('clears buffer on reconnect to avoid duplicates', () => {
+    // Simulate initial _fetchLogs call (retryDelay=null): buffer is cleared.
+    vm.runInContext('_modalState.taskId = "task-1"', ctx);
+    vm.runInContext('logsMode = "pretty"', ctx);
+    vm.runInContext('rawLogBuffer = "line1\\nline2\\nline3"', ctx);
+    ctx.renderLogs();
+    expect(elements['modal-logs'].children.length).toBe(3);
+    const renderedLen = vm.runInContext('_renderedLogLen', ctx);
+    expect(renderedLen).toBe('line1\nline2\nline3'.length);
+
+    // Simulate reconnect: _fetchLogs is called with retryDelay (non-null).
+    // The fix clears rawLogBuffer so the server's re-sent logs don't duplicate.
+    ctx._fetchLogs('task-1', 2000, 0);
+
+    // After _fetchLogs clears the buffer, rawLogBuffer must be empty and the
+    // render cursor must be reset to 0 so the next render is a full rebuild.
+    expect(vm.runInContext('rawLogBuffer', ctx)).toBe('');
+    expect(vm.runInContext('_renderedLogLen', ctx)).toBe(0);
+    expect(elements['modal-logs'].innerHTML).toBe('');
+  });
+
+  it('clears test buffer on reconnect to avoid duplicates', () => {
+    vm.runInContext('_modalState.taskId = "task-1"', ctx);
+    vm.runInContext('testRawLogBuffer = "test-line1\\ntest-line2"', ctx);
+    ctx.renderTestLogs();
+    expect(elements['modal-test-logs'].innerHTML).toContain('test-line1');
+
+    ctx._fetchTestLogs('task-1', 2000, 0);
+
+    expect(vm.runInContext('testRawLogBuffer', ctx)).toBe('');
+    expect(elements['modal-test-logs'].innerHTML).toBe('');
   });
 
   it('skips re-render when no new data has arrived', () => {
