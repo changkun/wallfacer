@@ -4,9 +4,9 @@
 
 ## Problem
 
-Native Windows support — running the Go server directly on the Windows host —
-depends on Claude Code having a Windows-compatible story. WSL2 support (Tier 1)
-is complete; this spec covers the remaining work for native Windows (Tier 2).
+WSL2 support (Tier 1) is complete. This spec covers the remaining work for
+native Windows (Tier 2) — running the Go server directly on the Windows host,
+with sandbox containers launched via Docker Desktop or Podman Desktop.
 
 For containerization backend analysis, see `specs/native-containerization-windows.md`.
 
@@ -15,8 +15,8 @@ For containerization backend analysis, see `specs/native-containerization-window
 - WSL2 support (Tier 1) is complete: signal handling, execve build tags,
   browser/WSL2 detection, runtime detection, SELinux mount stripping, file
   manager launch, Windows CI, docs, and compat tests are all shipped.
-- Claude Code must support Windows natively or via a WSL2 bridge where the
-  container runtime runs Linux containers through Docker Desktop's WSL2 backend
+- A container runtime that can run Linux containers on Windows (Docker Desktop
+  or Podman Desktop, both use WSL2 backend internally)
 
 ### 2A: Windows Release Binaries
 
@@ -100,12 +100,11 @@ Out of scope until there is demonstrated demand for native Windows deployment.
 |------|--------|------------|--------|
 | 1 | Windows release binaries (2A) | — | Small |
 | 2 | Document `go build` for Windows (2C) | — | Small |
-| 3 | Container path translation (2B) | Claude Code Windows support | Medium |
+| 3 | Container path translation (2B) | — | Medium |
 | 4 | End-to-end testing (2D) | 2B | Medium |
 | 5 | Windows service support (2E) | Demand | Large |
 
-Steps 1–2 can be done immediately. Steps 3–4 are blocked on Claude Code
-having a Windows-compatible execution path.
+Steps 1–3 can be done independently. Step 4 requires 2B.
 
 ---
 
@@ -113,7 +112,6 @@ having a Windows-compatible execution path.
 
 | Risk | Mitigation |
 |------|------------|
-| Claude Code does not support Windows natively | WSL2 support is complete and sidesteps this |
 | Docker Desktop license restrictions for commercial use | Podman Desktop is free; document both options |
 | Path translation edge cases on Windows | Thorough unit tests for drive letters, UNC, Unicode, spaces |
 | Windows CI adds maintenance burden | Keep minimal: build + vet + unit tests only |
