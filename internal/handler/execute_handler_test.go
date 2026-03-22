@@ -1155,15 +1155,18 @@ func TestRunCommitTransition_SuccessWithMock(t *testing.T) {
 	_ = s.UpdateTaskWorktrees(ctx, task.ID, map[string]string{worktreeDir: worktreeDir}, "task/branch")
 
 	h.runCommitTransition(task.ID, "session-1", store.TriggerUser, "commit error: ")
-	// Give the goroutine time to complete.
-	time.Sleep(100 * time.Millisecond)
 
-	updated, err := s.GetTask(ctx, task.ID)
-	if err != nil {
-		t.Fatal(err)
+	// Poll until the background goroutine completes the commit transition.
+	var updated *store.Task
+	for range 100 {
+		updated, _ = s.GetTask(ctx, task.ID)
+		if updated != nil && updated.Status == store.TaskStatusDone {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 	// MockRunner.Commit returns nil, so the task should reach done status.
-	if updated.Status != store.TaskStatusDone {
+	if updated == nil || updated.Status != store.TaskStatusDone {
 		t.Errorf("expected done status, got %q", updated.Status)
 	}
 }

@@ -1076,15 +1076,17 @@ func TestStartAutoRetrier_StartupScan(t *testing.T) {
 
 	h.StartAutoRetrier(ctx)
 
-	// Allow the startup goroutine time to run the recovery scan (all in-memory).
-	time.Sleep(100 * time.Millisecond)
-
-	// (a) should be reset to backlog.
-	gotA, err := h.store.GetTask(ctx, taskA.ID)
-	if err != nil {
-		t.Fatal(err)
+	// Poll until the startup goroutine completes the recovery scan.
+	var gotA *store.Task
+	for range 100 {
+		gotA, _ = h.store.GetTask(ctx, taskA.ID)
+		if gotA != nil && gotA.Status == store.TaskStatusBacklog {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
-	if gotA.Status != store.TaskStatusBacklog {
+	// (a) should be reset to backlog.
+	if gotA == nil || gotA.Status != store.TaskStatusBacklog {
 		t.Errorf("task (a): status = %q, want backlog (eligible retry should fire)", gotA.Status)
 	}
 
@@ -1181,14 +1183,18 @@ func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 	}
 
 	h.StartAutoRetrier(ctx)
-	time.Sleep(100 * time.Millisecond)
 
-	// task1 should be reset to backlog (count=2 < 3, budget=1 > 0).
-	got1, err := h.store.GetTask(ctx, task1.ID)
-	if err != nil {
-		t.Fatal(err)
+	// Poll until the startup goroutine completes the recovery scan.
+	var got1 *store.Task
+	for range 100 {
+		got1, _ = h.store.GetTask(ctx, task1.ID)
+		if got1 != nil && got1.Status == store.TaskStatusBacklog {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
-	if got1.Status != store.TaskStatusBacklog {
+	// task1 should be reset to backlog (count=2 < 3, budget=1 > 0).
+	if got1 == nil || got1.Status != store.TaskStatusBacklog {
 		t.Errorf("task1: status = %q, want backlog (one retry remaining at count=2)", got1.Status)
 	}
 
