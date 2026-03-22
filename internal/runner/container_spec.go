@@ -1,8 +1,9 @@
 package runner
 
 import (
-	"sort"
 	"strings"
+
+	"changkun.de/x/wallfacer/internal/pkg/sortedkeys"
 )
 
 // VolumeMount describes a single bind mount passed to the container runtime.
@@ -61,30 +62,16 @@ func (s ContainerSpec) Build() []string {
 	}
 	args := []string{"run", "--rm", "--network=" + network, "--name", s.Name}
 
-	if len(s.Labels) > 0 {
-		keys := make([]string, 0, len(s.Labels))
-		for k := range s.Labels {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			args = append(args, "--label", k+"="+s.Labels[k])
-		}
+	for k := range sortedkeys.Of(s.Labels) {
+		args = append(args, "--label", k+"="+s.Labels[k])
 	}
 
 	if s.EnvFile != "" {
 		args = append(args, "--env-file", s.EnvFile)
 	}
 
-	if len(s.Env) > 0 {
-		keys := make([]string, 0, len(s.Env))
-		for k := range s.Env {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			args = append(args, "-e", k+"="+s.Env[k])
-		}
+	for k := range sortedkeys.Of(s.Env) {
+		args = append(args, "-e", k+"="+s.Env[k])
 	}
 
 	for _, v := range s.Volumes {

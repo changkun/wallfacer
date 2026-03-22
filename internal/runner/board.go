@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -47,12 +48,12 @@ type BoardTask struct {
 // sharesWorkspace reports whether a task's worktree paths overlap with any of
 // the self task's workspace paths. Tasks with no worktrees (e.g. backlog) are
 // considered to share all workspaces so they appear in board context.
-func sharesWorkspace(worktreePaths map[string]string, selfWorkspaces map[string]struct{}) bool {
+func sharesWorkspace(worktreePaths map[string]string, selfWorkspaces set.Set[string]) bool {
 	if len(worktreePaths) == 0 {
 		return true // backlog tasks have no worktrees; include them
 	}
 	for repoPath := range worktreePaths {
-		if _, ok := selfWorkspaces[repoPath]; ok {
+		if selfWorkspaces.Has(repoPath) {
 			return true
 		}
 	}
@@ -124,22 +125,22 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 
 	// Build the set of workspace repo paths the self task is operating on.
 	// Siblings are only visible if they share at least one workspace.
-	selfWorkspaces := make(map[string]struct{})
+	selfWorkspaces := set.New[string]()
 	for _, t := range tasks {
 		if t.ID == selfTaskID {
 			for repoPath := range t.WorktreePaths {
-				selfWorkspaces[repoPath] = struct{}{}
+				selfWorkspaces.Add(repoPath)
 			}
 			break
 		}
 	}
 	// If the self task has no worktrees (e.g. backlog), fall back to the
 	// runner's configured workspace list so board context is still useful.
-	if len(selfWorkspaces) == 0 && len(r.workspaces) > 0 {
+	if selfWorkspaces.Len() == 0 && len(r.workspaces) > 0 {
 		for _, ws := range r.workspaces {
 			ws = strings.TrimSpace(ws)
 			if ws != "" {
-				selfWorkspaces[ws] = struct{}{}
+				selfWorkspaces.Add(ws)
 			}
 		}
 	}
@@ -151,7 +152,7 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 		shortID := t.ID.String()[:8]
 
 		// Skip siblings that do not share any workspace with the self task.
-		if !isSelf && len(selfWorkspaces) > 0 && !sharesWorkspace(t.WorktreePaths, selfWorkspaces) {
+		if !isSelf && selfWorkspaces.Len() > 0 && !sharesWorkspace(t.WorktreePaths, selfWorkspaces) {
 			continue
 		}
 

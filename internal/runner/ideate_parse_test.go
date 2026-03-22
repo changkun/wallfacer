@@ -2,6 +2,8 @@ package runner
 
 import (
 	"testing"
+
+	"changkun.de/x/wallfacer/internal/pkg/set"
 )
 
 // --- normalizeIdeationPriority tests ---
@@ -143,61 +145,61 @@ func TestNormalizeIdeationImpact_TrimsStringFields(t *testing.T) {
 // --- isIdeaDuplicateTitle tests ---
 
 func TestIsIdeaDuplicateTitle_EmptyTitle(t *testing.T) {
-	added := map[string]struct{}{}
-	if !isIdeaDuplicateTitle(added, "") {
+	added := set.New[string]()
+	if !isIdeaDuplicateTitle(&added, "") {
 		t.Error("empty title should be duplicate")
 	}
-	if !isIdeaDuplicateTitle(added, "   ") {
+	if !isIdeaDuplicateTitle(&added, "   ") {
 		t.Error("whitespace-only title should be duplicate")
 	}
 }
 
 func TestIsIdeaDuplicateTitle_FirstOccurrence(t *testing.T) {
-	added := map[string]struct{}{}
-	if isIdeaDuplicateTitle(added, "unique title") {
+	added := set.New[string]()
+	if isIdeaDuplicateTitle(&added, "unique title") {
 		t.Error("first occurrence should not be duplicate")
 	}
 }
 
 func TestIsIdeaDuplicateTitle_ExactMatch(t *testing.T) {
-	added := map[string]struct{}{}
-	isIdeaDuplicateTitle(added, "foo bar")
-	if !isIdeaDuplicateTitle(added, "foo bar") {
+	added := set.New[string]()
+	isIdeaDuplicateTitle(&added, "foo bar")
+	if !isIdeaDuplicateTitle(&added, "foo bar") {
 		t.Error("exact match should be duplicate")
 	}
 }
 
 func TestIsIdeaDuplicateTitle_CaseInsensitive(t *testing.T) {
-	added := map[string]struct{}{}
-	isIdeaDuplicateTitle(added, "Hello World")
-	if !isIdeaDuplicateTitle(added, "hello world") {
+	added := set.New[string]()
+	isIdeaDuplicateTitle(&added, "Hello World")
+	if !isIdeaDuplicateTitle(&added, "hello world") {
 		t.Error("case-insensitive match should be duplicate")
 	}
 }
 
 func TestIsIdeaDuplicateTitle_SubstringNoMatch(t *testing.T) {
-	added := map[string]struct{}{}
-	isIdeaDuplicateTitle(added, "add user authentication")
+	added := set.New[string]()
+	isIdeaDuplicateTitle(&added, "add user authentication")
 	// A shorter title contained in an existing title should NOT be a duplicate —
 	// only exact case-insensitive matches qualify.
-	if isIdeaDuplicateTitle(added, "user authentication") {
+	if isIdeaDuplicateTitle(&added, "user authentication") {
 		t.Error("substring of existing title should not be duplicate")
 	}
 }
 
 func TestIsIdeaDuplicateTitle_SuperstringNoMatch(t *testing.T) {
-	added := map[string]struct{}{}
-	isIdeaDuplicateTitle(added, "auth")
+	added := set.New[string]()
+	isIdeaDuplicateTitle(&added, "auth")
 	// Existing is a substring of new title — should NOT be a duplicate.
-	if isIdeaDuplicateTitle(added, "add auth feature") {
+	if isIdeaDuplicateTitle(&added, "add auth feature") {
 		t.Error("superstring of existing title should not be duplicate")
 	}
 }
 
 func TestIsIdeaDuplicateTitle_NoMatch(t *testing.T) {
-	added := map[string]struct{}{}
-	isIdeaDuplicateTitle(added, "foo")
-	if isIdeaDuplicateTitle(added, "bar") {
+	added := set.New[string]()
+	isIdeaDuplicateTitle(&added, "foo")
+	if isIdeaDuplicateTitle(&added, "bar") {
 		t.Error("different titles should not be duplicates")
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/prompts"
@@ -628,7 +629,7 @@ func collectIdeationFailureSignals(tasks []store.Task) []string {
 		label string
 	}
 	signals := make([]failureSignal, 0, len(tasks))
-	seen := map[string]struct{}{}
+	seen := set.New[string]()
 	for _, task := range tasks {
 		if task.Kind == store.TaskKindIdeaAgent {
 			continue
@@ -645,10 +646,10 @@ func collectIdeationFailureSignals(tasks []store.Task) []string {
 		if title == "" {
 			title = "(untitled)"
 		}
-		if _, ok := seen[title]; ok {
+		if seen.Has(title) {
 			continue
 		}
-		seen[title] = struct{}{}
+		seen.Add(title)
 		reason := "failed"
 		if strings.EqualFold(task.LastTestResult, "fail") {
 			reason = "last test result: fail"

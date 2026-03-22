@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"changkun.de/x/wallfacer/internal/pkg/set"
 )
 
 // Group represents a named set of workspace paths.
@@ -82,17 +84,17 @@ func NormalizeGroups(groups []Group) []Group {
 		return nil
 	}
 	out := make([]Group, 0, len(groups))
-	seen := map[string]struct{}{}
+	seen := set.New[string]()
 	for _, group := range groups {
 		ws := normalizeGroupPaths(group.Workspaces)
 		if len(ws) == 0 {
 			continue
 		}
 		key := groupKey(ws)
-		if _, ok := seen[key]; ok {
+		if seen.Has(key) {
 			continue
 		}
-		seen[key] = struct{}{}
+		seen.Add(key)
 		out = append(out, Group{Workspaces: ws})
 	}
 	return out
@@ -103,17 +105,17 @@ func normalizeGroupPaths(paths []string) []string {
 		return nil
 	}
 	out := make([]string, 0, len(paths))
-	seen := map[string]struct{}{}
+	seen := set.New[string]()
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
 		if path == "" {
 			continue
 		}
 		path = filepath.Clean(path)
-		if _, ok := seen[path]; ok {
+		if seen.Has(path) {
 			continue
 		}
-		seen[path] = struct{}{}
+		seen.Add(path)
 		out = append(out, path)
 	}
 	slices.Sort(out)

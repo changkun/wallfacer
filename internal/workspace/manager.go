@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -269,7 +270,7 @@ func validate(paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil
 	}
-	seen := map[string]struct{}{}
+	seen := set.New[string]()
 	validated := make([]string, 0, len(paths))
 	for _, path := range paths {
 		path = strings.TrimSpace(path)
@@ -290,10 +291,10 @@ func validate(paths []string) ([]string, error) {
 		if !info.IsDir() {
 			return nil, fmt.Errorf("workspace path is not a directory: %s", path)
 		}
-		if _, ok := seen[path]; ok {
+		if seen.Has(path) {
 			continue
 		}
-		seen[path] = struct{}{}
+		seen.Add(path)
 		validated = append(validated, path)
 	}
 	slices.Sort(validated)

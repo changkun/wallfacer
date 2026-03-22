@@ -17,6 +17,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"changkun.de/x/wallfacer/internal/pkg/sortedkeys"
 )
 
 // DefaultDurationBuckets are histogram upper bounds (in seconds) suited for
@@ -190,19 +192,13 @@ func (c *Counter) writeTo(w io.Writer) {
 	_, _ = fmt.Fprintf(w, "# TYPE %s counter\n", c.name)
 
 	c.mu.Lock()
-	keys := make([]string, 0, len(c.obs))
-	for k := range c.obs {
-		keys = append(keys, k)
-	}
-	// snapshot values while locked
 	snapshot := make(map[string]*counterCell, len(c.obs))
 	for k, cell := range c.obs {
 		snapshot[k] = cell
 	}
 	c.mu.Unlock()
 
-	sort.Strings(keys)
-	for _, k := range keys {
+	for k := range sortedkeys.Of(snapshot) {
 		cell := snapshot[k]
 		writeMetricLine(w, c.name, cell.labels, float64(cell.value))
 	}
@@ -275,18 +271,13 @@ func (h *Histogram) writeTo(w io.Writer) {
 	_, _ = fmt.Fprintf(w, "# TYPE %s histogram\n", h.name)
 
 	h.mu.Lock()
-	keys := make([]string, 0, len(h.obs))
-	for k := range h.obs {
-		keys = append(keys, k)
-	}
 	snapshot := make(map[string]*histogramCell, len(h.obs))
 	for k, cell := range h.obs {
 		snapshot[k] = cell
 	}
 	h.mu.Unlock()
 
-	sort.Strings(keys)
-	for _, k := range keys {
+	for k := range sortedkeys.Of(snapshot) {
 		cell := snapshot[k]
 		// Finite buckets.
 		for i, bound := range h.buckets {
@@ -313,16 +304,13 @@ func canonicalLabelKey(labels map[string]string) string {
 	if len(labels) == 0 {
 		return ""
 	}
-	keys := make([]string, 0, len(labels))
-	for k := range labels {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
 	var sb strings.Builder
-	for i, k := range keys {
-		if i > 0 {
+	first := true
+	for k := range sortedkeys.Of(labels) {
+		if !first {
 			sb.WriteByte('\x00')
 		}
+		first = false
 		sb.WriteString(k)
 		sb.WriteByte('=')
 		sb.WriteString(labels[k])
@@ -336,16 +324,13 @@ func canonicalLabelKey(labels map[string]string) string {
 func writeMetricLine(w io.Writer, name string, labels map[string]string, value float64) {
 	_, _ = fmt.Fprint(w, name)
 	if len(labels) > 0 {
-		keys := make([]string, 0, len(labels))
-		for k := range labels {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
 		_, _ = fmt.Fprint(w, "{")
-		for i, k := range keys {
-			if i > 0 {
+		first := true
+		for k := range sortedkeys.Of(labels) {
+			if !first {
 				_, _ = fmt.Fprint(w, ",")
 			}
+			first = false
 			_, _ = fmt.Fprintf(w, `%s="%s"`, k, escapeLabel(labels[k]))
 		}
 		_, _ = fmt.Fprint(w, "}")

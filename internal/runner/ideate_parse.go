@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -66,15 +67,15 @@ func normalizeIdeationImpact(idea *IdeateResult) {
 	}
 }
 
-func isIdeaDuplicateTitle(added map[string]struct{}, title string) bool {
+func isIdeaDuplicateTitle(added *set.Set[string], title string) bool {
 	current := strings.ToLower(strings.TrimSpace(title))
 	if current == "" {
 		return true
 	}
-	if _, ok := added[current]; ok {
+	if added.Has(current) {
 		return true
 	}
-	added[current] = struct{}{}
+	added.Add(current)
 	return false
 }
 
@@ -222,7 +223,7 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 	// Only reject ideas with truly empty fields or duplicate titles.
 	var valid []IdeateResult
 	var rejections []ideaRejection
-	seen := map[string]struct{}{}
+	seen := set.New[string]()
 	for _, r := range results {
 		title := strings.TrimSpace(r.Title)
 		prompt := strings.TrimSpace(r.Prompt)
@@ -237,7 +238,7 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 		normalizeIdeationImpact(&idea)
 		idea.Title = title
 		idea.Prompt = prompt
-		if isIdeaDuplicateTitle(seen, idea.Title) {
+		if isIdeaDuplicateTitle(&seen, idea.Title) {
 			rejections = append(rejections, ideaRejection{
 				Title:  title,
 				Score:  idea.ImpactScore,
