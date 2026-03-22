@@ -102,7 +102,14 @@ func TestGetConfig_UsesCWDForWorkspaceBrowserPathWithoutWorkspaces(t *testing.T)
 func TestUpdateConfig_PersistsWorkspaceGroups(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 
-	body := strings.NewReader(`{"workspace_groups":[{"workspaces":["` + ws + `","` + ws + `/../` + filepath.Base(ws) + `"]}]}`)
+	type wsGroup struct {
+		Workspaces []string `json:"workspaces"`
+	}
+	type wsGroupReq struct {
+		WorkspaceGroups []wsGroup `json:"workspace_groups"`
+	}
+	b, _ := json.Marshal(wsGroupReq{WorkspaceGroups: []wsGroup{{Workspaces: []string{ws, ws + "/../" + filepath.Base(ws)}}}})
+	body := strings.NewReader(string(b))
 	req := httptest.NewRequest(http.MethodPut, "/api/config", body)
 	w := httptest.NewRecorder()
 	h.UpdateConfig(w, req)
@@ -765,7 +772,7 @@ func TestGitCheckout_RejectsInvalidBranchName(t *testing.T) {
 		{""},
 	}
 	for _, tc := range tests {
-		body := `{"workspace": "` + repo + `", "branch": "` + tc.branch + `"}`
+		body := jsonObj("workspace", repo, "branch", tc.branch)
 		req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
 		w := httptest.NewRecorder()
 		h.GitCheckout(w, req)
@@ -788,7 +795,7 @@ func TestGitCheckout_RejectsWhenTasksInProgress(t *testing.T) {
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
 
 
-	body := `{"workspace": "` + repo + `", "branch": "main"}`
+	body := jsonObj("workspace", repo, "branch", "main")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitCheckout(w, req)
@@ -827,7 +834,7 @@ func TestGitCreateBranch_RejectsInvalidBranchName(t *testing.T) {
 	repo := setupRepo(t)
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 
-	body := `{"workspace": "` + repo + `", "branch": "bad..branch"}`
+	body := jsonObj("workspace", repo, "branch", "bad..branch")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitCreateBranch(w, req)
@@ -848,7 +855,7 @@ func TestGitCreateBranch_RejectsWhenTasksInProgress(t *testing.T) {
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
 
 
-	body := `{"workspace": "` + repo + `", "branch": "new-branch"}`
+	body := jsonObj("workspace", repo, "branch", "new-branch")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitCreateBranch(w, req)
@@ -975,7 +982,11 @@ func TestUpdateWorkspaces_SwitchesToNewWorkspace(t *testing.T) {
 	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
 
 	newWS := t.TempDir()
-	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
+	type wsReq struct {
+		Workspaces []string `json:"workspaces"`
+	}
+	b, _ := json.Marshal(wsReq{Workspaces: []string{newWS}})
+	body := strings.NewReader(string(b))
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
 	w := httptest.NewRecorder()
 	h.UpdateWorkspaces(w, req)
@@ -1017,7 +1028,11 @@ func TestUpdateWorkspaces_RejectsInProgressTasks(t *testing.T) {
 	}
 
 	newWS := t.TempDir()
-	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
+	type wsReq struct {
+		Workspaces []string `json:"workspaces"`
+	}
+	b, _ := json.Marshal(wsReq{Workspaces: []string{newWS}})
+	body := strings.NewReader(string(b))
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
 	w := httptest.NewRecorder()
 	h.UpdateWorkspaces(w, req)
@@ -1055,7 +1070,11 @@ func TestUpdateWorkspaces_SubscriptionUpdatesHandlerStore(t *testing.T) {
 	}
 
 	newWS := t.TempDir()
-	body := strings.NewReader(`{"workspaces":["` + newWS + `"]}`)
+	type wsReq struct {
+		Workspaces []string `json:"workspaces"`
+	}
+	b, _ := json.Marshal(wsReq{Workspaces: []string{newWS}})
+	body := strings.NewReader(string(b))
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces", body)
 	w := httptest.NewRecorder()
 	h.UpdateWorkspaces(w, req)

@@ -18,6 +18,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// jsonObj builds a JSON object string with properly escaped values.
+// Usage: jsonObj("workspace", repo, "branch", "main")
+func jsonObj(kvs ...string) string {
+	m := make(map[string]any, len(kvs)/2)
+	for i := 0; i < len(kvs)-1; i += 2 {
+		m[kvs[i]] = kvs[i+1]
+	}
+	b, _ := json.Marshal(m)
+	return string(b)
+}
+
 // gitRun runs a git command in dir and fails the test on error.
 func gitRun(t *testing.T, dir string, args ...string) string {
 	t.Helper()
@@ -375,7 +386,7 @@ func TestGitPush_Success(t *testing.T) {
 	gitRun(t, repo, "config", "branch.main.merge", "refs/heads/main")
 
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
-	body := `{"workspace": "` + repo + `"}`
+	body := jsonObj("workspace", repo)
 	req := httptest.NewRequest(http.MethodPost, "/api/git/push", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitPush(w, req)
@@ -396,7 +407,7 @@ func TestGitPush_Success(t *testing.T) {
 func TestGitPush_FailsWithoutRemote(t *testing.T) {
 	repo := setupRepo(t)
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
-	body := `{"workspace": "` + repo + `"}`
+	body := jsonObj("workspace", repo)
 	req := httptest.NewRequest(http.MethodPost, "/api/git/push", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitPush(w, req)
@@ -420,7 +431,7 @@ func TestGitRebaseOnMain_RejectsWhenTasksInProgress(t *testing.T) {
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: filepath.Join(t.TempDir(), "wt")}, "task-branch")
 
 
-	body := `{"workspace": "` + repo + `"}`
+	body := jsonObj("workspace", repo)
 	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitRebaseOnMain(w, req)
@@ -454,7 +465,7 @@ func TestGitSyncWorkspace_DoesNotBlockForUnrelatedWorkspaceTask(t *testing.T) {
 		t.Fatalf("UpdateTaskWorktrees: %v", err)
 	}
 
-	body := `{"workspace": "` + repoA + `"}`
+	body := jsonObj("workspace", repoA)
 	req := httptest.NewRequest(http.MethodPost, "/api/git/sync", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitSyncWorkspace(w, req)
@@ -480,7 +491,7 @@ func TestGitCheckout_BlocksWaitingTaskWithWorkspaceWorktree(t *testing.T) {
 		t.Fatalf("UpdateTaskStatus waiting: %v", err)
 	}
 
-	body := `{"workspace": "` + repo + `", "branch": "main"}`
+	body := jsonObj("workspace", repo, "branch", "main")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitCheckout(w, req)
@@ -513,7 +524,7 @@ func TestGitCreateBranch_DoesNotBlockFailedTaskWithoutWorktree(t *testing.T) {
 		t.Fatalf("UpdateTaskStatus failed: %v", err)
 	}
 
-	body := `{"workspace": "` + repo + `", "branch": "new-feature"}`
+	body := jsonObj("workspace", repo, "branch", "new-feature")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitCreateBranch(w, req)
@@ -540,7 +551,7 @@ func TestGitCreateBranch_DoesNotBlockFailedTaskWithMissingWorktreeDir(t *testing
 		t.Fatalf("UpdateTaskStatus failed: %v", err)
 	}
 
-	body := `{"workspace": "` + repo + `", "branch": "new-feature"}`
+	body := jsonObj("workspace", repo, "branch", "new-feature")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitCreateBranch(w, req)
@@ -564,7 +575,7 @@ func TestGitRebaseOnMain_BlocksOnlyTargetedWorkspace(t *testing.T) {
 		t.Fatalf("UpdateTaskWorktrees: %v", err)
 	}
 
-	bodyA := `{"workspace": "` + repoA + `"}`
+	bodyA := jsonObj("workspace", repoA)
 	reqA := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(bodyA))
 	wA := httptest.NewRecorder()
 	h.GitRebaseOnMain(wA, reqA)
@@ -572,7 +583,7 @@ func TestGitRebaseOnMain_BlocksOnlyTargetedWorkspace(t *testing.T) {
 		t.Fatalf("expected repo A rebase not to be blocked by repo B task, got 409: %s", wA.Body.String())
 	}
 
-	bodyB := `{"workspace": "` + repoB + `"}`
+	bodyB := jsonObj("workspace", repoB)
 	reqB := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(bodyB))
 	wB := httptest.NewRecorder()
 	h.GitRebaseOnMain(wB, reqB)
@@ -656,7 +667,7 @@ func TestGitCheckout_Success(t *testing.T) {
 	gitRun(t, repo, "branch", "other-branch")
 
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
-	body := `{"workspace": "` + repo + `", "branch": "other-branch"}`
+	body := jsonObj("workspace", repo, "branch", "other-branch")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/checkout", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitCheckout(w, req)
@@ -683,7 +694,7 @@ func TestGitCreateBranch_Success(t *testing.T) {
 	repo := setupRepo(t)
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 
-	body := `{"workspace": "` + repo + `", "branch": "new-feature"}`
+	body := jsonObj("workspace", repo, "branch", "new-feature")
 	req := httptest.NewRequest(http.MethodPost, "/api/git/create-branch", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitCreateBranch(w, req)
@@ -711,7 +722,7 @@ func TestGitSyncWorkspace_FailsWithNoUpstream(t *testing.T) {
 	repo := setupRepo(t)
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 
-	body := `{"workspace": "` + repo + `"}`
+	body := jsonObj("workspace", repo)
 	req := httptest.NewRequest(http.MethodPost, "/api/git/sync", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitSyncWorkspace(w, req)
@@ -1186,7 +1197,7 @@ func TestOpenFolder_NotAllowedWorkspace(t *testing.T) {
 func TestOpenFolder_AllowedWorkspace(t *testing.T) {
 	dir := t.TempDir()
 	h := newStaticWorkspaceHandler(t, []string{dir})
-	body := `{"path":"` + dir + `"}`
+	body := jsonObj("path", dir)
 	req := httptest.NewRequest(http.MethodPost, "/api/open-folder", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.OpenFolder(w, req)
@@ -1205,7 +1216,7 @@ func TestGitRebaseOnMain_FetchFails(t *testing.T) {
 	h, _ := newTestHandlerWithWorkspacesFromRepo(t, repo)
 
 	// The repo has no remote, so fetch will fail → 500.
-	body := `{"workspace": "` + repo + `"}`
+	body := jsonObj("workspace", repo)
 	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitRebaseOnMain(w, req)
@@ -1239,7 +1250,7 @@ func TestTaskBlocksWorkspaceMutation_FailedTaskWithExistingWorktree(t *testing.T
 	}
 
 	// A failed task with an existing worktree should block the rebase.
-	body := `{"workspace": "` + repo + `"}`
+	body := jsonObj("workspace", repo)
 	req := httptest.NewRequest(http.MethodPost, "/api/git/rebase-on-main", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.GitRebaseOnMain(w, req)
