@@ -127,7 +127,14 @@ async function startRefinement() {
     });
     // Immediately show the running state from the 202 response.
     // SSE will also deliver updates, but this avoids a visual gap.
-    if (updatedTask) updateRefineUI(updatedTask);
+    if (updatedTask) {
+      updateRefineUI(updatedTask);
+      // Merge the updated task into the local tasks array so the card
+      // re-renders with the "refining…" badge and disabled Start button.
+      var idx = tasks.findIndex(function(t) { return t.id === updatedTask.id; });
+      if (idx !== -1) tasks[idx] = updatedTask;
+      scheduleRender();
+    }
   } catch (e) {
     const errorSec = document.getElementById('refine-error-section');
     const errorMsg = document.getElementById('refine-error-msg');
@@ -218,6 +225,17 @@ function startRefineLogStream(taskId) {
         scheduleRefineLogRender();
       }
       refineLogsAbort = null;
+      // Log stream ended — container exited. Refresh the task so the
+      // refinement result appears without waiting for the SSE event.
+      if (refineTaskId) {
+        fetchTasks().then(function() {
+          var openId = getOpenModalTaskId();
+          if (openId) {
+            var t = tasks.find(function(x) { return x.id === openId; });
+            if (t) { updateRefineUI(t); renderRefineHistory(t); }
+          }
+        });
+      }
     })
     .catch(err => {
       if (err.name !== 'AbortError') {

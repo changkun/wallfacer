@@ -411,6 +411,10 @@ describe('startRefinement — calls updateRefineUI with returned task', () => {
 // resetRefinePanel — re-enables the apply button after it was disabled
 // ---------------------------------------------------------------------------
 
+// Note: testing tasks-array merge and scheduleRender in VM sandbox is unreliable
+// due to cross-realm object identity. The startRefinement optimistic UI test
+// (above) covers the critical DOM state change (running panel visible).
+
 describe('resetRefinePanel — resets apply button disabled state', () => {
   it('re-enables the apply button and restores its text', () => {
     const ctx = makeRefineContext();
