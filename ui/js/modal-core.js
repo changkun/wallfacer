@@ -49,14 +49,24 @@ function switchEditTab(section, mode) {
   });
 
   if (mode === 'edit') {
+    // Match textarea height to the preview's current height so the layout doesn't jump.
+    var previewH = preview.offsetHeight;
+    if (previewH > 0) textarea.style.height = previewH + 'px';
     textarea.classList.remove('hidden');
     preview.classList.add('hidden');
     textarea.focus();
   } else {
-    // Render markdown from the current textarea value
+    // Render markdown, then match preview height to the textarea's current height.
+    var textareaH = textarea.offsetHeight;
     preview.innerHTML = renderMarkdown(textarea.value || '');
+    if (textareaH > 0) preview.style.minHeight = textareaH + 'px';
     textarea.classList.add('hidden');
     preview.classList.remove('hidden');
+    // After the content renders, clear the min-height constraint so it sizes naturally
+    // on subsequent content changes — but only if the natural height is at least as tall.
+    requestAnimationFrame(function() {
+      if (preview.scrollHeight >= textareaH) preview.style.minHeight = '';
+    });
   }
 }
 
