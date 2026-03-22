@@ -1,8 +1,8 @@
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance when working with code in this repository.
 
 ## Project Overview
 
-Wallfacer is a task-board runner for Claude Code. It provides a web UI where tasks are created as cards, dragged to "In Progress" to trigger Claude Code execution in an isolated sandbox container, and results are inspected when done.
+Wallfacer is a task-board runner for AI agents. It provides a web UI where tasks are created as cards, dragged to "In Progress" to trigger AI agent execution in an isolated sandbox container, and results are inspected when done.
 
 **Architecture:** Browser → Go server (:8080) → per-task directory storage (`data/<uuid>/`). The server runs natively on the host and launches ephemeral sandbox containers via `os/exec` (podman/docker). Each task gets its own git worktree for isolation.
 
@@ -282,7 +282,7 @@ All can be edited from **Settings → API Configuration** in the UI (calls `PUT 
 
 Every implementation task MUST complete all three steps before finishing:
 
-1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. Run `go test ./...` (backend) or `cd ui && npx vitest@2 run` (frontend) to confirm they pass before committing.
+1. **Add tests** — Write unit tests for all new or changed functionality. Tests must cover the happy path and at least one error/edge case. **Bug fixes must always include a regression test** that fails without the fix and passes with it. Run `go test ./...` (backend) or `cd ui && npx vitest@2 run` (frontend) to confirm they pass before committing.
 
 2. **Update docs** — If your change adds, removes, or modifies any API route, CLI flag, env variable, data model field, or user-visible behavior, update the corresponding documentation. Do not skip this step. The user manual lives in `docs/guide/` with these focused guides:
    - `docs/guide/usage.md` — Index page with reading order (update if adding a new guide)
