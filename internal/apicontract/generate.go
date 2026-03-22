@@ -289,10 +289,15 @@ func GenerateRoutesJS() string {
 	fmt.Fprint(&b, "var Routes = {\n")
 
 	// Emit non-tasks namespaces first (stable order from Routes).
+	first := true
 	for _, ns := range nsOrder {
 		if ns == "tasks" {
 			continue // emitted last so we can append the task(id) sub-builder
 		}
+		if !first {
+			fmt.Fprint(&b, "\n")
+		}
+		first = false
 		emitNamespace(&b, ns, nsMap[ns])
 	}
 
@@ -307,13 +312,13 @@ func GenerateRoutesJS() string {
 		}
 		emitted[jsName] = true
 		fmt.Fprintf(&b, "    // %s %s\n", r.Method, r.Pattern)
-		fmt.Fprintf(&b, "    %s: function() { return %q; },\n", jsName, r.Pattern)
+		fmt.Fprintf(&b, "    %s: function () {\n      return %q;\n    },\n", jsName, r.Pattern)
 	}
 
 	// task(id) sub-builder.
 	fmt.Fprint(&b, "\n    // task(id) returns an object with path-builder methods for\n")
 	fmt.Fprint(&b, "    // all task-instance endpoints. Use the top-level task() alias.\n")
-	fmt.Fprint(&b, "    task: function(id) {\n")
+	fmt.Fprint(&b, "    task: function (id) {\n")
 	fmt.Fprint(&b, "      return {\n")
 
 	taskEmitted := map[string]bool{}
@@ -326,13 +331,17 @@ func GenerateRoutesJS() string {
 		extra := extraParams(r.Pattern)
 		body := buildTaskPathExpr(r.Pattern)
 		fmt.Fprintf(&b, "        // %s %s\n", r.Method, r.Pattern)
-		fmt.Fprintf(&b, "        %s: function(%s) { return %s; },\n", jsName, extra, body)
+		if extra == "" {
+			fmt.Fprintf(&b, "        %s: function () {\n          return %s;\n        },\n", jsName, body)
+		} else {
+			fmt.Fprintf(&b, "        %s: function (%s) {\n          return %s;\n        },\n", jsName, extra, body)
+		}
 	}
 
 	fmt.Fprint(&b, "      };\n")
 	fmt.Fprint(&b, "    },\n")
 	fmt.Fprint(&b, "  },\n")
-	fmt.Fprint(&b, "\n};\n")
+	fmt.Fprint(&b, "};\n")
 	fmt.Fprint(&b, "\n")
 	fmt.Fprint(&b, "// Convenience alias: task(id).diff(), task(id).logs(), etc.\n")
 	fmt.Fprint(&b, "var task = Routes.tasks.task;\n")
@@ -362,7 +371,7 @@ func jsKey(ns string) string {
 
 // emitNamespace writes one namespace block into b.
 func emitNamespace(b *bytes.Buffer, ns string, routes []Route) {
-	fmt.Fprintf(b, "\n  %s: {\n", jsKey(ns))
+	fmt.Fprintf(b, "  %s: {\n", jsKey(ns))
 	emitted := map[string]bool{}
 	for _, r := range routes {
 		jsName := jsMethodName(r, ns)
@@ -371,7 +380,7 @@ func emitNamespace(b *bytes.Buffer, ns string, routes []Route) {
 		}
 		emitted[jsName] = true
 		fmt.Fprintf(b, "    // %s %s\n", r.Method, r.Pattern)
-		fmt.Fprintf(b, "    %s: function() { return %q; },\n", jsName, r.Pattern)
+		fmt.Fprintf(b, "    %s: function () {\n      return %q;\n    },\n", jsName, r.Pattern)
 	}
 	fmt.Fprint(b, "  },\n")
 }

@@ -82,6 +82,7 @@ shell:
 # Staleness is enforced automatically by the tests in internal/apicontract/generate_test.go.
 api-contract:
 	go run scripts/gen-api-contract.go
+	npx --yes prettier@3 --write ui/js/generated/
 
 # Regenerate the static Tailwind CSS from UI sources (requires Node.js + network).
 # Run this after adding new Tailwind utility classes to ui/index.html or ui/js/*.js.
