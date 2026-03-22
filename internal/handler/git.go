@@ -345,7 +345,9 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(entry.payload) //nolint:errcheck
+		if _, err := w.Write(entry.payload); err != nil {
+			logger.Handler.Debug("diff response write failed", "task", id, "error", err)
+		}
 		return
 	}
 
@@ -480,7 +482,9 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	w.Header().Set("Cache-Control", cacheControl)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(payload) //nolint:errcheck
+	if _, err := w.Write(payload); err != nil {
+		logger.Handler.Debug("diff response write failed", "task", id, "error", err)
+	}
 }
 
 // GitBranches returns the list of local branches for a workspace.

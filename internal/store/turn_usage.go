@@ -46,7 +46,6 @@ func (s *Store) GetTurnUsages(taskID uuid.UUID) ([]TurnUsageRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close() //nolint:errcheck
 	var records []TurnUsageRecord
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -55,8 +54,12 @@ func (s *Store) GetTurnUsages(taskID uuid.UUID) ([]TurnUsageRecord, error) {
 			records = append(records, rec)
 		}
 	}
+	scanErr := scanner.Err()
+	if err := f.Close(); err != nil {
+		return nil, err
+	}
 	if records == nil {
 		records = []TurnUsageRecord{}
 	}
-	return records, scanner.Err()
+	return records, scanErr
 }

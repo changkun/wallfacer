@@ -528,7 +528,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(entries) //nolint:errcheck
+		if err := json.NewEncoder(w).Encode(entries); err != nil {
+			logger.Main.Debug("docs list response write failed", "error", err)
+		}
 	})
 	mux.HandleFunc("GET /api/docs/{slug...}", func(w http.ResponseWriter, r *http.Request) {
 		slug := r.PathValue("slug")
@@ -543,7 +545,9 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 			return
 		}
 		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-		w.Write(data) //nolint:errcheck
+		if _, err := w.Write(data); err != nil {
+			logger.Main.Debug("docs content response write failed", "error", err)
+		}
 	})
 
 	// withID wraps a handler that needs a parsed task UUID from the {id} path

@@ -333,7 +333,9 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 
 	go func() {
 		// Drain stderr so the process is not blocked writing to it.
-		io.Copy(io.Discard, stderrPR) //nolint:errcheck
+		if _, err := io.Copy(io.Discard, stderrPR); err != nil {
+			logger.Handler.Debug("refine stderr drain error", "error", err)
+		}
 		_ = stderrPR.Close()
 
 	}()
@@ -460,7 +462,9 @@ func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, _ *http.Request, i
 		wrote = true
 	}
 	if !wrote {
-		fmt.Fprintln(w, "(no output saved for this task)") //nolint:errcheck
+		if _, err := fmt.Fprintln(w, "(no output saved for this task)"); err != nil {
+			logger.Handler.Debug("output response write failed", "error", err)
+		}
 	}
 }
 

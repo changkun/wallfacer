@@ -338,7 +338,6 @@ func (s *Store) loadEvents(id uuid.UUID, dirName string) error {
 		if err != nil {
 			return err
 		}
-		defer f.Close() //nolint:errcheck
 
 		scanner := bufio.NewScanner(f)
 		buf := make([]byte, 0, 64*1024)
@@ -358,8 +357,12 @@ func (s *Store) loadEvents(id uuid.UUID, dirName string) error {
 				compactMaxID = evt.ID
 			}
 		}
-		if err := scanner.Err(); err != nil {
+		scanErr := scanner.Err()
+		if err := f.Close(); err != nil {
 			return err
+		}
+		if scanErr != nil {
+			return scanErr
 		}
 	} else if !os.IsNotExist(err) {
 		return err
