@@ -389,6 +389,14 @@ function waitForTaskTitle(taskId, timeoutMs) {
       return Promise.resolve();
     }
     return waitForTaskDelta(taskId, Math.min(remaining, 3000)).then(function() {
+      // When the SSE stream is absent (follower tab or pre-election),
+      // waitForTaskDelta falls back to fetchTasks() and resolves instantly.
+      // Add a minimum 1 s delay to prevent a tight fetch loop.
+      if (!tasksSource || tasksSource.readyState === EventSource.CLOSED) {
+        return new Promise(function(resolve) {
+          setTimeout(function() { resolve(step()); }, 1000);
+        });
+      }
       return step();
     }, function() {
       return Promise.resolve();
