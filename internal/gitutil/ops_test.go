@@ -266,6 +266,31 @@ func TestFFMerge(t *testing.T) {
 		}
 	})
 
+	t.Run("succeeds with dirty working directory", func(t *testing.T) {
+		repo := setupRepo(t)
+		gitRun(t, repo, "checkout", "-b", "task")
+		writeFile(t, filepath.Join(repo, "task.txt"), "task\n")
+		gitRun(t, repo, "add", ".")
+		gitRun(t, repo, "commit", "-m", "task commit")
+		gitRun(t, repo, "checkout", "main")
+
+		// Dirty the working directory with an uncommitted change.
+		writeFile(t, filepath.Join(repo, "dirty.txt"), "dirty\n")
+
+		if err := FFMerge(repo, "task"); err != nil {
+			t.Errorf("FFMerge with dirty working dir failed: %v", err)
+		}
+
+		// Verify the dirty file was preserved after stash pop.
+		data, err := os.ReadFile(filepath.Join(repo, "dirty.txt"))
+		if err != nil {
+			t.Fatalf("dirty file missing after merge: %v", err)
+		}
+		if string(data) != "dirty\n" {
+			t.Errorf("dirty file content = %q, want %q", string(data), "dirty\n")
+		}
+	})
+
 	t.Run("diverged branches fail ff-only merge", func(t *testing.T) {
 		repo := setupRepo(t)
 		gitRun(t, repo, "checkout", "-b", "task")

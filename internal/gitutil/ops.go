@@ -115,10 +115,21 @@ func FFMerge(repoPath, branchName string) error {
 	if err != nil {
 		return err
 	}
+
+	// Stash any local changes in the main repo so that checkout+merge
+	// does not fail with "Your local changes would be overwritten".
+	stashed := StashIfDirty(repoPath)
+
 	if out, err := exec.Command("git", "-C", repoPath, "checkout", defBranch).CombinedOutput(); err != nil {
+		if stashed {
+			_ = StashPop(repoPath)
+		}
 		return fmt.Errorf("git checkout %s in %s: %w\n%s", defBranch, repoPath, err, out)
 	}
 	out, err := exec.Command("git", "-C", repoPath, "merge", "--ff-only", branchName).CombinedOutput()
+	if stashed {
+		_ = StashPop(repoPath)
+	}
 	if err != nil {
 		return fmt.Errorf("git merge --ff-only %s in %s: %w\n%s", branchName, repoPath, err, out)
 	}
