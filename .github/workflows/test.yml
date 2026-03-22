@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  test-linux:
     runs-on: ubuntu-latest
 
     steps:
@@ -88,6 +88,26 @@ jobs:
         with:
           name: js-coverage
           path: ui/coverage-js
+
+  test-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
 
   test-windows:
     runs-on: windows-latest
