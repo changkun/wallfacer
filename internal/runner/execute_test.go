@@ -19,18 +19,22 @@ import (
 // Accepts testing.TB so it can be used from both *testing.T and *testing.B.
 func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.Store, *Runner) {
 	t.Helper()
-	// Use /dev/shm (tmpfs) when available to avoid ENOTEMPTY from overlayfs in
-	// container sandboxes. Heavy create/rename activity on overlayfs can cause
-	// unlinkat(AT_REMOVEDIR) to fail even on apparently-empty directories.
-	// Falling back to t.TempDir() on platforms where /dev/shm is absent (macOS).
+	// Use os.MkdirTemp with manual cleanup instead of t.TempDir() for the store
+	// directory. Background goroutines (oversight, event writes) may still hold
+	// file handles when TempDir's strict cleanup runs, causing "directory not
+	// empty" errors. Manual cleanup with os.RemoveAll tolerates this race.
+	// Prefer /dev/shm (tmpfs) on Linux to avoid overlayfs ENOTEMPTY issues.
 	var dataDir string
 	if dir, err := os.MkdirTemp("/dev/shm", "wallfacer-test-*"); err == nil {
 		dataDir = dir
-		t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
-
 	} else {
-		dataDir = t.TempDir()
+		var err2 error
+		dataDir, err2 = os.MkdirTemp("", "wallfacer-test-*")
+		if err2 != nil {
+			t.Fatal(err2)
+		}
 	}
+	t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
 	s, err := store.NewStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
