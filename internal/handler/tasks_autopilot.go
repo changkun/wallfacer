@@ -629,6 +629,15 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 // in addition to reacting to store change notifications.
 const autoTestInterval = 30 * time.Second
 
+// watcherSettleDelay is a short pause after receiving a wake signal before the
+// watcher acts. When the runner transitions a task to "waiting", the SSE event
+// and the wake signal are dispatched simultaneously inside notify(). Without a
+// delay the watcher can transition the task back out of "waiting" before the SSE
+// event reaches the browser, so the intermediate state is never rendered. A
+// 1.5-second settle window gives the client enough animation frames to paint the
+// intermediate column position. Tests can lower this for faster verification.
+var watcherSettleDelay = 1500 * time.Millisecond
+
 // StartAutoTester subscribes to store change notifications and automatically
 // triggers the test agent for waiting tasks that are untested and not behind
 // the default branch tip.
@@ -643,6 +652,13 @@ func (h *Handler) StartAutoTester(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ch:
+				// Brief settle so the UI can render the intermediate "waiting"
+				// state before we transition the task to in_progress (testing).
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(watcherSettleDelay):
+				}
 				h.tryAutoTest(ctx)
 			case <-ticker.C:
 				h.tryAutoTest(ctx)
@@ -852,6 +868,13 @@ func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ch:
+				// Brief settle so the UI can render the intermediate "waiting"
+				// state before we transition the task to committing/done.
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(watcherSettleDelay):
+				}
 				h.tryAutoSubmit(ctx)
 			case <-ticker.C:
 				h.tryAutoSubmit(ctx)

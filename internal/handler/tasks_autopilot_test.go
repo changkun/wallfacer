@@ -664,6 +664,137 @@ func TestStartAutoRefiner_ExitsOnCancel(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 }
 
+// TestAutoTester_SettleDelayDefersTrigger verifies that the auto-tester pauses
+// for watcherSettleDelay after receiving a wake signal before acting. This
+// ensures the SSE event for the intermediate "waiting" state reaches the
+// browser and is rendered before the watcher transitions the task back.
+func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
+	// Lower the settle delay for the test so it runs quickly.
+	orig := watcherSettleDelay
+	watcherSettleDelay = 300 * time.Millisecond
+	t.Cleanup(func() { watcherSettleDelay = orig })
+
+	h := newTestHandler(t)
+	h.SetAutotest(true)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create a waiting task with a worktree so it would be eligible for
+	// auto-test once the watcher runs.
+	repo, err := os.MkdirTemp("", "wallfacer-test-repo-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(repo) })
+	gitRun(t, repo, "init", "-b", "main")
+	gitRun(t, repo, "config", "user.email", "test@example.com")
+	gitRun(t, repo, "config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(repo, "file.txt"), []byte("initial\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "initial commit")
+
+	wtParent, err := os.MkdirTemp("", "wallfacer-test-wt-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(wtParent) })
+	wt := filepath.Join(wtParent, "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
+	// Start the watcher. The wake subscriber was created by StartAutoTester,
+	// so any subsequent notify will be delivered.
+	h.StartAutoTester(ctx)
+
+	// Trigger a wake signal by mutating the store.
+	_ = h.store.UpdateTaskTitle(ctx, task.ID, "trigger wake")
+
+	// Immediately after the wake, the task should still be waiting because
+	// the settle delay has not elapsed.
+	time.Sleep(50 * time.Millisecond)
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Fatalf("task should still be waiting during settle delay, got %s", got.Status)
+	}
+
+	// After the settle delay, the watcher should have transitioned the task
+	// out of waiting. In the test environment the container runner is not
+	// available, so the task may end up in "failed" rather than staying in
+	// "in_progress" — the important thing is that it left "waiting".
+	time.Sleep(watcherSettleDelay + 500*time.Millisecond)
+	got, _ = h.store.GetTask(ctx, task.ID)
+	if got.Status == store.TaskStatusWaiting {
+		t.Error("task should have left waiting after settle delay, still waiting")
+	}
+}
+
+// TestAutoSubmitter_SettleDelayDefersTrigger verifies that the auto-submitter
+// waits watcherSettleDelay after a wake signal before committing, giving the UI
+// time to render the "waiting" state.
+func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
+	orig := watcherSettleDelay
+	watcherSettleDelay = 300 * time.Millisecond
+	t.Cleanup(func() { watcherSettleDelay = orig })
+
+	h := newTestHandler(t)
+	h.SetAutosubmit(true)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create a waiting task that qualifies for auto-submit: has worktrees,
+	// passing test result, up to date, no conflicts.
+	repo, err := os.MkdirTemp("", "wallfacer-test-repo-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(repo) })
+	gitRun(t, repo, "init", "-b", "main")
+	gitRun(t, repo, "config", "user.email", "test@example.com")
+	gitRun(t, repo, "config", "user.name", "Test")
+	if err := os.WriteFile(filepath.Join(repo, "file.txt"), []byte("initial\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "initial commit")
+
+	wtParent, err := os.MkdirTemp("", "wallfacer-test-wt-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(wtParent) })
+	wt := filepath.Join(wtParent, "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test task", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+	_ = h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass")
+
+	h.StartAutoSubmitter(ctx)
+
+	// Trigger a wake signal.
+	_ = h.store.UpdateTaskTitle(ctx, task.ID, "trigger wake")
+
+	// During the settle delay the task must remain in waiting.
+	time.Sleep(50 * time.Millisecond)
+	got, _ := h.store.GetTask(ctx, task.ID)
+	if got.Status != store.TaskStatusWaiting {
+		t.Fatalf("task should still be waiting during settle delay, got %s", got.Status)
+	}
+
+	// After the settle delay, auto-submit should act.
+	time.Sleep(watcherSettleDelay + 500*time.Millisecond)
+	got, _ = h.store.GetTask(ctx, task.ID)
+	if got.Status == store.TaskStatusWaiting {
+		t.Error("task should have been submitted after settle delay, still waiting")
+	}
+}
+
 // --- checkConcurrencyAndUpdateStatus ---
 
 // TestCheckConcurrencyAndUpdateStatus_Success verifies that a valid backlog →
