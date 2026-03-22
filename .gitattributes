@@ -1,0 +1,6 @@
+# Normalize line endings to LF on checkout across all platforms.
+# This prevents CRLF issues on Windows CI that break:
+# - go:embed content (templates, golden files)
+# - generated file staleness checks
+# - byte-exact golden file comparisons
+* text=auto eol=lf
