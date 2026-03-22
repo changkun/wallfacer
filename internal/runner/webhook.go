@@ -151,10 +151,10 @@ func (wn *WebhookNotifier) runLoop(ctx context.Context, ch <-chan store.Sequence
 }
 
 func (wn *WebhookNotifier) handleDelta(ctx context.Context, delta store.SequencedDelta, lastStatus map[uuid.UUID]store.TaskStatus) {
-	if delta.Deleted || delta.Task == nil {
+	if delta.Value.Deleted || delta.Value.Task == nil {
 		return
 	}
-	task := delta.Task
+	task := delta.Value.Task
 	if prev, seen := lastStatus[task.ID]; seen && prev == task.Status {
 		return
 	}

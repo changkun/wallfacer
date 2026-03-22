@@ -132,7 +132,7 @@ func (s *Store) ListTasksAndSeq(_ context.Context, includeArchived bool) ([]Task
 		}
 		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
 	})
-	return tasks, s.deltaSeq.Load(), nil
+	return tasks, s.hub.LatestSeq(), nil
 }
 
 // ListArchivedTasksPage returns a single page of archived tasks ordered by

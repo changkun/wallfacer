@@ -1,6 +1,9 @@
 package store
 
-import "github.com/google/uuid"
+import (
+	"changkun.de/x/wallfacer/internal/pkg/dagscorer"
+	"github.com/google/uuid"
+)
 
 // CriticalPathScore returns the length of the longest downstream dependency chain
 // rooted at id — i.e., 1 + max(CriticalPathScore of every task that directly or
@@ -9,34 +12,24 @@ import "github.com/google/uuid"
 func (s *Store) CriticalPathScore(id uuid.UUID) int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.criticalPathScoreLocked(id, make(map[uuid.UUID]int), make(map[uuid.UUID]bool))
-}
 
-func (s *Store) criticalPathScoreLocked(id uuid.UUID, memo map[uuid.UUID]int, visiting map[uuid.UUID]bool) int {
-	if v, ok := memo[id]; ok {
-		return v
-	}
 	if _, ok := s.tasks[id]; !ok {
 		return 0 // unknown task
 	}
-	if visiting[id] {
-		return 1 // cycle guard
-	}
-	visiting[id] = true
-	defer func() { visiting[id] = false }()
-	best := 0
+
+	// Build reverse adjacency map: for each task, which tasks depend on it.
+	reverseAdj := make(map[uuid.UUID][]uuid.UUID)
 	for _, t := range s.tasks {
 		for _, depStr := range t.DependsOn {
 			depID, err := uuid.Parse(depStr)
-			if err != nil || depID != id {
+			if err != nil {
 				continue
 			}
-			if child := s.criticalPathScoreLocked(t.ID, memo, visiting); child > best {
-				best = child
-			}
+			reverseAdj[depID] = append(reverseAdj[depID], t.ID)
 		}
 	}
-	score := 1 + best
-	memo[id] = score
-	return score
+
+	return dagscorer.Score(id, func(n uuid.UUID) []uuid.UUID {
+		return reverseAdj[n]
+	})
 }

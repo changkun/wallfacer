@@ -4,6 +4,8 @@ package store
 import (
 	"testing"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 )
 
 func TestSubscribe_ReceivesNotificationOnCreate(t *testing.T) {
@@ -15,10 +17,10 @@ func TestSubscribe_ReceivesNotificationOnCreate(t *testing.T) {
 
 	select {
 	case delta := <-ch:
-		if delta.Task == nil {
+		if delta.Value.Task == nil {
 			t.Error("expected non-nil task in delta")
 		}
-		if delta.Deleted {
+		if delta.Value.Deleted {
 			t.Error("expected Deleted=false for CreateTask")
 		}
 	case <-time.After(time.Second):
@@ -37,8 +39,8 @@ func TestSubscribe_ReceivesNotificationOnStatusUpdate(t *testing.T) {
 
 	select {
 	case delta := <-ch:
-		if delta.Task == nil || delta.Task.ID != task.ID {
-			t.Errorf("expected delta for task %s, got %v", task.ID, delta.Task)
+		if delta.Value.Task == nil || delta.Value.Task.ID != task.ID {
+			t.Errorf("expected delta for task %s, got %v", task.ID, delta.Value.Task)
 		}
 	case <-time.After(time.Second):
 		t.Error("expected notification after UpdateTaskStatus, timed out")
@@ -56,10 +58,10 @@ func TestSubscribe_DeleteSendsDeletedDelta(t *testing.T) {
 
 	select {
 	case delta := <-ch:
-		if delta.Task == nil || delta.Task.ID != task.ID {
-			t.Errorf("expected delete delta for task %s, got %v", task.ID, delta.Task)
+		if delta.Value.Task == nil || delta.Value.Task.ID != task.ID {
+			t.Errorf("expected delete delta for task %s, got %v", task.ID, delta.Value.Task)
 		}
-		if !delta.Deleted {
+		if !delta.Value.Deleted {
 			t.Error("expected Deleted=true for DeleteTask")
 		}
 	case <-time.After(time.Second):
@@ -78,7 +80,6 @@ func TestUnsubscribe_StopsNotifications(t *testing.T) {
 	case <-ch:
 		t.Error("should not receive notification after unsubscribe")
 	case <-time.After(20 * time.Millisecond):
-		// correct: no notification received
 	}
 }
 
@@ -105,10 +106,9 @@ func TestNotify_NonBlocking(t *testing.T) {
 	_, _ = s.Subscribe()
 	dummy := &Task{}
 
-	// Send many notifications without draining — must not block.
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			s.notify(dummy, false)
 		}
 		close(done)
@@ -126,9 +126,8 @@ func TestNotify_BufferHoldsMultipleItems(t *testing.T) {
 	_, ch := s.Subscribe()
 	dummy := &Task{}
 
-	// The channel buffer is 256; fire fewer than that so all are delivered.
 	const n = 10
-	for i := 0; i < n; i++ {
+	for range n {
 		s.notify(dummy, false)
 	}
 
@@ -150,7 +149,7 @@ done:
 func TestSubscribe_IDsAreUnique(t *testing.T) {
 	s := newTestStore(t)
 	seen := make(map[int]bool)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		id, ch := s.Subscribe()
 		_ = ch
 		s.Unsubscribe(id)
@@ -169,17 +168,17 @@ func TestNotify_DeltaContainsCorrectTask(t *testing.T) {
 
 	select {
 	case delta := <-ch:
-		if delta.Deleted {
+		if delta.Value.Deleted {
 			t.Error("expected Deleted=false")
 		}
-		if delta.Task == nil {
+		if delta.Value.Task == nil {
 			t.Fatal("expected non-nil Task")
 		}
-		if delta.Task.ID != task.ID {
-			t.Errorf("delta task ID mismatch: got %s want %s", delta.Task.ID, task.ID)
+		if delta.Value.Task.ID != task.ID {
+			t.Errorf("delta task ID mismatch: got %s want %s", delta.Value.Task.ID, task.ID)
 		}
-		if delta.Task.Prompt != "hello" {
-			t.Errorf("expected prompt 'hello', got %q", delta.Task.Prompt)
+		if delta.Value.Task.Prompt != "hello" {
+			t.Errorf("expected prompt 'hello', got %q", delta.Value.Task.Prompt)
 		}
 	case <-time.After(time.Second):
 		t.Error("timed out waiting for delta")
@@ -207,11 +206,11 @@ func TestSubscribe_DeltaPayloadIsIsolatedFromStoreAndReplay(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for first delta")
 	}
-	if first.Task == nil {
+	if first.Value.Task == nil {
 		t.Fatal("expected task payload in first delta")
 	}
 
-	mutateTaskCloneForIsolation(first.Task)
+	mutateTaskCloneForIsolation(first.Value.Task)
 
 	got, err := s.GetTask(bg(), task.ID)
 	if err != nil {
@@ -226,7 +225,7 @@ func TestSubscribe_DeltaPayloadIsIsolatedFromStoreAndReplay(t *testing.T) {
 	if len(replayed) != 1 {
 		t.Fatalf("expected 1 replayed delta, got %d", len(replayed))
 	}
-	assertTaskMatchesSnapshot(t, replayed[0].Task, want)
+	assertTaskMatchesSnapshot(t, replayed[0].Value.Task, want)
 
 	if err := s.UpdateTaskStatus(bg(), task.ID, TaskStatusInProgress); err != nil {
 		t.Fatalf("UpdateTaskStatus: %v", err)
@@ -238,27 +237,25 @@ func TestSubscribe_DeltaPayloadIsIsolatedFromStoreAndReplay(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for second delta")
 	}
-	if second.Task == nil {
+	if second.Value.Task == nil {
 		t.Fatal("expected task payload in second delta")
 	}
-	if second.Task.Status != TaskStatusInProgress {
-		t.Fatalf("second delta status = %q, want %q", second.Task.Status, TaskStatusInProgress)
+	if second.Value.Task.Status != TaskStatusInProgress {
+		t.Fatalf("second delta status = %q, want %q", second.Value.Task.Status, TaskStatusInProgress)
 	}
-	if second.Task.PromptHistory[0] != want.PromptHistory[0] {
-		t.Fatalf("second delta prompt history = %q, want %q", second.Task.PromptHistory[0], want.PromptHistory[0])
+	if second.Value.Task.PromptHistory[0] != want.PromptHistory[0] {
+		t.Fatalf("second delta prompt history = %q, want %q", second.Value.Task.PromptHistory[0], want.PromptHistory[0])
 	}
-	if second.Task.RefineSessions[0].Messages[0].Content != want.RefineSessions[0].Messages[0].Content {
-		t.Fatalf("second delta refinement message = %q, want %q", second.Task.RefineSessions[0].Messages[0].Content, want.RefineSessions[0].Messages[0].Content)
+	if second.Value.Task.RefineSessions[0].Messages[0].Content != want.RefineSessions[0].Messages[0].Content {
+		t.Fatalf("second delta refinement message = %q, want %q", second.Value.Task.RefineSessions[0].Messages[0].Content, want.RefineSessions[0].Messages[0].Content)
 	}
-	if second.Task.WorktreePaths["/repo"] != want.WorktreePaths["/repo"] {
-		t.Fatalf("second delta worktree path = %q, want %q", second.Task.WorktreePaths["/repo"], want.WorktreePaths["/repo"])
+	if second.Value.Task.WorktreePaths["/repo"] != want.WorktreePaths["/repo"] {
+		t.Fatalf("second delta worktree path = %q, want %q", second.Value.Task.WorktreePaths["/repo"], want.WorktreePaths["/repo"])
 	}
 }
 
 // --- SubscribeWake / UnsubscribeWake tests ---
 
-// TestSubscribeWake_ReceivesSignal verifies that a wake subscriber receives a
-// signal after a notify call.
 func TestSubscribeWake_ReceivesSignal(t *testing.T) {
 	s := newTestStore(t)
 	id, ch := s.SubscribeWake()
@@ -274,9 +271,6 @@ func TestSubscribeWake_ReceivesSignal(t *testing.T) {
 	}
 }
 
-// TestSubscribeWake_BurstCoalescing verifies that 100 rapid notify calls result
-// in exactly 1 or 2 receives on the wake channel (burst coalescing), and that
-// no notify call blocks.
 func TestSubscribeWake_BurstCoalescing(t *testing.T) {
 	s := newTestStore(t)
 	id, ch := s.SubscribeWake()
@@ -284,10 +278,9 @@ func TestSubscribeWake_BurstCoalescing(t *testing.T) {
 
 	dummy := &Task{}
 
-	// Fire 100 rapid notify calls without draining — must not block.
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			s.notify(dummy, false)
 		}
 		close(done)
@@ -299,9 +292,6 @@ func TestSubscribeWake_BurstCoalescing(t *testing.T) {
 		t.Fatal("notify calls blocked unexpectedly")
 	}
 
-	// Drain all available signals. With a capacity-1 channel and non-blocking
-	// sends, at most 1 signal should be buffered after the burst. A count of 2
-	// is also acceptable in case a receive races with a concurrent send.
 	received := 0
 	for {
 		select {
@@ -317,8 +307,6 @@ drained:
 	}
 }
 
-// TestUnsubscribeWake_StopsSignals verifies that no signal is received after
-// UnsubscribeWake is called.
 func TestUnsubscribeWake_StopsSignals(t *testing.T) {
 	s := newTestStore(t)
 	id, ch := s.SubscribeWake()
@@ -331,26 +319,23 @@ func TestUnsubscribeWake_StopsSignals(t *testing.T) {
 	case <-ch:
 		t.Error("should not receive wake signal after UnsubscribeWake")
 	case <-time.After(20 * time.Millisecond):
-		// correct: no signal received
 	}
 }
 
 // --- Replay buffer and sequence ID tests ---
 
-// TestNotify_StampsMonotonicSeq verifies that each delta emitted by notify gets
-// a strictly increasing Seq field.
 func TestNotify_StampsMonotonicSeq(t *testing.T) {
 	s := newTestStore(t)
 	_, ch := s.Subscribe()
 	dummy := &Task{}
 
 	const n = 5
-	for i := 0; i < n; i++ {
+	for range n {
 		s.notify(dummy, false)
 	}
 
 	prev := int64(0)
-	for i := 0; i < n; i++ {
+	for range n {
 		select {
 		case sd := <-ch:
 			if sd.Seq <= prev {
@@ -358,12 +343,11 @@ func TestNotify_StampsMonotonicSeq(t *testing.T) {
 			}
 			prev = sd.Seq
 		case <-time.After(time.Second):
-			t.Fatalf("timed out waiting for delta %d", i)
+			t.Fatal("timed out waiting for delta")
 		}
 	}
 }
 
-// TestLatestDeltaSeq_StartsAtZero verifies the initial sequence is 0.
 func TestLatestDeltaSeq_StartsAtZero(t *testing.T) {
 	s := newTestStore(t)
 	if got := s.LatestDeltaSeq(); got != 0 {
@@ -371,7 +355,6 @@ func TestLatestDeltaSeq_StartsAtZero(t *testing.T) {
 	}
 }
 
-// TestLatestDeltaSeq_IncreasesWithNotify verifies LatestDeltaSeq tracks notify calls.
 func TestLatestDeltaSeq_IncreasesWithNotify(t *testing.T) {
 	s := newTestStore(t)
 	dummy := &Task{}
@@ -385,7 +368,6 @@ func TestLatestDeltaSeq_IncreasesWithNotify(t *testing.T) {
 	}
 }
 
-// TestDeltasSince_EmptyBuffer returns no gap and empty slice when buffer is empty.
 func TestDeltasSince_EmptyBuffer(t *testing.T) {
 	s := newTestStore(t)
 	deltas, tooOld := s.DeltasSince(0)
@@ -397,8 +379,6 @@ func TestDeltasSince_EmptyBuffer(t *testing.T) {
 	}
 }
 
-// TestDeltasSince_ReturnsAllWhenSeqIsZero verifies that DeltasSince(0) returns
-// all buffered deltas when seq=0 and the buffer starts at seq=1.
 func TestDeltasSince_ReturnsAllWhenSeqIsZero(t *testing.T) {
 	s := newTestStore(t)
 	dummy := &Task{}
@@ -418,7 +398,6 @@ func TestDeltasSince_ReturnsAllWhenSeqIsZero(t *testing.T) {
 	}
 }
 
-// TestDeltasSince_ReturnsMissedDeltas verifies partial replay when seq is mid-range.
 func TestDeltasSince_ReturnsMissedDeltas(t *testing.T) {
 	s := newTestStore(t)
 	dummy := &Task{}
@@ -427,7 +406,6 @@ func TestDeltasSince_ReturnsMissedDeltas(t *testing.T) {
 	s.notify(dummy, false) // seq=3
 	s.notify(dummy, false) // seq=4
 
-	// Client has seq=2; should receive seq=3 and seq=4.
 	deltas, tooOld := s.DeltasSince(2)
 	if tooOld {
 		t.Error("expected tooOld=false")
@@ -440,7 +418,6 @@ func TestDeltasSince_ReturnsMissedDeltas(t *testing.T) {
 	}
 }
 
-// TestDeltasSince_NothingNewWhenUpToDate returns empty and no gap.
 func TestDeltasSince_NothingNewWhenUpToDate(t *testing.T) {
 	s := newTestStore(t)
 	dummy := &Task{}
@@ -456,24 +433,22 @@ func TestDeltasSince_NothingNewWhenUpToDate(t *testing.T) {
 	}
 }
 
-// TestDeltasSince_GapTooOld verifies tooOld=true when the requested seq predates
-// the oldest buffered delta.
 func TestDeltasSince_GapTooOld(t *testing.T) {
+	// Use a hub with small replay capacity to test gap detection.
 	s := newTestStore(t)
+	s.hub = pubsub.NewHub[TaskDelta](
+		pubsub.WithReplayCapacity[TaskDelta](3),
+		pubsub.WithClone(cloneTaskDelta),
+	)
 	dummy := &Task{}
 
-	// Simulate a very old seq by directly manipulating the replay buffer.
-	// We inject entries with seq=10 and seq=11 into the buffer, leaving a gap
-	// for seq=1..9 that no longer exists.
-	s.replayMu.Lock()
-	s.replayBuf = []SequencedDelta{
-		{Seq: 10, TaskDelta: TaskDelta{Task: dummy}},
-		{Seq: 11, TaskDelta: TaskDelta{Task: dummy}},
+	// Publish enough to fill and overflow the small buffer.
+	for range 10 {
+		s.notify(dummy, false)
 	}
-	s.replayMu.Unlock()
 
-	// Requesting seq=5 means we need deltas 6..11, but oldest=10 > 5+1=6.
-	deltas, tooOld := s.DeltasSince(5)
+	// Requesting seq=1 means we need deltas 2..10, but only 3 are buffered.
+	deltas, tooOld := s.DeltasSince(1)
 	if !tooOld {
 		t.Error("expected tooOld=true when gap predates oldest buffer entry")
 	}
@@ -482,21 +457,21 @@ func TestDeltasSince_GapTooOld(t *testing.T) {
 	}
 }
 
-// TestDeltasSince_NoGapWhenOldestIsSeqPlusOne verifies the boundary: oldest == seq+1
-// is NOT a gap.
 func TestDeltasSince_NoGapWhenOldestIsSeqPlusOne(t *testing.T) {
+	// Use a hub with small replay capacity.
 	s := newTestStore(t)
+	s.hub = pubsub.NewHub[TaskDelta](
+		pubsub.WithReplayCapacity[TaskDelta](2),
+		pubsub.WithClone(cloneTaskDelta),
+	)
 	dummy := &Task{}
 
-	// oldest=6, seq=5 → oldest (6) > seq+1 (6) is false → no gap.
-	s.replayMu.Lock()
-	s.replayBuf = []SequencedDelta{
-		{Seq: 6, TaskDelta: TaskDelta{Task: dummy}},
-		{Seq: 7, TaskDelta: TaskDelta{Task: dummy}},
-	}
-	s.replayMu.Unlock()
+	// Publish exactly 2 items to fill the buffer.
+	s.notify(dummy, false) // seq=1
+	s.notify(dummy, false) // seq=2
 
-	deltas, tooOld := s.DeltasSince(5)
+	// oldest=1, seq=0 → oldest (1) > seq+1 (1) is false → no gap.
+	deltas, tooOld := s.DeltasSince(0)
 	if tooOld {
 		t.Error("expected tooOld=false when oldest == seq+1")
 	}
@@ -505,37 +480,36 @@ func TestDeltasSince_NoGapWhenOldestIsSeqPlusOne(t *testing.T) {
 	}
 }
 
-// TestReplayBuf_BoundedToMax verifies that the replay buffer never exceeds replayBufMax.
 func TestReplayBuf_BoundedToMax(t *testing.T) {
+	// Use a hub with known small capacity to test bounding.
+	const testCap = 50
 	s := newTestStore(t)
+	s.hub = pubsub.NewHub[TaskDelta](
+		pubsub.WithReplayCapacity[TaskDelta](testCap),
+		pubsub.WithClone(cloneTaskDelta),
+	)
 	dummy := &Task{}
 
-	for i := 0; i < replayBufMax+10; i++ {
+	for range testCap + 10 {
 		s.notify(dummy, false)
 	}
 
-	s.replayMu.RLock()
-	n := len(s.replayBuf)
-	s.replayMu.RUnlock()
-
-	if n > replayBufMax {
-		t.Errorf("replay buffer length %d exceeds max %d", n, replayBufMax)
+	// Request from seq=0 — should get at most testCap.
+	deltas, _ := s.DeltasSince(0)
+	if len(deltas) > testCap {
+		t.Errorf("replay returned %d deltas, expected at most %d", len(deltas), testCap)
 	}
 }
 
-// TestNotify_OverflowClosesChannel verifies that when a subscriber's buffer is
-// exhausted, the 257th notify call closes the channel (ok=false on receive),
-// decrements SubscriberCount to 0, and a fresh Subscribe still works.
 func TestNotify_OverflowClosesChannel(t *testing.T) {
 	s := newTestStore(t)
 	_, ch := s.Subscribe()
 	dummy := &Task{}
 
-	// Fill the buffer (256 items) and trigger one overflow — must not block.
-	const total = 257 // one beyond the 256-item buffer
+	const total = 257
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < total; i++ {
+		for range total {
 			s.notify(dummy, false)
 		}
 		close(done)
@@ -546,8 +520,6 @@ func TestNotify_OverflowClosesChannel(t *testing.T) {
 		t.Fatal("notify calls blocked unexpectedly on overflow")
 	}
 
-	// The channel must have been closed by the overflow eviction.
-	// Drain buffered items first, then confirm the close.
 	closed := false
 	timeout := time.After(time.Second)
 	for !closed {
@@ -561,12 +533,10 @@ func TestNotify_OverflowClosesChannel(t *testing.T) {
 		}
 	}
 
-	// The subscriber must have been removed from the store.
 	if count := s.SubscriberCount(); count != 0 {
 		t.Errorf("expected SubscriberCount=0 after eviction, got %d", count)
 	}
 
-	// A brand-new Subscribe must return a working open channel.
 	id2, ch2 := s.Subscribe()
 	defer s.Unsubscribe(id2)
 	s.notify(dummy, false)
@@ -575,7 +545,7 @@ func TestNotify_OverflowClosesChannel(t *testing.T) {
 		if !ok {
 			t.Error("fresh subscriber channel closed unexpectedly")
 		}
-		if sd.Task == nil {
+		if sd.Value.Task == nil {
 			t.Error("expected non-nil task in delta on fresh subscriber")
 		}
 	case <-time.After(time.Second):
@@ -583,19 +553,15 @@ func TestNotify_OverflowClosesChannel(t *testing.T) {
 	}
 }
 
-// TestNotify_OverflowUnsubscribeIsNoop verifies that calling Unsubscribe on an
-// already-evicted subscriber ID is safe and does not panic or block.
 func TestNotify_OverflowUnsubscribeIsNoop(t *testing.T) {
 	s := newTestStore(t)
 	id, ch := s.Subscribe()
 	dummy := &Task{}
 
-	// Overflow the channel to trigger eviction.
-	for i := 0; i < 257; i++ {
+	for range 257 {
 		s.notify(dummy, false)
 	}
 
-	// Wait for the channel to be closed.
 	timeout := time.After(time.Second)
 	for {
 		select {
@@ -608,7 +574,6 @@ func TestNotify_OverflowUnsubscribeIsNoop(t *testing.T) {
 		}
 	}
 evicted:
-	// Calling Unsubscribe on the already-evicted ID must not panic or spin.
 	done := make(chan struct{})
 	go func() {
 		s.Unsubscribe(id)
@@ -621,9 +586,6 @@ evicted:
 	}
 }
 
-// TestListTasksAndSeq_ConsistentView verifies that the sequence number returned
-// by ListTasksAndSeq matches the task state: if a task has been mutated, the seq
-// returned must be >= the seq of that mutation.
 func TestListTasksAndSeq_ConsistentView(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "hi", Timeout: 5})
@@ -635,12 +597,10 @@ func TestListTasksAndSeq_ConsistentView(t *testing.T) {
 	if len(tasks) == 0 {
 		t.Fatal("expected at least one task")
 	}
-	// seq must reflect the CreateTask notification (seq >= 1).
 	if seq < 1 {
 		t.Errorf("expected seq >= 1, got %d", seq)
 	}
 
-	// Update the task; the new seq must be higher.
 	_ = s.UpdateTaskStatus(bg(), task.ID, "in_progress")
 	_, seq2, _ := s.ListTasksAndSeq(bg(), false)
 	if seq2 <= seq {

@@ -322,7 +322,7 @@ func TestRunTwoPhase_Phase1Error_CallsOnPhase1Error(t *testing.T) {
 // the breaker, and that Phase2 is never entered.
 func TestRunTwoPhase_Phase1Error_CircuitBreakerRecordsFailure(t *testing.T) {
 	ctx := context.Background()
-	wb := &watcherBreaker{}
+	wb := newWatcherBreaker()
 	sentinelErr := errors.New("store unavailable")
 
 	phase2Called := false

@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
+
 	"github.com/google/uuid"
 )
 
@@ -372,8 +374,8 @@ func TestCompactTaskEvents_HybridLoad(t *testing.T) {
 			Data:      json.RawMessage([]byte(`{"n":` + strconv.Itoa(i) + `}`)),
 			CreatedAt: time.Now(),
 		}
-		if err := atomicWriteJSON(filepath.Join(tracesDir, fmt.Sprintf("%04d.json", i)), event); err != nil {
-			t.Fatalf("atomicWriteJSON(%d): %v", i, err)
+		if err := atomicfile.WriteJSON(filepath.Join(tracesDir, fmt.Sprintf("%04d.json", i)), event, 0644); err != nil {
+			t.Fatalf("WriteJSON(%d): %v", i, err)
 		}
 	}
 

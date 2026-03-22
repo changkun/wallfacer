@@ -75,11 +75,11 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 				// Replay missed deltas; the client already has a consistent
 				// base state so no snapshot is required.
 				for _, d := range deltas {
-					payload, encErr := marshalDeltaPayload(d.TaskDelta)
+					payload, encErr := marshalDeltaPayload(d.Value)
 					if encErr != nil {
 						continue
 					}
-					eventType := deltaEventType(d.TaskDelta)
+					eventType := deltaEventType(d.Value)
 					if _, werr := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", d.Seq, eventType, payload); werr != nil {
 						return
 					}
@@ -129,11 +129,11 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 			if delta.Seq <= replayUpTo {
 				continue
 			}
-			payload, err := marshalDeltaPayload(delta.TaskDelta)
+			payload, err := marshalDeltaPayload(delta.Value)
 			if err != nil {
 				continue
 			}
-			eventType := deltaEventType(delta.TaskDelta)
+			eventType := deltaEventType(delta.Value)
 			if _, err := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", delta.Seq, eventType, payload); err != nil {
 				return
 			}

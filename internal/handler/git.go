@@ -464,9 +464,6 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		etag:      etag,
 		immutable: immutable,
 	}
-	if !immutable {
-		entry.expiresAt = h.diffCache.now().Add(diffCacheTTL)
-	}
 	h.diffCache.set(id, entry)
 
 	cacheControl := "max-age=10"

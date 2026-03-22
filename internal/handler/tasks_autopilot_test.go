@@ -78,7 +78,7 @@ func TestTryAutoPromote_Phase1StoreErrorsLogAndOpenBreaker(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			mockStore := tc.store
-			wb := &watcherBreaker{}
+			wb := newWatcherBreaker()
 
 			phase1 := func(ctx context.Context) (*store.Task, error) {
 				waitingTasks, err := mockStore.ListTasksByStatus(ctx, store.TaskStatusWaiting)

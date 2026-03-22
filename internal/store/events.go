@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
+	"changkun.de/x/wallfacer/internal/pkg/pagination"
 	"github.com/google/uuid"
 )
 
@@ -86,16 +88,6 @@ type EventsPage struct {
 // typeSet restricts results to the given event types. A nil or empty map means
 // all event types are included.
 func (s *Store) GetEventsPage(_ context.Context, taskID uuid.UUID, afterID int64, limit int, typeSet map[EventType]struct{}) (EventsPage, error) {
-	const defaultLimit = 200
-	const maxLimit = 1000
-
-	if limit <= 0 {
-		limit = defaultLimit
-	}
-	if limit > maxLimit {
-		limit = maxLimit
-	}
-
 	s.mu.RLock()
 	if !s.eventsLoaded[taskID] {
 		s.mu.RUnlock()
@@ -106,38 +98,26 @@ func (s *Store) GetEventsPage(_ context.Context, taskID uuid.UUID, afterID int64
 	}
 	defer s.mu.RUnlock()
 
-	// Events are already sorted by ID (guaranteed by loadEvents and append order).
-	var filtered []TaskEvent
-	for _, ev := range s.events[taskID] {
-		if ev.ID <= afterID {
-			continue
+	var filter func(TaskEvent) bool
+	if len(typeSet) > 0 {
+		filter = func(ev TaskEvent) bool {
+			_, ok := typeSet[ev.EventType]
+			return ok
 		}
-		if len(typeSet) > 0 {
-			if _, ok := typeSet[ev.EventType]; !ok {
-				continue
-			}
-		}
-		filtered = append(filtered, ev)
 	}
 
-	total := len(filtered)
-	hasMore := total > limit
-
-	page := filtered
-	if total > limit {
-		page = filtered[:limit]
-	}
-
-	var nextAfter int64
-	if len(page) > 0 {
-		nextAfter = page[len(page)-1].ID
-	}
+	p := pagination.Paginate(
+		s.events[taskID],
+		func(ev TaskEvent) int64 { return ev.ID },
+		afterID, limit, 200, 1000,
+		filter,
+	)
 
 	return EventsPage{
-		Events:        page,
-		NextAfter:     nextAfter,
-		HasMore:       hasMore,
-		TotalFiltered: total,
+		Events:        p.Items,
+		NextAfter:     p.NextCursor,
+		HasMore:       p.HasMore,
+		TotalFiltered: p.TotalFiltered,
 	}, nil
 }
 
@@ -214,7 +194,7 @@ func (s *Store) saveEvent(taskID uuid.UUID, seq int, event TaskEvent) error {
 		return err
 	}
 	path := filepath.Join(tracesDir, fmt.Sprintf("%04d.json", seq))
-	return atomicWriteJSON(path, event)
+	return atomicfile.WriteJSON(path, event, 0644)
 }
 
 type numberedTraceFile struct {

@@ -13,6 +13,7 @@ import (
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/sandbox"
@@ -24,27 +25,28 @@ import (
 // watcherBreaker is a per-watcher circuit breaker that suppresses a specific
 // watcher when it encounters repeated failures. Unlike pauseAllAutomation it
 // leaves all other watchers unaffected and auto-heals after a backoff period.
+//
+// It wraps the generic [circuitbreaker.BackoffBreaker] and adds domain-specific
+// metadata (last failure reason and task ID) for health reporting.
 type watcherBreaker struct {
+	breaker    *circuitbreaker.BackoffBreaker
 	mu         sync.Mutex
-	failures   int
-	openUntil  time.Time // zero means closed (healthy)
 	lastReason string
 	lastTaskID *uuid.UUID
 }
 
-func (wb *watcherBreaker) isOpen() bool {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	return !wb.openUntil.IsZero() && time.Now().Before(wb.openUntil)
+func newWatcherBreaker() *watcherBreaker {
+	return &watcherBreaker{
+		breaker: circuitbreaker.NewBackoff(circuitbreaker.BackoffConfig{}),
+	}
 }
 
-// recordFailure increments the failure counter and opens the breaker with
-// exponential backoff (30s * 2^(n-1), capped at 5 minutes). Returns the
-// updated failure count.
+func (wb *watcherBreaker) isOpen() bool {
+	return wb.breaker.IsOpen()
+}
+
 func (wb *watcherBreaker) recordFailure(taskID *uuid.UUID, reason string) int {
 	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	wb.failures++
 	wb.lastReason = reason
 	if taskID != nil {
 		cp := *taskID
@@ -52,20 +54,16 @@ func (wb *watcherBreaker) recordFailure(taskID *uuid.UUID, reason string) int {
 	} else {
 		wb.lastTaskID = nil
 	}
-	// Exponential backoff: 30s * 2^(n-1), capped at 5 minutes.
-	backoff := time.Duration(30<<uint(wb.failures-1)) * time.Second
-	if backoff > 5*time.Minute {
-		backoff = 5 * time.Minute
-	}
-	wb.openUntil = time.Now().Add(backoff)
-	return wb.failures
+	wb.mu.Unlock()
+	return wb.breaker.RecordFailure()
 }
 
 func (wb *watcherBreaker) recordSuccess() {
+	wb.breaker.RecordSuccess()
 	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	wb.failures = 0
-	wb.openUntil = time.Time{}
+	wb.lastReason = ""
+	wb.lastTaskID = nil
+	wb.mu.Unlock()
 }
 
 // watcherHealthEntry is the per-watcher health state returned by GET /api/config.
@@ -78,18 +76,19 @@ type watcherHealthEntry struct {
 }
 
 func (wb *watcherBreaker) healthEntry(name string) watcherHealthEntry {
-	wb.mu.Lock()
-	defer wb.mu.Unlock()
-	open := !wb.openUntil.IsZero() && time.Now().Before(wb.openUntil)
+	open := wb.breaker.IsOpen()
 	entry := watcherHealthEntry{
-		Name:     name,
-		Healthy:  !open,
-		Failures: wb.failures,
+		Name:    name,
+		Healthy: !open,
 	}
+	entry.Failures = wb.breaker.Failures()
 	if open {
-		retryAt := wb.openUntil
-		entry.RetryAt = &retryAt
+		if retryAt, ok := wb.breaker.RetryAt(); ok {
+			entry.RetryAt = &retryAt
+		}
+		wb.mu.Lock()
 		entry.LastReason = wb.lastReason
+		wb.mu.Unlock()
 	}
 	return entry
 }
@@ -203,12 +202,12 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 			sandbox.Codex:  false,
 		},
 		breakers: map[string]*watcherBreaker{
-			"auto-promote": {},
-			"auto-retry":   {},
-			"auto-test":    {},
-			"auto-submit":  {},
-			"auto-sync":    {},
-			"auto-refine":  {},
+			"auto-promote": newWatcherBreaker(),
+			"auto-retry":   newWatcherBreaker(),
+			"auto-test":    newWatcherBreaker(),
+			"auto-submit":  newWatcherBreaker(),
+			"auto-sync":    newWatcherBreaker(),
+			"auto-refine":  newWatcherBreaker(),
 		},
 	}
 	// Initialize auto-push from env config so the header toggle reflects the persisted state.

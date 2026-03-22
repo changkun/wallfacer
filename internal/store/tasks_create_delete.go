@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
@@ -245,7 +246,7 @@ func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID, reason string) err
 	}
 	tomb := Tombstone{DeletedAt: time.Now(), Reason: reason}
 	tombPath := filepath.Join(s.dir, id.String(), "tombstone.json")
-	if err := atomicWriteJSON(tombPath, tomb); err != nil {
+	if err := atomicfile.WriteJSON(tombPath, tomb, 0644); err != nil {
 		s.mu.Unlock()
 		return fmt.Errorf("write tombstone: %w", err)
 	}

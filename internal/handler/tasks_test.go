@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -3937,35 +3938,39 @@ func TestWatcherBreaker_AutoSyncDoesNotAffectAutoPromote(t *testing.T) {
 }
 
 // TestWatcherBreaker_AutoRecoversAfterTimeout verifies that a breaker returns
-// to closed (healthy) once its openUntil time has elapsed.
+// to closed (healthy) once its backoff time has elapsed.
 func TestWatcherBreaker_AutoRecoversAfterTimeout(t *testing.T) {
-	wb := &watcherBreaker{}
+	now := time.Now()
+	wb := &watcherBreaker{
+		breaker: circuitbreaker.NewBackoff(circuitbreaker.BackoffConfig{
+			BaseDelay: 10 * time.Millisecond,
+			Now:       func() time.Time { return now },
+		}),
+	}
 
 	wb.recordFailure(nil, "transient error")
 	if !wb.isOpen() {
 		t.Fatal("expected breaker to be open immediately after failure")
 	}
 
-	// Wind the openUntil back to the past to simulate the timeout elapsing.
-	wb.mu.Lock()
-	wb.openUntil = time.Now().Add(-time.Second)
-	wb.mu.Unlock()
+	// Advance time past the backoff duration.
+	now = now.Add(20 * time.Millisecond)
 
 	if wb.isOpen() {
-		t.Error("expected breaker to be closed after openUntil has elapsed")
+		t.Error("expected breaker to be closed after backoff has elapsed")
 	}
 }
 
 // TestWatcherBreaker_RecordSuccessResets verifies that recordSuccess resets
 // the failure counter and closes the breaker.
 func TestWatcherBreaker_RecordSuccessResets(t *testing.T) {
-	wb := &watcherBreaker{}
+	wb := newWatcherBreaker()
 
 	wb.recordFailure(nil, "error 1")
 	wb.recordFailure(nil, "error 2")
 
-	if wb.failures != 2 {
-		t.Errorf("expected failures=2, got %d", wb.failures)
+	if f := wb.breaker.Failures(); f != 2 {
+		t.Errorf("expected failures=2, got %d", f)
 	}
 	if !wb.isOpen() {
 		t.Error("expected breaker to be open after failures")
@@ -3973,8 +3978,8 @@ func TestWatcherBreaker_RecordSuccessResets(t *testing.T) {
 
 	wb.recordSuccess()
 
-	if wb.failures != 0 {
-		t.Errorf("expected failures=0 after recordSuccess, got %d", wb.failures)
+	if f := wb.breaker.Failures(); f != 0 {
+		t.Errorf("expected failures=0 after recordSuccess, got %d", f)
 	}
 	if wb.isOpen() {
 		t.Error("expected breaker to be closed after recordSuccess")

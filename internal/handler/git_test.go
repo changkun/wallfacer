@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/pkg/cache"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -912,7 +913,7 @@ func TestDiffCacheTTLExpiry(t *testing.T) {
 
 	// Inject a controllable clock.
 	fakeNow := time.Now()
-	h.diffCache.now = func() time.Time { return fakeNow }
+	h.diffCache = newDiffCacheWithOpts(cache.WithClock[uuid.UUID, diffCacheEntry](func() time.Time { return fakeNow }))
 
 	wtDir := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task", wtDir, "HEAD")

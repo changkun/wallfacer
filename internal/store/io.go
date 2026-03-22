@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
+	"changkun.de/x/wallfacer/internal/pkg/retaintail"
 	"github.com/google/uuid"
 )
 
@@ -18,15 +20,9 @@ import (
 // operates in-place and is a no-op when a limit is 0 or the slice is already
 // within bounds.
 func (s *Store) pruneTaskPayload(t *Task) {
-	if s.retryHistoryLimit > 0 && len(t.RetryHistory) > s.retryHistoryLimit {
-		t.RetryHistory = t.RetryHistory[len(t.RetryHistory)-s.retryHistoryLimit:]
-	}
-	if s.refineSessionsLimit > 0 && len(t.RefineSessions) > s.refineSessionsLimit {
-		t.RefineSessions = t.RefineSessions[len(t.RefineSessions)-s.refineSessionsLimit:]
-	}
-	if s.promptHistoryLimit > 0 && len(t.PromptHistory) > s.promptHistoryLimit {
-		t.PromptHistory = t.PromptHistory[len(t.PromptHistory)-s.promptHistoryLimit:]
-	}
+	t.RetryHistory = retaintail.Tail(t.RetryHistory, s.retryHistoryLimit)
+	t.RefineSessions = retaintail.Tail(t.RefineSessions, s.refineSessionsLimit)
+	t.PromptHistory = retaintail.Tail(t.PromptHistory, s.promptHistoryLimit)
 }
 
 // saveTask atomically writes a task's metadata to its task.json file.
@@ -41,7 +37,7 @@ func (s *Store) saveTask(id uuid.UUID, task *Task) error {
 	pruned := *task // shallow copy; in-memory slices are not modified
 	s.pruneTaskPayload(&pruned)
 	path := filepath.Join(s.dir, id.String(), "task.json")
-	return atomicWriteJSON(path, &pruned)
+	return atomicfile.WriteJSON(path, &pruned, 0644)
 }
 
 // truncateTurnData applies the per-turn output size budget to data. If
@@ -131,7 +127,7 @@ func (s *Store) summaryPath(id uuid.UUID) string {
 
 // SaveSummary atomically writes the immutable task summary for a completed task.
 func (s *Store) SaveSummary(id uuid.UUID, summary TaskSummary) error {
-	return atomicWriteJSON(s.summaryPath(id), summary)
+	return atomicfile.WriteJSON(s.summaryPath(id), summary, 0644)
 }
 
 // LoadSummary reads the task summary for a completed task.
@@ -150,19 +146,6 @@ func (s *Store) LoadSummary(id uuid.UUID) (*TaskSummary, error) {
 		return nil, err
 	}
 	return &summary, nil
-}
-
-// atomicWriteJSON marshals v to JSON and writes it atomically via temp+rename.
-func atomicWriteJSON(path string, v any) error {
-	raw, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
 }
 
 // jsonUnmarshal is a thin wrapper around json.Unmarshal used internally.

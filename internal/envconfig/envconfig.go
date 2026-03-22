@@ -4,12 +4,12 @@ package envconfig
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -503,18 +503,7 @@ func updateRawWithUpdates(path string, raw []byte, updates map[string]*string) e
 	}
 	content := strings.TrimRight(strings.Join(kept, "\n"), "\n") + "\n"
 
-	// Atomic write via temp file + rename.
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(content), 0600); err != nil {
-		return fmt.Errorf("write env file: %w", err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		if removeErr := os.Remove(tmp); removeErr != nil {
-			slog.Default().With("component", "envconfig").Warn("cleanup temp env file after rename failure", "path", tmp, "error", removeErr)
-		}
-		return fmt.Errorf("rename env file: %w", err)
-	}
-	return nil
+	return atomicfile.Write(path, []byte(content), 0600)
 }
 
 // unquote strips matching double or single quotes surrounding a value.

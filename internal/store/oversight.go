@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"github.com/google/uuid"
 )
 
@@ -41,7 +42,7 @@ func oversightText(o TaskOversight) string {
 // the in-memory search index so that subsequent SearchTasks calls reflect the
 // new text without a disk read.
 func (s *Store) SaveOversight(taskID uuid.UUID, oversight TaskOversight) error {
-	if err := atomicWriteJSON(s.oversightPath(taskID), oversight); err != nil {
+	if err := atomicfile.WriteJSON(s.oversightPath(taskID), oversight, 0644); err != nil {
 		return err
 	}
 	raw := oversightText(oversight)
@@ -75,7 +76,7 @@ func (s *Store) GetOversight(taskID uuid.UUID) (*TaskOversight, error) {
 
 // SaveTestOversight atomically writes the test-agent oversight summary for a task.
 func (s *Store) SaveTestOversight(taskID uuid.UUID, oversight TaskOversight) error {
-	return atomicWriteJSON(s.testOversightPath(taskID), oversight)
+	return atomicfile.WriteJSON(s.testOversightPath(taskID), oversight, 0644)
 }
 
 // LoadOversightText reads oversight.json for taskID and concatenates all

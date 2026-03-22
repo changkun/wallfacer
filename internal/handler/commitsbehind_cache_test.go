@@ -1,14 +1,12 @@
 package handler
 
-// Note: the `now` field on commitsBehindCache was added specifically to support
-// time-controlled unit tests, making it possible to simulate TTL expiry
-// without real-time delays.
-
 import (
 	"errors"
 	"sync"
 	"testing"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/pkg/cache"
 )
 
 func TestCommitsBehindCache_Miss(t *testing.T) {
@@ -36,22 +34,21 @@ func TestCommitsBehindCache_Hit(t *testing.T) {
 }
 
 func TestCommitsBehindCache_Expiry(t *testing.T) {
-	clock := time.Now()
+	now := time.Now()
 	c := &commitsBehindCache{
-		entries: make(map[string]commitsBehindEntry),
-		ttl:     commitsBehindCacheTTL,
-		now:     func() time.Time { return clock },
+		c: cache.New[string, commitsBehindResult](
+			commitsBehindCacheTTL,
+			cache.WithClock[string, commitsBehindResult](func() time.Time { return now }),
+		),
 	}
 
 	c.set("repo", "worktree", 5, nil)
 
-	// Entry must be present before expiry.
 	if _, ok, _ := c.get("repo", "worktree"); !ok {
 		t.Fatal("expected cache hit before TTL expiry")
 	}
 
-	// Advance clock past TTL.
-	clock = clock.Add(commitsBehindCacheTTL + time.Millisecond)
+	now = now.Add(commitsBehindCacheTTL + time.Millisecond)
 
 	_, ok, _ := c.get("repo", "worktree")
 	if ok {
@@ -60,17 +57,17 @@ func TestCommitsBehindCache_Expiry(t *testing.T) {
 }
 
 func TestCommitsBehindCache_NotYetExpired(t *testing.T) {
-	clock := time.Now()
+	now := time.Now()
 	c := &commitsBehindCache{
-		entries: make(map[string]commitsBehindEntry),
-		ttl:     commitsBehindCacheTTL,
-		now:     func() time.Time { return clock },
+		c: cache.New[string, commitsBehindResult](
+			commitsBehindCacheTTL,
+			cache.WithClock[string, commitsBehindResult](func() time.Time { return now }),
+		),
 	}
 
 	c.set("repo", "worktree", 2, nil)
 
-	// 1ms before expiry — entry must still be present.
-	clock = clock.Add(commitsBehindCacheTTL - time.Millisecond)
+	now = now.Add(commitsBehindCacheTTL - time.Millisecond)
 
 	if _, ok, _ := c.get("repo", "worktree"); !ok {
 		t.Error("expected cache hit 1ms before expiry, got miss")
@@ -90,7 +87,6 @@ func TestCommitsBehindCache_Invalidate(t *testing.T) {
 
 func TestCommitsBehindCache_InvalidateUnknown(_ *testing.T) {
 	c := newCommitsBehindCache(commitsBehindCacheTTL)
-	// Must not panic when the key does not exist.
 	c.invalidate("nonexistent-repo", "nonexistent-worktree")
 }
 
@@ -124,15 +120,8 @@ func TestCommitsBehindCache_CachesError(t *testing.T) {
 }
 
 func TestCommitsBehindCache_CachedCommitsBehind_ServesFromCache(t *testing.T) {
-	calls := 0
 	c := newCommitsBehindCache(commitsBehindCacheTTL)
-	// Pre-populate with a known value to simulate a cache hit.
 	c.set("repo", "worktree", 7, nil)
-
-	// Override cachedCommitsBehind via set — the real gitutil.CommitsBehind
-	// would fail in a unit test environment since no actual git repo exists.
-	// We verify the cached value is returned without invoking CommitsBehind.
-	_ = calls // silence unused warning
 
 	n, ok, err := c.get("repo", "worktree")
 	if !ok {
@@ -152,8 +141,7 @@ func TestCommitsBehindCache_ConcurrentSafe(_ *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
 
-	for i := 0; i < goroutines; i++ {
-		i := i
+	for i := range goroutines {
 		go func() {
 			defer wg.Done()
 			switch i % 3 {
@@ -168,12 +156,10 @@ func TestCommitsBehindCache_ConcurrentSafe(_ *testing.T) {
 	}
 
 	wg.Wait()
-	// No assertions needed — the race detector validates safety.
 }
 
 func TestCommitsBehindCache_KeySeparation(t *testing.T) {
 	c := newCommitsBehindCache(commitsBehindCacheTTL)
-	// Two entries with the same repo but different worktrees.
 	c.set("/repo", "/wt1", 1, nil)
 	c.set("/repo", "/wt2", 2, nil)
 

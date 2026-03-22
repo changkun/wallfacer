@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 	"github.com/google/uuid"
 )
 
@@ -64,23 +65,8 @@ type Store struct {
 	// SaveOversight. Guarded by mu.
 	searchIndex map[uuid.UUID]indexedTaskText
 
-	// deltaSeq is a monotonically increasing counter stamped on every TaskDelta.
-	// It is incremented inside notify, which is always called while s.mu is
-	// write-locked, so reads under s.mu.RLock() yield a consistent snapshot.
-	deltaSeq atomic.Int64
-
-	// replayBuf holds the most recent replayBufMax SequencedDeltas so that
-	// reconnecting SSE clients can catch up without a full snapshot.
-	replayMu  sync.RWMutex
-	replayBuf []SequencedDelta
-
-	subMu       sync.Mutex
-	subscribers map[int]chan SequencedDelta
-	nextSubID   int
-
-	wakeSubMu       sync.Mutex
-	wakeSubscribers map[int]chan struct{}
-	nextWakeSubID   int
+	// hub is the generic pub/sub hub for task change notifications.
+	hub *pubsub.Hub[TaskDelta]
 
 	// Payload pruning limits. A value of 0 disables pruning for that field.
 	// Configured at startup from environment variables with fallback to the
@@ -125,8 +111,7 @@ func NewStore(dir string) (*Store, error) {
 		eventsLoaded:        make(map[uuid.UUID]bool),
 		tasksByStatus:       make(map[TaskStatus]map[uuid.UUID]struct{}),
 		searchIndex:         make(map[uuid.UUID]indexedTaskText),
-		subscribers:         make(map[int]chan SequencedDelta),
-		wakeSubscribers:     make(map[int]chan struct{}),
+		hub:                 pubsub.NewHub[TaskDelta](pubsub.WithClone(cloneTaskDelta)),
 		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", DefaultRetryHistoryLimit),
 		refineSessionsLimit: readEnvInt("WALLFACER_REFINE_SESSIONS_LIMIT", DefaultRefineSessionsLimit),
 		promptHistoryLimit:  readEnvInt("WALLFACER_PROMPT_HISTORY_LIMIT", DefaultPromptHistoryLimit),

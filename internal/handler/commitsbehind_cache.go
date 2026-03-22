@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"sync"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/pkg/cache"
 )
 
 // commitsBehindCacheTTL is the time-to-live for cached CommitsBehind results.
@@ -14,11 +14,10 @@ import (
 // result within one polling window.
 const commitsBehindCacheTTL = 20 * time.Second
 
-// commitsBehindEntry is a single cached result keyed by (repoPath, worktreePath).
-type commitsBehindEntry struct {
-	n         int
-	err       error
-	expiresAt time.Time
+// commitsBehindResult stores a cached CommitsBehind outcome.
+type commitsBehindResult struct {
+	n   int
+	err error
 }
 
 // commitsBehindCache is a short-lived in-memory cache for gitutil.CommitsBehind
@@ -26,20 +25,13 @@ type commitsBehindEntry struct {
 // checkAndSyncWaitingTasks, tryAutoTest, and tryAutoSubmit. Each CommitsBehind
 // call runs 3–6 git subprocesses, so deduplication within a polling window
 // substantially reduces subprocess overhead when N waiting tasks exist.
-//
-// The now field is injectable for deterministic unit testing.
 type commitsBehindCache struct {
-	mu      sync.Mutex
-	entries map[string]commitsBehindEntry // key: repoPath + "\x00" + worktreePath
-	ttl     time.Duration
-	now     func() time.Time // injectable for tests
+	c *cache.TTLCache[string, commitsBehindResult]
 }
 
 func newCommitsBehindCache(ttl time.Duration) *commitsBehindCache {
 	return &commitsBehindCache{
-		entries: make(map[string]commitsBehindEntry),
-		ttl:     ttl,
-		now:     time.Now,
+		c: cache.New[string, commitsBehindResult](ttl),
 	}
 }
 
@@ -49,27 +41,16 @@ func (c *commitsBehindCache) key(repoPath, worktreePath string) string {
 
 // get returns a cached result if one exists and has not expired.
 func (c *commitsBehindCache) get(repoPath, worktreePath string) (int, bool, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	e, ok := c.entries[c.key(repoPath, worktreePath)]
-	if !ok || c.now().After(e.expiresAt) {
+	r, ok := c.c.Get(c.key(repoPath, worktreePath))
+	if !ok {
 		return 0, false, nil
 	}
-	return e.n, true, e.err
+	return r.n, true, r.err
 }
 
 // set stores a result in the cache with the configured TTL.
 func (c *commitsBehindCache) set(repoPath, worktreePath string, n int, err error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.entries == nil {
-		c.entries = make(map[string]commitsBehindEntry)
-	}
-	c.entries[c.key(repoPath, worktreePath)] = commitsBehindEntry{
-		n:         n,
-		err:       err,
-		expiresAt: c.now().Add(c.ttl),
-	}
+	c.c.Set(c.key(repoPath, worktreePath), commitsBehindResult{n: n, err: err})
 }
 
 // cachedCommitsBehind returns a cached result if available, otherwise calls
@@ -87,7 +68,5 @@ func (c *commitsBehindCache) cachedCommitsBehind(repoPath, worktreePath string) 
 // entry does not exist. Call this after sync or rebase operations that change
 // a worktree's HEAD so subsequent calls observe the new state.
 func (c *commitsBehindCache) invalidate(repoPath, worktreePath string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	delete(c.entries, c.key(repoPath, worktreePath))
+	c.c.Invalidate(c.key(repoPath, worktreePath))
 }

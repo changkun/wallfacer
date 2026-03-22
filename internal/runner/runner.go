@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +16,8 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
+	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/store"
@@ -29,58 +30,6 @@ import (
 // required to open the circuit breaker. It can be overridden at startup via
 // WALLFACER_CONTAINER_CB_THRESHOLD.
 const DefaultCBThreshold = 5
-
-// trackedWg is a sync.WaitGroup that also records the label of each
-// outstanding goroutine so that Shutdown can report what it is waiting for.
-type trackedWg struct {
-	mu      sync.Mutex
-	pending map[string]int
-	wg      sync.WaitGroup
-}
-
-// Add increments the wait group counter and records label as pending.
-func (t *trackedWg) Add(label string) {
-	t.mu.Lock()
-	if t.pending == nil {
-		t.pending = make(map[string]int)
-	}
-	t.pending[label]++
-	t.mu.Unlock()
-	t.wg.Add(1)
-}
-
-// Done decrements the wait group counter and removes label from pending.
-func (t *trackedWg) Done(label string) {
-	t.mu.Lock()
-	t.pending[label]--
-	if t.pending[label] <= 0 {
-		delete(t.pending, label)
-	}
-	t.mu.Unlock()
-	t.wg.Done()
-}
-
-// Wait blocks until all tracked goroutines have called Done.
-func (t *trackedWg) Wait() {
-	t.wg.Wait()
-}
-
-// Pending returns a sorted slice of labels (with counts >1 shown as "label×N")
-// for all goroutines that have not yet called Done.
-func (t *trackedWg) Pending() []string {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	result := make([]string, 0, len(t.pending))
-	for label, count := range t.pending {
-		if count == 1 {
-			result = append(result, label)
-		} else {
-			result = append(result, fmt.Sprintf("%s×%d", label, count))
-		}
-	}
-	sort.Strings(result)
-	return result
-}
 
 // ContainerInfo represents a single sandbox container returned by ListContainers.
 type ContainerInfo struct {
@@ -321,9 +270,9 @@ type Runner struct {
 	refineContainers       *containerRegistry // taskID → refinement container name
 	ideateContainer        *containerRegistry // singleton: ideation container name
 	oversightMu            sync.Map           // taskID (string) → *sync.Mutex for serializing oversight generation
-	containerCB            *CircuitBreaker    // circuit breaker for container launch operations
+	containerCB            *circuitbreaker.Breaker // circuit breaker for container launch operations
 	executor               ContainerExecutor  // abstracts container runtime calls for testing
-	backgroundWg           trackedWg          // tracks fire-and-forget background goroutines
+	backgroundWg           trackedwg.WaitGroup // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
 	autosubmitFn           func() bool    // returns true when auto-submit is enabled
@@ -375,7 +324,7 @@ func (r *Runner) RecordContainerFailure() {
 // ContainerCircuitState returns the human-readable state of the container
 // circuit breaker ("closed", "open", or "half-open").
 func (r *Runner) ContainerCircuitState() string {
-	return r.containerCB.State()
+	return r.containerCB.State().String()
 }
 
 // ContainerCircuitFailures returns the current consecutive failure count of
@@ -579,7 +528,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 			cbOpenSec = n
 		}
 	}
-	r.containerCB = NewCircuitBreaker(cbThreshold, time.Duration(cbOpenSec)*time.Second)
+	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
 	r.executor = &osContainerExecutor{command: r.command}
 	r.reg = cfg.Reg
 
