@@ -82,10 +82,8 @@ func isIdeaDuplicateTitle(added map[string]struct{}, title string) bool {
 type ideaRejectReason string
 
 const (
-	ideaRejectEmptyFields     ideaRejectReason = "empty_fields"
-	ideaRejectDegenerateTitle ideaRejectReason = "degenerate_prompt"
-	ideaRejectLowImpact       ideaRejectReason = "below_threshold"
-	ideaRejectDuplicateTitle  ideaRejectReason = "duplicate_title"
+	ideaRejectEmptyFields    ideaRejectReason = "empty_fields"
+	ideaRejectDuplicateTitle ideaRejectReason = "duplicate_title"
 )
 
 type ideaRejection struct {
@@ -113,9 +111,7 @@ func (r *Runner) emitIdeationRejectionEvents(ctx context.Context, taskID uuid.UU
 	logger.Runner.Debug("ideation: idea filtering summary",
 		"task", taskID,
 		"rejections", len(rejections),
-		"below_threshold", countIdeaRejections(rejections, ideaRejectLowImpact),
 		"duplicate_title", countIdeaRejections(rejections, ideaRejectDuplicateTitle),
-		"degenerate_prompt", countIdeaRejections(rejections, ideaRejectDegenerateTitle),
 		"empty_fields", countIdeaRejections(rejections, ideaRejectEmptyFields),
 	)
 }
@@ -223,10 +219,7 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 	}
 
 	// Normalize schema and filter out malformed entries.
-	// An idea where prompt equals the title is a degenerate output: the agent
-	// copied the title into the prompt field instead of writing an implementation
-	// spec. Reject these so runIdeationTask fails loudly rather than silently
-	// creating tasks with no actionable implementation details.
+	// Only reject ideas with truly empty fields or duplicate titles.
 	var valid []IdeateResult
 	var rejections []ideaRejection
 	seen := map[string]struct{}{}
@@ -239,13 +232,6 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 				Reason: ideaRejectEmptyFields,
 			})
 			continue
-		}
-		if strings.EqualFold(title, prompt) {
-			rejections = append(rejections, ideaRejection{
-				Title:  title,
-				Reason: ideaRejectDegenerateTitle,
-			})
-			continue // prompt is just the title — not a useful implementation spec
 		}
 		idea := r
 		normalizeIdeationImpact(&idea)
@@ -276,7 +262,7 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 			// the workspace has no source code to analyse.
 			return nil, rejections, nil
 		}
-		return nil, rejections, fmt.Errorf("no valid ideas in parsed output (all entries were malformed or had prompt equal to title)")
+		return nil, rejections, fmt.Errorf("no valid ideas in parsed output (all entries had empty title or prompt)")
 	}
 	return valid, rejections, nil
 }

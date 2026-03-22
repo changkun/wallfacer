@@ -468,7 +468,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 		_ = r.store.UpdateTaskResult(bgCtx, taskID, strings.TrimSpace(sb.String()), "", "", 1)
 
 	} else {
-		_ = r.store.UpdateTaskResult(bgCtx, taskID, "No idea reached the minimum impact threshold.", "", "", 1)
+		_ = r.store.UpdateTaskResult(bgCtx, taskID, "Brainstorm complete — no ideas were proposed.", "", "", 1)
 
 	}
 

@@ -311,23 +311,18 @@ func TestExtractIdeas_NoJSONArray(t *testing.T) {
 	}
 }
 
-func TestExtractIdeas_DegenerateTitle(t *testing.T) {
-	// Prompt equals title: should be rejected.
+func TestExtractIdeas_PromptEqualsTitle_Accepted(t *testing.T) {
+	// Prompt equals title is now accepted — goal-focused prompts may match the title.
 	input := `[{"title":"build widget","prompt":"build widget","impact_score":90}]`
 	ideas, rejections, err := extractIdeas(input)
-	// May return error if all ideas are rejected, or return with empty ideas.
-	_ = ideas
-	_ = err
-
-	// Count degenerate rejections.
-	degenerateCount := 0
-	for _, r := range rejections {
-		if r.Reason == ideaRejectDegenerateTitle {
-			degenerateCount++
-		}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if degenerateCount == 0 {
-		t.Error("expected at least one degenerate_prompt rejection")
+	if len(ideas) != 1 {
+		t.Errorf("expected 1 idea (prompt==title accepted), got %d", len(ideas))
+	}
+	if len(rejections) != 0 {
+		t.Errorf("expected 0 rejections, got %d", len(rejections))
 	}
 }
 
@@ -427,7 +422,7 @@ func TestLooksLikeNoCodebaseOutput_Negative(t *testing.T) {
 // --- countIdeaRejections tests ---
 
 func TestCountIdeaRejections_Empty(t *testing.T) {
-	count := countIdeaRejections(nil, ideaRejectLowImpact)
+	count := countIdeaRejections(nil, ideaRejectEmptyFields)
 	if count != 0 {
 		t.Errorf("expected 0, got %d", count)
 	}
@@ -435,17 +430,14 @@ func TestCountIdeaRejections_Empty(t *testing.T) {
 
 func TestCountIdeaRejections_Counts(t *testing.T) {
 	rejections := []ideaRejection{
-		{Reason: ideaRejectLowImpact},
-		{Reason: ideaRejectLowImpact},
+		{Reason: ideaRejectEmptyFields},
+		{Reason: ideaRejectEmptyFields},
 		{Reason: ideaRejectDuplicateTitle},
 	}
-	if got := countIdeaRejections(rejections, ideaRejectLowImpact); got != 2 {
-		t.Errorf("expected 2 low_impact rejections, got %d", got)
+	if got := countIdeaRejections(rejections, ideaRejectEmptyFields); got != 2 {
+		t.Errorf("expected 2 empty_fields rejections, got %d", got)
 	}
 	if got := countIdeaRejections(rejections, ideaRejectDuplicateTitle); got != 1 {
 		t.Errorf("expected 1 duplicate_title rejection, got %d", got)
-	}
-	if got := countIdeaRejections(rejections, ideaRejectEmptyFields); got != 0 {
-		t.Errorf("expected 0 empty_fields rejections, got %d", got)
 	}
 }

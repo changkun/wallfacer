@@ -62,9 +62,9 @@ func TestEmitIdeationRejectionEvents_WithRejections(t *testing.T) {
 	}
 
 	rejections := []ideaRejection{
-		{Title: "Task A", Reason: ideaRejectLowImpact, Score: 3},
-		{Title: "", Reason: ideaRejectDuplicateTitle, Score: 0},  // blank → "(untitled)"
-		{Title: "Task B", Reason: ideaRejectDegenerateTitle, Score: 1},
+		{Title: "Task A", Reason: ideaRejectEmptyFields, Score: 3},
+		{Title: "", Reason: ideaRejectDuplicateTitle, Score: 0}, // blank → "(untitled)"
+		{Title: "Task B", Reason: ideaRejectDuplicateTitle, Score: 1},
 	}
 
 	r.emitIdeationRejectionEvents(ctx, task.ID, rejections)
@@ -148,12 +148,10 @@ func TestEmitIdeationRejectionEvents_AllReasonTypes(t *testing.T) {
 
 	rejections := []ideaRejection{
 		{Title: "A", Reason: ideaRejectEmptyFields, Score: 0},
-		{Title: "B", Reason: ideaRejectDegenerateTitle, Score: 1},
-		{Title: "C", Reason: ideaRejectLowImpact, Score: 2},
-		{Title: "D", Reason: ideaRejectDuplicateTitle, Score: 3},
+		{Title: "B", Reason: ideaRejectDuplicateTitle, Score: 1},
 	}
 
-	// Must not panic with all four reason types.
+	// Must not panic with both reason types.
 	r.emitIdeationRejectionEvents(ctx, task.ID, rejections)
 
 	events, err := s.GetEvents(ctx, task.ID)
@@ -167,7 +165,7 @@ func TestEmitIdeationRejectionEvents_AllReasonTypes(t *testing.T) {
 			count++
 		}
 	}
-	if count != 4 {
-		t.Errorf("expected 4 system events for 4 rejections, got %d", count)
+	if count != 2 {
+		t.Errorf("expected 2 system events for 2 rejections, got %d", count)
 	}
 }

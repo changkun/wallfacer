@@ -624,60 +624,24 @@ func TestIdeationTaskExcludesDoneAndFailedFromContext(t *testing.T) {
 	}
 }
 
-// TestExtractIdeasRejectsPromptEqualsTitle verifies that extractIdeas filters
-// out ideas where the prompt is identical to the title (case-insensitive). This
-// is the degenerate output seen in session bd202e3f where the agent copied each
-// title into its prompt field instead of writing an implementation spec.
-func TestExtractIdeasRejectsPromptEqualsTitle(t *testing.T) {
-	// All three ideas have prompt == title — none should pass the filter.
+// TestExtractIdeasAcceptsPromptEqualsTitle verifies that ideas where the prompt
+// is identical to the title are accepted. With goal-focused ideation, a concise
+// goal may legitimately match the title.
+func TestExtractIdeasAcceptsPromptEqualsTitle(t *testing.T) {
 	raw := `[
 		{"title": "Batch Task Creation API",        "category": "backend / API",           "prompt": "Batch Task Creation API"},
 		{"title": "Execution Environment Provenance","category": "observability / debugging","prompt": "Execution Environment Provenance"},
 		{"title": "Scheduled Task Auto-Promotion",  "category": "product feature",          "prompt": "Scheduled Task Auto-Promotion"}
 	]`
 	ideas, rejections, err := extractIdeas(raw)
-	if err == nil {
-		t.Fatalf("expected error when all prompts equal their titles, got %d ideas", len(ideas))
-	}
-	if len(ideas) != 0 {
-		t.Errorf("expected 0 ideas, got %d", len(ideas))
-	}
-	if len(rejections) != 3 {
-		t.Fatalf("expected 3 rejections, got %d", len(rejections))
-	}
-	for _, r := range rejections {
-		if r.Reason != ideaRejectDegenerateTitle {
-			t.Errorf("expected reason %q, got %q", ideaRejectDegenerateTitle, r.Reason)
-		}
-	}
-}
-
-// TestExtractIdeasPartiallyRejectsPromptEqualsTitle verifies that valid ideas
-// are still returned when only some entries have prompt == title.
-func TestExtractIdeasPartiallyRejectsPromptEqualsTitle(t *testing.T) {
-	raw := `[
-		{"title": "Add tests",  "category": "test coverage", "prompt": "Add tests"},
-		{"title": "Fix bug",    "category": "backend / API", "prompt": "Reproduce and fix the nil-pointer in handler/tasks.go:82 by adding a guard before the dereference.", "impact_score": 80},
-		{"title": "Refactor auth","category": "code quality","prompt": "Refactor auth"}
-	]`
-	ideas, rejections, err := extractIdeas(raw)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(ideas) != 1 {
-		t.Fatalf("expected 1 valid idea (only the non-degenerate entry), got %d", len(ideas))
+	if len(ideas) != 3 {
+		t.Fatalf("expected 3 ideas (prompt==title is accepted), got %d", len(ideas))
 	}
-	if ideas[0].Title != "Fix bug" {
-		t.Errorf("expected surviving idea to be 'Fix bug', got %q", ideas[0].Title)
-	}
-	if len(rejections) != 2 {
-		t.Fatalf("expected 2 rejections, got %d", len(rejections))
-	}
-	if rejections[0].Reason != ideaRejectDegenerateTitle {
-		t.Errorf("expected first rejection reason %q, got %q", ideaRejectDegenerateTitle, rejections[0].Reason)
-	}
-	if rejections[1].Reason != ideaRejectDegenerateTitle {
-		t.Errorf("expected second rejection reason %q, got %q", ideaRejectDegenerateTitle, rejections[1].Reason)
+	if len(rejections) != 0 {
+		t.Errorf("expected 0 rejections, got %d", len(rejections))
 	}
 }
 
@@ -739,23 +703,21 @@ func TestExtractIdeasFromRunOutputReturnsErrorWhenNoArrayFound(t *testing.T) {
 	}
 }
 
-// TestIdeationTaskFailsWhenAllPromptsEqualTitles verifies that when the
+// TestIdeationTaskSucceedsWhenPromptsEqualTitles verifies that when the
 // brainstorm agent returns JSON where every prompt equals its title, the
-// idea-agent task transitions to "failed" rather than silently creating tasks
-// with no implementation details. This reproduces the bd202e3f regression.
-func TestIdeationTaskFailsWhenAllPromptsEqualTitles(t *testing.T) {
-	// Construct output where each prompt is identical to its title — the
-	// degenerate case observed in the bug report.
-	degenerateIdeas := []IdeateResult{
+// ideas are accepted and the task succeeds. Goal-focused prompts may
+// legitimately be very concise, matching the title.
+func TestIdeationTaskSucceedsWhenPromptsEqualTitles(t *testing.T) {
+	ideas := []IdeateResult{
 		{Title: "Batch Task Creation API", Prompt: "Batch Task Creation API"},
 		{Title: "Execution Environment Provenance", Prompt: "Execution Environment Provenance"},
 		{Title: "Scheduled Task Auto-Promotion", Prompt: "Scheduled Task Auto-Promotion"},
 	}
-	cmd := fakeCmdScript(t, ideaOutput(degenerateIdeas), 0)
+	cmd := fakeCmdScript(t, ideaOutput(ideas), 0)
 	s, r := setupRunnerWithCmd(t, nil, cmd)
 	ctx := context.Background()
 
-	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "Analyzes the workspace and proposes 3 actionable improvements.", Timeout: 5, Kind: store.TaskKindIdeaAgent})
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm", Timeout: 5, Kind: store.TaskKindIdeaAgent})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -768,23 +730,11 @@ func TestIdeationTaskFailsWhenAllPromptsEqualTitles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The brainstorm should fail loudly, not silently succeed with empty tasks.
-	if updated.Status != store.TaskStatusFailed {
-		t.Fatalf("expected status=failed when all prompts equal their titles, got %q", updated.Status)
-	}
-
-	// No child tasks should have been created.
-	allTasks, err := s.ListTasks(ctx, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, tt := range allTasks {
-		if tt.ID == task.ID {
-			continue
-		}
-		if tt.HasTag("idea-agent") {
-			t.Errorf("unexpected child task created: %q (prompt=%q, executionPrompt=%q)", tt.Title, tt.Prompt, tt.ExecutionPrompt)
-		}
+	// With autosubmit enabled (the default), the task transitions through
+	// waiting → committing → done. Without autosubmit it stops at waiting.
+	// Either way, it must NOT be failed.
+	if updated.Status == store.TaskStatusFailed {
+		t.Fatalf("expected ideas to be accepted (prompt==title is allowed), but task failed")
 	}
 }
 
