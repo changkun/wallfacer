@@ -585,47 +585,21 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			statusSet = true
 			if isTestRun {
 				// Test verification complete: don't commit, return to waiting with verdict.
-				verdict := parseTestVerdict(output.Result, task.CustomPassPatterns, task.CustomFailPatterns)
-				if verdict == "" {
-					// No clear verdict detected; treat as fail so the task is not
-					// auto-submitted without explicit confirmation.
-					verdict = "fail"
-				}
-				_ = r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
-
-				if verdict == "fail" {
-					_ = r.store.IncrementTestFailCount(bgCtx, taskID)
-
-					_ = r.store.UpdateTaskPendingTestFeedback(bgCtx, taskID, buildTestFailureFeedback(output.Result))
-
-				} else {
-					_ = r.store.ResetTestFailCount(bgCtx, taskID)
-
-				}
-				r.GenerateTestOversight(taskID, task.TestRunStartTurn)
-				_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
-
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-
-					store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
-
-					"result": "Test verification complete: " + strings.ToUpper(verdict),
-				})
-			} else {
-				// Move to waiting for human review. Auto-submit (if enabled)
-				// will pick up the task and run the commit pipeline.
-				r.GenerateOversightBackground(taskID)
-				_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
-
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
-
-					store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
-
-					"result": "Task complete — awaiting review.",
-				})
+				r.finalizeTestRun(bgCtx, taskID, *task, output.Result)
+				return
 			}
+			// Move to waiting for human review. Auto-submit (if enabled)
+			// will pick up the task and run the commit pipeline.
+			r.GenerateOversightBackground(taskID)
+			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
+
+			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+
+				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
+			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+
+				"result": "Task complete — awaiting review.",
+			})
 			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 
 			return
@@ -653,29 +627,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			if isTestRun {
 				// Test run ended without an explicit stop_reason. Record
 				// "fail" when no verdict is detected so the task is not auto-submitted.
-				verdict := parseTestVerdict(output.Result, task.CustomPassPatterns, task.CustomFailPatterns)
-				if verdict == "" {
-					verdict = "fail"
-				}
-				_ = r.store.UpdateTaskTestRun(bgCtx, taskID, false, verdict)
-
-				if verdict == "fail" {
-					_ = r.store.IncrementTestFailCount(bgCtx, taskID)
-
-					_ = r.store.UpdateTaskPendingTestFeedback(bgCtx, taskID, buildTestFailureFeedback(output.Result))
-
-				} else {
-					_ = r.store.ResetTestFailCount(bgCtx, taskID)
-
-				}
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
-
-					"result": "Test verification complete: " + strings.ToUpper(verdict),
-				})
-				r.GenerateTestOversight(taskID, task.TestRunStartTurn)
-			} else {
-				r.GenerateOversight(taskID)
+				r.finalizeTestRun(bgCtx, taskID, *task, output.Result)
+				return
 			}
+			r.GenerateOversight(taskID)
 			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 
 			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,

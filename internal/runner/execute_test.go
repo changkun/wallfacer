@@ -1199,6 +1199,103 @@ func TestRunTestRunDefaultStopReasonTestOversightTerminal(t *testing.T) {
 	}
 }
 
+// TestFinalizeTestRunEventOrder verifies that finalizeTestRun emits events in
+// the required order: oversight reaches terminal state before the
+// "Test verification complete" system event, which precedes
+// UpdateTaskStatus(Waiting), the StateChange event, and the SpanStart event.
+func TestFinalizeTestRunEventOrder(t *testing.T) {
+	repo := setupTestRepo(t)
+	s, r := setupTestRunner(t, []string{repo})
+	ctx := context.Background()
+
+	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "finalize test run order", Timeout: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Mark as in_progress so status transitions are valid.
+	if err := s.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatal(err)
+	}
+	// Mark as an active test run so the store reflects realistic state.
+	if err := s.UpdateTaskTestRun(ctx, task.ID, true, ""); err != nil {
+		t.Fatal(err)
+	}
+	task, err = s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.finalizeTestRun(ctx, task.ID, *task, "All checks passed. **PASS**")
+
+	// 1. Task must be in waiting state.
+	after, err := s.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Status != store.TaskStatusWaiting {
+		t.Fatalf("expected status=waiting, got %q", after.Status)
+	}
+
+	// 2. Test oversight must be in terminal state (not pending/generating).
+	testOversight, err := s.GetTestOversight(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error reading test oversight: %v", err)
+	}
+	if testOversight.Status == store.OversightStatusPending || testOversight.Status == store.OversightStatusGenerating {
+		t.Fatalf("test oversight should be terminal before task is waiting, got %q", testOversight.Status)
+	}
+
+	// 3. Verify event order: system "Test verification complete" < StateChange(waiting) < SpanStart.
+	events, err := s.GetEvents(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var systemID, stateChangeID, spanStartID int64
+	for _, e := range events {
+		switch e.EventType {
+		case store.EventTypeSystem:
+			var d map[string]string
+			if jsonErr := json.Unmarshal(e.Data, &d); jsonErr == nil {
+				if strings.Contains(d["result"], "Test verification complete") {
+					systemID = e.ID
+				}
+			}
+		case store.EventTypeStateChange:
+			// Only the inProgress→waiting transition.
+			var d map[string]string
+			if jsonErr := json.Unmarshal(e.Data, &d); jsonErr == nil {
+				if d["to"] == string(store.TaskStatusWaiting) {
+					stateChangeID = e.ID
+				}
+			}
+		case store.EventTypeSpanStart:
+			var d store.SpanData
+			if jsonErr := json.Unmarshal(e.Data, &d); jsonErr == nil {
+				if d.Phase == "feedback_waiting" {
+					spanStartID = e.ID
+				}
+			}
+		}
+	}
+
+	if systemID == 0 {
+		t.Fatal("expected a 'Test verification complete' system event, none found")
+	}
+	if stateChangeID == 0 {
+		t.Fatal("expected a StateChange(→waiting) event, none found")
+	}
+	if spanStartID == 0 {
+		t.Fatal("expected a SpanStart(feedback_waiting) event, none found")
+	}
+	if systemID >= stateChangeID {
+		t.Fatalf("system event (id=%d) must come before StateChange event (id=%d)", systemID, stateChangeID)
+	}
+	if stateChangeID >= spanStartID {
+		t.Fatalf("StateChange event (id=%d) must come before SpanStart event (id=%d)", stateChangeID, spanStartID)
+	}
+}
+
 // Ensure time is imported to avoid unused import warnings.
 var _ = time.Second
 
