@@ -1,10 +1,10 @@
 package gitutil
 
 import (
-	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
+
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // WorkspaceGitStatus holds the git state for a single workspace directory.
@@ -28,32 +28,32 @@ func WorkspaceStatus(path string) WorkspaceGitStatus {
 		Name: filepath.Base(path),
 	}
 
-	if err := exec.Command("git", "-C", path, "rev-parse", "--git-dir").Run(); err != nil {
+	if err := cmdexec.Git(path, "rev-parse", "--git-dir").Run(); err != nil {
 		return s
 	}
 	s.IsGitRepo = true
 
-	if out, err := exec.Command("git", "-C", path, "branch", "--show-current").Output(); err == nil {
-		s.Branch = strings.TrimSpace(string(out))
+	if out, err := cmdexec.Git(path, "branch", "--show-current").Output(); err == nil {
+		s.Branch = out
 	}
 
-	if out, err := exec.Command("git", "-C", path, "remote", "get-url", "origin").Output(); err == nil {
-		s.RemoteURL = strings.TrimSpace(string(out))
+	if out, err := cmdexec.Git(path, "remote", "get-url", "origin").Output(); err == nil {
+		s.RemoteURL = out
 	}
 
 	// Does it have a remote tracking branch?
-	if err := exec.Command("git", "-C", path, "rev-parse", "--abbrev-ref", "@{u}").Run(); err != nil {
+	if err := cmdexec.Git(path, "rev-parse", "--abbrev-ref", "@{u}").Run(); err != nil {
 		return s
 	}
 	s.HasRemote = true
 
-	if out, err := exec.Command("git", "-C", path, "rev-list", "--count", "@{u}..HEAD").Output(); err == nil {
-		n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	if out, err := cmdexec.Git(path, "rev-list", "--count", "@{u}..HEAD").Output(); err == nil {
+		n, _ := strconv.Atoi(out)
 		s.AheadCount = n
 	}
 
-	if out, err := exec.Command("git", "-C", path, "rev-list", "--count", "HEAD..@{u}").Output(); err == nil {
-		n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	if out, err := cmdexec.Git(path, "rev-list", "--count", "HEAD..@{u}").Output(); err == nil {
+		n, _ := strconv.Atoi(out)
 		s.BehindCount = n
 	}
 
@@ -61,8 +61,8 @@ func WorkspaceStatus(path string) WorkspaceGitStatus {
 	mainBranch := RemoteDefaultBranch(path)
 	s.MainBranch = mainBranch
 	if s.Branch != "" && s.Branch != mainBranch {
-		if out, err := exec.Command("git", "-C", path, "rev-list", "--count", "HEAD..origin/"+mainBranch).Output(); err == nil {
-			n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+		if out, err := cmdexec.Git(path, "rev-list", "--count", "HEAD..origin/"+mainBranch).Output(); err == nil {
+			n, _ := strconv.Atoi(out)
 			s.BehindMainCount = n
 		}
 	}

@@ -8,6 +8,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -212,7 +213,7 @@ func (r *Runner) PruneOrphanedWorktrees(ctx context.Context, orphans []uuid.UUID
 			subdirPath := filepath.Join(taskDir, sub.Name())
 			if wsPath, ok := basenames[sub.Name()]; ok {
 				// Best-effort: unregister the worktree from git's internal index.
-				if err := runGitContext(ctx, wsPath, "worktree", "remove", "--force", subdirPath); err != nil {
+				if err := cmdexec.Git(wsPath, "worktree", "remove", "--force", subdirPath).WithContext(ctx).Run(); err != nil {
 					logger.Runner.Warn("worktree GC: git worktree remove", "task", id, "subdir", subdirPath, "error", err)
 				}
 			}

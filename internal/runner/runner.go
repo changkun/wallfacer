@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,10 +15,11 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
-	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
+	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
+	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"changkun.de/x/wallfacer/prompts"
@@ -136,10 +136,10 @@ func parseContainerList(out []byte) ([]containerJSON, error) {
 // and returns structured info for each matching container.
 // Supports both Podman and Docker JSON output formats.
 func (r *Runner) ListContainers() ([]ContainerInfo, error) {
-	out, err := exec.Command(r.command, "ps", "-a",
+	out, err := cmdexec.New(r.command, "ps", "-a",
 		"--filter", "name=wallfacer",
 		"--format", "json",
-	).Output()
+	).OutputBytes()
 	if err != nil {
 		return nil, err
 	}
@@ -260,19 +260,19 @@ type Runner struct {
 	instructionsPath       string
 	workspaceManager       *workspace.Manager
 	codexAuthPath          string
-	containerNetwork       string             // --network override; empty = read from env file
-	containerCPUs          string             // --cpus override; empty = read from env file
-	containerMemory        string             // --memory override; empty = read from env file
-	promptsMgr             *prompts.Manager   // prompt template manager
-	worktreeMu             sync.Mutex         // serializes all worktree filesystem operations on worktreesDir
-	repoMu                 sync.Map           // per-repo *sync.Mutex for serializing rebase+merge
-	taskContainers         *containerRegistry // taskID → container name
-	refineContainers       *containerRegistry // taskID → refinement container name
-	ideateContainer        *containerRegistry // singleton: ideation container name
-	oversightMu            sync.Map           // taskID (string) → *sync.Mutex for serializing oversight generation
+	containerNetwork       string                  // --network override; empty = read from env file
+	containerCPUs          string                  // --cpus override; empty = read from env file
+	containerMemory        string                  // --memory override; empty = read from env file
+	promptsMgr             *prompts.Manager        // prompt template manager
+	worktreeMu             sync.Mutex              // serializes all worktree filesystem operations on worktreesDir
+	repoMu                 sync.Map                // per-repo *sync.Mutex for serializing rebase+merge
+	taskContainers         *containerRegistry      // taskID → container name
+	refineContainers       *containerRegistry      // taskID → refinement container name
+	ideateContainer        *containerRegistry      // singleton: ideation container name
+	oversightMu            sync.Map                // taskID (string) → *sync.Mutex for serializing oversight generation
 	containerCB            *circuitbreaker.Breaker // circuit breaker for container launch operations
-	executor               ContainerExecutor  // abstracts container runtime calls for testing
-	backgroundWg           trackedwg.WaitGroup // tracks fire-and-forget background goroutines
+	executor               ContainerExecutor       // abstracts container runtime calls for testing
+	backgroundWg           trackedwg.WaitGroup     // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
 	autosubmitFn           func() bool    // returns true when auto-submit is enabled
@@ -816,7 +816,7 @@ func (r *Runner) KillContainer(taskID uuid.UUID) {
 	if name == "" {
 		return
 	}
-	_ = exec.Command(r.command, "kill", name).Run()
+	_ = cmdexec.New(r.command, "kill", name).Run()
 
 }
 
@@ -827,7 +827,7 @@ func (r *Runner) KillRefineContainer(taskID uuid.UUID) {
 	if name == "" {
 		return
 	}
-	_ = exec.Command(r.command, "kill", name).Run()
+	_ = cmdexec.New(r.command, "kill", name).Run()
 
 }
 
@@ -847,6 +847,6 @@ func (r *Runner) KillIdeateContainer() {
 	if name == "" {
 		return
 	}
-	_ = exec.Command(r.command, "kill", name).Run()
+	_ = cmdexec.New(r.command, "kill", name).Run()
 
 }

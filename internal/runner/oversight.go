@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -686,7 +686,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	defer cancel()
 
 	containerName := "wallfacer-oversight-" + taskID.String()[:8]
-	_ = exec.Command(r.command, "rm", "-f", containerName).Run()
+	_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
 
 	task, err := r.store.GetTask(r.shutdownCtx, taskID)
 	if err != nil {
@@ -713,14 +713,10 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 		}
 
 		args := spec.Build()
-		cmd := exec.CommandContext(runCtx, r.command, args...)
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
 
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
 
-		runErr := cmd.Run()
+		stdout, stderr, runErr := cmdexec.New(r.command, args...).WithContext(runCtx).Capture()
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
 
 		if runCtx.Err() != nil {
@@ -731,11 +727,11 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 			}
 		}
 
-		raw := strings.TrimSpace(stdout.String())
+		raw := strings.TrimSpace(string(stdout))
 		if raw == "" {
 			if runErr != nil {
 				return oversightRunResult{
-					err:   fmt.Errorf("container: %w (stderr: %s)", runErr, truncate(stderr.String(), 300)),
+					err:   fmt.Errorf("container: %w (stderr: %s)", runErr, truncate(string(stderr), 300)),
 					model: model,
 					sb:    selectedSandbox,
 				}
@@ -747,7 +743,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 		if err != nil {
 			if runErr != nil {
 				return oversightRunResult{
-					err:   fmt.Errorf("container: %w (stderr: %s stdout: %s)", runErr, truncate(stderr.String(), 300), truncate(raw, 300)),
+					err:   fmt.Errorf("container: %w (stderr: %s stdout: %s)", runErr, truncate(string(stderr), 300), truncate(raw, 300)),
 					model: model,
 					sb:    selectedSandbox,
 				}

@@ -4,11 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -40,9 +39,9 @@ func (r *Runner) captureExecutionEnvironment(task store.Task) store.ExecutionEnv
 	// Container digest: query the runtime for the image's content digest.
 	// Failures are non-fatal; digest is left empty when unavailable.
 	if env.ContainerImage != "" && r.command != "" {
-		out, err := exec.Command(r.command, "inspect", "--format", "{{.Digest}}", env.ContainerImage).Output()
+		out, err := cmdexec.New(r.command, "inspect", "--format", "{{.Digest}}", env.ContainerImage).Output()
 		if err == nil {
-			env.ContainerDigest = strings.TrimSpace(string(out))
+			env.ContainerDigest = out
 		}
 	}
 

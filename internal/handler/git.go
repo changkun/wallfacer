@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -15,6 +14,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -213,14 +213,14 @@ func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Git.Info("push", "workspace", req.Workspace)
-	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "push").CombinedOutput()
+	out, err := cmdexec.Git(req.Workspace, "push").WithContext(r.Context()).Combined()
 	if err != nil {
 		logger.Git.Error("push failed", "workspace", req.Workspace, "error", err)
-		http.Error(w, string(out), http.StatusInternalServerError)
+		http.Error(w, out, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"output": string(out)})
+	writeJSON(w, http.StatusOK, map[string]string{"output": out})
 }
 
 // GitSyncWorkspace fetches from remote and rebases the current branch onto its upstream.
@@ -245,27 +245,27 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 
 	logger.Git.Info("sync workspace", "workspace", req.Workspace)
 
-	if out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "fetch").CombinedOutput(); err != nil {
+	if out, err := cmdexec.Git(req.Workspace, "fetch").WithContext(r.Context()).Combined(); err != nil {
 		logger.Git.Error("fetch failed", "workspace", req.Workspace, "error", err)
-		http.Error(w, "fetch failed: "+string(out), http.StatusInternalServerError)
+		http.Error(w, "fetch failed: "+out, http.StatusInternalServerError)
 		return
 	}
 
-	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "rebase", "@{u}").CombinedOutput()
+	out, err := cmdexec.Git(req.Workspace, "rebase", "@{u}").WithContext(r.Context()).Combined()
 	if err != nil {
-		if abortErr := exec.Command("git", "-C", req.Workspace, "rebase", "--abort").Run(); abortErr != nil {
+		if abortErr := cmdexec.Git(req.Workspace, "rebase", "--abort").Run(); abortErr != nil {
 			logger.Git.Warn("rebase abort failed", "workspace", req.Workspace, "error", abortErr)
 		}
 		logger.Git.Error("sync rebase failed", "workspace", req.Workspace, "error", err)
-		if gitutil.IsConflictOutput(string(out)) {
+		if gitutil.IsConflictOutput(out) {
 			http.Error(w, "rebase conflict: resolve manually in "+req.Workspace, http.StatusConflict)
 			return
 		}
-		http.Error(w, "rebase failed: "+string(out), http.StatusInternalServerError)
+		http.Error(w, "rebase failed: "+out, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"output": string(out)})
+	writeJSON(w, http.StatusOK, map[string]string{"output": out})
 }
 
 // GitRebaseOnMain fetches the remote default branch and rebases the current branch onto it.
@@ -292,28 +292,28 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 	logger.Git.Info("rebase-on-main", "workspace", req.Workspace, "main", mainBranch)
 
 	// Fetch the remote default branch.
-	if out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "fetch", "origin", mainBranch).CombinedOutput(); err != nil {
+	if out, err := cmdexec.Git(req.Workspace, "fetch", "origin", mainBranch).WithContext(r.Context()).Combined(); err != nil {
 		logger.Git.Error("fetch failed", "workspace", req.Workspace, "error", err)
-		http.Error(w, "fetch failed: "+string(out), http.StatusInternalServerError)
+		http.Error(w, "fetch failed: "+out, http.StatusInternalServerError)
 		return
 	}
 
 	// Rebase onto origin/<main>.
-	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "rebase", "origin/"+mainBranch).CombinedOutput()
+	out, err := cmdexec.Git(req.Workspace, "rebase", "origin/"+mainBranch).WithContext(r.Context()).Combined()
 	if err != nil {
-		if abortErr := exec.Command("git", "-C", req.Workspace, "rebase", "--abort").Run(); abortErr != nil {
+		if abortErr := cmdexec.Git(req.Workspace, "rebase", "--abort").Run(); abortErr != nil {
 			logger.Git.Warn("rebase abort failed", "workspace", req.Workspace, "error", abortErr)
 		}
 		logger.Git.Error("rebase-on-main failed", "workspace", req.Workspace, "error", err)
-		if gitutil.IsConflictOutput(string(out)) {
+		if gitutil.IsConflictOutput(out) {
 			http.Error(w, "rebase conflict: resolve manually in "+req.Workspace, http.StatusConflict)
 			return
 		}
-		http.Error(w, "rebase failed: "+string(out), http.StatusInternalServerError)
+		http.Error(w, "rebase failed: "+out, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"output": string(out)})
+	writeJSON(w, http.StatusOK, map[string]string{"output": out})
 }
 
 // TaskDiff returns the git diff for a task's worktrees versus the default branch.
@@ -360,19 +360,17 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		// If the worktree directory no longer exists, fall back to stored commit hashes.
 		if _, statErr := os.Stat(worktreePath); statErr != nil {
 			commitHash := task.CommitHashes[repoPath]
-			var out []byte
+			var out string
 			if commitHash != "" {
 				if baseHash := task.BaseCommitHashes[repoPath]; baseHash != "" {
 					var gitErr error
-					out, gitErr = exec.CommandContext(r.Context(), "git", "-C", repoPath,
-						"diff", baseHash, commitHash).Output()
+					out, gitErr = cmdexec.Git(repoPath, "diff", baseHash, commitHash).WithContext(r.Context()).Output()
 					if gitErr != nil {
 						logger.Git.Debug("git diff base..commit failed", "repo", repoPath, "error", gitErr)
 					}
 				} else {
 					var gitErr error
-					out, gitErr = exec.CommandContext(r.Context(), "git", "-C", repoPath,
-						"show", commitHash).Output()
+					out, gitErr = cmdexec.Git(repoPath, "show", commitHash).WithContext(r.Context()).Output()
 					if gitErr != nil {
 						logger.Git.Debug("git show commit failed", "repo", repoPath, "error", gitErr)
 					}
@@ -383,15 +381,13 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 					// branch, not the inverse of commits that advanced main.
 					if base, mbErr := gitutil.MergeBase(repoPath, defBranch, task.BranchName); mbErr == nil {
 						var gitErr error
-						out, gitErr = exec.CommandContext(r.Context(), "git", "-C", repoPath,
-							"diff", base, task.BranchName).Output()
+						out, gitErr = cmdexec.Git(repoPath, "diff", base, task.BranchName).WithContext(r.Context()).Output()
 						if gitErr != nil {
 							logger.Git.Debug("git diff merge-base..branch failed", "repo", repoPath, "error", gitErr)
 						}
 					} else {
 						var gitErr error
-						out, gitErr = exec.CommandContext(r.Context(), "git", "-C", repoPath,
-							"diff", defBranch+".."+task.BranchName).Output()
+						out, gitErr = cmdexec.Git(repoPath, "diff", defBranch+".."+task.BranchName).WithContext(r.Context()).Output()
 						if gitErr != nil {
 							logger.Git.Debug("git diff default..branch failed", "repo", repoPath, "error", gitErr)
 						}
@@ -402,7 +398,7 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 				if len(task.WorktreePaths) > 1 {
 					fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
 				}
-				combined.Write(out)
+				combined.WriteString(out)
 			}
 			continue
 		}
@@ -418,21 +414,21 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		if err != nil {
 			base = defBranch
 		}
-		out, diffErr := exec.CommandContext(r.Context(), "git", "-C", worktreePath, "diff", base).Output()
+		out, diffErr := cmdexec.Git(worktreePath, "diff", base).WithContext(r.Context()).Output()
 		if diffErr != nil {
 			logger.Git.Debug("git diff base failed", "worktree", worktreePath, "error", diffErr)
 		}
 
 		// Include untracked files via --no-index diffs.
-		if untrackedRaw, err := exec.CommandContext(r.Context(), "git", "-C", worktreePath,
-			"ls-files", "--others", "--exclude-standard").Output(); err == nil {
-			for _, file := range strings.Split(strings.TrimSpace(string(untrackedRaw)), "\n") {
+		if untrackedRaw, err := cmdexec.Git(worktreePath,
+			"ls-files", "--others", "--exclude-standard").WithContext(r.Context()).Output(); err == nil {
+			for _, file := range strings.Split(untrackedRaw, "\n") {
 				if file == "" {
 					continue
 				}
-				fd, _ := exec.CommandContext(r.Context(), "git", "-C", worktreePath,
-					"diff", "--no-index", "/dev/null", file).Output()
-				out = append(out, fd...)
+				fd, _ := cmdexec.Git(worktreePath,
+					"diff", "--no-index", "/dev/null", file).WithContext(r.Context()).Output()
+				out += fd
 			}
 		}
 
@@ -440,7 +436,7 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 			if len(task.WorktreePaths) > 1 {
 				fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
 			}
-			combined.Write(out)
+			combined.WriteString(out)
 		}
 		if n, err := gitutil.CommitsBehind(repoPath, worktreePath); err == nil && n > 0 {
 			behindCounts[filepath.Base(repoPath)] = n
@@ -502,15 +498,14 @@ func (h *Handler) GitBranches(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := exec.CommandContext(r.Context(), "git", "-C", ws,
-		"branch", "--list", "--format=%(refname:short)").Output()
+	out, err := cmdexec.Git(ws, "branch", "--list", "--format=%(refname:short)").WithContext(r.Context()).Output()
 	if err != nil {
 		http.Error(w, "failed to list branches", http.StatusInternalServerError)
 		return
 	}
 
 	var branches []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for _, line := range strings.Split(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line != "" {
 			branches = append(branches, line)
@@ -518,9 +513,8 @@ func (h *Handler) GitBranches(w http.ResponseWriter, r *http.Request) {
 	}
 
 	current := ""
-	if curOut, err := exec.CommandContext(r.Context(), "git", "-C", ws,
-		"branch", "--show-current").Output(); err == nil {
-		current = strings.TrimSpace(string(curOut))
+	if curOut, err := cmdexec.Git(ws, "branch", "--show-current").WithContext(r.Context()).Output(); err == nil {
+		current = curOut
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -557,10 +551,10 @@ func (h *Handler) GitCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Git.Info("checkout", "workspace", req.Workspace, "branch", req.Branch)
-	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "checkout", req.Branch).CombinedOutput()
+	out, err := cmdexec.Git(req.Workspace, "checkout", req.Branch).WithContext(r.Context()).Combined()
 	if err != nil {
 		logger.Git.Error("checkout failed", "workspace", req.Workspace, "branch", req.Branch, "error", err)
-		http.Error(w, string(out), http.StatusInternalServerError)
+		http.Error(w, out, http.StatusInternalServerError)
 		return
 	}
 
@@ -595,10 +589,10 @@ func (h *Handler) GitCreateBranch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Git.Info("create-branch", "workspace", req.Workspace, "branch", req.Branch)
-	out, err := exec.CommandContext(r.Context(), "git", "-C", req.Workspace, "checkout", "-b", req.Branch).CombinedOutput()
+	out, err := cmdexec.Git(req.Workspace, "checkout", "-b", req.Branch).WithContext(r.Context()).Combined()
 	if err != nil {
 		logger.Git.Error("create-branch failed", "workspace", req.Workspace, "branch", req.Branch, "error", err)
-		http.Error(w, string(out), http.StatusInternalServerError)
+		http.Error(w, out, http.StatusInternalServerError)
 		return
 	}
 
@@ -619,14 +613,14 @@ func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cmd *exec.Cmd
+	var cmd *cmdexec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.CommandContext(r.Context(), "open", req.Path)
+		cmd = cmdexec.New("open", req.Path).WithContext(r.Context())
 	case "windows":
-		cmd = exec.CommandContext(r.Context(), "explorer", req.Path)
+		cmd = cmdexec.New("explorer", req.Path).WithContext(r.Context())
 	default:
-		cmd = exec.CommandContext(r.Context(), "xdg-open", req.Path)
+		cmd = cmdexec.New("xdg-open", req.Path).WithContext(r.Context())
 	}
 
 	if err := cmd.Run(); err != nil {

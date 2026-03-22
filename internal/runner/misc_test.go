@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -167,21 +168,21 @@ func TestIsConflictErrorConflictError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// runGit
+// cmdexec.Git
 // ---------------------------------------------------------------------------
 
-// TestRunGitSuccess verifies that runGit executes git commands successfully.
-func TestRunGitSuccess(t *testing.T) {
+// TestCmdexecGitSuccess verifies that cmdexec.Git executes git commands successfully.
+func TestCmdexecGitSuccess(t *testing.T) {
 	repo := setupTestRepo(t)
-	if err := runGit(repo, "status"); err != nil {
-		t.Fatalf("runGit git status should succeed: %v", err)
+	if err := cmdexec.Git(repo, "status").Run(); err != nil {
+		t.Fatalf("cmdexec.Git status should succeed: %v", err)
 	}
 }
 
-// TestRunGitInvalidDir verifies that runGit returns an error for a non-existent
+// TestCmdexecGitInvalidDir verifies that cmdexec.Git returns an error for a non-existent
 // directory.
-func TestRunGitInvalidDir(t *testing.T) {
-	err := runGit("/nonexistent/xyz/path/abc", "status")
+func TestCmdexecGitInvalidDir(t *testing.T) {
+	err := cmdexec.Git("/nonexistent/xyz/path/abc", "status").Run()
 	if err == nil {
 		t.Fatal("expected error for non-existent directory")
 	}

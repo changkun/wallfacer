@@ -1,9 +1,9 @@
 package runner
 
 import (
-	"bytes"
 	"context"
-	"os/exec"
+
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // ContainerExecutor abstracts the container runtime (podman/docker) for testing.
@@ -22,21 +22,16 @@ type osContainerExecutor struct {
 }
 
 // RunArgs removes any leftover container with the given name, then launches a
-// new container using exec.CommandContext and returns the combined output.
+// new container using cmdexec and returns the combined output.
 func (e *osContainerExecutor) RunArgs(ctx context.Context, name string, args []string) ([]byte, []byte, error) {
 	// Remove any leftover container from a previous interrupted run.
-	exec.Command(e.command, "rm", "-f", name).Run() //nolint:errcheck
+	cmdexec.New(e.command, "rm", "-f", name).Run() //nolint:errcheck
 
-	cmd := exec.CommandContext(ctx, e.command, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return stdout.Bytes(), stderr.Bytes(), err
+	return cmdexec.New(e.command, args...).WithContext(ctx).Capture()
 }
 
 // Kill forcibly stops and removes the named container.
 func (e *osContainerExecutor) Kill(name string) {
-	exec.Command(e.command, "kill", name).Run()     //nolint:errcheck
-	exec.Command(e.command, "rm", "-f", name).Run() //nolint:errcheck
+	cmdexec.New(e.command, "kill", name).Run()     //nolint:errcheck
+	cmdexec.New(e.command, "rm", "-f", name).Run() //nolint:errcheck
 }

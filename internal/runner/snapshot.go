@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // setupNonGitSnapshot copies ws into snapshotPath and initialises a local git
@@ -27,23 +28,23 @@ func setupNonGitSnapshot(ws, snapshotPath string) error {
 		return fmt.Errorf("cp workspace to snapshot: %w", err)
 	}
 	// Initialise a git repo so Phase 1 (hostStageAndCommit) can commit changes.
-	if out, err := exec.Command("git", "-C", snapshotPath, "init").CombinedOutput(); err != nil {
+	if out, err := cmdexec.Git(snapshotPath, "init").Combined(); err != nil {
 		if rmErr := os.RemoveAll(snapshotPath); rmErr != nil {
 			logger.Runner.Warn("snapshot cleanup failed after git init error", "path", snapshotPath, "error", rmErr)
 		}
 		return fmt.Errorf("git init snapshot: %w\n%s", err, out)
 	}
-	if err := exec.Command("git", "-C", snapshotPath, "config", "user.email", "wallfacer@local").Run(); err != nil {
+	if err := cmdexec.Git(snapshotPath, "config", "user.email", "wallfacer@local").Run(); err != nil {
 		logger.Runner.Warn("snapshot git config user.email", "path", snapshotPath, "error", err)
 	}
-	if err := exec.Command("git", "-C", snapshotPath, "config", "user.name", "Wallfacer").Run(); err != nil {
+	if err := cmdexec.Git(snapshotPath, "config", "user.name", "Wallfacer").Run(); err != nil {
 		logger.Runner.Warn("snapshot git config user.name", "path", snapshotPath, "error", err)
 	}
-	if err := exec.Command("git", "-C", snapshotPath, "add", "-A").Run(); err != nil {
+	if err := cmdexec.Git(snapshotPath, "add", "-A").Run(); err != nil {
 		logger.Runner.Warn("snapshot git add", "path", snapshotPath, "error", err)
 	}
 	// --allow-empty handles the edge case of an empty workspace.
-	if err := exec.Command("git", "-C", snapshotPath, "commit", "--allow-empty", "-m", "wallfacer: initial snapshot").Run(); err != nil {
+	if err := cmdexec.Git(snapshotPath, "commit", "--allow-empty", "-m", "wallfacer: initial snapshot").Run(); err != nil {
 		logger.Runner.Warn("snapshot git commit", "path", snapshotPath, "error", err)
 	}
 	return nil
@@ -58,10 +59,10 @@ func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
 	// --checksum is needed because files may have the same size and mtime
 	// but different content (e.g. macOS openrsync skips them otherwise).
 	if _, err := exec.LookPath("rsync"); err == nil {
-		out, err := exec.Command(
+		out, err := cmdexec.New(
 			"rsync", "-a", "--checksum", "--delete", "--exclude=.git",
 			snapshotPath+"/", targetPath+"/",
-		).CombinedOutput()
+		).Combined()
 		if err != nil {
 			return fmt.Errorf("rsync snapshot to workspace: %w\n%s", err, out)
 		}
@@ -86,7 +87,7 @@ func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
 // first for speed and falls back to a pure-Go walk on failure or on Windows.
 func copyDirContents(src, dst string) error {
 	if runtime.GOOS != "windows" {
-		out, err := exec.Command("cp", "-a", src+"/.", dst).CombinedOutput()
+		out, err := cmdexec.New("cp", "-a", src+"/.", dst).Combined()
 		if err == nil {
 			return nil
 		}

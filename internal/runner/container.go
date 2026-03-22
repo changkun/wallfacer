@@ -618,13 +618,3 @@ func isLikelyTokenLimitError(parts ...string) bool {
 	}
 	return false
 }
-
-// runGit is a helper to run a git command and discard output (best-effort).
-func runGit(dir string, args ...string) error {
-	return exec.Command("git", append([]string{"-C", dir}, args...)...).Run()
-}
-
-// runGitContext is like runGit but respects context cancellation.
-func runGitContext(ctx context.Context, dir string, args ...string) error {
-	return exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...).Run()
-}

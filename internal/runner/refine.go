@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/prompts"
@@ -180,54 +180,49 @@ func (r *Runner) runRefinementContainer(
 	defer r.refineContainers.Delete(taskID)
 
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
-		_ = exec.Command(r.command, "rm", "-f", containerName).Run()
+		_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
 
 		args := r.buildRefinementContainerArgs(containerName, taskID.String(), prompt, modelOverride, selectedSandbox)
 
-		cmd := exec.CommandContext(ctx, r.command, args...)
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-
 		logger.Runner.Debug("refine exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
-		runErr := cmd.Run()
+		stdout, stderr, runErr := cmdexec.New(r.command, args...).WithContext(ctx).Capture()
 
 		if ctx.Err() != nil {
-			_ = exec.Command(r.command, "kill", containerName).Run()
+			_ = cmdexec.New(r.command, "kill", containerName).Run()
 
-			_ = exec.Command(r.command, "rm", "-f", containerName).Run()
+			_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
 
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("refinement container terminated: %w", ctx.Err())
+			return nil, stdout, stderr, fmt.Errorf("refinement container terminated: %w", ctx.Err())
 		}
 
-		raw := strings.TrimSpace(stdout.String())
+		raw := strings.TrimSpace(string(stdout))
 		if raw == "" {
 			if runErr != nil {
 				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, stdout.Bytes(), stderr.Bytes(),
-						fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), stderr.String())
+					return nil, stdout, stderr,
+						fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), string(stderr))
 				}
-				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+				return nil, stdout, stderr, fmt.Errorf("exec container: %w", runErr)
 			}
-			stderrStr := strings.TrimSpace(stderr.String())
+			stderrStr := strings.TrimSpace(string(stderr))
 			if stderrStr != "" {
-				return nil, stdout.Bytes(), stderr.Bytes(),
+				return nil, stdout, stderr,
 					fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
 			}
-			return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("empty output from container")
+			return nil, stdout, stderr, fmt.Errorf("empty output from container")
 		}
 
 		output, parseErr := parseOutput(raw)
 		if parseErr != nil {
 			if runErr != nil {
 				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, stdout.Bytes(), stderr.Bytes(),
+					return nil, stdout, stderr,
 						fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
-							exitErr.ExitCode(), stderr.String(), truncate(raw, 500))
+							exitErr.ExitCode(), string(stderr), truncate(raw, 500))
 				}
-				return nil, stdout.Bytes(), stderr.Bytes(), fmt.Errorf("exec container: %w", runErr)
+				return nil, stdout, stderr, fmt.Errorf("exec container: %w", runErr)
 			}
-			return nil, stdout.Bytes(), stderr.Bytes(),
+			return nil, stdout, stderr,
 				fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
 		}
 
@@ -238,7 +233,7 @@ func (r *Runner) runRefinementContainer(
 			}
 		}
 		output.ActualSandbox = selectedSandbox
-		return output, stdout.Bytes(), stderr.Bytes(), nil
+		return output, stdout, stderr, nil
 	}
 
 	initialSandbox := sb

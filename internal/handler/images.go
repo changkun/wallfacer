@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
@@ -172,13 +173,13 @@ func (h *Handler) inspectImage(cmd string, sb sandbox.Type, image string) imageS
 	if cmd == "" || image == "" {
 		return status
 	}
-	out, err := exec.Command(cmd, "images", "--format",
+	out, err := cmdexec.New(cmd, "images", "--format",
 		"{{.Size}}\t{{.CreatedAt}}", image).Output()
-	if err != nil || strings.TrimSpace(string(out)) == "" {
+	if err != nil || out == "" {
 		return status
 	}
 	status.Cached = true
-	parts := strings.SplitN(strings.TrimSpace(string(out)), "\t", 2)
+	parts := strings.SplitN(out, "\t", 2)
 	if len(parts) >= 1 {
 		status.Size = parts[0]
 	}
@@ -210,9 +211,9 @@ func (h *Handler) DeleteImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := exec.Command(cmd, "rmi", image).CombinedOutput()
+	out, err := cmdexec.New(cmd, "rmi", image).Combined()
 	if err != nil {
-		http.Error(w, strings.TrimSpace(string(out)), http.StatusInternalServerError)
+		http.Error(w, out, http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"removed": image})

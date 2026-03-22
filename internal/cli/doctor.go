@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // RunDoctor implements the `wallfacer doctor` subcommand.
@@ -109,7 +111,7 @@ func RunDoctor(configDir string) {
 		fmt.Printf("    Install Podman (https://podman.io) or Docker (https://docker.com).\n")
 		issues++
 	} else {
-		out, err := exec.Command(runtimePath, "version", "--format", "{{.Client.Version}}").Output()
+		out, err := cmdexec.New(runtimePath, "version", "--format", "{{.Client.Version}}").Output()
 		if err != nil {
 			fmt.Printf("[!] Container runtime found (%s) but not responding\n", runtimePath)
 			if strings.Contains(containerCmd, "podman") {
@@ -119,7 +121,7 @@ func RunDoctor(configDir string) {
 			}
 			issues++
 		} else {
-			fmt.Printf("[ok] Container runtime: %s (v%s)\n", runtimePath, strings.TrimSpace(string(out)))
+			fmt.Printf("[ok] Container runtime: %s (v%s)\n", runtimePath, out)
 		}
 	}
 
@@ -154,8 +156,8 @@ func RunDoctor(configDir string) {
 		fmt.Printf("    Git is needed for worktrees, diffs, and auto-push.\n")
 		issues++
 	} else {
-		out, _ := exec.Command(gitPath, "--version").Output()
-		fmt.Printf("[ok] %s\n", strings.TrimSpace(string(out)))
+		out, _ := cmdexec.New(gitPath, "--version").Output()
+		fmt.Printf("[ok] %s\n", out)
 	}
 
 	// --- Summary ---
@@ -187,6 +189,6 @@ func printOptionalVar(vals map[string]string, key, fallback string) {
 
 // imageExists reports whether a container image is available locally.
 func imageExists(containerCmd, image string) bool {
-	out, err := exec.Command(containerCmd, "images", "-q", image).Output()
-	return err == nil && strings.TrimSpace(string(out)) != ""
+	out, err := cmdexec.New(containerCmd, "images", "-q", image).Output()
+	return err == nil && out != ""
 }

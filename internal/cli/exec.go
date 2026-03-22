@@ -3,11 +3,11 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"unicode"
 
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
@@ -73,13 +73,13 @@ func RunExec(configDir string, args []string) {
 		}
 	default:
 		// List running containers by name.
-		out, err := exec.Command(runtimePath, "ps", "--format", "{{.Names}}").Output()
+		out, err := cmdexec.New(runtimePath, "ps", "--format", "{{.Names}}").Output()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "wallfacer exec: failed to list containers: %v\n", err)
 			os.Exit(1)
 		}
 
-		containerName, err := resolveContainerByPrefix(string(out), cfg.prefix)
+		containerName, err := resolveContainerByPrefix(out, cfg.prefix)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "wallfacer exec: %v\n", err)
 			os.Exit(1)

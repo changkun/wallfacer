@@ -3,12 +3,12 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/prompts"
 )
 
@@ -516,8 +516,7 @@ func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(ctx context.Context, wo
 func (r *Runner) runWorkspaceGitCommand(parentCtx context.Context, workspace string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(parentCtx, workspaceIdeationCommandTTL)
 	defer cancel()
-	command := exec.CommandContext(ctx, "git", append([]string{"-C", workspace}, args...)...)
-	return command.Output()
+	return cmdexec.Git(workspace, args...).WithContext(ctx).OutputBytes()
 }
 
 func (r *Runner) workspacesForRunner() []string {

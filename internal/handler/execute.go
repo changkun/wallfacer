@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/logger"
 	runnerpkg "changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
@@ -563,11 +563,11 @@ func generateWorktreeDiff(worktreePaths map[string]string) string {
 		if err != nil {
 			continue
 		}
-		out, err := exec.Command("git", "-C", worktreePath, "diff", defBranch+"..HEAD").Output()
-		if err != nil || len(strings.TrimSpace(string(out))) == 0 {
+		out, err := cmdexec.Git(worktreePath, "diff", defBranch+"..HEAD").Output()
+		if err != nil || len(out) == 0 {
 			continue
 		}
-		diff := string(out)
+		diff := out
 		if len(worktreePaths) > 1 {
 			diff = "# " + filepath.Base(repoPath) + "\n" + diff
 		}

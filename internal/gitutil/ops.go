@@ -3,10 +3,11 @@ package gitutil
 import (
 	"fmt"
 	"log/slog"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
 
 // RebaseOntoDefault rebases the task branch (currently checked out in worktreePath)
@@ -22,20 +23,28 @@ func RebaseOntoDefault(repoPath, worktreePath string) error {
 		return conflictErr
 	}
 
-	out, err := exec.Command("git", "-C", worktreePath, "rebase", defBranch).CombinedOutput()
-	if err != nil {
-		// Abort so the repo is not stuck mid-rebase.
-		if abortErr := exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run(); abortErr != nil {
-			slog.Default().With("component", "git").Debug("rebase abort after failure", "path", worktreePath, "error", abortErr)
+	tx := cmdexec.NewTx()
+	tx.AddWithRollback(
+		cmdexec.Git(worktreePath, "rebase", defBranch),
+		cmdexec.Git(worktreePath, "rebase", "--abort"),
+	)
+	if txErr := tx.Run(); txErr != nil {
+		te, ok := txErr.(*cmdexec.TxError)
+		if !ok || te.Step == nil {
+			return txErr
 		}
-		if IsConflictOutput(string(out)) || IsRebaseNeedsMergeOutput(string(out)) {
+		out := te.Step.Output
+		if len(te.RollbackErrors) > 0 {
+			slog.Default().With("component", "git").Debug("rebase abort after failure", "path", worktreePath, "error", te.RollbackErrors)
+		}
+		if IsConflictOutput(out) || IsRebaseNeedsMergeOutput(out) {
 			return &ConflictError{
 				WorktreePath:    worktreePath,
-				ConflictedFiles: parseConflictedFiles(string(out)),
-				RawOutput:       string(out),
+				ConflictedFiles: parseConflictedFiles(out),
+				RawOutput:       out,
 			}
 		}
-		return fmt.Errorf("git rebase in %s: %w\n%s", worktreePath, err, out)
+		return fmt.Errorf("git rebase in %s: %w\n%s", worktreePath, te.Step.Err, out)
 	}
 	return nil
 }
@@ -55,10 +64,10 @@ func recoverRebaseState(worktreePath string) error {
 	// Clear stale merge/rebase metadata so the next attempt starts clean.
 	// Both are attempted; only the one matching the current state will succeed,
 	// so errors from the other are expected and intentionally ignored.
-	if err := exec.Command("git", "-C", worktreePath, "rebase", "--abort").Run(); err != nil {
+	if err := cmdexec.Git(worktreePath, "rebase", "--abort").Run(); err != nil {
 		slog.Default().With("component", "git").Debug("rebase abort (expected if not in rebase)", "path", worktreePath, "error", err)
 	}
-	if err := exec.Command("git", "-C", worktreePath, "merge", "--abort").Run(); err != nil {
+	if err := cmdexec.Git(worktreePath, "merge", "--abort").Run(); err != nil {
 		slog.Default().With("component", "git").Debug("merge abort (expected if not in merge)", "path", worktreePath, "error", err)
 	}
 
@@ -81,13 +90,13 @@ func recoverRebaseState(worktreePath string) error {
 // hasRebaseOrMergeState checks whether Git currently has leftover rebase or
 // merge state under .git/rebase-apply, .git/rebase-merge, or .git/MERGE_HEAD.
 func hasRebaseOrMergeState(worktreePath string) (bool, error) {
-	if _, err := exec.Command("git", "-C", worktreePath, "rev-parse", "--verify", "-q", "REBASE_HEAD").Output(); err == nil {
+	if _, err := cmdexec.Git(worktreePath, "rev-parse", "--verify", "-q", "REBASE_HEAD").Output(); err == nil {
 		return true, nil
 	}
-	if _, err := exec.Command("git", "-C", worktreePath, "rev-parse", "--verify", "-q", "MERGE_HEAD").Output(); err == nil {
+	if _, err := cmdexec.Git(worktreePath, "rev-parse", "--verify", "-q", "MERGE_HEAD").Output(); err == nil {
 		return true, nil
 	}
-	if _, err := exec.Command("git", "-C", worktreePath, "rev-parse", "--verify", "-q", "CHERRY_PICK_HEAD").Output(); err == nil {
+	if _, err := cmdexec.Git(worktreePath, "rev-parse", "--verify", "-q", "CHERRY_PICK_HEAD").Output(); err == nil {
 		return true, nil
 	}
 	return false, nil
@@ -97,13 +106,13 @@ func hasRebaseOrMergeState(worktreePath string) (bool, error) {
 // states while preserving tracked content. This is a no-op when nothing is
 // blocked.
 func clearConflictedPaths(worktreePath string) error {
-	if err := exec.Command("git", "-C", worktreePath, "reset", "--merge").Run(); err == nil {
+	if err := cmdexec.Git(worktreePath, "reset", "--merge").Run(); err == nil {
 		return nil
 	}
-	if err := exec.Command("git", "-C", worktreePath, "restore", "--staged", "--worktree", "--source=HEAD", "--", ".").Run(); err == nil {
+	if err := cmdexec.Git(worktreePath, "restore", "--staged", "--worktree", "--source=HEAD", "--", ".").Run(); err == nil {
 		return nil
 	}
-	if err := exec.Command("git", "-C", worktreePath, "reset", "--hard", "HEAD").Run(); err == nil {
+	if err := cmdexec.Git(worktreePath, "reset", "--hard", "HEAD").Run(); err == nil {
 		return nil
 	}
 	return fmt.Errorf("git clean failed in %s: clear conflicted state", worktreePath)
@@ -120,18 +129,26 @@ func FFMerge(repoPath, branchName string) error {
 	// does not fail with "Your local changes would be overwritten".
 	stashed := StashIfDirty(repoPath)
 
-	if out, err := exec.Command("git", "-C", repoPath, "checkout", defBranch).CombinedOutput(); err != nil {
-		if stashed {
-			_ = StashPop(repoPath)
-		}
-		return fmt.Errorf("git checkout %s in %s: %w\n%s", defBranch, repoPath, err, out)
-	}
-	out, err := exec.Command("git", "-C", repoPath, "merge", "--ff-only", branchName).CombinedOutput()
+	tx := cmdexec.NewTx()
 	if stashed {
-		_ = StashPop(repoPath)
+		tx.Defer(cmdexec.Git(repoPath, "stash", "pop"))
 	}
-	if err != nil {
-		return fmt.Errorf("git merge --ff-only %s in %s: %w\n%s", branchName, repoPath, err, out)
+	tx.Add(cmdexec.Git(repoPath, "checkout", defBranch))
+	tx.Add(cmdexec.Git(repoPath, "merge", "--ff-only", branchName))
+
+	if txErr := tx.Run(); txErr != nil {
+		te, ok := txErr.(*cmdexec.TxError)
+		if !ok || te.Step == nil {
+			// Only defer errors — stash pop failed on success path.
+			// Log but don't fail the merge itself.
+			slog.Default().With("component", "git").Debug("ff-merge defer error", "repo", repoPath, "error", txErr)
+			return nil
+		}
+		out := te.Step.Output
+		if te.Step.Index == 0 {
+			return fmt.Errorf("git checkout %s in %s: %w\n%s", defBranch, repoPath, te.Step.Err, out)
+		}
+		return fmt.Errorf("git merge --ff-only %s in %s: %w\n%s", branchName, repoPath, te.Step.Err, out)
 	}
 	return nil
 }
@@ -150,14 +167,11 @@ func CommitsBehind(repoPath, worktreePath string) (int, error) {
 		// branch that does not exist yet, so report 0.
 		return 0, nil
 	}
-	out, err := exec.Command(
-		"git", "-C", worktreePath,
-		"rev-list", "--count", "HEAD.."+defHash,
-	).Output()
+	out, err := cmdexec.Git(worktreePath, "rev-list", "--count", "HEAD.."+defHash).Output()
 	if err != nil {
 		return 0, fmt.Errorf("git rev-list in %s: %w", worktreePath, err)
 	}
-	n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	n, _ := strconv.Atoi(out)
 	return n, nil
 }
 
@@ -184,25 +198,22 @@ func defaultBranchCommitHash(repoPath, defBranch string) (string, error) {
 
 // HasCommitsAheadOf reports whether worktreePath has commits not yet in baseBranch.
 func HasCommitsAheadOf(worktreePath, baseBranch string) (bool, error) {
-	out, err := exec.Command(
-		"git", "-C", worktreePath,
-		"rev-list", "--count", baseBranch+"..HEAD",
-	).Output()
+	out, err := cmdexec.Git(worktreePath, "rev-list", "--count", baseBranch+"..HEAD").Output()
 	if err != nil {
 		return false, fmt.Errorf("git rev-list in %s: %w", worktreePath, err)
 	}
-	n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	n, _ := strconv.Atoi(out)
 	return n > 0, nil
 }
 
 // MergeBase returns the best common ancestor (merge-base) of two refs,
 // evaluated in the given repository/worktree path.
 func MergeBase(repoPath, ref1, ref2 string) (string, error) {
-	out, err := exec.Command("git", "-C", repoPath, "merge-base", ref1, ref2).Output()
+	out, err := cmdexec.Git(repoPath, "merge-base", ref1, ref2).Output()
 	if err != nil {
 		return "", fmt.Errorf("git merge-base %s %s in %s: %w", ref1, ref2, repoPath, err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return out, nil
 }
 
 // BranchTipCommit returns the hash, subject, and author timestamp of the most
@@ -212,15 +223,11 @@ func MergeBase(repoPath, ref1, ref2 string) (string, error) {
 //
 // Returns an error if the branch does not exist or the path is not a git repo.
 func BranchTipCommit(repoPath, branch string) (hash, subject string, ts time.Time, err error) {
-	out, cmdErr := exec.Command(
-		"git", "-C", repoPath,
-		"log", "-1", "--format=%H|%s|%aI", branch,
-	).Output()
+	line, cmdErr := cmdexec.Git(repoPath, "log", "-1", "--format=%H|%s|%aI", branch).Output()
 	if cmdErr != nil {
 		err = fmt.Errorf("git log in %s for branch %s: %w", repoPath, branch, cmdErr)
 		return
 	}
-	line := strings.TrimSpace(string(out))
 	if line == "" {
 		err = fmt.Errorf("branch %s not found or has no commits in %s", branch, repoPath)
 		return
@@ -244,7 +251,7 @@ func BranchTipCommit(repoPath, branch string) (hash, subject string, ts time.Tim
 // no remote configured). Callers should log the error and continue — stale
 // refs are better than aborting the operation entirely.
 func FetchOrigin(repoPath string) error {
-	out, err := exec.Command("git", "-C", repoPath, "fetch", "origin").CombinedOutput()
+	out, err := cmdexec.Git(repoPath, "fetch", "origin").Combined()
 	if err != nil {
 		return fmt.Errorf("git fetch origin in %s: %w\n%s", repoPath, err, out)
 	}
@@ -261,11 +268,11 @@ func IsConflictOutput(s string) bool {
 // HasConflicts reports whether the worktree at worktreePath has any unresolved
 // merge/rebase conflicts (files with conflict-marker status codes in git status).
 func HasConflicts(worktreePath string) (bool, error) {
-	out, err := exec.Command("git", "-C", worktreePath, "status", "--porcelain").Output()
+	out, err := cmdexec.Git(worktreePath, "status", "--porcelain").Output()
 	if err != nil {
 		return false, fmt.Errorf("git status in %s: %w", worktreePath, err)
 	}
-	for _, line := range strings.Split(string(out), "\n") {
+	for _, line := range strings.Split(out, "\n") {
 		if len(line) < 2 {
 			continue
 		}

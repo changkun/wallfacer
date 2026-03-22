@@ -1,12 +1,10 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,6 +12,7 @@ import (
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/prompts"
@@ -178,14 +177,14 @@ func (r *Runner) maybeAutoPush(ctx context.Context, taskID uuid.UUID, worktreePa
 		pushLabel := "push_" + filepath.Base(repoPath)
 		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: pushLabel})
 
-		out, pushErr := exec.CommandContext(ctx, "git", "-C", repoPath, "push").CombinedOutput()
+		out, pushErr := cmdexec.Git(repoPath, "push").WithContext(ctx).Combined()
 		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: pushLabel})
 
 		if pushErr != nil {
 			logger.Runner.Error("auto-push failed", "task", taskID, "repo", repoPath, "error", pushErr)
 			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{
 
-				"error": fmt.Sprintf("auto-push failed for %s: %v\n%s", repoPath, pushErr, strings.TrimSpace(string(out))),
+				"error": fmt.Sprintf("auto-push failed for %s: %v\n%s", repoPath, pushErr, out),
 			})
 		} else {
 			logger.Runner.Info("auto-push succeeded", "task", taskID, "repo", repoPath)
@@ -230,25 +229,24 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 			missing = append(missing, repoPath)
 			continue
 		}
-		if out, err := exec.CommandContext(ctx, "git", "-C", worktreePath, "add", "-A").CombinedOutput(); err != nil {
+		if out, err := cmdexec.Git(worktreePath, "add", "-A").WithContext(ctx).Combined(); err != nil {
 			if ctx.Err() != nil {
 				return false, fmt.Errorf("context canceled during git add: %w", ctx.Err())
 			}
-			gitOutput := strings.TrimSpace(string(out))
-			logger.Runner.Warn("host commit: git add -A", "repo", repoPath, "worktree", worktreePath, "error", err, "output", gitOutput)
-			errs = append(errs, fmt.Sprintf("git add in %s (worktree %s): %v: %s", repoPath, worktreePath, err, gitOutput))
+			logger.Runner.Warn("host commit: git add -A", "repo", repoPath, "worktree", worktreePath, "error", err, "output", out)
+			errs = append(errs, fmt.Sprintf("git add in %s (worktree %s): %v: %s", repoPath, worktreePath, err, out))
 			continue
 		}
 
-		out, _ := exec.CommandContext(ctx, "git", "-C", worktreePath, "status", "--porcelain").Output()
-		if len(strings.TrimSpace(string(out))) == 0 {
+		out, _ := cmdexec.Git(worktreePath, "status", "--porcelain").WithContext(ctx).Output()
+		if len(out) == 0 {
 			logger.Runner.Info("host commit: nothing to commit", "repo", repoPath)
 			continue
 		}
 
-		statOut, _ := exec.CommandContext(ctx, "git", "-C", worktreePath, "diff", "--cached", "--stat").Output()
-		logOut, _ := exec.CommandContext(ctx, "git", "-C", worktreePath, "log", "--format=%s", "-5").Output()
-		pending = append(pending, pendingCommit{repoPath, worktreePath, strings.TrimSpace(string(statOut)), strings.TrimSpace(string(logOut))})
+		statOut, _ := cmdexec.Git(worktreePath, "diff", "--cached", "--stat").WithContext(ctx).Output()
+		logOut, _ := cmdexec.Git(worktreePath, "log", "--format=%s", "-5").WithContext(ctx).Output()
+		pending = append(pending, pendingCommit{repoPath, worktreePath, statOut, logOut})
 	}
 
 	if len(pending) == 0 {
@@ -294,26 +292,22 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 	// Use global git identity to prevent sandbox-set local configs from
 	// overriding the host user's author information.
 	var gitConfigOverrides []string
-	if out, err := exec.CommandContext(ctx, "git", "config", "--global", "user.name").Output(); err == nil {
-		if n := strings.TrimSpace(string(out)); n != "" {
-			gitConfigOverrides = append(gitConfigOverrides, "-c", "user.name="+n)
-		}
+	if n, err := cmdexec.New("git", "config", "--global", "user.name").WithContext(ctx).Output(); err == nil && n != "" {
+		gitConfigOverrides = append(gitConfigOverrides, "-c", "user.name="+n)
 	}
-	if out, err := exec.CommandContext(ctx, "git", "config", "--global", "user.email").Output(); err == nil {
-		if e := strings.TrimSpace(string(out)); e != "" {
-			gitConfigOverrides = append(gitConfigOverrides, "-c", "user.email="+e)
-		}
+	if e, err := cmdexec.New("git", "config", "--global", "user.email").WithContext(ctx).Output(); err == nil && e != "" {
+		gitConfigOverrides = append(gitConfigOverrides, "-c", "user.email="+e)
 	}
 
 	committed := false
 	for _, p := range pending {
 		args := append([]string{"-C", p.worktreePath}, gitConfigOverrides...)
 		args = append(args, "commit", "-m", msg)
-		if out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput(); err != nil {
+		if out, err := cmdexec.New("git", args...).WithContext(ctx).Combined(); err != nil {
 			if ctx.Err() != nil {
 				return false, fmt.Errorf("context canceled during git commit: %w", ctx.Err())
 			}
-			logger.Runner.Warn("host commit: git commit", "repo", p.repoPath, "error", err, "output", string(out))
+			logger.Runner.Warn("host commit: git commit", "repo", p.repoPath, "error", err, "output", out)
 			errs = append(errs, fmt.Sprintf("git commit in %s: %v", p.repoPath, err))
 			continue
 		}
@@ -384,26 +378,21 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 	})
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, error) {
 		selectedModel := r.modelFromEnvForSandbox(selectedSandbox)
-		_ = exec.Command(r.command, "rm", "-f", containerName).Run()
+		_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
 
 		spec := r.buildBaseContainerSpec(containerName, selectedModel, selectedSandbox)
 		spec.Cmd = buildAgentCmd(commitPrompt, selectedModel)
 
-		cmd := exec.CommandContext(ctx, r.command, spec.Build()...)
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 
-		runErr := cmd.Run()
+		stdout, stderr, runErr := cmdexec.New(r.command, spec.Build()...).WithContext(ctx).Capture()
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 
 		if runErr != nil && ctx.Err() == nil {
-			return nil, fmt.Errorf("%w: stderr=%s", runErr, truncate(stderr.String(), 200))
+			return nil, fmt.Errorf("%w: stderr=%s", runErr, truncate(string(stderr), 200))
 		}
 
-		raw := strings.TrimSpace(stdout.String())
+		raw := strings.TrimSpace(string(stdout))
 		if raw == "" {
 			return nil, fmt.Errorf("empty output")
 		}

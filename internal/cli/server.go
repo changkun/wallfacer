@@ -22,6 +22,7 @@ import (
 	"changkun.de/x/wallfacer/internal/handler"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
@@ -849,8 +850,8 @@ func loggingMiddleware(next http.Handler, reg *metrics.Registry) http.Handler {
 // image (wallfacer:latest) is available, that image is used instead.
 // Returns the image reference that should actually be used.
 func ensureImage(containerCmd, image string) string {
-	out, err := exec.Command(containerCmd, "images", "-q", image).Output()
-	if err == nil && strings.TrimSpace(string(out)) != "" {
+	out, err := cmdexec.New(containerCmd, "images", "-q", image).Output()
+	if err == nil && out != "" {
 		return image // already present
 	}
 	logger.Main.Info("sandbox image not found locally, pulling from registry", "image", image)
@@ -861,8 +862,8 @@ func ensureImage(containerCmd, image string) string {
 		logger.Main.Warn("failed to pull sandbox image", "image", image, "error", err)
 		// Try the local fallback image if it differs from the requested one.
 		if image != fallbackSandboxImage {
-			fallbackOut, fallbackErr := exec.Command(containerCmd, "images", "-q", fallbackSandboxImage).Output()
-			if fallbackErr == nil && strings.TrimSpace(string(fallbackOut)) != "" {
+			fallbackOut, fallbackErr := cmdexec.New(containerCmd, "images", "-q", fallbackSandboxImage).Output()
+			if fallbackErr == nil && fallbackOut != "" {
 				logger.Main.Info("using local fallback sandbox image", "image", fallbackSandboxImage)
 				return fallbackSandboxImage
 			}
