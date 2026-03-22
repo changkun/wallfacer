@@ -1106,3 +1106,64 @@ func TestBuildIdeationPromptIncludesRejectedTitles(t *testing.T) {
 			prompt[:min(len(prompt), 300)])
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Exploration/Exploitation ratio
+// ---------------------------------------------------------------------------
+
+func TestExploreScoreRange(t *testing.T) {
+	// Verify exploreScore always returns values in [0, 1] across many rounds.
+	for round := 0; round < 100; round++ {
+		score := exploreScore(round)
+		if score < 0 || score > 1 {
+			t.Errorf("exploreScore(%d) = %f; want [0, 1]", round, score)
+		}
+	}
+}
+
+func TestModulateExploitRatio(t *testing.T) {
+	// Verify the modulated ratio is always in [0, 1] and varies across rounds.
+	seen := map[float64]struct{}{}
+	for round := 0; round < 30; round++ {
+		r := modulateExploitRatio(0.8, round)
+		if r < 0 || r > 1 {
+			t.Errorf("modulateExploitRatio(0.8, %d) = %f; want [0, 1]", round, r)
+		}
+		seen[r] = struct{}{}
+	}
+	// With jitter, we expect multiple distinct values across 30 rounds.
+	if len(seen) < 3 {
+		t.Errorf("expected variation across rounds; got only %d distinct values", len(seen))
+	}
+}
+
+func TestBuildIdeationPromptIncludesExploitRatio(t *testing.T) {
+	r := testRunnerForPrompts()
+	r.ideationExploitRatioFn = func() float64 { return 0.7 }
+	prompt := r.buildIdeationPrompt(nil)
+	if !strings.Contains(prompt, "exploitation") {
+		t.Error("prompt should contain exploitation/exploration guidance")
+	}
+}
+
+func TestIdeationHistoryRound(t *testing.T) {
+	dir := t.TempDir()
+	hist, err := LoadHistory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hist.Round() != 0 {
+		t.Errorf("expected 0 rounds for empty history, got %d", hist.Round())
+	}
+	_ = hist.Append(HistoryEntry{Title: "A", Reason: "accepted", RecordedAt: time.Now()})
+	_ = hist.Append(HistoryEntry{Title: "B", Reason: "rejected_threshold", RecordedAt: time.Now()})
+	_ = hist.Append(HistoryEntry{Title: "C", Reason: "accepted", RecordedAt: time.Now()})
+
+	hist2, err := LoadHistory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hist2.Round() != 2 {
+		t.Errorf("expected 2 rounds, got %d", hist2.Round())
+	}
+}
