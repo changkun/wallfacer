@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/workspacegroups"
 )
 
 func TestNewManagerWithoutWorkspacesCreatesScopedStore(t *testing.T) {
@@ -48,7 +47,7 @@ func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) 
 
 	wsA := t.TempDir()
 	wsB := t.TempDir()
-	if err := workspacegroups.Save(configDir, []workspacegroups.Group{
+	if err := SaveGroups(configDir, []Group{
 		{Workspaces: []string{wsA, wsB}},
 	}); err != nil {
 		t.Fatalf("save workspace groups: %v", err)
@@ -80,7 +79,7 @@ func TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup(t *testing.T)
 	}
 
 	ws := t.TempDir()
-	if err := workspacegroups.Save(configDir, []workspacegroups.Group{
+	if err := SaveGroups(configDir, []Group{
 		{Workspaces: []string{ws}},
 	}); err != nil {
 		t.Fatalf("save workspace groups: %v", err)
@@ -385,7 +384,7 @@ func TestSwitch_NoOpWhenWorkspacesMatch(t *testing.T) {
 	}
 
 	// Record workspace groups state before the no-op switch.
-	groupsBefore, err := workspacegroups.Load(configDir)
+	groupsBefore, err := LoadGroups(configDir)
 	if err != nil {
 		t.Fatalf("load groups before: %v", err)
 	}
@@ -405,7 +404,7 @@ func TestSwitch_NoOpWhenWorkspacesMatch(t *testing.T) {
 	}
 
 	// Workspace groups file must not have been rewritten.
-	groupsAfter, err := workspacegroups.Load(configDir)
+	groupsAfter, err := LoadGroups(configDir)
 	if err != nil {
 		t.Fatalf("load groups after: %v", err)
 	}

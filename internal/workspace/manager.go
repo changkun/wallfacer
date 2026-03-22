@@ -12,7 +12,6 @@ import (
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/workspacegroups"
 )
 
 // Snapshot holds the immutable state of a workspace configuration at a point in time.
@@ -72,7 +71,7 @@ func (m *Manager) startupWorkspaces(initial []string) []string {
 	if initial != nil {
 		return initial
 	}
-	groups, err := workspacegroups.Load(m.configDir)
+	groups, err := LoadGroups(m.configDir)
 	if err != nil || len(groups) == 0 {
 		return nil
 	}
@@ -218,7 +217,7 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 		}
 		swap.next.InstructionsPath = instructionsPath
 	}
-	if err := workspacegroups.Upsert(m.configDir, validated); err != nil {
+	if err := UpsertGroup(m.configDir, validated); err != nil {
 		swap.cleanup()
 		return Snapshot{}, fmt.Errorf("persist workspace group: %w", err)
 	}

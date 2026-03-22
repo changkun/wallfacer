@@ -12,7 +12,7 @@ import (
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/workspacegroups"
+	"changkun.de/x/wallfacer/internal/workspace"
 )
 
 // ssrfHardenedTransport returns an http.Transport that re-checks the resolved
@@ -98,9 +98,9 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	if s, ok := h.currentStore(); ok && s != nil {
 		payloadLimits = s.GetPayloadLimits()
 	}
-	groups, _ := workspacegroups.Load(h.configDir)
+	groups, _ := workspace.LoadGroups(h.configDir)
 	if len(workspaces) > 0 {
-		groups = workspacegroups.Normalize(append([]workspacegroups.Group{{Workspaces: workspaces}}, groups...))
+		groups = workspace.NormalizeGroups(append([]workspace.Group{{Workspaces: workspaces}}, groups...))
 	}
 	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-refine"}
 	watcherHealth := make([]watcherHealthEntry, 0, len(watcherNames))
@@ -209,13 +209,13 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Ideation             *bool                   `json:"ideation"`
 		IdeationInterval     *int                    `json:"ideation_interval"`      // minutes; 0 = run immediately on completion
 		IdeationExploitRatio *float64                `json:"ideation_exploit_ratio"` // 0.0–1.0; fraction of exploitation ideas
-		WorkspaceGroups      []workspacegroups.Group `json:"workspace_groups"`
+		WorkspaceGroups      []workspace.Group `json:"workspace_groups"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
 	}
 	if req.WorkspaceGroups != nil {
-		if err := workspacegroups.Save(h.configDir, req.WorkspaceGroups); err != nil {
+		if err := workspace.SaveGroups(h.configDir, req.WorkspaceGroups); err != nil {
 			http.Error(w, "save workspace groups: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

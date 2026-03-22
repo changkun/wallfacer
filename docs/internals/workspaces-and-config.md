@@ -37,7 +37,7 @@ Because paths are sorted before hashing, switching to workspaces `~/a` and `~/b`
 
 ### 📂 Workspace Groups
 
-Workspace groups are persisted in `~/.wallfacer/workspace-groups.json` by the `workspacegroups` package (`internal/workspacegroups/groups.go`). Each group is a `Group{Workspaces: []string}` entry. The file is a JSON array of groups, ordered by recency (most recently used first).
+Workspace groups are persisted in `~/.wallfacer/workspace-groups.json` by the `workspace` package (`internal/workspace/groups.go`). Each group is a `Group{Workspaces: []string}` entry. The file is a JSON array of groups, ordered by recency (most recently used first).
 
 Key operations:
 - **`Load(configDir)`** -- reads and normalizes groups from disk

@@ -1,5 +1,4 @@
-// Package workspacegroups manages persistent workspace group configurations.
-package workspacegroups
+package workspace
 
 import (
 	"encoding/json"
@@ -15,13 +14,13 @@ type Group struct {
 	Workspaces []string `json:"workspaces"`
 }
 
-func filePath(configDir string) string {
+func groupsFilePath(configDir string) string {
 	return filepath.Join(configDir, "workspace-groups.json")
 }
 
-// Load reads workspace groups from the config directory.
-func Load(configDir string) ([]Group, error) {
-	raw, err := os.ReadFile(filePath(configDir))
+// LoadGroups reads workspace groups from the config directory.
+func LoadGroups(configDir string) ([]Group, error) {
+	raw, err := os.ReadFile(groupsFilePath(configDir))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
@@ -32,16 +31,16 @@ func Load(configDir string) ([]Group, error) {
 	if err := json.Unmarshal(raw, &groups); err != nil {
 		return nil, err
 	}
-	return Normalize(groups), nil
+	return NormalizeGroups(groups), nil
 }
 
-// Save writes workspace groups to the config directory atomically.
-func Save(configDir string, groups []Group) error {
-	path := filePath(configDir)
+// SaveGroups writes workspace groups to the config directory atomically.
+func SaveGroups(configDir string, groups []Group) error {
+	path := groupsFilePath(configDir)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(Normalize(groups), "", "  ")
+	data, err := json.MarshalIndent(NormalizeGroups(groups), "", "  ")
 	if err != nil {
 		return err
 	}
@@ -52,13 +51,13 @@ func Save(configDir string, groups []Group) error {
 	return os.Rename(tmp, path)
 }
 
-// Upsert adds or promotes a workspace group to the front of the list.
-func Upsert(configDir string, workspaces []string) error {
-	workspaces = normalizePaths(workspaces)
+// UpsertGroup adds or promotes a workspace group to the front of the list.
+func UpsertGroup(configDir string, workspaces []string) error {
+	workspaces = normalizeGroupPaths(workspaces)
 	if len(workspaces) == 0 {
 		return nil
 	}
-	groups, err := Load(configDir)
+	groups, err := LoadGroups(configDir)
 	if err != nil {
 		return err
 	}
@@ -70,22 +69,22 @@ func Upsert(configDir string, workspaces []string) error {
 			}
 			reordered := append([]Group{{Workspaces: workspaces}}, groups[:i]...)
 			reordered = append(reordered, groups[i+1:]...)
-			return Save(configDir, reordered)
+			return SaveGroups(configDir, reordered)
 		}
 	}
 	groups = append([]Group{{Workspaces: workspaces}}, groups...)
-	return Save(configDir, groups)
+	return SaveGroups(configDir, groups)
 }
 
-// Normalize deduplicates and cleans workspace groups.
-func Normalize(groups []Group) []Group {
+// NormalizeGroups deduplicates and cleans workspace groups.
+func NormalizeGroups(groups []Group) []Group {
 	if len(groups) == 0 {
 		return nil
 	}
 	out := make([]Group, 0, len(groups))
 	seen := map[string]struct{}{}
 	for _, group := range groups {
-		ws := normalizePaths(group.Workspaces)
+		ws := normalizeGroupPaths(group.Workspaces)
 		if len(ws) == 0 {
 			continue
 		}
@@ -99,7 +98,7 @@ func Normalize(groups []Group) []Group {
 	return out
 }
 
-func normalizePaths(paths []string) []string {
+func normalizeGroupPaths(paths []string) []string {
 	if len(paths) == 0 {
 		return nil
 	}
