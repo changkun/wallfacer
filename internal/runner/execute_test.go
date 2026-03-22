@@ -14,52 +14,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// fakeStatefulCmd creates an executable shell script that returns different
-// JSON outputs on successive invocations. Container lifecycle calls ("rm",
-// "kill") are silently skipped without advancing the counter, so only the
-// real "run ..." calls consume an output slot.
-func fakeStatefulCmd(t *testing.T, outputs []string) string {
-	t.Helper()
-	dir := t.TempDir()
-
-	counterFile := filepath.Join(dir, "counter")
-	if err := os.WriteFile(counterFile, []byte("0"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	for i, o := range outputs {
-		p := filepath.Join(dir, fmt.Sprintf("out%d.txt", i))
-		if err := os.WriteFile(p, []byte(o), 0644); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// last.txt is the fallback when the counter exceeds the number of outputs.
-	last := outputs[len(outputs)-1]
-	if err := os.WriteFile(filepath.Join(dir, "last.txt"), []byte(last), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// The script skips "rm", "kill", and "inspect" subcommands and uses a counter
-	// to select the output file on each real "run" invocation.
-	script := fmt.Sprintf(`#!/bin/sh
-case "$1" in
-  rm|kill|inspect|ps) exit 0 ;;
-esac
-count=$(cat %s 2>/dev/null || echo 0)
-outfile=%s/out${count}.txt
-if [ ! -f "$outfile" ]; then outfile=%s/last.txt; fi
-cat "$outfile"
-echo $((count+1)) > %s
-`, counterFile, dir, dir, counterFile)
-
-	scriptPath := filepath.Join(dir, "fake-stateful")
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-	return scriptPath
-}
-
 // setupRunnerWithCmd creates a Store and Runner for testing with a custom
 // container command. Useful when tests need to control container output.
 // Accepts testing.TB so it can be used from both *testing.T and *testing.B.

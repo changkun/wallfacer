@@ -3,7 +3,6 @@ package runner
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,26 +12,6 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
-
-// fakeCmdScript creates a temporary executable shell script. When called with
-// any arguments the script writes output to stdout and exits with exitCode.
-// Using a file avoids shell-quoting issues with arbitrary output strings.
-func fakeCmdScript(t *testing.T, output string, exitCode int) string {
-	t.Helper()
-	dir := t.TempDir()
-
-	dataPath := filepath.Join(dir, "output.txt")
-	if err := os.WriteFile(dataPath, []byte(output), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	scriptPath := filepath.Join(dir, "fake-cmd")
-	script := fmt.Sprintf("#!/bin/sh\ncat %s\nexit %d\n", dataPath, exitCode)
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-	return scriptPath
-}
 
 // runnerWithCmd creates a minimal Runner backed by a fresh store using the
 // given container command string. No workspaces are configured, which is fine

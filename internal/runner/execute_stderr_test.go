@@ -3,45 +3,10 @@ package runner
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"changkun.de/x/wallfacer/internal/store"
 )
-
-// fakeCmdScriptWithStderr creates a temporary executable shell script that
-// writes stdout to stdout and stderr to stderr, then exits with exitCode.
-// Container lifecycle calls ("rm", "kill") are silently skipped so they do
-// not emit spurious output or stderr.
-func fakeCmdScriptWithStderr(t *testing.T, stdout, stderr string, exitCode int) string {
-	t.Helper()
-	dir := t.TempDir()
-
-	stdoutPath := filepath.Join(dir, "stdout.txt")
-	if err := os.WriteFile(stdoutPath, []byte(stdout), 0644); err != nil {
-		t.Fatal(err)
-	}
-	stderrPath := filepath.Join(dir, "stderr.txt")
-	if err := os.WriteFile(stderrPath, []byte(stderr), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	scriptPath := filepath.Join(dir, "fake-cmd-stderr")
-	script := fmt.Sprintf(`#!/bin/sh
-case "$1" in
-  rm|kill) exit 0 ;;
-esac
-cat %s
-cat %s >&2
-exit %d
-`, stdoutPath, stderrPath, exitCode)
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
-		t.Fatal(err)
-	}
-	return scriptPath
-}
 
 // TestRunEmitsSystemEventForNonEmptyStderr verifies that when a task turn
 // produces non-empty stderr output, a system event with a "stderr_file" key
