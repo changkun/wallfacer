@@ -301,6 +301,7 @@ Every implementation task MUST complete all three steps before finishing:
 
 ## Commit and push strategy
 
+- Before committing, always run `make fmt` and `make lint` and fix any issues they report.
 - Keep commits small and focused on one logical change.
 - Do not include unrelated changes in the same commit.
 - Use scoped, imperative commit messages matching existing style, e.g. `internal/runner: ...`, `ui: ...`, `docs: ...`.
