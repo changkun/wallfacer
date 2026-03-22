@@ -1,10 +1,10 @@
-package retaintail
+package tail
 
 import (
 	"testing"
 )
 
-func TestTail(t *testing.T) {
+func TestOf(t *testing.T) {
 	tests := []struct {
 		name string
 		s    []int
@@ -22,14 +22,14 @@ func TestTail(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Tail(tc.s, tc.n)
+			got := Of(tc.s, tc.n)
 			if len(got) != len(tc.want) {
-				t.Fatalf("Tail(%v, %d) = %v (len %d), want %v (len %d)",
+				t.Fatalf("Of(%v, %d) = %v (len %d), want %v (len %d)",
 					tc.s, tc.n, got, len(got), tc.want, len(tc.want))
 			}
 			for i := range got {
 				if got[i] != tc.want[i] {
-					t.Fatalf("Tail(%v, %d)[%d] = %d, want %d",
+					t.Fatalf("Of(%v, %d)[%d] = %d, want %d",
 						tc.s, tc.n, i, got[i], tc.want[i])
 				}
 			}
@@ -37,12 +37,11 @@ func TestTail(t *testing.T) {
 	}
 }
 
-func TestTail_SharesBackingArray(t *testing.T) {
+func TestOf_SharesBackingArray(t *testing.T) {
 	s := []int{1, 2, 3, 4, 5}
-	got := Tail(s, 3)
-	// Modifying the result should affect the original since it's a sub-slice.
+	got := Of(s, 3)
 	got[0] = 99
 	if s[2] != 99 {
-		t.Fatal("Tail result should share backing array with original slice")
+		t.Fatal("Of result should share backing array with original slice")
 	}
 }

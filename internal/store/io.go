@@ -11,7 +11,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
-	"changkun.de/x/wallfacer/internal/pkg/retaintail"
+	"changkun.de/x/wallfacer/internal/pkg/tail"
 	"github.com/google/uuid"
 )
 
@@ -20,9 +20,9 @@ import (
 // operates in-place and is a no-op when a limit is 0 or the slice is already
 // within bounds.
 func (s *Store) pruneTaskPayload(t *Task) {
-	t.RetryHistory = retaintail.Tail(t.RetryHistory, s.retryHistoryLimit)
-	t.RefineSessions = retaintail.Tail(t.RefineSessions, s.refineSessionsLimit)
-	t.PromptHistory = retaintail.Tail(t.PromptHistory, s.promptHistoryLimit)
+	t.RetryHistory = tail.Of(t.RetryHistory, s.retryHistoryLimit)
+	t.RefineSessions = tail.Of(t.RefineSessions, s.refineSessionsLimit)
+	t.PromptHistory = tail.Of(t.PromptHistory, s.promptHistoryLimit)
 }
 
 // saveTask atomically writes a task's metadata to its task.json file.
