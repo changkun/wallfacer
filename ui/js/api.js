@@ -293,19 +293,38 @@ function startTasksStream() {
   // opening a real SSE connection. Seed initial state with an HTTP fetch.
   if (!_sseIsLeader()) {
     tasksSource = null;
-    _sseOnFollowerEvent("tasks-snapshot", _handleTasksSnapshot);
-    _sseOnFollowerEvent("tasks-updated", _handleTaskUpdated);
-    _sseOnFollowerEvent("tasks-deleted", _handleTaskDeleted);
-    fetchTasks();
+    _sseConnState = "reconnecting";
+    _sseOnFollowerEvent("tasks-snapshot", function (data, id) {
+      _sseConnState = "ok";
+      _handleTasksSnapshot(data, id);
+    });
+    _sseOnFollowerEvent("tasks-updated", function (data, id) {
+      _sseConnState = "ok";
+      _handleTaskUpdated(data, id);
+    });
+    _sseOnFollowerEvent("tasks-deleted", function (data, id) {
+      _sseConnState = "ok";
+      _handleTaskDeleted(data, id);
+    });
+    fetchTasks().then(function () {
+      _sseConnState = "ok";
+    });
     return;
   }
 
   // Leader tab: open real EventSource and relay events to followers.
   const url = buildTasksStreamUrl(Routes.tasks.stream(), lastTasksEventId);
   tasksSource = new EventSource(url);
+  _sseConnState = "reconnecting";
   _lastSSEEventTime = Date.now();
 
+  tasksSource.addEventListener("open", function () {
+    _sseConnState = "ok";
+    if (typeof updateStatusBar === "function") updateStatusBar();
+  });
+
   tasksSource.addEventListener("snapshot", function (e) {
+    _sseConnState = "ok";
     _lastSSEEventTime = Date.now();
     var data = JSON.parse(e.data);
     _handleTasksSnapshot(data, e.lastEventId);
@@ -313,6 +332,7 @@ function startTasksStream() {
   });
 
   tasksSource.addEventListener("task-updated", function (e) {
+    _sseConnState = "ok";
     _lastSSEEventTime = Date.now();
     var data = JSON.parse(e.data);
     _handleTaskUpdated(data, e.lastEventId);
@@ -320,6 +340,7 @@ function startTasksStream() {
   });
 
   tasksSource.addEventListener("task-deleted", function (e) {
+    _sseConnState = "ok";
     _lastSSEEventTime = Date.now();
     var data = JSON.parse(e.data);
     _handleTaskDeleted(data, e.lastEventId);
@@ -327,15 +348,21 @@ function startTasksStream() {
   });
 
   tasksSource.addEventListener("heartbeat", function () {
+    _sseConnState = "ok";
     _lastSSEEventTime = Date.now();
   });
 
   tasksSource.onerror = function () {
     if (tasksSource.readyState === EventSource.CLOSED) {
+      _sseConnState = "closed";
       tasksSource = null;
+      if (typeof updateStatusBar === "function") updateStatusBar();
       var jittered = tasksRetryDelay * (1 + Math.random()); // uniform [base, 2×base]
       setTimeout(startTasksStream, jittered);
       tasksRetryDelay = Math.min(tasksRetryDelay * 2, 30000);
+    } else {
+      _sseConnState = "reconnecting";
+      if (typeof updateStatusBar === "function") updateStatusBar();
     }
   };
 }
@@ -343,6 +370,7 @@ function startTasksStream() {
 function stopTasksStream() {
   if (tasksSource) tasksSource.close();
   tasksSource = null;
+  _sseConnState = "closed";
   _lastSSEEventTime = 0;
 }
 

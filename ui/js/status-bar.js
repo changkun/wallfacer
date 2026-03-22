@@ -31,17 +31,9 @@ function _updateConnDot() {
   var label = document.getElementById("status-bar-conn-label");
   if (!dot || !label) return;
 
-  var state;
-  // tasksSource is the global SSE connection from state.js / api.js
-  if (typeof tasksSource === "undefined" || tasksSource === null) {
-    state = "closed";
-  } else if (tasksSource.readyState === 0 /* CONNECTING */) {
-    state = "reconnecting";
-  } else if (tasksSource.readyState === 1 /* OPEN */) {
-    state = "ok";
-  } else {
-    state = "closed";
-  }
+  // _sseConnState is maintained by api.js for both leader and follower tabs.
+  var state =
+    typeof _sseConnState !== "undefined" ? _sseConnState : "closed";
 
   dot.className = "status-bar-conn-dot status-bar-conn-dot--" + state;
 
@@ -122,11 +114,66 @@ function _updateWorkspace() {
 
 function toggleTerminalPanel() {
   var panel = document.getElementById("status-bar-panel");
+  var handle = document.getElementById("status-bar-panel-resize");
   var btn = document.getElementById("status-bar-terminal-btn");
   if (!panel) return;
   var isHidden = panel.classList.contains("hidden");
   panel.classList.toggle("hidden", !isHidden);
+  if (handle) handle.classList.toggle("hidden", !isHidden);
   if (btn) btn.setAttribute("aria-expanded", isHidden ? "true" : "false");
+}
+
+// ---------------------------------------------------------------------------
+// Resizable terminal panel
+// ---------------------------------------------------------------------------
+var _panelMinHeight = 80;
+var _panelMaxHeight = 600;
+var _panelStorageKey = "wallfacer-panel-height";
+
+function _initPanelResize() {
+  var handle = document.getElementById("status-bar-panel-resize");
+  var panel = document.getElementById("status-bar-panel");
+  if (!handle || !panel) return;
+
+  // Restore persisted height
+  var stored = localStorage.getItem(_panelStorageKey);
+  if (stored) {
+    var h = parseInt(stored, 10);
+    if (h >= _panelMinHeight && h <= _panelMaxHeight) {
+      panel.style.height = h + "px";
+    }
+  }
+
+  var startY = 0;
+  var startH = 0;
+
+  function onMouseMove(e) {
+    // Panel grows upward: mouse moving up (smaller clientY) = larger panel
+    var delta = startY - e.clientY;
+    var newH = Math.min(_panelMaxHeight, Math.max(_panelMinHeight, startH + delta));
+    panel.style.height = newH + "px";
+  }
+
+  function onMouseUp() {
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+    handle.classList.remove("status-bar-panel-resize--active");
+    document.body.style.userSelect = "";
+    document.body.style.cursor = "";
+    // Persist
+    localStorage.setItem(_panelStorageKey, parseInt(panel.style.height, 10));
+  }
+
+  handle.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    startY = e.clientY;
+    startH = panel.offsetHeight;
+    handle.classList.add("status-bar-panel-resize--active");
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "ns-resize";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  });
 }
 
 // Expose globally to fit the existing vanilla-JS pattern
@@ -135,7 +182,11 @@ window.updateStatusBar = updateStatusBar;
 window.toggleTerminalPanel = toggleTerminalPanel;
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initStatusBar);
+  document.addEventListener("DOMContentLoaded", function () {
+    initStatusBar();
+    _initPanelResize();
+  });
 } else {
   initStatusBar();
+  _initPanelResize();
 }

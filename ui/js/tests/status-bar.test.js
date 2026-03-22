@@ -20,6 +20,7 @@ describe("status-bar layout", () => {
     expect(html).toContain('id="status-bar"');
     expect(html).toContain('class="status-bar"');
     expect(html).toContain('id="status-bar-panel"');
+    expect(html).toContain('id="status-bar-panel-resize"');
     expect(html).toContain('class="status-bar__left"');
     expect(html).toContain('class="status-bar__right"');
     expect(html).toContain('id="status-bar-conn-dot"');
@@ -46,6 +47,7 @@ describe("status-bar layout", () => {
     const css = readFileSync(join(repoRoot, "ui/css/styles.css"), "utf8");
     expect(css).toContain(".status-bar");
     expect(css).toContain(".status-bar-panel");
+    expect(css).toContain(".status-bar-panel-resize");
     expect(css).toContain(".status-bar-conn-dot");
     expect(css).toContain(".status-bar-conn-dot--ok");
     expect(css).toContain(".status-bar-conn-dot--reconnecting");
@@ -79,9 +81,11 @@ function makeStatusBarContext(extra = {}) {
       id,
       className: "",
       textContent: "",
-      style: { display: "" },
+      offsetHeight: 260,
+      style: { display: "", height: "" },
       _ariaLabel: "",
       _ariaExpanded: "",
+      _listeners: {},
       classList: {
         _classes: new Set(),
         contains(c) {
@@ -104,6 +108,11 @@ function makeStatusBarContext(extra = {}) {
           }
         },
       },
+      addEventListener(event, handler) {
+        if (!this._listeners[event]) this._listeners[event] = [];
+        this._listeners[event].push(handler);
+      },
+      removeEventListener() {},
       setAttribute(attr, val) {
         if (attr === "aria-label") this._ariaLabel = val;
         if (attr === "aria-expanded") this._ariaExpanded = val;
@@ -123,29 +132,38 @@ function makeStatusBarContext(extra = {}) {
     "status-bar-in-progress",
     "status-bar-waiting",
     "status-bar-panel",
+    "status-bar-panel-resize",
     "status-bar-terminal-btn",
   ];
   ids.forEach((id) => {
     elements[id] = makeEl(id);
-    // Pre-add 'hidden' to panel
-    if (id === "status-bar-panel") {
+    // Pre-add 'hidden' to panel and resize handle
+    if (id === "status-bar-panel" || id === "status-bar-panel-resize") {
       elements[id].classList._classes.add("hidden");
     }
   });
 
+  const _storage = {};
   const ctx = {
     document: {
       getElementById(id) {
         return elements[id] || null;
       },
       addEventListener() {},
+      removeEventListener() {},
       activeElement: { tagName: "BODY", getAttribute: () => null },
       readyState: "complete",
+      body: { style: {} },
     },
     window: {},
+    localStorage: {
+      getItem(k) { return _storage[k] || null; },
+      setItem(k, v) { _storage[k] = String(v); },
+    },
     // Default global state
     tasks: [],
     tasksSource: null,
+    _sseConnState: "closed",
     activeWorkspaces: [],
     workspaceGroups: [],
     console,
@@ -160,8 +178,8 @@ function loadStatusBar(ctx) {
 }
 
 describe("updateStatusBar logic", () => {
-  it("sets conn dot to --closed when tasksSource is null", () => {
-    const { ctx, elements } = makeStatusBarContext({ tasksSource: null });
+  it("sets conn dot to --closed when _sseConnState is 'closed'", () => {
+    const { ctx, elements } = makeStatusBarContext({ _sseConnState: "closed" });
     loadStatusBar(ctx);
     ctx.updateStatusBar();
     expect(elements["status-bar-conn-dot"].className).toContain(
@@ -170,9 +188,20 @@ describe("updateStatusBar logic", () => {
     expect(elements["status-bar-conn-label"].textContent).toBe("Disconnected");
   });
 
-  it("sets conn dot to --ok when tasksSource.readyState === 1 (OPEN)", () => {
+  it("sets conn dot to --closed when _sseConnState is undefined", () => {
+    const { ctx, elements } = makeStatusBarContext();
+    delete ctx._sseConnState;
+    loadStatusBar(ctx);
+    ctx.updateStatusBar();
+    expect(elements["status-bar-conn-dot"].className).toContain(
+      "status-bar-conn-dot--closed",
+    );
+    expect(elements["status-bar-conn-label"].textContent).toBe("Disconnected");
+  });
+
+  it("sets conn dot to --ok when _sseConnState is 'ok'", () => {
     const { ctx, elements } = makeStatusBarContext({
-      tasksSource: { readyState: 1 },
+      _sseConnState: "ok",
     });
     loadStatusBar(ctx);
     ctx.updateStatusBar();
@@ -182,9 +211,9 @@ describe("updateStatusBar logic", () => {
     expect(elements["status-bar-conn-label"].textContent).toBe("Connected");
   });
 
-  it("sets conn dot to --reconnecting when tasksSource.readyState === 0 (CONNECTING)", () => {
+  it("sets conn dot to --reconnecting when _sseConnState is 'reconnecting'", () => {
     const { ctx, elements } = makeStatusBarContext({
-      tasksSource: { readyState: 0 },
+      _sseConnState: "reconnecting",
     });
     loadStatusBar(ctx);
     ctx.updateStatusBar();
@@ -261,33 +290,25 @@ describe("updateStatusBar logic", () => {
 });
 
 describe("toggleTerminalPanel", () => {
-  it("removes 'hidden' class from panel when initially hidden", () => {
+  it("removes 'hidden' class from panel and resize handle when initially hidden", () => {
     const { ctx, elements } = makeStatusBarContext();
     loadStatusBar(ctx);
-    // panel starts with hidden class
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
-      true,
-    );
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(true);
+    expect(elements["status-bar-panel-resize"].classList.contains("hidden")).toBe(true);
     ctx.toggleTerminalPanel();
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
-      false,
-    );
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(false);
+    expect(elements["status-bar-panel-resize"].classList.contains("hidden")).toBe(false);
     expect(elements["status-bar-terminal-btn"]._ariaExpanded).toBe("true");
   });
 
-  it("adds 'hidden' class when panel is visible", () => {
+  it("adds 'hidden' class to panel and resize handle when visible", () => {
     const { ctx, elements } = makeStatusBarContext();
     loadStatusBar(ctx);
-    // Open it first
     ctx.toggleTerminalPanel();
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
-      false,
-    );
-    // Close it
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(false);
     ctx.toggleTerminalPanel();
-    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
-      true,
-    );
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(true);
+    expect(elements["status-bar-panel-resize"].classList.contains("hidden")).toBe(true);
     expect(elements["status-bar-terminal-btn"]._ariaExpanded).toBe("false");
   });
 });

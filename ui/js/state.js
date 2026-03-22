@@ -27,6 +27,10 @@ let archivedScrollHandlerBound = false;
 // Tasks SSE state
 let tasksSource = null;
 let tasksRetryDelay = 1000;
+// Effective SSE connection state for the status bar. Set by both leader
+// (from EventSource.readyState) and follower (from BroadcastChannel activity).
+// Values: "ok" | "reconnecting" | "closed"
+let _sseConnState = "closed";
 // lastTasksEventId holds the SSE id: value from the most recently received
 // task stream event. Passed as ?last_event_id=<id> on reconnect to enable
 // delta replay instead of a full snapshot.
