@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -201,6 +202,9 @@ func TestBuildSandboxExecArgs_UsesDefaultWorkspaceMount(t *testing.T) {
 }
 
 func TestBuildSandboxExecArgs_UsesCodexAuthWhenAvailable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	tmp := t.TempDir()
 	authDir := filepath.Join(tmp, ".codex")
 	if err := os.MkdirAll(authDir, 0o755); err != nil {

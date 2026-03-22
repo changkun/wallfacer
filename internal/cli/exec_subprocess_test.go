@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -27,6 +28,9 @@ func TestRunExec_Helper(t *testing.T) {
 }
 
 func TestRunExec_TaskMode_Subprocess(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	tmp := t.TempDir()
 	runtime := filepath.Join(tmp, "podman")
 	marker := filepath.Join(tmp, "task.args")
@@ -73,6 +77,9 @@ func TestRunExec_TaskMode_Subprocess(t *testing.T) {
 }
 
 func TestRunExec_SandboxMode_Subprocess(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	tmp := t.TempDir()
 	runtime := filepath.Join(tmp, "podman")
 	marker := filepath.Join(tmp, "sandbox.args")

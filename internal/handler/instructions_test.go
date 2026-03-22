@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -201,6 +202,9 @@ func TestUpdateInstructions_RejectsUnknownFields(t *testing.T) {
 // TestUpdateInstructions_WriteError verifies that UpdateInstructions returns 500
 // when the instructions file cannot be written (e.g. directory is read-only).
 func TestUpdateInstructions_WriteError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	h, configDir := newTestHandlerWithInstructions(t)
 
 	// Make the instructions directory read-only so os.WriteFile fails.
@@ -225,6 +229,9 @@ func TestUpdateInstructions_WriteError(t *testing.T) {
 // TestReinitInstructions_WriteError verifies that ReinitInstructions returns 500
 // when the instructions directory cannot be written to.
 func TestReinitInstructions_WriteError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	h, configDir := newTestHandlerWithInstructions(t)
 
 	// Make the instructions directory read-only so instructions.Reinit fails.

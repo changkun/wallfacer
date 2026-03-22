@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -673,6 +674,9 @@ func TestSandboxImageForTest_CodexResolution(t *testing.T) {
 }
 
 func TestTestSandbox_PersistsTaskAfterRun(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	h, _ := newTestHandlerWithEnv(t)
 
 	body := map[string]interface{}{
@@ -744,6 +748,9 @@ func TestTestSandbox_PersistsTaskAfterRun(t *testing.T) {
 // TestTestSandbox_SandboxTestTag verifies that the smoke-test task is created
 // with the "sandbox-test" tag so it can be found by tag search after archiving.
 func TestTestSandbox_SandboxTestTag(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	h, _ := newTestHandlerWithEnv(t)
 
 	body := map[string]interface{}{"sandbox": "claude", "timeout": 1}

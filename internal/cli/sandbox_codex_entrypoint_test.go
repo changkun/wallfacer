@@ -5,11 +5,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestCodexEntrypointPreservesUsageFromStream(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skip("jq not installed")
 	}
@@ -116,6 +120,9 @@ printf 'final answer from codex' > "$LAST_MSG"
 }
 
 func TestCodexEntrypointSkipsFastConfigWhenDisabled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	tempDir := t.TempDir()
 	fakeCodexPath := filepath.Join(tempDir, "codex")
 	argsPath := filepath.Join(tempDir, "codex.args")

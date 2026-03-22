@@ -4,11 +4,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestClaudeEntrypointAddsFastPromptByDefault(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	tempDir := t.TempDir()
 	argsPath := filepath.Join(tempDir, "claude.args")
 	fakeClaudePath := filepath.Join(tempDir, "claude")
@@ -36,6 +40,9 @@ printf '%s\n' "$@" > "` + argsPath + `"
 }
 
 func TestClaudeEntrypointSkipsFastPromptWhenDisabled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	tempDir := t.TempDir()
 	argsPath := filepath.Join(tempDir, "claude.args")
 	fakeClaudePath := filepath.Join(tempDir, "claude")

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -146,6 +147,9 @@ func TestEnsureImage_ReturnsExistingOrPulledImage(t *testing.T) {
 }
 
 func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	tmp := t.TempDir()
 	runtimeScript := filepath.Join(tmp, "runtime.sh")
 	if err := os.WriteFile(runtimeScript, []byte("#!/bin/sh\n"+

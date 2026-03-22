@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -2222,6 +2223,9 @@ func TestTryAutoTest_RegularTasksDoNotConsumeTestSlots(t *testing.T) {
 }
 
 func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	s, err := store.NewStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -3850,6 +3854,9 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 }
 
 func TestAutoRetry_ContainerCrash(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	cmd := autoRetryCrashCmd(t)
 	s, r := setupAutoRetryRunner(t, cmd)
 	ctx := context.Background()
@@ -3889,6 +3896,9 @@ func TestAutoRetry_ContainerCrash(t *testing.T) {
 }
 
 func TestAutoRetry_BudgetCategoryDoesNotRetry(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	cmd := autoRetryBudgetErrorCmd(t)
 	s, r := setupAutoRetryRunner(t, cmd)
 	ctx := context.Background()
@@ -3916,6 +3926,9 @@ func TestAutoRetry_BudgetCategoryDoesNotRetry(t *testing.T) {
 }
 
 func TestAutoRetry_MaxTotalCap(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	cmd := autoRetryCrashCmd(t)
 	s, r := setupAutoRetryRunner(t, cmd)
 	ctx := context.Background()

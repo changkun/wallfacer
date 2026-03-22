@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -920,6 +921,9 @@ func TestStreamRefineLogs_NoFlusher(t *testing.T) {
 // lines and exits. The handler's select loop reads the lines and then
 // terminates naturally when the lines channel is closed.
 func TestStreamLogs_InProgress_ContainerExitsCleanly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	// Write a tiny shell script that prints two log lines and exits.
 	scriptPath := filepath.Join(t.TempDir(), "fake-logs.sh")
 	script := "#!/bin/sh\nprintf 'log line 1\\nlog line 2\\n'\n"
@@ -1052,6 +1056,9 @@ func TestStreamLogs_InProgress_ContextCancellation(t *testing.T) {
 // in StreamRefineLogs. The command prints two lines and exits so the lines
 // channel closes and the handler returns naturally.
 func TestStreamRefineLogs_ContainerExitsCleanly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Unix shell")
+	}
 	scriptPath := filepath.Join(t.TempDir(), "refine-logs.sh")
 	script := "#!/bin/sh\nprintf 'refine line 1\\nrefine line 2\\n'\n"
 	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
