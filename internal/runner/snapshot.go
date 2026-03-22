@@ -86,12 +86,12 @@ func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
 // first for speed and falls back to a pure-Go walk on failure or on Windows.
 func copyDirContents(src, dst string) error {
 	if runtime.GOOS != "windows" {
-		if out, err := exec.Command("cp", "-a", src+"/.", dst).CombinedOutput(); err == nil {
+		out, err := exec.Command("cp", "-a", src+"/.", dst).CombinedOutput()
+		if err == nil {
 			return nil
-		} else {
-			logger.Runner.Warn("cp -a failed, falling back to Go copy",
-				"src", src, "dst", dst, "error", fmt.Sprintf("%v: %s", err, out))
 		}
+		logger.Runner.Warn("cp -a failed, falling back to Go copy",
+			"src", src, "dst", dst, "error", fmt.Sprintf("%v: %s", err, out))
 	}
 	return copyDirContentsGo(src, dst)
 }
@@ -134,12 +134,12 @@ func copyFile(src, dst string, mode fs.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	if _, err := io.Copy(out, in); err != nil {
 		return err
 	}
