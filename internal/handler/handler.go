@@ -109,23 +109,12 @@ type Handler struct {
 	startTime  time.Time
 	reg        *metrics.Registry
 
-	autopilotMu sync.RWMutex
-	autopilot   bool
-
-	autotestMu sync.RWMutex
-	autotest   bool
-
-	autosubmitMu sync.RWMutex
-	autosubmit   bool
-
-	autorefineMu sync.RWMutex
-	autorefine   bool
-
-	autosyncMu sync.RWMutex
-	autosync   bool
-
-	autopushMu sync.RWMutex
-	autopush   bool
+	autopilot  atomic.Bool
+	autotest   atomic.Bool
+	autosubmit atomic.Bool
+	autorefine atomic.Bool
+	autosync   atomic.Bool
+	autopush   atomic.Bool
 
 	// breakers holds per-watcher circuit breakers. Keyed by watcher name
 	// (e.g. "auto-promote"). These are transient and auto-heal; they do not
@@ -210,7 +199,7 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	}
 	// Initialize auto-push from env config so the header toggle reflects the persisted state.
 	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
-		h.autopush = envCfg.AutoPushEnabled
+		h.autopush.Store(envCfg.AutoPushEnabled)
 	}
 	h.applySnapshot(wsMgr.Snapshot())
 	if wsMgr != nil {
@@ -341,88 +330,40 @@ func (h *Handler) refreshCodexBootstrapAuthState() {
 }
 
 // AutopilotEnabled returns whether autopilot mode is active.
-func (h *Handler) AutopilotEnabled() bool {
-	h.autopilotMu.RLock()
-	defer h.autopilotMu.RUnlock()
-	return h.autopilot
-}
+func (h *Handler) AutopilotEnabled() bool { return h.autopilot.Load() }
 
 // SetAutopilot enables or disables autopilot mode.
-func (h *Handler) SetAutopilot(enabled bool) {
-	h.autopilotMu.Lock()
-	h.autopilot = enabled
-	h.autopilotMu.Unlock()
-}
+func (h *Handler) SetAutopilot(enabled bool) { h.autopilot.Store(enabled) }
 
 // AutotestEnabled returns whether auto-test mode is active.
-func (h *Handler) AutotestEnabled() bool {
-	h.autotestMu.RLock()
-	defer h.autotestMu.RUnlock()
-	return h.autotest
-}
+func (h *Handler) AutotestEnabled() bool { return h.autotest.Load() }
 
 // SetAutotest enables or disables auto-test mode.
-func (h *Handler) SetAutotest(enabled bool) {
-	h.autotestMu.Lock()
-	h.autotest = enabled
-	h.autotestMu.Unlock()
-}
+func (h *Handler) SetAutotest(enabled bool) { h.autotest.Store(enabled) }
 
 // AutosubmitEnabled returns whether auto-submit mode is active.
-func (h *Handler) AutosubmitEnabled() bool {
-	h.autosubmitMu.RLock()
-	defer h.autosubmitMu.RUnlock()
-	return h.autosubmit
-}
+func (h *Handler) AutosubmitEnabled() bool { return h.autosubmit.Load() }
 
 // SetAutosubmit enables or disables auto-submit mode.
-func (h *Handler) SetAutosubmit(enabled bool) {
-	h.autosubmitMu.Lock()
-	h.autosubmit = enabled
-	h.autosubmitMu.Unlock()
-}
+func (h *Handler) SetAutosubmit(enabled bool) { h.autosubmit.Store(enabled) }
 
 // AutorefineEnabled returns whether auto-refinement mode is active.
-func (h *Handler) AutorefineEnabled() bool {
-	h.autorefineMu.RLock()
-	defer h.autorefineMu.RUnlock()
-	return h.autorefine
-}
+func (h *Handler) AutorefineEnabled() bool { return h.autorefine.Load() }
 
 // SetAutorefine enables or disables auto-refinement mode.
-func (h *Handler) SetAutorefine(enabled bool) {
-	h.autorefineMu.Lock()
-	h.autorefine = enabled
-	h.autorefineMu.Unlock()
-}
+func (h *Handler) SetAutorefine(enabled bool) { h.autorefine.Store(enabled) }
 
 // AutosyncEnabled returns whether auto-sync (tip-sync) mode is active.
-func (h *Handler) AutosyncEnabled() bool {
-	h.autosyncMu.RLock()
-	defer h.autosyncMu.RUnlock()
-	return h.autosync
-}
+func (h *Handler) AutosyncEnabled() bool { return h.autosync.Load() }
 
 // SetAutosync enables or disables auto-sync (tip-sync) mode.
-func (h *Handler) SetAutosync(enabled bool) {
-	h.autosyncMu.Lock()
-	h.autosync = enabled
-	h.autosyncMu.Unlock()
-}
+func (h *Handler) SetAutosync(enabled bool) { h.autosync.Store(enabled) }
 
 // AutopushEnabled returns whether auto-push mode is active.
-func (h *Handler) AutopushEnabled() bool {
-	h.autopushMu.RLock()
-	defer h.autopushMu.RUnlock()
-	return h.autopush
-}
+func (h *Handler) AutopushEnabled() bool { return h.autopush.Load() }
 
 // SetAutopush enables or disables auto-push mode.
-func (h *Handler) SetAutopush(enabled bool) {
-	h.autopushMu.Lock()
-	h.autopush = enabled
-	h.autopushMu.Unlock()
-}
+func (h *Handler) SetAutopush(enabled bool) { h.autopush.Store(enabled) }
 
 // openWatcherBreaker opens the circuit breaker for a specific watcher.
 // It does NOT disable other watchers. Returns true if the breaker was

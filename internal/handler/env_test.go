@@ -78,9 +78,7 @@ func TestUpdateEnvConfig_TriggersAutoPromote(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 
 	// Enable autopilot so tryAutoPromote will act.
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 
 	// Create a backlog task.
 	ctx := context.Background()

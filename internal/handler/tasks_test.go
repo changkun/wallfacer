@@ -1281,9 +1281,7 @@ func TestUpdateTask_SetDependsOn_AbsentFieldNoOp(t *testing.T) {
 // promotes the next eligible task instead.
 func TestTryAutoPromote_SkipsBlockedTask(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 
 	ctx := context.Background()
 	// dep: already in_progress (simulating it was started earlier), so it is
@@ -1328,9 +1326,7 @@ func TestTryAutoPromote_SkipsBlockedTask(t *testing.T) {
 // done is promoted normally.
 func TestTryAutoPromote_PromotesWhenDepsSatisfied(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 
 	ctx := context.Background()
 	dep, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "dep", Timeout: 15})
@@ -1355,9 +1351,7 @@ func TestTryAutoPromote_PromotesWhenDepsSatisfied(t *testing.T) {
 // so testing tasks cannot starve regular backlog promotions.
 func TestTryAutoPromote_DoesNotCountTestRuns(t *testing.T) {
 	h, envPath := newTestHandlerWithEnv(t)
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 	ctx := context.Background()
 
 	// Set regular max to 1.
@@ -2666,9 +2660,7 @@ func TestTryAutoSubmit_CommitMessageFailureFallsBackAndCompletes(t *testing.T) {
 // event emitted by tryAutoPromote contains "trigger": "auto_promote".
 func TestTryAutoPromote_EventHasAutoPromoteTrigger(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "task to promote", Timeout: 15})
@@ -3113,9 +3105,7 @@ func TestBatchCreateTasks_EmptyBatch(t *testing.T) {
 // scheduled time has passed.
 func TestTryAutoPromote_SkipsFutureScheduledTask(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 
 	ctx := context.Background()
 
@@ -3141,9 +3131,7 @@ func TestTryAutoPromote_SkipsFutureScheduledTask(t *testing.T) {
 // with a ScheduledAt in the past IS promoted normally.
 func TestTryAutoPromote_PromotesPastScheduledTask(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 
 	ctx := context.Background()
 
@@ -3169,9 +3157,7 @@ func TestTryAutoPromote_PromotesPastScheduledTask(t *testing.T) {
 // the unscheduled one is promoted.
 func TestTryAutoPromote_SkipsFutureButPromotesUnscheduled(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 
 	ctx := context.Background()
 

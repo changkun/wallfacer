@@ -13,9 +13,7 @@ import (
 // shortly after its due time via the precise timer set by ensureScheduledPromoteTrigger.
 func TestScheduledTaskPromotedOnTime(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -61,9 +59,7 @@ func TestScheduledTaskPromotedOnTime(t *testing.T) {
 // context prevents the timer from promoting a scheduled task.
 func TestScheduledTaskTimerCancelsOnContextDone(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
-	h.autopilotMu.Lock()
-	h.autopilot = true
-	h.autopilotMu.Unlock()
+	h.autopilot.Store(true)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

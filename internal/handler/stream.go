@@ -1,10 +1,8 @@
 package handler
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,6 +12,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/logpipe"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -217,79 +216,12 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
-
-	// Merge container stdout and stderr.
-	pr, pw := io.Pipe()
-	cmd.Stdout = pw
-	cmd.Stderr = pw
-
-	if err := cmd.Start(); err != nil {
-		_ = pr.Close()
-
-		_ = pw.Close()
-
+	p, err := logpipe.Start(cmd, logpipe.MergeStderr())
+	if err != nil {
 		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
 		return
 	}
-
-	// Close the write end once the subprocess exits.
-	go func() {
-		if err := cmd.Wait(); err != nil {
-			logger.Handler.Debug("container log stream ended (process killed or container removed)", "detail", err)
-		}
-		_ = pw.Close()
-
-	}()
-
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
-
-	// Feed scanner output through a channel so we can interleave keepalives.
-	lines := make(chan string)
-	go func() {
-		defer close(lines)
-		scanner := bufio.NewScanner(pr)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		for scanner.Scan() {
-			lines <- scanner.Text()
-		}
-		if err := scanner.Err(); err != nil {
-			logger.Handler.Debug("container log stream reader closed", "detail", err)
-		}
-	}()
-
-	keepalive := time.NewTicker(15 * time.Second)
-	defer keepalive.Stop()
-
-	for {
-		select {
-		case <-r.Context().Done():
-			_ = pr.Close()
-
-			return
-		case line, ok := <-lines:
-			if !ok {
-				return
-			}
-			if _, err := w.Write([]byte(line + "\n")); err != nil {
-				_ = pr.Close()
-
-				return
-			}
-			flusher.Flush()
-		case <-keepalive.C:
-			if _, err := w.Write([]byte("\n")); err != nil {
-				_ = pr.Close()
-
-				return
-			}
-			flusher.Flush()
-		}
-	}
+	streamLines(w, r, flusher, p)
 }
 
 // StreamRefineLogs streams live container logs for an active sandbox refinement run.
@@ -308,47 +240,22 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 		return
 	}
 
-	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
-
-	pr, pw := io.Pipe()
-	cmd.Stdout = pw
 	// Do not pipe cmd.Stderr into the response: errors from the log command
 	// itself (e.g. "no such container" when the container was already removed)
-	// would be forwarded verbatim to the client. Log them server-side only.
-	stderrPR, stderrPW := io.Pipe()
-	cmd.Stderr = stderrPW
-
-	if err := cmd.Start(); err != nil {
-		_ = pr.Close()
-
-		_ = pw.Close()
-
-		_ = stderrPR.Close()
-
-		_ = stderrPW.Close()
-
+	// would be forwarded verbatim to the client. Stderr is discarded by logpipe.
+	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
+	p, err := logpipe.Start(cmd)
+	if err != nil {
 		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
 		return
 	}
+	streamLines(w, r, flusher, p)
+}
 
-	go func() {
-		// Drain stderr so the process is not blocked writing to it.
-		if _, err := io.Copy(io.Discard, stderrPR); err != nil {
-			logger.Handler.Debug("refine stderr drain error", "error", err)
-		}
-		_ = stderrPR.Close()
-
-	}()
-	go func() {
-		if err := cmd.Wait(); err != nil {
-			logger.Handler.Debug("refine log stream ended (process killed or container removed)", "detail", err)
-		}
-		_ = pw.Close()
-
-		_ = stderrPW.Close()
-
-	}()
-
+// streamLines writes lines from a logpipe to the HTTP response with periodic
+// keepalive newlines. It blocks until the pipe is exhausted or the request
+// context is cancelled.
+func streamLines(w http.ResponseWriter, r *http.Request, flusher http.Flusher, p *logpipe.Pipe) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -356,42 +263,24 @@ func (h *Handler) StreamRefineLogs(w http.ResponseWriter, r *http.Request, id uu
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	lines := make(chan string)
-	go func() {
-		defer close(lines)
-		scanner := bufio.NewScanner(pr)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		for scanner.Scan() {
-			lines <- scanner.Text()
-		}
-		if err := scanner.Err(); err != nil {
-			logger.Handler.Debug("refine log stream reader closed", "detail", err)
-		}
-	}()
-
-	keepalive := time.NewTicker(15 * time.Second)
+	keepalive := time.NewTicker(sseKeepaliveInterval)
 	defer keepalive.Stop()
+	defer p.Close()
 
 	for {
 		select {
 		case <-r.Context().Done():
-			_ = pr.Close()
-
 			return
-		case line, ok := <-lines:
+		case line, ok := <-p.Lines():
 			if !ok {
 				return
 			}
 			if _, err := w.Write([]byte(line + "\n")); err != nil {
-				_ = pr.Close()
-
 				return
 			}
 			flusher.Flush()
 		case <-keepalive.C:
 			if _, err := w.Write([]byte("\n")); err != nil {
-				_ = pr.Close()
-
 				return
 			}
 			flusher.Flush()
