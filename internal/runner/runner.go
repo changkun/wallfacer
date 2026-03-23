@@ -429,60 +429,45 @@ func (r *Runner) Shutdown() {
 // so that WaitBackground can drain all outstanding work — particularly useful
 // in tests to prevent cleanup races with temp-dir removal.
 func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
-	label := "run:" + taskID.String()[:8]
-	r.backgroundWg.Add(label)
-	go func() {
-		defer r.backgroundWg.Done(label)
+	r.backgroundWg.Go("run:"+taskID.String()[:8], func() {
 		r.Run(taskID, prompt, sessionID, resumedFromWaiting)
-	}()
+	})
 }
 
 // SyncWorktreesBackground launches SyncWorktrees in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 // The optional onDone callbacks are called after SyncWorktrees returns.
 func (r *Runner) SyncWorktreesBackground(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus, onDone ...func()) {
-	label := "sync:" + taskID.String()[:8]
-	r.backgroundWg.Add(label)
-	go func() {
-		defer r.backgroundWg.Done(label)
+	r.backgroundWg.Go("sync:"+taskID.String()[:8], func() {
 		r.SyncWorktrees(taskID, sessionID, prevStatus)
 		for _, fn := range onDone {
 			fn()
 		}
-	}()
+	})
 }
 
 // RunRefinementBackground launches RunRefinement in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 func (r *Runner) RunRefinementBackground(taskID uuid.UUID, userInstructions string) {
-	label := "refine:" + taskID.String()[:8]
-	r.backgroundWg.Add(label)
-	go func() {
-		defer r.backgroundWg.Done(label)
+	r.backgroundWg.Go("refine:"+taskID.String()[:8], func() {
 		r.RunRefinement(taskID, userInstructions)
-	}()
+	})
 }
 
 // GenerateOversightBackground launches GenerateOversight in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 func (r *Runner) GenerateOversightBackground(taskID uuid.UUID) {
-	label := "oversight:" + taskID.String()[:8]
-	r.backgroundWg.Add(label)
-	go func() {
-		defer r.backgroundWg.Done(label)
+	r.backgroundWg.Go("oversight:"+taskID.String()[:8], func() {
 		r.GenerateOversight(taskID)
-	}()
+	})
 }
 
 // GenerateTitleBackground launches GenerateTitle in a background goroutine
 // tracked by backgroundWg so that WaitBackground can drain it before cleanup.
 func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
-	label := "title:" + taskID.String()[:8]
-	r.backgroundWg.Add(label)
-	go func() {
-		defer r.backgroundWg.Done(label)
+	r.backgroundWg.Go("title:"+taskID.String()[:8], func() {
 		r.GenerateTitle(taskID, prompt)
-	}()
+	})
 }
 
 // NewRunner constructs a Runner from the given store and config.
