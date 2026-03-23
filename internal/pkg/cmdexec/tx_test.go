@@ -53,17 +53,18 @@ func TestTx_RollbacksRunInReverse(t *testing.T) {
 	log := filepath.Join(dir, "order.txt")
 
 	tx := NewTx()
+	slog := filepath.ToSlash(log)
 	tx.AddWithRollback(
 		New("true"),
-		New("bash", "-c", "echo R0 >> "+log),
+		New("bash", "-c", "echo R0 >> "+slog),
 	)
 	tx.AddWithRollback(
 		New("true"),
-		New("bash", "-c", "echo R1 >> "+log),
+		New("bash", "-c", "echo R1 >> "+slog),
 	)
 	tx.AddWithRollback(
 		New("false"), // step 2 fails
-		New("bash", "-c", "echo R2 >> "+log),
+		New("bash", "-c", "echo R2 >> "+slog),
 	)
 
 	_ = tx.Run()
@@ -110,8 +111,9 @@ func TestTx_DeferRunsLIFO(t *testing.T) {
 	log := filepath.Join(dir, "order.txt")
 
 	tx := NewTx()
-	tx.Defer(New("bash", "-c", "echo D0 >> "+log))
-	tx.Defer(New("bash", "-c", "echo D1 >> "+log))
+	slog := filepath.ToSlash(log)
+	tx.Defer(New("bash", "-c", "echo D0 >> "+slog))
+	tx.Defer(New("bash", "-c", "echo D1 >> "+slog))
 	tx.Add(New("true"))
 	_ = tx.Run()
 
