@@ -1,7 +1,6 @@
 package store
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/ndjson"
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 	"github.com/google/uuid"
 )
@@ -330,42 +330,22 @@ func (s *Store) loadEvents(id uuid.UUID, dirName string) error {
 		return err
 	}
 
-	var events []TaskEvent
-	compactMaxID := int64(0)
 	compactPath := filepath.Join(tracesDir, "compact.ndjson")
-	if _, err := os.Stat(compactPath); err == nil {
-		f, err := os.Open(compactPath)
-		if err != nil {
-			return err
-		}
-
-		scanner := bufio.NewScanner(f)
-		buf := make([]byte, 0, 64*1024)
-		scanner.Buffer(buf, 1024*1024)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" {
-				continue
-			}
-			var evt TaskEvent
-			if err := jsonUnmarshal([]byte(line), &evt); err != nil {
-				logger.Store.Warn("skipping compact trace line", "task", dirName, "trace", "compact.ndjson", "error", err)
-				continue
-			}
-			events = append(events, evt)
-			if evt.ID > compactMaxID {
-				compactMaxID = evt.ID
-			}
-		}
-		scanErr := scanner.Err()
-		if err := f.Close(); err != nil {
-			return err
-		}
-		if scanErr != nil {
-			return scanErr
-		}
-	} else if !os.IsNotExist(err) {
+	events, err := ndjson.ReadFile[TaskEvent](compactPath,
+		ndjson.WithBufferSize(64*1024, 1024*1024),
+		ndjson.WithOnError(func(lineNum int, err error) {
+			logger.Store.Warn("skipping compact trace line", "task", dirName, "trace", "compact.ndjson", "line", lineNum, "error", err)
+		}),
+	)
+	if err != nil {
 		return err
+	}
+
+	compactMaxID := int64(0)
+	for _, evt := range events {
+		if evt.ID > compactMaxID {
+			compactMaxID = evt.ID
+		}
 	}
 
 	maxSeq := int(compactMaxID)

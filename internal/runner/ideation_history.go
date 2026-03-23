@@ -1,8 +1,6 @@
 package runner
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +8,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/ndjson"
 )
 
 // ideationHistoryTTL is how long rejected-idea records are retained.
@@ -50,41 +49,18 @@ func ideationHistoryPath(dataDir string) string {
 func LoadHistory(dataDir string) (*IdeationHistory, error) {
 	h := &IdeationHistory{path: ideationHistoryPath(dataDir)}
 
-	f, err := os.Open(h.path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return h, nil
-		}
-		return nil, fmt.Errorf("open ideation history: %w", err)
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
 	cutoff := time.Now().Add(-ideationHistoryTTL)
-	scanner := bufio.NewScanner(f)
-	lineNum := 0
-	for scanner.Scan() {
-		lineNum++
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
+	err := ndjson.ReadFileFunc[HistoryEntry](h.path, func(e HistoryEntry) bool {
+		if !e.RecordedAt.Before(cutoff) {
+			h.entries = append(h.entries, e)
 		}
-		var e HistoryEntry
-		if err := json.Unmarshal([]byte(line), &e); err != nil {
-			logger.Runner.Warn("ideation history: skipping malformed line",
-				"path", h.path, "line", lineNum, "error", err)
-			continue
-		}
-		if e.RecordedAt.Before(cutoff) {
-			continue // expired
-		}
-		h.entries = append(h.entries, e)
-	}
-	if err := scanner.Err(); err != nil {
-		// Truncated file mid-line — log a warning but return what we have.
-		logger.Runner.Warn("ideation history: read error (truncated file?)",
-			"path", h.path, "error", err)
+		return true
+	}, ndjson.WithOnError(func(lineNum int, err error) {
+		logger.Runner.Warn("ideation history: skipping malformed line",
+			"path", h.path, "line", lineNum, "error", err)
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("read ideation history: %w", err)
 	}
 	return h, nil
 }
@@ -95,25 +71,7 @@ func (h *IdeationHistory) Append(e HistoryEntry) error {
 	if e.RecordedAt.IsZero() {
 		e.RecordedAt = time.Now().UTC()
 	}
-	data, err := json.Marshal(e)
-	if err != nil {
-		return fmt.Errorf("marshal history entry: %w", err)
-	}
-
-	f, err := os.OpenFile(h.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("open ideation history for append: %w", err)
-	}
-
-	if _, err := fmt.Fprintf(f, "%s\n", data); err != nil {
-		_ = f.Close()
-
-		return fmt.Errorf("write ideation history entry: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("close ideation history: %w", err)
-	}
-	return nil
+	return ndjson.AppendFile(h.path, e)
 }
 
 // Round returns the number of ideation rounds recorded in the history.
