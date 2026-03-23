@@ -406,6 +406,8 @@ func TestTaskDiffNonGitWorkspaceLiveSnapshot(t *testing.T) {
 	_ = os.MkdirAll(snapshotPath, 0755)
 	_ = os.WriteFile(filepath.Join(snapshotPath, "file.txt"), []byte("original\n"), 0644)
 	gitRun(t, snapshotPath, "init")
+	gitRun(t, snapshotPath, "config", "user.email", "test@example.com")
+	gitRun(t, snapshotPath, "config", "user.name", "Test")
 	gitRun(t, snapshotPath, "add", "-A")
 	gitRun(t, snapshotPath, "commit", "-m", "wallfacer: initial snapshot")
 

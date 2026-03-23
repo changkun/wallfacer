@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -184,6 +185,9 @@ func TestAppendFile_CreatesAndAppends(t *testing.T) {
 }
 
 func TestReadFile_OpenError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod 0000 does not restrict reads on Windows")
+	}
 	// A path that exists but is a directory, not a file — os.Open succeeds
 	// but scanning will yield zero records. Instead, use a permission error.
 	dir := t.TempDir()
@@ -203,6 +207,9 @@ func TestReadFile_OpenError(t *testing.T) {
 }
 
 func TestReadFileFunc_OpenError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod 0000 does not restrict reads on Windows")
+	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "noread.jsonl")
 	if err := os.WriteFile(path, []byte(`{"name":"a","value":1}`+"\n"), 0644); err != nil {
