@@ -6,6 +6,7 @@ package ndjson
 import (
 	"bufio"
 	"encoding/json"
+	"io"
 	"os"
 	"strings"
 )
@@ -57,7 +58,12 @@ func ReadFile[T any](path string, opts ...Option) ([]T, error) {
 		return nil, err
 	}
 
-	scanner := bufio.NewScanner(f)
+	return readAll[T](f, &cfg)
+}
+
+// readAll reads and decodes all JSON lines from rc, then closes it.
+func readAll[T any](rc io.ReadCloser, cfg *config) ([]T, error) {
+	scanner := bufio.NewScanner(rc)
 	if cfg.bufMax > 0 {
 		scanner.Buffer(make([]byte, 0, cfg.bufInitial), cfg.bufMax)
 	}
@@ -81,7 +87,7 @@ func ReadFile[T any](path string, opts ...Option) ([]T, error) {
 	}
 
 	scanErr := scanner.Err()
-	if err := f.Close(); err != nil {
+	if err := rc.Close(); err != nil {
 		return nil, err
 	}
 	if scanErr != nil {
@@ -112,7 +118,12 @@ func ReadFileFunc[T any](path string, fn func(T) bool, opts ...Option) error {
 		return err
 	}
 
-	scanner := bufio.NewScanner(f)
+	return readFunc[T](f, fn, cfg)
+}
+
+// readFunc decodes JSON lines from rc, calling fn for each, then closes rc.
+func readFunc[T any](rc io.ReadCloser, fn func(T) bool, cfg config) error {
+	scanner := bufio.NewScanner(rc)
 	if cfg.bufMax > 0 {
 		scanner.Buffer(make([]byte, 0, cfg.bufInitial), cfg.bufMax)
 	}
@@ -137,7 +148,7 @@ func ReadFileFunc[T any](path string, fn func(T) bool, opts ...Option) error {
 	}
 
 	scanErr := scanner.Err()
-	if err := f.Close(); err != nil {
+	if err := rc.Close(); err != nil {
 		return err
 	}
 	return scanErr
@@ -158,10 +169,14 @@ func AppendFile[T any](path string, record T) error {
 		return err
 	}
 
-	// Write record + newline in a single call for atomicity.
-	if _, err := f.Write(append(data, '\n')); err != nil {
-		_ = f.Close()
+	return appendTo(f, data)
+}
+
+// appendTo writes data+newline to wc and closes it.
+func appendTo(wc io.WriteCloser, data []byte) error {
+	if _, err := wc.Write(append(data, '\n')); err != nil {
+		_ = wc.Close()
 		return err
 	}
-	return f.Close()
+	return wc.Close()
 }

@@ -66,6 +66,30 @@ func TestOfMap_KeyValuePairs(t *testing.T) {
 	}
 }
 
+func TestOfMap_EarlyBreak(t *testing.T) {
+	m := map[string]int{"c": 3, "a": 1, "b": 2}
+	count := 0
+	for range OfMap(m) {
+		count++
+		if count == 2 {
+			break
+		}
+	}
+	if count != 2 {
+		t.Fatalf("expected 2 iterations before break, got %d", count)
+	}
+}
+
+func TestOfMap_Empty(t *testing.T) {
+	count := 0
+	for range OfMap(map[string]int{}) {
+		count++
+	}
+	if count != 0 {
+		t.Fatalf("expected 0 iterations, got %d", count)
+	}
+}
+
 func TestOf_EarlyBreak(t *testing.T) {
 	m := map[string]int{"c": 3, "a": 1, "b": 2}
 	count := 0

@@ -213,6 +213,37 @@ func TestWatcher_NilWakeSource(t *testing.T) {
 	cancel()
 }
 
+func TestWatcher_SettleDelayCancelledDuringSettle(t *testing.T) {
+	ws := newMockWakeSource()
+	var actionCalled atomic.Bool
+	var shutdownCalled atomic.Bool
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	Start(ctx, Config{
+		Wake:        ws,
+		SettleDelay: 500 * time.Millisecond, // long settle
+		Action: func(_ context.Context) {
+			actionCalled.Store(true)
+		},
+		Shutdown: func() {
+			shutdownCalled.Store(true)
+		},
+	})
+
+	// Send wake then cancel during settle delay.
+	ws.wake()
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+
+	waitFor(t, shutdownCalled.Load)
+	// Action should NOT have been called since we cancelled during settle.
+	if actionCalled.Load() {
+		t.Error("action should not fire when cancelled during settle delay")
+	}
+}
+
 // waitFor polls pred at short intervals, failing the test after a timeout.
 func waitFor(t *testing.T, pred func() bool) {
 	t.Helper()

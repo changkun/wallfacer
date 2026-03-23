@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -197,6 +198,45 @@ func TestTx_RunContext(t *testing.T) {
 	err := tx.RunContext(ctx)
 	if err == nil {
 		t.Fatal("expected timeout error")
+	}
+}
+
+func TestStepError_ErrorAndUnwrap(t *testing.T) {
+	inner := errors.New("exec failed")
+	se := &StepError{Err: inner, Output: "some output", Index: 3}
+	if got := se.Error(); got != "step 3 failed: exec failed" {
+		t.Fatalf("StepError.Error() = %q", got)
+	}
+	if se.Unwrap() != inner {
+		t.Fatal("StepError.Unwrap() should return inner error")
+	}
+}
+
+func TestTxError_ErrorFormats(t *testing.T) {
+	// Step error only.
+	te := &TxError{Step: &StepError{Err: errors.New("fail"), Index: 0}}
+	if !strings.Contains(te.Error(), "step 0") {
+		t.Fatalf("expected step info, got %q", te.Error())
+	}
+
+	// Rollback errors only.
+	te2 := &TxError{
+		Step:           &StepError{Err: errors.New("fail"), Index: 1},
+		RollbackErrors: []error{errors.New("rb")},
+	}
+	if !strings.Contains(te2.Error(), "1 rollback error") {
+		t.Fatalf("expected rollback info, got %q", te2.Error())
+	}
+
+	// Defer errors only (no step).
+	te3 := &TxError{DeferErrors: []error{errors.New("d1"), errors.New("d2")}}
+	if !strings.Contains(te3.Error(), "2 defer error") {
+		t.Fatalf("expected defer info, got %q", te3.Error())
+	}
+
+	// Unwrap with nil Step.
+	if te3.Unwrap() != nil {
+		t.Fatal("Unwrap should return nil when Step is nil")
 	}
 }
 

@@ -2,6 +2,7 @@ package circuitbreaker
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -193,6 +194,179 @@ func TestBackoffBreaker_MaxDelayCap(t *testing.T) {
 	retryAt, _ := b.RetryAt()
 	if want := now.Add(50 * time.Millisecond); retryAt != want {
 		t.Fatalf("retryAt = %v, want capped at %v", retryAt, want)
+	}
+}
+
+func TestState_String(t *testing.T) {
+	tests := []struct {
+		state State
+		want  string
+	}{
+		{Closed, "closed"},
+		{Open, "open"},
+		{HalfOpen, "half-open"},
+		{State(99), "unknown"},
+	}
+	for _, tt := range tests {
+		if got := tt.state.String(); got != tt.want {
+			t.Errorf("State(%d).String() = %q, want %q", tt.state, got, tt.want)
+		}
+	}
+}
+
+func TestBreaker_HalfOpenFailureReopens(t *testing.T) {
+	const threshold = 2
+	openDuration := 20 * time.Millisecond
+
+	b := New(threshold, openDuration)
+
+	for range threshold {
+		b.RecordFailure()
+	}
+	time.Sleep(openDuration + 5*time.Millisecond)
+
+	// Transition to half-open via Allow.
+	if !b.Allow() {
+		t.Fatal("probe Allow() should return true")
+	}
+	if b.State() != HalfOpen {
+		t.Fatalf("expected HalfOpen, got %v", b.State())
+	}
+
+	// Record failure in half-open → should reopen.
+	b.RecordFailure()
+	if b.State() != Open {
+		t.Fatalf("expected Open after half-open failure, got %v", b.State())
+	}
+}
+
+func TestBreaker_HalfOpenAllowReturnsFalse(t *testing.T) {
+	const threshold = 2
+	openDuration := 20 * time.Millisecond
+
+	b := New(threshold, openDuration)
+	for range threshold {
+		b.RecordFailure()
+	}
+	time.Sleep(openDuration + 5*time.Millisecond)
+
+	// First Allow transitions Open → HalfOpen.
+	if !b.Allow() {
+		t.Fatal("probe Allow() should return true")
+	}
+
+	// Second concurrent Allow in HalfOpen → should return false and reopen.
+	if b.Allow() {
+		t.Fatal("Allow() should return false while half-open probe is active")
+	}
+	if b.State() != Open {
+		t.Fatalf("expected Open after second Allow in half-open, got %v", b.State())
+	}
+}
+
+func TestBreaker_OpenCASFailure(t *testing.T) {
+	// Simulate the CAS failure path in Allow() when the state was Open
+	// at the time of the Load but has been changed by another goroutine
+	// before the CAS executes. We force this by directly setting the
+	// state to HalfOpen after constructing an expired-open breaker, so
+	// Allow loads Open (we set openAt to expired) but the CAS(Open→HalfOpen)
+	// fails because the actual state is already HalfOpen.
+	b := New(1, time.Millisecond)
+
+	// Set state to Open with expired openAt.
+	b.state.Store(int32(Open))
+	b.openAt.Store(time.Now().Add(-time.Second).UnixNano())
+
+	// Now swap state to HalfOpen so the CAS in Allow will fail.
+	// But Allow reads state atomically, so it will see HalfOpen, not Open.
+	// Instead, use the race approach with many goroutines.
+
+	// Reset to Open with expired time.
+	b.state.Store(int32(Open))
+
+	// Many goroutines race to grab the probe slot. Most will lose the
+	// CAS or see HalfOpen state, exercising the CAS-failure path.
+	const goroutines = 100
+	var wg sync.WaitGroup
+	var probes atomic.Int32
+	var denied atomic.Int32
+	wg.Add(goroutines)
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			if b.Allow() {
+				probes.Add(1)
+			} else {
+				denied.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	// At least one goroutine should win the CAS, and many should be denied
+	// (hitting the CAS-failure or HalfOpen paths).
+	if p := probes.Load(); p < 1 {
+		t.Fatal("expected at least 1 probe winner")
+	}
+	if d := denied.Load(); d < 1 {
+		t.Fatal("expected at least 1 denied call (CAS failure path)")
+	}
+}
+
+func TestBreaker_OpenCASFailureDeterministic(t *testing.T) {
+	// Force the CAS failure path on line 79: when Allow() reads state as
+	// Open and duration has elapsed, it tries CAS(Open→HalfOpen). If the
+	// state is no longer Open (e.g., another goroutine already moved it),
+	// the CAS fails and Allow returns false.
+	//
+	// We simulate this by setting up an expired-open breaker, then swapping
+	// the state to HalfOpen before calling Allow. Since Allow loads state
+	// and sees Open (we trick it by immediately restoring), but CAS fails
+	// because we concurrently change it.
+	//
+	// Actually, we can't interleave within a single goroutine. Instead,
+	// directly set state to HalfOpen so CAS(Open→HalfOpen) will fail
+	// because the actual state is HalfOpen, not Open. But Allow will see
+	// HalfOpen in its initial Load, so it will take the HalfOpen case.
+	//
+	// The only way to test line 79 is via concurrent racing. Increase
+	// concurrency to make it reliable.
+	b := New(1, time.Nanosecond) // near-zero open duration
+	b.RecordFailure()            // opens circuit
+	time.Sleep(time.Millisecond) // ensure open duration expired
+
+	const goroutines = 500
+	var wg sync.WaitGroup
+	var probes atomic.Int32
+	var denied atomic.Int32
+	wg.Add(goroutines)
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			if b.Allow() {
+				probes.Add(1)
+				// Re-open the breaker so other goroutines have a chance
+				// to race on the CAS.
+				b.RecordFailure()
+			} else {
+				denied.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if d := denied.Load(); d < 1 {
+		t.Fatal("expected at least 1 denied call")
+	}
+}
+
+func TestBreaker_AllowDefaultCase(t *testing.T) {
+	// Exercise the default case by setting state to an invalid value.
+	b := New(1, time.Millisecond)
+	b.state.Store(99) // invalid state
+
+	if b.Allow() {
+		t.Fatal("Allow() should return false for unknown state")
 	}
 }
 

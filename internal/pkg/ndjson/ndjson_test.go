@@ -1,6 +1,8 @@
 package ndjson
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -178,6 +180,219 @@ func TestAppendFile_CreatesAndAppends(t *testing.T) {
 	}
 	if got[0].Name != "a" || got[1].Name != "b" {
 		t.Fatalf("unexpected records: %+v", got)
+	}
+}
+
+func TestReadFile_OpenError(t *testing.T) {
+	// A path that exists but is a directory, not a file — os.Open succeeds
+	// but scanning will yield zero records. Instead, use a permission error.
+	dir := t.TempDir()
+	path := filepath.Join(dir, "noread.jsonl")
+	if err := os.WriteFile(path, []byte(`{"name":"a","value":1}`+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0644) })
+
+	_, err := ReadFile[record](path)
+	if err == nil {
+		t.Fatal("expected permission error")
+	}
+}
+
+func TestReadFileFunc_OpenError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "noread.jsonl")
+	if err := os.WriteFile(path, []byte(`{"name":"a","value":1}`+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0644) })
+
+	err := ReadFileFunc[record](path, func(_ record) bool { return true })
+	if err == nil {
+		t.Fatal("expected permission error")
+	}
+}
+
+func TestReadFileFunc_SkipsEmptyLines(t *testing.T) {
+	path := writeTempFile(t, `{"name":"a","value":1}
+
+{"name":"b","value":2}
+`)
+	var got []record
+	err := ReadFileFunc[record](path, func(r record) bool {
+		got = append(got, r)
+		return true
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d records, want 2", len(got))
+	}
+}
+
+func TestReadFileFunc_OnErrorCallback(t *testing.T) {
+	path := writeTempFile(t, `{"name":"a","value":1}
+BAD LINE
+{"name":"b","value":2}
+`)
+	var errLines []int
+	err := ReadFileFunc[record](path, func(_ record) bool {
+		return true
+	}, WithOnError(func(lineNum int, _ error) {
+		errLines = append(errLines, lineNum)
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(errLines) != 1 || errLines[0] != 2 {
+		t.Fatalf("expected error on line 2, got %v", errLines)
+	}
+}
+
+func TestReadFileFunc_CustomBufferSize(t *testing.T) {
+	longVal := strings.Repeat("x", 100_000)
+	path := writeTempFile(t, `{"name":"`+longVal+`","value":1}`+"\n")
+
+	var got []record
+	err := ReadFileFunc[record](path, func(r record) bool {
+		got = append(got, r)
+		return true
+	}, WithBufferSize(64*1024, 1024*1024))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Name != longVal {
+		t.Fatal("expected long record")
+	}
+}
+
+func TestAppendFile_MarshalError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.jsonl")
+	// channels cannot be marshaled to JSON.
+	err := AppendFile(path, make(chan int))
+	if err == nil {
+		t.Fatal("expected marshal error")
+	}
+}
+
+func TestAppendFile_OpenError(t *testing.T) {
+	// Try to write to a path inside a non-existent directory.
+	err := AppendFile(filepath.Join(t.TempDir(), "nodir", "sub", "out.jsonl"), record{Name: "a"})
+	if err == nil {
+		t.Fatal("expected open error")
+	}
+}
+
+func TestReadFile_ScannerError(t *testing.T) {
+	// Create a file with a line longer than the default scanner buffer
+	// (64KB) WITHOUT using WithBufferSize, so the scanner hits its limit.
+	longLine := `{"name":"` + strings.Repeat("x", 70_000) + `","value":1}`
+	path := writeTempFile(t, longLine+"\n")
+
+	_, err := ReadFile[record](path)
+	if err == nil {
+		t.Fatal("expected scanner error for line exceeding buffer")
+	}
+}
+
+func TestReadFileFunc_ScannerError(t *testing.T) {
+	longLine := `{"name":"` + strings.Repeat("x", 70_000) + `","value":1}`
+	path := writeTempFile(t, longLine+"\n")
+
+	err := ReadFileFunc[record](path, func(_ record) bool { return true })
+	if err == nil {
+		t.Fatal("expected scanner error for line exceeding buffer")
+	}
+}
+
+// errCloser wraps a reader and returns an error on Close.
+type errCloser struct {
+	io.Reader
+	closeErr error
+}
+
+func (e *errCloser) Close() error { return e.closeErr }
+
+// errWriter wraps a writer and returns an error on Write.
+type errWriteCloser struct {
+	writeErr error
+	closeErr error
+	closed   bool
+}
+
+func (e *errWriteCloser) Write([]byte) (int, error) {
+	if e.writeErr != nil {
+		return 0, e.writeErr
+	}
+	return 0, nil
+}
+
+func (e *errWriteCloser) Close() error {
+	e.closed = true
+	return e.closeErr
+}
+
+func TestReadAll_CloseError(t *testing.T) {
+	data := `{"name":"a","value":1}` + "\n"
+	rc := &errCloser{
+		Reader:   strings.NewReader(data),
+		closeErr: errors.New("close failed"),
+	}
+	_, err := readAll[record](rc, &config{})
+	if err == nil || err.Error() != "close failed" {
+		t.Fatalf("expected close error, got %v", err)
+	}
+}
+
+func TestReadFunc_CloseError(t *testing.T) {
+	data := `{"name":"a","value":1}` + "\n"
+	rc := &errCloser{
+		Reader:   strings.NewReader(data),
+		closeErr: errors.New("close failed"),
+	}
+	err := readFunc[record](rc, func(_ record) bool { return true }, config{})
+	if err == nil || err.Error() != "close failed" {
+		t.Fatalf("expected close error, got %v", err)
+	}
+}
+
+func TestAppendTo_WriteError(t *testing.T) {
+	wc := &errWriteCloser{writeErr: errors.New("write failed")}
+	err := appendTo(wc, []byte(`{"name":"a"}`))
+	if err == nil || err.Error() != "write failed" {
+		t.Fatalf("expected write error, got %v", err)
+	}
+	if !wc.closed {
+		t.Fatal("expected Close to be called on write error")
+	}
+}
+
+func TestAppendTo_CloseError(t *testing.T) {
+	wc := &errWriteCloser{closeErr: errors.New("close failed")}
+	err := appendTo(wc, []byte(`{"name":"a"}`))
+	if err == nil || err.Error() != "close failed" {
+		t.Fatalf("expected close error, got %v", err)
+	}
+}
+
+func TestReadFile_EmptyFile(t *testing.T) {
+	path := writeTempFile(t, "")
+	got, err := ReadFile[record](path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil {
+		t.Fatal("expected non-nil empty slice")
+	}
+	if len(got) != 0 {
+		t.Fatalf("expected 0 records, got %d", len(got))
 	}
 }
 

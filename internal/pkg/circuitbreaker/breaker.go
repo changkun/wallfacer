@@ -85,9 +85,10 @@ func (b *Breaker) Allow() bool {
 			b.openAt.Store(time.Now().UnixNano())
 		}
 		return false
-	}
 
-	return false
+	default:
+		return false
+	}
 }
 
 // RecordSuccess resets the failure counter and closes the circuit.

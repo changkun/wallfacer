@@ -124,6 +124,23 @@ func TestPipe_Done(t *testing.T) {
 	}
 }
 
+func TestPipe_WithBufferSize(t *testing.T) {
+	cmd := exec.Command("echo", "buffered")
+	p, err := Start(cmd, WithBufferSize(128, 256))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Close()
+
+	var lines []string
+	for line := range p.Lines() {
+		lines = append(lines, line)
+	}
+	if len(lines) == 0 || lines[0] != "buffered" {
+		t.Fatalf("expected [buffered], got %v", lines)
+	}
+}
+
 func TestPipe_StartError(t *testing.T) {
 	cmd := exec.Command("nonexistent-command-that-does-not-exist")
 	_, err := Start(cmd)
