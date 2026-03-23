@@ -549,6 +549,14 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 			"task", t.ID)
 
 		promoteMu.Lock()
+		// Re-read task status under lock: another watcher (auto-test,
+		// auto-submit) may have already transitioned this task since the
+		// snapshot was taken at the top of the cycle.
+		freshTask, freshErr := h.store.GetTask(ctx, t.ID)
+		if freshErr != nil || freshTask == nil || freshTask.Status != store.TaskStatusWaiting {
+			promoteMu.Unlock()
+			continue
+		}
 		if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusInProgress); err != nil {
 			promoteMu.Unlock()
 			logger.Handler.Error("auto-sync: update task status", "task", t.ID, "error", err)
@@ -866,21 +874,15 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 					continue
 				}
 
-				// Skip if the last git fetch failed recently — local refs may be
-				// stale and CommitsBehind could return 0 for a task that is actually
-				// behind. The sync watcher will retry the fetch on its next cycle.
-				if t.LastFetchErrorAt != nil && time.Since(*t.LastFetchErrorAt) < constants.FetchErrorGracePeriod {
-					h.incAutopilotAction("auto_submitter", "skipped_stale_fetch")
-					continue
-				}
-
 				// Check that all worktrees are up to date and conflict-free.
 				skip := false
+				hasRemoteRepo := false
 				for repoPath, worktreePath := range t.WorktreePaths {
 					if !gitutil.IsGitRepo(repoPath) || !gitutil.HasOriginRemote(repoPath) {
 						// Non-git workspace or local-only repo: no remote to be behind, no conflicts.
 						continue
 					}
+					hasRemoteRepo = true
 					if !gitutil.IsGitRepo(worktreePath) {
 						skip = true
 						break
@@ -910,6 +912,14 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 					}
 				}
 				if skip {
+					continue
+				}
+
+				// Only apply the stale-fetch guard when the task has repos
+				// with remotes. Local-only and non-git repos can never be
+				// behind and don't need fetch protection.
+				if hasRemoteRepo && t.LastFetchErrorAt != nil && time.Since(*t.LastFetchErrorAt) < constants.FetchErrorGracePeriod {
+					h.incAutopilotAction("auto_submitter", "skipped_stale_fetch")
 					continue
 				}
 

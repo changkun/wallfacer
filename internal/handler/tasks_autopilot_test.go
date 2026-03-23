@@ -1352,8 +1352,12 @@ func TestTryAutoSubmit_SkipsTaskWithRecentFetchError(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Use a real git repo so CommitsBehind returns 0 (if we ever reach that check).
+	// Use a real git repo WITH a remote so the stale-fetch guard applies.
 	repo := setupRepo(t)
+	origin := t.TempDir()
+	gitRun(t, origin, "init", "--bare")
+	gitRun(t, repo, "remote", "add", "origin", origin)
+	gitRun(t, repo, "push", "-u", "origin", "main")
 
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "fetch-error guard test", Timeout: 15})
 	if err != nil {
