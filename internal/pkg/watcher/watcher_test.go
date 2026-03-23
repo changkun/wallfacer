@@ -152,7 +152,7 @@ func TestWatcher_Init(t *testing.T) {
 		},
 	})
 
-	waitFor(t, func() bool { return actionCalled.Load() })
+	waitFor(t, actionCalled.Load)
 	if !initCalled.Load() {
 		t.Error("Init was never called")
 	}
@@ -173,7 +173,7 @@ func TestWatcher_Shutdown(t *testing.T) {
 	})
 
 	cancel()
-	waitFor(t, func() bool { return shutdownCalled.Load() })
+	waitFor(t, shutdownCalled.Load)
 }
 
 func TestWatcher_ContextCancel(t *testing.T) {

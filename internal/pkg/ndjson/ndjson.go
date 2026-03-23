@@ -23,10 +23,10 @@ type Option func(*config)
 // WithBufferSize sets the initial and maximum scanner buffer sizes.
 // By default the bufio.Scanner default (64 KB max) is used. Use this
 // when lines may exceed that limit.
-func WithBufferSize(initial, max int) Option {
+func WithBufferSize(initial, maxSize int) Option {
 	return func(c *config) {
 		c.bufInitial = initial
-		c.bufMax = max
+		c.bufMax = maxSize
 	}
 }
 

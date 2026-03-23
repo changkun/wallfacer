@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestMap_LockUnlock(t *testing.T) {
+func TestMap_LockUnlock(_ *testing.T) {
 	var km Map[string]
 
 	km.Lock("a")

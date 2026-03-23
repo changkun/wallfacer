@@ -27,10 +27,10 @@ func MergeStderr() Option {
 
 // WithBufferSize sets the scanner buffer sizes (initial capacity, max).
 // Defaults: 64 KB initial, 1 MB max.
-func WithBufferSize(initial, max int) Option {
+func WithBufferSize(initial, maxSize int) Option {
 	return func(c *config) {
 		c.bufInitial = initial
-		c.bufMax = max
+		c.bufMax = maxSize
 	}
 }
 

@@ -113,7 +113,7 @@ func TestPipe_Done(t *testing.T) {
 	defer p.Close()
 
 	// Drain lines.
-	for range p.Lines() {
+	for range p.Lines() { //nolint:revive // intentionally draining
 	}
 
 	select {
