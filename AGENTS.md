@@ -8,6 +8,15 @@ Wallfacer is a task-board runner for AI agents. It provides a web UI where tasks
 
 For detailed documentation see `docs/`. The user manual is at `docs/guide/usage.md` and the technical internals index is at `docs/internals/internals.md`.
 
+## Specs & Roadmap
+
+Design specs live in `specs/`, numbered by milestone order. The roadmap and dependency graph are in [`specs/README.md`](specs/README.md). When creating or modifying a spec:
+
+- **Read `specs/README.md` first** to understand the milestone ordering and dependency graph.
+- **Number new specs** to reflect their position: main milestones use `NN-name.md` (e.g., `01-`, `02-`), branch-outs use `NNx-name.md` (e.g., `01a-`, `02a-`), and independent enhancements use `9N-name.md`.
+- **Assess cross-impacts** with existing milestones. If a new spec modifies interfaces defined in M1 (`SandboxBackend`) or M2 (`StorageBackend`), it must declare the dependency and be placed after those milestones.
+- **Update `specs/README.md`** when adding a spec — add it to the appropriate milestone table, branch-out section, or independent enhancements list.
+
 ## Build & Run Commands
 
 ```bash
