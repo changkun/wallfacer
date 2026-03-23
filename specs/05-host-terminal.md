@@ -250,12 +250,12 @@ If `GET /api/config` returns `terminalEnabled: false`:
 
 ### Cloud Deployment Note
 
-In cloud deployment (K8s backend per [cloud-sandbox-executor.md](cloud-sandbox-executor.md)), the host shell (Phases 1–2) has limited utility — the API server is a stateless pod with no meaningful workspace on its local filesystem.
+In cloud deployment (K8s backend per [01-sandbox-backends.md](01-sandbox-backends.md)), the host shell (Phases 1–2) has limited utility — the API server is a stateless pod with no meaningful workspace on its local filesystem.
 
 **Phase 3 becomes the primary terminal mode in cloud.** Container exec is the natural way to get a shell in the workspace:
 - For `LocalBackend`: `podman exec` into a running task container (as designed above)
 - For `K8sBackend`: `kubectl exec` into the task pod, relayed via the same WebSocket protocol
-- For long-lived workers (see [container-reuse.md](container-reuse.md)): exec into the aux or impl worker container
+- For long-lived workers (see [03-container-reuse.md](03-container-reuse.md)): exec into the aux or impl worker container
 
 The WebSocket protocol and xterm.js frontend are backend-agnostic — only the PTY spawn mechanism changes. The handler can dispatch based on the active `SandboxBackend`:
 

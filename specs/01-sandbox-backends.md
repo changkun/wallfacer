@@ -59,9 +59,9 @@ The `SandboxHandle` exposes `State() SandboxState` so the runner and handler can
 
 Managed platforms (e.g., Tensorlake) model sandboxes as long-lived resources with richer lifecycles including `Suspended` and `Snapshotting` states. Our model is deliberately simpler because wallfacer sandboxes are task-scoped executors, not general-purpose environments:
 
-- **No Suspend/Resume at the backend level.** Claude CLI is a one-shot process — it exits when done, so there is nothing to suspend between invocations. However, long-lived *worker containers* (see [Container Reuse](container-reuse.md)) can be paused via `podman pause`/`unpause` between exec invocations to reclaim CPU/memory. This is an optimization internal to `LocalBackend`, not a backend-level state.
+- **No Suspend/Resume at the backend level.** Claude CLI is a one-shot process — it exits when done, so there is nothing to suspend between invocations. However, long-lived *worker containers* (see [Container Reuse](03-container-reuse.md)) can be paused via `podman pause`/`unpause` between exec invocations to reclaim CPU/memory. This is an optimization internal to `LocalBackend`, not a backend-level state.
 
-- **No Snapshotting state.** Filesystem snapshots (warm caches, derived images) are a `LocalBackend` optimization covered in [Container Reuse](container-reuse.md). For K8s, pod checkpointing is a cluster-level concern outside the backend interface.
+- **No Snapshotting state.** Filesystem snapshots (warm caches, derived images) are a `LocalBackend` optimization covered in [Container Reuse](03-container-reuse.md). For K8s, pod checkpointing is a cluster-level concern outside the backend interface.
 
 - **Timeout is task-level, not sandbox-level.** The runner enforces task timeouts (`task.Timeout`) and kills the container via `handle.Kill()`. The backend doesn't need its own timeout — it's a policy decision made by the runner.
 
@@ -333,9 +333,9 @@ Currently checked via `podman images` / `docker images` in the handler. For K8s,
 | **DNS control** | Custom DNS resolution inside sandbox | `--dns` flag or custom resolv.conf | CoreDNS policy | Cloud (route API calls through gateway) |
 | **Ingress** | Whether sandbox can accept connections | Not applicable (sandboxes don't serve) | Not applicable | N/A |
 
-**Recommendation:** Keep `ContainerSpec.Network` as the coarse mode selector for now. For egress filtering and DNS control, add optional fields to `ContainerSpec` when needed (e.g., `EgressAllowlist []string`, `DNSServers []string`) — backends interpret them or ignore them. Fine-grained network policy is primarily a multi-tenant concern and should be designed in [cloud-multi-tenant.md](cloud-multi-tenant.md) alongside tenant isolation.
+**Recommendation:** Keep `ContainerSpec.Network` as the coarse mode selector for now. For egress filtering and DNS control, add optional fields to `ContainerSpec` when needed (e.g., `EgressAllowlist []string`, `DNSServers []string`) — backends interpret them or ignore them. Fine-grained network policy is primarily a multi-tenant concern and should be designed in [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) alongside tenant isolation.
 
 ### Dependencies on Other Epics
 
-- **Cloud Data Storage** (`cloud-data-storage.md`): If the store moves to a database, the sandbox executor doesn't need to share a filesystem for task metadata — only for worktrees. This simplifies shared volume requirements.
-- **Multi-Tenant** (`cloud-multi-tenant.md`): The control plane decides which backend each user's instance uses. The sandbox executor just needs to support configuration injection at startup.
+- **Cloud Data Storage** (`02-storage-backends.md`): If the store moves to a database, the sandbox executor doesn't need to share a filesystem for task metadata — only for worktrees. This simplifies shared volume requirements.
+- **Multi-Tenant** (`08-cloud-multi-tenant.md`): The control plane decides which backend each user's instance uses. The sandbox executor just needs to support configuration injection at startup.

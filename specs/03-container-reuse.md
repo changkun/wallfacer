@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-21
 **Updated:** 2026-03-23
-**Depends on:** [Pluggable Sandbox Backends](cloud-sandbox-executor.md) (Phase 1: Interface Extraction + Local Backend)
+**Depends on:** [Pluggable Sandbox Backends](01-sandbox-backends.md) (Phase 1: Interface Extraction + Local Backend)
 
 ## Problem
 
@@ -30,7 +30,7 @@ These two overhead sources are orthogonal and can be addressed independently:
 ## Prerequisite: Pluggable Sandbox Backends
 
 This spec builds on the `SandboxBackend` / `SandboxHandle` abstraction defined in
-[cloud-sandbox-executor.md](cloud-sandbox-executor.md). Container reuse is an optimization
+[01-sandbox-backends.md](01-sandbox-backends.md). Container reuse is an optimization
 **internal to `LocalBackend`** — the runner and handler never see it. The `SandboxBackend`
 interface remains unchanged:
 
@@ -439,7 +439,7 @@ only affect `LocalBackend` — K8s and remote backends ignore them.
 
 ## Implementation Plan
 
-All phases assume [Pluggable Sandbox Backends](cloud-sandbox-executor.md) Phase 1
+All phases assume [Pluggable Sandbox Backends](01-sandbox-backends.md) Phase 1
 (Interface Extraction + Local Backend) is complete.
 
 ### Phase 1: Auxiliary Workers (Profile C)

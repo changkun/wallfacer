@@ -48,13 +48,13 @@ This decomposes into three cross-cutting epics, plus related specs that have clo
 
 | Epic | Spec | What it covers |
 |------|------|----------------|
-| **Sandbox Executor** | [`cloud-sandbox-executor.md`](cloud-sandbox-executor.md) | Pluggable `SandboxBackend` interface; local, K8s, and remote Docker backends |
-| **Data Storage** | [`cloud-data-storage.md`](cloud-data-storage.md) | Pluggable `StorageBackend` interface; filesystem, PostgreSQL, and S3 backends |
-| **Multi-Tenant** | [`cloud-multi-tenant.md`](cloud-multi-tenant.md) | Control plane, user auth, instance provisioning and lifecycle |
-| **Container Reuse** | [`container-reuse.md`](container-reuse.md) | Long-lived worker containers inside `LocalBackend` (depends on sandbox executor) |
-| **File Explorer** | [`file-explorer.md`](file-explorer.md) | Workspace file browser; Phase 4 adds cloud `WorkspaceFS` abstraction |
-| **Host Terminal** | [`host-terminal.md`](host-terminal.md) | Web terminal; Phase 3 adds container exec for cloud |
-| **Desktop App** | [`native-desktop-app.md`](native-desktop-app.md) | Wails native wrapper (independent) |
+| **Sandbox Executor** | [`01-sandbox-backends.md`](01-sandbox-backends.md) | Pluggable `SandboxBackend` interface; local, K8s, and remote Docker backends |
+| **Data Storage** | [`02-storage-backends.md`](02-storage-backends.md) | Pluggable `StorageBackend` interface; filesystem, PostgreSQL, and S3 backends |
+| **Container Reuse** | [`03-container-reuse.md`](03-container-reuse.md) | Long-lived worker containers inside `LocalBackend` (depends on sandbox executor) |
+| **File Explorer** | [`04-file-explorer.md`](04-file-explorer.md) | Workspace file browser; Phase 4 adds cloud `WorkspaceFS` abstraction |
+| **Host Terminal** | [`05-host-terminal.md`](05-host-terminal.md) | Web terminal; Phase 3 adds container exec for cloud |
+| **Desktop App** | [`07-native-desktop-app.md`](07-native-desktop-app.md) | Wails native wrapper (independent) |
+| **Multi-Tenant** | [`08-cloud-multi-tenant.md`](08-cloud-multi-tenant.md) | Control plane, user auth, instance provisioning and lifecycle |
 
 ### Implementation Milestones
 

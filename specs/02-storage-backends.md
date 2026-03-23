@@ -6,8 +6,8 @@
 
 The wallfacer store (`internal/store/`) persists all task data to the local filesystem at `~/.wallfacer/data/<workspace-key>/<task-uuid>/`. State is loaded into memory at startup and kept in sync via atomic file writes. This works for single-machine deployment but breaks cloud deployment in two ways:
 
-1. **Instance lifecycle:** Per-user instances (see `cloud-multi-tenant.md`) need to hibernate and wake. If task data is on a local ephemeral disk, it's lost when the instance stops.
-2. **Shared access:** If the sandbox executor runs containers remotely (see `cloud-sandbox-executor.md`), task outputs written inside sandbox pods need to reach the wallfacer server's store.
+1. **Instance lifecycle:** Per-user instances (see `08-cloud-multi-tenant.md`) need to hibernate and wake. If task data is on a local ephemeral disk, it's lost when the instance stops.
+2. **Shared access:** If the sandbox executor runs containers remotely (see `01-sandbox-backends.md`), task outputs written inside sandbox pods need to reach the wallfacer server's store.
 
 ## Current Architecture
 
@@ -289,5 +289,5 @@ WALLFACER_BLOB_REGION=us-east-1
 
 ### Dependencies on Other Epics
 
-- **Multi-Tenant** (`cloud-multi-tenant.md`): Instance provisioning needs to configure the storage backend per user. The database schema includes a `workspace` column for data isolation.
-- **Sandbox Executor** (`cloud-sandbox-executor.md`): If sandbox pods write outputs to a shared volume, the storage backend needs to read from that volume (or the runner needs to relay outputs). The `TurnOutputWriter` interface handles this by abstracting where output bytes go.
+- **Multi-Tenant** (`08-cloud-multi-tenant.md`): Instance provisioning needs to configure the storage backend per user. The database schema includes a `workspace` column for data isolation.
+- **Sandbox Executor** (`01-sandbox-backends.md`): If sandbox pods write outputs to a shared volume, the storage backend needs to read from that volume (or the runner needs to relay outputs). The `TurnOutputWriter` interface handles this by abstracting where output bytes go.
