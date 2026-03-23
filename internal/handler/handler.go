@@ -159,8 +159,6 @@ type Handler struct {
 
 	sandboxTestMu     sync.RWMutex
 	sandboxTestPassed map[sandbox.Type]bool
-	webhookNotifier   func(envconfig.Config) *runner.WebhookNotifier
-
 	// scheduledPromoteMu guards scheduledPromoteTimer, which fires
 	// tryAutoPromote precisely when the soonest scheduled task becomes due.
 	scheduledPromoteMu    sync.Mutex
@@ -213,9 +211,6 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	// Initialize auto-push from env config so the header toggle reflects the persisted state.
 	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
 		h.autopush = envCfg.AutoPushEnabled
-	}
-	h.webhookNotifier = func(cfg envconfig.Config) *runner.WebhookNotifier {
-		return runner.NewWorkspaceWebhookNotifier(h.workspace, cfg)
 	}
 	h.applySnapshot(wsMgr.Snapshot())
 	if wsMgr != nil {

@@ -173,13 +173,6 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	// have not yet been refined, when auto-refine is enabled.
 	h.StartAutoRefiner(ctx)
 
-	// Start the webhook notifier if a URL is configured in the env file.
-	var wn *runner.WebhookNotifier
-	if envCfg.WebhookURL != "" {
-		wn = runner.NewWorkspaceWebhookNotifier(wsMgr, envCfg)
-		go wn.Start(ctx)
-	}
-
 	// Register scrape-time gauge collectors. HTTP counter and histogram are
 	// created inside loggingMiddleware so they are available via the same
 	// registry for /metrics.
@@ -345,11 +338,6 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	// Wait for background runner goroutines (oversight generation, title
 	// generation, etc.) to finish before the process exits.
 	r.Shutdown()
-
-	// Drain any in-flight webhook deliveries before process exit.
-	if wn != nil {
-		wn.Wait()
-	}
 
 	logger.Main.Info("shutdown complete")
 }
@@ -604,7 +592,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetEnvConfig":    h.GetEnvConfig,
 		"UpdateEnvConfig": h.UpdateEnvConfig,
 		"TestSandbox":     h.TestSandbox,
-		"TestWebhook":     h.TestWebhook,
 
 		// Workspace instructions.
 		"GetInstructions":    h.GetInstructions,
@@ -701,7 +688,6 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		// Environment configuration.
 		"UpdateEnvConfig": handler.BodyLimitDefault,
 		"TestSandbox":     handler.BodyLimitDefault,
-		"TestWebhook":     handler.BodyLimitDefault,
 
 		// Workspace instructions.
 		"UpdateInstructions": handler.BodyLimitInstructions,
@@ -879,7 +865,7 @@ func ensureImage(containerCmd, image string) string {
 
 func requiresStore(name string) bool {
 	switch name {
-	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "TestWebhook", "GitStatus", "GitStatusStream":
+	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream":
 		return false
 	default:
 		return true

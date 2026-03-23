@@ -468,4 +468,4 @@ See [Data & Storage](data-and-storage.md).
 - [Data & Storage](data-and-storage.md) — Data models, persistence, storage layer, migrations, search index, soft delete, task summaries
 - [Automation](automation.md) — Autopilot, oversight generation, ideation agent
 - [Git Worktrees](git-worktrees.md) — Worktree lifecycle, branch naming, cleanup
-- [API & Transport](api-and-transport.md) — HTTP routes, SSE, webhooks, metrics, middleware
+- [API & Transport](api-and-transport.md) — HTTP routes, SSE, metrics, middleware

@@ -558,5 +558,5 @@ Migration also handles the deprecated `Model` field by moving its value to `Mode
 
 - [architecture.md](architecture.md) -- System architecture overview
 - [task-lifecycle.md](task-lifecycle.md) -- Task state machine, turn loop, and board manifest
-- [api-and-transport.md](api-and-transport.md) -- HTTP API, SSE transport, and webhook delivery
+- [api-and-transport.md](api-and-transport.md) -- HTTP API and SSE transport
 - [git-worktrees.md](git-worktrees.md) -- Worktree isolation and commit pipeline

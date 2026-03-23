@@ -27,7 +27,7 @@ Create tasks, run them in isolated sandboxes, review diffs, and keep shipping wi
 - **Execution engine**: isolated containers, per-task git worktrees, safe parallel runs, circuit breaker, resource limits
 - **Autonomous loop**: refinement, implementation, testing, auto-submit, autopilot promotion, auto-retry, cost/token budgets
 - **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility, per-turn breakdown, task search
-- **Repo operations**: branch switching, sync/rebase helpers, auto commit and push, task forking, webhook notifications
+- **Repo operations**: branch switching, sync/rebase helpers, auto commit and push, task forking
 - **Flexible runtime**: Podman/Docker support, workspace-level instructions, Claude + Codex backends, system prompt customization
 
 For a complete walkthrough of workflows and controls, see [Usage Guide](docs/guide/usage.md).
@@ -102,7 +102,7 @@ For all available `make` targets (build, test, release, etc.), see [Technical In
 | 4 | [Automation](docs/guide/automation.md) | Autopilot, auto-test, auto-submit, auto-retry |
 | 5 | [Refinement & Ideation](docs/guide/refinement-and-ideation.md) | Prompt refinement, brainstorm agent |
 | 6 | [Oversight & Analytics](docs/guide/oversight-and-analytics.md) | Oversight summaries, costs, timeline |
-| 7 | [Configuration](docs/guide/configuration.md) | Settings, env vars, sandboxes, CLI, webhooks |
+| 7 | [Configuration](docs/guide/configuration.md) | Settings, env vars, sandboxes, CLI |
 | 8 | [Circuit Breakers](docs/guide/circuit-breakers.md) | Fault isolation, self-healing automation |
 
 **[Technical Internals](docs/internals/internals.md)** — start here for implementation details and architecture.
@@ -113,7 +113,7 @@ For all available `make` targets (build, test, release, etc.), see [Technical In
 | 2 | [Data & Storage](docs/internals/data-and-storage.md) | Data models, persistence, event sourcing, search index |
 | 3 | [Task Lifecycle](docs/internals/task-lifecycle.md) | State machine, turn loop, dependencies, board context |
 | 4 | [Git Worktrees](docs/internals/git-worktrees.md) | Worktree lifecycle, commit pipeline, branch management |
-| 5 | [API & Transport](docs/internals/api-and-transport.md) | HTTP routes, SSE, webhooks, metrics, middleware |
+| 5 | [API & Transport](docs/internals/api-and-transport.md) | HTTP routes, SSE, metrics, middleware |
 | 6 | [Automation](docs/internals/automation.md) | Background watchers, autopilot, circuit breakers |
 | 7 | [Workspaces & Config](docs/internals/workspaces-and-config.md) | Workspace manager, sandboxes, templates, env config |
 

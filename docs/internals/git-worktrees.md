@@ -361,5 +361,5 @@ Both operations are blocked while any task is `in_progress`, `waiting`, `committ
 ## See Also
 
 - [Workspaces & Configuration](workspaces-and-config.md) -- workspace manager, workspace key hashing, hot-swap, AGENTS.md lifecycle
-- [API & Transport](api-and-transport.md) -- HTTP routes, SSE, webhooks, metrics, middleware
+- [API & Transport](api-and-transport.md) -- HTTP routes, SSE, metrics, middleware
 - [Task Lifecycle](task-lifecycle.md) -- task state machine and execution loop

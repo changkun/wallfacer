@@ -178,7 +178,6 @@ The `Config` struct covers all known keys. Key categories:
 | **Parallelism** | `MaxParallelTasks`, `MaxTestParallelTasks` |
 | **Sandbox routing** | `DefaultSandbox`, `ImplementationSandbox`, `TestingSandbox`, `RefinementSandbox`, `TitleSandbox`, `OversightSandbox`, `CommitMessageSandbox`, `IdeaAgentSandbox`, `SandboxFast` |
 | **Container** | `ContainerNetwork`, `ContainerCPUs`, `ContainerMemory` |
-| **Webhooks** | `WebhookURL`, `WebhookSecret` |
 | **Behavior** | `OversightInterval`, `ArchivedTasksPerPage`, `AutoPushEnabled`, `AutoPushThreshold` |
 | **Workspaces** | `Workspaces` (parsed from OS path-list separator via `filepath.SplitList`) |
 
@@ -301,5 +300,5 @@ All templates are stored in a single JSON file at `~/.wallfacer/templates.json` 
 
 - [Architecture](architecture.md) — System overview, state machine, concurrency model
 - [Git Worktrees](git-worktrees.md) — Worktree setup, commit pipeline, branch management, orphan pruning
-- [API & Transport](api-and-transport.md) — HTTP API routes, SSE, webhooks, metrics, middleware
+- [API & Transport](api-and-transport.md) — HTTP API routes, SSE, metrics, middleware
 - [Task Lifecycle](task-lifecycle.md) — State transitions, data models, event sourcing

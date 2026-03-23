@@ -52,14 +52,8 @@ flowchart TD
         C7["h.StartAutoRefiner(ctx)"]
     end
 
-    subgraph "Webhook Notifier"
-        D1["runner.NewWorkspaceWebhookNotifier(wsMgr, cfg)"]
-        D2["go wn.Start(ctx)"]
-    end
-
     A1 --> A2 --> B1 --> B2 --> B3 --> B4
     B4 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6 --> C7
-    C7 --> D1 --> D2
 ```
 
 ### Recovery Scans

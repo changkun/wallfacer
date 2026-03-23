@@ -254,7 +254,6 @@ sequenceDiagram
     participant Srv as HTTP Server
     participant R as Runner
     participant BG as Background Goroutines
-    participant WH as WebhookNotifier
 
     Sig->>Srv: SIGTERM / SIGINT (signal.NotifyContext)
     Srv->>Srv: ctx.Done() → srv.Shutdown(5s timeout)
@@ -266,10 +265,9 @@ sequenceDiagram
     R->>BG: backgroundWg.Wait()
     Note over R: Logs pending goroutines every 3s while waiting
     R-->>Srv: Shutdown() returns
-    Srv->>WH: wn.Wait()
 ```
 
-The shutdown sequence is driven by `signal.NotifyContext(ctx, SIGTERM, Interrupt)` in `RunServer` (`internal/cli/server.go`). When a signal arrives, `ctx.Done()` fires. The HTTP server gets `srv.Shutdown(5s)` to drain in-flight requests; SSE handlers exit immediately because their request contexts derive from the now-cancelled base context. Then `Runner.Shutdown()` (`internal/runner/runner.go`) is called: it invokes `shutdownCancel()` to cancel `shutdownCtx` (which propagates to any container launches or store operations using it), closes `shutdownCh` to stop the board-cache subscription goroutine, waits on `boardSubscriptionWg`, then waits on `backgroundWg` with a 3-second ticker that logs still-pending goroutine labels. In-progress task containers are intentionally left running; they continue independently and are recovered by `RecoverOrphanedTasks` (`internal/runner/recovery.go`) on the next startup. Finally, the webhook notifier's `Wait()` drains any in-flight deliveries.
+The shutdown sequence is driven by `signal.NotifyContext(ctx, SIGTERM, Interrupt)` in `RunServer` (`internal/cli/server.go`). When a signal arrives, `ctx.Done()` fires. The HTTP server gets `srv.Shutdown(5s)` to drain in-flight requests; SSE handlers exit immediately because their request contexts derive from the now-cancelled base context. Then `Runner.Shutdown()` (`internal/runner/runner.go`) is called: it invokes `shutdownCancel()` to cancel `shutdownCtx` (which propagates to any container launches or store operations using it), closes `shutdownCh` to stop the board-cache subscription goroutine, waits on `boardSubscriptionWg`, then waits on `backgroundWg` with a 3-second ticker that logs still-pending goroutine labels. In-progress task containers are intentionally left running; they continue independently and are recovered by `RecoverOrphanedTasks` (`internal/runner/recovery.go`) on the next startup.
 
 ## Where to Look
 
@@ -306,7 +304,7 @@ Every `internal/` package and its role in the system:
 | `instructions` | Workspace-level `AGENTS.md` management (`~/.wallfacer/instructions/`) | `FilePath()` |
 | `logger` | Structured logging via `log/slog` with per-component named loggers | `Init()`, `Fatal()`, `Main`, `Runner`, `Store`, `Git`, `Handler`, `Recovery`, `Prompts` |
 | `metrics` | Lightweight Prometheus-compatible metrics registry (no external deps) | `Registry`, `Counter`, `Histogram`, `LabeledValue`, `NewRegistry()` |
-| `runner` | Container orchestration, turn loop, commit pipeline, worktree management | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `WebhookNotifier`, `Interface` |
+| `runner` | Container orchestration, turn loop, commit pipeline, worktree management | `Runner`, `NewRunner()`, `RunnerConfig`, `ContainerInfo`, `CircuitBreaker`, `Interface` |
 | `sandbox` | Sandbox type enumeration (Claude vs Codex) | `Type`, `Claude`, `Codex`, `All()`, `Parse()`, `Default()` |
 | `store` | Per-task directory persistence, data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `SequencedDelta` |
 | `workspace` | Workspace lifecycle manager; scoped data directories; hot-swap support; persistent workspace group configurations | `Manager`, `Snapshot`, `Group`, `NewManager()`, `NewStatic()`, `LoadGroups()`, `SaveGroups()` |
@@ -324,7 +322,7 @@ Each handler file in `internal/handler/` owns a specific concern area. The table
 | `tasks_autopilot.go` | Automation watchers: auto-promoter, auto-retrier, auto-tester, auto-submitter, auto-refiner, waiting-sync | `StartAutoPromoter()`, `StartAutoRetrier()`, etc. |
 | `stream.go` | SSE streaming for live task updates and container logs | `GET /api/tasks/stream`, `GET /api/tasks/{id}/logs` |
 | `config.go` | Server configuration (autopilot flags, sandbox list, watcher health) | `GET /api/config`, `PUT /api/config` |
-| `env.go` | Environment configuration (API tokens, model settings, sandbox routing) | `GET /api/env`, `PUT /api/env`, `POST /api/env/test`, `POST /api/env/test-webhook` |
+| `env.go` | Environment configuration (API tokens, model settings, sandbox routing) | `GET /api/env`, `PUT /api/env`, `POST /api/env/test` |
 | `workspace.go` | Workspace browsing and switching | `GET /api/workspaces/browse`, `PUT /api/workspaces` |
 | `instructions.go` | Workspace `AGENTS.md` read/write/reinit | `GET /api/instructions`, `PUT /api/instructions`, `POST /api/instructions/reinit` |
 | `prompts.go` | System prompt template listing, override, and deletion | `GET /api/system-prompts`, `PUT /api/system-prompts/{name}`, `DELETE /api/system-prompts/{name}` |
@@ -378,7 +376,7 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 
 **Circuit breakers** — Per-watcher exponential backoff suppresses individual automation loops on failure; container-level circuit breaker blocks launches when the runtime is unavailable. See [Circuit Breakers](../guide/circuit-breakers.md).
 
-**Observability** — SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics, webhook notifications. See [API & Transport](api-and-transport.md) for the metrics reference.
+**Observability** — SSE event streams, append-only trace timeline per task, span timing, Prometheus-compatible metrics. See [API & Transport](api-and-transport.md) for the metrics reference.
 
 **Middleware** — See [API & Transport](api-and-transport.md) for the middleware chain.
 
@@ -393,5 +391,5 @@ The `internal/logger` package provides named loggers built on `log/slog`:
 - [Task Lifecycle](task-lifecycle.md) — states, turn loop, dependencies, board context
 - [Git Operations](git-worktrees.md) — worktrees, commit pipeline, branch management
 - [Workspaces & Configuration](workspaces-and-config.md) — workspace manager, AGENTS.md, sandboxes, templates
-- [API & Transport](api-and-transport.md) — HTTP routes, SSE, webhooks, metrics, middleware
+- [API & Transport](api-and-transport.md) — HTTP routes, SSE, metrics, middleware
 - [Automation](automation.md) — watchers, auto-retry, circuit breakers

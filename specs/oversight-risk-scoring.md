@@ -608,4 +608,4 @@ Between-turn scoring via `parseTurnActivity` works for Codex today — it alread
 - No changes to the oversight agent or its prompt template — risk scoring is separate from phase summarization.
 - No changes to the refinement, commit, or test-verification pipelines.
 - No new sandbox activity type — risk scoring piggybacks on the implementation/testing turn output.
-- No changes to the webhook notifier — risk score is part of the Task struct and flows through existing webhook payloads automatically.
+

@@ -70,7 +70,7 @@ Understanding what agents did and what it cost.
 Deep reference for all settings and customization options.
 
 - **Essentials:** Settings UI walkthrough, key environment variables
-- **Advanced:** System prompt templates, sandbox routing, webhooks, security, CLI reference
+- **Advanced:** System prompt templates, sandbox routing, security, CLI reference
 
 ### 8. 🛡️ Circuit Breakers
 

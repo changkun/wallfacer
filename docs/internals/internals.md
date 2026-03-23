@@ -32,7 +32,7 @@ Worktree management, the commit pipeline, branch operations, conflict resolution
 
 [API & Transport](api-and-transport.md)
 
-HTTP route reference, SSE streaming, webhook notifications, Prometheus metrics, and middleware.
+HTTP route reference, SSE streaming, Prometheus metrics, and middleware.
 
 ### 6. Automation
 

@@ -203,13 +203,6 @@ function buildSaveEnvPayload() {
   const containerMemory = document.getElementById("env-container-memory")
     ? document.getElementById("env-container-memory").value.trim()
     : "";
-  const webhookURL = document.getElementById("env-webhook-url")
-    ? document.getElementById("env-webhook-url").value.trim()
-    : "";
-  const webhookSecretRaw = document.getElementById("env-webhook-secret")
-    ? document.getElementById("env-webhook-secret").value.trim()
-    : "";
-
   const body = {};
   if (oauthRaw) body.oauth_token = oauthRaw;
   if (apiKeyRaw) body.api_key = apiKeyRaw;
@@ -225,9 +218,6 @@ function buildSaveEnvPayload() {
   body.sandbox_fast = sandboxFastEl ? !!sandboxFastEl.checked : true;
   body.container_cpus = containerCPUs; // empty = clear
   body.container_memory = containerMemory; // empty = clear
-  body.webhook_url = webhookURL; // empty = clear/disable
-  if (webhookSecretRaw) body.webhook_secret = webhookSecretRaw; // empty = no change
-
   return body;
 }
 
@@ -301,27 +291,6 @@ async function testSandboxConfig(sandbox) {
   }
 }
 
-async function testWebhookConfig() {
-  const statusEl = document.getElementById("env-webhook-test-status");
-  if (!statusEl) return;
-  statusEl.textContent = "Testing…";
-
-  try {
-    await api(Routes.env.testWebhook(), {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-    statusEl.textContent = "Delivered.";
-    setTimeout(() => {
-      if (statusEl.textContent === "Delivered.") {
-        statusEl.textContent = "";
-      }
-    }, 6000);
-  } catch (e) {
-    statusEl.textContent = "Error: " + e.message;
-  }
-}
-
 function showEnvConfigEditor(event) {
   if (event) event.stopPropagation();
   return loadEnvConfig();
@@ -386,16 +355,6 @@ async function loadEnvConfig() {
   safeSetValue("env-container-memory", (el) => {
     el.value = "";
   });
-  safeSetValue("env-webhook-url", (el) => {
-    el.value = "";
-  });
-  safeSetValue("env-webhook-url-badge", (el) => {
-    el.textContent = "";
-  });
-  safeSetValue("env-webhook-secret", (el) => {
-    el.value = "";
-    el.placeholder = "(not set)";
-  });
   safeSetValue("env-config-status", (el) => {
     el.textContent = "";
   });
@@ -405,10 +364,6 @@ async function loadEnvConfig() {
   safeSetValue("env-codex-test-status", (el) => {
     el.textContent = "";
   });
-  safeSetValue("env-webhook-test-status", (el) => {
-    el.textContent = "";
-  });
-
   let cfg = {
     oauth_token: "",
     api_key: "",
@@ -473,16 +428,6 @@ async function loadEnvConfig() {
   safeSetValue("env-container-memory", (el) => {
     el.value = cfg.container_memory || "";
   });
-  // Webhook fields: the server returns "configured" (not the actual URL) when set.
-  safeSetValue("env-webhook-url", (el) => {
-    el.value = "";
-  }); // never pre-fill with the masked value
-  safeSetValue("env-webhook-url-badge", (el) => {
-    el.textContent = cfg.webhook_url === "configured" ? "configured" : "";
-  });
-  safeSetValue("env-webhook-secret", (el) => {
-    el.placeholder = cfg.webhook_url === "configured" ? "(set)" : "(not set)";
-  });
   safeSetValue("env-config-status", (el) => {
     if (el.textContent === "Failed to load configuration.") return;
     el.textContent = "";
@@ -494,9 +439,6 @@ async function loadEnvConfig() {
     el.textContent = "";
   });
   safeSetValue("env-codex-test-status", (el) => {
-    el.textContent = "";
-  });
-  safeSetValue("env-webhook-test-status", (el) => {
     el.textContent = "";
   });
 }
@@ -521,8 +463,6 @@ async function saveEnvConfig() {
     document.getElementById("env-oauth-token").value = "";
     document.getElementById("env-api-key").value = "";
     document.getElementById("env-openai-api-key").value = "";
-    const whSecret = document.getElementById("env-webhook-secret");
-    if (whSecret) whSecret.value = "";
     // Refresh placeholders.
     setTimeout(() => showEnvConfigEditor(null), 600);
   } catch (e) {

@@ -50,9 +50,7 @@ type Config struct {
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
 	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
 
-	WebhookURL    string   // WALLFACER_WEBHOOK_URL
-	WebhookSecret string   // WALLFACER_WEBHOOK_SECRET
-	Workspaces    []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
+	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
 
 // knownKeys is the ordered list of keys managed by this package.
@@ -85,8 +83,6 @@ var knownKeys = []string{
 	"WALLFACER_CONTAINER_NETWORK",
 	"WALLFACER_CONTAINER_CPUS",
 	"WALLFACER_CONTAINER_MEMORY",
-	"WALLFACER_WEBHOOK_URL",
-	"WALLFACER_WEBHOOK_SECRET",
 	"WALLFACER_WORKSPACES",
 }
 
@@ -172,10 +168,6 @@ func Parse(path string) (Config, error) {
 			cfg.ContainerCPUs = v
 		case "WALLFACER_CONTAINER_MEMORY":
 			cfg.ContainerMemory = v
-		case "WALLFACER_WEBHOOK_URL":
-			cfg.WebhookURL = v
-		case "WALLFACER_WEBHOOK_SECRET":
-			cfg.WebhookSecret = v
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
 		}
@@ -332,8 +324,6 @@ type Updates struct {
 	ContainerNetwork     *string
 	ContainerCPUs        *string
 	ContainerMemory      *string
-	WebhookURL           *string
-	WebhookSecret        *string
 	Workspaces           *string
 }
 
@@ -362,8 +352,6 @@ func Update(path string, u Updates) error {
 		"WALLFACER_CONTAINER_NETWORK":       u.ContainerNetwork,
 		"WALLFACER_CONTAINER_CPUS":          u.ContainerCPUs,
 		"WALLFACER_CONTAINER_MEMORY":        u.ContainerMemory,
-		"WALLFACER_WEBHOOK_URL":             u.WebhookURL,
-		"WALLFACER_WEBHOOK_SECRET":          u.WebhookSecret,
 		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}
 	return updateFile(path, updates)

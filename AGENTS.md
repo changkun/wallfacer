@@ -87,7 +87,6 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `GET /api/env` — Get env config (tokens masked)
 - `PUT /api/env` — Update env config; omitted/empty token fields are preserved
 - `POST /api/env/test` — Validate sandbox credentials via test container
-- `POST /api/env/test-webhook` — Send a synthetic webhook event
 
 ### Workspace Management
 - `GET /api/workspaces/browse` — List child directories for an absolute host path
@@ -223,7 +222,6 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - **Cost/token budgets** via `MaxCostUSD` and `MaxInputTokens` per task
 - **Failure categorization** classifies failures (timeout, budget_exceeded, worktree_setup, container_crash, agent_error, sync_error, unknown)
 - **Execution environment recording** captures container image, model, API base URL, and instructions hash for reproducibility
-- **Webhook notifications** via `WALLFACER_WEBHOOK_URL`/`WALLFACER_WEBHOOK_SECRET`
 - **Frontend** uses SSE for live updates; escapes HTML to prevent XSS
 - **No framework** on backend (stdlib `net/http`) or frontend (vanilla JS)
 - **Server API key** authentication via `WALLFACER_SERVER_API_KEY`
@@ -263,8 +261,6 @@ Optional variables (also in `.env`):
 - `WALLFACER_CONTAINER_NETWORK` — container network name
 - `WALLFACER_CONTAINER_CPUS` — container CPU limit (e.g. `"2.0"`)
 - `WALLFACER_CONTAINER_MEMORY` — container memory limit (e.g. `"4g"`)
-- `WALLFACER_WEBHOOK_URL` — webhook URL for task state change notifications
-- `WALLFACER_WEBHOOK_SECRET` — HMAC secret for webhook signature verification
 - `WALLFACER_WORKSPACES` — workspace paths (OS path-list separated)
 - `WALLFACER_ARCHIVED_TASKS_PER_PAGE` — pagination size for archived tasks
 - `WALLFACER_TOMBSTONE_RETENTION_DAYS` — days to retain soft-deleted task data (default: 7)
@@ -290,7 +286,7 @@ Every implementation task MUST complete all three steps before finishing:
    - `docs/guide/automation.md` — Automation pipeline toggles, auto-retry, circuit breakers
    - `docs/guide/refinement-and-ideation.md` — Prompt refinement and brainstorm agents
    - `docs/guide/oversight-and-analytics.md` — Oversight, usage tracking, costs, timeline
-   - `docs/guide/configuration.md` — Settings, env vars, sandboxes, CLI, webhooks, security
+   - `docs/guide/configuration.md` — Settings, env vars, sandboxes, CLI, security
    - `docs/guide/circuit-breakers.md` — Fault isolation reference
 
    Each guide has an **Essentials** section (core usage) and an **Advanced Topics** section (power-user features). Place new content in the appropriate section. If a new feature doesn't fit any existing guide, create a new guide file and add it to the `## Reading Order` section in `usage.md` — the server parses the first `[Title](file.md)` link under each `###` heading to build the numbered docs sidebar. Also update `AGENTS.md`, `CLAUDE.md`, and `docs/internals/*.md` as needed.

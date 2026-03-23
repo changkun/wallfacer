@@ -207,13 +207,6 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 |---|---|---|
 | `WALLFACER_SERVER_API_KEY` | -- | Bearer token for server API authentication; when set, all API requests must include `Authorization: Bearer <key>` |
 
-#### Webhooks
-
-| Variable | Default | Description |
-|---|---|---|
-| `WALLFACER_WEBHOOK_URL` | -- | POST endpoint for `task.state_changed` event notifications |
-| `WALLFACER_WEBHOOK_SECRET` | -- | HMAC-SHA256 signing secret; when set, Wallfacer sends an `X-Wallfacer-Signature` header with each delivery |
-
 ### 📝 System Prompt Templates
 
 Wallfacer uses seven built-in Go template files to instruct agent activities:
@@ -364,38 +357,6 @@ wallfacer exec a1b2c3d4 -- sh       # Use sh instead of bash
 wallfacer exec --sandbox claude      # Open shell in a new Claude sandbox
 wallfacer exec --sandbox codex       # Open shell in a new Codex sandbox
 ```
-
-### 🔔 Webhooks
-
-#### Configuration
-
-Set `WALLFACER_WEBHOOK_URL` in `~/.wallfacer/.env` (or via **Settings > Sandbox > Webhook Notifications**) to receive HTTP POST notifications on task state changes. Optionally set `WALLFACER_WEBHOOK_SECRET` to enable HMAC-SHA256 signature verification.
-
-#### Event Format
-
-Wallfacer sends `task.state_changed` events as JSON POST requests:
-
-```json
-{
-  "event_type": "task.state_changed",
-  "task_id": "uuid-string",
-  "status": "done",
-  "title": "Task title",
-  "prompt": "Task prompt (truncated to 200 chars)",
-  "result": "Task result (truncated to 500 chars)",
-  "occurred_at": "2026-03-21T12:00:00Z"
-}
-```
-
-When `WALLFACER_WEBHOOK_SECRET` is configured, each request includes an `X-Wallfacer-Signature` header containing the HMAC-SHA256 hex digest of the request body.
-
-#### When Webhooks Fire
-
-A webhook is delivered every time a task transitions to a new status (e.g., `backlog` to `in_progress`, `in_progress` to `done`, etc.).
-
-#### Testing
-
-Click **Test Webhook** in the Settings UI (or call `POST /api/env/test-webhook`) to send a synthetic `task.state_changed` event to verify delivery and signature validation.
 
 ### 🛡️ Security
 

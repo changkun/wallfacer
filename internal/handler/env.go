@@ -15,7 +15,6 @@ import (
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
-	"github.com/google/uuid"
 )
 
 const fallbackCodexSandboxImage = "wallfacer-codex:latest"
@@ -118,7 +117,6 @@ type envConfigResponse struct {
 	ContainerNetwork     string                                 `json:"container_network"`
 	ContainerCPUs        string                                 `json:"container_cpus"`
 	ContainerMemory      string                                 `json:"container_memory"`
-	WebhookURL           string                                 `json:"webhook_url"` // "configured" when set, "" otherwise
 }
 
 type sandboxTestResponse struct {
@@ -171,10 +169,6 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	if archivedTasksPerPage <= 0 {
 		archivedTasksPerPage = defaultArchivedTasksPerPage
 	}
-	webhookURL := ""
-	if cfg.WebhookURL != "" {
-		webhookURL = "configured"
-	}
 	writeJSON(w, http.StatusOK, envConfigResponse{
 		OAuthToken:           envconfig.MaskToken(cfg.OAuthToken),
 		APIKey:               envconfig.MaskToken(cfg.APIKey),
@@ -197,39 +191,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 		ContainerNetwork:     cfg.ContainerNetwork,
 		ContainerCPUs:        cfg.ContainerCPUs,
 		ContainerMemory:      cfg.ContainerMemory,
-		WebhookURL:           webhookURL,
 	})
-}
-
-// TestWebhook sends a synthetic task.state_changed payload using the canonical
-// webhook notifier path without mutating store state or creating a task.
-func (h *Handler) TestWebhook(w http.ResponseWriter, r *http.Request) {
-	cfg, err := envconfig.Parse(h.envFile)
-	if err != nil {
-		http.Error(w, "failed to read env file: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if strings.TrimSpace(cfg.WebhookURL) == "" {
-		http.Error(w, "webhook URL is not configured", http.StatusBadRequest)
-		return
-	}
-
-	now := time.Now().UTC()
-	payload := runner.NewTaskStateChangedPayload(
-		uuid.NewString(),
-		store.TaskStatusDone,
-		"Webhook delivery smoke test",
-		"Manual webhook test triggered from Wallfacer settings.",
-		"Synthetic task completion used to verify webhook delivery.",
-		now,
-	)
-
-	notifier := h.webhookNotifier(cfg)
-	if err := notifier.Send(r.Context(), payload); err != nil {
-		http.Error(w, "webhook delivery failed: "+err.Error(), http.StatusBadGateway)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // TestSandbox spins up a sandbox with the provided (or saved) credentials and
@@ -493,8 +455,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerNetwork     *string                                `json:"container_network"`
 		ContainerCPUs        *string                                `json:"container_cpus"`
 		ContainerMemory      *string                                `json:"container_memory"`
-		WebhookURL           *string                                `json:"webhook_url"`
-		WebhookSecret        *string                                `json:"webhook_secret"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -510,10 +470,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	if req.OpenAIAPIKey != nil && *req.OpenAIAPIKey == "" {
 		req.OpenAIAPIKey = nil
 	}
-	if req.WebhookSecret != nil && *req.WebhookSecret == "" {
-		req.WebhookSecret = nil
-	}
-
 	// Convert max_parallel_tasks int to string for the env file.
 	var maxParallel *string
 	if req.MaxParallelTasks != nil {
@@ -628,8 +584,6 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerNetwork:     req.ContainerNetwork,
 		ContainerCPUs:        req.ContainerCPUs,
 		ContainerMemory:      req.ContainerMemory,
-		WebhookURL:           req.WebhookURL,
-		WebhookSecret:        req.WebhookSecret,
 	}); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return

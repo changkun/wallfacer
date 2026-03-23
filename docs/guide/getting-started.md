@@ -94,7 +94,7 @@ Common `run` flags:
 | `-container` | auto-detected | Container runtime (`podman` or `docker`) |
 | `-log-format` | `text` | Log format: `text` or `json` |
 
-Run `wallfacer run -help` for the full flag list. For the complete configuration reference (env vars, sandbox routing, webhooks, etc.), see [Configuration](configuration.md).
+Run `wallfacer run -help` for the full flag list. For the complete configuration reference (env vars, sandbox routing, etc.), see [Configuration](configuration.md).
 
 ## Windows
 
@@ -125,5 +125,5 @@ The container runtime override `CONTAINER_CMD` works on all platforms if the aut
 ## Next Steps
 
 - [Usage Guide](usage.md) — how to create tasks, handle feedback, use autopilot, and manage results
-- [Configuration](configuration.md) — env vars, sandbox routing, webhooks, and advanced settings
+- [Configuration](configuration.md) — env vars, sandbox routing, and advanced settings
 - [Architecture](../internals/architecture.md) — system design and internals for contributors

@@ -1,6 +1,6 @@
 # 🌐 API & Transport
 
-This document covers the HTTP API surface, request processing pipeline, real-time event delivery (SSE and webhooks), container runtime integration, metrics, and supporting infrastructure for the Wallfacer server.
+This document covers the HTTP API surface, request processing pipeline, real-time event delivery (SSE), container runtime integration, metrics, and supporting infrastructure for the Wallfacer server.
 
 ## 🛣️ HTTP API
 
@@ -36,7 +36,6 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/env` | Get environment configuration (tokens masked) |
 | `PUT /api/env` | Update environment file; omitted/empty token fields are preserved |
 | `POST /api/env/test` | Test sandbox configuration by running a lightweight probe task |
-| `POST /api/env/test-webhook` | Send a synthetic webhook event using the configured webhook settings |
 | **Workspace instructions** | |
 | `GET /api/instructions` | Get the workspace AGENTS.md content |
 | `PUT /api/instructions` | Save the workspace AGENTS.md |
@@ -147,7 +146,7 @@ srv := &http.Server{
 | **CSRF** | `handler/middleware.go` `CSRFMiddleware()` | For mutating methods (POST, PUT, PATCH, DELETE), validates that the `Origin` or `Referer` header matches the server's host:port. GET/HEAD/OPTIONS pass through. Requests with no Origin/Referer also pass (for CLI/API clients). |
 | **Auth** | `handler/middleware.go` `BearerAuthMiddleware()` | When `WALLFACER_SERVER_API_KEY` is configured, requires `Authorization: Bearer <key>` on all requests except: the root page (`GET /`), and SSE paths (`/api/tasks/stream`, `/api/git/stream`, `*/logs`) which accept `?token=<key>` as a query parameter instead. No-op when no API key is configured. |
 | **Body limits** | `handler/middleware.go` `MaxBytesMiddleware()` | Applied per-route via `bodyLimits` map in `BuildMux`. Default: 1 MiB. Instructions: 5 MiB. Feedback: 512 KiB. Wraps `r.Body` with `http.MaxBytesReader` to reject oversized payloads. |
-| **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `UpdateWorkspaces`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `TestWebhook`, `GitStatus`, `GitStatusStream`. |
+| **Store guard** | `handler/handler.go` `RequireStoreMiddleware()` | Applied per-route via `requiresStore()` check. Returns 503 when no workspace/store is configured. Exempted routes: `GetConfig`, `UpdateConfig`, `BrowseWorkspaces`, `UpdateWorkspaces`, `GetEnvConfig`, `UpdateEnvConfig`, `TestSandbox`, `GitStatus`, `GitStatusStream`. |
 
 ## 📡 SSE Live Updates
 
@@ -235,79 +234,6 @@ Implemented in `Handler.GitStatusStream()` (`internal/handler/git.go`). Unlike t
 ### Live Container Logs (`GET /api/tasks/{id}/logs`)
 
 Not SSE in the strict sense — this endpoint streams raw `text/plain` output. It spawns `<runtime> logs -f --tail 100 <containerName>` as a subprocess, pipes stdout and stderr through a scanner, and writes lines to the HTTP response. A 15-second keepalive ticker sends empty newlines to keep the connection alive and detect client disconnects.
-
-## 🔔 Webhook Notifications
-
-When `WALLFACER_WEBHOOK_URL` is configured, the server sends HTTP POST notifications on task state changes. The payload includes the task ID, old status, new status, and timestamp. If `WALLFACER_WEBHOOK_SECRET` is set, the request includes an HMAC signature header for verification.
-
-Use `POST /api/env/test-webhook` to send a synthetic event and verify your endpoint.
-
-### Payload Structure
-
-Every webhook delivery is an HTTP POST with a JSON body of type `WebhookPayload` (`internal/runner/webhook.go`):
-
-```json
-{
-  "event_type": "task.state_changed",
-  "task_id": "abc12345-...",
-  "status": "done",
-  "title": "Fix auth regression",
-  "prompt": "Fix the login flow...",
-  "result": "Applied fix to auth.go...",
-  "occurred_at": "2026-03-21T12:00:00Z"
-}
-```
-
-Fields are truncated to prevent oversized payloads: `title` to 80 characters, `prompt` to 200, `result` to 500. If `title` is empty, it falls back to the first 80 characters of the prompt.
-
-### HMAC-SHA256 Signature
-
-When `WALLFACER_WEBHOOK_SECRET` is configured, each request includes the header:
-
-```
-X-Wallfacer-Signature: sha256=<hex-encoded-hmac>
-```
-
-The HMAC is computed over the raw JSON body bytes using `crypto/hmac` with `sha256.New` and the secret as the key. Receivers should recompute the HMAC and compare using `hmac.Equal` to verify authenticity.
-
-An additional header `X-Wallfacer-Event: task.state_changed` identifies the event type.
-
-### Delivery Model
-
-```mermaid
-flowchart TD
-    StoreNotify["Store.notify() emits<br/>SequencedDelta"] --> WN["WebhookNotifier.handleDelta()"]
-    WN --> StatusCheck{"Status changed<br/>since last seen?"}
-    StatusCheck -->|no| Drop[Drop duplicate]
-    StatusCheck -->|yes| Record["Record new status<br/>in lastStatus map"]
-    Record --> Goroutine["wn.wg.Add(1)<br/>go wn.Send(payload)"]
-    Goroutine --> Attempt0["POST to webhookURL<br/>(immediate)"]
-    Attempt0 --> Success{"2xx?"}
-    Success -->|yes| Done["wn.wg.Done()"]
-    Success -->|no| Retry1["Sleep 2s, retry"]
-    Retry1 --> Retry2["Sleep 5s, retry"]
-    Retry2 --> Retry3["Sleep 10s, retry"]
-    Retry3 --> Fail["Log error<br/>wn.wg.Done()"]
-```
-
-Key implementation details:
-
-- **Deduplication**: The notifier maintains a `lastStatus` map keyed by task UUID. Only transitions to a genuinely new status trigger a delivery — repeated notifications for the same status (e.g., from a position-only update) are silently dropped.
-- **Async goroutine pool**: Each delivery runs in its own goroutine, tracked by `wn.wg` (`sync.WaitGroup`). There is no fixed pool size; goroutines are spawned per-event.
-- **Retry schedule**: 4 attempts total — immediate, then 2s, 5s, 10s delays. The backoff durations are configurable via `SetRetryBackoffs()`. Inter-attempt sleeps respect context cancellation.
-- **HTTP client**: 10-second timeout per request (`http.Client{Timeout: 10 * time.Second}`).
-
-### Graceful Shutdown
-
-During server shutdown, after the HTTP server stops and `Runner.Shutdown()` completes, `wn.Wait()` blocks until all in-flight deliveries finish. This ensures no webhook is silently dropped on process exit.
-
-### Workspace-Aware Notifier
-
-`NewWorkspaceWebhookNotifier(wsMgr, cfg)` creates a notifier that re-subscribes to the active store whenever the workspace manager switches workspaces. It listens on both the workspace manager's channel (for workspace switches) and the current store's delta channel (for task changes).
-
-### Test Webhook
-
-`POST /api/env/test-webhook` constructs a synthetic `WebhookPayload` with a fake task ID and delivers it to the configured URL, returning the HTTP status code and any error to the caller. Useful for verifying endpoint connectivity and signature verification before relying on it in production.
 
 ## 🐳 Container Runtime
 
@@ -512,7 +438,6 @@ sequenceDiagram
     participant Srv as http.Server
     participant Watchers as Automation Watchers
     participant Runner as Runner
-    participant Webhook as WebhookNotifier
 
     OS->>Ctx: SIGTERM / SIGINT
     Ctx->>Ctx: cancel context
@@ -524,9 +449,6 @@ sequenceDiagram
 
     Srv->>Runner: r.Shutdown()
     Note over Runner: 1. Cancel shutdownCtx<br/>2. Close shutdownCh<br/>3. Wait for board-cache goroutine<br/>4. Wait for backgroundWg<br/>   (logs pending labels every 3s)
-
-    Runner->>Webhook: wn.Wait()
-    Note over Webhook: Drain in-flight webhook deliveries
 
     Note over Srv: "shutdown complete" logged
 ```
@@ -543,9 +465,7 @@ sequenceDiagram
    - Waits for the board subscription goroutine via `boardSubscriptionWg.Wait()`.
    - Waits for all tracked background goroutines via `backgroundWg.Wait()`, logging pending labels every 3 seconds so operators can see what is still running.
 
-4. **Webhook drain** — If a `WebhookNotifier` is active, `wn.Wait()` blocks until all in-flight deliveries complete.
-
-5. **In-progress tasks survive** — Running task containers are intentionally left alive. They continue to completion independently and will be recovered on the next server start via `RecoverOrphanedTasks`.
+4. **In-progress tasks survive** — Running task containers are intentionally left alive. They continue to completion independently and will be recovered on the next server start via `RecoverOrphanedTasks`.
 
 ## See Also
 
