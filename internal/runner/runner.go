@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"

@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/gitutil"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	runnerpkg "changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/prompts"

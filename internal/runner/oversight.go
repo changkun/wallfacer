@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
