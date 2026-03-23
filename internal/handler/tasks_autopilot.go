@@ -491,8 +491,8 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		behind := false
 		fetchFailed := false
 		for repoPath, worktreePath := range t.WorktreePaths {
-			if !gitutil.IsGitRepo(repoPath) {
-				// Non-git workspace: no remote to fetch, never behind.
+			if !gitutil.IsGitRepo(repoPath) || !gitutil.HasOriginRemote(repoPath) {
+				// Non-git workspace or local-only repo: no remote to fetch, never behind.
 				continue
 			}
 			if _, err := os.Stat(worktreePath); err != nil {
@@ -666,8 +666,8 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				// Only trigger if the worktree is up to date with the default branch.
 				behind := false
 				for repoPath, worktreePath := range t.WorktreePaths {
-					if !gitutil.IsGitRepo(repoPath) {
-						// Non-git workspace: no remote to be behind.
+					if !gitutil.IsGitRepo(repoPath) || !gitutil.HasOriginRemote(repoPath) {
+						// Non-git workspace or local-only repo: no remote to be behind.
 						continue
 					}
 					n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
@@ -877,8 +877,8 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				// Check that all worktrees are up to date and conflict-free.
 				skip := false
 				for repoPath, worktreePath := range t.WorktreePaths {
-					if !gitutil.IsGitRepo(repoPath) {
-						// Non-git workspace: no remote to be behind, no conflicts.
+					if !gitutil.IsGitRepo(repoPath) || !gitutil.HasOriginRemote(repoPath) {
+						// Non-git workspace or local-only repo: no remote to be behind, no conflicts.
 						continue
 					}
 					if !gitutil.IsGitRepo(worktreePath) {

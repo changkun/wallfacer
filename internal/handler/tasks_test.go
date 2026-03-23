@@ -2031,6 +2031,12 @@ func TestTryAutoTest_SkipsBehindTip(t *testing.T) {
 	ctx := context.Background()
 
 	repo := setupRepo(t)
+	// Add a bare remote so the behind-tip check is not skipped for local-only repos.
+	origin := t.TempDir()
+	gitRun(t, origin, "init", "--bare")
+	gitRun(t, repo, "remote", "add", "origin", origin)
+	gitRun(t, repo, "push", "-u", "origin", "main")
+
 	wt := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 
@@ -2547,6 +2553,12 @@ func TestTryAutoSubmit_SkipsBehindTip(t *testing.T) {
 	ctx := context.Background()
 
 	repo := setupRepo(t)
+	// Add a bare remote so the behind-tip check is not skipped for local-only repos.
+	origin := t.TempDir()
+	gitRun(t, origin, "init", "--bare")
+	gitRun(t, repo, "remote", "add", "origin", origin)
+	gitRun(t, repo, "push", "-u", "origin", "main")
+
 	wt := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
 

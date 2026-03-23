@@ -21,6 +21,29 @@ func TestIsGitRepo(t *testing.T) {
 	}
 }
 
+func TestHasOriginRemote(t *testing.T) {
+	t.Run("no remote", func(t *testing.T) {
+		repo := setupRepo(t)
+		if HasOriginRemote(repo) {
+			t.Error("HasOriginRemote should be false for a repo without a remote")
+		}
+	})
+	t.Run("with remote", func(t *testing.T) {
+		origin := t.TempDir()
+		gitRun(t, origin, "init", "--bare")
+		repo := setupRepo(t)
+		gitRun(t, repo, "remote", "add", "origin", origin)
+		if !HasOriginRemote(repo) {
+			t.Error("HasOriginRemote should be true for a repo with an origin remote")
+		}
+	})
+	t.Run("non-git dir", func(t *testing.T) {
+		if HasOriginRemote(t.TempDir()) {
+			t.Error("HasOriginRemote should be false for a non-git directory")
+		}
+	})
+}
+
 func TestDefaultBranch(t *testing.T) {
 	t.Run("local HEAD branch without remote", func(t *testing.T) {
 		repo := setupRepo(t)

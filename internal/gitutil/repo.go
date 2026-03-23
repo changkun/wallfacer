@@ -81,6 +81,12 @@ func IsGitRepo(path string) bool {
 	return cmdexec.Git(path, "rev-parse", "--git-dir").Run() == nil
 }
 
+// HasOriginRemote reports whether the repository at path has an "origin" remote configured.
+// Returns false for repos without a remote, non-git directories, or if the check fails.
+func HasOriginRemote(path string) bool {
+	return cmdexec.Git(path, "remote", "get-url", "origin").Run() == nil
+}
+
 // HasCommits reports whether the repository at path has at least one commit.
 // Returns false for empty repos (git init with no commits) and non-git directories.
 func HasCommits(path string) bool {
