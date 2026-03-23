@@ -1392,6 +1392,95 @@ func TestTryAutoSubmit_SkipsTaskWithRecentFetchError(t *testing.T) {
 	}
 }
 
+// TestTryAutoSubmit_LocalRepoIgnoresStaleFetchError verifies that a task on
+// a local-only git repo (no origin remote) is auto-submitted even when
+// LastFetchErrorAt is set. Before the fix, the stale-fetch guard blocked
+// auto-submit regardless of whether the task had repos that actually needed
+// remote checks.
+func TestTryAutoSubmit_LocalRepoIgnoresStaleFetchError(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+	h.SetAutosubmit(true)
+
+	ctx := context.Background()
+
+	// Local-only git repo: no origin remote configured.
+	repo := setupRepo(t)
+
+	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "local repo stale fetch test", Timeout: 15})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("ForceUpdateTaskStatus waiting: %v", err)
+	}
+	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, "pass"); err != nil {
+		t.Fatalf("UpdateTaskTestRun pass: %v", err)
+	}
+	if err := h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: repo}, "task-branch"); err != nil {
+		t.Fatalf("UpdateTaskWorktrees: %v", err)
+	}
+
+	// Simulate a stale fetch failure (from before the HasOriginRemote fix).
+	if err := h.store.RecordFetchFailure(ctx, task.ID, "fatal: 'origin' does not appear to be a git repository"); err != nil {
+		t.Fatalf("RecordFetchFailure: %v", err)
+	}
+
+	h.tryAutoSubmit(ctx)
+
+	got, err := h.store.GetTask(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("GetTask: %v", err)
+	}
+	// Local-only repos have no remote, so the stale-fetch guard must not apply.
+	// No session → task should go directly to done.
+	if got.Status != store.TaskStatusDone {
+		t.Errorf("expected local-repo task to reach done despite stale fetch error, got %s", got.Status)
+	}
+}
+
+// TestCheckAndSyncWaitingTasks_SkipsAlreadyPromotedTask verifies that the sync
+// watcher does not trip its circuit breaker when another watcher (e.g. auto-test)
+// has already promoted a waiting task to in_progress between the snapshot read
+// and the status transition.
+func TestCheckAndSyncWaitingTasks_SkipsAlreadyPromotedTask(t *testing.T) {
+	h := newStaticWorkspaceHandler(t, nil)
+	h.SetAutopilot(true)
+	ctx := context.Background()
+
+	// Create a git repo with a remote so the sync watcher's fetch/behind checks apply.
+	origin := t.TempDir()
+	gitRun(t, origin, "init", "--bare")
+	repo := setupRepo(t)
+	gitRun(t, repo, "remote", "add", "origin", origin)
+	gitRun(t, repo, "push", "-u", "origin", "main")
+
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, repo, "worktree", "add", "-b", "task-branch", wt, "HEAD")
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "sync race test", Timeout: 15})
+	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
+
+	// Add a commit to main so the worktree is behind (sync watcher would want to sync).
+	_ = os.WriteFile(filepath.Join(repo, "upstream.txt"), []byte("upstream\n"), 0644)
+	gitRun(t, repo, "add", ".")
+	gitRun(t, repo, "commit", "-m", "upstream commit")
+
+	// Simulate another watcher promoting the task to in_progress before the
+	// sync watcher's Phase 2 runs.
+	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
+
+	// Run the sync watcher — it should see the task as in_progress under the
+	// lock and skip it, NOT trip the circuit breaker.
+	h.checkAndSyncWaitingTasks(ctx)
+
+	// The auto-sync breaker must remain closed (healthy).
+	if h.breakers["auto-sync"].isOpen() {
+		t.Error("auto-sync circuit breaker should not have tripped for an already-promoted task")
+	}
+}
+
 // TestTryAutoSubmit_AllowsTaskAfterFetchErrorCleared verifies that once
 // ClearFetchFailure is called (simulating a successful subsequent fetch), the
 // previously blocked task becomes eligible and is auto-submitted.
