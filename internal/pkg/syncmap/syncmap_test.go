@@ -74,6 +74,46 @@ func TestMap_RangeEarlyStop(t *testing.T) {
 	}
 }
 
+func TestMap_All(t *testing.T) {
+	var m Map[int, string]
+
+	m.Store(1, "one")
+	m.Store(2, "two")
+	m.Store(3, "three")
+
+	seen := map[int]string{}
+	for k, v := range m.All() {
+		seen[k] = v
+	}
+
+	if len(seen) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(seen))
+	}
+	for k, want := range map[int]string{1: "one", 2: "two", 3: "three"} {
+		if seen[k] != want {
+			t.Errorf("key %d: want %q, got %q", k, want, seen[k])
+		}
+	}
+}
+
+func TestMap_AllEarlyBreak(t *testing.T) {
+	var m Map[int, int]
+	for i := range 5 {
+		m.Store(i, i)
+	}
+
+	count := 0
+	for range m.All() {
+		count++
+		if count == 2 {
+			break
+		}
+	}
+	if count != 2 {
+		t.Fatalf("expected All to stop after 2, got %d", count)
+	}
+}
+
 func TestMap_Concurrent(t *testing.T) {
 	var m Map[int, string]
 	var wg sync.WaitGroup

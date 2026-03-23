@@ -1,7 +1,10 @@
 // Package syncmap provides a type-safe wrapper around sync.Map.
 package syncmap
 
-import "sync"
+import (
+	"iter"
+	"sync"
+)
 
 // Map is a type-safe concurrent map. The zero value is ready to use.
 type Map[K comparable, V any] struct {
@@ -33,4 +36,13 @@ func (m *Map[K, V]) Range(fn func(K, V) bool) {
 	m.m.Range(func(k, v any) bool {
 		return fn(k.(K), v.(V))
 	})
+}
+
+// All returns an iterator over all key-value pairs.
+func (m *Map[K, V]) All() iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		m.m.Range(func(k, v any) bool {
+			return yield(k.(K), v.(V))
+		})
+	}
 }

@@ -71,3 +71,40 @@ func TestItems(t *testing.T) {
 		t.Fatalf("unexpected items: %v", items)
 	}
 }
+
+func TestAll(t *testing.T) {
+	s := New(3, 1, 2)
+	var got []int
+	for v := range s.All() {
+		got = append(got, v)
+	}
+	slices.Sort(got)
+	if len(got) != 3 || got[0] != 1 || got[1] != 2 || got[2] != 3 {
+		t.Fatalf("unexpected All() items: %v", got)
+	}
+}
+
+func TestAll_EarlyBreak(t *testing.T) {
+	s := New(1, 2, 3, 4, 5)
+	count := 0
+	for range s.All() {
+		count++
+		if count == 2 {
+			break
+		}
+	}
+	if count != 2 {
+		t.Fatalf("expected early break after 2, got %d", count)
+	}
+}
+
+func TestAll_Empty(t *testing.T) {
+	s := New[string]()
+	count := 0
+	for range s.All() {
+		count++
+	}
+	if count != 0 {
+		t.Fatalf("expected 0 items from empty set, got %d", count)
+	}
+}

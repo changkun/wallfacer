@@ -1,6 +1,11 @@
 // Package set provides a generic set type backed by a map.
 package set
 
+import (
+	"iter"
+	"maps"
+)
+
 // Set is an unordered collection of unique elements.
 // The zero value is not usable; create sets with [New] or [From].
 type Set[T comparable] struct {
@@ -42,7 +47,14 @@ func (s *Set[T]) Len() int {
 	return len(s.m)
 }
 
-// Items returns all elements in arbitrary order.
+// All returns an iterator over all elements in arbitrary order.
+// Unlike [Set.Items], it does not allocate a slice.
+func (s *Set[T]) All() iter.Seq[T] {
+	return maps.Keys(s.m)
+}
+
+// Items returns all elements as a slice in arbitrary order.
+// For iteration without allocation, use [Set.All].
 func (s *Set[T]) Items() []T {
 	result := make([]T, 0, len(s.m))
 	for item := range s.m {
