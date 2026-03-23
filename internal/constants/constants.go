@@ -192,16 +192,6 @@ const ChurnLookbackDays = 90
 const MaxChurnCommits = 200
 
 // ---------------------------------------------------------------------------
-// Pub/sub buffer sizes
-// ---------------------------------------------------------------------------
-
-// DefaultReplayCapacity is the replay buffer size for the pub/sub hub.
-const DefaultReplayCapacity = 512
-
-// DefaultChannelSize is the per-subscriber channel buffer size.
-const DefaultChannelSize = 256
-
-// ---------------------------------------------------------------------------
 // Task schema / pruning limits
 // ---------------------------------------------------------------------------
 
