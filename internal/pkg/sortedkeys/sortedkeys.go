@@ -5,34 +5,20 @@ package sortedkeys
 import (
 	"cmp"
 	"iter"
+	"maps"
 	"slices"
 )
 
 // Of returns an iterator over the keys of m in sorted order.
 func Of[K cmp.Ordered, V any](m map[K]V) iter.Seq[K] {
-	keys := make([]K, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return func(yield func(K) bool) {
-		for _, k := range keys {
-			if !yield(k) {
-				return
-			}
-		}
-	}
+	return slices.Values(slices.Sorted(maps.Keys(m)))
 }
 
 // OfMap returns an iterator over key-value pairs of m in key-sorted order.
 func OfMap[K cmp.Ordered, V any](m map[K]V) iter.Seq2[K, V] {
-	keys := make([]K, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
+	sorted := slices.Sorted(maps.Keys(m))
 	return func(yield func(K, V) bool) {
-		for _, k := range keys {
+		for _, k := range sorted {
 			if !yield(k, m[k]) {
 				return
 			}
