@@ -13,6 +13,7 @@ import (
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/watcher"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -114,27 +115,18 @@ var promoteMu sync.Mutex
 // precise one-shot timer for the soonest scheduled task so promotion happens
 // within milliseconds of the due time rather than waiting up to 60 seconds.
 func (h *Handler) StartAutoPromoter(ctx context.Context) {
-	subID, ch := h.store.SubscribeWake()
-	ticker := time.NewTicker(60 * time.Second)
-	go func() {
-		defer h.store.UnsubscribeWake(subID)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				h.scheduledPromoteMu.Lock()
-				if h.scheduledPromoteTimer != nil {
-					h.scheduledPromoteTimer.Stop()
-				}
-				h.scheduledPromoteMu.Unlock()
-				return
-			case <-ch:
-				h.tryAutoPromote(ctx)
-			case <-ticker.C:
-				h.tryAutoPromote(ctx)
+	watcher.Start(ctx, watcher.Config{
+		Wake:     h.store,
+		Interval: 60 * time.Second,
+		Action:   h.tryAutoPromote,
+		Shutdown: func() {
+			h.scheduledPromoteMu.Lock()
+			if h.scheduledPromoteTimer != nil {
+				h.scheduledPromoteTimer.Stop()
 			}
-		}
-	}()
+			h.scheduledPromoteMu.Unlock()
+		},
+	})
 }
 
 // ensureScheduledPromoteTrigger arms (or re-arms) a one-shot timer so that
@@ -175,28 +167,17 @@ var retryableCategories = map[store.FailureCategory]bool{
 // It also runs a recovery scan on startup to pick up any failed tasks that
 // may have been missed while the server was down.
 func (h *Handler) StartAutoRetrier(ctx context.Context) {
-	go func() {
-		subID, ch := h.store.SubscribeWake()
-		defer h.store.UnsubscribeWake(subID)
-
-		// Recovery scan: retry any eligible failed tasks that predate startup.
+	retryAll := func(ctx context.Context) {
 		failed, _ := h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
 		for _, t := range failed {
 			h.tryAutoRetry(ctx, t)
 		}
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ch:
-				failed, _ := h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
-				for _, t := range failed {
-					h.tryAutoRetry(ctx, t)
-				}
-			}
-		}
-	}()
+	}
+	watcher.Start(ctx, watcher.Config{
+		Wake:   h.store,
+		Init:   retryAll,
+		Action: retryAll,
+	})
 }
 
 // taskReachable reports whether target is reachable from start by following
@@ -502,18 +483,10 @@ const waitingSyncInterval = 30 * time.Second
 // checks all waiting tasks and automatically syncs any whose worktrees have
 // fallen behind the default branch.
 func (h *Handler) StartWaitingSyncWatcher(ctx context.Context) {
-	ticker := time.NewTicker(waitingSyncInterval)
-	go func() {
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				h.checkAndSyncWaitingTasks(ctx)
-			}
-		}
-	}()
+	watcher.Start(ctx, watcher.Config{
+		Interval: waitingSyncInterval,
+		Action:   h.checkAndSyncWaitingTasks,
+	})
 }
 
 // checkAndSyncWaitingTasks inspects every waiting task that has worktrees. If
@@ -660,29 +633,12 @@ var watcherSettleDelay = 1500 * time.Millisecond
 // triggers the test agent for waiting tasks that are untested and not behind
 // the default branch tip.
 func (h *Handler) StartAutoTester(ctx context.Context) {
-	subID, ch := h.store.SubscribeWake()
-	ticker := time.NewTicker(autoTestInterval)
-	go func() {
-		defer h.store.UnsubscribeWake(subID)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ch:
-				// Brief settle so the UI can render the intermediate "waiting"
-				// state before we transition the task to in_progress (testing).
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(watcherSettleDelay):
-				}
-				h.tryAutoTest(ctx)
-			case <-ticker.C:
-				h.tryAutoTest(ctx)
-			}
-		}
-	}()
+	watcher.Start(ctx, watcher.Config{
+		Wake:        h.store,
+		Interval:    autoTestInterval,
+		SettleDelay: watcherSettleDelay,
+		Action:      h.tryAutoTest,
+	})
 }
 
 // autoTestCandidate holds an eligible waiting task and its pre-built test prompt.
@@ -876,29 +832,12 @@ const autoSubmitInterval = 30 * time.Second
 // moves waiting tasks to done when they are verified (LastTestResult == "pass"),
 // not behind the default branch tip, and have no unresolved worktree conflicts.
 func (h *Handler) StartAutoSubmitter(ctx context.Context) {
-	subID, ch := h.store.SubscribeWake()
-	ticker := time.NewTicker(autoSubmitInterval)
-	go func() {
-		defer h.store.UnsubscribeWake(subID)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ch:
-				// Brief settle so the UI can render the intermediate "waiting"
-				// state before we transition the task to committing/done.
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(watcherSettleDelay):
-				}
-				h.tryAutoSubmit(ctx)
-			case <-ticker.C:
-				h.tryAutoSubmit(ctx)
-			}
-		}
-	}()
+	watcher.Start(ctx, watcher.Config{
+		Wake:        h.store,
+		Interval:    autoSubmitInterval,
+		SettleDelay: watcherSettleDelay,
+		Action:      h.tryAutoSubmit,
+	})
 }
 
 // autoSubmitCandidate holds a waiting task that has passed all eligibility checks
@@ -1077,22 +1016,11 @@ const autoRefineInterval = 30 * time.Second
 // StartAutoRefiner subscribes to store change notifications and automatically
 // triggers the refinement agent for backlog tasks that have not yet been refined.
 func (h *Handler) StartAutoRefiner(ctx context.Context) {
-	subID, ch := h.store.SubscribeWake()
-	ticker := time.NewTicker(autoRefineInterval)
-	go func() {
-		defer h.store.UnsubscribeWake(subID)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ch:
-				h.tryAutoRefine(ctx)
-			case <-ticker.C:
-				h.tryAutoRefine(ctx)
-			}
-		}
-	}()
+	watcher.Start(ctx, watcher.Config{
+		Wake:     h.store,
+		Interval: autoRefineInterval,
+		Action:   h.tryAutoRefine,
+	})
 }
 
 // tryAutoRefine scans backlog tasks and triggers the refinement agent for any

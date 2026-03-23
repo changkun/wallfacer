@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/watcher"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -18,21 +19,11 @@ const ideaAgentDefaultTimeout = 60
 // It also kicks off an initial schedule immediately so that ideation begins
 // as soon as the server starts (when enabled by default).
 func (h *Handler) StartIdeationWatcher(ctx context.Context) {
-	// Kick off the first brainstorm run (or timer) right away.
-	go h.maybeScheduleNextIdeation(ctx)
-
-	subID, ch := h.store.SubscribeWake()
-	go func() {
-		defer h.store.UnsubscribeWake(subID)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ch:
-				h.maybeScheduleNextIdeation(ctx)
-			}
-		}
-	}()
+	watcher.Start(ctx, watcher.Config{
+		Wake:   h.store,
+		Init:   h.maybeScheduleNextIdeation,
+		Action: h.maybeScheduleNextIdeation,
+	})
 }
 
 // maybeScheduleNextIdeation checks whether ideation is enabled and no
