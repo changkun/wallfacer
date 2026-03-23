@@ -63,13 +63,28 @@ if [ "$OS" = "windows" ]; then
   fi
 fi
 
-# --- Build download URL ---
+# --- Resolve version ---
 BINARY="wallfacer-${OS}-${ARCH}${EXT}"
 if [ "$VERSION" = "latest" ]; then
-  URL="https://github.com/${REPO}/releases/latest/download/${BINARY}"
-else
-  URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}"
+  # Use GitHub API to get the most recent release including prereleases/betas.
+  API_URL="https://api.github.com/repos/${REPO}/releases"
+  if command -v curl >/dev/null 2>&1; then
+    VERSION="$(curl -fsSL "$API_URL" | grep -m1 '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
+  elif command -v wget >/dev/null 2>&1; then
+    VERSION="$(wget -qO- "$API_URL" | grep -m1 '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
+  else
+    echo "Error: curl or wget is required." >&2
+    exit 1
+  fi
+  if [ -z "$VERSION" ]; then
+    echo "Error: could not determine latest release version." >&2
+    exit 1
+  fi
+  echo "Resolved latest version: ${VERSION}"
 fi
+
+# --- Build download URL ---
+URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}"
 
 echo "Downloading wallfacer (${OS}/${ARCH})..."
 echo "  ${URL}"
