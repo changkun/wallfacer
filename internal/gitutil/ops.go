@@ -272,7 +272,7 @@ func HasConflicts(worktreePath string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("git status in %s: %w", worktreePath, err)
 	}
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		if len(line) < 2 {
 			continue
 		}

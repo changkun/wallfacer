@@ -104,7 +104,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID
 	var typeSet map[store.EventType]struct{}
 	if v := q.Get("types"); v != "" {
 		typeSet = make(map[store.EventType]struct{})
-		for _, raw := range strings.Split(v, ",") {
+		for raw := range strings.SplitSeq(v, ",") {
 			t := strings.TrimSpace(raw)
 			if t == "" {
 				continue

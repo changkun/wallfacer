@@ -452,7 +452,7 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		// Include untracked files via --no-index diffs.
 		if untrackedRaw, err := cmdexec.Git(worktreePath,
 			"ls-files", "--others", "--exclude-standard").WithContext(r.Context()).Output(); err == nil {
-			for _, file := range strings.Split(untrackedRaw, "\n") {
+			for file := range strings.SplitSeq(untrackedRaw, "\n") {
 				if file == "" {
 					continue
 				}

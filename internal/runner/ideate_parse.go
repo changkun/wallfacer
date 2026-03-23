@@ -383,8 +383,7 @@ func extractIdeasFromRunOutput(result string, rawStdout, rawStderr []byte) ([]Id
 	var fallbackRejections []ideaRejection
 	var fallbackErr error
 	var candidateRejections []ideaRejection
-	lines := strings.Split(text, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, "{") {
 			continue

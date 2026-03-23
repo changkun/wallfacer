@@ -333,7 +333,7 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 	act := turnActivity{Turn: turnNum}
 	seenCodexCommands := map[string]bool{}
 
-	for _, line := range strings.Split(string(raw), "\n") {
+	for line := range strings.SplitSeq(string(raw), "\n") {
 		line = strings.TrimSpace(line)
 		if len(line) == 0 || line[0] != '{' {
 			continue

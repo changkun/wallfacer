@@ -94,7 +94,7 @@ func Parse(path string) (Config, error) {
 		return Config{}, err
 	}
 	cfg := Config{SandboxFast: true}
-	for _, line := range strings.Split(string(raw), "\n") {
+	for line := range strings.SplitSeq(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
 		if !ok {
 			continue

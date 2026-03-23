@@ -88,7 +88,7 @@ func (s ContainerSpec) Build() []string {
 			var parts []string
 			parts = append(parts, "type=bind", "src="+v.Host, "dst="+v.Container)
 			if v.Options != "" {
-				for _, opt := range strings.Split(v.Options, ",") {
+				for opt := range strings.SplitSeq(v.Options, ",") {
 					opt = strings.TrimSpace(opt)
 					if opt == "ro" {
 						parts = append(parts, "readonly")

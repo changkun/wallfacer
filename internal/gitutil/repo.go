@@ -31,7 +31,7 @@ var conflictFileRe = regexp.MustCompile(`CONFLICT \([^)]+\): (?:Merge conflict i
 // parseConflictedFiles extracts conflicted file paths from git rebase output.
 func parseConflictedFiles(output string) []string {
 	var files []string
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if m := conflictFileRe.FindStringSubmatch(strings.TrimSpace(line)); m != nil {
 			files = append(files, m[1])
 		}

@@ -66,7 +66,7 @@ func normalizeConversationID(output *agentOutput, raw string) {
 // The agent emits session_id in early stream messages, so it is often
 // present even when the container is killed mid-execution (e.g. timeout).
 func extractSessionID(raw []byte) string {
-	for _, line := range strings.Split(string(raw), "\n") {
+	for line := range strings.SplitSeq(string(raw), "\n") {
 		line = strings.TrimSpace(line)
 		if len(line) == 0 || line[0] != '{' {
 			continue

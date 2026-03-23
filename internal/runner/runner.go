@@ -115,7 +115,7 @@ func parseContainerList(out []byte) ([]containerJSON, error) {
 
 	// Docker: NDJSON (one JSON object per line).
 	var containers []containerJSON
-	for _, line := range strings.Split(trimmed, "\n") {
+	for line := range strings.SplitSeq(trimmed, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || line[0] != '{' {
 			continue

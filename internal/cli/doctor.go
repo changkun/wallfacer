@@ -58,7 +58,7 @@ func RunDoctor(configDir string) {
 	// --- Parse env values ---
 	vals := map[string]string{}
 	if raw != nil {
-		for _, line := range strings.Split(string(raw), "\n") {
+		for line := range strings.SplitSeq(string(raw), "\n") {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "#") || line == "" {
 				continue

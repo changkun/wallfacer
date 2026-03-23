@@ -278,7 +278,7 @@ func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(ctx context.Context, w
 
 	counts := make(map[string]int)
 	filteredCount := 0
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		file := strings.TrimSpace(line)
 		if file == "" {
 			continue
@@ -294,7 +294,7 @@ func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(ctx context.Context, w
 	// ignore rules so the caller always has some signal to work with.
 	if len(counts) == 0 && filteredCount > 0 {
 		all := make(map[string]int)
-		for _, line := range strings.Split(s, "\n") {
+		for line := range strings.SplitSeq(s, "\n") {
 			file := strings.TrimSpace(line)
 			if file != "" {
 				all[file]++
@@ -413,7 +413,7 @@ func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(ctx context.Context, wo
 
 	counts := make(map[string]int)
 	filteredCount := 0
-	for _, line := range strings.Split(string(raw), "\n") {
+	for line := range strings.SplitSeq(string(raw), "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
@@ -434,7 +434,7 @@ func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(ctx context.Context, wo
 	// they contain structural TODO-like text that does not represent real work.
 	if len(counts) == 0 && filteredCount > 0 {
 		all := make(map[string]int)
-		for _, line := range strings.Split(string(raw), "\n") {
+		for line := range strings.SplitSeq(string(raw), "\n") {
 			trimmed := strings.TrimSpace(line)
 			if trimmed == "" {
 				continue

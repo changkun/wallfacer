@@ -244,7 +244,7 @@ func sanitizeContainerBasename(base string) string {
 // name, or an error if no match or more than one match is found.
 func resolveContainerByPrefix(psOutput, prefix string) (string, error) {
 	var matches []string
-	for _, line := range strings.Split(psOutput, "\n") {
+	for line := range strings.SplitSeq(psOutput, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
