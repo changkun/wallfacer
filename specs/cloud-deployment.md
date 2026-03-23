@@ -44,26 +44,51 @@ Instead, the cloud deployment strategy follows the **Codespaces model**: a contr
                           └─────────────────────┘
 ```
 
-This decomposes into three cross-cutting epics:
+This decomposes into three cross-cutting epics, plus related specs that have cloud-dependent phases:
 
 | Epic | Spec | What it covers |
 |------|------|----------------|
+| **Sandbox Executor** | [`cloud-sandbox-executor.md`](cloud-sandbox-executor.md) | Pluggable `SandboxBackend` interface; local, K8s, and remote Docker backends |
+| **Data Storage** | [`cloud-data-storage.md`](cloud-data-storage.md) | Pluggable `StorageBackend` interface; filesystem, PostgreSQL, and S3 backends |
 | **Multi-Tenant** | [`cloud-multi-tenant.md`](cloud-multi-tenant.md) | Control plane, user auth, instance provisioning and lifecycle |
-| **Sandbox Executor** | [`cloud-sandbox-executor.md`](cloud-sandbox-executor.md) | Abstract `ContainerExecutor` to support remote backends (K8s Jobs, cloud VMs) |
-| **Cloud Data Storage** | [`cloud-data-storage.md`](cloud-data-storage.md) | Replace filesystem `Store` with pluggable backends (DB, object storage) |
+| **Container Reuse** | [`container-reuse.md`](container-reuse.md) | Long-lived worker containers inside `LocalBackend` (depends on sandbox executor) |
+| **File Explorer** | [`file-explorer.md`](file-explorer.md) | Workspace file browser; Phase 4 adds cloud `WorkspaceFS` abstraction |
+| **Host Terminal** | [`host-terminal.md`](host-terminal.md) | Web terminal; Phase 3 adds container exec for cloud |
+| **Desktop App** | [`native-desktop-app.md`](native-desktop-app.md) | Wails native wrapper (independent) |
 
-### Dependency Graph
+### Implementation Milestones
+
+The specs are sequenced into 8 milestones to minimize cross-impacts. Interface extractions come first (pure refactors, no behavior change), local UX features deliver value early, and cloud integration is deferred to the end.
 
 ```
-Multi-Tenant ──depends-on──▶ Cloud Data Storage
-     │                              ▲
-     │                              │
-     └──depends-on──▶ Sandbox Executor ─depends-on─┘
+M1: Sandbox Backend Interface ──┬──▶ M3: Container Reuse
+                                │
+                                ├──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
+                                │           ▲                     (capstone)
+M2: Storage Backend Interface ──┘───────────┘
+                                                    ▲
+M4: File Explorer (local) ─────────────────────────▶│ (Phase 4)
+M5: Host Terminal (local) ─────────────────────────▶│ (Phase 3)
+M7: Desktop App ───────────────────────────────────▶│ (ships after UX)
 ```
 
-- **Cloud Data Storage** is the foundation: the store interface must exist before instances can be provisioned with cloud-backed persistence.
-- **Sandbox Executor** can proceed in parallel once the store interface is defined, since it primarily affects `internal/runner/` rather than `internal/store/`.
-- **Multi-Tenant** is the top-level epic that wires everything together: it needs both cloud storage (for per-user data isolation) and the sandbox executor (for remote container execution).
+| # | Milestone | Spec Phases | Delivers |
+|---|-----------|-------------|----------|
+| **M1** | Sandbox backend interface | sandbox-executor Ph1 | `SandboxBackend`/`SandboxHandle` + `LocalBackend` (pure refactor) |
+| **M2** | Storage backend interface | data-storage Ph1–3 | `StorageBackend` + `FilesystemBackend` + `TurnOutputWriter` (pure refactor) |
+| **M3** | Container reuse | container-reuse Ph1–2 | Aux worker containers for title/oversight/commit (~10x startup savings) |
+| **M4** | File explorer | file-explorer Ph1–3 | Browse + edit workspace files in the web UI |
+| **M5** | Host terminal | host-terminal Ph1–2 | Interactive shell in the web UI (WebSocket + PTY) |
+| **M6** | Cloud backends | sandbox-executor Ph2–3, data-storage Ph4–7 | K8s backend, PostgreSQL, S3, migration tool |
+| **M7** | Desktop app | native-desktop-app | Wails native wrapper (macOS .app, Windows .exe) |
+| **M8** | Multi-tenant (capstone) | multi-tenant all, deferred phases | Control plane, auth, instance lifecycle, cloud file/terminal access |
+
+**Ordering rationale:**
+- **M1–M2 first:** Pure refactors that create the abstraction seams all downstream milestones plug into. Low risk, high leverage.
+- **M3 after M1:** Container reuse modifies the same `internal/runner/` files. Doing it right after M1 avoids revisiting them later.
+- **M4–M5 before M6:** Deliver user-visible value with no cloud dependency. Exercise different code paths (`internal/handler/` + `ui/`) than M1–M3.
+- **M7 after M4–M5:** Desktop app ships with file explorer + terminal already built in. (Fully independent — can move earlier.)
+- **M8 last:** Capstone that wires everything together. Picks up deferred cloud phases from M3/M4/M5.
 
 ---
 

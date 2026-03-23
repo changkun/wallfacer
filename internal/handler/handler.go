@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/logger"
@@ -18,6 +17,7 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/lazyval"
 	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
@@ -147,7 +147,7 @@ type Handler struct {
 	ideationExploitRatio float64 // 0.0–1.0; default 0.8 (80% exploitation)
 
 	sandboxTestMu     sync.RWMutex
-	sandboxTestPassed map[constants.SandboxType]bool
+	sandboxTestPassed map[sandbox.Type]bool
 	// scheduledPromoteMu guards scheduledPromoteTimer, which fires
 	// tryAutoPromote precisely when the soonest scheduled task becomes due.
 	scheduledPromoteMu    sync.Mutex
@@ -184,9 +184,9 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		ideationInterval:     60 * time.Minute,
 		ideationExploitRatio: 0.8,
 		reg:                  reg,
-		sandboxTestPassed: map[constants.SandboxType]bool{
-			constants.SandboxClaude: false,
-			constants.SandboxCodex:  false,
+		sandboxTestPassed: map[sandbox.Type]bool{
+			sandbox.Claude: false,
+			sandbox.Codex:  false,
 		},
 		breakers: map[string]*watcherBreaker{
 			"auto-promote": newWatcherBreaker(),
@@ -319,14 +319,14 @@ func (h *Handler) incAutopilotPhase2Miss(watcher string) {
 	})
 }
 
-func (h *Handler) setSandboxTestPassed(sb constants.SandboxType, passed bool) {
+func (h *Handler) setSandboxTestPassed(sb sandbox.Type, passed bool) {
 	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.Lock()
 	h.sandboxTestPassed[s] = passed
 	h.sandboxTestMu.Unlock()
 }
 
-func (h *Handler) sandboxTestPassedState(sb constants.SandboxType) bool {
+func (h *Handler) sandboxTestPassedState(sb sandbox.Type) bool {
 	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.RLock()
 	defer h.sandboxTestMu.RUnlock()
@@ -339,7 +339,7 @@ func (h *Handler) refreshCodexBootstrapAuthState() {
 	}
 	ok, _ := h.runner.HostCodexAuthStatus(time.Now())
 	if ok {
-		h.setSandboxTestPassed(constants.SandboxCodex, true)
+		h.setSandboxTestPassed(sandbox.Codex, true)
 	}
 }
 

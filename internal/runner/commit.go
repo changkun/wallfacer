@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/prompts"
 	"github.com/google/uuid"
@@ -360,7 +360,7 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		logger.Runner.Warn("generate commit message: get task", "task", taskID, "error", err)
 	}
 
-	sb := constants.SandboxClaude
+	sb := sandbox.Claude
 	if task != nil {
 		sb = r.sandboxForTaskActivity(task, activityCommitMessage)
 	}
@@ -376,7 +376,7 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		DiffStat:  diffStat,
 		RecentLog: recentLog,
 	})
-	runWithSandbox := func(selectedSandbox constants.SandboxType) (*agentOutput, error) {
+	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, error) {
 		selectedModel := r.modelFromEnvForSandbox(selectedSandbox)
 		_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
 
@@ -408,27 +408,27 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 	initialSandbox := sb
 	output, err := runWithSandbox(initialSandbox)
 	if err != nil {
-		if initialSandbox == constants.SandboxClaude && isLikelyTokenLimitError(err.Error()) {
+		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error()) {
 			logger.Runner.Warn("commit message generation: claude token limit hit; retrying with codex", "task", taskID)
 			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during commit message generation)",
 			})
-			output, err = runWithSandbox(constants.SandboxCodex)
+			output, err = runWithSandbox(sandbox.Codex)
 		}
 		if err != nil {
 			logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
 			return "", newCommitMessageGenerationError("%v", err)
 		}
 	}
-	if initialSandbox == constants.SandboxClaude && output != nil && output.IsError &&
+	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("commit message generation: claude output reported token limit; retrying with codex", "task", taskID)
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit in commit message output)",
 		})
-		output, err = runWithSandbox(constants.SandboxCodex)
+		output, err = runWithSandbox(sandbox.Codex)
 		if err != nil {
 			logger.Runner.Warn("commit message generation failed", "task", taskID, "error", err)
 			return "", newCommitMessageGenerationError("%v", err)

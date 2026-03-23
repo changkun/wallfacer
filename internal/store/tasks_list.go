@@ -6,13 +6,12 @@ import (
 	"os"
 	"sort"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"github.com/google/uuid"
 )
 
 // ListTasksByStatus returns all tasks with the given status, sorted by position then creation time.
-func (s *Store) ListTasksByStatus(_ context.Context, status constants.TaskStatus) ([]Task, error) {
+func (s *Store) ListTasksByStatus(_ context.Context, status TaskStatus) ([]Task, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -35,7 +34,7 @@ func (s *Store) ListTasksByStatus(_ context.Context, status constants.TaskStatus
 }
 
 // CountByStatus returns the number of active tasks with the given status in O(1).
-func (s *Store) CountByStatus(status constants.TaskStatus) int {
+func (s *Store) CountByStatus(status TaskStatus) int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.tasksByStatus[status])

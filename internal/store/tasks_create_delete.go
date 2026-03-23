@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -19,10 +19,10 @@ import (
 // every newly created task. ResetTaskForRetry uses this same map so that a
 // manual retry after a budget-exhausted auto-retry cycle restores the full
 // budget, allowing the auto-retrier to act again on the next failure.
-var defaultAutoRetryBudget = map[constants.FailureCategory]int{
-	constants.FailureCategoryContainerCrash: 2,
-	constants.FailureCategorySyncError:      2,
-	constants.FailureCategoryWorktree:       1,
+var defaultAutoRetryBudget = map[FailureCategory]int{
+	FailureCategoryContainerCrash: 2,
+	FailureCategorySyncError:      2,
+	FailureCategoryWorktree:       1,
 }
 
 // TaskCreateOptions holds parameters for creating a new task.
@@ -33,10 +33,10 @@ type TaskCreateOptions struct {
 	Goal               string
 	Timeout            int
 	MountWorktrees     bool
-	Kind               constants.TaskKind
+	Kind               TaskKind
 	Tags               []string
-	Sandbox            constants.SandboxType
-	SandboxByActivity  map[constants.SandboxActivity]constants.SandboxType
+	Sandbox            sandbox.Type
+	SandboxByActivity  map[SandboxActivity]sandbox.Type
 	MaxCostUSD         float64
 	MaxInputTokens     int
 	ScheduledAt        *time.Time
@@ -69,12 +69,12 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	}
 
 	task := &Task{
-		SchemaVersion:   constants.CurrentTaskSchemaVersion,
+		SchemaVersion:   CurrentTaskSchemaVersion,
 		ID:              id,
 		Goal:            goal,
 		GoalManuallySet: opts.Goal != "",
 		Prompt:          opts.Prompt,
-		Status:          constants.TaskStatusBacklog,
+		Status:          TaskStatusBacklog,
 		Turns:           0,
 		Timeout:         clampTimeout(opts.Timeout),
 		MountWorktrees:  opts.MountWorktrees,
@@ -84,10 +84,10 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 		UpdatedAt: now,
 		// AutoRetryBudget provides per-category retry allowances for transient
 		// failures. Budget is only granted for categories where retrying is safe.
-		AutoRetryBudget: map[constants.FailureCategory]int{
-			constants.FailureCategoryContainerCrash: defaultAutoRetryBudget[constants.FailureCategoryContainerCrash],
-			constants.FailureCategorySyncError:      defaultAutoRetryBudget[constants.FailureCategorySyncError],
-			constants.FailureCategoryWorktree:       defaultAutoRetryBudget[constants.FailureCategoryWorktree],
+		AutoRetryBudget: map[FailureCategory]int{
+			FailureCategoryContainerCrash: defaultAutoRetryBudget[FailureCategoryContainerCrash],
+			FailureCategorySyncError:      defaultAutoRetryBudget[FailureCategorySyncError],
+			FailureCategoryWorktree:       defaultAutoRetryBudget[FailureCategoryWorktree],
 		},
 	}
 
@@ -103,7 +103,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 
 	// Sandbox.
 	if opts.Sandbox != "" {
-		task.Sandbox = constants.NormalizeSandboxType(string(opts.Sandbox))
+		task.Sandbox = sandbox.Normalize(string(opts.Sandbox))
 	}
 
 	// SandboxByActivity: normalise (validates keys, strips invalid entries).
@@ -162,7 +162,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	minPos := 0
 	hasBacklog := false
 	for _, t := range s.tasks {
-		if t.Status == constants.TaskStatusBacklog {
+		if t.Status == TaskStatusBacklog {
 			if !hasBacklog || t.Position < minPos {
 				minPos = t.Position
 				hasBacklog = true
@@ -194,7 +194,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 // Optional tags are attached to the task for categorisation.
 //
 // Deprecated: prefer CreateTaskWithOptions for full initialization in one write.
-func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, mountWorktrees bool, _ string, kind constants.TaskKind, tags ...string) (*Task, error) {
+func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, mountWorktrees bool, _ string, kind TaskKind, tags ...string) (*Task, error) {
 	return s.CreateTaskWithOptions(ctx, TaskCreateOptions{
 		Prompt:         prompt,
 		Timeout:        timeout,
@@ -204,21 +204,21 @@ func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, moun
 	})
 }
 
-func normalizeSandboxByActivity(input map[constants.SandboxActivity]constants.SandboxType) map[constants.SandboxActivity]constants.SandboxType {
+func normalizeSandboxByActivity(input map[SandboxActivity]sandbox.Type) map[SandboxActivity]sandbox.Type {
 	if len(input) == 0 {
 		return nil
 	}
-	allowed := make(map[constants.SandboxActivity]struct{}, len(constants.SandboxActivities))
-	for _, key := range constants.SandboxActivities {
+	allowed := make(map[SandboxActivity]struct{}, len(SandboxActivities))
+	for _, key := range SandboxActivities {
 		allowed[key] = struct{}{}
 	}
-	out := make(map[constants.SandboxActivity]constants.SandboxType)
+	out := make(map[SandboxActivity]sandbox.Type)
 	for k, v := range input {
-		key := constants.SandboxActivity(strings.ToLower(strings.TrimSpace(string(k))))
+		key := SandboxActivity(strings.ToLower(strings.TrimSpace(string(k))))
 		if _, ok := allowed[key]; !ok {
 			continue
 		}
-		val, ok := constants.ParseSandboxType(string(v))
+		val, ok := sandbox.Parse(string(v))
 		if !ok {
 			continue
 		}
@@ -302,7 +302,7 @@ func (s *Store) removeOrphanedDependents(ctx context.Context, cancelledID uuid.U
 // Cancelled tasks can never reach done, so their dependents would otherwise be
 // permanently blocked by the auto-promoter's dependency check.
 func (s *Store) CancelTask(ctx context.Context, id uuid.UUID) error {
-	if err := s.ForceUpdateTaskStatus(ctx, id, constants.TaskStatusCancelled); err != nil {
+	if err := s.ForceUpdateTaskStatus(ctx, id, TaskStatusCancelled); err != nil {
 		return err
 	}
 	s.removeOrphanedDependents(ctx, id)

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 )
@@ -1245,10 +1245,10 @@ func TestSsrfHardenedTransport_BlocksPrivateIPRequests(t *testing.T) {
 // TestDefaultSandbox_ExplicitSandboxReturned verifies that an explicitly
 // configured default sandbox is returned as-is.
 func TestDefaultSandbox_ExplicitSandboxReturned(t *testing.T) {
-	cfg := envconfig.Config{DefaultSandbox: constants.SandboxCodex}
+	cfg := envconfig.Config{DefaultSandbox: sandbox.Codex}
 	result := defaultSandbox(cfg)
-	if result != constants.SandboxCodex {
-		t.Errorf("expected %q, got %q", constants.SandboxCodex, result)
+	if result != sandbox.Codex {
+		t.Errorf("expected %q, got %q", sandbox.Codex, result)
 	}
 }
 
@@ -1258,8 +1258,8 @@ func TestDefaultSandbox_ExplicitSandboxReturned(t *testing.T) {
 func TestDefaultSandbox_ClaudeModelFallsBackToClaude(t *testing.T) {
 	cfg := envconfig.Config{DefaultModel: "claude-opus-4-6"}
 	result := defaultSandbox(cfg)
-	if result != constants.SandboxClaude {
-		t.Errorf("expected %q, got %q", constants.SandboxClaude, result)
+	if result != sandbox.Claude {
+		t.Errorf("expected %q, got %q", sandbox.Claude, result)
 	}
 }
 
@@ -1269,8 +1269,8 @@ func TestDefaultSandbox_ClaudeModelFallsBackToClaude(t *testing.T) {
 func TestDefaultSandbox_CodexModelFallsBackToCodex(t *testing.T) {
 	cfg := envconfig.Config{CodexDefaultModel: "codex-mini-latest"}
 	result := defaultSandbox(cfg)
-	if result != constants.SandboxCodex {
-		t.Errorf("expected %q, got %q", constants.SandboxCodex, result)
+	if result != sandbox.Codex {
+		t.Errorf("expected %q, got %q", sandbox.Codex, result)
 	}
 }
 
@@ -1279,7 +1279,7 @@ func TestDefaultSandbox_CodexModelFallsBackToCodex(t *testing.T) {
 func TestDefaultSandbox_EmptyConfigReturnsClaude(t *testing.T) {
 	cfg := envconfig.Config{}
 	result := defaultSandbox(cfg)
-	if result != constants.SandboxClaude {
-		t.Errorf("expected %q (default), got %q", constants.SandboxClaude, result)
+	if result != sandbox.Claude {
+		t.Errorf("expected %q (default), got %q", sandbox.Claude, result)
 	}
 }

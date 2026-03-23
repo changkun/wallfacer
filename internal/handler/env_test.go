@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -528,7 +528,7 @@ func TestSandboxImageForTest_CodexResolution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sandboxImageForTest(constants.SandboxType(tt.sandbox), tt.inImage)
+			got := sandboxImageForTest(sandbox.Type(tt.sandbox), tt.inImage)
 			if got != tt.want {
 				t.Fatalf("sandboxImageForTest(%q, %q) = %q; want %q", tt.sandbox, tt.inImage, got, tt.want)
 			}

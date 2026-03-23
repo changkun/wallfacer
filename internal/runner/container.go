@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -55,7 +55,7 @@ type agentOutput struct {
 
 	// ActualSandbox is set by runContainer (not parsed from JSON) to record
 	// which sandbox actually executed this turn, including fallback scenarios.
-	ActualSandbox constants.SandboxType `json:"-"`
+	ActualSandbox sandbox.Type `json:"-"`
 }
 
 const (
@@ -85,7 +85,7 @@ func (r *Runner) buildContainerArgs(
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
 ) []string {
-	return r.buildContainerArgsForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, constants.SandboxClaude)
+	return r.buildContainerArgsForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, sandbox.Claude)
 }
 
 func (r *Runner) buildContainerArgsForSandbox(
@@ -94,7 +94,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
-	sb constants.SandboxType,
+	sb sandbox.Type,
 ) []string {
 	// Resolve model once: override takes priority, then env default.
 	model := modelOverride
@@ -205,8 +205,8 @@ func (r *Runner) buildContainerArgsForSandbox(
 	return spec.Build()
 }
 
-func instructionsFilenameForSandbox(sb constants.SandboxType) string {
-	if sb == constants.SandboxCodex {
+func instructionsFilenameForSandbox(sb sandbox.Type) string {
+	if sb == sandbox.Codex {
 		return instructions.InstructionsFilename
 	}
 	return instructions.LegacyInstructionsFilename
@@ -216,7 +216,7 @@ func instructionsFilenameForSandbox(sb constants.SandboxType) string {
 // read-only bind mount (CLAUDE.md for claude, AGENTS.md for codex).
 // It is a no-op when instructionsPath is empty or does not exist on the host.
 // Both buildContainerArgsForSandbox and buildIdeationContainerArgs share this logic.
-func (r *Runner) appendInstructionsMount(volumes []VolumeMount, sb constants.SandboxType) []VolumeMount {
+func (r *Runner) appendInstructionsMount(volumes []VolumeMount, sb sandbox.Type) []VolumeMount {
 	if r.instructionsPath == "" {
 		return volumes
 	}
@@ -252,8 +252,8 @@ func buildAgentCmd(prompt, model string) []string {
 	return cmd
 }
 
-func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sb constants.SandboxType) []VolumeMount {
-	if sb != constants.SandboxCodex {
+func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sb sandbox.Type) []VolumeMount {
+	if sb != sandbox.Codex {
 		return volumes
 	}
 	if hostPath := r.hostCodexAuthPath(); hostPath != "" {
@@ -276,7 +276,7 @@ func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sb constants.Sandbo
 //
 // Callers set Labels, additional Volumes (workspace directories, instructions
 // file, board context), WorkDir, and Cmd for their specific needs.
-func (r *Runner) buildBaseContainerSpec(containerName, model string, sb constants.SandboxType) ContainerSpec {
+func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.Type) ContainerSpec {
 	spec := ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
@@ -300,8 +300,8 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb constant
 	return spec
 }
 
-func (r *Runner) sandboxImageForSandbox(sb constants.SandboxType) string {
-	if sb != constants.SandboxCodex {
+func (r *Runner) sandboxImageForSandbox(sb sandbox.Type) string {
+	if sb != sandbox.Codex {
 		return strings.TrimSpace(r.sandboxImage)
 	}
 	baseImage := strings.TrimSpace(r.sandboxImage)
@@ -337,13 +337,13 @@ func (r *Runner) sandboxImageForSandbox(sb constants.SandboxType) string {
 
 // modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file (if configured).
 // Returns an empty string when the file cannot be read or the key is absent.
-func (r *Runner) sandboxForTask(task *store.Task) constants.SandboxType {
+func (r *Runner) sandboxForTask(task *store.Task) sandbox.Type {
 	return r.sandboxForTaskActivity(task, activityImplementation)
 }
 
-func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) constants.SandboxType {
+func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) sandbox.Type {
 	if task == nil {
-		return constants.SandboxClaude
+		return sandbox.Claude
 	}
 	activity = store.SandboxActivity(strings.ToLower(strings.TrimSpace(string(activity))))
 	if task.SandboxByActivity != nil {
@@ -357,10 +357,10 @@ func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.Sandbox
 	if sb := r.sandboxFromEnvForActivity(activity); sb != "" {
 		return sb
 	}
-	return constants.SandboxClaude
+	return sandbox.Claude
 }
 
-func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) constants.SandboxType {
+func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) sandbox.Type {
 	if r.envFile == "" {
 		return ""
 	}
@@ -403,12 +403,12 @@ func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) const
 }
 
 func (r *Runner) modelFromEnv() string {
-	return r.modelFromEnvForSandbox(constants.SandboxClaude)
+	return r.modelFromEnvForSandbox(sandbox.Claude)
 }
 
 // modelFromEnvForSandbox reads the default model for the given sandbox.
 // Supports "claude" and "codex" values.
-func (r *Runner) modelFromEnvForSandbox(sb constants.SandboxType) string {
+func (r *Runner) modelFromEnvForSandbox(sb sandbox.Type) string {
 	if r.envFile == "" {
 		return ""
 	}
@@ -417,7 +417,7 @@ func (r *Runner) modelFromEnvForSandbox(sb constants.SandboxType) string {
 		return ""
 	}
 	switch sb {
-	case constants.SandboxCodex:
+	case sandbox.Codex:
 		return cfg.CodexDefaultModel
 	default:
 		return cfg.DefaultModel
@@ -427,12 +427,12 @@ func (r *Runner) modelFromEnvForSandbox(sb constants.SandboxType) string {
 // titleModelFromEnv reads CLAUDE_TITLE_MODEL from the env file,
 // falling back to CLAUDE_DEFAULT_MODEL if the title model is not set.
 func (r *Runner) titleModelFromEnv() string {
-	return r.titleModelFromEnvForSandbox(constants.SandboxClaude)
+	return r.titleModelFromEnvForSandbox(sandbox.Claude)
 }
 
 // titleModelFromEnvForSandbox returns the sandbox-specific title model.
 // Supports "claude" and "codex" values.
-func (r *Runner) titleModelFromEnvForSandbox(sb constants.SandboxType) string {
+func (r *Runner) titleModelFromEnvForSandbox(sb sandbox.Type) string {
 	if r.envFile == "" {
 		return ""
 	}
@@ -441,7 +441,7 @@ func (r *Runner) titleModelFromEnvForSandbox(sb constants.SandboxType) string {
 		return ""
 	}
 	switch sb {
-	case constants.SandboxCodex:
+	case sandbox.Codex:
 		if cfg.CodexTitleModel != "" {
 			return cfg.CodexTitleModel
 		}
@@ -476,14 +476,14 @@ func (r *Runner) runContainer(
 	r.taskContainers.Set(taskID, containerName)
 	defer r.taskContainers.Delete(taskID)
 
-	sb := constants.SandboxClaude
+	sb := sandbox.Claude
 	if task, err := r.store.GetTask(r.shutdownCtx, taskID); err == nil {
 		sb = r.sandboxForTaskActivity(task, activity)
 	} else {
 		logger.Runner.Warn("runContainer: get task", "task", taskID, "error", err)
 	}
 
-	runWithSandbox := func(selectedSandbox constants.SandboxType) (*agentOutput, []byte, []byte, error) {
+	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
 		// Refuse to launch if the container runtime is known-unavailable.
 		if !r.containerCB.Allow() {
 			return nil, nil, nil, fmt.Errorf("container circuit breaker open: container runtime may be unavailable")
@@ -560,19 +560,19 @@ func (r *Runner) runContainer(
 
 	output, rawStdout, rawStderr, err := runWithSandbox(sb)
 	if err != nil {
-		if sb == constants.SandboxClaude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
+		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
 			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
 				"task", taskID, "activity", activity)
 			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit)",
 			})
-			return runWithSandbox(constants.SandboxCodex)
+			return runWithSandbox(sandbox.Codex)
 		}
 		return nil, rawStdout, rawStderr, err
 	}
 
-	if sb == constants.SandboxClaude && output != nil && output.IsError &&
+	if sb == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID, "activity", activity)
@@ -580,7 +580,7 @@ func (r *Runner) runContainer(
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit in output)",
 		})
-		return runWithSandbox(constants.SandboxCodex)
+		return runWithSandbox(sandbox.Codex)
 	}
 
 	return output, rawStdout, rawStderr, nil

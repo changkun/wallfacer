@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -155,8 +155,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Goal               string                                 `json:"goal"`
 		Timeout            int                                    `json:"timeout"`
 		MountWorktrees     bool                                   `json:"mount_worktrees"`
-		Sandbox            constants.SandboxType                           `json:"sandbox"`
-		SandboxByActivity  map[store.SandboxActivity]constants.SandboxType `json:"sandbox_by_activity"`
+		Sandbox            sandbox.Type                           `json:"sandbox"`
+		SandboxByActivity  map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
 		Kind               store.TaskKind                         `json:"kind"`
 		Tags               []string                               `json:"tags"`
 		MaxCostUSD         float64                                `json:"max_cost_usd"`
@@ -219,8 +219,8 @@ type batchTaskInput struct {
 	Prompt            string                                 `json:"prompt"`
 	Timeout           int                                    `json:"timeout"`
 	Tags              []string                               `json:"tags"`
-	Sandbox           constants.SandboxType                           `json:"sandbox"`
-	SandboxByActivity map[store.SandboxActivity]constants.SandboxType `json:"sandbox_by_activity"`
+	Sandbox           sandbox.Type                           `json:"sandbox"`
+	SandboxByActivity map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
 	Kind              store.TaskKind                         `json:"kind"`
 	MountWorktrees    bool                                   `json:"mount_worktrees"`
 	DependsOnRefs     []string                               `json:"depends_on_refs"`
@@ -533,8 +533,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		Timeout           *int                                    `json:"timeout"`
 		FreshStart        *bool                                   `json:"fresh_start"`
 		MountWorktrees    *bool                                   `json:"mount_worktrees"`
-		Sandbox           *constants.SandboxType                           `json:"sandbox"`
-		SandboxByActivity *map[store.SandboxActivity]constants.SandboxType `json:"sandbox_by_activity"`
+		Sandbox           *sandbox.Type                           `json:"sandbox"`
+		SandboxByActivity *map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
 		DependsOn         *[]string                               `json:"depends_on"`
 		Tags              *[]string                               `json:"tags"`
 		MaxCostUSD        *float64                                `json:"max_cost_usd"`

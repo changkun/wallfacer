@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/pagination"
@@ -19,7 +18,7 @@ import (
 )
 
 // InsertEvent appends a new event to the task's audit trail.
-func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType constants.EventType, data any) error {
+func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType EventType, data any) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -88,7 +87,7 @@ type EventsPage struct {
 //
 // typeSet restricts results to the given event types. A nil or empty map means
 // all event types are included.
-func (s *Store) GetEventsPage(_ context.Context, taskID uuid.UUID, afterID int64, limit int, typeSet map[constants.EventType]struct{}) (EventsPage, error) {
+func (s *Store) GetEventsPage(_ context.Context, taskID uuid.UUID, afterID int64, limit int, typeSet map[EventType]struct{}) (EventsPage, error) {
 	s.mu.RLock()
 	if !s.eventsLoaded[taskID] {
 		s.mu.RUnlock()
@@ -145,7 +144,7 @@ func ComputeSpans(events []TaskEvent) ([]SpanResult, error) {
 	var spans []SpanResult
 
 	for _, ev := range events {
-		if ev.EventType != constants.EventTypeSpanStart && ev.EventType != constants.EventTypeSpanEnd {
+		if ev.EventType != EventTypeSpanStart && ev.EventType != EventTypeSpanEnd {
 			continue
 		}
 		var data SpanData
@@ -153,7 +152,7 @@ func ComputeSpans(events []TaskEvent) ([]SpanResult, error) {
 			continue
 		}
 		key := spanKey{phase: data.Phase, label: data.Label}
-		if ev.EventType == constants.EventTypeSpanStart {
+		if ev.EventType == EventTypeSpanStart {
 			startTimes[key] = ev.CreatedAt
 		} else {
 			if startedAt, ok := startTimes[key]; ok {

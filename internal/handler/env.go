@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -105,8 +105,8 @@ type envConfigResponse struct {
 	TitleModel           string                                 `json:"title_model"`
 	CodexDefaultModel    string                                 `json:"codex_default_model"`
 	CodexTitleModel      string                                 `json:"codex_title_model"`
-	DefaultSandbox       constants.SandboxType                           `json:"default_sandbox"`
-	SandboxByActivity    map[store.SandboxActivity]constants.SandboxType `json:"sandbox_by_activity,omitempty"`
+	DefaultSandbox       sandbox.Type                           `json:"default_sandbox"`
+	SandboxByActivity    map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity,omitempty"`
 	MaxParallelTasks     int                                    `json:"max_parallel_tasks"`
 	MaxTestParallelTasks int                                    `json:"max_test_parallel_tasks"`
 	OversightInterval    int                                    `json:"oversight_interval"`
@@ -121,7 +121,7 @@ type envConfigResponse struct {
 
 type sandboxTestResponse struct {
 	TaskID         string       `json:"task_id"`
-	Sandbox        constants.SandboxType `json:"sandbox"`
+	Sandbox        sandbox.Type `json:"sandbox"`
 	Status         string       `json:"status"`
 	LastTestResult string       `json:"last_test_result,omitempty"`
 	Result         string       `json:"result,omitempty"`
@@ -129,7 +129,7 @@ type sandboxTestResponse struct {
 }
 
 type sandboxTestRequest struct {
-	Sandbox           *constants.SandboxType                          `json:"sandbox"`
+	Sandbox           *sandbox.Type                          `json:"sandbox"`
 	Timeout           *int                                   `json:"timeout"`
 	Prompt            *string                                `json:"prompt"`
 	OAuthToken        *string                                `json:"oauth_token"`
@@ -141,8 +141,8 @@ type sandboxTestRequest struct {
 	TitleModel        *string                                `json:"title_model"`
 	CodexDefaultModel *string                                `json:"codex_default_model"`
 	CodexTitleModel   *string                                `json:"codex_title_model"`
-	DefaultSandbox    *constants.SandboxType                          `json:"default_sandbox"`
-	SandboxByActivity map[store.SandboxActivity]constants.SandboxType `json:"sandbox_by_activity"`
+	DefaultSandbox    *sandbox.Type                          `json:"default_sandbox"`
+	SandboxByActivity map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
 	SandboxFast       *bool                                  `json:"sandbox_fast"`
 }
 
@@ -204,7 +204,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sb := constants.SandboxClaude
+	sb := sandbox.Claude
 	if req.Sandbox != nil {
 		if !req.Sandbox.IsValid() {
 			http.Error(w, "invalid sandbox: use claude or codex", http.StatusBadRequest)
@@ -377,8 +377,8 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 	return tempFile.Name(), nil
 }
 
-func sandboxImageForTest(sb constants.SandboxType, baseImage string) string {
-	if sb == constants.SandboxCodex {
+func sandboxImageForTest(sb sandbox.Type, baseImage string) string {
+	if sb == sandbox.Codex {
 		return testCodexImage(baseImage)
 	}
 	return strings.TrimSpace(baseImage)
@@ -443,8 +443,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		TitleModel           *string                                `json:"title_model"`
 		CodexDefaultModel    *string                                `json:"codex_default_model"`
 		CodexTitleModel      *string                                `json:"codex_title_model"`
-		DefaultSandbox       *constants.SandboxType                          `json:"default_sandbox"`
-		SandboxByActivity    map[store.SandboxActivity]constants.SandboxType `json:"sandbox_by_activity"`
+		DefaultSandbox       *sandbox.Type                          `json:"default_sandbox"`
+		SandboxByActivity    map[store.SandboxActivity]sandbox.Type `json:"sandbox_by_activity"`
 		MaxParallelTasks     *int                                   `json:"max_parallel_tasks"`
 		MaxTestParallelTasks *int                                   `json:"max_test_parallel_tasks"`
 		OversightInterval    *int                                   `json:"oversight_interval"`
@@ -592,7 +592,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	// Any env update may affect sandbox connectivity/model settings; require
 	// a fresh sandbox test before allowing API-key codex tasks again.
 	// If valid host codex auth is present, keep codex usable.
-	h.setSandboxTestPassed(constants.SandboxCodex, false)
+	h.setSandboxTestPassed(sandbox.Codex, false)
 	h.refreshCodexBootstrapAuthState()
 	if err := envconfig.UpdateSandboxSettings(
 		h.envFile,

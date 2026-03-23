@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
 type execMode int
@@ -21,7 +21,7 @@ const (
 type execConfig struct {
 	mode    execMode
 	prefix  string
-	sandbox constants.SandboxType
+	sandbox sandbox.Type
 	command []string
 }
 
@@ -114,7 +114,7 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 				return nil, fmt.Errorf("missing sandbox value for --sandbox")
 			}
 			cfg.mode = execModeSandbox
-			cfg.sandbox = constants.NormalizeSandboxType(positional[i+1])
+			cfg.sandbox = sandbox.Normalize(positional[i+1])
 			if i+2 < len(positional) {
 				cfg.command = append(cfg.command[:0], positional[i+2:]...)
 			}
@@ -144,7 +144,7 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 	return cfg, nil
 }
 
-func buildSandboxExecArgs(runtimePath, configDir string, sb constants.SandboxType, command []string) ([]string, error) {
+func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, command []string) ([]string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("getwd: %w", err)
@@ -158,10 +158,10 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb constants.SandboxTyp
 	if info, err := os.Stat(envFile); err == nil && !info.IsDir() {
 		args = append(args, "--env-file", envFile)
 	}
-	if sb == constants.SandboxClaude {
+	if sb == sandbox.Claude {
 		args = append(args, "-v", "claude-config:/home/claude/.claude")
 	}
-	if sb == constants.SandboxCodex {
+	if sb == sandbox.Codex {
 		if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 			codexPath := filepath.Join(home, ".codex")
 			if info, err := os.Stat(filepath.Join(codexPath, "auth.json")); err == nil && !info.IsDir() {
@@ -179,9 +179,9 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb constants.SandboxTyp
 	return args, nil
 }
 
-func resolveSandboxImageForExec(baseImage string, sb constants.SandboxType) string {
+func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
 	baseImage = strings.TrimSpace(baseImage)
-	if sb != constants.SandboxCodex {
+	if sb != sandbox.Codex {
 		return baseImage
 	}
 	if baseImage == "" {

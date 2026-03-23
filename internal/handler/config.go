@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 )
@@ -46,11 +46,11 @@ func ssrfHardenedTransport() *http.Transport {
 		},
 	}
 }
-func availableSandboxes(cfg envconfig.Config) []constants.SandboxType {
-	sandboxSet := map[constants.SandboxType]bool{}
-	var sandboxes []constants.SandboxType
-	add := func(name constants.SandboxType) {
-		name = constants.NormalizeSandboxType(strings.TrimSpace(string(name)))
+func availableSandboxes(cfg envconfig.Config) []sandbox.Type {
+	sandboxSet := map[sandbox.Type]bool{}
+	var sandboxes []sandbox.Type
+	add := func(name sandbox.Type) {
+		name = sandbox.Normalize(strings.TrimSpace(string(name)))
 		if name == "" || sandboxSet[name] {
 			return
 		}
@@ -59,8 +59,8 @@ func availableSandboxes(cfg envconfig.Config) []constants.SandboxType {
 	}
 	// Always expose both built-in sandboxes in the UI so users can select
 	// either provider even before model/env values are configured.
-	add(constants.SandboxClaude)
-	add(constants.SandboxCodex)
+	add(sandbox.Claude)
+	add(sandbox.Codex)
 
 	if cfg.DefaultSandbox != "" {
 		add(cfg.DefaultSandbox)
@@ -71,17 +71,17 @@ func availableSandboxes(cfg envconfig.Config) []constants.SandboxType {
 	return sandboxes
 }
 
-func defaultSandbox(cfg envconfig.Config) constants.SandboxType {
+func defaultSandbox(cfg envconfig.Config) sandbox.Type {
 	if cfg.DefaultSandbox != "" {
 		return cfg.DefaultSandbox
 	}
 	if cfg.DefaultModel != "" {
-		return constants.SandboxClaude
+		return sandbox.Claude
 	}
 	if cfg.CodexDefaultModel != "" {
-		return constants.SandboxCodex
+		return sandbox.Codex
 	}
-	return constants.SandboxClaude
+	return sandbox.Claude
 }
 
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
@@ -117,9 +117,9 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"instructions_path":        instructionsPath,
 		"prompts_dir":              promptsDir,
 		"sandbox_activities":       store.SandboxActivities,
-		"sandboxes":                []constants.SandboxType{constants.SandboxClaude, constants.SandboxCodex},
-		"default_sandbox":          constants.SandboxClaude,
-		"sandbox_usable":           map[constants.SandboxType]bool{constants.SandboxClaude: true, constants.SandboxCodex: true},
+		"sandboxes":                []sandbox.Type{sandbox.Claude, sandbox.Codex},
+		"default_sandbox":          sandbox.Claude,
+		"sandbox_usable":           map[sandbox.Type]bool{sandbox.Claude: true, sandbox.Codex: true},
 		"sandbox_reasons":          map[string]string{},
 		"activity_sandboxes":       map[string]string{},
 		"autopilot":                h.AutopilotEnabled(),
@@ -146,9 +146,9 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 
 	sandboxes := availableSandboxes(*cfg)
-	sandboxUsable := map[constants.SandboxType]bool{
-		constants.SandboxClaude: true,
-		constants.SandboxCodex:  true,
+	sandboxUsable := map[sandbox.Type]bool{
+		sandbox.Claude: true,
+		sandbox.Codex:  true,
 	}
 	sandboxReasons := map[string]string{}
 	for _, sbox := range sandboxes {
