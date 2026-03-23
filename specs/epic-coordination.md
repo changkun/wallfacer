@@ -279,6 +279,268 @@ Phase A delivers value without B/C/D — even manually-created tasks with depend
 
 ---
 
+## UX & UI Design
+
+### Design Philosophy
+
+The core challenge: epics introduce a second layer of structure (groups of tasks with phases and gates) into a board that is currently flat. The design must surface epic context without overwhelming the kanban simplicity that makes wallfacer usable.
+
+**Principle: epics are a lens, not a mode.** The board always shows individual tasks. Epic context is overlaid — filtering, grouping, progress indicators — but the fundamental interaction unit remains the task card. Users who don't use epics see zero change.
+
+### Board Integration
+
+#### Epic Filter Bar
+
+When any tasks have `epic:*` tags, a horizontal bar appears below the header tabs:
+
+```
+┌─header──────────────────────────────────────────────────┐
+│ [workspace-group-tabs]     [search] [auto] [⌘] [stats]  │
+├─epic-bar────────────────────────────────────────────────┤
+│ All │ sandbox-backends (3/7) │ storage-backends (0/5) │  │
+├─────┴───────────────────────────────────────────────────┤
+│ Backlog      │ In Progress │ Waiting    │ Done          │
+│              │             │            │               │
+│ [card]       │ [card]      │ [card]     │ [card]        │
+│ [card]       │             │            │ [card]        │
+│ ...          │             │            │ ...           │
+└─────────────────────────────────────────────────────────┘
+```
+
+- **"All"** (default) shows every task, no filtering. Epic bar is informational only.
+- **Clicking an epic slug** filters the board to show only tasks with that `epic:*` tag. The parenthetical shows `(done/total)`.
+- **Active filter** is visually distinguished (accent underline, bolder weight, `var(--accent)` text).
+- **Bar auto-hides** when no epics exist (zero tasks with `epic:*` tags).
+- Style: same height/rhythm as workspace group tabs (11px font, 4px 10px padding, 6px top radius). Uses `var(--bg-raised)` background, `var(--border)` bottom border.
+
+#### Epic-Grouped Card View
+
+When an epic filter is active, the board columns gain **phase group dividers**:
+
+```
+Backlog                    │ In Progress
+                           │
+── Phase 1: Interface ─────│── Phase 1: Interface ─────
+ [define-interface]        │ [local-backend] ▶ running
+ [retire-executor]  🔒     │
+                           │
+── Phase 1 Gate ───────────│
+ [verify-m1] 🔒            │
+                           │
+── Phase 2: Migration ─────│
+ [migrate-runner] 🔒       │
+ [migrate-listing] 🔒      │
+```
+
+- **Phase dividers**: thin horizontal rule with phase name, 10px uppercase text, `var(--text-muted)`, letter-spacing 0.05em. Matches the existing column header style.
+- **Lock icon (🔒)**: shown on cards whose dependencies are not yet met. Subtle `var(--text-muted)` opacity. Tooltip on hover: "Blocked by: define-interface, local-backend".
+- **Phase dividers are only visible when an epic filter is active.** In "All" view, cards appear in their normal board position without phase grouping.
+
+#### Task Card Enhancements
+
+Task cards gain two small additions when they belong to an epic:
+
+1. **Epic pill badge**: small tag-style badge showing `epic:sandbox-backends` using the existing tag color cycling system. Appears in the tag row alongside other tags.
+
+2. **Dependency indicator**: if the task has `DependsOn` entries, show a small chain-link icon with count (e.g., `🔗 2`). Clicking opens a tooltip listing dependency task titles and their statuses (done ✓, in-progress ◉, backlog ○).
+
+Both additions use existing badge/tag styling. No new visual concepts.
+
+#### Gate Task Card
+
+Gate tasks look like regular task cards with visual distinction:
+
+- **Badge**: `badge-gate` — uses the existing test/purple palette (`#ede8f7` bg, `#5a3fa0` text) with a shield or checkmark icon.
+- **Card border**: left border accent in purple (2px solid, like the existing priority card pattern).
+- **Title**: auto-generated "Phase 1 Gate: verify" — shown in the card title slot.
+- **Status display**: when done, shows pass/fail prominently. Pass: green background tint. Fail: red background tint (same pattern as `badge-testing` pass/fail).
+
+#### Planner Task Card
+
+Planner tasks also look like regular task cards:
+
+- **Badge**: `badge-planner` — uses the existing idea-agent/blue palette with a blueprint/plan icon.
+- **When done**: the card shows a summary line: "Created 7 tasks in epic:sandbox-backends".
+- **When in progress**: shows "Decomposing spec..." with spinner.
+
+### Epic Progress Panel
+
+Accessible via the epic filter bar or a dedicated button in the header action row. Opens as a **modal** (reusing `.modal-wide` pattern) showing all epics:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Epic Progress                                        [×] │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  sandbox-backends                            $2.34 total │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │ Phase 1: Interface extraction          5/7 tasks    │ │
+│  │ ████████████████████░░░░░░ 71%         $1.82        │ │
+│  │ ◉ in-progress: local-backend                        │ │
+│  │ ○ backlog: retire-executor, update-registry         │ │
+│  │ Gate: backlog 🔒                                    │ │
+│  ├─────────────────────────────────────────────────────┤ │
+│  │ Phase 2: Migration                     0/4 tasks    │ │
+│  │ ░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%         —            │ │
+│  │ Blocked by Phase 1 Gate                             │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                          │
+│  storage-backends                            $0.00 total │
+│  ┌─────────────────────────────────────────────────────┐ │
+│  │ Phase 1: Interface extraction          0/5 tasks    │ │
+│  │ ░░░░░░░░░░░░░░░░░░░░░░░░░░ 0%         —            │ │
+│  └─────────────────────────────────────────────────────┘ │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Progress bar**: uses `var(--accent)` for filled portion, `var(--bg-raised)` for empty. 8px height, 4px border-radius (pill).
+
+**Phase card**: uses `.settings-card` pattern — bordered card with subtle gradient background, 12px border-radius. Collapsible via `<details>` element (same as settings cards).
+
+**Task status icons**: ✓ done (green), ◉ in-progress (blue), ○ backlog (gray), ✕ failed (red), ⏸ waiting (orange). Inline with task titles, 11px text.
+
+**Cost column**: right-aligned, `var(--text-muted)`, 11px monospace. Accumulated from task summaries.
+
+**Gate status**: shown as a special row within each phase card. Status badge matches gate task status. "Blocked by Phase N Gate" shown in muted text for subsequent phases.
+
+**Clicking a task title** in the progress panel opens the task detail modal (existing behavior). **Clicking "Phase 1"** filters the board to `epic:sandbox-backends` + `phase:1`.
+
+### Planner Creation UX
+
+Two entry points for creating a planner task:
+
+#### 1. From the board (new task dialog)
+
+The existing "New Task" dialog gains a **Kind** selector (dropdown or toggle) when the user clicks the + button:
+
+```
+┌─────────────────────────────────────────────┐
+│ New Task                                [×] │
+├─────────────────────────────────────────────┤
+│ Kind:  [Task ▾]  [Planner]  [Idea Agent]   │
+│                                             │
+│ Prompt:                                     │
+│ ┌─────────────────────────────────────────┐ │
+│ │ Plan implementation of                  │ │
+│ │ specs/01-sandbox-backends.md Phase 1    │ │
+│ └─────────────────────────────────────────┘ │
+│                                             │
+│                           [Create Planner]  │
+└─────────────────────────────────────────────┘
+```
+
+When "Planner" is selected:
+- The prompt field label changes to "Spec reference or content"
+- A hint appears: "Reference a spec file path (e.g. `specs/01-sandbox-backends.md`) or paste spec content directly."
+- The submit button says "Create Planner" instead of "Create Task"
+- Timeout defaults to 30 minutes (planners are fast)
+
+#### 2. From the epic progress panel
+
+If no epics exist yet, the epic progress panel shows an empty state with a CTA:
+
+```
+┌──────────────────────────────────────────────────────┐
+│ Epic Progress                                    [×] │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  No epics yet.                                       │
+│                                                      │
+│  Create a planner task to decompose a spec into      │
+│  an epic with phased tasks, dependencies, and gates. │
+│                                                      │
+│  [+ Create Planner Task]                             │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+### Epic Oversight View
+
+When viewing a task that belongs to an epic, the **task detail modal** gains an "Epic Context" section in the left panel:
+
+```
+┌──────────────────────┬──────────────────────────────────┐
+│ Task Detail          │ Results                          │
+│                      │                                  │
+│ ── Epic Context ──   │ (existing result/log view)       │
+│ epic:sandbox-backends│                                  │
+│ Phase 1 of 2         │                                  │
+│ 5/7 tasks done       │                                  │
+│                      │                                  │
+│ Dependencies:        │                                  │
+│  ✓ define-interface  │                                  │
+│  ✓ local-backend     │                                  │
+│                      │                                  │
+│ Dependents:          │                                  │
+│  ○ retire-executor   │                                  │
+│  ○ update-registry   │                                  │
+│                      │                                  │
+│ ── Specs & Goals ──  │                                  │
+│ (existing prompt/    │                                  │
+│  goal view)          │                                  │
+└──────────────────────┴──────────────────────────────────┘
+```
+
+- **Epic Context section**: appears above the existing Specs & Goals section in the left panel. Only shown for tasks with `epic:*` tags.
+- **Dependencies/Dependents**: clickable task titles that navigate to those tasks' detail modals.
+- **Phase progress**: compact "5/7 tasks done" with mini progress bar (same style as the epic progress panel but inline).
+
+### Gate Oversight
+
+When a gate task completes, its **oversight summary** includes a structured verification report:
+
+```
+── Gate: Phase 1 Verification ──
+
+Test Suite:     ✓ 142 passed, 0 failed, 0 skipped
+Lint:           ✓ no issues
+Vet:            ✓ no issues
+Compilation:    ✓ clean build
+
+Phase 1 tasks verified:
+  ✓ define-interface — SandboxBackend/SandboxHandle defined
+  ✓ local-backend — LocalBackend wraps os/exec with state tracking
+  ✓ runner-migration — Runner uses backend.Launch() instead of executor.RunArgs()
+  ...
+
+Verdict: PASS — Phase 2 tasks are now unblocked.
+```
+
+This is generated by the gate agent (via `prompts/gate.tmpl`) and displayed in the standard oversight panel. The gate template instructs the agent to produce this structured format.
+
+### Re-Planning UX
+
+When a planner's decomposition needs adjustment:
+
+1. **Cancel epic tasks**: The epic progress panel shows a **"Cancel All"** button (`.btn-danger`) per phase. Clicking cancels all backlog/waiting tasks in that phase (not in-progress or done tasks). Confirmation dialog: "Cancel 4 backlog tasks in Phase 2? Done tasks will be preserved."
+
+2. **Re-plan**: After cancellation, the user creates a new planner task. The planner agent sees the completed tasks in board.json and skips already-done work, creating only the remaining tasks.
+
+3. **Edit individual tasks**: Tasks created by the planner are regular tasks. The user can edit prompts, add/remove dependencies, change timeouts — all via the existing task detail modal.
+
+### Notification & Status
+
+The **status bar** (bottom of the page) gains epic awareness:
+
+```
+● Connected · repo-a, repo-b  │  2 in progress · 1 waiting  │  epic: sandbox-backends 5/7
+```
+
+When an epic filter is active, the status bar shows the filtered epic's progress (`5/7`). Uses `var(--text-muted)` for the label, `var(--text)` for the count. Clicking navigates to the epic progress panel.
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `E` | Toggle epic progress panel |
+| `1`–`9` (when epic bar visible) | Switch to epic filter by position |
+| `0` or `Esc` | Clear epic filter (show all) |
+
+These follow the existing shortcut pattern (single-key when no input is focused).
+
+---
+
 ## Example: Using the System
 
 **Step 1:** Create a planner task:
