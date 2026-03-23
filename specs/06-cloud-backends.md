@@ -44,77 +44,13 @@ Instead, the cloud deployment strategy follows the **Codespaces model**: a contr
                           └─────────────────────┘
 ```
 
-This decomposes into three cross-cutting epics, plus related specs that have cloud-dependent phases:
+This decomposes into three cross-cutting epics (see [README.md](README.md) for the full milestone roadmap):
 
 | Epic | Spec | What it covers |
 |------|------|----------------|
-| **Sandbox Executor** | [`01-sandbox-backends.md`](01-sandbox-backends.md) | Pluggable `SandboxBackend` interface; local, K8s, and remote Docker backends |
-| **Data Storage** | [`02-storage-backends.md`](02-storage-backends.md) | Pluggable `StorageBackend` interface; filesystem, PostgreSQL, and S3 backends |
-| **Container Reuse** | [`03-container-reuse.md`](03-container-reuse.md) | Long-lived worker containers inside `LocalBackend` (depends on sandbox executor) |
-| **File Explorer** | [`04-file-explorer.md`](04-file-explorer.md) | Workspace file browser; Phase 4 adds cloud `WorkspaceFS` abstraction |
-| **Host Terminal** | [`05-host-terminal.md`](05-host-terminal.md) | Web terminal; Phase 3 adds container exec for cloud |
-| **Desktop App** | [`07-native-desktop-app.md`](07-native-desktop-app.md) | Wails native wrapper (independent) |
-| **Multi-Tenant** | [`08-cloud-multi-tenant.md`](08-cloud-multi-tenant.md) | Control plane, user auth, instance provisioning and lifecycle |
-
-### Implementation Milestones
-
-The specs are sequenced into 8 milestones to minimize cross-impacts. Interface extractions come first (pure refactors, no behavior change), local UX features deliver value early, and cloud integration is deferred to the end.
-
-```
-                                ┌──▶ M3: Container Reuse
-                                │
-M1: Sandbox Backend Interface ──┼──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
-                                │           ▲                     (capstone)
-                                │   M2: Storage Interface ─┤
-                                │           │               │
-                                │           └──▶ M2.5: Multi-Workspace Groups
-                                │
-                                ├──▶ Native Containerization (platform-specific)
-                                │     ├─ Linux  (bubblewrap, systemd-nspawn)
-                                │     ├─ macOS  (Virtualization.framework, sandbox_init)
-                                │     └─ Windows (Job Objects, Hyper-V)
-                                │
-M4: File Explorer (local) ──────┼────────────────────────▶│ (Phase 4)
-M5: Host Terminal (local) ──────┼────────────────────────▶│ (Phase 3)
-M7: Desktop App ────────────────┘ (ships after UX)
-```
-
-| # | Milestone | Spec Phases | Delivers |
-|---|-----------|-------------|----------|
-| **M1** | Sandbox backend interface | sandbox-executor Ph1 | `SandboxBackend`/`SandboxHandle` + `LocalBackend` (pure refactor) |
-| **M2** | Storage backend interface | data-storage Ph1–3 | `StorageBackend` + `FilesystemBackend` + `TurnOutputWriter` (pure refactor) |
-| **M3** | Container reuse | container-reuse Ph1–2 | Aux worker containers for title/oversight/commit (~10x startup savings) |
-| **M4** | File explorer | file-explorer Ph1–3 | Browse + edit workspace files in the web UI |
-| **M5** | Host terminal | host-terminal Ph1–2 | Interactive shell in the web UI (WebSocket + PTY) |
-| **M6** | Cloud backends | sandbox-executor Ph2–3, data-storage Ph4–7 | K8s backend, PostgreSQL, S3, migration tool |
-| **M7** | Desktop app | native-desktop-app | Wails native wrapper (macOS .app, Windows .exe) |
-| **M8** | Multi-tenant (capstone) | multi-tenant all, deferred phases | Control plane, auth, instance lifecycle, cloud file/terminal access |
-
-**Branches from M1 (independent, any time after M1):**
-
-| Platform | Spec | Delivers |
-|----------|------|----------|
-| Linux | [native-containerization-linux.md](native-containerization-linux.md) | `BubblewrapBackend`, `NspawnBackend` — daemon-free, zero-install on most distros |
-| macOS | [native-containerization-macos.md](native-containerization-macos.md) | `VZBackend` (Virtualization.framework VM), `SandboxInitBackend` (sandbox_init) — no Docker/Podman needed |
-| Windows | [native-containerization-windows.md](native-containerization-windows.md) | `JobObjectBackend`, `HyperVBackend` — native Windows isolation without Docker Desktop |
-
-These are alternative `SandboxBackend` implementations that plug into the interface defined in M1. They are platform-specific and independent of each other and of M2–M8. Implement as needed based on platform priority.
-
-**Branch from M2 (after store interfaces are stable):**
-
-| Spec | Delivers |
-|------|----------|
-| [multiple-concurrent-workspace-groups.md](multiple-concurrent-workspace-groups.md) | Multi-store manager, runner task-to-group mapping, watcher multi-store iteration. Allows tasks in different workspace groups to run simultaneously. |
-
-Multi-workspace groups modifies store lifecycle, runner execution paths, and handler watchers. Placed after M2 because it touches Store lifecycle patterns that M2 also refactors (`StorageBackend` extraction). Independent of M3 (container reuse is internal to `LocalBackend`) and M4–M5 (different code paths). Benefits M8 (multi-tenant) by proving multi-store concurrency.
-
-**Ordering rationale:**
-- **M1–M2 first:** Pure refactors that create the abstraction seams all downstream milestones plug into. Low risk, high leverage.
-- **M3 after M1:** Container reuse modifies the same `internal/runner/` files. Doing it right after M1 avoids revisiting them later.
-- **M2.5 after M2:** Multi-workspace groups modifies store lifecycle; wait for `StorageBackend` interfaces to stabilize. Can run in parallel with M3.
-- **M4–M5 before M6:** Deliver user-visible value with no cloud dependency. Exercise different code paths (`internal/handler/` + `ui/`) than M1–M3.
-- **M7 after M4–M5:** Desktop app ships with file explorer + terminal already built in. (Fully independent — can move earlier.)
-- **M8 last:** Capstone that wires everything together. Picks up deferred cloud phases from M3/M4/M5.
+| **Sandbox Executor** | [01-sandbox-backends.md](01-sandbox-backends.md) | Pluggable `SandboxBackend` interface; local, K8s, and remote Docker backends |
+| **Data Storage** | [02-storage-backends.md](02-storage-backends.md) | Pluggable `StorageBackend` interface; filesystem, PostgreSQL, and S3 backends |
+| **Multi-Tenant** | [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) | Control plane, user auth, instance provisioning and lifecycle |
 
 ---
 

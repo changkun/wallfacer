@@ -9,7 +9,7 @@ inside WSL2 today. This spec covers Tier 2: running the Go server natively on
 a Windows host, with Linux sandbox containers launched via Docker Desktop or
 Podman Desktop (both use a WSL2 backend internally).
 
-For containerization backend analysis, see `specs/native-containerization-windows.md`.
+For containerization backend analysis, see `specs/01c-native-sandbox-windows.md`.
 
 ## What Tier 1 Already Covers
 

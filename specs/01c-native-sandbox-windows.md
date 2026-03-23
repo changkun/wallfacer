@@ -218,4 +218,4 @@ launch, SELinux mount opts, path separators) are all complete — see the
 "Server Prerequisites" section above.
 
 For remaining Tier 2 work (release binaries, path translation, e2e testing),
-see `specs/windows-support.md`.
+see `specs/01d-windows-support.md`.
