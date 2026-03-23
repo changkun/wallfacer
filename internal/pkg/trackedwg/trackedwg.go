@@ -39,6 +39,16 @@ func (w *WaitGroup) Done(label string) {
 	w.wg.Done()
 }
 
+// Go launches fn in a background goroutine tracked under label.
+// It is shorthand for Add(label) followed by a goroutine that defers Done(label).
+func (w *WaitGroup) Go(label string, fn func()) {
+	w.Add(label)
+	go func() {
+		defer w.Done(label)
+		fn()
+	}()
+}
+
 // Wait blocks until all tracked goroutines have called Done.
 func (w *WaitGroup) Wait() {
 	w.wg.Wait()

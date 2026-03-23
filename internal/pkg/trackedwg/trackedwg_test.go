@@ -121,6 +121,44 @@ func TestWaitGroup_ConcurrentAddDone(t *testing.T) {
 	}
 }
 
+func TestWaitGroup_Go(t *testing.T) {
+	var wg WaitGroup
+	done := make(chan struct{})
+
+	wg.Go("work", func() {
+		close(done)
+	})
+
+	// Verify label is tracked.
+	<-done // wait for goroutine body to execute
+	// Give a moment for Done to fire.
+	wg.Wait()
+
+	if p := wg.Pending(); len(p) != 0 {
+		t.Fatalf("expected empty Pending after Go+Wait, got %v", p)
+	}
+}
+
+func TestWaitGroup_Go_TracksLabel(t *testing.T) {
+	var wg WaitGroup
+	started := make(chan struct{})
+	release := make(chan struct{})
+
+	wg.Go("blocker", func() {
+		close(started)
+		<-release
+	})
+
+	<-started
+	pending := wg.Pending()
+	if len(pending) != 1 || pending[0] != "blocker" {
+		t.Fatalf("expected [blocker] in Pending, got %v", pending)
+	}
+
+	close(release)
+	wg.Wait()
+}
+
 func TestWaitGroup_AddOrdering(t *testing.T) {
 	var wg WaitGroup
 
