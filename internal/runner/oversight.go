@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -249,7 +249,7 @@ func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID, fromTur
 			turnFiles = append(turnFiles, filepath.Join(outputsDir, e.Name()))
 		}
 	}
-	sort.Strings(turnFiles)
+	slices.Sort(turnFiles)
 
 	var activities []turnActivity
 	for i, path := range turnFiles {

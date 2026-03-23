@@ -8,7 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"testing"
 	"time"
 
@@ -462,7 +462,7 @@ func TestMigrateTaskJSON_CanonicalizeDependsOn(t *testing.T) {
 	}
 
 	want := []string{id1.String(), id2.String()}
-	sort.Strings(want)
+	slices.Sort(want)
 	if !stringSliceEqual(task.DependsOn, want) {
 		t.Errorf("DependsOn = %v, want %v", task.DependsOn, want)
 	}

@@ -11,10 +11,11 @@
 package metrics
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"math"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -111,12 +112,11 @@ func (r *Registry) WritePrometheus(w io.Writer) {
 	for _, h := range r.histograms {
 		hs = append(hs, h)
 	}
-	gs := make([]gaugeEntry, len(r.gauges))
-	copy(gs, r.gauges)
+	gs := slices.Clone(r.gauges)
 	r.mu.Unlock()
 
-	sort.Slice(cs, func(i, j int) bool { return cs[i].name < cs[j].name })
-	sort.Slice(hs, func(i, j int) bool { return hs[i].name < hs[j].name })
+	slices.SortFunc(cs, func(a, b *Counter) int { return cmp.Compare(a.name, b.name) })
+	slices.SortFunc(hs, func(a, b *Histogram) int { return cmp.Compare(a.name, b.name) })
 
 	for _, c := range cs {
 		c.writeTo(w)
@@ -227,9 +227,8 @@ type histogramCell struct {
 }
 
 func newHistogram(name, help string, buckets []float64) *Histogram {
-	bs := make([]float64, len(buckets))
-	copy(bs, buckets)
-	sort.Float64s(bs)
+	bs := slices.Clone(buckets)
+	slices.Sort(bs)
 	return &Histogram{
 		name:    name,
 		help:    help,

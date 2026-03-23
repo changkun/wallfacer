@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -318,8 +318,8 @@ func (s *Store) ListDeletedTasks(_ context.Context) ([]Task, error) {
 	for _, t := range s.deleted {
 		out = append(out, deepCloneTask(t))
 	}
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].UpdatedAt.After(out[j].UpdatedAt)
+	slices.SortFunc(out, func(a, b Task) int {
+		return b.UpdatedAt.Compare(a.UpdatedAt)
 	})
 	return out, nil
 }

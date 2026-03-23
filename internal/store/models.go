@@ -222,10 +222,8 @@ var allowedTransitions = map[TaskStatus][]TaskStatus{
 // permitted by the task state machine, or a descriptive error wrapping
 // ErrInvalidTransition if it is not.
 func ValidateTransition(from, to TaskStatus) error {
-	for _, allowed := range allowedTransitions[from] {
-		if allowed == to {
-			return nil
-		}
+	if slices.Contains(allowedTransitions[from], to) {
+		return nil
 	}
 	return fmt.Errorf("%w: %s → %s", ErrInvalidTransition, from, to)
 }
@@ -375,12 +373,7 @@ func IsAutoRetryEligible(t Task, category FailureCategory) bool {
 
 // HasTag reports whether the task has the given tag.
 func (t *Task) HasTag(tag string) bool {
-	for _, v := range t.Tags {
-		if v == tag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(t.Tags, tag)
 }
 
 // cloneRefinementSessionSlice deep-copies a []RefinementSession, duplicating

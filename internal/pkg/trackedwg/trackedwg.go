@@ -4,7 +4,7 @@ package trackedwg
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"sync"
 )
 
@@ -67,6 +67,6 @@ func (w *WaitGroup) Pending() []string {
 			result = append(result, fmt.Sprintf("%s×%d", label, count))
 		}
 	}
-	sort.Strings(result)
+	slices.Sort(result)
 	return result
 }

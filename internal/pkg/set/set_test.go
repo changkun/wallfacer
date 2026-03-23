@@ -1,7 +1,7 @@
 package set
 
 import (
-	"sort"
+	"slices"
 	"testing"
 )
 
@@ -66,7 +66,7 @@ func TestHas_Miss(t *testing.T) {
 func TestItems(t *testing.T) {
 	s := New(3, 1, 2)
 	items := s.Items()
-	sort.Ints(items)
+	slices.Sort(items)
 	if len(items) != 3 || items[0] != 1 || items[1] != 2 || items[2] != 3 {
 		t.Fatalf("unexpected items: %v", items)
 	}

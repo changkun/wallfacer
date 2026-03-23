@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -258,9 +259,7 @@ func (h *Handler) currentWorkspaces() []string {
 	if len(ws) == 0 {
 		return nil
 	}
-	out := make([]string, len(ws))
-	copy(out, ws)
-	return out
+	return slices.Clone(ws)
 }
 
 func (h *Handler) currentInstructionsPath() string {

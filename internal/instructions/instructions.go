@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -64,9 +64,8 @@ create files or directories directly under ` + "`/workspace/`" + `.
 // The key is derived from the SHA-256 of the sorted, colon-joined absolute paths,
 // so the same set of workspaces always maps to the same file regardless of order.
 func Key(workspaces []string) string {
-	sorted := make([]string, len(workspaces))
-	copy(sorted, workspaces)
-	sort.Strings(sorted)
+	sorted := slices.Clone(workspaces)
+	slices.Sort(sorted)
 	h := sha256.Sum256([]byte(strings.Join(sorted, ":")))
 	return fmt.Sprintf("%x", h[:8]) // 16 hex chars
 }

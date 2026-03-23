@@ -2,7 +2,7 @@ package store
 
 import (
 	"encoding/json"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -121,7 +121,7 @@ func canonicalizeDependsOn(deps []string) []string {
 		seen[id] = struct{}{}
 		out = append(out, id.String()) // canonical lowercase hyphenated form
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	if len(out) == 0 {
 		return nil
 	}

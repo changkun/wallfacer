@@ -1,10 +1,11 @@
 package runner
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/constants"
@@ -249,11 +250,11 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 		}
 		valid = append(valid, idea)
 	}
-	sort.Slice(valid, func(i, j int) bool {
-		if valid[i].ImpactScore == valid[j].ImpactScore {
-			return valid[i].Title < valid[j].Title
+	slices.SortFunc(valid, func(a, b IdeateResult) int {
+		if c := cmp.Compare(b.ImpactScore, a.ImpactScore); c != 0 {
+			return c
 		}
-		return valid[i].ImpactScore > valid[j].ImpactScore
+		return strings.Compare(a.Title, b.Title)
 	})
 	if len(valid) > constants.MaxIdeationIdeas {
 		valid = valid[:constants.MaxIdeationIdeas]

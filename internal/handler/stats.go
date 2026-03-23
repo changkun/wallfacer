@@ -1,8 +1,9 @@
 package handler
 
 import (
+	"cmp"
 	"net/http"
-	"sort"
+	"slices"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/store"
@@ -143,10 +144,9 @@ func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.T
 	}
 
 	// TopTasks: sort all tasks by cost descending, take top 10.
-	sorted := make([]store.Task, len(tasks))
-	copy(sorted, tasks)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Usage.CostUSD > sorted[j].Usage.CostUSD
+	sorted := slices.Clone(tasks)
+	slices.SortFunc(sorted, func(a, b store.Task) int {
+		return cmp.Compare(b.Usage.CostUSD, a.Usage.CostUSD)
 	})
 	top := min(10, len(sorted))
 	resp.TopTasks = make([]TaskCostEntry, top)

@@ -1,12 +1,13 @@
 package handler
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -298,14 +299,14 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			if len(cpCandidates) == 0 {
 				return nil, nil
 			}
-			sort.Slice(cpCandidates, func(i, j int) bool {
-				if cpCandidates[i].score != cpCandidates[j].score {
-					return cpCandidates[i].score > cpCandidates[j].score
+			slices.SortFunc(cpCandidates, func(a, b cpCandidate) int {
+				if c := cmp.Compare(b.score, a.score); c != 0 {
+					return c
 				}
-				if cpCandidates[i].task.Position != cpCandidates[j].task.Position {
-					return cpCandidates[i].task.Position < cpCandidates[j].task.Position
+				if c := cmp.Compare(a.task.Position, b.task.Position); c != 0 {
+					return c
 				}
-				return cpCandidates[i].task.CreatedAt.Before(cpCandidates[j].task.CreatedAt)
+				return a.task.CreatedAt.Compare(b.task.CreatedAt)
 			})
 			best := cpCandidates[0].task
 			return &best, nil

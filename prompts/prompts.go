@@ -16,6 +16,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"text/template"
 
 	"changkun.de/x/wallfacer/internal/logger"
@@ -121,9 +122,7 @@ func NewManager(userDir string) *Manager {
 
 // KnownNames returns all known template API names in a fixed order.
 func (m *Manager) KnownNames() []string {
-	result := make([]string, len(knownNames))
-	copy(result, knownNames)
-	return result
+	return slices.Clone(knownNames)
 }
 
 // PromptsDir returns the user override directory for this Manager, or an

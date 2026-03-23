@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,7 +9,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -111,8 +112,7 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 	if r.boardCache.json != nil &&
 		r.boardCache.seq == currentSeq &&
 		r.boardCache.selfTaskID == selfTaskID {
-		jsonCopy := make([]byte, len(r.boardCache.json))
-		copy(jsonCopy, r.boardCache.json)
+		jsonCopy := slices.Clone(r.boardCache.json)
 		mountsCopy := deepCopyMounts(r.boardCache.mounts)
 		r.boardCache.mu.Unlock()
 		return jsonCopy, mountsCopy, nil
@@ -298,7 +298,12 @@ func logBoardManifestSizeWarning(sizes []struct {
 	id    string
 	bytes int
 }, totalBytes int) {
-	sort.Slice(sizes, func(i, j int) bool { return sizes[i].bytes > sizes[j].bytes })
+	slices.SortFunc(sizes, func(a, b struct {
+		id    string
+		bytes int
+	}) int {
+		return cmp.Compare(b.bytes, a.bytes)
+	})
 
 	top := sizes
 	if len(top) > 5 {

@@ -1,10 +1,11 @@
 package runner
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -244,13 +245,11 @@ func (r *Runner) collectWorkspaceChurnSignals(ctx context.Context) ([]prompts.Wo
 	for _, sig := range byDisplayPath {
 		result = append(result, *sig)
 	}
-	sort.Slice(result, func(i, j int) bool {
-		si := effectiveScore(result[i].Score, result[i].Boosted)
-		sj := effectiveScore(result[j].Score, result[j].Boosted)
-		if si != sj {
-			return si > sj
+	slices.SortFunc(result, func(a, b prompts.WorkspaceSignal) int {
+		if c := cmp.Compare(effectiveScore(b.Score, b.Boosted), effectiveScore(a.Score, a.Boosted)); c != 0 {
+			return c
 		}
-		return result[i].DisplayPath < result[j].DisplayPath
+		return strings.Compare(a.DisplayPath, b.DisplayPath)
 	})
 	if len(result) > constants.MaxIdeationChurnSignals {
 		result = result[:constants.MaxIdeationChurnSignals]
@@ -309,11 +308,11 @@ func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(ctx context.Context, w
 		for p, c := range all {
 			items = append(items, kv{p, c})
 		}
-		sort.Slice(items, func(i, j int) bool {
-			if items[i].count != items[j].count {
-				return items[i].count > items[j].count
+		slices.SortFunc(items, func(a, b kv) int {
+			if c := cmp.Compare(b.count, a.count); c != 0 {
+				return c
 			}
-			return items[i].path < items[j].path
+			return strings.Compare(a.path, b.path)
 		})
 		maxItems := 3
 		if maxItems > len(items) {
@@ -335,13 +334,11 @@ func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(ctx context.Context, w
 	for path, count := range counts {
 		list = append(list, ranked{path, count, isBoostedPath(path)})
 	}
-	sort.Slice(list, func(i, j int) bool {
-		si := effectiveScore(list[i].count, list[i].boosted)
-		sj := effectiveScore(list[j].count, list[j].boosted)
-		if si != sj {
-			return si > sj
+	slices.SortFunc(list, func(a, b ranked) int {
+		if c := cmp.Compare(effectiveScore(b.count, b.boosted), effectiveScore(a.count, a.boosted)); c != 0 {
+			return c
 		}
-		return list[i].path < list[j].path
+		return strings.Compare(a.path, b.path)
 	})
 
 	basename := workspaceBasename(workspace)
@@ -393,13 +390,11 @@ func (r *Runner) collectWorkspaceTodoSignals(ctx context.Context) ([]prompts.Wor
 	for _, sig := range byDisplayPath {
 		result = append(result, *sig)
 	}
-	sort.Slice(result, func(i, j int) bool {
-		si := effectiveScore(result[i].Score, result[i].Boosted)
-		sj := effectiveScore(result[j].Score, result[j].Boosted)
-		if si != sj {
-			return si > sj
+	slices.SortFunc(result, func(a, b prompts.WorkspaceSignal) int {
+		if c := cmp.Compare(effectiveScore(b.Score, b.Boosted), effectiveScore(a.Score, a.Boosted)); c != 0 {
+			return c
 		}
-		return result[i].DisplayPath < result[j].DisplayPath
+		return strings.Compare(a.DisplayPath, b.DisplayPath)
 	})
 	if len(result) > constants.MaxIdeationTodoSignals {
 		result = result[:constants.MaxIdeationTodoSignals]
@@ -462,11 +457,11 @@ func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(ctx context.Context, wo
 		for p, c := range all {
 			items = append(items, kv{p, c})
 		}
-		sort.Slice(items, func(i, j int) bool {
-			if items[i].count != items[j].count {
-				return items[i].count > items[j].count
+		slices.SortFunc(items, func(a, b kv) int {
+			if c := cmp.Compare(b.count, a.count); c != 0 {
+				return c
 			}
-			return items[i].path < items[j].path
+			return strings.Compare(a.path, b.path)
 		})
 		maxItems := 3
 		if maxItems > len(items) {
@@ -487,13 +482,11 @@ func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(ctx context.Context, wo
 	for path, count := range counts {
 		list = append(list, ranked{path, count, isBoostedPath(path)})
 	}
-	sort.Slice(list, func(i, j int) bool {
-		si := effectiveScore(list[i].count, list[i].boosted)
-		sj := effectiveScore(list[j].count, list[j].boosted)
-		if si != sj {
-			return si > sj
+	slices.SortFunc(list, func(a, b ranked) int {
+		if c := cmp.Compare(effectiveScore(b.count, b.boosted), effectiveScore(a.count, a.boosted)); c != 0 {
+			return c
 		}
-		return list[i].path < list[j].path
+		return strings.Compare(a.path, b.path)
 	})
 
 	basename := workspaceBasename(workspace)

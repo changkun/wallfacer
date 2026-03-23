@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
@@ -170,14 +170,14 @@ func (r *Runner) buildContainerArgsForSandbox(
 	for shortID := range siblingMounts {
 		shortIDs = append(shortIDs, shortID)
 	}
-	sort.Strings(shortIDs)
+	slices.Sort(shortIDs)
 	for _, shortID := range shortIDs {
 		repos := siblingMounts[shortID]
 		repoPaths := make([]string, 0, len(repos))
 		for repoPath := range repos {
 			repoPaths = append(repoPaths, repoPath)
 		}
-		sort.Strings(repoPaths)
+		slices.Sort(repoPaths)
 		for _, repoPath := range repoPaths {
 			wtPath := repos[repoPath]
 			basename := sanitizeBasename(repoPath)

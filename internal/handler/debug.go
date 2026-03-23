@@ -1,11 +1,12 @@
 package handler
 
 import (
+	"cmp"
 	"encoding/json"
 	"math"
 	"net/http"
 	"runtime"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -197,7 +198,7 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Compute percentiles for execution durations.
-	sort.Float64s(execDurations)
+	slices.Sort(execDurations)
 	var medianExecS, p95ExecS, avgExecS float64
 	if n := len(execDurations); n > 0 {
 		medianExecS = execDurations[percentileIndex(n, 50)]
@@ -226,7 +227,7 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 
 	phases := make(map[string]phaseStats, len(durations))
 	for phase, ds := range durations {
-		sort.Slice(ds, func(i, j int) bool { return ds[i] < ds[j] })
+		slices.SortFunc(ds, cmp.Compare)
 		n := len(ds)
 		var sumMs int64
 		for _, d := range ds {

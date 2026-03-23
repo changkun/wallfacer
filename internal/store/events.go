@@ -1,12 +1,13 @@
 package store
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -64,8 +65,7 @@ func (s *Store) GetEvents(_ context.Context, taskID uuid.UUID) ([]TaskEvent, err
 	defer s.mu.RUnlock()
 
 	events := s.events[taskID]
-	out := make([]TaskEvent, len(events))
-	copy(out, events)
+	out := slices.Clone(events)
 	return out, nil
 }
 
@@ -179,8 +179,8 @@ func ComputeSpans(events []TaskEvent) ([]SpanResult, error) {
 		})
 	}
 
-	sort.Slice(spans, func(i, j int) bool {
-		return spans[i].StartedAt.Before(spans[j].StartedAt)
+	slices.SortFunc(spans, func(a, b SpanResult) int {
+		return a.StartedAt.Compare(b.StartedAt)
 	})
 
 	return spans, nil
@@ -278,8 +278,8 @@ func (s *Store) compactTaskEvents(taskID uuid.UUID, maxSeq int64) error {
 		return nil
 	}
 
-	sort.Slice(traceFiles, func(i, j int) bool {
-		return traceFiles[i].seq < traceFiles[j].seq
+	slices.SortFunc(traceFiles, func(a, b numberedTraceFile) int {
+		return cmp.Compare(a.seq, b.seq)
 	})
 
 	var compact []byte

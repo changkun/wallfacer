@@ -1,7 +1,10 @@
 // Package sandbox defines the supported sandbox runtime types.
 package sandbox
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // Type identifies a sandbox runtime (e.g. "claude", "codex").
 type Type string
@@ -16,9 +19,7 @@ var all = []Type{Claude, Codex}
 
 // All returns a copy of all known sandbox types.
 func All() []Type {
-	out := make([]Type, len(all))
-	copy(out, all)
-	return out
+	return slices.Clone(all)
 }
 
 // Parse attempts to parse value into a known sandbox Type.

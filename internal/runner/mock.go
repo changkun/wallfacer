@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -50,27 +51,21 @@ var _ Interface = (*MockRunner)(nil)
 func (m *MockRunner) RunCalls() []uuid.UUID {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	out := make([]uuid.UUID, len(m.RunBackgroundCalls))
-	copy(out, m.RunBackgroundCalls)
-	return out
+	return slices.Clone(m.RunBackgroundCalls)
 }
 
 // KillCalls returns a race-safe snapshot of the KillContainer call IDs.
 func (m *MockRunner) KillCalls() []uuid.UUID {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	out := make([]uuid.UUID, len(m.KillContainerCalls))
-	copy(out, m.KillContainerCalls)
-	return out
+	return slices.Clone(m.KillContainerCalls)
 }
 
 // KillRefineCalls returns a race-safe snapshot of the KillRefineContainer call IDs.
 func (m *MockRunner) KillRefineCalls() []uuid.UUID {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	out := make([]uuid.UUID, len(m.KillRefineContainerCalls))
-	copy(out, m.KillRefineContainerCalls)
-	return out
+	return slices.Clone(m.KillRefineContainerCalls)
 }
 
 // RunBackground records the call and returns immediately.

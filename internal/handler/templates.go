@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -58,8 +58,8 @@ func (h *Handler) ListTemplates(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	sort.Slice(templates, func(i, j int) bool {
-		return templates[i].CreatedAt.After(templates[j].CreatedAt)
+	slices.SortFunc(templates, func(a, b PromptTemplate) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
 	})
 	writeJSON(w, http.StatusOK, templates)
 }
@@ -115,13 +115,7 @@ func (h *Handler) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idx := -1
-	for i, t := range templates {
-		if t.ID == id {
-			idx = i
-			break
-		}
-	}
+	idx := slices.IndexFunc(templates, func(t PromptTemplate) bool { return t.ID == id })
 	if idx == -1 {
 		http.Error(w, "template not found", http.StatusNotFound)
 		return

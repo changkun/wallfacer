@@ -1,14 +1,24 @@
 package store
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
+	"strings"
 
 	"changkun.de/x/wallfacer/internal/logger"
 	"github.com/google/uuid"
 )
+
+// cmpTaskPositionCreatedAt orders tasks by Position ascending, then CreatedAt ascending.
+func cmpTaskPositionCreatedAt(a, b Task) int {
+	if c := cmp.Compare(a.Position, b.Position); c != 0 {
+		return c
+	}
+	return a.CreatedAt.Compare(b.CreatedAt)
+}
 
 // ListTasksByStatus returns all tasks with the given status, sorted by position then creation time.
 func (s *Store) ListTasksByStatus(_ context.Context, status TaskStatus) ([]Task, error) {
@@ -24,12 +34,7 @@ func (s *Store) ListTasksByStatus(_ context.Context, status TaskStatus) ([]Task,
 		}
 		tasks = append(tasks, cloneTask(t))
 	}
-	sort.Slice(tasks, func(i, j int) bool {
-		if tasks[i].Position != tasks[j].Position {
-			return tasks[i].Position < tasks[j].Position
-		}
-		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
-	})
+	slices.SortFunc(tasks, cmpTaskPositionCreatedAt)
 	return tasks, nil
 }
 
@@ -101,12 +106,7 @@ func (s *Store) ListTasks(_ context.Context, includeArchived bool) ([]Task, erro
 		}
 		tasks = append(tasks, cloneTask(t))
 	}
-	sort.Slice(tasks, func(i, j int) bool {
-		if tasks[i].Position != tasks[j].Position {
-			return tasks[i].Position < tasks[j].Position
-		}
-		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
-	})
+	slices.SortFunc(tasks, cmpTaskPositionCreatedAt)
 	return tasks, nil
 }
 
@@ -126,12 +126,7 @@ func (s *Store) ListTasksAndSeq(_ context.Context, includeArchived bool) ([]Task
 		}
 		tasks = append(tasks, cloneTask(t))
 	}
-	sort.Slice(tasks, func(i, j int) bool {
-		if tasks[i].Position != tasks[j].Position {
-			return tasks[i].Position < tasks[j].Position
-		}
-		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
-	})
+	slices.SortFunc(tasks, cmpTaskPositionCreatedAt)
 	return tasks, s.hub.LatestSeq(), nil
 }
 
@@ -161,11 +156,11 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 		}
 		archived = append(archived, cloneTask(t))
 	}
-	sort.Slice(archived, func(i, j int) bool {
-		if archived[i].UpdatedAt.Equal(archived[j].UpdatedAt) {
-			return archived[i].ID.String() > archived[j].ID.String()
+	slices.SortFunc(archived, func(a, b Task) int {
+		if c := b.UpdatedAt.Compare(a.UpdatedAt); c != 0 {
+			return c
 		}
-		return archived[i].UpdatedAt.After(archived[j].UpdatedAt)
+		return strings.Compare(b.ID.String(), a.ID.String())
 	})
 
 	total := len(archived)
@@ -176,13 +171,7 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 	start, end := 0, min(pageSize, total)
 	switch {
 	case beforeID != nil:
-		idx := -1
-		for i := range archived {
-			if archived[i].ID == *beforeID {
-				idx = i
-				break
-			}
-		}
+		idx := slices.IndexFunc(archived, func(t Task) bool { return t.ID == *beforeID })
 		if idx == -1 {
 			return nil, total, false, false, fmt.Errorf("before cursor task not found")
 		}
@@ -192,13 +181,7 @@ func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID,
 		}
 		end = min(start+pageSize, total)
 	case afterID != nil:
-		idx := -1
-		for i := range archived {
-			if archived[i].ID == *afterID {
-				idx = i
-				break
-			}
-		}
+		idx := slices.IndexFunc(archived, func(t Task) bool { return t.ID == *afterID })
 		if idx == -1 {
 			return nil, total, false, false, fmt.Errorf("after cursor task not found")
 		}
@@ -233,12 +216,9 @@ func (s *Store) TasksDependingOn(_ context.Context, taskID uuid.UUID) ([]*Task, 
 		default:
 			continue
 		}
-		for _, depStr := range t.DependsOn {
-			if depStr == taskIDStr {
-				cp := deepCloneTask(t)
-				result = append(result, &cp)
-				break
-			}
+		if slices.Contains(t.DependsOn, taskIDStr) {
+			cp := deepCloneTask(t)
+			result = append(result, &cp)
 		}
 	}
 	return result, nil

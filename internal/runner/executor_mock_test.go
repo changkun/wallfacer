@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 )
 
@@ -67,16 +68,12 @@ func (m *MockContainerExecutor) Kill(name string) {
 func (m *MockContainerExecutor) RunArgsCalls() []ContainerCall {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	result := make([]ContainerCall, len(m.calls))
-	copy(result, m.calls)
-	return result
+	return slices.Clone(m.calls)
 }
 
 // KillCalls returns a copy of all recorded Kill invocations.
 func (m *MockContainerExecutor) KillCalls() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	result := make([]string, len(m.killCalls))
-	copy(result, m.killCalls)
-	return result
+	return slices.Clone(m.killCalls)
 }

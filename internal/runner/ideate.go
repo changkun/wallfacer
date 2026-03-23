@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -70,26 +71,21 @@ var ideaCategoryPool = []string{
 // IdeationCategories returns the full inspiration pool used when generating
 // brainstorm prompts.
 func (r *Runner) IdeationCategories() []string {
-	result := make([]string, len(ideaCategoryPool))
-	copy(result, ideaCategoryPool)
-	return result
+	return slices.Clone(ideaCategoryPool)
 }
 
 // IdeationIgnorePatterns returns the ordered list of path prefixes excluded from
 // workspace signal collection. This is exposed via GET /api/config so clients can
 // understand and reproduce the filtering without reading source code.
 func (r *Runner) IdeationIgnorePatterns() []string {
-	result := make([]string, len(IdeationIgnorePatterns))
-	copy(result, IdeationIgnorePatterns)
-	return result
+	return slices.Clone(IdeationIgnorePatterns)
 }
 
 // pickCategoriesForInspiration returns a broader set of categories for the
 // generate-then-rank pipeline. Unlike pickCategories which assigned one
 // category per idea slot, this provides a larger pool purely as inspiration.
 func pickCategoriesForInspiration() []string {
-	pool := make([]string, len(ideaCategoryPool))
-	copy(pool, ideaCategoryPool)
+	pool := slices.Clone(ideaCategoryPool)
 	for i := len(pool) - 1; i > 0; i-- {
 		j := rand.Intn(i + 1)
 		pool[i], pool[j] = pool[j], pool[i]

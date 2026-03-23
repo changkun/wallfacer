@@ -1,10 +1,11 @@
 package store
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -375,8 +376,8 @@ func (s *Store) loadEvents(id uuid.UUID, dirName string) error {
 	}
 
 	// Sort events by ID for consistent ordering.
-	sort.Slice(events, func(i, j int) bool {
-		return events[i].ID < events[j].ID
+	slices.SortFunc(events, func(a, b TaskEvent) int {
+		return cmp.Compare(a.ID, b.ID)
 	})
 
 	s.events[id] = events
