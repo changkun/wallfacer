@@ -54,10 +54,9 @@ func TestContainerRegistry_Range(t *testing.T) {
 	}
 
 	seen := map[uuid.UUID]string{}
-	r.Range(func(id uuid.UUID, name string) bool {
+	for id, name := range r.All() {
 		seen[id] = name
-		return true
-	})
+	}
 
 	if len(seen) != len(ids) {
 		t.Fatalf("expected %d entries from Range, got %d", len(ids), len(seen))
@@ -76,10 +75,10 @@ func TestContainerRegistry_RangeEarlyStop(t *testing.T) {
 	}
 
 	count := 0
-	r.Range(func(_ uuid.UUID, _ string) bool {
+	for range r.All() {
 		count++
-		return false // stop after first
-	})
+		break // stop after first
+	}
 
 	if count != 1 {
 		t.Fatalf("expected Range to stop after 1 iteration when fn returns false, got %d", count)
@@ -185,8 +184,7 @@ func TestContainerRegistry_ConcurrentAccess(t *testing.T) {
 	wg.Wait()
 
 	// All entries should be gone
-	r.Range(func(id uuid.UUID, name string) bool {
+	for id, name := range r.All() {
 		t.Errorf("unexpected entry after all deletes: id=%v name=%q", id, name)
-		return true
-	})
+	}
 }
