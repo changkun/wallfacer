@@ -61,15 +61,20 @@ This decomposes into three cross-cutting epics, plus related specs that have clo
 The specs are sequenced into 8 milestones to minimize cross-impacts. Interface extractions come first (pure refactors, no behavior change), local UX features deliver value early, and cloud integration is deferred to the end.
 
 ```
-M1: Sandbox Backend Interface ──┬──▶ M3: Container Reuse
+                                ┌──▶ M3: Container Reuse
                                 │
-                                ├──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
+M1: Sandbox Backend Interface ──┼──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
                                 │           ▲                     (capstone)
-M2: Storage Backend Interface ──┘───────────┘
-                                                    ▲
-M4: File Explorer (local) ─────────────────────────▶│ (Phase 4)
-M5: Host Terminal (local) ─────────────────────────▶│ (Phase 3)
-M7: Desktop App ───────────────────────────────────▶│ (ships after UX)
+                                │   M2: Storage Interface ─┘
+                                │
+                                ├──▶ Native Containerization (platform-specific)
+                                │     ├─ Linux  (bubblewrap, systemd-nspawn)
+                                │     ├─ macOS  (Virtualization.framework, sandbox_init)
+                                │     └─ Windows (Job Objects, Hyper-V)
+                                │
+M4: File Explorer (local) ──────┼────────────────────────▶│ (Phase 4)
+M5: Host Terminal (local) ──────┼────────────────────────▶│ (Phase 3)
+M7: Desktop App ────────────────┘ (ships after UX)
 ```
 
 | # | Milestone | Spec Phases | Delivers |
@@ -82,6 +87,16 @@ M7: Desktop App ─────────────────────�
 | **M6** | Cloud backends | sandbox-executor Ph2–3, data-storage Ph4–7 | K8s backend, PostgreSQL, S3, migration tool |
 | **M7** | Desktop app | native-desktop-app | Wails native wrapper (macOS .app, Windows .exe) |
 | **M8** | Multi-tenant (capstone) | multi-tenant all, deferred phases | Control plane, auth, instance lifecycle, cloud file/terminal access |
+
+**Branches from M1 (independent, any time after M1):**
+
+| Platform | Spec | Delivers |
+|----------|------|----------|
+| Linux | [native-containerization-linux.md](native-containerization-linux.md) | `BubblewrapBackend`, `NspawnBackend` — daemon-free, zero-install on most distros |
+| macOS | [native-containerization-macos.md](native-containerization-macos.md) | `VZBackend` (Virtualization.framework VM), `SandboxInitBackend` (sandbox_init) — no Docker/Podman needed |
+| Windows | [native-containerization-windows.md](native-containerization-windows.md) | `JobObjectBackend`, `HyperVBackend` — native Windows isolation without Docker Desktop |
+
+These are alternative `SandboxBackend` implementations that plug into the interface defined in M1. They are platform-specific and independent of each other and of M2–M8. Implement as needed based on platform priority.
 
 **Ordering rationale:**
 - **M1–M2 first:** Pure refactors that create the abstraction seams all downstream milestones plug into. Low risk, high leverage.
