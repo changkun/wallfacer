@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/ndjson"
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
@@ -58,7 +59,7 @@ type Store struct {
 	// count for that status) instead of O(n) full-map scans.
 	// Always accessed under s.mu (read or write lock). Inner maps are never nil
 	// after initialisation — use addToStatusIndex / removeFromStatusIndex.
-	tasksByStatus map[TaskStatus]map[uuid.UUID]struct{}
+	tasksByStatus map[constants.TaskStatus]map[uuid.UUID]struct{}
 
 	// searchIndex holds pre-lowercased text for fast in-memory search.
 	// Entries are created/updated in all task mutation methods and in
@@ -109,13 +110,13 @@ func NewStore(dir string) (*Store, error) {
 		events:              make(map[uuid.UUID][]TaskEvent),
 		nextSeq:             make(map[uuid.UUID]int),
 		eventsLoaded:        make(map[uuid.UUID]bool),
-		tasksByStatus:       make(map[TaskStatus]map[uuid.UUID]struct{}),
+		tasksByStatus:       make(map[constants.TaskStatus]map[uuid.UUID]struct{}),
 		searchIndex:         make(map[uuid.UUID]indexedTaskText),
 		hub:                 pubsub.NewHub[TaskDelta](pubsub.WithClone(cloneTaskDelta)),
-		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", DefaultRetryHistoryLimit),
-		refineSessionsLimit: readEnvInt("WALLFACER_REFINE_SESSIONS_LIMIT", DefaultRefineSessionsLimit),
-		promptHistoryLimit:  readEnvInt("WALLFACER_PROMPT_HISTORY_LIMIT", DefaultPromptHistoryLimit),
-		maxTurnOutputBytes:  readEnvInt("WALLFACER_MAX_TURN_OUTPUT_BYTES", DefaultMaxTurnOutputBytes),
+		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", constants.DefaultRetryHistoryLimit),
+		refineSessionsLimit: readEnvInt("WALLFACER_REFINE_SESSIONS_LIMIT", constants.DefaultRefineSessionsLimit),
+		promptHistoryLimit:  readEnvInt("WALLFACER_PROMPT_HISTORY_LIMIT", constants.DefaultPromptHistoryLimit),
+		maxTurnOutputBytes:  readEnvInt("WALLFACER_MAX_TURN_OUTPUT_BYTES", constants.DefaultMaxTurnOutputBytes),
 	}
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -146,7 +147,7 @@ func (s *Store) WaitCompaction() { s.compactWg.Wait() }
 
 // addToStatusIndex inserts id into tasksByStatus[status].
 // Must be called while s.mu is held for writing.
-func (s *Store) addToStatusIndex(status TaskStatus, id uuid.UUID) {
+func (s *Store) addToStatusIndex(status constants.TaskStatus, id uuid.UUID) {
 	if s.tasksByStatus[status] == nil {
 		s.tasksByStatus[status] = make(map[uuid.UUID]struct{})
 	}
@@ -155,7 +156,7 @@ func (s *Store) addToStatusIndex(status TaskStatus, id uuid.UUID) {
 
 // removeFromStatusIndex removes id from tasksByStatus[status].
 // Must be called while s.mu is held for writing.
-func (s *Store) removeFromStatusIndex(status TaskStatus, id uuid.UUID) {
+func (s *Store) removeFromStatusIndex(status constants.TaskStatus, id uuid.UUID) {
 	delete(s.tasksByStatus[status], id)
 }
 
@@ -277,9 +278,9 @@ func (s *Store) loadAll() error {
 // isTerminalStatus reports whether a task status indicates the task is
 // no longer executing and will not produce new events without explicit
 // user action (retry/resume).
-func isTerminalStatus(status TaskStatus) bool {
+func isTerminalStatus(status constants.TaskStatus) bool {
 	switch status {
-	case TaskStatusDone, TaskStatusFailed, TaskStatusCancelled:
+	case constants.TaskStatusDone, constants.TaskStatusFailed, constants.TaskStatusCancelled:
 		return true
 	}
 	return false

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -43,9 +43,9 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		output *agentOutput
 		err    error
 		model  string
-		sb     sandbox.Type
+		sb     constants.SandboxType
 	}
-	runWithSandbox := func(selected sandbox.Type) titleResult {
+	runWithSandbox := func(selected constants.SandboxType) titleResult {
 		mdl := r.titleModelFromEnvForSandbox(selected)
 		_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
 
@@ -95,7 +95,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	res := runWithSandbox(sb)
 
 	// Fallback: if the claude sandbox hit a rate/token limit, retry with codex.
-	if sb == sandbox.Claude && res.err != nil &&
+	if sb == constants.SandboxClaude && res.err != nil &&
 		isLikelyTokenLimitError(res.err.Error()) {
 		logger.Runner.Warn("title generation: claude sandbox token limit hit; retrying with codex",
 			"task", taskID)
@@ -103,10 +103,10 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit hit during title generation)",
 		})
-		sb = sandbox.Codex
-		res = runWithSandbox(sandbox.Codex)
+		sb = constants.SandboxCodex
+		res = runWithSandbox(constants.SandboxCodex)
 	}
-	if sb == sandbox.Claude && res.output != nil && res.output.IsError &&
+	if sb == constants.SandboxClaude && res.output != nil && res.output.IsError &&
 		isLikelyTokenLimitError(res.output.Result, res.output.Subtype) {
 		logger.Runner.Warn("title generation: claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID)
@@ -114,8 +114,8 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit in title output)",
 		})
-		sb = sandbox.Codex
-		res = runWithSandbox(sandbox.Codex)
+		sb = constants.SandboxCodex
+		res = runWithSandbox(constants.SandboxCodex)
 	}
 
 	if res.err != nil {

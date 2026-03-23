@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
 // UpdateTaskStatus transitions the task identified by id to the given status.
-func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskStatus) error {
+func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status constants.TaskStatus) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -20,13 +20,13 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	if !ok {
 		return fmt.Errorf("task not found: %s", id)
 	}
-	if err := ValidateTransition(t.Status, status); err != nil {
+	if err := constants.ValidateTransition(t.Status, status); err != nil {
 		return err
 	}
 	s.removeFromStatusIndex(t.Status, id)
 	t.Status = status
 	s.addToStatusIndex(t.Status, id)
-	if status == TaskStatusInProgress && t.StartedAt == nil {
+	if status == constants.TaskStatusInProgress && t.StartedAt == nil {
 		now := time.Now()
 		t.StartedAt = &now
 	}
@@ -34,13 +34,13 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	if status == TaskStatusDone {
+	if status == constants.TaskStatusDone {
 		s.buildAndSaveSummary(*t)
 	}
 	// Search index not updated: status is not a search-indexed field
 	// (title, prompt, tags, oversight).
 	s.notify(t, false)
-	if status == TaskStatusDone || status == TaskStatusFailed || status == TaskStatusCancelled {
+	if status == constants.TaskStatusDone || status == constants.TaskStatusFailed || status == constants.TaskStatusCancelled {
 		// Capture the highest sequence number present right now, while we still
 		// hold the store lock, so the goroutine only compacts events that belong
 		// to the session that just finished. If the task is immediately retried,
@@ -107,7 +107,7 @@ func (s *Store) buildAndSaveSummary(task Task) {
 //
 // Like UpdateTaskStatus, it writes summary.json atomically before notifying
 // subscribers when transitioning to TaskStatusDone.
-func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskStatus) error {
+func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status constants.TaskStatus) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -118,7 +118,7 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	s.removeFromStatusIndex(t.Status, id)
 	t.Status = status
 	s.addToStatusIndex(t.Status, id)
-	if status == TaskStatusInProgress && t.StartedAt == nil {
+	if status == constants.TaskStatusInProgress && t.StartedAt == nil {
 		now := time.Now()
 		t.StartedAt = &now
 	}
@@ -126,7 +126,7 @@ func (s *Store) ForceUpdateTaskStatus(_ context.Context, id uuid.UUID, status Ta
 	if err := s.saveTask(id, t); err != nil {
 		return err
 	}
-	if status == TaskStatusDone {
+	if status == constants.TaskStatusDone {
 		s.buildAndSaveSummary(*t)
 	}
 	// Search index not updated: status is not a search-indexed field
@@ -185,7 +185,7 @@ func (s *Store) UpdateTaskResult(_ context.Context, id uuid.UUID, result, sessio
 // AccumulateSubAgentUsage adds token/cost deltas to the task's running totals
 // and records the contribution under the named sub-agent in UsageBreakdown.
 // agent should be one of the SandboxActivity constants.
-func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent SandboxActivity, delta TaskUsage) error {
+func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent constants.SandboxActivity, delta TaskUsage) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.Usage.InputTokens += delta.InputTokens
 		t.Usage.OutputTokens += delta.OutputTokens
@@ -193,7 +193,7 @@ func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent S
 		t.Usage.CacheCreationTokens += delta.CacheCreationTokens
 		t.Usage.CostUSD += delta.CostUSD
 		if t.UsageBreakdown == nil {
-			t.UsageBreakdown = make(map[SandboxActivity]TaskUsage)
+			t.UsageBreakdown = make(map[constants.SandboxActivity]TaskUsage)
 		}
 		prev := t.UsageBreakdown[agent]
 		prev.InputTokens += delta.InputTokens
@@ -209,7 +209,7 @@ func (s *Store) AccumulateSubAgentUsage(_ context.Context, id uuid.UUID, agent S
 // AccumulateTaskUsage is a convenience wrapper that accumulates usage without
 // attributing it to a specific sub-agent. Prefer AccumulateSubAgentUsage.
 func (s *Store) AccumulateTaskUsage(ctx context.Context, id uuid.UUID, delta TaskUsage) error {
-	return s.AccumulateSubAgentUsage(ctx, id, SandboxActivityImplementation, delta)
+	return s.AccumulateSubAgentUsage(ctx, id, constants.SandboxActivityImplementation, delta)
 }
 
 // UpdateTaskPosition updates the task board column sort position.
@@ -285,7 +285,7 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 		if !ok {
 			return false, nil // deleted dependency → unsatisfied (conservative)
 		}
-		if dep.Status != TaskStatusDone {
+		if dep.Status != constants.TaskStatusDone {
 			return false, nil
 		}
 	}
@@ -293,7 +293,7 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 }
 
 // UpdateTaskBacklog edits prompt, goal, timeout, fresh_start, mount_worktrees, and budget limits for backlog tasks.
-func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, goal *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[SandboxActivity]sandbox.Type, maxCostUSD *float64, maxInputTokens *int) error {
+func (s *Store) UpdateTaskBacklog(_ context.Context, id uuid.UUID, prompt *string, goal *string, timeout *int, freshStart *bool, mountWorktrees *bool, sandboxByActivity *map[constants.SandboxActivity]constants.SandboxType, maxCostUSD *float64, maxInputTokens *int) error {
 	// Compute the lowercased fields before acquiring the lock so that
 	// strings.ToLower does not extend the critical section.
 	var loweredPrompt string
@@ -378,7 +378,7 @@ func (s *Store) UpdateTaskBudget(_ context.Context, id uuid.UUID, maxCostUSD *fl
 
 // UpdateTaskSandboxByActivity stores task sandbox overrides by activity key.
 // Passing an empty map clears the override map.
-func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[SandboxActivity]sandbox.Type) error {
+func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, sandboxByActivity map[constants.SandboxActivity]constants.SandboxType) error {
 	return s.mutateTask(id, func(t *Task) error {
 		t.SandboxByActivity = normalizeSandboxByActivity(sandboxByActivity)
 		return nil
@@ -386,9 +386,9 @@ func (s *Store) UpdateTaskSandboxByActivity(_ context.Context, id uuid.UUID, san
 }
 
 // UpdateTaskSandbox stores the task sandbox selection (e.g. "claude" or "codex").
-func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sb sandbox.Type) error {
+func (s *Store) UpdateTaskSandbox(_ context.Context, id uuid.UUID, sb constants.SandboxType) error {
 	return s.mutateTask(id, func(t *Task) error {
-		t.Sandbox = sandbox.Normalize(string(sb))
+		t.Sandbox = constants.NormalizeSandboxType(string(sb))
 		return nil
 	})
 }
@@ -480,7 +480,7 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	t.Result = nil
 	t.StopReason = nil
 	t.Turns = 0
-	t.Status = TaskStatusBacklog
+	t.Status = constants.TaskStatusBacklog
 	if freshStart {
 		t.WorktreePaths = nil
 		t.BranchName = ""
@@ -494,10 +494,10 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 	// Reset auto-retry counters so that a manual retry after budget exhaustion
 	// grants a fresh allowance and the auto-retrier can act on the next failure.
 	t.AutoRetryCount = 0
-	t.AutoRetryBudget = map[FailureCategory]int{
-		FailureCategoryContainerCrash: defaultAutoRetryBudget[FailureCategoryContainerCrash],
-		FailureCategorySyncError:      defaultAutoRetryBudget[FailureCategorySyncError],
-		FailureCategoryWorktree:       defaultAutoRetryBudget[FailureCategoryWorktree],
+	t.AutoRetryBudget = map[constants.FailureCategory]int{
+		constants.FailureCategoryContainerCrash: defaultAutoRetryBudget[constants.FailureCategoryContainerCrash],
+		constants.FailureCategorySyncError:      defaultAutoRetryBudget[constants.FailureCategorySyncError],
+		constants.FailureCategoryWorktree:       defaultAutoRetryBudget[constants.FailureCategoryWorktree],
 	}
 	t.CurrentRefinement = nil
 	if freshStart {
@@ -527,7 +527,7 @@ func (s *Store) ArchiveAllDone(_ context.Context) ([]uuid.UUID, error) {
 		if t.Archived {
 			continue
 		}
-		if t.Status != TaskStatusDone && t.Status != TaskStatusCancelled {
+		if t.Status != constants.TaskStatusDone && t.Status != constants.TaskStatusCancelled {
 			continue
 		}
 		t.Archived = true
@@ -561,7 +561,7 @@ func (s *Store) ResumeTask(_ context.Context, id uuid.UUID, timeout *int) error 
 	}
 
 	s.removeFromStatusIndex(t.Status, id)
-	t.Status = TaskStatusInProgress
+	t.Status = constants.TaskStatusInProgress
 	s.addToStatusIndex(t.Status, id)
 	if t.StartedAt == nil {
 		now := time.Now()

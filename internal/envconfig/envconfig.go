@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -36,15 +36,15 @@ type Config struct {
 	CodexDefaultModel string // CODEX_DEFAULT_MODEL
 	CodexTitleModel   string // CODEX_TITLE_MODEL
 
-	DefaultSandbox        sandbox.Type // WALLFACER_DEFAULT_SANDBOX
-	ImplementationSandbox sandbox.Type // WALLFACER_SANDBOX_IMPLEMENTATION
-	TestingSandbox        sandbox.Type // WALLFACER_SANDBOX_TESTING
-	RefinementSandbox     sandbox.Type // WALLFACER_SANDBOX_REFINEMENT
-	TitleSandbox          sandbox.Type // WALLFACER_SANDBOX_TITLE
-	OversightSandbox      sandbox.Type // WALLFACER_SANDBOX_OVERSIGHT
-	CommitMessageSandbox  sandbox.Type // WALLFACER_SANDBOX_COMMIT_MESSAGE
-	IdeaAgentSandbox      sandbox.Type // WALLFACER_SANDBOX_IDEA_AGENT
-	SandboxFast           bool         // WALLFACER_SANDBOX_FAST ("true"/"false"), defaults to true when unset
+	DefaultSandbox        constants.SandboxType // WALLFACER_DEFAULT_SANDBOX
+	ImplementationSandbox constants.SandboxType // WALLFACER_SANDBOX_IMPLEMENTATION
+	TestingSandbox        constants.SandboxType // WALLFACER_SANDBOX_TESTING
+	RefinementSandbox     constants.SandboxType // WALLFACER_SANDBOX_REFINEMENT
+	TitleSandbox          constants.SandboxType // WALLFACER_SANDBOX_TITLE
+	OversightSandbox      constants.SandboxType // WALLFACER_SANDBOX_OVERSIGHT
+	CommitMessageSandbox  constants.SandboxType // WALLFACER_SANDBOX_COMMIT_MESSAGE
+	IdeaAgentSandbox      constants.SandboxType // WALLFACER_SANDBOX_IDEA_AGENT
+	SandboxFast           bool                  // WALLFACER_SANDBOX_FAST ("true"/"false"), defaults to true when unset
 
 	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
@@ -145,21 +145,21 @@ func Parse(path string) (Config, error) {
 		case "CODEX_TITLE_MODEL":
 			cfg.CodexTitleModel = v
 		case "WALLFACER_DEFAULT_SANDBOX":
-			cfg.DefaultSandbox = sandbox.Normalize(v)
+			cfg.DefaultSandbox = constants.NormalizeSandboxType(v)
 		case "WALLFACER_SANDBOX_IMPLEMENTATION":
-			cfg.ImplementationSandbox = sandbox.Normalize(v)
+			cfg.ImplementationSandbox = constants.NormalizeSandboxType(v)
 		case "WALLFACER_SANDBOX_TESTING":
-			cfg.TestingSandbox = sandbox.Normalize(v)
+			cfg.TestingSandbox = constants.NormalizeSandboxType(v)
 		case "WALLFACER_SANDBOX_REFINEMENT":
-			cfg.RefinementSandbox = sandbox.Normalize(v)
+			cfg.RefinementSandbox = constants.NormalizeSandboxType(v)
 		case "WALLFACER_SANDBOX_TITLE":
-			cfg.TitleSandbox = sandbox.Normalize(v)
+			cfg.TitleSandbox = constants.NormalizeSandboxType(v)
 		case "WALLFACER_SANDBOX_OVERSIGHT":
-			cfg.OversightSandbox = sandbox.Normalize(v)
+			cfg.OversightSandbox = constants.NormalizeSandboxType(v)
 		case "WALLFACER_SANDBOX_COMMIT_MESSAGE":
-			cfg.CommitMessageSandbox = sandbox.Normalize(v)
+			cfg.CommitMessageSandbox = constants.NormalizeSandboxType(v)
 		case "WALLFACER_SANDBOX_IDEA_AGENT":
-			cfg.IdeaAgentSandbox = sandbox.Normalize(v)
+			cfg.IdeaAgentSandbox = constants.NormalizeSandboxType(v)
 		case "WALLFACER_SANDBOX_FAST":
 			cfg.SandboxFast = v != "false"
 		case "WALLFACER_CONTAINER_NETWORK":
@@ -206,8 +206,8 @@ func FormatWorkspaces(workspaces []string) string {
 }
 
 // SandboxByActivity returns the per-activity sandbox type overrides derived from config.
-func (c Config) SandboxByActivity() map[store.SandboxActivity]sandbox.Type {
-	out := map[store.SandboxActivity]sandbox.Type{}
+func (c Config) SandboxByActivity() map[store.SandboxActivity]constants.SandboxType {
+	out := map[store.SandboxActivity]constants.SandboxType{}
 	if c.ImplementationSandbox != "" {
 		out[store.SandboxActivityImplementation] = c.ImplementationSandbox
 	}
@@ -369,7 +369,7 @@ func UpdateWorkspaces(path string, workspaces []string) error {
 // defaultSandbox controls WALLFACER_DEFAULT_SANDBOX.
 // sandboxByActivity supports keys: implementation, testing, refinement, title,
 // oversight, commit_message, idea_agent.
-func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByActivity map[store.SandboxActivity]sandbox.Type) error {
+func UpdateSandboxSettings(path string, defaultSandbox *constants.SandboxType, sandboxByActivity map[store.SandboxActivity]constants.SandboxType) error {
 	var impl, test, refine, title, oversight, commit, idea *string
 	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
@@ -379,37 +379,37 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 		title, oversight, commit, idea = &emptyTitle, &emptyOversight, &emptyCommit, &emptyIdea
 
 		if v, ok := sandboxByActivity[store.SandboxActivityImplementation]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(constants.NormalizeSandboxType(string(v)))
 			impl = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityTesting]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(constants.NormalizeSandboxType(string(v)))
 			test = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityRefinement]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(constants.NormalizeSandboxType(string(v)))
 			refine = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityTitle]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(constants.NormalizeSandboxType(string(v)))
 			title = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityOversight]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(constants.NormalizeSandboxType(string(v)))
 			oversight = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityCommitMessage]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(constants.NormalizeSandboxType(string(v)))
 			commit = &s
 		}
 		if v, ok := sandboxByActivity[store.SandboxActivityIdeaAgent]; ok {
-			s := string(sandbox.Normalize(string(v)))
+			s := string(constants.NormalizeSandboxType(string(v)))
 			idea = &s
 		}
 	}
 
 	if defaultSandbox != nil {
-		s := string(sandbox.Normalize(string(*defaultSandbox)))
+		s := string(constants.NormalizeSandboxType(string(*defaultSandbox)))
 		defaultSandboxValue = &s
 	}
 

@@ -13,15 +13,15 @@ import (
 
 	"github.com/google/uuid"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
-	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
 // imagePull tracks an in-progress or recently completed image pull.
 type imagePull struct {
 	ID      string        `json:"pull_id"`
 	Image   string        `json:"image"`
-	Sandbox sandbox.Type  `json:"sandbox"`
+	Sandbox constants.SandboxType  `json:"sandbox"`
 	Lines   chan string   `json:"-"`
 	Done    chan struct{} `json:"-"`
 	Err     error         `json:"-"`
@@ -31,7 +31,7 @@ type imagePull struct {
 
 // imageStatus describes a single sandbox image.
 type imageStatus struct {
-	Sandbox sandbox.Type `json:"sandbox"`
+	Sandbox constants.SandboxType `json:"sandbox"`
 	Image   string       `json:"image"`
 	Cached  bool         `json:"cached"`
 	Size    string       `json:"size,omitempty"`
@@ -154,8 +154,8 @@ func (h *Handler) GetImageStatus(w http.ResponseWriter, _ *http.Request) {
 	codexImage := testCodexImage(claudeImage)
 
 	images := []imageStatus{
-		h.inspectImage(cmd, sandbox.Claude, claudeImage),
-		h.inspectImage(cmd, sandbox.Codex, codexImage),
+		h.inspectImage(cmd, constants.SandboxClaude, claudeImage),
+		h.inspectImage(cmd, constants.SandboxCodex, codexImage),
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -165,7 +165,7 @@ func (h *Handler) GetImageStatus(w http.ResponseWriter, _ *http.Request) {
 }
 
 // inspectImage checks whether an image is cached and retrieves metadata.
-func (h *Handler) inspectImage(cmd string, sb sandbox.Type, image string) imageStatus {
+func (h *Handler) inspectImage(cmd string, sb constants.SandboxType, image string) imageStatus {
 	status := imageStatus{
 		Sandbox: sb,
 		Image:   image,
@@ -198,10 +198,10 @@ func (h *Handler) DeleteImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sb := sandbox.Default(req.Sandbox)
+	sb := constants.DefaultSandboxType(req.Sandbox)
 	claudeImage := h.runner.SandboxImage()
 	image := claudeImage
-	if sb == sandbox.Codex {
+	if sb == constants.SandboxCodex {
 		image = testCodexImage(claudeImage)
 	}
 
@@ -228,10 +228,10 @@ func (h *Handler) PullImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sb := sandbox.Default(req.Sandbox)
+	sb := constants.DefaultSandboxType(req.Sandbox)
 	claudeImage := h.runner.SandboxImage()
 	image := claudeImage
-	if sb == sandbox.Codex {
+	if sb == constants.SandboxCodex {
 		image = testCodexImage(claudeImage)
 	}
 	if image == "" {
