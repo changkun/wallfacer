@@ -8,8 +8,14 @@ Wallfacer currently requires Docker or Podman, neither of which has a seamless
 Windows-native story: Docker Desktop requires a licence for commercial use and runs
 containers inside a WSL2 or Hyper-V Linux VM, while Podman for Windows is early-stage.
 
-This spec explores Windows-native isolation alternatives and the architectural changes
-needed to support them.
+This spec explores Windows-native isolation alternatives that can be implemented as
+`SandboxBackend` implementations (see [01-sandbox-backends.md](01-sandbox-backends.md)).
+
+**Prerequisite:** [01-sandbox-backends.md](01-sandbox-backends.md) Phase 1 must
+be complete. Each native executor is implemented as a `SandboxBackend`, receiving
+a structured `ContainerSpec` via `Launch(ctx, spec)` instead of parsing CLI args.
+The returned `SandboxHandle` tracks lifecycle states (`Creating` → `Running` →
+`Streaming` → `Stopped`/`Failed`).
 
 ## Server Prerequisites (Complete)
 
@@ -103,7 +109,7 @@ VMs directly from Wallfacer, bypassing Docker/Podman.
 
 ### Integration Plan
 
-Implement a `HyperVExecutor` that calls `hvc.exe` (or the lower-level `vmcompute`
+Implement a `HyperVBackend` (implementing `SandboxBackend`) that calls `hvc.exe` (or the lower-level `vmcompute`
 COM API via CGo) to:
 
 1. Create an ephemeral VM from a base VHDX (built from the wallfacer OCI image via
@@ -150,7 +156,7 @@ but does not provide filesystem namespacing or a separate kernel.
 
 ### Integration Plan
 
-Implement a `JobObjectExecutor` in Go using `golang.org/x/sys/windows`:
+Implement a `JobObjectBackend` (implementing `SandboxBackend`) in Go using `golang.org/x/sys/windows`:
 
 ```go
 // Pseudocode

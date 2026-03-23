@@ -11,21 +11,27 @@ lower the barrier to entry and remove the daemon dependency entirely.
 
 The original spec explored external CLI tools (`apple/container`, `vfkit`, `sandbox-exec`,
 Lima). This revised spec focuses on **pure Go implementations** — i.e., replacing the
-`osContainerExecutor` (which shells out to an external binary) with Go code that drives
+`LocalBackend` (which shells out to an external binary) with Go code that drives
 macOS platform APIs directly. No external container runtime binary is required at
 runtime; the isolation logic is compiled into the Wallfacer binary.
 
 ## Scope
 
-This spec covers macOS-only isolation techniques that can replace the
-`osContainerExecutor` without changing the rest of the runner architecture.
-The `ContainerExecutor` interface (`RunArgs` / `Kill`) remains the contract; only
-the implementation changes.
+This spec covers macOS-only isolation techniques that can replace `LocalBackend`
+as alternative `SandboxBackend` implementations (see [01-sandbox-backends.md](01-sandbox-backends.md)).
+
+**Prerequisite:** [01-sandbox-backends.md](01-sandbox-backends.md) Phase 1 must
+be complete. Each native executor is implemented as a `SandboxBackend`, receiving
+a structured `ContainerSpec` via `Launch(ctx, spec)` — **not** raw CLI args.
+This eliminates the arg-parsing problem from the original design where
+`VZBackend.RunArgs` had to reverse-engineer `ContainerSpec.Build()` output.
+The returned `SandboxHandle` tracks lifecycle states and streams output via
+`Stdout() io.ReadCloser`.
 
 ```go
-type ContainerExecutor interface {
-    RunArgs(ctx context.Context, name string, args []string) (stdout, stderr []byte, err error)
-    Kill(name string)
+type SandboxBackend interface {
+    Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error)
+    List(ctx context.Context) ([]ContainerInfo, error)
 }
 ```
 
@@ -44,7 +50,7 @@ type ContainerExecutor interface {
 
 ---
 
-## Option A: `VZExecutor` — Virtualization.framework via `github.com/Code-Hex/vz`
+## Option A: `VZBackend` — Virtualization.framework via `github.com/Code-Hex/vz`
 
 `github.com/Code-Hex/vz` provides idiomatic Go bindings for Apple's
 `Virtualization.framework` via CGo. It is the same underlying framework used by
@@ -74,73 +80,62 @@ github.com/google/go-containerregistry      # OCI image pull, layer extraction
 
 ### Implementation Sketch
 
-A `VZExecutor` satisfies `ContainerExecutor` by owning the full VM lifecycle:
+A `VZBackend` implements `SandboxBackend` by owning the full VM lifecycle:
 
 ```go
-// internal/runner/executor_vz_darwin.go
+// internal/runner/backend_vz_darwin.go
 //go:build darwin
 
 package runner
 
 import (
     "context"
+    "io"
     "sync"
 
     vz "github.com/Code-Hex/vz/v3"
-    "github.com/google/go-containerregistry/pkg/crane"
 )
 
-type VZExecutor struct {
+type VZBackend struct {
     imageCache string        // local directory for unpacked OCI rootfs layers
     mu         sync.Mutex
     vms        map[string]*vz.VirtualMachine // keyed by container name
 }
 
-func (e *VZExecutor) RunArgs(ctx context.Context, name string, args []string) ([]byte, []byte, error) {
-    // 1. Parse image name from args (last non-flag token before Cmd).
-    image, mounts, cmd := parseContainerArgs(args)
-
-    // 2. Pull and cache OCI image locally (skip if digest matches).
-    rootfs, err := e.ensureRootfs(image)
+func (b *VZBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error) {
+    // 1. Pull and cache OCI image locally (skip if digest matches).
+    rootfs, err := b.ensureRootfs(spec.Image)
     if err != nil {
-        return nil, nil, err
+        return nil, err
     }
 
-    // 3. Build vz.VirtualMachineConfiguration.
-    cfg, err := buildVMConfig(rootfs, mounts, cmd)
+    // 2. Build vz.VirtualMachineConfiguration from ContainerSpec fields.
+    cfg, err := buildVMConfig(rootfs, spec.Volumes, spec.Cmd, spec.CPUs, spec.Memory)
     if err != nil {
-        return nil, nil, err
+        return nil, err
     }
 
-    // 4. Start VM; wire virtio-serial to stdout/stderr buffers.
-    vm, stdout, stderr, err := startVM(ctx, cfg)
+    // 3. Start VM; wire virtio-serial to stdout pipe.
+    vm, stdoutPipe, err := startVM(ctx, cfg)
     if err != nil {
-        return nil, nil, err
+        return nil, err
     }
-    e.mu.Lock()
-    e.vms[name] = vm
-    e.mu.Unlock()
+    b.mu.Lock()
+    b.vms[spec.Name] = vm
+    b.mu.Unlock()
 
-    // 5. Wait for VM to stop; collect exit code via virtio-vsock.
-    exitCode, err := waitVM(ctx, vm, stdout, stderr)
-    e.mu.Lock()
-    delete(e.vms, name)
-    e.mu.Unlock()
-
-    if exitCode != 0 {
-        return stdout.Bytes(), stderr.Bytes(), &exitError{code: exitCode}
-    }
-    return stdout.Bytes(), stderr.Bytes(), err
+    // 4. Return handle — caller reads from Stdout(), calls Wait()/Kill().
+    return &vzHandle{
+        name:   spec.Name,
+        vm:     vm,
+        stdout: stdoutPipe,
+        backend: b,
+    }, nil
 }
 
-func (e *VZExecutor) Kill(name string) {
-    e.mu.Lock()
-    vm := e.vms[name]
-    e.mu.Unlock()
-    if vm != nil {
-        vm.RequestStop()  //nolint:errcheck
-        vm.Stop()         //nolint:errcheck
-    }
+func (b *VZBackend) List(ctx context.Context) ([]ContainerInfo, error) {
+    // Return currently tracked VMs
+    // ...
 }
 ```
 
@@ -148,7 +143,7 @@ func (e *VZExecutor) Kill(name string) {
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ VZExecutor.RunArgs                                  │
+│ VZBackend.Launch                                   │
 │                                                     │
 │  1. go-containerregistry: pull OCI layers          │
 │     └─ cache by image digest → skip if present     │
@@ -209,20 +204,20 @@ Cache layout: `~/.wallfacer/image-cache/<digest>/rootfs/`
 
 Layers are applied with whiteout handling (`.wh.` prefix files → delete).
 
-### ContainerSpec Compatibility
+### ContainerSpec Mapping
 
-`ContainerSpec.Build()` produces flags in the existing format. `VZExecutor.RunArgs`
-receives the same `args []string` as `osContainerExecutor` and must parse:
+`VZBackend.Launch(ctx, spec)` receives a structured `ContainerSpec` directly —
+no CLI arg parsing needed. The mapping is straightforward:
 
-- `--name <n>` → ignored (name is passed separately)
-- `--env-file <f>` → read env vars into init's environment
-- `-e K=V` → set in init's environment
-- `-v HOST:CT[:opts]` → create additional `VirtioFileSystemDevice` entries
-- `-w WORKDIR` → set working directory for the chroot exec
-- `--cpus N` → `cfg.SetCPUCount(int(N))`
-- `--memory N` → `cfg.SetMemorySize(bytes(N))`
-- `--network=...` → always NAT; `host` remapped automatically
-- `<image>` → OCI reference to pull
+- `spec.Name` → VM identifier for the registry
+- `spec.EnvFile` → read env vars into init's environment
+- `spec.Env` → set in init's environment
+- `spec.Volumes` → create `VirtioFileSystemDevice` entries per `VolumeMount`
+- `spec.WorkDir` → set working directory for the chroot exec
+- `spec.CPUs` → `cfg.SetCPUCount(int(N))`
+- `spec.Memory` → `cfg.SetMemorySize(bytes(N))`
+- `spec.Network` → always NAT; `host` remapped automatically
+- `spec.Image` → OCI reference to pull
 - `<cmd...>` → command run inside chroot
 
 ### Trade-offs
@@ -238,9 +233,9 @@ receives the same `args []string` as `osContainerExecutor` and must parse:
 
 ---
 
-## Option B: `SandboxInitExecutor` — CGo `sandbox_init(3)`
+## Option B: `SandboxInitBackend` — CGo `sandbox_init(3)`
 
-Instead of invoking the system `sandbox-exec` binary, a `SandboxInitExecutor` calls
+Instead of invoking the system `sandbox-exec` binary, a `SandboxInitBackend` calls
 the private `sandbox_init(3)` C API directly from Go via CGo. The sandbox restriction
 is applied to a forked child process before it execs Claude Code. No external binary
 dependency; Claude Code must be installed on the host.
@@ -327,7 +322,7 @@ func runSandboxShim() {
 }
 ```
 
-`SandboxInitExecutor.RunArgs` then spawns `wallfacer` (itself) with
+`SandboxInitBackend.RunArgs` then spawns `wallfacer` (itself) with
 `_WALLFACER_SANDBOX_SHIM=1` and the encoded profile/target/args. stdout/stderr are
 piped back as normal.
 
@@ -370,7 +365,7 @@ piped back as normal.
 (allow signal (target self))
 ```
 
-### `SandboxInitExecutor` Implementation
+### `SandboxInitBackend` Implementation
 
 ```go
 // internal/runner/executor_sandbox_darwin.go
@@ -378,34 +373,35 @@ piped back as normal.
 
 package runner
 
-type SandboxInitExecutor struct {
+type SandboxInitBackend struct {
     claudeBinary     string // e.g. /usr/local/bin/claude
     claudeConfigDir  string // e.g. ~/.claude
     instructionsPath string // read-only CLAUDE.md mount path
 }
 
-func (e *SandboxInitExecutor) RunArgs(ctx context.Context, name string, args []string) ([]byte, []byte, error) {
-    worktree, claudeArgs := parseWorktreeAndArgs(args)
+func (b *SandboxInitBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error) {
+    // Extract worktree path from spec.Volumes (first RW bind mount)
+    worktree := findWorktreeMount(spec.Volumes)
     profile := renderSBPLProfile(sbplTemplate, sbplVars{
         WorktreePath:     worktree,
-        ClaudeConfigDir:  e.claudeConfigDir,
-        InstructionsPath: e.instructionsPath,
-        ClaudeBinary:     e.claudeBinary,
+        ClaudeConfigDir:  b.claudeConfigDir,
+        InstructionsPath: b.instructionsPath,
+        ClaudeBinary:     b.claudeBinary,
     })
 
-    argsJSON, _ := json.Marshal(claudeArgs)
+    argsJSON, _ := json.Marshal(spec.Cmd)
     cmd := exec.CommandContext(ctx, os.Executable())
     cmd.Env = append(os.Environ(),
         "_WALLFACER_SANDBOX_SHIM=1",
         "_WALLFACER_SANDBOX_PROFILE="+profile,
-        "_WALLFACER_SANDBOX_TARGET="+e.claudeBinary,
+        "_WALLFACER_SANDBOX_TARGET="+b.claudeBinary,
         "_WALLFACER_SANDBOX_ARGS="+string(argsJSON),
     )
-    // ... pipe stdout/stderr, run, return
+    // ... pipe stdout, cmd.Start(), return SandboxHandle
 }
 
-func (e *SandboxInitExecutor) Kill(name string) {
-    // name → pid stored in a sync.Map; send SIGKILL
+func (b *SandboxInitBackend) List(ctx context.Context) ([]ContainerInfo, error) {
+    // Return currently tracked sandbox processes
 }
 ```
 
@@ -424,7 +420,7 @@ func (e *SandboxInitExecutor) Kill(name string) {
 
 ## Option C: External CLI Fallback (existing approach, kept for Linux/non-macOS)
 
-The existing `osContainerExecutor` remains the default on Linux and when a container
+The existing `LocalBackend` remains the default on Linux and when a container
 runtime is detected. The pure Go options above are additive; they do not replace the
 existing path for non-macOS users.
 
@@ -432,21 +428,21 @@ existing path for non-macOS users.
 
 ## Implementation Plan
 
-### Phase 1 — `SandboxInitExecutor` (lower isolation, faster to ship)
+### Phase 1 — `SandboxInitBackend` (lower isolation, faster to ship)
 
 1. Add `internal/runner/sandbox_darwin.go` — CGo `applySandboxProfile` wrapper.
 2. Add `init()` re-exec shim in `main.go` (guarded by `_WALLFACER_SANDBOX_SHIM`).
-3. Add `internal/runner/executor_sandbox_darwin.go` — `SandboxInitExecutor`.
+3. Add `internal/runner/executor_sandbox_darwin.go` — `SandboxInitBackend`.
 4. Wire into runtime detection: when `CONTAINER_CMD=sandbox` or no container runtime
-   found on macOS, use `SandboxInitExecutor`.
+   found on macOS, use `SandboxInitBackend`.
 5. Add `ClaudeBinary` detection (probe `which claude`, `~/.claude/local/claude`).
 
-### Phase 2 — `VZExecutor` (full isolation)
+### Phase 2 — `VZBackend` (full isolation)
 
 1. Add Go module dependencies: `github.com/Code-Hex/vz/v3`, `go-containerregistry`.
 2. Add `cmd/wallfacer-init/` — Linux init binary (cross-compiled, embedded).
 3. Add kernel + initramfs build tooling under `build/vmlinuz/` with `go generate`.
-4. Implement `internal/runner/executor_vz_darwin.go` — `VZExecutor`.
+4. Implement `internal/runner/executor_vz_darwin.go` — `VZBackend`.
 5. Implement OCI layer cache in `internal/runner/imagecache/`.
 6. Wire into runtime detection above `sandbox` in the priority list.
 7. Add `//go:build darwin` guards throughout; Linux path unchanged.
@@ -455,8 +451,8 @@ existing path for non-macOS users.
 
 ```
 CONTAINER_CMD env var                         # explicit override always wins
-→ vz          (VZExecutor, darwin only)       # Phase 2 pure Go VM
-→ sandbox     (SandboxInitExecutor, darwin)   # Phase 1 pure Go sandbox
+→ vz          (VZBackend, darwin only)       # Phase 2 pure Go VM
+→ sandbox     (SandboxInitBackend, darwin)   # Phase 1 pure Go sandbox
 → container   (/usr/local/bin/container)      # apple/container CLI (existing)
 → /opt/podman/bin/podman                      # existing
 → podman                                      # existing
@@ -466,14 +462,14 @@ CONTAINER_CMD env var                         # explicit override always wins
 Auto-detection on macOS (when `CONTAINER_CMD` is unset):
 
 ```
-macOS 13+  → probe VZExecutor availability → fall through to CLI runtimes → sandbox
+macOS 13+  → probe VZBackend availability → fall through to CLI runtimes → sandbox
 macOS <13  → probe CLI runtimes → sandbox
 Linux      → probe CLI runtimes only
 ```
 
 ### Network Mode Mapping
 
-| Requested | VZExecutor | SandboxInitExecutor | osContainerExecutor |
+| Requested | VZBackend | SandboxInitBackend | LocalBackend |
 |---|---|---|---|
 | `host` (default) | NAT (remapped automatically) | N/A (shares host) | `--network=host` |
 | `nat` | NAT | N/A | `--network=bridge` |
@@ -483,7 +479,7 @@ Linux      → probe CLI runtimes only
 
 ## Summary Comparison
 
-| | `VZExecutor` | `SandboxInitExecutor` | `osContainerExecutor` |
+| | `VZBackend` | `SandboxInitBackend` | `LocalBackend` |
 |---|---|---|---|
 | External binary | None | None | podman / docker |
 | Isolation level | Full Linux kernel | Syscall/path filter | Full Linux kernel |

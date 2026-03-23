@@ -13,8 +13,15 @@ are trivial to install, covering a range of isolation depths.
 ## Scope
 
 This spec covers Linux-native alternatives to Docker/Podman that can back the
-`ContainerExecutor` interface. The goal is to support at least one option that
-ships with a stock Linux installation with no extra packages.
+`SandboxBackend` interface (see [01-sandbox-backends.md](01-sandbox-backends.md)).
+The goal is to support at least one option that ships with a stock Linux
+installation with no extra packages.
+
+**Prerequisite:** [01-sandbox-backends.md](01-sandbox-backends.md) Phase 1 must
+be complete. Each native executor is implemented as a `SandboxBackend` (not the
+retired `ContainerExecutor`), receiving a structured `ContainerSpec` via
+`Launch(ctx, spec)` instead of parsing CLI args. The returned `SandboxHandle`
+tracks lifecycle states (`Creating` → `Running` → `Streaming` → `Stopped`/`Failed`).
 
 ---
 
@@ -39,8 +46,8 @@ to create an isolated environment without root or a daemon.
 
 ### Integration Plan
 
-Implement a `BubblewrapExecutor` that maps the current `ContainerSpec` to `bwrap`
-flags:
+Implement a `BubblewrapBackend` (implementing `SandboxBackend`) that maps
+`ContainerSpec` fields to `bwrap` flags:
 
 | ContainerSpec concept | bwrap equivalent |
 |---|---|
@@ -112,7 +119,7 @@ every modern Linux distribution that uses systemd (Fedora, Debian, Ubuntu, Arch,
 
 ### Integration Plan
 
-Implement a `NspawnExecutor`:
+Implement a `NspawnBackend` (implementing `SandboxBackend`):
 
 ```bash
 systemd-nspawn \
@@ -249,8 +256,8 @@ fully untrusted. Requires installation; not a zero-dependency option.
 
 1. **`bubblewrap`** — best balance of isolation, availability, and implementation
    cost. Most distros ship it; zero-install on Fedora/Ubuntu/Arch. Implement
-   `BubblewrapExecutor`.
-2. **`systemd-nspawn`** — add as a `NspawnExecutor` for server/CI deployments where
+   `BubblewrapBackend` (implementing `SandboxBackend`).
+2. **`systemd-nspawn`** — add as a `NspawnBackend` for server/CI deployments where
    root is available and cgroup resource limits are required.
 3. **`unshare`** — document as a building block; implement only if bubblewrap is
    unavailable.
