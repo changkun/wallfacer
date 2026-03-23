@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"github.com/google/uuid"
 )
 
@@ -44,16 +45,7 @@ func (h *Handler) loadTemplates() ([]PromptTemplate, error) {
 }
 
 func (h *Handler) saveTemplates(templates []PromptTemplate) error {
-	path := h.templatesPath()
-	raw, err := json.MarshalIndent(templates, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return atomicfile.WriteJSON(h.templatesPath(), templates, 0644)
 }
 
 // ListTemplates handles GET /api/templates.

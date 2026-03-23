@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/set"
 )
 
@@ -42,15 +43,7 @@ func SaveGroups(configDir string, groups []Group) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(NormalizeGroups(groups), "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return atomicfile.WriteJSON(path, NormalizeGroups(groups), 0o644)
 }
 
 // UpsertGroup adds or promotes a workspace group to the front of the list.

@@ -19,6 +19,7 @@ import (
 	"text/template"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 )
 
 //go:embed *.tmpl
@@ -213,12 +214,7 @@ func (m *Manager) WriteOverride(apiName, content string) error {
 	if err := os.MkdirAll(m.userDir, 0755); err != nil {
 		return fmt.Errorf("create prompts dir: %w", err)
 	}
-	path := filepath.Join(m.userDir, apiName+".tmpl")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, []byte(content), 0644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return atomicfile.Write(filepath.Join(m.userDir, apiName+".tmpl"), []byte(content), 0644)
 }
 
 // DeleteOverride removes the user override for the given API name.

@@ -306,12 +306,8 @@ func (s *Store) compactTaskEvents(taskID uuid.UUID, maxSeq int64) error {
 		compact = append(compact, '\n')
 	}
 
-	tmpPath := filepath.Join(tracesDir, "compact.ndjson.tmp")
 	compactPath := filepath.Join(tracesDir, "compact.ndjson")
-	if err := os.WriteFile(tmpPath, compact, 0644); err != nil {
-		return err
-	}
-	if err := os.Rename(tmpPath, compactPath); err != nil {
+	if err := atomicfile.Write(compactPath, compact, 0644); err != nil {
 		return err
 	}
 
