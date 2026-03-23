@@ -235,6 +235,32 @@ Each node: `{ path, name, type, expanded, children, loading }`
 - **File create/delete** — context menu actions
 - **Multi-tab viewer** — open multiple files in tabs instead of modal
 
+### Phase 4: Cloud Backend File Access (Future)
+
+Phases 1–3 use direct filesystem access (`os.ReadDir`, `os.ReadFile`, `os.WriteFile`) on the server host. This works for:
+- **Local backend** — workspaces are on the host filesystem
+- **Cloud with shared volume** — if the server pod mounts the same PVC/NFS as sandbox pods, file access works unchanged
+
+It does **not** work when workspaces only exist inside sandbox pods (K8s backend without shared volume). For that scenario, the explorer handlers need a filesystem abstraction:
+
+```go
+// WorkspaceFS abstracts file access to workspace directories.
+type WorkspaceFS interface {
+    ReadDir(path string) ([]fs.DirEntry, error)
+    ReadFile(path string) ([]byte, error)
+    WriteFile(path string, data []byte) error
+    Stat(path string) (fs.FileInfo, error)
+}
+```
+
+- **Local implementation:** Delegates to `os` package (current behavior)
+- **K8s implementation:** Proxies via `kubectl exec` into a sidecar or uses the K8s API to read from PVCs
+- **Remote Docker:** Proxies via `docker exec` or `docker cp`
+
+This aligns with the `SandboxBackend` abstraction in [cloud-sandbox-executor.md](cloud-sandbox-executor.md) — the backend knows where files live. A `SandboxBackend.FileAccess()` method could return a `WorkspaceFS` for the active backend.
+
+**Recommendation:** Defer to Phase 4. Phases 1–3 deliver full value for the local and shared-volume deployments that exist today. The `WorkspaceFS` interface is a clean extension point that doesn't require rearchitecting the handlers — just swap the `os.*` calls for interface calls.
+
 ---
 
 ## File Inventory

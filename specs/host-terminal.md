@@ -248,6 +248,25 @@ If `GET /api/config` returns `terminalEnabled: false`:
 - Dropdown to select from running containers (data from `GET /api/containers`)
 - Replaces `wallfacer exec` CLI for many use cases
 
+### Cloud Deployment Note
+
+In cloud deployment (K8s backend per [cloud-sandbox-executor.md](cloud-sandbox-executor.md)), the host shell (Phases 1–2) has limited utility — the API server is a stateless pod with no meaningful workspace on its local filesystem.
+
+**Phase 3 becomes the primary terminal mode in cloud.** Container exec is the natural way to get a shell in the workspace:
+- For `LocalBackend`: `podman exec` into a running task container (as designed above)
+- For `K8sBackend`: `kubectl exec` into the task pod, relayed via the same WebSocket protocol
+- For long-lived workers (see [container-reuse.md](container-reuse.md)): exec into the aux or impl worker container
+
+The WebSocket protocol and xterm.js frontend are backend-agnostic — only the PTY spawn mechanism changes. The handler can dispatch based on the active `SandboxBackend`:
+
+| Backend | Host shell | Container exec |
+|---------|-----------|---------------|
+| Local | PTY via `creack/pty` (Phase 1) | `podman exec` via PTY (Phase 3) |
+| K8s | Disabled or shells into server pod (limited) | `kubectl exec` via SPDY/WebSocket relay |
+| Remote Docker | Disabled | `docker -H <remote> exec` via PTY |
+
+**Recommendation:** Implement Phases 1–2 for local. When implementing K8s backend, prioritize Phase 3 as the default terminal mode and consider disabling host shell in cloud deployments (or gating it behind an additional `WALLFACER_TERMINAL_HOST_SHELL` flag).
+
 ---
 
 ## File Inventory
