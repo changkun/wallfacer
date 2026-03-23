@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -176,9 +177,9 @@ func TestGetEnvConfig_DefaultMaxParallel(t *testing.T) {
 	var resp envConfigResponse
 	_ = json.NewDecoder(w.Body).Decode(&resp)
 
-	// When not configured, should fall back to defaultMaxConcurrentTasks.
-	if resp.MaxParallelTasks != defaultMaxConcurrentTasks {
-		t.Errorf("expected default %d, got %d", defaultMaxConcurrentTasks, resp.MaxParallelTasks)
+	// When not configured, should fall back to constants.DefaultMaxConcurrentTasks.
+	if resp.MaxParallelTasks != constants.DefaultMaxConcurrentTasks {
+		t.Errorf("expected default %d, got %d", constants.DefaultMaxConcurrentTasks, resp.MaxParallelTasks)
 	}
 }
 
@@ -193,8 +194,8 @@ func TestGetEnvConfig_DefaultArchivedTasksPerPage(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if resp.ArchivedTasksPerPage != defaultArchivedTasksPerPage {
-		t.Errorf("expected default archived_tasks_per_page %d, got %d", defaultArchivedTasksPerPage, resp.ArchivedTasksPerPage)
+	if resp.ArchivedTasksPerPage != constants.DefaultArchivedTasksPerPage {
+		t.Errorf("expected default archived_tasks_per_page %d, got %d", constants.DefaultArchivedTasksPerPage, resp.ArchivedTasksPerPage)
 	}
 }
 

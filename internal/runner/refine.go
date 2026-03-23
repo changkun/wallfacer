@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/sandbox"
@@ -16,8 +17,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const refinementTimeout = 30 * time.Minute
-
 // RunRefinement runs the sandbox agent in read-only mode to produce a
 // detailed implementation spec for the task's current prompt. The task
 // stays in backlog; only CurrentRefinement is updated to track state.
@@ -25,7 +24,7 @@ const refinementTimeout = 30 * time.Minute
 // agent's focus (e.g. "keep backward compatibility").
 func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	bgCtx := r.shutdownCtx
-	ctx, cancel := context.WithTimeout(r.shutdownCtx, refinementTimeout)
+	ctx, cancel := context.WithTimeout(r.shutdownCtx, constants.RefinementTimeout)
 	defer cancel()
 
 	task, err := r.store.GetTask(bgCtx, taskID)

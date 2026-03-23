@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
@@ -23,7 +24,7 @@ import (
 //  3. Normalize Sandbox (trim) and SandboxByActivity via
 //     normalizeSandboxByActivity.
 //  4. Backfill AutoRetryBudget for tasks created before schema version 2.
-//  5. Stamp SchemaVersion = CurrentTaskSchemaVersion.
+//  5. Stamp SchemaVersion = constants.CurrentTaskSchemaVersion.
 func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	var task Task
 	if err := json.Unmarshal(raw, &task); err != nil {
@@ -93,8 +94,8 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	}
 
 	// (6) Guarantee SchemaVersion is current.
-	if task.SchemaVersion != CurrentTaskSchemaVersion {
-		task.SchemaVersion = CurrentTaskSchemaVersion
+	if task.SchemaVersion != constants.CurrentTaskSchemaVersion {
+		task.SchemaVersion = constants.CurrentTaskSchemaVersion
 		changed = true
 	}
 

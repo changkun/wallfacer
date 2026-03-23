@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+
+	"changkun.de/x/wallfacer/internal/constants"
 )
 
 // Package-level named loggers, populated by Init.
@@ -240,9 +242,8 @@ func prettyValue(v slog.Value) string {
 	if isUUID(s) {
 		return s[:8]
 	}
-	const maxLen = 200
-	if len(s) > maxLen {
-		s = s[:maxLen] + "…"
+	if len(s) > constants.LogValueMaxLen {
+		s = s[:constants.LogValueMaxLen] + "…"
 	}
 	if needsQuoting(s) {
 		return fmt.Sprintf("%q", s)

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/cache"
 	"github.com/google/uuid"
 )
@@ -57,9 +58,9 @@ func TestDiffCacheImmutableNeverExpires(t *testing.T) {
 	clock := func() time.Time { return now }
 	c := &diffCache{
 		c: cache.New[uuid.UUID, diffCacheEntry](
-			diffCacheTTL,
+			constants.DiffCacheTTL,
 			cache.WithClock[uuid.UUID, diffCacheEntry](clock),
-			cache.WithMaxSize[uuid.UUID, diffCacheEntry](maxImmutableEntries),
+			cache.WithMaxSize[uuid.UUID, diffCacheEntry](constants.MaxImmutableDiffEntries),
 		),
 	}
 	id := uuid.New()
@@ -83,7 +84,7 @@ func TestDiffCacheTTLExpiryDirect(t *testing.T) {
 	clock := func() time.Time { return now }
 	c := &diffCache{
 		c: cache.New[uuid.UUID, diffCacheEntry](
-			diffCacheTTL,
+			constants.DiffCacheTTL,
 			cache.WithClock[uuid.UUID, diffCacheEntry](clock),
 		),
 	}
@@ -98,7 +99,7 @@ func TestDiffCacheTTLExpiryDirect(t *testing.T) {
 		t.Fatal("expected hit before expiry")
 	}
 
-	now = now.Add(diffCacheTTL + time.Millisecond)
+	now = now.Add(constants.DiffCacheTTL + time.Millisecond)
 
 	if _, ok := c.get(id); ok {
 		t.Error("expected miss after expiry, got hit")
@@ -110,7 +111,7 @@ func TestDiffCacheTTLNotYetExpired(t *testing.T) {
 	clock := func() time.Time { return now }
 	c := &diffCache{
 		c: cache.New[uuid.UUID, diffCacheEntry](
-			diffCacheTTL,
+			constants.DiffCacheTTL,
 			cache.WithClock[uuid.UUID, diffCacheEntry](clock),
 		),
 	}
@@ -121,7 +122,7 @@ func TestDiffCacheTTLNotYetExpired(t *testing.T) {
 		immutable: false,
 	})
 
-	now = now.Add(diffCacheTTL - time.Millisecond)
+	now = now.Add(constants.DiffCacheTTL - time.Millisecond)
 
 	if _, ok := c.get(id); !ok {
 		t.Error("expected hit 1ms before expiry, got miss")
@@ -188,7 +189,7 @@ func TestDiffETag(t *testing.T) {
 func TestDiffCacheLRUEviction(t *testing.T) {
 	c := newDiffCache()
 
-	ids := make([]uuid.UUID, maxImmutableEntries+1)
+	ids := make([]uuid.UUID, constants.MaxImmutableDiffEntries+1)
 	for i := range ids {
 		ids[i] = uuid.New()
 		c.set(ids[i], diffCacheEntry{
@@ -204,7 +205,7 @@ func TestDiffCacheLRUEviction(t *testing.T) {
 	}
 
 	// The newest entry must still be present.
-	if _, ok := c.get(ids[maxImmutableEntries]); !ok {
+	if _, ok := c.get(ids[constants.MaxImmutableDiffEntries]); !ok {
 		t.Error("newest entry should still be retrievable after eviction")
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/handler"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/runner"
@@ -260,7 +261,7 @@ func TestGauge_CircuitBreakerOpen(t *testing.T) {
 	}
 
 	// Trip the circuit breaker by recording failures above the threshold.
-	for i := 0; i < runner.DefaultCBThreshold+1; i++ {
+	for i := 0; i < constants.DefaultCBThreshold+1; i++ {
 		r.RecordContainerFailure()
 	}
 

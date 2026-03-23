@@ -318,7 +318,7 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 
 // TaskDiff returns the git diff for a task's worktrees versus the default branch.
 // Responses are cached: terminal tasks (done/cancelled/archived) are cached
-// indefinitely; active tasks are cached for diffCacheTTL (10 s). ETag and
+// indefinitely; active tasks are cached for constants.DiffCacheTTL (10 s). ETag and
 // Cache-Control headers are set so browsers can issue conditional requests.
 func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
 	task, err := h.store.GetTask(r.Context(), id)

@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
@@ -26,11 +27,6 @@ import (
 	"changkun.de/x/wallfacer/prompts"
 	"github.com/google/uuid"
 )
-
-// DefaultCBThreshold is the number of consecutive container launch failures
-// required to open the circuit breaker. It can be overridden at startup via
-// WALLFACER_CONTAINER_CB_THRESHOLD.
-const DefaultCBThreshold = 5
 
 // ContainerInfo represents a single sandbox container returned by ListContainers.
 type ContainerInfo struct {
@@ -223,11 +219,6 @@ func (r *Runner) ContainerName(taskID uuid.UUID) string {
 	}
 	return ""
 }
-
-const (
-	maxRebaseRetries   = 3
-	defaultTaskTimeout = 60 * time.Minute
-)
 
 // RunnerConfig holds all configuration needed to construct a Runner.
 //
@@ -502,7 +493,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	// Defaults: 5 consecutive failures trip the breaker; it stays open for
 	// 30 s before allowing a single probe (half-open).
 	// Both values can be overridden via environment variables.
-	cbThreshold := DefaultCBThreshold
+	cbThreshold := constants.DefaultCBThreshold
 	cbOpenSec := 30
 	if v := os.Getenv("WALLFACER_CONTAINER_CB_THRESHOLD"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {

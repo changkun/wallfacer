@@ -10,22 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/watcher"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
-
-const defaultMaxConcurrentTasks = 5
-
-// maxTestFailRetries is the maximum number of consecutive test failures before
-// the auto-resume cycle is halted. After this many failures without a passing
-// test or manual feedback, the task stays in waiting until the user intervenes.
-const maxTestFailRetries = 3
-
-// defaultMaxTestConcurrentTasks is used when WALLFACER_MAX_TEST_PARALLEL is not set.
-const defaultMaxTestConcurrentTasks = 2
 
 // maxConcurrentTasks returns the configured parallel task limit. The value is
 // lazily cached and only re-parsed after UpdateEnvConfig calls Invalidate.
@@ -94,7 +85,7 @@ var promoteMu sync.Mutex
 func (h *Handler) StartAutoPromoter(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
 		Wake:     h.store,
-		Interval: 60 * time.Second,
+		Interval: constants.AutoPromoteInterval,
 		Action:   h.tryAutoPromote,
 		Shutdown: func() {
 			h.scheduledPromoteMu.Lock()
@@ -245,9 +236,9 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					continue
 				}
 				// Cap: skip tasks that have failed too many consecutive tests.
-				if t.TestFailCount >= maxTestFailRetries {
+				if t.TestFailCount >= constants.MaxTestFailRetries {
 					logger.Handler.Info("auto-promote: skipping task — test fail cap reached",
-						"task", t.ID, "test_fail_count", t.TestFailCount, "max", maxTestFailRetries)
+						"task", t.ID, "test_fail_count", t.TestFailCount, "max", constants.MaxTestFailRetries)
 					continue
 				}
 				if resumeCandidate == nil || t.Position < resumeCandidate.task.Position {
@@ -335,11 +326,11 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 				if freshTask.SessionID == nil || *freshTask.SessionID == "" {
 					return false, nil
 				}
-				if freshTask.TestFailCount >= maxTestFailRetries {
+				if freshTask.TestFailCount >= constants.MaxTestFailRetries {
 					logger.Handler.Info("auto-promote: test fail cap reached, stopping auto-resume",
 						"task", freshTask.ID, "test_fail_count", freshTask.TestFailCount)
 					h.insertEventOrLog(ctx, freshTask.ID, store.EventTypeSystem, map[string]string{
-						"result": fmt.Sprintf("Auto-resume halted: %d consecutive test failures (cap: %d). Manual feedback required to continue.", freshTask.TestFailCount, maxTestFailRetries),
+						"result": fmt.Sprintf("Auto-resume halted: %d consecutive test failures (cap: %d). Manual feedback required to continue.", freshTask.TestFailCount, constants.MaxTestFailRetries),
 					})
 					return false, nil
 				}
@@ -422,10 +413,10 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 		h.incAutopilotAction("auto_retrier", "suppressed_budget")
 		return
 	}
-	if task.AutoRetryCount >= store.MaxAutoRetries {
+	if task.AutoRetryCount >= constants.MaxAutoRetries {
 		logger.Handler.Info("auto-retry suppressed: global retry cap reached",
 			"task", task.ID, "auto_retry_count", task.AutoRetryCount,
-			"max", store.MaxAutoRetries, "category", task.FailureCategory)
+			"max", constants.MaxAutoRetries, "category", task.FailureCategory)
 		h.incAutopilotAction("auto_retrier", "suppressed_max_count")
 		return
 	}
@@ -452,16 +443,12 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 		}))
 }
 
-// waitingSyncInterval is how often the watcher polls for waiting tasks that
-// have fallen behind the default branch.
-const waitingSyncInterval = 30 * time.Second
-
 // StartWaitingSyncWatcher starts a background goroutine that periodically
 // checks all waiting tasks and automatically syncs any whose worktrees have
 // fallen behind the default branch.
 func (h *Handler) StartWaitingSyncWatcher(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
-		Interval: waitingSyncInterval,
+		Interval: constants.WaitingSyncInterval,
 		Action:   h.checkAndSyncWaitingTasks,
 	})
 }
@@ -593,27 +580,14 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 	}
 }
 
-// autoTestInterval is how often the auto-tester polls for eligible waiting tasks
-// in addition to reacting to store change notifications.
-const autoTestInterval = 30 * time.Second
-
-// watcherSettleDelay is a short pause after receiving a wake signal before the
-// watcher acts. When the runner transitions a task to "waiting", the SSE event
-// and the wake signal are dispatched simultaneously inside notify(). Without a
-// delay the watcher can transition the task back out of "waiting" before the SSE
-// event reaches the browser, so the intermediate state is never rendered. A
-// 1.5-second settle window gives the client enough animation frames to paint the
-// intermediate column position. Tests can lower this for faster verification.
-var watcherSettleDelay = 1500 * time.Millisecond
-
 // StartAutoTester subscribes to store change notifications and automatically
 // triggers the test agent for waiting tasks that are untested and not behind
 // the default branch tip.
 func (h *Handler) StartAutoTester(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
 		Wake:        h.store,
-		Interval:    autoTestInterval,
-		SettleDelay: watcherSettleDelay,
+		Interval:    constants.AutoTestInterval,
+		SettleDelay: constants.WatcherSettleDelay,
 		Action:      h.tryAutoTest,
 	})
 }
@@ -801,18 +775,14 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 	})
 }
 
-// autoSubmitInterval is how often the auto-submitter polls for eligible waiting tasks
-// in addition to reacting to store change notifications.
-const autoSubmitInterval = 30 * time.Second
-
 // StartAutoSubmitter subscribes to store change notifications and automatically
 // moves waiting tasks to done when they are verified (LastTestResult == "pass"),
 // not behind the default branch tip, and have no unresolved worktree conflicts.
 func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
 		Wake:        h.store,
-		Interval:    autoSubmitInterval,
-		SettleDelay: watcherSettleDelay,
+		Interval:    constants.AutoSubmitInterval,
+		SettleDelay: constants.WatcherSettleDelay,
 		Action:      h.tryAutoSubmit,
 	})
 }
@@ -890,7 +860,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				// Skip if the last git fetch failed recently — local refs may be
 				// stale and CommitsBehind could return 0 for a task that is actually
 				// behind. The sync watcher will retry the fetch on its next cycle.
-				if t.LastFetchErrorAt != nil && time.Since(*t.LastFetchErrorAt) < 5*time.Minute {
+				if t.LastFetchErrorAt != nil && time.Since(*t.LastFetchErrorAt) < constants.FetchErrorGracePeriod {
 					h.incAutopilotAction("auto_submitter", "skipped_stale_fetch")
 					continue
 				}
@@ -987,15 +957,12 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 	})
 }
 
-// autoRefineInterval is how often the auto-refiner polls for backlog tasks.
-const autoRefineInterval = 30 * time.Second
-
 // StartAutoRefiner subscribes to store change notifications and automatically
 // triggers the refinement agent for backlog tasks that have not yet been refined.
 func (h *Handler) StartAutoRefiner(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
 		Wake:     h.store,
-		Interval: autoRefineInterval,
+		Interval: constants.AutoRefineInterval,
 		Action:   h.tryAutoRefine,
 	})
 }

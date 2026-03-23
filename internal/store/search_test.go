@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/constants"
 )
 
 // createTaskWithTitle is a helper that creates a task and sets its title.
@@ -236,8 +238,8 @@ func TestSearchTasks_Cap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchTasks: %v", err)
 	}
-	if len(results) > maxSearchResults {
-		t.Errorf("expected at most %d results, got %d", maxSearchResults, len(results))
+	if len(results) > constants.MaxSearchResults {
+		t.Errorf("expected at most %d results, got %d", constants.MaxSearchResults, len(results))
 	}
 }
 
@@ -753,7 +755,7 @@ func BenchmarkSearchTasks_OversightDisk(b *testing.B) {
 
 		results := make([]TaskSearchResult, 0)
 		for _, t := range snapshot {
-			if len(results) >= maxSearchResults {
+			if len(results) >= constants.MaxSearchResults {
 				break
 			}
 			if field, snippet, ok := oldMatchTask(t); ok {

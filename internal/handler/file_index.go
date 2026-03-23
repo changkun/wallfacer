@@ -7,11 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 )
-
-// fileIndexTTL is the default time-to-live for a cached workspace file list.
-const fileIndexTTL = 30 * time.Second
 
 // fileCacheEntry holds the file list for one workspace plus cache metadata.
 type fileCacheEntry struct {
@@ -42,7 +40,7 @@ func newFileIndex() *fileIndex {
 	idx := &fileIndex{
 		entries:    make(map[string]fileCacheEntry),
 		refreshing: make(map[string]bool),
-		ttl:        fileIndexTTL,
+		ttl:        constants.FileIndexTTL,
 		now:        time.Now,
 	}
 	idx.buildFn = buildFiles
@@ -61,7 +59,7 @@ func workspaceMtime(ws string) (time.Time, error) {
 // buildFiles walks ws and returns paths prefixed by the workspace basename
 // (e.g. "myrepo/cmd/main.go") plus the mtime of the workspace root at walk
 // start. Hidden directories and entries in skipDirs are skipped. The list is
-// capped at maxFileListSize.
+// capped at constants.MaxFileListSize.
 func buildFiles(ws string) ([]string, time.Time) {
 	mtime, err := workspaceMtime(ws)
 	if err != nil {
@@ -85,7 +83,7 @@ func buildFiles(ws string) ([]string, time.Time) {
 			}
 			return nil
 		}
-		if len(files) >= maxFileListSize {
+		if len(files) >= constants.MaxFileListSize {
 			return filepath.SkipAll
 		}
 		rel, relErr := filepath.Rel(ws, path)

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/ndjson"
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
@@ -112,10 +113,10 @@ func NewStore(dir string) (*Store, error) {
 		tasksByStatus:       make(map[TaskStatus]map[uuid.UUID]struct{}),
 		searchIndex:         make(map[uuid.UUID]indexedTaskText),
 		hub:                 pubsub.NewHub[TaskDelta](pubsub.WithClone(cloneTaskDelta)),
-		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", DefaultRetryHistoryLimit),
-		refineSessionsLimit: readEnvInt("WALLFACER_REFINE_SESSIONS_LIMIT", DefaultRefineSessionsLimit),
-		promptHistoryLimit:  readEnvInt("WALLFACER_PROMPT_HISTORY_LIMIT", DefaultPromptHistoryLimit),
-		maxTurnOutputBytes:  readEnvInt("WALLFACER_MAX_TURN_OUTPUT_BYTES", DefaultMaxTurnOutputBytes),
+		retryHistoryLimit:   readEnvInt("WALLFACER_RETRY_HISTORY_LIMIT", constants.DefaultRetryHistoryLimit),
+		refineSessionsLimit: readEnvInt("WALLFACER_REFINE_SESSIONS_LIMIT", constants.DefaultRefineSessionsLimit),
+		promptHistoryLimit:  readEnvInt("WALLFACER_PROMPT_HISTORY_LIMIT", constants.DefaultPromptHistoryLimit),
+		maxTurnOutputBytes:  readEnvInt("WALLFACER_MAX_TURN_OUTPUT_BYTES", constants.DefaultMaxTurnOutputBytes),
 	}
 
 	if err := os.MkdirAll(dir, 0755); err != nil {

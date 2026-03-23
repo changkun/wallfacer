@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
@@ -185,8 +186,8 @@ func TestMigrateTaskJSON_SchemaVersionStamped(t *testing.T) {
 	if !changed {
 		t.Error("expected changed=true when schema version was not current")
 	}
-	if task.SchemaVersion != CurrentTaskSchemaVersion {
-		t.Errorf("SchemaVersion = %d, want %d", task.SchemaVersion, CurrentTaskSchemaVersion)
+	if task.SchemaVersion != constants.CurrentTaskSchemaVersion {
+		t.Errorf("SchemaVersion = %d, want %d", task.SchemaVersion, constants.CurrentTaskSchemaVersion)
 	}
 }
 
@@ -213,7 +214,7 @@ func TestMigrateTaskJSON_NoChangesWhenAlreadyCurrent(t *testing.T) {
 		"created_at":     now,
 		"updated_at":     now,
 		"sandbox":        string(sandbox.Claude),
-		"schema_version": CurrentTaskSchemaVersion,
+		"schema_version": constants.CurrentTaskSchemaVersion,
 		"auto_retry_budget": map[string]int{
 			string(FailureCategoryContainerCrash): 2,
 			string(FailureCategorySyncError):      2,

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
@@ -91,8 +92,6 @@ func (r *Runner) RestoreMissingTaskWorktrees(ctx context.Context, tasks []store.
 	return restored
 }
 
-const defaultWorktreeHealthInterval = 2 * time.Minute
-
 // StartWorktreeHealthWatcher proactively scans active tasks for missing
 // worktree directories and attempts to restore them. It runs an initial scan
 // at startup and then repeats every 2 minutes. Errors are logged at Warn level
@@ -118,7 +117,7 @@ func (r *Runner) StartWorktreeHealthWatcher(ctx context.Context) {
 	// Run one scan immediately at startup before the first tick.
 	runScan()
 
-	ticker := time.NewTicker(defaultWorktreeHealthInterval)
+	ticker := time.NewTicker(constants.DefaultWorktreeHealthInterval)
 	defer ticker.Stop()
 
 	for {
@@ -238,8 +237,6 @@ func (r *Runner) PruneOrphanedWorktrees(ctx context.Context, orphans []uuid.UUID
 	return removed
 }
 
-const defaultWorktreeGCInterval = 24 * time.Hour
-
 // StartWorktreeGC runs ScanOrphanedWorktrees + PruneOrphanedWorktrees on a
 // periodic interval. interval defaults to 24h; override with
 // WALLFACER_WORKTREE_GC_INTERVAL (e.g. "6h", "30m").
@@ -247,7 +244,7 @@ func (r *Runner) StartWorktreeGC(ctx context.Context) {
 	r.backgroundWg.Add("worktree-gc")
 	defer r.backgroundWg.Done("worktree-gc")
 
-	interval := defaultWorktreeGCInterval
+	interval := constants.DefaultWorktreeGCInterval
 	if v := os.Getenv("WALLFACER_WORKTREE_GC_INTERVAL"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			interval = d

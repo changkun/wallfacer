@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"github.com/google/uuid"
 )
 
@@ -38,7 +39,7 @@ func TestPruneTaskPayload(t *testing.T) {
 	s.mu.Lock()
 	tp := s.tasks[task.ID]
 
-	// 15 RetryHistory entries (limit = DefaultRetryHistoryLimit = 10).
+	// 15 RetryHistory entries (limit = constants.DefaultRetryHistoryLimit = 10).
 	for i := 0; i < 15; i++ {
 		tp.RetryHistory = append(tp.RetryHistory, RetryRecord{
 			RetiredAt: now.Add(time.Duration(i) * time.Second),
@@ -47,7 +48,7 @@ func TestPruneTaskPayload(t *testing.T) {
 		})
 	}
 
-	// 8 RefineSessions entries (limit = DefaultRefineSessionsLimit = 5).
+	// 8 RefineSessions entries (limit = constants.DefaultRefineSessionsLimit = 5).
 	for i := 0; i < 8; i++ {
 		tp.RefineSessions = append(tp.RefineSessions, RefinementSession{
 			ID:        fmt.Sprintf("session-%d", i),
@@ -55,7 +56,7 @@ func TestPruneTaskPayload(t *testing.T) {
 		})
 	}
 
-	// 25 PromptHistory entries (limit = DefaultPromptHistoryLimit = 20).
+	// 25 PromptHistory entries (limit = constants.DefaultPromptHistoryLimit = 20).
 	for i := 0; i < 25; i++ {
 		tp.PromptHistory = append(tp.PromptHistory, fmt.Sprintf("prompt-%d", i))
 	}
@@ -78,22 +79,22 @@ func TestPruneTaskPayload(t *testing.T) {
 		t.Fatalf("Unmarshal task.json: %v", err)
 	}
 
-	if got := len(diskTask.RetryHistory); got > DefaultRetryHistoryLimit {
-		t.Errorf("disk RetryHistory len = %d, want ≤ %d", got, DefaultRetryHistoryLimit)
+	if got := len(diskTask.RetryHistory); got > constants.DefaultRetryHistoryLimit {
+		t.Errorf("disk RetryHistory len = %d, want ≤ %d", got, constants.DefaultRetryHistoryLimit)
 	}
-	if got := len(diskTask.RefineSessions); got > DefaultRefineSessionsLimit {
-		t.Errorf("disk RefineSessions len = %d, want ≤ %d", got, DefaultRefineSessionsLimit)
+	if got := len(diskTask.RefineSessions); got > constants.DefaultRefineSessionsLimit {
+		t.Errorf("disk RefineSessions len = %d, want ≤ %d", got, constants.DefaultRefineSessionsLimit)
 	}
-	if got := len(diskTask.PromptHistory); got > DefaultPromptHistoryLimit {
-		t.Errorf("disk PromptHistory len = %d, want ≤ %d", got, DefaultPromptHistoryLimit)
+	if got := len(diskTask.PromptHistory); got > constants.DefaultPromptHistoryLimit {
+		t.Errorf("disk PromptHistory len = %d, want ≤ %d", got, constants.DefaultPromptHistoryLimit)
 	}
 
 	// ── Step 4: verify most-recent entries are retained (tail of each slice) ─
-	if len(diskTask.RetryHistory) == DefaultRetryHistoryLimit {
+	if len(diskTask.RetryHistory) == constants.DefaultRetryHistoryLimit {
 		// The oldest kept entry should be index (15-10)=5, the newest index 14.
 		first := diskTask.RetryHistory[0].Prompt
-		last := diskTask.RetryHistory[DefaultRetryHistoryLimit-1].Prompt
-		wantFirst := fmt.Sprintf("retry-%d", 15-DefaultRetryHistoryLimit)
+		last := diskTask.RetryHistory[constants.DefaultRetryHistoryLimit-1].Prompt
+		wantFirst := fmt.Sprintf("retry-%d", 15-constants.DefaultRetryHistoryLimit)
 		wantLast := "retry-14"
 		if first != wantFirst {
 			t.Errorf("disk RetryHistory[0].Prompt = %q, want %q (oldest retained)", first, wantFirst)
@@ -103,8 +104,8 @@ func TestPruneTaskPayload(t *testing.T) {
 		}
 	}
 
-	if len(diskTask.PromptHistory) == DefaultPromptHistoryLimit {
-		last := diskTask.PromptHistory[DefaultPromptHistoryLimit-1]
+	if len(diskTask.PromptHistory) == constants.DefaultPromptHistoryLimit {
+		last := diskTask.PromptHistory[constants.DefaultPromptHistoryLimit-1]
 		wantLast := "prompt-24"
 		if last != wantLast {
 			t.Errorf("disk PromptHistory[last] = %q, want %q (most recent)", last, wantLast)
@@ -135,14 +136,14 @@ func TestPruneTaskPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask after reload: %v", err)
 	}
-	if n := len(reloaded.RetryHistory); n > DefaultRetryHistoryLimit {
-		t.Errorf("reloaded RetryHistory len = %d, want ≤ %d", n, DefaultRetryHistoryLimit)
+	if n := len(reloaded.RetryHistory); n > constants.DefaultRetryHistoryLimit {
+		t.Errorf("reloaded RetryHistory len = %d, want ≤ %d", n, constants.DefaultRetryHistoryLimit)
 	}
-	if n := len(reloaded.RefineSessions); n > DefaultRefineSessionsLimit {
-		t.Errorf("reloaded RefineSessions len = %d, want ≤ %d", n, DefaultRefineSessionsLimit)
+	if n := len(reloaded.RefineSessions); n > constants.DefaultRefineSessionsLimit {
+		t.Errorf("reloaded RefineSessions len = %d, want ≤ %d", n, constants.DefaultRefineSessionsLimit)
 	}
-	if n := len(reloaded.PromptHistory); n > DefaultPromptHistoryLimit {
-		t.Errorf("reloaded PromptHistory len = %d, want ≤ %d", n, DefaultPromptHistoryLimit)
+	if n := len(reloaded.PromptHistory); n > constants.DefaultPromptHistoryLimit {
+		t.Errorf("reloaded PromptHistory len = %d, want ≤ %d", n, constants.DefaultPromptHistoryLimit)
 	}
 }
 
@@ -159,7 +160,7 @@ func TestPruneTaskPayload_LoadTimeMigration(t *testing.T) {
 
 	// Write a task.json with slices that exceed all three default limits.
 	overLimit := Task{
-		SchemaVersion: CurrentTaskSchemaVersion,
+		SchemaVersion: constants.CurrentTaskSchemaVersion,
 		ID:            id,
 		Prompt:        "migration test",
 		Status:        TaskStatusBacklog,
@@ -203,14 +204,14 @@ func TestPruneTaskPayload_LoadTimeMigration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	if n := len(loaded.RetryHistory); n > DefaultRetryHistoryLimit {
-		t.Errorf("load-time RetryHistory len = %d, want ≤ %d", n, DefaultRetryHistoryLimit)
+	if n := len(loaded.RetryHistory); n > constants.DefaultRetryHistoryLimit {
+		t.Errorf("load-time RetryHistory len = %d, want ≤ %d", n, constants.DefaultRetryHistoryLimit)
 	}
-	if n := len(loaded.RefineSessions); n > DefaultRefineSessionsLimit {
-		t.Errorf("load-time RefineSessions len = %d, want ≤ %d", n, DefaultRefineSessionsLimit)
+	if n := len(loaded.RefineSessions); n > constants.DefaultRefineSessionsLimit {
+		t.Errorf("load-time RefineSessions len = %d, want ≤ %d", n, constants.DefaultRefineSessionsLimit)
 	}
-	if n := len(loaded.PromptHistory); n > DefaultPromptHistoryLimit {
-		t.Errorf("load-time PromptHistory len = %d, want ≤ %d", n, DefaultPromptHistoryLimit)
+	if n := len(loaded.PromptHistory); n > constants.DefaultPromptHistoryLimit {
+		t.Errorf("load-time PromptHistory len = %d, want ≤ %d", n, constants.DefaultPromptHistoryLimit)
 	}
 }
 
@@ -264,14 +265,14 @@ func TestPruneTaskPayload_ZeroLimitDisablesPruning(t *testing.T) {
 func TestGetPayloadLimits(t *testing.T) {
 	s := newTestStore(t)
 	limits := s.GetPayloadLimits()
-	if limits.RetryHistory != DefaultRetryHistoryLimit {
-		t.Errorf("RetryHistory limit = %d, want %d", limits.RetryHistory, DefaultRetryHistoryLimit)
+	if limits.RetryHistory != constants.DefaultRetryHistoryLimit {
+		t.Errorf("RetryHistory limit = %d, want %d", limits.RetryHistory, constants.DefaultRetryHistoryLimit)
 	}
-	if limits.RefineSessions != DefaultRefineSessionsLimit {
-		t.Errorf("RefineSessions limit = %d, want %d", limits.RefineSessions, DefaultRefineSessionsLimit)
+	if limits.RefineSessions != constants.DefaultRefineSessionsLimit {
+		t.Errorf("RefineSessions limit = %d, want %d", limits.RefineSessions, constants.DefaultRefineSessionsLimit)
 	}
-	if limits.PromptHistory != DefaultPromptHistoryLimit {
-		t.Errorf("PromptHistory limit = %d, want %d", limits.PromptHistory, DefaultPromptHistoryLimit)
+	if limits.PromptHistory != constants.DefaultPromptHistoryLimit {
+		t.Errorf("PromptHistory limit = %d, want %d", limits.PromptHistory, constants.DefaultPromptHistoryLimit)
 	}
 }
 
@@ -308,7 +309,7 @@ func TestGetPayloadLimits_InvalidEnvFallsBackToDefault(t *testing.T) {
 		t.Fatalf("NewStore: %v", err)
 	}
 	limits := s.GetPayloadLimits()
-	if limits.RetryHistory != DefaultRetryHistoryLimit {
-		t.Errorf("RetryHistory limit = %d, want default %d for invalid env value", limits.RetryHistory, DefaultRetryHistoryLimit)
+	if limits.RetryHistory != constants.DefaultRetryHistoryLimit {
+		t.Errorf("RetryHistory limit = %d, want default %d for invalid env value", limits.RetryHistory, constants.DefaultRetryHistoryLimit)
 	}
 }

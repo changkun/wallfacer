@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/cache"
 )
 
 func TestCommitsBehindCache_Miss(t *testing.T) {
-	c := newCommitsBehindCache(commitsBehindCacheTTL)
+	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	_, ok, _ := c.get("repo", "worktree")
 	if ok {
 		t.Error("expected miss on empty cache, got hit")
@@ -18,7 +19,7 @@ func TestCommitsBehindCache_Miss(t *testing.T) {
 }
 
 func TestCommitsBehindCache_Hit(t *testing.T) {
-	c := newCommitsBehindCache(commitsBehindCacheTTL)
+	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	c.set("repo", "worktree", 3, nil)
 
 	n, ok, err := c.get("repo", "worktree")
@@ -37,7 +38,7 @@ func TestCommitsBehindCache_Expiry(t *testing.T) {
 	now := time.Now()
 	c := &commitsBehindCache{
 		c: cache.New[string, commitsBehindResult](
-			commitsBehindCacheTTL,
+			constants.CommitsBehindCacheTTL,
 			cache.WithClock[string, commitsBehindResult](func() time.Time { return now }),
 		),
 	}
@@ -48,7 +49,7 @@ func TestCommitsBehindCache_Expiry(t *testing.T) {
 		t.Fatal("expected cache hit before TTL expiry")
 	}
 
-	now = now.Add(commitsBehindCacheTTL + time.Millisecond)
+	now = now.Add(constants.CommitsBehindCacheTTL + time.Millisecond)
 
 	_, ok, _ := c.get("repo", "worktree")
 	if ok {
@@ -60,14 +61,14 @@ func TestCommitsBehindCache_NotYetExpired(t *testing.T) {
 	now := time.Now()
 	c := &commitsBehindCache{
 		c: cache.New[string, commitsBehindResult](
-			commitsBehindCacheTTL,
+			constants.CommitsBehindCacheTTL,
 			cache.WithClock[string, commitsBehindResult](func() time.Time { return now }),
 		),
 	}
 
 	c.set("repo", "worktree", 2, nil)
 
-	now = now.Add(commitsBehindCacheTTL - time.Millisecond)
+	now = now.Add(constants.CommitsBehindCacheTTL - time.Millisecond)
 
 	if _, ok, _ := c.get("repo", "worktree"); !ok {
 		t.Error("expected cache hit 1ms before expiry, got miss")
@@ -75,7 +76,7 @@ func TestCommitsBehindCache_NotYetExpired(t *testing.T) {
 }
 
 func TestCommitsBehindCache_Invalidate(t *testing.T) {
-	c := newCommitsBehindCache(commitsBehindCacheTTL)
+	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	c.set("repo", "worktree", 1, nil)
 
 	c.invalidate("repo", "worktree")
@@ -86,12 +87,12 @@ func TestCommitsBehindCache_Invalidate(t *testing.T) {
 }
 
 func TestCommitsBehindCache_InvalidateUnknown(_ *testing.T) {
-	c := newCommitsBehindCache(commitsBehindCacheTTL)
+	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	c.invalidate("nonexistent-repo", "nonexistent-worktree")
 }
 
 func TestCommitsBehindCache_InvalidateIsolation(t *testing.T) {
-	c := newCommitsBehindCache(commitsBehindCacheTTL)
+	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	c.set("repo", "wt1", 1, nil)
 	c.set("repo", "wt2", 2, nil)
 
@@ -107,7 +108,7 @@ func TestCommitsBehindCache_InvalidateIsolation(t *testing.T) {
 
 func TestCommitsBehindCache_CachesError(t *testing.T) {
 	sentinel := errors.New("git error")
-	c := newCommitsBehindCache(commitsBehindCacheTTL)
+	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	c.set("repo", "worktree", 0, sentinel)
 
 	_, ok, err := c.get("repo", "worktree")
@@ -120,7 +121,7 @@ func TestCommitsBehindCache_CachesError(t *testing.T) {
 }
 
 func TestCommitsBehindCache_CachedCommitsBehind_ServesFromCache(t *testing.T) {
-	c := newCommitsBehindCache(commitsBehindCacheTTL)
+	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	c.set("repo", "worktree", 7, nil)
 
 	n, ok, err := c.get("repo", "worktree")
@@ -136,7 +137,7 @@ func TestCommitsBehindCache_CachedCommitsBehind_ServesFromCache(t *testing.T) {
 }
 
 func TestCommitsBehindCache_ConcurrentSafe(_ *testing.T) {
-	c := newCommitsBehindCache(commitsBehindCacheTTL)
+	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	const goroutines = 20
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
@@ -159,7 +160,7 @@ func TestCommitsBehindCache_ConcurrentSafe(_ *testing.T) {
 }
 
 func TestCommitsBehindCache_KeySeparation(t *testing.T) {
-	c := newCommitsBehindCache(commitsBehindCacheTTL)
+	c := newCommitsBehindCache(constants.CommitsBehindCacheTTL)
 	c.set("/repo", "/wt1", 1, nil)
 	c.set("/repo", "/wt2", 2, nil)
 

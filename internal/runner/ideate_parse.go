@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/store"
@@ -43,7 +44,7 @@ func normalizeIdeationImpact(idea *IdeateResult) {
 		case "low":
 			idea.ImpactScore = 35
 		default:
-			idea.ImpactScore = defaultIdeationImpactScore
+			idea.ImpactScore = constants.DefaultIdeationImpactScore
 		}
 	}
 	if idea.Priority == "" {
@@ -254,8 +255,8 @@ func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 		}
 		return valid[i].ImpactScore > valid[j].ImpactScore
 	})
-	if len(valid) > maxIdeationIdeas {
-		valid = valid[:maxIdeationIdeas]
+	if len(valid) > constants.MaxIdeationIdeas {
+		valid = valid[:constants.MaxIdeationIdeas]
 	}
 	if len(valid) == 0 {
 		if len(results) == 0 {

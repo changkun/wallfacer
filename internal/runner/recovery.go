@@ -7,13 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
-
-const containerPollInterval = 5 * time.Second
 
 // ContainerLister can enumerate currently running containers.
 type ContainerLister interface {
@@ -186,7 +185,7 @@ func RecoverOrphanedTasks(ctx context.Context, s *store.Store, lister ContainerL
 // The goroutine exits when ctx is cancelled (e.g. on server shutdown) or after
 // a 4-hour safety timeout to prevent indefinitely-leaked goroutines.
 func monitorContainerUntilStopped(ctx context.Context, s *store.Store, lister ContainerLister, taskID uuid.UUID) {
-	monitorContainerUntilStoppedWithConfig(ctx, s, lister, taskID, containerPollInterval, 4*time.Hour)
+	monitorContainerUntilStoppedWithConfig(ctx, s, lister, taskID, constants.ContainerPollInterval, 4*time.Hour)
 }
 
 // monitorContainerUntilStoppedWithConfig is the testable core of

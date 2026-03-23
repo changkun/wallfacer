@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/prompts"
 )
@@ -213,7 +214,7 @@ func workspaceBasename(ws string) string {
 // minified assets. When multiple workspaces are active each path is namespaced
 // with the workspace basename. Duplicate paths that appear in multiple workspaces
 // are collapsed into a single scored entry. Results are capped at
-// maxIdeationChurnSignals. The second return value is the total count of paths
+// constants.MaxIdeationChurnSignals. The second return value is the total count of paths
 // excluded by the ignore rules across all workspaces.
 func (r *Runner) collectWorkspaceChurnSignals(ctx context.Context) ([]prompts.WorkspaceSignal, int) {
 	workspaces := r.workspacesForRunner()
@@ -251,8 +252,8 @@ func (r *Runner) collectWorkspaceChurnSignals(ctx context.Context) ([]prompts.Wo
 		}
 		return result[i].DisplayPath < result[j].DisplayPath
 	})
-	if len(result) > maxIdeationChurnSignals {
-		result = result[:maxIdeationChurnSignals]
+	if len(result) > constants.MaxIdeationChurnSignals {
+		result = result[:constants.MaxIdeationChurnSignals]
 	}
 	return result, totalFiltered
 }
@@ -266,8 +267,8 @@ func (r *Runner) collectWorkspaceChurnSignals(ctx context.Context) ([]prompts.Wo
 // signal rather than nothing. The fallback count is not added to filteredCount.
 func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(ctx context.Context, workspace string, multi bool) ([]prompts.WorkspaceSignal, int) {
 	raw, err := r.runWorkspaceGitCommand(ctx, workspace, "log", "--name-only", "--pretty=format:",
-		fmt.Sprintf("--since=%d.days.ago", churnLookbackDays),
-		"-n", strconv.Itoa(maxChurnCommits))
+		fmt.Sprintf("--since=%d.days.ago", constants.ChurnLookbackDays),
+		"-n", strconv.Itoa(constants.MaxChurnCommits))
 	if err != nil {
 		return nil, 0
 	}
@@ -365,7 +366,7 @@ func (r *Runner) collectWorkspaceChurnSignalsForWorkspace(ctx context.Context, w
 // workspaces. Paths are filtered to exclude vendor/generated trees, minified assets,
 // and prompt template files. Multi-workspace paths are namespaced, and duplicate
 // paths across workspaces are collapsed into a single scored entry. Results are
-// capped at maxIdeationTodoSignals. The second return value is the total excluded count.
+// capped at constants.MaxIdeationTodoSignals. The second return value is the total excluded count.
 func (r *Runner) collectWorkspaceTodoSignals(ctx context.Context) ([]prompts.WorkspaceSignal, int) {
 	workspaces := r.workspacesForRunner()
 	multi := len(workspaces) > 1
@@ -400,8 +401,8 @@ func (r *Runner) collectWorkspaceTodoSignals(ctx context.Context) ([]prompts.Wor
 		}
 		return result[i].DisplayPath < result[j].DisplayPath
 	})
-	if len(result) > maxIdeationTodoSignals {
-		result = result[:maxIdeationTodoSignals]
+	if len(result) > constants.MaxIdeationTodoSignals {
+		result = result[:constants.MaxIdeationTodoSignals]
 	}
 	return result, totalFiltered
 }
@@ -514,7 +515,7 @@ func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(ctx context.Context, wo
 }
 
 func (r *Runner) runWorkspaceGitCommand(parentCtx context.Context, workspace string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(parentCtx, workspaceIdeationCommandTTL)
+	ctx, cancel := context.WithTimeout(parentCtx, constants.WorkspaceIdeationCommandTTL)
 	defer cancel()
 	return cmdexec.Git(workspace, args...).WithContext(ctx).OutputBytes()
 }

@@ -5,13 +5,11 @@ import (
 	"net/http"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/watcher"
 	"changkun.de/x/wallfacer/internal/store"
 )
-
-// ideaAgentDefaultTimeout is the default timeout (minutes) for idea-agent task cards.
-const ideaAgentDefaultTimeout = 60
 
 // StartIdeationWatcher subscribes to store change notifications and, whenever
 // an idea-agent task transitions out of active states, schedules the next
@@ -115,7 +113,7 @@ func (h *Handler) createIdeaAgentTask(ctx context.Context) *store.Task {
 	ideaPrompt := h.runner.BuildIdeationPrompt(activeTasks)
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
 		Prompt:  ideaPrompt,
-		Timeout: ideaAgentDefaultTimeout,
+		Timeout: constants.IdeaAgentDefaultTimeout,
 		Kind:    store.TaskKindIdeaAgent,
 	})
 	if err != nil {

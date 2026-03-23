@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -269,12 +270,12 @@ func newTestHandlerWithTwoWorkspaces(t *testing.T) (*Handler, string, string) {
 }
 
 // TestGetFiles_MaxCapEnforcedAcrossWorkspaces verifies that when the combined
-// file count across workspaces exceeds maxFileListSize the response is capped.
+// file count across workspaces exceeds constants.MaxFileListSize the response is capped.
 func TestGetFiles_MaxCapEnforcedAcrossWorkspaces(t *testing.T) {
 	h, ws1, ws2 := newTestHandlerWithTwoWorkspaces(t)
 
-	// Fill each workspace with more than half of maxFileListSize files.
-	half := maxFileListSize/2 + 100
+	// Fill each workspace with more than half of constants.MaxFileListSize files.
+	half := constants.MaxFileListSize/2 + 100
 	for i := 0; i < half; i++ {
 		name := filepath.Join(ws1, fmt.Sprintf("f%d.go", i))
 		if err := os.WriteFile(name, nil, 0644); err != nil {
@@ -303,8 +304,8 @@ func TestGetFiles_MaxCapEnforcedAcrossWorkspaces(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected files array, got %v", resp["files"])
 	}
-	if len(files) > maxFileListSize {
-		t.Errorf("expected at most %d files, got %d", maxFileListSize, len(files))
+	if len(files) > constants.MaxFileListSize {
+		t.Errorf("expected at most %d files, got %d", constants.MaxFileListSize, len(files))
 	}
 }
 

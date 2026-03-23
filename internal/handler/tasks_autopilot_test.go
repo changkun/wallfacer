@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/store"
@@ -665,14 +666,14 @@ func TestStartAutoRefiner_ExitsOnCancel(t *testing.T) {
 }
 
 // TestAutoTester_SettleDelayDefersTrigger verifies that the auto-tester pauses
-// for watcherSettleDelay after receiving a wake signal before acting. This
+// for constants.WatcherSettleDelay after receiving a wake signal before acting. This
 // ensures the SSE event for the intermediate "waiting" state reaches the
 // browser and is rendered before the watcher transitions the task back.
 func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 	// Lower the settle delay for the test so it runs quickly.
-	orig := watcherSettleDelay
-	watcherSettleDelay = 300 * time.Millisecond
-	t.Cleanup(func() { watcherSettleDelay = orig })
+	orig := constants.WatcherSettleDelay
+	constants.WatcherSettleDelay = 300 * time.Millisecond
+	t.Cleanup(func() { constants.WatcherSettleDelay = orig })
 
 	h := newTestHandler(t)
 	h.SetAutotest(true)
@@ -726,7 +727,7 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 	// out of waiting. In the test environment the container runner is not
 	// available, so the task may end up in "failed" rather than staying in
 	// "in_progress" — the important thing is that it left "waiting".
-	time.Sleep(watcherSettleDelay + 500*time.Millisecond)
+	time.Sleep(constants.WatcherSettleDelay + 500*time.Millisecond)
 	got, _ = h.store.GetTask(ctx, task.ID)
 	if got.Status == store.TaskStatusWaiting {
 		t.Error("task should have left waiting after settle delay, still waiting")
@@ -734,12 +735,12 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 }
 
 // TestAutoSubmitter_SettleDelayDefersTrigger verifies that the auto-submitter
-// waits watcherSettleDelay after a wake signal before committing, giving the UI
+// waits constants.WatcherSettleDelay after a wake signal before committing, giving the UI
 // time to render the "waiting" state.
 func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
-	orig := watcherSettleDelay
-	watcherSettleDelay = 300 * time.Millisecond
-	t.Cleanup(func() { watcherSettleDelay = orig })
+	orig := constants.WatcherSettleDelay
+	constants.WatcherSettleDelay = 300 * time.Millisecond
+	t.Cleanup(func() { constants.WatcherSettleDelay = orig })
 
 	h := newTestHandler(t)
 	h.SetAutosubmit(true)
@@ -788,7 +789,7 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 	}
 
 	// After the settle delay, auto-submit should act.
-	time.Sleep(watcherSettleDelay + 500*time.Millisecond)
+	time.Sleep(constants.WatcherSettleDelay + 500*time.Millisecond)
 	got, _ = h.store.GetTask(ctx, task.ID)
 	if got.Status == store.TaskStatusWaiting {
 		t.Error("task should have been submitted after settle delay, still waiting")
@@ -941,8 +942,8 @@ func TestUpdateEnvConfig_InvalidatesParallelLimitCache(t *testing.T) {
 
 	// Prime the cache with the default (no env file entry → default 5).
 	initial := h.maxConcurrentTasks()
-	if initial != defaultMaxConcurrentTasks {
-		t.Fatalf("initial: want %d, got %d", defaultMaxConcurrentTasks, initial)
+	if initial != constants.DefaultMaxConcurrentTasks {
+		t.Fatalf("initial: want %d, got %d", constants.DefaultMaxConcurrentTasks, initial)
 	}
 
 	// Call UpdateEnvConfig to change max_parallel_tasks to 9.
@@ -969,8 +970,8 @@ func TestUpdateEnvConfig_InvalidatesTestParallelLimitCache(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 
 	initial := h.maxTestConcurrentTasks()
-	if initial != defaultMaxTestConcurrentTasks {
-		t.Fatalf("initial: want %d, got %d", defaultMaxTestConcurrentTasks, initial)
+	if initial != constants.DefaultMaxTestConcurrentTasks {
+		t.Fatalf("initial: want %d, got %d", constants.DefaultMaxTestConcurrentTasks, initial)
 	}
 
 	newLimit := 6
@@ -995,7 +996,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 	// ── Test 1: regression guard ─────────────────────────────────────────────
 	// The exact regressed scenario fixed in a4e6326: the handler was using
 	// len(RetryHistory) (=5) instead of AutoRetryCount (=1) as the gate.
-	// With count=1 < store.MaxAutoRetries(3) and budget=2 > 0, the task MUST
+	// With count=1 < constants.MaxAutoRetries(3) and budget=2 > 0, the task MUST
 	// be retried despite having 5 RetryHistory entries.
 	t.Run("regression_uses_auto_retry_count_not_retry_history_length", func(t *testing.T) {
 		h := newTestHandler(t)
@@ -1043,7 +1044,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 	})
 
 	// ── Test 2: total cap enforcement ────────────────────────────────────────
-	// AutoRetryCount == store.MaxAutoRetries(3) must block retry even when
+	// AutoRetryCount == constants.MaxAutoRetries(3) must block retry even when
 	// the per-category budget is plentiful.
 	t.Run("total_cap_prevents_retry", func(t *testing.T) {
 		h := newTestHandler(t)
@@ -1061,7 +1062,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 			ID:              created.ID,
 			Status:          store.TaskStatusFailed,
 			Prompt:          created.Prompt,
-			AutoRetryCount:  store.MaxAutoRetries, // == 3, at the cap
+			AutoRetryCount:  constants.MaxAutoRetries, // == 3, at the cap
 			FailureCategory: store.FailureCategoryContainerCrash,
 			AutoRetryBudget: map[store.FailureCategory]int{
 				store.FailureCategoryContainerCrash: 5, // budget is irrelevant when count is at cap
@@ -1246,7 +1247,7 @@ func TestStartAutoRetrier_StartupScan(t *testing.T) {
 //   - task1: AutoRetryCount=2, FailureCategory=container_crash, budget=1.
 //     The scan should retry this once more (reset to backlog).
 //
-//   - task2: AutoRetryCount=3 (== store.MaxAutoRetries), FailureCategory=container_crash.
+//   - task2: AutoRetryCount=3 (== constants.MaxAutoRetries), FailureCategory=container_crash.
 //     The scan must NOT retry this — the total cap is already hit.
 func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 	h := newTestHandler(t)
@@ -1293,15 +1294,15 @@ func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for range store.MaxAutoRetries {
+	for range constants.MaxAutoRetries {
 		if err := h.store.IncrementAutoRetryCount(ctx, task2.ID, store.FailureCategorySyncError); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	t2pre, _ := h.store.GetTask(ctx, task2.ID)
-	if t2pre.AutoRetryCount != store.MaxAutoRetries {
-		t.Fatalf("setup: task2 AutoRetryCount=%d, want %d", t2pre.AutoRetryCount, store.MaxAutoRetries)
+	if t2pre.AutoRetryCount != constants.MaxAutoRetries {
+		t.Fatalf("setup: task2 AutoRetryCount=%d, want %d", t2pre.AutoRetryCount, constants.MaxAutoRetries)
 	}
 
 	if err := h.store.ForceUpdateTaskStatus(ctx, task2.ID, store.TaskStatusFailed); err != nil {
@@ -1327,16 +1328,16 @@ func TestStartAutoRetrier_ServerRestartDoubleRetryGuard(t *testing.T) {
 		t.Errorf("task1: status = %q, want backlog (one retry remaining at count=2)", got1.Status)
 	}
 
-	// task2 must remain failed — count=3 hits store.MaxAutoRetries.
+	// task2 must remain failed — count=3 hits constants.MaxAutoRetries.
 	got2, err := h.store.GetTask(ctx, task2.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got2.Status != store.TaskStatusFailed {
-		t.Errorf("task2: status = %q, want failed (max count=%d already hit)", got2.Status, store.MaxAutoRetries)
+		t.Errorf("task2: status = %q, want failed (max count=%d already hit)", got2.Status, constants.MaxAutoRetries)
 	}
-	if got2.AutoRetryCount != store.MaxAutoRetries {
-		t.Errorf("task2: AutoRetryCount=%d, want %d (unchanged)", got2.AutoRetryCount, store.MaxAutoRetries)
+	if got2.AutoRetryCount != constants.MaxAutoRetries {
+		t.Errorf("task2: AutoRetryCount=%d, want %d (unchanged)", got2.AutoRetryCount, constants.MaxAutoRetries)
 	}
 }
 

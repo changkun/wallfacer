@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/cache"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
@@ -986,7 +987,7 @@ func TestDiffCacheTTLExpiry(t *testing.T) {
 	}
 
 	// Advance time past the TTL.
-	fakeNow = fakeNow.Add(diffCacheTTL + time.Second)
+	fakeNow = fakeNow.Add(constants.DiffCacheTTL + time.Second)
 
 	// After TTL expiry the cache entry is stale — expect a cache miss (200 with fresh data).
 	req3 := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/diff", nil)

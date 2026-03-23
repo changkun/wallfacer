@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"github.com/google/uuid"
 )
 
@@ -368,8 +369,8 @@ func TestMigrateTaskJSON_LegacyNoSchemaVersion(t *testing.T) {
 	if !task.UpdatedAt.Equal(modTime) {
 		t.Errorf("UpdatedAt = %v, want %v (file mod time)", task.UpdatedAt, modTime)
 	}
-	if task.SchemaVersion != CurrentTaskSchemaVersion {
-		t.Errorf("SchemaVersion = %d, want %d", task.SchemaVersion, CurrentTaskSchemaVersion)
+	if task.SchemaVersion != constants.CurrentTaskSchemaVersion {
+		t.Errorf("SchemaVersion = %d, want %d", task.SchemaVersion, constants.CurrentTaskSchemaVersion)
 	}
 }
 
@@ -388,7 +389,7 @@ func TestMigrateTaskJSON_AlreadyCurrent(t *testing.T) {
 		"created_at": %q,
 		"updated_at": %q,
 		"auto_retry_budget": {"container_crash": 2, "sync_error": 2, "worktree_setup": 1}
-	}`, CurrentTaskSchemaVersion, id.String(), now.Format(time.RFC3339), now.Format(time.RFC3339)))
+	}`, constants.CurrentTaskSchemaVersion, id.String(), now.Format(time.RFC3339), now.Format(time.RFC3339)))
 
 	_, changed, err := migrateTaskJSON(raw, time.Now())
 	if err != nil {
@@ -411,7 +412,7 @@ func TestMigrateTaskJSON_BackfillGoal(t *testing.T) {
 		"created_at": %q,
 		"updated_at": %q,
 		"auto_retry_budget": {"container_crash": 2, "sync_error": 2, "worktree_setup": 1}
-	}`, CurrentTaskSchemaVersion, id.String(), now.Format(time.RFC3339), now.Format(time.RFC3339))
+	}`, constants.CurrentTaskSchemaVersion, id.String(), now.Format(time.RFC3339), now.Format(time.RFC3339))
 
 	task, changed, err := migrateTaskJSON(raw, time.Now())
 	if err != nil {
@@ -447,7 +448,7 @@ func TestMigrateTaskJSON_CanonicalizeDependsOn(t *testing.T) {
 		"updated_at": "2024-01-01T00:00:00Z",
 		"depends_on": [" %s ", "%s", "not-a-uuid", "%s"]
 	}`,
-		CurrentTaskSchemaVersion,
+		constants.CurrentTaskSchemaVersion,
 		id1.String(), id2.String(),
 		id1.String(), // duplicate
 	))
@@ -480,7 +481,7 @@ func TestMigrateTaskJSON_InvalidDependsOnDropped(t *testing.T) {
 		"created_at": %q,
 		"updated_at": %q,
 		"depends_on": ["not-a-uuid", "also-not", ""]
-	}`, CurrentTaskSchemaVersion, now, now))
+	}`, constants.CurrentTaskSchemaVersion, now, now))
 
 	task, changed, err := migrateTaskJSON(raw, time.Now())
 	if err != nil {
@@ -528,8 +529,8 @@ func TestLoadAll_MigratesLegacyJSON(t *testing.T) {
 	if task.Timeout != 60 {
 		t.Errorf("Timeout = %d, want 60", task.Timeout)
 	}
-	if task.SchemaVersion != CurrentTaskSchemaVersion {
-		t.Errorf("in-memory SchemaVersion = %d, want %d", task.SchemaVersion, CurrentTaskSchemaVersion)
+	if task.SchemaVersion != constants.CurrentTaskSchemaVersion {
+		t.Errorf("in-memory SchemaVersion = %d, want %d", task.SchemaVersion, constants.CurrentTaskSchemaVersion)
 	}
 	if task.CreatedAt.IsZero() {
 		t.Error("CreatedAt is zero after migration")
@@ -544,8 +545,8 @@ func TestLoadAll_MigratesLegacyJSON(t *testing.T) {
 	if err := json.Unmarshal(raw, &persisted); err != nil {
 		t.Fatalf("unmarshal persisted task.json: %v", err)
 	}
-	if persisted.SchemaVersion != CurrentTaskSchemaVersion {
-		t.Errorf("persisted SchemaVersion = %d, want %d", persisted.SchemaVersion, CurrentTaskSchemaVersion)
+	if persisted.SchemaVersion != constants.CurrentTaskSchemaVersion {
+		t.Errorf("persisted SchemaVersion = %d, want %d", persisted.SchemaVersion, constants.CurrentTaskSchemaVersion)
 	}
 	if persisted.Status != TaskStatusBacklog {
 		t.Errorf("persisted Status = %q, want %q", persisted.Status, TaskStatusBacklog)
@@ -553,15 +554,15 @@ func TestLoadAll_MigratesLegacyJSON(t *testing.T) {
 }
 
 // TestCreateTask_StampsSchemaVersion verifies that newly created tasks have
-// SchemaVersion = CurrentTaskSchemaVersion both in memory and on disk.
+// SchemaVersion = constants.CurrentTaskSchemaVersion both in memory and on disk.
 func TestCreateTask_StampsSchemaVersion(t *testing.T) {
 	s := newTestStore(t)
 	task, err := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "versioned task", Timeout: 10})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
-	if task.SchemaVersion != CurrentTaskSchemaVersion {
-		t.Errorf("in-memory SchemaVersion = %d, want %d", task.SchemaVersion, CurrentTaskSchemaVersion)
+	if task.SchemaVersion != constants.CurrentTaskSchemaVersion {
+		t.Errorf("in-memory SchemaVersion = %d, want %d", task.SchemaVersion, constants.CurrentTaskSchemaVersion)
 	}
 
 	// Reload and check on-disk value.
@@ -573,8 +574,8 @@ func TestCreateTask_StampsSchemaVersion(t *testing.T) {
 	if err := json.Unmarshal(raw, &persisted); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if persisted.SchemaVersion != CurrentTaskSchemaVersion {
-		t.Errorf("persisted SchemaVersion = %d, want %d", persisted.SchemaVersion, CurrentTaskSchemaVersion)
+	if persisted.SchemaVersion != constants.CurrentTaskSchemaVersion {
+		t.Errorf("persisted SchemaVersion = %d, want %d", persisted.SchemaVersion, constants.CurrentTaskSchemaVersion)
 	}
 }
 
@@ -616,8 +617,8 @@ func TestMutationMethods_StampSchemaVersion(t *testing.T) {
 	if err := json.Unmarshal(raw, &persisted); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if persisted.SchemaVersion != CurrentTaskSchemaVersion {
-		t.Errorf("SchemaVersion after mutation = %d, want %d", persisted.SchemaVersion, CurrentTaskSchemaVersion)
+	if persisted.SchemaVersion != constants.CurrentTaskSchemaVersion {
+		t.Errorf("SchemaVersion after mutation = %d, want %d", persisted.SchemaVersion, constants.CurrentTaskSchemaVersion)
 	}
 	if persisted.Title != "Updated Title" {
 		t.Errorf("Title = %q, want 'Updated Title'", persisted.Title)

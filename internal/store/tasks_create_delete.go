@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/sandbox"
@@ -69,7 +70,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	}
 
 	task := &Task{
-		SchemaVersion:   CurrentTaskSchemaVersion,
+		SchemaVersion:   constants.CurrentTaskSchemaVersion,
 		ID:              id,
 		Goal:            goal,
 		GoalManuallySet: opts.Goal != "",

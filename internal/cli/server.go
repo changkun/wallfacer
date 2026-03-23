@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/apicontract"
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/handler"
 	"changkun.de/x/wallfacer/internal/logger"
@@ -74,7 +75,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		logger.Main.Info("store loaded", "path", snapshot.ScopedDataDir)
 
 		// Purge tombstoned tasks older than the retention period.
-		tombstoneRetentionDays := 7
+		tombstoneRetentionDays := constants.DefaultTombstoneRetentionDays
 		if v, err := strconv.Atoi(os.Getenv("WALLFACER_TOMBSTONE_RETENTION_DAYS")); err == nil && v > 0 {
 			tombstoneRetentionDays = v
 		}

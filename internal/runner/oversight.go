@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
@@ -675,9 +676,8 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	log := formatActivityLog(activities)
 
 	// Cap total log size to avoid exceeding prompt limits.
-	const maxLogBytes = 40000
-	if len(log) > maxLogBytes {
-		log = log[:maxLogBytes] + "\n[...truncated...]"
+	if len(log) > constants.MaxOversightLogBytes {
+		log = log[:constants.MaxOversightLogBytes] + "\n[...truncated...]"
 	}
 
 	prompt := r.promptsMgr.Oversight(log)

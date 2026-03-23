@@ -11,16 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/logpipe"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
-
-// sseKeepaliveInterval controls how often SSE streams send keepalive comments
-// to prevent proxy and OS-level TCP idle timeouts from silently closing the
-// connection. Tests can lower this for faster verification.
-var sseKeepaliveInterval = 15 * time.Second
 
 // StreamTasks streams task changes as SSE with typed events.
 //
@@ -113,7 +109,7 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
-	keepalive := time.NewTicker(sseKeepaliveInterval)
+	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
 	defer keepalive.Stop()
 
 	for {
@@ -263,7 +259,7 @@ func streamLines(w http.ResponseWriter, r *http.Request, flusher http.Flusher, p
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	keepalive := time.NewTicker(sseKeepaliveInterval)
+	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
 	defer keepalive.Stop()
 	defer p.Close()
 

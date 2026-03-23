@@ -7,13 +7,6 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/cache"
 )
 
-// commitsBehindCacheTTL is the time-to-live for cached CommitsBehind results.
-// It is shorter than the 30-second poll interval so stale results don't persist
-// across two polling cycles, but long enough for all three watchers
-// (checkAndSyncWaitingTasks, tryAutoTest, tryAutoSubmit) to share a single
-// result within one polling window.
-const commitsBehindCacheTTL = 20 * time.Second
-
 // commitsBehindResult stores a cached CommitsBehind outcome.
 type commitsBehindResult struct {
 	n   int

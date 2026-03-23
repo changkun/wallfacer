@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/tail"
@@ -33,7 +34,7 @@ func (s *Store) pruneTaskPayload(t *Task) {
 // retains full slice history for the current server lifetime; only the
 // persisted file is bounded.
 func (s *Store) saveTask(id uuid.UUID, task *Task) error {
-	task.SchemaVersion = CurrentTaskSchemaVersion
+	task.SchemaVersion = constants.CurrentTaskSchemaVersion
 	pruned := *task // shallow copy; in-memory slices are not modified
 	s.pruneTaskPayload(&pruned)
 	path := filepath.Join(s.dir, id.String(), "task.json")

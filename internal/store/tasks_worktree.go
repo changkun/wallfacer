@@ -8,14 +8,13 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"github.com/google/uuid"
 )
 
 // ErrRefinementAlreadyRunning is returned by StartRefinementJobIfIdle when a
 // refinement job is already in "running" state for the given task.
 var ErrRefinementAlreadyRunning = errors.New("refinement already running")
-
-const refinementRecentCompleteWindow = 500 * time.Millisecond
 
 // ListTasks returns all tasks sorted by position then creation time.
 
@@ -141,7 +140,7 @@ func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *R
 			}
 			if t.CurrentRefinement.Source == "runner" && (status == RefinementJobStatusFailed || status == RefinementJobStatusDone) {
 				elapsed := time.Since(t.UpdatedAt)
-				if elapsed >= 0 && elapsed < refinementRecentCompleteWindow && (t.CurrentRefinement.Error != "" || t.CurrentRefinement.Result != "") {
+				if elapsed >= 0 && elapsed < constants.RefinementRecentCompleteWindow && (t.CurrentRefinement.Error != "" || t.CurrentRefinement.Result != "") {
 					return ErrRefinementAlreadyRunning
 				}
 			}
@@ -190,13 +189,10 @@ func (s *Store) DismissRefinement(_ context.Context, id uuid.UUID) error {
 	})
 }
 
-const maxSearchResults = 50
-const snippetPadding = 60
-
 // SearchTasks performs a case-insensitive substring search across title, prompt,
 // tags (joined), and oversight summary text. Search order favours the cheapest
 // fields first. Each task produces at most one result (first matching field).
-// Results are capped at maxSearchResults. Archived tasks are included.
+// Results are capped at constants.MaxSearchResults. Archived tasks are included.
 //
 // All matching is done against the in-memory search index (pre-lowercased text
 // built at startup and kept in sync with mutations), so no per-query disk I/O
@@ -215,7 +211,7 @@ func (s *Store) SearchTasks(_ context.Context, query string) ([]TaskSearchResult
 	s.mu.RLock()
 	matches := make([]matchResult, 0)
 	for id, t := range s.tasks {
-		if len(matches) >= maxSearchResults {
+		if len(matches) >= constants.MaxSearchResults {
 			break
 		}
 		if field, snippet, ok := matchTask(t, s.searchIndex[id], q); ok {
@@ -265,17 +261,17 @@ func matchTask(t *Task, entry indexedTaskText, q string) (field, snippet string,
 }
 
 // buildSnippet returns an HTML-escaped substring of src centred on the match at
-// [idx, idx+matchLen) with up to snippetPadding bytes of context on each side.
+// [idx, idx+matchLen) with up to constants.SnippetPadding bytes of context on each side.
 // Truncation points are adjusted to UTF-8 rune boundaries, and ellipsis markers
 // are prepended/appended when the window is shorter than src.
 func buildSnippet(src string, idx, matchLen int) string {
-	start := idx - snippetPadding
+	start := idx - constants.SnippetPadding
 	prefix := "…"
 	if start <= 0 {
 		start = 0
 		prefix = ""
 	}
-	end := idx + matchLen + snippetPadding
+	end := idx + matchLen + constants.SnippetPadding
 	suffix := "…"
 	if end >= len(src) {
 		end = len(src)

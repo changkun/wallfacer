@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -919,9 +920,8 @@ func TestStreamBoardJSON_LargeDataTriggersWarning(t *testing.T) {
 	t.Logf("streamBoardJSON wrote %d bytes", written)
 
 	// The manifest must exceed 64 KB so that logBoardManifestSizeWarning was called.
-	const maxManifestBytes = 64 * 1024
-	if written <= maxManifestBytes {
-		t.Logf("note: written=%d did not exceed threshold %d; warning branch may not have fired", written, maxManifestBytes)
+	if written <= int64(constants.MaxBoardManifestBytes) {
+		t.Logf("note: written=%d did not exceed threshold %d; warning branch may not have fired", written, constants.MaxBoardManifestBytes)
 	}
 
 	// Verify board.json was created and is non-empty.

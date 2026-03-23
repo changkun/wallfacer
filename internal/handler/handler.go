@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/logger"
@@ -176,13 +177,13 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		workspaces:           workspaces,
 		envFile:              r.EnvFile(),
 		diffCache:            newDiffCache(),
-		commitsBehindCache:   newCommitsBehindCache(commitsBehindCacheTTL),
+		commitsBehindCache:   newCommitsBehindCache(constants.CommitsBehindCacheTTL),
 		fileIndex:            newFileIndex(),
 		pulls:                newPullTracker(),
 		startTime:            time.Now(),
 		ideationEnabled:      false,
-		ideationInterval:     60 * time.Minute,
-		ideationExploitRatio: 0.8,
+		ideationInterval:     constants.DefaultIdeationInterval,
+		ideationExploitRatio: constants.DefaultIdeationExploitRatio,
 		reg:                  reg,
 		sandboxTestPassed: map[sandbox.Type]bool{
 			sandbox.Claude: false,
@@ -200,14 +201,14 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	h.cachedMaxParallel = lazyval.New(func() int {
 		cfg, err := envconfig.Parse(h.envFile)
 		if err != nil || cfg.MaxParallelTasks <= 0 {
-			return defaultMaxConcurrentTasks
+			return constants.DefaultMaxConcurrentTasks
 		}
 		return cfg.MaxParallelTasks
 	})
 	h.cachedMaxTestParallel = lazyval.New(func() int {
 		cfg, err := envconfig.Parse(h.envFile)
 		if err != nil || cfg.MaxTestParallelTasks <= 0 {
-			return defaultMaxTestConcurrentTasks
+			return constants.DefaultMaxTestConcurrentTasks
 		}
 		return cfg.MaxTestParallelTasks
 	})

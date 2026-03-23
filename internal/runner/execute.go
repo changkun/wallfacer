@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/store"
@@ -99,7 +100,7 @@ func classifyFailure(err error, isError bool, result string) store.FailureCatego
 // tryAutoRetry checks whether the task should be automatically retried given
 // the failure category. It returns true and resets the task to backlog when:
 //   - the per-category budget is > 0, AND
-//   - the total auto-retry count is < store.MaxAutoRetries.
+//   - the total auto-retry count is < constants.MaxAutoRetries.
 //
 // The caller must set statusSet=true before calling and return immediately
 // when tryAutoRetry returns true, so the deferred guard does not overwrite
@@ -120,7 +121,7 @@ func (r *Runner) tryAutoRetry(bgCtx context.Context, taskID uuid.UUID, category 
 		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"message": fmt.Sprintf("auto-retry %d/%d after %s",
-				updated.AutoRetryCount, store.MaxAutoRetries, category),
+				updated.AutoRetryCount, constants.MaxAutoRetries, category),
 		})
 	}
 	_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusBacklog)
@@ -191,7 +192,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		statusSet = true
 		ideaTimeout := time.Duration(task.Timeout) * time.Minute
 		if ideaTimeout <= 0 {
-			ideaTimeout = defaultTaskTimeout
+			ideaTimeout = constants.DefaultTaskTimeout
 		}
 		ideaCtx, ideaCancel := context.WithTimeout(bgCtx, ideaTimeout)
 		defer ideaCancel()
@@ -255,7 +256,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// Apply per-task total timeout across all turns.
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
-		timeout = defaultTaskTimeout
+		timeout = constants.DefaultTaskTimeout
 	}
 	ctx, cancel := context.WithTimeout(bgCtx, timeout)
 	defer cancel()
@@ -680,7 +681,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
-		timeout = defaultTaskTimeout
+		timeout = constants.DefaultTaskTimeout
 	}
 	ctx, cancel := context.WithTimeout(bgCtx, timeout)
 	defer cancel()
@@ -738,7 +739,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 
 		var rebaseErr error
 		conflictDetected := false
-		for attempt := 1; attempt <= maxRebaseRetries; attempt++ {
+		for attempt := 1; attempt <= constants.MaxRebaseRetries; attempt++ {
 			rebaseErr = gitutil.RebaseOntoDefault(repoPath, worktreePath)
 			if rebaseErr == nil {
 				break
@@ -749,7 +750,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 				break
 			}
 			conflictDetected = true
-			if attempt == maxRebaseRetries {
+			if attempt == constants.MaxRebaseRetries {
 				break
 			}
 			logger.Runner.Warn("sync rebase conflict, invoking resolver",
@@ -757,9 +758,9 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d/%d)...",
-					filepath.Base(repoPath), attempt, maxRebaseRetries),
+					filepath.Base(repoPath), attempt, constants.MaxRebaseRetries),
 			})
-			if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch, ConflictResolverTriggerSync, attempt, maxRebaseRetries); resolveErr != nil {
+			if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch, ConflictResolverTriggerSync, attempt, constants.MaxRebaseRetries); resolveErr != nil {
 				rebaseErr = fmt.Errorf("conflict resolution failed: %w", resolveErr)
 				break
 			}
@@ -812,8 +813,8 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 				"status":       "handoff",
 				"trigger":      string(ConflictResolverTriggerSync),
 				"repo":         filepath.Base(repoPath),
-				"attempt":      maxRebaseRetries,
-				"max_attempts": maxRebaseRetries,
+				"attempt":      constants.MaxRebaseRetries,
+				"max_attempts": constants.MaxRebaseRetries,
 				"result":       fmt.Sprintf("Automatic conflict resolver exhausted retries for %s. Handing off to the main agent for interactive resolution.", filepath.Base(repoPath)),
 			})
 			if !testStateInvalidated {
@@ -954,7 +955,7 @@ func parseTestVerdict(result string, customPass, customFail []string) string {
 	// verdict word. Check a small tail window so trailing status text does not
 	// hide a valid verdict.
 	lines := strings.Split(upper, "\n")
-	const maxTailLines = 15
+	maxTailLines := constants.MaxTailLines
 	seen := 0
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimRight(strings.TrimSpace(lines[i]), ".*!?:;,-")

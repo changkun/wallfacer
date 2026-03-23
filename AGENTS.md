@@ -67,6 +67,7 @@ Key server files:
 - `internal/workspace/` — Workspace manager; scopes data by workspace key; supports runtime workspace switching
 - `internal/logger/` — Structured logging utilities
 - `internal/metrics/` — Prometheus-compatible metrics
+- `internal/constants/` — Consolidated system parameters: timeouts, intervals, retry counts, size limits, concurrency caps, pagination defaults
 - `internal/sandbox/` — Sandbox type enumeration (Claude, Codex)
 - `prompts/` — System prompt templates (title, commit, refinement, oversight, test, ideation, conflict)
 - `ui/index.html` + `ui/js/` — Task board UI (vanilla JS + Tailwind CSS + Sortable.js)

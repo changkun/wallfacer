@@ -2,10 +2,9 @@ package handler
 
 import (
 	"net/http"
-)
 
-// maxFileListSize caps the total number of files returned to keep responses fast.
-const maxFileListSize = 8000
+	"changkun.de/x/wallfacer/internal/constants"
+)
 
 // skipDirs lists directory names that should never be traversed during file listing.
 var skipDirs = map[string]bool{
@@ -32,11 +31,11 @@ func (h *Handler) GetFiles(w http.ResponseWriter, _ *http.Request) {
 	files := make([]string, 0, 256)
 
 	for _, ws := range workspaces {
-		if len(files) >= maxFileListSize {
+		if len(files) >= constants.MaxFileListSize {
 			break
 		}
 		wsFiles := h.fileIndex.Files(ws)
-		remaining := maxFileListSize - len(files)
+		remaining := constants.MaxFileListSize - len(files)
 		if len(wsFiles) > remaining {
 			wsFiles = wsFiles[:remaining]
 		}

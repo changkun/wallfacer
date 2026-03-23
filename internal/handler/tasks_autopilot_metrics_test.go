@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
@@ -148,7 +149,7 @@ func TestAutoRetrySuppressedMaxCount(t *testing.T) {
 	// Increment AutoRetryCount to the global cap using a different category so
 	// that the ContainerCrash budget (set as FailureCategory) remains non-zero.
 	// This isolates the count-cap path from the budget-exhausted path.
-	for i := 0; i < store.MaxAutoRetries; i++ {
+	for i := 0; i < constants.MaxAutoRetries; i++ {
 		if err := h.store.IncrementAutoRetryCount(ctx, task.ID, store.FailureCategorySyncError); err != nil {
 			t.Fatalf("IncrementAutoRetryCount[%d]: %v", i, err)
 		}

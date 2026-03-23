@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -1181,9 +1182,9 @@ func TestStreamLogs_Committing_ServesStoredLogs(t *testing.T) {
 // periodic heartbeat events to prevent the connection from going idle.
 func TestStreamTasks_Keepalive(t *testing.T) {
 	// Use a very short keepalive interval for the test.
-	orig := sseKeepaliveInterval
-	sseKeepaliveInterval = 20 * time.Millisecond
-	t.Cleanup(func() { sseKeepaliveInterval = orig })
+	orig := constants.SSEKeepaliveInterval
+	constants.SSEKeepaliveInterval = 20 * time.Millisecond
+	t.Cleanup(func() { constants.SSEKeepaliveInterval = orig })
 
 	h := newTestHandler(t)
 	ctx := context.Background()

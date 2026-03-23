@@ -11,23 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/prompts"
 	"github.com/google/uuid"
-)
-
-const (
-	maxIdeationIdeas            = 3
-	defaultIdeationImpactScore  = 60
-	maxIdeationChurnSignals     = 6
-	maxIdeationTodoSignals      = 6
-	workspaceIdeationCommandTTL = 2 * time.Second
-
-	churnLookbackDays = 90  // only include commits newer than this many days
-	maxChurnCommits   = 200 // hard cap so very active repos don't scan unboundedly
 )
 
 // exploreScore returns a value in [0, 1] representing how exploratory the
@@ -655,7 +645,7 @@ func collectIdeationFailureSignals(tasks []store.Task) []string {
 			reason = "last test result: fail"
 		}
 		signals = append(signals, failureSignal{label: fmt.Sprintf("%s (%s)", title, reason)})
-		if len(signals) >= maxIdeationIdeas {
+		if len(signals) >= constants.MaxIdeationIdeas {
 			break
 		}
 	}

@@ -4,13 +4,15 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"changkun.de/x/wallfacer/internal/constants"
 )
 
-// BodyLimitDefault and related constants define request body size limits.
+// Convenience aliases so callers can write handler.BodyLimitDefault etc.
 const (
-	BodyLimitDefault      int64 = 1 << 20   // 1 MiB
-	BodyLimitInstructions int64 = 5 << 20   // 5 MiB
-	BodyLimitFeedback     int64 = 512 << 10 // 512 KiB
+	BodyLimitDefault      = constants.BodyLimitDefault
+	BodyLimitInstructions = constants.BodyLimitInstructions
+	BodyLimitFeedback     = constants.BodyLimitFeedback
 )
 
 // MaxBytesMiddleware limits the size of the request body for downstream handlers.

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
@@ -45,7 +46,7 @@ func (r *Runner) Commit(taskID uuid.UUID, sessionID string) error {
 	}
 	timeout := time.Duration(task.Timeout) * time.Minute
 	if timeout <= 0 {
-		timeout = defaultTaskTimeout
+		timeout = constants.DefaultTaskTimeout
 	}
 	ctx, cancel := context.WithTimeout(r.shutdownCtx, timeout)
 	defer cancel()
@@ -341,7 +342,7 @@ func localFallbackCommitMessage(prompt, diffStat string) string {
 	}
 
 	const prefix = "wallfacer: "
-	const maxSubjectRunes = 72 - len(prefix)
+	maxSubjectRunes := constants.MaxCommitSubjectRunes
 	runes := []rune(subject)
 	if len(runes) > maxSubjectRunes {
 		subject = strings.TrimSpace(string(runes[:maxSubjectRunes]))
@@ -578,10 +579,10 @@ func (r *Runner) rebaseAndMergeOne(
 
 	// Rebase with conflict-resolution retry loop.
 	var rebaseErr error
-	for attempt := 1; attempt <= maxRebaseRetries; attempt++ {
+	for attempt := 1; attempt <= constants.MaxRebaseRetries; attempt++ {
 		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
-			"result": fmt.Sprintf("Rebasing %s onto %s (attempt %d/%d)...", repoPath, defBranch, attempt, maxRebaseRetries),
+			"result": fmt.Sprintf("Rebasing %s onto %s (attempt %d/%d)...", repoPath, defBranch, attempt, constants.MaxRebaseRetries),
 		})
 
 		rebaseErr = gitutil.RebaseOntoDefault(repoPath, worktreePath)
@@ -601,10 +602,10 @@ func (r *Runner) rebaseAndMergeOne(
 			})
 		}
 
-		if attempt == maxRebaseRetries {
+		if attempt == constants.MaxRebaseRetries {
 			return fmt.Errorf(
 				"rebase failed after %d attempts in %s: %w",
-				maxRebaseRetries, repoPath, rebaseErr,
+				constants.MaxRebaseRetries, repoPath, rebaseErr,
 			)
 		}
 
@@ -619,7 +620,7 @@ func (r *Runner) rebaseAndMergeOne(
 			"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d)...", repoPath, attempt),
 		})
 
-		if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch, ConflictResolverTriggerCommit, attempt, maxRebaseRetries); resolveErr != nil {
+		if resolveErr := r.resolveConflicts(ctx, taskID, repoPath, worktreePath, sessionID, defBranch, ConflictResolverTriggerCommit, attempt, constants.MaxRebaseRetries); resolveErr != nil {
 			return fmt.Errorf("conflict resolution failed: %w", resolveErr)
 		}
 	}

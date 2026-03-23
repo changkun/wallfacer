@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/constants"
 )
 
 // commitFileInRepo creates a file at relPath inside repoDir and commits it.
@@ -371,12 +373,12 @@ func TestChurnSignalsFallbackWhenAllIgnored(t *testing.T) {
 }
 
 // TestChurnSignalsCap verifies that the collector returns at most
-// maxIdeationChurnSignals entries even when the repo has more hot files.
+// constants.MaxIdeationChurnSignals entries even when the repo has more hot files.
 func TestChurnSignalsCap(t *testing.T) {
 	repo := setupTestRepo(t)
 
 	// Create more files than the cap.
-	for i := 0; i < maxIdeationChurnSignals+3; i++ {
+	for i := 0; i < constants.MaxIdeationChurnSignals+3; i++ {
 		commitFileInRepo(t, repo, fmt.Sprintf("internal/file%d.go", i),
 			"package foo\n", fmt.Sprintf("add file %d", i))
 	}
@@ -384,8 +386,8 @@ func TestChurnSignalsCap(t *testing.T) {
 	_, r := setupTestRunner(t, []string{repo})
 	signals, _ := r.collectWorkspaceChurnSignals(context.Background())
 
-	if len(signals) > maxIdeationChurnSignals {
-		t.Errorf("expected at most %d churn signals, got %d", maxIdeationChurnSignals, len(signals))
+	if len(signals) > constants.MaxIdeationChurnSignals {
+		t.Errorf("expected at most %d churn signals, got %d", constants.MaxIdeationChurnSignals, len(signals))
 	}
 }
 
@@ -579,11 +581,11 @@ func TestTodoSignalsMultiWorkspaceNamespacing(t *testing.T) {
 }
 
 // TestTodoSignalsCap verifies that the collector returns at most
-// maxIdeationTodoSignals entries even when the repo has many files with TODOs.
+// constants.MaxIdeationTodoSignals entries even when the repo has many files with TODOs.
 func TestTodoSignalsCap(t *testing.T) {
 	repo := setupTestRepo(t)
 
-	for i := 0; i < maxIdeationTodoSignals+3; i++ {
+	for i := 0; i < constants.MaxIdeationTodoSignals+3; i++ {
 		commitFileInRepo(t, repo, fmt.Sprintf("internal/file%d.go", i),
 			fmt.Sprintf("package foo\n// TODO: item %d\n", i),
 			fmt.Sprintf("add file %d", i))
@@ -592,8 +594,8 @@ func TestTodoSignalsCap(t *testing.T) {
 	_, r := setupTestRunner(t, []string{repo})
 	signals, _ := r.collectWorkspaceTodoSignals(context.Background())
 
-	if len(signals) > maxIdeationTodoSignals {
-		t.Errorf("expected at most %d TODO signals, got %d", maxIdeationTodoSignals, len(signals))
+	if len(signals) > constants.MaxIdeationTodoSignals {
+		t.Errorf("expected at most %d TODO signals, got %d", constants.MaxIdeationTodoSignals, len(signals))
 	}
 }
 
@@ -686,7 +688,7 @@ func TestIdeationIgnorePatterns(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestChurnSignalsExcludeOldCommits verifies that commits older than
-// churnLookbackDays are excluded from churn signals, while recent commits
+// constants.ChurnLookbackDays are excluded from churn signals, while recent commits
 // are included.
 func TestChurnSignalsExcludeOldCommits(t *testing.T) {
 	repo := setupTestRepo(t)
@@ -731,7 +733,7 @@ func TestChurnSignalsExcludeOldCommits(t *testing.T) {
 	for _, p := range paths {
 		if strings.Contains(p, "old_file.go") {
 			t.Errorf("churn signals contain old_file.go from 91 days ago; expected it to be excluded by %d-day window",
-				churnLookbackDays)
+				constants.ChurnLookbackDays)
 		}
 	}
 

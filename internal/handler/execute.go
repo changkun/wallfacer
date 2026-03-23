@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
@@ -542,11 +543,6 @@ func buildTestPrompt(originalPrompt, criteria, implResult, diff string) string {
 	})
 }
 
-// maxDiffBytes is the maximum number of bytes to include from the git diff in
-// the test prompt. Diffs beyond this limit are truncated to keep the prompt
-// focused and avoid hitting context limits.
-const maxDiffBytes = 16000
-
 // generateWorktreeDiff produces a unified git diff for each worktree showing
 // all changes on the task branch relative to the default branch. Returns an
 // empty string if no worktrees are provided or no diffs are found.
@@ -574,8 +570,8 @@ func generateWorktreeDiff(worktreePaths map[string]string) string {
 		parts = append(parts, diff)
 	}
 	combined := strings.Join(parts, "\n")
-	if len(combined) > maxDiffBytes {
-		combined = combined[:maxDiffBytes] + "\n... (diff truncated)"
+	if len(combined) > constants.MaxDiffBytes {
+		combined = combined[:constants.MaxDiffBytes] + "\n... (diff truncated)"
 	}
 	return combined
 }

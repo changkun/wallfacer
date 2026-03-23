@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/store"
@@ -222,8 +223,7 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 
 	// Manifest size guard: warn when the file would exceed 64 KB so that
 	// operators are notified before token costs become significant.
-	const maxManifestBytes = 64 * 1024
-	if len(jsonBytes) > maxManifestBytes {
+	if len(jsonBytes) > constants.MaxBoardManifestBytes {
 		sizes := make([]struct {
 			id    string
 			bytes int
@@ -450,8 +450,7 @@ func streamBoardJSON(ctx context.Context, st *store.Store, selfTaskID uuid.UUID,
 		return "", 0, werr
 	}
 
-	const maxManifestBytes = 64 * 1024
-	if cw.n > maxManifestBytes {
+	if cw.n > int64(constants.MaxBoardManifestBytes) {
 		logBoardManifestSizeWarning(taskSizes, int(cw.n))
 	}
 

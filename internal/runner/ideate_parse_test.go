@@ -3,6 +3,7 @@ package runner
 import (
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/set"
 )
 
@@ -93,8 +94,8 @@ func TestNormalizeIdeationImpact_ZeroImpact_LowPriority(t *testing.T) {
 func TestNormalizeIdeationImpact_ZeroImpact_NoPriority(t *testing.T) {
 	idea := &IdeateResult{Priority: "", ImpactScore: 0}
 	normalizeIdeationImpact(idea)
-	if idea.ImpactScore != defaultIdeationImpactScore {
-		t.Errorf("expected ImpactScore=%d for no priority, got %d", defaultIdeationImpactScore, idea.ImpactScore)
+	if idea.ImpactScore != constants.DefaultIdeationImpactScore {
+		t.Errorf("expected ImpactScore=%d for no priority, got %d", constants.DefaultIdeationImpactScore, idea.ImpactScore)
 	}
 }
 

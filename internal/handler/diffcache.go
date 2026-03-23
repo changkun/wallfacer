@@ -3,18 +3,11 @@ package handler
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/pkg/cache"
 	"github.com/google/uuid"
 )
-
-// diffCacheTTL is the time-to-live for cached diff entries for non-terminal tasks.
-const diffCacheTTL = 10 * time.Second
-
-// maxImmutableEntries caps the number of retained terminal-task diff entries.
-// At ~16 KB max diff size this bounds worst-case memory at ~4 MB.
-const maxImmutableEntries = 256
 
 // diffCacheEntry holds a pre-serialized diff response with cache metadata.
 type diffCacheEntry struct {
@@ -24,8 +17,8 @@ type diffCacheEntry struct {
 }
 
 // diffCache is a task-state-keyed in-memory cache for diff responses.
-// Non-terminal tasks are cached for diffCacheTTL; terminal tasks are cached
-// indefinitely (immutable) up to maxImmutableEntries, with oldest-first eviction.
+// Non-terminal tasks are cached for constants.DiffCacheTTL; terminal tasks are cached
+// indefinitely (immutable) up to constants.MaxImmutableDiffEntries, with oldest-first eviction.
 type diffCache struct {
 	c *cache.TTLCache[uuid.UUID, diffCacheEntry]
 }
@@ -36,11 +29,11 @@ func newDiffCache() *diffCache {
 
 func newDiffCacheWithOpts(opts ...cache.Option[uuid.UUID, diffCacheEntry]) *diffCache {
 	allOpts := []cache.Option[uuid.UUID, diffCacheEntry]{
-		cache.WithMaxSize[uuid.UUID, diffCacheEntry](maxImmutableEntries),
+		cache.WithMaxSize[uuid.UUID, diffCacheEntry](constants.MaxImmutableDiffEntries),
 	}
 	allOpts = append(allOpts, opts...)
 	return &diffCache{
-		c: cache.New[uuid.UUID, diffCacheEntry](diffCacheTTL, allOpts...),
+		c: cache.New[uuid.UUID, diffCacheEntry](constants.DiffCacheTTL, allOpts...),
 	}
 }
 

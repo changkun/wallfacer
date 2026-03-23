@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/runner"
@@ -18,7 +19,6 @@ import (
 )
 
 const fallbackCodexSandboxImage = "wallfacer-codex:latest"
-const defaultArchivedTasksPerPage = 20
 
 // privateIPNets lists networks blocked for SSRF prevention: RFC 1918 private
 // ranges, loopback (IPv4 and IPv6), and link-local ranges.
@@ -155,11 +155,11 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	}
 	maxParallel := cfg.MaxParallelTasks
 	if maxParallel <= 0 {
-		maxParallel = defaultMaxConcurrentTasks
+		maxParallel = constants.DefaultMaxConcurrentTasks
 	}
 	maxTestParallel := cfg.MaxTestParallelTasks
 	if maxTestParallel <= 0 {
-		maxTestParallel = defaultMaxTestConcurrentTasks
+		maxTestParallel = constants.DefaultMaxTestConcurrentTasks
 	}
 	autoPushThreshold := cfg.AutoPushThreshold
 	if autoPushThreshold <= 0 {
@@ -167,7 +167,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	}
 	archivedTasksPerPage := cfg.ArchivedTasksPerPage
 	if archivedTasksPerPage <= 0 {
-		archivedTasksPerPage = defaultArchivedTasksPerPage
+		archivedTasksPerPage = constants.DefaultArchivedTasksPerPage
 	}
 	writeJSON(w, http.StatusOK, envConfigResponse{
 		OAuthToken:           envconfig.MaskToken(cfg.OAuthToken),

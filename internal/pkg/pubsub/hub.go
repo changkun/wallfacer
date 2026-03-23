@@ -5,11 +5,8 @@ package pubsub
 import (
 	"sync"
 	"sync/atomic"
-)
 
-const (
-	defaultReplayCapacity = 512
-	defaultChannelSize    = 256
+	"changkun.de/x/wallfacer/internal/constants"
 )
 
 // Sequenced wraps a value with a monotonic sequence number assigned by the hub.
@@ -62,8 +59,8 @@ func WithClone[T any](fn func(T) T) Option[T] {
 // NewHub creates a Hub with the given options.
 func NewHub[T any](opts ...Option[T]) *Hub[T] {
 	h := &Hub[T]{
-		replayCap:       defaultReplayCapacity,
-		channelSize:     defaultChannelSize,
+		replayCap:       constants.DefaultReplayCapacity,
+		channelSize:     constants.DefaultChannelSize,
 		subscribers:     make(map[int]chan Sequenced[T]),
 		wakeSubscribers: make(map[int]chan struct{}),
 	}

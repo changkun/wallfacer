@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
@@ -241,29 +242,6 @@ func (s TaskStatus) AllowedTransitions() []TaskStatus {
 	return allowedTransitions[s]
 }
 
-// CurrentTaskSchemaVersion is the on-disk schema version for task.json.
-// Increment this constant whenever a new migration step is added to
-// migrateTaskJSON so that already-migrated files are not re-written on
-// every startup.
-const CurrentTaskSchemaVersion = 2
-
-// DefaultRetryHistoryLimit, DefaultRefineSessionsLimit, and
-// DefaultPromptHistoryLimit cap the number of entries persisted for the three
-// unboundedly-growing task slice fields. Each limit can be overridden via the
-// corresponding WALLFACER_*_LIMIT environment variable. A value of 0 disables
-// pruning for that field.
-const (
-	DefaultRetryHistoryLimit   = 10
-	DefaultRefineSessionsLimit = 5
-	DefaultPromptHistoryLimit  = 20
-)
-
-// DefaultMaxTurnOutputBytes is the default per-turn stdout/stderr output size
-// budget. Outputs exceeding this limit are truncated server-side and a sentinel
-// NDJSON line is appended so the UI can surface a warning. Set
-// WALLFACER_MAX_TURN_OUTPUT_BYTES=0 to disable the limit entirely.
-const DefaultMaxTurnOutputBytes = 8 * 1024 * 1024 // 8 MB
-
 // PayloadLimits holds the effective pruning limits for the three
 // unboundedly-growing task slice fields. Values are exposed via GET /api/config
 // so the UI can display "showing last N entries" contextual messages.
@@ -385,18 +363,14 @@ type Task struct {
 	LastFetchErrorAt *time.Time `json:"last_fetch_error_at,omitempty"`
 }
 
-// MaxAutoRetries is the global cap on automatic retries per task across all
-// failure categories and retry paths (runner and handler).
-const MaxAutoRetries = 3
-
 // IsAutoRetryEligible reports whether task t is eligible for an automatic retry
 // given the failure category that caused it to fail. It returns false when:
 //   - the per-category budget in AutoRetryBudget is zero or missing
-//   - the total AutoRetryCount has reached MaxAutoRetries
+//   - the total AutoRetryCount has reached constants.MaxAutoRetries
 //
 // This is the single authoritative check used by both the runner and handler.
 func IsAutoRetryEligible(t Task, category FailureCategory) bool {
-	return t.AutoRetryBudget[category] > 0 && t.AutoRetryCount < MaxAutoRetries
+	return t.AutoRetryBudget[category] > 0 && t.AutoRetryCount < constants.MaxAutoRetries
 }
 
 // HasTag reports whether the task has the given tag.
