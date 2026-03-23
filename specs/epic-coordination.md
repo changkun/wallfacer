@@ -539,6 +539,259 @@ When an epic filter is active, the status bar shows the filtered epic's progress
 
 These follow the existing shortcut pattern (single-key when no input is focused).
 
+### Human-in-the-Loop Planning Workflow
+
+The UX above handles visualization. But the harder UX problem is *planning itself* — the iterative, multi-step process where a human and AI collaborate to turn a vague goal ("move to cloud") into a concrete, executable plan. This is not a one-shot operation. It requires drafting, reviewing, adjusting, approving, monitoring, and re-planning.
+
+#### The Planning Loop
+
+A large initiative goes through this cycle, potentially multiple times:
+
+```
+  ┌─────────────────────────────────────────────────────────────┐
+  │                                                             │
+  ▼                                                             │
+Draft ──▶ Review ──▶ Approve ──▶ Execute ──▶ Assess ──┬──▶ Done
+  ▲          │                      │          │       │
+  │          ▼                      ▼          ▼       │
+  └──── Revise                  Intervene   Re-plan ───┘
+```
+
+Each stage needs explicit UX support. The current spec only covers Execute and a bit of Assess. Here's the full design:
+
+#### Stage 1: Draft — Planner Task as a Conversation
+
+The planner task currently runs once and produces a batch of tasks. But for a complex initiative, the first plan is rarely right. The planner should support **iterative refinement before committing**.
+
+**Design: Planner tasks produce a draft, not tasks.**
+
+When a planner task completes, it moves to `waiting` (not `done`), and its result contains the proposed plan as structured JSON. The plan is not yet materialized into tasks. The user reviews it first.
+
+**Planner result display** (in the task detail modal):
+
+```
+┌──────────────────────┬──────────────────────────────────────┐
+│ Planner: M1 Sandbox  │ Proposed Plan                        │
+│                      │                                      │
+│ ── Status ──         │ epic: sandbox-backends                │
+│ ⏸ Waiting for review │ 2 phases · 7 tasks · 1 gate          │
+│                      │ Est. cost: ~$3-5                      │
+│ ── Spec Source ──    │                                      │
+│ 01-sandbox-backends  │ ── Phase 1: Interface Extraction ──  │
+│ Phase 1              │                                      │
+│                      │ 1. Define SandboxBackend interface    │
+│ ── Feedback ──       │    Files: backend.go (new)            │
+│ (input area for      │    Depends on: —                      │
+│  revision notes)     │    Acceptance: interface compiles     │
+│                      │                                      │
+│                      │ 2. Implement LocalBackend             │
+│                      │    Files: backend_local.go (new),     │
+│                      │           executor.go                 │
+│                      │    Depends on: #1                     │
+│                      │    Acceptance: existing tests pass    │
+│                      │                                      │
+│                      │ 3. Refactor Runner                    │
+│                      │    Files: runner.go, execute.go,      │
+│                      │           container.go                │
+│                      │    Depends on: #2                     │
+│                      │    Acceptance: runContainer uses      │
+│                      │                backend.Launch()       │
+│                      │                                      │
+│                      │ ... (4 more tasks)                    │
+│                      │                                      │
+│                      │ ── Phase 1 Gate ──                    │
+│                      │ Run: go test ./..., go vet ./...      │
+│                      │                                      │
+│ [Revise]             │ [Approve & Create Tasks]  [Discard]  │
+└──────────────────────┴──────────────────────────────────────┘
+```
+
+**Key interactions:**
+
+- **Approve & Create Tasks**: materializes the plan into actual backlog tasks with dependency wiring. Planner task moves to `done`. This is the point of no return (though tasks can be cancelled later).
+
+- **Revise**: user types feedback in the left panel input ("Split task 3 into runner.go and execute.go separately", "Add a task for updating mock tests", "Move listing into phase 2"). Submits feedback. Planner task resumes with the feedback, produces a revised plan. Returns to `waiting` with the new proposal. The user can revise as many times as needed.
+
+- **Discard**: cancels the planner task. No tasks created.
+
+**Why this works:** The existing `waiting` → feedback → resume loop already exists for regular tasks. The planner reuses it. The only new UI is the structured plan rendering in the right panel (instead of raw text output).
+
+#### Stage 2: Review — Plan Visualization Before Commitment
+
+Before approving, the user needs to understand the plan's structure. The proposed plan rendering (above) shows a flat list. For complex plans, add a **dependency graph visualization**:
+
+```
+┌─ Plan Graph ─────────────────────────────────────────────────┐
+│                                                              │
+│  ┌───────────┐                                               │
+│  │ 1. Define │──┬──▶ ┌──────────┐──▶ ┌──────────────┐       │
+│  │ interface │  │    │ 2. Local │    │ 3. Refactor  │       │
+│  └───────────┘  │    │ backend  │    │ Runner       │──┐    │
+│                 │    └──────────┘    └──────────────┘  │    │
+│                 │                                      │    │
+│                 └──▶ ┌──────────┐                      ▼    │
+│                      │ 5. Move  │──▶ ┌──────────────┐       │
+│                      │ listing  │    │ 6. Retire    │       │
+│                      └──────────┘    │ executor     │       │
+│                                      └──────────────┘       │
+│                                            │                │
+│                                            ▼                │
+│                                      ┌──────────┐          │
+│                                      │ Gate:    │          │
+│                                      │ verify   │          │
+│                                      └──────────┘          │
+│                                                              │
+│  Legend: ■ backlog  ◉ in-progress  ✓ done  ✕ failed         │
+└──────────────────────────────────────────────────────────────┘
+```
+
+This is rendered as an ASCII/SVG DAG in the plan review panel. Nodes are colored by status. The graph makes parallelism visible — tasks 2 and 5 can run concurrently; task 6 waits for both 3 and 5.
+
+**Implementation:** Topological layout with Sugiyama-style layering. The dependency data is already available (the planner output has `depends_on_refs`). Render as positioned `<div>` nodes with CSS-drawn connectors (SVG lines or CSS border tricks). No external library needed for small graphs (<20 nodes).
+
+#### Stage 3: Approve — Selective Materialization
+
+Instead of all-or-nothing approval, support **per-phase approval**:
+
+```
+── Phase 1: Interface Extraction ──    [Approve Phase 1]
+  7 tasks + 1 gate
+
+── Phase 2: Migration ──               [Approve Phase 2] (disabled)
+  4 tasks                              "Approve Phase 1 first"
+```
+
+Approving Phase 1 creates those 7 tasks + gate in the backlog. Phase 2 remains in the planner's plan, not yet materialized. When Phase 1 completes (gate passes), the user can then approve Phase 2 — potentially after revising it based on what Phase 1 revealed.
+
+This prevents creating 40 backlog tasks for a 5-phase epic upfront. The plan adapts as earlier phases complete and reveal new information.
+
+**Implementation:** The planner task stays in `waiting` after Phase 1 approval. Its result is updated to mark Phase 1 as "materialized." The user can re-enter feedback to revise Phase 2 before approving it. The planner only moves to `done` when all phases are materialized or the user discards remaining phases.
+
+#### Stage 4: Execute — Active Monitoring Dashboard
+
+During execution, the human needs to spot problems early. The epic progress panel gains a **live activity feed**:
+
+```
+┌─ sandbox-backends — Live Activity ──────────────────────────┐
+│                                                              │
+│ 14:32  ✓ define-interface → done (2 turns, $0.42)           │
+│ 14:33  ▶ local-backend started                               │
+│ 14:33  ▶ move-listing started                                │
+│ 14:38  ⚠ local-backend: 3 test failures in runner_test.go    │
+│ 14:41  ✓ local-backend → done (4 turns, $0.89)              │
+│ 14:42  ▶ refactor-runner started                             │
+│ 14:45  ⚠ refactor-runner: modified 12 files (expected 3-5)   │
+│                                                              │
+│ [Pause Epic]  [View Board]                                   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Warning indicators** (⚠) surface when:
+- A task modifies significantly more files than expected (based on the plan's file list)
+- A task takes more turns than typical (e.g., >5 turns for a task sized at 2-3 files)
+- A task's cost exceeds the per-task budget estimate
+- Test failures are detected in the output
+
+**"Pause Epic"** button: sets all backlog tasks in the epic to `ScheduledAt = far future`, effectively freezing auto-promotion. The user can investigate, intervene, then "Resume Epic" to clear the scheduled dates.
+
+The activity feed is built from task events (state_change, span_end) filtered by epic tag. Rendered as a reverse-chronological list with timestamps, task titles, and status icons. Uses the existing SSE task stream — no new endpoint needed.
+
+#### Stage 5: Intervene — Mid-Execution Course Correction
+
+When an agent makes a wrong architectural decision mid-epic, the human needs to correct course without restarting everything.
+
+**Intervention options in the task detail modal:**
+
+1. **Edit prompt of a backlog task**: the task hasn't run yet. The user can revise its prompt to account for decisions made by earlier tasks. Example: "Task 3 defined the interface differently than expected — update task 5's prompt to use the new method signatures."
+
+2. **Provide feedback on a waiting task**: existing mechanism. The agent resumes with the correction.
+
+3. **Cancel and re-create**: cancel a backlog task, create a replacement with an updated prompt. The replacement inherits the original's position in the dependency graph (manually re-wire dependencies).
+
+4. **Insert a new task**: add a task mid-epic that wasn't in the original plan. Tag it with the epic and phase. Wire dependencies to the appropriate predecessors. The dependency graph updates and the auto-promoter schedules it correctly.
+
+For (3) and (4), the UI should make dependency wiring easy. The task creation dialog, when an epic filter is active, shows a **dependency picker**:
+
+```
+Dependencies:
+  ✓ define-interface (done)
+  ✓ local-backend (done)
+  ☐ refactor-runner (in-progress)
+  ☐ move-listing (backlog)
+
+Select tasks this new task should wait for.
+```
+
+Checkboxes with task titles and status badges. Pre-populated based on the task's position in the phase.
+
+#### Stage 6: Assess & Re-Plan — Learning from Execution
+
+After a phase or epic completes, the human needs to assess what happened and decide whether the remaining plan is still valid.
+
+**Post-phase assessment prompt**: When a gate task completes, the epic progress panel shows an assessment section:
+
+```
+┌─ Phase 1 Complete ──────────────────────────────────────────┐
+│                                                              │
+│ Gate: ✓ PASS — all tests, lint, vet clean                   │
+│                                                              │
+│ Summary:                                                     │
+│ • 6 tasks completed in 47 minutes, $3.21 total              │
+│ • 2 tasks needed auto-retry (agent_error)                    │
+│ • refactor-runner modified 8 files (plan estimated 3)        │
+│                                                              │
+│ Phase 2 is ready for approval.                               │
+│                                                              │
+│ Before approving, consider:                                  │
+│ • Does the interface from Phase 1 match Phase 2's           │
+│   assumptions?                                               │
+│ • Were there unexpected changes that affect Phase 2 tasks?   │
+│                                                              │
+│ [Review Phase 2 Plan]  [Revise Phase 2]  [Approve Phase 2]  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**"Revise Phase 2"** sends feedback to the planner task (which is still in `waiting`), asking it to re-plan Phase 2 based on what actually happened in Phase 1. The planner agent reads the current codebase (post-Phase 1 changes) and board.json (with full results from Phase 1 tasks) and produces an updated Phase 2 plan.
+
+This is the key re-planning loop: the plan evolves based on reality, not just the original spec.
+
+#### Putting It Together: The Full Human Workflow
+
+Here's how a human drives the cloud move using this system:
+
+```
+1. Human writes/refines spec files (specs/01-sandbox-backends.md, etc.)
+   └─ This is creative work. No automation.
+
+2. Human creates a planner task for M1 Phase 1
+   └─ "Plan implementation of specs/01-sandbox-backends.md Phase 1"
+
+3. Planner agent proposes 7 tasks + 1 gate
+   └─ Human reviews the plan graph, task prompts, file lists
+   └─ Human provides feedback: "Combine tasks 4 and 5, they're too small"
+   └─ Planner revises: 6 tasks + 1 gate
+   └─ Human approves Phase 1
+
+4. Auto-promoter runs tasks in dependency order
+   └─ Human monitors live activity feed
+   └─ Task 3 makes an unexpected interface choice
+   └─ Human provides feedback on Task 3 (waiting state)
+   └─ Task 3 resumes and corrects course
+
+5. Phase 1 gate runs and passes
+   └─ Human reviews post-phase assessment
+   └─ Human asks planner to revise Phase 2 based on Phase 1 results
+   └─ Planner produces updated Phase 2 plan
+   └─ Human approves Phase 2
+
+6. Repeat 4-5 for Phase 2
+
+7. Human creates planner for M2, M3, etc.
+   └─ Each milestone builds on the stable foundation of completed milestones
+```
+
+The human's role is **editorial, not operational**: they write specs, review plans, provide directional feedback, and decide when to proceed. The system handles decomposition, scheduling, execution, and verification.
+
 ---
 
 ## Example: Using the System
