@@ -10,13 +10,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
+	"changkun.de/x/wallfacer/internal/pkg/lazyval"
 	"changkun.de/x/wallfacer/internal/runner"
-	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
@@ -129,10 +130,9 @@ type Handler struct {
 
 	// cachedMaxParallel and cachedMaxTestParallel cache the configured parallel
 	// task limits so that maxConcurrentTasks/maxTestConcurrentTasks do not
-	// re-parse the env file on every call. A value of 0 is the sentinel for
-	// "not yet loaded"; UpdateEnvConfig resets them to 0 to force a reload.
-	cachedMaxParallel     atomic.Int32
-	cachedMaxTestParallel atomic.Int32
+	// re-parse the env file on every call. Invalidate on env config update.
+	cachedMaxParallel     *lazyval.Value[int]
+	cachedMaxTestParallel *lazyval.Value[int]
 
 	// ideationEnabled controls whether brainstorm auto-repeat is active.
 	// ideationInterval is the delay between consecutive brainstorm runs (0 = run immediately on completion).
@@ -147,7 +147,7 @@ type Handler struct {
 	ideationExploitRatio float64 // 0.0–1.0; default 0.8 (80% exploitation)
 
 	sandboxTestMu     sync.RWMutex
-	sandboxTestPassed map[sandbox.Type]bool
+	sandboxTestPassed map[constants.SandboxType]bool
 	// scheduledPromoteMu guards scheduledPromoteTimer, which fires
 	// tryAutoPromote precisely when the soonest scheduled task becomes due.
 	scheduledPromoteMu    sync.Mutex
@@ -184,9 +184,9 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 		ideationInterval:     60 * time.Minute,
 		ideationExploitRatio: 0.8,
 		reg:                  reg,
-		sandboxTestPassed: map[sandbox.Type]bool{
-			sandbox.Claude: false,
-			sandbox.Codex:  false,
+		sandboxTestPassed: map[constants.SandboxType]bool{
+			constants.SandboxClaude: false,
+			constants.SandboxCodex:  false,
 		},
 		breakers: map[string]*watcherBreaker{
 			"auto-promote": newWatcherBreaker(),
@@ -197,6 +197,20 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 			"auto-refine":  newWatcherBreaker(),
 		},
 	}
+	h.cachedMaxParallel = lazyval.New(func() int {
+		cfg, err := envconfig.Parse(h.envFile)
+		if err != nil || cfg.MaxParallelTasks <= 0 {
+			return defaultMaxConcurrentTasks
+		}
+		return cfg.MaxParallelTasks
+	})
+	h.cachedMaxTestParallel = lazyval.New(func() int {
+		cfg, err := envconfig.Parse(h.envFile)
+		if err != nil || cfg.MaxTestParallelTasks <= 0 {
+			return defaultMaxTestConcurrentTasks
+		}
+		return cfg.MaxTestParallelTasks
+	})
 	// Initialize auto-push from env config so the header toggle reflects the persisted state.
 	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
 		h.autopush.Store(envCfg.AutoPushEnabled)
@@ -305,14 +319,14 @@ func (h *Handler) incAutopilotPhase2Miss(watcher string) {
 	})
 }
 
-func (h *Handler) setSandboxTestPassed(sb sandbox.Type, passed bool) {
+func (h *Handler) setSandboxTestPassed(sb constants.SandboxType, passed bool) {
 	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.Lock()
 	h.sandboxTestPassed[s] = passed
 	h.sandboxTestMu.Unlock()
 }
 
-func (h *Handler) sandboxTestPassedState(sb sandbox.Type) bool {
+func (h *Handler) sandboxTestPassedState(sb constants.SandboxType) bool {
 	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.RLock()
 	defer h.sandboxTestMu.RUnlock()
@@ -325,7 +339,7 @@ func (h *Handler) refreshCodexBootstrapAuthState() {
 	}
 	ok, _ := h.runner.HostCodexAuthStatus(time.Now())
 	if ok {
-		h.setSandboxTestPassed(sandbox.Codex, true)
+		h.setSandboxTestPassed(constants.SandboxCodex, true)
 	}
 }
 

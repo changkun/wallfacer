@@ -890,7 +890,7 @@ func TestMaxConcurrentTasks_Caching(t *testing.T) {
 	}
 
 	// Manually invalidate the cache (simulating what UpdateEnvConfig does).
-	h.cachedMaxParallel.Store(0)
+	h.cachedMaxParallel.Invalidate()
 
 	// Third call should re-read from the file and return the updated value.
 	got = h.maxConcurrentTasks()
@@ -925,7 +925,7 @@ func TestMaxTestConcurrentTasks_Caching(t *testing.T) {
 		t.Fatalf("second call (cached): want 3, got %d", got)
 	}
 
-	h.cachedMaxTestParallel.Store(0)
+	h.cachedMaxTestParallel.Invalidate()
 
 	got = h.maxTestConcurrentTasks()
 	if got != 8 {

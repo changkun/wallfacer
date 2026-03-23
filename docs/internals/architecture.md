@@ -309,6 +309,28 @@ Every `internal/` package and its role in the system:
 | `store` | Per-task directory persistence, data models, event sourcing, pub/sub | `Store`, `Task`, `TaskEvent`, `TaskUsage`, `SandboxActivity`, `SequencedDelta` |
 | `workspace` | Workspace lifecycle manager; scoped data directories; hot-swap support; persistent workspace group configurations | `Manager`, `Snapshot`, `Group`, `NewManager()`, `NewStatic()`, `LoadGroups()`, `SaveGroups()` |
 
+Shared utility packages under `internal/pkg/`:
+
+| Package | Purpose | Key exported types / functions |
+|---|---|---|
+| `pkg/atomicfile` | Atomic file writes (temp + rename) | `Write()` |
+| `pkg/cache` | TTL cache with expiration | `TTLCache[K,V]` |
+| `pkg/circuitbreaker` | Circuit breakers (lock-free and backoff variants) | `Breaker`, `BackoffBreaker` |
+| `pkg/cmdexec` | `os/exec` wrapper for container commands | `Runner`, `Run()` |
+| `pkg/dagscorer` | DAG-based task dependency scoring | `Score()` |
+| `pkg/keyedmu` | Per-key mutex map for fine-grained locking | `Map[K]` |
+| `pkg/lazyval` | Lazily-computed cached value with invalidation | `Value[T]`, `New()` |
+| `pkg/logpipe` | Streaming log pipe for container output | `Pipe` |
+| `pkg/ndjson` | Newline-delimited JSON reader | `Reader` |
+| `pkg/pagination` | Cursor-based pagination helpers | `Paginate()` |
+| `pkg/pubsub` | Generic fan-out notification hub with replay | `Hub[T]` |
+| `pkg/set` | Generic set type | `Set[T]` |
+| `pkg/sortedkeys` | Sorted map key iteration | `Of()` |
+| `pkg/syncmap` | Type-safe generic wrapper around `sync.Map` | `Map[K,V]` |
+| `pkg/tail` | Tail-follow for log files | `Follow()` |
+| `pkg/trackedwg` | `sync.WaitGroup` with pending-task labels | `WaitGroup` |
+| `pkg/watcher` | Event-loop background watcher | `Start()` |
+
 ## Handler Organisation
 
 Each handler file in `internal/handler/` owns a specific concern area. The table below lists every non-test `.go` file:

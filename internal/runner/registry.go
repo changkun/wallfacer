@@ -1,8 +1,7 @@
 package runner
 
 import (
-	"sync"
-
+	"changkun.de/x/wallfacer/internal/pkg/syncmap"
 	"github.com/google/uuid"
 )
 
@@ -11,39 +10,22 @@ import (
 // via crypto/rand and will never be all-zeros in practice.
 var singletonKey = uuid.Nil
 
-// containerRegistry is a type-safe wrapper around sync.Map for tracking
-// active container names keyed by task UUID.
+// containerRegistry tracks active container names keyed by task UUID.
 //
 // Note: Range is never called on the ideateContainer registry (it holds at most
 // one singleton entry). The Range method is provided for completeness.
 type containerRegistry struct {
-	m sync.Map
+	syncmap.Map[uuid.UUID, string]
 }
 
 // Set stores name under id.
 func (r *containerRegistry) Set(id uuid.UUID, name string) {
-	r.m.Store(id, name)
+	r.Store(id, name)
 }
 
 // Get returns the container name for id and whether it was found.
 func (r *containerRegistry) Get(id uuid.UUID) (string, bool) {
-	v, ok := r.m.Load(id)
-	if !ok {
-		return "", false
-	}
-	return v.(string), true
-}
-
-// Delete removes the entry for id.
-func (r *containerRegistry) Delete(id uuid.UUID) {
-	r.m.Delete(id)
-}
-
-// Range calls fn for each entry. Iteration stops if fn returns false.
-func (r *containerRegistry) Range(fn func(uuid.UUID, string) bool) {
-	r.m.Range(func(k, v any) bool {
-		return fn(k.(uuid.UUID), v.(string))
-	})
+	return r.Load(id)
 }
 
 // SetSingleton stores name under the fixed singleton key (uuid.Nil).

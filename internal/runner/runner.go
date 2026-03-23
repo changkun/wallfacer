@@ -19,6 +19,7 @@ import (
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/pkg/keyedmu"
 	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
@@ -265,11 +266,11 @@ type Runner struct {
 	containerMemory        string                  // --memory override; empty = read from env file
 	promptsMgr             *prompts.Manager        // prompt template manager
 	worktreeMu             sync.Mutex              // serializes all worktree filesystem operations on worktreesDir
-	repoMu                 sync.Map                // per-repo *sync.Mutex for serializing rebase+merge
+	repoMu                 keyedmu.Map[string]     // per-repo mutex for serializing rebase+merge
 	taskContainers         *containerRegistry      // taskID → container name
 	refineContainers       *containerRegistry      // taskID → refinement container name
 	ideateContainer        *containerRegistry      // singleton: ideation container name
-	oversightMu            sync.Map                // taskID (string) → *sync.Mutex for serializing oversight generation
+	oversightMu            keyedmu.Map[string]     // per-task mutex for serializing oversight generation
 	containerCB            *circuitbreaker.Breaker // circuit breaker for container launch operations
 	executor               ContainerExecutor       // abstracts container runtime calls for testing
 	backgroundWg           trackedwg.WaitGroup     // tracks fire-and-forget background goroutines
@@ -774,15 +775,13 @@ func isJWTExpired(jwt string, now time.Time) bool {
 // repoLock returns a per-repo mutex, creating one on first access.
 // Used to serialize rebase+merge operations on the same repository.
 func (r *Runner) repoLock(repoPath string) *sync.Mutex {
-	v, _ := r.repoMu.LoadOrStore(repoPath, &sync.Mutex{})
-	return v.(*sync.Mutex)
+	return r.repoMu.Get(repoPath)
 }
 
 // oversightLock returns the per-task mutex for serialising oversight generation.
 // The mutex is created on first access and stored in oversightMu.
 func (r *Runner) oversightLock(taskID uuid.UUID) *sync.Mutex {
-	v, _ := r.oversightMu.LoadOrStore(taskID.String(), &sync.Mutex{})
-	return v.(*sync.Mutex)
+	return r.oversightMu.Get(taskID.String())
 }
 
 // RefineContainerName returns the active refinement container name for a task.

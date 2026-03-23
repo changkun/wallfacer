@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/watcher"
@@ -29,36 +28,14 @@ const maxTestFailRetries = 3
 const defaultMaxTestConcurrentTasks = 2
 
 // maxConcurrentTasks returns the configured parallel task limit. The value is
-// cached in an atomic field so the env file is only parsed on the first call
-// and after UpdateEnvConfig invalidates the cache (by resetting the field to 0).
+// lazily cached and only re-parsed after UpdateEnvConfig calls Invalidate.
 func (h *Handler) maxConcurrentTasks() int {
-	if v := h.cachedMaxParallel.Load(); v > 0 {
-		return int(v)
-	}
-	cfg, err := envconfig.Parse(h.envFile)
-	if err != nil || cfg.MaxParallelTasks <= 0 {
-		h.cachedMaxParallel.Store(int32(defaultMaxConcurrentTasks))
-		return defaultMaxConcurrentTasks
-	}
-	h.cachedMaxParallel.Store(int32(cfg.MaxParallelTasks))
-	return cfg.MaxParallelTasks
+	return h.cachedMaxParallel.Get()
 }
 
-// maxTestConcurrentTasks returns the configured parallel test-run limit. The
-// value is cached in an atomic field so the env file is only parsed on the
-// first call and after UpdateEnvConfig invalidates the cache (by resetting the
-// field to 0).
+// maxTestConcurrentTasks returns the configured parallel test-run limit.
 func (h *Handler) maxTestConcurrentTasks() int {
-	if v := h.cachedMaxTestParallel.Load(); v > 0 {
-		return int(v)
-	}
-	cfg, err := envconfig.Parse(h.envFile)
-	if err != nil || cfg.MaxTestParallelTasks <= 0 {
-		h.cachedMaxTestParallel.Store(int32(defaultMaxTestConcurrentTasks))
-		return defaultMaxTestConcurrentTasks
-	}
-	h.cachedMaxTestParallel.Store(int32(cfg.MaxTestParallelTasks))
-	return cfg.MaxTestParallelTasks
+	return h.cachedMaxTestParallel.Get()
 }
 
 func (h *Handler) countRegularInProgress(_ context.Context) (int, error) {
