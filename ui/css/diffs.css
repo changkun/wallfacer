@@ -339,3 +339,7 @@
   color: var(--accent);
   font-weight: 600;
 }
+.diff-truncated {
+  color: var(--text-muted);
+  font-style: italic;
+}

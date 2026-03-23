@@ -458,35 +458,41 @@ function invalidateDiffBehindCounts(taskId) {
   }
 }
 
-function renderDiffInto(el, diff) {
+function renderDiffInto(el, diff, maxLines) {
   if (!diff) {
     el.innerHTML = '<span style="color:var(--text-muted)">no changes</span>';
     return;
   }
-  const lines = diff.split("\n");
-  el.innerHTML = lines
-    .map((line) => {
-      const escaped = escapeHtml(line);
-      if (/^=== .+ ===$/.test(line)) {
-        return `<span class="diff-workspace-label">${escaped}</span>`;
-      } else if (line.startsWith("+") && !line.startsWith("+++")) {
-        return `<span class="diff-add">${escaped}</span>`;
-      } else if (line.startsWith("-") && !line.startsWith("---")) {
-        return `<span class="diff-del">${escaped}</span>`;
-      } else if (line.startsWith("@@")) {
-        return `<span class="diff-hunk">${escaped}</span>`;
-      } else if (
-        line.startsWith("diff ") ||
-        line.startsWith("--- ") ||
-        line.startsWith("+++ ") ||
-        line.startsWith("index ") ||
-        line.startsWith("Binary ")
-      ) {
-        return `<span class="diff-header">${escaped}</span>`;
-      }
-      return escaped;
-    })
-    .join("\n");
+  const allLines = diff.split("\n");
+  const truncated = maxLines && allLines.length > maxLines;
+  const lines = truncated ? allLines.slice(0, maxLines) : allLines;
+  el.innerHTML =
+    lines
+      .map((line) => {
+        const escaped = escapeHtml(line);
+        if (/^=== .+ ===$/.test(line)) {
+          return `<span class="diff-workspace-label">${escaped}</span>`;
+        } else if (line.startsWith("+") && !line.startsWith("+++")) {
+          return `<span class="diff-add">${escaped}</span>`;
+        } else if (line.startsWith("-") && !line.startsWith("---")) {
+          return `<span class="diff-del">${escaped}</span>`;
+        } else if (line.startsWith("@@")) {
+          return `<span class="diff-hunk">${escaped}</span>`;
+        } else if (
+          line.startsWith("diff ") ||
+          line.startsWith("--- ") ||
+          line.startsWith("+++ ") ||
+          line.startsWith("index ") ||
+          line.startsWith("Binary ")
+        ) {
+          return `<span class="diff-header">${escaped}</span>`;
+        }
+        return escaped;
+      })
+      .join("\n") +
+    (truncated
+      ? `\n<span class="diff-truncated">\u2026 ${allLines.length - maxLines} more lines</span>`
+      : "");
 }
 
 async function fetchDiff(card, taskId, updatedAt) {
@@ -537,6 +543,8 @@ async function fetchDiff(card, taskId, updatedAt) {
   }
 }
 
+var CARD_DIFF_MAX_LINES = 150;
+
 function applyDiffToCard(el, diff, behindCounts, taskId) {
   const task =
     typeof tasks !== "undefined" ? tasks.find((t) => t.id === taskId) : null;
@@ -555,7 +563,7 @@ function applyDiffToCard(el, diff, behindCounts, taskId) {
       `</div>`;
   }
   const tmp = document.createElement("div");
-  renderDiffInto(tmp, diff);
+  renderDiffInto(tmp, diff, CARD_DIFF_MAX_LINES);
   el.innerHTML = warning + tmp.innerHTML;
 }
 
@@ -1138,6 +1146,8 @@ if (typeof module !== "undefined") {
     isTestCard,
     invalidateDiffBehindCounts,
     BEHIND_TTL_MS,
+    CARD_DIFF_MAX_LINES,
+    renderDiffInto,
     diffCache,
     cardOversightCache,
     fetchDiff,
