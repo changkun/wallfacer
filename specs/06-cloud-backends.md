@@ -65,7 +65,9 @@ The specs are sequenced into 8 milestones to minimize cross-impacts. Interface e
                                 │
 M1: Sandbox Backend Interface ──┼──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
                                 │           ▲                     (capstone)
-                                │   M2: Storage Interface ─┘
+                                │   M2: Storage Interface ─┤
+                                │           │               │
+                                │           └──▶ M2.5: Multi-Workspace Groups
                                 │
                                 ├──▶ Native Containerization (platform-specific)
                                 │     ├─ Linux  (bubblewrap, systemd-nspawn)
@@ -98,9 +100,18 @@ M7: Desktop App ────────────────┘ (ships after
 
 These are alternative `SandboxBackend` implementations that plug into the interface defined in M1. They are platform-specific and independent of each other and of M2–M8. Implement as needed based on platform priority.
 
+**Branch from M2 (after store interfaces are stable):**
+
+| Spec | Delivers |
+|------|----------|
+| [multiple-concurrent-workspace-groups.md](multiple-concurrent-workspace-groups.md) | Multi-store manager, runner task-to-group mapping, watcher multi-store iteration. Allows tasks in different workspace groups to run simultaneously. |
+
+Multi-workspace groups modifies store lifecycle, runner execution paths, and handler watchers. Placed after M2 because it touches Store lifecycle patterns that M2 also refactors (`StorageBackend` extraction). Independent of M3 (container reuse is internal to `LocalBackend`) and M4–M5 (different code paths). Benefits M8 (multi-tenant) by proving multi-store concurrency.
+
 **Ordering rationale:**
 - **M1–M2 first:** Pure refactors that create the abstraction seams all downstream milestones plug into. Low risk, high leverage.
 - **M3 after M1:** Container reuse modifies the same `internal/runner/` files. Doing it right after M1 avoids revisiting them later.
+- **M2.5 after M2:** Multi-workspace groups modifies store lifecycle; wait for `StorageBackend` interfaces to stabilize. Can run in parallel with M3.
 - **M4–M5 before M6:** Deliver user-visible value with no cloud dependency. Exercise different code paths (`internal/handler/` + `ui/`) than M1–M3.
 - **M7 after M4–M5:** Desktop app ships with file explorer + terminal already built in. (Fully independent — can move earlier.)
 - **M8 last:** Capstone that wires everything together. Picks up deferred cloud phases from M3/M4/M5.
