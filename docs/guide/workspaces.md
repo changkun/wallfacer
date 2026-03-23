@@ -132,7 +132,7 @@ When a task moves to **In Progress**:
 2. A git worktree is created at `~/.wallfacer/data/<workspace-key>/worktrees/<task-id>/<repo-name>/`
 3. The worktree is mounted read-write into the task container under `/workspace/<repo-name>/`
 
-For non-git workspaces, a snapshot copy is created instead, with a local git repository initialised for change tracking.
+For non-git workspaces, a snapshot copy is created instead, with a local git repository initialised for change tracking. When the task completes, the diff is captured from the snapshot before changes are extracted back to the original directory, so the diff view works for non-git workspaces too.
 
 #### Worktree lifecycle
 

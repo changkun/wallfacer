@@ -28,6 +28,7 @@ func deepCloneTask(t *Task) Task {
 	cp.WorktreePaths = maps.Clone(t.WorktreePaths)
 	cp.CommitHashes = maps.Clone(t.CommitHashes)
 	cp.BaseCommitHashes = maps.Clone(t.BaseCommitHashes)
+	cp.SnapshotDiffs = maps.Clone(t.SnapshotDiffs)
 	cp.AutoRetryBudget = maps.Clone(t.AutoRetryBudget)
 
 	if t.CurrentRefinement != nil {
@@ -61,6 +62,10 @@ func deepCloneTask(t *Task) Task {
 	if t.ScheduledAt != nil {
 		scheduledAt := *t.ScheduledAt
 		cp.ScheduledAt = &scheduledAt
+	}
+	if t.LastFetchErrorAt != nil {
+		lastFetchErrorAt := *t.LastFetchErrorAt
+		cp.LastFetchErrorAt = &lastFetchErrorAt
 	}
 
 	return cp

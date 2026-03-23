@@ -1445,6 +1445,28 @@ func TestUpdateTaskBaseCommitHashes_NotFound(t *testing.T) {
 	}
 }
 
+func TestUpdateTaskSnapshotDiffs(t *testing.T) {
+	s := newTestStore(t)
+	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
+
+	diffs := map[string]string{"/workspace/a": "diff --git a/file.txt b/file.txt\n+hello"}
+	if err := s.UpdateTaskSnapshotDiffs(bg(), task.ID, diffs); err != nil {
+		t.Fatalf("UpdateTaskSnapshotDiffs: %v", err)
+	}
+
+	got, _ := s.GetTask(bg(), task.ID)
+	if got.SnapshotDiffs["/workspace/a"] != diffs["/workspace/a"] {
+		t.Errorf("SnapshotDiffs[/workspace/a] = %q, want %q", got.SnapshotDiffs["/workspace/a"], diffs["/workspace/a"])
+	}
+}
+
+func TestUpdateTaskSnapshotDiffs_NotFound(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.UpdateTaskSnapshotDiffs(bg(), uuid.New(), nil); err == nil {
+		t.Error("expected error for unknown task")
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Concurrency
 // ─────────────────────────────────────────────────────────────────────────────

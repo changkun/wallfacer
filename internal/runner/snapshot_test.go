@@ -151,6 +151,76 @@ func TestExtractSnapshotDoesNotLeakGitDir(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// computeSnapshotDiff
+// ---------------------------------------------------------------------------
+
+// TestComputeSnapshotDiff verifies that computeSnapshotDiff returns a diff
+// showing changes relative to the initial snapshot commit.
+func TestComputeSnapshotDiff(t *testing.T) {
+	ws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ws, "file.txt"), []byte("original\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshotPath := filepath.Join(t.TempDir(), "snapshot")
+	if err := setupNonGitSnapshot(ws, snapshotPath); err != nil {
+		t.Fatal(err)
+	}
+
+	// Simulate agent modifications: modify existing file and add a new one.
+	if err := os.WriteFile(filepath.Join(snapshotPath, "file.txt"), []byte("modified\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotPath, "new.txt"), []byte("new content\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	// Stage and commit the changes (as hostStageAndCommit would).
+	if _, err := exec.Command("git", "-C", snapshotPath, "add", "-A").Output(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := exec.Command("git", "-C", snapshotPath, "commit", "-m", "agent changes").CombinedOutput(); err != nil {
+		t.Fatal(err)
+	}
+
+	diff := computeSnapshotDiff(context.Background(), snapshotPath)
+	if diff == "" {
+		t.Fatal("expected non-empty diff")
+	}
+	if !strings.Contains(diff, "file.txt") {
+		t.Error("diff should reference file.txt")
+	}
+	if !strings.Contains(diff, "-original") {
+		t.Error("diff should show removal of 'original'")
+	}
+	if !strings.Contains(diff, "+modified") {
+		t.Error("diff should show addition of 'modified'")
+	}
+	if !strings.Contains(diff, "new.txt") {
+		t.Error("diff should reference new.txt")
+	}
+}
+
+// TestComputeSnapshotDiffEmpty verifies that computeSnapshotDiff returns an
+// empty string when no changes were made.
+func TestComputeSnapshotDiffEmpty(t *testing.T) {
+	ws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ws, "file.txt"), []byte("hello\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshotPath := filepath.Join(t.TempDir(), "snapshot")
+	if err := setupNonGitSnapshot(ws, snapshotPath); err != nil {
+		t.Fatal(err)
+	}
+
+	// No changes — diff should be empty.
+	diff := computeSnapshotDiff(context.Background(), snapshotPath)
+	if diff != "" {
+		t.Fatalf("expected empty diff for unchanged snapshot, got:\n%s", diff)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Non-git commit pipeline integration
 // ---------------------------------------------------------------------------
 
@@ -209,6 +279,19 @@ func TestCommitPipelineNonGitWorkspace(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(ws, "new.txt")); err != nil {
 		t.Fatal("new.txt should exist in workspace after non-git commit:", err)
+	}
+
+	// Verify snapshot diffs were persisted.
+	updated, _ := s.GetTask(ctx, task.ID)
+	if updated.SnapshotDiffs == nil {
+		t.Fatal("SnapshotDiffs should be set after non-git commit")
+	}
+	diff, ok := updated.SnapshotDiffs[ws]
+	if !ok || diff == "" {
+		t.Fatal("SnapshotDiffs should contain a non-empty diff for the workspace")
+	}
+	if !strings.Contains(diff, "app.txt") {
+		t.Error("snapshot diff should reference app.txt")
 	}
 }
 

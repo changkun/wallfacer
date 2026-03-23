@@ -45,7 +45,8 @@ When a workspace is not a git repository (or is an empty git repo with no commit
 1. `cp -a ws/. snapshotPath` copies all files including hidden ones.
 2. `git init` + `git add -A` + `git commit --allow-empty` initializes a local git repo for change tracking.
 3. The standard commit pipeline (Phase 1) can then commit changes within the snapshot.
-4. After task completion, `extractSnapshotToWorkspace()` copies changes back using `rsync --delete --exclude=.git` (falling back to `cp` if rsync is unavailable).
+4. Before extraction, `computeSnapshotDiff()` captures a unified diff of all changes relative to the initial snapshot commit. This diff is stored in `Task.SnapshotDiffs` so the diff view works even after the snapshot is cleaned up.
+5. `extractSnapshotToWorkspace()` copies changes back using `rsync --delete --exclude=.git` (falling back to `cp` if rsync is unavailable).
 
 ### Stale Branch Recovery
 
@@ -310,7 +311,7 @@ This is useful when other tasks have merged changes to the default branch and yo
 - **Active worktrees** -- uses `merge-base` to diff only the task's changes since it diverged, including untracked files (via `git diff --no-index /dev/null <file>`)
 - **Merged tasks** (worktree cleaned up) -- falls back to stored `CommitHashes` / `BaseCommitHashes` or branch names to reconstruct the diff
 - Returns `behind_counts` per repo indicating how many commits the default branch has advanced since the task branched off
-- **Non-git workspaces** -- silently skipped (no diff to compute)
+- **Non-git workspaces** -- for active tasks, the diff is computed live from the snapshot's git repo; for terminal tasks, the stored `SnapshotDiffs` captured at commit time are returned
 - **Caching** -- terminal tasks (done/cancelled/archived) are cached with `immutable` Cache-Control; active tasks are cached for 10 seconds with ETag support for conditional requests
 
 ## Git Helper Functions (`internal/gitutil/`)

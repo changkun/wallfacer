@@ -101,6 +101,16 @@ func (s *Store) UpdateTaskCommitMessage(_ context.Context, id uuid.UUID, msg str
 	})
 }
 
+// UpdateTaskSnapshotDiffs stores the pre-computed diffs for non-git workspaces.
+// These diffs are captured from the snapshot git repo before the snapshot is
+// extracted back to the original workspace directory.
+func (s *Store) UpdateTaskSnapshotDiffs(_ context.Context, id uuid.UUID, diffs map[string]string) error {
+	return s.mutateTask(id, func(t *Task) error {
+		t.SnapshotDiffs = diffs
+		return nil
+	})
+}
+
 // UpdateTaskBaseCommitHashes stores the default-branch HEAD captured before merge.
 func (s *Store) UpdateTaskBaseCommitHashes(_ context.Context, id uuid.UUID, hashes map[string]string) error {
 	return s.mutateTask(id, func(t *Task) error {

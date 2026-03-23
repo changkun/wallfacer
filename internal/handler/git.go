@@ -355,8 +355,36 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	behindCounts := make(map[string]int)
 
 	for repoPath, worktreePath := range task.WorktreePaths {
-		// Skip non-git workspaces silently — no diff to compute.
 		if !gitutil.IsGitRepo(repoPath) {
+			// Non-git workspace: try live snapshot first, then stored diff.
+			if _, statErr := os.Stat(worktreePath); statErr == nil && gitutil.IsGitRepo(worktreePath) {
+				// Active task: compute diff from snapshot (initial commit → HEAD).
+				out, _ := cmdexec.Git(worktreePath, "diff", "HEAD~1").WithContext(r.Context()).Output()
+				// Include untracked files (same pattern as regular worktrees below).
+				if untrackedRaw, err := cmdexec.Git(worktreePath,
+					"ls-files", "--others", "--exclude-standard").WithContext(r.Context()).Output(); err == nil {
+					for file := range strings.SplitSeq(untrackedRaw, "\n") {
+						if file == "" {
+							continue
+						}
+						fd, _ := cmdexec.Git(worktreePath,
+							"diff", "--no-index", "/dev/null", file).WithContext(r.Context()).Output()
+						out += fd
+					}
+				}
+				if len(out) > 0 {
+					if len(task.WorktreePaths) > 1 {
+						fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
+					}
+					combined.WriteString(out)
+				}
+			} else if task.SnapshotDiffs[repoPath] != "" {
+				// Terminal task: use stored diff captured at commit time.
+				if len(task.WorktreePaths) > 1 {
+					fmt.Fprintf(&combined, "=== %s ===\n", filepath.Base(repoPath))
+				}
+				combined.WriteString(task.SnapshotDiffs[repoPath])
+			}
 			continue
 		}
 		// If the worktree directory no longer exists, fall back to stored commit hashes.
@@ -509,7 +537,7 @@ func (h *Handler) GitBranches(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var branches []string
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line != "" {
 			branches = append(branches, line)

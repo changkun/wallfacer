@@ -290,6 +290,7 @@ type Task struct {
 	BranchName       string            `json:"branch_name,omitempty"`        // "task/<uuid8>"
 	CommitHashes     map[string]string `json:"commit_hashes,omitempty"`      // host repoPath → commit hash after merge
 	BaseCommitHashes map[string]string `json:"base_commit_hashes,omitempty"` // host repoPath → defBranch HEAD before merge
+	SnapshotDiffs    map[string]string `json:"snapshot_diffs,omitempty"`     // repoPath → diff text (non-git workspaces only)
 	CommitMessage    string            `json:"commit_message,omitempty"`     // generated commit message from the commit pipeline
 	MountWorktrees   bool              `json:"mount_worktrees,omitempty"`
 	Model            string            `json:"model,omitempty"`          // deprecated: retained for migration compatibility

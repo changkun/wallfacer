@@ -117,6 +117,7 @@ The `Task` struct (`internal/store/models.go`) is the core domain model. All fie
 | `BranchName` | `string` | `branch_name` | Task branch (`task/<uuid8>`) |
 | `CommitHashes` | `map[string]string` | `commit_hashes` | Post-merge commit hash per repo |
 | `BaseCommitHashes` | `map[string]string` | `base_commit_hashes` | Default branch HEAD before merge |
+| `SnapshotDiffs` | `map[string]string` | `snapshot_diffs` | Pre-computed diffs for non-git workspaces (repoPath → diff text) |
 | `CommitMessage` | `string` | `commit_message` | Generated commit message from commit pipeline |
 | `MountWorktrees` | `bool` | `mount_worktrees` | Whether worktrees are mounted into the container |
 

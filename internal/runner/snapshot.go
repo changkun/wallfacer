@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -8,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
@@ -145,4 +147,33 @@ func copyFile(src, dst string, mode fs.FileMode) error {
 		return err
 	}
 	return out.Close()
+}
+
+// computeSnapshotDiff computes a unified diff of all changes in a snapshot
+// directory relative to its initial commit. The snapshot has an initial commit
+// containing the original workspace files, and the agent's changes are committed
+// on top. This produces a diff showing what the agent changed.
+func computeSnapshotDiff(ctx context.Context, snapshotPath string) string {
+	// Diff the initial commit against the current working tree (HEAD + uncommitted).
+	// HEAD~1 is the initial snapshot commit created by setupNonGitSnapshot.
+	out, err := cmdexec.Git(snapshotPath, "diff", "HEAD~1").WithContext(ctx).Output()
+	if err != nil {
+		// If HEAD~1 doesn't exist (only one commit), diff against the empty tree.
+		out, _ = cmdexec.Git(snapshotPath, "diff", "4b825dc642cb6eb9a060e54bf899d69f82623700", "HEAD").WithContext(ctx).Output()
+	}
+
+	// Include untracked files as new-file diffs.
+	if untrackedRaw, err := cmdexec.Git(snapshotPath,
+		"ls-files", "--others", "--exclude-standard").WithContext(ctx).Output(); err == nil {
+		for _, file := range strings.Split(untrackedRaw, "\n") {
+			if file == "" {
+				continue
+			}
+			fd, _ := cmdexec.Git(snapshotPath,
+				"diff", "--no-index", "/dev/null", file).WithContext(ctx).Output()
+			out += fd
+		}
+	}
+
+	return out
 }

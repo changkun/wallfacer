@@ -368,6 +368,68 @@ func TestTaskDiffAfterCommitPipeline(t *testing.T) {
 	}
 }
 
+// TestTaskDiffNonGitWorkspaceStoredDiff verifies that TaskDiff returns stored
+// snapshot diffs for non-git workspaces after the commit pipeline has run.
+func TestTaskDiffNonGitWorkspaceStoredDiff(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	// Use a plain (non-git) directory as the workspace.
+	ws := t.TempDir()
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "non-git test", Timeout: 5})
+	nonexistent := filepath.Join(t.TempDir(), "cleaned-up-snapshot")
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{ws: nonexistent}, "task-branch")
+
+	// Simulate stored snapshot diff (as the commit pipeline would have captured).
+	storedDiff := "diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-original\n+modified\n"
+	_ = h.store.UpdateTaskSnapshotDiffs(ctx, task.ID, map[string]string{ws: storedDiff})
+
+	resp := callTaskDiff(t, h, task.ID)
+
+	if resp.Diff != storedDiff {
+		t.Errorf("expected stored snapshot diff, got: %q", resp.Diff)
+	}
+}
+
+// TestTaskDiffNonGitWorkspaceLiveSnapshot verifies that TaskDiff computes a
+// live diff from the snapshot git repo when it still exists (active task).
+func TestTaskDiffNonGitWorkspaceLiveSnapshot(t *testing.T) {
+	h := newTestHandler(t)
+	ctx := context.Background()
+
+	// Use a plain (non-git) directory as the workspace.
+	ws := t.TempDir()
+
+	// Create a snapshot with an initial commit (simulating setupNonGitSnapshot).
+	snapshotPath := filepath.Join(t.TempDir(), "snapshot")
+	_ = os.MkdirAll(snapshotPath, 0755)
+	_ = os.WriteFile(filepath.Join(snapshotPath, "file.txt"), []byte("original\n"), 0644)
+	gitRun(t, snapshotPath, "init")
+	gitRun(t, snapshotPath, "add", "-A")
+	gitRun(t, snapshotPath, "commit", "-m", "wallfacer: initial snapshot")
+
+	// Simulate agent changes in the snapshot.
+	_ = os.WriteFile(filepath.Join(snapshotPath, "file.txt"), []byte("modified\n"), 0644)
+	gitRun(t, snapshotPath, "add", "-A")
+	gitRun(t, snapshotPath, "commit", "-m", "agent changes")
+
+	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "non-git live test", Timeout: 5})
+	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{ws: snapshotPath}, "task-branch")
+
+	resp := callTaskDiff(t, h, task.ID)
+
+	if !strings.Contains(resp.Diff, "file.txt") {
+		t.Error("expected diff to contain file.txt")
+	}
+	if !strings.Contains(resp.Diff, "-original") {
+		t.Error("expected diff to show removal of 'original'")
+	}
+	if !strings.Contains(resp.Diff, "+modified") {
+		t.Error("expected diff to show addition of 'modified'")
+	}
+}
+
 // TestGitPush_Success verifies that push succeeds when a bare remote is configured.
 func TestGitPush_Success(t *testing.T) {
 	repo := setupRepo(t)

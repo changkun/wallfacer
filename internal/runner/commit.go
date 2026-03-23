@@ -102,7 +102,7 @@ func (r *Runner) commit(
 	})
 	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "rebase_merge"})
 
-	commitHashes, baseHashes, mergeErr := r.rebaseAndMerge(ctx, taskID, worktreePaths, branchName, sessionID)
+	commitHashes, baseHashes, snapshotDiffs, mergeErr := r.rebaseAndMerge(ctx, taskID, worktreePaths, branchName, sessionID)
 	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "rebase_merge"})
 
 	if mergeErr != nil {
@@ -127,6 +127,11 @@ func (r *Runner) commit(
 	if len(baseHashes) > 0 {
 		if err := r.store.UpdateTaskBaseCommitHashes(bgCtx, taskID, baseHashes); err != nil {
 			logger.Runner.Warn("save base commit hashes", "task", taskID, "error", err)
+		}
+	}
+	if len(snapshotDiffs) > 0 {
+		if err := r.store.UpdateTaskSnapshotDiffs(bgCtx, taskID, snapshotDiffs); err != nil {
+			logger.Runner.Warn("save snapshot diffs", "task", taskID, "error", err)
 		}
 	}
 	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "cleanup"})
@@ -488,10 +493,11 @@ func (r *Runner) rebaseAndMerge(
 	worktreePaths map[string]string,
 	branchName string,
 	sessionID string,
-) (map[string]string, map[string]string, error) {
+) (commitHashes, baseHashes, snapshotDiffs map[string]string, err error) {
 	bgCtx := r.shutdownCtx
-	commitHashes := make(map[string]string)
-	baseHashes := make(map[string]string)
+	commitHashes = make(map[string]string)
+	baseHashes = make(map[string]string)
+	snapshotDiffs = make(map[string]string)
 
 	var missing int
 	for repoPath, worktreePath := range worktreePaths {
@@ -508,18 +514,18 @@ func (r *Runner) rebaseAndMerge(
 		mu := r.repoLock(repoPath)
 		mu.Lock()
 
-		err := r.rebaseAndMergeOne(ctx, taskID, repoPath, worktreePath, branchName, sessionID, bgCtx, commitHashes, baseHashes)
+		err := r.rebaseAndMergeOne(ctx, taskID, repoPath, worktreePath, branchName, sessionID, bgCtx, commitHashes, baseHashes, snapshotDiffs)
 		mu.Unlock()
 		if err != nil {
-			return commitHashes, baseHashes, err
+			return commitHashes, baseHashes, snapshotDiffs, err
 		}
 	}
 
 	if missing > 0 && missing == len(worktreePaths) {
-		return commitHashes, baseHashes, fmt.Errorf("all worktrees missing, nothing to rebase/merge")
+		return commitHashes, baseHashes, snapshotDiffs, fmt.Errorf("all worktrees missing, nothing to rebase/merge")
 	}
 
-	return commitHashes, baseHashes, nil
+	return commitHashes, baseHashes, snapshotDiffs, nil
 }
 
 // rebaseAndMergeOne handles the rebase+merge pipeline for a single repo/worktree pair.
@@ -529,7 +535,7 @@ func (r *Runner) rebaseAndMergeOne(
 	taskID uuid.UUID,
 	repoPath, worktreePath, branchName, sessionID string,
 	bgCtx context.Context, //nolint:revive // bgCtx is a separate long-lived context, not a replacement for ctx
-	commitHashes, baseHashes map[string]string,
+	commitHashes, baseHashes, snapshotDiffs map[string]string,
 ) error {
 	if !gitutil.IsGitRepo(repoPath) || !gitutil.HasCommits(repoPath) {
 		// Non-git workspace or empty git repo (no commits): the worktree was
@@ -538,6 +544,13 @@ func (r *Runner) rebaseAndMergeOne(
 
 			"result": fmt.Sprintf("Extracting changes from sandbox to %s...", filepath.Base(repoPath)),
 		})
+
+		// Capture the diff before extraction so we can show it in the UI.
+		// The snapshot has an initial commit + agent changes committed on top.
+		if diff := computeSnapshotDiff(ctx, worktreePath); diff != "" {
+			snapshotDiffs[repoPath] = diff
+		}
+
 		if err := extractSnapshotToWorkspace(worktreePath, repoPath); err != nil {
 			return fmt.Errorf("extract snapshot for %s: %w", repoPath, err)
 		}
