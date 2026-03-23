@@ -55,6 +55,18 @@ Creating → Running → Streaming → Stopping → Stopped
 
 The `SandboxHandle` exposes `State() SandboxState` so the runner and handler can query current state without shelling out.
 
+#### Design Note: Comparison with Managed Sandbox Platforms
+
+Managed platforms (e.g., Tensorlake) model sandboxes as long-lived resources with richer lifecycles including `Suspended` and `Snapshotting` states. Our model is deliberately simpler because wallfacer sandboxes are task-scoped executors, not general-purpose environments:
+
+- **No Suspend/Resume at the backend level.** Claude CLI is a one-shot process — it exits when done, so there is nothing to suspend between invocations. However, long-lived *worker containers* (see [Container Reuse](container-reuse.md)) can be paused via `podman pause`/`unpause` between exec invocations to reclaim CPU/memory. This is an optimization internal to `LocalBackend`, not a backend-level state.
+
+- **No Snapshotting state.** Filesystem snapshots (warm caches, derived images) are a `LocalBackend` optimization covered in [Container Reuse](container-reuse.md). For K8s, pod checkpointing is a cluster-level concern outside the backend interface.
+
+- **Timeout is task-level, not sandbox-level.** The runner enforces task timeouts (`task.Timeout`) and kills the container via `handle.Kill()`. The backend doesn't need its own timeout — it's a policy decision made by the runner.
+
+If future needs require persistent sandboxes (e.g., interactive development environments), the state machine can be extended with `Suspended` and `Resuming` states without breaking existing backends — they simply never enter those states.
+
 ### New Interfaces
 
 ```go
@@ -307,9 +319,21 @@ Currently checked via `podman images` / `docker images` in the handler. For K8s,
 - Local: check local image cache (as today)
 - K8s: assume images are available (or check a registry)
 
-### Network Policies
+### Network Control
 
-`WALLFACER_CONTAINER_NETWORK` sets `ContainerSpec.Network`. For local containers, this maps to `--network`. For K8s, this maps to NetworkPolicy resources. The field remains on `ContainerSpec`; its interpretation is backend-specific.
+`ContainerSpec.Network` is the abstraction point for network configuration. Currently it's a single string (`"host"`, `"none"`, `"slirp4netns"`) mapped to `--network`. This is sufficient for single-user local deployment but insufficient for cloud/multi-tenant scenarios.
+
+**Levels of network control:**
+
+| Level | What it controls | Local | K8s | When needed |
+|-------|-----------------|-------|-----|-------------|
+| **Mode** | Connectivity model (host/none/NAT) | `--network` flag | Pod network mode | Now (implemented) |
+| **Egress filtering** | Which external hosts the sandbox can reach | iptables/nftables rules, or `slirp4netns` with allowlist | NetworkPolicy with egress rules | Multi-tenant (prevent data exfiltration) |
+| **Inter-sandbox isolation** | Whether task containers can see each other | Separate network namespaces (already true with `--rm`) | NetworkPolicy with pod selector | Multi-tenant |
+| **DNS control** | Custom DNS resolution inside sandbox | `--dns` flag or custom resolv.conf | CoreDNS policy | Cloud (route API calls through gateway) |
+| **Ingress** | Whether sandbox can accept connections | Not applicable (sandboxes don't serve) | Not applicable | N/A |
+
+**Recommendation:** Keep `ContainerSpec.Network` as the coarse mode selector for now. For egress filtering and DNS control, add optional fields to `ContainerSpec` when needed (e.g., `EgressAllowlist []string`, `DNSServers []string`) — backends interpret them or ignore them. Fine-grained network policy is primarily a multi-tenant concern and should be designed in [cloud-multi-tenant.md](cloud-multi-tenant.md) alongside tenant isolation.
 
 ### Dependencies on Other Epics
 
