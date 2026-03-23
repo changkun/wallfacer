@@ -1,39 +1,85 @@
 # Cloud Deployment
 
-**Date:** 2026-02-21
+**Date:** 2026-02-21 | **Revised:** 2026-03-23
 
-## Core Constraints
+## Current State
 
-The app has four hard runtime dependencies that shape cloud deployment:
+Single-user VPS deployment (Option 1 from the original spec) is fully supported today. All necessary features are implemented:
 
-1. **Container runtime** (`podman`/`docker` via `os/exec`) — required for every task execution
-2. **Git** on the host — worktrees, rebase, merge all run on the host
-3. **Workspace directories** must exist on the machine running the Go server
-4. **No built-in authentication** — the HTTP server is open to anyone who can reach port 8080 (addressed by `WALLFACER_SERVER_API_KEY` or a reverse proxy)
+- `-no-browser` flag, `CONTAINER_CMD` env var, `WALLFACER_SERVER_API_KEY` authentication
+- Filesystem storage on persistent disk, systemd unit, Caddy reverse proxy for TLS
+- See the VPS deployment section below for the complete recipe
+
+The remaining cloud deployment work is about **multi-user scalability**: allowing multiple users to each run their own wallfacer instance in the cloud, with shared infrastructure for sandbox execution and data persistence.
 
 ---
 
-## Option 1: VPS + Reverse Proxy (lowest effort)
+## Architecture: Per-User Instances ("Codespaces Model")
 
-Deploy the Go binary to any Linux VM (EC2, Hetzner, DigitalOcean, etc.) with Docker/Podman installed.
+The wallfacer server is deeply stateful: in-memory task maps (`sync.RWMutex`), filesystem-backed store (`data/<workspace-key>/`), local git worktrees, local container runtime via `os/exec`, per-process automation loops (auto-promote, auto-retry, auto-test), and goroutine-tracked background work. Making a single server instance serve multiple users would require replacing nearly every core subsystem.
 
-**What already works:**
-- `-no-browser` flag suppresses the browser launch
-- `CONTAINER_CMD` env var selects the container runtime
-- `WALLFACER_SERVER_API_KEY` provides bearer-token authentication
-- Filesystem storage works on a persistent disk
+Instead, the cloud deployment strategy follows the **Codespaces model**: a control plane provisions a dedicated wallfacer instance per user. Each instance is a full stateful server with its own workspace, storage, and sandbox access. This preserves the existing single-user architecture while enabling multi-user deployment.
 
-**Remaining gaps:**
+```
+                          ┌─────────────────────────┐
+                          │     Control Plane        │
+                          │  (auth, provisioning,    │
+                          │   instance lifecycle)    │
+                          └──────────┬──────────────┘
+                                     │
+              ┌──────────────────────┼──────────────────────┐
+              │                      │                      │
+     ┌────────▼────────┐   ┌────────▼────────┐   ┌────────▼────────┐
+     │  User A Instance │   │  User B Instance │   │  User C Instance │
+     │  wallfacer :8080 │   │  wallfacer :8080 │   │  wallfacer :8080 │
+     │  + local store   │   │  + local store   │   │  + local store   │
+     └────────┬────────┘   └────────┬────────┘   └────────┬────────┘
+              │                      │                      │
+              └──────────────────────┼──────────────────────┘
+                                     │
+                          ┌──────────▼──────────┐
+                          │  Sandbox Cluster     │
+                          │  (K8s Jobs / VMs /   │
+                          │   container pool)    │
+                          └─────────────────────┘
+```
 
-| Gap | Fix |
-|-----|-----|
-| HTTPS | Caddy with automatic TLS, or Nginx + certbot |
-| Workspace repos must be on the VM | `git clone` or rsync repos to the VM at setup |
-| Container runtime | Install Docker or Podman on the VM |
+This decomposes into three cross-cutting epics:
+
+| Epic | Spec | What it covers |
+|------|------|----------------|
+| **Multi-Tenant** | [`cloud-multi-tenant.md`](cloud-multi-tenant.md) | Control plane, user auth, instance provisioning and lifecycle |
+| **Sandbox Executor** | [`cloud-sandbox-executor.md`](cloud-sandbox-executor.md) | Abstract `ContainerExecutor` to support remote backends (K8s Jobs, cloud VMs) |
+| **Cloud Data Storage** | [`cloud-data-storage.md`](cloud-data-storage.md) | Replace filesystem `Store` with pluggable backends (DB, object storage) |
+
+### Dependency Graph
+
+```
+Multi-Tenant ──depends-on──▶ Cloud Data Storage
+     │                              ▲
+     │                              │
+     └──depends-on──▶ Sandbox Executor ─depends-on─┘
+```
+
+- **Cloud Data Storage** is the foundation: the store interface must exist before instances can be provisioned with cloud-backed persistence.
+- **Sandbox Executor** can proceed in parallel once the store interface is defined, since it primarily affects `internal/runner/` rather than `internal/store/`.
+- **Multi-Tenant** is the top-level epic that wires everything together: it needs both cloud storage (for per-user data isolation) and the sandbox executor (for remote container execution).
+
+---
+
+## Single-User VPS Deployment (works today)
+
+Deploy the Go binary to any Linux VM with Docker/Podman installed.
+
+**Setup checklist:**
+
+| Step | How |
+|------|-----|
+| TLS | Caddy with automatic TLS |
+| Workspace repos | `git clone` repos to the VM |
+| Container runtime | Install Docker or Podman |
 | Persistent storage | Mount a volume at `~/.wallfacer/` |
-| Survives reboots | Write a systemd unit file |
-
-Deployable with about a day of infrastructure work. The biggest practical friction is that workspace repos need to exist on the remote machine.
+| Survive reboots | Systemd unit file |
 
 **Architecture:**
 ```
@@ -44,7 +90,7 @@ Internet → Caddy (HTTPS) → wallfacer :8080 (WALLFACER_SERVER_API_KEY)
                     /home/user/repos/<workspace>
 ```
 
-**Systemd unit example:**
+**Systemd unit:**
 ```ini
 [Unit]
 Description=Wallfacer
@@ -60,7 +106,7 @@ Environment=CONTAINER_CMD=docker
 WantedBy=multi-user.target
 ```
 
-**Caddy example:**
+**Caddy:**
 ```
 wallfacer.example.com {
     reverse_proxy localhost:8080
@@ -69,47 +115,16 @@ wallfacer.example.com {
 
 ---
 
-## Option 2: Docker-in-Docker (containerize the server itself)
+## Docker-in-Docker (containerize the server)
 
-Run the wallfacer Go server inside a container, which then needs to spawn task containers.
-
-**Problem:** The server uses `os/exec` to call `podman run`. Inside a container this requires one of:
-- Mounting the Docker socket (`-v /var/run/docker.sock:/var/run/docker.sock`) — gives the container root-equivalent access to the host; a deliberate security trade-off
-- Docker-in-Docker (DinD) with `--privileged` — fragile, not recommended in production
-- Podman rootless inside a container — complex, kernel version dependent
-
-**When to choose this:** Only if a platform (Railway, Render, Fly.io) requires the server to be containerized. The socket-mount approach works but must be a conscious security decision.
-
----
-
-## Option 3: Kubernetes with Job API (cloud-native, major refactoring)
-
-Replace `os/exec` container spawning with the Kubernetes `batch/v1 Job` API. Tasks become K8s Jobs that mount PersistentVolumeClaims for worktrees.
-
-**Required changes:**
-
-| Component | Current | Cloud-native replacement |
-|-----------|---------|--------------------------|
-| Task execution | `podman run` via `os/exec` | `client-go` creating K8s Jobs |
-| Persistence | `~/.wallfacer/data/` filesystem | PostgreSQL or similar |
-| Worktrees | Local git worktrees | Per-task PVCs or init containers |
-| Log streaming | Container stdout via `os/exec` pipe | `k8s.io/client-go` pod log stream |
-| State | In-memory `sync.RWMutex` map | DB-backed, enables replicas |
-
-**Verdict:** Multi-week refactor. Worth it for multi-user, horizontal scaling, or enterprise deployment. For personal/team use, Option 1 is far more practical.
+Only relevant if a platform requires the server itself to be containerized. Requires mounting the Docker socket (`-v /var/run/docker.sock:/var/run/docker.sock`) — a deliberate security trade-off. This approach becomes the default for per-user instances in the multi-tenant model, where each user's wallfacer runs inside a container or pod.
 
 ---
 
 ## Decision Matrix
 
-| Approach | Effort | Auth | Multi-user | Notes |
-|----------|--------|------|------------|-------|
-| **VPS + Caddy** | Low | `WALLFACER_SERVER_API_KEY` + Caddy TLS | No | Works today with minimal infra setup |
-| **Docker-in-Docker** | Medium | Same as VPS | No | Only if platform mandates containerized server |
-| **K8s + Job API** | High | K8s RBAC | Yes | Multi-week refactor; enables horizontal scaling |
-
----
-
-## Recommendation
-
-Start with **Option 1 (VPS + Caddy)**. Authentication is already available via `WALLFACER_SERVER_API_KEY`; the only infrastructure work is TLS (Caddy handles automatically), a systemd unit, and cloning workspace repos to the VM. Migrate to Option 3 only if multi-user or horizontal scaling becomes a real need.
+| Approach | Effort | Auth | Multi-user | When to use |
+|----------|--------|------|------------|-------------|
+| **VPS + Caddy** | Done | `WALLFACER_SERVER_API_KEY` | No | Personal/single-team use today |
+| **Per-user instances** | High | OAuth2/OIDC via control plane | Yes | Multi-user cloud deployment |
+| **Shared stateless server** | Very High | Per-user sessions | Yes | Not recommended — too much refactoring for the benefit |
