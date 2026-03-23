@@ -491,6 +491,10 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		behind := false
 		fetchFailed := false
 		for repoPath, worktreePath := range t.WorktreePaths {
+			if !gitutil.IsGitRepo(repoPath) {
+				// Non-git workspace: no remote to fetch, never behind.
+				continue
+			}
 			if _, err := os.Stat(worktreePath); err != nil {
 				// Worktree directory no longer exists on disk; skip silently.
 				continue
@@ -662,6 +666,10 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 				// Only trigger if the worktree is up to date with the default branch.
 				behind := false
 				for repoPath, worktreePath := range t.WorktreePaths {
+					if !gitutil.IsGitRepo(repoPath) {
+						// Non-git workspace: no remote to be behind.
+						continue
+					}
 					n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
 					if err != nil {
 						logger.Handler.Warn("auto-test: check commits behind",
@@ -869,6 +877,10 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				// Check that all worktrees are up to date and conflict-free.
 				skip := false
 				for repoPath, worktreePath := range t.WorktreePaths {
+					if !gitutil.IsGitRepo(repoPath) {
+						// Non-git workspace: no remote to be behind, no conflicts.
+						continue
+					}
 					if !gitutil.IsGitRepo(worktreePath) {
 						skip = true
 						break
