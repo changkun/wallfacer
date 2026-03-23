@@ -788,8 +788,9 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 		t.Fatalf("task should still be waiting during settle delay, got %s", got.Status)
 	}
 
-	// After the settle delay, auto-submit should act.
-	time.Sleep(constants.WatcherSettleDelay + 500*time.Millisecond)
+	// After the settle delay, auto-submit should act. Use a generous timeout
+	// because git operations in the auto-submit pipeline can be slow on CI.
+	time.Sleep(constants.WatcherSettleDelay + 2*time.Second)
 	got, _ = h.store.GetTask(ctx, task.ID)
 	if got.Status == store.TaskStatusWaiting {
 		t.Error("task should have been submitted after settle delay, still waiting")
