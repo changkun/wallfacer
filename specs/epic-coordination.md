@@ -355,8 +355,6 @@ Mitigation: cap same-epic sibling count. Include the N nearest (by dependency di
 
 ---
 
-## Dependencies on Other Specs
+## Relationship to Other Specs
 
-This spec is **M0** — it precedes and enables all other milestones. No dependencies on M1–M8. Can be implemented against the current codebase.
-
-The planner system is what makes M1–M8 executable at scale: instead of manually creating tasks for each milestone, create a planner task pointing at the spec file.
+This spec is independent of the cloud/platform milestones (M1–M8). It can be implemented against the current codebase at any time. Once in place, it enables automated task decomposition for any spec — create a planner task pointing at a spec file and the system handles the rest.

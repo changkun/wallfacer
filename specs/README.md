@@ -1,14 +1,16 @@
 # Specs
 
-Implementation roadmap for wallfacer. Specs are numbered by milestone order.
+Implementation roadmap for wallfacer. Numbered specs (`01-`–`08-`) form the cloud/platform milestone sequence. Unnumbered specs are core improvements independent of cloud deployment.
 
-## Dependency Graph
+## Core Infrastructure
+
+| Spec | Delivers |
+|------|----------|
+| [epic-coordination.md](epic-coordination.md) | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking. Enables automated decomposition of all milestones below. |
+
+## Cloud/Platform Milestone Graph
 
 ```
-M0: Epic Coordination ─────────────────────────────────────────────
-  (planner tasks, cross-task context, gate tasks, epic progress)
-  Enables automated decomposition of all milestones below.
-
                                 ┌──▶ M3: Container Reuse
                                 │
 M1: Sandbox Backend Interface ──┼──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
@@ -31,7 +33,6 @@ M7: Desktop App ────────────────┘ (ships after
 
 | # | Milestone | Spec | Delivers |
 |---|-----------|------|----------|
-| **M0** | Epic coordination | [00-epic-coordination.md](00-epic-coordination.md) | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking |
 | **M1** | Sandbox backend interface | [01-sandbox-backends.md](01-sandbox-backends.md) | `SandboxBackend`/`SandboxHandle` + `LocalBackend` (pure refactor) |
 | **M2** | Storage backend interface | [02-storage-backends.md](02-storage-backends.md) | `StorageBackend` + `FilesystemBackend` + `TurnOutputWriter` (pure refactor) |
 | **M3** | Container reuse | [03-container-reuse.md](03-container-reuse.md) | Aux worker containers for title/oversight/commit (~10x startup savings) |
@@ -75,8 +76,8 @@ After M2 (store interfaces stable). Independent of M3. Can run in parallel with 
 
 ## Ordering Rationale
 
-- **M0 first or parallel with M1:** Epic coordination has no code dependencies on M1–M8. It can be implemented against the current codebase and then used to decompose M1–M8 into tasks automatically. Alternatively, implement M0 Phase A (board enhancement) first for immediate cross-task context benefits, then M0 Phase B (planner) when ready to automate decomposition.
-- **M1–M2 early:** Pure refactors creating abstraction seams all downstream milestones plug into. Low risk, high leverage.
+- **Epic coordination is independent** of the cloud/platform milestones. Implement it whenever — before, during, or after M1–M8. Once in place, it can automate task decomposition for any milestone.
+- **M1–M2 first:** Pure refactors creating abstraction seams all downstream milestones plug into. Low risk, high leverage.
 - **M3 after M1:** Container reuse modifies the same `internal/runner/` files. Doing it right after M1 avoids revisiting them later.
 - **M2.5 after M2:** Multi-workspace groups modifies store lifecycle; wait for `StorageBackend` interfaces to stabilize. Can run in parallel with M3.
 - **M4–M5 before M6:** Deliver user-visible value with no cloud dependency. Exercise different code paths (`internal/handler/` + `ui/`).
