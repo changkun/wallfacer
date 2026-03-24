@@ -828,7 +828,7 @@ func TestLogBoardManifestSizeWarning_Sorted(t *testing.T) {
 // a temp directory containing board.json with the exact bytes provided.
 func TestWriteBoardDir_CreatesFileWithContent(t *testing.T) {
 	data := []byte(`{"tasks":[], "generated_at":"2024-01-01T00:00:00Z"}`)
-	dir, err := writeBoardDir(data)
+	dir, err := writeBoardDir(data, "")
 	if err != nil {
 		t.Fatalf("writeBoardDir: %v", err)
 	}
@@ -847,7 +847,7 @@ func TestWriteBoardDir_CreatesFileWithContent(t *testing.T) {
 
 // TestWriteBoardDir_EmptyData verifies that writeBoardDir works with minimal data.
 func TestWriteBoardDir_EmptyData(t *testing.T) {
-	dir, err := writeBoardDir([]byte("{}"))
+	dir, err := writeBoardDir([]byte("{}"), "")
 	if err != nil {
 		t.Fatalf("writeBoardDir empty: %v", err)
 	}
@@ -862,7 +862,7 @@ func TestWriteBoardDir_EmptyData(t *testing.T) {
 // TestWriteBoardDir_ReturnsDirPath verifies that the returned path is a valid
 // directory that contains board.json.
 func TestWriteBoardDir_ReturnsDirPath(t *testing.T) {
-	dir, err := writeBoardDir([]byte(`{"ok":true}`))
+	dir, err := writeBoardDir([]byte(`{"ok":true}`), "")
 	if err != nil {
 		t.Fatalf("writeBoardDir: %v", err)
 	}

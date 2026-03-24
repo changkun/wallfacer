@@ -64,6 +64,7 @@ type Interface interface {
 	Command() string
 	SandboxImage() string
 	WorktreesDir() string
+	TmpDir() string
 	EnvFile() string
 	Prompts() *prompts.Manager
 	WorkspaceManager() *workspace.Manager

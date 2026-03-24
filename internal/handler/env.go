@@ -280,6 +280,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		EnvFile:          tempEnvFile,
 		Workspaces:       h.currentWorkspaces(),
 		WorktreesDir:     h.runner.WorktreesDir(),
+		TmpDir:           h.runner.TmpDir(),
 		InstructionsPath: h.currentInstructionsPath(),
 		CodexAuthPath:    h.runner.CodexAuthPath(),
 	})

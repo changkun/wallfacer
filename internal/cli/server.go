@@ -87,6 +87,15 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		logger.Fatal("create worktrees dir", "error", err)
 	}
 
+	// tmpDir is used for ephemeral files that are bind-mounted into containers.
+	// It must live under a path that the container runtime exposes to the host
+	// filesystem (on macOS Docker Desktop this means under $HOME, not $TMPDIR
+	// which resolves to /var/folders/... and is not shared with the VM).
+	tmpDir := filepath.Join(configDir, "tmp")
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		logger.Fatal("create tmp dir", "error", err)
+	}
+
 	if snapshot.InstructionsPath != "" {
 		logger.Main.Info("workspace instructions", "path", snapshot.InstructionsPath)
 	}
@@ -117,6 +126,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		EnvFile:          *envFile,
 		Workspaces:       workspaces,
 		WorktreesDir:     worktreesDir,
+		TmpDir:           tmpDir,
 		InstructionsPath: snapshot.InstructionsPath,
 		CodexAuthPath:    codexAuthPath,
 		ContainerNetwork: envCfg.ContainerNetwork,

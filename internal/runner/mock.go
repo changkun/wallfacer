@@ -196,6 +196,9 @@ func (m *MockRunner) SandboxImage() string { return m.Image }
 // WorktreesDir returns the configured worktrees directory.
 func (m *MockRunner) WorktreesDir() string { return m.WtDir }
 
+// TmpDir returns the base directory for ephemeral container-mounted files.
+func (m *MockRunner) TmpDir() string { return "" }
+
 // EnvFile returns the configured env file path.
 func (m *MockRunner) EnvFile() string { return m.EnvFilePath }
 

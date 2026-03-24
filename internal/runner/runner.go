@@ -234,6 +234,7 @@ type RunnerConfig struct {
 	ContainerNetwork string           // --network value for task containers (empty = read from env file, fallback "host")
 	ContainerCPUs    string           // --cpus value for task containers (empty = read from env file, no limit)
 	ContainerMemory  string           // --memory value for task containers (empty = read from env file, no limit)
+	TmpDir           string           // base dir for ephemeral files bind-mounted into containers (must be Docker-accessible)
 	Prompts          *prompts.Manager // prompt template manager; nil = use prompts.Default
 	WorkspaceManager *workspace.Manager
 	Reg              *metrics.Registry // optional metrics registry; nil disables metric collection
@@ -249,6 +250,7 @@ type Runner struct {
 	envFile                string
 	workspaces             []string
 	worktreesDir           string
+	tmpDir                 string
 	instructionsPath       string
 	workspaceManager       *workspace.Manager
 	codexAuthPath          string
@@ -475,6 +477,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		envFile:          cfg.EnvFile,
 		workspaces:       cfg.Workspaces,
 		worktreesDir:     cfg.WorktreesDir,
+		tmpDir:           cfg.TmpDir,
 		instructionsPath: cfg.InstructionsPath,
 		codexAuthPath:    strings.TrimSpace(cfg.CodexAuthPath),
 		containerNetwork: cfg.ContainerNetwork,
@@ -654,6 +657,11 @@ func (r *Runner) EnvFile() string {
 // WorktreesDir returns the directory where task worktrees are created.
 func (r *Runner) WorktreesDir() string {
 	return r.worktreesDir
+}
+
+// TmpDir returns the base directory for ephemeral files bind-mounted into containers.
+func (r *Runner) TmpDir() string {
+	return r.tmpDir
 }
 
 // InstructionsPath returns the host path mounted as /workspace/AGENTS.md.

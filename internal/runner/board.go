@@ -317,10 +317,12 @@ func logBoardManifestSizeWarning(sizes []struct {
 	logger.Runner.Warn("board manifest is large", args...)
 }
 
-// writeBoardDir writes board.json to a new temp directory and returns the
-// directory path. The caller must defer os.RemoveAll(dir).
-func writeBoardDir(data []byte) (string, error) {
-	dir, err := os.MkdirTemp("", "wallfacer-board-*")
+// writeBoardDir writes board.json to a new temp directory under baseDir and
+// returns the directory path. The caller must defer os.RemoveAll(dir).
+// baseDir must be a path accessible to Docker bind mounts (e.g. under $HOME).
+// When baseDir is empty, os.TempDir() is used as the fallback.
+func writeBoardDir(data []byte, baseDir string) (string, error) {
+	dir, err := os.MkdirTemp(baseDir, "wallfacer-board-*")
 	if err != nil {
 		return "", err
 	}

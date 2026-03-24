@@ -353,7 +353,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	}
 	var boardDir string
 	if boardJSON != nil {
-		boardDir, boardErr = writeBoardDir(boardJSON)
+		boardDir, boardErr = writeBoardDir(boardJSON, r.tmpDir)
 		if boardErr != nil {
 			logger.Runner.Warn("board context write failed", "task", taskID, "error", boardErr)
 		}
