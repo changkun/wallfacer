@@ -26,7 +26,7 @@
   grid-template-columns: 1.2fr 0.8fr;
   gap: 0;
   font-size: 12px;
-  min-height: 380px;
+  height: 520px;
 }
 .ws-picker__browser {
   display: flex;
@@ -34,6 +34,7 @@
   gap: 8px;
   padding: 14px 16px;
   border-right: 1px solid var(--border);
+  min-height: 0;
 }
 .ws-picker__path-row {
   display: flex;
@@ -115,6 +116,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 14px 16px;
+  min-height: 0;
 }
 .ws-picker__selection-header {
   display: flex;
