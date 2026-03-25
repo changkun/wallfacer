@@ -404,11 +404,11 @@ describe("openRaiseLimitInline — uses task(id).update() route helper", () => {
       fetchTasks,
       Routes: RoutesWithoutCollectionUpdate,
       getOpenModalTaskId: vi.fn().mockReturnValue(TASK_ID),
-      // prompt() is used by openRaiseLimitInline to ask for new limits.
-      prompt: vi
+      // showPrompt() is used by openRaiseLimitInline to ask for new limits.
+      showPrompt: vi
         .fn()
-        .mockReturnValueOnce("10.00") // new cost limit
-        .mockReturnValueOnce("50000"), // new token limit
+        .mockResolvedValueOnce("10.00") // new cost limit
+        .mockResolvedValueOnce("50000"), // new token limit
       elements: [["modal-budget-exceeded-banner", banner]],
     });
     ctx.task = RoutesWithoutCollectionUpdate.tasks.task;
