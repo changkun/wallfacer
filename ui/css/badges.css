@@ -66,6 +66,13 @@
   background: #eae8e4;
   color: #888078;
 }
+.badge-blocked,
+.badge-dep-cancelled,
+.badge-deps-met {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .badge-blocked {
   background: #fef3c7;
   color: #92400e;
