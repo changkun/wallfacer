@@ -3,6 +3,10 @@
 **Date:** 2026-03-23
 **Updated:** 2026-03-25
 
+## Already Implemented
+
+- **Interfaces and types** (`internal/runner/backend.go`): `SandboxState` enum (6 states), `SandboxBackend` interface (`Launch`, `List`), `SandboxHandle` interface (`State`, `Stdout`, `Wait`, `Kill`, `Name`), `String()` method. Tests in `backend_test.go`.
+
 ## Problem
 
 The wallfacer runner executes all sandbox containers via `os/exec` calling a local `podman`/`docker` binary (`internal/runner/executor.go`). The `ContainerExecutor` interface passes raw CLI `args []string`, which leaks the podman/docker abstraction. This has two consequences:
@@ -93,21 +97,6 @@ type SandboxHandle interface {
 ---
 
 ## Tasks
-
-### Task 1: Define interfaces and types
-
-**Goal:** Add `SandboxState`, `SandboxBackend`, and `SandboxHandle` as new types. No behavior changes yet.
-
-**Work:**
-1. Create `internal/runner/backend.go` with `SandboxState` enum, `SandboxBackend` interface, and `SandboxHandle` interface (see Target Interfaces above)
-2. Add `String()` method on `SandboxState` for logging
-3. Add unit tests for `SandboxState.String()` and interface compliance (compile-time checks)
-
-**Files:** `internal/runner/backend.go` (new), `internal/runner/backend_test.go` (new)
-
-**Acceptance:** Compiles, tests pass, no existing behavior changes.
-
----
 
 ### Task 2: Implement `LocalBackend.Launch()` with `localHandle`
 
@@ -259,7 +248,7 @@ type SandboxHandle interface {
 
 **Goal:** Implement `K8sBackend` for dispatching sandbox containers as K8s Jobs.
 
-**Depends on:** Tasks 1–9 complete.
+**Depends on:** Tasks 2–9 complete.
 
 **Work:**
 1. Add `internal/runner/backend_k8s.go` implementing `SandboxBackend` via `client-go`
@@ -280,7 +269,7 @@ This task is deliberately left as a single unit — it should be broken down fur
 
 **Goal:** Implement `RemoteDockerBackend` for SSH/HTTPS dispatch to a remote Docker host.
 
-**Depends on:** Tasks 1–9 complete.
+**Depends on:** Tasks 2–9 complete.
 
 **Work:**
 1. Add `internal/runner/backend_remote.go` using Docker client SDK
@@ -295,20 +284,19 @@ Lower priority than K8s. Useful for simple single-host remote setups.
 ## Task Dependency Graph
 
 ```
-Task 1 (interfaces)
-  └→ Task 2 (LocalBackend.Launch)
-  └→ Task 3 (LocalBackend.List)
-       └→ Task 4 (refactor Runner)
-            └→ Task 5 (refactor runContainer)
-                 └→ Task 6 (upgrade registry)
-                      └→ Task 7 (retire ContainerExecutor)
-                           └→ Task 8 (unify log streaming)
-                                └→ Task 9 (env var backend selection)
-                                     └→ Task 10 (K8s backend)
-                                     └→ Task 11 (Remote Docker backend)
+Task 2 (LocalBackend.Launch)  ─┐
+Task 3 (LocalBackend.List)    ─┤
+                               └→ Task 4 (refactor Runner)
+                                    └→ Task 5 (refactor runContainer)
+                                         └→ Task 6 (upgrade registry)
+                                              └→ Task 7 (retire ContainerExecutor)
+                                                   └→ Task 8 (unify log streaming)
+                                                        └→ Task 9 (env var backend selection)
+                                                             └→ Task 10 (K8s backend)
+                                                             └→ Task 11 (Remote Docker backend)
 ```
 
-Tasks 2 and 3 can run in parallel after Task 1. Tasks 10 and 11 can run in parallel after Task 9. All other tasks are sequential.
+Tasks 2 and 3 can run in parallel (interfaces from Task 1 are already implemented). Tasks 10 and 11 can run in parallel after Task 9. All other tasks are sequential.
 
 ---
 
