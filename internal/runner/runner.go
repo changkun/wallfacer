@@ -129,57 +129,10 @@ func parseContainerList(out []byte) ([]containerJSON, error) {
 	return containers, nil
 }
 
-// ListContainers runs `<runtime> ps -a --filter name=wallfacer --format json`
-// and returns structured info for each matching container.
-// Supports both Podman and Docker JSON output formats.
+// ListContainers returns structured info for each wallfacer container known
+// to the sandbox backend. Supports both Podman and Docker JSON output formats.
 func (r *Runner) ListContainers() ([]ContainerInfo, error) {
-	out, err := cmdexec.New(r.command, "ps", "-a",
-		"--filter", "name=wallfacer",
-		"--format", "json",
-	).OutputBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	raw, err := parseContainerList(out)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]ContainerInfo, 0, len(raw))
-	for _, c := range raw {
-		name, err := c.name()
-		if err != nil {
-			logger.Runner.Warn("ListContainers: skipping malformed container entry", "error", err)
-			continue
-		}
-
-		// Primary: extract task UUID from the wallfacer.task.id label.
-		// This works regardless of the container name format.
-		taskID := ""
-		if c.Labels != nil {
-			taskID = c.Labels["wallfacer.task.id"]
-		}
-		// Fallback for containers created without labels (old format wallfacer-<uuid>):
-		// try stripping the "wallfacer-" prefix and check if the remainder is a UUID.
-		if taskID == "" {
-			candidate := strings.TrimPrefix(name, "wallfacer-")
-			if candidate != name && isUUID(candidate) {
-				taskID = candidate
-			}
-		}
-
-		result = append(result, ContainerInfo{
-			ID:        c.ID,
-			Name:      name,
-			TaskID:    taskID,
-			Image:     c.Image,
-			State:     c.State,
-			Status:    c.Status,
-			CreatedAt: c.createdUnix(),
-		})
-	}
-	return result, nil
+	return r.backend.List(context.Background())
 }
 
 // isUUID returns true if s looks like a standard UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).
@@ -265,7 +218,8 @@ type Runner struct {
 	ideateContainer        *containerRegistry      // singleton: ideation container name
 	oversightMu            keyedmu.Map[string]     // per-task mutex for serializing oversight generation
 	containerCB            *circuitbreaker.Breaker // circuit breaker for container launch operations
-	executor               ContainerExecutor       // abstracts container runtime calls for testing
+	backend                SandboxBackend          // pluggable sandbox backend (local podman/docker, future: k8s)
+	executor               ContainerExecutor       // abstracts container runtime calls for testing (deprecated: use backend)
 	backgroundWg           trackedwg.WaitGroup     // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
@@ -509,6 +463,7 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		}
 	}
 	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
+	r.backend = NewLocalBackend(r.command)
 	r.executor = &osContainerExecutor{command: r.command}
 	r.reg = cfg.Reg
 
