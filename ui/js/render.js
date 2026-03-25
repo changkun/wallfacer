@@ -265,13 +265,13 @@ function renderDependencyBadge(t) {
   var depIds = getTaskDependencyIds(t);
   if (depIds.length === 0) return "";
   if (hasCancelledOrMissingDep(t)) {
-    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700 font-medium badge badge-dep-cancelled" title="A dependency was cancelled or removed; this task may be unblocked after the next sync">${_dependencyBadgeSvg("blocked")}<span>dependency cancelled</span></span>`;
+    return `<span class="inline-flex items-center gap-1 badge badge-dep-cancelled" title="A dependency was cancelled or removed; this task may be unblocked after the next sync">${_dependencyBadgeSvg("blocked")}<span>dependency cancelled</span></span>`;
   }
   var unmetCount = getUnmetDependencyCount(t);
   if (unmetCount > 0) {
-    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-700 font-medium badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">${_dependencyBadgeSvg("blocked")}<span>${depIds.length} dep${depIds.length !== 1 ? "s" : ""}</span></span>`;
+    return `<span class="inline-flex items-center gap-1 badge badge-blocked" title="Blocked by: ${escapeHtml(getBlockingTaskNames(t))}">${_dependencyBadgeSvg("blocked")}<span>${depIds.length} dep${depIds.length !== 1 ? "s" : ""}</span></span>`;
   }
-  return `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-emerald-100 text-emerald-700 font-medium badge badge-deps-met" title="All dependencies satisfied; ready for promotion">${_dependencyBadgeSvg("ready")}<span>ready</span></span>`;
+  return `<span class="inline-flex items-center gap-1 badge badge-deps-met" title="All dependencies satisfied; ready for promotion">${_dependencyBadgeSvg("ready")}<span>ready</span></span>`;
 }
 
 function focusFirstCardInColumn(status) {

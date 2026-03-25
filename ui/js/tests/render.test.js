@@ -821,7 +821,6 @@ describe("render.js backlog dependency badge", () => {
     ctx.updateCard(card, task, 0);
 
     expect(card.innerHTML).toContain("badge-blocked");
-    expect(card.innerHTML).toContain("bg-amber-100");
     expect(card.innerHTML).toContain("1 dep");
     expect(card.innerHTML).toContain("<svg");
   });
@@ -853,7 +852,6 @@ describe("render.js backlog dependency badge", () => {
     ctx.updateCard(card, task, 0);
 
     expect(card.innerHTML).toContain("badge-deps-met");
-    expect(card.innerHTML).toContain("bg-emerald-100");
     expect(card.innerHTML).toContain("ready");
   });
 
