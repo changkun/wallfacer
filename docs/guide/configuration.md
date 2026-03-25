@@ -209,7 +209,7 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 
 ### 📝 System Prompt Templates
 
-Wallfacer uses seven built-in Go template files to instruct agent activities:
+Wallfacer uses eight built-in Go template files to instruct agent activities:
 
 | Template | Purpose |
 |---|---|
@@ -220,6 +220,7 @@ Wallfacer uses seven built-in Go template files to instruct agent activities:
 | `oversight.tmpl` | Oversight summary generation |
 | `ideation.tmpl` | Brainstorm/ideation agent |
 | `conflict.tmpl` | Merge conflict resolution |
+| `instructions.tmpl` | Workspace instructions (AGENTS.md) generation |
 
 #### Viewing and Editing
 

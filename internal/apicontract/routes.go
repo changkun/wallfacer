@@ -211,7 +211,7 @@ var Routes = []Route{
 	{
 		Method: http.MethodGet, Pattern: "/api/system-prompts", Name: "ListSystemPrompts",
 		JSName:      "list",
-		Description: "List all 7 built-in system prompt templates with override status and content.",
+		Description: "List all 8 built-in system prompt templates with override status and content.",
 		Tags:        []string{"system-prompts"},
 	},
 	{
@@ -386,7 +386,7 @@ var Routes = []Route{
 	{
 		Method: http.MethodDelete, Pattern: "/api/tasks/{id}", Name: "DeleteTask",
 		JSName:      "delete",
-		Description: "Permanently delete a task and its data.",
+		Description: "Soft-delete a task (tombstone); data retained within retention window.",
 		Tags:        []string{"tasks"},
 	},
 	{

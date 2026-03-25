@@ -75,7 +75,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/tasks/deleted` | List soft-deleted (tombstoned) tasks within retention window |
 | **Task instance operations ({id})** | |
 | `PATCH /api/tasks/{id}` | Update task fields: status, prompt, goal, timeout, sandbox, dependencies, fresh_start |
-| `DELETE /api/tasks/{id}` | Permanently delete a task and its data |
+| `DELETE /api/tasks/{id}` | Soft-delete a task (tombstone); data retained within retention window |
 | `GET /api/tasks/{id}/events` | Task event timeline; supports cursor pagination (`after`, `limit`) and type filtering (`types`) |
 | `POST /api/tasks/{id}/feedback` | Submit a feedback message to a waiting task |
 | `POST /api/tasks/{id}/done` | Mark a waiting task as done and trigger commit-and-push |

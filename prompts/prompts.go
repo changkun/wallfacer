@@ -101,7 +101,7 @@ var knownNames = []string{
 	"instructions",
 }
 
-// Manager manages the seven built-in prompt templates with optional
+// Manager manages the eight built-in prompt templates with optional
 // per-user overrides stored in userDir.
 //
 // On each render call the Manager checks userDir/<apiName>.tmpl; if the file

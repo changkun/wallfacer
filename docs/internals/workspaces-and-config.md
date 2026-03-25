@@ -21,7 +21,7 @@ type Snapshot struct {
 
 ### 🔑 Workspace Key Hashing
 
-Each unique combination of workspace directories is identified by a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This is computed by `instructions.Key()` (`internal/instructions/instructions.go`):
+Each unique combination of workspace directories is identified by a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This is computed by `prompts.InstructionsKey()` (`prompts/instructions.go`):
 
 ```go
 func Key(workspaces []string) string {
@@ -61,7 +61,7 @@ flowchart TD
     Same -->|yes| NoOp["Return current snapshot"]
     Same -->|no| Build["Build candidate snapshot"]
     Build --> OpenStore["Open new scoped store<br/>(data/<key>/)"]
-    OpenStore --> Instructions["Ensure AGENTS.md exists<br/>(instructions.Ensure)"]
+    OpenStore --> Instructions["Ensure AGENTS.md exists<br/>(prompts.EnsureInstructions)"]
     Instructions --> Groups["Upsert workspace group<br/>(workspace-groups.json)"]
     Groups --> Env["Persist WALLFACER_WORKSPACES<br/>to .env file"]
     Env --> Swap["Atomic swap under write lock:<br/>increment generation, install snapshot"]
@@ -85,7 +85,7 @@ The filename is derived from the same SHA-256 fingerprint used for workspace sco
 
 ### 📄 Default Template Generation
 
-When `instructions.Ensure()` is called and no file exists yet, `BuildContent()` (`internal/instructions/instructions.go`) assembles the initial content from:
+When `prompts.EnsureInstructions()` is called and no file exists yet, `BuildInstructionsContent()` (`prompts/instructions.go`) assembles the initial content from:
 
 1. **Default template** -- general guidance for agents (complete tasks as described, make focused changes, run tests, write clear commit messages, etc.). Also includes board context documentation explaining `/workspace/.tasks/board.json` and sibling worktree paths.
 
@@ -95,7 +95,7 @@ When `instructions.Ensure()` is called and no file exists yet, `BuildContent()` 
 
 ### 🔄 Re-init Logic
 
-`instructions.Reinit()` regenerates the file from scratch using `BuildContent()`, overwriting any user edits. This is triggered by **Settings > AGENTS.md > Re-init** in the UI, which calls `POST /api/instructions/reinit`. The re-init picks up any new `AGENTS.md` / `CLAUDE.md` files that may have appeared in the workspaces since the last generation.
+`prompts.ReinitInstructions()` regenerates the file from scratch using `BuildInstructionsContent()`, overwriting any user edits. This is triggered by **Settings > AGENTS.md > Re-init** in the UI, which calls `POST /api/instructions/reinit`. The re-init picks up any new `AGENTS.md` / `CLAUDE.md` files that may have appeared in the workspaces since the last generation.
 
 ### 📂 Mount Path
 
@@ -207,7 +207,7 @@ Watchers (auto-promoter, auto-retrier, etc.) do not directly subscribe to env fi
 
 ### 📦 Embedded Templates
 
-Seven prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`prompts/prompts.go`):
+Eight prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`prompts/prompts.go`):
 
 | Embedded file | API name | Used for |
 |---|---|---|
@@ -218,6 +218,7 @@ Seven prompt templates are embedded into the binary at compile time via `go:embe
 | `oversight.tmpl` | `oversight` | Oversight summarization of task activity |
 | `ideation.tmpl` | `ideation` | Brainstorm/ideation agent |
 | `conflict.tmpl` | `conflict_resolution` | Rebase conflict resolution agent |
+| `instructions.tmpl` | `instructions` | Workspace instructions (AGENTS.md) generation |
 
 ### 💾 Override Storage
 
@@ -248,6 +249,10 @@ Key design: a broken override never crashes the server. Parse or execution error
 All templates (embedded and override) share a single `FuncMap`:
 
 - `add(a, b int) int` — integer addition, used for 1-based indexing in templates (e.g., `{{add $i 1}}`).
+- `mul(a, b float64) float64` — floating-point multiplication.
+- `sub(a, b float64) float64` — floating-point subtraction.
+- `exploitCount(ratio float64, total int) int` — compute exploitation count for ideation.
+- `exploreCount(ratio float64, total int) int` — compute exploration count for ideation.
 
 ### ✅ Validation
 
@@ -261,7 +266,7 @@ All templates (embedded and override) share a single `FuncMap`:
 
 | Method | Path | Behavior |
 |---|---|---|
-| `GET /api/system-prompts` | Lists all 7 templates with their content and override status |
+| `GET /api/system-prompts` | Lists all 8 templates with their content and override status |
 | `GET /api/system-prompts/{name}` | Returns a single template by API name |
 | `PUT /api/system-prompts/{name}` | Validates and writes override to `~/.wallfacer/prompts/<name>.tmpl` |
 | `DELETE /api/system-prompts/{name}` | Deletes the override file, restoring the embedded default |
