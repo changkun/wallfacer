@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -1436,6 +1437,103 @@ func TestTryAutoSubmit_LocalRepoIgnoresStaleFetchError(t *testing.T) {
 	// No session → task should go directly to done.
 	if got.Status != store.TaskStatusDone {
 		t.Errorf("expected local-repo task to reach done despite stale fetch error, got %s", got.Status)
+	}
+}
+
+// TestTryAutoPromote_PromotesMultipleTasks verifies that a single call to
+// tryAutoPromote promotes all eligible backlog tasks up to the concurrency
+// limit, rather than only promoting one task per watcher cycle.
+//
+// This is a regression test for the bug where tryAutoPromote's Phase1 returned
+// only a single best candidate, causing the promoter to advance one task per
+// 60-second tick even when multiple slots were available.
+func TestTryAutoPromote_PromotesMultipleTasks(t *testing.T) {
+	h := newTestHandler(t)
+	h.SetAutopilot(true)
+
+	ctx := context.Background()
+
+	// Create 3 backlog tasks.
+	var taskIDs []uuid.UUID
+	for i := 0; i < 3; i++ {
+		task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+			Prompt:  fmt.Sprintf("task %d", i),
+			Timeout: 15,
+		})
+		if err != nil {
+			t.Fatalf("CreateTask[%d]: %v", i, err)
+		}
+		taskIDs = append(taskIDs, task.ID)
+	}
+
+	// Default max concurrent is 5, so all 3 should be promoted in one call.
+	h.tryAutoPromote(ctx)
+
+	for i, id := range taskIDs {
+		got, err := h.store.GetTask(ctx, id)
+		if err != nil {
+			t.Fatalf("GetTask[%d]: %v", i, err)
+		}
+		if got.Status != store.TaskStatusInProgress {
+			t.Errorf("task[%d] status = %q, want in_progress — tryAutoPromote must promote all eligible tasks in one pass", i, got.Status)
+		}
+	}
+}
+
+// TestTryAutoPromote_RespectsCapacityLimit verifies that tryAutoPromote does
+// not exceed the concurrency limit when more backlog tasks exist than available
+// slots.
+func TestTryAutoPromote_RespectsCapacityLimit(t *testing.T) {
+	h, envPath := newTestHandlerWithEnv(t)
+	h.SetAutopilot(true)
+
+	ctx := context.Background()
+
+	// Set max parallel to 2.
+	limit := "2"
+	if err := envconfig.Update(envPath, envconfig.Updates{MaxParallel: &limit}); err != nil {
+		t.Fatalf("envconfig.Update: %v", err)
+	}
+	h.cachedMaxParallel.Invalidate()
+
+	// Create 5 backlog tasks.
+	var taskIDs []uuid.UUID
+	for i := 0; i < 5; i++ {
+		task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{
+			Prompt:  fmt.Sprintf("task %d", i),
+			Timeout: 15,
+		})
+		if err != nil {
+			t.Fatalf("CreateTask[%d]: %v", i, err)
+		}
+		taskIDs = append(taskIDs, task.ID)
+	}
+
+	h.tryAutoPromote(ctx)
+
+	promoted := 0
+	backlog := 0
+	for i, id := range taskIDs {
+		got, err := h.store.GetTask(ctx, id)
+		if err != nil {
+			t.Fatalf("GetTask[%d]: %v", i, err)
+		}
+		switch got.Status {
+		case store.TaskStatusInProgress:
+			promoted++
+		case store.TaskStatusBacklog:
+			backlog++
+		default:
+			// Runner may transition tasks to failed quickly in test env.
+			promoted++
+		}
+	}
+
+	if promoted != 2 {
+		t.Errorf("promoted = %d, want 2 (max_parallel=2)", promoted)
+	}
+	if backlog != 3 {
+		t.Errorf("backlog = %d, want 3 remaining", backlog)
 	}
 }
 

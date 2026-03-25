@@ -188,20 +188,29 @@ func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) 
 	return dfs(start)
 }
 
+// autoPromoteCandidate holds a task eligible for auto-promotion and whether it
+// is a resume (waiting task with failed-test feedback) vs a fresh backlog promote.
+type autoPromoteCandidate struct {
+	task     store.Task
+	isResume bool
+	feedback string
+}
+
 // tryAutoPromote checks if there is capacity to run more tasks and promotes
-// the highest-priority (lowest position) backlog task if so.
+// backlog tasks up to the concurrency limit in a single pass.
 // When autopilot is disabled, no promotion happens.
 //
 // Concurrency design: two-phase protocol via runTwoPhase.
 //
 // Phase 1 (no lock): call store.ListTasksByStatus, compute the regular in-progress
-// count, and find the best backlog candidate. AreDependenciesSatisfied may do
+// count, and collect all eligible candidates. AreDependenciesSatisfied may do
 // disk I/O here; we must not hold promoteMu during these potentially slow
 // operations so that a concurrent tryAutoPromote call (or tryAutoTest) can
 // proceed in parallel.
 //
 // Phase 2 (under promoteMu): re-count to pick up any state changes that
-// happened during Phase 1, re-check capacity, then promote.
+// happened during Phase 1, re-check capacity, then promote all candidates
+// that still fit within the concurrency limit.
 func (h *Handler) tryAutoPromote(ctx context.Context) {
 	if !h.AutopilotEnabled() {
 		return
@@ -210,12 +219,8 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		return
 	}
 
-	type autoResumeCandidate struct {
-		task     store.Task
-		feedback string
-	}
-
-	var resumeCandidate *autoResumeCandidate
+	// candidates is populated by Phase1 and consumed by Phase2 via closure.
+	var candidates []autoPromoteCandidate
 
 	runTwoPhase(ctx, &promoteMu, TwoPhaseWatcherConfig{
 		Name: "auto-promote",
@@ -223,7 +228,9 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			h.breakers["auto-promote"].recordFailure(nil, err.Error())
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
-			// Phase 1 (no lock): build candidate without holding promoteMu.
+			// Phase 1 (no lock): build candidate list without holding promoteMu.
+
+			// Check for auto-resume candidates first (waiting tasks with failed test feedback).
 			waitingTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
 			if err != nil {
 				return nil, err
@@ -242,149 +249,168 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 						"task", t.ID, "test_fail_count", t.TestFailCount, "max", constants.MaxTestFailRetries)
 					continue
 				}
-				if resumeCandidate == nil || t.Position < resumeCandidate.task.Position {
-					cp := *t
-					resumeCandidate = &autoResumeCandidate{
-						task:     cp,
-						feedback: t.PendingTestFeedback,
-					}
-				}
-			}
-			if resumeCandidate != nil {
-				return &resumeCandidate.task, nil
+				candidates = append(candidates, autoPromoteCandidate{
+					task:     *t,
+					isResume: true,
+					feedback: t.PendingTestFeedback,
+				})
 			}
 
+			// Check available capacity for backlog promotion.
 			regularInProgress := h.store.CountRegularInProgress()
-			if regularInProgress >= h.maxConcurrentTasks() {
+			availableSlots := h.maxConcurrentTasks() - regularInProgress
+			if availableSlots <= 0 && len(candidates) == 0 {
 				h.incAutopilotAction("auto_promoter", "skipped_capacity")
 				return nil, nil
 			}
 
-			backlogTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusBacklog)
-			if err != nil {
-				return nil, err
+			if availableSlots > 0 {
+				backlogTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusBacklog)
+				if err != nil {
+					return nil, err
+				}
+
+				type cpCandidate struct {
+					task  store.Task
+					score int
+				}
+				var cpCandidates []cpCandidate
+				var nextScheduled *time.Time
+				for i := range backlogTasks {
+					t := &backlogTasks[i]
+					if t.Kind == store.TaskKindIdeaAgent {
+						continue
+					}
+					if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
+						h.incAutopilotAction("auto_promoter", "skipped_scheduled")
+						if nextScheduled == nil || t.ScheduledAt.Before(*nextScheduled) {
+							nextScheduled = t.ScheduledAt
+						}
+						continue
+					}
+					satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
+					if err != nil || !satisfied {
+						h.incAutopilotAction("auto_promoter", "skipped_dependency")
+						continue
+					}
+					cpCandidates = append(cpCandidates, cpCandidate{task: *t, score: h.store.CriticalPathScore(t.ID)})
+				}
+				// Arm a precise timer for the soonest scheduled task so it is
+				// promoted within milliseconds of its due time rather than waiting
+				// for the next 60-second ticker tick.
+				if nextScheduled != nil {
+					h.ensureScheduledPromoteTrigger(ctx, *nextScheduled)
+				}
+				if len(cpCandidates) > 0 {
+					slices.SortFunc(cpCandidates, func(a, b cpCandidate) int {
+						if c := cmp.Compare(b.score, a.score); c != 0 {
+							return c
+						}
+						if c := cmp.Compare(a.task.Position, b.task.Position); c != 0 {
+							return c
+						}
+						return a.task.CreatedAt.Compare(b.task.CreatedAt)
+					})
+					for _, cp := range cpCandidates {
+						if availableSlots <= 0 {
+							break
+						}
+						candidates = append(candidates, autoPromoteCandidate{task: cp.task})
+						availableSlots--
+					}
+				}
 			}
 
-			type cpCandidate struct {
-				task  store.Task
-				score int
-			}
-			var cpCandidates []cpCandidate
-			var nextScheduled *time.Time
-			for i := range backlogTasks {
-				t := &backlogTasks[i]
-				if t.Kind == store.TaskKindIdeaAgent {
-					continue
-				}
-				if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
-					h.incAutopilotAction("auto_promoter", "skipped_scheduled")
-					if nextScheduled == nil || t.ScheduledAt.Before(*nextScheduled) {
-						nextScheduled = t.ScheduledAt
-					}
-					continue
-				}
-				satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
-				if err != nil || !satisfied {
-					h.incAutopilotAction("auto_promoter", "skipped_dependency")
-					continue
-				}
-				cpCandidates = append(cpCandidates, cpCandidate{task: *t, score: h.store.CriticalPathScore(t.ID)})
-			}
-			// Arm a precise timer for the soonest scheduled task so it is
-			// promoted within milliseconds of its due time rather than waiting
-			// for the next 60-second ticker tick.
-			if nextScheduled != nil {
-				h.ensureScheduledPromoteTrigger(ctx, *nextScheduled)
-			}
-			if len(cpCandidates) == 0 {
+			if len(candidates) == 0 {
 				return nil, nil
 			}
-			slices.SortFunc(cpCandidates, func(a, b cpCandidate) int {
-				if c := cmp.Compare(b.score, a.score); c != 0 {
-					return c
-				}
-				if c := cmp.Compare(a.task.Position, b.task.Position); c != 0 {
-					return c
-				}
-				return a.task.CreatedAt.Compare(b.task.CreatedAt)
-			})
-			best := cpCandidates[0].task
-			return &best, nil
+			// Return first candidate as signal that there is at least one eligible task.
+			return &candidates[0].task, nil
 		},
 		AfterPhase1: h.testPhase1Done,
 		OnPhase2Miss: func(_ *store.Task) {
 			h.incAutopilotPhase2Miss("auto_promoter")
 		},
-		Phase2: func(ctx context.Context, candidate *store.Task) (bool, error) {
-			if resumeCandidate != nil && candidate != nil && candidate.ID == resumeCandidate.task.ID {
-				freshTask, err := h.store.GetTask(ctx, candidate.ID)
-				if err != nil || freshTask == nil {
-					return false, nil
-				}
-				if freshTask.Status != store.TaskStatusWaiting || freshTask.IsTestRun || freshTask.LastTestResult != "fail" || freshTask.PendingTestFeedback == "" {
-					return false, nil
-				}
-				if freshTask.SessionID == nil || *freshTask.SessionID == "" {
-					return false, nil
-				}
-				if freshTask.TestFailCount >= constants.MaxTestFailRetries {
-					logger.Handler.Info("auto-promote: test fail cap reached, stopping auto-resume",
-						"task", freshTask.ID, "test_fail_count", freshTask.TestFailCount)
-					h.insertEventOrLog(ctx, freshTask.ID, store.EventTypeSystem, map[string]string{
-						"result": fmt.Sprintf("Auto-resume halted: %d consecutive test failures (cap: %d). Manual feedback required to continue.", freshTask.TestFailCount, constants.MaxTestFailRetries),
-					})
-					return false, nil
+		Phase2: func(ctx context.Context, _ *store.Task) (bool, error) {
+			// Phase 2 (under promoteMu): process all collected candidates.
+			promoted := false
+
+			for _, c := range candidates {
+				if c.isResume {
+					// Auto-resume: re-verify eligibility with fresh state.
+					freshTask, err := h.store.GetTask(ctx, c.task.ID)
+					if err != nil || freshTask == nil {
+						continue
+					}
+					if freshTask.Status != store.TaskStatusWaiting || freshTask.IsTestRun || freshTask.LastTestResult != "fail" || freshTask.PendingTestFeedback == "" {
+						continue
+					}
+					if freshTask.SessionID == nil || *freshTask.SessionID == "" {
+						continue
+					}
+					if freshTask.TestFailCount >= constants.MaxTestFailRetries {
+						logger.Handler.Info("auto-promote: test fail cap reached, stopping auto-resume",
+							"task", freshTask.ID, "test_fail_count", freshTask.TestFailCount)
+						h.insertEventOrLog(ctx, freshTask.ID, store.EventTypeSystem, map[string]string{
+							"result": fmt.Sprintf("Auto-resume halted: %d consecutive test failures (cap: %d). Manual feedback required to continue.", freshTask.TestFailCount, constants.MaxTestFailRetries),
+						})
+						continue
+					}
+
+					logger.Handler.Info("auto-promote: resuming waiting task from failed test feedback",
+						"task", freshTask.ID)
+					if err := h.resumeWaitingTaskWithFeedbackLocked(ctx, freshTask, freshTask.PendingTestFeedback, store.TriggerFeedback, "Autopilot: resuming task with failed test feedback."); err != nil {
+						logger.Handler.Error("auto-promote resume failed test feedback", "task", freshTask.ID, "error", err)
+						h.breakers["auto-promote"].recordFailure(&freshTask.ID, err.Error())
+						continue
+					}
+					h.incAutopilotAction("auto_promoter", "resumed_failed_test")
+					h.breakers["auto-promote"].recordSuccess()
+					promoted = true
+					continue
 				}
 
-				logger.Handler.Info("auto-promote: resuming waiting task from failed test feedback",
-					"task", freshTask.ID)
-				if err := h.resumeWaitingTaskWithFeedbackLocked(ctx, freshTask, freshTask.PendingTestFeedback, store.TriggerFeedback, "Autopilot: resuming task with failed test feedback."); err != nil {
-					logger.Handler.Error("auto-promote resume failed test feedback", "task", freshTask.ID, "error", err)
-					h.breakers["auto-promote"].recordFailure(&freshTask.ID, err.Error())
-					return false, nil
+				// Backlog promotion: re-verify capacity with a fresh count.
+				// Re-read in-progress count each iteration; prior iterations may
+				// have promoted tasks, increasing the count.
+				freshInProgress := h.store.CountRegularInProgress()
+				if freshInProgress >= h.maxConcurrentTasks() {
+					h.incAutopilotAction("auto_promoter", "skipped_capacity")
+					break
 				}
-				h.incAutopilotAction("auto_promoter", "resumed_failed_test")
+
+				// Abort promotion when the container runtime is known-unavailable.
+				// Without this guard, slot openings caused by failures would trigger
+				// back-to-back promotions that all immediately fail, cascading across
+				// every backlog task.
+				if !h.runner.ContainerCircuitAllow() {
+					logger.Handler.Warn("auto-promote skipped: container circuit breaker open")
+					break
+				}
+
+				logger.Handler.Info("auto-promoting backlog task",
+					"task", c.task.ID, "position", c.task.Position,
+					"in_progress", freshInProgress)
+
+				if err := h.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
+					logger.Handler.Error("auto-promote status update", "task", c.task.ID, "error", err)
+					h.breakers["auto-promote"].recordFailure(&c.task.ID, err.Error())
+					continue
+				}
+				h.incAutopilotAction("auto_promoter", "promoted")
+				h.insertEventOrLog(ctx, c.task.ID, store.EventTypeStateChange,
+					store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusInProgress, store.TriggerAutoPromote, nil))
+
+				sessionID := ""
+				if !c.task.FreshStart && c.task.SessionID != nil {
+					sessionID = *c.task.SessionID
+				}
+				h.runner.RunBackground(c.task.ID, c.task.Prompt, sessionID, false)
 				h.breakers["auto-promote"].recordSuccess()
-				return true, nil
+				promoted = true
 			}
 
-			// Phase 2 (under promoteMu): re-verify capacity with a fresh count and promote.
-			// Re-read in-progress count; state may have changed during Phase 1 I/O.
-			freshInProgress := h.store.CountRegularInProgress()
-			if freshInProgress >= h.maxConcurrentTasks() {
-				h.incAutopilotAction("auto_promoter", "skipped_capacity")
-				return false, nil
-			}
-
-			// Abort promotion when the container runtime is known-unavailable.
-			// Without this guard, slot openings caused by failures would trigger
-			// back-to-back promotions that all immediately fail, cascading across
-			// every backlog task.
-			if !h.runner.ContainerCircuitAllow() {
-				logger.Handler.Warn("auto-promote skipped: container circuit breaker open")
-				return false, nil
-			}
-
-			logger.Handler.Info("auto-promoting backlog task",
-				"task", candidate.ID, "position", candidate.Position,
-				"in_progress", freshInProgress)
-
-			if err := h.store.UpdateTaskStatus(ctx, candidate.ID, store.TaskStatusInProgress); err != nil {
-				logger.Handler.Error("auto-promote status update", "task", candidate.ID, "error", err)
-				h.breakers["auto-promote"].recordFailure(&candidate.ID, err.Error())
-				return false, nil
-			}
-			h.incAutopilotAction("auto_promoter", "promoted")
-			h.insertEventOrLog(ctx, candidate.ID, store.EventTypeStateChange,
-				store.NewStateChangeData(store.TaskStatusBacklog, store.TaskStatusInProgress, store.TriggerAutoPromote, nil))
-
-			sessionID := ""
-			if !candidate.FreshStart && candidate.SessionID != nil {
-				sessionID = *candidate.SessionID
-			}
-			h.runner.RunBackground(candidate.ID, candidate.Prompt, sessionID, false)
-			h.breakers["auto-promote"].recordSuccess()
-			return true, nil
+			return promoted, nil
 		},
 	})
 }
