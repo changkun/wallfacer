@@ -150,7 +150,7 @@ async function openWorkspaceFolder(path) {
 }
 
 function renderWorkspaces() {
-  const el = document.getElementById("workspace-group-tab-workspaces");
+  const el = document.getElementById("workspace-git-bar");
   if (!el) return;
   if (!gitStatuses || gitStatuses.length === 0) {
     el.innerHTML = (activeWorkspaces || [])

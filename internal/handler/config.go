@@ -100,7 +100,22 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	}
 	groups, _ := workspace.LoadGroups(h.configDir)
 	if len(workspaces) > 0 {
-		groups = workspace.NormalizeGroups(append([]workspace.Group{{Workspaces: workspaces}}, groups...))
+		key := workspace.GroupKey(workspaces)
+		found := false
+		for i, g := range groups {
+			if workspace.GroupKey(g.Workspaces) == key {
+				// Promote existing group to front, preserving its Name.
+				promoted := g
+				promoted.Workspaces = workspaces
+				groups = append([]workspace.Group{promoted}, append(groups[:i], groups[i+1:]...)...)
+				found = true
+				break
+			}
+		}
+		if !found {
+			groups = append([]workspace.Group{{Workspaces: workspaces}}, groups...)
+		}
+		groups = workspace.NormalizeGroups(groups)
 	}
 	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-refine"}
 	watcherHealth := make([]watcherHealthEntry, 0, len(watcherNames))

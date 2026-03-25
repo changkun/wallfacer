@@ -159,9 +159,9 @@ async function loadImageStatus() {
 // Deletes a cached sandbox image.
 async function deleteSandboxImage(sandboxType) {
   if (
-    !confirm(
+    !(await showConfirm(
       "Remove the " + sandboxType + " sandbox image? You can re-pull it later.",
-    )
+    ))
   )
     return;
   try {

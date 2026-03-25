@@ -1,0 +1,25 @@
+<!-- Prompt Modal -->
+<div
+  id="prompt-modal"
+  class="modal-overlay fixed inset-0 z-[60] hidden items-center justify-center p-4"
+>
+  <div class="modal-card" style="max-width: 420px; width: 100%">
+    <div class="p-6">
+      <p
+        id="prompt-message"
+        class="text-sm"
+        style="color: var(--text-primary); margin: 0 0 12px; line-height: 1.5"
+      ></p>
+      <input
+        id="prompt-input"
+        type="text"
+        class="field"
+        style="width: 100%; box-sizing: border-box; font-size: 13px; padding: 6px 10px; margin-bottom: 16px"
+      />
+      <div style="display: flex; justify-content: flex-end; gap: 8px">
+        <button id="prompt-cancel-btn" class="btn btn-ghost">Cancel</button>
+        <button id="prompt-ok-btn" class="btn btn-accent">OK</button>
+      </div>
+    </div>
+  </div>
+</div>

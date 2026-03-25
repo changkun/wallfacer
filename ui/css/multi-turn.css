@@ -285,8 +285,8 @@ pre.result-entry-body {
     order: 10;
     flex-basis: 100%;
   }
-  .workspace-group-tab__workspaces {
-    display: none;
+  .workspace-git-bar {
+    padding: 4px 14px;
   }
   .app-header__actions {
     width: 100%;

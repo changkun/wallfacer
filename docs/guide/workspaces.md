@@ -85,11 +85,21 @@ Each saved group appears as a tab in the header bar. The currently active group 
 
 When the window is too narrow to fit all tabs, overflow tabs are automatically hidden and accessible via the **+** menu. The active tab is never auto-hidden.
 
+#### Naming groups
+
+By default, tabs show the basename(s) of the workspace directories (e.g. `repo-a + repo-b`). You can assign a short, readable name to any group:
+
+- **Double-click** the active tab in the header to rename it inline. Press Enter to confirm or Escape to cancel.
+- Open **Settings > Workspace** and click **Rename** next to a group to set a name via a dialog.
+
+Named groups display the custom name on the tab. Hover over a tab to see the full workspace paths. To clear a custom name, rename it to an empty string -- the tab reverts to the basename fallback.
+
 #### Managing tabs
 
 | Action | How |
 |---|---|
 | Switch to a group | Click its tab in the header |
+| Rename a group | Double-click the active tab, or click **Rename** in Settings |
 | Hide a tab | Click the X on an inactive tab |
 | Restore a hidden tab | Click the **+** button and select from the list |
 | Add a new group | Click **+** and choose "New workspace group..." to open the workspace picker |

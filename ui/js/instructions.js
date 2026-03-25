@@ -81,9 +81,9 @@ async function saveInstructions() {
 // Called from the Re-init button inside the editor modal.
 async function reinitInstructionsFromEditor() {
   if (
-    !confirm(
-      "Re-initialize from the default template and each repository's AGENTS.md (or legacy CLAUDE.md)?\n\nThis will overwrite your current edits.",
-    )
+    !(await showConfirm(
+      "Re-initialize from the default template and each repository's AGENTS.md (or legacy CLAUDE.md)? This will overwrite your current edits.",
+    ))
   ) {
     return;
   }

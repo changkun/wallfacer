@@ -420,9 +420,9 @@ async function deleteTask(id) {
   }
 }
 
-function deleteCurrentTask() {
+async function deleteCurrentTask() {
   if (!getOpenModalTaskId()) return;
-  if (!confirm("This task will be recoverable for 7 days. Delete anyway?"))
+  if (!(await showConfirm("This task will be recoverable for 7 days. Delete anyway?")))
     return;
   deleteTask(getOpenModalTaskId());
   closeModal();
@@ -625,9 +625,9 @@ async function startTask() {
 async function cancelTask() {
   if (!getOpenModalTaskId()) return;
   if (
-    !confirm(
+    !(await showConfirm(
       "Cancel this task? The sandbox will be cleaned up and all prepared changes discarded. History and logs will be preserved.",
-    )
+    ))
   )
     return;
   const taskId = getOpenModalTaskId();
@@ -651,16 +651,16 @@ async function openRaiseLimitInline() {
   const banner = document.getElementById("modal-budget-exceeded-banner");
   if (!banner) return;
 
-  const newCost = prompt(
-    "New cost limit in USD (0 = unlimited):\nCurrent limit: " +
+  const newCost = await showPrompt(
+    "New cost limit in USD (0 = unlimited). Current limit: " +
       (currentTask.max_cost_usd > 0
         ? "$" + currentTask.max_cost_usd.toFixed(2)
         : "none"),
     currentTask.max_cost_usd > 0 ? String(currentTask.max_cost_usd) : "",
   );
   if (newCost === null) return; // cancelled
-  const newTokens = prompt(
-    "New input token limit (0 = unlimited):\nCurrent limit: " +
+  const newTokens = await showPrompt(
+    "New input token limit (0 = unlimited). Current limit: " +
       (currentTask.max_input_tokens > 0
         ? currentTask.max_input_tokens.toLocaleString()
         : "none"),

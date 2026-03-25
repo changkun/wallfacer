@@ -48,11 +48,15 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition:
     color 0.12s,
     border-color 0.12s,
     background 0.12s;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 60px;
+  max-width: 240px;
 }
 .workspace-group-tab:hover {
   color: var(--text-primary);
@@ -102,17 +106,68 @@
   padding: 6px 8px;
   font-size: 14px;
   font-weight: 400;
+  flex-shrink: 0;
+  max-width: none;
+  overflow: visible;
 }
 .workspace-group-tab--add:hover {
   color: var(--text-primary);
 }
-.workspace-group-tab__workspaces {
+.workspace-group-tab__edit {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin-left: 4px;
-  padding-left: 8px;
-  border-left: 1px solid var(--border);
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.12s,
+    background 0.12s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.workspace-group-tab--active:hover .workspace-group-tab__edit {
+  opacity: 0.6;
+}
+.workspace-group-tab__edit:hover {
+  opacity: 1;
+  background: var(--bg-input);
+}
+.workspace-group-tab__rename-input {
+  all: unset;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0 4px;
+  width: 100%;
+  min-width: 40px;
+  max-width: 200px;
+  box-sizing: border-box;
+}
+.workspace-git-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 24px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
+  min-height: 0;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+.workspace-git-bar:empty {
+  display: none;
 }
 
 .app-header__actions {

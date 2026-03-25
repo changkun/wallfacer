@@ -547,6 +547,50 @@ describe("renderHeaderWorkspaceGroupTabs", () => {
 });
 
 // ---------------------------------------------------------------------------
+// workspaceGroupLabel — name preference
+// ---------------------------------------------------------------------------
+
+describe("workspaceGroupLabel", () => {
+  it("prefers group.name over basenames when set", () => {
+    const ctx = makeContext();
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+
+    const label = ctx.workspaceGroupLabel({
+      name: "My Project",
+      workspaces: ["/Users/test/repo-a", "/Users/test/repo-b"],
+    });
+    expect(label).toBe("My Project");
+  });
+
+  it("falls back to basenames when name is empty", () => {
+    const ctx = makeContext();
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+
+    const label = ctx.workspaceGroupLabel({
+      name: "",
+      workspaces: ["/Users/test/repo-a", "/Users/test/repo-b"],
+    });
+    expect(label).toBe("repo-a + repo-b");
+  });
+
+  it("falls back to basenames when name is absent", () => {
+    const ctx = makeContext();
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+
+    const label = ctx.workspaceGroupLabel({
+      workspaces: ["/Users/test/single-repo"],
+    });
+    expect(label).toBe("single-repo");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // browseWorkspaces
 // ---------------------------------------------------------------------------
 

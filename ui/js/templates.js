@@ -349,7 +349,7 @@ async function saveNewTemplate() {
 }
 
 async function _deleteTemplate(id) {
-  if (!confirm("Delete this template?")) return;
+  if (!(await showConfirm("Delete this template?"))) return;
   try {
     await api("/api/templates/" + id, { method: "DELETE" });
     await _refreshTemplatesList();

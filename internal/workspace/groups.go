@@ -14,6 +14,7 @@ import (
 
 // Group represents a named set of workspace paths.
 type Group struct {
+	Name       string   `json:"name,omitempty"`
 	Workspaces []string `json:"workspaces"`
 }
 
@@ -56,13 +57,14 @@ func UpsertGroup(configDir string, workspaces []string) error {
 	if err != nil {
 		return err
 	}
-	key := groupKey(workspaces)
+	key := GroupKey(workspaces)
 	for i, group := range groups {
-		if groupKey(group.Workspaces) == key {
+		if GroupKey(group.Workspaces) == key {
 			if i == 0 {
 				return nil
 			}
-			reordered := append([]Group{{Workspaces: workspaces}}, groups[:i]...)
+			promoted := Group{Name: group.Name, Workspaces: workspaces}
+			reordered := append([]Group{promoted}, groups[:i]...)
 			reordered = append(reordered, groups[i+1:]...)
 			return SaveGroups(configDir, reordered)
 		}
@@ -83,12 +85,12 @@ func NormalizeGroups(groups []Group) []Group {
 		if len(ws) == 0 {
 			continue
 		}
-		key := groupKey(ws)
+		key := GroupKey(ws)
 		if seen.Has(key) {
 			continue
 		}
 		seen.Add(key)
-		out = append(out, Group{Workspaces: ws})
+		out = append(out, Group{Name: group.Name, Workspaces: ws})
 	}
 	return out
 }
@@ -115,6 +117,7 @@ func normalizeGroupPaths(paths []string) []string {
 	return out
 }
 
-func groupKey(paths []string) string {
+// GroupKey returns a canonical key for a set of workspace paths.
+func GroupKey(paths []string) string {
 	return strings.Join(paths, "\n")
 }

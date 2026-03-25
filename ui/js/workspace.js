@@ -241,6 +241,7 @@ function renderWorkspaceSelectionSummary() {
 function workspaceGroupLabel(group) {
   if (!group || !Array.isArray(group.workspaces) || !group.workspaces.length)
     return "Empty group";
+  if (group.name) return group.name;
   var names = group.workspaces.map(function (path) {
     var clean = String(path || "").replace(/[\\/]+$/, "");
     var parts = clean.split(/[\\/]/);
@@ -300,6 +301,11 @@ function renderWorkspaceGroups() {
         ">" +
         (switching ? workspaceSwitchSpinnerHtml() + " Switching..." : "Use") +
         "</button>" +
+        '<button type="button" class="btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="renameWorkspaceGroup(' +
+        index +
+        ')"' +
+        (workspaceGroupSwitching ? " disabled" : "") +
+        ">Rename</button>" +
         '<button type="button" class="btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="editWorkspaceGroup(' +
         index +
         ')"' +
@@ -370,9 +376,14 @@ function renderHeaderWorkspaceGroupTabs() {
         index +
         '" title="' +
         escapeHtml(title) +
-        '">' +
+        '" ondblclick="startInlineTabRename(this,' +
+        index +
+        ')">' +
         label +
-        '<span id="workspace-group-tab-workspaces" class="workspace-group-tab__workspaces"></span></div>';
+        '<span class="workspace-group-tab__edit" onclick="event.stopPropagation();startInlineTabRename(this.parentElement,' +
+        index +
+        ')" title="Rename group">&#9998;</span>' +
+        '</div>';
     } else {
       tabs +=
         '<button type="button" class="' +
@@ -395,8 +406,6 @@ function renderHeaderWorkspaceGroupTabs() {
   tabs +=
     '<button type="button" class="workspace-group-tab workspace-group-tab--add" onclick="addWorkspaceGroupTab(event)" title="Add workspace group">+</button>';
   el.innerHTML = tabs;
-  // Re-render workspace chips into the active tab's container.
-  if (typeof renderWorkspaces === "function") renderWorkspaces();
   // Auto-collapse overflowing tabs after layout.
   requestAnimationFrame(function () {
     _collapseOverflowingTabs();
@@ -851,6 +860,68 @@ async function deleteWorkspaceGroup(index) {
     showAlert("Failed to update workspace groups: " + e.message);
     await fetchConfig();
   }
+}
+
+async function renameWorkspaceGroup(index) {
+  var group = workspaceGroups[index];
+  if (!group) return;
+  var current = group.name || workspaceGroupLabel(group);
+  var newName = await showPrompt("Rename workspace group:", current);
+  if (newName === null) return;
+  newName = newName.trim();
+  group.name = newName; // empty string clears the custom name
+  renderWorkspaceGroups();
+  renderHeaderWorkspaceGroupTabs();
+  try {
+    await saveWorkspaceGroups();
+  } catch (e) {
+    showAlert("Failed to rename workspace group: " + e.message);
+    await fetchConfig();
+  }
+}
+
+function startInlineTabRename(tabEl, index) {
+  var group = workspaceGroups[index];
+  if (!group) return;
+  var current = group.name || workspaceGroupLabel(group);
+  var input = document.createElement("input");
+  input.type = "text";
+  input.value = current;
+  input.className = "workspace-group-tab__rename-input";
+  // Replace tab content with input.
+  var origHtml = tabEl.innerHTML;
+  tabEl.innerHTML = "";
+  tabEl.appendChild(input);
+  input.focus();
+  input.select();
+
+  var committed = false;
+  function commit() {
+    if (committed) return;
+    committed = true;
+    var newName = input.value.trim();
+    group.name = newName;
+    renderWorkspaceGroups();
+    renderHeaderWorkspaceGroupTabs();
+    saveWorkspaceGroups();
+  }
+  function cancel() {
+    if (committed) return;
+    committed = true;
+    tabEl.innerHTML = origHtml;
+  }
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancel();
+    }
+  });
+  input.addEventListener("blur", function () {
+    commit();
+  });
 }
 
 async function applyWorkspaceSelection() {

@@ -21,6 +21,56 @@ function closeAlert() {
   }
 }
 
+function showConfirm(message) {
+  return new Promise(function (resolve) {
+    document.getElementById("confirm-message").textContent = message;
+    var modal = document.getElementById("confirm-modal");
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+    var confirmBtn = document.getElementById("confirm-ok-btn");
+    var cancelBtn = document.getElementById("confirm-cancel-btn");
+    confirmBtn.focus();
+
+    var cleanup;
+    function close(result) {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      if (cleanup) { cleanup(); cleanup = null; }
+      resolve(result);
+    }
+    confirmBtn.onclick = function () { close(true); };
+    cancelBtn.onclick = function () { close(false); };
+    cleanup = bindModalDismiss(modal, function () { close(false); });
+  });
+}
+
+function showPrompt(message, defaultValue) {
+  return new Promise(function (resolve) {
+    document.getElementById("prompt-message").textContent = message;
+    var input = document.getElementById("prompt-input");
+    input.value = defaultValue || "";
+    var modal = document.getElementById("prompt-modal");
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+    input.focus();
+    input.select();
+
+    var cleanup;
+    function close(result) {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      if (cleanup) { cleanup(); cleanup = null; }
+      resolve(result);
+    }
+    document.getElementById("prompt-ok-btn").onclick = function () { close(input.value); };
+    document.getElementById("prompt-cancel-btn").onclick = function () { close(null); };
+    cleanup = bindModalDismiss(modal, function () { close(null); });
+    input.onkeydown = function (e) {
+      if (e.key === "Enter") { e.preventDefault(); close(input.value); }
+    };
+  });
+}
+
 function escapeHtml(s) {
   if (!s) return "";
   return s

@@ -191,11 +191,11 @@ async function resetSystemPromptToDefault() {
   });
   if (!tmpl || !tmpl.has_override) return;
   if (
-    !confirm(
+    !(await showConfirm(
       'Reset "' +
         _systemPromptCurrent +
-        '" to the embedded default?\nYour override will be deleted.',
-    )
+        '" to the embedded default? Your override will be deleted.',
+    ))
   )
     return;
 

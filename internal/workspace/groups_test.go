@@ -208,6 +208,76 @@ func TestUpsertGroup_NewGroup_AddedToFront(t *testing.T) {
 	}
 }
 
+func TestNormalizeGroups_PreservesName(t *testing.T) {
+	wsA := t.TempDir()
+
+	input := []Group{
+		{Name: "My Project", Workspaces: []string{wsA}},
+	}
+	result := NormalizeGroups(input)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 group, got %d", len(result))
+	}
+	if result[0].Name != "My Project" {
+		t.Errorf("expected Name=%q, got %q", "My Project", result[0].Name)
+	}
+}
+
+func TestUpsertGroup_PreservesExistingName(t *testing.T) {
+	configDir := t.TempDir()
+	wsA := t.TempDir()
+	wsB := t.TempDir()
+
+	if err := SaveGroups(configDir, []Group{
+		{Name: "First", Workspaces: []string{wsA}},
+		{Name: "Second", Workspaces: []string{wsB}},
+	}); err != nil {
+		t.Fatalf("SaveGroups: %v", err)
+	}
+
+	// Promote wsB to front — its name "Second" should be preserved.
+	if err := UpsertGroup(configDir, []string{wsB}); err != nil {
+		t.Fatalf("UpsertGroup: %v", err)
+	}
+
+	groups, err := LoadGroups(configDir)
+	if err != nil {
+		t.Fatalf("LoadGroups: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 groups, got %d", len(groups))
+	}
+	if groups[0].Name != "Second" {
+		t.Errorf("promoted group: expected Name=%q, got %q", "Second", groups[0].Name)
+	}
+	if groups[1].Name != "First" {
+		t.Errorf("remaining group: expected Name=%q, got %q", "First", groups[1].Name)
+	}
+}
+
+func TestSaveGroups_RoundTrip_WithName(t *testing.T) {
+	configDir := t.TempDir()
+	wsA := t.TempDir()
+
+	input := []Group{
+		{Name: "Named Group", Workspaces: []string{wsA}},
+	}
+	if err := SaveGroups(configDir, input); err != nil {
+		t.Fatalf("SaveGroups: %v", err)
+	}
+
+	got, err := LoadGroups(configDir)
+	if err != nil {
+		t.Fatalf("LoadGroups: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("round-trip: expected 1 group, got %d", len(got))
+	}
+	if got[0].Name != "Named Group" {
+		t.Errorf("round-trip: expected Name=%q, got %q", "Named Group", got[0].Name)
+	}
+}
+
 func TestUpsertGroup_EmptyWorkspaces_NoOp(t *testing.T) {
 	configDir := t.TempDir()
 	wsA := t.TempDir()
