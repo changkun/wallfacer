@@ -24,6 +24,21 @@ func waitForBackground(ms int) {
 	time.Sleep(time.Duration(ms) * time.Millisecond)
 }
 
+// waitForCond polls pred every 10ms until it returns true or timeout elapses.
+// Unlike a fixed time.Sleep this adapts to the actual speed of the environment,
+// making tests reliable on both fast local machines and slow CI runners.
+func waitForCond(t *testing.T, timeout time.Duration, desc string, pred func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if pred() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for: %s", desc)
+}
+
 // setTaskSessionID is a helper that sets a session ID on a task via UpdateTaskResult.
 func setTaskSessionID(t *testing.T, h *Handler, id uuid.UUID, sessionID string) {
 	t.Helper()

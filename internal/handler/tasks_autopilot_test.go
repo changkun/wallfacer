@@ -671,10 +671,9 @@ func TestStartAutoRefiner_ExitsOnCancel(t *testing.T) {
 // ensures the SSE event for the intermediate "waiting" state reaches the
 // browser and is rendered before the watcher transitions the task back.
 func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
-	// Lower the settle delay for the test so it runs quickly, but keep it
-	// large enough that slow CI runners do not race past it.
+	// Lower the settle delay for the test so it runs quickly.
 	orig := constants.WatcherSettleDelay
-	constants.WatcherSettleDelay = 500 * time.Millisecond
+	constants.WatcherSettleDelay = 300 * time.Millisecond
 	t.Cleanup(func() { constants.WatcherSettleDelay = orig })
 
 	h := newTestHandler(t)
@@ -725,15 +724,13 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 		t.Fatalf("task should still be waiting during settle delay, got %s", got.Status)
 	}
 
-	// After the settle delay, the watcher should have transitioned the task
-	// out of waiting. In the test environment the container runner is not
-	// available, so the task may end up in "failed" rather than staying in
-	// "in_progress" — the important thing is that it left "waiting".
-	time.Sleep(constants.WatcherSettleDelay + 2*time.Second)
-	got, _ = h.store.GetTask(ctx, task.ID)
-	if got.Status == store.TaskStatusWaiting {
-		t.Error("task should have left waiting after settle delay, still waiting")
-	}
+	// Poll until the watcher transitions the task out of waiting.
+	// In the test environment the container runner is not available, so the
+	// task may end up in "failed" — the important thing is it left "waiting".
+	waitForCond(t, 5*time.Second, "task left waiting after settle delay", func() bool {
+		got, _ := h.store.GetTask(ctx, task.ID)
+		return got.Status != store.TaskStatusWaiting
+	})
 }
 
 // TestAutoSubmitter_SettleDelayDefersTrigger verifies that the auto-submitter
@@ -741,7 +738,7 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 // time to render the "waiting" state.
 func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 	orig := constants.WatcherSettleDelay
-	constants.WatcherSettleDelay = 500 * time.Millisecond
+	constants.WatcherSettleDelay = 300 * time.Millisecond
 	t.Cleanup(func() { constants.WatcherSettleDelay = orig })
 
 	h := newTestHandler(t)
@@ -790,13 +787,11 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 		t.Fatalf("task should still be waiting during settle delay, got %s", got.Status)
 	}
 
-	// After the settle delay, auto-submit should act. Use a generous timeout
-	// because git operations in the auto-submit pipeline can be slow on CI.
-	time.Sleep(constants.WatcherSettleDelay + 2*time.Second)
-	got, _ = h.store.GetTask(ctx, task.ID)
-	if got.Status == store.TaskStatusWaiting {
-		t.Error("task should have been submitted after settle delay, still waiting")
-	}
+	// Poll until auto-submit transitions the task out of waiting.
+	waitForCond(t, 5*time.Second, "task submitted after settle delay", func() bool {
+		got, _ := h.store.GetTask(ctx, task.ID)
+		return got.Status != store.TaskStatusWaiting
+	})
 }
 
 // --- checkConcurrencyAndUpdateStatus ---

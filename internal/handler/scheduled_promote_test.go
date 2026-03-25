@@ -9,8 +9,8 @@ import (
 )
 
 // TestScheduledTaskPromotedOnTime verifies that a backlog task with a
-// ScheduledAt ~150ms in the future is NOT promoted immediately, but IS promoted
-// shortly after its due time via the precise timer set by ensureScheduledPromoteTrigger.
+// ScheduledAt in the future is NOT promoted immediately, but IS promoted
+// after its due time via the precise timer set by ensureScheduledPromoteTrigger.
 func TestScheduledTaskPromotedOnTime(t *testing.T) {
 	h, _ := newTestHandlerWithEnv(t)
 	h.autopilot.Store(true)
@@ -18,14 +18,12 @@ func TestScheduledTaskPromotedOnTime(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create a backlog task scheduled 500ms from now — enough headroom so that
-	// even on slow CI runners the first tryAutoPromote call finishes before the
-	// due time arrives.
+	// Create a backlog task scheduled 200ms from now.
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "scheduled soon", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
-	due := time.Now().Add(500 * time.Millisecond)
+	due := time.Now().Add(200 * time.Millisecond)
 	if err := h.store.UpdateTaskScheduledAt(ctx, task.ID, &due); err != nil {
 		t.Fatalf("UpdateTaskScheduledAt: %v", err)
 	}
@@ -42,19 +40,11 @@ func TestScheduledTaskPromotedOnTime(t *testing.T) {
 		t.Fatalf("expected task to remain in backlog before due time, got %s", got.Status)
 	}
 
-	// Wait until well past the due time so the timer has fired.
-	time.Sleep(1500 * time.Millisecond)
-
-	// The timer should have fired and called tryAutoPromote by now.
-	// The task must have left the backlog — it will be in_progress or further
-	// along (failed/done) because the test runner has no real container.
-	got, err = h.store.GetTask(ctx, task.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Status == store.TaskStatusBacklog {
-		t.Errorf("expected task to be promoted after due time via timer, but still in backlog")
-	}
+	// Poll until the timer fires and promotes the task out of backlog.
+	waitForCond(t, 5*time.Second, "task promoted out of backlog", func() bool {
+		got, err := h.store.GetTask(ctx, task.ID)
+		return err == nil && got.Status != store.TaskStatusBacklog
+	})
 }
 
 // TestScheduledTaskTimerCancelsOnContextDone verifies that cancelling the
