@@ -71,14 +71,13 @@ Key server files:
 - `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; auto-retry; circuit breaker
 - `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TurnUsageRecord, TaskEvent, TaskOversight, TaskSummary, Tombstone, RetryRecord, FailureCategory), event sourcing, soft delete, search index; see `docs/internals/data-and-storage.md` for full data model documentation
 - `internal/envconfig/` — `.env` file parsing and atomic update; exposes `Parse` and `Update` for the handler and runner
-- `internal/instructions/` — Workspace-level AGENTS.md management (`~/.wallfacer/instructions/`)
 - `internal/gitutil/` — Git utility operations (ops, repo, status, stash, worktree)
 - `internal/workspace/` — Workspace manager; scopes data by workspace key; supports runtime workspace switching
 - `internal/logger/` — Structured logging utilities
 - `internal/metrics/` — Prometheus-compatible metrics
 - `internal/constants/` — Consolidated system parameters: timeouts, intervals, retry counts, size limits, concurrency caps, pagination defaults
 - `internal/sandbox/` — Sandbox type enumeration (Claude, Codex)
-- `prompts/` — System prompt templates (title, commit, refinement, oversight, test, ideation, conflict)
+- `prompts/` — System prompt templates (title, commit, refinement, oversight, test, ideation, conflict, instructions) and workspace-level AGENTS.md management (`~/.wallfacer/instructions/`)
 - `ui/index.html` + `ui/js/` — Task board UI (vanilla JS + Tailwind CSS + Sortable.js)
 
 ## API Routes
@@ -225,7 +224,7 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - **Workspace AGENTS.md** mounted read-only at `/workspace/AGENTS.md` so Claude Code picks it up automatically
 - **Oversight summaries** generated asynchronously when tasks reach waiting/done/failed
 - **Task refinement** via sandbox agent: refines prompts before execution
-- **System prompt templates** are overridable built-in prompts (`prompts/*.tmpl`); users can customize via the UI or API
+- **System prompt templates** are overridable built-in prompts (`prompts/*.tmpl`); users can customize via the UI or API; includes the workspace instructions template
 - **Prompt templates** for reusable task creation patterns
 
 - **Auto-retry** with per-failure-category budget; failed tasks can be automatically retried
@@ -243,8 +242,8 @@ Each unique combination of workspace directories gets its own `AGENTS.md` in `~/
 The file is identified by a SHA-256 fingerprint of the sorted workspace paths, so switching to workspaces `~/a` and `~/b` (in any order) shares the same file.
 
 On first run the file is created from:
-1. A default wallfacer template (defined in `instructions.go`).
-2. A reference list of per-repo `AGENTS.md` (or legacy `CLAUDE.md`) paths so agents can read them on demand.
+1. The `instructions.tmpl` template in `prompts/`, rendered via the prompt Manager (overridable like other system prompts).
+2. A reference list of per-repo `AGENTS.md` (or `CLAUDE.md`) paths so agents can read them on demand.
 
 Users can manually edit the file from **Settings → AGENTS.md → Edit** in the UI, or regenerate it from the repo files at any time with **Re-init**. The file is mounted read-only into every task container at `/workspace/AGENTS.md`.
 
