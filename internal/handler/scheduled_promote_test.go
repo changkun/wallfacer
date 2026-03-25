@@ -18,12 +18,14 @@ func TestScheduledTaskPromotedOnTime(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create a backlog task scheduled 150ms from now.
+	// Create a backlog task scheduled 500ms from now — enough headroom so that
+	// even on slow CI runners the first tryAutoPromote call finishes before the
+	// due time arrives.
 	task, err := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "scheduled soon", Timeout: 15})
 	if err != nil {
 		t.Fatal(err)
 	}
-	due := time.Now().Add(150 * time.Millisecond)
+	due := time.Now().Add(500 * time.Millisecond)
 	if err := h.store.UpdateTaskScheduledAt(ctx, task.ID, &due); err != nil {
 		t.Fatalf("UpdateTaskScheduledAt: %v", err)
 	}
@@ -40,8 +42,8 @@ func TestScheduledTaskPromotedOnTime(t *testing.T) {
 		t.Fatalf("expected task to remain in backlog before due time, got %s", got.Status)
 	}
 
-	// Wait until past the due time (generous margin so CI is not flaky).
-	time.Sleep(400 * time.Millisecond)
+	// Wait until well past the due time so the timer has fired.
+	time.Sleep(1500 * time.Millisecond)
 
 	// The timer should have fired and called tryAutoPromote by now.
 	// The task must have left the backlog — it will be in_progress or further

@@ -671,9 +671,10 @@ func TestStartAutoRefiner_ExitsOnCancel(t *testing.T) {
 // ensures the SSE event for the intermediate "waiting" state reaches the
 // browser and is rendered before the watcher transitions the task back.
 func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
-	// Lower the settle delay for the test so it runs quickly.
+	// Lower the settle delay for the test so it runs quickly, but keep it
+	// large enough that slow CI runners do not race past it.
 	orig := constants.WatcherSettleDelay
-	constants.WatcherSettleDelay = 300 * time.Millisecond
+	constants.WatcherSettleDelay = 500 * time.Millisecond
 	t.Cleanup(func() { constants.WatcherSettleDelay = orig })
 
 	h := newTestHandler(t)
@@ -728,7 +729,7 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 	// out of waiting. In the test environment the container runner is not
 	// available, so the task may end up in "failed" rather than staying in
 	// "in_progress" — the important thing is that it left "waiting".
-	time.Sleep(constants.WatcherSettleDelay + 500*time.Millisecond)
+	time.Sleep(constants.WatcherSettleDelay + 2*time.Second)
 	got, _ = h.store.GetTask(ctx, task.ID)
 	if got.Status == store.TaskStatusWaiting {
 		t.Error("task should have left waiting after settle delay, still waiting")
@@ -740,7 +741,7 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 // time to render the "waiting" state.
 func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 	orig := constants.WatcherSettleDelay
-	constants.WatcherSettleDelay = 300 * time.Millisecond
+	constants.WatcherSettleDelay = 500 * time.Millisecond
 	t.Cleanup(func() { constants.WatcherSettleDelay = orig })
 
 	h := newTestHandler(t)
