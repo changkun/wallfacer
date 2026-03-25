@@ -61,11 +61,12 @@ Alternative `SandboxBackend` implementations. Independent of each other and of M
 
 After M2 (store interfaces stable). Independent of M3. Can run in parallel with M3.
 
-## Related to M4 — File Attachments
+## Related to M4 — File Attachments & Host Mounts
 
 | Spec | Delivers |
 |------|----------|
 | [04a-file-image-attachments.md](04a-file-image-attachments.md) | Drag-and-drop file and image attachments for task prompts |
+| [04b-host-mounts.md](04b-host-mounts.md) | Per-task read-only host filesystem mounts into sandbox containers |
 
 ## Independent Enhancements
 
