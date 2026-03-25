@@ -36,7 +36,7 @@ make build-codex    # OpenAI Codex sandbox image
 
 ```bash
 # Start the server once to create ~/.wallfacer/.env
-./wallfacer run
+wallfacer run
 # Stop with Ctrl-C, then edit the env file:
 ```
 
