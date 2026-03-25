@@ -709,15 +709,24 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting)
 	_ = h.store.UpdateTaskWorktrees(ctx, task.ID, map[string]string{repo: wt}, "task-branch")
 
-	// Start the watcher. The wake subscriber was created by StartAutoTester,
-	// so any subsequent notify will be delivered.
+	// Start the watcher. The goroutine subscribes to the store wake channel
+	// asynchronously, so we must ensure it is subscribed before we trigger.
 	h.StartAutoTester(ctx)
 
-	// Trigger a wake signal by mutating the store.
-	_ = h.store.UpdateTaskTitle(ctx, task.ID, "trigger wake")
+	// Send wake signals repeatedly so at least one arrives after the
+	// goroutine has subscribed. On fast machines the first signal lands;
+	// on slow CI the retry ensures delivery without a fragile sleep.
+	wakeCount := 0
+	go func() {
+		for i := 0; i < 20; i++ {
+			time.Sleep(25 * time.Millisecond)
+			_ = h.store.UpdateTaskTitle(ctx, task.ID, fmt.Sprintf("trigger wake %d", i))
+			wakeCount++
+		}
+	}()
 
-	// Immediately after the wake, the task should still be waiting because
-	// the settle delay has not elapsed.
+	// During the settle delay (300ms) the task should remain in waiting
+	// even after the first wake signal.
 	time.Sleep(50 * time.Millisecond)
 	got, _ := h.store.GetTask(ctx, task.ID)
 	if got.Status != store.TaskStatusWaiting {
@@ -727,7 +736,7 @@ func TestAutoTester_SettleDelayDefersTrigger(t *testing.T) {
 	// Poll until the watcher transitions the task out of waiting.
 	// In the test environment the container runner is not available, so the
 	// task may end up in "failed" — the important thing is it left "waiting".
-	waitForCond(t, 5*time.Second, "task left waiting after settle delay", func() bool {
+	waitForCond(t, 10*time.Second, "task left waiting after settle delay", func() bool {
 		got, _ := h.store.GetTask(ctx, task.ID)
 		return got.Status != store.TaskStatusWaiting
 	})
@@ -777,8 +786,14 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 
 	h.StartAutoSubmitter(ctx)
 
-	// Trigger a wake signal.
-	_ = h.store.UpdateTaskTitle(ctx, task.ID, "trigger wake")
+	// Send wake signals repeatedly so at least one arrives after the
+	// goroutine has subscribed (avoids race on slow CI).
+	go func() {
+		for i := 0; i < 20; i++ {
+			time.Sleep(25 * time.Millisecond)
+			_ = h.store.UpdateTaskTitle(ctx, task.ID, fmt.Sprintf("trigger wake %d", i))
+		}
+	}()
 
 	// During the settle delay the task must remain in waiting.
 	time.Sleep(50 * time.Millisecond)
@@ -788,7 +803,7 @@ func TestAutoSubmitter_SettleDelayDefersTrigger(t *testing.T) {
 	}
 
 	// Poll until auto-submit transitions the task out of waiting.
-	waitForCond(t, 5*time.Second, "task submitted after settle delay", func() bool {
+	waitForCond(t, 10*time.Second, "task submitted after settle delay", func() bool {
 		got, _ := h.store.GetTask(ctx, task.ID)
 		return got.Status != store.TaskStatusWaiting
 	})
