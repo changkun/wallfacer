@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"os"
 
-	"changkun.de/x/wallfacer/internal/instructions"
+	"changkun.de/x/wallfacer/prompts"
 )
 
 // GetInstructions returns the current workspace AGENTS.md content.
@@ -53,7 +53,7 @@ func (h *Handler) ReinitInstructions(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
 		return
 	}
-	path, err := instructions.Reinit(h.configDir, h.currentWorkspaces())
+	path, err := prompts.ReinitInstructions(h.configDir, h.currentWorkspaces())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

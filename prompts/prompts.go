@@ -67,13 +67,14 @@ func templateFuncMap() template.FuncMap {
 
 // embeddedToAPI maps embedded template file names to user-facing API names.
 var embeddedToAPI = map[string]string{
-	"ideation.tmpl":   "ideation",
-	"refinement.tmpl": "refinement",
-	"oversight.tmpl":  "oversight",
-	"title.tmpl":      "title",
-	"commit.tmpl":     "commit_message",
-	"conflict.tmpl":   "conflict_resolution",
-	"test.tmpl":       "test_verification",
+	"ideation.tmpl":     "ideation",
+	"refinement.tmpl":   "refinement",
+	"oversight.tmpl":    "oversight",
+	"title.tmpl":        "title",
+	"commit.tmpl":       "commit_message",
+	"conflict.tmpl":     "conflict_resolution",
+	"test.tmpl":         "test_verification",
+	"instructions.tmpl": "instructions",
 }
 
 // apiToEmbedded maps user-facing API names to embedded template file names.
@@ -85,6 +86,7 @@ var apiToEmbedded = map[string]string{
 	"commit_message":      "commit.tmpl",
 	"conflict_resolution": "conflict.tmpl",
 	"test_verification":   "test.tmpl",
+	"instructions":        "instructions.tmpl",
 }
 
 // knownNames is the ordered list of all user-facing template API names.
@@ -96,6 +98,7 @@ var knownNames = []string{
 	"commit_message",
 	"conflict_resolution",
 	"test_verification",
+	"instructions",
 }
 
 // Manager manages the seven built-in prompt templates with optional
@@ -265,6 +268,11 @@ func mockContextFor(apiName string) (interface{}, bool) {
 		return struct{ ActivityLog string }{ActivityLog: "example activity log"}, true
 	case "title":
 		return struct{ Prompt string }{Prompt: "example task"}, true
+	case "instructions":
+		return InstructionsData{
+			Workspaces:          []InstructionsWorkspace{{Name: "example-repo"}},
+			RepoInstructionRefs: []InstructionsRepoRef{{Workspace: "example-repo", Filename: "AGENTS.md"}},
+		}, true
 	default:
 		return nil, false
 	}
@@ -392,6 +400,23 @@ type TestData struct {
 	Diff           string // optional
 }
 
+// InstructionsWorkspace represents a single workspace entry for the instructions template.
+type InstructionsWorkspace struct {
+	Name string // basename of the workspace directory
+}
+
+// InstructionsRepoRef represents a per-repo instructions file reference.
+type InstructionsRepoRef struct {
+	Workspace string // basename of the workspace directory
+	Filename  string // "AGENTS.md" or "CLAUDE.md"
+}
+
+// InstructionsData holds template variables for the workspace instructions prompt.
+type InstructionsData struct {
+	Workspaces          []InstructionsWorkspace
+	RepoInstructionRefs []InstructionsRepoRef
+}
+
 // --- Manager methods ---
 
 // Refinement renders the spec-writing agent prompt.
@@ -420,6 +445,9 @@ func (m *Manager) ConflictResolution(d ConflictData) string { return m.render("c
 // TestVerification renders the test verification agent prompt.
 func (m *Manager) TestVerification(d TestData) string { return m.render("test.tmpl", d) }
 
+// Instructions renders the workspace instructions (AGENTS.md) content.
+func (m *Manager) Instructions(d InstructionsData) string { return m.render("instructions.tmpl", d) }
+
 // --- Package-level functions (delegate to Default for backward compatibility) ---
 
 // Refinement renders the spec-writing agent prompt.
@@ -443,3 +471,6 @@ func ConflictResolution(d ConflictData) string { return Default.ConflictResoluti
 
 // TestVerification renders the test verification agent prompt.
 func TestVerification(d TestData) string { return Default.TestVerification(d) }
+
+// Instructions renders the workspace instructions (AGENTS.md) content.
+func Instructions(d InstructionsData) string { return Default.Instructions(d) }

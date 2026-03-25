@@ -36,7 +36,7 @@ func newTestHandlerWithPrompts(t *testing.T) (*Handler, *prompts.Manager) {
 
 // --- ListSystemPrompts ---
 
-func TestListSystemPrompts_ReturnsAllSeven(t *testing.T) {
+func TestListSystemPrompts_ReturnsAll(t *testing.T) {
 	h, _ := newTestHandlerWithPrompts(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/system-prompts", nil)
 	w := httptest.NewRecorder()
@@ -49,8 +49,8 @@ func TestListSystemPrompts_ReturnsAllSeven(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(result) != 7 {
-		t.Errorf("len(result) = %d, want 7", len(result))
+	if len(result) != 8 {
+		t.Errorf("len(result) = %d, want 8", len(result))
 	}
 	for _, item := range result {
 		if item["name"] == "" {

@@ -1,4 +1,4 @@
-package instructions
+package prompts
 
 import (
 	"os"
@@ -8,15 +8,15 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Key
+// InstructionsKey
 // ---------------------------------------------------------------------------
 
 // TestInstructionsKeyStable verifies that the same workspace list always
 // produces the same key.
 func TestInstructionsKeyStable(t *testing.T) {
 	ws := []string{"/home/user/projectA", "/home/user/projectB"}
-	k1 := Key(ws)
-	k2 := Key(ws)
+	k1 := InstructionsKey(ws)
+	k2 := InstructionsKey(ws)
 	if k1 != k2 {
 		t.Fatalf("key should be stable: got %q then %q", k1, k2)
 	}
@@ -28,16 +28,16 @@ func TestInstructionsKeyStable(t *testing.T) {
 func TestInstructionsKeyOrderIndependent(t *testing.T) {
 	ws1 := []string{"/home/user/alpha", "/home/user/beta"}
 	ws2 := []string{"/home/user/beta", "/home/user/alpha"}
-	if Key(ws1) != Key(ws2) {
-		t.Fatalf("key must be order-independent: %q != %q", Key(ws1), Key(ws2))
+	if InstructionsKey(ws1) != InstructionsKey(ws2) {
+		t.Fatalf("key must be order-independent: %q != %q", InstructionsKey(ws1), InstructionsKey(ws2))
 	}
 }
 
 // TestInstructionsKeyDifferentWorkspaces verifies that distinct workspace sets
 // produce distinct keys.
 func TestInstructionsKeyDifferentWorkspaces(t *testing.T) {
-	k1 := Key([]string{"/home/user/foo"})
-	k2 := Key([]string{"/home/user/bar"})
+	k1 := InstructionsKey([]string{"/home/user/foo"})
+	k2 := InstructionsKey([]string{"/home/user/bar"})
 	if k1 == k2 {
 		t.Fatalf("different workspaces should produce different keys, both got %q", k1)
 	}
@@ -45,14 +45,14 @@ func TestInstructionsKeyDifferentWorkspaces(t *testing.T) {
 
 // TestInstructionsKeyLength verifies the key is exactly 16 hex characters.
 func TestInstructionsKeyLength(t *testing.T) {
-	k := Key([]string{"/some/path"})
+	k := InstructionsKey([]string{"/some/path"})
 	if len(k) != 16 {
 		t.Fatalf("expected 16-char key, got %d chars: %q", len(k), k)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// BuildContent
+// BuildInstructionsContent
 // ---------------------------------------------------------------------------
 
 // TestBuildInstructionsContentDefault verifies that when no workspace
@@ -60,9 +60,9 @@ func TestInstructionsKeyLength(t *testing.T) {
 // workspace layout section but no per-repo instructions sections.
 func TestBuildInstructionsContentDefault(t *testing.T) {
 	dir := t.TempDir() // no AGENTS.md inside
-	content := BuildContent([]string{dir})
-	if !strings.HasPrefix(content, defaultTemplate) {
-		t.Fatal("content should start with the default template")
+	content := BuildInstructionsContent([]string{dir})
+	if !strings.Contains(content, "# Workspace Instructions") {
+		t.Fatal("content should contain the default template header")
 	}
 	if !strings.Contains(content, "## Workspace Layout") {
 		t.Fatal("content should include workspace layout section")
@@ -86,10 +86,10 @@ func TestBuildInstructionsContentWithWorkspaceCLAUDE(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	content := BuildContent([]string{dir})
+	content := BuildInstructionsContent([]string{dir})
 
-	if !strings.HasPrefix(content, defaultTemplate) {
-		t.Fatal("content should start with the default template")
+	if !strings.Contains(content, "# Workspace Instructions") {
+		t.Fatal("content should contain the default template header")
 	}
 
 	// Content must NOT be embedded; only a path reference should appear.
@@ -98,7 +98,7 @@ func TestBuildInstructionsContentWithWorkspaceCLAUDE(t *testing.T) {
 	}
 
 	name := filepath.Base(dir)
-	pathRef := "- `/workspace/" + name + "/AGENTS.md`"
+	pathRef := "/workspace/" + name + "/AGENTS.md"
 	if !strings.Contains(content, pathRef) {
 		t.Fatalf("single-workspace should contain path reference %q; got:\n%s", pathRef, content)
 	}
@@ -112,9 +112,9 @@ func TestBuildInstructionsContentWithWorkspaceCLAUDE(t *testing.T) {
 // a AGENTS.md produces no Repo-Specific Instructions section.
 func TestBuildInstructionsContentMissingCLAUDE(t *testing.T) {
 	dir := t.TempDir() // no AGENTS.md
-	content := BuildContent([]string{dir})
-	if !strings.HasPrefix(content, defaultTemplate) {
-		t.Fatal("content should start with the default template")
+	content := BuildInstructionsContent([]string{dir})
+	if !strings.Contains(content, "# Workspace Instructions") {
+		t.Fatal("content should contain the default template header")
 	}
 	if strings.Contains(content, "## Repo-Specific Instructions") {
 		t.Fatal("workspace without AGENTS.md should not produce Repo-Specific Instructions section")
@@ -130,11 +130,11 @@ func TestBuildInstructionsContentSingleWorkspaceRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	content := BuildContent([]string{dir})
+	content := BuildInstructionsContent([]string{dir})
 
 	name := filepath.Base(dir)
 	// A path reference must appear.
-	pathRef := "- `/workspace/" + name + "/AGENTS.md`"
+	pathRef := "/workspace/" + name + "/AGENTS.md"
 	if !strings.Contains(content, pathRef) {
 		t.Fatalf("single-workspace output should contain path reference %q", pathRef)
 	}
@@ -161,15 +161,15 @@ func TestBuildInstructionsContentMultipleWorkspaces(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	content := BuildContent([]string{dirA, dirB, dirC})
+	content := BuildInstructionsContent([]string{dirA, dirB, dirC})
 
 	nameA := filepath.Base(dirA)
 	nameB := filepath.Base(dirB)
 	nameC := filepath.Base(dirC)
 
-	refA := "- `/workspace/" + nameA + "/AGENTS.md`"
-	refC := "- `/workspace/" + nameC + "/AGENTS.md`"
-	refB := "- `/workspace/" + nameB + "/AGENTS.md`"
+	refA := "/workspace/" + nameA + "/AGENTS.md"
+	refC := "/workspace/" + nameC + "/AGENTS.md"
+	refB := "/workspace/" + nameB + "/AGENTS.md"
 
 	if !strings.Contains(content, refA) {
 		t.Errorf("expected path reference for workspace A: %q", refA)
@@ -177,7 +177,7 @@ func TestBuildInstructionsContentMultipleWorkspaces(t *testing.T) {
 	if !strings.Contains(content, refC) {
 		t.Errorf("expected path reference for workspace C: %q", refC)
 	}
-	// dirB has no AGENTS.md — its path should not appear.
+	// dirB has no AGENTS.md — its path should not appear in repo refs.
 	if strings.Contains(content, refB) {
 		t.Errorf("workspace B (no AGENTS.md) should not appear in references")
 	}
@@ -204,7 +204,7 @@ func TestBuildInstructionsContentTrailingNewline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	content := BuildContent([]string{dir})
+	content := BuildInstructionsContent([]string{dir})
 
 	if !strings.HasSuffix(content, "\n") {
 		t.Fatal("content should end with a newline")
@@ -212,18 +212,18 @@ func TestBuildInstructionsContentTrailingNewline(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Ensure
+// EnsureInstructions
 // ---------------------------------------------------------------------------
 
-// TestEnsureWorkspaceInstructionsCreatesFile verifies that the function
+// TestEnsureInstructionsCreatesFile verifies that the function
 // creates a new instructions file when one does not exist yet.
-func TestEnsureWorkspaceInstructionsCreatesFile(t *testing.T) {
+func TestEnsureInstructionsCreatesFile(t *testing.T) {
 	configDir := t.TempDir()
 	ws := t.TempDir()
 
-	path, err := Ensure(configDir, []string{ws})
+	path, err := EnsureInstructions(configDir, []string{ws})
 	if err != nil {
-		t.Fatal("Ensure:", err)
+		t.Fatal("EnsureInstructions:", err)
 	}
 
 	if _, err := os.Stat(path); err != nil {
@@ -236,13 +236,13 @@ func TestEnsureWorkspaceInstructionsCreatesFile(t *testing.T) {
 	}
 }
 
-// TestEnsureWorkspaceInstructionsIdempotent verifies that calling Ensure a
+// TestEnsureInstructionsIdempotent verifies that calling EnsureInstructions a
 // second time does NOT overwrite manually edited content.
-func TestEnsureWorkspaceInstructionsIdempotent(t *testing.T) {
+func TestEnsureInstructionsIdempotent(t *testing.T) {
 	configDir := t.TempDir()
 	ws := t.TempDir()
 
-	path, err := Ensure(configDir, []string{ws})
+	path, err := EnsureInstructions(configDir, []string{ws})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestEnsureWorkspaceInstructionsIdempotent(t *testing.T) {
 	}
 
 	// Calling again should not overwrite the custom content.
-	path2, err := Ensure(configDir, []string{ws})
+	path2, err := EnsureInstructions(configDir, []string{ws})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,9 +267,9 @@ func TestEnsureWorkspaceInstructionsIdempotent(t *testing.T) {
 	}
 }
 
-// TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE verifies that a
+// TestEnsureInstructionsIncludesWorkspaceCLAUDE verifies that a
 // newly created instructions file references the single workspace's AGENTS.md path.
-func TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE(t *testing.T) {
+func TestEnsureInstructionsIncludesWorkspaceCLAUDE(t *testing.T) {
 	configDir := t.TempDir()
 	ws := t.TempDir()
 
@@ -278,14 +278,14 @@ func TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path, err := Ensure(configDir, []string{ws})
+	path, err := EnsureInstructions(configDir, []string{ws})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	data, _ := os.ReadFile(path)
 	name := filepath.Base(ws)
-	pathRef := "- `/workspace/" + name + "/AGENTS.md`"
+	pathRef := "/workspace/" + name + "/AGENTS.md"
 	// A path reference must appear; content must not be embedded.
 	if !strings.Contains(string(data), pathRef) {
 		t.Fatalf("instructions file should reference single-workspace AGENTS.md path; got:\n%s", data)
@@ -296,17 +296,17 @@ func TestEnsureWorkspaceInstructionsIncludesWorkspaceCLAUDE(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Reinit
+// ReinitInstructions
 // ---------------------------------------------------------------------------
 
-// TestReinitWorkspaceInstructionsOverwrites verifies that Reinit replaces any
+// TestReinitInstructionsOverwrites verifies that ReinitInstructions replaces any
 // previously written (or manually edited) content.
-func TestReinitWorkspaceInstructionsOverwrites(t *testing.T) {
+func TestReinitInstructionsOverwrites(t *testing.T) {
 	configDir := t.TempDir()
 	ws := t.TempDir()
 
 	// First write stale content.
-	path, err := Ensure(configDir, []string{ws})
+	path, err := EnsureInstructions(configDir, []string{ws})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +320,7 @@ func TestReinitWorkspaceInstructionsOverwrites(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path2, err := Reinit(configDir, []string{ws})
+	path2, err := ReinitInstructions(configDir, []string{ws})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,15 +330,64 @@ func TestReinitWorkspaceInstructionsOverwrites(t *testing.T) {
 
 	data, _ := os.ReadFile(path)
 	if strings.Contains(string(data), "stale content") {
-		t.Fatal("Reinit should have overwritten stale content")
+		t.Fatal("ReinitInstructions should have overwritten stale content")
 	}
 	// For a single workspace a path reference must appear; content must not be embedded.
 	name := filepath.Base(ws)
-	pathRef := "- `/workspace/" + name + "/AGENTS.md`"
+	pathRef := "/workspace/" + name + "/AGENTS.md"
 	if !strings.Contains(string(data), pathRef) {
-		t.Fatalf("Reinit should reference single-workspace AGENTS.md path; got:\n%s", data)
+		t.Fatalf("ReinitInstructions should reference single-workspace AGENTS.md path; got:\n%s", data)
 	}
 	if strings.Contains(string(data), repoInstructions) {
-		t.Fatalf("Reinit should not embed single-workspace AGENTS.md content; got:\n%s", data)
+		t.Fatalf("ReinitInstructions should not embed single-workspace AGENTS.md content; got:\n%s", data)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Instructions template rendering
+// ---------------------------------------------------------------------------
+
+// TestInstructionsTemplateRender verifies that the Manager.Instructions method
+// renders the template with the provided data.
+func TestInstructionsTemplateRender(t *testing.T) {
+	content := Default.Instructions(InstructionsData{
+		Workspaces: []InstructionsWorkspace{
+			{Name: "repo-a"},
+			{Name: "repo-b"},
+		},
+		RepoInstructionRefs: []InstructionsRepoRef{
+			{Workspace: "repo-a", Filename: "AGENTS.md"},
+		},
+	})
+
+	if !strings.Contains(content, "# Workspace Instructions") {
+		t.Fatal("rendered content should contain template header")
+	}
+	if !strings.Contains(content, "/workspace/repo-a/") {
+		t.Fatal("rendered content should list repo-a workspace")
+	}
+	if !strings.Contains(content, "/workspace/repo-b/") {
+		t.Fatal("rendered content should list repo-b workspace")
+	}
+	if !strings.Contains(content, "/workspace/repo-a/AGENTS.md") {
+		t.Fatal("rendered content should reference repo-a AGENTS.md")
+	}
+	if !strings.Contains(content, "## Repo-Specific Instructions") {
+		t.Fatal("rendered content should include Repo-Specific Instructions section")
+	}
+}
+
+// TestInstructionsTemplateNoRefs verifies that the Repo-Specific Instructions
+// section is omitted when no repos have instruction files.
+func TestInstructionsTemplateNoRefs(t *testing.T) {
+	content := Default.Instructions(InstructionsData{
+		Workspaces: []InstructionsWorkspace{{Name: "my-repo"}},
+	})
+
+	if !strings.Contains(content, "/workspace/my-repo/") {
+		t.Fatal("should list workspace")
+	}
+	if strings.Contains(content, "## Repo-Specific Instructions") {
+		t.Fatal("should not include Repo-Specific Instructions when no refs")
 	}
 }

@@ -10,8 +10,8 @@ import (
 	"sync"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/pkg/set"
+	"changkun.de/x/wallfacer/prompts"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -90,7 +90,7 @@ func NewStatic(store *store.Store, workspaces []string, instructionsPath string)
 		Generation:       1,
 	}
 	if len(ws) > 0 {
-		m.current.Key = instructions.Key(ws)
+		m.current.Key = prompts.InstructionsKey(ws)
 	}
 	if store != nil {
 		m.current.ScopedDataDir = store.DataDir()
@@ -186,7 +186,7 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 
 	// Build the candidate snapshot. All external side effects happen here,
 	// before the atomic swap, so the manager is never left in a partial state.
-	key := instructions.Key(validated)
+	key := prompts.InstructionsKey(validated)
 	swap := pendingSwap{
 		next: Snapshot{
 			Key:           key,
@@ -211,7 +211,7 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	}
 
 	if len(validated) > 0 {
-		instructionsPath, err := instructions.Ensure(m.configDir, validated)
+		instructionsPath, err := prompts.EnsureInstructions(m.configDir, validated)
 		if err != nil {
 			swap.cleanup()
 			return Snapshot{}, fmt.Errorf("ensure instructions: %w", err)

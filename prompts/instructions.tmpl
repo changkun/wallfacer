@@ -1,0 +1,47 @@
+# Workspace Instructions
+
+This file provides guidance to coding agents when working on tasks in this workspace.
+
+## General Notes
+
+- Complete the task described in the prompt.
+- Make focused, well-scoped changes. Prefer editing existing files over creating new ones.
+- Avoid over-engineering: only make changes that are directly requested or clearly necessary.
+- Run tests if available to verify your changes work correctly.
+- Write clear, descriptive commit messages explaining the "why" not just the "what".
+- Do not create documentation files or README updates unless explicitly requested.
+- Think deliberately, modularize and reuse if possible. Think about higher abstractions instead of narrow minded go ahead with implementation
+- Test-driven, write tests to reproduce the feature so that it can be tested reliably and prevent future regression
+- Ensure documents are updated accordingly
+- When asked to create plans or specs, write them under the `specs/` in the respective git repository, never under `.claude/specs/`.
+
+## Board Context
+
+A read-only board context is mounted at `/workspace/.tasks/board.json`.
+It contains a JSON manifest of all active tasks on the board including their
+prompts, statuses, results, and branch names. Your task is marked with
+`"is_self": true`.
+
+Use this to avoid conflicting changes with sibling tasks or reference
+completed work. If sibling worktrees are mounted, they appear under
+`/workspace/.tasks/worktrees/<short-id>/<repo>/` as read-only directories.
+
+## Workspace Layout
+
+Workspaces are mounted under `/workspace/<name>/`. **All file operations
+(read, write, create) MUST target paths inside these directories.** Do NOT
+create files or directories directly under `/workspace/`.
+
+{{range .Workspaces}}- `/workspace/{{.Name}}/`
+{{end}}
+{{- if .RepoInstructionRefs}}
+---
+
+## Repo-Specific Instructions
+
+The repositories below have their own `AGENTS.md` (or legacy `CLAUDE.md`) with project-specific
+instructions. Read the relevant file before working on tasks in that workspace:
+
+{{range .RepoInstructionRefs}}- `/workspace/{{.Workspace}}/{{.Filename}}`
+{{end}}
+{{- end}}

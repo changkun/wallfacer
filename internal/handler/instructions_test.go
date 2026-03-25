@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/runner"
+	"changkun.de/x/wallfacer/prompts"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -62,7 +62,7 @@ func TestGetInstructions_ReturnsContent(t *testing.T) {
 	h, configDir := newTestHandlerWithInstructions(t)
 
 	// Write the instructions file directly.
-	instPath := instructions.FilePath(configDir, h.workspaces)
+	instPath := prompts.InstructionsFilePath(configDir, h.workspaces)
 	if err := os.MkdirAll(filepath.Dir(instPath), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestUpdateInstructions_WritesContent(t *testing.T) {
 	}
 
 	// Verify the file was written.
-	instPath := instructions.FilePath(configDir, h.workspaces)
+	instPath := prompts.InstructionsFilePath(configDir, h.workspaces)
 	written, err := os.ReadFile(instPath)
 	if err != nil {
 		t.Fatalf("read written file: %v", err)
@@ -164,7 +164,7 @@ func TestReinitInstructions_Success(t *testing.T) {
 	}
 
 	// Verify the file was created.
-	instPath := instructions.FilePath(configDir, h.workspaces)
+	instPath := prompts.InstructionsFilePath(configDir, h.workspaces)
 	if _, err := os.Stat(instPath); err != nil {
 		t.Errorf("expected instructions file to exist after reinit: %v", err)
 	}

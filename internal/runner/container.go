@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
-	"changkun.de/x/wallfacer/internal/instructions"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -207,9 +207,9 @@ func (r *Runner) buildContainerArgsForSandbox(
 
 func instructionsFilenameForSandbox(sb sandbox.Type) string {
 	if sb == sandbox.Codex {
-		return instructions.InstructionsFilename
+		return prompts.CodexInstructionsFilename
 	}
-	return instructions.LegacyInstructionsFilename
+	return prompts.ClaudeInstructionsFilename
 }
 
 // appendInstructionsMount adds the workspace-level instructions file as a
