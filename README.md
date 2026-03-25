@@ -67,7 +67,7 @@ curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh 
 # — or: go install changkun.de/x/wallfacer@latest       # requires Go 1.25+
 
 # 2. Start the server (restores your last workspace group, or starts empty)
-./wallfacer run
+wallfacer run
 ```
 
 The browser opens to `http://localhost:8080`. Add your Claude credential (OAuth token or API key) in **Settings → API Configuration**. The sandbox image is pulled automatically on first task run.
@@ -82,10 +82,10 @@ Codex can be enabled either by:
 
 ```bash
 # Custom port, skip auto-opening the browser
-./wallfacer run -addr :9090 -no-browser
+wallfacer run -addr :9090 -no-browser
 
 # Check prerequisites and configuration
-./wallfacer doctor
+wallfacer doctor
 ```
 
 For all available `make` targets (build, test, release, etc.), see [Technical Internals: Architecture](docs/internals/architecture.md#development-setup).
