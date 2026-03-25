@@ -1,6 +1,7 @@
 # Pluggable Sandbox Backends
 
 **Date:** 2026-03-23
+**Updated:** 2026-03-25
 
 ## Problem
 
@@ -32,7 +33,9 @@ Key types involved:
 - **Log streaming** — Container stdout captured by `cmdexec.Capture()` as a blocking call; live log streaming uses a separate `logpipe.Pipe` mechanism.
 - **Circuit breaker** (`internal/pkg/circuitbreaker`) — Three-state breaker (closed/open/half-open) gating `runContainer()` calls; tracks consecutive failures via atomic CAS.
 
-## Design: Pluggable Sandbox Backends
+---
+
+## Design
 
 ### Sandbox Lifecycle States
 
@@ -53,24 +56,9 @@ Creating → Running → Streaming → Stopping → Stopped
 | `Stopped` | Container exited (success or non-zero). Terminal state. | Backend, after `Wait()` returns. |
 | `Failed` | Container could not be created or crashed before producing output. Terminal state. | Backend, on launch failure or runtime error. |
 
-The `SandboxHandle` exposes `State() SandboxState` so the runner and handler can query current state without shelling out.
-
-#### Design Note: Comparison with Managed Sandbox Platforms
-
-Managed platforms (e.g., Tensorlake) model sandboxes as long-lived resources with richer lifecycles including `Suspended` and `Snapshotting` states. Our model is deliberately simpler because wallfacer sandboxes are task-scoped executors, not general-purpose environments:
-
-- **No Suspend/Resume at the backend level.** Claude CLI is a one-shot process — it exits when done, so there is nothing to suspend between invocations. However, long-lived *worker containers* (see [Container Reuse](03-container-reuse.md)) can be paused via `podman pause`/`unpause` between exec invocations to reclaim CPU/memory. This is an optimization internal to `LocalBackend`, not a backend-level state.
-
-- **No Snapshotting state.** Filesystem snapshots (warm caches, derived images) are a `LocalBackend` optimization covered in [Container Reuse](03-container-reuse.md). For K8s, pod checkpointing is a cluster-level concern outside the backend interface.
-
-- **Timeout is task-level, not sandbox-level.** The runner enforces task timeouts (`task.Timeout`) and kills the container via `handle.Kill()`. The backend doesn't need its own timeout — it's a policy decision made by the runner.
-
-If future needs require persistent sandboxes (e.g., interactive development environments), the state machine can be extended with `Suspended` and `Resuming` states without breaking existing backends — they simply never enter those states.
-
-### New Interfaces
+### Target Interfaces
 
 ```go
-// SandboxState represents the lifecycle state of a sandbox container.
 type SandboxState int
 
 const (
@@ -82,173 +70,251 @@ const (
     SandboxFailed
 )
 
-// SandboxBackend abstracts where and how sandbox containers run.
 type SandboxBackend interface {
-    // Launch starts a container from the given spec and returns a handle.
-    // The handle streams output and allows cancellation.
-    // The container is in Creating state during this call and transitions
-    // to Running before Launch returns (or to Failed on error).
     Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error)
-
-    // List returns currently running sandboxes managed by this backend.
-    // Replaces the current ListContainers() shell-out.
     List(ctx context.Context) ([]ContainerInfo, error)
 }
 
-// SandboxHandle represents a running sandbox container with lifecycle tracking.
 type SandboxHandle interface {
-    // State returns the current lifecycle state of the container.
     State() SandboxState
-
-    // Stdout returns a reader for the container's stdout/stderr.
-    // Reading from this transitions the state to Streaming.
     Stdout() io.ReadCloser
-
-    // Wait blocks until the container exits and returns its exit code.
-    // Transitions state to Stopped on return.
     Wait() (exitCode int, err error)
-
-    // Kill requests the container to stop. Transitions state to Stopping,
-    // then Stopped once the container has exited.
     Kill() error
-
-    // Name returns the container's unique identifier
-    // (container name, pod name, VM ID, etc.).
     Name() string
 }
 ```
 
-### Backend Implementations
+### Design Notes
 
-#### 1. Local Backend
-
-The primary backend. Wraps the existing `osContainerExecutor` but returns a `SandboxHandle` with proper lifecycle state tracking instead of blocking on `cmdexec.Capture()`.
-
-```go
-type LocalBackend struct {
-    command string // "podman" or "docker"
-}
-```
-
-**Key changes from current `osContainerExecutor`:**
-
-- `Launch()` calls `os/exec.Command().Start()` (non-blocking) instead of `Capture()` (blocking). Returns a `localHandle` that owns the `exec.Cmd` and its stdout pipe.
-- `localHandle.Stdout()` returns the pipe reader. The runner reads and parses output while the container runs — same logic as today's `parseOutput()`, but now the handle tracks state transitions as reads occur.
-- `localHandle.Wait()` calls `cmd.Wait()` and transitions to `Stopped`.
-- `localHandle.Kill()` runs `podman kill` + `podman rm -f`, transitions through `Stopping` → `Stopped`.
-- `List()` replaces `ListContainers()` shell-out; same `podman ps --format json` parsing but encapsulated inside the backend.
-
-**Behavioral improvement:** Today `RunArgs()` blocks the entire goroutine until container exit, and live log streaming requires a separate `logpipe.Pipe` mechanism. With the handle-based approach, the runner reads from `Stdout()` directly, unifying output parsing and live streaming into a single path.
-
-#### 2. Kubernetes Backend
-
-Creates K8s Jobs via `client-go`. Each task becomes a Job with a single-container Pod.
-
-```go
-type K8sBackend struct {
-    clientset kubernetes.Interface
-    namespace string
-    // PVC or CSI driver config for workspace volume mounting
-}
-```
-
-**Mapping `ContainerSpec` → K8s Job:**
-
-| ContainerSpec field | K8s equivalent |
-|---------------------|----------------|
-| `Image` | `pod.spec.containers[0].image` |
-| `Volumes` | `pod.spec.volumes` + `volumeMounts` (PVC, hostPath, or NFS) |
-| `Env` | `pod.spec.containers[0].env` (secrets via SecretKeyRef) |
-| `Labels` | `job.metadata.labels` |
-| `Network` | K8s NetworkPolicy or service mesh |
-| `CPUs`, `Memory` | `resources.requests` / `resources.limits` |
-| `Cmd` | `pod.spec.containers[0].args` |
-| `WorkDir` | `pod.spec.containers[0].workingDir` |
-
-**State mapping:** K8s pod phases map to sandbox states: `Pending` → `Creating`, `Running` → `Running`/`Streaming`, `Succeeded`/`Failed` → `Stopped`/`Failed`.
-
-**Log streaming:** `k8s.io/client-go` pod log follow stream (replaces `os/exec` pipe).
-
-**Workspace mounting:**
-- Option A: PersistentVolumeClaim per user, pre-populated with cloned repos
-- Option B: Init container that clones repos on Job start (slower but simpler)
-- Option C: NFS/EFS shared volume with per-user subdirectories
-
-**Worktree challenge:** Git worktrees use absolute paths in their `.git` file, referencing the main repo's `.git/worktrees/<name>/` directory. In K8s, the wallfacer server creates worktrees on its own filesystem — these paths don't exist inside the Job pod. **Solution:** Create worktrees inside the shared volume (PVC), or use an init container that creates the worktree inside the pod before the agent starts.
-
-#### 3. Remote Docker Backend (optional)
-
-SSH tunnel or Docker API over HTTPS to a remote Docker host.
-
-```go
-type RemoteDockerBackend struct {
-    client *docker.Client // docker client SDK pointing at remote host
-}
-```
-
-Useful for simple setups where a beefy VM runs all containers. Lower complexity than K8s but limited to single-host scaling. State tracking via Docker events API.
+- **No Suspend/Resume at the backend level.** Claude CLI is a one-shot process — it exits when done. Long-lived worker containers (see [Container Reuse](03-container-reuse.md)) can be paused via `podman pause`/`unpause` between exec invocations, but that is an optimization internal to `LocalBackend`.
+- **No Snapshotting state.** Filesystem snapshots are a `LocalBackend` optimization covered in [Container Reuse](03-container-reuse.md).
+- **Timeout is task-level, not sandbox-level.** The runner enforces `task.Timeout` and kills via `handle.Kill()`.
 
 ---
 
-## Runner Changes
+## Tasks
 
-### Replace `executor` with `backend`
+### Task 1: Define interfaces and types
 
-In `internal/runner/runner.go`, the `Runner` struct replaces `executor ContainerExecutor` with `backend SandboxBackend`:
+**Goal:** Add `SandboxState`, `SandboxBackend`, and `SandboxHandle` as new types. No behavior changes yet.
 
-```go
-type Runner struct {
-    // ...
-    backend SandboxBackend // replaces executor ContainerExecutor
-    // ...
-}
+**Work:**
+1. Create `internal/runner/backend.go` with `SandboxState` enum, `SandboxBackend` interface, and `SandboxHandle` interface (see Target Interfaces above)
+2. Add `String()` method on `SandboxState` for logging
+3. Add unit tests for `SandboxState.String()` and interface compliance (compile-time checks)
+
+**Files:** `internal/runner/backend.go` (new), `internal/runner/backend_test.go` (new)
+
+**Acceptance:** Compiles, tests pass, no existing behavior changes.
+
+---
+
+### Task 2: Implement `LocalBackend.Launch()` with `localHandle`
+
+**Goal:** Implement the local (podman/docker) backend that launches containers non-blocking and returns a handle with lifecycle state tracking.
+
+**Work:**
+1. Create `internal/runner/backend_local.go` with `LocalBackend` struct (field: `command string`)
+2. Implement `LocalBackend.Launch(ctx, spec)`:
+   - Build CLI args from `spec.Build()`
+   - Remove leftover containers (same as current `osContainerExecutor`)
+   - Call `os/exec.Command().Start()` (non-blocking) instead of `cmdexec.Capture()` (blocking)
+   - Pipe stdout+stderr via `cmd.StdoutPipe()` / `cmd.StderrPipe()`
+   - Return a `localHandle` that owns the `exec.Cmd` and its stdout pipe
+3. Implement `localHandle`:
+   - `State()` returns current state (atomic, thread-safe)
+   - `Stdout()` returns the pipe reader
+   - `Wait()` calls `cmd.Wait()`, transitions to `Stopped`
+   - `Kill()` runs `podman kill` + `podman rm -f`, transitions through `Stopping` → `Stopped`
+   - `Name()` returns container name
+   - State transitions: `Creating` → `Running` (after `Start()`) → `Streaming` (after first read) → `Stopped`/`Failed`
+4. Add unit tests: launch with a trivial container (e.g., `echo hello`), verify state transitions, verify Kill() transitions, verify Wait() returns exit code
+
+**Files:** `internal/runner/backend_local.go` (new), `internal/runner/backend_local_test.go` (new)
+
+**Acceptance:** `LocalBackend` satisfies `SandboxBackend` interface. State transitions are correct. Can launch, stream, wait, and kill containers.
+
+---
+
+### Task 3: Implement `LocalBackend.List()`
+
+**Goal:** Move the existing `ListContainers()` logic into `LocalBackend.List()`.
+
+**Work:**
+1. Move `ListContainers()` logic from `runner.go:132-183` into `LocalBackend.List(ctx)`
+2. Include `parseContainerList()` — handles both Podman (JSON array) and Docker (NDJSON) format
+3. Return `[]ContainerInfo` (same struct, same fields)
+4. Add unit tests with sample Podman and Docker JSON outputs
+
+**Files:** `internal/runner/backend_local.go`, `internal/runner/backend_local_test.go`
+
+**Acceptance:** `List()` returns same data as current `ListContainers()`. Both Podman and Docker JSON formats handled.
+
+---
+
+### Task 4: Refactor `Runner` to use `SandboxBackend`
+
+**Goal:** Replace `executor ContainerExecutor` with `backend SandboxBackend` in the `Runner` struct.
+
+**Work:**
+1. In `runner.go`, change `Runner.executor ContainerExecutor` → `Runner.backend SandboxBackend`
+2. Update `NewRunner()` (or wherever the executor is injected) to accept/create a `LocalBackend`
+3. Update `ListContainers()` on `Runner` to delegate to `r.backend.List(ctx)`
+4. Ensure all call sites that reference `r.executor` are updated
+5. All existing tests must pass — may need to update test helpers that inject mock executors
+
+**Files:** `internal/runner/runner.go`, `internal/runner/runner_test.go`, any files that construct `Runner`
+
+**Acceptance:** `Runner` uses `SandboxBackend`. All existing tests pass. No behavior change.
+
+---
+
+### Task 5: Refactor `runContainer()` to use handle-based streaming
+
+**Goal:** Replace the blocking `executor.RunArgs()` call with the non-blocking `backend.Launch()` + handle pattern.
+
+**Work:**
+1. In `container.go`, refactor `runContainer()`:
+   - Replace `r.executor.RunArgs(ctx, name, args)` with `r.backend.Launch(ctx, spec)`
+   - Read output from `handle.Stdout()` instead of parsing a byte slice
+   - Call `handle.Wait()` to get exit code
+   - Use `handle.State()` for circuit-breaker decisions: `SandboxFailed` at creation = runtime failure, `SandboxStopped` with non-zero exit = agent error
+2. Update `parseOutput()` / `parseAgentOutput()` to accept `io.Reader` instead of `[]byte` (or adapt the bridge)
+3. Update container kill path: replace `r.executor.Kill(name)` with `handle.Kill()`
+4. Update circuit breaker integration to use handle state
+
+**Files:** `internal/runner/container.go`, `internal/runner/output.go` (if output parsing changes), `internal/runner/container_test.go`
+
+**Acceptance:** `runContainer()` uses handle-based streaming. Output parsing works from reader. Circuit breaker uses handle state. All tests pass.
+
+---
+
+### Task 6: Upgrade container registry to store handles
+
+**Goal:** Replace `containerRegistry`'s `syncmap.Map[uuid.UUID, string]` with handle storage for richer state queries.
+
+**Work:**
+1. Change `containerRegistry` to map `uuid.UUID → SandboxHandle` (or a wrapper struct with both handle and name)
+2. Update `Set()`, `Get()`, `Delete()` methods
+3. `ContainerName(id)` delegates to `handle.Name()`
+4. Kill by task ID now calls `handle.Kill()` directly instead of shelling out
+5. Update all call sites in handler (container kill endpoint, task cancel, etc.)
+
+**Files:** `internal/runner/registry.go`, `internal/runner/registry_test.go`, `internal/handler/containers.go`
+
+**Acceptance:** Registry stores handles. Kill works through handle. All tests pass.
+
+---
+
+### Task 7: Retire `ContainerExecutor` interface
+
+**Goal:** Remove the old abstraction now that `SandboxBackend` is fully wired.
+
+**Work:**
+1. Delete `ContainerExecutor` interface from `executor.go`
+2. Delete `osContainerExecutor` implementation
+3. Delete or migrate `MockContainerExecutor` in test files — replace with mock `SandboxBackend`
+4. Remove any remaining references to the old interface
+5. Clean up imports
+
+**Files:** `internal/runner/executor.go` (delete or empty), `internal/runner/executor_mock_test.go` (delete or replace)
+
+**Acceptance:** No references to `ContainerExecutor` remain. All tests pass with `SandboxBackend` mocks.
+
+---
+
+### Task 8: Unify log streaming through the handle
+
+**Goal:** Remove the separate `logpipe.Pipe` mechanism and stream logs directly from the handle's `Stdout()`.
+
+**Work:**
+1. Audit how `logpipe.Pipe` is used for live log streaming to the UI (SSE `/api/tasks/{id}/logs`)
+2. Replace logpipe with a tee or multi-reader on `handle.Stdout()` — output parsing and live log streaming read from the same source
+3. Ensure SSE log streaming still works correctly with the new reader path
+4. Remove logpipe if no longer needed
+
+**Files:** `internal/runner/logpipe/` (audit/remove), `internal/handler/stream.go`, `internal/runner/container.go`
+
+**Acceptance:** Live log streaming works through the handle's stdout. No separate pipe mechanism needed. SSE logs work correctly.
+
+---
+
+### Task 9: Backend selection via env var
+
+**Goal:** Add `WALLFACER_SANDBOX_BACKEND` env var so the server can select between backends at startup.
+
+**Work:**
+1. Add `WALLFACER_SANDBOX_BACKEND` to `internal/envconfig/` (values: `local`, default: `local`)
+2. In server startup, create the appropriate backend based on config
+3. Add to `wallfacer doctor` output
+4. Update docs: `CLAUDE.md`, `docs/guide/configuration.md`
+
+**Files:** `internal/envconfig/envconfig.go`, `internal/cli/server.go`, `internal/cli/doctor.go`, docs
+
+**Acceptance:** `WALLFACER_SANDBOX_BACKEND=local` works (only option for now). Doctor reports backend. Docs updated.
+
+---
+
+### Task 10: Kubernetes backend (future)
+
+**Goal:** Implement `K8sBackend` for dispatching sandbox containers as K8s Jobs.
+
+**Depends on:** Tasks 1–9 complete.
+
+**Work:**
+1. Add `internal/runner/backend_k8s.go` implementing `SandboxBackend` via `client-go`
+2. Map `ContainerSpec` → K8s Job spec (see design table above)
+3. Implement `k8sHandle` with state tracking via pod watch
+4. Implement log streaming via pod log follow API
+5. Handle worktree mounting via shared PVC (see Worktree Management section)
+6. Add `k8s` as a value for `WALLFACER_SANDBOX_BACKEND`
+7. Integration tests with kind or minikube
+
+**New dependency:** `k8s.io/client-go`
+
+This task is deliberately left as a single unit — it should be broken down further when work begins.
+
+---
+
+### Task 11: Remote Docker backend (optional, future)
+
+**Goal:** Implement `RemoteDockerBackend` for SSH/HTTPS dispatch to a remote Docker host.
+
+**Depends on:** Tasks 1–9 complete.
+
+**Work:**
+1. Add `internal/runner/backend_remote.go` using Docker client SDK
+2. SSH tunnel or TLS client cert for authentication
+3. State tracking via Docker events API
+4. Volume mounting via NFS or pre-provisioned volumes on the remote host
+
+Lower priority than K8s. Useful for simple single-host remote setups.
+
+---
+
+## Task Dependency Graph
+
+```
+Task 1 (interfaces)
+  └→ Task 2 (LocalBackend.Launch)
+  └→ Task 3 (LocalBackend.List)
+       └→ Task 4 (refactor Runner)
+            └→ Task 5 (refactor runContainer)
+                 └→ Task 6 (upgrade registry)
+                      └→ Task 7 (retire ContainerExecutor)
+                           └→ Task 8 (unify log streaming)
+                                └→ Task 9 (env var backend selection)
+                                     └→ Task 10 (K8s backend)
+                                     └→ Task 11 (Remote Docker backend)
 ```
 
-### Refactor `runContainer` flow
-
-Current flow in `internal/runner/container.go` calls `executor.RunArgs()` which blocks until the container exits. The new flow uses the handle for non-blocking launch, output streaming, and lifecycle tracking:
-
-```go
-func (r *Runner) runContainer(ctx context.Context, spec ContainerSpec) (*agentOutput, error) {
-    handle, err := r.backend.Launch(ctx, spec)
-    if err != nil {
-        return nil, err
-    }
-
-    // Register for lookup by task ID (replaces containerRegistry.Set)
-    r.taskContainers.SetHandle(taskID, handle)
-    defer r.taskContainers.Delete(taskID)
-
-    // Stream and parse output — same parseOutput logic, reads from handle.Stdout()
-    // State transitions: Running → Streaming as output arrives
-    output := r.parseAgentOutput(handle.Stdout())
-
-    exitCode, err := handle.Wait()
-    // handle.State() == SandboxStopped at this point
-    // ... handle exit code, errors, circuit breaker recording, etc.
-}
-```
-
-### Container registry upgrade
-
-The `containerRegistry` currently maps `taskID → string` (container name). With handles, it could optionally map `taskID → SandboxHandle`, giving the runner direct access to `State()` and `Kill()` without needing to resolve names. This is an implementation choice — at minimum, `ContainerName()` delegates to `handle.Name()`.
-
-### Container listing
-
-`ListContainers()` currently shells out to `podman ps --format json` in `runner.go:139-187`. Replace with `backend.List()` — each backend implements listing natively:
-- Local: same `podman ps` parsing, but encapsulated
-- K8s: `client.BatchV1().Jobs().List()` with label selector
-- Remote Docker: `client.ContainerList()`
-
-### Circuit breaker
-
-The circuit breaker (`containerCB`) wraps `backend.Launch()`. The handle's `State()` provides richer failure information — `SandboxFailed` at creation time is a circuit-breaker-relevant failure, while `SandboxStopped` with non-zero exit is an agent error (not a runtime failure).
+Tasks 2 and 3 can run in parallel after Task 1. Tasks 10 and 11 can run in parallel after Task 9. All other tasks are sequential.
 
 ---
 
 ## Worktree Management in Cloud
 
-The biggest architectural challenge. Currently:
+The biggest architectural challenge for remote backends. Currently:
 
 1. `Runner.ensureTaskWorktrees()` creates worktrees at `~/.wallfacer/worktrees/<task-uuid>/` (`internal/runner/worktree.go`)
 2. `buildContainerArgs()` bind-mounts worktree paths into the container
@@ -264,46 +330,7 @@ In a K8s/remote backend, the worktree filesystem must be accessible to both the 
 | **In-pod worktree creation** | Init container creates worktree; server reads results via K8s exec or shared volume | Decouples server from filesystem; git operations move to pod |
 | **Git server sidecar** | Each pod has a git sidecar that handles worktree ops via API | Clean separation; most complex |
 
-**Recommended:** Shared volume (PVC/NFS) for initial implementation. The wallfacer server and sandbox pods mount the same volume. Worktree creation and git operations happen from the server (as today). The pod sees the worktree as a regular directory.
-
----
-
-## Implementation Plan
-
-### Phase 1: Interface Extraction + Local Backend
-
-1. Define `SandboxState`, `SandboxBackend`, and `SandboxHandle` in `internal/runner/backend.go`
-2. Implement `LocalBackend` and `localHandle` wrapping `os/exec` with lifecycle state tracking
-   - `Launch()` uses `cmd.Start()` (non-blocking) + stdout pipe → returns `localHandle`
-   - `localHandle` tracks state transitions: Creating → Running → Streaming → Stopped/Failed
-   - `localHandle.Kill()` runs `podman kill` + `podman rm -f`
-   - `LocalBackend.List()` encapsulates the existing `podman ps --format json` parsing
-3. Refactor `Runner` to use `SandboxBackend` instead of `ContainerExecutor`
-4. Refactor `runContainer()` in `container.go` to use `SandboxHandle` for output streaming
-5. Update `containerRegistry` to store handles (or at minimum delegate `Name()` and `Kill()`)
-6. Retire `ContainerExecutor` interface and `osContainerExecutor`
-7. All existing tests pass with `LocalBackend` — no behavior change
-
-**Files touched:** `internal/runner/executor.go` (retire), `internal/runner/backend.go` (new), `internal/runner/backend_local.go` (new), `internal/runner/runner.go`, `internal/runner/container.go`, `internal/runner/execute.go`, `internal/runner/registry.go`
-
-### Phase 2: Kubernetes Backend
-
-1. Add `internal/runner/backend_k8s.go` implementing `SandboxBackend` via `client-go`
-2. Map `ContainerSpec` → K8s Job spec
-3. Implement `k8sHandle` with state tracking via pod watch
-4. Implement log streaming via pod log follow API
-5. Handle worktree mounting via shared PVC
-6. Add `WALLFACER_SANDBOX_BACKEND` env var (`local` | `k8s`)
-7. Integration tests with kind or minikube
-
-**New dependency:** `k8s.io/client-go`
-
-### Phase 3: Remote Docker Backend (optional)
-
-1. Add `internal/runner/backend_remote.go` using Docker client SDK
-2. SSH tunnel or TLS client cert for authentication
-3. State tracking via Docker events API
-4. Volume mounting via NFS or pre-provisioned volumes on the remote host
+**Recommended:** Shared volume (PVC/NFS) for initial implementation. Design details deferred to Task 10.
 
 ---
 
@@ -321,21 +348,9 @@ Currently checked via `podman images` / `docker images` in the handler. For K8s,
 
 ### Network Control
 
-`ContainerSpec.Network` is the abstraction point for network configuration. Currently it's a single string (`"host"`, `"none"`, `"slirp4netns"`) mapped to `--network`. This is sufficient for single-user local deployment but insufficient for cloud/multi-tenant scenarios.
-
-**Levels of network control:**
-
-| Level | What it controls | Local | K8s | When needed |
-|-------|-----------------|-------|-----|-------------|
-| **Mode** | Connectivity model (host/none/NAT) | `--network` flag | Pod network mode | Now (implemented) |
-| **Egress filtering** | Which external hosts the sandbox can reach | iptables/nftables rules, or `slirp4netns` with allowlist | NetworkPolicy with egress rules | Multi-tenant (prevent data exfiltration) |
-| **Inter-sandbox isolation** | Whether task containers can see each other | Separate network namespaces (already true with `--rm`) | NetworkPolicy with pod selector | Multi-tenant |
-| **DNS control** | Custom DNS resolution inside sandbox | `--dns` flag or custom resolv.conf | CoreDNS policy | Cloud (route API calls through gateway) |
-| **Ingress** | Whether sandbox can accept connections | Not applicable (sandboxes don't serve) | Not applicable | N/A |
-
-**Recommendation:** Keep `ContainerSpec.Network` as the coarse mode selector for now. For egress filtering and DNS control, add optional fields to `ContainerSpec` when needed (e.g., `EgressAllowlist []string`, `DNSServers []string`) — backends interpret them or ignore them. Fine-grained network policy is primarily a multi-tenant concern and should be designed in [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) alongside tenant isolation.
+`ContainerSpec.Network` is the abstraction point. Currently a single string (`"host"`, `"none"`, `"slirp4netns"`). Sufficient for local deployment. For egress filtering and DNS control, add optional fields to `ContainerSpec` when needed — this is primarily a multi-tenant concern designed in [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md).
 
 ### Dependencies on Other Epics
 
-- **Cloud Data Storage** (`02-storage-backends.md`): If the store moves to a database, the sandbox executor doesn't need to share a filesystem for task metadata — only for worktrees. This simplifies shared volume requirements.
-- **Multi-Tenant** (`08-cloud-multi-tenant.md`): The control plane decides which backend each user's instance uses. The sandbox executor just needs to support configuration injection at startup.
+- **Cloud Data Storage** (`02-storage-backends.md`): If the store moves to a database, the sandbox executor doesn't need to share a filesystem for task metadata — only for worktrees.
+- **Multi-Tenant** (`08-cloud-multi-tenant.md`): The control plane decides which backend each user's instance uses.
