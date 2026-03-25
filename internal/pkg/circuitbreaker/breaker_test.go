@@ -331,9 +331,9 @@ func TestBreaker_OpenCASFailureDeterministic(t *testing.T) {
 	//
 	// The only way to test line 79 is via concurrent racing. Increase
 	// concurrency to make it reliable.
-	b := New(1, time.Nanosecond) // near-zero open duration
-	b.RecordFailure()            // opens circuit
-	time.Sleep(time.Millisecond) // ensure open duration expired
+	b := New(1, time.Hour) // long open duration so re-opens stay unexpired
+	b.RecordFailure()      // opens circuit
+	b.openAt.Store(0)      // force expired so initial goroutines see elapsed >> openDuration
 
 	const goroutines = 500
 	var wg sync.WaitGroup
