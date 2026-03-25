@@ -73,6 +73,7 @@ After M2 (store interfaces stable). Independent of M3. Can run in parallel with 
 |------|----------|
 | [90-oversight-risk-scoring.md](90-oversight-risk-scoring.md) | Real-time agent action risk assessment |
 | [91-visual-verification.md](91-visual-verification.md) | Visual verification for UI changes |
+| [92-live-serve.md](92-live-serve.md) | Build and run developed software from within Wallfacer |
 
 ## Ordering Rationale
 
