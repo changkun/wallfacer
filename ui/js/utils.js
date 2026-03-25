@@ -35,12 +35,21 @@ function showConfirm(message) {
     function close(result) {
       modal.classList.add("hidden");
       modal.classList.remove("flex");
-      if (cleanup) { cleanup(); cleanup = null; }
+      if (cleanup) {
+        cleanup();
+        cleanup = null;
+      }
       resolve(result);
     }
-    confirmBtn.onclick = function () { close(true); };
-    cancelBtn.onclick = function () { close(false); };
-    cleanup = bindModalDismiss(modal, function () { close(false); });
+    confirmBtn.onclick = function () {
+      close(true);
+    };
+    cancelBtn.onclick = function () {
+      close(false);
+    };
+    cleanup = bindModalDismiss(modal, function () {
+      close(false);
+    });
   });
 }
 
@@ -59,14 +68,26 @@ function showPrompt(message, defaultValue) {
     function close(result) {
       modal.classList.add("hidden");
       modal.classList.remove("flex");
-      if (cleanup) { cleanup(); cleanup = null; }
+      if (cleanup) {
+        cleanup();
+        cleanup = null;
+      }
       resolve(result);
     }
-    document.getElementById("prompt-ok-btn").onclick = function () { close(input.value); };
-    document.getElementById("prompt-cancel-btn").onclick = function () { close(null); };
-    cleanup = bindModalDismiss(modal, function () { close(null); });
+    document.getElementById("prompt-ok-btn").onclick = function () {
+      close(input.value);
+    };
+    document.getElementById("prompt-cancel-btn").onclick = function () {
+      close(null);
+    };
+    cleanup = bindModalDismiss(modal, function () {
+      close(null);
+    });
     input.onkeydown = function (e) {
-      if (e.key === "Enter") { e.preventDefault(); close(input.value); }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        close(input.value);
+      }
     };
   });
 }

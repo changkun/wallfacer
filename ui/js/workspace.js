@@ -383,7 +383,7 @@ function renderHeaderWorkspaceGroupTabs() {
         '<span class="workspace-group-tab__edit" onclick="event.stopPropagation();startInlineTabRename(this.parentElement,' +
         index +
         ')" title="Rename group">&#9998;</span>' +
-        '</div>';
+        "</div>";
     } else {
       tabs +=
         '<button type="button" class="' +
