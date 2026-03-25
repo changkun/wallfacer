@@ -1,11 +1,13 @@
 # Pluggable Sandbox Backends
 
 **Date:** 2026-03-23
-**Updated:** 2026-03-25
+**Updated:** 2026-03-26
 
 ## Already Implemented
 
 - **Interfaces and types** (`internal/runner/backend.go`): `SandboxState` enum (6 states), `SandboxBackend` interface (`Launch`, `List`), `SandboxHandle` interface (`State`, `Stdout`, `Wait`, `Kill`, `Name`), `String()` method. Tests in `backend_test.go`.
+- **`LocalBackend`** (`internal/runner/backend_local.go`): `Launch()` starts containers non-blocking via `cmd.Start()`, returns `localHandle` with atomic state tracking. `List()` shells out to `ps --format json` and handles both Podman JSON array and Docker NDJSON. Tests in `backend_local_test.go`.
+- **Runner wiring** (`internal/runner/runner.go`): `Runner.backend` field initialized as `NewLocalBackend(r.command)` in `NewRunner()`. `ListContainers()` delegates to `r.backend.List()`. Old `executor` field retained temporarily for `container.go` and `ideate.go`.
 
 ## Problem
 
@@ -28,12 +30,14 @@ Runner.Run()                  (internal/runner/execute.go)
 
 Key types involved:
 
-- **`ContainerExecutor`** (`internal/runner/executor.go:11-17`) — Current abstraction. Two methods: `RunArgs(ctx, name, args) → (stdout, stderr, err)` and `Kill(name)`. Passes raw CLI args.
-- **`osContainerExecutor`** — Production implementation; removes leftover containers, calls `cmdexec.Capture()`.
+- **`SandboxBackend`** (`internal/runner/backend.go`) — New abstraction. `Launch(ctx, spec) → (SandboxHandle, error)` and `List(ctx) → ([]ContainerInfo, error)`. `Runner.backend` field, initialized as `LocalBackend`.
+- **`LocalBackend`** (`internal/runner/backend_local.go`) — Production implementation; `Launch()` starts non-blocking via `cmd.Start()`, `List()` shells out to `ps --format json`.
+- **`ContainerExecutor`** (`internal/runner/executor.go`) — **Deprecated.** Still used by `container.go` and `ideate.go` for `RunArgs()` and `Kill()`. Will be removed in Task 7.
+- **`osContainerExecutor`** — Legacy implementation; removes leftover containers, calls `cmdexec.Capture()`.
 - **`ContainerSpec`** (`internal/runner/container_spec.go`) — Structured container description (Image, Name, Volumes, Env, Labels, Network, CPUs, Memory, Cmd, WorkDir, ExtraFlags). Its `Build()` method returns `[]string` CLI args.
 - **`VolumeMount`** (`internal/runner/container_spec.go:10-15`) — Single bind mount or named volume descriptor (Host, Container, Options, Named).
 - **`containerRegistry`** (`internal/runner/registry.go`) — `syncmap.Map[uuid.UUID, string]` tracking `taskID → containerName` for running containers.
-- **`ContainerInfo`** (`internal/runner/runner.go:35-45`) — Runtime container metadata returned by `ListContainers()`, which shells out to `podman ps --format json`.
+- **`ContainerInfo`** (`internal/runner/runner.go`) — Runtime container metadata. `ListContainers()` now delegates to `r.backend.List()`.
 - **Log streaming** — Container stdout captured by `cmdexec.Capture()` as a blocking call; live log streaming uses a separate `logpipe.Pipe` mechanism.
 - **Circuit breaker** (`internal/pkg/circuitbreaker`) — Three-state breaker (closed/open/half-open) gating `runContainer()` calls; tracks consecutive failures via atomic CAS.
 
@@ -98,73 +102,13 @@ type SandboxHandle interface {
 
 ## Tasks
 
-### Task 2: Implement `LocalBackend.Launch()` with `localHandle`
-
-**Goal:** Implement the local (podman/docker) backend that launches containers non-blocking and returns a handle with lifecycle state tracking.
-
-**Work:**
-1. Create `internal/runner/backend_local.go` with `LocalBackend` struct (field: `command string`)
-2. Implement `LocalBackend.Launch(ctx, spec)`:
-   - Build CLI args from `spec.Build()`
-   - Remove leftover containers (same as current `osContainerExecutor`)
-   - Call `os/exec.Command().Start()` (non-blocking) instead of `cmdexec.Capture()` (blocking)
-   - Pipe stdout+stderr via `cmd.StdoutPipe()` / `cmd.StderrPipe()`
-   - Return a `localHandle` that owns the `exec.Cmd` and its stdout pipe
-3. Implement `localHandle`:
-   - `State()` returns current state (atomic, thread-safe)
-   - `Stdout()` returns the pipe reader
-   - `Wait()` calls `cmd.Wait()`, transitions to `Stopped`
-   - `Kill()` runs `podman kill` + `podman rm -f`, transitions through `Stopping` → `Stopped`
-   - `Name()` returns container name
-   - State transitions: `Creating` → `Running` (after `Start()`) → `Streaming` (after first read) → `Stopped`/`Failed`
-4. Add unit tests: launch with a trivial container (e.g., `echo hello`), verify state transitions, verify Kill() transitions, verify Wait() returns exit code
-
-**Files:** `internal/runner/backend_local.go` (new), `internal/runner/backend_local_test.go` (new)
-
-**Acceptance:** `LocalBackend` satisfies `SandboxBackend` interface. State transitions are correct. Can launch, stream, wait, and kill containers.
-
----
-
-### Task 3: Implement `LocalBackend.List()`
-
-**Goal:** Move the existing `ListContainers()` logic into `LocalBackend.List()`.
-
-**Work:**
-1. Move `ListContainers()` logic from `runner.go:132-183` into `LocalBackend.List(ctx)`
-2. Include `parseContainerList()` — handles both Podman (JSON array) and Docker (NDJSON) format
-3. Return `[]ContainerInfo` (same struct, same fields)
-4. Add unit tests with sample Podman and Docker JSON outputs
-
-**Files:** `internal/runner/backend_local.go`, `internal/runner/backend_local_test.go`
-
-**Acceptance:** `List()` returns same data as current `ListContainers()`. Both Podman and Docker JSON formats handled.
-
----
-
-### Task 4: Refactor `Runner` to use `SandboxBackend`
-
-**Goal:** Replace `executor ContainerExecutor` with `backend SandboxBackend` in the `Runner` struct.
-
-**Work:**
-1. In `runner.go`, change `Runner.executor ContainerExecutor` → `Runner.backend SandboxBackend`
-2. Update `NewRunner()` (or wherever the executor is injected) to accept/create a `LocalBackend`
-3. Update `ListContainers()` on `Runner` to delegate to `r.backend.List(ctx)`
-4. Ensure all call sites that reference `r.executor` are updated
-5. All existing tests must pass — may need to update test helpers that inject mock executors
-
-**Files:** `internal/runner/runner.go`, `internal/runner/runner_test.go`, any files that construct `Runner`
-
-**Acceptance:** `Runner` uses `SandboxBackend`. All existing tests pass. No behavior change.
-
----
-
 ### Task 5: Refactor `runContainer()` to use handle-based streaming
 
-**Goal:** Replace the blocking `executor.RunArgs()` call with the non-blocking `backend.Launch()` + handle pattern.
+**Goal:** Replace the blocking `executor.RunArgs()` call with the non-blocking `backend.Launch()` + handle pattern. The `Runner` already has a `backend SandboxBackend` field (from Task 4); this task switches `runContainer()` and `ideate.go` from `r.executor` to `r.backend`.
 
 **Work:**
 1. In `container.go`, refactor `runContainer()`:
-   - Replace `r.executor.RunArgs(ctx, name, args)` with `r.backend.Launch(ctx, spec)`
+   - Replace `r.executor.RunArgs(ctx, name, args)` (line ~497) with `r.backend.Launch(ctx, spec)`
    - Read output from `handle.Stdout()` instead of parsing a byte slice
    - Call `handle.Wait()` to get exit code
    - Use `handle.State()` for circuit-breaker decisions: `SandboxFailed` at creation = runtime failure, `SandboxStopped` with non-zero exit = agent error
@@ -248,7 +192,7 @@ type SandboxHandle interface {
 
 **Goal:** Implement `K8sBackend` for dispatching sandbox containers as K8s Jobs.
 
-**Depends on:** Tasks 2–9 complete.
+**Depends on:** Tasks 5–9 complete.
 
 **Work:**
 1. Add `internal/runner/backend_k8s.go` implementing `SandboxBackend` via `client-go`
@@ -269,7 +213,7 @@ This task is deliberately left as a single unit — it should be broken down fur
 
 **Goal:** Implement `RemoteDockerBackend` for SSH/HTTPS dispatch to a remote Docker host.
 
-**Depends on:** Tasks 2–9 complete.
+**Depends on:** Tasks 5–9 complete.
 
 **Work:**
 1. Add `internal/runner/backend_remote.go` using Docker client SDK
@@ -284,19 +228,16 @@ Lower priority than K8s. Useful for simple single-host remote setups.
 ## Task Dependency Graph
 
 ```
-Task 2 (LocalBackend.Launch)  ─┐
-Task 3 (LocalBackend.List)    ─┤
-                               └→ Task 4 (refactor Runner)
-                                    └→ Task 5 (refactor runContainer)
-                                         └→ Task 6 (upgrade registry)
-                                              └→ Task 7 (retire ContainerExecutor)
-                                                   └→ Task 8 (unify log streaming)
-                                                        └→ Task 9 (env var backend selection)
-                                                             └→ Task 10 (K8s backend)
-                                                             └→ Task 11 (Remote Docker backend)
+Task 5 (refactor runContainer)
+  └→ Task 6 (upgrade registry)
+       └→ Task 7 (retire ContainerExecutor)
+            └→ Task 8 (unify log streaming)
+                 └→ Task 9 (env var backend selection)
+                      └→ Task 10 (K8s backend)
+                      └→ Task 11 (Remote Docker backend)
 ```
 
-Tasks 2 and 3 can run in parallel (interfaces from Task 1 are already implemented). Tasks 10 and 11 can run in parallel after Task 9. All other tasks are sequential.
+Tasks 5–9 are sequential. Tasks 10 and 11 can run in parallel after Task 9.
 
 ---
 
