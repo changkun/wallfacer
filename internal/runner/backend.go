@@ -8,6 +8,7 @@ import (
 // SandboxState represents the lifecycle state of a sandbox container.
 type SandboxState int
 
+// Sandbox lifecycle states.
 const (
 	SandboxCreating  SandboxState = iota // Backend is provisioning the container.
 	SandboxRunning                       // Container process is alive but has not yet produced output.
