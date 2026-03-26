@@ -6,7 +6,7 @@
 
 ## Goal
 
-Wire `DatabaseBackend` (structured data) and `ObjectStorageBackend` (blobs) together into a single `StorageBackend` that routes each method to the appropriate underlying backend.
+Wire `DatabaseBackend` (tasks + events + small blobs) and `ObjectStorageBackend` (large blobs) together into a single `StorageBackend` that routes each method to the appropriate underlying backend.
 
 ## What to do
 
@@ -14,17 +14,19 @@ Wire `DatabaseBackend` (structured data) and `ObjectStorageBackend` (blobs) toge
 
 ```go
 type CompositeBackend struct {
-    db   *DatabaseBackend
-    blob *ObjectStorageBackend
+    db       *DatabaseBackend
+    blob     *ObjectStorageBackend
+    blobKeys map[string]bool // key prefixes routed to blob storage
 }
 
 func NewCompositeBackend(db *DatabaseBackend, blob *ObjectStorageBackend) *CompositeBackend
 ```
 
 2. Route methods:
-   - Task, event, oversight, summary, tombstone → `db`
-   - Output save/read → `blob`
+   - Task CRUD, events → `db`
+   - Blob operations → route by key prefix: `"outputs/*"` → `blob`, everything else (`"oversight"`, `"summary"`, `"tombstone"`) → `db`
    - `Init`, `RemoveTask` → both (db record + blob cleanup)
+   - `ListBlobOwners` → `db` (small blobs like tombstones are always in DB)
 
 3. Wire into `NewRunner`/`NewStore` selection: when `WALLFACER_STORAGE_BACKEND=postgres`, construct `CompositeBackend` from the configured database and blob backends.
 

@@ -10,16 +10,14 @@ Remove `Store.OutputsDir()` which returns a filesystem path. Replace all callers
 
 ## What to do
 
-1. Add a `ReadOutput(taskID uuid.UUID, filename string) ([]byte, error)` method to `Store` that delegates to the backend.
+1. Add a `ReadBlob(taskID uuid.UUID, key string) ([]byte, error)` convenience method to `Store` that delegates to `backend.ReadBlob`.
 
 2. Find all callers of `OutputsDir` and replace them:
-   - `internal/handler/execute.go` — serves output files to the UI
-   - `internal/handler/files.go` — file listing for output directory
+   - `internal/handler/execute.go` — serves output files to the UI; change from `http.ServeFile(w, r, filepath)` to `store.ReadBlob(id, "outputs/"+filename)` and write the response body
+   - `internal/handler/files.go` — file listing for output directory; may need a `ListBlobs(taskID, prefix)` method or scan via known turn numbers
    - Any runner code that reads back outputs
 
-3. For the handler serving output files, change from `http.ServeFile(w, r, filepath)` to reading via the backend and writing the response body.
-
-4. Remove `OutputsDir` from `Store`.
+3. Remove `OutputsDir` from `Store`.
 
 ## Key files
 

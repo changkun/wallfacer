@@ -22,11 +22,14 @@ type ObjectStorageBackend struct {
 func NewObjectStorageBackend(bucket, prefix, region string) (*ObjectStorageBackend, error)
 ```
 
-2. Implement `SaveOutput` and `ReadOutput`:
-   - Key layout: `<prefix>/<task-uuid>/outputs/<filename>`
+2. Implement blob methods:
+   - `SaveBlob` → S3 `PutObject` at key `<prefix>/<task-uuid>/<blob-key>`
+   - `ReadBlob` → S3 `GetObject`
+   - `DeleteBlob` → S3 `DeleteObject`
+   - `ListBlobOwners` → S3 `ListObjectsV2` with prefix scan
    - Use multipart upload for large files
 
-3. All other `StorageBackend` methods return `ErrNotSupported` — structured data is handled by the database backend.
+3. All other `StorageBackend` methods (tasks, events) return `ErrNotSupported` — structured data is handled by the database backend via the composite backend.
 
 4. Add env vars to `internal/envconfig/`:
    - `WALLFACER_BLOB_STORAGE` (`s3` | `gcs`)

@@ -13,32 +13,29 @@ Define a `StorageBackend` interface that captures all persistence I/O currently 
 1. Create `internal/store/backend.go` with the `StorageBackend` interface:
 
 ```go
+// Three concerns: tasks (structured, indexed), events (ordered,
+// append-heavy), and blobs (named bytes per task).
 type StorageBackend interface {
+    // Tasks (structured, indexed)
     Init(taskID uuid.UUID) error
     LoadAll() ([]*Task, error)
     SaveTask(t *Task) error
     RemoveTask(taskID uuid.UUID) error
 
+    // Events (ordered, append-heavy)
     SaveEvent(taskID uuid.UUID, seq int, event TaskEvent) error
     LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, error)
     CompactEvents(taskID uuid.UUID, events []TaskEvent) error
 
-    SaveOutput(taskID uuid.UUID, turn int, stdout, stderr []byte) error
-    ReadOutput(taskID uuid.UUID, filename string) ([]byte, error)
-
-    SaveOversight(taskID uuid.UUID, data []byte) error
-    ReadOversight(taskID uuid.UUID) ([]byte, error)
-    SaveTestOversight(taskID uuid.UUID, data []byte) error
-    ReadTestOversight(taskID uuid.UUID) ([]byte, error)
-    SaveSummary(taskID uuid.UUID, data []byte) error
-    LoadSummary(taskID uuid.UUID) ([]byte, error)
-
-    WriteTombstone(taskID uuid.UUID, data []byte) error
-    ReadTombstone(taskID uuid.UUID) ([]byte, error)
-    DeleteTombstone(taskID uuid.UUID) error
-    ListTombstones() ([]uuid.UUID, error)
+    // Blobs (named bytes per task)
+    SaveBlob(taskID uuid.UUID, key string, data []byte) error
+    ReadBlob(taskID uuid.UUID, key string) ([]byte, error)
+    DeleteBlob(taskID uuid.UUID, key string) error
+    ListBlobOwners(key string) ([]uuid.UUID, error)
 }
 ```
+
+The Store layer maps domain concepts to blob keys (e.g., `SaveOversight` → `SaveBlob(id, "oversight", data)`, `SaveTurnOutput` → `SaveBlob(id, "outputs/turn-0001.json", data)`, `ListTombstones` → `ListBlobOwners("tombstone")`).
 
 2. Add a `backend StorageBackend` field to the `Store` struct.
 

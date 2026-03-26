@@ -19,8 +19,7 @@ Add a CLI subcommand that migrates task data from the filesystem backend to the 
    - Load all tasks from filesystem via `LoadAll()`
    - Insert each task into the database via `SaveTask()`
    - Copy events via `LoadEvents()` → `SaveEvent()` (preserve sequence numbers)
-   - Copy output files via filesystem read → `SaveOutput()`
-   - Copy oversight, summaries, tombstones
+   - Copy all blobs via `ReadBlob()` → `SaveBlob()` (outputs, oversight, summaries, tombstones — all use the same blob interface)
 
 3. Add a `migrated` marker file in the filesystem store to prevent double-load.
 

@@ -60,37 +60,46 @@ Extract the store's persistence operations into a `StorageBackend` interface. Th
 // StorageBackend abstracts where task data is physically stored.
 // The Store struct handles in-memory caching, indexing, pub/sub, and
 // schema migration; the backend handles only persistence I/O.
+//
+// Three concerns: tasks (structured, indexed), events (ordered,
+// append-heavy), and blobs (named bytes per task — outputs, oversight,
+// summaries, tombstones, etc.).
 type StorageBackend interface {
-    // Task persistence
-    Init(taskID uuid.UUID) error                   // create task directory/namespace
-    LoadAll() ([]*Task, error)                     // startup: load all tasks
-    SaveTask(t *Task) error                        // atomic write of task record
-    RemoveTask(taskID uuid.UUID) error             // hard delete (after retention)
+    // Tasks (structured, indexed)
+    Init(taskID uuid.UUID) error
+    LoadAll() ([]*Task, error)
+    SaveTask(t *Task) error
+    RemoveTask(taskID uuid.UUID) error
 
-    // Event persistence
+    // Events (ordered, append-heavy)
     SaveEvent(taskID uuid.UUID, seq int, event TaskEvent) error
-    LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, error) // events + max seq
+    LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, error)
     CompactEvents(taskID uuid.UUID, events []TaskEvent) error
 
-    // Output persistence (large blobs)
-    SaveOutput(taskID uuid.UUID, turn int, stdout, stderr []byte) error
-    ReadOutput(taskID uuid.UUID, filename string) ([]byte, error)
-
-    // Oversight and summaries
-    SaveOversight(taskID uuid.UUID, data []byte) error
-    ReadOversight(taskID uuid.UUID) ([]byte, error)
-    SaveTestOversight(taskID uuid.UUID, data []byte) error
-    ReadTestOversight(taskID uuid.UUID) ([]byte, error)
-    SaveSummary(taskID uuid.UUID, data []byte) error
-    LoadSummary(taskID uuid.UUID) ([]byte, error)
-
-    // Tombstones
-    WriteTombstone(taskID uuid.UUID, data []byte) error
-    ReadTombstone(taskID uuid.UUID) ([]byte, error)
-    DeleteTombstone(taskID uuid.UUID) error
-    ListTombstones() ([]uuid.UUID, error)
+    // Blobs (named bytes per task)
+    SaveBlob(taskID uuid.UUID, key string, data []byte) error
+    ReadBlob(taskID uuid.UUID, key string) ([]byte, error)
+    DeleteBlob(taskID uuid.UUID, key string) error
+    ListBlobOwners(key string) ([]uuid.UUID, error)
 }
 ```
+
+The `Store` layer maps domain concepts to blob keys:
+
+| Store method | Backend call |
+|---|---|
+| `SaveOversight(id, data)` | `SaveBlob(id, "oversight", data)` |
+| `SaveTestOversight(id, data)` | `SaveBlob(id, "test-oversight", data)` |
+| `SaveSummary(id, data)` | `SaveBlob(id, "summary", data)` |
+| `WriteTombstone(id, data)` | `SaveBlob(id, "tombstone", data)` |
+| `ListTombstones()` | `ListBlobOwners("tombstone")` |
+| `SaveTurnOutput(id, turn, out, err)` | `SaveBlob(id, "outputs/turn-0001.json", out)` + stderr |
+
+The backend only knows three concepts — tasks, events, blobs — and each implementation maps them to its natural storage:
+
+- **Filesystem**: blob key → file path under task directory
+- **PostgreSQL**: blob key → row in a `task_blobs(task_id, key, data)` table
+- **S3**: blob key → object key suffix
 
 ### Backend Implementations
 
@@ -131,29 +140,18 @@ CREATE TABLE task_events (
 );
 CREATE INDEX idx_events_task ON task_events(task_id, seq);
 
--- Oversight summaries
-CREATE TABLE task_oversight (
-    task_id     UUID PRIMARY KEY REFERENCES tasks(id),
-    data        JSONB NOT NULL,
-    created_at  TIMESTAMP DEFAULT NOW()
+-- Blob storage (oversight, summaries, tombstones, small outputs)
+CREATE TABLE task_blobs (
+    task_id     UUID NOT NULL REFERENCES tasks(id),
+    key         TEXT NOT NULL,       -- e.g., "oversight", "tombstone", "summary"
+    data        BYTEA NOT NULL,
+    created_at  TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (task_id, key)
 );
-
--- Task summaries (immutable, for cost dashboard)
-CREATE TABLE task_summaries (
-    task_id     UUID PRIMARY KEY REFERENCES tasks(id),
-    data        JSONB NOT NULL,
-    created_at  TIMESTAMP DEFAULT NOW()
-);
-
--- Tombstones (soft-delete markers)
-CREATE TABLE task_tombstones (
-    task_id     UUID PRIMARY KEY,
-    data        JSONB NOT NULL,
-    created_at  TIMESTAMP DEFAULT NOW()
-);
+CREATE INDEX idx_blobs_key ON task_blobs(key);  -- for ListBlobOwners
 ```
 
-**Large outputs** (turn stdout/stderr) go to object storage (see below), not the database.
+**Large outputs** (turn stdout/stderr) go to object storage (see below), not the database. Small blobs (oversight, summaries, tombstones) go directly into `task_blobs`.
 
 #### 3. Object Storage Backend (S3/GCS)
 
@@ -167,24 +165,31 @@ type ObjectStorageBackend struct {
 }
 ```
 
-**Key layout:**
+**Key layout:** blob key maps directly to the S3 object key suffix:
 ```
-s3://bucket/wallfacer/<workspace-key>/<task-uuid>/outputs/turn-1-stdout
-s3://bucket/wallfacer/<workspace-key>/<task-uuid>/outputs/turn-1-stderr
+s3://bucket/<prefix>/<task-uuid>/<key>
+s3://bucket/wallfacer/ws-abc123/deadbeef-1234/outputs/turn-0001.json
+s3://bucket/wallfacer/ws-abc123/deadbeef-1234/oversight
 ```
 
 #### 4. Composite Backend
 
-Combines database (structured data) and object storage (blobs):
+Combines database (tasks + events + small blobs) and object storage (large blobs):
 
 ```go
 type CompositeBackend struct {
-    db   *DatabaseBackend
-    blob *ObjectStorageBackend
+    db        *DatabaseBackend
+    blob      *ObjectStorageBackend
+    blobKeys  map[string]bool // keys routed to blob storage (e.g., "outputs/*")
 }
 
-func (c *CompositeBackend) SaveTask(t *Task) error      { return c.db.SaveTask(t) }
-func (c *CompositeBackend) SaveOutput(...) error         { return c.blob.SaveOutput(...) }
+func (c *CompositeBackend) SaveTask(t *Task) error { return c.db.SaveTask(t) }
+func (c *CompositeBackend) SaveBlob(id uuid.UUID, key string, data []byte) error {
+    if c.isBlobKey(key) {
+        return c.blob.SaveBlob(id, key, data)
+    }
+    return c.db.SaveBlob(id, key, data) // small blobs stay in DB
+}
 ```
 
 ---
@@ -230,12 +235,11 @@ func NewStore(backend StorageBackend) (*Store, error) {
 
 The runner currently calls `store.OutputsDir(taskID)` to get a filesystem directory path, and `SaveTurnOutput` writes directly via `os.WriteFile`. The handler serves output files by constructing paths from `OutputsDir`. For non-filesystem backends, this breaks.
 
-**Options:**
-1. **Writer interface:** `store.TurnOutputWriter(taskID, filename) → io.WriteCloser` — backend returns a writer (file, S3 upload, etc.)
-2. **Byte buffer:** Runner accumulates output in memory, calls `store.SaveTurnOutput(taskID, turn, stdout, stderr)` — already the current API, but the backend would handle storage
-3. **Streaming upload:** Runner pipes container stdout through a `TeeReader` that both parses and uploads — most efficient but most complex
+With the blob interface, outputs become blob keys like `"outputs/turn-0001.json"`. The `Store` maps:
+- `SaveTurnOutput(id, turn, stdout, stderr)` → `backend.SaveBlob(id, "outputs/turn-0001.json", stdout)` + `backend.SaveBlob(id, "outputs/turn-0001.stderr.txt", stderr)`
+- Output serving in handlers → `backend.ReadBlob(id, key)`
 
-**Recommended:** Option 2 (byte buffer) is already the current API shape (`SaveTurnOutput` accepts `[]byte`). The backend just needs to implement where those bytes go. For reading, add `ReadOutput(taskID, filename) ([]byte, error)` to replace direct filesystem path access. Option 1 can be added later if memory pressure from large outputs becomes an issue.
+`OutputsDir` is removed; all access goes through the blob interface.
 
 ### Phase 3: Search Index
 

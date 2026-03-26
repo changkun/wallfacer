@@ -22,12 +22,13 @@ func NewFilesystemBackend(dir string) *FilesystemBackend
 
 2. Move filesystem operations from these locations into backend methods:
    - `io.go: saveTask` → `atomicfile.WriteJSON` call moves to `backend.SaveTask`
-   - `io.go: SaveTurnOutput` → `os.WriteFile` calls move to `backend.SaveOutput`
+   - `io.go: SaveTurnOutput` → `os.WriteFile` calls move to `backend.SaveBlob` (key = `"outputs/turn-NNNN.json"`, `"outputs/turn-NNNN.stderr.txt"`)
    - `store.go: loadAll` → directory scanning moves to `backend.LoadAll`
    - `events.go: saveEvent` → file write moves to `backend.SaveEvent`
    - `events.go: compactTaskEvents` → compaction write moves to `backend.CompactEvents`
-   - `oversight.go` — all `atomicfile.WriteJSON`/`os.ReadFile` calls move to backend
-   - `tasks_create_delete.go` — `os.MkdirAll` moves to `backend.Init`, tombstone I/O to backend
+   - `oversight.go` — all `atomicfile.WriteJSON`/`os.ReadFile` calls become `backend.SaveBlob`/`ReadBlob` with keys like `"oversight"`, `"test-oversight"`
+   - `tasks_create_delete.go` — `os.MkdirAll` moves to `backend.Init`; tombstone I/O becomes `backend.SaveBlob(id, "tombstone", data)` / `ListBlobOwners("tombstone")`
+   - `io.go: SaveSummary/LoadSummary` → `backend.SaveBlob(id, "summary", data)` / `ReadBlob(id, "summary")`
 
 3. Change `NewStore(dir string)` to `NewStore(backend StorageBackend)`. Create a convenience constructor:
 
