@@ -48,7 +48,7 @@ This decomposes into three cross-cutting epics (see [README.md](README.md) for t
 
 | Epic | Spec | What it covers |
 |------|------|----------------|
-| **Sandbox Executor** | [01-sandbox-backends.md](01-sandbox-backends.md) | Pluggable `SandboxBackend` interface; local, K8s, and remote Docker backends |
+| **Sandbox Executor** | [01-sandbox-backends.md](01-sandbox-backends.md) | Pluggable `sandbox.Backend` interface — **complete** (`LocalBackend` + all runner callers migrated). Remote backends (K8s, remote Docker) below. |
 | **Data Storage** | [02-storage-backends.md](02-storage-backends.md) | Pluggable `StorageBackend` interface; filesystem, PostgreSQL, and S3 backends |
 | **Multi-Tenant** | [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) | Control plane, user auth, instance provisioning and lifecycle |
 
@@ -115,3 +115,78 @@ Only relevant if a platform requires the server itself to be containerized. Requ
 | **VPS + Caddy** | Done | `WALLFACER_SERVER_API_KEY` | No | Personal/single-team use today |
 | **Per-user instances** | High | OAuth2/OIDC via control plane | Yes | Multi-user cloud deployment |
 | **Shared stateless server** | Very High | Per-user sessions | Yes | Not recommended — too much refactoring for the benefit |
+
+---
+
+## Remote Sandbox Backends
+
+The `sandbox.Backend` interface ([01-sandbox-backends.md](01-sandbox-backends.md)) and `LocalBackend` are complete. Remote backends implement the same interface for cloud execution. The runner and handlers are unaware of the backend — they call `backend.Launch(ctx, spec)` and interact with the returned `sandbox.Handle`.
+
+### Kubernetes backend
+
+Implement `K8sBackend` in `internal/sandbox/k8s.go` dispatching containers as K8s Jobs.
+
+**Work:**
+1. Implement `sandbox.Backend` via `client-go`
+2. Map `sandbox.ContainerSpec` → K8s Job spec (image, env, volumes, resource limits → `resources.limits`)
+3. `k8sHandle` with state tracking via pod watch
+4. Log streaming via pod log follow API
+5. Worktree mounting via shared PVC (see Worktree Management below)
+6. Add `k8s` as a value for `WALLFACER_SANDBOX_BACKEND`
+7. Integration tests with kind or minikube
+
+**New dependency:** `k8s.io/client-go`
+
+### Remote Docker backend (optional)
+
+Implement `RemoteDockerBackend` in `internal/sandbox/remote.go` for SSH/HTTPS dispatch to a remote Docker host.
+
+**Work:**
+1. Implement `sandbox.Backend` via Docker client SDK
+2. SSH tunnel or TLS client cert for authentication
+3. State tracking via Docker events API
+4. Volume mounting via NFS or pre-provisioned volumes on the remote host
+
+Lower priority than K8s. Useful for simple single-host remote setups.
+
+---
+
+## Worktree Management in Cloud
+
+The biggest architectural challenge for remote backends. The `sandbox.Backend` interface takes a `ContainerSpec` with `Volumes` already populated — it does not manage worktrees. Worktree provisioning is an **orchestration concern** handled by the runner (or a cloud variant of it) before calling `backend.Launch()`.
+
+Currently (local deployment):
+
+1. `Runner.ensureTaskWorktrees()` creates worktrees at `~/.wallfacer/worktrees/<task-uuid>/`
+2. `buildContainerSpecForSandbox()` adds worktree paths as bind-mount `VolumeMount` entries
+3. Agent writes to `/workspace/<repo>` inside the container (= the worktree on the host)
+4. After task completion, runner commits from the worktree and cleans it up
+
+In a K8s/remote backend, the worktree filesystem must be accessible to both the wallfacer server (for git operations) and the sandbox pod (for agent writes). Options:
+
+| Approach | How | Tradeoffs |
+|----------|-----|-----------|
+| **Shared volume (PVC/NFS)** | Both server and pods mount the same volume | Simple; requires ReadWriteMany PVC; potential contention |
+| **Server-side worktree + rsync** | Server creates worktree, syncs to pod volume pre-launch, syncs back post-completion | No shared storage needed; adds latency; complex |
+| **In-pod worktree creation** | Init container creates worktree; server reads results via K8s exec or shared volume | Decouples server from filesystem; git operations move to pod |
+| **Git server sidecar** | Each pod has a git sidecar that handles worktree ops via API | Clean separation; most complex |
+
+**Recommended:** Shared volume (PVC/NFS) for initial implementation.
+
+---
+
+## Cross-Cutting Concerns for Remote Backends
+
+### Resource Limits
+
+`ContainerSpec.CPUs` and `ContainerSpec.Memory` map directly to K8s `resources.limits`. No interface change needed — the backend interprets these fields.
+
+### Sandbox Image Management
+
+Currently checked via `podman images` / `docker images` in the handler. For K8s, images are pulled by the kubelet. The `GET /api/images` endpoint needs a backend-aware implementation:
+- Local: check local image cache (as today)
+- K8s: assume images are available (or check a registry)
+
+### Network Control
+
+`ContainerSpec.Network` is the abstraction point. Currently a single string (`"host"`, `"none"`, `"slirp4netns"`). Sufficient for local deployment. For egress filtering and DNS control, add optional fields to `ContainerSpec` when needed — primarily a multi-tenant concern ([08-cloud-multi-tenant.md](08-cloud-multi-tenant.md)).

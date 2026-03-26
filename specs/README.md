@@ -33,7 +33,7 @@ M7: Desktop App ────────────────┘ (ships after
 
 | # | Milestone | Spec | Delivers |
 |---|-----------|------|----------|
-| **M1** | Sandbox backend interface | [01-sandbox-backends.md](01-sandbox-backends.md) | `SandboxBackend`/`SandboxHandle` + `LocalBackend` (pure refactor) |
+| **M1** | Sandbox backend interface | [01-sandbox-backends.md](01-sandbox-backends.md) | `sandbox.Backend`/`sandbox.Handle` + `LocalBackend` — **complete** |
 | **M2** | Storage backend interface | [02-storage-backends.md](02-storage-backends.md) | `StorageBackend` + `FilesystemBackend` + `TurnOutputWriter` (pure refactor) |
 | **M3** | Container reuse | [03-container-reuse.md](03-container-reuse.md) | Aux worker containers for title/oversight/commit (~10x startup savings) |
 | **M4** | File explorer | [04-file-explorer.md](04-file-explorer.md) | Browse + edit workspace files in the web UI |
