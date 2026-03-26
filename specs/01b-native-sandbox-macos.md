@@ -18,19 +18,17 @@ runtime; the isolation logic is compiled into the Wallfacer binary.
 ## Scope
 
 This spec covers macOS-only isolation techniques that can replace `LocalBackend`
-as alternative `SandboxBackend` implementations (see [01-sandbox-backends.md](01-sandbox-backends.md)).
+as alternative `sandbox.Backend` implementations (see [01-sandbox-backends.md](01-sandbox-backends.md)).
 
-**Prerequisite:** [01-sandbox-backends.md](01-sandbox-backends.md) Phase 1 must
-be complete. Each native executor is implemented as a `SandboxBackend`, receiving
-a structured `ContainerSpec` via `Launch(ctx, spec)` — **not** raw CLI args.
-This eliminates the arg-parsing problem from the original design where
-`VZBackend.RunArgs` had to reverse-engineer `ContainerSpec.Build()` output.
-The returned `SandboxHandle` tracks lifecycle states and streams output via
-`Stdout() io.ReadCloser`.
+**Prerequisite:** [01-sandbox-backends.md](01-sandbox-backends.md) — **complete** (v0.0.6).
+Each native backend implements `sandbox.Backend` (`internal/sandbox/`), receiving
+a structured `sandbox.ContainerSpec` via `Launch(ctx, spec)`. The returned
+`sandbox.Handle` tracks lifecycle states and streams output via `Stdout()`/`Stderr()`.
 
 ```go
-type SandboxBackend interface {
-    Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error)
+// internal/sandbox/backend.go
+type Backend interface {
+    Launch(ctx context.Context, spec ContainerSpec) (Handle, error)
     List(ctx context.Context) ([]ContainerInfo, error)
 }
 ```
@@ -80,17 +78,16 @@ github.com/google/go-containerregistry      # OCI image pull, layer extraction
 
 ### Implementation Sketch
 
-A `VZBackend` implements `SandboxBackend` by owning the full VM lifecycle:
+A `VZBackend` implements `sandbox.Backend` by owning the full VM lifecycle:
 
 ```go
-// internal/runner/backend_vz_darwin.go
+// internal/sandbox/vz_darwin.go
 //go:build darwin
 
-package runner
+package sandbox
 
 import (
     "context"
-    "io"
     "sync"
 
     vz "github.com/Code-Hex/vz/v3"
@@ -102,7 +99,7 @@ type VZBackend struct {
     vms        map[string]*vz.VirtualMachine // keyed by container name
 }
 
-func (b *VZBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error) {
+func (b *VZBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, error) {
     // 1. Pull and cache OCI image locally (skip if digest matches).
     rootfs, err := b.ensureRootfs(spec.Image)
     if err != nil {
@@ -124,7 +121,7 @@ func (b *VZBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxHand
     b.vms[spec.Name] = vm
     b.mu.Unlock()
 
-    // 4. Return handle — caller reads from Stdout(), calls Wait()/Kill().
+    // 4. Return handle — caller reads from Stdout()/Stderr(), calls Wait()/Kill().
     return &vzHandle{
         name:   spec.Name,
         vm:     vm,
@@ -206,7 +203,7 @@ Layers are applied with whiteout handling (`.wh.` prefix files → delete).
 
 ### ContainerSpec Mapping
 
-`VZBackend.Launch(ctx, spec)` receives a structured `ContainerSpec` directly —
+`VZBackend.Launch(ctx, spec)` receives a structured `sandbox.ContainerSpec` directly —
 no CLI arg parsing needed. The mapping is straightforward:
 
 - `spec.Name` → VM identifier for the registry
@@ -256,10 +253,10 @@ dependency; Claude Code must be installed on the host.
 ### CGo Wrapper
 
 ```go
-// internal/runner/sandbox_darwin.go
+// internal/sandbox/cgo_darwin.go
 //go:build darwin
 
-package runner
+package sandbox
 
 /*
 #cgo LDFLAGS: -framework Sandbox
@@ -322,9 +319,9 @@ func runSandboxShim() {
 }
 ```
 
-`SandboxInitBackend.RunArgs` then spawns `wallfacer` (itself) with
+`SandboxInitBackend.Launch` then spawns `wallfacer` (itself) with
 `_WALLFACER_SANDBOX_SHIM=1` and the encoded profile/target/args. stdout/stderr are
-piped back as normal.
+piped back as normal and returned via the `sandbox.Handle`.
 
 ### SBPL Profile Template
 
@@ -368,10 +365,10 @@ piped back as normal.
 ### `SandboxInitBackend` Implementation
 
 ```go
-// internal/runner/executor_sandbox_darwin.go
+// internal/sandbox/sandbox_init_darwin.go
 //go:build darwin
 
-package runner
+package sandbox
 
 type SandboxInitBackend struct {
     claudeBinary     string // e.g. /usr/local/bin/claude
@@ -379,7 +376,7 @@ type SandboxInitBackend struct {
     instructionsPath string // read-only CLAUDE.md mount path
 }
 
-func (b *SandboxInitBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error) {
+func (b *SandboxInitBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, error) {
     // Extract worktree path from spec.Volumes (first RW bind mount)
     worktree := findWorktreeMount(spec.Volumes)
     profile := renderSBPLProfile(sbplTemplate, sbplVars{
@@ -397,7 +394,7 @@ func (b *SandboxInitBackend) Launch(ctx context.Context, spec ContainerSpec) (Sa
         "_WALLFACER_SANDBOX_TARGET="+b.claudeBinary,
         "_WALLFACER_SANDBOX_ARGS="+string(argsJSON),
     )
-    // ... pipe stdout, cmd.Start(), return SandboxHandle
+    // ... pipe stdout/stderr, cmd.Start(), return sandbox.Handle
 }
 
 func (b *SandboxInitBackend) List(ctx context.Context) ([]ContainerInfo, error) {
@@ -430,11 +427,10 @@ existing path for non-macOS users.
 
 ### Phase 1 — `SandboxInitBackend` (lower isolation, faster to ship)
 
-1. Add `internal/runner/sandbox_darwin.go` — CGo `applySandboxProfile` wrapper.
+1. Add `internal/sandbox/cgo_darwin.go` — CGo `applySandboxProfile` wrapper.
 2. Add `init()` re-exec shim in `main.go` (guarded by `_WALLFACER_SANDBOX_SHIM`).
-3. Add `internal/runner/executor_sandbox_darwin.go` — `SandboxInitBackend`.
-4. Wire into runtime detection: when `CONTAINER_CMD=sandbox` or no container runtime
-   found on macOS, use `SandboxInitBackend`.
+3. Add `internal/sandbox/sandbox_init_darwin.go` — `SandboxInitBackend`.
+4. Wire into `WALLFACER_SANDBOX_BACKEND` switch in `NewRunner()`: value `sandbox`.
 5. Add `ClaudeBinary` detection (probe `which claude`, `~/.claude/local/claude`).
 
 ### Phase 2 — `VZBackend` (full isolation)
@@ -442,29 +438,27 @@ existing path for non-macOS users.
 1. Add Go module dependencies: `github.com/Code-Hex/vz/v3`, `go-containerregistry`.
 2. Add `cmd/wallfacer-init/` — Linux init binary (cross-compiled, embedded).
 3. Add kernel + initramfs build tooling under `build/vmlinuz/` with `go generate`.
-4. Implement `internal/runner/executor_vz_darwin.go` — `VZBackend`.
-5. Implement OCI layer cache in `internal/runner/imagecache/`.
-6. Wire into runtime detection above `sandbox` in the priority list.
+4. Implement `internal/sandbox/vz_darwin.go` — `VZBackend`.
+5. Implement OCI layer cache in `internal/sandbox/imagecache/`.
+6. Wire into `WALLFACER_SANDBOX_BACKEND` switch: value `vz`.
 7. Add `//go:build darwin` guards throughout; Linux path unchanged.
 
-### Runtime Detection Priority (Revised)
+### Backend Selection
+
+Backend is selected via `WALLFACER_SANDBOX_BACKEND` env var (parsed in `internal/envconfig/`, selected in `NewRunner()` switch). Current values: `local` (default). New values added by this spec:
 
 ```
-CONTAINER_CMD env var                         # explicit override always wins
-→ vz          (VZBackend, darwin only)       # Phase 2 pure Go VM
-→ sandbox     (SandboxInitBackend, darwin)   # Phase 1 pure Go sandbox
-→ container   (/usr/local/bin/container)      # apple/container CLI (existing)
-→ /opt/podman/bin/podman                      # existing
-→ podman                                      # existing
-→ docker                                      # existing
+WALLFACER_SANDBOX_BACKEND=vz        # VZBackend (Phase 2, macOS 13+ only)
+WALLFACER_SANDBOX_BACKEND=sandbox   # SandboxInitBackend (Phase 1, macOS only)
+WALLFACER_SANDBOX_BACKEND=local     # LocalBackend (default, any OS with podman/docker)
 ```
 
-Auto-detection on macOS (when `CONTAINER_CMD` is unset):
+Auto-detection (when `WALLFACER_SANDBOX_BACKEND` is unset or `local`):
 
 ```
-macOS 13+  → probe VZBackend availability → fall through to CLI runtimes → sandbox
-macOS <13  → probe CLI runtimes → sandbox
-Linux      → probe CLI runtimes only
+macOS 13+  → probe VZBackend availability → fall through to LocalBackend
+macOS <13  → LocalBackend (requires podman/docker) or SandboxInitBackend
+Linux      → LocalBackend only
 ```
 
 ### Network Mode Mapping
