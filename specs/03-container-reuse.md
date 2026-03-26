@@ -1,8 +1,7 @@
 # Container Reuse
 
-**Date:** 2026-03-21
-**Updated:** 2026-03-23
-**Depends on:** [Pluggable Sandbox Backends](01-sandbox-backends.md) (Phase 1: Interface Extraction + Local Backend)
+**Status:** Not started | **Date:** 2026-03-21
+**Depends on:** [M1: Pluggable Sandbox Backends](01-sandbox-backends.md) — complete (v0.0.6)
 
 ## Problem
 
@@ -29,22 +28,23 @@ These two overhead sources are orthogonal and can be addressed independently:
 
 ## Prerequisite: Pluggable Sandbox Backends
 
-This spec builds on the `SandboxBackend` / `SandboxHandle` abstraction defined in
-[01-sandbox-backends.md](01-sandbox-backends.md). Container reuse is an optimization
-**internal to `LocalBackend`** — the runner and handler never see it. The `SandboxBackend`
+This spec builds on the `sandbox.Backend` / `sandbox.Handle` abstraction in
+`internal/sandbox/` (implemented in M1, v0.0.6). Container reuse is an optimization
+**internal to `LocalBackend`** — the runner and handler never see it. The `Backend`
 interface remains unchanged:
 
 ```
-Runner → backend.Launch(spec) → SandboxHandle
-                                  .State()   → SandboxCreating/Running/Streaming/Stopped/Failed
+Runner → backend.Launch(spec) → Handle
+                                  .State()   → Creating/Running/Streaming/Stopped/Failed
                                   .Stdout()  → io.ReadCloser
+                                  .Stderr()  → io.ReadCloser
                                   .Wait()    → exitCode
                                   .Kill()
 ```
 
 Container reuse changes how `LocalBackend.Launch()` provisions the underlying container
 (ephemeral `podman run` vs `podman exec` on a long-lived worker), but the returned
-`SandboxHandle` behaves identically. The runner's turn loop, output parsing, circuit
+`Handle` behaves identically. The runner's turn loop, output parsing, circuit
 breaker, and lifecycle tracking are unaffected.
 
 For K8s and remote backends, container reuse is not applicable — pod scheduling and
@@ -86,7 +86,7 @@ remote Docker have their own lifecycle models. This spec is scoped to `LocalBack
 
 ### Current Lifecycle
 
-Every container invocation follows (inside `osContainerExecutor.RunArgs()`):
+Every container invocation follows (inside `LocalBackend.Launch()`):
 1. `podman rm -f <name>` — clean up any leftover container
 2. `podman run --rm --name <name> ... <image> <cmd>` — ephemeral launch
 3. Container runs Claude CLI, produces NDJSON on stdout, exits
@@ -95,8 +95,8 @@ Every container invocation follows (inside `osContainerExecutor.RunArgs()`):
 Session state survives via the `claude-config` named volume and `--resume <sessionID>`.
 Worktree changes persist on the host via bind mounts.
 
-Key files: `internal/runner/container_spec.go` (spec builder), `internal/runner/executor.go`
-(runtime abstraction), `internal/runner/container.go` (role-specific arg builders).
+Key files: `internal/sandbox/spec.go` (`ContainerSpec`, `Build()`), `internal/sandbox/local.go`
+(`LocalBackend`, `localHandle`), `internal/runner/container.go` (role-specific spec builders).
 
 ---
 
@@ -187,7 +187,7 @@ overhead**. These are two orthogonal concerns within `LocalBackend`:
 │  │   state tracking │  │   layers         │  │
 │  └─────────────────┘  └──────────────────┘  │
 │                                             │
-│  Both hidden behind SandboxBackend.Launch() │
+│  Both hidden behind Backend.Launch()          │
 └─────────────────────────────────────────────┘
 ```
 
@@ -227,13 +227,13 @@ Container reuse lives entirely inside `LocalBackend`. The backend tracks two kin
 workers alongside ephemeral containers:
 
 ```go
-// internal/runner/backend_local.go
+// internal/sandbox/local.go (extend existing LocalBackend)
 
 type LocalBackend struct {
-    command string // "podman" or "docker"
+    command string // "podman" or "docker" (existing field)
 
     // Worker management (container reuse optimization)
-    auxWorkers   map[constants.SandboxType]*auxWorker // shared Profile C workers
+    auxWorkers   map[sandbox.Type]*auxWorker // shared Profile C workers
     auxWorkersMu sync.Mutex
 
     implWorkers   map[uuid.UUID]*implWorker // per-task Profile A workers
@@ -248,7 +248,7 @@ When `Launch()` is called, the backend decides the execution strategy based on t
 container spec's mount profile and configuration:
 
 ```go
-func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error) {
+func (b *LocalBackend) Launch(ctx context.Context, spec sandbox.ContainerSpec) (sandbox.Handle, error) {
     profile := spec.MountProfile() // A, B, or C based on spec shape
 
     switch {
@@ -262,7 +262,7 @@ func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxH
 }
 ```
 
-The returned `SandboxHandle` is identical regardless of execution strategy — the runner
+The returned `Handle` is identical regardless of execution strategy — the runner
 never knows whether the container was ephemeral or a worker exec.
 
 ### Profile C: Shared Auxiliary Worker
@@ -294,7 +294,7 @@ container. Claude CLI's session state in `claude-config` uses file-level locking
 contention is observed, serialize access with a `sync.Mutex` in the `auxWorker` — since
 auxiliary agents are fast (5–30 s), FIFO queuing is acceptable.
 
-**Handle state mapping:** The `SandboxHandle` returned by `launchViaAuxWorker` wraps the
+**Handle state mapping:** The `Handle` returned by `launchViaAuxWorker` wraps the
 `podman exec` process. State transitions work the same as ephemeral handles:
 `Creating` (exec starting) → `Running` → `Streaming` → `Stopped`/`Failed`.
 
@@ -361,7 +361,7 @@ worker's bind mount still points to the same path, so no worker restart is neede
 ### New Types Inside LocalBackend
 
 ```go
-// internal/runner/backend_local_worker.go
+// internal/sandbox/worker.go
 
 // auxWorker manages a long-lived container that serves auxiliary agent
 // invocations (title, oversight, commit message) via podman exec.
@@ -374,7 +374,7 @@ type auxWorker struct {
 }
 
 func (w *auxWorker) ensureRunning(ctx context.Context) error
-func (w *auxWorker) exec(ctx context.Context, cmd []string) (SandboxHandle, error)
+func (w *auxWorker) exec(ctx context.Context, cmd []string) (Handle, error)
 func (w *auxWorker) stop()
 
 // implWorker manages a long-lived per-task container that serves
@@ -389,13 +389,12 @@ type implWorker struct {
 }
 
 func (w *implWorker) ensureRunning(ctx context.Context) error
-func (w *implWorker) exec(ctx context.Context, cmd []string) (SandboxHandle, error)
+func (w *implWorker) exec(ctx context.Context, cmd []string) (Handle, error)
 func (w *implWorker) stop()
 ```
 
-Note: Unlike the previous design that extended `ContainerExecutor` with `Create`, `Start`,
-`ExecInContainer`, `IsRunning`, `Remove`, these workers call `podman`/`docker` directly
-via `cmdexec` — they are implementation details of `LocalBackend`, not interface methods.
+Workers call `podman`/`docker` directly via `cmdexec` — they are implementation
+details of `LocalBackend`, not `Backend` interface methods.
 
 ### Health Checks and Recovery
 
@@ -439,15 +438,14 @@ only affect `LocalBackend` — K8s and remote backends ignore them.
 
 ## Implementation Plan
 
-All phases assume [Pluggable Sandbox Backends](01-sandbox-backends.md) Phase 1
-(Interface Extraction + Local Backend) is complete.
+M1 (Pluggable Sandbox Backends) is complete. `LocalBackend` is in `internal/sandbox/local.go`.
 
 ### Phase 1: Auxiliary Workers (Profile C)
 
-1. Add `auxWorker` type in `internal/runner/backend_local_worker.go`
-2. Implement `ensureRunning`, `exec` (returns `SandboxHandle`), `stop`, health check
-3. Add `MountProfile()` to `ContainerSpec` for routing decisions
-4. Wire `LocalBackend.Launch()` to route Profile C specs through aux workers
+1. Add `auxWorker` type in `internal/sandbox/worker.go`
+2. Implement `ensureRunning`, `exec` (returns `Handle`), `stop`, health check
+3. Add `MountProfile()` to `ContainerSpec` in `internal/sandbox/spec.go` for routing decisions
+4. Wire `LocalBackend.Launch()` in `internal/sandbox/local.go` to route Profile C specs through aux workers
 5. Add integration test: launch worker, exec title generation, verify output matches ephemeral
 6. Feature-flagged behind `WALLFACER_AUX_WORKERS`
 
@@ -502,4 +500,4 @@ The biggest win is for auxiliary agents: title + oversight + commit currently co
 | `claude-config` contention | Concurrent exec corrupts session state | Claude CLI uses file locking; add `sync.Mutex` if needed |
 | `podman exec` not available | Some container runtimes may not support exec | Feature flag disables workers; fallback to ephemeral |
 | Stale sibling mounts (Profile A) | New sibling tasks not visible in container | Board.json still lists them; accept limitation or recreate worker |
-| Backend interface change | If `SandboxBackend` changes, workers need updating | Workers are internal to `LocalBackend`; no interface coupling |
+| Backend interface change | If `Backend` interface changes, workers need updating | Workers are internal to `LocalBackend`; no interface coupling |
