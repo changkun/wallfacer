@@ -465,6 +465,7 @@ func (r *Runner) runContainer(
 	containerName := "wallfacer-" + slug + "-" + taskID.String()[:8]
 
 	// Track the container name so KillContainer and StreamLogs can find it.
+	// Initially register by name; upgraded to handle after Launch succeeds.
 	r.taskContainers.Set(taskID, containerName)
 	defer r.taskContainers.Delete(taskID)
 
@@ -492,6 +493,8 @@ func (r *Runner) runContainer(
 			r.containerCB.RecordFailure()
 			return nil, nil, nil, fmt.Errorf("launch container: %w", launchErr)
 		}
+		// Upgrade registry entry with the handle so kill goes through it.
+		r.taskContainers.SetHandle(taskID, handle, nil)
 
 		// Read all output from the handle, then wait for exit.
 		rawStdout, _ := io.ReadAll(handle.Stdout())

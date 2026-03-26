@@ -210,6 +210,11 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 			}
 			return nil, nil, nil, fmt.Errorf("launch ideation container: %w", launchErr)
 		}
+		// Upgrade registry entries with the handle so kill goes through it.
+		if taskID != uuid.Nil {
+			r.taskContainers.SetHandle(taskID, handle, nil)
+		}
+		r.ideateContainer.SetSingletonHandle(handle, nil)
 
 		rawStdout, _ := io.ReadAll(handle.Stdout())
 		rawStderr, _ := io.ReadAll(handle.Stderr())

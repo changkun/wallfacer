@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 
@@ -54,8 +55,8 @@ func TestContainerRegistry_Range(t *testing.T) {
 	}
 
 	seen := map[uuid.UUID]string{}
-	for id, name := range r.All() {
-		seen[id] = name
+	for id, entry := range r.All() {
+		seen[id] = entry.name
 	}
 
 	if len(seen) != len(ids) {
@@ -184,7 +185,82 @@ func TestContainerRegistry_ConcurrentAccess(t *testing.T) {
 	wg.Wait()
 
 	// All entries should be gone
-	for id, name := range r.All() {
-		t.Errorf("unexpected entry after all deletes: id=%v name=%q", id, name)
+	for id, entry := range r.All() {
+		t.Errorf("unexpected entry after all deletes: id=%v name=%q", id, entry.name)
 	}
 }
+
+// ---------- Handle-based registry tests ----------
+
+func TestContainerRegistry_SetHandleGetHandle(t *testing.T) {
+	r := &containerRegistry{}
+	id := uuid.New()
+	h := &stubHandle{name: "wallfacer-handle-test"}
+
+	r.SetHandle(id, h, nil)
+
+	// Get returns the name from the handle.
+	name, ok := r.Get(id)
+	if !ok || name != "wallfacer-handle-test" {
+		t.Fatalf("Get after SetHandle: ok=%v, name=%q", ok, name)
+	}
+
+	// GetHandle returns the handle itself.
+	got := r.GetHandle(id)
+	if got != h {
+		t.Fatal("GetHandle returned different handle")
+	}
+}
+
+func TestContainerRegistry_GetHandleMissing(t *testing.T) {
+	r := &containerRegistry{}
+	if h := r.GetHandle(uuid.New()); h != nil {
+		t.Fatalf("expected nil handle for missing entry, got %v", h)
+	}
+}
+
+func TestContainerRegistry_SetNameGetHandleNil(t *testing.T) {
+	r := &containerRegistry{}
+	id := uuid.New()
+	r.Set(id, "name-only")
+
+	// GetHandle returns nil for name-only entries.
+	if h := r.GetHandle(id); h != nil {
+		t.Fatalf("expected nil handle for name-only entry, got %v", h)
+	}
+}
+
+func TestContainerRegistry_SingletonHandle(t *testing.T) {
+	r := &containerRegistry{}
+	h := &stubHandle{name: "wallfacer-ideate-handle"}
+
+	r.SetSingletonHandle(h, nil)
+
+	name, ok := r.GetSingleton()
+	if !ok || name != "wallfacer-ideate-handle" {
+		t.Fatalf("GetSingleton after SetSingletonHandle: ok=%v, name=%q", ok, name)
+	}
+
+	got := r.GetSingletonHandle()
+	if got != h {
+		t.Fatal("GetSingletonHandle returned different handle")
+	}
+
+	r.DeleteSingleton()
+	if got := r.GetSingletonHandle(); got != nil {
+		t.Fatal("expected nil after DeleteSingleton")
+	}
+}
+
+// stubHandle is a minimal SandboxHandle for registry tests.
+type stubHandle struct {
+	name   string
+	killed bool
+}
+
+func (h *stubHandle) State() SandboxState   { return SandboxRunning }
+func (h *stubHandle) Stdout() io.ReadCloser { return nil }
+func (h *stubHandle) Stderr() io.ReadCloser { return nil }
+func (h *stubHandle) Wait() (int, error)    { return 0, nil }
+func (h *stubHandle) Kill() error           { h.killed = true; return nil }
+func (h *stubHandle) Name() string          { return h.name }

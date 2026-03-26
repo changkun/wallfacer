@@ -219,7 +219,6 @@ type Runner struct {
 	oversightMu            keyedmu.Map[string]     // per-task mutex for serializing oversight generation
 	containerCB            *circuitbreaker.Breaker // circuit breaker for container launch operations
 	backend                SandboxBackend          // pluggable sandbox backend (local podman/docker, future: k8s)
-	executor               ContainerExecutor       // abstracts container runtime calls for testing (deprecated: use backend)
 	backgroundWg           trackedwg.WaitGroup     // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
@@ -464,7 +463,6 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	}
 	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
 	r.backend = NewLocalBackend(r.command)
-	r.executor = &osContainerExecutor{command: r.command}
 	r.reg = cfg.Reg
 
 	if r.workspaceManager != nil {
@@ -748,25 +746,34 @@ func (r *Runner) RefineContainerName(taskID uuid.UUID) string {
 }
 
 // KillContainer sends a kill signal to the running container for a task.
+// If a SandboxHandle is registered, kill goes through the handle; otherwise
+// falls back to shelling out via cmdexec (for legacy callers not yet migrated).
 // Safe to call when no container is running — errors are silently ignored.
 func (r *Runner) KillContainer(taskID uuid.UUID) {
+	if h := r.taskContainers.GetHandle(taskID); h != nil {
+		_ = h.Kill()
+		return
+	}
 	name := r.ContainerName(taskID)
 	if name == "" {
 		return
 	}
 	_ = cmdexec.New(r.command, "kill", name).Run()
-
 }
 
 // KillRefineContainer sends a kill signal to the running refinement container.
-// Safe to call when no refinement container is running — errors are silently ignored.
+// If a SandboxHandle is registered, kill goes through the handle; otherwise
+// falls back to shelling out. Safe to call when no refinement container is running.
 func (r *Runner) KillRefineContainer(taskID uuid.UUID) {
+	if h := r.refineContainers.GetHandle(taskID); h != nil {
+		_ = h.Kill()
+		return
+	}
 	name := r.RefineContainerName(taskID)
 	if name == "" {
 		return
 	}
 	_ = cmdexec.New(r.command, "kill", name).Run()
-
 }
 
 // IdeateContainerName returns the name of the currently running ideation container,
@@ -779,12 +786,16 @@ func (r *Runner) IdeateContainerName() string {
 }
 
 // KillIdeateContainer sends a kill signal to the running ideation container.
-// Safe to call when no ideation container is running.
+// If a SandboxHandle is registered, kill goes through the handle; otherwise
+// falls back to shelling out. Safe to call when no ideation container is running.
 func (r *Runner) KillIdeateContainer() {
+	if h := r.ideateContainer.GetSingletonHandle(); h != nil {
+		_ = h.Kill()
+		return
+	}
 	name := r.IdeateContainerName()
 	if name == "" {
 		return
 	}
 	_ = cmdexec.New(r.command, "kill", name).Run()
-
 }
