@@ -2,10 +2,6 @@ package store
 
 import "changkun.de/x/wallfacer/internal/pkg/pubsub"
 
-// SequencedDelta is a type alias for pubsub.Sequenced[TaskDelta] to minimize
-// downstream churn in consumers that reference this type.
-type SequencedDelta = pubsub.Sequenced[TaskDelta]
-
 // TaskDelta carries the payload for a single task change notification.
 // Deleted is true when the task was removed; Task.ID holds the affected task's ID.
 // For non-delete events, Task is a standalone clone of the mutated task.
@@ -16,7 +12,7 @@ type TaskDelta struct {
 
 // Subscribe registers a channel that receives a SequencedDelta whenever task
 // state changes. The caller must call Unsubscribe with the returned ID when done.
-func (s *Store) Subscribe() (int, <-chan SequencedDelta) {
+func (s *Store) Subscribe() (int, <-chan pubsub.Sequenced[TaskDelta]) {
 	return s.hub.Subscribe()
 }
 
@@ -63,7 +59,7 @@ func (s *Store) LatestDeltaSeq() int64 {
 // DeltasSince returns all buffered SequencedDeltas with Seq > seq.
 // The second return value is true when the requested seq predates the oldest
 // entry in the replay buffer (gap-too-old).
-func (s *Store) DeltasSince(seq int64) ([]SequencedDelta, bool) {
+func (s *Store) DeltasSince(seq int64) ([]pubsub.Sequenced[TaskDelta], bool) {
 	return s.hub.Since(seq)
 }
 

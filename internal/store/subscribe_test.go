@@ -92,7 +92,7 @@ func TestSubscribe_MultipleSubscribersAllNotified(t *testing.T) {
 
 	_, _ = s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
-	for i, ch := range []<-chan SequencedDelta{ch1, ch2} {
+	for i, ch := range []<-chan pubsub.Sequenced[TaskDelta]{ch1, ch2} {
 		select {
 		case <-ch:
 		case <-time.After(time.Second):
@@ -200,7 +200,7 @@ func TestSubscribe_DeltaPayloadIsIsolatedFromStoreAndReplay(t *testing.T) {
 	s.notify(s.tasks[task.ID], false)
 	s.mu.RUnlock()
 
-	var first SequencedDelta
+	var first pubsub.Sequenced[TaskDelta]
 	select {
 	case first = <-ch:
 	case <-time.After(time.Second):
@@ -231,7 +231,7 @@ func TestSubscribe_DeltaPayloadIsIsolatedFromStoreAndReplay(t *testing.T) {
 		t.Fatalf("UpdateTaskStatus: %v", err)
 	}
 
-	var second SequencedDelta
+	var second pubsub.Sequenced[TaskDelta]
 	select {
 	case second = <-ch:
 	case <-time.After(time.Second):

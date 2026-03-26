@@ -19,6 +19,7 @@ import (
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/keyedmu"
+	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -399,7 +400,7 @@ func (r *Runner) startBoardSubscriptionLoop(initial *store.Store) {
 			wsSubID int
 			wsCh    <-chan workspace.Snapshot
 			subID   int
-			subCh   <-chan store.SequencedDelta
+			subCh   <-chan pubsub.Sequenced[store.TaskDelta]
 			cur     = initial
 		)
 		if r.workspaceManager != nil {
