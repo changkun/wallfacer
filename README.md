@@ -62,9 +62,8 @@ Track token usage and cost by task/activity so operations stay measurable as aut
 ## Quick Start
 
 ```bash
-# 1. Install (pick one)
+# 1. Install
 curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
-# — or: go install changkun.de/x/wallfacer@latest       # requires Go 1.25+
 
 # 2. Start the server (restores your last workspace group, or starts empty)
 wallfacer run

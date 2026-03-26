@@ -43,8 +43,7 @@ linux/{amd64,arm64} and darwin/{amd64,arm64}. No Windows target.
   (current matrix: linux/{amd64,arm64}, darwin/{amd64,arm64})
 - Output as `wallfacer-windows-amd64.exe` (current naming: `wallfacer-{goos}-{goarch}`)
 - Add Windows install instructions (`install.sh` explicitly rejects Windows with
-  "Wallfacer supports Linux and macOS"); provide a direct download path or
-  document `go install` as the Windows alternative
+  "Wallfacer supports Linux and macOS"); provide a direct download path
 
 ### B. Container Path Translation
 

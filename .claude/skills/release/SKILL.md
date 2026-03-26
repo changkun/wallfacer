@@ -37,7 +37,6 @@ Create `docs/releases/<version>.md` following the established style:
 6. Include an **Upgrading** section with install instructions:
    - One-liner: `curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh`
    - Direct binary download note (binaries auto-attached by CI)
-   - `go install changkun.de/x/wallfacer@<version>`
 7. Close with a bold summary line (commit count, lines changed, tagline)
 
 Style guidelines:

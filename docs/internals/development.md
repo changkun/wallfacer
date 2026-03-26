@@ -18,9 +18,6 @@ cd wallfacer
 
 # Build the server binary
 go build -o wallfacer .
-
-# Or install directly via Go (requires Go 1.25+)
-go install changkun.de/x/wallfacer@latest
 ```
 
 Build sandbox images locally (optional — auto-pulled from ghcr.io at runtime):

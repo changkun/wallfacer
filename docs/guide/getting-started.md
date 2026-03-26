@@ -16,7 +16,7 @@ curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh 
 
 This detects your OS and architecture, downloads the latest binary, and places it in `/usr/local/bin` (or `~/.local/bin`). Set `WALLFACER_INSTALL_DIR` to override the location, or `WALLFACER_VERSION=v0.0.5` for a specific version.
 
-> **Building from source?** See [Development Setup](../internals/development.md) for `go install`, `go build`, `make` targets, and sandbox image builds.
+> **Building from source?** See [Development Setup](../internals/development.md) for `go build`, `make` targets, and sandbox image builds.
 
 ## Step 2 — Start Wallfacer
 
