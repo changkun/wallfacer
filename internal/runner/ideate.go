@@ -3,10 +3,10 @@ package runner
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"os"
-	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
@@ -196,31 +196,37 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 		}
 	}
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
-		args := r.buildIdeationContainerArgs(containerName, prompt, selectedSandbox)
+		spec := r.buildIdeationContainerSpec(containerName, prompt, selectedSandbox)
 
-		logger.Runner.Debug("ideate exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
+		logger.Runner.Debug("ideate exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox)
 		if taskID != uuid.Nil {
 			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
-
 		}
-		rawStdout, rawStderr, runErr := r.executor.RunArgs(ctx, containerName, args)
+
+		handle, launchErr := r.backend.Launch(ctx, spec)
+		if launchErr != nil {
+			if taskID != uuid.Nil {
+				_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
+			}
+			return nil, nil, nil, fmt.Errorf("launch ideation container: %w", launchErr)
+		}
+
+		rawStdout, _ := io.ReadAll(handle.Stdout())
+		rawStderr, _ := io.ReadAll(handle.Stderr())
+		exitCode, waitErr := handle.Wait()
 		if taskID != uuid.Nil {
 			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
-
 		}
 
 		if ctx.Err() != nil {
-			r.executor.Kill(containerName)
+			_ = handle.Kill()
 			return nil, rawStdout, rawStderr, fmt.Errorf("ideation container terminated: %w", ctx.Err())
 		}
 
 		raw := strings.TrimSpace(string(rawStdout))
 		if raw == "" {
-			if runErr != nil {
-				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, rawStdout, rawStderr, fmt.Errorf("container exited %d: stderr=%s", exitErr.ExitCode(), string(rawStderr))
-				}
-				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", runErr)
+			if waitErr != nil || exitCode != 0 {
+				return nil, rawStdout, rawStderr, fmt.Errorf("container exited %d: stderr=%s", exitCode, string(rawStderr))
 			}
 			return nil, rawStdout, rawStderr, fmt.Errorf("empty output from ideation container")
 		}
@@ -282,10 +288,10 @@ func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
 	return r.buildIdeationPrompt(existingTasks, r.collectIdeationContext(r.shutdownCtx))
 }
 
-// buildIdeationContainerArgs builds the container run arguments for the
-// ideation agent. Workspaces are mounted read-only; no task label, no
-// worktrees, and no board context are used.
-func (r *Runner) buildIdeationContainerArgs(containerName, prompt string, sb sandbox.Type) []string {
+// buildIdeationContainerSpec builds a ContainerSpec for the ideation agent.
+// Workspaces are mounted read-only; no task label, no worktrees, and no
+// board context are used.
+func (r *Runner) buildIdeationContainerSpec(containerName, prompt string, sb sandbox.Type) ContainerSpec {
 	model := r.modelFromEnvForSandbox(sb)
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
 
@@ -312,7 +318,7 @@ func (r *Runner) buildIdeationContainerArgs(containerName, prompt string, sb san
 	spec.WorkDir = workdirForBasenames(basenames)
 	spec.Cmd = buildAgentCmd(prompt, model)
 
-	return spec.Build()
+	return spec
 }
 
 // runIdeationTask executes the brainstorm agent for an idea-agent task card.

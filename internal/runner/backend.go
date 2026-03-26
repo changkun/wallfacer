@@ -52,8 +52,10 @@ type SandboxBackend interface {
 type SandboxHandle interface {
 	// State returns the current lifecycle state of the container.
 	State() SandboxState
-	// Stdout returns a reader for the container's combined stdout/stderr stream.
+	// Stdout returns a reader for the container's stdout stream.
 	Stdout() io.ReadCloser
+	// Stderr returns a reader for the container's stderr stream.
+	Stderr() io.ReadCloser
 	// Wait blocks until the container exits and returns its exit code.
 	Wait() (exitCode int, err error)
 	// Kill forcibly stops the container.

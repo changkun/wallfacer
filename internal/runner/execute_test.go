@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1671,6 +1672,13 @@ func setupRunnerWithMockExecutor(t testing.TB, workspaces []string, mock *MockCo
 	t.Helper()
 	s, r := setupRunnerWithCmd(t, workspaces, "true") // "true" for rm/kill calls, not used
 	r.executor = mock
+	// Inject a MockSandboxBackend with a copy of the responses so that
+	// backend.Launch() (used by runContainer/RunIdeation) returns the
+	// pre-configured output. Link the backend mock so RunArgsCalls/KillCalls
+	// on the executor mock delegate to the backend mock.
+	bm := &MockSandboxBackend{responses: slices.Clone(mock.responses)}
+	mock.backendMock = bm
+	r.backend = bm
 	return s, r
 }
 

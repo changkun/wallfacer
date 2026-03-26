@@ -3,8 +3,8 @@ package runner
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -78,24 +78,16 @@ const (
 // will be mounted read-only at /workspace/.tasks/ inside the container.
 // siblingMounts maps shortID → (repoPath → worktreePath) for read-only
 // sibling worktree mounts under /workspace/.tasks/worktrees/.
-func (r *Runner) buildContainerArgs(
-	containerName, taskID, prompt, sessionID string,
-	worktreeOverrides map[string]string,
-	boardDir string,
-	siblingMounts map[string]map[string]string,
-	modelOverride string,
-) []string {
-	return r.buildContainerArgsForSandbox(containerName, taskID, prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, sandbox.Claude)
-}
-
-func (r *Runner) buildContainerArgsForSandbox(
+// buildContainerSpecForSandbox constructs a ContainerSpec for the given sandbox
+// with all workspace mounts, labels, board context, and agent command configured.
+func (r *Runner) buildContainerSpecForSandbox(
 	containerName, taskID, prompt, sessionID string,
 	worktreeOverrides map[string]string,
 	boardDir string,
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
 	sb sandbox.Type,
-) []string {
+) ContainerSpec {
 	// Resolve model once: override takes priority, then env default.
 	model := modelOverride
 	if model == "" {
@@ -202,7 +194,7 @@ func (r *Runner) buildContainerArgsForSandbox(
 	}
 
 	spec.Network = r.resolvedContainerNetwork()
-	return spec.Build()
+	return spec
 }
 
 func instructionsFilenameForSandbox(sb sandbox.Type) string {
@@ -489,36 +481,44 @@ func (r *Runner) runContainer(
 			return nil, nil, nil, fmt.Errorf("container circuit breaker open: container runtime may be unavailable")
 		}
 
-		args := r.buildContainerArgsForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
+		spec := r.buildContainerSpecForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
 
-		logger.Runner.Debug("exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
+		logger.Runner.Debug("exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox)
 		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(activity)})
 
-		rawStdout, rawStderr, runErr := r.executor.RunArgs(ctx, containerName, args)
+		handle, launchErr := r.backend.Launch(ctx, spec)
+		if launchErr != nil {
+			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
+			r.containerCB.RecordFailure()
+			return nil, nil, nil, fmt.Errorf("launch container: %w", launchErr)
+		}
+
+		// Read all output from the handle, then wait for exit.
+		rawStdout, _ := io.ReadAll(handle.Stdout())
+		rawStderr, _ := io.ReadAll(handle.Stderr())
+		exitCode, waitErr := handle.Wait()
 		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
 
-		// Detect container runtime failures (daemon/binary unavailable).
-		// Only trip the breaker for runtime-level errors, not for Claude
-		// exiting non-zero (exit codes 1–124).
-		if runErr != nil && ctx.Err() == nil && isContainerRuntimeError(runErr) {
+		// Detect container runtime failures (exit code 125 = engine error).
+		if exitCode == 125 && ctx.Err() == nil {
 			r.containerCB.RecordFailure()
 		}
 
 		// If the context was cancelled or timed out, kill the container explicitly
 		// and return the context error rather than parsing potentially incomplete output.
 		if ctx.Err() != nil {
-			r.executor.Kill(containerName)
+			_ = handle.Kill()
 			return nil, rawStdout, rawStderr, fmt.Errorf("container terminated: %w", ctx.Err())
 		}
 
 		raw := strings.TrimSpace(string(rawStdout))
 		if raw == "" {
-			if runErr != nil {
-				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, rawStdout, rawStderr,
-						fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), string(rawStderr))
-				}
-				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", runErr)
+			if waitErr != nil {
+				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", waitErr)
+			}
+			if exitCode != 0 {
+				return nil, rawStdout, rawStderr,
+					fmt.Errorf("container exited with code %d: stderr=%s", exitCode, string(rawStderr))
 			}
 			stderrStr := strings.TrimSpace(string(rawStderr))
 			if stderrStr != "" {
@@ -530,26 +530,22 @@ func (r *Runner) runContainer(
 
 		output, parseErr := parseOutput(raw)
 		if parseErr != nil {
-			if runErr != nil {
-				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, rawStdout, rawStderr,
-						fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
-							exitErr.ExitCode(), string(rawStderr), truncate(raw, 500))
-				}
-				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", runErr)
+			if waitErr != nil {
+				return nil, rawStdout, rawStderr, fmt.Errorf("exec container: %w", waitErr)
+			}
+			if exitCode != 0 {
+				return nil, rawStdout, rawStderr,
+					fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
+						exitCode, string(rawStderr), truncate(raw, 500))
 			}
 			return nil, rawStdout, rawStderr,
 				fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
 		}
 
 		// The agent may exit non-zero even when it produces a valid result.
-		if runErr != nil {
-			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				logger.Runner.Warn("container exited non-zero but produced valid output",
-					"task", taskID, "code", exitErr.ExitCode(), "sandbox", selectedSandbox)
-			} else {
-				logger.Runner.Warn("container error but produced valid output", "task", taskID, "error", runErr, "sandbox", selectedSandbox)
-			}
+		if exitCode != 0 {
+			logger.Runner.Warn("container exited non-zero but produced valid output",
+				"task", taskID, "code", exitCode, "sandbox", selectedSandbox)
 		}
 
 		// Container runtime is healthy: close the circuit (or keep it closed).

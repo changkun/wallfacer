@@ -48,6 +48,7 @@ type fakeSandboxHandle struct{}
 
 func (fakeSandboxHandle) State() SandboxState   { return SandboxCreating }
 func (fakeSandboxHandle) Stdout() io.ReadCloser { return nil }
+func (fakeSandboxHandle) Stderr() io.ReadCloser { return nil }
 func (fakeSandboxHandle) Wait() (int, error)    { return 0, nil }
 func (fakeSandboxHandle) Kill() error           { return nil }
 func (fakeSandboxHandle) Name() string          { return "" }

@@ -47,13 +47,11 @@ func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxH
 		return nil, fmt.Errorf("stderr pipe: %w", err)
 	}
 
-	// Merge stdout and stderr into a single reader.
-	merged := io.NopCloser(io.MultiReader(stdout, stderr))
-
 	h := &localHandle{
 		name:    name,
 		cmd:     cmd,
-		stdout:  merged,
+		stdout:  stdout,
+		stderr:  stderr,
 		command: b.command,
 	}
 	h.state.Store(int32(SandboxCreating))
@@ -122,6 +120,7 @@ type localHandle struct {
 	name    string
 	cmd     *exec.Cmd
 	stdout  io.ReadCloser
+	stderr  io.ReadCloser
 	command string // runtime binary, needed for kill/rm
 	state   atomic.Int32
 }
@@ -132,6 +131,10 @@ func (h *localHandle) State() SandboxState {
 
 func (h *localHandle) Stdout() io.ReadCloser {
 	return h.stdout
+}
+
+func (h *localHandle) Stderr() io.ReadCloser {
+	return h.stderr
 }
 
 func (h *localHandle) Wait() (int, error) {
