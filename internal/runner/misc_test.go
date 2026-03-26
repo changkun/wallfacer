@@ -913,8 +913,12 @@ func TestRunContainerContextCancelled(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when context is cancelled")
 	}
-	if !strings.Contains(err.Error(), "container terminated") {
-		t.Fatalf("expected 'container terminated' error, got: %v", err)
+	// The context may expire before Launch (yielding "launch container: …
+	// context deadline exceeded") or after Launch during Wait (yielding
+	// "container terminated: context deadline exceeded"). Both are correct.
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "container terminated") && !strings.Contains(errMsg, "context deadline exceeded") {
+		t.Fatalf("expected context cancellation error, got: %v", err)
 	}
 }
 
