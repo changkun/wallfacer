@@ -111,6 +111,37 @@ func Start(cmd *exec.Cmd, opts ...Option) (*Pipe, error) {
 	return p, nil
 }
 
+// StartReader creates a Pipe that scans lines from an existing io.ReadCloser
+// instead of launching a subprocess. The Lines channel is closed when the
+// reader returns EOF or an error.
+func StartReader(r io.ReadCloser, opts ...Option) *Pipe {
+	cfg := config{
+		bufInitial: 64 * 1024,
+		bufMax:     1024 * 1024,
+	}
+	for _, o := range opts {
+		o(&cfg)
+	}
+
+	p := &Pipe{
+		lines: make(chan string),
+		pr:    nil, // no pipe reader to close; caller owns the reader
+		done:  make(chan struct{}),
+	}
+
+	go func() {
+		defer close(p.lines)
+		defer close(p.done)
+		scanner := bufio.NewScanner(r)
+		scanner.Buffer(make([]byte, 0, cfg.bufInitial), cfg.bufMax)
+		for scanner.Scan() {
+			p.lines <- scanner.Text()
+		}
+	}()
+
+	return p
+}
+
 // Lines returns the channel delivering one line at a time. The channel
 // is closed when the subprocess exits and all output has been scanned.
 func (p *Pipe) Lines() <-chan string {
