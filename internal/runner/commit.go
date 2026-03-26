@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -384,21 +385,29 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 	})
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, error) {
 		selectedModel := r.modelFromEnvForSandbox(selectedSandbox)
-		_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
 
 		spec := r.buildBaseContainerSpec(containerName, selectedModel, selectedSandbox)
 		spec.Cmd = buildAgentCmd(commitPrompt, selectedModel)
 
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 
-		stdout, stderr, runErr := cmdexec.New(r.command, spec.Build()...).WithContext(ctx).Capture()
+		handle, launchErr := r.backend.Launch(ctx, spec)
+		if launchErr != nil {
+			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
+			return nil, fmt.Errorf("launch commit message container: %w", launchErr)
+		}
+		r.taskContainers.SetHandle(taskID, handle, nil)
+
+		rawStdout, _ := io.ReadAll(handle.Stdout())
+		rawStderr, _ := io.ReadAll(handle.Stderr())
+		exitCode, _ := handle.Wait()
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 
-		if runErr != nil && ctx.Err() == nil {
-			return nil, fmt.Errorf("%w: stderr=%s", runErr, truncate(string(stderr), 200))
+		if exitCode != 0 && ctx.Err() == nil {
+			return nil, fmt.Errorf("container exited with code %d: stderr=%s", exitCode, truncate(string(rawStderr), 200))
 		}
 
-		raw := strings.TrimSpace(string(stdout))
+		raw := strings.TrimSpace(string(rawStdout))
 		if raw == "" {
 			return nil, fmt.Errorf("empty output")
 		}

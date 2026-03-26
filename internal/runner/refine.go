@@ -3,14 +3,13 @@ package runner
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/prompts"
@@ -85,10 +84,10 @@ func (r *Runner) buildRefinementPrompt(task *store.Task, userInstructions string
 	})
 }
 
-// buildRefinementContainerArgs builds container args for a read-only refinement
+// buildRefinementContainerSpec builds a ContainerSpec for a read-only refinement
 // run. Workspaces are mounted read-only; no worktrees, board context, or sibling
 // mounts are used since the agent should only read, not commit.
-func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, modelOverride string, sb sandbox.Type) []string {
+func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, modelOverride string, sb sandbox.Type) ContainerSpec {
 	model := modelOverride
 	if model == "" {
 		model = r.modelFromEnvForSandbox(sb)
@@ -161,7 +160,7 @@ func (r *Runner) buildRefinementContainerArgs(containerName, taskID, prompt, mod
 		spec.Cmd = append(spec.Cmd, "--model", model)
 	}
 
-	return spec.Build()
+	return spec
 }
 
 // runRefinementContainer executes a refinement container and parses its output.
@@ -179,60 +178,56 @@ func (r *Runner) runRefinementContainer(
 	defer r.refineContainers.Delete(taskID)
 
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
-		_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
+		spec := r.buildRefinementContainerSpec(containerName, taskID.String(), prompt, modelOverride, selectedSandbox)
 
-		args := r.buildRefinementContainerArgs(containerName, taskID.String(), prompt, modelOverride, selectedSandbox)
+		logger.Runner.Debug("refine exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox)
 
-		logger.Runner.Debug("refine exec", "cmd", r.command, "args", strings.Join(args, " "), "sandbox", selectedSandbox)
-		stdout, stderr, runErr := cmdexec.New(r.command, args...).WithContext(ctx).Capture()
+		handle, launchErr := r.backend.Launch(ctx, spec)
+		if launchErr != nil {
+			return nil, nil, nil, fmt.Errorf("launch refinement container: %w", launchErr)
+		}
+		r.refineContainers.SetHandle(taskID, handle, nil)
+
+		rawStdout, _ := io.ReadAll(handle.Stdout())
+		rawStderr, _ := io.ReadAll(handle.Stderr())
+		exitCode, _ := handle.Wait()
 
 		if ctx.Err() != nil {
-			_ = cmdexec.New(r.command, "kill", containerName).Run()
-
-			_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
-
-			return nil, stdout, stderr, fmt.Errorf("refinement container terminated: %w", ctx.Err())
+			_ = handle.Kill()
+			return nil, rawStdout, rawStderr, fmt.Errorf("refinement container terminated: %w", ctx.Err())
 		}
 
-		raw := strings.TrimSpace(string(stdout))
+		raw := strings.TrimSpace(string(rawStdout))
 		if raw == "" {
-			if runErr != nil {
-				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, stdout, stderr,
-						fmt.Errorf("container exited with code %d: stderr=%s", exitErr.ExitCode(), string(stderr))
-				}
-				return nil, stdout, stderr, fmt.Errorf("exec container: %w", runErr)
+			if exitCode != 0 {
+				return nil, rawStdout, rawStderr,
+					fmt.Errorf("container exited with code %d: stderr=%s", exitCode, string(rawStderr))
 			}
-			stderrStr := strings.TrimSpace(string(stderr))
+			stderrStr := strings.TrimSpace(string(rawStderr))
 			if stderrStr != "" {
-				return nil, stdout, stderr,
+				return nil, rawStdout, rawStderr,
 					fmt.Errorf("empty output from container: stderr=%s", truncate(stderrStr, 500))
 			}
-			return nil, stdout, stderr, fmt.Errorf("empty output from container")
+			return nil, rawStdout, rawStderr, fmt.Errorf("empty output from container")
 		}
 
 		output, parseErr := parseOutput(raw)
 		if parseErr != nil {
-			if runErr != nil {
-				if exitErr, ok := runErr.(*exec.ExitError); ok {
-					return nil, stdout, stderr,
-						fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
-							exitErr.ExitCode(), string(stderr), truncate(raw, 500))
-				}
-				return nil, stdout, stderr, fmt.Errorf("exec container: %w", runErr)
+			if exitCode != 0 {
+				return nil, rawStdout, rawStderr,
+					fmt.Errorf("container exited with code %d: stderr=%s stdout=%s",
+						exitCode, string(rawStderr), truncate(raw, 500))
 			}
-			return nil, stdout, stderr,
+			return nil, rawStdout, rawStderr,
 				fmt.Errorf("parse output: %w (raw: %s)", parseErr, truncate(raw, 200))
 		}
 
-		if runErr != nil {
-			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				logger.Runner.Warn("refinement container exited non-zero but produced valid output",
-					"task", taskID, "code", exitErr.ExitCode(), "sandbox", selectedSandbox)
-			}
+		if exitCode != 0 {
+			logger.Runner.Warn("refinement container exited non-zero but produced valid output",
+				"task", taskID, "code", exitCode, "sandbox", selectedSandbox)
 		}
 		output.ActualSandbox = selectedSandbox
-		return output, stdout, stderr, nil
+		return output, rawStdout, rawStderr, nil
 	}
 
 	initialSandbox := sb

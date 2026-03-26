@@ -3,12 +3,11 @@ package runner
 import (
 	"context"
 	"fmt"
-	"os/exec"
+	"io"
 	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -47,47 +46,51 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	}
 	runWithSandbox := func(selected sandbox.Type) titleResult {
 		mdl := r.titleModelFromEnvForSandbox(selected)
-		_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
 
 		spec := r.buildBaseContainerSpec(containerName, mdl, selected)
 		spec.Cmd = buildAgentCmd(titlePrompt, mdl)
 
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 
-		stdout, stderr, runErr := cmdexec.New(r.command, spec.Build()...).WithContext(ctx).Capture()
+		handle, launchErr := r.backend.Launch(ctx, spec)
+		if launchErr != nil {
+			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+			return titleResult{err: fmt.Errorf("launch title container: %w", launchErr), model: mdl, sb: selected}
+		}
+		r.taskContainers.SetHandle(taskID, handle, nil)
+
+		rawStdout, _ := io.ReadAll(handle.Stdout())
+		rawStderr, _ := io.ReadAll(handle.Stderr())
+		exitCode, _ := handle.Wait()
 		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 
 		if ctx.Err() != nil {
+			_ = handle.Kill()
 			return titleResult{err: fmt.Errorf("container terminated: %w", ctx.Err()), model: mdl, sb: selected}
 		}
 
-		raw := strings.TrimSpace(string(stdout))
+		raw := strings.TrimSpace(string(rawStdout))
 		if raw == "" {
-			if runErr != nil {
-				return titleResult{err: fmt.Errorf("%w: stderr=%s", runErr, truncate(string(stderr), 200)), model: mdl, sb: selected}
+			if exitCode != 0 {
+				return titleResult{err: fmt.Errorf("container exited with code %d: stderr=%s", exitCode, truncate(string(rawStderr), 200)), model: mdl, sb: selected}
 			}
 			return titleResult{err: fmt.Errorf("empty output"), model: mdl, sb: selected}
 		}
 
 		parsed, parseErr := parseOutput(raw)
 		if parseErr != nil {
-			if runErr != nil {
+			if exitCode != 0 {
 				return titleResult{
-					err:   fmt.Errorf("%w: stderr=%s stdout=%s", runErr, truncate(string(stderr), 200), truncate(raw, 200)),
+					err:   fmt.Errorf("container exited with code %d: stderr=%s stdout=%s", exitCode, truncate(string(rawStderr), 200), truncate(raw, 200)),
 					model: mdl,
 					sb:    selected,
 				}
 			}
 			return titleResult{err: fmt.Errorf("parse failure: raw=%s", truncate(raw, 200)), model: mdl, sb: selected}
 		}
-		if runErr != nil {
-			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				logger.Runner.Warn("title generation: container exited non-zero but produced valid output",
-					"task", taskID, "code", exitErr.ExitCode(), "sandbox", selected, "model", mdl)
-			} else {
-				logger.Runner.Warn("title generation: container error but produced valid output",
-					"task", taskID, "error", runErr, "sandbox", selected, "model", mdl)
-			}
+		if exitCode != 0 {
+			logger.Runner.Warn("title generation: container exited non-zero but produced valid output",
+				"task", taskID, "code", exitCode, "sandbox", selected, "model", mdl)
 		}
 		return titleResult{output: parsed, model: mdl, sb: selected}
 	}

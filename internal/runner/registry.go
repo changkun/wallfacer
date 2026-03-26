@@ -13,13 +13,12 @@ import (
 var singletonKey = uuid.Nil
 
 // containerEntry stores a container name, an optional SandboxHandle, and an
-// optional log reader. Callers that have been migrated to backend.Launch()
-// store the handle; legacy callers (title, refine, commit) store only the name.
-// The logReader, when set, provides a tee'd copy of the container's stdout
-// for live log streaming (SSE) without spawning a separate `podman logs` process.
+// optional log reader. Callers that use backend.Launch() store the handle
+// via SetHandle(); callers that use cmdexec directly (title, refine, commit)
+// store only the name via Set().
 type containerEntry struct {
 	name      string
-	handle    SandboxHandle // nil for legacy callers
+	handle    SandboxHandle // nil for name-only registrations
 	logReader io.ReadCloser // nil when no log tee is configured
 }
 
@@ -31,7 +30,7 @@ type containerRegistry struct {
 	syncmap.Map[uuid.UUID, containerEntry]
 }
 
-// Set stores a container name without a handle (legacy path).
+// Set stores a container name without a handle.
 func (r *containerRegistry) Set(id uuid.UUID, name string) {
 	r.Store(id, containerEntry{name: name})
 }
