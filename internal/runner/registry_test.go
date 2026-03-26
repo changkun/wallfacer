@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -258,9 +259,9 @@ type stubHandle struct {
 	killed bool
 }
 
-func (h *stubHandle) State() SandboxState   { return SandboxRunning }
-func (h *stubHandle) Stdout() io.ReadCloser { return nil }
-func (h *stubHandle) Stderr() io.ReadCloser { return nil }
-func (h *stubHandle) Wait() (int, error)    { return 0, nil }
-func (h *stubHandle) Kill() error           { h.killed = true; return nil }
-func (h *stubHandle) Name() string          { return h.name }
+func (h *stubHandle) State() sandbox.BackendState { return sandbox.StateRunning }
+func (h *stubHandle) Stdout() io.ReadCloser       { return nil }
+func (h *stubHandle) Stderr() io.ReadCloser       { return nil }
+func (h *stubHandle) Wait() (int, error)          { return 0, nil }
+func (h *stubHandle) Kill() error                 { h.killed = true; return nil }
+func (h *stubHandle) Name() string                { return h.name }

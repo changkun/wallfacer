@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"changkun.de/x/wallfacer/prompts"
@@ -26,7 +27,7 @@ type Interface interface {
 	PruneUnknownWorktrees()
 
 	// Container management.
-	ListContainers() ([]ContainerInfo, error)
+	ListContainers() ([]sandbox.ContainerInfo, error)
 	ContainerName(taskID uuid.UUID) string
 	RefineContainerName(taskID uuid.UUID) string
 	KillContainer(taskID uuid.UUID)

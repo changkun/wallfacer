@@ -7,6 +7,8 @@ import (
 	"io"
 	"slices"
 	"sync"
+
+	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
 // ContainerResponse holds the pre-configured response for a single Launch invocation.
@@ -35,7 +37,7 @@ type MockSandboxBackend struct {
 }
 
 // Launch pops the next response and returns a mockSandboxHandle that yields it.
-func (m *MockSandboxBackend) Launch(_ context.Context, spec ContainerSpec) (SandboxHandle, error) {
+func (m *MockSandboxBackend) Launch(_ context.Context, spec sandbox.ContainerSpec) (sandbox.Handle, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -67,7 +69,7 @@ func (m *MockSandboxBackend) Launch(_ context.Context, spec ContainerSpec) (Sand
 }
 
 // List returns an empty container list.
-func (m *MockSandboxBackend) List(_ context.Context) ([]ContainerInfo, error) {
+func (m *MockSandboxBackend) List(_ context.Context) ([]sandbox.ContainerInfo, error) {
 	return nil, nil
 }
 
@@ -95,10 +97,10 @@ type mockSandboxHandle struct {
 	parent   *MockSandboxBackend
 }
 
-func (h *mockSandboxHandle) State() SandboxState   { return SandboxRunning }
-func (h *mockSandboxHandle) Stdout() io.ReadCloser { return h.stdout }
-func (h *mockSandboxHandle) Stderr() io.ReadCloser { return h.stderr }
-func (h *mockSandboxHandle) Wait() (int, error)    { return h.exitCode, h.waitErr }
+func (h *mockSandboxHandle) State() sandbox.BackendState { return sandbox.StateRunning }
+func (h *mockSandboxHandle) Stdout() io.ReadCloser       { return h.stdout }
+func (h *mockSandboxHandle) Stderr() io.ReadCloser       { return h.stderr }
+func (h *mockSandboxHandle) Wait() (int, error)          { return h.exitCode, h.waitErr }
 func (h *mockSandboxHandle) Kill() error {
 	h.parent.mu.Lock()
 	defer h.parent.mu.Unlock()

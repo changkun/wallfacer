@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,134 +20,17 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/keyedmu"
 	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"changkun.de/x/wallfacer/prompts"
 	"github.com/google/uuid"
 )
 
-// ContainerInfo represents a single sandbox container returned by ListContainers.
-type ContainerInfo struct {
-	ID        string `json:"id"`         // short container ID
-	Name      string `json:"name"`       // full container name (e.g. wallfacer-<slug>-<uuid8>)
-	TaskID    string `json:"task_id"`    // task UUID from label, empty if not a task container
-	TaskTitle string `json:"task_title"` // task title populated by the handler from the store
-	Image     string `json:"image"`      // image name
-	State     string `json:"state"`      // running | exited | paused | …
-	Status    string `json:"status"`     // human-readable status (e.g. "Up 5 minutes")
-	CreatedAt int64  `json:"created_at"` // unix timestamp
-}
-
-// containerJSON is used to unmarshal `podman/docker ps --format json` output.
-// Podman and Docker use different JSON formats:
-//   - Podman outputs a JSON array; Docker outputs one JSON object per line (NDJSON).
-//   - Podman's "Names" is []string; Docker's "Names" is a single string.
-//   - Podman's "Created" is int64 (unix timestamp); Docker's "CreatedAt" is a string.
-//
-// We use json.RawMessage for Names and any for Created to handle both.
-type containerJSON struct {
-	ID        string            `json:"Id"`
-	Names     json.RawMessage   `json:"Names"`
-	Image     string            `json:"Image"`
-	State     string            `json:"State"`
-	Status    string            `json:"Status"`
-	Created   any               `json:"Created"`
-	CreatedAt string            `json:"CreatedAt"` // Docker uses CreatedAt (string) instead of Created
-	Labels    map[string]string `json:"Labels"`    // task metadata labels (wallfacer.task.id, etc.)
-}
-
-// name extracts the container name from the Names field, handling both
-// Podman ([]string) and Docker (string) formats.
-// Returns an error if Names is non-nil but cannot be decoded as either format.
-func (c *containerJSON) name() (string, error) {
-	if c.Names == nil {
-		return "", nil
-	}
-	// Try []string first (Podman format).
-	var names []string
-	if err := json.Unmarshal(c.Names, &names); err == nil && len(names) > 0 {
-		return strings.TrimPrefix(names[0], "/"), nil
-	}
-	// Try single string (Docker format).
-	var name string
-	if err := json.Unmarshal(c.Names, &name); err == nil {
-		return strings.TrimPrefix(name, "/"), nil
-	}
-	return "", fmt.Errorf("containerJSON.name: cannot decode Names field: %s", c.Names)
-}
-
-// createdUnix returns the creation time as a unix timestamp.
-// Podman provides Created as a numeric unix timestamp; Docker provides it
-// as a float or string. We handle both gracefully.
-func (c *containerJSON) createdUnix() int64 {
-	// Podman: Created is a JSON number (int64 or float64).
-	if c.Created != nil {
-		switch v := c.Created.(type) {
-		case float64:
-			return int64(v)
-		case json.Number:
-			if n, err := v.Int64(); err == nil {
-				return n
-			}
-		}
-	}
-	return 0
-}
-
-// parseContainerList parses the JSON output of `ps --format json`, handling
-// both Podman (JSON array) and Docker (NDJSON, one object per line) formats.
-func parseContainerList(out []byte) ([]containerJSON, error) {
-	trimmed := strings.TrimSpace(string(out))
-	if trimmed == "" || trimmed == "null" {
-		return nil, nil
-	}
-
-	// Podman: JSON array.
-	if trimmed[0] == '[' {
-		var containers []containerJSON
-		if err := json.Unmarshal(out, &containers); err != nil {
-			return nil, fmt.Errorf("parse container list (array): %w", err)
-		}
-		return containers, nil
-	}
-
-	// Docker: NDJSON (one JSON object per line).
-	var containers []containerJSON
-	for line := range strings.SplitSeq(trimmed, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || line[0] != '{' {
-			continue
-		}
-		var c containerJSON
-		if err := json.Unmarshal([]byte(line), &c); err != nil {
-			return nil, fmt.Errorf("parse container list (ndjson line): %w", err)
-		}
-		containers = append(containers, c)
-	}
-	return containers, nil
-}
-
 // ListContainers returns structured info for each wallfacer container known
 // to the sandbox backend. Supports both Podman and Docker JSON output formats.
-func (r *Runner) ListContainers() ([]ContainerInfo, error) {
+func (r *Runner) ListContainers() ([]sandbox.ContainerInfo, error) {
 	return r.backend.List(context.Background())
-}
-
-// isUUID returns true if s looks like a standard UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).
-func isUUID(s string) bool {
-	if len(s) != 36 {
-		return false
-	}
-	for i, c := range s {
-		if i == 8 || i == 13 || i == 18 || i == 23 {
-			if c != '-' {
-				return false
-			}
-		} else if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
-			return false
-		}
-	}
-	return true
 }
 
 // ContainerName returns the active container name for a task.
@@ -218,7 +100,7 @@ type Runner struct {
 	ideateContainer        *containerRegistry      // singleton: ideation container name
 	oversightMu            keyedmu.Map[string]     // per-task mutex for serializing oversight generation
 	containerCB            *circuitbreaker.Breaker // circuit breaker for container launch operations
-	backend                SandboxBackend          // pluggable sandbox backend (local podman/docker, future: k8s)
+	backend                sandbox.Backend         // pluggable sandbox backend (local podman/docker, future: k8s)
 	backgroundWg           trackedwg.WaitGroup     // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
@@ -464,11 +346,11 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
 	switch cfg.SandboxBackend {
 	case "", "local":
-		r.backend = NewLocalBackend(r.command)
+		r.backend = sandbox.NewLocalBackend(r.command)
 	default:
 		// Unknown backend value; fall back to local and log a warning.
 		logger.Runner.Warn("unknown sandbox backend, falling back to local", "backend", cfg.SandboxBackend)
-		r.backend = NewLocalBackend(r.command)
+		r.backend = sandbox.NewLocalBackend(r.command)
 	}
 	r.reg = cfg.Reg
 

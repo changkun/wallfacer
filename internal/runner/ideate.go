@@ -296,7 +296,7 @@ func (r *Runner) BuildIdeationPrompt(existingTasks []store.Task) string {
 // buildIdeationContainerSpec builds a ContainerSpec for the ideation agent.
 // Workspaces are mounted read-only; no task label, no worktrees, and no
 // board context are used.
-func (r *Runner) buildIdeationContainerSpec(containerName, prompt string, sb sandbox.Type) ContainerSpec {
+func (r *Runner) buildIdeationContainerSpec(containerName, prompt string, sb sandbox.Type) sandbox.ContainerSpec {
 	model := r.modelFromEnvForSandbox(sb)
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
 
@@ -310,7 +310,7 @@ func (r *Runner) buildIdeationContainerSpec(containerName, prompt string, sb san
 			basename := sanitizeBasename(ws)
 			basenames = append(basenames, basename)
 			// Read-only mount: ideation should only read, not modify.
-			spec.Volumes = append(spec.Volumes, VolumeMount{
+			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 				Host:      ws,
 				Container: "/workspace/" + basename,
 				Options:   mountOpts("z", "ro"),

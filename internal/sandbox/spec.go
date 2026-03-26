@@ -1,4 +1,4 @@
-package runner
+package sandbox
 
 import (
 	"strings"
@@ -27,13 +27,7 @@ type ContainerSpec struct {
 	WorkDir    string            // -w workdir (omitted when empty)
 	ExtraFlags []string          // inserted between last -v/-w and image
 	// Network controls the --network flag passed to the container runtime.
-	// Valid values:
-	//   "host"        — (default) unrestricted; required if the agent needs
-	//                   internet access to call the Anthropic API through the host
-	//   "none"        — complete isolation, for air-gapped local-only workspaces
-	//   "slirp4netns" — Podman user-mode networking: allows outbound connections
-	//                   but blocks inbound connections and host loopback access
-	// An empty string falls back to "host" for backward compatibility.
+	// An empty string defaults to "host".
 	Network string // --network (defaults to "host" when empty)
 	// Resource limits — zero values mean no limit is passed to the runtime.
 	CPUs   string   // e.g. "2.0" → --cpus 2.0
@@ -42,19 +36,6 @@ type ContainerSpec struct {
 }
 
 // Build returns the complete argument slice starting with "run".
-// Flag order:
-//
-//	run --rm --network=<Network|host> --name <Name>
-//	[--label key=val ...]   (sorted)
-//	[--env-file <EnvFile>]
-//	[-e KEY=VAL ...]        (sorted)
-//	[-v HOST:CONTAINER[:OPTIONS] ...]
-//	[-w <WorkDir>]
-//	[--cpus <CPUs>]
-//	[--memory <Memory>]
-//	[<ExtraFlags> ...]
-//	<Image>
-//	[<Cmd> ...]
 func (s ContainerSpec) Build() []string {
 	network := s.Network
 	if network == "" {
@@ -76,15 +57,12 @@ func (s ContainerSpec) Build() []string {
 
 	for _, v := range s.Volumes {
 		if v.Named {
-			// Named volumes (e.g. "claude-config:/home/...") use -v syntax.
 			mount := v.Host + ":" + v.Container
 			if v.Options != "" {
 				mount += ":" + v.Options
 			}
 			args = append(args, "-v", mount)
 		} else {
-			// Bind mounts use --mount syntax which handles colons and
-			// unicode characters in host paths without ambiguity.
 			var parts []string
 			parts = append(parts, "type=bind", "src="+v.Host, "dst="+v.Container)
 			if v.Options != "" {

@@ -87,7 +87,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 	siblingMounts map[string]map[string]string,
 	modelOverride string,
 	sb sandbox.Type,
-) ContainerSpec {
+) sandbox.ContainerSpec {
 	// Resolve model once: override takes priority, then env default.
 	model := modelOverride
 	if model == "" {
@@ -119,7 +119,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 			}
 			basename := sanitizeBasename(ws)
 			basenames = append(basenames, basename)
-			spec.Volumes = append(spec.Volumes, VolumeMount{
+			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 				Host:      hostPath,
 				Container: "/workspace/" + basename,
 				Options:   mountOpts("z"),
@@ -132,7 +132,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 			if _, isWorktree := worktreeOverrides[ws]; isWorktree {
 				gitDir := filepath.Join(ws, ".git")
 				if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
-					spec.Volumes = append(spec.Volumes, VolumeMount{
+					spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 						Host:      gitDir,
 						Container: gitDir,
 						Options:   mountOpts("z"),
@@ -149,7 +149,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 
 	// Board context: mount board.json read-only at /workspace/.tasks/.
 	if boardDir != "" {
-		spec.Volumes = append(spec.Volumes, VolumeMount{
+		spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 			Host:      boardDir,
 			Container: "/workspace/.tasks",
 			Options:   mountOpts("z", "ro"),
@@ -174,7 +174,7 @@ func (r *Runner) buildContainerSpecForSandbox(
 			wtPath := repos[repoPath]
 			basename := sanitizeBasename(repoPath)
 			containerPath := "/workspace/.tasks/worktrees/" + shortID + "/" + basename
-			spec.Volumes = append(spec.Volumes, VolumeMount{
+			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 				Host:      wtPath,
 				Container: containerPath,
 				Options:   mountOpts("z", "ro"),
@@ -208,14 +208,14 @@ func instructionsFilenameForSandbox(sb sandbox.Type) string {
 // read-only bind mount (CLAUDE.md for claude, AGENTS.md for codex).
 // It is a no-op when instructionsPath is empty or does not exist on the host.
 // Both buildContainerArgsForSandbox and buildIdeationContainerArgs share this logic.
-func (r *Runner) appendInstructionsMount(volumes []VolumeMount, sb sandbox.Type) []VolumeMount {
+func (r *Runner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb sandbox.Type) []sandbox.VolumeMount {
 	if r.instructionsPath == "" {
 		return volumes
 	}
 	if _, err := os.Stat(r.instructionsPath); err != nil {
 		return volumes
 	}
-	return append(volumes, VolumeMount{
+	return append(volumes, sandbox.VolumeMount{
 		Host:      r.instructionsPath,
 		Container: "/workspace/" + instructionsFilenameForSandbox(sb),
 		Options:   mountOpts("z", "ro"),
@@ -244,12 +244,12 @@ func buildAgentCmd(prompt, model string) []string {
 	return cmd
 }
 
-func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sb sandbox.Type) []VolumeMount {
+func (r *Runner) appendCodexAuthMount(volumes []sandbox.VolumeMount, sb sandbox.Type) []sandbox.VolumeMount {
 	if sb != sandbox.Codex {
 		return volumes
 	}
 	if hostPath := r.hostCodexAuthPath(); hostPath != "" {
-		volumes = append(volumes, VolumeMount{
+		volumes = append(volumes, sandbox.VolumeMount{
 			Host:      hostPath,
 			Container: "/home/codex/.codex",
 			Options:   mountOpts("z", "ro"),
@@ -268,8 +268,8 @@ func (r *Runner) appendCodexAuthMount(volumes []VolumeMount, sb sandbox.Type) []
 //
 // Callers set Labels, additional Volumes (workspace directories, instructions
 // file, board context), WorkDir, and Cmd for their specific needs.
-func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.Type) ContainerSpec {
-	spec := ContainerSpec{
+func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.Type) sandbox.ContainerSpec {
+	spec := sandbox.ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
 		Image:   r.sandboxImageForSandbox(sb),
@@ -280,7 +280,7 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.
 	if model != "" {
 		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
 	}
-	spec.Volumes = append(spec.Volumes, VolumeMount{
+	spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 		Host:      "claude-config",
 		Container: "/home/claude/.claude",
 		Named:     true,

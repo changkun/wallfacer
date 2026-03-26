@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
 	"changkun.de/x/wallfacer/prompts"
@@ -101,7 +102,7 @@ func (m *MockRunner) CleanupWorktrees(taskID uuid.UUID, _ map[string]string, _ s
 func (m *MockRunner) PruneUnknownWorktrees() {}
 
 // ListContainers returns an empty list.
-func (m *MockRunner) ListContainers() ([]ContainerInfo, error) { return nil, nil }
+func (m *MockRunner) ListContainers() ([]sandbox.ContainerInfo, error) { return nil, nil }
 
 // ContainerName returns the container name for a task, using ContainerNameFn if set.
 func (m *MockRunner) ContainerName(taskID uuid.UUID) string {

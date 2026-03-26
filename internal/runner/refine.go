@@ -87,13 +87,13 @@ func (r *Runner) buildRefinementPrompt(task *store.Task, userInstructions string
 // buildRefinementContainerSpec builds a ContainerSpec for a read-only refinement
 // run. Workspaces are mounted read-only; no worktrees, board context, or sibling
 // mounts are used since the agent should only read, not commit.
-func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, modelOverride string, sb sandbox.Type) ContainerSpec {
+func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, modelOverride string, sb sandbox.Type) sandbox.ContainerSpec {
 	model := modelOverride
 	if model == "" {
 		model = r.modelFromEnvForSandbox(sb)
 	}
 
-	spec := ContainerSpec{
+	spec := sandbox.ContainerSpec{
 		Runtime: r.command,
 		Name:    containerName,
 		Image:   r.sandboxImageForSandbox(sb),
@@ -114,7 +114,7 @@ func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, mod
 		spec.Env = map[string]string{"CLAUDE_CODE_MODEL": model}
 	}
 
-	spec.Volumes = append(spec.Volumes, VolumeMount{
+	spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 		Host:      "claude-config",
 		Container: "/home/claude/.claude",
 		Named:     true,
@@ -131,7 +131,7 @@ func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, mod
 			basename := sanitizeBasename(ws)
 			basenames = append(basenames, basename)
 			// Mount read-only: refinement should inspect, not modify.
-			spec.Volumes = append(spec.Volumes, VolumeMount{
+			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 				Host:      ws,
 				Container: "/workspace/" + basename,
 				Options:   mountOpts("z", "ro"),
@@ -141,7 +141,7 @@ func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, mod
 
 	if r.instructionsPath != "" {
 		if _, err := os.Stat(r.instructionsPath); err == nil {
-			spec.Volumes = append(spec.Volumes, VolumeMount{
+			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
 				Host:      r.instructionsPath,
 				Container: "/workspace/" + instructionsFilenameForSandbox(sb),
 				Options:   mountOpts("z", "ro"),

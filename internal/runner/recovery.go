@@ -10,13 +10,14 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
 
 // ContainerLister can enumerate currently running containers.
 type ContainerLister interface {
-	ListContainers() ([]ContainerInfo, error)
+	ListContainers() ([]sandbox.ContainerInfo, error)
 }
 
 func missingRecoveryWorktrees(t store.Task) []string {

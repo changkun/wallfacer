@@ -671,7 +671,7 @@ func TestAppendInstructionsMount(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRunnerForArgTest(t, tc.cfgFn(t))
-			initial := []VolumeMount{{Host: "claude-config", Container: "/home/claude/.claude", Named: true}}
+			initial := []sandbox.VolumeMount{{Host: "claude-config", Container: "/home/claude/.claude", Named: true}}
 			result := r.appendInstructionsMount(initial, sandbox.Normalize(tc.sandbox))
 
 			if tc.wantNone {
@@ -834,7 +834,7 @@ func TestTitleStyleInvocation(t *testing.T) {
 // TestContainerSpecCPUsAndMemoryFlags verifies that non-empty CPUs and Memory
 // fields emit --cpus and --memory flags, respectively.
 func TestContainerSpecCPUsAndMemoryFlags(t *testing.T) {
-	spec := ContainerSpec{
+	spec := sandbox.ContainerSpec{
 		Name:   "test",
 		Image:  "img",
 		CPUs:   "1.5",
@@ -853,7 +853,7 @@ func TestContainerSpecCPUsAndMemoryFlags(t *testing.T) {
 // TestContainerSpecZeroCPUsAndMemoryNoFlags verifies that zero-value CPUs and
 // Memory fields produce no --cpus or --memory flags.
 func TestContainerSpecZeroCPUsAndMemoryNoFlags(t *testing.T) {
-	spec := ContainerSpec{Name: "test", Image: "img"}
+	spec := sandbox.ContainerSpec{Name: "test", Image: "img"}
 	args := spec.Build()
 
 	for i, a := range args {
@@ -869,7 +869,7 @@ func TestContainerSpecZeroCPUsAndMemoryNoFlags(t *testing.T) {
 // TestContainerSpecResourceFlagsBeforeExtraFlags verifies that --cpus and
 // --memory appear after -w and before ExtraFlags and the image.
 func TestContainerSpecResourceFlagsBeforeExtraFlags(t *testing.T) {
-	spec := ContainerSpec{
+	spec := sandbox.ContainerSpec{
 		Name:       "test",
 		Image:      "img",
 		WorkDir:    "/work",

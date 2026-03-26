@@ -1,18 +1,17 @@
-package runner
+package sandbox
 
 import (
 	"context"
 	"fmt"
 	"io"
 	"os/exec"
-	"strings"
 	"sync/atomic"
 
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
 
-// LocalBackend implements SandboxBackend using a local container runtime
+// LocalBackend implements Backend using a local container runtime
 // (podman or docker) via os/exec.
 type LocalBackend struct {
 	command string // path to podman or docker binary
@@ -27,7 +26,7 @@ func NewLocalBackend(command string) *LocalBackend {
 // Launch starts a container from spec and returns a handle for interacting
 // with it. The container process is started non-blocking; call handle.Wait()
 // to block until it exits.
-func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error) {
+func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, error) {
 	name := spec.Name
 	args := spec.Build()
 
@@ -54,14 +53,14 @@ func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (SandboxH
 		stderr:  stderr,
 		command: b.command,
 	}
-	h.state.Store(int32(SandboxCreating))
+	h.state.Store(int32(StateCreating))
 
 	if err := cmd.Start(); err != nil {
-		h.state.Store(int32(SandboxFailed))
+		h.state.Store(int32(StateFailed))
 		return nil, fmt.Errorf("start container: %w", err)
 	}
 
-	h.state.Store(int32(SandboxRunning))
+	h.state.Store(int32(StateRunning))
 	return h, nil
 }
 
@@ -75,44 +74,7 @@ func (b *LocalBackend) List(ctx context.Context) ([]ContainerInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	raw, err := parseContainerList(out)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]ContainerInfo, 0, len(raw))
-	for _, c := range raw {
-		name, nameErr := c.name()
-		if nameErr != nil {
-			logger.Runner.Warn("List: skipping malformed container entry", "error", nameErr)
-			continue
-		}
-
-		// Primary: extract task UUID from the wallfacer.task.id label.
-		taskID := ""
-		if c.Labels != nil {
-			taskID = c.Labels["wallfacer.task.id"]
-		}
-		// Fallback for containers created without labels (old format wallfacer-<uuid>).
-		if taskID == "" {
-			candidate := strings.TrimPrefix(name, "wallfacer-")
-			if candidate != name && isUUID(candidate) {
-				taskID = candidate
-			}
-		}
-
-		result = append(result, ContainerInfo{
-			ID:        c.ID,
-			Name:      name,
-			TaskID:    taskID,
-			Image:     c.Image,
-			State:     c.State,
-			Status:    c.Status,
-			CreatedAt: c.createdUnix(),
-		})
-	}
-	return result, nil
+	return ParseContainerList(out)
 }
 
 // localHandle is a stateful reference to a container launched by LocalBackend.
@@ -125,8 +87,8 @@ type localHandle struct {
 	state   atomic.Int32
 }
 
-func (h *localHandle) State() SandboxState {
-	return SandboxState(h.state.Load())
+func (h *localHandle) State() BackendState {
+	return BackendState(h.state.Load())
 }
 
 func (h *localHandle) Stdout() io.ReadCloser {
@@ -141,18 +103,18 @@ func (h *localHandle) Wait() (int, error) {
 	err := h.cmd.Wait()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			h.state.Store(int32(SandboxStopped))
+			h.state.Store(int32(StateStopped))
 			return exitErr.ExitCode(), nil
 		}
-		h.state.Store(int32(SandboxFailed))
+		h.state.Store(int32(StateFailed))
 		return -1, err
 	}
-	h.state.Store(int32(SandboxStopped))
+	h.state.Store(int32(StateStopped))
 	return 0, nil
 }
 
 func (h *localHandle) Kill() error {
-	h.state.Store(int32(SandboxStopping))
+	h.state.Store(int32(StateStopping))
 
 	if err := cmdexec.New(h.command, "kill", h.name).Run(); err != nil {
 		logger.Runner.Debug("kill container", "name", h.name, "error", err)
@@ -161,7 +123,7 @@ func (h *localHandle) Kill() error {
 		logger.Runner.Debug("remove container", "name", h.name, "error", err)
 	}
 
-	h.state.Store(int32(SandboxStopped))
+	h.state.Store(int32(StateStopped))
 	return nil
 }
 
@@ -171,10 +133,6 @@ func (h *localHandle) Name() string {
 
 // Compile-time interface checks.
 var (
-	_ SandboxBackend = (*LocalBackend)(nil)
-	_ SandboxHandle  = (*localHandle)(nil)
+	_ Backend = (*LocalBackend)(nil)
+	_ Handle  = (*localHandle)(nil)
 )
-
-// containerJSON helpers (parseContainerList, isUUID, containerJSON.name,
-// containerJSON.createdUnix) are defined in runner.go and shared with
-// LocalBackend.List().

@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"changkun.de/x/wallfacer/internal/pkg/syncmap"
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
 
@@ -12,14 +13,14 @@ import (
 // via crypto/rand and will never be all-zeros in practice.
 var singletonKey = uuid.Nil
 
-// containerEntry stores a container name, an optional SandboxHandle, and an
+// containerEntry stores a container name, an optional sandbox.Handle, and an
 // optional log reader. Callers that use backend.Launch() store the handle
 // via SetHandle(); callers that use cmdexec directly (title, refine, commit)
 // store only the name via Set().
 type containerEntry struct {
 	name      string
-	handle    SandboxHandle // nil for name-only registrations
-	logReader io.ReadCloser // nil when no log tee is configured
+	handle    sandbox.Handle // nil for name-only registrations
+	logReader io.ReadCloser  // nil when no log tee is configured
 }
 
 // containerRegistry tracks active containers keyed by task UUID.
@@ -35,9 +36,9 @@ func (r *containerRegistry) Set(id uuid.UUID, name string) {
 	r.Store(id, containerEntry{name: name})
 }
 
-// SetHandle stores a container name with a SandboxHandle and an optional
+// SetHandle stores a container name with a sandbox.Handle and an optional
 // log reader for live log streaming.
-func (r *containerRegistry) SetHandle(id uuid.UUID, handle SandboxHandle, logReader io.ReadCloser) {
+func (r *containerRegistry) SetHandle(id uuid.UUID, handle sandbox.Handle, logReader io.ReadCloser) {
 	r.Store(id, containerEntry{name: handle.Name(), handle: handle, logReader: logReader})
 }
 
@@ -50,9 +51,9 @@ func (r *containerRegistry) Get(id uuid.UUID) (string, bool) {
 	return e.name, true
 }
 
-// GetHandle returns the SandboxHandle for id, or nil if not found or if the
+// GetHandle returns the sandbox.Handle for id, or nil if not found or if the
 // entry was registered without a handle.
-func (r *containerRegistry) GetHandle(id uuid.UUID) SandboxHandle {
+func (r *containerRegistry) GetHandle(id uuid.UUID) sandbox.Handle {
 	e, ok := r.Load(id)
 	if !ok {
 		return nil
@@ -77,7 +78,7 @@ func (r *containerRegistry) SetSingleton(name string) {
 }
 
 // SetSingletonHandle stores a handle under the fixed singleton key.
-func (r *containerRegistry) SetSingletonHandle(handle SandboxHandle, logReader io.ReadCloser) {
+func (r *containerRegistry) SetSingletonHandle(handle sandbox.Handle, logReader io.ReadCloser) {
 	r.SetHandle(singletonKey, handle, logReader)
 }
 
@@ -91,8 +92,8 @@ func (r *containerRegistry) GetSingleton() (string, bool) {
 	return r.Get(singletonKey)
 }
 
-// GetSingletonHandle returns the singleton SandboxHandle, or nil.
-func (r *containerRegistry) GetSingletonHandle() SandboxHandle {
+// GetSingletonHandle returns the singleton sandbox.Handle, or nil.
+func (r *containerRegistry) GetSingletonHandle() sandbox.Handle {
 	return r.GetHandle(singletonKey)
 }
 
