@@ -9,19 +9,21 @@
 - **`LocalBackend`** (`internal/runner/backend_local.go`): `Launch()` starts containers non-blocking via `cmd.Start()`, returns `localHandle` with atomic state tracking. `List()` shells out to `ps --format json` and handles both Podman JSON array and Docker NDJSON. Tests in `backend_local_test.go`.
 - **Runner wiring** (`internal/runner/runner.go`): `Runner.backend` field initialized as `NewLocalBackend(r.command)` in `NewRunner()`. `ListContainers()` delegates to `r.backend.List()`.
 - **Handle-based streaming** (`internal/runner/container.go`, `ideate.go`): `runContainer()` and `RunIdeation()` use `r.backend.Launch()` + `handle.Stdout()`/`Stderr()`/`Wait()`/`Kill()`. `SandboxHandle` interface includes `Stderr()`. Spec builders `buildContainerSpecForSandbox()` and `buildIdeationContainerSpec()` return `ContainerSpec`. Test-only args wrappers in `export_test.go`; `MockSandboxBackend` in `executor_mock_test.go`.
-- **Handle-aware registry** (`internal/runner/registry.go`): `containerEntry{name, handle, logReader}`. `SetHandle()`/`GetHandle()` store the `SandboxHandle`; kill methods (`KillContainer`, `KillRefineContainer`, `KillIdeateContainer`) use `handle.Kill()` when available, falling back to `cmdexec` for legacy callers. Tests in `registry_test.go`.
+- **Handle-aware registry** (`internal/runner/registry.go`): `containerEntry{name, handle, logReader}`. `SetHandle()`/`GetHandle()` store the `SandboxHandle`; kill methods (`KillContainer`, `KillRefineContainer`, `KillIdeateContainer`) use `handle.Kill()` when available, falling back to `cmdexec` for name-only registrations (title, refine, commit). Tests in `registry_test.go`.
 - **ContainerExecutor retired**: `executor.go` deleted. `Runner.executor` field removed. `MockContainerExecutor` replaced by `MockSandboxBackend`. `setupRunnerWithMockBackend()` in tests.
+- **All callers use backend.Launch()**: `title.go`, `refine.go`, `commit.go` migrated from `cmdexec.Capture()` to `r.backend.Launch()`. Kill methods use `handle.Kill()` exclusively (no cmdexec fallback).
 - **Log streaming**: SSE log streaming (`/api/tasks/{id}/logs`) uses `podman logs -f` via `logpipe.Start()` — intentionally kept as-is. The `podman logs -f` approach avoids back-pressure, supports late-joining clients with `--tail`, and decouples output parsing from streaming. Added `logpipe.StartReader()` for future use with non-subprocess readers.
+- **Backend selection**: `WALLFACER_SANDBOX_BACKEND` env var (values: `local`, default: `local`). Parsed in `envconfig`, passed via `RunnerConfig`, selected in `NewRunner()`. Reported by `wallfacer doctor`.
 
 ## Problem
 
-The wallfacer runner executes all sandbox containers via `os/exec` calling a local `podman`/`docker` binary (`internal/runner/executor.go`). The `ContainerExecutor` interface passes raw CLI `args []string`, which leaks the podman/docker abstraction. This has two consequences:
+The wallfacer runner originally executed all sandbox containers via a `ContainerExecutor` interface that passed raw CLI `args []string`, leaking the podman/docker abstraction. This had two consequences:
 
-1. **No lifecycle management.** A container is launched, blocks until exit, and is cleaned up — there is no intermediate state tracking. The runner cannot observe whether a container is starting, streaming output, stopping, or has crashed without shelling out to `podman ps`.
+1. **No lifecycle management.** A container was launched, blocked until exit, and was cleaned up — no intermediate state tracking.
 
-2. **Hard-coupled to local runtime.** For cloud deployment, the server needs to dispatch sandbox containers to remote execution backends (Kubernetes Jobs, cloud VM pools, remote Docker hosts) without changing the task lifecycle or runner logic. A cloud-native backend needs structured input (`ContainerSpec`), not CLI args.
+2. **Hard-coupled to local runtime.** Cloud deployment requires dispatching to remote backends (Kubernetes Jobs, cloud VM pools, remote Docker hosts) with structured input, not CLI args.
 
-Both problems are solved by a single abstraction: a `SandboxBackend` interface that accepts a `ContainerSpec`, returns a stateful `SandboxHandle`, and works identically for local and remote backends.
+Both problems are now solved by the `SandboxBackend` interface that accepts a `ContainerSpec`, returns a stateful `SandboxHandle`, and works identically for local and remote backends. The remaining work is adding remote backend implementations (K8s, remote Docker).
 
 ## Current Architecture
 
@@ -107,30 +109,33 @@ type SandboxHandle interface {
 
 ## Tasks
 
-### Task 9: Backend selection via env var
+### Task 10: Extract `internal/sandbox/backend` package
 
-**Goal:** Add `WALLFACER_SANDBOX_BACKEND` env var so the server can select between backends at startup.
+**Goal:** Move `SandboxBackend`, `SandboxHandle`, `SandboxState`, `ContainerSpec`, `VolumeMount`, `ContainerInfo`, and `LocalBackend` into a standalone `internal/sandbox/backend` package. This establishes a clean package boundary so future backends (K8s, remote Docker) can be added as separate packages without importing the runner.
 
 **Work:**
-1. Add `WALLFACER_SANDBOX_BACKEND` to `internal/envconfig/` (values: `local`, default: `local`)
-2. In server startup, create the appropriate backend based on config
-3. Add to `wallfacer doctor` output
-4. Update docs: `CLAUDE.md`, `docs/guide/configuration.md`
+1. Create `internal/sandbox/backend/` with the interface types (`SandboxState`, `SandboxBackend`, `SandboxHandle`), `ContainerSpec`, `VolumeMount`
+2. Move `LocalBackend`, `localHandle` into `internal/sandbox/backend/local/` (or keep in `backend/`)
+3. Move `ContainerInfo`, `containerJSON`, `parseContainerList`, `isUUID` helper
+4. Update all imports in `internal/runner/` to reference the new package
+5. The `internal/runner/` package becomes a consumer of `sandbox/backend`, not the definer
 
-**Files:** `internal/envconfig/envconfig.go`, `internal/cli/server.go`, `internal/cli/doctor.go`, docs
+**Dependencies:** `backend.go` has zero project deps (stdlib only). `LocalBackend` depends on `logger` and `cmdexec` — pass as constructor args or import directly. `ContainerSpec` depends on `sortedkeys` — trivial.
 
-**Acceptance:** `WALLFACER_SANDBOX_BACKEND=local` works (only option for now). Doctor reports backend. Docs updated.
+**Files:** New `internal/sandbox/backend/` package; update imports in `internal/runner/*.go`, `internal/handler/stream.go`
+
+**Acceptance:** Backend types live in their own package. Runner imports and uses them. All tests pass.
 
 ---
 
-### Task 10: Kubernetes backend (future)
+### Task 11: Kubernetes backend (future)
 
 **Goal:** Implement `K8sBackend` for dispatching sandbox containers as K8s Jobs.
 
-**Depends on:** Task 9 complete.
+**Depends on:** Task 10 complete.
 
 **Work:**
-1. Add `internal/runner/backend_k8s.go` implementing `SandboxBackend` via `client-go`
+1. Add `internal/sandbox/backend/k8s.go` implementing `SandboxBackend` via `client-go`
 2. Map `ContainerSpec` → K8s Job spec (see design table above)
 3. Implement `k8sHandle` with state tracking via pod watch
 4. Implement log streaming via pod log follow API
@@ -144,14 +149,14 @@ This task is deliberately left as a single unit — it should be broken down fur
 
 ---
 
-### Task 11: Remote Docker backend (optional, future)
+### Task 12: Remote Docker backend (optional, future)
 
 **Goal:** Implement `RemoteDockerBackend` for SSH/HTTPS dispatch to a remote Docker host.
 
-**Depends on:** Task 9 complete.
+**Depends on:** Task 10 complete.
 
 **Work:**
-1. Add `internal/runner/backend_remote.go` using Docker client SDK
+1. Add `internal/sandbox/backend/remote.go` using Docker client SDK
 2. SSH tunnel or TLS client cert for authentication
 3. State tracking via Docker events API
 4. Volume mounting via NFS or pre-provisioned volumes on the remote host
@@ -163,12 +168,12 @@ Lower priority than K8s. Useful for simple single-host remote setups.
 ## Task Dependency Graph
 
 ```
-Task 9 (env var backend selection)
-  └→ Task 10 (K8s backend)
-  └→ Task 11 (Remote Docker backend)
+Task 10 (extract sandbox/backend package)
+  └→ Task 11 (K8s backend)
+  └→ Task 12 (Remote Docker backend)
 ```
 
-Tasks 10 and 11 can run in parallel after Task 9.
+Task 10 is a prerequisite for both cloud backends. Tasks 11 and 12 can run in parallel after Task 10.
 
 ---
 
@@ -212,5 +217,5 @@ Currently checked via `podman images` / `docker images` in the handler. For K8s,
 
 ### Dependencies on Other Epics
 
-- **Cloud Data Storage** (`02-storage-backends.md`): If the store moves to a database, the sandbox executor doesn't need to share a filesystem for task metadata — only for worktrees.
+- **Cloud Data Storage** (`02-storage-backends.md`): If the store moves to a database, the sandbox backend doesn't need to share a filesystem for task metadata — only for worktrees.
 - **Multi-Tenant** (`08-cloud-multi-tenant.md`): The control plane decides which backend each user's instance uses.
