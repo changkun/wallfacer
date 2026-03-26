@@ -275,14 +275,148 @@ During implementation, an agent encounters a domain it's unfamiliar with and spa
 
 6. **MCP as the communication protocol?** Claude Code already supports MCP tools. If the orchestrator exposed an MCP server, agents could use tool calls to communicate. This is architecturally clean but adds infrastructure complexity.
 
-## Recommended Next Steps
+## Audit Results: Role Divergence Classification
 
-1. **Audit role divergence.** Diff the container-spec builders and launch sequences across all seven roles. Classify each difference as fundamental vs. incidental.
+The audit compared all seven roles across container spec building, launch sequence, output parsing, usage tracking, sandbox selection, and error handling.
 
-2. **Prototype Option A.** Extract `runAgent()` with role descriptors. Migrate title generation first (simplest role), then oversight, then refinement. Validate that all existing tests pass unchanged.
+### Role Tier Clustering
 
-3. **Enumerate planned roles.** Collect concrete agent roles the project wants to support in the next 2-3 milestones. This determines whether Option B's interface flexibility is justified.
+The 7 roles cluster into 3 tiers based on their fundamental container needs:
 
-4. **Spike on file-based messaging (D1).** Mount a shared directory between two concurrent task containers. Have one write a message, the other read it. Validate latency and ergonomics.
+| Tier | Roles | Workspace Mounts | Multi-turn | Session Recovery |
+|------|-------|-------------------|------------|------------------|
+| **Heavyweight** | Implementation, Testing | RW + board + siblings | Yes | Yes (impl only) |
+| **Inspector** | Refinement, Ideation | RO, no board | No | No |
+| **Headless** | Title, Oversight, Commit Msg | None | No | No |
 
-5. **Write implementation spec.** Based on findings from steps 1-4, write a concrete implementation spec with task breakdown.
+### Fundamental Differences (4 boolean dimensions)
+
+These reflect genuinely different security/execution models:
+
+| Aspect | Heavyweight | Inspector | Headless |
+|--------|-------------|-----------|----------|
+| Workspace mounts | Read-write | Read-only | None |
+| Board context + sibling worktrees | Yes | No | No |
+| Multi-turn with `--resume` | Yes | No | No |
+| Session recovery on "no conversation" | Impl only | No | No |
+
+### Incidental Differences (copy-paste drift)
+
+These are accidental divergences that should be normalized:
+
+1. **Flag order.** Oversight uses `-p <prompt> --output-format stream-json --verbose`; all others use `--verbose` before `--output-format`. Order is irrelevant to behavior.
+
+2. **Container naming.** Ideation uses `wallfacer-ideate-{timestamp_ms}` while all others use `wallfacer-{role}-{uuid8}`. Timestamp-based names risk collisions under rapid succession.
+
+3. **Timeout sources.** Hard-coded per role (title: 60s, oversight: 3m, commit: 90s, refinement: `constants.RefinementTimeout`, implementation: task timeout). Should be centralized in `internal/constants/`.
+
+4. **Token-limit fallback structure.** All roles implement the same two-phase Claude→Codex retry, but oversight and ideation use slightly different wrapper structures (`oversightRunResult` vs inline). The logic is identical.
+
+5. **Usage accumulation.** All roles follow the same `AccumulateSubAgentUsage()` + `AppendTurnUsage()` pattern — no actual drift here.
+
+### Shared Across All 7 Roles
+
+- NDJSON output format (`--output-format stream-json`)
+- Same parse struct (`agentOutput`)
+- Same usage tracking pattern
+- Token-limit fallback (Claude → Codex)
+- Per-activity sandbox routing via env vars
+- Base container spec foundation (`buildBaseContainerSpec()`)
+
+## Decision: Option A (Role Descriptors)
+
+### Rationale
+
+The divergences are almost entirely incidental. The fundamental differences reduce to 4 boolean/enum dimensions — this is parametric variance, not behavioral variance. A descriptor (data) fits better than an interface (behavior) because all 7 roles follow the exact same execution sequence:
+
+> build spec → launch → read NDJSON → parse → accumulate usage
+
+The only variance is in *what gets mounted* and *how the result string is interpreted*.
+
+**Why not Option B (Interface)?** Roles don't have meaningfully different control flow. An interface is justified when implementations need fundamentally different execution models. Here, a descriptor captures all variance. If a future role truly needs a different execution model, it can bypass `runAgent()` entirely — the descriptor doesn't prevent that.
+
+**Why not Options C/D yet?** No concrete use case demands inter-agent communication today. The abstraction is layered: Option A is independently valuable and doesn't preclude adding C/D later.
+
+### Descriptor Shape
+
+```go
+type MountMode int
+
+const (
+    MountNone     MountMode = iota // Title, Oversight, Commit Msg
+    MountReadOnly                   // Refinement, Ideation
+    MountReadWrite                  // Implementation, Testing
+)
+
+type AgentRole struct {
+    Activity    store.SandboxActivity
+    PromptTmpl  string                        // template name in prompts/
+    Timeout     func(*store.Task) time.Duration
+    MountMode   MountMode
+    MountBoard  bool                          // include board.json + sibling worktrees
+    SingleTurn  bool                          // no --resume loop
+    ParseResult func(string) (any, error)     // role-specific output extraction
+}
+```
+
+A central `runAgent(ctx, role AgentRole, task, prompt, opts)` handles:
+- Sandbox selection (existing 4-tier hierarchy)
+- Container spec building (dispatch on `MountMode` + `MountBoard`)
+- Container lifecycle (register → launch → read → wait → parse NDJSON)
+- Usage accumulation
+- Token-limit fallback (Claude → Codex)
+
+### Incidental Drift Fixes (included in refactor)
+
+- Normalize flag order to `--verbose --output-format stream-json` everywhere
+- Use UUID suffix for ideation container names
+- Centralize all role timeouts in `internal/constants/`
+- Extract token-limit fallback retry into a single shared helper
+
+## Implementation Plan
+
+### Phase 1 — Headless Roles (Title, Oversight, Commit Message)
+
+Simplest tier: no mounts, single-turn. The three implementations are nearly identical modulo prompt template and result parsing.
+
+1. Define `AgentRole` type and `MountMode` enum in a new file `internal/runner/agent.go`.
+2. Implement `runAgent()` with support for `MountNone` only.
+3. Define role descriptors: `roleTitle`, `roleOversight`, `roleCommitMessage`.
+4. Migrate `GenerateTitle()` to call `runAgent(roleTitle, ...)` — remove duplicated spec-building and launch logic from `title.go`.
+5. Migrate `runOversightAgent()` similarly — collapse `oversight.go` launch code.
+6. Migrate `generateCommitMessage()` similarly — collapse `commit.go` launch code.
+7. Verify all existing tests pass unchanged.
+
+### Phase 2 — Inspector Roles (Refinement, Ideation)
+
+Add `MountReadOnly` support to `runAgent()`.
+
+1. Extend `runAgent()` to handle `MountMode: MountReadOnly` — mount all workspace directories read-only, mount instructions file.
+2. Define `roleRefinement` and `roleIdeaAgent` descriptors.
+3. Delete `buildRefinementContainerSpec()` and `buildIdeationContainerSpec()` — they are near-identical and collapse into `runAgent()`.
+4. Migrate `RunRefinement()` and `RunIdeation()` to call `runAgent()`.
+5. Verify all existing tests pass unchanged.
+
+### Phase 3 — Heavyweight Roles (Implementation, Testing)
+
+These have the most accretion (session recovery, auto-continue, verdict inference, worktree management). The container launch unifies; the turn loop and post-processing stay in their respective files.
+
+1. Extend `runAgent()` to handle `MountMode: MountReadWrite` — mount worktrees read-write, mount board context and sibling worktrees.
+2. Define `roleImplementation` and `roleTesting` descriptors with `SingleTurn: false`.
+3. Refactor `runContainer()` to call `runAgent()` for each turn invocation. The turn loop, session management, and auto-continue logic remain in `execute.go` but no longer duplicate spec-building or launch code.
+4. Verify all existing tests pass unchanged.
+
+### Phase 4 — Cleanup
+
+1. Remove dead code: orphaned spec builders, duplicated fallback helpers.
+2. Consolidate container naming to `wallfacer-{role}-{uuid8}` pattern.
+3. Centralize remaining hard-coded timeouts into `internal/constants/`.
+
+## Deferred Work
+
+The following are explicitly out of scope for this refactor but compatible with it:
+
+- **Agent Interface (Option B):** Only needed if a future role requires fundamentally different control flow. The descriptor can be promoted to an interface at that point without breaking existing roles.
+- **Agent Graph (Option C):** The existing implicit pipeline (implement → commit → title/oversight) could be made explicit as a graph, but the current hard-coded sequencing works and the graph adds complexity with no immediate payoff.
+- **Inter-Agent Communication (Options D1/D2/D3):** No concrete use case demands it today. File-based messaging (D1) remains the simplest path if needed later.
+- **User-Configurable Agent Pipelines:** Requires a configuration format, validation, and UI — significant scope that should be driven by concrete user demand.
