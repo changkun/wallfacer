@@ -267,6 +267,7 @@ Optional variables (also in `.env`):
 - `WALLFACER_AUTO_PUSH` — enable auto-push after task completion (`true`/`false`)
 - `WALLFACER_AUTO_PUSH_THRESHOLD` — minimum completed tasks before auto-push triggers
 - `WALLFACER_SANDBOX_FAST` — enable fast-mode sandbox hints (default: `true`)
+- `WALLFACER_SANDBOX_BACKEND` — sandbox backend selection (values: `local`; default: `local`)
 - `WALLFACER_CONTAINER_NETWORK` — container network name
 - `WALLFACER_CONTAINER_CPUS` — container CPU limit (e.g. `"2.0"`)
 - `WALLFACER_CONTAINER_MEMORY` — container memory limit (e.g. `"4g"`)

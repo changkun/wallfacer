@@ -46,6 +46,7 @@ type Config struct {
 	IdeaAgentSandbox      sandbox.Type // WALLFACER_SANDBOX_IDEA_AGENT
 	SandboxFast           bool         // WALLFACER_SANDBOX_FAST ("true"/"false"), defaults to true when unset
 
+	SandboxBackend   string // WALLFACER_SANDBOX_BACKEND (values: "local"; default: "local")
 	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
 	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
@@ -80,6 +81,7 @@ var knownKeys = []string{
 	"WALLFACER_SANDBOX_COMMIT_MESSAGE",
 	"WALLFACER_SANDBOX_IDEA_AGENT",
 	"WALLFACER_SANDBOX_FAST",
+	"WALLFACER_SANDBOX_BACKEND",
 	"WALLFACER_CONTAINER_NETWORK",
 	"WALLFACER_CONTAINER_CPUS",
 	"WALLFACER_CONTAINER_MEMORY",
@@ -162,6 +164,8 @@ func Parse(path string) (Config, error) {
 			cfg.IdeaAgentSandbox = sandbox.Normalize(v)
 		case "WALLFACER_SANDBOX_FAST":
 			cfg.SandboxFast = v != "false"
+		case "WALLFACER_SANDBOX_BACKEND":
+			cfg.SandboxBackend = strings.ToLower(strings.TrimSpace(v))
 		case "WALLFACER_CONTAINER_NETWORK":
 			cfg.ContainerNetwork = v
 		case "WALLFACER_CONTAINER_CPUS":

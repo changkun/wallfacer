@@ -129,6 +129,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		TmpDir:           tmpDir,
 		InstructionsPath: snapshot.InstructionsPath,
 		CodexAuthPath:    codexAuthPath,
+		SandboxBackend:   envCfg.SandboxBackend,
 		ContainerNetwork: envCfg.ContainerNetwork,
 		ContainerCPUs:    envCfg.ContainerCPUs,
 		ContainerMemory:  envCfg.ContainerMemory,

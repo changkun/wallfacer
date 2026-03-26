@@ -553,6 +553,43 @@ func TestMaskToken(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SandboxBackend
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestParseSandboxBackendLocal(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_SANDBOX_BACKEND=local\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.SandboxBackend != "local" {
+		t.Fatalf("SandboxBackend = %q; want %q", cfg.SandboxBackend, "local")
+	}
+}
+
+func TestParseSandboxBackendAbsent(t *testing.T) {
+	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.SandboxBackend != "" {
+		t.Fatalf("SandboxBackend = %q; want empty when absent", cfg.SandboxBackend)
+	}
+}
+
+func TestParseSandboxBackendNormalized(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_SANDBOX_BACKEND= Local \n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.SandboxBackend != "local" {
+		t.Fatalf("SandboxBackend = %q; want %q (lowered+trimmed)", cfg.SandboxBackend, "local")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ParseWorkspaces / FormatWorkspaces
 // ─────────────────────────────────────────────────────────────────────────────
 

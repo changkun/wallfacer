@@ -125,6 +125,13 @@ func RunDoctor(configDir string) {
 		}
 	}
 
+	// --- Sandbox backend ---
+	sandboxBackend := vals["WALLFACER_SANDBOX_BACKEND"]
+	if sandboxBackend == "" {
+		sandboxBackend = "local"
+	}
+	fmt.Printf("[ok] Sandbox backend: %s\n", sandboxBackend)
+
 	// --- Sandbox images ---
 	if lookErr == nil {
 		image := envOrDefault("SANDBOX_IMAGE", defaultSandboxImage())

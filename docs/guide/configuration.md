@@ -178,6 +178,7 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 
 | Variable | Default | Description |
 |---|---|---|
+| `WALLFACER_SANDBOX_BACKEND` | `local` | Sandbox backend selection (`local` for podman/docker) |
 | `WALLFACER_CONTAINER_NETWORK` | -- | Container network name |
 | `WALLFACER_CONTAINER_CPUS` | (no limit) | CPU limit per container, e.g. `"2.0"` |
 | `WALLFACER_CONTAINER_MEMORY` | (no limit) | Memory limit per container, e.g. `"4g"` |

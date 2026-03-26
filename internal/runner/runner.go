@@ -19,7 +19,6 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/pkg/keyedmu"
 	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
 	"changkun.de/x/wallfacer/internal/store"
@@ -184,6 +183,7 @@ type RunnerConfig struct {
 	WorktreesDir     string
 	InstructionsPath string
 	CodexAuthPath    string           // host path to codex auth cache directory (default: ~/.codex)
+	SandboxBackend   string           // "local" (default) — selects the SandboxBackend implementation
 	ContainerNetwork string           // --network value for task containers (empty = read from env file, fallback "host")
 	ContainerCPUs    string           // --cpus value for task containers (empty = read from env file, no limit)
 	ContainerMemory  string           // --memory value for task containers (empty = read from env file, no limit)
@@ -462,7 +462,14 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		}
 	}
 	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
-	r.backend = NewLocalBackend(r.command)
+	switch cfg.SandboxBackend {
+	case "", "local":
+		r.backend = NewLocalBackend(r.command)
+	default:
+		// Unknown backend value; fall back to local and log a warning.
+		logger.Runner.Warn("unknown sandbox backend, falling back to local", "backend", cfg.SandboxBackend)
+		r.backend = NewLocalBackend(r.command)
+	}
 	r.reg = cfg.Reg
 
 	if r.workspaceManager != nil {
@@ -746,34 +753,22 @@ func (r *Runner) RefineContainerName(taskID uuid.UUID) string {
 }
 
 // KillContainer sends a kill signal to the running container for a task.
-// If a SandboxHandle is registered, kill goes through the handle; otherwise
-// falls back to shelling out via cmdexec (for legacy callers not yet migrated).
+// Kill goes through the SandboxHandle when registered; otherwise it is a no-op
+// (container already exited or was never launched).
 // Safe to call when no container is running — errors are silently ignored.
 func (r *Runner) KillContainer(taskID uuid.UUID) {
 	if h := r.taskContainers.GetHandle(taskID); h != nil {
 		_ = h.Kill()
-		return
 	}
-	name := r.ContainerName(taskID)
-	if name == "" {
-		return
-	}
-	_ = cmdexec.New(r.command, "kill", name).Run()
 }
 
 // KillRefineContainer sends a kill signal to the running refinement container.
-// If a SandboxHandle is registered, kill goes through the handle; otherwise
-// falls back to shelling out. Safe to call when no refinement container is running.
+// Kill goes through the SandboxHandle when registered; otherwise it is a no-op.
+// Safe to call when no refinement container is running.
 func (r *Runner) KillRefineContainer(taskID uuid.UUID) {
 	if h := r.refineContainers.GetHandle(taskID); h != nil {
 		_ = h.Kill()
-		return
 	}
-	name := r.RefineContainerName(taskID)
-	if name == "" {
-		return
-	}
-	_ = cmdexec.New(r.command, "kill", name).Run()
 }
 
 // IdeateContainerName returns the name of the currently running ideation container,
@@ -786,16 +781,10 @@ func (r *Runner) IdeateContainerName() string {
 }
 
 // KillIdeateContainer sends a kill signal to the running ideation container.
-// If a SandboxHandle is registered, kill goes through the handle; otherwise
-// falls back to shelling out. Safe to call when no ideation container is running.
+// Kill goes through the SandboxHandle when registered; otherwise it is a no-op.
+// Safe to call when no ideation container is running.
 func (r *Runner) KillIdeateContainer() {
 	if h := r.ideateContainer.GetSingletonHandle(); h != nil {
 		_ = h.Kill()
-		return
 	}
-	name := r.IdeateContainerName()
-	if name == "" {
-		return
-	}
-	_ = cmdexec.New(r.command, "kill", name).Run()
 }
