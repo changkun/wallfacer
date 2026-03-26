@@ -96,6 +96,24 @@ Kill methods (`KillContainer`, `KillRefineContainer`, `KillIdeateContainer`) rou
 - All direct `cmdexec.Capture()` calls for container execution
 - All `cmdexec.New(r.command, "kill", name).Run()` fallbacks in kill methods
 
+## Design Evolution
+
+The spec originated on 2026-03-23 as **"Cloud Sandbox Executor"** — part of a cloud deployment epic alongside multi-tenant and cloud data storage specs. The initial design proposed three backends (`LocalBackend`, `K8sBackend`, `RemoteDockerBackend`), a three-phase implementation plan, and extensive cloud worktree management via shared PVC/NFS. Several aspects changed during implementation:
+
+1. **Scope narrowed.** Only Phase 1 (interface extraction + `LocalBackend`) shipped. K8s and remote Docker backends were deferred to M6.
+
+2. **Separate stdout/stderr.** The initial design specified a single `Stdout() io.ReadCloser` returning combined output. Implementation split into `Stdout()` and `Stderr()` after `io.MultiReader` caused back-pressure deadlocks when SSE clients weren't connected.
+
+3. **Dedicated package.** The initial design placed all types in `internal/runner/`. Implementation extracted them to `internal/sandbox/` for cleaner separation from orchestration logic.
+
+4. **Shorter names.** `SandboxBackend` → `Backend`, `SandboxHandle` → `Handle`, `SandboxState` → `BackendState`. The `sandbox` package name already provides context.
+
+5. **`Build()` made explicitly local-only.** The spec noted this conceptually; the implementation codified it as a key decision — `ContainerSpec` is declarative, `Build()` is a `LocalBackend` concern only.
+
+6. **Log streaming kept decoupled.** The initial design implied unifying output parsing and live streaming via the handle. Implementation kept SSE endpoints using `podman logs -f` via `logpipe` independently, avoiding back-pressure and supporting late-joining clients.
+
+7. **Cloud worktree management dropped.** Described in the original as "the biggest architectural challenge," it was deferred entirely to M6.
+
 ## Future Work
 
 Remote backend implementations (K8s, remote Docker) and cloud worktree management are scoped under [M6: Cloud Backends](06-cloud-backends.md).
