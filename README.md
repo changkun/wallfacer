@@ -14,6 +14,16 @@ Create tasks, run them in isolated sandboxes, review diffs, and keep shipping wi
 
 ![Wallfacer teaser](./images/overview.png)
 
+## Quick Start
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh  # install
+wallfacer doctor  # check prerequisites
+wallfacer run     # start the server
+```
+
+A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings → API Configuration**. See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough.
+
 ## Why Wallfacer
 
 - **Autonomous delivery loop**: backlog -> implementation -> testing -> review -> merge-ready output
@@ -58,36 +68,6 @@ Inspect what happened, when it happened, and why it happened before you accept a
 ![Usage and cost breakdown](./images/usage.png)
 
 Track token usage and cost by task/activity so operations stay measurable as automation scales.
-
-## Quick Start
-
-```bash
-# 1. Install
-curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
-
-# 2. Start the server (restores your last workspace group, or starts empty)
-wallfacer run
-```
-
-The browser opens to `http://localhost:8080`. Add your Claude credential (OAuth token or API key) in **Settings → API Configuration**. The sandbox image is pulled automatically on first task run.
-
-Codex can be enabled either by:
-- host auth cache at `~/.codex/auth.json` (auto-detected at bootstrap), or
-- `OPENAI_API_KEY` in `~/.wallfacer/.env` / **Settings → API Configuration** (plus one successful Codex test).
-
-**See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough**, including credential setup, configuration options, and troubleshooting.
-
-### Common Commands
-
-```bash
-# Custom port, skip auto-opening the browser
-wallfacer run -addr :9090 -no-browser
-
-# Check prerequisites and configuration
-wallfacer doctor
-```
-
-For all available `make` targets (build, test, release, etc.), see [Technical Internals: Architecture](docs/internals/architecture.md#development-setup).
 
 ## Documentation
 
