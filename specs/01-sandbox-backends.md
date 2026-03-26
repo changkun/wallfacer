@@ -5,15 +5,13 @@
 
 ## Already Implemented
 
-- **Interfaces and types** (`internal/runner/backend.go`): `SandboxState` enum (6 states), `SandboxBackend` interface (`Launch`, `List`), `SandboxHandle` interface (`State`, `Stdout`, `Wait`, `Kill`, `Name`), `String()` method. Tests in `backend_test.go`.
-- **`LocalBackend`** (`internal/runner/backend_local.go`): `Launch()` starts containers non-blocking via `cmd.Start()`, returns `localHandle` with atomic state tracking. `List()` shells out to `ps --format json` and handles both Podman JSON array and Docker NDJSON. Tests in `backend_local_test.go`.
-- **Runner wiring** (`internal/runner/runner.go`): `Runner.backend` field initialized as `NewLocalBackend(r.command)` in `NewRunner()`. `ListContainers()` delegates to `r.backend.List()`.
-- **Handle-based streaming** (`internal/runner/container.go`, `ideate.go`): `runContainer()` and `RunIdeation()` use `r.backend.Launch()` + `handle.Stdout()`/`Stderr()`/`Wait()`/`Kill()`. `SandboxHandle` interface includes `Stderr()`. Spec builders `buildContainerSpecForSandbox()` and `buildIdeationContainerSpec()` return `ContainerSpec`. Test-only args wrappers in `export_test.go`; `MockSandboxBackend` in `executor_mock_test.go`.
-- **Handle-aware registry** (`internal/runner/registry.go`): `containerEntry{name, handle, logReader}`. `SetHandle()`/`GetHandle()` store the `SandboxHandle`; kill methods (`KillContainer`, `KillRefineContainer`, `KillIdeateContainer`) use `handle.Kill()` when available, falling back to `cmdexec` for name-only registrations (title, refine, commit). Tests in `registry_test.go`.
-- **ContainerExecutor retired**: `executor.go` deleted. `Runner.executor` field removed. `MockContainerExecutor` replaced by `MockSandboxBackend`. `setupRunnerWithMockBackend()` in tests.
-- **All callers use backend.Launch()**: `title.go`, `refine.go`, `commit.go` migrated from `cmdexec.Capture()` to `r.backend.Launch()`. Kill methods use `handle.Kill()` exclusively (no cmdexec fallback).
-- **Log streaming**: SSE log streaming (`/api/tasks/{id}/logs`) uses `podman logs -f` via `logpipe.Start()` — intentionally kept as-is. The `podman logs -f` approach avoids back-pressure, supports late-joining clients with `--tail`, and decouples output parsing from streaming. Added `logpipe.StartReader()` for future use with non-subprocess readers.
-- **Backend selection**: `WALLFACER_SANDBOX_BACKEND` env var (values: `local`, default: `local`). Parsed in `envconfig`, passed via `RunnerConfig`, selected in `NewRunner()`. Reported by `wallfacer doctor`.
+All local-backend infrastructure is complete. The `internal/sandbox` package defines the pluggable backend abstraction and its local implementation:
+
+- **`internal/sandbox/`** — Single package containing: `Backend` and `Handle` interfaces, `BackendState` enum (6 states), `ContainerSpec`/`VolumeMount` (declarative container description), `ContainerInfo` (runtime metadata), `LocalBackend`/`localHandle` (podman/docker via os/exec), `ParseContainerList`/`IsUUID` (JSON parsing helpers). Tests in `parse_test.go`.
+- **Runner wiring** (`internal/runner/`): `Runner.backend sandbox.Backend` field. All container callers (`runContainer`, `RunIdeation`, `GenerateTitle`, `runRefinementContainer`, `generateCommitMessage`) use `r.backend.Launch()` + handle. Kill methods use `handle.Kill()` exclusively. `MockSandboxBackend` in `executor_mock_test.go`.
+- **Handle-aware registry** (`internal/runner/registry.go`): `containerEntry{name, handle, logReader}`. `SetHandle()`/`GetHandle()` for handle storage; kill methods route through handle.
+- **Log streaming**: SSE uses `podman logs -f` via `logpipe.Start()` — intentionally kept (avoids back-pressure, supports late-joining clients). `logpipe.StartReader()` available for future use.
+- **Backend selection**: `WALLFACER_SANDBOX_BACKEND` env var (values: `local`, default: `local`). Parsed in `envconfig`, selected in `NewRunner()`, reported by `wallfacer doctor`.
 
 ## Problem
 
@@ -38,15 +36,13 @@ Runner.Run()                  (internal/runner/execute.go)
 
 Key types involved:
 
-- **`SandboxBackend`** (`internal/runner/backend.go`) — Core abstraction. `Launch(ctx, spec) → (SandboxHandle, error)` and `List(ctx) → ([]ContainerInfo, error)`. `Runner.backend` field, initialized as `LocalBackend`.
-- **`SandboxHandle`** (`internal/runner/backend.go`) — Stateful handle: `State()`, `Stdout()`, `Stderr()`, `Wait()`, `Kill()`, `Name()`.
-- **`LocalBackend`** (`internal/runner/backend_local.go`) — Production implementation; `Launch()` starts non-blocking via `cmd.Start()`, `List()` shells out to `ps --format json`.
-- **`containerRegistry`** (`internal/runner/registry.go`) — `syncmap.Map[uuid.UUID, containerEntry]` storing name + optional `SandboxHandle` + optional `logReader`. Kill methods use handle when available.
-- **`ContainerSpec`** (`internal/runner/container_spec.go`) — Structured container description (Image, Name, Volumes, Env, Labels, Network, CPUs, Memory, Cmd, WorkDir, ExtraFlags). Its `Build()` method returns `[]string` CLI args.
-- **`VolumeMount`** (`internal/runner/container_spec.go:10-15`) — Single bind mount or named volume descriptor (Host, Container, Options, Named).
-- **`ContainerInfo`** (`internal/runner/runner.go`) — Runtime container metadata. `ListContainers()` delegates to `r.backend.List()`.
-- **Log streaming** — SSE log endpoints use `logpipe.Start()` to spawn `podman logs -f` on the container name from the registry. `logpipe.StartReader()` available for `io.ReadCloser` inputs.
-- **Circuit breaker** (`internal/pkg/circuitbreaker`) — Three-state breaker (closed/open/half-open) gating `runContainer()` calls; uses exit code 125 detection from handle.
+- **`sandbox.Backend`** (`internal/sandbox/backend.go`) — Core interface. `Launch(ctx, spec) → (Handle, error)` and `List(ctx) → ([]ContainerInfo, error)`.
+- **`sandbox.Handle`** (`internal/sandbox/backend.go`) — Stateful handle: `State()`, `Stdout()`, `Stderr()`, `Wait()`, `Kill()`, `Name()`.
+- **`sandbox.LocalBackend`** (`internal/sandbox/local.go`) — Production implementation; `Launch()` starts non-blocking via `cmd.Start()`, `List()` shells out to `ps --format json`.
+- **`sandbox.ContainerSpec`** (`internal/sandbox/spec.go`) — Structured container description. `Build()` returns `[]string` CLI args.
+- **`sandbox.ContainerInfo`** (`internal/sandbox/backend.go`) — Runtime container metadata.
+- **`containerRegistry`** (`internal/runner/registry.go`) — `syncmap.Map[uuid.UUID, containerEntry]` storing name + optional `sandbox.Handle`. Kill methods route through handle.
+- **Circuit breaker** (`internal/pkg/circuitbreaker`) — Three-state breaker gating `runContainer()` calls; uses exit code 125 detection from handle.
 
 ---
 
@@ -71,28 +67,29 @@ Creating → Running → Streaming → Stopping → Stopped
 | `Stopped` | Container exited (success or non-zero). Terminal state. | Backend, after `Wait()` returns. |
 | `Failed` | Container could not be created or crashed before producing output. Terminal state. | Backend, on launch failure or runtime error. |
 
-### Target Interfaces
+### Interfaces (as implemented in `internal/sandbox/`)
 
 ```go
-type SandboxState int
+type BackendState int
 
 const (
-    SandboxCreating  SandboxState = iota
-    SandboxRunning
-    SandboxStreaming
-    SandboxStopping
-    SandboxStopped
-    SandboxFailed
+    StateCreating  BackendState = iota
+    StateRunning
+    StateStreaming
+    StateStopping
+    StateStopped
+    StateFailed
 )
 
-type SandboxBackend interface {
-    Launch(ctx context.Context, spec ContainerSpec) (SandboxHandle, error)
+type Backend interface {
+    Launch(ctx context.Context, spec ContainerSpec) (Handle, error)
     List(ctx context.Context) ([]ContainerInfo, error)
 }
 
-type SandboxHandle interface {
-    State() SandboxState
+type Handle interface {
+    State() BackendState
     Stdout() io.ReadCloser
+    Stderr() io.ReadCloser
     Wait() (exitCode int, err error)
     Kill() error
     Name() string
@@ -109,33 +106,12 @@ type SandboxHandle interface {
 
 ## Tasks
 
-### Task 10: Extract `internal/sandbox/backend` package
-
-**Goal:** Move `SandboxBackend`, `SandboxHandle`, `SandboxState`, `ContainerSpec`, `VolumeMount`, `ContainerInfo`, and `LocalBackend` into a standalone `internal/sandbox/backend` package. This establishes a clean package boundary so future backends (K8s, remote Docker) can be added as separate packages without importing the runner.
-
-**Work:**
-1. Create `internal/sandbox/backend/` with the interface types (`SandboxState`, `SandboxBackend`, `SandboxHandle`), `ContainerSpec`, `VolumeMount`
-2. Move `LocalBackend`, `localHandle` into `internal/sandbox/backend/local/` (or keep in `backend/`)
-3. Move `ContainerInfo`, `containerJSON`, `parseContainerList`, `isUUID` helper
-4. Update all imports in `internal/runner/` to reference the new package
-5. The `internal/runner/` package becomes a consumer of `sandbox/backend`, not the definer
-
-**Dependencies:** `backend.go` has zero project deps (stdlib only). `LocalBackend` depends on `logger` and `cmdexec` — pass as constructor args or import directly. `ContainerSpec` depends on `sortedkeys` — trivial.
-
-**Files:** New `internal/sandbox/backend/` package; update imports in `internal/runner/*.go`, `internal/handler/stream.go`
-
-**Acceptance:** Backend types live in their own package. Runner imports and uses them. All tests pass.
-
----
-
 ### Task 11: Kubernetes backend (future)
 
 **Goal:** Implement `K8sBackend` for dispatching sandbox containers as K8s Jobs.
 
-**Depends on:** Task 10 complete.
-
 **Work:**
-1. Add `internal/sandbox/backend/k8s.go` implementing `SandboxBackend` via `client-go`
+1. Add `internal/sandbox/k8s.go` implementing `sandbox.Backend` via `client-go`
 2. Map `ContainerSpec` → K8s Job spec (see design table above)
 3. Implement `k8sHandle` with state tracking via pod watch
 4. Implement log streaming via pod log follow API
@@ -153,10 +129,8 @@ This task is deliberately left as a single unit — it should be broken down fur
 
 **Goal:** Implement `RemoteDockerBackend` for SSH/HTTPS dispatch to a remote Docker host.
 
-**Depends on:** Task 10 complete.
-
 **Work:**
-1. Add `internal/sandbox/backend/remote.go` using Docker client SDK
+1. Add `internal/sandbox/remote.go` implementing `sandbox.Backend` via Docker client SDK
 2. SSH tunnel or TLS client cert for authentication
 3. State tracking via Docker events API
 4. Volume mounting via NFS or pre-provisioned volumes on the remote host
@@ -168,12 +142,11 @@ Lower priority than K8s. Useful for simple single-host remote setups.
 ## Task Dependency Graph
 
 ```
-Task 10 (extract sandbox/backend package)
-  └→ Task 11 (K8s backend)
-  └→ Task 12 (Remote Docker backend)
+Task 11 (K8s backend)
+Task 12 (Remote Docker backend)
 ```
 
-Task 10 is a prerequisite for both cloud backends. Tasks 11 and 12 can run in parallel after Task 10.
+Tasks 11 and 12 are independent and can run in parallel. All local-backend infrastructure is complete.
 
 ---
 
@@ -182,7 +155,7 @@ Task 10 is a prerequisite for both cloud backends. Tasks 11 and 12 can run in pa
 The biggest architectural challenge for remote backends. Currently:
 
 1. `Runner.ensureTaskWorktrees()` creates worktrees at `~/.wallfacer/worktrees/<task-uuid>/` (`internal/runner/worktree.go`)
-2. `buildContainerArgs()` bind-mounts worktree paths into the container
+2. `buildContainerSpecForSandbox()` bind-mounts worktree paths into the container
 3. Agent writes to `/workspace/<repo>` inside the container (= the worktree on the host)
 4. After task completion, runner commits from the worktree and cleans it up
 
@@ -195,7 +168,7 @@ In a K8s/remote backend, the worktree filesystem must be accessible to both the 
 | **In-pod worktree creation** | Init container creates worktree; server reads results via K8s exec or shared volume | Decouples server from filesystem; git operations move to pod |
 | **Git server sidecar** | Each pod has a git sidecar that handles worktree ops via API | Clean separation; most complex |
 
-**Recommended:** Shared volume (PVC/NFS) for initial implementation. Design details deferred to Task 10.
+**Recommended:** Shared volume (PVC/NFS) for initial implementation. Design details deferred to Task 11.
 
 ---
 
