@@ -1036,12 +1036,12 @@ func TestBuildBaseContainerSpecParityWithBuildContainerArgsForSandbox(t *testing
 // between the arg-builder and the executor abstraction.
 func TestExecutorRunArgsClaudeSandbox(t *testing.T) {
 	repo := setupTestRepo(t)
-	mock := &MockContainerExecutor{
+	mock := &MockSandboxBackend{
 		responses: []ContainerResponse{
 			{Stdout: []byte(`{"result":"ok","session_id":"s1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
 		},
 	}
-	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
 	ctx := context.Background()
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "executor args claude test", Timeout: 5})
@@ -1079,12 +1079,12 @@ func TestExecutorRunArgsClaudeSandbox(t *testing.T) {
 // image (derived from the base wallfacer image name).
 func TestExecutorRunArgsCodexSandbox(t *testing.T) {
 	repo := setupTestRepo(t)
-	mock := &MockContainerExecutor{
+	mock := &MockSandboxBackend{
 		responses: []ContainerResponse{
 			{Stdout: []byte(`{"result":"ok","session_id":"s1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
 		},
 	}
-	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
 	// Use a wallfacer-named image so sandboxImageForSandbox derives the codex variant.
 	r.sandboxImage = "wallfacer:latest"
 	ctx := context.Background()

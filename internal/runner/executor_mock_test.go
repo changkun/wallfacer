@@ -24,73 +24,9 @@ type ContainerCall struct {
 	Args []string
 }
 
-// MockContainerExecutor is a test implementation of ContainerExecutor that
-// returns pre-configured responses from a queue and records all invocations
-// so tests can assert on the exact container name and args passed.
-//
-// When backendMock is set (by setupRunnerWithMockExecutor), RunArgsCalls and
-// KillCalls delegate to the backend mock so that tests asserting on the mock
-// executor automatically see calls from the backend code path.
-type MockContainerExecutor struct {
-	mu          sync.Mutex
-	responses   []ContainerResponse
-	calls       []ContainerCall
-	killCalls   []string
-	backendMock *MockSandboxBackend // when set, RunArgsCalls/KillCalls delegate here
-}
-
-// RunArgs pops the next response from the queue and returns it.
-func (m *MockContainerExecutor) RunArgs(_ context.Context, name string, args []string) ([]byte, []byte, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.calls = append(m.calls, ContainerCall{Name: name, Args: args})
-
-	if len(m.responses) == 0 {
-		return nil, nil, fmt.Errorf("mock: no more responses queued")
-	}
-
-	resp := m.responses[0]
-	m.responses = m.responses[1:]
-
-	if resp.Panic {
-		panic("MockContainerExecutor: simulated panic")
-	}
-
-	return resp.Stdout, resp.Stderr, resp.Err
-}
-
-// Kill records the kill invocation; it does not perform any real operation.
-func (m *MockContainerExecutor) Kill(name string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.killCalls = append(m.killCalls, name)
-}
-
-// RunArgsCalls returns a copy of all recorded Launch/RunArgs invocations.
-// When a backend mock is wired, it returns the backend mock's calls instead.
-func (m *MockContainerExecutor) RunArgsCalls() []ContainerCall {
-	if m.backendMock != nil {
-		return m.backendMock.RunArgsCalls()
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return slices.Clone(m.calls)
-}
-
-// KillCalls returns a copy of all recorded Kill invocations.
-// When a backend mock is wired, it returns the backend mock's kill calls instead.
-func (m *MockContainerExecutor) KillCalls() []string {
-	if m.backendMock != nil {
-		return m.backendMock.KillCalls()
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return slices.Clone(m.killCalls)
-}
-
 // MockSandboxBackend implements SandboxBackend for tests. It pops pre-configured
-// ContainerResponse entries from a queue and records all Launch calls.
+// ContainerResponse entries from a queue and records all Launch calls so tests
+// can assert on the exact container spec and args passed.
 type MockSandboxBackend struct {
 	mu        sync.Mutex
 	responses []ContainerResponse

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1663,22 +1662,15 @@ func TestSyncWorktrees_PreservesTestVerdictAfterCleanSync(t *testing.T) {
 // Mock executor tests
 // ---------------------------------------------------------------------------
 
-// setupRunnerWithMockExecutor creates a Store and Runner whose container calls
-// are routed through the provided MockContainerExecutor instead of a real
+// setupRunnerWithMockBackend creates a Store and Runner whose container calls
+// are routed through the provided MockSandboxBackend instead of a real
 // container runtime. The runner still needs a real git workspace for worktree
 // setup; pass a repo returned by setupTestRepo(t) (or nil for idea-agent-only
 // tasks that skip worktree setup).
-func setupRunnerWithMockExecutor(t testing.TB, workspaces []string, mock *MockContainerExecutor) (*store.Store, *Runner) {
+func setupRunnerWithMockBackend(t testing.TB, workspaces []string, mock *MockSandboxBackend) (*store.Store, *Runner) {
 	t.Helper()
 	s, r := setupRunnerWithCmd(t, workspaces, "true") // "true" for rm/kill calls, not used
-	r.executor = mock
-	// Inject a MockSandboxBackend with a copy of the responses so that
-	// backend.Launch() (used by runContainer/RunIdeation) returns the
-	// pre-configured output. Link the backend mock so RunArgsCalls/KillCalls
-	// on the executor mock delegate to the backend mock.
-	bm := &MockSandboxBackend{responses: slices.Clone(mock.responses)}
-	mock.backendMock = bm
-	r.backend = bm
+	r.backend = mock
 	return s, r
 }
 
@@ -1687,13 +1679,13 @@ func setupRunnerWithMockExecutor(t testing.TB, workspaces []string, mock *MockCo
 // on turn 2. Two RunArgs calls must be recorded.
 func TestMockMaxTokensAutoContinue(t *testing.T) {
 	repo := setupTestRepo(t)
-	mock := &MockContainerExecutor{
+	mock := &MockSandboxBackend{
 		responses: []ContainerResponse{
 			{Stdout: []byte(`{"result":"partial","session_id":"sess1","stop_reason":"max_tokens","is_error":false,"total_cost_usd":0.001}`)},
 			{Stdout: []byte(`{"result":"done","session_id":"sess1","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
 		},
 	}
-	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
 	ctx := context.Background()
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "mock max_tokens test", Timeout: 5})
@@ -1723,13 +1715,13 @@ func TestMockMaxTokensAutoContinue(t *testing.T) {
 // on turn 2.
 func TestMockPauseTurnAutoContinue(t *testing.T) {
 	repo := setupTestRepo(t)
-	mock := &MockContainerExecutor{
+	mock := &MockSandboxBackend{
 		responses: []ContainerResponse{
 			{Stdout: []byte(`{"result":"paused","session_id":"sess2","stop_reason":"pause_turn","is_error":false,"total_cost_usd":0.001}`)},
 			{Stdout: []byte(`{"result":"done","session_id":"sess2","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
 		},
 	}
-	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
 	ctx := context.Background()
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "mock pause_turn test", Timeout: 5})
@@ -1765,12 +1757,12 @@ func TestMockIdeaAgentJSONParsing(t *testing.T) {
 	}
 	ideasJSON := ideaOutput(ideas)
 
-	mock := &MockContainerExecutor{
+	mock := &MockSandboxBackend{
 		responses: []ContainerResponse{
 			{Stdout: []byte(ideasJSON)},
 		},
 	}
-	s, r := setupRunnerWithMockExecutor(t, nil, mock)
+	s, r := setupRunnerWithMockBackend(t, nil, mock)
 	ctx := context.Background()
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "brainstorm via mock", Timeout: 5, Kind: store.TaskKindIdeaAgent})
@@ -1809,12 +1801,12 @@ func TestMockIdeaAgentJSONParsing(t *testing.T) {
 // FailureCategoryUnknown.
 func TestMockDeferredPanicRecovery(t *testing.T) {
 	repo := setupTestRepo(t)
-	mock := &MockContainerExecutor{
+	mock := &MockSandboxBackend{
 		responses: []ContainerResponse{
 			{Panic: true},
 		},
 	}
-	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
 	ctx := context.Background()
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "panic recovery test", Timeout: 5})
@@ -1841,14 +1833,14 @@ func TestMockDeferredPanicRecovery(t *testing.T) {
 func TestMockFailureCategoryContainerCrash(t *testing.T) {
 	repo := setupTestRepo(t)
 	// Provide 3 crash responses: 2 consumed by auto-retries, 1 for final failure.
-	mock := &MockContainerExecutor{
+	mock := &MockSandboxBackend{
 		responses: []ContainerResponse{
 			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
 			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
 			{Stdout: nil, Stderr: nil, Err: fmt.Errorf("exit status 1")},
 		},
 	}
-	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
 	ctx := context.Background()
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "container crash test", Timeout: 5})
@@ -1878,7 +1870,7 @@ func TestMockFailureCategoryContainerCrash(t *testing.T) {
 func TestMockSessionIDPassedToResume(t *testing.T) {
 	repo := setupTestRepo(t)
 	const wantSession = "session-abc-123"
-	mock := &MockContainerExecutor{
+	mock := &MockSandboxBackend{
 		responses: []ContainerResponse{
 			// Turn 1: max_tokens so the loop continues; session_id is captured.
 			{Stdout: []byte(`{"result":"partial","session_id":"` + wantSession + `","stop_reason":"max_tokens","is_error":false,"total_cost_usd":0.001}`)},
@@ -1886,7 +1878,7 @@ func TestMockSessionIDPassedToResume(t *testing.T) {
 			{Stdout: []byte(`{"result":"done","session_id":"` + wantSession + `","stop_reason":"end_turn","is_error":false,"total_cost_usd":0.001}`)},
 		},
 	}
-	s, r := setupRunnerWithMockExecutor(t, []string{repo}, mock)
+	s, r := setupRunnerWithMockBackend(t, []string{repo}, mock)
 	ctx := context.Background()
 
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "session id resume test", Timeout: 5})
