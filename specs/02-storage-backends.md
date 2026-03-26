@@ -1,6 +1,6 @@
-# Cloud Data Storage
+# M2: Pluggable Storage Backends
 
-**Date:** 2026-03-23
+**Status:** Not started | **Date:** 2026-03-23
 
 ## Problem
 
@@ -18,7 +18,8 @@ The wallfacer store (`internal/store/`) persists all task data to the local file
 | `task.json` | Core task record (title, prompt, status, dependencies, sessions, costs) | 1–50 KB | Read on startup, written on every mutation |
 | `traces/compact.ndjson` | Compacted event log | 10–500 KB | Append-heavy, read for timeline |
 | `traces/NNNN.json` | Individual event files (pre-compaction) | 0.5–5 KB each | Append-only, read for timeline |
-| `outputs/turn-N-{stdout,stderr}` | Raw agent output per turn | 10 KB–10 MB | Written by runner, read by UI |
+| `outputs/turn-NNNN.json` | Raw agent stdout per turn | 10 KB–10 MB | Written by runner, read by UI |
+| `outputs/turn-NNNN.stderr.txt` | Raw agent stderr per turn | 1–100 KB | Written by runner, read by UI |
 | `oversight.json` | Generated oversight summary | 1–20 KB | Written once, read by UI |
 | `tombstone.json` | Soft-delete marker | <1 KB | Written on delete, pruned after retention |
 | `summary.json` | Immutable task summary (cost dashboard) | 1–5 KB | Written once at task completion |
@@ -32,16 +33,20 @@ The wallfacer store (`internal/store/`) persists all task data to the local file
 
 ### Store interface surface
 
-The `Store` struct exposes ~40 methods. Key categories:
+The `Store` struct (`internal/store/store.go`) exposes ~50 methods. Key categories:
 
 | Category | Methods | I/O pattern |
 |----------|---------|-------------|
-| Task CRUD | `CreateTask`, `UpdateTask`, `GetTask`, `ListTasks`, `DeleteTask` | Read/write `task.json` |
-| Events | `AppendEvent`, `ListEvents`, `ListEventsCursor` | Append to `traces/`, read with pagination |
-| Outputs | `SaveTurnOutput`, `TurnOutputPath` | Write/read `outputs/` files |
-| Search | `SearchTasks` | In-memory scan |
-| Oversight | `SaveOversight`, `GetOversight` | Write/read `oversight.json` |
-| Lifecycle | `NewStore`, `Close`, `WaitCompaction` | Directory scan, cleanup |
+| Task CRUD | `CreateTaskWithOptions`, `CreateTask`, `mutateTask`, `DeleteTask`, `CancelTask`, `RestoreTask`, `PurgeTask` | Read/write `task.json` via `atomicfile.WriteJSON` |
+| Events | `InsertEvent`, `GetEvents`, `GetEventsPage` | Append to `traces/`, read with cursor pagination |
+| Outputs | `SaveTurnOutput`, `OutputsDir` | Write/read `outputs/` files directly |
+| Search | `SearchTasks`, `RebuildSearchIndex` | In-memory scan of pre-lowercased index |
+| Oversight | `SaveOversight`, `GetOversight`, `SaveTestOversight`, `GetTestOversight` | Write/read `oversight.json` |
+| Summaries | `SaveSummary`, `LoadSummary` | Write/read `summary.json` |
+| Lifecycle | `NewStore(dir string)`, `Close`, `WaitCompaction` | Directory scan, cleanup |
+| Pub/Sub | `Subscribe`, `Unsubscribe`, `SubscribeWake` | In-memory change notification |
+
+`NewStore` takes a filesystem directory path only — no backend parameter.
 
 ---
 
@@ -53,27 +58,31 @@ Extract the store's persistence operations into a `StorageBackend` interface. Th
 
 ```go
 // StorageBackend abstracts where task data is physically stored.
+// The Store struct handles in-memory caching, indexing, pub/sub, and
+// schema migration; the backend handles only persistence I/O.
 type StorageBackend interface {
     // Task persistence
-    LoadAll() ([]*Task, error)
-    SaveTask(t *Task) error
-    DeleteTask(id uuid.UUID) error
+    Init(taskID uuid.UUID) error                   // create task directory/namespace
+    LoadAll() ([]*Task, error)                     // startup: load all tasks
+    SaveTask(t *Task) error                        // atomic write of task record
+    RemoveTask(taskID uuid.UUID) error             // hard delete (after retention)
 
     // Event persistence
-    AppendEvent(taskID uuid.UUID, event TaskEvent) error
-    LoadEvents(taskID uuid.UUID) ([]TaskEvent, error)
+    SaveEvent(taskID uuid.UUID, seq int, event TaskEvent) error
+    LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, error) // events + max seq
     CompactEvents(taskID uuid.UUID, events []TaskEvent) error
 
     // Output persistence (large blobs)
-    SaveOutput(taskID uuid.UUID, filename string, data []byte) error
+    SaveOutput(taskID uuid.UUID, turn int, stdout, stderr []byte) error
     ReadOutput(taskID uuid.UUID, filename string) ([]byte, error)
-    OutputPath(taskID uuid.UUID, filename string) string // for streaming; may return "" for non-filesystem backends
 
     // Oversight and summaries
     SaveOversight(taskID uuid.UUID, data []byte) error
     ReadOversight(taskID uuid.UUID) ([]byte, error)
+    SaveTestOversight(taskID uuid.UUID, data []byte) error
+    ReadTestOversight(taskID uuid.UUID) ([]byte, error)
     SaveSummary(taskID uuid.UUID, data []byte) error
-    ListSummaries() ([][]byte, error)
+    LoadSummary(taskID uuid.UUID) ([]byte, error)
 
     // Tombstones
     WriteTombstone(taskID uuid.UUID, data []byte) error
@@ -184,39 +193,30 @@ func (c *CompositeBackend) SaveOutput(...) error         { return c.blob.SaveOut
 
 ### Phase 1: Extract Backend Interface
 
-Separate persistence from in-memory logic in `internal/store/store.go`:
+Separate persistence from in-memory logic. Currently `saveTask` (`internal/store/io.go`) calls `atomicfile.WriteJSON` directly, and `CreateTaskWithOptions` (`internal/store/tasks_create_delete.go`) calls `os.MkdirAll` for directory creation. These filesystem calls move into the backend.
 
-**Before:**
+**Before** (current code in `io.go`):
 ```go
-func (s *Store) CreateTask(t *Task) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-    s.tasks[t.ID] = t
-    s.addToStatusIndex(t.Status, t.ID)
-    s.updateSearchIndex(t)
-    // ... write task.json to disk
-    s.hub.Publish(TaskDelta{...})
-    return nil
+func (s *Store) saveTask(id uuid.UUID, task *Task) error {
+    task.SchemaVersion = constants.CurrentTaskSchemaVersion
+    pruned := *task
+    s.pruneTaskPayload(&pruned)
+    path := filepath.Join(s.dir, id.String(), "task.json")
+    return atomicfile.WriteJSON(path, &pruned, 0644)
 }
 ```
 
 **After:**
 ```go
-func (s *Store) CreateTask(t *Task) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-    if err := s.backend.SaveTask(t); err != nil {
-        return err
-    }
-    s.tasks[t.ID] = t
-    s.addToStatusIndex(t.Status, t.ID)
-    s.updateSearchIndex(t)
-    s.hub.Publish(TaskDelta{...})
-    return nil
+func (s *Store) saveTask(id uuid.UUID, task *Task) error {
+    task.SchemaVersion = constants.CurrentTaskSchemaVersion
+    pruned := *task
+    s.pruneTaskPayload(&pruned)
+    return s.backend.SaveTask(&pruned)
 }
 ```
 
-The `Store` struct gains a `backend StorageBackend` field. Construction:
+The `Store` struct gains a `backend StorageBackend` field. Construction changes from `NewStore(dir string)` to:
 ```go
 func NewStore(backend StorageBackend) (*Store, error) {
     s := &Store{backend: backend, ...}
@@ -228,14 +228,14 @@ func NewStore(backend StorageBackend) (*Store, error) {
 
 ### Phase 2: Output Path Handling
 
-The runner currently calls `store.TurnOutputPath()` to get a filesystem path, then writes directly to it. For non-filesystem backends, this breaks.
+The runner currently calls `store.OutputsDir(taskID)` to get a filesystem directory path, and `SaveTurnOutput` writes directly via `os.WriteFile`. The handler serves output files by constructing paths from `OutputsDir`. For non-filesystem backends, this breaks.
 
 **Options:**
 1. **Writer interface:** `store.TurnOutputWriter(taskID, filename) → io.WriteCloser` — backend returns a writer (file, S3 upload, etc.)
-2. **Byte buffer:** Runner accumulates output in memory, calls `store.SaveTurnOutput(taskID, filename, data)` — simpler but uses more memory for large outputs
+2. **Byte buffer:** Runner accumulates output in memory, calls `store.SaveTurnOutput(taskID, turn, stdout, stderr)` — already the current API, but the backend would handle storage
 3. **Streaming upload:** Runner pipes container stdout through a `TeeReader` that both parses and uploads — most efficient but most complex
 
-**Recommended:** Option 1 (writer interface) for turn outputs since they can be large (10+ MB). Option 2 (byte buffer) for smaller items (oversight, summaries).
+**Recommended:** Option 2 (byte buffer) is already the current API shape (`SaveTurnOutput` accepts `[]byte`). The backend just needs to implement where those bytes go. For reading, add `ReadOutput(taskID, filename) ([]byte, error)` to replace direct filesystem path access. Option 1 can be added later if memory pressure from large outputs becomes an issue.
 
 ### Phase 3: Search Index
 
@@ -276,18 +276,22 @@ WALLFACER_BLOB_REGION=us-east-1
 
 ---
 
-## Implementation Order
+## Implementation Tasks
 
-1. **Extract `StorageBackend` interface** from existing `Store` methods — pure refactoring, no behavior change
-2. **Implement `FilesystemBackend`** — move file I/O out of `Store` into the backend
-3. **Add `TurnOutputWriter` interface** — replace `TurnOutputPath()` with streaming writes
-4. **Implement `DatabaseBackend`** — PostgreSQL for task metadata and events
-5. **Implement `ObjectStorageBackend`** — S3/GCS for large outputs
-6. **Implement `CompositeBackend`** — wire DB + blob together
-7. **Add `wallfacer migrate` command** — filesystem → cloud migration tool
-8. **Cloud-native search** — SQL full-text search for database backend
+Detailed task breakdowns are in [`02-storage-backends/`](02-storage-backends/).
 
-### Dependencies on Other Epics
+| # | Task | Depends on | Effort |
+|---|------|-----------|--------|
+| 1 | [Extract `StorageBackend` interface](02-storage-backends/task-01-extract-interface.md) | — | Medium |
+| 2 | [Implement `FilesystemBackend`](02-storage-backends/task-02-filesystem-backend.md) | 1 | Large |
+| 3 | [Replace `OutputsDir` with backend methods](02-storage-backends/task-03-replace-outputsdir.md) | 2 | Small |
+| 4 | [Implement `DatabaseBackend` (PostgreSQL)](02-storage-backends/task-04-database-backend.md) | 2 | Large |
+| 5 | [Implement `ObjectStorageBackend` (S3/GCS)](02-storage-backends/task-05-object-storage-backend.md) | 2 | Medium |
+| 6 | [Implement `CompositeBackend`](02-storage-backends/task-06-composite-backend.md) | 4, 5 | Small |
+| 7 | [Add `wallfacer migrate` command](02-storage-backends/task-07-migrate-command.md) | 6 | Medium |
+| 8 | [Cloud-native search](02-storage-backends/task-08-cloud-search.md) | 4 | Medium |
 
+### Dependencies
+
+- **M1: Sandbox Backends** (`01-sandbox-backends.md`) — complete. The `sandbox.Backend` interface is in place. If future remote backends write outputs inside sandbox pods, the storage backend abstraction handles where those bytes go.
 - **Multi-Tenant** (`08-cloud-multi-tenant.md`): Instance provisioning needs to configure the storage backend per user. The database schema includes a `workspace` column for data isolation.
-- **Sandbox Executor** (`01-sandbox-backends.md`): If sandbox pods write outputs to a shared volume, the storage backend needs to read from that volume (or the runner needs to relay outputs). The `TurnOutputWriter` interface handles this by abstracting where output bytes go.
