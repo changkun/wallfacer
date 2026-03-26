@@ -1,37 +1,33 @@
-# Container Reuse
+# Sandbox Reuse
 
 **Status:** Not started | **Date:** 2026-03-21
 **Depends on:** [M1: Pluggable Sandbox Backends](01-sandbox-backends.md) — complete (v0.0.6)
 
 ## Problem
 
-Wallfacer creates and destroys an ephemeral container for every agent invocation —
+Wallfacer creates and destroys an ephemeral sandbox for every agent invocation —
 implementation turns, title generation, oversight summaries, commit messages, refinement,
-and ideation. Every invocation pays two kinds of overhead:
+and ideation. Every invocation pays startup overhead that varies by backend:
 
-1. **Container runtime overhead** — process namespace creation, cgroup setup, image layer
-   mount, volume attach: roughly 0.5–2 s per launch on Podman with cached images.
-
-2. **Filesystem overhead** — each `podman run` creates a fresh read-write overlay layer.
-   Any warm caches (npm, pip, compilation artifacts) from previous runs are lost. The
-   storage driver performs repeated layer mount/unmount operations under load.
+| Backend | Startup cost | What's wasted |
+|---------|-------------|---------------|
+| Local (podman/docker) | 0.5–2 s per container (namespace, cgroup, overlay) | Warm caches, compiled artifacts |
+| K8s | 5–30 s per pod (scheduling, image pull, volume attach) | Everything — pods are fully ephemeral |
+| VZ (macOS VM) | 3–10 s per VM (kernel boot, rootfs mount) | VM memory, warm runtimes |
+| Sandbox-init (macOS) | ~100 ms per process fork | Dependency caches |
 
 For a single task lifecycle that generates a title, runs 3 implementation turns, produces
-an oversight summary, and generates a commit message, that is 6 container create/destroy
-cycles. With 5 concurrent tasks, the host performs ~30 container lifecycle operations per
-batch.
+an oversight summary, and generates a commit message, that is 6 sandbox create/destroy
+cycles. With 5 concurrent tasks, the system performs ~30 lifecycle operations per batch.
 
-These two overhead sources are orthogonal and can be addressed independently:
-- **Container reuse** (this spec) eliminates runtime lifecycle churn via long-lived workers
-- **Filesystem reuse** (snapshots, warm overlays, persistent layers) eliminates I/O
-  initialization overhead — discussed in the Filesystem Layer section below
+The core idea is **keep a sandbox host alive and exec into it** rather than
+create/destroy for each invocation. This pattern applies to every backend — each
+implements it differently, but the strategy is the same.
 
-## Prerequisite: Pluggable Sandbox Backends
+## Scope
 
-This spec builds on the `sandbox.Backend` / `sandbox.Handle` abstraction in
-`internal/sandbox/` (implemented in M1, v0.0.6). Container reuse is an optimization
-**internal to `LocalBackend`** — the runner and handler never see it. The `Backend`
-interface remains unchanged:
+Sandbox reuse is an optimization **internal to each `Backend`** — the runner and handler
+never see it. The `Backend` interface (`internal/sandbox/backend.go`) remains unchanged:
 
 ```
 Runner → backend.Launch(spec) → Handle
@@ -42,17 +38,26 @@ Runner → backend.Launch(spec) → Handle
                                   .Kill()
 ```
 
-Container reuse changes how `LocalBackend.Launch()` provisions the underlying container
-(ephemeral `podman run` vs `podman exec` on a long-lived worker), but the returned
-`Handle` behaves identically. The runner's turn loop, output parsing, circuit
-breaker, and lifecycle tracking are unaffected.
+Each backend decides internally whether to create a fresh sandbox or exec into an
+existing one. The returned `Handle` behaves identically either way. The runner's turn
+loop, output parsing, circuit breaker, and lifecycle tracking are unaffected.
 
-For K8s and remote backends, container reuse is not applicable — pod scheduling and
-remote Docker have their own lifecycle models. This spec is scoped to `LocalBackend`.
+How reuse manifests per backend:
 
-## Current Architecture
+| Backend | Reuse mechanism |
+|---------|----------------|
+| Local (podman/docker) | Long-lived container + `podman exec` |
+| K8s | Long-lived pod + `kubectl exec` |
+| VZ (macOS VM) | Long-lived VM + exec via vsock/SSH |
+| Sandbox-init (macOS) | Process pool or warm sandbox profiles |
 
-### Container Roles
+This spec details the `LocalBackend` implementation first, as it is the only backend
+currently implemented. The mount profile analysis and worker lifecycle pattern
+apply to all backends.
+
+## Agent Roles and Mount Profiles
+
+### Roles
 
 | Role | Mount Profile | Typical Duration | Frequency |
 |------|--------------|------------------|-----------|
@@ -170,24 +175,24 @@ Combine strategies based on mount profile:
 
 ## Filesystem Layer
 
-Container reuse (long-lived workers) addresses **runtime overhead** but not **filesystem
-overhead**. These are two orthogonal concerns within `LocalBackend`:
+Sandbox reuse (long-lived workers) addresses **runtime overhead** but not **filesystem
+overhead**. These are two orthogonal concerns within each backend:
 
 ```
 ┌─────────────────────────────────────────────┐
-│ LocalBackend                                │
+│ Backend (any implementation)                │
 │                                             │
 │  ┌─────────────────┐  ┌──────────────────┐  │
 │  │ Runtime Layer    │  │ Filesystem Layer │  │
 │  │                  │  │                  │  │
-│  │ • Ephemeral run  │  │ • Overlay FS     │  │
+│  │ • Ephemeral      │  │ • Overlay FS     │  │
 │  │ • Long-lived     │  │ • Snapshots      │  │
 │  │   worker + exec  │  │ • Warm caches    │  │
 │  │ • Lifecycle      │  │ • Persistent     │  │
 │  │   state tracking │  │   layers         │  │
 │  └─────────────────┘  └──────────────────┘  │
 │                                             │
-│  Both hidden behind Backend.Launch()          │
+│  Both hidden behind Backend.Launch()        │
 └─────────────────────────────────────────────┘
 ```
 
@@ -219,12 +224,12 @@ to later — they add significant complexity for diminishing returns.
 
 ---
 
-## Recommended Approach: Hybrid Workers Inside LocalBackend
+## LocalBackend Implementation: Hybrid Workers
 
 ### Architecture
 
-Container reuse lives entirely inside `LocalBackend`. The backend tracks two kinds of
-workers alongside ephemeral containers:
+The first implementation targets `LocalBackend` (`internal/sandbox/local.go`). The
+backend tracks two kinds of workers alongside ephemeral containers:
 
 ```go
 // internal/sandbox/local.go (extend existing LocalBackend)
@@ -356,9 +361,9 @@ worker's bind mount still points to the same path, so no worker restart is neede
 
 ---
 
-## Implementation Design
+## Implementation Design (LocalBackend)
 
-### New Types Inside LocalBackend
+### New Types
 
 ```go
 // internal/sandbox/worker.go
@@ -431,8 +436,8 @@ workspace mounts at all.
 | `WALLFACER_AUX_WORKERS` | `true` | Enable shared auxiliary worker containers |
 | `WALLFACER_IMPL_WORKERS` | `true` | Enable per-task implementation workers |
 
-When disabled, `LocalBackend.Launch()` always uses ephemeral containers. These flags
-only affect `LocalBackend` — K8s and remote backends ignore them.
+When disabled, `LocalBackend.Launch()` always uses ephemeral containers. Future backends
+will have their own reuse configuration as appropriate to their runtime model.
 
 ---
 
@@ -500,4 +505,4 @@ The biggest win is for auxiliary agents: title + oversight + commit currently co
 | `claude-config` contention | Concurrent exec corrupts session state | Claude CLI uses file locking; add `sync.Mutex` if needed |
 | `podman exec` not available | Some container runtimes may not support exec | Feature flag disables workers; fallback to ephemeral |
 | Stale sibling mounts (Profile A) | New sibling tasks not visible in container | Board.json still lists them; accept limitation or recreate worker |
-| Backend interface change | If `Backend` interface changes, workers need updating | Workers are internal to `LocalBackend`; no interface coupling |
+| Backend interface change | If `Backend` interface changes, workers need updating | Workers are internal to each backend; no interface coupling |
