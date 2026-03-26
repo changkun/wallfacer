@@ -7,7 +7,8 @@
 
 - **Interfaces and types** (`internal/runner/backend.go`): `SandboxState` enum (6 states), `SandboxBackend` interface (`Launch`, `List`), `SandboxHandle` interface (`State`, `Stdout`, `Wait`, `Kill`, `Name`), `String()` method. Tests in `backend_test.go`.
 - **`LocalBackend`** (`internal/runner/backend_local.go`): `Launch()` starts containers non-blocking via `cmd.Start()`, returns `localHandle` with atomic state tracking. `List()` shells out to `ps --format json` and handles both Podman JSON array and Docker NDJSON. Tests in `backend_local_test.go`.
-- **Runner wiring** (`internal/runner/runner.go`): `Runner.backend` field initialized as `NewLocalBackend(r.command)` in `NewRunner()`. `ListContainers()` delegates to `r.backend.List()`. Old `executor` field retained temporarily for `container.go` and `ideate.go`.
+- **Runner wiring** (`internal/runner/runner.go`): `Runner.backend` field initialized as `NewLocalBackend(r.command)` in `NewRunner()`. `ListContainers()` delegates to `r.backend.List()`.
+- **Handle-based streaming** (`internal/runner/container.go`, `ideate.go`): `runContainer()` and `RunIdeation()` use `r.backend.Launch()` + `handle.Stdout()`/`Stderr()`/`Wait()`/`Kill()`. `SandboxHandle` interface includes `Stderr()`. Spec builders `buildContainerSpecForSandbox()` and `buildIdeationContainerSpec()` return `ContainerSpec`. Old `executor` field retained temporarily. Test-only args wrappers in `export_test.go`; `MockSandboxBackend` in `executor_mock_test.go`.
 
 ## Problem
 
@@ -23,23 +24,25 @@ Both problems are solved by a single abstraction: a `SandboxBackend` interface t
 
 ```
 Runner.Run()                  (internal/runner/execute.go)
-  → buildContainerArgsForSandbox()  → constructs ContainerSpec, calls Build() for CLI args
-  → executor.RunArgs(ctx, name, args) → os/exec: runs `podman run`, blocks, returns stdout/stderr
-  → executor.Kill(name)               → os/exec: runs `podman kill` + `podman rm`
+  → buildContainerSpecForSandbox()   → constructs ContainerSpec
+  → backend.Launch(ctx, spec)        → returns SandboxHandle (non-blocking)
+  → handle.Stdout() / Stderr()       → io.ReadCloser streams
+  → handle.Wait()                    → exit code
+  → handle.Kill()                    → on context cancel
 ```
 
 Key types involved:
 
-- **`SandboxBackend`** (`internal/runner/backend.go`) — New abstraction. `Launch(ctx, spec) → (SandboxHandle, error)` and `List(ctx) → ([]ContainerInfo, error)`. `Runner.backend` field, initialized as `LocalBackend`.
+- **`SandboxBackend`** (`internal/runner/backend.go`) — Core abstraction. `Launch(ctx, spec) → (SandboxHandle, error)` and `List(ctx) → ([]ContainerInfo, error)`. `Runner.backend` field, initialized as `LocalBackend`.
+- **`SandboxHandle`** (`internal/runner/backend.go`) — Stateful handle: `State()`, `Stdout()`, `Stderr()`, `Wait()`, `Kill()`, `Name()`.
 - **`LocalBackend`** (`internal/runner/backend_local.go`) — Production implementation; `Launch()` starts non-blocking via `cmd.Start()`, `List()` shells out to `ps --format json`.
-- **`ContainerExecutor`** (`internal/runner/executor.go`) — **Deprecated.** Still used by `container.go` and `ideate.go` for `RunArgs()` and `Kill()`. Will be removed in Task 7.
-- **`osContainerExecutor`** — Legacy implementation; removes leftover containers, calls `cmdexec.Capture()`.
+- **`ContainerExecutor`** (`internal/runner/executor.go`) — **Deprecated.** No longer used by `container.go` or `ideate.go`. Retained for `runner.go` kill helpers. Will be removed in Task 7.
 - **`ContainerSpec`** (`internal/runner/container_spec.go`) — Structured container description (Image, Name, Volumes, Env, Labels, Network, CPUs, Memory, Cmd, WorkDir, ExtraFlags). Its `Build()` method returns `[]string` CLI args.
 - **`VolumeMount`** (`internal/runner/container_spec.go:10-15`) — Single bind mount or named volume descriptor (Host, Container, Options, Named).
 - **`containerRegistry`** (`internal/runner/registry.go`) — `syncmap.Map[uuid.UUID, string]` tracking `taskID → containerName` for running containers.
-- **`ContainerInfo`** (`internal/runner/runner.go`) — Runtime container metadata. `ListContainers()` now delegates to `r.backend.List()`.
-- **Log streaming** — Container stdout captured by `cmdexec.Capture()` as a blocking call; live log streaming uses a separate `logpipe.Pipe` mechanism.
-- **Circuit breaker** (`internal/pkg/circuitbreaker`) — Three-state breaker (closed/open/half-open) gating `runContainer()` calls; tracks consecutive failures via atomic CAS.
+- **`ContainerInfo`** (`internal/runner/runner.go`) — Runtime container metadata. `ListContainers()` delegates to `r.backend.List()`.
+- **Log streaming** — Live log streaming uses `logpipe.Pipe` mechanism; handle stdout is consumed by output parsing.
+- **Circuit breaker** (`internal/pkg/circuitbreaker`) — Three-state breaker (closed/open/half-open) gating `runContainer()` calls; uses exit code 125 detection from handle.
 
 ---
 
@@ -102,26 +105,6 @@ type SandboxHandle interface {
 
 ## Tasks
 
-### Task 5: Refactor `runContainer()` to use handle-based streaming
-
-**Goal:** Replace the blocking `executor.RunArgs()` call with the non-blocking `backend.Launch()` + handle pattern. The `Runner` already has a `backend SandboxBackend` field (from Task 4); this task switches `runContainer()` and `ideate.go` from `r.executor` to `r.backend`.
-
-**Work:**
-1. In `container.go`, refactor `runContainer()`:
-   - Replace `r.executor.RunArgs(ctx, name, args)` (line ~497) with `r.backend.Launch(ctx, spec)`
-   - Read output from `handle.Stdout()` instead of parsing a byte slice
-   - Call `handle.Wait()` to get exit code
-   - Use `handle.State()` for circuit-breaker decisions: `SandboxFailed` at creation = runtime failure, `SandboxStopped` with non-zero exit = agent error
-2. Update `parseOutput()` / `parseAgentOutput()` to accept `io.Reader` instead of `[]byte` (or adapt the bridge)
-3. Update container kill path: replace `r.executor.Kill(name)` with `handle.Kill()`
-4. Update circuit breaker integration to use handle state
-
-**Files:** `internal/runner/container.go`, `internal/runner/output.go` (if output parsing changes), `internal/runner/container_test.go`
-
-**Acceptance:** `runContainer()` uses handle-based streaming. Output parsing works from reader. Circuit breaker uses handle state. All tests pass.
-
----
-
 ### Task 6: Upgrade container registry to store handles
 
 **Goal:** Replace `containerRegistry`'s `syncmap.Map[uuid.UUID, string]` with handle storage for richer state queries.
@@ -141,18 +124,18 @@ type SandboxHandle interface {
 
 ### Task 7: Retire `ContainerExecutor` interface
 
-**Goal:** Remove the old abstraction now that `SandboxBackend` is fully wired.
+**Goal:** Remove the old abstraction. `container.go` and `ideate.go` already use `r.backend.Launch()`. The `executor` field is only referenced by `runner.go` kill helpers (`KillContainer`, `KillRefineContainer`, `KillIdeateContainer`) which shell out directly via `cmdexec`.
 
 **Work:**
-1. Delete `ContainerExecutor` interface from `executor.go`
-2. Delete `osContainerExecutor` implementation
-3. Delete or migrate `MockContainerExecutor` in test files — replace with mock `SandboxBackend`
-4. Remove any remaining references to the old interface
-5. Clean up imports
+1. Delete `ContainerExecutor` interface and `osContainerExecutor` from `executor.go`
+2. Remove `Runner.executor` field and its initialization in `NewRunner()`
+3. Migrate remaining kill helpers in `runner.go` to use `r.backend` or registry handles (depends on Task 6)
+4. Remove `MockContainerExecutor` from `executor_mock_test.go` — `MockSandboxBackend` already exists
+5. Update `setupRunnerWithMockExecutor` to use only `MockSandboxBackend`
 
-**Files:** `internal/runner/executor.go` (delete or empty), `internal/runner/executor_mock_test.go` (delete or replace)
+**Files:** `internal/runner/executor.go` (delete), `internal/runner/executor_mock_test.go`, `internal/runner/runner.go`, `internal/runner/execute_test.go`
 
-**Acceptance:** No references to `ContainerExecutor` remain. All tests pass with `SandboxBackend` mocks.
+**Acceptance:** No references to `ContainerExecutor` or `r.executor` remain. All tests pass with `SandboxBackend` mocks.
 
 ---
 
@@ -228,16 +211,15 @@ Lower priority than K8s. Useful for simple single-host remote setups.
 ## Task Dependency Graph
 
 ```
-Task 5 (refactor runContainer)
-  └→ Task 6 (upgrade registry)
-       └→ Task 7 (retire ContainerExecutor)
-            └→ Task 8 (unify log streaming)
-                 └→ Task 9 (env var backend selection)
-                      └→ Task 10 (K8s backend)
-                      └→ Task 11 (Remote Docker backend)
+Task 6 (upgrade registry)
+  └→ Task 7 (retire ContainerExecutor)
+       └→ Task 8 (unify log streaming)
+            └→ Task 9 (env var backend selection)
+                 └→ Task 10 (K8s backend)
+                 └→ Task 11 (Remote Docker backend)
 ```
 
-Tasks 5–9 are sequential. Tasks 10 and 11 can run in parallel after Task 9.
+Tasks 6–9 are sequential. Tasks 10 and 11 can run in parallel after Task 9.
 
 ---
 
