@@ -8,7 +8,10 @@
 - **Interfaces and types** (`internal/runner/backend.go`): `SandboxState` enum (6 states), `SandboxBackend` interface (`Launch`, `List`), `SandboxHandle` interface (`State`, `Stdout`, `Wait`, `Kill`, `Name`), `String()` method. Tests in `backend_test.go`.
 - **`LocalBackend`** (`internal/runner/backend_local.go`): `Launch()` starts containers non-blocking via `cmd.Start()`, returns `localHandle` with atomic state tracking. `List()` shells out to `ps --format json` and handles both Podman JSON array and Docker NDJSON. Tests in `backend_local_test.go`.
 - **Runner wiring** (`internal/runner/runner.go`): `Runner.backend` field initialized as `NewLocalBackend(r.command)` in `NewRunner()`. `ListContainers()` delegates to `r.backend.List()`.
-- **Handle-based streaming** (`internal/runner/container.go`, `ideate.go`): `runContainer()` and `RunIdeation()` use `r.backend.Launch()` + `handle.Stdout()`/`Stderr()`/`Wait()`/`Kill()`. `SandboxHandle` interface includes `Stderr()`. Spec builders `buildContainerSpecForSandbox()` and `buildIdeationContainerSpec()` return `ContainerSpec`. Old `executor` field retained temporarily. Test-only args wrappers in `export_test.go`; `MockSandboxBackend` in `executor_mock_test.go`.
+- **Handle-based streaming** (`internal/runner/container.go`, `ideate.go`): `runContainer()` and `RunIdeation()` use `r.backend.Launch()` + `handle.Stdout()`/`Stderr()`/`Wait()`/`Kill()`. `SandboxHandle` interface includes `Stderr()`. Spec builders `buildContainerSpecForSandbox()` and `buildIdeationContainerSpec()` return `ContainerSpec`. Test-only args wrappers in `export_test.go`; `MockSandboxBackend` in `executor_mock_test.go`.
+- **Handle-aware registry** (`internal/runner/registry.go`): `containerEntry{name, handle, logReader}`. `SetHandle()`/`GetHandle()` store the `SandboxHandle`; kill methods (`KillContainer`, `KillRefineContainer`, `KillIdeateContainer`) use `handle.Kill()` when available, falling back to `cmdexec` for legacy callers. Tests in `registry_test.go`.
+- **ContainerExecutor retired**: `executor.go` deleted. `Runner.executor` field removed. `MockContainerExecutor` replaced by `MockSandboxBackend`. `setupRunnerWithMockBackend()` in tests.
+- **Log streaming**: SSE log streaming (`/api/tasks/{id}/logs`) uses `podman logs -f` via `logpipe.Start()` — intentionally kept as-is. The `podman logs -f` approach avoids back-pressure, supports late-joining clients with `--tail`, and decouples output parsing from streaming. Added `logpipe.StartReader()` for future use with non-subprocess readers.
 
 ## Problem
 
@@ -36,12 +39,11 @@ Key types involved:
 - **`SandboxBackend`** (`internal/runner/backend.go`) — Core abstraction. `Launch(ctx, spec) → (SandboxHandle, error)` and `List(ctx) → ([]ContainerInfo, error)`. `Runner.backend` field, initialized as `LocalBackend`.
 - **`SandboxHandle`** (`internal/runner/backend.go`) — Stateful handle: `State()`, `Stdout()`, `Stderr()`, `Wait()`, `Kill()`, `Name()`.
 - **`LocalBackend`** (`internal/runner/backend_local.go`) — Production implementation; `Launch()` starts non-blocking via `cmd.Start()`, `List()` shells out to `ps --format json`.
-- **`ContainerExecutor`** (`internal/runner/executor.go`) — **Deprecated.** No longer used by `container.go` or `ideate.go`. Retained for `runner.go` kill helpers. Will be removed in Task 7.
+- **`containerRegistry`** (`internal/runner/registry.go`) — `syncmap.Map[uuid.UUID, containerEntry]` storing name + optional `SandboxHandle` + optional `logReader`. Kill methods use handle when available.
 - **`ContainerSpec`** (`internal/runner/container_spec.go`) — Structured container description (Image, Name, Volumes, Env, Labels, Network, CPUs, Memory, Cmd, WorkDir, ExtraFlags). Its `Build()` method returns `[]string` CLI args.
 - **`VolumeMount`** (`internal/runner/container_spec.go:10-15`) — Single bind mount or named volume descriptor (Host, Container, Options, Named).
-- **`containerRegistry`** (`internal/runner/registry.go`) — `syncmap.Map[uuid.UUID, string]` tracking `taskID → containerName` for running containers.
 - **`ContainerInfo`** (`internal/runner/runner.go`) — Runtime container metadata. `ListContainers()` delegates to `r.backend.List()`.
-- **Log streaming** — Live log streaming uses `logpipe.Pipe` mechanism; handle stdout is consumed by output parsing.
+- **Log streaming** — SSE log endpoints use `logpipe.Start()` to spawn `podman logs -f` on the container name from the registry. `logpipe.StartReader()` available for `io.ReadCloser` inputs.
 - **Circuit breaker** (`internal/pkg/circuitbreaker`) — Three-state breaker (closed/open/half-open) gating `runContainer()` calls; uses exit code 125 detection from handle.
 
 ---
@@ -105,56 +107,6 @@ type SandboxHandle interface {
 
 ## Tasks
 
-### Task 6: Upgrade container registry to store handles
-
-**Goal:** Replace `containerRegistry`'s `syncmap.Map[uuid.UUID, string]` with handle storage for richer state queries.
-
-**Work:**
-1. Change `containerRegistry` to map `uuid.UUID → SandboxHandle` (or a wrapper struct with both handle and name)
-2. Update `Set()`, `Get()`, `Delete()` methods
-3. `ContainerName(id)` delegates to `handle.Name()`
-4. Kill by task ID now calls `handle.Kill()` directly instead of shelling out
-5. Update all call sites in handler (container kill endpoint, task cancel, etc.)
-
-**Files:** `internal/runner/registry.go`, `internal/runner/registry_test.go`, `internal/handler/containers.go`
-
-**Acceptance:** Registry stores handles. Kill works through handle. All tests pass.
-
----
-
-### Task 7: Retire `ContainerExecutor` interface
-
-**Goal:** Remove the old abstraction. `container.go` and `ideate.go` already use `r.backend.Launch()`. The `executor` field is only referenced by `runner.go` kill helpers (`KillContainer`, `KillRefineContainer`, `KillIdeateContainer`) which shell out directly via `cmdexec`.
-
-**Work:**
-1. Delete `ContainerExecutor` interface and `osContainerExecutor` from `executor.go`
-2. Remove `Runner.executor` field and its initialization in `NewRunner()`
-3. Migrate remaining kill helpers in `runner.go` to use `r.backend` or registry handles (depends on Task 6)
-4. Remove `MockContainerExecutor` from `executor_mock_test.go` — `MockSandboxBackend` already exists
-5. Update `setupRunnerWithMockExecutor` to use only `MockSandboxBackend`
-
-**Files:** `internal/runner/executor.go` (delete), `internal/runner/executor_mock_test.go`, `internal/runner/runner.go`, `internal/runner/execute_test.go`
-
-**Acceptance:** No references to `ContainerExecutor` or `r.executor` remain. All tests pass with `SandboxBackend` mocks.
-
----
-
-### Task 8: Unify log streaming through the handle
-
-**Goal:** Remove the separate `logpipe.Pipe` mechanism and stream logs directly from the handle's `Stdout()`.
-
-**Work:**
-1. Audit how `logpipe.Pipe` is used for live log streaming to the UI (SSE `/api/tasks/{id}/logs`)
-2. Replace logpipe with a tee or multi-reader on `handle.Stdout()` — output parsing and live log streaming read from the same source
-3. Ensure SSE log streaming still works correctly with the new reader path
-4. Remove logpipe if no longer needed
-
-**Files:** `internal/runner/logpipe/` (audit/remove), `internal/handler/stream.go`, `internal/runner/container.go`
-
-**Acceptance:** Live log streaming works through the handle's stdout. No separate pipe mechanism needed. SSE logs work correctly.
-
----
-
 ### Task 9: Backend selection via env var
 
 **Goal:** Add `WALLFACER_SANDBOX_BACKEND` env var so the server can select between backends at startup.
@@ -175,7 +127,7 @@ type SandboxHandle interface {
 
 **Goal:** Implement `K8sBackend` for dispatching sandbox containers as K8s Jobs.
 
-**Depends on:** Tasks 5–9 complete.
+**Depends on:** Task 9 complete.
 
 **Work:**
 1. Add `internal/runner/backend_k8s.go` implementing `SandboxBackend` via `client-go`
@@ -196,7 +148,7 @@ This task is deliberately left as a single unit — it should be broken down fur
 
 **Goal:** Implement `RemoteDockerBackend` for SSH/HTTPS dispatch to a remote Docker host.
 
-**Depends on:** Tasks 5–9 complete.
+**Depends on:** Task 9 complete.
 
 **Work:**
 1. Add `internal/runner/backend_remote.go` using Docker client SDK
@@ -211,15 +163,12 @@ Lower priority than K8s. Useful for simple single-host remote setups.
 ## Task Dependency Graph
 
 ```
-Task 6 (upgrade registry)
-  └→ Task 7 (retire ContainerExecutor)
-       └→ Task 8 (unify log streaming)
-            └→ Task 9 (env var backend selection)
-                 └→ Task 10 (K8s backend)
-                 └→ Task 11 (Remote Docker backend)
+Task 9 (env var backend selection)
+  └→ Task 10 (K8s backend)
+  └→ Task 11 (Remote Docker backend)
 ```
 
-Tasks 6–9 are sequential. Tasks 10 and 11 can run in parallel after Task 9.
+Tasks 10 and 11 can run in parallel after Task 9.
 
 ---
 
