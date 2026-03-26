@@ -140,6 +140,18 @@ var Routes = []Route{
 		Tags:        []string{"workspaces"},
 	},
 	{
+		Method: http.MethodPost, Pattern: "/api/workspaces/mkdir", Name: "MkdirWorkspace",
+		JSName:      "mkdir",
+		Description: "Create a new directory under an absolute host path.",
+		Tags:        []string{"workspaces"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/workspaces/rename", Name: "RenameWorkspace",
+		JSName:      "rename",
+		Description: "Rename a directory at an absolute host path.",
+		Tags:        []string{"workspaces"},
+	},
+	{
 		Method: http.MethodPut, Pattern: "/api/workspaces", Name: "UpdateWorkspaces",
 		JSName:      "update",
 		Description: "Replace the active workspace set and switch the scoped task board.",

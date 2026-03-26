@@ -103,12 +103,16 @@
 }
 .workspace-group-tab--add {
   color: var(--text-muted);
-  padding: 6px 8px;
+  padding: 4px 8px;
   font-size: 14px;
   font-weight: 400;
   flex-shrink: 0;
+  min-width: 0;
   max-width: none;
   overflow: visible;
+}
+.workspace-group-tab--add:focus-visible {
+  outline: none;
 }
 .workspace-group-tab--add:hover {
   color: var(--text-primary);

@@ -78,6 +78,14 @@ var Routes = {
     browse: function () {
       return "/api/workspaces/browse";
     },
+    // POST /api/workspaces/mkdir
+    mkdir: function () {
+      return "/api/workspaces/mkdir";
+    },
+    // POST /api/workspaces/rename
+    rename: function () {
+      return "/api/workspaces/rename";
+    },
     // PUT /api/workspaces
     update: function () {
       return "/api/workspaces";

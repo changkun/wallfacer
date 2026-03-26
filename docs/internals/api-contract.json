@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 77,
+  "route_count": 79,
   "routes": [
     {
       "method": "GET",
@@ -125,6 +125,24 @@
       "pattern": "/api/workspaces/browse",
       "name": "BrowseWorkspaces",
       "description": "List child directories for an absolute host path.",
+      "tags": [
+        "workspaces"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/workspaces/mkdir",
+      "name": "MkdirWorkspace",
+      "description": "Create a new directory under an absolute host path.",
+      "tags": [
+        "workspaces"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/workspaces/rename",
+      "name": "RenameWorkspace",
+      "description": "Rename a directory at an absolute host path.",
       "tags": [
         "workspaces"
       ]

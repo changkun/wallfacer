@@ -593,6 +593,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"GetConfig":        h.GetConfig,
 		"UpdateConfig":     h.UpdateConfig,
 		"BrowseWorkspaces": h.BrowseWorkspaces,
+		"MkdirWorkspace":   h.MkdirWorkspace,
+		"RenameWorkspace":  h.RenameWorkspace,
 		"UpdateWorkspaces": h.UpdateWorkspaces,
 
 		// Ideation agent.
@@ -710,6 +712,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 
 		// Prompt templates.
 		"CreateTemplate": handler.BodyLimitDefault,
+
+		// Workspace browser.
+		"MkdirWorkspace":  handler.BodyLimitDefault,
+		"RenameWorkspace": handler.BodyLimitDefault,
 
 		// Git workspace operations.
 		"GitPush":          handler.BodyLimitDefault,
@@ -877,7 +883,7 @@ func ensureImage(containerCmd, image string) string {
 
 func requiresStore(name string) bool {
 	switch name {
-	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream":
+	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "MkdirWorkspace", "RenameWorkspace", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream":
 		return false
 	default:
 		return true

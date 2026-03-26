@@ -771,3 +771,152 @@ describe("useWorkspaceGroup — spinner lifecycle", () => {
     expect(vm.runInContext("workspaceGroupSwitching", ctx)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// createWorkspaceFolder
+// ---------------------------------------------------------------------------
+
+describe("createWorkspaceFolder", () => {
+  it("calls mkdir API and refreshes the listing", async () => {
+    const apiFn = vi
+      .fn()
+      .mockResolvedValue({ path: "/Users/test/dev/new-folder" });
+    const ctx = makeContext({
+      api: apiFn,
+      Routes: {
+        config: { get: () => "/api/config", update: () => "/api/config" },
+        workspaces: {
+          browse: () => "/api/workspaces/browse",
+          update: () => "/api/workspaces",
+          mkdir: () => "/api/workspaces/mkdir",
+          rename: () => "/api/workspaces/rename",
+        },
+      },
+      elements: [
+        ["workspace-browser-path", { value: "/Users/test/dev" }],
+        ["workspace-browser-status", { textContent: "" }],
+        ["workspace-browser-list", { innerHTML: "" }],
+        ["workspace-browser-entries", { innerHTML: "" }],
+        ["workspace-browser-breadcrumb", { textContent: "" }],
+        ["workspace-browser-include-hidden", { checked: false }],
+      ],
+    });
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+    // Override showPrompt after loading utils.js (which defines the real one).
+    ctx.showPrompt = vi.fn().mockResolvedValue("new-folder");
+    vm.runInContext('workspaceBrowserPath = "/Users/test/dev";', ctx);
+
+    await ctx.createWorkspaceFolder();
+
+    // First call is mkdir, second is browse (refresh).
+    expect(apiFn).toHaveBeenCalledWith("/api/workspaces/mkdir", {
+      method: "POST",
+      body: JSON.stringify({ path: "/Users/test/dev", name: "new-folder" }),
+    });
+  });
+
+  it("does nothing when prompt is cancelled", async () => {
+    const apiFn = vi.fn().mockResolvedValue({});
+    const ctx = makeContext({
+      api: apiFn,
+      Routes: {
+        config: { get: () => "/api/config", update: () => "/api/config" },
+        workspaces: {
+          browse: () => "/api/workspaces/browse",
+          update: () => "/api/workspaces",
+          mkdir: () => "/api/workspaces/mkdir",
+          rename: () => "/api/workspaces/rename",
+        },
+      },
+    });
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+    ctx.showPrompt = vi.fn().mockResolvedValue(null);
+    vm.runInContext('workspaceBrowserPath = "/Users/test/dev";', ctx);
+
+    await ctx.createWorkspaceFolder();
+
+    expect(apiFn).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renameWorkspaceBrowserEntry
+// ---------------------------------------------------------------------------
+
+describe("renameWorkspaceBrowserEntry", () => {
+  it("calls rename API and refreshes the listing", async () => {
+    const apiFn = vi
+      .fn()
+      .mockResolvedValue({ path: "/Users/test/dev/renamed" });
+    const ctx = makeContext({
+      api: apiFn,
+      Routes: {
+        config: { get: () => "/api/config", update: () => "/api/config" },
+        workspaces: {
+          browse: () => "/api/workspaces/browse",
+          update: () => "/api/workspaces",
+          mkdir: () => "/api/workspaces/mkdir",
+          rename: () => "/api/workspaces/rename",
+        },
+      },
+      elements: [
+        ["workspace-browser-path", { value: "/Users/test/dev" }],
+        ["workspace-browser-status", { textContent: "" }],
+        ["workspace-browser-list", { innerHTML: "" }],
+        ["workspace-browser-entries", { innerHTML: "" }],
+        ["workspace-browser-breadcrumb", { textContent: "" }],
+        ["workspace-browser-include-hidden", { checked: false }],
+      ],
+    });
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+    ctx.showPrompt = vi.fn().mockResolvedValue("renamed");
+    vm.runInContext('workspaceBrowserPath = "/Users/test/dev";', ctx);
+
+    await ctx.renameWorkspaceBrowserEntry(
+      "/Users/test/dev/old-name",
+      "old-name",
+    );
+
+    expect(apiFn).toHaveBeenCalledWith("/api/workspaces/rename", {
+      method: "POST",
+      body: JSON.stringify({
+        path: "/Users/test/dev/old-name",
+        name: "renamed",
+      }),
+    });
+  });
+
+  it("does nothing when name is unchanged", async () => {
+    const apiFn = vi.fn().mockResolvedValue({});
+    const ctx = makeContext({
+      api: apiFn,
+      Routes: {
+        config: { get: () => "/api/config", update: () => "/api/config" },
+        workspaces: {
+          browse: () => "/api/workspaces/browse",
+          update: () => "/api/workspaces",
+          mkdir: () => "/api/workspaces/mkdir",
+          rename: () => "/api/workspaces/rename",
+        },
+      },
+    });
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "utils.js");
+    loadScript(ctx, "workspace.js");
+    ctx.showPrompt = vi.fn().mockResolvedValue("same-name");
+    vm.runInContext('workspaceBrowserPath = "/Users/test/dev";', ctx);
+
+    await ctx.renameWorkspaceBrowserEntry(
+      "/Users/test/dev/same-name",
+      "same-name",
+    );
+
+    expect(apiFn).not.toHaveBeenCalled();
+  });
+});

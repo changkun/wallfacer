@@ -1283,3 +1283,150 @@ func TestDefaultSandbox_EmptyConfigReturnsClaude(t *testing.T) {
 		t.Errorf("expected %q (default), got %q", sandbox.Claude, result)
 	}
 }
+
+// --- MkdirWorkspace ---
+
+func TestMkdirWorkspace_CreatesDirectory(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	body := `{"path":"` + ws + `","name":"new-folder"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/mkdir", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.MkdirWorkspace(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	target := filepath.Join(ws, "new-folder")
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("expected directory to exist: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatal("expected a directory")
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["path"] != target {
+		t.Errorf("expected path %q, got %q", target, resp["path"])
+	}
+}
+
+func TestMkdirWorkspace_RejectsRelativePath(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	body := `{"path":"relative/path","name":"folder"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/mkdir", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.MkdirWorkspace(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestMkdirWorkspace_RejectsPathTraversal(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	cases := []string{"..", "../escape", "a/b"}
+	for _, name := range cases {
+		body := `{"path":"` + ws + `","name":"` + name + `"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/workspaces/mkdir", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		h.MkdirWorkspace(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("name %q: expected 400, got %d", name, w.Code)
+		}
+	}
+}
+
+func TestMkdirWorkspace_ConflictOnExisting(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	existing := filepath.Join(ws, "existing")
+	if err := os.Mkdir(existing, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	body := `{"path":"` + ws + `","name":"existing"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/mkdir", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.MkdirWorkspace(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", w.Code)
+	}
+}
+
+// --- RenameWorkspace ---
+
+func TestRenameWorkspace_RenamesDirectory(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	old := filepath.Join(ws, "old-name")
+	if err := os.Mkdir(old, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	body := `{"path":"` + old + `","name":"new-name"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/rename", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.RenameWorkspace(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	newPath := filepath.Join(ws, "new-name")
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Error("expected old directory to be gone")
+	}
+	if _, err := os.Stat(newPath); err != nil {
+		t.Fatalf("expected new directory to exist: %v", err)
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp["path"] != newPath {
+		t.Errorf("expected path %q, got %q", newPath, resp["path"])
+	}
+}
+
+func TestRenameWorkspace_ConflictOnExisting(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	src := filepath.Join(ws, "source")
+	dst := filepath.Join(ws, "target")
+	if err := os.Mkdir(src, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(dst, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	body := `{"path":"` + src + `","name":"target"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/rename", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	h.RenameWorkspace(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", w.Code)
+	}
+}
+
+func TestRenameWorkspace_RejectsPathTraversal(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+	src := filepath.Join(ws, "source")
+	if err := os.Mkdir(src, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []string{"..", "a/b"}
+	for _, name := range cases {
+		body := `{"path":"` + src + `","name":"` + name + `"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/workspaces/rename", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		h.RenameWorkspace(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("name %q: expected 400, got %d", name, w.Code)
+		}
+	}
+}

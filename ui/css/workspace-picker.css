@@ -190,6 +190,15 @@
   flex-shrink: 0;
   line-height: 1.4;
 }
+.ws-entry__rename {
+  font-size: 10px;
+  padding: 2px 4px;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+.ws-entry__rename:hover {
+  opacity: 1;
+}
 .ws-entry__add {
   font-size: 11px;
   padding: 2px 8px;

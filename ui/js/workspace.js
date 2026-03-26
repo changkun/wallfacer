@@ -660,6 +660,12 @@ function renderWorkspaceBrowser() {
         : '<button type="button" class="btn-ghost ws-entry__add" onclick="event.stopPropagation();addWorkspaceSelection(\'' +
           escapeHtml(entry.path) +
           "')\">+ Add</button>";
+      var renameBtn =
+        '<button type="button" class="btn-ghost ws-entry__rename" onclick="event.stopPropagation();renameWorkspaceBrowserEntry(\'' +
+        escapeHtml(entry.path) +
+        "','" +
+        escapeHtml(entry.name) +
+        '\')" title="Rename">&#9998;</button>';
       return (
         '<div class="ws-entry">' +
         '<button type="button" class="ws-entry__name" onclick="openWorkspaceBrowserEntry2(\'' +
@@ -670,6 +676,7 @@ function renderWorkspaceBrowser() {
         "</span>" +
         badge +
         "</button>" +
+        renameBtn +
         addBtn +
         "</div>"
       );
@@ -793,6 +800,39 @@ function openWorkspaceBrowserEntry2(path) {
 function addCurrentWorkspaceFolder() {
   if (!workspaceBrowserPath) return;
   addWorkspaceSelection(workspaceBrowserPath);
+}
+
+async function createWorkspaceFolder() {
+  if (!workspaceBrowserPath) return;
+  var name = await showPrompt("New folder name:", "");
+  if (name === null) return;
+  name = name.trim();
+  if (!name) return;
+  try {
+    await api(Routes.workspaces.mkdir(), {
+      method: "POST",
+      body: JSON.stringify({ path: workspaceBrowserPath, name: name }),
+    });
+    browseWorkspaces(workspaceBrowserPath);
+  } catch (e) {
+    showAlert("Failed to create folder: " + e.message);
+  }
+}
+
+async function renameWorkspaceBrowserEntry(path, currentName) {
+  var newName = await showPrompt("Rename folder:", currentName);
+  if (newName === null) return;
+  newName = newName.trim();
+  if (!newName || newName === currentName) return;
+  try {
+    await api(Routes.workspaces.rename(), {
+      method: "POST",
+      body: JSON.stringify({ path: path, name: newName }),
+    });
+    browseWorkspaces(workspaceBrowserPath);
+  } catch (e) {
+    showAlert("Failed to rename folder: " + e.message);
+  }
 }
 
 function addWorkspaceSelection(path) {

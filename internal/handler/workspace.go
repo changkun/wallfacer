@@ -65,6 +65,75 @@ func (h *Handler) BrowseWorkspaces(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// MkdirWorkspace creates a new directory under an absolute host path.
+func (h *Handler) MkdirWorkspace(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path string `json:"path"`
+		Name string `json:"name"`
+	}
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if !filepath.IsAbs(req.Path) {
+		http.Error(w, "path must be absolute", http.StatusBadRequest)
+		return
+	}
+	info, err := os.Stat(req.Path)
+	if err != nil || !info.IsDir() {
+		http.Error(w, "path must be an existing directory", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" || req.Name == "." || req.Name == ".." ||
+		strings.Contains(req.Name, "/") {
+		http.Error(w, "invalid folder name", http.StatusBadRequest)
+		return
+	}
+	target := filepath.Join(req.Path, req.Name)
+	if _, err := os.Stat(target); err == nil {
+		http.Error(w, "directory already exists", http.StatusConflict)
+		return
+	}
+	if err := os.Mkdir(target, 0755); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"path": target})
+}
+
+// RenameWorkspace renames a directory at an absolute host path.
+func (h *Handler) RenameWorkspace(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path string `json:"path"`
+		Name string `json:"name"`
+	}
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+	if !filepath.IsAbs(req.Path) {
+		http.Error(w, "path must be absolute", http.StatusBadRequest)
+		return
+	}
+	if _, err := os.Stat(req.Path); err != nil {
+		http.Error(w, "path does not exist", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" || req.Name == "." || req.Name == ".." ||
+		strings.ContainsAny(req.Name, "/\\") {
+		http.Error(w, "invalid folder name", http.StatusBadRequest)
+		return
+	}
+	target := filepath.Join(filepath.Dir(req.Path), req.Name)
+	if _, err := os.Stat(target); err == nil {
+		http.Error(w, "target already exists", http.StatusConflict)
+		return
+	}
+	if err := os.Rename(req.Path, target); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"path": target})
+}
+
 // UpdateWorkspaces switches the active workspace set.
 func (h *Handler) UpdateWorkspaces(w http.ResponseWriter, r *http.Request) {
 	var req struct {
