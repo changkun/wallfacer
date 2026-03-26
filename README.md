@@ -16,10 +16,22 @@ Create tasks, run them in isolated sandboxes, review diffs, and keep shipping wi
 
 ## Quick Start
 
+Install:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh  # install
-wallfacer doctor  # check prerequisites
-wallfacer run     # start the server
+curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
+```
+
+Check prerequisites:
+
+```bash
+wallfacer doctor
+```
+
+Start the server:
+
+```bash
+wallfacer run
 ```
 
 A browser window opens automatically. Add your Claude credential (OAuth token via `claude setup-token`, or API key from [console.anthropic.com](https://console.anthropic.com/)) in **Settings → API Configuration**. See [Getting Started](docs/guide/getting-started.md) for the full setup walkthrough.
