@@ -34,7 +34,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *runner.MockRunner, *store.S
 		t.Fatalf("write env file: %v", err)
 	}
 
-	s, err := store.NewStore(filepath.Join(workdir, "data"))
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

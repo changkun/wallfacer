@@ -26,7 +26,7 @@ func newTestHandlerWithWorkspaces(t *testing.T) (*Handler, string) {
 	ws := t.TempDir()
 	configDir := t.TempDir()
 
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -983,7 +983,7 @@ func TestGitRebaseOnMain_RejectsUnknownWorkspace(t *testing.T) {
 func newTestHandlerWithWorkspacesFromRepo(t *testing.T, repo string) (*Handler, string) {
 	t.Helper()
 	configDir := t.TempDir()
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1008,7 +1008,7 @@ func newTestHandlerWithRealWorkspaceManager(t *testing.T) (*Handler, *workspace.
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(storeDir) })
 
-	s, err := store.NewStore(storeDir)
+	s, err := store.NewFileStore(storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}

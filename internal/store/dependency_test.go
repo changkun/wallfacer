@@ -168,7 +168,7 @@ func TestUpdateTaskDependsOn_Persists(t *testing.T) {
 	_ = s.UpdateTaskDependsOn(bg(), b.ID, []string{a.ID.String()})
 
 	// Reload from the same directory.
-	s2, err := NewStore(s.dir)
+	s2, err := NewFileStore(s.dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestUpdateTaskDependsOn_ClearsToNil(t *testing.T) {
 	_ = s.UpdateTaskDependsOn(bg(), b.ID, []string{}) // clear
 
 	// Reload from disk to check persisted JSON.
-	s2, err := NewStore(s.dir)
+	s2, err := NewFileStore(s.dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}

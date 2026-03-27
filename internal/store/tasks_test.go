@@ -102,10 +102,10 @@ func TestCreateTask_TimeoutClampedMax(t *testing.T) {
 
 func TestCreateTask_PersistsToDisk(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewStore(dir)
+	s, _ := NewFileStore(dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "persist me", Timeout: 5})
 
-	s2, _ := NewStore(dir)
+	s2, _ := NewFileStore(dir)
 	got, err := s2.GetTask(bg(), task.ID)
 	if err != nil {
 		t.Fatalf("GetTask after reload: %v", err)
@@ -334,7 +334,7 @@ func TestDeleteTask_Basic(t *testing.T) {
 
 func TestDeleteTask_RetainsDiskData(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewStore(dir)
+	s, _ := NewFileStore(dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "delete me", Timeout: 5})
 	taskDir := dir + "/" + task.ID.String()
 
@@ -1155,7 +1155,7 @@ func TestResetTaskForRetry_NotFound(t *testing.T) {
 
 func TestResetTaskForRetryAccumulatesHistory(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -1246,7 +1246,7 @@ func TestResetTaskForRetryAccumulatesHistory(t *testing.T) {
 	}
 
 	// Step 5: Reload store from disk and verify RetryHistory survived round-trip.
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore (reload): %v", err)
 	}
@@ -1545,7 +1545,7 @@ func TestUpdateTaskScheduledAt_SetAndClear(t *testing.T) {
 
 func TestUpdateTaskScheduledAt_PersistsAndLoads(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewStore(dir)
+	s, _ := NewFileStore(dir)
 
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "persist-scheduled", Timeout: 5})
 	future := time.Now().Add(3 * time.Hour).Truncate(time.Second)
@@ -1554,7 +1554,7 @@ func TestUpdateTaskScheduledAt_PersistsAndLoads(t *testing.T) {
 	}
 
 	// Reload from disk.
-	s2, _ := NewStore(dir)
+	s2, _ := NewFileStore(dir)
 	got, err := s2.GetTask(bg(), task.ID)
 	if err != nil {
 		t.Fatalf("GetTask after reload: %v", err)
@@ -1718,7 +1718,7 @@ func TestPurgeExpired(t *testing.T) {
 
 func TestStorePersistsTombstone(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -1729,7 +1729,7 @@ func TestStorePersistsTombstone(t *testing.T) {
 	}
 
 	// Reload the store from the same directory.
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -1810,7 +1810,7 @@ func TestUpdateTaskEnvironment_RoundTrip(t *testing.T) {
 
 func TestUpdateTaskEnvironment_PersistsAcrossLoad(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -1831,7 +1831,7 @@ func TestUpdateTaskEnvironment_PersistsAcrossLoad(t *testing.T) {
 	s.Close()
 
 	// Reload from disk.
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore (reload): %v", err)
 	}

@@ -831,7 +831,7 @@ func TestGenerateOversightNoTurns(t *testing.T) {
 // pending status when no oversight.json has been written yet.
 func TestGetOversightPendingWhenMissing(t *testing.T) {
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -854,7 +854,7 @@ func TestGetOversightPendingWhenMissing(t *testing.T) {
 // TestSaveAndGetOversight verifies the round-trip persistence of oversight data.
 func TestSaveAndGetOversight(t *testing.T) {
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1540,7 +1540,7 @@ func TestInferCodexToolName(t *testing.T) {
 // the oversight interval is 0 (disabled, no env file configured), the worker
 // goroutine returns immediately without blocking on the context.
 func TestPeriodicOversightWorker_DisabledReturnsImmediately(t *testing.T) {
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1581,7 +1581,7 @@ func TestPeriodicOversightWorker_ContextCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1613,7 +1613,7 @@ func TestPeriodicOversightWorker_ContextCancellation(t *testing.T) {
 // non-existent env file path still causes the worker to return immediately
 // (parse error → interval=0 → disabled).
 func TestPeriodicOversightWorker_EnvFileMissing(t *testing.T) {
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

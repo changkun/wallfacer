@@ -1036,7 +1036,7 @@ func TestBuildIdeationPromptIncludesRejectedTitles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := store.NewStore(dir)
+	s, err := store.NewFileStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

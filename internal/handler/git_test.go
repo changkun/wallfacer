@@ -68,7 +68,7 @@ func newTestHandler(t *testing.T) *Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewStore(storeDir)
+	s, err := store.NewFileStore(storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 
@@ -91,7 +91,7 @@ func newStaticWorkspaceHandler(t *testing.T, workspaces []string) *Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewStore(storeDir)
+	s, err := store.NewFileStore(storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 

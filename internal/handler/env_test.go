@@ -30,7 +30,7 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewStore(storeDir)
+	s, err := store.NewFileStore(storeDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func newTestHandlerWithEnv(t *testing.T) (*Handler, string) {
 
 func newTestHandlerWithEnvAndCodexAuth(t *testing.T) (*Handler, string, string) {
 	t.Helper()
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

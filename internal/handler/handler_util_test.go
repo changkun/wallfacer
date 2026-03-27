@@ -74,7 +74,7 @@ func TestIncAutopilotPhase2Miss_WithRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewStore(storeDir)
+	s, err := store.NewFileStore(storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 		t.Fatal(err)

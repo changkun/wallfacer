@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
@@ -60,25 +59,17 @@ func (s *Store) CountRegularInProgress() int {
 	return count
 }
 
-// ListSummaries returns all task summaries found in data/*/summary.json.
-// It walks the data directory and reads each summary file independently,
-// without loading the full task.json. Tasks that completed before summary.json
-// was introduced will simply have no entry in the returned slice.
+// ListSummaries returns all task summaries by finding tasks that have a
+// summary.json blob, then reading each one. Tasks that completed before
+// summary.json was introduced will simply have no entry in the returned slice.
 func (s *Store) ListSummaries() ([]TaskSummary, error) {
-	entries, err := os.ReadDir(s.dir)
+	owners, err := s.backend.ListBlobOwners("summary.json")
 	if err != nil {
-		return nil, fmt.Errorf("read data dir: %w", err)
+		return nil, fmt.Errorf("list summary owners: %w", err)
 	}
 
 	var summaries []TaskSummary
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		id, err := uuid.Parse(entry.Name())
-		if err != nil {
-			continue // skip non-UUID directories
-		}
+	for _, id := range owners {
 		summary, err := s.LoadSummary(id)
 		if err != nil {
 			logger.Store.Warn("failed to load summary", "id", id, "error", err)

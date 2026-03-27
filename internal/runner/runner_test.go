@@ -55,7 +55,7 @@ func setupTestRepo(t *testing.T) string {
 func setupTestRunner(t *testing.T, workspaces []string) (*store.Store, *Runner) {
 	t.Helper()
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func enableCommitMessageGeneration(t *testing.T, runner *Runner) {
 func newTestRunnerWithInstructions(t *testing.T, instructionsPath string) *Runner {
 	t.Helper()
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 
 	ws := t.TempDir()
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	ws1 := t.TempDir()
 	ws2 := t.TempDir()
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
 	}
 
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestHostCodexAuthStatus_Valid(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,7 +381,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 
 	ws := t.TempDir()
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}

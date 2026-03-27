@@ -252,7 +252,7 @@ func newTestHandlerWithTwoWorkspaces(t *testing.T) (*Handler, string, string) {
 	ws2 := t.TempDir()
 	configDir := t.TempDir()
 
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

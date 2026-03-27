@@ -36,7 +36,7 @@ func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.S
 		}
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}

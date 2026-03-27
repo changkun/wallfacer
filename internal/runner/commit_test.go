@@ -19,7 +19,7 @@ import (
 func runnerWithCmd(t *testing.T, cmd string) *Runner {
 	t.Helper()
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 	cmd := fakeCmdScript(t, validStreamJSON, 0)
 
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestHostStageAndCommitFallsBackOnCommitMessageFailure(t *testing.T) {
 	cmd := fakeCmdScript(t, "", 1) // always fails
 
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing(t *testing.T) {
 	repo := setupTestRepo(t)
 
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,7 +374,7 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 	cmd := fakeCmdScript(t, validStreamJSON, 0) // for commit message generation
 
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,7 +517,7 @@ func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
 	repo := setupTestRepo(t)
 
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -661,7 +661,7 @@ func TestLocalFallbackCommitMessage_WhitespaceOnlyPromptUsesDiff(t *testing.T) {
 // TestMaybeAutoPush_NoEnvFile verifies that maybeAutoPush is a no-op when
 // envFile is not configured.
 func TestMaybeAutoPush_NoEnvFile(t *testing.T) {
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -682,7 +682,7 @@ func TestMaybeAutoPush_AutoPushDisabled(t *testing.T) {
 	if err := os.WriteFile(envFile, []byte("WALLFACER_AUTO_PUSH=false\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -704,7 +704,7 @@ func TestMaybeAutoPush_NonGitDir(t *testing.T) {
 	if err := os.WriteFile(envFile, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -729,7 +729,7 @@ func TestMaybeAutoPush_NonGitDir(t *testing.T) {
 // when the env file path is set but the file does not exist.
 func TestMaybeAutoPush_MissingEnvFile(t *testing.T) {
 	envFile := filepath.Join(t.TempDir(), "nonexistent.env")
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

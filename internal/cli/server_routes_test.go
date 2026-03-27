@@ -35,7 +35,7 @@ func TestContractRoutes_AllRegisteredInMux(t *testing.T) {
 	if err := os.MkdirAll(worktrees, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	s, err := store.NewStore(filepath.Join(workdir, "data"))
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

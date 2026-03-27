@@ -14,7 +14,7 @@ import (
 // TestEmitIdeationRejectionEvents_EmptySlice verifies that the function is a
 // no-op and does not panic when given a nil/empty rejection slice.
 func TestEmitIdeationRejectionEvents_EmptySlice(t *testing.T) {
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestEmitIdeationRejectionEvents_EmptySlice(t *testing.T) {
 // event is inserted per rejection and that the label falls back to "(untitled)"
 // when the rejection title is blank.
 func TestEmitIdeationRejectionEvents_WithRejections(t *testing.T) {
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestEmitIdeationRejectionEvents_WithRejections(t *testing.T) {
 // TestEmitIdeationRejectionEvents_EmptyTitle verifies that a rejection with a
 // blank title is labelled "(untitled)" in the inserted event.
 func TestEmitIdeationRejectionEvents_EmptyTitle(t *testing.T) {
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestEmitIdeationRejectionEvents_EmptyTitle(t *testing.T) {
 // TestEmitIdeationRejectionEvents_AllReasonTypes verifies that all four
 // rejection reason constants produce events without panicking.
 func TestEmitIdeationRejectionEvents_AllReasonTypes(t *testing.T) {
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,7 +22,7 @@
 //
 // # Usage
 //
-//	s, err := store.NewStore(dataDir)
+//	s, err := store.NewFileStore(dataDir)
 //	task, err := s.CreateTask(ctx, "implement feature X", "goal", 0)
 //	s.UpdateTaskStatus(ctx, task.ID, store.StatusInProgress)
 //	events, _ := s.GetTaskEvents(ctx, task.ID)

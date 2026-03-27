@@ -2,16 +2,16 @@ package store
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
@@ -150,9 +150,7 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 
 	// Create the task directory outside the lock; the directory name is derived
 	// from the UUID which is already fixed, so no race is possible.
-	taskDir := filepath.Join(s.dir, task.ID.String())
-	tracesDir := filepath.Join(taskDir, "traces")
-	if err := os.MkdirAll(tracesDir, 0755); err != nil {
+	if err := s.backend.Init(task.ID); err != nil {
 		return nil, err
 	}
 
@@ -246,8 +244,12 @@ func (s *Store) DeleteTask(ctx context.Context, id uuid.UUID, reason string) err
 		return fmt.Errorf("task not found: %s", id)
 	}
 	tomb := Tombstone{DeletedAt: time.Now(), Reason: reason}
-	tombPath := filepath.Join(s.dir, id.String(), "tombstone.json")
-	if err := atomicfile.WriteJSON(tombPath, tomb, 0644); err != nil {
+	tombData, err := json.Marshal(tomb)
+	if err != nil {
+		s.mu.Unlock()
+		return fmt.Errorf("marshal tombstone: %w", err)
+	}
+	if err := s.backend.SaveBlob(id, "tombstone.json", tombData); err != nil {
 		s.mu.Unlock()
 		return fmt.Errorf("write tombstone: %w", err)
 	}
@@ -350,8 +352,7 @@ func (s *Store) RestoreTask(_ context.Context, id uuid.UUID) error {
 	if _, ok := s.deleted[id]; !ok {
 		return fmt.Errorf("deleted task not found: %s", id)
 	}
-	tombPath := filepath.Join(s.dir, id.String(), "tombstone.json")
-	if err := os.Remove(tombPath); err != nil && !os.IsNotExist(err) {
+	if err := s.backend.DeleteBlob(id, "tombstone.json"); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove tombstone: %w", err)
 	}
 	delete(s.deleted, id)
@@ -377,8 +378,7 @@ func (s *Store) purgeTaskLocked(id uuid.UUID) error {
 	if _, ok := s.deleted[id]; !ok {
 		return fmt.Errorf("no tombstoned task: %s", id)
 	}
-	taskDir := filepath.Join(s.dir, id.String())
-	if err := os.RemoveAll(taskDir); err != nil {
+	if err := s.backend.RemoveTask(id); err != nil {
 		return fmt.Errorf("purge task dir: %w", err)
 	}
 	delete(s.deleted, id)
@@ -400,8 +400,7 @@ func (s *Store) PurgeExpiredTombstones(retentionDays int) {
 	defer s.mu.Unlock()
 
 	for id := range s.deleted {
-		tombPath := filepath.Join(s.dir, id.String(), "tombstone.json")
-		raw, err := os.ReadFile(tombPath)
+		raw, err := s.backend.ReadBlob(id, "tombstone.json")
 		if err != nil {
 			logger.Store.Warn("purge: read tombstone", "task", id, "error", err)
 			continue

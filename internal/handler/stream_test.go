@@ -676,7 +676,7 @@ func newTestHandlerWithMockRunner(t *testing.T, mock *runner.MockRunner) (*Handl
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewStore(storeDir)
+	s, err := store.NewFileStore(storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 

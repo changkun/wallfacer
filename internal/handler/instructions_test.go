@@ -26,7 +26,7 @@ func newTestHandlerWithInstructions(t *testing.T) (*Handler, string) {
 		t.Fatal(err)
 	}
 
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

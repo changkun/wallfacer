@@ -66,7 +66,7 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
 
 func TestGauge_FailedTasksByCategory(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), "data")
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestGauge_FailedTasksByCategory(t *testing.T) {
 
 func TestGauge_CircuitBreakerOpen(t *testing.T) {
 	workdir := t.TempDir()
-	s, err := store.NewStore(filepath.Join(workdir, "data"))
+	s, err := store.NewFileStore(filepath.Join(workdir, "data"))
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

@@ -80,7 +80,7 @@ func TestNewStateChangeData_WithExtra(t *testing.T) {
 
 func TestStore_DataDir(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

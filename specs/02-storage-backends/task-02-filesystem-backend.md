@@ -1,6 +1,6 @@
 # Task 2: Implement FilesystemBackend
 
-**Status:** Not started
+**Status:** Done
 **Depends on:** Task 1
 **Effort:** Large
 
@@ -55,3 +55,15 @@ func NewFileStore(dir string) (*Store, error) {
 - `Store` methods contain no direct `os.*`, `filepath.*`, or `atomicfile.*` calls for data persistence
 - All existing tests pass
 - `NewStore` accepts a `StorageBackend`; existing call sites use `NewFileStore`
+
+## Implementation notes
+
+- **`NewFilesystemBackend` returns `(*FilesystemBackend, error)`** instead of `*FilesystemBackend` — the spec omitted the error return, but the constructor calls `os.MkdirAll` which can fail, so it must propagate the error.
+- **`NewFileStore` sets `s.dir` after `NewStore`** rather than passing `dir` as a second parameter to `NewStore`. The `dir` field is kept on Store for backward compatibility with `OutputsDir()` and `DataDir()` until Task 3 removes them.
+- **Blob keys use `.json` suffix** (e.g., `"oversight.json"`, `"tombstone.json"`, `"summary.json"`) to match existing filenames, rather than the bare names the spec suggested (e.g., `"oversight"`, `"tombstone"`, `"summary"`). This preserves on-disk compatibility.
+- **`currentMaxEventSeq` removed** — replaced by capturing `s.nextSeq[id]-1` under the lock (equivalent since `saveEvent` updates both disk and memory atomically under the lock). This simplifies the compaction path.
+- **`compactTaskEvents` now reads events from memory** under a read lock and passes them to `backend.CompactEvents`, rather than the backend re-reading trace files from disk.
+- **`FilesystemBackend.LoadAll` persists migrated tasks** directly, rather than the Store layer doing a separate migration-detection pass.
+- **`turn_usage.go` left unchanged** — its `ndjson.AppendFile` append semantics don't map cleanly to `SaveBlob` (overwrite). Deferred to a follow-up.
+- **`OutputsDir()` and `DataDir()` still use `s.dir`** — deferred to Task 3 as designed.
+- **`ListSummaries` uses `ListBlobOwners("summary.json")`** instead of scanning `os.ReadDir(s.dir)` directly.

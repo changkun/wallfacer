@@ -24,7 +24,7 @@ func newTestHandlerWithRegistry(t *testing.T) (*Handler, *metrics.Registry) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := store.NewStore(storeDir)
+	s, err := store.NewFileStore(storeDir)
 	if err != nil {
 		_ = os.RemoveAll(storeDir)
 

@@ -4,22 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
 
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"github.com/google/uuid"
 )
-
-// oversightPath returns the filesystem path for a task's oversight.json file.
-func (s *Store) oversightPath(taskID uuid.UUID) string {
-	return filepath.Join(s.dir, taskID.String(), "oversight.json")
-}
-
-// testOversightPath returns the filesystem path for a task's oversight-test.json file.
-func (s *Store) testOversightPath(taskID uuid.UUID) string {
-	return filepath.Join(s.dir, taskID.String(), "oversight-test.json")
-}
 
 // oversightText concatenates all phase titles and summaries from an oversight
 // object into a single space-separated string suitable for indexing or search.
@@ -38,11 +26,14 @@ func oversightText(o TaskOversight) string {
 	return strings.TrimSpace(sb.String())
 }
 
-// SaveOversight atomically writes the oversight summary for a task and updates
-// the in-memory search index so that subsequent SearchTasks calls reflect the
-// new text without a disk read.
+// SaveOversight writes the oversight summary for a task via the backend and
+// updates the in-memory search index.
 func (s *Store) SaveOversight(taskID uuid.UUID, oversight TaskOversight) error {
-	if err := atomicfile.WriteJSON(s.oversightPath(taskID), oversight, 0644); err != nil {
+	data, err := json.Marshal(oversight)
+	if err != nil {
+		return err
+	}
+	if err := s.backend.SaveBlob(taskID, "oversight.json", data); err != nil {
 		return err
 	}
 	raw := oversightText(oversight)
@@ -57,9 +48,9 @@ func (s *Store) SaveOversight(taskID uuid.UUID, oversight TaskOversight) error {
 }
 
 // GetOversight reads the oversight summary for a task.
-// Returns (nil, nil) when no oversight file exists yet (status pending).
+// Returns a pending TaskOversight when no oversight file exists yet.
 func (s *Store) GetOversight(taskID uuid.UUID) (*TaskOversight, error) {
-	data, err := os.ReadFile(s.oversightPath(taskID))
+	data, err := s.backend.ReadBlob(taskID, "oversight.json")
 	if errors.Is(err, os.ErrNotExist) {
 		pending := TaskOversight{Status: OversightStatusPending}
 		return &pending, nil
@@ -74,16 +65,20 @@ func (s *Store) GetOversight(taskID uuid.UUID) (*TaskOversight, error) {
 	return &o, nil
 }
 
-// SaveTestOversight atomically writes the test-agent oversight summary for a task.
+// SaveTestOversight writes the test-agent oversight summary for a task via the backend.
 func (s *Store) SaveTestOversight(taskID uuid.UUID, oversight TaskOversight) error {
-	return atomicfile.WriteJSON(s.testOversightPath(taskID), oversight, 0644)
+	data, err := json.Marshal(oversight)
+	if err != nil {
+		return err
+	}
+	return s.backend.SaveBlob(taskID, "oversight-test.json", data)
 }
 
 // LoadOversightText reads oversight.json for taskID and concatenates all
 // phase Title and Summary fields into a single searchable string.
-// Returns ("", nil) when the file does not exist (task never generated oversight).
+// Returns ("", nil) when the file does not exist.
 func (s *Store) LoadOversightText(taskID uuid.UUID) (string, error) {
-	data, err := os.ReadFile(s.oversightPath(taskID))
+	data, err := s.backend.ReadBlob(taskID, "oversight.json")
 	if errors.Is(err, os.ErrNotExist) {
 		return "", nil
 	}
@@ -100,7 +95,7 @@ func (s *Store) LoadOversightText(taskID uuid.UUID) (string, error) {
 // GetTestOversight reads the test-agent oversight summary for a task.
 // Returns a pending TaskOversight when no oversight-test.json exists yet.
 func (s *Store) GetTestOversight(taskID uuid.UUID) (*TaskOversight, error) {
-	data, err := os.ReadFile(s.testOversightPath(taskID))
+	data, err := s.backend.ReadBlob(taskID, "oversight-test.json")
 	if errors.Is(err, os.ErrNotExist) {
 		pending := TaskOversight{Status: OversightStatusPending}
 		return &pending, nil

@@ -579,7 +579,7 @@ func TestSearchIndex_LoadAll(t *testing.T) {
 	dir := t.TempDir()
 
 	// Create a store, populate a task with oversight, then close it.
-	s1, err := NewStore(dir)
+	s1, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -599,7 +599,7 @@ func TestSearchIndex_LoadAll(t *testing.T) {
 	}
 
 	// Open a second Store against the same directory to simulate a server restart.
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore (second): %v", err)
 	}
@@ -660,7 +660,7 @@ func TestSearchIndex_DeleteTask(t *testing.T) {
 // BenchmarkSearchTasks_Indexed measures SearchTasks using the in-memory index.
 // Run with: go test -bench=BenchmarkSearchTasks -benchmem ./internal/store/
 func BenchmarkSearchTasks_Indexed(b *testing.B) {
-	s, err := NewStore(b.TempDir())
+	s, err := NewFileStore(b.TempDir())
 	if err != nil {
 		b.Fatalf("NewStore: %v", err)
 	}
@@ -697,7 +697,7 @@ func BenchmarkSearchTasks_Indexed(b *testing.B) {
 // oversight.json from disk for every candidate on every query. It bypasses the
 // index to serve as a regression baseline. Run alongside BenchmarkSearchTasks_Indexed.
 func BenchmarkSearchTasks_OversightDisk(b *testing.B) {
-	s, err := NewStore(b.TempDir())
+	s, err := NewFileStore(b.TempDir())
 	if err != nil {
 		b.Fatalf("NewStore: %v", err)
 	}

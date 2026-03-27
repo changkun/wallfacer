@@ -14,7 +14,7 @@ import (
 // in benchmarks (b.TempDir requires *testing.B, not *testing.T).
 func newBenchStore(b *testing.B) *Store {
 	b.Helper()
-	s, err := NewStore(b.TempDir())
+	s, err := NewFileStore(b.TempDir())
 	if err != nil {
 		b.Fatalf("NewStore: %v", err)
 	}

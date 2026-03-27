@@ -17,7 +17,7 @@ import (
 func newRunnerForArgTest(t *testing.T, cfg RunnerConfig) *Runner {
 	t.Helper()
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}

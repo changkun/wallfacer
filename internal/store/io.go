@@ -7,11 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/tail"
 	"github.com/google/uuid"
 )
@@ -26,19 +24,15 @@ func (s *Store) pruneTaskPayload(t *Task) {
 	t.PromptHistory = tail.Of(t.PromptHistory, s.promptHistoryLimit)
 }
 
-// saveTask atomically writes a task's metadata to its task.json file.
+// saveTask stamps the schema version, prunes payload, and delegates
+// persistence to the storage backend.
 // Must be called with s.mu held for writing.
-// It stamps SchemaVersion = CurrentTaskSchemaVersion on every write so that
-// all on-disk files are always at the current schema version.
-// A shallow copy is taken before pruning so that the in-memory task pointer
-// retains full slice history for the current server lifetime; only the
-// persisted file is bounded.
 func (s *Store) saveTask(id uuid.UUID, task *Task) error {
+	_ = id // task.ID is authoritative; id kept for call-site clarity
 	task.SchemaVersion = constants.CurrentTaskSchemaVersion
 	pruned := *task // shallow copy; in-memory slices are not modified
 	s.pruneTaskPayload(&pruned)
-	path := filepath.Join(s.dir, id.String(), "task.json")
-	return atomicfile.WriteJSON(path, &pruned, 0644)
+	return s.backend.SaveTask(&pruned)
 }
 
 // truncateTurnData applies the per-turn output size budget to data. If
@@ -74,13 +68,8 @@ func (s *Store) truncateTurnData(data []byte) ([]byte, int) {
 	return result, originalLen
 }
 
-// SaveTurnOutput persists raw stdout/stderr for a given turn to the outputs directory.
+// SaveTurnOutput persists raw stdout/stderr for a given turn via the backend.
 func (s *Store) SaveTurnOutput(taskID uuid.UUID, turn int, stdout, stderr []byte) error {
-	outputsDir := filepath.Join(s.dir, taskID.String(), "outputs")
-	if err := os.MkdirAll(outputsDir, 0755); err != nil {
-		return fmt.Errorf("create outputs dir: %w", err)
-	}
-
 	truncated := false
 
 	// Apply the server-side per-turn stdout size budget.
@@ -91,8 +80,8 @@ func (s *Store) SaveTurnOutput(taskID uuid.UUID, turn int, stdout, stderr []byte
 		truncated = true
 	}
 
-	name := fmt.Sprintf("turn-%04d.json", turn)
-	if err := os.WriteFile(filepath.Join(outputsDir, name), stdout, 0644); err != nil {
+	stdoutKey := fmt.Sprintf("outputs/turn-%04d.json", turn)
+	if err := s.backend.SaveBlob(taskID, stdoutKey, stdout); err != nil {
 		return fmt.Errorf("write stdout: %w", err)
 	}
 
@@ -105,8 +94,8 @@ func (s *Store) SaveTurnOutput(taskID uuid.UUID, turn int, stdout, stderr []byte
 			truncated = true
 		}
 
-		stderrName := fmt.Sprintf("turn-%04d.stderr.txt", turn)
-		if err := os.WriteFile(filepath.Join(outputsDir, stderrName), stderr, 0644); err != nil {
+		stderrKey := fmt.Sprintf("outputs/turn-%04d.stderr.txt", turn)
+		if err := s.backend.SaveBlob(taskID, stderrKey, stderr); err != nil {
 			return fmt.Errorf("write stderr: %w", err)
 		}
 	}
@@ -121,21 +110,20 @@ func (s *Store) SaveTurnOutput(taskID uuid.UUID, turn int, stdout, stderr []byte
 	return nil
 }
 
-// summaryPath returns the filesystem path for a task's summary.json file.
-func (s *Store) summaryPath(id uuid.UUID) string {
-	return filepath.Join(s.dir, id.String(), "summary.json")
-}
-
 // SaveSummary atomically writes the immutable task summary for a completed task.
 func (s *Store) SaveSummary(id uuid.UUID, summary TaskSummary) error {
-	return atomicfile.WriteJSON(s.summaryPath(id), summary, 0644)
+	data, err := json.Marshal(summary)
+	if err != nil {
+		return err
+	}
+	return s.backend.SaveBlob(id, "summary.json", data)
 }
 
 // LoadSummary reads the task summary for a completed task.
 // Returns (nil, nil) when no summary file exists (task completed before this
 // feature was introduced, or task is not in done status).
 func (s *Store) LoadSummary(id uuid.UUID) (*TaskSummary, error) {
-	data, err := os.ReadFile(s.summaryPath(id))
+	data, err := s.backend.ReadBlob(id, "summary.json")
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}

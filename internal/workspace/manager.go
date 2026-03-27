@@ -48,7 +48,7 @@ type Manager struct {
 	nextSubID int
 
 	// newStore is the factory used to open scoped stores. It defaults to
-	// store.NewStore and can be replaced in tests to intercept created stores.
+	// store.NewFileStore and can be replaced in tests to intercept created stores.
 	newStore func(dir string) (*store.Store, error)
 }
 
@@ -59,7 +59,7 @@ func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager,
 		dataDir:   dataDir,
 		envFile:   envFile,
 		subs:      make(map[int]chan Snapshot),
-		newStore:  store.NewStore,
+		newStore:  store.NewFileStore,
 	}
 	initial = m.startupWorkspaces(initial)
 	if _, err := m.Switch(initial); err != nil {
@@ -181,7 +181,7 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	// Determine the factory to use (supports injection in tests).
 	newStoreFn := m.newStore
 	if newStoreFn == nil {
-		newStoreFn = store.NewStore
+		newStoreFn = store.NewFileStore
 	}
 
 	// Build the candidate snapshot. All external side effects happen here,

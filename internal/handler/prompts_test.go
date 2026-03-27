@@ -21,7 +21,7 @@ func newTestHandlerWithPrompts(t *testing.T) (*Handler, *prompts.Manager) {
 	dir := t.TempDir()
 	promptsDir := filepath.Join(dir, "prompts")
 
-	s, err := store.NewStore(filepath.Join(dir, "data"))
+	s, err := store.NewFileStore(filepath.Join(dir, "data"))
 	if err != nil {
 		t.Fatal(err)
 	}

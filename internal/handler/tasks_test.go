@@ -2201,7 +2201,7 @@ func TestTryAutoPromote_ResumesFailedTestFeedbackWhenAutopilotEnabled(t *testing
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
 	}
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3786,7 +3786,7 @@ func setupAutoRetryRunner(t *testing.T, cmd string) (*store.Store, *runner.Runne
 			t.Fatal(err)
 		}
 	}
-	s, storeErr := store.NewStore(dataDir)
+	s, storeErr := store.NewFileStore(dataDir)
 	if storeErr != nil {
 		_ = os.RemoveAll(dataDir)
 		t.Fatal(storeErr)

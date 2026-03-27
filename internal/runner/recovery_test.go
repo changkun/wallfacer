@@ -91,7 +91,7 @@ func TestRecoverOrphanedTasks(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// 1. Create store in a temp directory.
-			s, err := store.NewStore(t.TempDir())
+			s, err := store.NewFileStore(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -161,7 +161,7 @@ func TestRecoverOrphanedTasks(t *testing.T) {
 }
 
 func TestRecoverOrphanedTasks_InProgressMissingWorktreeBecomesFailed(t *testing.T) {
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestRecoverOrphanedTasks_CommittingGitCheck(t *testing.T) {
 	newCommittingTask := func(t *testing.T, repoDir string) (*store.Task, *store.Store) {
 		t.Helper()
 		ctx := context.Background()
-		s, err := store.NewStore(t.TempDir())
+		s, err := store.NewFileStore(t.TempDir())
 		if err != nil {
 			t.Fatalf("NewStore: %v", err)
 		}
@@ -345,7 +345,7 @@ func (s *sequenceLister) ListContainers() ([]sandbox.ContainerInfo, error) {
 // status has been forced to in_progress. Returns the store and the task.
 func setupInProgressTask(t *testing.T) (*store.Store, *store.Task) {
 	t.Helper()
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

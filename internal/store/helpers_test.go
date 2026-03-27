@@ -17,7 +17,7 @@ func bg() context.Context {
 // newTestStore creates a Store backed by a fresh temporary directory.
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	s, err := NewStore(t.TempDir())
+	s, err := NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}

@@ -1,19 +1,14 @@
 package store
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
 	"changkun.de/x/wallfacer/internal/pkg/pagination"
 	"github.com/google/uuid"
 )
@@ -42,7 +37,7 @@ func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType Event
 		CreatedAt: time.Now(),
 	}
 
-	if err := s.saveEvent(taskID, seq, event); err != nil {
+	if err := s.backend.SaveEvent(taskID, seq, event); err != nil {
 		return err
 	}
 
@@ -186,17 +181,8 @@ func ComputeSpans(events []TaskEvent) ([]SpanResult, error) {
 	return spans, nil
 }
 
-// saveEvent writes a single event to the task's traces directory.
-// Must be called with s.mu held for writing.
-func (s *Store) saveEvent(taskID uuid.UUID, seq int, event TaskEvent) error {
-	tracesDir := filepath.Join(s.dir, taskID.String(), "traces")
-	if err := os.MkdirAll(tracesDir, 0755); err != nil {
-		return err
-	}
-	path := filepath.Join(tracesDir, fmt.Sprintf("%04d.json", seq))
-	return atomicfile.WriteJSON(path, event, 0644)
-}
-
+// numberedTraceFile and parseNumberedTraceFile are used by FilesystemBackend
+// for trace file parsing.
 type numberedTraceFile struct {
 	name string
 	seq  int
@@ -217,105 +203,25 @@ func parseNumberedTraceFile(name string) (numberedTraceFile, bool) {
 	return numberedTraceFile{name: name, seq: seq}, true
 }
 
-// currentMaxEventSeq reads the traces directory for taskID and returns the
-// highest sequence number among all numbered trace files (e.g. 0005.json → 5).
-// Returns 0 if the directory is empty, does not exist, or contains no numbered
-// files. This is a pure filesystem read with no in-memory side effects.
-func (s *Store) currentMaxEventSeq(taskID uuid.UUID) (int64, error) {
-	tracesDir := filepath.Join(s.dir, taskID.String(), "traces")
-	entries, err := os.ReadDir(tracesDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	var maxSeq int64
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		tf, ok := parseNumberedTraceFile(entry.Name())
-		if !ok {
-			continue
-		}
-		if int64(tf.seq) > maxSeq {
-			maxSeq = int64(tf.seq)
-		}
-	}
-	return maxSeq, nil
-}
-
-// compactTaskEvents merges all numbered trace files whose sequence number is
-// ≤ maxSeq into a single compact.ndjson file, then removes those individual
-// files. Files beyond maxSeq are left untouched, preserving session boundaries
-// when a task is retried immediately after completion.
+// compactTaskEvents delegates to the backend to compact events for a task.
+// The events to compact are taken from the in-memory event list, filtered
+// to include only events with ID ≤ maxSeq.
 func (s *Store) compactTaskEvents(taskID uuid.UUID, maxSeq int64) error {
-	tracesDir := filepath.Join(s.dir, taskID.String(), "traces")
-	entries, err := os.ReadDir(tracesDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+	// Read events from memory. This is called from a background goroutine
+	// after the lock has been released, so we need to acquire a read lock.
+	s.mu.RLock()
+	allEvents := s.events[taskID]
+	var eventsToCompact []TaskEvent
+	for _, evt := range allEvents {
+		if evt.ID <= maxSeq {
+			eventsToCompact = append(eventsToCompact, evt)
 		}
-		return err
 	}
+	s.mu.RUnlock()
 
-	var traceFiles []numberedTraceFile
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		traceFile, ok := parseNumberedTraceFile(entry.Name())
-		if !ok {
-			continue
-		}
-		if int64(traceFile.seq) > maxSeq {
-			continue // beyond the session boundary; leave for the next session
-		}
-		traceFiles = append(traceFiles, traceFile)
-	}
-	if len(traceFiles) == 0 {
+	if len(eventsToCompact) == 0 {
 		return nil
 	}
 
-	slices.SortFunc(traceFiles, func(a, b numberedTraceFile) int {
-		return cmp.Compare(a.seq, b.seq)
-	})
-
-	var compact []byte
-	for _, traceFile := range traceFiles {
-		path := filepath.Join(tracesDir, traceFile.name)
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			logger.Store.Warn("compact: skipping unreadable trace", "task", taskID, "trace", traceFile.name, "error", err)
-			continue
-		}
-
-		var evt TaskEvent
-		if err := json.Unmarshal(raw, &evt); err != nil {
-			logger.Store.Warn("compact: skipping corrupt trace", "task", taskID, "trace", traceFile.name, "error", err)
-			continue
-		}
-
-		line, err := json.Marshal(evt)
-		if err != nil {
-			logger.Store.Warn("compact: skipping unmarshalable trace", "task", taskID, "trace", traceFile.name, "error", err)
-			continue
-		}
-		compact = append(compact, line...)
-		compact = append(compact, '\n')
-	}
-
-	compactPath := filepath.Join(tracesDir, "compact.ndjson")
-	if err := atomicfile.Write(compactPath, compact, 0644); err != nil {
-		return err
-	}
-
-	for _, traceFile := range traceFiles {
-		if err := os.Remove(filepath.Join(tracesDir, traceFile.name)); err != nil && !os.IsNotExist(err) {
-			logger.Store.Warn("compact: failed to remove trace", "task", taskID, "trace", traceFile.name, "error", err)
-		}
-	}
-
-	return nil
+	return s.backend.CompactEvents(taskID, eventsToCompact)
 }

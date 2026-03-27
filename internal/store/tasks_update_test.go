@@ -38,7 +38,7 @@ func TestMutateTask_UpdatedAtPersistedAfterRefactoredMethod(t *testing.T) {
 	}
 
 	// Verify persistence by loading through a fresh store backed by the same dir.
-	s2, err := NewStore(s.dir)
+	s2, err := NewFileStore(s.dir)
 	if err != nil {
 		t.Fatalf("NewStore (reload): %v", err)
 	}
@@ -375,7 +375,7 @@ func TestResetTaskForRetry_ResetsAutoRetryCountAndBudget_Persisted(t *testing.T)
 	}
 
 	// Reload from disk to verify persistence.
-	s2, err := NewStore(s.dir)
+	s2, err := NewFileStore(s.dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}

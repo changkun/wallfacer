@@ -29,7 +29,7 @@ func TestNewStore_EmptyDir(t *testing.T) {
 
 func TestNewStore_CreatesDirectoryRecursively(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "nested", "data")
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore with nested path: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestNewStore_SkipsNonUUIDDirectories(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, "not-a-uuid"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestNewStore_SkipsUUIDDirWithMissingTaskJSON(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, id.String()), 0755); err != nil {
 		t.Fatal(err)
 	}
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestNewStore_SkipsCorruptTaskJSON(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(taskDir, "task.json"), []byte("{invalid json}"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -92,10 +92,10 @@ func TestNewStore_SkipsCorruptTaskJSON(t *testing.T) {
 
 func TestNewStore_LoadsExistingTask(t *testing.T) {
 	dir := t.TempDir()
-	s1, _ := NewStore(dir)
+	s1, _ := NewFileStore(dir)
 	task, _ := s1.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "hello", Timeout: 10})
 
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("reload NewStore: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestOutputsDir(t *testing.T) {
 
 func TestPersistence_FullRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewStore(dir)
+	s, _ := NewFileStore(dir)
 
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "round trip prompt", Timeout: 15})
 	_ = s.UpdateTaskStatus(bg(), task.ID, "in_progress")
@@ -138,7 +138,7 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "in_progress")
 	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, "some output")
 
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("reload NewStore: %v", err)
 	}
@@ -174,11 +174,11 @@ func TestPersistence_FullRoundTrip(t *testing.T) {
 
 func TestPersistence_DeletedTaskGoneAfterReload(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewStore(dir)
+	s, _ := NewFileStore(dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "delete me", Timeout: 5})
 	_ = s.DeleteTask(bg(), task.ID, "")
 
-	s2, _ := NewStore(dir)
+	s2, _ := NewFileStore(dir)
 	if _, err := s2.GetTask(bg(), task.ID); err == nil {
 		t.Error("expected task to be absent after delete + reload")
 	}
@@ -514,7 +514,7 @@ func TestLoadAll_MigratesLegacyJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -598,7 +598,7 @@ func TestMutationMethods_StampSchemaVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -658,7 +658,7 @@ func TestSetTaskFailureCategory(t *testing.T) {
 	}
 
 	// Round-trip through JSON (simulate server restart): reload from disk.
-	s2, err := NewStore(s.dir)
+	s2, err := NewFileStore(s.dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -833,7 +833,7 @@ func TestStatusIndex_DeleteRemovesFromIndex(t *testing.T) {
 // disk correctly repopulates the secondary index.
 func TestStatusIndex_ReloadRebuildsIndex(t *testing.T) {
 	dir := t.TempDir()
-	s1, _ := NewStore(dir)
+	s1, _ := NewFileStore(dir)
 
 	t1, _ := s1.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "backlog task", Timeout: 10})
 	t2, _ := s1.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "in_progress task", Timeout: 10})
@@ -841,7 +841,7 @@ func TestStatusIndex_ReloadRebuildsIndex(t *testing.T) {
 	_ = t1
 
 	// Reload from disk.
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -914,7 +914,7 @@ func TestCountRegularInProgress(t *testing.T) {
 // backlog, in_progress, waiting, done, and failed statuses.
 func seedBenchmarkStore(b *testing.B, n int) *Store {
 	b.Helper()
-	s, err := NewStore(b.TempDir())
+	s, err := NewFileStore(b.TempDir())
 	if err != nil {
 		b.Fatalf("NewStore: %v", err)
 	}
@@ -1031,7 +1031,7 @@ func TestIsClosed_TrueAfterClose(t *testing.T) {
 // loaded at startup, and are lazily loaded on first access.
 func TestLazyEventLoading(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -1060,7 +1060,7 @@ func TestLazyEventLoading(t *testing.T) {
 	s.WaitCompaction()
 
 	// Re-open the store from the same directory.
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -1099,7 +1099,7 @@ func TestLazyEventLoading(t *testing.T) {
 // (non-terminal) tasks are loaded eagerly at startup.
 func TestLazyEventLoading_ActiveTasksEager(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -1122,7 +1122,7 @@ func TestLazyEventLoading_ActiveTasksEager(t *testing.T) {
 	}
 
 	// Re-open.
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}

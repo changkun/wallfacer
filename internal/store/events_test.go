@@ -175,11 +175,11 @@ func TestInsertEvent_NotFound(t *testing.T) {
 
 func TestInsertEvent_PersistsAndReloads(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewStore(dir)
+	s, _ := NewFileStore(dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, "hello world")
 
-	s2, _ := NewStore(dir)
+	s2, _ := NewFileStore(dir)
 	events, _ := s2.GetEvents(bg(), task.ID)
 	if len(events) != 1 {
 		t.Fatalf("expected 1 event after reload, got %d", len(events))
@@ -208,14 +208,14 @@ func TestGetEvents_ReturnsCopy(t *testing.T) {
 
 func TestGetEvents_SortedByIDAfterReload(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewStore(dir)
+	s, _ := NewFileStore(dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	for i := 0; i < 5; i++ {
 		_ = s.InsertEvent(bg(), task.ID, EventTypeOutput, i)
 	}
 
-	s2, _ := NewStore(dir)
+	s2, _ := NewFileStore(dir)
 	events, _ := s2.GetEvents(bg(), task.ID)
 	if len(events) != 5 {
 		t.Fatalf("expected 5 events, got %d", len(events))
@@ -229,13 +229,13 @@ func TestGetEvents_SortedByIDAfterReload(t *testing.T) {
 
 func TestLoadEvents_SkipsNonJSONFiles(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewStore(dir)
+	s, _ := NewFileStore(dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 
 	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
 	_ = os.WriteFile(filepath.Join(tracesDir, "README.txt"), []byte("not json"), 0644)
 
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore after injecting non-JSON: %v", err)
 	}
@@ -247,14 +247,14 @@ func TestLoadEvents_SkipsNonJSONFiles(t *testing.T) {
 
 func TestLoadEvents_SkipsCorruptTraceFiles(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := NewStore(dir)
+	s, _ := NewFileStore(dir)
 	task, _ := s.CreateTaskWithOptions(bg(), TaskCreateOptions{Prompt: "p", Timeout: 5})
 	_ = s.InsertEvent(bg(), task.ID, EventTypeStateChange, "good")
 
 	tracesDir := filepath.Join(dir, task.ID.String(), "traces")
 	_ = os.WriteFile(filepath.Join(tracesDir, "0001.json"), []byte("{bad json}"), 0644)
 
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore with corrupt trace: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestCompactTaskEvents_Basic(t *testing.T) {
 
 func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -332,7 +332,7 @@ func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
 		t.Fatalf("compactTaskEvents: %v", err)
 	}
 
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -355,7 +355,7 @@ func TestCompactTaskEvents_LoadEventsAfterCompaction(t *testing.T) {
 
 func TestCompactTaskEvents_HybridLoad(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -379,7 +379,7 @@ func TestCompactTaskEvents_HybridLoad(t *testing.T) {
 		}
 	}
 
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -711,7 +711,7 @@ func TestGetEventsPage_EmptyTask(t *testing.T) {
 // new-session events into the previous session's compact.ndjson.
 func TestCompactTaskEvents_SessionBoundary(t *testing.T) {
 	dir := t.TempDir()
-	s, err := NewStore(dir)
+	s, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -762,7 +762,7 @@ func TestCompactTaskEvents_SessionBoundary(t *testing.T) {
 	}
 
 	// A fresh store load must surface all 8 events in order.
-	s2, err := NewStore(dir)
+	s2, err := NewFileStore(dir)
 	if err != nil {
 		t.Fatalf("NewStore reload: %v", err)
 	}
@@ -780,41 +780,44 @@ func TestCompactTaskEvents_SessionBoundary(t *testing.T) {
 	}
 }
 
-// TestCurrentMaxEventSeq verifies that currentMaxEventSeq returns the highest
+// TestMaxEventSeqViaLoadEvents verifies that LoadEvents returns the highest
 // sequence number among numbered trace files in the traces directory.
-func TestCurrentMaxEventSeq(t *testing.T) {
+func TestMaxEventSeqViaLoadEvents(t *testing.T) {
 	s := newTestStore(t)
 	task, _ := s.CreateTaskWithOptions(context.Background(), TaskCreateOptions{Prompt: "p", Timeout: 5, Kind: TaskKindTask})
 
-	// No events yet: should return 0.
-	maxSeq, err := s.currentMaxEventSeq(task.ID)
+	// No events yet: LoadEvents returns maxSeq 0.
+	events, maxSeq, err := s.backend.LoadEvents(task.ID)
 	if err != nil {
-		t.Fatalf("currentMaxEventSeq (empty): %v", err)
+		t.Fatalf("LoadEvents (empty): %v", err)
 	}
-	if maxSeq != 0 {
-		t.Errorf("empty traces: got %d, want 0", maxSeq)
+	if maxSeq != 0 || len(events) != 0 {
+		t.Errorf("empty traces: got maxSeq=%d, len=%d; want 0, 0", maxSeq, len(events))
 	}
 
 	// Insert 7 events; highest seq should be 7.
 	insertOutputEvents(t, s, task.ID, 7)
-	maxSeq, err = s.currentMaxEventSeq(task.ID)
+	events, maxSeq, err = s.backend.LoadEvents(task.ID)
 	if err != nil {
-		t.Fatalf("currentMaxEventSeq (7 events): %v", err)
+		t.Fatalf("LoadEvents (7 events): %v", err)
 	}
 	if maxSeq != 7 {
-		t.Errorf("7 events: got %d, want 7", maxSeq)
+		t.Errorf("7 events: got maxSeq=%d, want 7", maxSeq)
+	}
+	if len(events) != 7 {
+		t.Errorf("7 events: got len=%d, want 7", len(events))
 	}
 
 	// After compacting events 1-4, numbered files 5-7 remain; max should still be 7.
 	if err := s.compactTaskEvents(task.ID, 4); err != nil {
 		t.Fatalf("compactTaskEvents(maxSeq=4): %v", err)
 	}
-	maxSeq, err = s.currentMaxEventSeq(task.ID)
+	_, maxSeq, err = s.backend.LoadEvents(task.ID)
 	if err != nil {
-		t.Fatalf("currentMaxEventSeq (after partial compact): %v", err)
+		t.Fatalf("LoadEvents (after partial compact): %v", err)
 	}
 	if maxSeq != 7 {
-		t.Errorf("after compact(4): got %d, want 7", maxSeq)
+		t.Errorf("after compact(4): got maxSeq=%d, want 7", maxSeq)
 	}
 }
 

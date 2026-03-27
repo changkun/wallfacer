@@ -340,7 +340,7 @@ func TestSubscribe_MultipleSubscribersAllReceive(t *testing.T) {
 
 func TestNewStatic_SnapshotReflectsInputs(t *testing.T) {
 	storeDir := t.TempDir()
-	s, err := store.NewStore(storeDir)
+	s, err := store.NewFileStore(storeDir)
 	if err != nil {
 		t.Fatalf("NewStore: %v", err)
 	}
@@ -435,7 +435,7 @@ func TestSwitch_FailedInstructionClosesCandidate(t *testing.T) {
 	// called on the candidate when the switch fails.
 	var candidateStore *store.Store
 	m.newStore = func(dir string) (*store.Store, error) {
-		s, err := store.NewStore(dir)
+		s, err := store.NewFileStore(dir)
 		if err == nil {
 			candidateStore = s
 		}

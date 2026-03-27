@@ -32,7 +32,7 @@ func TestRunnerCommand(t *testing.T) {
 // workspaces are configured.
 func TestWorkspacesEmpty(t *testing.T) {
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestWorkspacesEmpty(t *testing.T) {
 // space-separated workspace list.
 func TestWorkspacesMultiple(t *testing.T) {
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestWorkspacesMultiple(t *testing.T) {
 // spaces are preserved intact through the Runner (regression test for the
 // strings.Fields roundtrip bug).
 func TestWorkspacesMethod_PathsWithSpaces(t *testing.T) {
-	s, err := store.NewStore(t.TempDir())
+	s, err := store.NewFileStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,7 +588,7 @@ func TestBuildContainerArgsWithEnvFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -612,7 +612,7 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 	wt := t.TempDir()
 
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -653,7 +653,7 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 	wt := t.TempDir()
 
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -683,7 +683,7 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 	repo := setupTestRepo(t)
 
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1086,7 +1086,7 @@ func TestRunnerEnvFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1100,7 +1100,7 @@ func TestRunnerEnvFile(t *testing.T) {
 // TestRunnerWorktreesDir verifies that WorktreesDir() returns the configured worktrees directory.
 func TestRunnerWorktreesDir(t *testing.T) {
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1128,7 +1128,7 @@ func TestRunnerInstructionsPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1283,7 +1283,7 @@ func TestModelFromEnv_WithEnvFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1303,7 +1303,7 @@ func TestModelFromEnv_WithEnvFile(t *testing.T) {
 func TestModelFromEnv_BadEnvFile(t *testing.T) {
 	// Point to a non-existent file.
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1337,7 +1337,7 @@ func TestTitleModelFromEnv_WithTitleModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1360,7 +1360,7 @@ func TestTitleModelFromEnv_FallsBackToDefaultModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	dataDir := t.TempDir()
-	s, err := store.NewStore(dataDir)
+	s, err := store.NewFileStore(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}

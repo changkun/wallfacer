@@ -1,11 +1,9 @@
 package store
 
 import (
-	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,7 +12,6 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/ndjson"
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 	"github.com/google/uuid"
 )
@@ -49,6 +46,7 @@ func buildIndexEntry(t *Task, oversightRaw string) indexedTaskText {
 type Store struct {
 	mu      sync.RWMutex
 	dir     string
+	backend StorageBackend
 	closed  atomic.Bool
 	tasks   map[uuid.UUID]*Task
 	deleted map[uuid.UUID]*Task // tombstoned tasks (soft-deleted, not yet purged)
@@ -102,10 +100,11 @@ func readEnvInt(key string, defaultVal int) int {
 	return defaultVal
 }
 
-// NewStore loads (or creates) a Store rooted at dir.
-func NewStore(dir string) (*Store, error) {
+// NewStore creates a Store backed by the given StorageBackend, loading all
+// existing tasks from the backend into memory.
+func NewStore(backend StorageBackend) (*Store, error) {
 	s := &Store{
-		dir:                 dir,
+		backend:             backend,
 		tasks:               make(map[uuid.UUID]*Task),
 		deleted:             make(map[uuid.UUID]*Task),
 		events:              make(map[uuid.UUID][]TaskEvent),
@@ -120,10 +119,6 @@ func NewStore(dir string) (*Store, error) {
 		maxTurnOutputBytes:  readEnvInt("WALLFACER_MAX_TURN_OUTPUT_BYTES", constants.DefaultMaxTurnOutputBytes),
 	}
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("create data dir: %w", err)
-	}
-
 	if err := s.loadAll(); err != nil {
 		return nil, fmt.Errorf("load store: %w", err)
 	}
@@ -133,6 +128,21 @@ func NewStore(dir string) (*Store, error) {
 		s.addToStatusIndex(t.Status, id)
 	}
 
+	return s, nil
+}
+
+// NewFileStore creates a Store backed by a FilesystemBackend rooted at dir.
+// This is the standard constructor for local deployments.
+func NewFileStore(dir string) (*Store, error) {
+	backend, err := NewFilesystemBackend(dir)
+	if err != nil {
+		return nil, err
+	}
+	s, err := NewStore(backend)
+	if err != nil {
+		return nil, err
+	}
+	s.dir = dir
 	return s, nil
 }
 
@@ -183,90 +193,47 @@ func (s *Store) DataDir() string {
 	return s.dir
 }
 
-// loadAll scans the data directory and populates in-memory maps.
+// loadAll delegates to the backend to load all tasks, then populates
+// in-memory maps (tombstone detection, search index, event loading).
 func (s *Store) loadAll() error {
-	entries, err := os.ReadDir(s.dir)
+	allTasks, err := s.backend.LoadAll()
 	if err != nil {
 		return err
 	}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		id, err := uuid.Parse(entry.Name())
-		if err != nil {
-			continue // skip non-UUID directories
-		}
-
-		taskPath := filepath.Join(s.dir, entry.Name(), "task.json")
-		raw, err := os.ReadFile(taskPath)
-		if err != nil {
-			logger.Store.Warn("skipping task", "name", entry.Name(), "error", err)
-			continue
-		}
-
-		// Determine file mod time for defaulting missing timestamps.
-		var modTime time.Time
-		if fi, err := os.Stat(taskPath); err == nil {
-			modTime = fi.ModTime()
-		} else {
-			modTime = time.Now()
-		}
-
-		task, changed, err := migrateTaskJSON(raw, modTime)
-		if err != nil {
-			logger.Store.Warn("skipping task", "name", entry.Name(), "error", err)
-			continue
-		}
+	for _, task := range allTasks {
+		id := task.ID
 
 		// Check for a tombstone marker; if present this task is soft-deleted.
-		tombPath := filepath.Join(s.dir, entry.Name(), "tombstone.json")
-		if tombRaw, err := os.ReadFile(tombPath); err == nil {
+		if tombRaw, err := s.backend.ReadBlob(id, "tombstone.json"); err == nil {
 			var tomb Tombstone
 			if jsonUnmarshal(tombRaw, &tomb) == nil {
-				s.deleted[id] = &task
-				// Defer event loading for deleted tasks; load lazily on access.
+				s.deleted[id] = task
 				s.eventsLoaded[id] = false
 				continue
 			}
 		}
 
 		// Prune oversized slices on load so the in-memory task is bounded from
-		// the first read. This migrates existing large files written before the
-		// retention limits were introduced without requiring a schema bump.
-		s.pruneTaskPayload(&task)
+		// the first read.
+		s.pruneTaskPayload(task)
 
-		// Build search index entry before updating the in-memory maps.
-		// Oversight read errors are non-fatal; the task remains indexed without
-		// oversight text. Doing this before the map update keeps expensive disk
-		// I/O and strings.ToLower work outside any future lock scope.
+		// Build search index entry. Oversight read errors are non-fatal.
 		oversightRaw, oversightErr := s.LoadOversightText(id)
 		if oversightErr != nil && !os.IsNotExist(oversightErr) {
 			logger.Store.Warn("startup: failed to load oversight for search index",
 				"task", id, "error", oversightErr)
 		}
-		indexEntry := buildIndexEntry(&task, oversightRaw)
+		indexEntry := buildIndexEntry(task, oversightRaw)
 
-		s.tasks[id] = &task
-
-		// Persist the migrated task back to disk so future loads skip migration.
-		if changed {
-			if err := s.saveTask(id, &task); err != nil {
-				logger.Store.Warn("failed to persist migrated task", "name", entry.Name(), "error", err)
-			}
-		}
-
+		s.tasks[id] = task
 		s.searchIndex[id] = indexEntry
 
 		// Eagerly load events only for tasks that may still be active.
-		// Terminal-state tasks (done, failed, cancelled) and archived tasks
-		// have their events loaded lazily on first access, which dramatically
-		// speeds up startup for workspaces with large histories.
 		if isTerminalStatus(task.Status) || task.Archived {
 			s.eventsLoaded[id] = false
 		} else {
-			if err := s.loadEvents(id, entry.Name()); err != nil {
+			if err := s.loadEvents(id); err != nil {
 				return err
 			}
 			s.eventsLoaded[id] = true
@@ -314,73 +281,23 @@ func (s *Store) ensureEventsLoadedLocked(id uuid.UUID) {
 	if s.eventsLoaded[id] {
 		return
 	}
-	if err := s.loadEvents(id, id.String()); err != nil {
+	if err := s.loadEvents(id); err != nil {
 		logger.Store.Warn("lazy event load failed", "task", id, "error", err)
 	}
 	s.eventsLoaded[id] = true
 }
 
-// loadEvents reads trace files for a single task into memory.
-func (s *Store) loadEvents(id uuid.UUID, dirName string) error {
-	tracesDir := filepath.Join(s.dir, dirName, "traces")
-	traceEntries, err := os.ReadDir(tracesDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			s.nextSeq[id] = 1
-			return nil
-		}
-		return err
-	}
-
-	compactPath := filepath.Join(tracesDir, "compact.ndjson")
-	events, err := ndjson.ReadFile[TaskEvent](compactPath,
-		ndjson.WithBufferSize(64*1024, 1024*1024),
-		ndjson.WithOnError(func(lineNum int, err error) {
-			logger.Store.Warn("skipping compact trace line", "task", dirName, "trace", "compact.ndjson", "line", lineNum, "error", err)
-		}),
-	)
+// loadEvents delegates to the backend to read all events for a task.
+func (s *Store) loadEvents(id uuid.UUID) error {
+	events, maxSeq, err := s.backend.LoadEvents(id)
 	if err != nil {
 		return err
 	}
-
-	compactMaxID := int64(0)
-	for _, evt := range events {
-		if evt.ID > compactMaxID {
-			compactMaxID = evt.ID
-		}
-	}
-
-	maxSeq := int(compactMaxID)
-	for _, te := range traceEntries {
-		if te.IsDir() {
-			continue
-		}
-		traceFile, ok := parseNumberedTraceFile(te.Name())
-		if !ok || int64(traceFile.seq) <= compactMaxID {
-			continue
-		}
-		raw, err := os.ReadFile(filepath.Join(tracesDir, te.Name()))
-		if err != nil {
-			logger.Store.Warn("skipping trace", "task", dirName, "trace", te.Name(), "error", err)
-			continue
-		}
-		var evt TaskEvent
-		if err := jsonUnmarshal(raw, &evt); err != nil {
-			logger.Store.Warn("skipping trace", "task", dirName, "trace", te.Name(), "error", err)
-			continue
-		}
-		events = append(events, evt)
-		if traceFile.seq > maxSeq {
-			maxSeq = traceFile.seq
-		}
-	}
-
-	// Sort events by ID for consistent ordering.
-	slices.SortFunc(events, func(a, b TaskEvent) int {
-		return cmp.Compare(a.ID, b.ID)
-	})
-
 	s.events[id] = events
-	s.nextSeq[id] = maxSeq + 1
+	if maxSeq == 0 && len(events) == 0 {
+		s.nextSeq[id] = 1
+	} else {
+		s.nextSeq[id] = int(maxSeq) + 1
+	}
 	return nil
 }
