@@ -108,10 +108,12 @@ After all tasks are implemented:
 2. Run `make build` to confirm the binary builds cleanly.
 3. If any tests fail, diagnose and fix before finishing.
 
-## Step 5: Update the spec
+## Step 5: Update specs and epic index
 
 After all tasks are implemented (or partially implemented if focus instructions
-were given), update the spec file itself:
+were given), update the spec file, related specs, and the epic index:
+
+### 5a. Update the implemented spec
 
 1. **Set Status** — change the `**Status:**` line to `Done` (or `Partially done`
    if only focused items were implemented).
@@ -123,8 +125,30 @@ were given), update the spec file itself:
    - Why the deviation was necessary (codebase constraint, user decision,
      discovered during implementation, etc.)
    If the implementation matched the spec exactly, omit this section.
-3. Commit the spec update together with the implementation or as a separate
-   small commit (e.g., `specs: mark task-01-extract-interface as done`).
+
+### 5b. Update `specs/README.md`
+
+1. Read `specs/README.md`.
+2. Update the **Status** column for this spec's row (e.g., `Not started` →
+   `**Complete**`, or `**In progress** (N/M tasks done)`).
+3. If the implementation changes any dependency relationships, ordering
+   rationale, or milestone descriptions, update those too.
+
+### 5c. Update related specs
+
+Check whether the implementation affects other specs:
+
+1. If this spec introduces or changes interfaces that downstream specs reference
+   (e.g., new types, new API routes, renamed fields), update those specs to
+   reflect the actual implementation.
+2. If another spec's dependency on this one is now satisfied, note that in the
+   dependent spec (e.g., update a prerequisites section).
+3. Only make factual corrections — do not redesign other specs.
+
+### 5d. Commit
+
+Commit all spec and index updates together as a single small commit
+(e.g., `specs: mark 01-sandbox-backends as complete, update README`).
 
 ## Step 6: Summary
 
