@@ -297,29 +297,27 @@ function activeGroupBadgeHtml(group) {
 
   var parts = [];
   if (inProgress > 0) {
-    // Spinning circle icon for running tasks.
     parts.push(
-      '<span style="color:var(--blue-400, #60a5fa);font-size:10px;" title="' +
+      '<span class="badge badge-in_progress" style="font-size:9px;padding:1px 5px;" title="' +
         inProgress +
         ' running">' +
-        '<span class="spinner" style="width:8px;height:8px;border-width:1.5px;vertical-align:middle;"></span> ' +
+        '<span class="spinner" style="width:7px;height:7px;border-width:1.5px;vertical-align:middle;"></span> ' +
         inProgress +
         "</span>",
     );
   }
   if (waiting > 0) {
-    // Pause icon (double bar) for waiting tasks.
     parts.push(
-      '<span style="color:var(--amber-400, #fbbf24);font-size:10px;" title="' +
+      '<span class="badge badge-waiting" style="font-size:9px;padding:1px 5px;" title="' +
         waiting +
-        ' waiting">&#9646;&#9646; ' +
+        ' waiting">' +
         waiting +
         "</span>",
     );
   }
   return parts.length > 0
-    ? ' <span style="font-weight:400;margin-left:4px;">' +
-        parts.join(" ") +
+    ? ' <span style="font-weight:400;margin-left:4px;display:inline-flex;gap:3px;vertical-align:middle;">' +
+        parts.join("") +
         "</span>"
     : "";
 }
@@ -401,6 +399,26 @@ function renderWorkspaceGroups() {
     .join("");
 }
 
+// updateWorkspaceGroupBadges updates only the badge portions of existing
+// workspace group tabs without rebuilding the entire tab bar. Called from
+// render() on every task state change for live badge updates.
+function updateWorkspaceGroupBadges() {
+  var el = document.getElementById("workspace-group-tabs");
+  if (!el) return;
+  var badges = el.querySelectorAll(".wg-badge");
+  for (var i = 0; i < badges.length; i++) {
+    var key = badges[i].getAttribute("data-wg-key");
+    if (!key) continue;
+    // Find the matching group to recompute the badge.
+    for (var j = 0; j < workspaceGroups.length; j++) {
+      if ((workspaceGroups[j].key || "") === key) {
+        badges[i].innerHTML = activeGroupBadgeHtml(workspaceGroups[j]);
+        break;
+      }
+    }
+  }
+}
+
 var _tabOverflowObserver = null;
 
 function renderHeaderWorkspaceGroupTabs() {
@@ -423,12 +441,12 @@ function renderHeaderWorkspaceGroupTabs() {
     var cls = "workspace-group-tab";
     if (active) cls += " workspace-group-tab--active";
     if (switching) cls += " workspace-group-tab--switching";
-    var badge = activeGroupBadgeHtml(group);
+    var badgeHtml = '<span class="wg-badge" data-wg-key="' + escapeHtml(group.key || "") + '">' + activeGroupBadgeHtml(group) + "</span>";
     var label = switching
       ? workspaceSwitchSpinnerHtml() +
         " " +
         escapeHtml(workspaceGroupLabel(group))
-      : escapeHtml(workspaceGroupLabel(group)) + badge;
+      : escapeHtml(workspaceGroupLabel(group)) + badgeHtml;
     var title = paths.join("\n");
     var closeBtn = active
       ? ""

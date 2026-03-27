@@ -942,7 +942,7 @@ describe("activeGroupBadgeHtml", () => {
     return ctx;
   }
 
-  it("renders running count from live tasks for viewed group", () => {
+  it("renders running badge from live tasks for viewed group", () => {
     const ctx = setup({
       activeWs: ["/ws/a"],
       tasksJSON: [
@@ -955,11 +955,12 @@ describe("activeGroupBadgeHtml", () => {
       key: "abc",
       workspaces: ["/ws/a"],
     });
-    expect(html).toContain("2 running"); // title attr
+    expect(html).toContain("badge-in_progress");
     expect(html).toContain("spinner");
+    expect(html).toContain("2 running"); // title attr
   });
 
-  it("renders waiting count from live tasks for viewed group", () => {
+  it("renders waiting badge from live tasks for viewed group", () => {
     const ctx = setup({
       activeWs: ["/ws/a"],
       tasksJSON: [{ status: "waiting" }, { status: "waiting" }],
@@ -968,6 +969,7 @@ describe("activeGroupBadgeHtml", () => {
       key: "abc",
       workspaces: ["/ws/a"],
     });
+    expect(html).toContain("badge-waiting");
     expect(html).toContain("2 waiting"); // title attr
     expect(html).not.toContain("spinner");
   });
@@ -981,8 +983,8 @@ describe("activeGroupBadgeHtml", () => {
       key: "bg",
       workspaces: ["/ws/b"],
     });
+    expect(html).toContain("badge-in_progress");
     expect(html).toContain("5 running"); // title attr
-    expect(html).toContain("spinner");
   });
 
   it("returns empty string when both counts are 0", () => {
