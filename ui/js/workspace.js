@@ -116,9 +116,7 @@ async function fetchConfig() {
     workspaceGroups = Array.isArray(cfg.workspace_groups)
       ? cfg.workspace_groups.slice()
       : [];
-    activeGroups = Array.isArray(cfg.active_groups)
-      ? cfg.active_groups
-      : [];
+    activeGroups = Array.isArray(cfg.active_groups) ? cfg.active_groups : [];
     workspaceBrowserPath =
       cfg.workspace_browser_path ||
       activeWorkspaces[0] ||
@@ -441,7 +439,12 @@ function renderHeaderWorkspaceGroupTabs() {
     var cls = "workspace-group-tab";
     if (active) cls += " workspace-group-tab--active";
     if (switching) cls += " workspace-group-tab--switching";
-    var badgeHtml = '<span class="wg-badge" data-wg-key="' + escapeHtml(group.key || "") + '">' + activeGroupBadgeHtml(group) + "</span>";
+    var badgeHtml =
+      '<span class="wg-badge" data-wg-key="' +
+      escapeHtml(group.key || "") +
+      '">' +
+      activeGroupBadgeHtml(group) +
+      "</span>";
     var label = switching
       ? workspaceSwitchSpinnerHtml() +
         " " +

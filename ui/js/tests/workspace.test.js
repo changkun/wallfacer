@@ -926,7 +926,11 @@ describe("renameWorkspaceBrowserEntry", () => {
 // ---------------------------------------------------------------------------
 
 describe("activeGroupBadgeHtml", () => {
-  function setup({ activeGroupsJSON = [], tasksJSON = [], activeWs = [] } = {}) {
+  function setup({
+    activeGroupsJSON = [],
+    tasksJSON = [],
+    activeWs = [],
+  } = {}) {
     const el = { innerHTML: "" };
     const ctx = makeContext({
       elements: [["settings-workspace-groups", el]],
