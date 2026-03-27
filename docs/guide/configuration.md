@@ -198,7 +198,7 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 
 | Variable | Default | Description |
 |---|---|---|
-| `WALLFACER_WORKSPACES` | -- | Workspace paths (colon-separated on Unix, semicolon on Windows); alternative to CLI arguments |
+| `WALLFACER_WORKSPACES` | -- | Workspace paths (colon-separated on Unix, semicolon on Windows); alternative to CLI arguments. On Windows, host paths are automatically translated for container volume mounts (Docker Desktop uses `/c/` prefix, Podman Desktop uses `/mnt/c/`). |
 | `WALLFACER_ARCHIVED_TASKS_PER_PAGE` | `20` | Pagination size for archived tasks |
 | `WALLFACER_TOMBSTONE_RETENTION_DAYS` | `7` | Days to retain soft-deleted task data before permanent removal |
 

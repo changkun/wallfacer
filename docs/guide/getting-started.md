@@ -106,6 +106,8 @@ A pre-built `wallfacer-windows-amd64.exe` binary is available on the [releases p
 curl -fsSL https://raw.githubusercontent.com/changkun/wallfacer/main/install.sh | sh
 ```
 
+**Prerequisites:** Docker Desktop or Podman Desktop must be installed and running as the container runtime for task execution. Windows drive-letter paths (e.g., `C:\Users\alice\project`) are automatically translated for container volume mounts -- no manual path conversion is needed.
+
 ### WSL2
 
 Windows users can also run Wallfacer inside WSL2 with the same experience as native Linux:

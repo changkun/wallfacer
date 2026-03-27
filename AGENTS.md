@@ -76,7 +76,7 @@ Key server files:
 - `internal/logger/` — Structured logging utilities
 - `internal/metrics/` — Prometheus-compatible metrics
 - `internal/constants/` — Consolidated system parameters: timeouts, intervals, retry counts, size limits, concurrency caps, pagination defaults
-- `internal/sandbox/` — Sandbox type enumeration (Claude, Codex)
+- `internal/sandbox/` — Sandbox type enumeration (Claude, Codex); Windows host path translation for container mounts
 - `prompts/` — System prompt templates (title, commit, refinement, oversight, test, ideation, conflict, instructions) and workspace-level AGENTS.md management (`~/.wallfacer/instructions/`)
 - `ui/index.html` + `ui/js/` — Task board UI (vanilla JS + Tailwind CSS + Sortable.js)
 
