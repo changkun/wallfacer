@@ -7,13 +7,13 @@ manager (`internal/workspace/manager.go`) holds one `Snapshot` at a time
 containing a `Store`, workspace paths, instructions path, scoped data
 directory, and a deterministic key. When the user switches groups:
 
-- `Handler.UpdateWorkspaces()` (`workspace.go:76-88`) returns HTTP 409 if
+- `Handler.UpdateWorkspaces()` (`workspace.go:145-156`) returns HTTP 409 if
   any task is `InProgress` or `Committing`.
 - `Manager.Switch()` atomically swaps `m.current`, then **closes the
-  previous store** (`lines 249-253`). The store's `Close()` sets an atomic
+  previous store** (`lines 251-253`). The store's `Close()` sets an atomic
   `closed` flag but does not interrupt in-flight operations.
-- The subscription goroutines in both Runner (`runner.go:622+`) and
-  Handler (`handler.go:222-228`) call `applyWorkspaceSnapshot()` /
+- The subscription goroutines in both Runner and
+  Handler call `applyWorkspaceSnapshot()` /
   `applySnapshot()`, which replace `r.store` / `h.store` with the new
   store reference.
 
@@ -32,15 +32,15 @@ already use isolated worktrees. The only blocking issues are:
 
 1. `Switch()` closes the old store immediately.
 2. The 409 guard in `UpdateWorkspaces()` prevents switching entirely.
-3. Watchers subscribe to a single store's `SubscribeWake()` at startup and
+3. Watchers subscribe to a single store via `Wake: h.store` at startup and
    never re-subscribe when the store changes.
-4. `Runner.Run()` (`execute.go:134+`) reads `r.store` at entry and uses it
+4. `Runner.Run()` (`execute.go:135+`) reads `r.store` at entry and uses it
    throughout — if a workspace switch occurs mid-execution the reference
    becomes stale.
 
 ---
 
-## Current Architecture (as of 2026-03-22)
+## Current Architecture (as of 2026-03-27)
 
 ### Manager
 
@@ -73,7 +73,7 @@ swap under `mu.Lock` → publish to subscribers → close previous store.
 ### Runner
 
 ```go
-// internal/runner/runner.go (lines 303-346)
+// internal/runner/runner.go (lines 81-126)
 type Runner struct {
     store            *store.Store        // swapped via applyWorkspaceSnapshot
     storeMu          sync.RWMutex        // guards store + workspace fields
@@ -85,21 +85,21 @@ type Runner struct {
 
 - `RunBackground(taskID, prompt, sessionID, resumedFromWaiting)` — spawns
   `Run()` in a goroutine tracked by `backgroundWg`.
-- `Run()` reads `r.store` at entry (`execute.go:134+`) and uses it for
+- `Run()` reads `r.store` at entry (`execute.go:135+`) and uses it for
   all operations without re-checking.
-- `startBoardSubscriptionLoop()` (`runner.go:622+`) subscribes to both
+- `startBoardSubscriptionLoop()` subscribes to both
   workspace changes (via `wsMgr.Subscribe()`) and store changes (via
   `store.SubscribeWake()`). On workspace change it calls
   `applyWorkspaceSnapshot()` and re-subscribes to the new store.
-- `RunBackground()` (`runner.go:482-489`) spawns `Run()` without workspace
+- `RunBackground()` (`runner.go:261-265`) spawns `Run()` without workspace
   key capture or task count management.
-- `currentStore()` (`runner.go:596-600`) returns `r.store` under `storeMu`
+- `currentStore()` (`runner.go:388-392`) returns `r.store` under `storeMu`
   read lock but is rarely used — most code reads `r.store` directly.
 
 ### Handler
 
 ```go
-// internal/handler/handler.go (lines 98-173)
+// internal/handler/handler.go (lines 100-162)
 type Handler struct {
     snapshotMu sync.RWMutex
     store      *store.Store     // mirrors workspace.Manager.current.Store
@@ -111,18 +111,17 @@ type Handler struct {
 ```
 
 - `currentStore()` reads from `h.workspace.Store()` (manager) directly.
-- Six watchers (`tasks_autopilot.go`) each call `h.store.SubscribeWake()`
-  at startup and reference `h.store` directly (~1000+ total references
-  across the handler package).
+- Five watchers (`tasks_autopilot.go`) use `Wake: h.store` at startup and
+  reference `h.store` directly across the handler package.
 
 | Watcher               | Start Line | Subscription |
 |-----------------------|-----------|--------------|
-| StartAutoPromoter     | 116       | `h.store.SubscribeWake()` |
-| StartAutoRetrier      | 177       | `h.store.SubscribeWake()` |
-| StartWaitingSyncWatcher| 504      | `h.store.SubscribeWake()` |
-| StartAutoTester       | 662       | `h.store.SubscribeWake()` |
-| StartAutoSubmitter    | 878       | `h.store.SubscribeWake()` |
-| StartAutoRefiner      | 1079      | `h.store.SubscribeWake()` |
+| StartAutoPromoter     | 88        | `Wake: h.store` |
+| StartAutoRetrier      | 146       | `Wake: h.store` |
+| StartWaitingSyncWatcher| 478      | (no explicit Wake) |
+| StartAutoTester       | 627       | `Wake: h.store` |
+| StartAutoSubmitter    | 826       | `Wake: h.store` |
+| StartAutoRefiner      | 1013      | `Wake: h.store` |
 
 ### Store
 
@@ -241,8 +240,7 @@ handler= handler.NewHandler(s, runner, ...)
    ```
 
    This is the most invasive change in the runner — `Run()` and the
-   functions it calls (`executeTask`, `commitAndPush`, `runIdeationTask`,
-   etc.) reference `r.store` extensively. Options:
+   functions it calls reference `r.store` extensively. Options:
 
    **Option A — per-execution context struct**: Wrap `s *store.Store` in a
    struct passed through the call chain. Clean but touches many signatures.
@@ -299,11 +297,11 @@ lines refactored), `handler.go` (~30 lines), `config.go` (~10 lines)
 ### Changes
 
 1. **Remove 409 blocking check** in `UpdateWorkspaces()`
-   (`workspace.go:76-88`). This is the user-facing fix. Switches always
+   (`workspace.go:145-156`). This is the user-facing fix. Switches always
    succeed.
 
-2. **Watcher store subscription** — The six watchers currently subscribe to
-   `h.store.SubscribeWake()` at startup. When the viewed workspace changes,
+2. **Watcher store subscription** — The watchers currently use `Wake: h.store`
+   at startup. When the viewed workspace changes,
    these subscriptions become stale (they still listen to the old store).
 
    **Fix**: Each watcher re-subscribes when the workspace snapshot changes.
@@ -320,7 +318,7 @@ lines refactored), `handler.go` (~30 lines), `config.go` (~10 lines)
    }
    ```
 
-   Each `StartAuto*` method replaces its `h.store.SubscribeWake()` call
+   Each `StartAuto*` method replaces its `Wake: h.store` field
    with `h.storeWakeChan(ctx)`.
 
 3. **Multi-store watcher iteration** — Watchers that scan for eligible
@@ -367,14 +365,14 @@ lines refactored), `handler.go` (~30 lines), `config.go` (~10 lines)
 
 ### Already Done
 
-- `applyWorkspaceSelection()` (`workspace.js:856-880`) has no 409
+- `applyWorkspaceSelection()` has no 409
   handling — the generic catch block shows errors but does not check
-  status codes. No removal needed.
+  status codes. No frontend removal needed.
 
 ### Changes
 
-1. **Activity indicator** — `renderWorkspaceGroups()` (lines 272-330)
-   and `renderHeaderWorkspaceGroupTabs()` (lines 334-405): show a
+1. **Activity indicator** — `renderWorkspaceGroups()` (lines 273-336)
+   and `renderHeaderWorkspaceGroupTabs()` (lines 340-414): show a
    dot/badge next to groups that appear in `active_group_keys` from the
    config response.
 
