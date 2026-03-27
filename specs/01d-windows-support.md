@@ -1,6 +1,6 @@
 # Windows Support — Tier 2 (Native Windows Host)
 
-**Date:** 2026-03-22 (revised)
+**Date:** 2026-03-22 (revised 2026-03-27)
 
 ## Context
 
@@ -11,41 +11,18 @@ Podman Desktop (both use a WSL2 backend internally).
 
 For containerization backend analysis, see `specs/01c-native-sandbox-windows.md`.
 
-## What Tier 1 Already Covers
+## Already Implemented
 
-The following are **done** and do not need further work:
-
-- Cross-platform signal handling (`internal/cli/signal_windows.go`, `signal_unix.go`)
-- `execve` replacement on Windows (`internal/cli/execve_windows.go` uses `os/exec.Command`)
-- SELinux `:z` mount option stripped on non-Linux (`mountOpts()` in `internal/runner/container.go`)
-- Browser launch with WSL2 detection (`openBrowser()` in `internal/cli/cli.go`)
-- File manager launch via `explorer.exe` on Windows (`OpenFolder()` in `internal/handler/git.go`)
-- Container runtime detection with Windows paths (`detectContainerRuntime()` in `internal/cli/cli.go`)
-- `os.TempDir()` used throughout (no hardcoded `/tmp` in production code)
-- `sanitizeBasename()` handles both `\` and `/` separators (`internal/runner/util.go`)
-- `os.PathListSeparator` for `WALLFACER_WORKSPACES` parsing (`internal/envconfig/envconfig.go`)
-- Windows CI job: build + vet + unit tests (`.github/workflows/test.yml`, `test-windows` job)
-- WSL2 getting-started docs (`docs/guide/getting-started.md`)
-- Path separator notes in `docs/guide/configuration.md` and `docs/guide/workspaces.md`
+- Cross-platform signal handling, `execve` replacement, SELinux mount stripping,
+  browser/file-manager launch, container runtime detection, path separator handling
+- Windows CI: build + vet + unit tests (`.github/workflows/test.yml`)
+- Windows release binaries (`windows/amd64` in `.github/workflows/release-binary.yml`;
+  `install.sh` supports Windows)
+- Native Windows getting-started docs (`docs/guide/getting-started.md`)
 
 ## Remaining Work
 
-### A. Windows Release Binaries
-
-**Status:** Not started
-**Effort:** Small
-
-The release workflow (`.github/workflows/release-binary.yml`) builds for
-linux/{amd64,arm64} and darwin/{amd64,arm64}. No Windows target.
-
-**Changes:**
-- Add `windows/amd64` to the build matrix in `.github/workflows/release-binary.yml`
-  (current matrix: linux/{amd64,arm64}, darwin/{amd64,arm64})
-- Output as `wallfacer-windows-amd64.exe` (current naming: `wallfacer-{goos}-{goarch}`)
-- Add Windows install instructions (`install.sh` explicitly rejects Windows with
-  "Wallfacer supports Linux and macOS"); provide a direct download path
-
-### B. Container Path Translation
+### A. Container Path Translation
 
 **Status:** Not started
 **Effort:** Medium
@@ -57,28 +34,16 @@ layer must handle both.
 
 **Changes:**
 - Add a path translation helper called from `ContainerSpec.Build()` in
-  `internal/runner/container_spec.go` (bind mounts already use `--mount`
-  syntax at lines 99–114, so colon-in-path ambiguity is not an issue)
+  `internal/sandbox/spec.go` (bind mounts already use `--mount` syntax, so
+  colon-in-path ambiguity is not an issue)
 - Handle drive letter mapping (`C:` → `/c/` for Docker, `/mnt/c/` for Podman)
 - Detect which runtime is in use (the runtime path is available on `ContainerSpec`)
   and apply the correct mapping
 - Unit tests for edge cases (UNC paths, spaces, Unicode characters); existing
-  tests in `container_spec_test.go` already cover Unicode paths but only with
-  Unix-style paths
+  tests in `internal/sandbox/sandbox_test.go` already cover Unicode paths but
+  only with Unix-style paths
 
-### C. Build Documentation for Windows
-
-**Status:** Not started
-**Effort:** Small (documentation only)
-
-Windows users without `make` need build instructions. The getting-started guide
-(`docs/guide/getting-started.md`) currently has a "Windows (WSL2)" section but
-no native Windows section. Since the Go server already compiles on Windows,
-document `go build -o wallfacer.exe .` as the native Windows build path and add
-prerequisites (Go 1.25+, Docker Desktop or Podman Desktop). Defer PowerShell
-scripts or task runners until demand appears.
-
-### D. End-to-End Testing on Windows
+### B. End-to-End Testing on Windows
 
 **Status:** Not started
 **Effort:** Medium
@@ -95,7 +60,7 @@ in `tasks_autopilot_test.go` and browser launch tests in `main_test.go`.
 - CI job with Docker Desktop is complex and may not be worth the maintenance;
   keep Windows CI focused on compilation and unit tests
 
-### E. Windows Service Support
+### C. Windows Service Support
 
 **Status:** Deferred
 **Effort:** Large
@@ -109,13 +74,11 @@ scope until there is demonstrated demand.
 
 | Step | Item | Depends on | Effort |
 |------|------|------------|--------|
-| 1 | Release binaries (A) | — | Small |
-| 2 | Build docs (C) | — | Small |
-| 3 | Path translation (B) | — | Medium |
-| 4 | E2E testing (D) | B | Medium |
-| 5 | Windows service (E) | Demand | Large |
+| 1 | Path translation (A) | — | Medium |
+| 2 | E2E testing (B) | A | Medium |
+| 3 | Windows service (C) | Demand | Large |
 
-Steps 1–3 are independent. Step 4 requires B.
+Step 1 is the critical remaining work. Step 2 requires A.
 
 ## Risks
 
