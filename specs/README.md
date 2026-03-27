@@ -6,7 +6,7 @@ Implementation roadmap for wallfacer. Numbered specs (`01-`–`08-`) form the cl
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [epic-coordination.md](epic-coordination.md) | Not started | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking. Enables automated decomposition of all milestones below. |
+| [epic-coordination.md](epic-coordination.md) | Not started | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking. UX depends on M4 (file explorer) for spec browsing and chat-driven iteration. |
 
 ## Cloud/Platform Milestone Graph
 
@@ -25,6 +25,9 @@ M1: Sandbox Backend Interface ──┼──▶ M6: Cloud Backends ──▶ M8
                                 │     └─ Windows (Job Objects, Hyper-V)
                                 │
 M4: File Explorer (local) ──────┼────────────────────────▶│ (Phase 4)
+        │                       │
+        └──▶ Epic Coordination (spec management UX)
+                                │
 M5: Host Terminal (local) ──────┼────────────────────────▶│ (Phase 3)
 M7: Desktop App ────────────────┘ (ships after UX)
 ```
@@ -79,7 +82,7 @@ After M2 (store interfaces stable). Independent of M3. Can run in parallel with 
 
 ## Ordering Rationale
 
-- **Epic coordination is independent** of the cloud/platform milestones. Implement it whenever — before, during, or after M1–M8. Once in place, it can automate task decomposition for any milestone.
+- **Epic coordination depends on M4 (file explorer)** for its spec management UX. The backend pieces (planner task kind, board.json context, gate tasks) are independent, but the full UX — browsing specs, focused markdown view, chat-driven iteration — requires the file explorer panel. Implement M4 Phase 1 first, then epic coordination.
 - **M1–M2 first:** Pure refactors creating abstraction seams all downstream milestones plug into. Low risk, high leverage.
 - **M3 after M1:** Container reuse modifies the same `internal/runner/` files. Doing it right after M1 avoids revisiting them later.
 - **M2.5 after M2:** Multi-workspace groups modifies store lifecycle; wait for `StorageBackend` interfaces to stabilize. Can run in parallel with M3.

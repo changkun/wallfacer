@@ -873,3 +873,17 @@ Mitigation: cap same-epic sibling count. Include the N nearest (by dependency di
 ## Relationship to Other Specs
 
 This spec is independent of the cloud/platform milestones (M1–M8). It can be implemented against the current codebase at any time. Once in place, it enables automated task decomposition for any spec — create a planner task pointing at a spec file and the system handles the rest.
+
+### Dependency on File Explorer (M4)
+
+The epic coordination UX is fundamentally about **managing and iterating on spec markdown files**. The planning loop — draft, review, revise, approve — requires:
+
+1. **A file explorer** to browse and select spec files from the workspace
+2. **A focused markdown viewer/editor** for reading and updating specs inline
+3. **Chat-driven spec iteration** where a background agent updates spec files based on conversation, and the focused view reflects changes live
+
+This means the file explorer panel from [04-file-explorer.md](04-file-explorer.md) (at minimum Phase 1: read-only browsing + preview) is a prerequisite for the full epic coordination UX. The planner task creation dialog should allow selecting a spec file from the explorer rather than requiring the user to type a file path.
+
+The envisioned workflow: the user opens a spec in the focused markdown view, iterates on it via a chat stream (the planner agent proposes changes, the user reviews in the markdown view), then breaks the finalized spec into kanban tasks that appear in the existing board. The spec file itself gets updated as tasks execute and reveal new information — closing the loop between planning and execution.
+
+**Implementation order:** File explorer Phase 1 (read-only) → Epic coordination P1-P2 (planner + board context) → File explorer Phase 2 (editing) → Epic coordination UX (chat-driven spec iteration).

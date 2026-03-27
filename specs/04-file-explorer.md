@@ -261,6 +261,10 @@ This aligns with the `SandboxBackend` abstraction in [01-sandbox-backends.md](01
 
 **Recommendation:** Defer to Phase 4. Phases 1–3 deliver full value for the local and shared-volume deployments that exist today. The `WorkspaceFS` interface is a clean extension point that doesn't require rearchitecting the handlers — just swap the `os.*` calls for interface calls.
 
+### Relationship to Epic Coordination
+
+The file explorer is a prerequisite for the epic coordination UX ([epic-coordination.md](epic-coordination.md)). The planning workflow revolves around iterating on spec markdown files — browsing specs in the explorer, viewing them in a focused markdown panel, and updating them via a chat-driven agent. Phase 1 (read-only browsing + preview) unblocks the planner task creation UX; Phase 2 (editing) enables chat-driven spec iteration where the planner agent proposes spec changes and the user reviews them inline.
+
 ---
 
 ## File Inventory
