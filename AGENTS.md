@@ -72,7 +72,7 @@ Key server files:
 - `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TurnUsageRecord, TaskEvent, TaskOversight, TaskSummary, Tombstone, RetryRecord, FailureCategory), event sourcing, soft delete, search index; see `docs/internals/data-and-storage.md` for full data model documentation
 - `internal/envconfig/` — `.env` file parsing and atomic update; exposes `Parse` and `Update` for the handler and runner
 - `internal/gitutil/` — Git utility operations (ops, repo, status, stash, worktree)
-- `internal/workspace/` — Workspace manager; scopes data by workspace key; supports runtime workspace switching
+- `internal/workspace/` — Workspace manager; scopes data by workspace key; supports runtime workspace switching with concurrent multi-group execution (stores stay alive while tasks are running)
 - `internal/logger/` — Structured logging utilities
 - `internal/metrics/` — Prometheus-compatible metrics
 - `internal/constants/` — Consolidated system parameters: timeouts, intervals, retry counts, size limits, concurrency caps, pagination defaults
