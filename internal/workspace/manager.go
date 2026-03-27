@@ -75,9 +75,6 @@ func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager,
 	if _, err := m.Switch(initial); err != nil {
 		return nil, err
 	}
-	// Seed activeGroups with the initial snapshot.
-	snap := m.current
-	m.activeGroups[snap.Key] = &activeGroup{snapshot: snap}
 	return m, nil
 }
 
@@ -182,8 +179,11 @@ func (m *Manager) Unsubscribe(id int) {
 // new workspace set. It short-circuits when the normalized set matches the
 // current workspaces. All external side effects (store creation, instructions,
 // workspace groups, env file) are applied before the atomic swap; every
-// failure path closes the candidate store so it does not accumulate. After a
-// successful swap the previous store is closed outside the lock.
+// failure path closes the candidate store so it does not accumulate.
+//
+// Multi-store lifecycle: if the previous group has running tasks
+// (taskCount > 0), its store is kept open in activeGroups. If switching to a
+// key that is already in activeGroups, the existing store is reused.
 func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	validated, err := validate(paths)
 	if err != nil {
@@ -216,19 +216,33 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 		},
 	}
 
-	s, err := newStoreFn(swap.next.ScopedDataDir)
-	if err != nil {
-		return Snapshot{}, fmt.Errorf("open scoped store: %w", err)
+	// Check if a store for this key is already active (e.g. switching back
+	// to a group that still has running tasks). Reuse it instead of creating
+	// a new one.
+	var reusedStore bool
+	m.mu.RLock()
+	if ag, ok := m.activeGroups[key]; ok && ag.snapshot.Store != nil && !ag.snapshot.Store.IsClosed() {
+		swap.next.Store = ag.snapshot.Store
+		reusedStore = true
 	}
-	swap.next.Store = s
+	m.mu.RUnlock()
+
+	if !reusedStore {
+		s, err := newStoreFn(swap.next.ScopedDataDir)
+		if err != nil {
+			return Snapshot{}, fmt.Errorf("open scoped store: %w", err)
+		}
+		swap.next.Store = s
+	}
 
 	// cleanup is idempotent; called on every failure path to release the
-	// candidate store. Cleared to a no-op after the swap commits.
+	// candidate store. Cleared to a no-op after the swap commits. Reused
+	// stores must NOT be closed on failure — they belong to an active group.
 	closed := false
 	swap.cleanup = func() {
-		if !closed {
+		if !closed && !reusedStore {
 			closed = true
-			s.Close()
+			swap.next.Store.Close()
 		}
 	}
 
@@ -254,13 +268,38 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 		}
 	}
 
-	// All external effects succeeded: atomically install the new snapshot.
+	// All external effects succeeded: atomically install the new snapshot
+	// and update activeGroups.
 	m.mu.Lock()
 	m.nextGen++
 	swap.next.Generation = m.nextGen
 	swap.next.Workspaces = validated
 	swap.previous = m.current // capture actual current under write lock
 	m.current = swap.next
+
+	// Update activeGroups: add/update the new group's entry.
+	if ag, ok := m.activeGroups[key]; ok {
+		ag.snapshot = swap.next // update snapshot but preserve taskCount
+	} else {
+		m.activeGroups[key] = &activeGroup{snapshot: swap.next}
+	}
+
+	// Decide whether the previous group's store should be closed.
+	previousKey := swap.previous.Key
+	var closePrevious bool
+	var previousStore *store.Store
+	if previousKey != key {
+		if ag, ok := m.activeGroups[previousKey]; ok {
+			if ag.taskCount.Load() == 0 {
+				// No running tasks — close the store and remove from activeGroups.
+				closePrevious = true
+				previousStore = ag.snapshot.Store
+				delete(m.activeGroups, previousKey)
+			}
+			// else: tasks are running, keep the store alive in activeGroups.
+		}
+	}
+
 	snapshot := cloneSnapshot(m.current)
 	m.mu.Unlock()
 
@@ -268,10 +307,9 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	swap.cleanup = func() {} // no-op: next.Store is now owned by m.current
 	m.publish(snapshot)
 
-	// Close the previous store outside the lock so old scoped stores do not
-	// accumulate. Subscribers already received the new snapshot via publish.
-	if swap.previous.Store != nil {
-		swap.previous.Store.Close()
+	// Close the previous store outside the lock if it was marked for cleanup.
+	if closePrevious && previousStore != nil {
+		previousStore.Close()
 	}
 
 	return snapshot, nil

@@ -743,3 +743,143 @@ func TestDecrementUnknownKeyIsNoOp(t *testing.T) {
 	m.DecrementAndCleanup("nonexistent")
 	// Should not panic.
 }
+
+// --- Switch multi-store lifecycle tests ---
+
+// TestSwitchKeepsStoreForRunningTasks verifies that switching away from a group
+// with running tasks keeps its store open and in activeGroups.
+func TestSwitchKeepsStoreForRunningTasks(t *testing.T) {
+	m, _ := newTestManager(t)
+	wsA := t.TempDir()
+	snapA, err := m.Switch([]string{wsA})
+	if err != nil {
+		t.Fatalf("Switch to A: %v", err)
+	}
+	storeA := snapA.Store
+
+	// Simulate a running task in group A.
+	m.IncrementTaskCount(snapA.Key)
+
+	// Switch to group B.
+	wsB := t.TempDir()
+	_, err = m.Switch([]string{wsB})
+	if err != nil {
+		t.Fatalf("Switch to B: %v", err)
+	}
+
+	// Group A's store should remain open and in activeGroups.
+	if storeA.IsClosed() {
+		t.Fatal("expected group A store to remain open (has running tasks)")
+	}
+	if _, ok := m.StoreForKey(snapA.Key); !ok {
+		t.Fatal("expected group A to remain in activeGroups")
+	}
+
+	// Should have 2 active groups now.
+	if len(m.ActiveGroupKeys()) != 2 {
+		t.Fatalf("expected 2 active groups, got %d", len(m.ActiveGroupKeys()))
+	}
+}
+
+// TestSwitchClosesIdleGroup verifies that switching away from a group with
+// no running tasks closes its store and removes it from activeGroups.
+func TestSwitchClosesIdleGroup(t *testing.T) {
+	m, _ := newTestManager(t)
+	wsA := t.TempDir()
+	snapA, err := m.Switch([]string{wsA})
+	if err != nil {
+		t.Fatalf("Switch to A: %v", err)
+	}
+	storeA := snapA.Store
+
+	// No tasks running in group A (taskCount == 0).
+	// Switch to group B.
+	wsB := t.TempDir()
+	_, err = m.Switch([]string{wsB})
+	if err != nil {
+		t.Fatalf("Switch to B: %v", err)
+	}
+
+	// Group A's store should be closed and removed.
+	if !storeA.IsClosed() {
+		t.Fatal("expected group A store to be closed (no running tasks)")
+	}
+	if _, ok := m.StoreForKey(snapA.Key); ok {
+		t.Fatal("expected group A to be removed from activeGroups")
+	}
+
+	// Should have only 1 active group (B).
+	if len(m.ActiveGroupKeys()) != 1 {
+		t.Fatalf("expected 1 active group, got %d", len(m.ActiveGroupKeys()))
+	}
+}
+
+// TestSwitchBackReusesStore verifies that switching A→B→A reuses A's store
+// if it is still in activeGroups (because of running tasks).
+func TestSwitchBackReusesStore(t *testing.T) {
+	m, _ := newTestManager(t)
+	wsA := t.TempDir()
+	snapA, err := m.Switch([]string{wsA})
+	if err != nil {
+		t.Fatalf("Switch to A: %v", err)
+	}
+	storeA := snapA.Store
+
+	// Simulate a running task so A's store stays alive.
+	m.IncrementTaskCount(snapA.Key)
+
+	// Switch to B.
+	wsB := t.TempDir()
+	_, err = m.Switch([]string{wsB})
+	if err != nil {
+		t.Fatalf("Switch to B: %v", err)
+	}
+
+	// Switch back to A — should reuse the same store.
+	snapA2, err := m.Switch([]string{wsA})
+	if err != nil {
+		t.Fatalf("Switch back to A: %v", err)
+	}
+
+	if snapA2.Store != storeA {
+		t.Fatal("expected switch-back to reuse the same store pointer")
+	}
+	if storeA.IsClosed() {
+		t.Fatal("expected reused store to remain open")
+	}
+}
+
+// TestSwitchToSameGroupActiveGroupsUnchanged verifies that switching to the
+// same workspace set is a no-op and does not modify activeGroups.
+func TestSwitchToSameGroupActiveGroupsUnchanged(t *testing.T) {
+	configDir := t.TempDir()
+	dataDir := t.TempDir()
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, nil, 0o600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+	ws := t.TempDir()
+	m, err := NewManager(configDir, dataDir, envFile, []string{ws})
+	if err != nil {
+		t.Fatalf("NewManager: %v", err)
+	}
+
+	keysBefore := m.ActiveGroupKeys()
+	snapBefore := m.Snapshot()
+
+	// Switch to the same workspace — should be a no-op.
+	snapAfter, err := m.Switch([]string{ws})
+	if err != nil {
+		t.Fatalf("Switch (no-op): %v", err)
+	}
+	if snapAfter.Generation != snapBefore.Generation {
+		t.Errorf("generation changed on no-op switch: before=%d after=%d",
+			snapBefore.Generation, snapAfter.Generation)
+	}
+
+	keysAfter := m.ActiveGroupKeys()
+	if len(keysBefore) != len(keysAfter) {
+		t.Fatalf("activeGroups count changed on no-op switch: before=%d after=%d",
+			len(keysBefore), len(keysAfter))
+	}
+}

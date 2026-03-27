@@ -1,6 +1,6 @@
 # Task 2: Modify Switch() for Multi-Store Lifecycle
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** 1 (Multi-Store Manager)
 **Effort:** Medium
