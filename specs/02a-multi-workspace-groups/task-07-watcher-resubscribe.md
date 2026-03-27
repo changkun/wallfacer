@@ -1,6 +1,6 @@
 # Task 7: Watcher Store Re-subscription on Workspace Change
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** 3 (Handler Changes)
 **Effort:** Medium

@@ -90,7 +90,7 @@ var promoteMu sync.Mutex
 // within milliseconds of the due time rather than waiting up to 60 seconds.
 func (h *Handler) StartAutoPromoter(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
-		Wake:     h.store,
+		Wake:     h.newResubscribingWakeSource(),
 		Interval: constants.AutoPromoteInterval,
 		Action:   h.tryAutoPromote,
 		Shutdown: func() {
@@ -148,7 +148,7 @@ func (h *Handler) StartAutoRetrier(ctx context.Context) {
 		}
 	}
 	watcher.Start(ctx, watcher.Config{
-		Wake:   h.store,
+		Wake:   h.newResubscribingWakeSource(),
 		Init:   retryAll,
 		Action: retryAll,
 	})
@@ -629,7 +629,7 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 // the default branch tip.
 func (h *Handler) StartAutoTester(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
-		Wake:        h.store,
+		Wake:        h.newResubscribingWakeSource(),
 		Interval:    constants.AutoTestInterval,
 		SettleDelay: constants.WatcherSettleDelay,
 		Action:      h.tryAutoTest,
@@ -828,7 +828,7 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 // not behind the default branch tip, and have no unresolved worktree conflicts.
 func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
-		Wake:        h.store,
+		Wake:        h.newResubscribingWakeSource(),
 		Interval:    constants.AutoSubmitInterval,
 		SettleDelay: constants.WatcherSettleDelay,
 		Action:      h.tryAutoSubmit,
@@ -1015,7 +1015,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 // triggers the refinement agent for backlog tasks that have not yet been refined.
 func (h *Handler) StartAutoRefiner(ctx context.Context) {
 	watcher.Start(ctx, watcher.Config{
-		Wake:     h.store,
+		Wake:     h.newResubscribingWakeSource(),
 		Interval: constants.AutoRefineInterval,
 		Action:   h.tryAutoRefine,
 	})
