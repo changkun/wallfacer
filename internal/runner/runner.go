@@ -80,6 +80,8 @@ type RunnerConfig struct {
 type Runner struct {
 	store                  *store.Store
 	storeMu                sync.RWMutex
+	wsKey                  string   // workspace key of the currently viewed group (guarded by storeMu)
+	taskWSKey              sync.Map // uuid.UUID → string: maps task IDs to their workspace group key
 	command                string
 	sandboxImage           string
 	envFile                string
@@ -388,6 +390,7 @@ func (r *Runner) WorkspaceManager() *workspace.Manager {
 func (r *Runner) applyWorkspaceSnapshot(s workspace.Snapshot) {
 	r.storeMu.Lock()
 	r.store = s.Store
+	r.wsKey = s.Key
 	r.workspaces = s.Workspaces
 	r.instructionsPath = s.InstructionsPath
 	r.storeMu.Unlock()
@@ -399,6 +402,27 @@ func (r *Runner) currentStore() *store.Store {
 	r.storeMu.RLock()
 	defer r.storeMu.RUnlock()
 	return r.store
+}
+
+// currentWSKey returns the workspace key of the currently viewed group.
+func (r *Runner) currentWSKey() string {
+	r.storeMu.RLock()
+	defer r.storeMu.RUnlock()
+	return r.wsKey
+}
+
+// taskStore returns the store for the workspace group that owns the given task.
+// It first checks the task-to-group mapping, then falls back to the currently
+// viewed store if the mapping is missing or the group is no longer active.
+func (r *Runner) taskStore(taskID uuid.UUID) *store.Store {
+	if key, ok := r.taskWSKey.Load(taskID); ok {
+		if r.workspaceManager != nil {
+			if s, ok := r.workspaceManager.StoreForKey(key.(string)); ok {
+				return s
+			}
+		}
+	}
+	return r.currentStore()
 }
 
 // startBoardSubscriptionLoop spawns a goroutine that listens for store task

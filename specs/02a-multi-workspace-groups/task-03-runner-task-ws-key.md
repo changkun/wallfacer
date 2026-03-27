@@ -1,6 +1,6 @@
 # Task 3: Track Task-to-Group Mapping in Runner
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** 2 (Runner Multi-Store Awareness)
 **Effort:** Small
