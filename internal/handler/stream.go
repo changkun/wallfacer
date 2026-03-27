@@ -105,6 +105,10 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 		if _, err := fmt.Fprintf(w, "id: %d\nevent: snapshot\ndata: %s\n\n", currentSeq, snapshot); err != nil {
 			return
 		}
+		// Include cross-group task counts in the initial payload.
+		if agData, err := json.Marshal(h.activeGroupInfos(r.Context())); err == nil {
+			fmt.Fprintf(w, "event: active_groups\ndata: %s\n\n", agData)
+		}
 		flusher.Flush()
 	}
 
@@ -130,6 +134,13 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 			eventType := deltaEventType(delta.Value)
 			if _, err := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", delta.Seq, eventType, payload); err != nil {
 				return
+			}
+			// Emit cross-group task counts so the frontend can update
+			// workspace tab badges for background groups in real time.
+			if agData, err := json.Marshal(h.activeGroupInfos(r.Context())); err == nil {
+				if _, err := fmt.Fprintf(w, "event: active_groups\ndata: %s\n\n", agData); err != nil {
+					return
+				}
 			}
 			flusher.Flush()
 		case <-keepalive.C:

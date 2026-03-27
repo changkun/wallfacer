@@ -347,6 +347,16 @@ function startTasksStream() {
     _sseRelay("tasks-deleted", data, e.lastEventId);
   });
 
+  tasksSource.addEventListener("active_groups", function (e) {
+    try {
+      activeGroups = JSON.parse(e.data);
+      if (typeof updateWorkspaceGroupBadges === "function")
+        updateWorkspaceGroupBadges();
+    } catch (err) {
+      console.error("active_groups SSE parse error:", err);
+    }
+  });
+
   tasksSource.addEventListener("heartbeat", function () {
     _sseConnState = "ok";
     _lastSSEEventTime = Date.now();
