@@ -264,34 +264,64 @@ function workspaceGroupsEqual(a, b) {
 
 // activeGroupBadgeHtml returns HTML for task count badges if the given
 // workspace group has in-progress or waiting tasks. Returns "" when both are 0.
+// For the viewed group, counts are computed from the live SSE-synced tasks
+// array so badges update in real time. For background groups, server-side
+// activeGroups data is used.
 function activeGroupBadgeHtml(group) {
   var key = group.key || "";
   if (!key) return "";
-  for (var i = 0; i < activeGroups.length; i++) {
-    if (activeGroups[i].key !== key) continue;
-    var info = activeGroups[i];
-    var parts = [];
-    if (info.in_progress > 0) {
-      parts.push(
-        '<span class="text-xs" style="color:var(--blue-400, #60a5fa);">' +
-          info.in_progress +
-          " running</span>",
-      );
+
+  var inProgress = 0;
+  var waiting = 0;
+
+  // Check if this is the currently viewed group.
+  var paths = Array.isArray(group.workspaces) ? group.workspaces : [];
+  var isViewed = workspaceGroupsEqual(paths, activeWorkspaces);
+
+  if (isViewed && typeof tasks !== "undefined") {
+    // Compute from live task list for instant updates.
+    for (var j = 0; j < tasks.length; j++) {
+      var s = tasks[j].status;
+      if (s === "in_progress" || s === "committing") inProgress++;
+      else if (s === "waiting") waiting++;
     }
-    if (info.waiting > 0) {
-      parts.push(
-        '<span class="text-xs" style="color:var(--amber-400, #fbbf24);">' +
-          info.waiting +
-          " waiting</span>",
-      );
+  } else {
+    // Use server-side data for background groups.
+    for (var i = 0; i < activeGroups.length; i++) {
+      if (activeGroups[i].key !== key) continue;
+      inProgress = activeGroups[i].in_progress || 0;
+      waiting = activeGroups[i].waiting || 0;
+      break;
     }
-    return parts.length > 0
-      ? ' <span style="font-weight:400;margin-left:4px;">' +
-          parts.join(" ") +
-          "</span>"
-      : "";
   }
-  return "";
+
+  var parts = [];
+  if (inProgress > 0) {
+    // Spinning circle icon for running tasks.
+    parts.push(
+      '<span style="color:var(--blue-400, #60a5fa);font-size:10px;" title="' +
+        inProgress +
+        ' running">' +
+        '<span class="spinner" style="width:8px;height:8px;border-width:1.5px;vertical-align:middle;"></span> ' +
+        inProgress +
+        "</span>",
+    );
+  }
+  if (waiting > 0) {
+    // Pause icon (double bar) for waiting tasks.
+    parts.push(
+      '<span style="color:var(--amber-400, #fbbf24);font-size:10px;" title="' +
+        waiting +
+        ' waiting">&#9646;&#9646; ' +
+        waiting +
+        "</span>",
+    );
+  }
+  return parts.length > 0
+    ? ' <span style="font-weight:400;margin-left:4px;">' +
+        parts.join(" ") +
+        "</span>"
+    : "";
 }
 
 function workspaceSwitchSpinnerHtml() {

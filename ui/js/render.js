@@ -572,6 +572,10 @@ function render() {
   // Sync ideation spinner from live task list (no polling needed).
   if (typeof updateIdeationFromTasks === "function")
     updateIdeationFromTasks(tasks);
+  // Re-render workspace group tab badges so running/waiting counts
+  // update in real time as tasks change status via SSE.
+  if (typeof renderHeaderWorkspaceGroupTabs === "function")
+    renderHeaderWorkspaceGroupTabs();
   updateBacklogSortButton();
 
   const columns = {
