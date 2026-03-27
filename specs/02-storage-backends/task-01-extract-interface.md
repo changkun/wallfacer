@@ -1,6 +1,6 @@
 # Task 1: Extract StorageBackend Interface
 
-**Status:** Not started
+**Status:** Done
 **Depends on:** None
 **Effort:** Medium
 
