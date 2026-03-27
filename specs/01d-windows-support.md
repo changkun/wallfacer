@@ -60,14 +60,6 @@ in `tasks_autopilot_test.go` and browser launch tests in `main_test.go`.
 - CI job with Docker Desktop is complex and may not be worth the maintenance;
   keep Windows CI focused on compilation and unit tests
 
-### C. Windows Service Support
-
-**Status:** Deferred
-**Effort:** Large
-
-Register Wallfacer as a Windows Service for long-running deployments. Out of
-scope until there is demonstrated demand.
-
 ---
 
 ## Implementation Order
@@ -76,7 +68,6 @@ scope until there is demonstrated demand.
 |------|------|------------|--------|
 | 1 | Path translation (A) | — | Medium |
 | 2 | E2E testing (B) | A | Medium |
-| 3 | Windows service (C) | Demand | Large |
 
 Step 1 is the critical remaining work. Step 2 requires A.
 
