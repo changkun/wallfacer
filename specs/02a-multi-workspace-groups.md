@@ -7,10 +7,10 @@ manager (`internal/workspace/manager.go`) holds one `Snapshot` at a time
 containing a `Store`, workspace paths, instructions path, scoped data
 directory, and a deterministic key. When the user switches groups:
 
-- `Handler.UpdateWorkspaces()` (`workspace.go:145-156`) returns HTTP 409 if
+- `Handler.UpdateWorkspaces()` (`workspace.go:147-158`) returns HTTP 409 if
   any task is `InProgress` or `Committing`.
 - `Manager.Switch()` atomically swaps `m.current`, then **closes the
-  previous store** (`lines 251-253`). The store's `Close()` sets an atomic
+  previous store** (`lines 256-257`). The store's `Close()` sets an atomic
   `closed` flag but does not interrupt in-flight operations.
 - The subscription goroutines in both Runner and
   Handler call `applyWorkspaceSnapshot()` /
@@ -73,7 +73,7 @@ swap under `mu.Lock` → publish to subscribers → close previous store.
 ### Runner
 
 ```go
-// internal/runner/runner.go (lines 81-126)
+// internal/runner/runner.go (lines 80-125)
 type Runner struct {
     store            *store.Store        // swapped via applyWorkspaceSnapshot
     storeMu          sync.RWMutex        // guards store + workspace fields
@@ -91,15 +91,15 @@ type Runner struct {
   workspace changes (via `wsMgr.Subscribe()`) and store changes (via
   `store.SubscribeWake()`). On workspace change it calls
   `applyWorkspaceSnapshot()` and re-subscribes to the new store.
-- `RunBackground()` (`runner.go:261-265`) spawns `Run()` without workspace
+- `RunBackground()` (`runner.go:266-270`) spawns `Run()` without workspace
   key capture or task count management.
-- `currentStore()` (`runner.go:388-392`) returns `r.store` under `storeMu`
+- `currentStore()` (`runner.go:398-402`) returns `r.store` under `storeMu`
   read lock but is rarely used — most code reads `r.store` directly.
 
 ### Handler
 
 ```go
-// internal/handler/handler.go (lines 100-162)
+// internal/handler/handler.go (lines 107-169)
 type Handler struct {
     snapshotMu sync.RWMutex
     store      *store.Store     // mirrors workspace.Manager.current.Store
@@ -116,12 +116,12 @@ type Handler struct {
 
 | Watcher               | Start Line | Subscription |
 |-----------------------|-----------|--------------|
-| StartAutoPromoter     | 88        | `Wake: h.store` |
-| StartAutoRetrier      | 146       | `Wake: h.store` |
-| StartWaitingSyncWatcher| 478      | (no explicit Wake) |
-| StartAutoTester       | 627       | `Wake: h.store` |
-| StartAutoSubmitter    | 826       | `Wake: h.store` |
-| StartAutoRefiner      | 1013      | `Wake: h.store` |
+| StartAutoPromoter     | 91        | `Wake: h.store` |
+| StartAutoRetrier      | 143       | `Wake: h.store` |
+| StartWaitingSyncWatcher| 481      | (no explicit Wake) |
+| StartAutoTester       | 630       | `Wake: h.store` |
+| StartAutoSubmitter    | 829       | `Wake: h.store` |
+| StartAutoRefiner      | 1016      | `Wake: h.store` |
 
 ### Store
 
@@ -297,7 +297,7 @@ lines refactored), `handler.go` (~30 lines), `config.go` (~10 lines)
 ### Changes
 
 1. **Remove 409 blocking check** in `UpdateWorkspaces()`
-   (`workspace.go:145-156`). This is the user-facing fix. Switches always
+   (`workspace.go:147-158`). This is the user-facing fix. Switches always
    succeed.
 
 2. **Watcher store subscription** — The watchers currently use `Wake: h.store`
