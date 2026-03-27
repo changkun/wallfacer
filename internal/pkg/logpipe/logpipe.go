@@ -156,8 +156,10 @@ func (p *Pipe) Done() <-chan struct{} {
 }
 
 // Close terminates the pipe reader, causing the scanner goroutine to exit.
-// Safe to call multiple times. Note: must not be called on pipes created via
-// StartReader, which sets pr to nil since the caller owns the reader.
+// Safe to call multiple times and on pipes created via StartReader (no-op
+// in that case since the caller owns the reader).
 func (p *Pipe) Close() {
-	_ = p.pr.Close()
+	if p.pr != nil {
+		_ = p.pr.Close()
+	}
 }

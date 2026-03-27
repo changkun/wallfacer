@@ -1,6 +1,7 @@
 package logpipe
 
 import (
+	"io"
 	"os/exec"
 	"strings"
 	"testing"
@@ -151,6 +152,23 @@ func TestPipe_WithBufferSize(t *testing.T) {
 	if len(lines) == 0 || lines[0] != "buffered" {
 		t.Fatalf("expected [buffered], got %v", lines)
 	}
+}
+
+// TestStartReader_CloseDoesNotPanic verifies that calling Close on a pipe
+// created via StartReader does not panic. This is a regression test for a bug
+// where Close() unconditionally called p.pr.Close() but StartReader sets pr
+// to nil, causing a nil pointer dereference.
+func TestStartReader_CloseDoesNotPanic(t *testing.T) {
+	r := strings.NewReader("line1\nline2\n")
+	p := StartReader(io.NopCloser(r))
+
+	// Drain lines so the scanner goroutine exits.
+	for range p.Lines() {
+	}
+	<-p.Done()
+
+	// This must not panic.
+	p.Close()
 }
 
 // TestPipe_StartError verifies that Start returns an error when the
