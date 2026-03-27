@@ -1,6 +1,6 @@
 # M2: Pluggable Storage Backends
 
-**Status:** Not started | **Date:** 2026-03-23
+**Status:** Enablers complete (tasks 1–3); cloud backends deferred | **Date:** 2026-03-23
 
 ## Problem
 
@@ -284,11 +284,20 @@ WALLFACER_BLOB_REGION=us-east-1
 
 Detailed task breakdowns are in [`02-storage-backends/`](02-storage-backends/).
 
+### Enablers (complete)
+
+| # | Task | Status | Effort |
+|---|------|--------|--------|
+| 1 | [Extract `StorageBackend` interface](02-storage-backends/task-01-extract-interface.md) | **Done** | Medium |
+| 2 | [Implement `FilesystemBackend`](02-storage-backends/task-02-filesystem-backend.md) | **Done** | Large |
+| 3 | [Replace `OutputsDir` with backend methods](02-storage-backends/task-03-replace-outputsdir.md) | **Done** | Small |
+
+### Cloud backends (deferred)
+
+These depend on a concrete cloud deployment target. Implement when needed.
+
 | # | Task | Depends on | Effort |
 |---|------|-----------|--------|
-| 1 | [Extract `StorageBackend` interface](02-storage-backends/task-01-extract-interface.md) | — | Medium |
-| 2 | [Implement `FilesystemBackend`](02-storage-backends/task-02-filesystem-backend.md) | 1 | Large |
-| 3 | [Replace `OutputsDir` with backend methods](02-storage-backends/task-03-replace-outputsdir.md) | 2 | Small |
 | 4 | [Implement `DatabaseBackend` (PostgreSQL)](02-storage-backends/task-04-database-backend.md) | 2 | Large |
 | 5 | [Implement `ObjectStorageBackend` (S3/GCS)](02-storage-backends/task-05-object-storage-backend.md) | 2 | Medium |
 | 6 | [Implement `CompositeBackend`](02-storage-backends/task-06-composite-backend.md) | 4, 5 | Small |
