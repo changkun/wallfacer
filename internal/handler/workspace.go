@@ -12,6 +12,8 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 )
 
+// workspaceBrowseEntry describes a single directory entry returned by
+// BrowseWorkspaces, including whether it is a git repository.
 type workspaceBrowseEntry struct {
 	Name      string `json:"name"`
 	Path      string `json:"path"`

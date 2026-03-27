@@ -42,6 +42,8 @@ func modulateExploitRatio(baseExploit float64, round int) float64 {
 	return max(0, min(1, effective))
 }
 
+// ideationContext aggregates workspace-derived signals used to enrich the
+// brainstorm prompt with objective urgency data (failures, churn, TODOs).
 type ideationContext struct {
 	FailureSignals     []string
 	ChurnSignals       []prompts.WorkspaceSignal
@@ -618,6 +620,9 @@ func (r *Runner) collectIdeationContextFromTasks(ctx context.Context, tasks []st
 	}
 }
 
+// collectIdeationFailureSignals extracts human-readable failure summaries from
+// tasks that are either in failed status or have a last_test_result of "fail".
+// Results are deduplicated by title and capped at MaxIdeationIdeas.
 func collectIdeationFailureSignals(tasks []store.Task) []string {
 	type failureSignal struct {
 		label string

@@ -191,6 +191,8 @@ func TestBuildTaskPathExpr_Substitution(t *testing.T) {
 	}
 }
 
+// TestRoute_FullPattern verifies that FullPattern concatenates Method and Pattern
+// with a space separator, matching the Go 1.22+ ServeMux pattern syntax.
 func TestRoute_FullPattern(t *testing.T) {
 	r := Route{Method: "GET", Pattern: "/api/tasks"}
 	got := r.FullPattern()
@@ -200,6 +202,8 @@ func TestRoute_FullPattern(t *testing.T) {
 	}
 }
 
+// TestRoute_FullPattern_AllRoutes ensures every route in the canonical Routes
+// slice produces a non-empty FullPattern that starts with its HTTP method.
 func TestRoute_FullPattern_AllRoutes(t *testing.T) {
 	for _, r := range Routes {
 		fp := r.FullPattern()

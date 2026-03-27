@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+// TestIsWSL validates WSL detection via WSL_DISTRO_NAME and WSL_INTEROP
+// environment variables, covering all three cases: neither set, only distro
+// set, and only interop set.
 func TestIsWSL(t *testing.T) {
 	// When neither WSL env var is set, isWSL should return false.
 	t.Setenv("WSL_DISTRO_NAME", "")
@@ -27,6 +30,8 @@ func TestIsWSL(t *testing.T) {
 	}
 }
 
+// TestDetectContainerRuntimeOverride verifies that CONTAINER_CMD env override
+// takes precedence over all other detection paths.
 func TestDetectContainerRuntimeOverride(t *testing.T) {
 	t.Setenv("CONTAINER_CMD", "/custom/runtime")
 	got := detectContainerRuntime()
@@ -35,6 +40,8 @@ func TestDetectContainerRuntimeOverride(t *testing.T) {
 	}
 }
 
+// TestDetectContainerRuntimeFallback verifies the platform-specific default
+// when no override is set and nothing is found on PATH.
 func TestDetectContainerRuntimeFallback(t *testing.T) {
 	// Clear all overrides; PATH won't have podman/docker in CI typically.
 	t.Setenv("CONTAINER_CMD", "")

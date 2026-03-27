@@ -8,7 +8,8 @@ import (
 	"time"
 )
 
-// mockWakeSource is a test WakeSource backed by a channel.
+// mockWakeSource is a test WakeSource backed by a buffered channel.
+// It tracks subscribe/unsubscribe call counts for assertions.
 type mockWakeSource struct {
 	ch           chan struct{}
 	mu           sync.Mutex
@@ -40,6 +41,8 @@ func (m *mockWakeSource) wake() {
 	}
 }
 
+// TestWatcher_WakeOnly verifies that a wake signal triggers the Action callback
+// and that cancellation causes the watcher to unsubscribe.
 func TestWatcher_WakeOnly(t *testing.T) {
 	ws := newMockWakeSource()
 	var calls atomic.Int32
@@ -65,6 +68,8 @@ func TestWatcher_WakeOnly(t *testing.T) {
 	})
 }
 
+// TestWatcher_TickerOnly verifies that the periodic ticker fires the Action
+// callback without any wake source configured.
 func TestWatcher_TickerOnly(t *testing.T) {
 	var calls atomic.Int32
 
@@ -82,6 +87,8 @@ func TestWatcher_TickerOnly(t *testing.T) {
 	cancel()
 }
 
+// TestWatcher_WakeAndTicker verifies that both wake signals and ticker ticks
+// independently trigger the Action callback.
 func TestWatcher_WakeAndTicker(t *testing.T) {
 	ws := newMockWakeSource()
 	var calls atomic.Int32
@@ -106,6 +113,8 @@ func TestWatcher_WakeAndTicker(t *testing.T) {
 	cancel()
 }
 
+// TestWatcher_SettleDelay verifies that the Action is not called until the
+// settle delay has elapsed after a wake signal.
 func TestWatcher_SettleDelay(t *testing.T) {
 	ws := newMockWakeSource()
 	var actionTime atomic.Int64
@@ -132,6 +141,8 @@ func TestWatcher_SettleDelay(t *testing.T) {
 	cancel()
 }
 
+// TestWatcher_Init verifies that the Init callback runs before any Action
+// callback fires.
 func TestWatcher_Init(t *testing.T) {
 	var initCalled atomic.Bool
 	var actionCalled atomic.Bool
@@ -159,6 +170,8 @@ func TestWatcher_Init(t *testing.T) {
 	cancel()
 }
 
+// TestWatcher_Shutdown verifies that the Shutdown callback is invoked when the
+// context is cancelled.
 func TestWatcher_Shutdown(t *testing.T) {
 	var shutdownCalled atomic.Bool
 
@@ -176,6 +189,8 @@ func TestWatcher_Shutdown(t *testing.T) {
 	waitFor(t, shutdownCalled.Load)
 }
 
+// TestWatcher_ContextCancel verifies that starting with an already-cancelled
+// context exits promptly and unsubscribes from the wake source.
 func TestWatcher_ContextCancel(t *testing.T) {
 	ws := newMockWakeSource()
 
@@ -196,6 +211,8 @@ func TestWatcher_ContextCancel(t *testing.T) {
 	})
 }
 
+// TestWatcher_NilWakeSource verifies that a nil Wake source (ticker-only mode)
+// works correctly without panicking.
 func TestWatcher_NilWakeSource(t *testing.T) {
 	var calls atomic.Int32
 
@@ -213,6 +230,9 @@ func TestWatcher_NilWakeSource(t *testing.T) {
 	cancel()
 }
 
+// TestWatcher_SettleDelayCancelledDuringSettle verifies that cancelling the
+// context during the settle delay prevents the Action from firing and triggers
+// the Shutdown callback instead.
 func TestWatcher_SettleDelayCancelledDuringSettle(t *testing.T) {
 	ws := newMockWakeSource()
 	var actionCalled atomic.Bool

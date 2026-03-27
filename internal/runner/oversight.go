@@ -434,6 +434,8 @@ func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 	return act
 }
 
+// parseContentBlocks decodes a JSON content field that may be either an array
+// of content blocks or a single content block object.
 func parseContentBlocks(raw json.RawMessage) []ndjsonContent {
 	if len(raw) == 0 {
 		return nil
@@ -449,6 +451,8 @@ func parseContentBlocks(raw json.RawMessage) []ndjsonContent {
 	return nil
 }
 
+// canonicalizeToolName maps various tool name spellings (bash, command_execution,
+// read_file, etc.) to their display-friendly canonical forms (Bash, Read, Write, etc.).
 func canonicalizeToolName(name string) string {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "bash", "command_execution":
@@ -474,6 +478,8 @@ func canonicalizeToolName(name string) string {
 	}
 }
 
+// codexToolFromItem extracts the canonicalized tool name and input summary
+// from a Codex-format NDJSON item, checking Type, Name, ToolName, and Tool fields.
 func codexToolFromItem(item *ndjsonItem) (string, string) {
 	toolName := canonicalizeToolName(item.Type)
 	if toolName == "" || toolName == item.Type {
@@ -490,6 +496,9 @@ func codexToolFromItem(item *ndjsonItem) (string, string) {
 	return toolName, extractToolInputGo(toolName, parseRawInput(item.Input))
 }
 
+// inferCodexToolName classifies a shell command string as Read, Write, or Bash
+// based on the first word (cat→Read, git commit→Write, etc.). Used when
+// Codex items report commands without an explicit tool type.
 func inferCodexToolName(command string) string {
 	cmd := strings.ToLower(strings.TrimSpace(command))
 	if cmd == "" {
@@ -601,6 +610,8 @@ func parseRawInput(raw json.RawMessage) map[string]interface{} {
 	return m
 }
 
+// normalizeCodexCommand strips the "/bin/bash -lc" wrapper and surrounding
+// quotes that Codex prepends to shell commands, returning the inner command.
 func normalizeCodexCommand(command string) string {
 	cmd := strings.TrimSpace(command)
 	const prefix = "/bin/bash -lc "
@@ -640,6 +651,7 @@ func formatActivityLog(activities []turnActivity) string {
 	return sb.String()
 }
 
+// ifStr returns a when cond is true, b otherwise. A ternary helper for strings.
 func ifStr(cond bool, a, b string) string {
 	if cond {
 		return a

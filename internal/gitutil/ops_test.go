@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+// TestIsConflictOutput validates that various git output strings are correctly
+// classified as conflict or non-conflict indicators.
 func TestIsConflictOutput(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -28,6 +30,8 @@ func TestIsConflictOutput(t *testing.T) {
 	}
 }
 
+// TestIsRebaseNeedsMergeOutput validates detection of git output that indicates
+// an active rebase/merge state blocking a new rebase attempt.
 func TestIsRebaseNeedsMergeOutput(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -47,6 +51,8 @@ func TestIsRebaseNeedsMergeOutput(t *testing.T) {
 	}
 }
 
+// TestMergeBase verifies merge-base computation for diverged branches and
+// invalid refs.
 func TestMergeBase(t *testing.T) {
 	t.Run("returns correct ancestor for diverged branches", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -85,6 +91,8 @@ func TestMergeBase(t *testing.T) {
 	})
 }
 
+// TestCommitsBehind verifies the count of commits a worktree is behind the
+// default branch, including edge cases like detached HEAD and missing branches.
 func TestCommitsBehind(t *testing.T) {
 	t.Run("zero when branches are equal", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -123,6 +131,8 @@ func TestCommitsBehind(t *testing.T) {
 		}
 	})
 
+	// Regression: when local "main" branch is deleted but origin/main exists,
+	// CommitsBehind should still resolve the default branch via remote ref.
 	t.Run("detached repo head with only origin main still works", func(t *testing.T) {
 		origin := t.TempDir()
 		gitRun(t, origin, "init", "--bare", "-b", "main")
@@ -188,6 +198,8 @@ func TestHasCommitsAheadOf(t *testing.T) {
 	})
 }
 
+// TestRebaseOntoDefault validates clean rebases succeed and conflicting changes
+// produce a ConflictError with populated file list.
 func TestRebaseOntoDefault(t *testing.T) {
 	t.Run("clean rebase succeeds", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -236,6 +248,7 @@ func TestRebaseOntoDefault(t *testing.T) {
 	})
 }
 
+// TestParseConflictedFiles validates extraction of file paths from git conflict output.
 func TestParseConflictedFiles(t *testing.T) {
 	input := "CONFLICT (content): Merge conflict in foo/bar.go\n" +
 		"CONFLICT (add/add): Merge conflict in baz.txt\n" +
@@ -252,6 +265,8 @@ func TestParseConflictedFiles(t *testing.T) {
 	}
 }
 
+// TestFFMerge validates fast-forward merges including dirty-worktree stash/pop
+// and diverged-branch rejection.
 func TestFFMerge(t *testing.T) {
 	t.Run("fast-forward merge succeeds", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -309,6 +324,8 @@ func TestFFMerge(t *testing.T) {
 	})
 }
 
+// TestBranchTipCommit validates retrieval of the latest commit hash, subject,
+// and timestamp for existing and nonexistent branches.
 func TestBranchTipCommit(t *testing.T) {
 	t.Run("returns hash, subject, and timestamp for existing branch", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -364,6 +381,8 @@ func TestBranchTipCommit(t *testing.T) {
 	})
 }
 
+// TestHasConflicts_CleanRepo verifies that a repo with no unmerged paths reports
+// no conflicts.
 func TestHasConflicts_CleanRepo(t *testing.T) {
 	repo := setupRepo(t)
 	has, err := HasConflicts(repo)
@@ -375,6 +394,7 @@ func TestHasConflicts_CleanRepo(t *testing.T) {
 	}
 }
 
+// TestHasConflicts_NonGitDir verifies that a non-git directory returns an error.
 func TestHasConflicts_NonGitDir(t *testing.T) {
 	_, err := HasConflicts(t.TempDir())
 	if err == nil {
@@ -419,6 +439,8 @@ func createMergeConflict(t *testing.T, files []string) string {
 	return repo
 }
 
+// TestClearConflictedPaths validates the escalating cleanup strategy: git reset
+// --merge, then git restore, then git reset --hard, and error on non-git dirs.
 func TestClearConflictedPaths(t *testing.T) {
 	t.Run("clean repo is a no-op", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -496,6 +518,8 @@ func TestClearConflictedPaths(t *testing.T) {
 	})
 }
 
+// TestRecoverRebaseState validates that stale rebase and merge states are
+// cleaned up so subsequent rebase attempts can proceed.
 func TestRecoverRebaseState(t *testing.T) {
 	t.Run("clean repo returns nil", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -563,6 +587,8 @@ func TestRecoverRebaseState(t *testing.T) {
 	})
 }
 
+// TestHasRebaseMergeState validates detection of REBASE_HEAD, MERGE_HEAD, and
+// CHERRY_PICK_HEAD refs that indicate interrupted operations.
 func TestHasRebaseMergeState(t *testing.T) {
 	t.Run("no state returns false", func(t *testing.T) {
 		repo := setupRepo(t)

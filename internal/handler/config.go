@@ -46,6 +46,9 @@ func ssrfHardenedTransport() *http.Transport {
 		},
 	}
 }
+// availableSandboxes returns all sandbox types the UI should display,
+// combining the built-in Claude and Codex sandboxes with any user-configured
+// default or per-activity sandbox overrides.
 func availableSandboxes(cfg envconfig.Config) []sandbox.Type {
 	sandboxSet := map[sandbox.Type]bool{}
 	var sandboxes []sandbox.Type
@@ -71,6 +74,9 @@ func availableSandboxes(cfg envconfig.Config) []sandbox.Type {
 	return sandboxes
 }
 
+// defaultSandbox determines which sandbox type should be pre-selected for new
+// tasks. Priority: explicit DefaultSandbox > Claude (if DefaultModel set) >
+// Codex (if CodexDefaultModel set) > Claude as fallback.
 func defaultSandbox(cfg envconfig.Config) sandbox.Type {
 	if cfg.DefaultSandbox != "" {
 		return cfg.DefaultSandbox
@@ -84,6 +90,9 @@ func defaultSandbox(cfg envconfig.Config) sandbox.Type {
 	return sandbox.Claude
 }
 
+// buildConfigResponse assembles the full configuration payload returned by
+// GET /api/config and reused by UpdateWorkspaces after a workspace switch.
+// When cfg is nil (env file not readable), sandbox-related fields use safe defaults.
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
 	promptsDir := h.runner.Prompts().PromptsDir()
 	workspaces := h.currentWorkspaces()

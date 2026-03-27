@@ -28,6 +28,9 @@ func (h *Handler) closeFeedbackWaitingSpan(ctx context.Context, taskID uuid.UUID
 		store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 }
 
+// validateTaskWorktreesForCommit verifies that the task has worktrees and
+// that all worktree directories exist on disk. Returns an HTTP-friendly error
+// if any are missing.
 func validateTaskWorktreesForCommit(task *store.Task) error {
 	if len(task.WorktreePaths) == 0 {
 		return httpErrorf(http.StatusConflict, "task has no worktrees to commit")
@@ -40,6 +43,8 @@ func validateTaskWorktreesForCommit(task *store.Task) error {
 	return nil
 }
 
+// missingTaskWorktrees returns the repo paths whose worktree directories are
+// absent, empty, or not valid git repositories.
 func missingTaskWorktrees(task *store.Task) []string {
 	if task == nil {
 		return nil
@@ -60,6 +65,10 @@ func missingTaskWorktrees(task *store.Task) []string {
 	return missing
 }
 
+// restoreTaskWorktreesForCommit re-creates any missing worktree directories
+// for a task that is about to enter the commit pipeline. Returns the updated
+// task with refreshed worktree paths, or the original task if no restoration
+// was needed.
 func (h *Handler) restoreTaskWorktreesForCommit(ctx context.Context, task *store.Task) (*store.Task, error) {
 	if task == nil || len(task.WorktreePaths) == 0 || h.runner == nil {
 		return task, nil
@@ -82,6 +91,9 @@ func (h *Handler) restoreTaskWorktreesForCommit(ctx context.Context, task *store
 	return updated, nil
 }
 
+// statusError is an error that carries an HTTP status code. Used by
+// validateTaskWorktreesForCommit and similar helpers to propagate
+// structured errors that map directly to HTTP responses.
 type statusError struct {
 	code int
 	msg  string
@@ -89,6 +101,8 @@ type statusError struct {
 
 func (e *statusError) Error() string { return e.msg }
 
+// httpErrorf creates a statusError with the given HTTP status code and
+// formatted message.
 func httpErrorf(code int, format string, args ...any) error {
 	return &statusError{
 		code: code,
@@ -151,6 +165,10 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
 
+// resumeWaitingTaskWithFeedbackLocked transitions a waiting task back to
+// in_progress with the given feedback message and launches the runner in
+// the background. Must be called with promoteMu held to prevent races
+// with tryAutoSubmit.
 func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task *store.Task, message string, trigger store.Trigger, systemMessage string) error {
 	if err := h.store.UpdateTaskTestRun(ctx, task.ID, false, ""); err != nil {
 		return err
@@ -186,6 +204,10 @@ func (h *Handler) resumeWaitingTaskWithFeedbackLocked(ctx context.Context, task 
 	return nil
 }
 
+// runCommitTransition launches the commit pipeline in a background goroutine.
+// On success it transitions the task to done; on failure it transitions to
+// failed (or back to waiting for recoverable commit-message errors). The
+// trigger identifies whether this was user-initiated or auto-submit.
 func (h *Handler) runCommitTransition(taskID uuid.UUID, sessionID string, trigger store.Trigger, failurePrefix string) {
 	go func() {
 		bgCtx := h.runner.ShutdownCtx()

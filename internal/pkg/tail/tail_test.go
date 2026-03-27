@@ -4,6 +4,8 @@ import (
 	"testing"
 )
 
+// TestOf exercises Of with a table of edge cases: nil/empty slices, zero/negative n,
+// n greater/equal/less than len, and n=1.
 func TestOf(t *testing.T) {
 	tests := []struct {
 		name string
@@ -37,6 +39,9 @@ func TestOf(t *testing.T) {
 	}
 }
 
+// TestOf_SharesBackingArray verifies that the returned sub-slice shares the
+// backing array with the original, so mutations propagate. This confirms Of
+// returns a slice header (not a copy), which is the expected zero-allocation behavior.
 func TestOf_SharesBackingArray(t *testing.T) {
 	s := []int{1, 2, 3, 4, 5}
 	got := Of(s, 3)

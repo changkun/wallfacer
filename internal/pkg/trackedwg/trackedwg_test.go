@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// TestWaitGroup_Sequential verifies basic Add/Done/Wait lifecycle and that
+// Pending correctly reflects the label before and after Done.
 func TestWaitGroup_Sequential(t *testing.T) {
 	var wg WaitGroup
 
@@ -25,6 +27,8 @@ func TestWaitGroup_Sequential(t *testing.T) {
 	}
 }
 
+// TestWaitGroup_MultipleDistinctLabels verifies that Pending returns all
+// distinct labels in sorted order.
 func TestWaitGroup_MultipleDistinctLabels(t *testing.T) {
 	var wg WaitGroup
 
@@ -53,6 +57,8 @@ func TestWaitGroup_MultipleDistinctLabels(t *testing.T) {
 	}
 }
 
+// TestWaitGroup_RepeatedLabel verifies that duplicate labels are displayed with
+// a multiplicity suffix (e.g. "foo x2") and correctly decremented.
 func TestWaitGroup_RepeatedLabel(t *testing.T) {
 	var wg WaitGroup
 
@@ -78,6 +84,7 @@ func TestWaitGroup_RepeatedLabel(t *testing.T) {
 	}
 }
 
+// TestWaitGroup_WaitBlocks verifies that Wait actually blocks until Done is called.
 func TestWaitGroup_WaitBlocks(t *testing.T) {
 	var wg WaitGroup
 	const delay = 20 * time.Millisecond
@@ -97,6 +104,8 @@ func TestWaitGroup_WaitBlocks(t *testing.T) {
 	}
 }
 
+// TestWaitGroup_ConcurrentAddDone stress-tests that concurrent Add/Done calls
+// from many goroutines do not race and resolve to an empty Pending set.
 func TestWaitGroup_ConcurrentAddDone(t *testing.T) {
 	var wg WaitGroup
 	const n = 50
@@ -121,6 +130,8 @@ func TestWaitGroup_ConcurrentAddDone(t *testing.T) {
 	}
 }
 
+// TestWaitGroup_Go verifies that the Go convenience method launches a tracked
+// goroutine that cleans up after itself.
 func TestWaitGroup_Go(t *testing.T) {
 	var wg WaitGroup
 	done := make(chan struct{})
@@ -139,6 +150,8 @@ func TestWaitGroup_Go(t *testing.T) {
 	}
 }
 
+// TestWaitGroup_Go_TracksLabel verifies that a goroutine launched via Go is
+// visible in Pending while it is still running.
 func TestWaitGroup_Go_TracksLabel(t *testing.T) {
 	var wg WaitGroup
 	started := make(chan struct{})
@@ -159,6 +172,8 @@ func TestWaitGroup_Go_TracksLabel(t *testing.T) {
 	wg.Wait()
 }
 
+// TestWaitGroup_AddOrdering verifies that Add must be called before the
+// goroutine starts, ensuring Wait does not return prematurely.
 func TestWaitGroup_AddOrdering(t *testing.T) {
 	var wg WaitGroup
 

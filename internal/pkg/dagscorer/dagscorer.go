@@ -10,6 +10,8 @@ func Score[Node comparable](start Node, children func(Node) []Node) int {
 	return score(start, children, make(map[Node]int), make(map[Node]bool))
 }
 
+// score recursively computes the longest downstream chain via DFS with memoization.
+// The visiting set detects cycles; memo caches computed scores to avoid re-traversal.
 func score[Node comparable](id Node, children func(Node) []Node, memo map[Node]int, visiting map[Node]bool) int {
 	if v, ok := memo[id]; ok {
 		return v
@@ -20,12 +22,14 @@ func score[Node comparable](id Node, children func(Node) []Node, memo map[Node]i
 	visiting[id] = true
 	defer func() { visiting[id] = false }()
 
+	// Find the child with the longest downstream chain.
 	best := 0
 	for _, child := range children(id) {
 		if s := score(child, children, memo, visiting); s > best {
 			best = s
 		}
 	}
+	// Score = 1 (this node) + longest child chain.
 	result := 1 + best
 	memo[id] = result
 	return result

@@ -203,6 +203,10 @@ func (s *Store) CreateTask(ctx context.Context, prompt string, timeout int, moun
 	})
 }
 
+// normalizeSandboxByActivity validates and normalizes a sandbox-by-activity map.
+// It lowercases and trims activity keys, validates them against the allowed set,
+// parses sandbox type values, and drops invalid entries. Returns nil for an
+// empty result so omitempty keeps JSON clean.
 func normalizeSandboxByActivity(input map[SandboxActivity]sandbox.Type) map[SandboxActivity]sandbox.Type {
 	if len(input) == 0 {
 		return nil
@@ -328,6 +332,10 @@ func (s *Store) ListDeletedTasks(_ context.Context) ([]Task, error) {
 
 // RestoreTask removes the tombstone from a soft-deleted task, moving it back
 // into the active task map so it reappears in ListTasks.
+// The method uses a two-phase locking strategy: first a read lock to snapshot
+// the task and perform disk I/O (oversight text loading), then a write lock
+// to apply the state change. The write lock re-checks the task still exists
+// in s.deleted to guard against concurrent Restore or Purge calls.
 func (s *Store) RestoreTask(_ context.Context, id uuid.UUID) error {
 	// Snapshot the deleted task pointer under a brief read lock so the
 	// oversight disk read and buildIndexEntry can run outside the write lock.

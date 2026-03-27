@@ -19,12 +19,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// workspaceMutationBlockingTask is a lightweight task summary included in
+// 409 Conflict responses when a git mutation (push, checkout, sync) is
+// blocked by active tasks that hold worktrees in the affected workspace.
 type workspaceMutationBlockingTask struct {
 	ID     string `json:"id"`
 	Title  string `json:"title"`
 	Status string `json:"status"`
 }
 
+// workspaceMutationConflictResponse is the 409 Conflict response body
+// returned when a workspace git operation is refused due to blocking tasks.
 type workspaceMutationConflictResponse struct {
 	Error         string                          `json:"error"`
 	Workspace     string                          `json:"workspace"`
@@ -50,6 +55,8 @@ func collectWorkspaceStatuses(workspaces []string) []gitutil.WorkspaceGitStatus 
 	return results
 }
 
+// workspaceMutationGuardStatuses returns the task statuses that may block
+// workspace-level git mutations because the task holds worktrees.
 func workspaceMutationGuardStatuses() []store.TaskStatus {
 	return []store.TaskStatus{
 		store.TaskStatusInProgress,
@@ -59,6 +66,9 @@ func workspaceMutationGuardStatuses() []store.TaskStatus {
 	}
 }
 
+// taskBlocksWorkspaceMutation reports whether the given task holds a live
+// worktree in the specified workspace that would conflict with a git mutation.
+// Failed tasks only block if their worktree directory still exists on disk.
 func taskBlocksWorkspaceMutation(task store.Task, workspace string) bool {
 	worktreePath, ok := task.WorktreePaths[workspace]
 	if !ok || worktreePath == "" {
@@ -73,6 +83,8 @@ func taskBlocksWorkspaceMutation(task store.Task, workspace string) bool {
 	return true
 }
 
+// workspaceMutationBlockingTasks returns all tasks that would block a git
+// mutation on the given workspace, checking tasks in all guard statuses.
 func workspaceMutationBlockingTasks(ctx context.Context, s *store.Store, workspace string) ([]workspaceMutationBlockingTask, error) {
 	var blocking []workspaceMutationBlockingTask
 	for _, status := range workspaceMutationGuardStatuses() {
@@ -94,6 +106,9 @@ func workspaceMutationBlockingTasks(ctx context.Context, s *store.Store, workspa
 	return blocking, nil
 }
 
+// refuseWorkspaceMutationIfBlocked checks for blocking tasks and writes a
+// 409 Conflict response if any exist. Returns true when the mutation was
+// refused and the caller should abort; false when it is safe to proceed.
 func (h *Handler) refuseWorkspaceMutationIfBlocked(w http.ResponseWriter, r *http.Request, workspace, action string) bool {
 	s, ok := h.currentStore()
 	if !ok || s == nil {

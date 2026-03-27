@@ -18,6 +18,7 @@ type Group struct {
 	Workspaces []string `json:"workspaces"`
 }
 
+// groupsFilePath returns the path to the workspace-groups.json file within configDir.
 func groupsFilePath(configDir string) string {
 	return filepath.Join(configDir, "workspace-groups.json")
 }
@@ -48,6 +49,8 @@ func SaveGroups(configDir string, groups []Group) error {
 }
 
 // UpsertGroup adds or promotes a workspace group to the front of the list.
+// If the group already exists (matching by GroupKey), it is moved to position 0
+// with its name preserved. If it does not exist, a new unnamed group is prepended.
 func UpsertGroup(configDir string, workspaces []string) error {
 	workspaces = normalizeGroupPaths(workspaces)
 	if len(workspaces) == 0 {
@@ -95,6 +98,8 @@ func NormalizeGroups(groups []Group) []Group {
 	return out
 }
 
+// normalizeGroupPaths deduplicates, trims whitespace, cleans, and sorts paths.
+// Returns nil for empty input.
 func normalizeGroupPaths(paths []string) []string {
 	if len(paths) == 0 {
 		return nil
@@ -118,6 +123,8 @@ func normalizeGroupPaths(paths []string) []string {
 }
 
 // GroupKey returns a canonical key for a set of workspace paths.
+// Paths must be pre-sorted (as done by normalizeGroupPaths) so that the same
+// set of workspaces always produces the same key regardless of input order.
 func GroupKey(paths []string) string {
 	return strings.Join(paths, "\n")
 }

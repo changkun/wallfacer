@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// newTestBackend creates a FilesystemBackend rooted in a fresh temporary directory.
 func newTestBackend(t *testing.T) *FilesystemBackend {
 	t.Helper()
 	b, err := NewFilesystemBackend(t.TempDir())
@@ -186,6 +187,7 @@ func TestFilesystemBackend_CompactEvents(t *testing.T) {
 	}
 }
 
+// formatTraceFileName builds a zero-padded 4-digit trace file name like "0042.json".
 func formatTraceFileName(seq int) string {
 	return filepath.Base(filepath.Join(".", func() string {
 		s := "0000"

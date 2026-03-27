@@ -26,6 +26,8 @@ func (e *ConflictError) Error() string {
 
 func (e *ConflictError) Unwrap() error { return ErrConflict }
 
+// conflictFileRe matches git's "CONFLICT (...): Merge conflict in <path>" or
+// "CONFLICT (...): content conflict in <path>" lines to extract file paths.
 var conflictFileRe = regexp.MustCompile(`CONFLICT \([^)]+\): (?:Merge conflict in|content conflict in) (.+)$`)
 
 // parseConflictedFiles extracts conflicted file paths from git rebase output.
@@ -117,6 +119,7 @@ func DefaultBranch(repoPath string) (string, error) {
 
 // RemoteDefaultBranch returns the default branch of the "origin" remote
 // (e.g. "main" or "master"). It does NOT consider the current checkout.
+// Falls back to probing "origin/main" then "origin/master", defaulting to "main".
 func RemoteDefaultBranch(repoPath string) string {
 	if out, err := cmdexec.Git(repoPath, "symbolic-ref", "--short", "refs/remotes/origin/HEAD").Output(); err == nil {
 		branch := strings.TrimPrefix(out, "origin/")

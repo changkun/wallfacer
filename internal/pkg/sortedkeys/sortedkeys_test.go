@@ -2,6 +2,7 @@ package sortedkeys
 
 import "testing"
 
+// TestOf_StringKeys verifies that Of returns string keys in ascending sorted order.
 func TestOf_StringKeys(t *testing.T) {
 	m := map[string]int{"c": 3, "a": 1, "b": 2}
 	var keys []string
@@ -19,6 +20,7 @@ func TestOf_StringKeys(t *testing.T) {
 	}
 }
 
+// TestOf_IntKeys verifies that Of works with integer keys in ascending order.
 func TestOf_IntKeys(t *testing.T) {
 	m := map[int]string{3: "c", 1: "a", 2: "b"}
 	var keys []int
@@ -36,6 +38,7 @@ func TestOf_IntKeys(t *testing.T) {
 	}
 }
 
+// TestOf_Empty verifies that Of over an empty map yields zero iterations.
 func TestOf_Empty(t *testing.T) {
 	count := 0
 	for range Of(map[string]int{}) {
@@ -46,6 +49,7 @@ func TestOf_Empty(t *testing.T) {
 	}
 }
 
+// TestOfMap_KeyValuePairs verifies that OfMap yields key-value pairs in key-sorted order.
 func TestOfMap_KeyValuePairs(t *testing.T) {
 	m := map[string]int{"c": 3, "a": 1, "b": 2}
 	var keys []string
@@ -66,6 +70,7 @@ func TestOfMap_KeyValuePairs(t *testing.T) {
 	}
 }
 
+// TestOfMap_EarlyBreak verifies that breaking from the OfMap iterator stops iteration.
 func TestOfMap_EarlyBreak(t *testing.T) {
 	m := map[string]int{"c": 3, "a": 1, "b": 2}
 	count := 0
@@ -80,6 +85,7 @@ func TestOfMap_EarlyBreak(t *testing.T) {
 	}
 }
 
+// TestOfMap_Empty verifies that OfMap over an empty map yields zero iterations.
 func TestOfMap_Empty(t *testing.T) {
 	count := 0
 	for range OfMap(map[string]int{}) {
@@ -90,6 +96,7 @@ func TestOfMap_Empty(t *testing.T) {
 	}
 }
 
+// TestOf_EarlyBreak verifies that breaking from the Of iterator stops iteration.
 func TestOf_EarlyBreak(t *testing.T) {
 	m := map[string]int{"c": 3, "a": 1, "b": 2}
 	count := 0

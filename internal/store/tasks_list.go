@@ -82,9 +82,6 @@ func (s *Store) ListSummaries() ([]TaskSummary, error) {
 	return summaries, nil
 }
 
-// ErrRefinementAlreadyRunning is returned by StartRefinementJobIfIdle when a
-// refinement job is already in "running" state for the given task.
-
 // ListTasks returns all tasks, optionally including archived ones.
 func (s *Store) ListTasks(_ context.Context, includeArchived bool) ([]Task, error) {
 	s.mu.RLock()
@@ -128,6 +125,8 @@ func (s *Store) ListTasksAndSeq(_ context.Context, includeArchived bool) ([]Task
 //   - beforeID: return older tasks after the referenced archived task.
 //   - afterID:  return newer tasks before the referenced archived task.
 //   - both nil: return the first page (newest archived tasks).
+//
+// Returns: (page, totalArchived, hasMoreBefore, hasMoreAfter, error).
 func (s *Store) ListArchivedTasksPage(_ context.Context, pageSize int, beforeID, afterID *uuid.UUID) ([]Task, int, bool, bool, error) {
 	if pageSize < 1 {
 		pageSize = 1
@@ -239,8 +238,3 @@ func (s *Store) GetTask(_ context.Context, id uuid.UUID) (*Task, error) {
 	cp := deepCloneTask(t)
 	return &cp, nil
 }
-
-// TaskCreateOptions contains all bootstrap-only fields for a new task.
-// Pass it to CreateTaskWithOptions to create a fully populated task in a
-// single atomic write, avoiding races between SSE subscribers and post-create
-// update calls.

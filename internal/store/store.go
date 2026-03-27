@@ -50,7 +50,7 @@ type Store struct {
 	tasks   map[uuid.UUID]*Task
 	deleted map[uuid.UUID]*Task // tombstoned tasks (soft-deleted, not yet purged)
 	events  map[uuid.UUID][]TaskEvent
-	nextSeq map[uuid.UUID]int
+	nextSeq map[uuid.UUID]int // next event sequence number to assign per task
 
 	// tasksByStatus is a secondary index from status → set of task IDs.
 	// It enables O(1) CountByStatus and O(k) ListTasksByStatus (where k is the

@@ -26,6 +26,8 @@ import (
 //go:embed *.tmpl
 var fs embed.FS
 
+// embeddedTmpl holds the parsed set of all *.tmpl files embedded in the binary.
+// It is populated once during init and shared (read-only) by all Manager instances.
 var embeddedTmpl *template.Template
 
 // Default is set in init() after embeddedTmpl is populated.
@@ -48,6 +50,8 @@ func templateFuncMap() template.FuncMap {
 		"add": func(a, b int) int { return a + b },
 		"mul": func(a, b float64) float64 { return a * b },
 		"sub": func(a, b float64) float64 { return a - b },
+		// exploitCount returns how many of `total` ideas should be exploitation-style,
+		// clamped to [0, total]. Used by the ideation template to split ideas.
 		"exploitCount": func(ratio float64, total int) int {
 			n := int(math.Round(ratio * float64(total)))
 			if n > total {
@@ -55,6 +59,7 @@ func templateFuncMap() template.FuncMap {
 			}
 			return n
 		},
+		// exploreCount is the complement of exploitCount: total minus the exploit share.
 		"exploreCount": func(ratio float64, total int) int {
 			n := int(math.Round(ratio * float64(total)))
 			if n > total {

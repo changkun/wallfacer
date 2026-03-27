@@ -95,6 +95,7 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	// SandboxFast defaults to true; only an explicit "false" in the file disables it.
 	cfg := Config{SandboxFast: true}
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
@@ -265,6 +266,9 @@ func parseEnvLine(line string) (key, value string, ok bool) {
 	return k, unquote(v), true
 }
 
+// stripEnvInlineComment removes a trailing # comment from a value string,
+// respecting single and double quotes so that hash characters inside quoted
+// regions are preserved literally.
 func stripEnvInlineComment(v string) string {
 	inSingleQuote := false
 	inDoubleQuote := false
@@ -377,6 +381,8 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 	var impl, test, refine, title, oversight, commit, idea *string
 	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
+		// Start with all activity pointers set to empty strings, which means "clear".
+		// Only activities present in the map will be overwritten with actual values below.
 		emptyImpl, emptyTest, emptyRefine := "", "", ""
 		emptyTitle, emptyOversight, emptyCommit, emptyIdea := "", "", "", ""
 		impl, test, refine = &emptyImpl, &emptyTest, &emptyRefine
@@ -435,6 +441,8 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 	return updateRawWithUpdates(path, raw, updates)
 }
 
+// updateFile reads the env file at path and applies the given updates map.
+// It delegates to updateRawWithUpdates after reading the file contents.
 func updateFile(path string, updates map[string]*string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -443,6 +451,11 @@ func updateFile(path string, updates map[string]*string) error {
 	return updateRawWithUpdates(path, raw, updates)
 }
 
+// updateRawWithUpdates applies a set of key updates to raw env file content.
+// It performs a three-phase merge:
+//  1. Scan existing lines, updating or clearing matched keys in-place.
+//  2. Append any new keys (not already in the file) in knownKeys order.
+//  3. Strip blank lines introduced by clearing, then write atomically.
 func updateRawWithUpdates(path string, raw []byte, updates map[string]*string) error {
 	lines := strings.Split(string(raw), "\n")
 	seen := map[string]bool{}

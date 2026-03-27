@@ -9,6 +9,9 @@ import (
 	"testing"
 )
 
+// TestClaudeEntrypointAddsFastPromptByDefault verifies that the Claude sandbox
+// entrypoint script injects the /fast system prompt by default (WALLFACER_SANDBOX_FAST
+// not explicitly disabled).
 func TestClaudeEntrypointAddsFastPromptByDefault(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
@@ -39,6 +42,8 @@ printf '%s\n' "$@" > "` + argsPath + `"
 	}
 }
 
+// TestClaudeEntrypointSkipsFastPromptWhenDisabled verifies that setting
+// WALLFACER_SANDBOX_FAST=false prevents the /fast system prompt from being added.
 func TestClaudeEntrypointSkipsFastPromptWhenDisabled(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")

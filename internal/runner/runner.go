@@ -1,4 +1,3 @@
-// Package runner orchestrates sandbox containers for task execution.
 package runner
 
 import (
@@ -185,6 +184,8 @@ func (r *Runner) SetStopReasonHandler(fn func(taskID uuid.UUID, stopReason strin
 	r.stopReasonMu.Unlock()
 }
 
+// notifyStopReason invokes the registered stop-reason callback (if any) under
+// a read lock. Used to inform handlers when max_tokens triggers auto-continue.
 func (r *Runner) notifyStopReason(taskID uuid.UUID, stopReason string) {
 	r.stopReasonMu.RLock()
 	fn := r.onStopReason
@@ -201,6 +202,8 @@ func (r *Runner) SetAutosubmitFunc(fn func() bool) {
 	r.autosubmitFn = fn
 }
 
+// isAutosubmitEnabled returns whether auto-submit is currently enabled.
+// Defaults to true for backward compatibility when no callback is registered.
 func (r *Runner) isAutosubmitEnabled() bool {
 	if r.autosubmitFn == nil {
 		return true // default to auto-create for backward compatibility
@@ -214,6 +217,8 @@ func (r *Runner) SetIdeationExploitRatioFunc(fn func() float64) {
 	r.ideationExploitRatioFn = fn
 }
 
+// ideationExploitRatio returns the current exploitation ratio (0-1) for ideation.
+// Defaults to 0.8 when no callback is registered.
 func (r *Runner) ideationExploitRatio() float64 {
 	if r.ideationExploitRatioFn == nil {
 		return 0.8
@@ -377,6 +382,9 @@ func (r *Runner) WorkspaceManager() *workspace.Manager {
 	return r.workspaceManager
 }
 
+// applyWorkspaceSnapshot atomically replaces the runner's store, workspace paths,
+// and instructions path from a workspace manager snapshot. Called when the active
+// workspace group changes at runtime.
 func (r *Runner) applyWorkspaceSnapshot(s workspace.Snapshot) {
 	r.storeMu.Lock()
 	r.store = s.Store
@@ -385,12 +393,17 @@ func (r *Runner) applyWorkspaceSnapshot(s workspace.Snapshot) {
 	r.storeMu.Unlock()
 }
 
+// currentStore returns the runner's active store under a read lock.
+// The store may change when workspaces are switched at runtime.
 func (r *Runner) currentStore() *store.Store {
 	r.storeMu.RLock()
 	defer r.storeMu.RUnlock()
 	return r.store
 }
 
+// startBoardSubscriptionLoop spawns a goroutine that listens for store task
+// mutations and workspace switches, incrementing boardChangeSeq on each event
+// so that generateBoardContextAndMounts can detect stale cache entries.
 func (r *Runner) startBoardSubscriptionLoop(initial *store.Store) {
 	r.boardSubscriptionWg.Add(1)
 	go func() {
@@ -580,6 +593,8 @@ func (r *Runner) Workspaces() []string {
 	return r.workspaces
 }
 
+// hostCodexAuthPath validates and returns the host Codex auth cache directory
+// path, or "" if the path is empty, doesn't exist, or lacks an auth.json file.
 func (r *Runner) hostCodexAuthPath() string {
 	path := strings.TrimSpace(r.codexAuthPath)
 	if path == "" {
@@ -596,6 +611,8 @@ func (r *Runner) hostCodexAuthPath() string {
 	return ""
 }
 
+// isJWTExpired checks whether a JWT's "exp" claim is at or past now.
+// Returns false for malformed tokens (non-3-segment, invalid base64, missing exp).
 func isJWTExpired(jwt string, now time.Time) bool {
 	parts := strings.Split(jwt, ".")
 	if len(parts) < 2 {

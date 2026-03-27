@@ -2,6 +2,7 @@ package dagscorer
 
 import "testing"
 
+// TestScore_SingleNode verifies that a leaf node with no children scores 1.
 func TestScore_SingleNode(t *testing.T) {
 	adj := map[string][]string{"a": {}}
 	s := Score("a", func(n string) []string { return adj[n] })
@@ -10,6 +11,7 @@ func TestScore_SingleNode(t *testing.T) {
 	}
 }
 
+// TestScore_LinearChain verifies that a chain a->b->c scores 3 (the full path length).
 func TestScore_LinearChain(t *testing.T) {
 	// a -> b -> c
 	adj := map[string][]string{"a": {"b"}, "b": {"c"}, "c": {}}
@@ -19,6 +21,8 @@ func TestScore_LinearChain(t *testing.T) {
 	}
 }
 
+// TestScore_DiamondDAG verifies the score through a diamond-shaped DAG where
+// multiple paths converge on the same node; the result is the longest path (3).
 func TestScore_DiamondDAG(t *testing.T) {
 	// a -> b, a -> c, b -> d, c -> d
 	adj := map[string][]string{"a": {"b", "c"}, "b": {"d"}, "c": {"d"}, "d": {}}
@@ -28,6 +32,8 @@ func TestScore_DiamondDAG(t *testing.T) {
 	}
 }
 
+// TestScore_Cycle verifies that cycles are broken gracefully: the cycle-back
+// node returns 1, preventing infinite recursion.
 func TestScore_Cycle(t *testing.T) {
 	// a -> b -> a (cycle)
 	adj := map[string][]string{"a": {"b"}, "b": {"a"}}
@@ -38,6 +44,8 @@ func TestScore_Cycle(t *testing.T) {
 	}
 }
 
+// TestScore_UnknownNode verifies that a node not in the adjacency map scores 1
+// (treated as a leaf with no children).
 func TestScore_UnknownNode(t *testing.T) {
 	adj := map[string][]string{}
 	s := Score("unknown", func(n string) []string { return adj[n] })
@@ -47,6 +55,8 @@ func TestScore_UnknownNode(t *testing.T) {
 	}
 }
 
+// TestScore_BranchingDAG verifies that when branches have different lengths,
+// the score reflects the longest path (a->b->d = 3, not a->c = 2).
 func TestScore_BranchingDAG(t *testing.T) {
 	// a -> b -> d (length 3)
 	// a -> c (length 2)

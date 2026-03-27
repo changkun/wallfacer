@@ -23,10 +23,13 @@ type diffCache struct {
 	c *cache.TTLCache[uuid.UUID, diffCacheEntry]
 }
 
+// newDiffCache creates a diffCache with production default options.
 func newDiffCache() *diffCache {
 	return newDiffCacheWithOpts()
 }
 
+// newDiffCacheWithOpts creates a diffCache with the given additional options
+// (used by tests to override eviction limits).
 func newDiffCacheWithOpts(opts ...cache.Option[uuid.UUID, diffCacheEntry]) *diffCache {
 	allOpts := []cache.Option[uuid.UUID, diffCacheEntry]{
 		cache.WithMaxSize[uuid.UUID, diffCacheEntry](constants.MaxImmutableDiffEntries),

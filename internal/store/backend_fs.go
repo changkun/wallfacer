@@ -139,6 +139,8 @@ func (b *FilesystemBackend) LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, er
 		return nil, 0, err
 	}
 
+	// Determine the highest event ID already in the compact file so we
+	// can skip numbered trace files that are already covered.
 	compactMaxID := int64(0)
 	for _, evt := range events {
 		if evt.ID > compactMaxID {
@@ -146,6 +148,7 @@ func (b *FilesystemBackend) LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, er
 		}
 	}
 
+	// Merge in numbered trace files whose sequence exceeds the compact boundary.
 	maxSeq := compactMaxID
 	for _, te := range traceEntries {
 		if te.IsDir() {

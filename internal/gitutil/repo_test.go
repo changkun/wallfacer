@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// TestIsGitRepo validates detection of git repos vs plain directories and
+// missing paths.
 func TestIsGitRepo(t *testing.T) {
 	repo := setupRepo(t)
 	plain := t.TempDir()
@@ -21,6 +23,8 @@ func TestIsGitRepo(t *testing.T) {
 	}
 }
 
+// TestHasOriginRemote validates origin remote detection for repos with and
+// without a configured remote.
 func TestHasOriginRemote(t *testing.T) {
 	t.Run("no remote", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -44,6 +48,8 @@ func TestHasOriginRemote(t *testing.T) {
 	})
 }
 
+// TestDefaultBranch validates branch resolution priority: current local branch
+// is preferred over origin/HEAD, with "main" as final fallback.
 func TestDefaultBranch(t *testing.T) {
 	t.Run("local HEAD branch without remote", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -183,6 +189,7 @@ func TestHasCommits(t *testing.T) {
 	})
 }
 
+// TestConflictError_Error validates that the error message includes the file count.
 func TestConflictError_Error(t *testing.T) {
 	e := &ConflictError{
 		WorktreePath:    "/repo/wt",

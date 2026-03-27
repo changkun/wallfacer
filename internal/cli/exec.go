@@ -11,18 +11,21 @@ import (
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
+// execMode distinguishes between attaching to a running task container
+// and launching a fresh sandbox shell.
 type execMode int
 
 const (
-	execModeTask execMode = iota
-	execModeSandbox
+	execModeTask    execMode = iota // attach to an existing task container by UUID prefix
+	execModeSandbox                 // launch a new interactive sandbox container
 )
 
+// execConfig holds the parsed arguments for the exec subcommand.
 type execConfig struct {
-	mode    execMode
-	prefix  string
-	sandbox sandbox.Type
-	command []string
+	mode    execMode     // task or sandbox mode
+	prefix  string       // task UUID prefix (task mode only)
+	sandbox sandbox.Type // sandbox type to launch (sandbox mode only)
+	command []string     // command to run inside the container
 }
 
 // RunExec attaches to a running task container or opens a new sandbox shell.
@@ -106,6 +109,8 @@ func RunExec(configDir string, args []string) {
 	}
 }
 
+// parseExecConfig interprets the positional arguments to determine exec mode
+// (task vs sandbox), validates the arguments, and returns the configuration.
 func parseExecConfig(positional, command []string) (*execConfig, error) {
 	cfg := &execConfig{mode: execModeTask, command: command}
 	for i := 0; i < len(positional); i++ {
@@ -144,6 +149,10 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 	return cfg, nil
 }
 
+// buildSandboxExecArgs constructs the container-runtime argument list for
+// launching a new interactive sandbox container. It mounts the current working
+// directory as a workspace, injects the .env file, and wires up sandbox-specific
+// configuration volumes (e.g. claude config, codex auth).
 func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, command []string) ([]string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -179,6 +188,10 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, comman
 	return args, nil
 }
 
+// resolveSandboxImageForExec derives the correct container image for the given
+// sandbox type. For Codex, it rewrites "wallfacer" image names to
+// "wallfacer-codex" while preserving the registry prefix, tag, and digest.
+// Non-wallfacer images and Claude sandboxes are returned unchanged.
 func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
 	baseImage = strings.TrimSpace(baseImage)
 	if sb != sandbox.Codex {
@@ -192,6 +205,9 @@ func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
 		return baseImage
 	}
 
+	// Decompose the image reference into components:
+	//   [registry/prefix/]wallfacer[:tag][@digest]
+	// so we can swap "wallfacer" for "wallfacer-codex" while keeping everything else.
 	registry := baseImage
 	digest := ""
 	if at := strings.Index(registry, "@"); at != -1 {
@@ -210,7 +226,7 @@ func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
 		repoName = repoName[idx+1:]
 	}
 	if repoName != "wallfacer" {
-		return baseImage
+		return baseImage // not a wallfacer image; return as-is
 	}
 	return prefix + "wallfacer-codex" + tag + digest
 }

@@ -15,6 +15,7 @@ const (
 	Codex  Type = "codex"
 )
 
+// all is the canonical list of supported sandbox types, used by All().
 var all = []Type{Claude, Codex}
 
 // All returns a copy of all known sandbox types.

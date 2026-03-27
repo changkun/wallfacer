@@ -9,6 +9,7 @@ import (
 	"changkun.de/x/wallfacer/internal/envconfig"
 )
 
+// writeEnvFile creates a temporary .env file with the given content and returns its path.
 func writeEnvFile(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -19,6 +20,7 @@ func writeEnvFile(t *testing.T, content string) string {
 	return path
 }
 
+// TestParse verifies that Parse correctly reads known keys and ignores unknown ones.
 func TestParse(t *testing.T) {
 	content := `# comment
 CLAUDE_CODE_OAUTH_TOKEN=oauth-abc
@@ -50,6 +52,7 @@ UNKNOWN_KEY=ignored
 	}
 }
 
+// TestParseExportedKeys verifies that the "export " prefix is stripped from key lines.
 func TestParseExportedKeys(t *testing.T) {
 	content := `export CLAUDE_CODE_OAUTH_TOKEN=exported-oauth
 export ANTHROPIC_API_KEY=sk-ant-exported
@@ -67,6 +70,7 @@ export ANTHROPIC_API_KEY=sk-ant-exported
 	}
 }
 
+// TestParseInlineComment verifies that trailing # comments are stripped from values.
 func TestParseInlineComment(t *testing.T) {
 	content := `CLAUDE_CODE_OAUTH_TOKEN=oauth-abc # set in local env
 CLAUDE_DEFAULT_MODEL=claude-sonnet-4-0 # this is a model`
@@ -83,6 +87,7 @@ CLAUDE_DEFAULT_MODEL=claude-sonnet-4-0 # this is a model`
 	}
 }
 
+// TestParseEmpty verifies that a file with only comments yields zero-value config fields.
 func TestParseEmpty(t *testing.T) {
 	path := writeEnvFile(t, "# just a comment\n\n")
 	cfg, err := envconfig.Parse(path)
@@ -94,6 +99,7 @@ func TestParseEmpty(t *testing.T) {
 	}
 }
 
+// TestParseServerAPIKey verifies parsing of the WALLFACER_SERVER_API_KEY field.
 func TestParseServerAPIKey(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_SERVER_API_KEY=secret-key\n")
 	cfg, err := envconfig.Parse(path)
@@ -105,8 +111,10 @@ func TestParseServerAPIKey(t *testing.T) {
 	}
 }
 
+// ptr returns a pointer to s, used to construct non-nil Updates fields in tests.
 func ptr(s string) *string { return &s }
 
+// TestUpdateExistingKeys verifies that Update replaces existing keys and appends new ones.
 func TestUpdateExistingKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=old-token\nANTHROPIC_BASE_URL=https://old.example.com\n"
 	path := writeEnvFile(t, content)
@@ -134,6 +142,7 @@ func TestUpdateExistingKeys(t *testing.T) {
 	}
 }
 
+// TestUpdateNilSkips verifies that nil pointer fields in Updates leave existing values unchanged.
 func TestUpdateNilSkips(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=keep-me\n"
 	path := writeEnvFile(t, content)
@@ -154,6 +163,7 @@ func TestUpdateNilSkips(t *testing.T) {
 	}
 }
 
+// TestUpdateClearsField verifies that an empty-string pointer removes the key from the file.
 func TestUpdateClearsField(t *testing.T) {
 	content := "ANTHROPIC_BASE_URL=https://old.example.com\nCLAUDE_DEFAULT_MODEL=claude-opus-4-5\n"
 	path := writeEnvFile(t, content)
@@ -178,6 +188,7 @@ func TestUpdateClearsField(t *testing.T) {
 	}
 }
 
+// TestUpdateAppendsNewKeys verifies that keys not present in the file are appended.
 func TestUpdateAppendsNewKeys(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -202,6 +213,7 @@ func TestUpdateAppendsNewKeys(t *testing.T) {
 	}
 }
 
+// TestUpdatePreservesComments verifies that comment lines survive an Update round-trip.
 func TestUpdatePreservesComments(t *testing.T) {
 	content := "# Auth token\nCLAUDE_CODE_OAUTH_TOKEN=tok\n# end\n"
 	path := writeEnvFile(t, content)
@@ -216,6 +228,7 @@ func TestUpdatePreservesComments(t *testing.T) {
 	}
 }
 
+// TestUpdateServerAPIKey verifies that the server API key can be set via Update.
 func TestUpdateServerAPIKey(t *testing.T) {
 	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
 	value := "server-secret"
@@ -231,6 +244,7 @@ func TestUpdateServerAPIKey(t *testing.T) {
 	}
 }
 
+// TestParseCodexFields verifies parsing of all OpenAI Codex-related env keys.
 func TestParseCodexFields(t *testing.T) {
 	content := `OPENAI_API_KEY=sk-openai-abc
 OPENAI_BASE_URL=https://api.openai.com/v1
@@ -256,6 +270,7 @@ CODEX_TITLE_MODEL=codex-mini-latest
 	}
 }
 
+// TestParseCodexFieldsAbsent verifies that Codex fields default to empty when not in the file.
 func TestParseCodexFieldsAbsent(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -278,6 +293,7 @@ func TestParseCodexFieldsAbsent(t *testing.T) {
 // OversightInterval
 // ---------------------------------------------------------------------------
 
+// TestParseOversightInterval verifies parsing a valid positive oversight interval.
 func TestParseOversightInterval(t *testing.T) {
 	content := "WALLFACER_OVERSIGHT_INTERVAL=10\n"
 	path := writeEnvFile(t, content)
@@ -290,6 +306,7 @@ func TestParseOversightInterval(t *testing.T) {
 	}
 }
 
+// TestParseOversightIntervalZero verifies that an explicit "0" is accepted (disables periodic oversight).
 func TestParseOversightIntervalZero(t *testing.T) {
 	content := "WALLFACER_OVERSIGHT_INTERVAL=0\n"
 	path := writeEnvFile(t, content)
@@ -302,6 +319,7 @@ func TestParseOversightIntervalZero(t *testing.T) {
 	}
 }
 
+// TestParseOversightIntervalInvalid verifies that a non-numeric value is silently ignored (defaults to 0).
 func TestParseOversightIntervalInvalid(t *testing.T) {
 	content := "WALLFACER_OVERSIGHT_INTERVAL=notanumber\n"
 	path := writeEnvFile(t, content)
@@ -315,6 +333,7 @@ func TestParseOversightIntervalInvalid(t *testing.T) {
 	}
 }
 
+// TestParseOversightIntervalAbsent verifies that a missing key defaults to 0.
 func TestParseOversightIntervalAbsent(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -327,6 +346,7 @@ func TestParseOversightIntervalAbsent(t *testing.T) {
 	}
 }
 
+// TestParseArchivedTasksPerPage verifies parsing a valid page size value.
 func TestParseArchivedTasksPerPage(t *testing.T) {
 	content := "WALLFACER_ARCHIVED_TASKS_PER_PAGE=30\n"
 	path := writeEnvFile(t, content)
@@ -339,6 +359,7 @@ func TestParseArchivedTasksPerPage(t *testing.T) {
 	}
 }
 
+// TestParseArchivedTasksPerPageAbsent verifies that a missing key defaults to 0.
 func TestParseArchivedTasksPerPageAbsent(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -351,6 +372,7 @@ func TestParseArchivedTasksPerPageAbsent(t *testing.T) {
 	}
 }
 
+// TestParseMaxTestParallelTasks verifies parsing a valid max test parallel value.
 func TestParseMaxTestParallelTasks(t *testing.T) {
 	content := "WALLFACER_MAX_TEST_PARALLEL=3\n"
 	path := writeEnvFile(t, content)
@@ -363,6 +385,7 @@ func TestParseMaxTestParallelTasks(t *testing.T) {
 	}
 }
 
+// TestParseMaxTestParallelTasksAbsent verifies that a missing key defaults to 0.
 func TestParseMaxTestParallelTasksAbsent(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -375,6 +398,7 @@ func TestParseMaxTestParallelTasksAbsent(t *testing.T) {
 	}
 }
 
+// TestUpdateMaxTestParallelTasks verifies that max test parallel can be set via Update.
 func TestUpdateMaxTestParallelTasks(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -393,6 +417,7 @@ func TestUpdateMaxTestParallelTasks(t *testing.T) {
 	}
 }
 
+// TestUpdateOversightInterval verifies that the oversight interval can be set via Update.
 func TestUpdateOversightInterval(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -411,6 +436,7 @@ func TestUpdateOversightInterval(t *testing.T) {
 	}
 }
 
+// TestUpdateArchivedTasksPerPage verifies that the archived tasks page size can be set via Update.
 func TestUpdateArchivedTasksPerPage(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -433,6 +459,7 @@ func TestUpdateArchivedTasksPerPage(t *testing.T) {
 // AutoPush
 // ---------------------------------------------------------------------------
 
+// TestParseAutoPush verifies parsing of auto-push enabled flag and threshold.
 func TestParseAutoPush(t *testing.T) {
 	content := "WALLFACER_AUTO_PUSH=true\nWALLFACER_AUTO_PUSH_THRESHOLD=3\n"
 	path := writeEnvFile(t, content)
@@ -448,6 +475,7 @@ func TestParseAutoPush(t *testing.T) {
 	}
 }
 
+// TestParseAutoPushDefaults verifies that auto-push defaults to disabled with threshold 0.
 func TestParseAutoPushDefaults(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -463,6 +491,7 @@ func TestParseAutoPushDefaults(t *testing.T) {
 	}
 }
 
+// TestParseSandboxFastDefaultsToTrue verifies SandboxFast is true when the key is absent.
 func TestParseSandboxFastDefaultsToTrue(t *testing.T) {
 	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
 	cfg, err := envconfig.Parse(path)
@@ -474,6 +503,7 @@ func TestParseSandboxFastDefaultsToTrue(t *testing.T) {
 	}
 }
 
+// TestParseSandboxFastFalse verifies SandboxFast is false when explicitly set to "false".
 func TestParseSandboxFastFalse(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_SANDBOX_FAST=false\n")
 	cfg, err := envconfig.Parse(path)
@@ -485,6 +515,7 @@ func TestParseSandboxFastFalse(t *testing.T) {
 	}
 }
 
+// TestUpdateSandboxFast verifies that SandboxFast can be toggled via Update.
 func TestUpdateSandboxFast(t *testing.T) {
 	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
 	enabled := "false"
@@ -501,6 +532,7 @@ func TestUpdateSandboxFast(t *testing.T) {
 	}
 }
 
+// TestUpdateAutoPush verifies that auto-push settings can be written and read back.
 func TestUpdateAutoPush(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
 	path := writeEnvFile(t, content)
@@ -526,6 +558,8 @@ func TestUpdateAutoPush(t *testing.T) {
 	}
 }
 
+// TestMaskToken verifies token redaction: empty stays empty, short tokens are fully masked,
+// and longer tokens show first 4 and last 4 characters with "..." in between.
 func TestMaskToken(t *testing.T) {
 	tests := []struct {
 		input, want string
@@ -556,6 +590,7 @@ func TestMaskToken(t *testing.T) {
 // SandboxBackend
 // ─────────────────────────────────────────────────────────────────────────────
 
+// TestParseSandboxBackendLocal verifies that the "local" backend value is parsed correctly.
 func TestParseSandboxBackendLocal(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_SANDBOX_BACKEND=local\n")
 	cfg, err := envconfig.Parse(path)
@@ -567,6 +602,7 @@ func TestParseSandboxBackendLocal(t *testing.T) {
 	}
 }
 
+// TestParseSandboxBackendAbsent verifies that a missing backend key defaults to empty string.
 func TestParseSandboxBackendAbsent(t *testing.T) {
 	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
 	cfg, err := envconfig.Parse(path)
@@ -578,6 +614,7 @@ func TestParseSandboxBackendAbsent(t *testing.T) {
 	}
 }
 
+// TestParseSandboxBackendNormalized verifies that the backend value is lowercased and trimmed.
 func TestParseSandboxBackendNormalized(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_SANDBOX_BACKEND= Local \n")
 	cfg, err := envconfig.Parse(path)
@@ -593,6 +630,7 @@ func TestParseSandboxBackendNormalized(t *testing.T) {
 // ParseWorkspaces / FormatWorkspaces
 // ─────────────────────────────────────────────────────────────────────────────
 
+// TestParseWorkspaces_Empty verifies that empty and whitespace-only input returns nil.
 func TestParseWorkspaces_Empty(t *testing.T) {
 	if got := envconfig.ParseWorkspaces(""); got != nil {
 		t.Errorf("ParseWorkspaces(\"\") = %v, want nil", got)
@@ -602,6 +640,7 @@ func TestParseWorkspaces_Empty(t *testing.T) {
 	}
 }
 
+// TestParseWorkspaces_SinglePath verifies a single path without separators.
 func TestParseWorkspaces_SinglePath(t *testing.T) {
 	got := envconfig.ParseWorkspaces("/workspace/proj")
 	if len(got) != 1 || got[0] != "/workspace/proj" {
@@ -609,6 +648,7 @@ func TestParseWorkspaces_SinglePath(t *testing.T) {
 	}
 }
 
+// TestParseWorkspaces_MultiplePaths verifies splitting multiple OS path-list separated paths.
 func TestParseWorkspaces_MultiplePaths(t *testing.T) {
 	input := strings.Join([]string{"/a", "/b", "/c"}, string(os.PathListSeparator))
 	got := envconfig.ParseWorkspaces(input)
@@ -620,6 +660,7 @@ func TestParseWorkspaces_MultiplePaths(t *testing.T) {
 	}
 }
 
+// TestParseWorkspaces_FiltersEmptyEntries verifies that empty segments from double separators are dropped.
 func TestParseWorkspaces_FiltersEmptyEntries(t *testing.T) {
 	// Leading/trailing/double separators produce empty parts.
 	sep := string(os.PathListSeparator)
@@ -629,12 +670,14 @@ func TestParseWorkspaces_FiltersEmptyEntries(t *testing.T) {
 	}
 }
 
+// TestParseWorkspaces_AllEmptyEntriesReturnsNil verifies that only separators (no real paths) returns nil.
 func TestParseWorkspaces_AllEmptyEntriesReturnsNil(t *testing.T) {
 	if got := envconfig.ParseWorkspaces(strings.Repeat(string(os.PathListSeparator), 3)); got != nil {
 		t.Errorf("ParseWorkspaces(all separators) = %v, want nil", got)
 	}
 }
 
+// TestFormatWorkspaces_Empty verifies that nil and empty slices produce an empty string.
 func TestFormatWorkspaces_Empty(t *testing.T) {
 	if got := envconfig.FormatWorkspaces(nil); got != "" {
 		t.Errorf("FormatWorkspaces(nil) = %q, want \"\"", got)
@@ -644,6 +687,7 @@ func TestFormatWorkspaces_Empty(t *testing.T) {
 	}
 }
 
+// TestFormatWorkspaces_Single verifies that a single-element slice encodes without separator.
 func TestFormatWorkspaces_Single(t *testing.T) {
 	got := envconfig.FormatWorkspaces([]string{"/workspace/proj"})
 	if got != "/workspace/proj" {
@@ -651,6 +695,7 @@ func TestFormatWorkspaces_Single(t *testing.T) {
 	}
 }
 
+// TestFormatWorkspaces_Multiple verifies that all paths appear in the encoded output.
 func TestFormatWorkspaces_Multiple(t *testing.T) {
 	paths := []string{"/a", "/b", "/c"}
 	got := envconfig.FormatWorkspaces(paths)
@@ -659,6 +704,7 @@ func TestFormatWorkspaces_Multiple(t *testing.T) {
 	}
 }
 
+// TestFormatWorkspaces_RoundTrip verifies that Format then Parse returns the original paths.
 func TestFormatWorkspaces_RoundTrip(t *testing.T) {
 	original := []string{"/workspace/project1", "/workspace/project2"}
 	encoded := envconfig.FormatWorkspaces(original)
@@ -677,6 +723,7 @@ func TestFormatWorkspaces_RoundTrip(t *testing.T) {
 // UpdateWorkspaces
 // ─────────────────────────────────────────────────────────────────────────────
 
+// TestUpdateWorkspaces_WritesAndReads verifies that UpdateWorkspaces writes the key to the file.
 func TestUpdateWorkspaces_WritesAndReads(t *testing.T) {
 	path := writeEnvFile(t, "ANTHROPIC_API_KEY=sk-test\n")
 
@@ -694,6 +741,7 @@ func TestUpdateWorkspaces_WritesAndReads(t *testing.T) {
 	}
 }
 
+// TestUpdateWorkspaces_ClearsWithEmpty verifies that passing nil clears the workspace path.
 func TestUpdateWorkspaces_ClearsWithEmpty(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_WORKSPACES=/old/path\nANTHROPIC_API_KEY=sk-test\n")
 

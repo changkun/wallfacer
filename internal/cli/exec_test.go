@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+// TestParseExecConfig_TaskMode verifies that a bare UUID prefix is parsed as
+// task-mode configuration.
 func TestParseExecConfig_TaskMode(t *testing.T) {
 	cfg, err := parseExecConfig([]string{"249e9c9c"}, []string{"bash"})
 	if err != nil {
@@ -21,6 +23,8 @@ func TestParseExecConfig_TaskMode(t *testing.T) {
 	}
 }
 
+// TestParseExecConfig_SandboxMode verifies that --sandbox flag switches to
+// sandbox mode with the specified sandbox type.
 func TestParseExecConfig_SandboxMode(t *testing.T) {
 	cfg, err := parseExecConfig([]string{"--sandbox", "codex"}, []string{"bash"})
 	if err != nil {
@@ -34,6 +38,8 @@ func TestParseExecConfig_SandboxMode(t *testing.T) {
 	}
 }
 
+// TestParseExecConfig_SandboxModeAllowsCommand verifies that extra positional
+// arguments after --sandbox <type> are treated as the in-container command.
 func TestParseExecConfig_SandboxModeAllowsCommand(t *testing.T) {
 	cfg, err := parseExecConfig([]string{"--sandbox", "claude", "sh", "-c", "echo", "hi"}, []string{"bash"})
 	if err != nil {
@@ -56,6 +62,8 @@ func TestParseExecConfig_SandboxModeAllowsCommand(t *testing.T) {
 	}
 }
 
+// TestParseExecConfig_SandboxRejectsInvalidRuntime verifies that an unrecognized
+// sandbox type (e.g. "llama") is rejected with an error.
 func TestParseExecConfig_SandboxRejectsInvalidRuntime(t *testing.T) {
 	_, err := parseExecConfig([]string{"--sandbox", "llama"}, []string{"bash"})
 	if err == nil {
@@ -63,6 +71,8 @@ func TestParseExecConfig_SandboxRejectsInvalidRuntime(t *testing.T) {
 	}
 }
 
+// TestResolveSandboxImageForExec_CodexFromWallfacer verifies that "wallfacer:latest"
+// is rewritten to "wallfacer-codex:latest" for the Codex sandbox.
 func TestResolveSandboxImageForExec_CodexFromWallfacer(t *testing.T) {
 	got := resolveSandboxImageForExec("wallfacer:latest", "codex")
 	if got != "wallfacer-codex:latest" {
@@ -70,6 +80,8 @@ func TestResolveSandboxImageForExec_CodexFromWallfacer(t *testing.T) {
 	}
 }
 
+// TestResolveSandboxImageForExec_CodexKeepsUnrelatedImage verifies that non-wallfacer
+// images are returned unchanged even when Codex sandbox is requested.
 func TestResolveSandboxImageForExec_CodexKeepsUnrelatedImage(t *testing.T) {
 	got := resolveSandboxImageForExec("ghcr.io/acme/custom:tag", "codex")
 	if got != "ghcr.io/acme/custom:tag" {
@@ -81,6 +93,8 @@ func TestResolveSandboxImageForExec_CodexKeepsUnrelatedImage(t *testing.T) {
 // resolveContainerByPrefix
 // ---------------------------------------------------------------------------
 
+// TestResolveContainerByPrefixExactMatch verifies single-container resolution
+// when the prefix matches the trailing UUID portion of the container name.
 func TestResolveContainerByPrefixExactMatch(t *testing.T) {
 	psOutput := "wallfacer-add-dark-mode-249e9c9c\n"
 	got, err := resolveContainerByPrefix(psOutput, "249e9c9c")
@@ -92,6 +106,8 @@ func TestResolveContainerByPrefixExactMatch(t *testing.T) {
 	}
 }
 
+// TestResolveContainerByPrefixSubstringMatch verifies that the prefix is
+// matched as a substring within the container name, not just a trailing suffix.
 func TestResolveContainerByPrefixSubstringMatch(t *testing.T) {
 	// The prefix appears in the middle of the container name (slug portion).
 	psOutput := "wallfacer-fix-foo-bar-abcd1234\nwallfacer-other-task-99887766\n"
@@ -104,6 +120,8 @@ func TestResolveContainerByPrefixSubstringMatch(t *testing.T) {
 	}
 }
 
+// TestResolveContainerByPrefixNoMatch verifies that a prefix matching no
+// container produces a descriptive error.
 func TestResolveContainerByPrefixNoMatch(t *testing.T) {
 	psOutput := "wallfacer-add-dark-mode-249e9c9c\nwallfacer-fix-login-abcdef12\n"
 	_, err := resolveContainerByPrefix(psOutput, "deadbeef")
@@ -118,6 +136,8 @@ func TestResolveContainerByPrefixNoMatch(t *testing.T) {
 	}
 }
 
+// TestResolveContainerByPrefixAmbiguous verifies that a prefix matching multiple
+// containers produces an error listing all candidates.
 func TestResolveContainerByPrefixAmbiguous(t *testing.T) {
 	// Two containers whose names both contain the prefix.
 	psOutput := "wallfacer-task-a-249e9c9c\nwallfacer-task-b-249e9c9c\n"
@@ -136,6 +156,8 @@ func TestResolveContainerByPrefixAmbiguous(t *testing.T) {
 	}
 }
 
+// TestResolveContainerByPrefixEmptyOutput verifies that empty ps output
+// (no running containers) produces a "no running container" error.
 func TestResolveContainerByPrefixEmptyOutput(t *testing.T) {
 	_, err := resolveContainerByPrefix("", "249e9c9c")
 	if err == nil {
@@ -146,6 +168,8 @@ func TestResolveContainerByPrefixEmptyOutput(t *testing.T) {
 	}
 }
 
+// TestResolveContainerByPrefixBlankLines verifies that blank lines in ps
+// output are silently skipped without causing false matches.
 func TestResolveContainerByPrefixBlankLines(t *testing.T) {
 	// Blank lines in ps output must be ignored.
 	psOutput := "\n\nwallfacer-fix-auth-aabbccdd\n\n"
@@ -158,6 +182,8 @@ func TestResolveContainerByPrefixBlankLines(t *testing.T) {
 	}
 }
 
+// TestResolveContainerByPrefixMultipleContainersOneMatch verifies that only
+// the matching container is returned when several are running.
 func TestResolveContainerByPrefixMultipleContainersOneMatch(t *testing.T) {
 	// Several containers are running but only one matches the prefix.
 	psOutput := strings.Join([]string{
@@ -175,6 +201,8 @@ func TestResolveContainerByPrefixMultipleContainersOneMatch(t *testing.T) {
 	}
 }
 
+// TestBuildSandboxExecArgs_UsesDefaultWorkspaceMount verifies that sandbox
+// exec args include the env-file, Claude config volume, and workspace bind mount.
 func TestBuildSandboxExecArgs_UsesDefaultWorkspaceMount(t *testing.T) {
 	tmp := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmp, ".env"), []byte("CLAUDE_CODE_OAUTH_TOKEN=x"), 0o600); err != nil {
@@ -201,6 +229,9 @@ func TestBuildSandboxExecArgs_UsesDefaultWorkspaceMount(t *testing.T) {
 	}
 }
 
+// TestBuildSandboxExecArgs_UsesCodexAuthWhenAvailable verifies that Codex
+// sandbox exec args include a read-only bind mount for ~/.codex/auth.json
+// when the auth file exists on the host.
 func TestBuildSandboxExecArgs_UsesCodexAuthWhenAvailable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
@@ -238,6 +269,9 @@ func TestBuildSandboxExecArgs_UsesCodexAuthWhenAvailable(t *testing.T) {
 	}
 }
 
+// TestResolveSandboxImageForExec_ClonesDockerImageTagAndDigest verifies that
+// both the tag and digest portions are preserved when rewriting a wallfacer
+// image to wallfacer-codex.
 func TestResolveSandboxImageForExec_ClonesDockerImageTagAndDigest(t *testing.T) {
 	got := resolveSandboxImageForExec("ghcr.io/acme/wallfacer:latest@sha256:12345", "codex")
 	if got != "ghcr.io/acme/wallfacer-codex:latest@sha256:12345" {

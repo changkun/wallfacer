@@ -129,6 +129,8 @@ func StartReader(r io.ReadCloser, opts ...Option) *Pipe {
 		done:  make(chan struct{}),
 	}
 
+	// Scan lines from the reader in a background goroutine. The lines channel
+	// and done channel are both closed when the reader returns EOF or error.
 	go func() {
 		defer close(p.lines)
 		defer close(p.done)
@@ -154,7 +156,8 @@ func (p *Pipe) Done() <-chan struct{} {
 }
 
 // Close terminates the pipe reader, causing the scanner goroutine to exit.
-// Safe to call multiple times.
+// Safe to call multiple times. Note: must not be called on pipes created via
+// StartReader, which sets pr to nil since the caller owns the reader.
 func (p *Pipe) Close() {
 	_ = p.pr.Close()
 }

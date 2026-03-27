@@ -32,6 +32,8 @@ func IsCommitMessageGenerationError(err error) bool {
 	return errors.Is(err, ErrCommitMessageGeneration)
 }
 
+// newCommitMessageGenerationError wraps a formatted message with ErrCommitMessageGeneration
+// so callers can distinguish commit-message failures from other commit pipeline errors.
 func newCommitMessageGenerationError(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrCommitMessageGeneration, fmt.Sprintf(format, args...))
 }
@@ -328,6 +330,11 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 	return committed, nil
 }
 
+// localFallbackCommitMessage builds a "wallfacer: <subject>" commit message
+// without invoking a container. Used when the agent-based commit message
+// generation fails. The subject is derived from the first line of the prompt,
+// falling back to the first line of the diff stat, and is capped at
+// MaxCommitSubjectRunes.
 func localFallbackCommitMessage(prompt, diffStat string) string {
 	subject := strings.TrimSpace(prompt)
 	if idx := strings.Index(subject, "\n"); idx >= 0 {

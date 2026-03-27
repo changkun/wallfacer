@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// TestTTLCache_SetGet verifies basic set-then-get round-trip returns the stored value.
 func TestTTLCache_SetGet(t *testing.T) {
 	c := New[string, int](time.Minute)
 	c.Set("a", 1)
@@ -15,6 +16,7 @@ func TestTTLCache_SetGet(t *testing.T) {
 	}
 }
 
+// TestTTLCache_Miss verifies that Get returns false for a key that was never set.
 func TestTTLCache_Miss(t *testing.T) {
 	c := New[string, int](time.Minute)
 	_, ok := c.Get("missing")
@@ -23,6 +25,8 @@ func TestTTLCache_Miss(t *testing.T) {
 	}
 }
 
+// TestTTLCache_Expiry verifies that entries become inaccessible after their TTL expires,
+// using an injectable clock to advance time deterministically.
 func TestTTLCache_Expiry(t *testing.T) {
 	now := time.Now()
 	c := New[string, int](10*time.Millisecond, WithClock[string, int](func() time.Time { return now }))
@@ -38,6 +42,7 @@ func TestTTLCache_Expiry(t *testing.T) {
 	}
 }
 
+// TestTTLCache_SetPermanent verifies that permanent entries survive past the TTL.
 func TestTTLCache_SetPermanent(t *testing.T) {
 	now := time.Now()
 	c := New[string, int](10*time.Millisecond, WithClock[string, int](func() time.Time { return now }))
@@ -53,6 +58,8 @@ func TestTTLCache_SetPermanent(t *testing.T) {
 	}
 }
 
+// TestTTLCache_MaxSize_EvictsOldest verifies that exceeding MaxSize evicts
+// the oldest permanent entry (FIFO order).
 func TestTTLCache_MaxSize_EvictsOldest(t *testing.T) {
 	c := New[string, int](time.Minute, WithMaxSize[string, int](2))
 
@@ -71,6 +78,8 @@ func TestTTLCache_MaxSize_EvictsOldest(t *testing.T) {
 	}
 }
 
+// TestTTLCache_MaxSize_UpdateDoesNotEvict verifies that updating an existing
+// permanent entry does not count as a new insertion for eviction purposes.
 func TestTTLCache_MaxSize_UpdateDoesNotEvict(t *testing.T) {
 	c := New[string, int](time.Minute, WithMaxSize[string, int](2))
 
@@ -86,6 +95,7 @@ func TestTTLCache_MaxSize_UpdateDoesNotEvict(t *testing.T) {
 	}
 }
 
+// TestTTLCache_Invalidate verifies that Invalidate removes a TTL-based entry.
 func TestTTLCache_Invalidate(t *testing.T) {
 	c := New[string, int](time.Minute)
 
@@ -96,6 +106,9 @@ func TestTTLCache_Invalidate(t *testing.T) {
 	}
 }
 
+// TestTTLCache_Invalidate_Permanent verifies that Invalidate removes a permanent
+// entry and also cleans it from the permanentKeys tracking slice, so subsequent
+// insertions up to MaxSize do not trigger spurious evictions.
 func TestTTLCache_Invalidate_Permanent(t *testing.T) {
 	c := New[string, int](time.Minute, WithMaxSize[string, int](10))
 
@@ -118,6 +131,8 @@ func TestTTLCache_Invalidate_Permanent(t *testing.T) {
 	}
 }
 
+// TestTTLCache_Concurrent exercises concurrent Set and Get operations to verify
+// the mutex-based thread safety does not cause data races.
 func TestTTLCache_Concurrent(_ *testing.T) {
 	c := New[int, int](time.Minute)
 	const n = 50

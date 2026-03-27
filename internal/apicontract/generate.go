@@ -466,9 +466,11 @@ func buildTaskPathExpr(pattern string) string {
 	s = strings.ReplaceAll(s, "{id}", `" + id + "`)
 	s = strings.ReplaceAll(s, "{filename}", `" + filename + "`)
 	s = `"` + s + `"`
-	// Remove empty-string fragments that arise when a placeholder is at the end.
+	// Clean up artifacts from placeholder substitution:
+	// - Empty-string concatenations ("") appear when a placeholder is at the end
+	//   of the pattern, e.g. "/api/tasks/{id}" becomes "/api/tasks/" + id + ""
+	// - Trailing " + " remains after removing the empty string at the end.
 	s = strings.ReplaceAll(s, `""`, "")
-	// Remove any trailing "+ " left after the last variable.
 	s = strings.TrimSuffix(s, ` + `)
 	return s
 }

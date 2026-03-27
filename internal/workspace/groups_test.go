@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// TestUpsertMovesExistingGroupToFront verifies that upserting an existing group
+// promotes it to position 0 without duplicating it.
 func TestUpsertMovesExistingGroupToFront(t *testing.T) {
 	configDir := t.TempDir()
 	wsA := t.TempDir()
@@ -36,6 +38,8 @@ func TestUpsertMovesExistingGroupToFront(t *testing.T) {
 	}
 }
 
+// TestNormalizeGroups_DeduplicatesGroups verifies that groups with identical
+// workspace sets (after path sorting) are collapsed to a single entry.
 func TestNormalizeGroups_DeduplicatesGroups(t *testing.T) {
 	wsA := t.TempDir()
 	wsB := t.TempDir()
@@ -51,6 +55,8 @@ func TestNormalizeGroups_DeduplicatesGroups(t *testing.T) {
 	}
 }
 
+// TestNormalizeGroups_RemovesEmptyWorkspaces verifies that empty-string entries
+// are stripped from workspace lists within a group.
 func TestNormalizeGroups_RemovesEmptyWorkspaces(t *testing.T) {
 	wsA := t.TempDir()
 
@@ -66,6 +72,8 @@ func TestNormalizeGroups_RemovesEmptyWorkspaces(t *testing.T) {
 	}
 }
 
+// TestNormalizeGroups_RemovesGroupsWithNoValidWorkspaces verifies that groups
+// containing only empty/whitespace paths are dropped entirely.
 func TestNormalizeGroups_RemovesGroupsWithNoValidWorkspaces(t *testing.T) {
 	input := []Group{
 		{Workspaces: []string{"", "   "}},
@@ -87,6 +95,8 @@ func TestNormalizeGroups_EmptyInput(t *testing.T) {
 	}
 }
 
+// TestLoadGroups_MissingFile_ReturnsNilNil verifies graceful handling when the
+// groups file does not exist (first-run scenario).
 func TestLoadGroups_MissingFile_ReturnsNilNil(t *testing.T) {
 	configDir := t.TempDir()
 	// No file written, so it should not exist.
@@ -110,6 +120,8 @@ func TestLoadGroups_MissingDirectory_ReturnsNilNil(t *testing.T) {
 	}
 }
 
+// TestSaveGroups_RoundTrip verifies that saved groups can be loaded back
+// with identical content.
 func TestSaveGroups_RoundTrip(t *testing.T) {
 	configDir := t.TempDir()
 	wsA := t.TempDir()
@@ -132,6 +144,8 @@ func TestSaveGroups_RoundTrip(t *testing.T) {
 	}
 }
 
+// TestSaveGroups_AtomicWrite verifies that no temporary file is left behind
+// after a successful save (atomic rename semantics).
 func TestSaveGroups_AtomicWrite(t *testing.T) {
 	// Verify that .tmp file is cleaned up and the actual file exists.
 	configDir := t.TempDir()
@@ -223,6 +237,8 @@ func TestNormalizeGroups_PreservesName(t *testing.T) {
 	}
 }
 
+// TestUpsertGroup_PreservesExistingName verifies that promoting a group to the
+// front retains its user-assigned name.
 func TestUpsertGroup_PreservesExistingName(t *testing.T) {
 	configDir := t.TempDir()
 	wsA := t.TempDir()
@@ -278,6 +294,8 @@ func TestSaveGroups_RoundTrip_WithName(t *testing.T) {
 	}
 }
 
+// TestUpsertGroup_EmptyWorkspaces_NoOp verifies that upserting an empty
+// workspace list does not modify the existing groups.
 func TestUpsertGroup_EmptyWorkspaces_NoOp(t *testing.T) {
 	configDir := t.TempDir()
 	wsA := t.TempDir()

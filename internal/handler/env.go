@@ -119,6 +119,8 @@ type envConfigResponse struct {
 	ContainerMemory      string                                 `json:"container_memory"`
 }
 
+// sandboxTestResponse is the JSON body returned after running a sandbox
+// smoke-check via POST /api/env/test.
 type sandboxTestResponse struct {
 	TaskID         string       `json:"task_id"`
 	Sandbox        sandbox.Type `json:"sandbox"`
@@ -128,6 +130,8 @@ type sandboxTestResponse struct {
 	StopReason     string       `json:"stop_reason,omitempty"`
 }
 
+// sandboxTestRequest is the JSON body accepted by POST /api/env/test.
+// All credential fields use pointer semantics: nil means "use saved value".
 type sandboxTestRequest struct {
 	Sandbox           *sandbox.Type                          `json:"sandbox"`
 	Timeout           *int                                   `json:"timeout"`
@@ -334,6 +338,9 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// buildTestEnvFile creates a temporary .env file by copying the current env
+// file and applying any overrides from the sandbox test request. The caller
+// is responsible for removing the temp file after use.
 func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 	tempFile, err := os.CreateTemp("", "wallfacer-env-test-")
 	if err != nil {
@@ -378,6 +385,8 @@ func (h *Handler) buildTestEnvFile(req *sandboxTestRequest) (string, error) {
 	return tempFile.Name(), nil
 }
 
+// sandboxImageForTest returns the container image name to use for a sandbox
+// connectivity test. For Codex it derives the image from the base Claude image.
 func sandboxImageForTest(sb sandbox.Type, baseImage string) string {
 	if sb == sandbox.Codex {
 		return testCodexImage(baseImage)
@@ -385,6 +394,9 @@ func sandboxImageForTest(sb sandbox.Type, baseImage string) string {
 	return strings.TrimSpace(baseImage)
 }
 
+// testCodexImage derives the Codex sandbox image name from the Claude base
+// image by replacing the repository name "wallfacer" with "wallfacer-codex"
+// while preserving registry, tag, and digest components.
 func testCodexImage(baseImage string) string {
 	baseImage = strings.TrimSpace(baseImage)
 	if baseImage == "" {
@@ -621,6 +633,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// reqBoolString converts an optional bool pointer to an optional string
+// pointer ("true"/"false") for use with envconfig.Updates.
 func reqBoolString(v *bool) *string {
 	if v == nil {
 		return nil

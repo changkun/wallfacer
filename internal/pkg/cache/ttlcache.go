@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// entry holds a cached value along with its expiration metadata.
 type entry[V any] struct {
 	value     V
 	permanent bool      // permanent entries never expire by TTL
@@ -88,8 +89,10 @@ func (c *TTLCache[K, V]) SetPermanent(key K, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, exists := c.entries[key]; !exists {
+		// Track insertion order for oldest-first eviction.
 		c.permanentKeys = append(c.permanentKeys, key)
 		if c.maxSize > 0 && len(c.permanentKeys) > c.maxSize {
+			// Evict the oldest permanent entry (FIFO order).
 			oldest := c.permanentKeys[0]
 			c.permanentKeys = c.permanentKeys[1:]
 			delete(c.entries, oldest)
@@ -106,6 +109,7 @@ func (c *TTLCache[K, V]) Invalidate(key K) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if e, ok := c.entries[key]; ok && e.permanent {
+		// Remove from the insertion-order tracking slice to keep eviction accurate.
 		for i, k := range c.permanentKeys {
 			if k == key {
 				c.permanentKeys = append(c.permanentKeys[:i], c.permanentKeys[i+1:]...)

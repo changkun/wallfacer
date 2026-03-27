@@ -41,11 +41,12 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	// (title, prompt, tags, oversight).
 	s.notify(t, false)
 	if status == TaskStatusDone || status == TaskStatusFailed || status == TaskStatusCancelled {
+		// Terminal state reached: compact event trace files in the background.
 		// Capture the highest sequence number from in-memory state while we
 		// still hold the store lock, so the goroutine only compacts events
 		// that belong to the session that just finished. If the task is
 		// immediately retried, new events (higher seqs) will be left as
-		// numbered files.
+		// numbered files and picked up by the next compaction cycle.
 		maxSeq := int64(s.nextSeq[id] - 1)
 		s.compactWg.Add(1)
 		go func(taskID uuid.UUID, maxSeq int64) {
@@ -443,6 +444,8 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 		return fmt.Errorf("task not found: %s", id)
 	}
 
+	// Snapshot the current run's outcome before resetting fields.
+	// Result is truncated to 2000 chars to keep the RetryHistory entries bounded.
 	result := ""
 	if t.Result != nil {
 		result = *t.Result

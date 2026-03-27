@@ -2,6 +2,7 @@ package pagination
 
 import "testing"
 
+// item is a test fixture with an ID used as cursor and a string payload.
 type item struct {
 	ID    int64
 	Value string
@@ -14,6 +15,7 @@ var testItems = []item{
 	{6, "f"}, {7, "g"}, {8, "h"}, {9, "i"}, {10, "j"},
 }
 
+// TestPaginate_Empty verifies that an empty input yields zero items and HasMore=false.
 func TestPaginate_Empty(t *testing.T) {
 	p := Paginate([]item{}, cursor, 0, 10, 100, 1000, nil)
 	if len(p.Items) != 0 {
@@ -27,6 +29,8 @@ func TestPaginate_Empty(t *testing.T) {
 	}
 }
 
+// TestPaginate_NoFilter verifies basic pagination of the first page with no filter,
+// checking item count, boundaries, HasMore, TotalFiltered, and NextCursor.
 func TestPaginate_NoFilter(t *testing.T) {
 	p := Paginate(testItems, cursor, 0, 5, 100, 1000, nil)
 	if len(p.Items) != 5 {
@@ -46,6 +50,7 @@ func TestPaginate_NoFilter(t *testing.T) {
 	}
 }
 
+// TestPaginate_WithCursor verifies that afterCursor skips items with ID <= cursor.
 func TestPaginate_WithCursor(t *testing.T) {
 	p := Paginate(testItems, cursor, 5, 3, 100, 1000, nil)
 	if len(p.Items) != 3 {
@@ -59,6 +64,8 @@ func TestPaginate_WithCursor(t *testing.T) {
 	}
 }
 
+// TestPaginate_WithFilter verifies that the filter predicate excludes non-matching
+// items from both the result slice and the TotalFiltered count.
 func TestPaginate_WithFilter(t *testing.T) {
 	even := func(i item) bool { return i.ID%2 == 0 }
 	p := Paginate(testItems, cursor, 0, 3, 100, 1000, even)
@@ -78,6 +85,7 @@ func TestPaginate_WithFilter(t *testing.T) {
 	}
 }
 
+// TestPaginate_DefaultLimit verifies that limit=0 falls back to the defaultLimit.
 func TestPaginate_DefaultLimit(t *testing.T) {
 	p := Paginate(testItems, cursor, 0, 0, 3, 1000, nil)
 	if len(p.Items) != 3 {
@@ -85,6 +93,7 @@ func TestPaginate_DefaultLimit(t *testing.T) {
 	}
 }
 
+// TestPaginate_MaxLimit verifies that a requested limit exceeding maxLimit is clamped.
 func TestPaginate_MaxLimit(t *testing.T) {
 	p := Paginate(testItems, cursor, 0, 999, 100, 5, nil)
 	if len(p.Items) != 5 {
@@ -92,6 +101,8 @@ func TestPaginate_MaxLimit(t *testing.T) {
 	}
 }
 
+// TestPaginate_LastPage verifies that the final page has HasMore=false when all
+// remaining items fit within the limit.
 func TestPaginate_LastPage(t *testing.T) {
 	p := Paginate(testItems, cursor, 8, 10, 100, 1000, nil)
 	if len(p.Items) != 2 {

@@ -89,6 +89,7 @@ type countWriter struct {
 	n int64
 }
 
+// Write delegates to the wrapped writer and accumulates the byte count.
 func (cw *countWriter) Write(p []byte) (int, error) {
 	n, err := cw.w.Write(p)
 	cw.n += int64(n)

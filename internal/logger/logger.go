@@ -28,6 +28,8 @@ var (
 	Prompts  *slog.Logger
 )
 
+// init sets up default text-format loggers so that any package importing logger
+// gets working loggers even if Init is never called explicitly.
 func init() {
 	Init("text")
 }
@@ -90,6 +92,8 @@ type prettyHandler struct {
 	color    bool
 }
 
+// newPrettyHandler creates a prettyHandler that writes colored, human-friendly
+// log lines to w. Color is auto-detected based on terminal capabilities.
 func newPrettyHandler(w io.Writer, opts *slog.HandlerOptions) *prettyHandler {
 	return &prettyHandler{
 		w:     w,
@@ -115,6 +119,7 @@ func isColorEnabled(w io.Writer) bool {
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
+// clone returns a shallow copy with an independent preAttrs slice (copy-on-write).
 func (h *prettyHandler) clone() *prettyHandler {
 	return &prettyHandler{
 		w:        h.w,
@@ -124,20 +129,25 @@ func (h *prettyHandler) clone() *prettyHandler {
 	}
 }
 
+// Enabled reports whether the handler is configured to log at the given level.
 func (h *prettyHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.opts.Level.Level()
 }
 
+// WithAttrs returns a new handler with the given attributes pre-set on every record.
 func (h *prettyHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	cp := h.clone()
 	cp.preAttrs = append(cp.preAttrs, attrs...)
 	return cp
 }
 
+// WithGroup is a no-op; groups are not used in this application.
 func (h *prettyHandler) WithGroup(_ string) slog.Handler {
 	return h // groups are not used in this application
 }
 
+// Handle formats and writes a single log record.
+// Layout: timestamp  level  component  source  message  | key=value ...
 func (h *prettyHandler) Handle(_ context.Context, r slog.Record) error {
 	// Collect all attributes: pre-set (from With) then record attrs.
 	all := make([]slog.Attr, 0, len(h.preAttrs)+r.NumAttrs())

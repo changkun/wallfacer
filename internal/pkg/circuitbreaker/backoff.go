@@ -57,6 +57,7 @@ func (b *BackoffBreaker) RecordFailure() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.failures++
+	// Compute exponential backoff: baseDelay * 2^(failures-1), using bit shift.
 	backoff := b.baseDelay * time.Duration(1<<uint(b.failures-1))
 	if backoff > b.maxDelay {
 		backoff = b.maxDelay

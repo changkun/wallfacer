@@ -18,6 +18,8 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 )
 
+// TestStatusResponseWriter_WriteHeaderAndFlush verifies that the
+// statusResponseWriter captures the status code and delegates Flush.
 func TestStatusResponseWriter_WriteHeaderAndFlush(t *testing.T) {
 	rr := httptest.NewRecorder()
 	sw := &statusResponseWriter{
@@ -36,6 +38,8 @@ func TestStatusResponseWriter_WriteHeaderAndFlush(t *testing.T) {
 	}
 }
 
+// TestLoggingMiddleware_LogsForApiAndUiRoutes verifies that the logging
+// middleware preserves the status code for both API and UI routes.
 func TestLoggingMiddleware_LogsForApiAndUiRoutes(t *testing.T) {
 	reg := metrics.NewRegistry()
 	apiHandler := loggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -58,6 +62,9 @@ func TestLoggingMiddleware_LogsForApiAndUiRoutes(t *testing.T) {
 	}
 }
 
+// TestBuildMux_RoutesServeKnownPaths verifies that the mux returns the
+// expected HTTP status codes for a selection of known paths (health, config,
+// tasks, events, outputs).
 func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	workdir := t.TempDir()
 	worktrees := filepath.Join(workdir, "worktrees")
@@ -126,6 +133,8 @@ func TestBuildMux_RoutesServeKnownPaths(t *testing.T) {
 	}
 }
 
+// TestEnsureImage_ReturnsExistingOrPulledImage verifies that ensureImage
+// returns the requested image when it is already present locally.
 func TestEnsureImage_ReturnsExistingOrPulledImage(t *testing.T) {
 	tmp := t.TempDir()
 	runtimeScript := filepath.Join(tmp, "runtime.sh")
@@ -147,6 +156,9 @@ func TestEnsureImage_ReturnsExistingOrPulledImage(t *testing.T) {
 	}
 }
 
+// TestEnsureImage_UsesFallbackWhenPullFails verifies that ensureImage falls
+// back to wallfacer:latest when the requested image is not cached and the
+// pull fails.
 func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
@@ -173,6 +185,8 @@ func TestEnsureImage_UsesFallbackWhenPullFails(t *testing.T) {
 	}
 }
 
+// TestGauge_FailedTasksByCategory validates the Prometheus gauge collector
+// that counts failed tasks grouped by failure category.
 func TestGauge_FailedTasksByCategory(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), "data")
 	s, err := store.NewFileStore(dataDir)
@@ -229,6 +243,8 @@ func TestGauge_FailedTasksByCategory(t *testing.T) {
 	}
 }
 
+// TestGauge_CircuitBreakerOpen validates the circuit-breaker gauge: starts at
+// 0 (closed), then flips to 1 (open) after exceeding the failure threshold.
 func TestGauge_CircuitBreakerOpen(t *testing.T) {
 	workdir := t.TempDir()
 	s, err := store.NewFileStore(filepath.Join(workdir, "data"))

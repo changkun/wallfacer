@@ -16,8 +16,6 @@ import (
 // refinement job is already in "running" state for the given task.
 var ErrRefinementAlreadyRunning = errors.New("refinement already running")
 
-// ListTasks returns all tasks sorted by position then creation time.
-
 // UpdateTaskWorktrees updates the worktree paths and branch name for a task.
 func (s *Store) UpdateTaskWorktrees(_ context.Context, id uuid.UUID, worktreePaths map[string]string, branchName string) error {
 	return s.mutateTask(id, func(t *Task) error {
@@ -148,6 +146,10 @@ func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *R
 			if status == RefinementJobStatusRunning {
 				return ErrRefinementAlreadyRunning
 			}
+			// Guard against fast failure/completion races: if a runner-sourced
+			// job just finished (within the recent-complete window) and has
+			// a result or error, treat it as still in-flight to prevent a
+			// duplicate start before the UI has had time to observe the outcome.
 			if t.CurrentRefinement.Source == "runner" && (status == RefinementJobStatusFailed || status == RefinementJobStatusDone) {
 				elapsed := time.Since(t.UpdatedAt)
 				if elapsed >= 0 && elapsed < constants.RefinementRecentCompleteWindow && (t.CurrentRefinement.Error != "" || t.CurrentRefinement.Result != "") {

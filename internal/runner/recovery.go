@@ -20,6 +20,9 @@ type ContainerLister interface {
 	ListContainers() ([]sandbox.ContainerInfo, error)
 }
 
+// missingRecoveryWorktrees returns the repo paths whose worktree directories
+// are either empty strings or missing from the filesystem. Used during startup
+// recovery to detect tasks with broken worktree state.
 func missingRecoveryWorktrees(t store.Task) []string {
 	var missing []string
 	for repoPath, worktreePath := range t.WorktreePaths {
@@ -34,6 +37,9 @@ func missingRecoveryWorktrees(t store.Task) []string {
 	return missing
 }
 
+// markTaskFailedForMissingWorktrees transitions a task to failed with a
+// worktree_setup failure category when its worktree directories are missing.
+// Used by both the startup recovery and the container monitor paths.
 func markTaskFailedForMissingWorktrees(ctx context.Context, s *store.Store, task store.Task, from store.TaskStatus, trigger store.Trigger) {
 	message := fmt.Sprintf("task worktree missing for: %s", strings.Join(missingRecoveryWorktrees(task), ", "))
 	logger.Recovery.Warn("task worktree missing during recovery", "task", task.ID, "from", from, "error", message)

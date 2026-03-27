@@ -89,6 +89,8 @@ func buildInstructionsData(workspaces []string) InstructionsData {
 		name := filepath.Base(ws)
 		data.Workspaces = append(data.Workspaces, InstructionsWorkspace{Name: name})
 
+		// Prefer AGENTS.md (Codex convention) over CLAUDE.md. If AGENTS.md
+		// exists, skip the CLAUDE.md check so a repo is never listed twice.
 		if _, err := os.Stat(filepath.Join(ws, CodexInstructionsFilename)); err == nil {
 			data.RepoInstructionRefs = append(data.RepoInstructionRefs, InstructionsRepoRef{
 				Workspace: name,

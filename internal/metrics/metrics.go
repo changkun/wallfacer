@@ -151,11 +151,13 @@ type Counter struct {
 	obs map[string]*counterCell // canonical label key → cell
 }
 
+// counterCell holds the accumulated value for one distinct label combination.
 type counterCell struct {
 	labels map[string]string
 	value  uint64
 }
 
+// newCounter creates a Counter with the given name and help text.
 func newCounter(name, help string) *Counter {
 	return &Counter{
 		name: name,
@@ -187,6 +189,7 @@ func (c *Counter) Add(labels map[string]string, delta uint64) {
 	c.mu.Unlock()
 }
 
+// writeTo writes the counter family (HELP, TYPE, and all series) to w.
 func (c *Counter) writeTo(w io.Writer) {
 	_, _ = fmt.Fprintf(w, "# HELP %s %s\n", c.name, c.help)
 	_, _ = fmt.Fprintf(w, "# TYPE %s counter\n", c.name)
@@ -219,6 +222,7 @@ type Histogram struct {
 	obs map[string]*histogramCell // canonical label key → cell
 }
 
+// histogramCell holds the bucket counts, sum, and total count for one distinct label combination.
 type histogramCell struct {
 	labels map[string]string
 	counts []uint64 // len == len(Histogram.buckets)+1; last slot is +Inf
@@ -226,6 +230,8 @@ type histogramCell struct {
 	count  uint64
 }
 
+// newHistogram creates a Histogram with the given name, help text, and bucket
+// upper bounds. The buckets are cloned and sorted in ascending order.
 func newHistogram(name, help string, buckets []float64) *Histogram {
 	bs := slices.Clone(buckets)
 	slices.Sort(bs)
@@ -265,6 +271,7 @@ func (h *Histogram) Observe(labels map[string]string, value float64) {
 	h.mu.Unlock()
 }
 
+// writeTo writes the histogram family (HELP, TYPE, buckets, sum, count) to w.
 func (h *Histogram) writeTo(w io.Writer) {
 	_, _ = fmt.Fprintf(w, "# HELP %s %s\n", h.name, h.help)
 	_, _ = fmt.Fprintf(w, "# TYPE %s histogram\n", h.name)

@@ -44,16 +44,19 @@ type pullTracker struct {
 	pulls map[string]*imagePull
 }
 
+// newPullTracker creates an empty pullTracker.
 func newPullTracker() *pullTracker {
 	return &pullTracker{pulls: make(map[string]*imagePull)}
 }
 
+// get returns a tracked pull by ID, or nil if not found.
 func (pt *pullTracker) get(id string) *imagePull {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
 	return pt.pulls[id]
 }
 
+// store registers a new or existing pull in the tracker.
 func (pt *pullTracker) store(p *imagePull) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
@@ -164,7 +167,8 @@ func (h *Handler) GetImageStatus(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// inspectImage checks whether an image is cached and retrieves metadata.
+// inspectImage checks whether an image is cached in the local container runtime
+// and retrieves its size and creation time from `<cmd> images --format ...`.
 func (h *Handler) inspectImage(cmd string, sb sandbox.Type, image string) imageStatus {
 	status := imageStatus{
 		Sandbox: sb,

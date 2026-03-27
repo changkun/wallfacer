@@ -23,6 +23,8 @@ func RebaseOntoDefault(repoPath, worktreePath string) error {
 		return conflictErr
 	}
 
+	// Use a transactional command: attempt the rebase, and if it fails,
+	// automatically abort it so the worktree is left in a clean state.
 	tx := cmdexec.NewTx()
 	tx.AddWithRollback(
 		cmdexec.Git(worktreePath, "rebase", defBranch),
@@ -119,6 +121,8 @@ func clearConflictedPaths(worktreePath string) error {
 }
 
 // FFMerge fast-forward merges branchName into the default branch of repoPath.
+// It stashes any dirty working-tree state before checkout, and restores it
+// after the merge completes. Returns an error if the merge is not fast-forward.
 func FFMerge(repoPath, branchName string) error {
 	defBranch, err := DefaultBranch(repoPath)
 	if err != nil {
@@ -175,6 +179,10 @@ func CommitsBehind(repoPath, worktreePath string) (int, error) {
 	return n, nil
 }
 
+// defaultBranchCommitHash resolves the commit hash of the default branch,
+// trying multiple ref forms in order: bare name, refs/heads/, origin/ remote,
+// and refs/remotes/origin/. This handles detached-HEAD repos where the local
+// branch may not exist but the remote tracking ref is still available.
 func defaultBranchCommitHash(repoPath, defBranch string) (string, error) {
 	candidates := []string{
 		defBranch,
@@ -276,7 +284,10 @@ func HasConflicts(worktreePath string) (bool, error) {
 		if len(line) < 2 {
 			continue
 		}
-		// Conflict status codes: UU, AA, DD, AU, UA, DU, UD
+		// Git porcelain status uses a two-character XY code. The conflict
+		// status codes below correspond to unmerged entries:
+		//   UU = both modified, AA = both added, DD = both deleted,
+		//   AU/UA = added by us/them, DU/UD = deleted by us/them.
 		xy := line[:2]
 		switch xy {
 		case "UU", "AA", "DD", "AU", "UA", "DU", "UD":

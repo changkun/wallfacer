@@ -49,9 +49,10 @@ func (e *TxError) Unwrap() error {
 	return nil
 }
 
+// txStep pairs a forward command with an optional rollback command.
 type txStep struct {
 	cmd      *Cmd
-	rollback *Cmd
+	rollback *Cmd // nil if no rollback is needed for this step
 }
 
 // Tx groups commands into a transaction with per-step rollback.

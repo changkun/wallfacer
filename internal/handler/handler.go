@@ -38,16 +38,20 @@ type watcherBreaker struct {
 	lastTaskID *uuid.UUID
 }
 
+// newWatcherBreaker creates a watcherBreaker with default backoff configuration.
 func newWatcherBreaker() *watcherBreaker {
 	return &watcherBreaker{
 		breaker: circuitbreaker.NewBackoff(circuitbreaker.BackoffConfig{}),
 	}
 }
 
+// isOpen reports whether the breaker is currently in the open (tripped) state.
 func (wb *watcherBreaker) isOpen() bool {
 	return wb.breaker.IsOpen()
 }
 
+// recordFailure records a failure with metadata for health reporting and
+// delegates to the underlying backoff breaker. Returns the new failure count.
 func (wb *watcherBreaker) recordFailure(taskID *uuid.UUID, reason string) int {
 	wb.mu.Lock()
 	wb.lastReason = reason
@@ -61,6 +65,7 @@ func (wb *watcherBreaker) recordFailure(taskID *uuid.UUID, reason string) int {
 	return wb.breaker.RecordFailure()
 }
 
+// recordSuccess resets the failure state and clears the last failure metadata.
 func (wb *watcherBreaker) recordSuccess() {
 	wb.breaker.RecordSuccess()
 	wb.mu.Lock()
@@ -78,6 +83,8 @@ type watcherHealthEntry struct {
 	LastReason string     `json:"last_reason,omitempty"`
 }
 
+// healthEntry builds a watcherHealthEntry snapshot for inclusion in the
+// GET /api/config response, reporting current breaker state and last failure.
 func (wb *watcherBreaker) healthEntry(name string) watcherHealthEntry {
 	open := wb.breaker.IsOpen()
 	entry := watcherHealthEntry{
@@ -230,6 +237,8 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	return h
 }
 
+// currentStore returns the active store, preferring the workspace manager's
+// store when available. Returns (nil, false) when no store is configured.
 func (h *Handler) currentStore() (*store.Store, bool) {
 	if h.workspace != nil {
 		return h.workspace.Store()
@@ -240,6 +249,8 @@ func (h *Handler) currentStore() (*store.Store, bool) {
 	return s, s != nil
 }
 
+// requireStore returns the active store or writes a 503 Service Unavailable
+// response if no store is configured. Returns (nil, false) on failure.
 func (h *Handler) requireStore(w http.ResponseWriter) (*store.Store, bool) {
 	s, ok := h.currentStore()
 	if !ok || s == nil {
@@ -249,6 +260,8 @@ func (h *Handler) requireStore(w http.ResponseWriter) (*store.Store, bool) {
 	return s, true
 }
 
+// currentWorkspaces returns the active workspace directory paths. Returns nil
+// when no workspaces are configured. The returned slice is a clone.
 func (h *Handler) currentWorkspaces() []string {
 	if h.workspace != nil {
 		return h.workspace.Workspaces()
@@ -262,6 +275,8 @@ func (h *Handler) currentWorkspaces() []string {
 	return slices.Clone(ws)
 }
 
+// currentInstructionsPath returns the filesystem path to the active
+// workspace AGENTS.md, or "" if no workspace manager is available.
 func (h *Handler) currentInstructionsPath() string {
 	if h.workspace != nil {
 		return h.workspace.InstructionsPath()
@@ -281,6 +296,7 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 	h.snapshotMu.Unlock()
 }
 
+// hasStore reports whether the handler has a configured store.
 func (h *Handler) hasStore() bool {
 	_, ok := h.currentStore()
 	return ok
@@ -319,6 +335,8 @@ func (h *Handler) incAutopilotPhase2Miss(watcher string) {
 	})
 }
 
+// setSandboxTestPassed records whether the given sandbox type has passed its
+// connectivity test. Protected by sandboxTestMu for concurrent access.
 func (h *Handler) setSandboxTestPassed(sb sandbox.Type, passed bool) {
 	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.Lock()
@@ -326,6 +344,8 @@ func (h *Handler) setSandboxTestPassed(sb sandbox.Type, passed bool) {
 	h.sandboxTestMu.Unlock()
 }
 
+// sandboxTestPassedState reports whether the given sandbox type has passed
+// its connectivity test.
 func (h *Handler) sandboxTestPassedState(sb sandbox.Type) bool {
 	s := normalizeSandbox(string(sb))
 	h.sandboxTestMu.RLock()
@@ -333,6 +353,8 @@ func (h *Handler) sandboxTestPassedState(sb sandbox.Type) bool {
 	return h.sandboxTestPassed[s]
 }
 
+// refreshCodexBootstrapAuthState checks host-level Codex authentication
+// (~/.codex/auth.json) and marks the Codex sandbox as test-passed if valid.
 func (h *Handler) refreshCodexBootstrapAuthState() {
 	if h.runner == nil {
 		return

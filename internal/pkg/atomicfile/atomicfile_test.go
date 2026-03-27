@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+// TestWrite_Success validates the happy path: data is written to the target
+// path and the temporary file is cleaned up afterward.
 func TestWrite_Success(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "out.txt")
@@ -31,6 +33,8 @@ func TestWrite_Success(t *testing.T) {
 	}
 }
 
+// TestWrite_DirNotExist verifies that Write returns an error when the
+// parent directory does not exist.
 func TestWrite_DirNotExist(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "no-such-dir", "file.txt")
 	if err := Write(path, []byte("x"), 0644); err == nil {
@@ -38,6 +42,8 @@ func TestWrite_DirNotExist(t *testing.T) {
 	}
 }
 
+// TestWriteJSON_Success verifies that WriteJSON marshals a value as indented
+// JSON and the result can be read back and unmarshaled correctly.
 func TestWriteJSON_Success(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "data.json")
@@ -60,6 +66,8 @@ func TestWriteJSON_Success(t *testing.T) {
 	}
 }
 
+// TestWriteJSON_MarshalError verifies that WriteJSON returns an error for
+// unmarshalable types (channels) and does not leave a file on disk.
 func TestWriteJSON_MarshalError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.json")
@@ -73,6 +81,8 @@ func TestWriteJSON_MarshalError(t *testing.T) {
 	}
 }
 
+// TestWrite_Overwrite verifies that a second Write to the same path
+// atomically replaces the file content.
 func TestWrite_Overwrite(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "file.txt")
@@ -90,6 +100,8 @@ func TestWrite_Overwrite(t *testing.T) {
 	}
 }
 
+// TestWrite_Concurrent verifies that concurrent writes to the same path
+// do not corrupt the file -- exactly one writer's content should survive.
 func TestWrite_Concurrent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "concurrent.txt")

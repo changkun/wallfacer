@@ -11,6 +11,8 @@ import (
 )
 
 // buildMinimalTaskJSON creates a minimal valid task JSON for migration testing.
+// Override keys are merged into the base object (id + prompt); callers can
+// selectively set fields like "status", "depends_on", "sandbox", etc.
 func buildMinimalTaskJSON(t *testing.T, overrides map[string]any) []byte {
 	t.Helper()
 	base := map[string]any{

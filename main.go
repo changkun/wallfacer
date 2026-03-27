@@ -10,10 +10,10 @@ import (
 )
 
 //go:embed ui
-var uiFiles embed.FS
+var uiFiles embed.FS // uiFiles holds the frontend assets (HTML, JS, CSS) served by the web server.
 
 //go:embed docs
-var docsFiles embed.FS
+var docsFiles embed.FS // docsFiles holds the user-facing documentation served at /docs.
 
 func main() {
 	configDir := cli.ConfigDir()
@@ -23,6 +23,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Dispatch to the appropriate CLI subcommand. "doctor" and "env" are
+	// aliases that both run the prerequisite/config check.
 	switch os.Args[1] {
 	case "doctor", "env":
 		cli.RunDoctor(configDir)

@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// TestHub_PublishSubscribe verifies that a subscriber receives published values
+// with correct monotonic sequence numbers.
 func TestHub_PublishSubscribe(t *testing.T) {
 	h := NewHub[string]()
 	id, ch := h.Subscribe()
@@ -26,6 +28,8 @@ func TestHub_PublishSubscribe(t *testing.T) {
 	}
 }
 
+// TestHub_WakeCoalescing verifies that rapid publishes coalesce into a bounded
+// number of wake signals (capacity-1 channel absorbs bursts).
 func TestHub_WakeCoalescing(t *testing.T) {
 	h := NewHub[int]()
 	id, ch := h.SubscribeWake()
@@ -52,6 +56,8 @@ done:
 	}
 }
 
+// TestHub_OverflowEviction verifies that a subscriber whose channel buffer is
+// full gets evicted (channel closed) rather than blocking the publisher.
 func TestHub_OverflowEviction(t *testing.T) {
 	h := NewHub[int](WithChannelSize[int](1))
 	id, ch := h.Subscribe()
@@ -74,6 +80,8 @@ func TestHub_OverflowEviction(t *testing.T) {
 	}
 }
 
+// TestHub_UnsubscribeDrains verifies that Unsubscribe drains buffered items
+// without blocking and removes the subscriber from the active set.
 func TestHub_UnsubscribeDrains(t *testing.T) {
 	h := NewHub[int]()
 	id, _ := h.Subscribe()
@@ -89,6 +97,8 @@ func TestHub_UnsubscribeDrains(t *testing.T) {
 	}
 }
 
+// TestHub_Since_NoGap verifies that Since returns only entries after the given
+// sequence number when the replay buffer contains the full history.
 func TestHub_Since_NoGap(t *testing.T) {
 	h := NewHub[int]()
 
@@ -108,6 +118,8 @@ func TestHub_Since_NoGap(t *testing.T) {
 	}
 }
 
+// TestHub_Since_Gap verifies that Since reports a gap when the requested sequence
+// has been evicted from the bounded replay buffer.
 func TestHub_Since_Gap(t *testing.T) {
 	h := NewHub[int](WithReplayCapacity[int](3))
 
@@ -122,6 +134,7 @@ func TestHub_Since_Gap(t *testing.T) {
 	}
 }
 
+// TestHub_Since_Empty verifies that Since on an empty hub returns nil with no gap.
 func TestHub_Since_Empty(t *testing.T) {
 	h := NewHub[int]()
 	items, gap := h.Since(0)
@@ -133,6 +146,8 @@ func TestHub_Since_Empty(t *testing.T) {
 	}
 }
 
+// TestHub_Since_AllCurrent verifies that Since returns nil when the caller is
+// already up to date with the latest sequence number.
 func TestHub_Since_AllCurrent(t *testing.T) {
 	h := NewHub[int]()
 	h.Publish(1)
@@ -147,6 +162,8 @@ func TestHub_Since_AllCurrent(t *testing.T) {
 	}
 }
 
+// TestHub_LatestSeq verifies that LatestSeq starts at 0 and increments with
+// each Publish call.
 func TestHub_LatestSeq(t *testing.T) {
 	h := NewHub[int]()
 	if h.LatestSeq() != 0 {
@@ -158,6 +175,8 @@ func TestHub_LatestSeq(t *testing.T) {
 	}
 }
 
+// TestHub_WithClone verifies that the clone function isolates subscribers from
+// mutations to the original published value.
 func TestHub_WithClone(t *testing.T) {
 	type val struct{ N int }
 	h := NewHub[*val](WithClone[*val](func(v *val) *val {
@@ -182,6 +201,8 @@ func TestHub_WithClone(t *testing.T) {
 	}
 }
 
+// TestHub_ConcurrentSafe stress-tests that concurrent Publish, Subscribe,
+// SubscribeWake, and Since operations do not race (validated by -race detector).
 func TestHub_ConcurrentSafe(_ *testing.T) {
 	h := NewHub[int]()
 	const n = 50

@@ -28,6 +28,8 @@ func newCommitsBehindCache(ttl time.Duration) *commitsBehindCache {
 	}
 }
 
+// key builds a cache lookup key by joining repo and worktree paths with a
+// NUL separator (which cannot appear in filesystem paths).
 func (c *commitsBehindCache) key(repoPath, worktreePath string) string {
 	return repoPath + "\x00" + worktreePath
 }

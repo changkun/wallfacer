@@ -30,10 +30,15 @@ func (h *Handler) maxTestConcurrentTasks() int {
 	return h.cachedMaxTestParallel.Get()
 }
 
+// countRegularInProgress returns the number of non-test in-progress tasks
+// from the store's secondary index. The context parameter is unused but
+// matches the calling convention for store query methods.
 func (h *Handler) countRegularInProgress(_ context.Context) (int, error) {
 	return h.store.CountRegularInProgress(), nil
 }
 
+// countRegularInProgress counts non-test in-progress tasks from a task slice.
+// Used in Phase 1 of auto-promotion where a snapshot is already available.
 func countRegularInProgress(tasks []store.Task) int {
 	count := 0
 	for i := range tasks {

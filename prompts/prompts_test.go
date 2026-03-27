@@ -272,6 +272,9 @@ func TestValidate_AllKnownNamesWithEmbeddedDefaults(t *testing.T) {
 
 // --- Tests for all six remaining template renderers ---
 
+// TestRefinement_ReturnsNonEmptyRendered verifies that the refinement template
+// renders with all fields populated and produces valid (non-empty, no raw
+// template syntax) output.
 func TestRefinement_ReturnsNonEmptyRendered(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	data := prompts.RefinementData{
@@ -291,6 +294,8 @@ func TestRefinement_ReturnsNonEmptyRendered(t *testing.T) {
 	}
 }
 
+// TestIdeation_ReturnsNonEmptyRendered verifies that the ideation template
+// renders with existing tasks and categories populated.
 func TestIdeation_ReturnsNonEmptyRendered(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	data := prompts.IdeationData{
@@ -308,6 +313,8 @@ func TestIdeation_ReturnsNonEmptyRendered(t *testing.T) {
 	}
 }
 
+// TestOversight_ReturnsNonEmptyRendered verifies that the oversight template
+// renders with a sample activity log.
 func TestOversight_ReturnsNonEmptyRendered(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	got := mgr.Oversight("Phase 1: analyzed codebase. Phase 2: implemented feature.")
@@ -319,6 +326,8 @@ func TestOversight_ReturnsNonEmptyRendered(t *testing.T) {
 	}
 }
 
+// TestCommitMessage_ReturnsNonEmptyRendered verifies that the commit message
+// template renders with prompt, diff stat, and recent log populated.
 func TestCommitMessage_ReturnsNonEmptyRendered(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	data := prompts.CommitData{
@@ -335,6 +344,8 @@ func TestCommitMessage_ReturnsNonEmptyRendered(t *testing.T) {
 	}
 }
 
+// TestConflictResolution_ReturnsNonEmptyRendered verifies that the conflict
+// resolution template renders with container path and default branch populated.
 func TestConflictResolution_ReturnsNonEmptyRendered(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	data := prompts.ConflictData{
@@ -350,6 +361,9 @@ func TestConflictResolution_ReturnsNonEmptyRendered(t *testing.T) {
 	}
 }
 
+// TestTestVerification_ReturnsNonEmptyRendered verifies that the test
+// verification template renders with all optional fields (criteria, impl
+// result, diff) populated.
 func TestTestVerification_ReturnsNonEmptyRendered(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	data := prompts.TestData{
@@ -367,7 +381,8 @@ func TestTestVerification_ReturnsNonEmptyRendered(t *testing.T) {
 	}
 }
 
-// Package-level delegation functions.
+// Package-level delegation functions — each verifies that the package-level
+// convenience function delegates to Default and produces non-empty output.
 
 func TestPackageLevelRefinement_NonEmpty(t *testing.T) {
 	got := prompts.Refinement(prompts.RefinementData{Prompt: "do something", Status: "backlog"})
@@ -418,6 +433,9 @@ func TestPackageLevelTitle_NonEmpty(t *testing.T) {
 	}
 }
 
+// TestIdeation_EmptyData verifies that the ideation template renders
+// successfully even when all data fields are zero-valued (no existing tasks,
+// categories, or hotspots).
 func TestIdeation_EmptyData(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	got := mgr.Ideation(prompts.IdeationData{})
@@ -426,6 +444,9 @@ func TestIdeation_EmptyData(t *testing.T) {
 	}
 }
 
+// TestTestVerification_NoCriteria verifies that the test verification template
+// renders when only the required OriginalPrompt is set and all optional fields
+// (Criteria, ImplResult, Diff) are empty.
 func TestTestVerification_NoCriteria(t *testing.T) {
 	mgr := prompts.NewManager(t.TempDir())
 	got := mgr.TestVerification(prompts.TestData{OriginalPrompt: "build something"})

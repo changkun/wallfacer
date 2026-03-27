@@ -134,12 +134,18 @@ const (
 	// SandboxActivityImplementation is the main implementation phase.
 	SandboxActivityImplementation SandboxActivity = "implementation"
 	// SandboxActivityTesting is the test-execution phase.
-	SandboxActivityTesting       SandboxActivity = "testing"
-	SandboxActivityRefinement    SandboxActivity = "refinement"
-	SandboxActivityTitle         SandboxActivity = "title"
-	SandboxActivityOversight     SandboxActivity = "oversight"
+	// SandboxActivityTesting is the automated test-execution phase.
+	SandboxActivityTesting SandboxActivity = "testing"
+	// SandboxActivityRefinement is the prompt-refinement phase.
+	SandboxActivityRefinement SandboxActivity = "refinement"
+	// SandboxActivityTitle is the background title-generation phase.
+	SandboxActivityTitle SandboxActivity = "title"
+	// SandboxActivityOversight is the oversight summary generation phase.
+	SandboxActivityOversight SandboxActivity = "oversight"
+	// SandboxActivityCommitMessage is the commit-message generation phase.
 	SandboxActivityCommitMessage SandboxActivity = "commit_message"
-	SandboxActivityIdeaAgent     SandboxActivity = "idea_agent"
+	// SandboxActivityIdeaAgent is the brainstorm/ideation phase.
+	SandboxActivityIdeaAgent SandboxActivity = "idea_agent"
 
 	// SandboxActivityTest is a usage-attribution-only activity (not used for sandbox routing).
 	SandboxActivityTest          SandboxActivity = "test"

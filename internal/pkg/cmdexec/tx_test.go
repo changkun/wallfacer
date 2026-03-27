@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// TestTx_AllSucceed verifies that a transaction with all passing steps returns nil.
 func TestTx_AllSucceed(t *testing.T) {
 	tx := NewTx()
 	tx.Add(New("true"))
@@ -19,6 +20,8 @@ func TestTx_AllSucceed(t *testing.T) {
 	}
 }
 
+// TestTx_StepFailsRunsRollback verifies that when a step fails, its rollback
+// command executes and the error carries the correct step index.
 func TestTx_StepFailsRunsRollback(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "rollback-ran")
@@ -49,6 +52,8 @@ func TestTx_StepFailsRunsRollback(t *testing.T) {
 	}
 }
 
+// TestTx_RollbacksRunInReverse verifies that rollback commands execute in reverse
+// order (from the failed step back to step 0).
 func TestTx_RollbacksRunInReverse(t *testing.T) {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "order.txt")
@@ -79,6 +84,7 @@ func TestTx_RollbacksRunInReverse(t *testing.T) {
 	}
 }
 
+// TestTx_DeferAlwaysRuns verifies that deferred commands execute even on success.
 func TestTx_DeferAlwaysRuns(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "defer-ran")
@@ -93,6 +99,7 @@ func TestTx_DeferAlwaysRuns(t *testing.T) {
 	}
 }
 
+// TestTx_DeferRunsOnFailure verifies that deferred commands execute even when a step fails.
 func TestTx_DeferRunsOnFailure(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "defer-ran")
@@ -107,6 +114,7 @@ func TestTx_DeferRunsOnFailure(t *testing.T) {
 	}
 }
 
+// TestTx_DeferRunsLIFO verifies that deferred commands execute in last-in-first-out order.
 func TestTx_DeferRunsLIFO(t *testing.T) {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "order.txt")
@@ -126,6 +134,8 @@ func TestTx_DeferRunsLIFO(t *testing.T) {
 	}
 }
 
+// TestTx_RollbackErrorCollected verifies that a failing rollback command is
+// captured in TxError.RollbackErrors rather than being silently dropped.
 func TestTx_RollbackErrorCollected(t *testing.T) {
 	tx := NewTx()
 	tx.AddWithRollback(
@@ -143,6 +153,8 @@ func TestTx_RollbackErrorCollected(t *testing.T) {
 	}
 }
 
+// TestTx_DeferErrorCollected verifies that a failing defer with no step failure
+// still returns a TxError with Step=nil and the defer error recorded.
 func TestTx_DeferErrorCollected(t *testing.T) {
 	tx := NewTx()
 	tx.Defer(New("false"))
@@ -161,6 +173,8 @@ func TestTx_DeferErrorCollected(t *testing.T) {
 	}
 }
 
+// TestTx_StepOutputCaptured verifies that the combined output of a failed step
+// is available in StepError.Output for diagnostic purposes.
 func TestTx_StepOutputCaptured(t *testing.T) {
 	tx := NewTx()
 	tx.Add(New("bash", "-c", "echo conflict-marker; exit 1"))
@@ -175,6 +189,8 @@ func TestTx_StepOutputCaptured(t *testing.T) {
 	}
 }
 
+// TestTx_UnwrapReturnsStepErr verifies that TxError.Unwrap returns the underlying
+// exec error for use with errors.Is/As.
 func TestTx_UnwrapReturnsStepErr(t *testing.T) {
 	tx := NewTx()
 	tx.Add(New("false"))
@@ -189,6 +205,7 @@ func TestTx_UnwrapReturnsStepErr(t *testing.T) {
 	}
 }
 
+// TestTx_RunContext verifies that RunContext propagates the context timeout to steps.
 func TestTx_RunContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 	defer cancel()
@@ -201,6 +218,8 @@ func TestTx_RunContext(t *testing.T) {
 	}
 }
 
+// TestStepError_ErrorAndUnwrap verifies the Error string format and Unwrap behavior
+// of StepError.
 func TestStepError_ErrorAndUnwrap(t *testing.T) {
 	inner := errors.New("exec failed")
 	se := &StepError{Err: inner, Output: "some output", Index: 3}
@@ -212,6 +231,8 @@ func TestStepError_ErrorAndUnwrap(t *testing.T) {
 	}
 }
 
+// TestTxError_ErrorFormats verifies that TxError.Error includes step, rollback,
+// and defer error summaries, and that Unwrap returns nil when Step is nil.
 func TestTxError_ErrorFormats(t *testing.T) {
 	// Step error only.
 	te := &TxError{Step: &StepError{Err: errors.New("fail"), Index: 0}}
@@ -240,6 +261,7 @@ func TestTxError_ErrorFormats(t *testing.T) {
 	}
 }
 
+// TestTx_Empty verifies that running a transaction with no steps succeeds.
 func TestTx_Empty(t *testing.T) {
 	tx := NewTx()
 	if err := tx.Run(); err != nil {

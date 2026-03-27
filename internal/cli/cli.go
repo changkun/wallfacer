@@ -63,6 +63,8 @@ func PrintUsage() {
 	fmt.Fprintf(os.Stderr, "\nRun 'wallfacer <command> -help' for more information on a command.\n")
 }
 
+// initConfigDir ensures the configuration directory exists and seeds the .env
+// template file if it does not already exist.
 func initConfigDir(configDir, envFile string) {
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		logger.Fatal("create config dir", "error", err)
@@ -101,6 +103,8 @@ func initConfigDir(configDir, envFile string) {
 	}
 }
 
+// envOrDefault returns the value of the environment variable key, or fallback
+// if the variable is unset or empty.
 func envOrDefault(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -152,6 +156,8 @@ func isWSL() bool {
 	return os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != ""
 }
 
+// openBrowser launches the platform's default browser with the given URL.
+// Under WSL, it delegates to cmd.exe so the Windows host browser opens.
 func openBrowser(url string) {
 	switch runtime.GOOS {
 	case "darwin":

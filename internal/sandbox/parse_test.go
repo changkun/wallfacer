@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+// TestParseContainerListPodmanJSON verifies parsing Podman's JSON array format
+// where Names is an array and Created is a unix timestamp number.
 func TestParseContainerListPodmanJSON(t *testing.T) {
 	containers := []map[string]any{
 		{
@@ -39,6 +41,8 @@ func TestParseContainerListPodmanJSON(t *testing.T) {
 	}
 }
 
+// TestParseContainerListDockerNDJSON verifies parsing Docker's NDJSON format
+// (one JSON object per line) where Names is a bare string with a leading "/".
 func TestParseContainerListDockerNDJSON(t *testing.T) {
 	line1 := `{"Id":"def456","Names":"wallfacer-slug-aabbccdd","Image":"sandbox-claude:latest","State":"running","Status":"Up 2 minutes","Labels":{"wallfacer.task.id":"11111111-2222-3333-4444-555555555555"}}`
 	line2 := `{"Id":"ghi789","Names":"/wallfacer-other-11223344","Image":"sandbox-codex:latest","State":"exited","Status":"Exited (0) 1 minute ago","Labels":{}}`
@@ -56,6 +60,8 @@ func TestParseContainerListDockerNDJSON(t *testing.T) {
 	}
 }
 
+// TestParseContainerListEmpty verifies that empty, null, and whitespace-only
+// inputs return an empty slice without error.
 func TestParseContainerListEmpty(t *testing.T) {
 	for _, input := range []string{"", "null", "  \n  "} {
 		result, err := ParseContainerList([]byte(input))
@@ -68,6 +74,8 @@ func TestParseContainerListEmpty(t *testing.T) {
 	}
 }
 
+// TestParseContainerListTaskIDFallback verifies that when the wallfacer.task.id
+// label is absent, the task ID is extracted from the container name suffix.
 func TestParseContainerListTaskIDFallback(t *testing.T) {
 	containers := []map[string]any{
 		{
@@ -90,6 +98,8 @@ func TestParseContainerListTaskIDFallback(t *testing.T) {
 	}
 }
 
+// TestIsUUID validates the UUID format checker against valid, invalid, and
+// edge-case inputs (wrong length, non-hex chars, wrong separators).
 func TestIsUUID(t *testing.T) {
 	tests := []struct {
 		input string
@@ -112,6 +122,8 @@ func TestIsUUID(t *testing.T) {
 	}
 }
 
+// TestBackendStateString verifies the human-readable name for each backend
+// lifecycle state, including the "unknown" fallback for out-of-range values.
 func TestBackendStateString(t *testing.T) {
 	tests := []struct {
 		state BackendState
@@ -132,6 +144,8 @@ func TestBackendStateString(t *testing.T) {
 	}
 }
 
+// TestContainerSpecBuild verifies that Build() produces the expected CLI
+// arguments including network, name, and image flags.
 func TestContainerSpecBuild(t *testing.T) {
 	spec := ContainerSpec{
 		Runtime: "podman",

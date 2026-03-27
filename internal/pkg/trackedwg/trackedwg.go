@@ -21,10 +21,13 @@ type WaitGroup struct {
 func (w *WaitGroup) Add(label string) {
 	w.mu.Lock()
 	if w.pending == nil {
-		w.pending = make(map[string]int)
+		w.pending = make(map[string]int) // lazy init to support zero-value usage
 	}
 	w.pending[label]++
 	w.mu.Unlock()
+	// wg.Add must happen after recording the label so that Pending is always
+	// consistent: if a caller checks Pending after Add returns, the label is
+	// guaranteed to be visible.
 	w.wg.Add(1)
 }
 

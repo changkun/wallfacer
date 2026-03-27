@@ -87,18 +87,26 @@ type localHandle struct {
 	state   atomic.Int32
 }
 
+// State returns the current lifecycle state, read atomically so it is safe
+// to call from any goroutine.
 func (h *localHandle) State() BackendState {
 	return BackendState(h.state.Load())
 }
 
+// Stdout returns the container's stdout pipe, established before Start().
 func (h *localHandle) Stdout() io.ReadCloser {
 	return h.stdout
 }
 
+// Stderr returns the container's stderr pipe, established before Start().
 func (h *localHandle) Stderr() io.ReadCloser {
 	return h.stderr
 }
 
+// Wait blocks until the container process exits. A non-zero exit code from
+// the container is returned as (exitCode, nil) with state set to Stopped.
+// Only unexpected errors (e.g. wait syscall failures) return a non-nil error
+// with state set to Failed.
 func (h *localHandle) Wait() (int, error) {
 	err := h.cmd.Wait()
 	if err != nil {
@@ -113,6 +121,9 @@ func (h *localHandle) Wait() (int, error) {
 	return 0, nil
 }
 
+// Kill forcibly stops and removes the container. It first sends a kill signal,
+// then force-removes to clean up. Errors from kill/rm are logged but not
+// returned, since the goal is best-effort cleanup.
 func (h *localHandle) Kill() error {
 	h.state.Store(int32(StateStopping))
 
@@ -127,6 +138,7 @@ func (h *localHandle) Kill() error {
 	return nil
 }
 
+// Name returns the container name assigned at launch time.
 func (h *localHandle) Name() string {
 	return h.name
 }

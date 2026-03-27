@@ -11,6 +11,7 @@ import (
 // canonicalLabelKey
 // ---------------------------------------------------------------------------
 
+// TestCanonicalLabelKey_Empty verifies that nil and empty label maps produce an empty key.
 func TestCanonicalLabelKey_Empty(t *testing.T) {
 	if got := canonicalLabelKey(nil); got != "" {
 		t.Errorf("expected empty string for nil labels, got %q", got)
@@ -20,6 +21,7 @@ func TestCanonicalLabelKey_Empty(t *testing.T) {
 	}
 }
 
+// TestCanonicalLabelKey_Deterministic verifies that the same label map always produces the same key.
 func TestCanonicalLabelKey_Deterministic(t *testing.T) {
 	labels := map[string]string{"method": "GET", "route": "/api/tasks", "status": "200"}
 	k1 := canonicalLabelKey(labels)
@@ -29,6 +31,7 @@ func TestCanonicalLabelKey_Deterministic(t *testing.T) {
 	}
 }
 
+// TestCanonicalLabelKey_OrderIndependent verifies that insertion order of map entries does not affect the key.
 func TestCanonicalLabelKey_OrderIndependent(t *testing.T) {
 	a := canonicalLabelKey(map[string]string{"a": "1", "b": "2"})
 	b := canonicalLabelKey(map[string]string{"b": "2", "a": "1"})
@@ -37,6 +40,7 @@ func TestCanonicalLabelKey_OrderIndependent(t *testing.T) {
 	}
 }
 
+// TestCanonicalLabelKey_DistinguishesLabelSets verifies that different label values produce different keys.
 func TestCanonicalLabelKey_DistinguishesLabelSets(t *testing.T) {
 	k1 := canonicalLabelKey(map[string]string{"method": "GET", "status": "200"})
 	k2 := canonicalLabelKey(map[string]string{"method": "POST", "status": "200"})
@@ -49,6 +53,7 @@ func TestCanonicalLabelKey_DistinguishesLabelSets(t *testing.T) {
 // Counter
 // ---------------------------------------------------------------------------
 
+// TestCounter_IncSingleLabel verifies that Inc increments a counter with a single label set.
 func TestCounter_IncSingleLabel(t *testing.T) {
 	reg := NewRegistry()
 	c := reg.Counter("test_counter", "A test counter.")
@@ -66,6 +71,7 @@ func TestCounter_IncSingleLabel(t *testing.T) {
 	}
 }
 
+// TestCounter_AddAccumulates verifies that multiple Add calls accumulate correctly.
 func TestCounter_AddAccumulates(t *testing.T) {
 	reg := NewRegistry()
 	c := reg.Counter("acc_counter", "Accumulating counter.")
@@ -82,6 +88,7 @@ func TestCounter_AddAccumulates(t *testing.T) {
 	}
 }
 
+// TestCounter_MultipleLabelSets verifies that distinct label sets are tracked independently.
 func TestCounter_MultipleLabelSets(t *testing.T) {
 	reg := NewRegistry()
 	c := reg.Counter("multi_counter", "Multi label counter.")
@@ -99,6 +106,7 @@ func TestCounter_MultipleLabelSets(t *testing.T) {
 	}
 }
 
+// TestCounter_HelpAndTypeComments verifies that HELP and TYPE header lines are written even with no observations.
 func TestCounter_HelpAndTypeComments(t *testing.T) {
 	reg := NewRegistry()
 	reg.Counter("wallfacer_http_requests_total", "Total HTTP requests.")
@@ -116,6 +124,7 @@ func TestCounter_HelpAndTypeComments(t *testing.T) {
 	}
 }
 
+// TestCounter_RegistryDeduplicates verifies that Counter() returns the same instance for repeated calls.
 func TestCounter_RegistryDeduplicates(t *testing.T) {
 	reg := NewRegistry()
 	c1 := reg.Counter("dup", "help")
@@ -129,6 +138,7 @@ func TestCounter_RegistryDeduplicates(t *testing.T) {
 // Histogram
 // ---------------------------------------------------------------------------
 
+// TestHistogram_ObserveSingleValue verifies basic histogram output: TYPE, buckets, sum, and count lines.
 func TestHistogram_ObserveSingleValue(t *testing.T) {
 	reg := NewRegistry()
 	h := reg.Histogram("req_duration", "Duration.", []float64{0.1, 0.5, 1.0})
@@ -155,6 +165,8 @@ func TestHistogram_ObserveSingleValue(t *testing.T) {
 	}
 }
 
+// TestHistogram_CumulativeBuckets verifies cumulative bucket semantics: an observation
+// of 0.05 increments le=0.1 and +Inf but not le=0.01.
 func TestHistogram_CumulativeBuckets(t *testing.T) {
 	// An observation of 0.05 should fall in the le=0.1 bucket (and higher)
 	// but NOT in le=0.01.
@@ -189,6 +201,7 @@ func TestHistogram_CumulativeBuckets(t *testing.T) {
 	}
 }
 
+// TestHistogram_SumAndCount verifies that sum and count are correctly accumulated across observations.
 func TestHistogram_SumAndCount(t *testing.T) {
 	reg := NewRegistry()
 	h := reg.Histogram("h", "help", DefaultDurationBuckets)
@@ -210,6 +223,7 @@ func TestHistogram_SumAndCount(t *testing.T) {
 	}
 }
 
+// TestHistogram_RegistryDeduplicates verifies that Histogram() returns the same instance for repeated calls.
 func TestHistogram_RegistryDeduplicates(t *testing.T) {
 	reg := NewRegistry()
 	h1 := reg.Histogram("dup_hist", "help", DefaultDurationBuckets)
@@ -219,6 +233,7 @@ func TestHistogram_RegistryDeduplicates(t *testing.T) {
 	}
 }
 
+// TestHistogram_BucketsAreSorted verifies that unsorted bucket bounds are sorted on creation.
 func TestHistogram_BucketsAreSorted(t *testing.T) {
 	reg := NewRegistry()
 	// Pass unsorted buckets to verify they are sorted on creation.
@@ -245,6 +260,7 @@ func TestHistogram_BucketsAreSorted(t *testing.T) {
 // Gauge
 // ---------------------------------------------------------------------------
 
+// TestGauge_CallsFnOnScrape verifies that the gauge collector function is called on each WritePrometheus.
 func TestGauge_CallsFnOnScrape(t *testing.T) {
 	reg := NewRegistry()
 	calls := 0
@@ -264,6 +280,7 @@ func TestGauge_CallsFnOnScrape(t *testing.T) {
 	}
 }
 
+// TestGauge_HelpAndTypeComments verifies that gauge HELP and TYPE header lines are written.
 func TestGauge_HelpAndTypeComments(t *testing.T) {
 	reg := NewRegistry()
 	reg.Gauge("tasks_total", "Number of tasks.", func() []LabeledValue {
@@ -282,6 +299,7 @@ func TestGauge_HelpAndTypeComments(t *testing.T) {
 	}
 }
 
+// TestGauge_EmptySliceSkipped verifies that a gauge returning no values produces no output at all.
 func TestGauge_EmptySliceSkipped(t *testing.T) {
 	reg := NewRegistry()
 	reg.Gauge("empty_gauge", "help", func() []LabeledValue { return nil })
@@ -295,6 +313,7 @@ func TestGauge_EmptySliceSkipped(t *testing.T) {
 	}
 }
 
+// TestGauge_WithLabels verifies that gauge values with multiple label sets are rendered correctly.
 func TestGauge_WithLabels(t *testing.T) {
 	reg := NewRegistry()
 	reg.Gauge("wallfacer_tasks_total", "Task count.", func() []LabeledValue {
@@ -323,6 +342,7 @@ func TestGauge_WithLabels(t *testing.T) {
 // WritePrometheus ordering and format
 // ---------------------------------------------------------------------------
 
+// TestWritePrometheus_CountersBeforeHistogramsBeforeGauges verifies output ordering.
 func TestWritePrometheus_CountersBeforeHistogramsBeforeGauges(t *testing.T) {
 	reg := NewRegistry()
 	reg.Gauge("zz_gauge", "g", func() []LabeledValue {
@@ -350,6 +370,7 @@ func TestWritePrometheus_CountersBeforeHistogramsBeforeGauges(t *testing.T) {
 	}
 }
 
+// TestWritePrometheus_MetricNameFormat verifies that labels are sorted alphabetically in output.
 func TestWritePrometheus_MetricNameFormat(t *testing.T) {
 	reg := NewRegistry()
 	c := reg.Counter("wallfacer_http_requests_total", "help")
@@ -370,18 +391,21 @@ func TestWritePrometheus_MetricNameFormat(t *testing.T) {
 // escapeLabel
 // ---------------------------------------------------------------------------
 
+// TestEscapeLabel_Backslash verifies that backslashes in label values are escaped.
 func TestEscapeLabel_Backslash(t *testing.T) {
 	if got := escapeLabel(`a\b`); got != `a\\b` {
 		t.Errorf("expected backslash escape, got %q", got)
 	}
 }
 
+// TestEscapeLabel_Quote verifies that double quotes in label values are escaped.
 func TestEscapeLabel_Quote(t *testing.T) {
 	if got := escapeLabel(`say "hi"`); got != `say \"hi\"` {
 		t.Errorf("expected quote escape, got %q", got)
 	}
 }
 
+// TestEscapeLabel_Newline verifies that newlines in label values are escaped.
 func TestEscapeLabel_Newline(t *testing.T) {
 	if got := escapeLabel("line1\nline2"); got != `line1\nline2` {
 		t.Errorf("expected newline escape, got %q", got)
@@ -392,30 +416,35 @@ func TestEscapeLabel_Newline(t *testing.T) {
 // formatMetricValue
 // ---------------------------------------------------------------------------
 
+// TestFormatMetricValue_PosInf verifies positive infinity renders as "+Inf".
 func TestFormatMetricValue_PosInf(t *testing.T) {
 	if got := formatMetricValue(math.Inf(1)); got != "+Inf" {
 		t.Errorf("expected +Inf, got %q", got)
 	}
 }
 
+// TestFormatMetricValue_NegInf verifies negative infinity renders as "-Inf".
 func TestFormatMetricValue_NegInf(t *testing.T) {
 	if got := formatMetricValue(math.Inf(-1)); got != "-Inf" {
 		t.Errorf("expected -Inf, got %q", got)
 	}
 }
 
+// TestFormatMetricValue_NaN verifies NaN renders as "NaN".
 func TestFormatMetricValue_NaN(t *testing.T) {
 	if got := formatMetricValue(math.NaN()); got != "NaN" {
 		t.Errorf("expected NaN, got %q", got)
 	}
 }
 
+// TestFormatMetricValue_Integer verifies that integer values render without a decimal point.
 func TestFormatMetricValue_Integer(t *testing.T) {
 	if got := formatMetricValue(42); got != "42" {
 		t.Errorf("expected 42, got %q", got)
 	}
 }
 
+// TestFormatMetricValue_Float verifies that fractional values render with their decimal digits.
 func TestFormatMetricValue_Float(t *testing.T) {
 	if got := formatMetricValue(0.005); got != "0.005" {
 		t.Errorf("expected 0.005, got %q", got)
@@ -426,6 +455,7 @@ func TestFormatMetricValue_Float(t *testing.T) {
 // Concurrency smoke test
 // ---------------------------------------------------------------------------
 
+// TestRegistry_ConcurrentIncrement stress-tests counter thread safety with 100 concurrent goroutines.
 func TestRegistry_ConcurrentIncrement(t *testing.T) {
 	reg := NewRegistry()
 	c := reg.Counter("concurrent", "help")
@@ -453,6 +483,7 @@ func TestRegistry_ConcurrentIncrement(t *testing.T) {
 	}
 }
 
+// TestRegistry_ConcurrentObserve stress-tests histogram thread safety with 50 concurrent goroutines.
 func TestRegistry_ConcurrentObserve(t *testing.T) {
 	reg := NewRegistry()
 	h := reg.Histogram("concurrent_hist", "help", DefaultDurationBuckets)

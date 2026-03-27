@@ -24,6 +24,10 @@ func newTestStore(t *testing.T) *Store {
 	return s
 }
 
+// setTaskCloneFixture populates all nested, pointer, slice, and map fields on
+// task with deterministic values, then returns a deep clone. The clone serves
+// as the "golden snapshot" that later assertions compare against to verify
+// isolation of store-returned copies.
 func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	t.Helper()
 
@@ -97,6 +101,10 @@ func setTaskCloneFixture(t *testing.T, task *Task) Task {
 	return deepCloneTask(task)
 }
 
+// mutateTaskCloneForIsolation modifies every nested field on task in-place.
+// After calling this on a clone returned by GetTask/ListTasks, a subsequent
+// read from the store should still match the original snapshot -- proving the
+// clone is fully independent of store-owned state.
 func mutateTaskCloneForIsolation(task *Task) {
 	task.PromptHistory[0] = "mutated-prompt-history"
 	task.RetryHistory[0].Prompt = "mutated-retry-prompt"
@@ -116,6 +124,8 @@ func mutateTaskCloneForIsolation(task *Task) {
 	*task.ScheduledAt = time.Unix(1_800_000_000, 0).UTC()
 }
 
+// assertTaskMatchesSnapshot fails the test if got does not deeply equal want.
+// Used to verify that store-returned clones are not aliased with internal state.
 func assertTaskMatchesSnapshot(t *testing.T, got *Task, want Task) {
 	t.Helper()
 	if !reflect.DeepEqual(*got, want) {

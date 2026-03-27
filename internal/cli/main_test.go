@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+// TestPrintUsage validates that the help text written to stderr contains the
+// expected command listing and usage header.
 func TestPrintUsage(t *testing.T) {
 	out := captureStderr(func() {
 		PrintUsage()
@@ -23,6 +25,8 @@ func TestPrintUsage(t *testing.T) {
 	}
 }
 
+// TestEnvOrDefault verifies that envOrDefault returns the env value when set
+// and the fallback when the variable is empty.
 func TestEnvOrDefault(t *testing.T) {
 	t.Setenv("WALLF_TEST_KEY", "value")
 	if got := envOrDefault("WALLF_TEST_KEY", "fallback"); got != "value" {
@@ -34,6 +38,8 @@ func TestEnvOrDefault(t *testing.T) {
 	}
 }
 
+// TestInitConfigDir_CreatesEnvTemplate verifies that initConfigDir creates the
+// .env template on first call and leaves it untouched on subsequent calls.
 func TestInitConfigDir_CreatesEnvTemplate(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -59,6 +65,8 @@ func TestInitConfigDir_CreatesEnvTemplate(t *testing.T) {
 	}
 }
 
+// TestDetectContainerRuntime checks that the detection prefers /opt/podman
+// when available and otherwise falls back through podman/docker on $PATH.
 func TestDetectContainerRuntime(t *testing.T) {
 	if _, err := os.Stat("/opt/podman/bin/podman"); err == nil {
 		if got := detectContainerRuntime(); got != "/opt/podman/bin/podman" {
@@ -80,6 +88,8 @@ func TestDetectContainerRuntime(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_MissingEnvFile verifies that doctor reports the missing .env
+// file warning when it does not exist.
 func TestRunDoctor_MissingEnvFile(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -97,6 +107,8 @@ func TestRunDoctor_MissingEnvFile(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_WithCredentials verifies that doctor recognizes both Claude and
+// OpenAI credentials and optional URL settings from the .env file.
 func TestRunDoctor_WithCredentials(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -124,6 +136,8 @@ func TestRunDoctor_WithCredentials(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_ConfigDirMissing verifies that doctor warns when both the
+// config directory and .env file are absent.
 func TestRunDoctor_ConfigDirMissing(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing-dir")
 	envFile := filepath.Join(missing, ".env")
@@ -141,6 +155,8 @@ func TestRunDoctor_ConfigDirMissing(t *testing.T) {
 	}
 }
 
+// TestOpenBrowser_InvokesPlatformCommand installs a fake browser-open script on
+// $PATH and verifies that openBrowser invokes it with the given URL.
 func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 	root := t.TempDir()
 	marker := filepath.Join(root, "called")
@@ -180,6 +196,8 @@ func TestOpenBrowser_InvokesPlatformCommand(t *testing.T) {
 	}
 }
 
+// TestRunStatusJsonOutput verifies that `wallfacer status --json` outputs the
+// raw JSON response from the server without any formatting.
 func TestRunStatusJsonOutput(t *testing.T) {
 	response := `[{"id":"12345678-1234-1234-1234-1234567890ab","title":"test","status":"done","turns":1,"usage":{"cost_usd":0.2}}]`
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

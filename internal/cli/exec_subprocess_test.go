@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+// TestRunExec_Helper is a test-process helper that is re-exec'd by the
+// subprocess tests below. It is a no-op when WALLFACER_EXEC_HELPER is not set.
 func TestRunExec_Helper(t *testing.T) {
 	if os.Getenv("WALLFACER_EXEC_HELPER") != "1" {
 		return
@@ -27,6 +29,9 @@ func TestRunExec_Helper(t *testing.T) {
 	}
 }
 
+// TestRunExec_TaskMode_Subprocess verifies the end-to-end task-mode exec path
+// by spawning a subprocess with a fake container runtime that records the exec
+// arguments and confirming they match "exec -it <container> bash".
 func TestRunExec_TaskMode_Subprocess(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
@@ -76,6 +81,9 @@ func TestRunExec_TaskMode_Subprocess(t *testing.T) {
 	}
 }
 
+// TestRunExec_SandboxMode_Subprocess verifies the end-to-end sandbox-mode exec
+// path by spawning a subprocess with a fake container runtime and confirming
+// it runs an interactive sandbox container with --rm and --network=host.
 func TestRunExec_SandboxMode_Subprocess(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")

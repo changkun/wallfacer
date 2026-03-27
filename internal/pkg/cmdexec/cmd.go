@@ -36,6 +36,8 @@ func (c *Cmd) WithContext(ctx context.Context) *Cmd {
 	return &cp
 }
 
+// build constructs the underlying os/exec.Cmd, using CommandContext if a
+// context was set via WithContext, or plain Command otherwise.
 func (c *Cmd) build() *exec.Cmd {
 	if c.ctx != nil {
 		return exec.CommandContext(c.ctx, c.name, c.args...)

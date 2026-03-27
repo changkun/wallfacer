@@ -36,7 +36,9 @@ type ContainerSpec struct {
 }
 
 // Build returns the complete argument slice starting with "run".
+// The Runtime field is NOT included; the caller uses it as the exec binary path.
 func (s ContainerSpec) Build() []string {
+	// Default to host networking so the agent can reach the API server on localhost.
 	network := s.Network
 	if network == "" {
 		network = "host"
@@ -55,6 +57,9 @@ func (s ContainerSpec) Build() []string {
 		args = append(args, "-e", k+"="+s.Env[k])
 	}
 
+	// Emit volume mounts. Named volumes use the short -v syntax, while bind
+	// mounts use the long --mount syntax which supports the "readonly" keyword
+	// instead of the short "ro" option.
 	for _, v := range s.Volumes {
 		if v.Named {
 			mount := v.Host + ":" + v.Container
@@ -68,6 +73,7 @@ func (s ContainerSpec) Build() []string {
 			if v.Options != "" {
 				for opt := range strings.SplitSeq(v.Options, ",") {
 					opt = strings.TrimSpace(opt)
+					// Translate "ro" to "readonly" for --mount syntax compatibility.
 					if opt == "ro" {
 						parts = append(parts, "readonly")
 					} else if opt != "" {

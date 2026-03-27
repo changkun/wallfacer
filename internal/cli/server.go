@@ -774,6 +774,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	return mux
 }
 
+// normalizeBrowserVisibleHostPort derives a host:port string suitable for
+// display and CSRF origin checks. When the listener bound to a wildcard
+// address (0.0.0.0 or ::), it substitutes the originally requested host or
+// falls back to "localhost" so the resulting address is reachable from a browser.
 func normalizeBrowserVisibleHostPort(requestedAddr string, addr net.Addr) string {
 	host, port, err := net.SplitHostPort(addr.String())
 	if err != nil {
@@ -797,11 +801,14 @@ type statusResponseWriter struct {
 	status int
 }
 
+// WriteHeader captures the status code before delegating to the wrapped writer.
 func (w *statusResponseWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)
 }
 
+// Flush delegates to the wrapped writer's Flush if it implements http.Flusher.
+// This is required for SSE streaming through the logging middleware.
 func (w *statusResponseWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
@@ -881,6 +888,10 @@ func ensureImage(containerCmd, image string) string {
 	return image
 }
 
+// requiresStore returns true for route names that need an active workspace
+// store. Routes that operate without a store (configuration, env settings,
+// workspace browsing, git status) return false so the RequireStoreMiddleware
+// is not applied and requests succeed even before workspaces are configured.
 func requiresStore(name string) bool {
 	switch name {
 	case "GetConfig", "UpdateConfig", "BrowseWorkspaces", "MkdirWorkspace", "RenameWorkspace", "UpdateWorkspaces", "GetEnvConfig", "UpdateEnvConfig", "TestSandbox", "GitStatus", "GitStatusStream":

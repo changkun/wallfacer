@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// insertOutputEvents inserts count output events sequentially for a task.
 func insertOutputEvents(t *testing.T, s *Store, taskID uuid.UUID, count int) {
 	t.Helper()
 	for i := 1; i <= count; i++ {
@@ -28,6 +29,8 @@ func insertOutputEvents(t *testing.T, s *Store, taskID uuid.UUID, count int) {
 	}
 }
 
+// readCompactEvents reads a compact.ndjson file and returns parsed events
+// and the raw bytes. Used by compaction tests to verify on-disk state.
 func readCompactEvents(t *testing.T, path string) ([]TaskEvent, []byte) {
 	t.Helper()
 	raw, err := os.ReadFile(path)

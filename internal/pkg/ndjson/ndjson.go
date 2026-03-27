@@ -93,6 +93,8 @@ func readAll[T any](rc io.ReadCloser, cfg *config) ([]T, error) {
 	if scanErr != nil {
 		return nil, scanErr
 	}
+	// Normalize nil to empty slice so callers always get a non-nil result,
+	// matching the behavior of ReadFile when the file does not exist.
 	if results == nil {
 		results = []T{}
 	}

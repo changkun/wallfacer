@@ -34,6 +34,8 @@ func (km *Map[K]) Delete(key K) {
 	km.m.Delete(key)
 }
 
+// load returns the mutex for key, atomically creating a new one on first access.
+// LoadOrStore ensures that concurrent callers for the same key receive the same mutex.
 func (km *Map[K]) load(key K) *sync.Mutex {
 	v, _ := km.m.LoadOrStore(key, &sync.Mutex{})
 	return v.(*sync.Mutex)

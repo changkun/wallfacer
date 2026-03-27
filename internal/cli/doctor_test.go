@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+// TestRunDoctor_AllGood verifies the happy path: valid config dir, env file,
+// and credential produce only [ok] lines and no issue warnings.
 func TestRunDoctor_AllGood(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -29,6 +31,8 @@ func TestRunDoctor_AllGood(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_MissingConfigDir verifies doctor warns about a non-existent
+// config directory and reports an issue count.
 func TestRunDoctor_MissingConfigDir(t *testing.T) {
 	configDir := filepath.Join(t.TempDir(), "nonexistent")
 
@@ -44,6 +48,8 @@ func TestRunDoctor_MissingConfigDir(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_NoCredentials verifies doctor warns when no Claude credential
+// is configured in the .env file.
 func TestRunDoctor_NoCredentials(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -60,6 +66,8 @@ func TestRunDoctor_NoCredentials(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_PlaceholderTokenIgnored verifies that the default template
+// placeholder "your-oauth-token-here" is treated as missing, not as a valid credential.
 func TestRunDoctor_PlaceholderTokenIgnored(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -76,6 +84,8 @@ func TestRunDoctor_PlaceholderTokenIgnored(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_OAuthTokenWorks verifies that a real (non-placeholder) OAuth
+// token is recognized as a valid Claude credential.
 func TestRunDoctor_OAuthTokenWorks(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -92,6 +102,8 @@ func TestRunDoctor_OAuthTokenWorks(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_OpenAIOptional verifies that the optional OPENAI_API_KEY is
+// reported as [ok] when present alongside an Anthropic credential.
 func TestRunDoctor_OpenAIOptional(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -108,6 +120,8 @@ func TestRunDoctor_OpenAIOptional(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_ContainerRuntimeNotFound verifies that doctor warns when the
+// configured container runtime binary does not exist.
 func TestRunDoctor_ContainerRuntimeNotFound(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")
@@ -127,6 +141,8 @@ func TestRunDoctor_ContainerRuntimeNotFound(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_GitCheck verifies that doctor detects git on the system PATH
+// (expected to be present in CI and development environments).
 func TestRunDoctor_GitCheck(t *testing.T) {
 	configDir := t.TempDir()
 	envFile := filepath.Join(configDir, ".env")

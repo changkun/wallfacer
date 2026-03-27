@@ -38,11 +38,12 @@ func CreateWorktree(repoPath, worktreePath, branchName string) error {
 		return nil
 	}
 
+	// Create a new branch from HEAD and check it out in the worktree.
 	out, err := cmdexec.Git(repoPath, "worktree", "add", "-b", branchName, worktreePath, "HEAD").Combined()
 	if err != nil {
-		// Branch may have been created between the check and the add, or
-		// a stale worktree entry triggers "already registered worktree".
-		// Reattach so in-progress commits are preserved.
+		// Race condition: branch may have been created between the check and
+		// the add, or a stale worktree entry triggers "already registered
+		// worktree". Reattach so in-progress commits are preserved.
 		if strings.Contains(out, "already exists") ||
 			strings.Contains(out, "already registered worktree") {
 			_ = cmdexec.Git(repoPath, "worktree", "prune").Run()
@@ -59,7 +60,9 @@ func CreateWorktree(repoPath, worktreePath, branchName string) error {
 
 // CreateWorktreeAt creates a new branch at baseCommit and checks it out as a
 // worktree at worktreePath. baseCommit can be any git revision (hash, branch, tag).
-// Handles the same stale-branch and missing-worktree edge cases as CreateWorktree.
+// Unlike CreateWorktree, on conflict it deletes the stale branch and retries,
+// since the caller specifies an explicit base commit rather than preserving
+// existing branch state.
 func CreateWorktreeAt(repoPath, worktreePath, branchName, baseCommit string) error {
 	out, err := cmdexec.Git(repoPath, "worktree", "add", "-b", branchName, worktreePath, baseCommit).Combined()
 	if err != nil && strings.Contains(out, "already exists") {

@@ -11,8 +11,8 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/ndjson"
 )
 
-// ideationHistoryTTL is how long rejected-idea records are retained.
-// Override via WALLFACER_IDEATION_HISTORY_TTL (e.g. "720h").
+// ideationHistoryTTL is how long rejected-idea records are retained (default 30 days).
+// Override via WALLFACER_IDEATION_HISTORY_TTL (e.g. "720h"). Evaluated once at init.
 var ideationHistoryTTL = func() time.Duration {
 	if v := os.Getenv("WALLFACER_IDEATION_HISTORY_TTL"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil && d > 0 {

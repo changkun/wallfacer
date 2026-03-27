@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestNew_Empty verifies that New with no arguments produces an empty set.
 func TestNew_Empty(t *testing.T) {
 	s := New[int]()
 	if s.Len() != 0 {
@@ -12,6 +13,7 @@ func TestNew_Empty(t *testing.T) {
 	}
 }
 
+// TestNew_WithItems verifies that New deduplicates its arguments.
 func TestNew_WithItems(t *testing.T) {
 	s := New(1, 2, 3, 2, 1)
 	if s.Len() != 3 {
@@ -24,6 +26,7 @@ func TestNew_WithItems(t *testing.T) {
 	}
 }
 
+// TestFrom verifies that From creates a set from a slice, deduplicating entries.
 func TestFrom(t *testing.T) {
 	s := From([]string{"a", "b", "a"})
 	if s.Len() != 2 {
@@ -31,6 +34,7 @@ func TestFrom(t *testing.T) {
 	}
 }
 
+// TestAdd verifies that Add is idempotent (adding the same item twice does not increase Len).
 func TestAdd(t *testing.T) {
 	s := New[string]()
 	s.Add("x")
@@ -43,6 +47,7 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+// TestRemove verifies that Remove deletes an element and is a no-op for absent elements.
 func TestRemove(t *testing.T) {
 	s := New("a", "b")
 	s.Remove("a")
@@ -56,6 +61,7 @@ func TestRemove(t *testing.T) {
 	s.Remove("z")
 }
 
+// TestHas_Miss verifies that Has returns false for an element not in the set.
 func TestHas_Miss(t *testing.T) {
 	s := New[int]()
 	if s.Has(42) {
@@ -63,6 +69,7 @@ func TestHas_Miss(t *testing.T) {
 	}
 }
 
+// TestItems verifies that Items returns all elements (sorted here for stable comparison).
 func TestItems(t *testing.T) {
 	s := New(3, 1, 2)
 	items := s.Items()
@@ -72,6 +79,7 @@ func TestItems(t *testing.T) {
 	}
 }
 
+// TestAll verifies that the All iterator yields every element in the set.
 func TestAll(t *testing.T) {
 	s := New(3, 1, 2)
 	var got []int
@@ -84,6 +92,7 @@ func TestAll(t *testing.T) {
 	}
 }
 
+// TestAll_EarlyBreak verifies that breaking out of the All iterator stops iteration.
 func TestAll_EarlyBreak(t *testing.T) {
 	s := New(1, 2, 3, 4, 5)
 	count := 0
@@ -98,6 +107,7 @@ func TestAll_EarlyBreak(t *testing.T) {
 	}
 }
 
+// TestAll_Empty verifies that All over an empty set yields zero iterations.
 func TestAll_Empty(t *testing.T) {
 	s := New[string]()
 	count := 0

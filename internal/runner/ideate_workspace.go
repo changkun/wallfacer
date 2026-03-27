@@ -507,12 +507,17 @@ func (r *Runner) collectWorkspaceTodoSignalsForWorkspace(ctx context.Context, wo
 	return out, filteredCount
 }
 
+// runWorkspaceGitCommand runs a git command in the given workspace directory
+// with a short timeout (WorkspaceIdeationCommandTTL) to prevent slow repos
+// from blocking ideation signal collection.
 func (r *Runner) runWorkspaceGitCommand(parentCtx context.Context, workspace string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(parentCtx, constants.WorkspaceIdeationCommandTTL)
 	defer cancel()
 	return cmdexec.Git(workspace, args...).WithContext(ctx).OutputBytes()
 }
 
+// workspacesForRunner returns the non-empty trimmed workspace paths
+// configured on the runner.
 func (r *Runner) workspacesForRunner() []string {
 	var ws []string
 	for _, raw := range r.workspaces {

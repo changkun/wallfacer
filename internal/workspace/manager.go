@@ -1,4 +1,3 @@
-// Package workspace manages workspace lifecycle and scoped store switching.
 package workspace
 
 import (
@@ -40,10 +39,11 @@ type Manager struct {
 	dataDir   string
 	envFile   string
 
-	mu        sync.RWMutex
-	current   Snapshot
-	nextGen   uint64
-	subsMu    sync.Mutex
+	mu      sync.RWMutex // guards current and nextGen
+	current Snapshot
+	nextGen uint64
+
+	subsMu    sync.Mutex // guards subs and nextSubID; separate from mu to avoid lock ordering issues
 	subs      map[int]chan Snapshot
 	nextSubID int
 
@@ -68,6 +68,9 @@ func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager,
 	return m, nil
 }
 
+// startupWorkspaces determines the initial workspace set. If initial is
+// non-nil (even if empty), it is used as-is. Otherwise the most recently used
+// workspace group is restored from disk, enabling session persistence.
 func (m *Manager) startupWorkspaces(initial []string) []string {
 	if initial != nil {
 		return initial
@@ -135,6 +138,8 @@ func (m *Manager) HasStore() bool {
 }
 
 // Subscribe returns a channel that receives snapshots on workspace changes.
+// The channel is buffered (capacity 8) so slow consumers do not block the
+// manager; if the buffer is full, the snapshot is silently dropped.
 func (m *Manager) Subscribe() (int, <-chan Snapshot) {
 	m.subsMu.Lock()
 	defer m.subsMu.Unlock()
@@ -255,6 +260,8 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	return snapshot, nil
 }
 
+// publish sends the snapshot to all active subscribers. Non-blocking: if a
+// subscriber's channel buffer is full, that subscriber's notification is dropped.
 func (m *Manager) publish(snapshot Snapshot) {
 	m.subsMu.Lock()
 	defer m.subsMu.Unlock()
@@ -266,6 +273,9 @@ func (m *Manager) publish(snapshot Snapshot) {
 	}
 }
 
+// validate checks that all workspace paths are absolute, clean, existing
+// directories and returns a deduplicated, sorted slice. Returns an error
+// for any invalid path.
 func validate(paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil
@@ -307,11 +317,14 @@ func workspacesEqual(a, b []string) bool {
 	return slices.Equal(a, b)
 }
 
+// cloneSnapshot creates a shallow copy of s with the Workspaces slice cloned
+// so the caller cannot mutate the manager's internal state.
 func cloneSnapshot(s Snapshot) Snapshot {
 	s.Workspaces = cloneStrings(s.Workspaces)
 	return s
 }
 
+// cloneStrings returns a copy of in, or nil if in is empty.
 func cloneStrings(in []string) []string {
 	if len(in) == 0 {
 		return nil

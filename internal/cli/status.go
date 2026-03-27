@@ -34,6 +34,7 @@ type containerSummary struct {
 	TaskID string `json:"task_id"`
 }
 
+// ANSI escape sequences for terminal formatting.
 const (
 	ansiReset = "\033[0m"
 	ansiBold  = "\033[1m"
@@ -256,7 +257,7 @@ func RunStatus(_ string, args []string) {
 
 	// Watch mode: clear screen and redraw every 2 seconds until Ctrl-C.
 	for {
-		fmt.Print("\033[H\033[2J")
+		fmt.Print("\033[H\033[2J") // ANSI: move cursor to home + clear entire screen
 		render()
 		time.Sleep(2 * time.Second)
 	}

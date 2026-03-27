@@ -9,6 +9,8 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 )
 
+// TestParseEnvLinePreservesHashesInsideQuotes verifies that # characters inside
+// double or single quotes are not treated as inline comments.
 func TestParseEnvLinePreservesHashesInsideQuotes(t *testing.T) {
 	key, value, ok := parseEnvLine(`PROMPT="Improve # parser behavior" # top-level comment`)
 	if !ok {
@@ -30,6 +32,8 @@ func TestParseEnvLinePreservesHashesInsideQuotes(t *testing.T) {
 	}
 }
 
+// TestStripEnvInlineComment verifies inline comment stripping for unquoted,
+// double-quoted, and plain values with trailing comments.
 func TestStripEnvInlineComment(t *testing.T) {
 	if got := stripEnvInlineComment("value # trailing comment"); got != "value" {
 		t.Fatalf("stripEnvInlineComment = %q, want %q", got, "value")
@@ -42,6 +46,8 @@ func TestStripEnvInlineComment(t *testing.T) {
 	}
 }
 
+// TestSandboxByActivity verifies that SandboxByActivity returns a map of all
+// non-empty sandbox overrides, and nil when no overrides are configured.
 func TestSandboxByActivity(t *testing.T) {
 	cfg := Config{
 		ImplementationSandbox: "claude",
@@ -77,6 +83,9 @@ func TestSandboxByActivity(t *testing.T) {
 	}
 }
 
+// TestUpdateSandboxSettings verifies that UpdateSandboxSettings correctly updates
+// the default sandbox, sets specified per-activity overrides, clears unmentioned
+// activities, and preserves unrelated keys in the file.
 func TestUpdateSandboxSettings(t *testing.T) {
 	path := t.TempDir() + "/.env"
 	initial := strings.Join([]string{

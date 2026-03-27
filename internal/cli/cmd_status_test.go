@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// TestGroupByStatus verifies that tasks are correctly bucketed by their Status field.
 func TestGroupByStatus(t *testing.T) {
 	tasks := []taskSummary{
 		{ID: "a", Status: "backlog"},
@@ -36,6 +37,7 @@ func TestGroupByStatus(t *testing.T) {
 	}
 }
 
+// TestGroupByStatusEmpty verifies that nil input produces an empty map.
 func TestGroupByStatusEmpty(t *testing.T) {
 	groups := groupByStatus(nil)
 	if len(groups) != 0 {
@@ -43,6 +45,8 @@ func TestGroupByStatusEmpty(t *testing.T) {
 	}
 }
 
+// TestFormatCost validates dollar-formatted cost output with 4 decimal places,
+// including rounding behavior at the boundary.
 func TestFormatCost(t *testing.T) {
 	tests := []struct {
 		input float64
@@ -63,6 +67,8 @@ func TestFormatCost(t *testing.T) {
 	}
 }
 
+// TestTruncate validates string truncation including multi-byte rune handling
+// and the ellipsis suffix behavior.
 func TestTruncate(t *testing.T) {
 	tests := []struct {
 		input string
@@ -85,6 +91,8 @@ func TestTruncate(t *testing.T) {
 	}
 }
 
+// TestMatchContainers verifies the task-ID-to-container-name mapping, including
+// that containers without a task ID are excluded.
 func TestMatchContainers(t *testing.T) {
 	containers := []containerSummary{
 		{Name: "wallfacer-impl-uuid-1", TaskID: "uuid-1"},
@@ -107,6 +115,7 @@ func TestMatchContainers(t *testing.T) {
 	}
 }
 
+// TestMatchContainersEmpty verifies that nil input produces an empty map.
 func TestMatchContainersEmpty(t *testing.T) {
 	result := matchContainers(nil)
 	if len(result) != 0 {
@@ -114,6 +123,8 @@ func TestMatchContainersEmpty(t *testing.T) {
 	}
 }
 
+// TestMatchContainersDuplicateTaskID verifies last-write-wins semantics when
+// multiple containers share the same task ID.
 func TestMatchContainersDuplicateTaskID(t *testing.T) {
 	// Last container wins when multiple containers share a task ID.
 	containers := []containerSummary{
@@ -126,6 +137,8 @@ func TestMatchContainersDuplicateTaskID(t *testing.T) {
 	}
 }
 
+// TestStatusLabel validates that known statuses return their display names and
+// unknown statuses get auto-capitalized.
 func TestStatusLabel(t *testing.T) {
 	if got := statusLabel("backlog"); got != "Backlog" {
 		t.Fatalf("statusLabel(backlog) = %q, want Backlog", got)
@@ -138,6 +151,8 @@ func TestStatusLabel(t *testing.T) {
 	}
 }
 
+// TestFetchTasks validates successful task list fetching and error handling for
+// malformed JSON responses.
 func TestFetchTasks(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -174,6 +189,8 @@ func TestFetchTasks(t *testing.T) {
 	})
 }
 
+// TestFetchContainers validates successful container list fetching and JSON
+// deserialization of task_id fields.
 func TestFetchContainers(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/containers" {
@@ -193,6 +210,8 @@ func TestFetchContainers(t *testing.T) {
 	}
 }
 
+// TestPrintBoard verifies that the board output contains status headings,
+// container name annotations, truncated task IDs, and cost totals.
 func TestPrintBoard(t *testing.T) {
 	tasks := []taskSummary{
 		{ID: "1111111111111111111111111111111111111111", Title: "Short", Status: "done", Turns: 1, Usage: taskUsage{CostUSD: 0.1234}},
@@ -212,6 +231,8 @@ func TestPrintBoard(t *testing.T) {
 	}
 }
 
+// TestRunStatus exercises both the formatted and --json output modes of the
+// status subcommand against a mock HTTP server.
 func TestRunStatus(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -245,6 +266,8 @@ func TestRunStatus(t *testing.T) {
 	}
 }
 
+// captureStdout redirects os.Stdout to a pipe, runs fn, and returns
+// everything written to stdout as a string.
 func captureStdout(fn func()) string {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -266,6 +289,8 @@ func captureStdout(fn func()) string {
 	return buf.String()
 }
 
+// captureStderr redirects os.Stderr to a pipe, runs fn, and returns
+// everything written to stderr as a string.
 func captureStderr(fn func()) string {
 	old := os.Stderr
 	r, w, _ := os.Pipe()

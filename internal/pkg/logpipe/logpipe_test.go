@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// TestPipe_BasicOutput verifies that a simple subprocess's stdout lines
+// are delivered through the Lines channel.
 func TestPipe_BasicOutput(t *testing.T) {
 	cmd := exec.Command("echo", "-e", "hello\nworld")
 	p, err := Start(cmd)
@@ -28,6 +30,8 @@ func TestPipe_BasicOutput(t *testing.T) {
 	}
 }
 
+// TestPipe_MergeStderr verifies that with MergeStderr enabled, both stdout
+// and stderr output appear in the Lines channel.
 func TestPipe_MergeStderr(t *testing.T) {
 	// sh -c prints to both stdout and stderr.
 	cmd := exec.Command("sh", "-c", "echo out; echo err >&2")
@@ -47,6 +51,8 @@ func TestPipe_MergeStderr(t *testing.T) {
 	}
 }
 
+// TestPipe_StderrDiscardedByDefault verifies that without MergeStderr,
+// stderr output is silently discarded and only stdout appears.
 func TestPipe_StderrDiscardedByDefault(t *testing.T) {
 	cmd := exec.Command("sh", "-c", "echo out; echo err >&2")
 	p, err := Start(cmd)
@@ -68,6 +74,8 @@ func TestPipe_StderrDiscardedByDefault(t *testing.T) {
 	}
 }
 
+// TestPipe_Close verifies that calling Close on a pipe with a long-running
+// subprocess causes the Lines channel to drain and close.
 func TestPipe_Close(t *testing.T) {
 	// A long-running command that we close early.
 	cmd := exec.Command("sh", "-c", "while true; do echo tick; sleep 0.01; done")
@@ -104,6 +112,8 @@ func TestPipe_Close(t *testing.T) {
 	}
 }
 
+// TestPipe_Done verifies that the Done channel is closed after the
+// subprocess exits and all output has been scanned.
 func TestPipe_Done(t *testing.T) {
 	cmd := exec.Command("echo", "done")
 	p, err := Start(cmd)
@@ -124,6 +134,8 @@ func TestPipe_Done(t *testing.T) {
 	}
 }
 
+// TestPipe_WithBufferSize verifies that custom buffer sizes are applied
+// and the pipe still delivers output correctly.
 func TestPipe_WithBufferSize(t *testing.T) {
 	cmd := exec.Command("echo", "buffered")
 	p, err := Start(cmd, WithBufferSize(128, 256))
@@ -141,6 +153,8 @@ func TestPipe_WithBufferSize(t *testing.T) {
 	}
 }
 
+// TestPipe_StartError verifies that Start returns an error when the
+// command binary does not exist.
 func TestPipe_StartError(t *testing.T) {
 	cmd := exec.Command("nonexistent-command-that-does-not-exist")
 	_, err := Start(cmd)

@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestMap_StoreLoad verifies basic Store and Load round-trip.
 func TestMap_StoreLoad(t *testing.T) {
 	var m Map[string, int]
 
@@ -16,6 +17,8 @@ func TestMap_StoreLoad(t *testing.T) {
 	}
 }
 
+// TestMap_LoadMissing verifies that Load returns the zero value and ok=false
+// for keys that were never stored.
 func TestMap_LoadMissing(t *testing.T) {
 	var m Map[string, int]
 
@@ -28,6 +31,7 @@ func TestMap_LoadMissing(t *testing.T) {
 	}
 }
 
+// TestMap_Delete verifies that a stored entry is no longer found after deletion.
 func TestMap_Delete(t *testing.T) {
 	var m Map[string, string]
 
@@ -40,6 +44,7 @@ func TestMap_Delete(t *testing.T) {
 	}
 }
 
+// TestMap_Range verifies that Range visits all stored entries.
 func TestMap_Range(t *testing.T) {
 	var m Map[int, string]
 
@@ -58,6 +63,8 @@ func TestMap_Range(t *testing.T) {
 	}
 }
 
+// TestMap_RangeEarlyStop verifies that Range stops iterating when the callback
+// returns false.
 func TestMap_RangeEarlyStop(t *testing.T) {
 	var m Map[int, int]
 	for i := range 5 {
@@ -74,6 +81,7 @@ func TestMap_RangeEarlyStop(t *testing.T) {
 	}
 }
 
+// TestMap_All verifies that the All iterator yields all stored key-value pairs.
 func TestMap_All(t *testing.T) {
 	var m Map[int, string]
 
@@ -96,6 +104,8 @@ func TestMap_All(t *testing.T) {
 	}
 }
 
+// TestMap_AllEarlyBreak verifies that breaking out of a for-range over All
+// stops iteration promptly.
 func TestMap_AllEarlyBreak(t *testing.T) {
 	var m Map[int, int]
 	for i := range 5 {
@@ -114,6 +124,8 @@ func TestMap_AllEarlyBreak(t *testing.T) {
 	}
 }
 
+// TestMap_Concurrent stress-tests that concurrent Store operations from many
+// goroutines are all visible afterwards (validated by -race detector).
 func TestMap_Concurrent(t *testing.T) {
 	var m Map[int, string]
 	var wg sync.WaitGroup

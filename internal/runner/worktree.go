@@ -22,6 +22,11 @@ func (r *Runner) setupWorktrees(taskID uuid.UUID) (map[string]string, string, er
 	return r.ensureTaskWorktrees(taskID, nil, "")
 }
 
+// ensureTaskWorktrees creates or reuses worktrees for each workspace. When existing
+// is non-nil, only those repos are processed (reattach mode). Otherwise all configured
+// workspaces are used. For git repos a proper worktree is created; for non-git
+// workspaces a snapshot copy with a local git repo is set up instead. The worktreeMu
+// must be held by the caller (or this method acquires it internally).
 func (r *Runner) ensureTaskWorktrees(taskID uuid.UUID, existing map[string]string, branchName string) (map[string]string, string, error) {
 	r.worktreeMu.Lock()
 	defer r.worktreeMu.Unlock()

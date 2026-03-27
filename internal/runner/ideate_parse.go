@@ -15,6 +15,8 @@ import (
 	"github.com/google/uuid"
 )
 
+// normalizeIdeationPriority maps various priority labels (P1, critical, etc.)
+// to one of "high", "medium", "low", or "" for unrecognized values.
 func normalizeIdeationPriority(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "high", "p1", "critical", "urgent":
@@ -28,6 +30,10 @@ func normalizeIdeationPriority(value string) string {
 	}
 }
 
+// normalizeIdeationImpact ensures priority and impact_score are consistent.
+// When one is missing, it derives the other: impact_score maps to priority
+// bands (>=80 high, >=72 medium, else low) and vice versa. Also trims
+// whitespace from text fields.
 func normalizeIdeationImpact(idea *IdeateResult) {
 	idea.Priority = normalizeIdeationPriority(idea.Priority)
 	if idea.ImpactScore < 0 {
@@ -69,6 +75,8 @@ func normalizeIdeationImpact(idea *IdeateResult) {
 	}
 }
 
+// isIdeaDuplicateTitle reports whether title is empty or was already seen
+// (case-insensitive). On first encounter it adds the title to the set.
 func isIdeaDuplicateTitle(added *set.Set[string], title string) bool {
 	current := strings.ToLower(strings.TrimSpace(title))
 	if current == "" {
@@ -95,6 +103,8 @@ type ideaRejection struct {
 	Score  int
 }
 
+// emitIdeationRejectionEvents inserts a system event for each rejected idea
+// so operators can see why specific proposals were filtered out.
 func (r *Runner) emitIdeationRejectionEvents(ctx context.Context, taskID uuid.UUID, rejections []ideaRejection) {
 	if len(rejections) == 0 {
 		return
@@ -119,6 +129,7 @@ func (r *Runner) emitIdeationRejectionEvents(ctx context.Context, taskID uuid.UU
 	)
 }
 
+// countIdeaRejections returns how many rejections match the given reason.
 func countIdeaRejections(rejections []ideaRejection, reason ideaRejectReason) int {
 	total := 0
 	for _, rejection := range rejections {
@@ -151,6 +162,8 @@ func extractIdeas(text string) ([]IdeateResult, []ideaRejection, error) {
 	return nil, nil, fmt.Errorf("no JSON array found in agent output")
 }
 
+// extractJSONArrayLikeCandidates returns candidate strings that might contain
+// a JSON array: the raw text itself, plus any fenced code blocks found within it.
 func extractJSONArrayLikeCandidates(text string) []string {
 	candidates := make([]string, 0, 2)
 	if text == "" {
@@ -163,6 +176,10 @@ func extractJSONArrayLikeCandidates(text string) []string {
 	return candidates
 }
 
+// parseIdeaJSONArray extracts and parses a JSON array of IdeateResult from text.
+// Uses bracket-depth tracking to find the closing ']', normalizes each entry's
+// impact/priority, and filters out empty or duplicate titles. Results are sorted
+// by descending impact score and capped at MaxIdeationIdeas.
 func parseIdeaJSONArray(text string) ([]IdeateResult, []ideaRejection, error) {
 	start := strings.Index(text, "[")
 	if start == -1 {
@@ -318,6 +335,8 @@ func repairTruncatedJSONArray(text string, start int) string {
 	return text[start:lastObjEnd+1] + "]"
 }
 
+// findJSONCodeBlock extracts the content of ```json or ``` fenced code blocks.
+// Returns all matches found in text (may be empty).
 func findJSONCodeBlock(text string) []string {
 	var blocks []string
 	offset := 0
@@ -368,6 +387,10 @@ func looksLikeNoCodebaseOutput(result string) bool {
 	return false
 }
 
+// extractIdeasFromRunOutput is a recovery path that tries to extract ideas from
+// the raw container output when the primary parsed result fails. It scans NDJSON
+// lines for any agentOutput.Result that contains a valid idea array, preferring
+// the line with a non-empty StopReason (the final result message).
 func extractIdeasFromRunOutput(result string, rawStdout, rawStderr []byte) ([]IdeateResult, []ideaRejection, error) {
 	// Prefer the final parsed result if it already contains ideas.
 	if ideas, rejections, err := extractIdeas(result); err == nil {

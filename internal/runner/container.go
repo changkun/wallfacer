@@ -33,7 +33,8 @@ func mountOpts(opts ...string) string {
 	return strings.Join(opts, ",")
 }
 
-// agentUsage mirrors the token-usage object in the agent's JSON output.
+// agentUsage mirrors the token-usage JSON object emitted by the agent container.
+// Fields map directly to the Anthropic API usage response.
 type agentUsage struct {
 	InputTokens              int `json:"input_tokens"`
 	OutputTokens             int `json:"output_tokens"`
@@ -58,6 +59,8 @@ type agentOutput struct {
 	ActualSandbox sandbox.Type `json:"-"`
 }
 
+// Package-level aliases for SandboxActivity constants to reduce verbosity
+// in sandbox routing call sites throughout the runner package.
 const (
 	activityImplementation = store.SandboxActivityImplementation
 	activityTesting        = store.SandboxActivityTesting
@@ -197,6 +200,8 @@ func (r *Runner) buildContainerSpecForSandbox(
 	return spec
 }
 
+// instructionsFilenameForSandbox returns the container-side filename for
+// workspace-level instructions. Claude expects CLAUDE.md; Codex expects AGENTS.md.
 func instructionsFilenameForSandbox(sb sandbox.Type) string {
 	if sb == sandbox.Codex {
 		return prompts.CodexInstructionsFilename
@@ -244,6 +249,8 @@ func buildAgentCmd(prompt, model string) []string {
 	return cmd
 }
 
+// appendCodexAuthMount adds the host Codex auth cache as a read-only bind
+// mount when the sandbox is Codex and the host path exists. No-op for other sandboxes.
 func (r *Runner) appendCodexAuthMount(volumes []sandbox.VolumeMount, sb sandbox.Type) []sandbox.VolumeMount {
 	if sb != sandbox.Codex {
 		return volumes
@@ -292,6 +299,9 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.
 	return spec
 }
 
+// sandboxImageForSandbox derives the container image name for the given sandbox type.
+// For Claude it returns the configured sandboxImage as-is. For Codex it rewrites
+// "wallfacer" → "wallfacer-codex" in the image name (preserving registry, tag, and digest).
 func (r *Runner) sandboxImageForSandbox(sb sandbox.Type) string {
 	if sb != sandbox.Codex {
 		return strings.TrimSpace(r.sandboxImage)
@@ -327,12 +337,15 @@ func (r *Runner) sandboxImageForSandbox(sb sandbox.Type) string {
 	return prefix + "wallfacer-codex" + tag + digest
 }
 
-// modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file (if configured).
-// Returns an empty string when the file cannot be read or the key is absent.
+// sandboxForTask returns the resolved sandbox type for the task's implementation activity.
+// Shorthand for sandboxForTaskActivity(task, activityImplementation).
 func (r *Runner) sandboxForTask(task *store.Task) sandbox.Type {
 	return r.sandboxForTaskActivity(task, activityImplementation)
 }
 
+// sandboxForTaskActivity resolves the sandbox type for a given task and activity.
+// Resolution priority: per-task per-activity override → per-task sandbox → env-file
+// per-activity setting → env-file default sandbox → Claude (hardcoded fallback).
 func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.SandboxActivity) sandbox.Type {
 	if task == nil {
 		return sandbox.Claude
@@ -352,6 +365,9 @@ func (r *Runner) sandboxForTaskActivity(task *store.Task, activity store.Sandbox
 	return sandbox.Claude
 }
 
+// sandboxFromEnvForActivity reads the env-file sandbox routing for a specific activity.
+// Falls back to cfg.DefaultSandbox when no activity-specific override is set.
+// Returns "" when the env file is absent or unparseable.
 func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) sandbox.Type {
 	if r.envFile == "" {
 		return ""
@@ -394,6 +410,8 @@ func (r *Runner) sandboxFromEnvForActivity(activity store.SandboxActivity) sandb
 	return cfg.DefaultSandbox
 }
 
+// modelFromEnv reads CLAUDE_DEFAULT_MODEL from the env file.
+// Returns an empty string when the file is absent or the key is unset.
 func (r *Runner) modelFromEnv() string {
 	return r.modelFromEnvForSandbox(sandbox.Claude)
 }
@@ -585,6 +603,9 @@ func (r *Runner) runContainer(
 	return output, rawStdout, rawStderr, nil
 }
 
+// isLikelyTokenLimitError heuristically detects rate-limit and token-limit errors
+// by scanning the joined lowercase text for known keyword groups. Used to trigger
+// claude→codex sandbox fallback when the claude sandbox hits API limits.
 func isLikelyTokenLimitError(parts ...string) bool {
 	joined := strings.ToLower(strings.Join(parts, " "))
 	if joined == "" {

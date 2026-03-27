@@ -37,6 +37,9 @@ func Paginate[T any](
 	var result []T
 	totalFiltered := 0
 
+	// Single pass: skip items at or before the cursor, apply filter, then
+	// collect up to limit items. Continue counting totalFiltered past the
+	// limit to determine HasMore.
 	for _, item := range items {
 		c := cursor(item)
 		if afterCursor > 0 && c <= afterCursor {
@@ -51,6 +54,7 @@ func Paginate[T any](
 		}
 	}
 
+	// Ensure non-nil slice for JSON serialization ([] instead of null).
 	if result == nil {
 		result = []T{}
 	}

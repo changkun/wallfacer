@@ -10,6 +10,10 @@ import (
 	"testing"
 )
 
+// TestCodexEntrypointPreservesUsageFromStream verifies that the Codex sandbox
+// entrypoint script accumulates streaming turn.completed events and emits a
+// final JSON envelope with result text, session ID, stop reason, cost, and
+// token usage fields that the runner depends on.
 func TestCodexEntrypointPreservesUsageFromStream(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")
@@ -119,6 +123,9 @@ printf 'final answer from codex' > "$LAST_MSG"
 	}
 }
 
+// TestCodexEntrypointSkipsFastConfigWhenDisabled verifies that setting
+// WALLFACER_SANDBOX_FAST=false prevents the low reasoning effort config
+// from being passed to the Codex CLI.
 func TestCodexEntrypointSkipsFastConfigWhenDisabled(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("requires Unix shell")

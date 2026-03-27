@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// TestBreaker_ClosedByDefault verifies a new breaker starts in the closed state
+// with zero failures and allows operations.
 func TestBreaker_ClosedByDefault(t *testing.T) {
 	b := New(3, 30*time.Second)
 	if !b.Allow() {
@@ -20,6 +22,8 @@ func TestBreaker_ClosedByDefault(t *testing.T) {
 	}
 }
 
+// TestBreaker_OpensAfterThreshold verifies that the breaker stays closed until
+// the failure count reaches the threshold, then transitions to open.
 func TestBreaker_OpensAfterThreshold(t *testing.T) {
 	const threshold = 5
 	b := New(threshold, 30*time.Second)
@@ -43,6 +47,9 @@ func TestBreaker_OpensAfterThreshold(t *testing.T) {
 	}
 }
 
+// TestBreaker_TransitionsToHalfOpen verifies that after the open duration elapses,
+// the first Allow call returns true (the probe) and transitions to half-open,
+// while subsequent calls return false.
 func TestBreaker_TransitionsToHalfOpen(t *testing.T) {
 	const threshold = 3
 	openDuration := 20 * time.Millisecond
@@ -70,6 +77,8 @@ func TestBreaker_TransitionsToHalfOpen(t *testing.T) {
 	}
 }
 
+// TestBreaker_ClosesOnSuccess verifies the full recovery cycle: open -> half-open
+// (probe) -> closed after RecordSuccess, with failures reset to zero.
 func TestBreaker_ClosesOnSuccess(t *testing.T) {
 	const threshold = 2
 	openDuration := 20 * time.Millisecond
@@ -104,6 +113,8 @@ func TestBreaker_ClosesOnSuccess(t *testing.T) {
 	}
 }
 
+// TestBreaker_ConcurrentSafe exercises concurrent Allow, RecordFailure, and
+// RecordSuccess calls to verify the lock-free atomic operations are race-free.
 func TestBreaker_ConcurrentSafe(_ *testing.T) {
 	b := New(5, 10*time.Millisecond)
 
@@ -130,6 +141,8 @@ func TestBreaker_ConcurrentSafe(_ *testing.T) {
 	_ = b.Failures()
 }
 
+// TestBackoffBreaker_ClosedByDefault verifies a new BackoffBreaker starts healthy
+// with zero failures and no retry-at time.
 func TestBackoffBreaker_ClosedByDefault(t *testing.T) {
 	b := NewBackoff(BackoffConfig{})
 	if b.IsOpen() {
@@ -143,6 +156,8 @@ func TestBackoffBreaker_ClosedByDefault(t *testing.T) {
 	}
 }
 
+// TestBackoffBreaker_ExponentialBackoff verifies that each consecutive failure
+// doubles the backoff delay (baseDelay * 2^(n-1)).
 func TestBackoffBreaker_ExponentialBackoff(t *testing.T) {
 	now := time.Now()
 	b := NewBackoff(BackoffConfig{
@@ -179,6 +194,8 @@ func TestBackoffBreaker_ExponentialBackoff(t *testing.T) {
 	}
 }
 
+// TestBackoffBreaker_MaxDelayCap verifies that the backoff delay never exceeds MaxDelay
+// regardless of how many failures accumulate.
 func TestBackoffBreaker_MaxDelayCap(t *testing.T) {
 	now := time.Now()
 	b := NewBackoff(BackoffConfig{
@@ -197,6 +214,8 @@ func TestBackoffBreaker_MaxDelayCap(t *testing.T) {
 	}
 }
 
+// TestState_String verifies the String representation for all three valid states
+// and the fallback for invalid state values.
 func TestState_String(t *testing.T) {
 	tests := []struct {
 		state State
@@ -214,6 +233,8 @@ func TestState_String(t *testing.T) {
 	}
 }
 
+// TestBreaker_HalfOpenFailureReopens verifies that a failure during the half-open
+// probe transitions the breaker back to open.
 func TestBreaker_HalfOpenFailureReopens(t *testing.T) {
 	const threshold = 2
 	openDuration := 20 * time.Millisecond
@@ -240,6 +261,9 @@ func TestBreaker_HalfOpenFailureReopens(t *testing.T) {
 	}
 }
 
+// TestBreaker_HalfOpenAllowReturnsFalse verifies that a second Allow call while
+// in half-open state returns false and reopens the breaker, ensuring only one
+// probe operation is permitted.
 func TestBreaker_HalfOpenAllowReturnsFalse(t *testing.T) {
 	const threshold = 2
 	openDuration := 20 * time.Millisecond
@@ -360,6 +384,8 @@ func TestBreaker_OpenCASFailureDeterministic(t *testing.T) {
 	}
 }
 
+// TestBreaker_AllowDefaultCase exercises the default branch in Allow by setting
+// the state to an invalid value, verifying it returns false.
 func TestBreaker_AllowDefaultCase(t *testing.T) {
 	// Exercise the default case by setting state to an invalid value.
 	b := New(1, time.Millisecond)
@@ -370,6 +396,8 @@ func TestBreaker_AllowDefaultCase(t *testing.T) {
 	}
 }
 
+// TestBackoffBreaker_RecordSuccessResets verifies that RecordSuccess clears the
+// failure count and closes the breaker.
 func TestBackoffBreaker_RecordSuccessResets(t *testing.T) {
 	b := NewBackoff(BackoffConfig{BaseDelay: time.Second})
 	b.RecordFailure()

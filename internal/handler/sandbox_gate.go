@@ -10,10 +10,15 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 )
 
+// normalizeSandbox maps an arbitrary string to a canonical sandbox.Type,
+// applying the same default logic as sandbox.Default (empty → Claude).
 func normalizeSandbox(s string) sandbox.Type {
 	return sandbox.Default(s)
 }
 
+// sandboxUsable reports whether the given sandbox type can accept tasks.
+// For Codex it checks host auth, API key presence, and prior test pass.
+// Returns (usable, reason) where reason explains why it is not usable.
 func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 	s := sb.OrDefault()
 	if s != sandbox.Codex {
@@ -48,6 +53,8 @@ func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 	return true, ""
 }
 
+// validateRequestedSandboxes checks that both the task-level sandbox and all
+// per-activity sandbox overrides are usable. Returns the first failure reason.
 func (h *Handler) validateRequestedSandboxes(taskSandbox sandbox.Type, byActivity map[store.SandboxActivity]sandbox.Type) error {
 	if ok, reason := h.sandboxUsable(taskSandbox); !ok {
 		return errors.New(reason)

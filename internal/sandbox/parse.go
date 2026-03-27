@@ -6,26 +6,35 @@ import (
 	"strings"
 )
 
-// containerJSON is used to unmarshal `podman/docker ps --format json` output.
+// containerJSON is the union of fields emitted by `podman ps --format json`
+// and `docker ps --format json`. Fields like Names and Created have different
+// JSON types between the two runtimes, so they use json.RawMessage / any to
+// defer decoding until the runtime-specific accessor methods.
 type containerJSON struct {
 	ID        string            `json:"Id"`
-	Names     json.RawMessage   `json:"Names"`
+	Names     json.RawMessage   `json:"Names"`   // string (Docker) or []string (Podman)
 	Image     string            `json:"Image"`
 	State     string            `json:"State"`
 	Status    string            `json:"Status"`
-	Created   any               `json:"Created"`
-	CreatedAt string            `json:"CreatedAt"`
+	Created   any               `json:"Created"`  // float64 (Podman unix ts) or json.Number
+	CreatedAt string            `json:"CreatedAt"` // human-readable, not always present
 	Labels    map[string]string `json:"Labels"`
 }
 
+// name extracts the container name from the Names JSON field.
+// Podman returns Names as a JSON array of strings, while Docker returns it as
+// a plain string (sometimes with a leading "/" prefix). This method tries both
+// decodings and strips the "/" prefix that Docker adds.
 func (c *containerJSON) name() (string, error) {
 	if c.Names == nil {
 		return "", nil
 	}
+	// Try Podman format first: JSON array of strings.
 	var names []string
 	if err := json.Unmarshal(c.Names, &names); err == nil && len(names) > 0 {
 		return strings.TrimPrefix(names[0], "/"), nil
 	}
+	// Fall back to Docker format: bare JSON string.
 	var name string
 	if err := json.Unmarshal(c.Names, &name); err == nil {
 		return strings.TrimPrefix(name, "/"), nil
@@ -33,6 +42,10 @@ func (c *containerJSON) name() (string, error) {
 	return "", fmt.Errorf("containerJSON.name: cannot decode Names field: %s", c.Names)
 }
 
+// createdUnix extracts the container creation time as a Unix timestamp.
+// The Created field varies by runtime: Podman emits a numeric Unix timestamp
+// (decoded as float64 by encoding/json), while Docker may emit a json.Number.
+// Returns 0 if the field is absent or has an unexpected type.
 func (c *containerJSON) createdUnix() int64 {
 	if c.Created != nil {
 		switch v := c.Created.(type) {
@@ -83,6 +96,8 @@ func ParseContainerList(out []byte) ([]ContainerInfo, error) {
 			continue
 		}
 
+		// Extract task ID: prefer the explicit label, fall back to parsing
+		// the UUID suffix from the container name (legacy naming convention).
 		taskID := ""
 		if c.Labels != nil {
 			taskID = c.Labels["wallfacer.task.id"]
@@ -113,6 +128,8 @@ func IsUUID(s string) bool {
 		return false
 	}
 	for i, c := range s {
+		// Positions 8, 13, 18, 23 are the four hyphen separators in a UUID:
+		// xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 		if i == 8 || i == 13 || i == 18 || i == 23 {
 			if c != '-' {
 				return false

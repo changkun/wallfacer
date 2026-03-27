@@ -9,7 +9,7 @@ import (
 )
 
 // WakeSource provides subscribe/unsubscribe for coalescing wake signals.
-// *store.Store satisfies this interface without modification.
+// Typically satisfied by *pubsub.Hub via its SubscribeWake/UnsubscribeWake methods.
 type WakeSource interface {
 	SubscribeWake() (id int, ch <-chan struct{})
 	UnsubscribeWake(id int)
@@ -47,6 +47,8 @@ func Start(ctx context.Context, cfg Config) {
 	go run(ctx, cfg)
 }
 
+// run implements the event loop. It subscribes to wake signals, sets up a
+// ticker, runs the optional Init, then enters a select loop until ctx is done.
 func run(ctx context.Context, cfg Config) {
 	// Subscribe to wake channel if configured.
 	var wakeCh <-chan struct{}
@@ -56,7 +58,8 @@ func run(ctx context.Context, cfg Config) {
 		defer cfg.Wake.UnsubscribeWake(id)
 	}
 
-	// Set up ticker if configured.
+	// Set up ticker if configured. A nil tickCh (zero Interval) means the
+	// select case is permanently blocked, making this a wake-only watcher.
 	var tickCh <-chan time.Time
 	if cfg.Interval > 0 {
 		ticker := time.NewTicker(cfg.Interval)
@@ -78,6 +81,9 @@ func run(ctx context.Context, cfg Config) {
 			}
 			return
 		case <-wakeCh:
+			// Optional settle delay: pause briefly after a wake signal to let
+			// burst events coalesce before running the action. The inner select
+			// ensures cancellation is still respected during the delay.
 			if cfg.SettleDelay > 0 {
 				select {
 				case <-ctx.Done():

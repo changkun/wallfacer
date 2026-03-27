@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestMap_LockUnlock verifies basic Lock/Unlock on a single key does not deadlock.
 func TestMap_LockUnlock(_ *testing.T) {
 	var km Map[string]
 
@@ -12,6 +13,8 @@ func TestMap_LockUnlock(_ *testing.T) {
 	km.Unlock("a")
 }
 
+// TestMap_Get verifies that Get returns the same mutex for the same key
+// and distinct mutexes for different keys.
 func TestMap_Get(t *testing.T) {
 	var km Map[string]
 
@@ -27,6 +30,7 @@ func TestMap_Get(t *testing.T) {
 	}
 }
 
+// TestMap_Delete verifies that deleting a key causes Get to allocate a fresh mutex.
 func TestMap_Delete(t *testing.T) {
 	var km Map[int]
 
@@ -38,6 +42,8 @@ func TestMap_Delete(t *testing.T) {
 	}
 }
 
+// TestMap_Concurrent stress-tests that per-key locking serializes increments
+// correctly across 100 goroutines per key, with 10 independent keys.
 func TestMap_Concurrent(t *testing.T) {
 	var km Map[int]
 	var wg sync.WaitGroup

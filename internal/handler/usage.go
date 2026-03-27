@@ -17,6 +17,7 @@ type usageResponse struct {
 	PeriodDays int                                       `json:"period_days"`
 }
 
+// addUsage accumulates all token and cost fields from src into dst.
 func addUsage(dst *store.TaskUsage, src store.TaskUsage) {
 	dst.InputTokens += src.InputTokens
 	dst.OutputTokens += src.OutputTokens

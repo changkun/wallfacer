@@ -47,10 +47,14 @@ func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType Event
 }
 
 // GetEvents returns a copy of all events for a task in order.
+// If events have not been loaded yet (lazy loading for terminal tasks),
+// this method upgrades from a read lock to a write lock, loads the events,
+// then downgrades back to a read lock. The lock gap between RUnlock and
+// Lock is safe because ensureEventsLoadedLocked is idempotent.
 func (s *Store) GetEvents(_ context.Context, taskID uuid.UUID) ([]TaskEvent, error) {
 	s.mu.RLock()
 	if !s.eventsLoaded[taskID] {
-		// Events not yet loaded — upgrade to write lock and load them.
+		// Events not yet loaded — release read lock, acquire write lock to load.
 		s.mu.RUnlock()
 		s.mu.Lock()
 		s.ensureEventsLoadedLocked(taskID)
@@ -181,13 +185,17 @@ func ComputeSpans(events []TaskEvent) ([]SpanResult, error) {
 	return spans, nil
 }
 
-// numberedTraceFile and parseNumberedTraceFile are used by FilesystemBackend
-// for trace file parsing.
+// numberedTraceFile represents a parsed trace file name (e.g. "0042.json")
+// with its extracted sequence number. Used by FilesystemBackend to identify
+// individual event files that have not yet been compacted.
 type numberedTraceFile struct {
-	name string
-	seq  int
+	name string // original file name, e.g. "0042.json"
+	seq  int    // parsed sequence number, e.g. 42
 }
 
+// parseNumberedTraceFile extracts the sequence number from a trace file name
+// like "0042.json". Returns false for non-numeric or non-.json file names
+// (e.g. "compact.ndjson", "README.txt").
 func parseNumberedTraceFile(name string) (numberedTraceFile, bool) {
 	if !strings.HasSuffix(name, ".json") {
 		return numberedTraceFile{}, false

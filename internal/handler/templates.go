@@ -25,10 +25,13 @@ type PromptTemplate struct {
 // templatesMu protects all reads and writes to the templates.json file.
 var templatesMu sync.RWMutex
 
+// templatesPath returns the filesystem path to the templates.json file.
 func (h *Handler) templatesPath() string {
 	return filepath.Join(h.configDir, "templates.json")
 }
 
+// loadTemplates reads and parses templates.json. Returns an empty slice
+// (not an error) when the file does not exist.
 func (h *Handler) loadTemplates() ([]PromptTemplate, error) {
 	data, err := os.ReadFile(h.templatesPath())
 	if errors.Is(err, os.ErrNotExist) {
@@ -44,6 +47,7 @@ func (h *Handler) loadTemplates() ([]PromptTemplate, error) {
 	return templates, nil
 }
 
+// saveTemplates writes the templates slice to templates.json atomically.
 func (h *Handler) saveTemplates(templates []PromptTemplate) error {
 	return atomicfile.WriteJSON(h.templatesPath(), templates, 0644)
 }

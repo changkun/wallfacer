@@ -2,6 +2,7 @@ package sandbox
 
 import "testing"
 
+// TestAll_ReturnsBothTypes verifies that All() returns exactly Claude and Codex.
 func TestAll_ReturnsBothTypes(t *testing.T) {
 	all := All()
 	if len(all) != 2 {
@@ -19,6 +20,8 @@ func TestAll_ReturnsBothTypes(t *testing.T) {
 	}
 }
 
+// TestAll_ReturnsCopy verifies that mutating the returned slice does not
+// affect the internal canonical list.
 func TestAll_ReturnsCopy(t *testing.T) {
 	a := All()
 	b := All()
@@ -28,6 +31,8 @@ func TestAll_ReturnsCopy(t *testing.T) {
 	}
 }
 
+// TestParse_ValidClaude verifies that Parse accepts "claude" in various cases
+// and whitespace variants.
 func TestParse_ValidClaude(t *testing.T) {
 	tests := []string{"claude", "CLAUDE", "Claude", "  claude  ", " CLAUDE "}
 	for _, input := range tests {
@@ -41,6 +46,8 @@ func TestParse_ValidClaude(t *testing.T) {
 	}
 }
 
+// TestParse_ValidCodex verifies that Parse accepts "codex" in various cases
+// and whitespace variants.
 func TestParse_ValidCodex(t *testing.T) {
 	tests := []string{"codex", "CODEX", "Codex", "  codex  ", " CODEX "}
 	for _, input := range tests {
@@ -54,6 +61,8 @@ func TestParse_ValidCodex(t *testing.T) {
 	}
 }
 
+// TestParse_Invalid verifies that Parse rejects unknown sandbox names
+// and returns an empty Type with ok=false.
 func TestParse_Invalid(t *testing.T) {
 	tests := []string{"", "unknown", "docker", "openai", "gpt4", "  "}
 	for _, input := range tests {
@@ -67,6 +76,8 @@ func TestParse_Invalid(t *testing.T) {
 	}
 }
 
+// TestNormalize_ValidInputs verifies that Normalize returns the canonical Type
+// for recognized sandbox names regardless of case or whitespace.
 func TestNormalize_ValidInputs(t *testing.T) {
 	tests := []struct {
 		input string
@@ -86,8 +97,9 @@ func TestNormalize_ValidInputs(t *testing.T) {
 	}
 }
 
+// TestNormalize_InvalidInputs verifies that unrecognized values are lowercased
+// and trimmed rather than rejected, so they can be stored as-is.
 func TestNormalize_InvalidInputs(t *testing.T) {
-	// For invalid inputs, Normalize returns lowercase-trimmed value (not empty string)
 	tests := []struct {
 		input string
 		want  Type
@@ -104,6 +116,8 @@ func TestNormalize_InvalidInputs(t *testing.T) {
 	}
 }
 
+// TestDefault_ValidInputs verifies that Default returns the parsed Type for
+// recognized inputs.
 func TestDefault_ValidInputs(t *testing.T) {
 	if got := Default("claude"); got != Claude {
 		t.Errorf("Default(%q) = %q, want %q", "claude", got, Claude)
@@ -116,6 +130,8 @@ func TestDefault_ValidInputs(t *testing.T) {
 	}
 }
 
+// TestDefault_InvalidFallsBackToClaude verifies that unrecognized values
+// fall back to Claude as the default sandbox type.
 func TestDefault_InvalidFallsBackToClaude(t *testing.T) {
 	tests := []string{"", "unknown", "docker", "  "}
 	for _, input := range tests {
@@ -126,6 +142,7 @@ func TestDefault_InvalidFallsBackToClaude(t *testing.T) {
 	}
 }
 
+// TestIsValid_ValidTypes verifies that the two known sandbox types report as valid.
 func TestIsValid_ValidTypes(t *testing.T) {
 	if !Claude.IsValid() {
 		t.Error("Claude.IsValid() = false, want true")
@@ -135,8 +152,10 @@ func TestIsValid_ValidTypes(t *testing.T) {
 	}
 }
 
+// TestIsValid_InvalidTypes verifies that unknown strings are reported as invalid.
+// Note: IsValid delegates to Parse which lowercases the input, so "CLAUDE" would
+// actually be valid -- only truly unknown names are tested here.
 func TestIsValid_InvalidTypes(t *testing.T) {
-	// Note: "CLAUDE" is NOT invalid because Parse() lowercases input before matching.
 	tests := []Type{"", "unknown", "docker"}
 	for _, tp := range tests {
 		if tp.IsValid() {
@@ -145,6 +164,7 @@ func TestIsValid_InvalidTypes(t *testing.T) {
 	}
 }
 
+// TestOrDefault_ValidTypes verifies that OrDefault is a no-op for known types.
 func TestOrDefault_ValidTypes(t *testing.T) {
 	if got := Claude.OrDefault(); got != Claude {
 		t.Errorf("Claude.OrDefault() = %q, want %q", got, Claude)
@@ -154,8 +174,9 @@ func TestOrDefault_ValidTypes(t *testing.T) {
 	}
 }
 
+// TestOrDefault_InvalidFallsBackToClaude verifies that OrDefault returns Claude
+// for unknown Type values.
 func TestOrDefault_InvalidFallsBackToClaude(t *testing.T) {
-	// Note: "CLAUDE" is treated as valid (Parse lowercases), so it's excluded here.
 	tests := []Type{"", "unknown", "docker"}
 	for _, tp := range tests {
 		got := tp.OrDefault()

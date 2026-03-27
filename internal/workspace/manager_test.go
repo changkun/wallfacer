@@ -9,6 +9,8 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 )
 
+// TestNewManagerWithoutWorkspacesCreatesScopedStore verifies that even with no
+// workspaces, a scoped store and key are still created (for the "empty" workspace set).
 func TestNewManagerWithoutWorkspacesCreatesScopedStore(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
@@ -37,6 +39,9 @@ func TestNewManagerWithoutWorkspacesCreatesScopedStore(t *testing.T) {
 	}
 }
 
+// TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup verifies session
+// restore: when no initial workspaces are provided (nil), the most recently used
+// group is loaded from disk.
 func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()
@@ -70,6 +75,9 @@ func TestNewManagerWithoutWorkspacesLoadsMostRecentWorkspaceGroup(t *testing.T) 
 	}
 }
 
+// TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup verifies that
+// passing an explicit empty slice (non-nil) suppresses session restore,
+// distinguishing "no workspaces requested" from "use last session".
 func TestNewManagerExplicitEmptyWorkspacesDoesNotRestoreSavedGroup(t *testing.T) {
 	configDir := t.TempDir()
 	dataDir := t.TempDir()

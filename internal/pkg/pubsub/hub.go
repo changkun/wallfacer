@@ -25,22 +25,27 @@ type Sequenced[T any] struct {
 // subscribers. A bounded replay buffer allows reconnecting clients to catch up
 // on missed events via [Since].
 type Hub[T any] struct {
-	deltaSeq atomic.Int64
+	deltaSeq atomic.Int64 // monotonically increasing sequence counter
 
+	// Replay buffer: bounded ring of recent messages for reconnecting clients.
+	// Protected by replayMu (RWMutex: writers append, readers call Since).
 	replayMu  sync.RWMutex
 	replayBuf []Sequenced[T]
 	replayCap int
 
+	// Full subscribers: each gets a buffered channel receiving every published message.
 	subMu       sync.Mutex
 	subscribers map[int]chan Sequenced[T]
 	nextSubID   int
 	channelSize int
 
+	// Wake subscribers: lightweight capacity-1 channels that coalesce bursts
+	// into a single signal, useful for polling-style consumers.
 	wakeSubMu       sync.Mutex
 	wakeSubscribers map[int]chan struct{}
 	nextWakeSubID   int
 
-	clone func(T) T // optional deep-copy function
+	clone func(T) T // optional deep-copy function for value isolation
 }
 
 // Option configures a [Hub].
@@ -76,6 +81,8 @@ func NewHub[T any](opts ...Option[T]) *Hub[T] {
 	return h
 }
 
+// cloneValue returns a deep copy of v if a clone function was configured,
+// otherwise returns v as-is (shared reference).
 func (h *Hub[T]) cloneValue(v T) T {
 	if h.clone != nil {
 		return h.clone(v)
@@ -99,6 +106,9 @@ func (h *Hub[T]) Publish(value T) {
 	h.replayMu.Unlock()
 
 	// Fan out to live subscribers.
+	// Fan out to live subscribers. Non-blocking send: if a subscriber's
+	// channel is full, close it and mark for eviction to prevent a slow
+	// consumer from blocking all publishers.
 	var overflowed []int
 	h.subMu.Lock()
 	for id, ch := range h.subscribers {
@@ -109,12 +119,16 @@ func (h *Hub[T]) Publish(value T) {
 			overflowed = append(overflowed, id)
 		}
 	}
+	// Remove evicted subscribers in a second pass to avoid mutating the map
+	// during iteration.
 	for _, id := range overflowed {
 		delete(h.subscribers, id)
 	}
 	h.subMu.Unlock()
 
-	// Fan out wake signal.
+	// Fan out wake signal. Non-blocking send into capacity-1 channels
+	// naturally coalesces burst notifications: if a signal is already
+	// pending the new one is dropped, which is the desired behavior.
 	h.wakeSubMu.Lock()
 	for _, ch := range h.wakeSubscribers {
 		select {

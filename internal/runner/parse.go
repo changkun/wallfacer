@@ -48,6 +48,9 @@ func parseOutput(raw string) (*agentOutput, error) {
 	return nil, fmt.Errorf("no valid JSON object found in output")
 }
 
+// normalizeConversationID ensures output.SessionID is populated. It prefers the
+// parsed SessionID, falls back to ThreadID (Codex format), and finally scans
+// the raw NDJSON for a session_id in early stream messages.
 func normalizeConversationID(output *agentOutput, raw string) {
 	if output == nil {
 		return

@@ -990,6 +990,8 @@ func parseTestVerdict(result string, customPass, customFail []string) string {
 	return ""
 }
 
+// buildTestFailureFeedback wraps the test agent's result text into a
+// structured feedback message for the implementation agent to address.
 func buildTestFailureFeedback(result string) string {
 	result = strings.TrimSpace(result)
 	if result == "" {
@@ -1063,6 +1065,9 @@ func inferPassFromContent(result string, customPass, customFail []string) string
 	return ""
 }
 
+// parseTestVerdictFromLine checks a single uppercase line for a labeled verdict
+// pattern (e.g. "Result: PASS") or a trailing verdict word (e.g. "...PASS").
+// Returns "pass", "fail", or "" if no verdict is detected.
 func parseTestVerdictFromLine(line string) string {
 	if m := verdictLabelPattern.FindStringSubmatch(line); m != nil {
 		return verdictTokenToValue(m[1])
@@ -1084,6 +1089,8 @@ func parseTestVerdictFromLine(line string) string {
 	return verdictTokenToValue(last)
 }
 
+// verdictTokenToValue maps uppercase verdict tokens (PASS, PASSED, FAIL, etc.)
+// to their normalized values ("pass" or "fail"). Returns "" for unrecognized tokens.
 func verdictTokenToValue(token string) string {
 	switch strings.ToUpper(token) {
 	case "PASS", "PASSED", "PASSING":
