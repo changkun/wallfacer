@@ -60,7 +60,7 @@ Alternative `SandboxBackend` implementations. Independent of each other and of M
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [02a-multi-workspace-groups.md](02a-multi-workspace-groups.md) | **In progress** (6/11 tasks done) | Multi-store manager, runner task-to-group mapping. Run tasks across workspace groups simultaneously. |
+| [02a-multi-workspace-groups.md](02a-multi-workspace-groups.md) | **Complete** | Multi-store manager, runner task-to-group mapping. Run tasks across workspace groups simultaneously. |
 
 After M2 (store interfaces stable). Independent of M3. Can run in parallel with M3.
 

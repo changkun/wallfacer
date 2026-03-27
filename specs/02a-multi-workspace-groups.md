@@ -395,9 +395,9 @@ open; `activeGroups` has one entry.
 ```
 Phase 1 (Manager)    — foundation, no dependencies          ✓ DONE (tasks 1-2)
 Phase 2 (Runner)     — depends on Phase 1                   ✓ DONE (tasks 3-5)
-Phase 3 (Handler)    — depends on Phase 1 & 2               partially done (task 6 done, 7-9 todo)
-Phase 4 (Frontend)   — depends on Phase 3                   todo (task 10)
-Phase 5 (Server)     — parallel with Phase 3, minimal changes  todo (no changes needed)
+Phase 3 (Handler)    — depends on Phase 1 & 2               ✓ DONE (tasks 6-9)
+Phase 4 (Frontend)   — depends on Phase 3                   ✓ DONE (task 10)
+Phase 5 (Docs)       — depends on all phases                ✓ DONE (task 11)
 ```
 
 ---

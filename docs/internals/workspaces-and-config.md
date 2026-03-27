@@ -69,9 +69,26 @@ flowchart TD
     Publish --> Close["Close previous store"]
 ```
 
-All external side effects (store creation, instructions file, workspace groups, env file) are applied before the atomic swap. Every failure path closes the candidate store so it does not accumulate. After a successful swap, the previous store is closed outside the lock.
+All external side effects (store creation, instructions file, workspace groups, env file) are applied before the atomic swap. Every failure path closes the candidate store so it does not accumulate.
 
-Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams, the runner) to react to workspace switches.
+#### Multi-store lifecycle
+
+The manager supports multiple concurrent workspace groups via an `activeGroups` map (`map[string]*activeGroup`). Each entry tracks a `Snapshot` and an atomic `taskCount` representing the number of in-progress + committing tasks in that group.
+
+**Store lifecycle rule**: a store stays open when `taskCount > 0 OR key == current.Key` (the viewed group).
+
+After a successful swap:
+- The new group is added to `activeGroups` (or its snapshot is updated if already present).
+- The previous group's store is closed only if its `taskCount == 0` and it is no longer the viewed group.
+- If switching back to a key already in `activeGroups`, the existing store is reused instead of creating a new one.
+
+`IncrementTaskCount(key)` and `DecrementAndCleanup(key)` are called by the Runner at task start and completion to manage the reference count.
+
+#### Runner task-to-store resolution
+
+Each task is associated with a workspace group key at dispatch time (captured in `RunBackground()`). The Runner's `taskStore(taskID)` method resolves the correct store by looking up the task's key in `Manager.StoreForKey()`, falling back to the currently viewed store if the mapping is missing or the group is no longer active. All execution-path code (`Run()`, `commit()`, `GenerateTitle()`, etc.) uses `taskStore()` instead of the mutable `r.store` field.
+
+Subscribers (registered via `Manager.Subscribe()`) receive `Snapshot` values on a buffered channel whenever workspaces change, allowing other components (e.g. SSE streams, the runner, autopilot watchers) to react to workspace switches.
 
 ## 📝 AGENTS.md Lifecycle
 

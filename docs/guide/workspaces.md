@@ -108,9 +108,9 @@ Named groups display the custom name on the tab. Hover over a tab to see the ful
 
 Groups are saved automatically to `~/.wallfacer/workspace-groups.json` whenever a group becomes active. The most recently used group is promoted to the front of the list.
 
-#### Switching constraints
+#### Concurrent workspace groups
 
-You cannot switch workspace groups while any task is in the **In Progress** or **Committing** state. Complete or cancel running tasks before switching.
+You can switch workspace groups at any time, even while tasks are running. Tasks in the previous group continue executing in the background -- their stores and worktrees are kept alive until all tasks complete. The header tabs show per-group task count badges (**N running**, **N waiting**) so you can see at a glance which groups have active work.
 
 ### 🌿 Branch Management
 
