@@ -1,4 +1,4 @@
-# Task 9: Expose Active Group Keys in Config API
+# Task 9: Expose Per-Group Task Counts in Config API
 
 **Status:** Todo
 **Depends on:** Task 1
@@ -7,24 +7,64 @@
 
 ## Goal
 
-Add `active_group_keys` to the config API response so the frontend knows
-which workspace groups have open stores (running tasks).
+Add `active_groups` to the config API response with per-group task status
+counts, so the frontend can show how many tasks are in progress and waiting
+for each workspace group — even groups that are not currently viewed.
 
 ## What to do
 
-1. In `internal/handler/config.go`, add to `buildConfigResponse()`:
+1. In `internal/handler/config.go`, add a helper that queries all active
+   stores for task counts:
 
    ```go
-   "active_group_keys": h.workspace.ActiveGroupKeys(),
+   type activeGroupInfo struct {
+       Key        string `json:"key"`
+       InProgress int    `json:"in_progress"`
+       Waiting    int    `json:"waiting"`
+   }
+
+   func (h *Handler) activeGroupInfos(ctx context.Context) []activeGroupInfo {
+       var infos []activeGroupInfo
+       if h.workspace == nil {
+           return infos
+       }
+       for _, snap := range h.workspace.AllActiveSnapshots() {
+           info := activeGroupInfo{Key: snap.Key}
+           if snap.Store != nil {
+               if tasks, err := snap.Store.ListTasks(ctx, false); err == nil {
+                   for _, t := range tasks {
+                       switch t.Status {
+                       case store.TaskStatusInProgress, store.TaskStatusCommitting:
+                           info.InProgress++
+                       case store.TaskStatusWaiting:
+                           info.Waiting++
+                       }
+                   }
+               }
+           }
+           infos = append(infos, info)
+       }
+       return infos
+   }
    ```
 
-2. Verify `ActiveGroupKeys()` was added in task-01.
+2. In `buildConfigResponse()`, add:
+
+   ```go
+   "active_groups": h.activeGroupInfos(ctx),
+   ```
+
+   This replaces the originally planned `active_group_keys` field with a
+   richer structure that includes per-status counts.
 
 ## Tests
 
-- `TestConfigResponseIncludesActiveGroupKeys` — create manager with
-  two active groups, call `buildConfigResponse`, verify the field is
-  present and contains both keys.
+- `TestConfigResponseIncludesActiveGroups` — create manager with two
+  active groups, add tasks with different statuses, call
+  `buildConfigResponse`, verify the field contains both groups with
+  correct counts.
+- `TestActiveGroupInfosEmptyManager` — nil workspace manager returns
+  empty slice.
 
 ## Boundaries
 
