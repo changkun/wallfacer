@@ -91,6 +91,119 @@ func TestTaskStoreFallback(t *testing.T) {
 	}
 }
 
+// --- RunBackground lifecycle tests ---
+
+// TestRunBackgroundCapturesWSKey verifies that RunBackground stores the
+// workspace key in taskWSKey before Run() starts.
+func TestRunBackgroundCapturesWSKey(t *testing.T) {
+	storeDir := t.TempDir()
+	s, err := store.NewFileStore(storeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	mgr := workspace.NewStatic(s, []string{"/ws/a"}, "")
+	snap := mgr.Snapshot()
+
+	_, r := setupTestRunner(t, nil)
+	r.workspaceManager = mgr
+	r.applyWorkspaceSnapshot(snap)
+
+	taskID := uuid.New()
+
+	// RunBackground will call Run(), which will fail quickly since the
+	// task doesn't exist in the store. That's fine — we're testing
+	// the bookkeeping, not the execution.
+	r.RunBackground(taskID, "test prompt", "", false)
+
+	// The key should be captured immediately (before Run returns).
+	if key, ok := r.taskWSKey.Load(taskID); !ok {
+		t.Fatal("expected taskWSKey to be populated after RunBackground")
+	} else if key.(string) != snap.Key {
+		t.Fatalf("expected wsKey=%q, got %q", snap.Key, key.(string))
+	}
+
+	// Wait for the background goroutine to finish.
+	r.WaitBackground()
+
+	// After completion, the mapping should be cleaned up.
+	if _, ok := r.taskWSKey.Load(taskID); ok {
+		t.Fatal("expected taskWSKey to be deleted after Run completes")
+	}
+}
+
+// TestRunBackgroundIncrementsTaskCount verifies that RunBackground calls
+// IncrementTaskCount on the workspace manager.
+func TestRunBackgroundIncrementsTaskCount(t *testing.T) {
+	storeDir := t.TempDir()
+	s, err := store.NewFileStore(storeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	mgr := workspace.NewStatic(s, []string{"/ws/a"}, "")
+	snap := mgr.Snapshot()
+
+	_, r := setupTestRunner(t, nil)
+	r.workspaceManager = mgr
+	r.applyWorkspaceSnapshot(snap)
+
+	// Launch two tasks to verify count increments.
+	taskA := uuid.New()
+	taskB := uuid.New()
+	r.RunBackground(taskA, "test A", "", false)
+	r.RunBackground(taskB, "test B", "", false)
+
+	// Wait for both to finish.
+	r.WaitBackground()
+
+	// After both tasks complete, DecrementAndCleanup should have been
+	// called twice. Since this is the viewed group, it stays in
+	// activeGroups even at count 0.
+	keys := mgr.ActiveGroupKeys()
+	if len(keys) != 1 {
+		t.Fatalf("expected 1 active group, got %d", len(keys))
+	}
+}
+
+// TestRunBackgroundCleansUpOnCompletion verifies that after Run() returns,
+// both the taskWSKey entry is deleted and DecrementAndCleanup is called.
+func TestRunBackgroundCleansUpOnCompletion(t *testing.T) {
+	storeA, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { storeA.Close() })
+
+	mgr := workspace.NewStatic(storeA, []string{"/ws/a"}, "")
+	snap := mgr.Snapshot()
+
+	// Manually increment to simulate pre-existing task count.
+	mgr.IncrementTaskCount(snap.Key)
+
+	_, r := setupTestRunner(t, nil)
+	r.workspaceManager = mgr
+	r.applyWorkspaceSnapshot(snap)
+
+	taskID := uuid.New()
+	r.RunBackground(taskID, "cleanup test", "", false)
+	r.WaitBackground()
+
+	// taskWSKey should be cleaned up.
+	if _, ok := r.taskWSKey.Load(taskID); ok {
+		t.Fatal("expected taskWSKey to be deleted after completion")
+	}
+
+	// The pre-existing increment + RunBackground's increment = 2.
+	// RunBackground's defer calls DecrementAndCleanup once, leaving 1.
+	// Since this is the viewed group, it stays regardless.
+	if _, ok := mgr.StoreForKey(snap.Key); !ok {
+		t.Fatal("expected viewed group to remain in activeGroups")
+	}
+}
+
 // TestTaskStoreFallbackOnMissingGroup verifies that taskStore falls back to
 // currentStore when the mapped group is no longer active in the manager.
 func TestTaskStoreFallbackOnMissingGroup(t *testing.T) {

@@ -266,7 +266,21 @@ func (r *Runner) Shutdown() {
 // so that WaitBackground can drain all outstanding work — particularly useful
 // in tests to prevent cleanup races with temp-dir removal.
 func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resumedFromWaiting bool) {
+	// Capture the current workspace key at dispatch time so the task uses the
+	// correct store even if the user switches workspaces during execution.
+	wsKey := r.currentWSKey()
+	r.taskWSKey.Store(taskID, wsKey)
+	if r.workspaceManager != nil {
+		r.workspaceManager.IncrementTaskCount(wsKey)
+	}
+
 	r.backgroundWg.Go("run:"+taskID.String()[:8], func() {
+		defer r.taskWSKey.Delete(taskID)
+		defer func() {
+			if r.workspaceManager != nil {
+				r.workspaceManager.DecrementAndCleanup(wsKey)
+			}
+		}()
 		r.Run(taskID, prompt, sessionID, resumedFromWaiting)
 	})
 }

@@ -1,6 +1,6 @@
 # Task 4: RunBackground Workspace Lifecycle Management
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1, Task 3
 **Phase:** 2 (Runner Multi-Store Awareness)
 **Effort:** Small
