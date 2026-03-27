@@ -539,6 +539,123 @@ When an epic filter is active, the status bar shows the filtered epic's progress
 
 These follow the existing shortcut pattern (single-key when no input is focused).
 
+### Design Option: Spec-Centric Planning View
+
+The board integration above (epic filter bar, phase dividers, progress panel) overlays epic awareness onto the existing kanban. This works for *execution monitoring*, but the harder problem is *planning itself* — the iterative process of refining specs and breaking them into tasks. An alternative design puts **spec documents** at the center of the UX rather than task cards.
+
+#### Motivation
+
+Observation from real usage: managing large changes requires constant iteration on spec markdown files. Specs need a filesystem structure to organize, a focused view to read, and a way to update them as execution reveals new information. The current design treats specs as opaque inputs to a planner task. A spec-centric design treats them as **living documents** that evolve alongside execution.
+
+#### Layout: Split-Pane Spec Workspace
+
+A dedicated planning mode with three panes — spec explorer, focused document view, and chat stream:
+
+```
++--header------------------------------------------------------+
+| [Board] [Specs]   workspace-group-tabs   [search] [settings] |
++----------+---------------------------+-----------------------+
+|          |                           |                       |
+| Spec     |  Focused Markdown View    |  Chat Stream          |
+| Explorer |                           |                       |
+|          |  # Sandbox Backends       |  > Break Phase 1 into |
+| specs/   |                           |    tasks that each    |
+|  01-sand |  ## Phase 1: Interface    |    touch 2-5 files    |
+|  01a-nat |                           |                       |
+|  01b-nat |  Define SandboxBackend    |  Agent: I'll split    |
+|  01c-nat |  and SandboxHandle as     |  into 6 tasks...      |
+|  01d-win*|  interfaces in a new      |                       |
+|  02-stor |  `internal/sandbox/`      |  [updated spec with   |
+|  02a-mul |  package. The interface   |   task breakdown       |
+|  03-cont |  has three methods:       |   highlighted]         |
+|  04-file |  - Launch(spec) Handle    |                       |
+|  epic-co |  - ListContainers() []C   |  > Make tasks 4 and 5 |
+|          |  - Stop(name) error       |    one task, they're   |
+|          |                           |    too small           |
+|          |  ## Tasks (auto-generated) |                       |
+|          |  - [ ] Define interfaces  |  Agent: Combined into  |
+|          |  - [ ] Implement Local    |  task "Migrate listing |
+|          |  - [ ] Refactor Runner    |  and retire executor"  |
+|          |  ...                       |                       |
+|          |                           |  [Send to Board ▶]    |
++----------+---------------------------+-----------------------+
++--status-bar--------------------------------------------------+
+```
+
+**Left pane — Spec Explorer:** A file tree rooted at `specs/` (reuses file explorer infrastructure from M4). Shows spec files with status badges (complete, in-progress, not started). Clicking a spec opens it in the focused view.
+
+**Center pane — Focused Markdown View:** Renders the selected spec as formatted markdown with live updates. When the chat agent modifies the spec file, the view refreshes automatically. Supports inline editing — the user can click to edit sections directly, or let the agent do it via the chat. Task checklists within the spec are interactive (click to mark done). Diff highlighting shows what the agent changed since the last user review.
+
+**Right pane — Chat Stream:** A conversation interface for iterating on the focused spec. The user types directives ("break Phase 1 into tasks", "this section is too vague, expand it", "add acceptance criteria to each task"). The agent reads the spec, explores the codebase, and proposes changes — which appear as highlighted diffs in the center pane. The user can accept, reject, or refine.
+
+#### Chat-Driven Spec Iteration Workflow
+
+```
+1. User opens specs/01-sandbox-backends.md in the focused view
+2. User types in chat: "Plan implementation of Phase 1"
+3. Agent reads the spec + codebase, proposes a task breakdown
+   → Spec file updated with a "## Tasks" section containing the breakdown
+   → Focused view shows the diff (new section highlighted)
+4. User reviews, types: "Task 3 is too large, split the runner refactor"
+   → Agent revises the spec's task section
+   → Focused view updates, diff shows the change
+5. User types: "Looks good. Send Phase 1 tasks to the board"
+   → Agent extracts tasks from the spec and creates them as kanban cards
+   → Board view shows new backlog cards with epic tags and dependencies
+6. Tasks execute on the kanban board (existing auto-promoter)
+7. As tasks complete, agent updates the spec:
+   → Marks completed items, adds implementation notes
+   → Focused view reflects changes in real-time
+8. After Phase 1 gate passes, user returns to spec view:
+   → "Now plan Phase 2, accounting for what Phase 1 actually built"
+   → Agent reads completed task results + current codebase
+   → Proposes Phase 2 tasks, updates spec
+```
+
+The key difference from the task-centric design: **the spec file is the source of truth** for the plan, not structured JSON in a planner task's output. The spec evolves continuously. Tasks are materialized *from* the spec when the user is ready, not produced as a one-shot batch.
+
+#### Spec File Conventions
+
+For the chat agent to read and update specs programmatically, specs follow a light convention for task sections:
+
+```markdown
+## Phase 1: Interface Extraction
+
+### Tasks
+
+- [ ] **Define SandboxBackend interface** — `internal/sandbox/backend.go` (new)
+  Acceptance: interface compiles, doc comments on all methods
+  Depends on: —
+
+- [ ] **Implement LocalBackend** — `internal/sandbox/backend_local.go` (new), `executor.go`
+  Acceptance: existing tests pass with LocalBackend wired in
+  Depends on: Define SandboxBackend interface
+
+- [x] **Refactor Runner** — `runner.go`, `execute.go`, `container.go`
+  Acceptance: runContainer uses backend.Launch()
+  Depends on: Implement LocalBackend
+  Completed: 2026-03-28, cost $0.89
+```
+
+The agent parses this format to extract tasks for board creation and updates checkboxes + completion notes as tasks finish. The format is human-readable markdown — no JSON schemas to maintain.
+
+#### Comparison: Task-Centric vs Spec-Centric
+
+| Aspect | Task-Centric (current design) | Spec-Centric (this option) |
+|--------|-------------------------------|---------------------------|
+| Primary object | Planner task card | Spec markdown file |
+| Plan lives in | Planner task output (JSON) | Spec file (markdown) |
+| Iteration medium | Task feedback loop | Chat stream + live doc |
+| Review location | Task detail modal | Dedicated split-pane view |
+| Plan persistence | Task data directory | Git-tracked spec file |
+| Spec updates during execution | Manual | Agent updates automatically |
+| UI complexity | Overlay on kanban | New view mode alongside kanban |
+| M4 dependency | None (file path in prompt) | Required (explorer + editing) |
+
+**The two designs are complementary, not mutually exclusive.** The task-centric backend (P1-P5: planner task kind, board.json context, gate tasks, epic tags, progress tracking) is needed regardless. The spec-centric UI is an alternative *frontend* for the planning workflow that can be built on top of the same backend primitives.
+
+**Recommended approach:** Implement the task-centric backend first (P1-P5). Then build the spec-centric UI as the planning frontend, which provides a better UX for the iterative planning loop while the kanban board remains the execution monitoring view.
+
 ### Human-in-the-Loop Planning Workflow
 
 The UX above handles visualization. But the harder UX problem is *planning itself* — the iterative, multi-step process where a human and AI collaborate to turn a vague goal ("move to cloud") into a concrete, executable plan. This is not a one-shot operation. It requires drafting, reviewing, adjusting, approving, monitoring, and re-planning.
