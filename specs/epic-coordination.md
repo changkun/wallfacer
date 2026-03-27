@@ -279,6 +279,44 @@ Phase A delivers value without B/C/D — even manually-created tasks with depend
 
 ---
 
+## When to Use Spec-Driven vs Task-Driven Mode
+
+Spec-driven mode (epics with planner decomposition) and task-driven mode (manually creating individual tasks) serve different situations. The wrong choice wastes effort: over-structuring a small change adds ceremony, while under-structuring a large change leads to incoherent results.
+
+### Codebase Size and Maturity Heuristics
+
+| Scenario | Recommended mode | Why |
+|---|---|---|
+| **Very large codebase** (100k+ LOC, many packages) | Spec-driven | Agents cannot hold the full codebase in context. A spec decomposes work into scoped tasks that each touch a manageable slice. Cross-task context (P2) propagates interface decisions across boundaries. |
+| **Near-empty / greenfield codebase** | Spec-driven | No existing code to orient agents. A spec provides the architectural skeleton — agents need explicit phase ordering and interface contracts to build coherently from scratch. |
+| **Medium codebase with established patterns** (10k–100k LOC) | Task-driven (default) | Agents can infer conventions from existing code. Individual tasks with clear prompts are sufficient. Epic overhead adds coordination cost without proportional benefit. |
+| **Small, well-structured codebase** (<10k LOC) | Task-driven | The whole codebase fits in agent context. Decomposition is unnecessary — a single task can implement a feature end-to-end. |
+
+### Decision Metrics
+
+The UI should surface these metrics (in the planner creation dialog or a "mode recommendation" tooltip) to help users choose:
+
+| Metric | How to measure | Threshold guidance |
+|---|---|---|
+| **Files touched** | Estimate from spec scope or past similar changes | >15 files → spec-driven; <5 files → task-driven |
+| **Cross-package dependencies** | Count distinct packages/directories affected | >3 packages → spec-driven |
+| **Interface changes** | Does the change define or modify shared interfaces/contracts? | Any shared interface change → spec-driven (gates verify coherence) |
+| **Sequential ordering required** | Must some work complete before other work can start? | >2 sequential phases → spec-driven (dependency wiring + gates) |
+| **Estimated agent turns** | Rough count of independent implementation units | >5 turns → spec-driven; 1-3 turns → task-driven |
+| **Existing test coverage** | Are there tests that verify integration between affected areas? | Low coverage in affected area → spec-driven (gates add verification) |
+
+### Surfacing in the UI
+
+When a user creates a new task, the dialog could show a lightweight recommendation based on workspace metrics:
+
+- **Codebase size indicator**: LOC count and package count from the workspace (computed once, cached).
+- **Spec complexity indicator**: If the prompt references a spec file, scan it for phase/milestone markers and estimate task count.
+- **Suggestion banner**: A non-blocking hint like "This spec touches 6 packages across 3 phases — consider using a planner task for structured decomposition" or "This looks like a single-file change — a regular task should work well."
+
+The recommendation is advisory only — users always choose. The goal is to reduce the "should I use epics for this?" decision fatigue.
+
+---
+
 ## UX & UI Design
 
 ### Design Philosophy
