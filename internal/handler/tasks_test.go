@@ -992,7 +992,7 @@ func TestServeOutput_JSONFile(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	// Manually create the outputs directory and a turn file.
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	if err := os.MkdirAll(outputsDir, 0755); err != nil {
 		t.Fatal(err)
 	}

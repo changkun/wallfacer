@@ -77,11 +77,14 @@ func TestStreamLogs_TaskNotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	// serveStoredLogs is called for done/cancelled tasks (no live container).
-	// When there are no outputs saved, it returns "no logs saved" 404.
+	// When there are no outputs saved, it returns 200 with a "no output" message.
 	h.serveStoredLogs(w, req, task.ID)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected 404 when no logs, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 when no logs, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "no output saved") {
+		t.Errorf("expected 'no output saved' message, got: %s", w.Body.String())
 	}
 }
 
@@ -91,7 +94,7 @@ func TestServeStoredLogs_ShowsNoOutputMessage(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
 	// Create an empty outputs directory but no turn files.
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
@@ -111,7 +114,7 @@ func TestServeStoredLogs_ServesTurnFiles(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result": "ok"}`), 0644)
@@ -139,7 +142,7 @@ func TestServeStoredLogsUpTo_FiltersHigherTurns(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
@@ -169,7 +172,7 @@ func TestServeStoredLogsFrom_FiltersLowerTurns(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn": 1}`), 0644)
@@ -199,7 +202,7 @@ func TestServeStoredLogs_SkipsEmptyFiles(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	// Empty file — should be skipped.
@@ -221,7 +224,7 @@ func TestServeStoredLogs_SkipsNonTurnFiles(t *testing.T) {
 	ctx := context.Background()
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 15})
 
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	// Non-turn file — should be skipped.
@@ -710,7 +713,7 @@ func TestStreamLogs_DoneTaskServesStoredLogs(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
 	// Write a turn file so serveStoredLogs returns 200 instead of 404.
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"result":"ok"}`), 0644)
@@ -735,14 +738,16 @@ func TestStreamLogs_CancelledTaskServesStoredLogs(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "cancel test", Timeout: 15})
 	_ = h.store.UpdateTaskStatus(ctx, task.ID, store.TaskStatusCancelled)
 
-	// No turn files; serveStoredLogs will return 404 "no logs saved".
+	// No turn files; serveStoredLogs returns 200 with "no output" message.
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
 	h.StreamLogs(w, req, task.ID)
 
-	// The task exists but has no saved logs — expect 404 from serveStoredLogs.
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected 404 (no logs saved), got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 (no logs), got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "no output saved") {
+		t.Errorf("expected 'no output saved' message, got: %s", w.Body.String())
 	}
 }
 
@@ -755,7 +760,7 @@ func TestStreamLogs_PhaseImplQueryParam(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "impl phase test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
@@ -786,7 +791,7 @@ func TestStreamLogs_PhaseTestQueryParam(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test phase test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusDone)
 
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"turn":1}`), 0644)
@@ -819,14 +824,13 @@ func TestStreamLogs_InProgressNoContainerExitsOnContextCancel(t *testing.T) {
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress)
 
 	// The mock runner always returns "" for ContainerName, so StreamLogs
-	// falls back to serveStoredLogs (no turn files → 404).
+	// falls back to serveStoredLogs (no turn files → 200 with message).
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/"+task.ID.String()+"/logs", nil)
 	w := httptest.NewRecorder()
 	h.StreamLogs(w, req, task.ID)
 
-	// No turn files, no container: expect the "no logs saved" 404 path.
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected 404 (no logs saved for in-progress task with no container), got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 (no logs), got %d", w.Code)
 	}
 }
 
@@ -1147,9 +1151,9 @@ func TestStreamLogs_PhaseTest_InProgress(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.StreamLogs(w, req, task.ID)
 
-	// No turn files saved → serveStoredLogs → 404 "no logs saved".
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected 404 (no logs saved, not stored-from path), got %d", w.Code)
+	// No turn files saved → serveStoredLogs → 200 with "no output" message.
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 (no logs), got %d", w.Code)
 	}
 }
 
@@ -1161,7 +1165,7 @@ func TestStreamLogs_Committing_ServesStoredLogs(t *testing.T) {
 	task, _ := h.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "committing test", Timeout: 15})
 	_ = h.store.ForceUpdateTaskStatus(ctx, task.ID, store.TaskStatusCommitting)
 
-	outputsDir := h.store.OutputsDir(task.ID)
+	outputsDir := filepath.Join(h.store.DataDir(), task.ID.String(), "outputs")
 	_ = os.MkdirAll(outputsDir, 0755)
 
 	_ = os.WriteFile(filepath.Join(outputsDir, "turn-0001.json"), []byte(`{"status":"committing"}`), 0644)
@@ -1212,7 +1216,7 @@ func TestStreamTasks_Keepalive(t *testing.T) {
 }
 
 // TestServeStoredLogsRange_DirectoryMissing verifies that serveStoredLogsRange
-// returns 404 when the outputs directory does not exist.
+// returns 200 with "no output saved" when no turn files exist.
 func TestServeStoredLogsRange_DirectoryMissing(t *testing.T) {
 	h := newTestHandler(t)
 	ctx := context.Background()
@@ -1223,7 +1227,10 @@ func TestServeStoredLogsRange_DirectoryMissing(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.serveStoredLogsRange(w, req, task.ID, 0, 0)
 
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected 404 for missing outputs directory, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 for missing outputs, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "no output saved") {
+		t.Errorf("expected 'no output saved' message, got: %s", w.Body.String())
 	}
 }

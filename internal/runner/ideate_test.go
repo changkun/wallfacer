@@ -202,7 +202,7 @@ func TestIdeationTaskSavesTurnOutput(t *testing.T) {
 	r.Run(task.ID, "", "", false)
 
 	// The turn output file must exist after the task completes.
-	outputsDir := s.OutputsDir(task.ID)
+	outputsDir := filepath.Join(s.DataDir(), task.ID.String(), "outputs")
 	turnFile := filepath.Join(outputsDir, "turn-0001.json")
 	if _, statErr := os.Stat(turnFile); statErr != nil {
 		t.Fatalf("turn-0001.json should exist after idea-agent run: %v", statErr)

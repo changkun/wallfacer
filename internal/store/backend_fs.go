@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
@@ -31,8 +32,8 @@ func NewFilesystemBackend(dir string) (*FilesystemBackend, error) {
 	return &FilesystemBackend{dir: dir}, nil
 }
 
-// Dir returns the root data directory path. Used by Store.OutputsDir and
-// Store.DataDir for backward compatibility until those are removed.
+// Dir returns the root data directory path. Used by Store.DataDir for
+// backward compatibility.
 func (b *FilesystemBackend) Dir() string { return b.dir }
 
 // Init creates the task directory and traces subdirectory.
@@ -256,6 +257,46 @@ func (b *FilesystemBackend) ReadBlob(taskID uuid.UUID, key string) ([]byte, erro
 func (b *FilesystemBackend) DeleteBlob(taskID uuid.UUID, key string) error {
 	path := filepath.Join(b.dir, taskID.String(), key)
 	return os.Remove(path)
+}
+
+// ListBlobs returns the keys of all blobs for a task that start with prefix.
+// Keys are returned relative to the task directory (e.g., "outputs/turn-0001.json").
+// A prefix ending in "/" lists all files in that subdirectory.
+func (b *FilesystemBackend) ListBlobs(taskID uuid.UUID, prefix string) ([]string, error) {
+	// Split prefix into directory and filename prefix parts.
+	// "outputs/turn-" → dir="outputs", filePrefix="turn-"
+	// "outputs/"      → dir="outputs", filePrefix=""
+	var dirPart, filePrefix string
+	if strings.HasSuffix(prefix, "/") {
+		dirPart = strings.TrimSuffix(prefix, "/")
+		filePrefix = ""
+	} else {
+		dirPart = filepath.Dir(prefix)
+		filePrefix = filepath.Base(prefix)
+	}
+
+	dir := filepath.Join(b.dir, taskID.String(), dirPart)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var keys []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if filePrefix != "" && !strings.HasPrefix(name, filePrefix) {
+			continue
+		}
+		key := filepath.Join(dirPart, name)
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 // ListBlobOwners returns the UUIDs of all tasks that have the given blob key.

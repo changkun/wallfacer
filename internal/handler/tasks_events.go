@@ -3,8 +3,6 @@ package handler
 import (
 	"bytes"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -140,37 +138,29 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID
 }
 
 // ServeOutput serves a raw turn output file for a task.
-func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UUID, filename string) {
+func (h *Handler) ServeOutput(w http.ResponseWriter, _ *http.Request, id uuid.UUID, filename string) {
 	// Validate filename to prevent path traversal.
 	if strings.Contains(filename, "/") || strings.Contains(filename, "..") {
 		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
 
-	path := filepath.Join(h.store.OutputsDir(id), filename)
-	fi, err := os.Stat(path)
+	data, err := h.store.ReadBlob(id, "outputs/"+filename)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
-	// Detect server-side truncation by reading the last 256 bytes of the file.
+	// Detect server-side truncation by checking the tail of the data.
 	// A truncation_notice sentinel is appended by SaveTurnOutput when the output
 	// exceeds the WALLFACER_MAX_TURN_OUTPUT_BYTES budget.
-	if fi.Size() > 0 {
-		tailSize := int64(256)
-		if fi.Size() < tailSize {
-			tailSize = fi.Size()
+	if len(data) > 0 {
+		tailSize := 256
+		if len(data) < tailSize {
+			tailSize = len(data)
 		}
-		if f, ferr := os.Open(path); ferr == nil {
-			buf := make([]byte, tailSize)
-			if _, rerr := f.ReadAt(buf, fi.Size()-tailSize); rerr == nil {
-				if bytes.Contains(buf, []byte(`"truncation_notice"`)) {
-					w.Header().Set("X-Wallfacer-Truncated", "true")
-				}
-			}
-			_ = f.Close()
-
+		if bytes.Contains(data[len(data)-tailSize:], []byte(`"truncation_notice"`)) {
+			w.Header().Set("X-Wallfacer-Truncated", "true")
 		}
 	}
 
@@ -180,7 +170,7 @@ func (h *Handler) ServeOutput(w http.ResponseWriter, r *http.Request, id uuid.UU
 	default:
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
-	http.ServeFile(w, r, path)
+	_, _ = w.Write(data)
 }
 
 // GenerateMissingTitles triggers background title generation for untitled tasks.

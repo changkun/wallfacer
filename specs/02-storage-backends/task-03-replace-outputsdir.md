@@ -1,6 +1,6 @@
 # Task 3: Replace OutputsDir with Backend Methods
 
-**Status:** Not started
+**Status:** Done
 **Depends on:** Task 2
 **Effort:** Small
 
@@ -31,3 +31,10 @@ Remove `Store.OutputsDir()` which returns a filesystem path. Replace all callers
 - Handlers serve outputs via backend `ReadOutput`
 - No direct filesystem path construction for outputs outside the backend
 - All tests pass
+
+## Implementation notes
+
+- **Added `ListBlobs(taskID, prefix)` to `StorageBackend` interface** — required by `serveStoredLogsRange` and `buildActivityLog` which need to enumerate turn files. The spec mentioned this might be needed ("may need a ListBlobs method").
+- **Convenience methods `Store.ReadBlob` and `Store.ListBlobs`** added as thin delegates to the backend, so callers don't need to access the backend directly.
+- **`serveStoredLogsRange` now returns 200 (not 404) for missing outputs** — when no turn files exist, it writes a "no output saved" message. Previously it returned 404 when the outputs directory didn't exist. The new behavior is correct for backend-agnostic access where "missing directory" has no meaning.
+- **`ServeOutput` no longer uses `http.ServeFile`** — reads the full blob into memory and writes it directly. This loses Range request support and If-Modified-Since, which is acceptable since turn output files are typically small (bounded by `WALLFACER_MAX_TURN_OUTPUT_BYTES`).

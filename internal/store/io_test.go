@@ -21,7 +21,7 @@ func TestSaveTurnOutput_StdoutOnly(t *testing.T) {
 		t.Fatalf("SaveTurnOutput: %v", err)
 	}
 
-	outPath := filepath.Join(s.OutputsDir(task.ID), "turn-0001.json")
+	outPath := filepath.Join(filepath.Join(s.DataDir(), task.ID.String(), "outputs"), "turn-0001.json")
 	data, err := os.ReadFile(outPath)
 	if err != nil {
 		t.Fatalf("read stdout file: %v", err)
@@ -31,7 +31,7 @@ func TestSaveTurnOutput_StdoutOnly(t *testing.T) {
 	}
 
 	// No stderr file when stderr is nil/empty.
-	stderrPath := filepath.Join(s.OutputsDir(task.ID), "turn-0001.stderr.txt")
+	stderrPath := filepath.Join(filepath.Join(s.DataDir(), task.ID.String(), "outputs"), "turn-0001.stderr.txt")
 	if _, err := os.Stat(stderrPath); !os.IsNotExist(err) {
 		t.Error("stderr file should not exist when stderr is empty")
 	}
@@ -46,7 +46,7 @@ func TestSaveTurnOutput_WithStderr(t *testing.T) {
 		t.Fatalf("SaveTurnOutput: %v", err)
 	}
 
-	stderrPath := filepath.Join(s.OutputsDir(task.ID), "turn-0002.stderr.txt")
+	stderrPath := filepath.Join(filepath.Join(s.DataDir(), task.ID.String(), "outputs"), "turn-0002.stderr.txt")
 	data, err := os.ReadFile(stderrPath)
 	if err != nil {
 		t.Fatalf("read stderr file: %v", err)
@@ -65,7 +65,7 @@ func TestSaveTurnOutput_TurnNumberFormatted(t *testing.T) {
 		t.Fatalf("SaveTurnOutput: %v", err)
 	}
 
-	outPath := filepath.Join(s.OutputsDir(task.ID), "turn-0042.json")
+	outPath := filepath.Join(filepath.Join(s.DataDir(), task.ID.String(), "outputs"), "turn-0042.json")
 	if _, err := os.ReadFile(outPath); err != nil {
 		t.Errorf("expected file turn-0042.json: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestSaveTurnOutput_Truncation(t *testing.T) {
 	}
 
 	// --- File size assertions ---
-	outPath := filepath.Join(s.OutputsDir(task.ID), "turn-0007.json")
+	outPath := filepath.Join(filepath.Join(s.DataDir(), task.ID.String(), "outputs"), "turn-0007.json")
 	data, err := os.ReadFile(outPath)
 	if err != nil {
 		t.Fatalf("read output file: %v", err)
@@ -196,7 +196,7 @@ func TestSaveTurnOutput_NoTruncationUnderLimit(t *testing.T) {
 		t.Fatalf("SaveTurnOutput: %v", err)
 	}
 
-	outPath := filepath.Join(s.OutputsDir(task.ID), "turn-0001.json")
+	outPath := filepath.Join(filepath.Join(s.DataDir(), task.ID.String(), "outputs"), "turn-0001.json")
 	data, _ := os.ReadFile(outPath)
 	if string(data) != string(stdout) {
 		t.Errorf("data was unexpectedly modified: got %q, want %q", data, stdout)
@@ -221,7 +221,7 @@ func TestSaveTurnOutput_UnlimitedWhenZero(t *testing.T) {
 		t.Fatalf("SaveTurnOutput: %v", err)
 	}
 
-	outPath := filepath.Join(s.OutputsDir(task.ID), "turn-0001.json")
+	outPath := filepath.Join(filepath.Join(s.DataDir(), task.ID.String(), "outputs"), "turn-0001.json")
 	data, _ := os.ReadFile(outPath)
 	if len(data) != len(big) {
 		t.Errorf("expected %d bytes unchanged, got %d", len(big), len(data))

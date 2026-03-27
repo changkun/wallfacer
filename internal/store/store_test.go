@@ -1,4 +1,4 @@
-// Tests for store.go: NewStore, loadAll, loadEvents, OutputsDir, Close,
+// Tests for store.go: NewStore, loadAll, loadEvents, Close,
 // and full persistence round-trip integration tests.
 package store
 
@@ -111,15 +111,6 @@ func TestNewStore_LoadsExistingTask(t *testing.T) {
 func TestClose_IsNoOp(t *testing.T) {
 	s := newTestStore(t)
 	s.Close() // must not panic
-}
-
-func TestOutputsDir(t *testing.T) {
-	s := newTestStore(t)
-	id := uuid.New()
-	want := filepath.Join(s.dir, id.String(), "outputs")
-	if got := s.OutputsDir(id); got != want {
-		t.Errorf("OutputsDir = %q, want %q", got, want)
-	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

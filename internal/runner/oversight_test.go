@@ -618,7 +618,7 @@ func TestGenerateOversightSuccess(t *testing.T) {
 	}
 
 	// Write a fake turn file so buildActivityLog has something to process.
-	outputsDir := s.OutputsDir(task.ID)
+	outputsDir := filepath.Join(s.DataDir(), task.ID.String(), "outputs")
 	if err := os.MkdirAll(outputsDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -657,7 +657,7 @@ func TestGenerateOversightAcceptsValidOutputOnNonZeroExit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outputsDir := s.OutputsDir(task.ID)
+	outputsDir := filepath.Join(s.DataDir(), task.ID.String(), "outputs")
 	if err := os.MkdirAll(outputsDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -696,7 +696,7 @@ func TestGenerateOversightContainerError(t *testing.T) {
 	}
 
 	// Write a turn file so it gets past the "no activity" check.
-	outputsDir := s.OutputsDir(task.ID)
+	outputsDir := filepath.Join(s.DataDir(), task.ID.String(), "outputs")
 	if err := os.MkdirAll(outputsDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -730,7 +730,7 @@ func TestGenerateOversightFallsBackToCodexOnTokenLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outputsDir := s.OutputsDir(task.ID)
+	outputsDir := filepath.Join(s.DataDir(), task.ID.String(), "outputs")
 	if err := os.MkdirAll(outputsDir, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -773,7 +773,7 @@ func TestGenerateOversightEmptyResult(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outputsDir := s.OutputsDir(task.ID)
+	outputsDir := filepath.Join(s.DataDir(), task.ID.String(), "outputs")
 	if err := os.MkdirAll(outputsDir, 0755); err != nil {
 		t.Fatal(err)
 	}

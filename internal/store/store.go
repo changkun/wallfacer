@@ -3,7 +3,6 @@ package store
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -182,10 +181,14 @@ func (s *Store) GetPayloadLimits() PayloadLimits {
 	}
 }
 
-// OutputsDir returns the path to the outputs directory for a task.
-// Handlers use this to serve turn output files without accessing Store internals.
-func (s *Store) OutputsDir(taskID uuid.UUID) string {
-	return filepath.Join(s.dir, taskID.String(), "outputs")
+// ReadBlob reads a named blob for a task, delegating to the storage backend.
+func (s *Store) ReadBlob(taskID uuid.UUID, key string) ([]byte, error) {
+	return s.backend.ReadBlob(taskID, key)
+}
+
+// ListBlobs returns blob keys for a task matching a prefix, delegating to the backend.
+func (s *Store) ListBlobs(taskID uuid.UUID, prefix string) ([]string, error) {
+	return s.backend.ListBlobs(taskID, prefix)
 }
 
 // DataDir returns the root data directory path for this store.

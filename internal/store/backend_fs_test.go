@@ -266,6 +266,53 @@ func TestFilesystemBackend_ReadBlob_NotFound(t *testing.T) {
 	}
 }
 
+func TestFilesystemBackend_ListBlobs(t *testing.T) {
+	b := newTestBackend(t)
+	id := uuid.New()
+	if err := b.Init(id); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write some output blobs.
+	for _, key := range []string{
+		"outputs/turn-0001.json",
+		"outputs/turn-0001.stderr.txt",
+		"outputs/turn-0002.json",
+		"oversight.json",
+	} {
+		if err := b.SaveBlob(id, key, []byte("data")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// List with prefix "outputs/turn-" should return 3 keys.
+	keys, err := b.ListBlobs(id, "outputs/turn-")
+	if err != nil {
+		t.Fatalf("ListBlobs: %v", err)
+	}
+	if len(keys) != 3 {
+		t.Errorf("got %d keys, want 3: %v", len(keys), keys)
+	}
+
+	// List with prefix "outputs/" should return all 3 output files.
+	keys, err = b.ListBlobs(id, "outputs/")
+	if err != nil {
+		t.Fatalf("ListBlobs (all outputs): %v", err)
+	}
+	if len(keys) != 3 {
+		t.Errorf("got %d keys, want 3: %v", len(keys), keys)
+	}
+
+	// List missing directory should return nil, nil.
+	keys, err = b.ListBlobs(id, "nonexistent/")
+	if err != nil {
+		t.Fatalf("ListBlobs (missing dir): %v", err)
+	}
+	if len(keys) != 0 {
+		t.Errorf("expected 0 keys for missing dir, got %d", len(keys))
+	}
+}
+
 func TestFilesystemBackend_ListBlobOwners(t *testing.T) {
 	b := newTestBackend(t)
 	id1, id2, id3 := uuid.New(), uuid.New(), uuid.New()

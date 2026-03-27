@@ -22,5 +22,6 @@ type StorageBackend interface {
 	SaveBlob(taskID uuid.UUID, key string, data []byte) error
 	ReadBlob(taskID uuid.UUID, key string) ([]byte, error)
 	DeleteBlob(taskID uuid.UUID, key string) error
+	ListBlobs(taskID uuid.UUID, prefix string) ([]string, error)
 	ListBlobOwners(key string) ([]uuid.UUID, error)
 }

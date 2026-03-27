@@ -6,7 +6,6 @@ import (
 	"io"
 	"math"
 	"math/rand"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -569,15 +568,13 @@ func (r *Runner) createIdeaBacklogTasks(ctx context.Context, parentTaskID uuid.U
 func (r *Runner) CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) error {
 	// The raw agent output is stored in the turn output file; the task Result
 	// field contains only the summary lines. Re-extract from the turn output.
-	turnFile := r.store.OutputsDir(taskID) + "/turn-0001.json"
-	rawStdout, readErr := os.ReadFile(turnFile)
+	rawStdout, readErr := r.store.ReadBlob(taskID, "outputs/turn-0001.json")
 	if readErr != nil {
 		return fmt.Errorf("read turn output: %w", readErr)
 	}
 
 	var rawStderr []byte
-	stderrFile := r.store.OutputsDir(taskID) + "/turn-0001.stderr.txt"
-	if data, err := os.ReadFile(stderrFile); err == nil {
+	if data, err := r.store.ReadBlob(taskID, "outputs/turn-0001.stderr.txt"); err == nil {
 		rawStderr = data
 	}
 

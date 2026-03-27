@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -304,8 +303,7 @@ func (h *Handler) serveStoredLogsFrom(w http.ResponseWriter, r *http.Request, id
 // serveStoredLogsRange serves saved turn files in the range (fromTurn, maxTurn].
 // fromTurn=0 means no lower bound; maxTurn=0 means no upper bound.
 func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, _ *http.Request, id uuid.UUID, fromTurn, maxTurn int) {
-	outputsDir := h.store.OutputsDir(id)
-	entries, err := os.ReadDir(outputsDir)
+	keys, err := h.store.ListBlobs(id, "outputs/turn-")
 	if err != nil {
 		http.Error(w, "no logs saved for this task", http.StatusNotFound)
 		return
@@ -316,14 +314,8 @@ func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, _ *http.Request, i
 	w.WriteHeader(http.StatusOK)
 
 	wrote := false
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasPrefix(name, "turn-") {
-			continue
-		}
+	for _, key := range keys {
+		name := filepath.Base(key)
 		if !strings.HasSuffix(name, ".json") && !strings.HasSuffix(name, ".stderr.txt") {
 			continue
 		}
@@ -334,7 +326,7 @@ func (h *Handler) serveStoredLogsRange(w http.ResponseWriter, _ *http.Request, i
 		if fromTurn > 0 && turn <= fromTurn {
 			continue
 		}
-		content, readErr := os.ReadFile(filepath.Join(outputsDir, name))
+		content, readErr := h.store.ReadBlob(id, key)
 		if readErr != nil || len(strings.TrimSpace(string(content))) == 0 {
 			continue
 		}

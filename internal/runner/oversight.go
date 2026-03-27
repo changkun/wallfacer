@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -204,8 +202,8 @@ func (r *Runner) periodicOversightWorker(ctx context.Context, taskID uuid.UUID) 
 			}
 
 			// Skip if there is no agent output yet.
-			entries, err := os.ReadDir(r.store.OutputsDir(taskID))
-			if err == nil && len(entries) > 0 {
+			keys, err := r.store.ListBlobs(taskID, "outputs/turn-")
+			if err == nil && len(keys) > 0 {
 				r.generateOversightLocked(taskID)
 			}
 			mu.Unlock()
@@ -225,39 +223,34 @@ type turnActivity struct {
 // activity summary, cross-referencing event timestamps. fromTurn is the first
 // turn number to include (1-indexed); pass 1 to include all turns.
 func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID, fromTurn int) ([]turnActivity, error) {
-	outputsDir := r.store.OutputsDir(taskID)
-	entries, err := os.ReadDir(outputsDir)
+	keys, err := r.store.ListBlobs(taskID, "outputs/turn-")
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
+		return nil, nil
 	}
+
+	// Filter to .json turn files only (not stderr).
+	var turnKeys []string
+	for _, key := range keys {
+		if strings.HasSuffix(key, ".json") {
+			turnKeys = append(turnKeys, key)
+		}
+	}
+	if len(turnKeys) == 0 {
+		return nil, nil
+	}
+	slices.Sort(turnKeys)
 
 	// Build a turn→timestamp index from output events.
 	events, _ := r.store.GetEvents(ctx, taskID)
 	turnTimestamps := buildTurnTimestamps(events)
 
-	// Collect turn files in order.
-	var turnFiles []string
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		// Only match turn-NNNN.json files (not stderr files).
-		if strings.HasPrefix(e.Name(), "turn-") {
-			turnFiles = append(turnFiles, filepath.Join(outputsDir, e.Name()))
-		}
-	}
-	slices.Sort(turnFiles)
-
 	var activities []turnActivity
-	for i, path := range turnFiles {
+	for i, key := range turnKeys {
 		turnNum := i + 1
 		if turnNum < fromTurn {
 			continue // Skip turns before the requested boundary.
 		}
-		raw, err := os.ReadFile(path)
+		raw, err := r.store.ReadBlob(taskID, key)
 		if err != nil {
 			continue
 		}
