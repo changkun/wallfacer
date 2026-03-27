@@ -8,15 +8,15 @@ import "github.com/google/uuid"
 // primitives (e.g., SaveOversight → SaveBlob(id, "oversight", data)).
 type StorageBackend interface {
 	// Tasks: structured, indexed task metadata.
-	Init(taskID uuid.UUID) error                          // Create the storage location for a new task.
-	LoadAll() ([]*Task, error)                             // Read all tasks; called once at startup.
-	SaveTask(t *Task) error                                // Atomically persist task metadata.
-	RemoveTask(taskID uuid.UUID) error                     // Permanently delete a task and all its data.
+	Init(taskID uuid.UUID) error       // Create the storage location for a new task.
+	LoadAll() ([]*Task, error)         // Read all tasks; called once at startup.
+	SaveTask(t *Task) error            // Atomically persist task metadata.
+	RemoveTask(taskID uuid.UUID) error // Permanently delete a task and all its data.
 
 	// Events: ordered, append-heavy audit trail per task.
-	SaveEvent(taskID uuid.UUID, seq int, event TaskEvent) error      // Persist a single event by sequence number.
-	LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, error)         // Read all events; returns events and highest seq.
-	CompactEvents(taskID uuid.UUID, events []TaskEvent) error        // Merge events into compact form and remove originals.
+	SaveEvent(taskID uuid.UUID, seq int, event TaskEvent) error // Persist a single event by sequence number.
+	LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, error)    // Read all events; returns events and highest seq.
+	CompactEvents(taskID uuid.UUID, events []TaskEvent) error   // Merge events into compact form and remove originals.
 
 	// Blobs: named byte payloads per task (e.g. oversight.json, outputs/).
 	SaveBlob(taskID uuid.UUID, key string, data []byte) error    // Write a named blob; creates parent dirs as needed.

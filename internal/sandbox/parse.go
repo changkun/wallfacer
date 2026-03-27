@@ -12,11 +12,11 @@ import (
 // defer decoding until the runtime-specific accessor methods.
 type containerJSON struct {
 	ID        string            `json:"Id"`
-	Names     json.RawMessage   `json:"Names"`   // string (Docker) or []string (Podman)
+	Names     json.RawMessage   `json:"Names"` // string (Docker) or []string (Podman)
 	Image     string            `json:"Image"`
 	State     string            `json:"State"`
 	Status    string            `json:"Status"`
-	Created   any               `json:"Created"`  // float64 (Podman unix ts) or json.Number
+	Created   any               `json:"Created"`   // float64 (Podman unix ts) or json.Number
 	CreatedAt string            `json:"CreatedAt"` // human-readable, not always present
 	Labels    map[string]string `json:"Labels"`
 }

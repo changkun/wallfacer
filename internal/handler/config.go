@@ -46,6 +46,7 @@ func ssrfHardenedTransport() *http.Transport {
 		},
 	}
 }
+
 // availableSandboxes returns all sandbox types the UI should display,
 // combining the built-in Claude and Codex sandboxes with any user-configured
 // default or per-activity sandbox overrides.
