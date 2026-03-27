@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/pkg/set"
@@ -24,6 +25,13 @@ type Snapshot struct {
 	Generation       uint64
 }
 
+// activeGroup tracks a workspace group whose store is still open, either
+// because it is the currently viewed group or because it has running tasks.
+type activeGroup struct {
+	snapshot  Snapshot
+	taskCount atomic.Int32 // in-progress + committing tasks
+}
+
 // pendingSwap carries the before/after snapshots and a cleanup callback
 // for an in-flight Switch operation. cleanup closes next.Store on failure
 // paths; it is cleared to a no-op once the swap commits successfully.
@@ -39,9 +47,10 @@ type Manager struct {
 	dataDir   string
 	envFile   string
 
-	mu      sync.RWMutex // guards current and nextGen
-	current Snapshot
-	nextGen uint64
+	mu           sync.RWMutex // guards current, nextGen, and activeGroups
+	current      Snapshot     // the currently "viewed" workspace group
+	nextGen      uint64
+	activeGroups map[string]*activeGroup // key = Snapshot.Key; groups with open stores
 
 	subsMu    sync.Mutex // guards subs and nextSubID; separate from mu to avoid lock ordering issues
 	subs      map[int]chan Snapshot
@@ -55,16 +64,20 @@ type Manager struct {
 // NewManager creates a Manager and switches to the initial workspace set.
 func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager, error) {
 	m := &Manager{
-		configDir: configDir,
-		dataDir:   dataDir,
-		envFile:   envFile,
-		subs:      make(map[int]chan Snapshot),
-		newStore:  store.NewFileStore,
+		configDir:    configDir,
+		dataDir:      dataDir,
+		envFile:      envFile,
+		subs:         make(map[int]chan Snapshot),
+		activeGroups: make(map[string]*activeGroup),
+		newStore:     store.NewFileStore,
 	}
 	initial = m.startupWorkspaces(initial)
 	if _, err := m.Switch(initial); err != nil {
 		return nil, err
 	}
+	// Seed activeGroups with the initial snapshot.
+	snap := m.current
+	m.activeGroups[snap.Key] = &activeGroup{snapshot: snap}
 	return m, nil
 }
 
@@ -84,7 +97,10 @@ func (m *Manager) startupWorkspaces(initial []string) []string {
 
 // NewStatic creates a Manager with a fixed workspace set, useful for testing.
 func NewStatic(store *store.Store, workspaces []string, instructionsPath string) *Manager {
-	m := &Manager{subs: make(map[int]chan Snapshot)}
+	m := &Manager{
+		subs:         make(map[int]chan Snapshot),
+		activeGroups: make(map[string]*activeGroup),
+	}
 	ws := cloneStrings(workspaces)
 	m.current = Snapshot{
 		Workspaces:       ws,
@@ -99,6 +115,7 @@ func NewStatic(store *store.Store, workspaces []string, instructionsPath string)
 		m.current.ScopedDataDir = store.DataDir()
 	}
 	m.nextGen = m.current.Generation
+	m.activeGroups[m.current.Key] = &activeGroup{snapshot: m.current}
 	return m
 }
 
@@ -258,6 +275,76 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	}
 
 	return snapshot, nil
+}
+
+// AllActiveSnapshots returns cloned snapshots for all groups with open stores
+// (the viewed group plus any groups with running tasks).
+func (m *Manager) AllActiveSnapshots() []Snapshot {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]Snapshot, 0, len(m.activeGroups))
+	for _, ag := range m.activeGroups {
+		out = append(out, cloneSnapshot(ag.snapshot))
+	}
+	return out
+}
+
+// StoreForKey returns the store for a workspace key, if it is still active.
+func (m *Manager) StoreForKey(key string) (*store.Store, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	ag, ok := m.activeGroups[key]
+	if !ok {
+		return nil, false
+	}
+	return ag.snapshot.Store, ag.snapshot.Store != nil
+}
+
+// ActiveGroupKeys returns the workspace keys for all groups with open stores.
+func (m *Manager) ActiveGroupKeys() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	keys := make([]string, 0, len(m.activeGroups))
+	for k := range m.activeGroups {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// IncrementTaskCount marks a new running task in the given workspace group.
+// The atomic increment is safe under RLock since activeGroup.taskCount is an
+// atomic.Int32.
+func (m *Manager) IncrementTaskCount(key string) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if ag, ok := m.activeGroups[key]; ok {
+		ag.taskCount.Add(1)
+	}
+}
+
+// DecrementAndCleanup decrements the task count for the given workspace group.
+// If the count reaches zero and the group is not the currently viewed group,
+// the group's store is closed and the entry is removed from activeGroups.
+// A write lock is used to atomically check the count and remove the entry,
+// preventing a race where a new task could be created between decrement and cleanup.
+func (m *Manager) DecrementAndCleanup(key string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ag, ok := m.activeGroups[key]
+	if !ok {
+		return
+	}
+	newCount := ag.taskCount.Add(-1)
+	if newCount > 0 {
+		return
+	}
+	// Count reached zero. Clean up if this is not the viewed group.
+	if key != m.current.Key {
+		if ag.snapshot.Store != nil {
+			ag.snapshot.Store.Close()
+		}
+		delete(m.activeGroups, key)
+	}
 }
 
 // publish sends the snapshot to all active subscribers. Non-blocking: if a

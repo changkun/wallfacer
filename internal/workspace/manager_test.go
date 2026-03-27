@@ -562,3 +562,184 @@ func TestSwitch_SuccessClosesPreviousStore(t *testing.T) {
 		t.Error("expected new store to remain open")
 	}
 }
+
+// --- activeGroups tests ---
+
+// TestActiveGroupsInitialization verifies that after NewManager, activeGroups
+// has exactly one entry matching the initial snapshot.
+func TestActiveGroupsInitialization(t *testing.T) {
+	m, _ := newTestManager(t)
+	keys := m.ActiveGroupKeys()
+	if len(keys) != 1 {
+		t.Fatalf("expected 1 active group, got %d", len(keys))
+	}
+	snap := m.Snapshot()
+	if keys[0] != snap.Key {
+		t.Fatalf("active group key %q does not match snapshot key %q", keys[0], snap.Key)
+	}
+	s, ok := m.StoreForKey(snap.Key)
+	if !ok {
+		t.Fatal("StoreForKey returned false for the initial group")
+	}
+	if s != snap.Store {
+		t.Fatal("StoreForKey returned a different store than the snapshot")
+	}
+}
+
+// TestActiveGroupsInitializationStatic verifies that NewStatic also initializes
+// activeGroups with exactly one entry.
+func TestActiveGroupsInitializationStatic(t *testing.T) {
+	storeDir := t.TempDir()
+	s, err := store.NewFileStore(storeDir)
+	if err != nil {
+		t.Fatalf("NewFileStore: %v", err)
+	}
+	m := NewStatic(s, []string{"/fake/ws"}, "")
+	keys := m.ActiveGroupKeys()
+	if len(keys) != 1 {
+		t.Fatalf("expected 1 active group, got %d", len(keys))
+	}
+}
+
+// TestIncrementDecrementTaskCount verifies that incrementing and decrementing
+// task counts works, and that a non-viewed group is cleaned up when its count
+// reaches zero.
+func TestIncrementDecrementTaskCount(t *testing.T) {
+	m, _ := newTestManager(t)
+
+	// Insert a second active group to simulate a background group.
+	bgStoreDir := t.TempDir()
+	bgStore, err := store.NewFileStore(bgStoreDir)
+	if err != nil {
+		t.Fatalf("NewFileStore: %v", err)
+	}
+	bgKey := "background-group-key"
+	m.mu.Lock()
+	m.activeGroups[bgKey] = &activeGroup{
+		snapshot: Snapshot{
+			Key:   bgKey,
+			Store: bgStore,
+		},
+	}
+	m.mu.Unlock()
+
+	// Increment twice.
+	m.IncrementTaskCount(bgKey)
+	m.IncrementTaskCount(bgKey)
+
+	// Decrement once — group should still exist.
+	m.DecrementAndCleanup(bgKey)
+	if _, ok := m.StoreForKey(bgKey); !ok {
+		t.Fatal("expected background group to still exist after first decrement")
+	}
+	if bgStore.IsClosed() {
+		t.Fatal("expected background store to remain open")
+	}
+
+	// Decrement to zero — non-viewed group should be cleaned up.
+	m.DecrementAndCleanup(bgKey)
+	if _, ok := m.StoreForKey(bgKey); ok {
+		t.Fatal("expected background group to be removed after count reached zero")
+	}
+	if !bgStore.IsClosed() {
+		t.Fatal("expected background store to be closed after cleanup")
+	}
+}
+
+// TestDecrementViewedGroupNotRemoved verifies that the currently viewed group
+// is not removed from activeGroups even when its task count reaches zero.
+func TestDecrementViewedGroupNotRemoved(t *testing.T) {
+	m, _ := newTestManager(t)
+	snap := m.Snapshot()
+
+	// Increment and decrement on the viewed group.
+	m.IncrementTaskCount(snap.Key)
+	m.DecrementAndCleanup(snap.Key)
+
+	// The viewed group should still exist.
+	if _, ok := m.StoreForKey(snap.Key); !ok {
+		t.Fatal("expected viewed group to remain in activeGroups after count reached zero")
+	}
+	if snap.Store.IsClosed() {
+		t.Fatal("expected viewed group store to remain open")
+	}
+}
+
+// TestAllActiveSnapshots verifies that AllActiveSnapshots returns all groups.
+func TestAllActiveSnapshots(t *testing.T) {
+	m, _ := newTestManager(t)
+
+	// Insert a second active group.
+	bgStoreDir := t.TempDir()
+	bgStore, err := store.NewFileStore(bgStoreDir)
+	if err != nil {
+		t.Fatalf("NewFileStore: %v", err)
+	}
+	bgKey := "another-group"
+	m.mu.Lock()
+	m.activeGroups[bgKey] = &activeGroup{
+		snapshot: Snapshot{
+			Key:   bgKey,
+			Store: bgStore,
+		},
+	}
+	m.mu.Unlock()
+
+	snaps := m.AllActiveSnapshots()
+	if len(snaps) != 2 {
+		t.Fatalf("expected 2 active snapshots, got %d", len(snaps))
+	}
+
+	// Verify both keys are present.
+	keys := make(map[string]bool)
+	for _, s := range snaps {
+		keys[s.Key] = true
+	}
+	viewedKey := m.Snapshot().Key
+	if !keys[viewedKey] {
+		t.Fatalf("expected viewed group key %q in snapshots", viewedKey)
+	}
+	if !keys[bgKey] {
+		t.Fatalf("expected background group key %q in snapshots", bgKey)
+	}
+}
+
+// TestStoreForKey verifies correct store lookup and false for unknown keys.
+func TestStoreForKey(t *testing.T) {
+	m, _ := newTestManager(t)
+	snap := m.Snapshot()
+
+	// Known key returns the correct store.
+	s, ok := m.StoreForKey(snap.Key)
+	if !ok {
+		t.Fatal("expected ok=true for known key")
+	}
+	if s != snap.Store {
+		t.Fatal("expected store to match snapshot store")
+	}
+
+	// Unknown key returns false.
+	_, ok = m.StoreForKey("nonexistent-key")
+	if ok {
+		t.Fatal("expected ok=false for unknown key")
+	}
+}
+
+// TestIncrementUnknownKeyIsNoOp verifies that incrementing an unknown key
+// does not panic or create an entry.
+func TestIncrementUnknownKeyIsNoOp(t *testing.T) {
+	m, _ := newTestManager(t)
+	m.IncrementTaskCount("nonexistent")
+	// Should not panic or add an entry.
+	if len(m.ActiveGroupKeys()) != 1 {
+		t.Fatal("expected no new group created for unknown key")
+	}
+}
+
+// TestDecrementUnknownKeyIsNoOp verifies that decrementing an unknown key
+// does not panic.
+func TestDecrementUnknownKeyIsNoOp(t *testing.T) {
+	m, _ := newTestManager(t)
+	m.DecrementAndCleanup("nonexistent")
+	// Should not panic.
+}
