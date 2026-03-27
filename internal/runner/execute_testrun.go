@@ -24,25 +24,25 @@ func (r *Runner) finalizeTestRun(
 		// auto-submitted without explicit confirmation.
 		verdict = "fail"
 	}
-	_ = r.store.UpdateTaskTestRun(ctx, taskID, false, verdict)
+	_ = r.taskStore(taskID).UpdateTaskTestRun(ctx, taskID, false, verdict)
 
 	if verdict == "fail" {
-		_ = r.store.IncrementTestFailCount(ctx, taskID)
-		_ = r.store.UpdateTaskPendingTestFeedback(ctx, taskID, buildTestFailureFeedback(result))
+		_ = r.taskStore(taskID).IncrementTestFailCount(ctx, taskID)
+		_ = r.taskStore(taskID).UpdateTaskPendingTestFeedback(ctx, taskID, buildTestFailureFeedback(result))
 	} else {
-		_ = r.store.ResetTestFailCount(ctx, taskID)
+		_ = r.taskStore(taskID).ResetTestFailCount(ctx, taskID)
 	}
 
 	// GenerateTestOversight is synchronous: oversight must be in terminal
 	// state before the task becomes visible as 'waiting'.
 	r.GenerateTestOversight(taskID, task.TestRunStartTurn)
 
-	_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 		"result": "Test verification complete: " + strings.ToUpper(verdict),
 	})
-	_ = r.store.UpdateTaskStatus(ctx, taskID, store.TaskStatusWaiting)
-	_ = r.store.InsertEvent(ctx, taskID, store.EventTypeStateChange,
+	_ = r.taskStore(taskID).UpdateTaskStatus(ctx, taskID, store.TaskStatusWaiting)
+	_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeStateChange,
 		store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
-	_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart,
+	_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart,
 		store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 }

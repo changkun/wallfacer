@@ -42,7 +42,7 @@ func newCommitMessageGenerationError(format string, args ...any) error {
 // (stage → rebase → merge → cleanup) for a task.
 // Returns an error if any phase of the pipeline fails.
 func (r *Runner) Commit(taskID uuid.UUID, sessionID string) error {
-	task, err := r.store.GetTask(r.shutdownCtx, taskID)
+	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Error("commit get task", "task", taskID, "error", err)
 		return fmt.Errorf("get task: %w", err)
@@ -71,19 +71,19 @@ func (r *Runner) commit(
 	logger.Runner.Info("auto-commit", "task", taskID, "session", sessionID)
 
 	// Phase 1: stage and commit all uncommitted changes on the host.
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": "Phase 1/3: Staging and committing changes...",
 	})
-	task, _ := r.store.GetTask(bgCtx, taskID)
+	task, _ := r.taskStore(taskID).GetTask(bgCtx, taskID)
 	taskPrompt := ""
 	if task != nil {
 		taskPrompt = task.Prompt
 	}
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "stage"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "stage"})
 
 	_, stageErr := r.hostStageAndCommit(ctx, taskID, worktreePaths, taskPrompt)
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "stage"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "stage"})
 
 	if stageErr != nil {
 		logger.Runner.Error("host stage/commit failed", "task", taskID, "error", stageErr)
@@ -91,7 +91,7 @@ func (r *Runner) commit(
 		if IsCommitMessageGenerationError(stageErr) {
 			eventMessage = stageErr.Error()
 		}
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
 
 			"error": eventMessage,
 		})
@@ -99,18 +99,18 @@ func (r *Runner) commit(
 	}
 
 	// Phase 2: host-side rebase and merge for each git worktree.
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": "Phase 2/3: Rebasing and merging into default branch...",
 	})
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "rebase_merge"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "rebase_merge"})
 
 	commitHashes, baseHashes, snapshotDiffs, mergeErr := r.rebaseAndMerge(ctx, taskID, worktreePaths, branchName, sessionID)
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "rebase_merge"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "rebase_merge"})
 
 	if mergeErr != nil {
 		logger.Runner.Error("rebase/merge failed", "task", taskID, "error", mergeErr)
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{
 
 			"error": "rebase/merge failed: " + mergeErr.Error(),
 		})
@@ -118,31 +118,31 @@ func (r *Runner) commit(
 	}
 
 	// Phase 3: persist commit hashes and clean up worktrees.
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": "Phase 3/3: Cleaning up...",
 	})
 	if len(commitHashes) > 0 {
-		if err := r.store.UpdateTaskCommitHashes(bgCtx, taskID, commitHashes); err != nil {
+		if err := r.taskStore(taskID).UpdateTaskCommitHashes(bgCtx, taskID, commitHashes); err != nil {
 			logger.Runner.Warn("save commit hashes", "task", taskID, "error", err)
 		}
 	}
 	if len(baseHashes) > 0 {
-		if err := r.store.UpdateTaskBaseCommitHashes(bgCtx, taskID, baseHashes); err != nil {
+		if err := r.taskStore(taskID).UpdateTaskBaseCommitHashes(bgCtx, taskID, baseHashes); err != nil {
 			logger.Runner.Warn("save base commit hashes", "task", taskID, "error", err)
 		}
 	}
 	if len(snapshotDiffs) > 0 {
-		if err := r.store.UpdateTaskSnapshotDiffs(bgCtx, taskID, snapshotDiffs); err != nil {
+		if err := r.taskStore(taskID).UpdateTaskSnapshotDiffs(bgCtx, taskID, snapshotDiffs); err != nil {
 			logger.Runner.Warn("save snapshot diffs", "task", taskID, "error", err)
 		}
 	}
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "cleanup"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: "cleanup"})
 
 	r.cleanupWorktrees(taskID, worktreePaths, branchName)
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "cleanup"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: "cleanup"})
 
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": "Commit pipeline completed.",
 	})
@@ -179,25 +179,25 @@ func (r *Runner) maybeAutoPush(ctx context.Context, taskID uuid.UUID, worktreePa
 			continue
 		}
 		logger.Runner.Info("auto-push", "task", taskID, "repo", repoPath, "ahead", s.AheadCount)
-		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Auto-pushing %s (%d commit(s) ahead)...", repoPath, s.AheadCount),
 		})
 		pushLabel := "push_" + filepath.Base(repoPath)
-		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: pushLabel})
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "commit", Label: pushLabel})
 
 		out, pushErr := cmdexec.Git(repoPath, "push").WithContext(ctx).Combined()
-		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: pushLabel})
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "commit", Label: pushLabel})
 
 		if pushErr != nil {
 			logger.Runner.Error("auto-push failed", "task", taskID, "repo", repoPath, "error", pushErr)
-			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{
 
 				"error": fmt.Sprintf("auto-push failed for %s: %v\n%s", repoPath, pushErr, out),
 			})
 		} else {
 			logger.Runner.Info("auto-push succeeded", "task", taskID, "repo", repoPath)
-			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": fmt.Sprintf("Auto-push succeeded for %s.", repoPath),
 			})
@@ -286,14 +286,14 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 	if err != nil {
 		msg = localFallbackCommitMessage(prompt, allStats.String())
 		logger.Runner.Warn("commit message generation failed, using local fallback", "task", taskID, "error", err, "message", msg)
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": "Commit message generation failed; using fallback commit message.",
 		})
 	}
 
 	// Persist the commit message so it can be displayed in the UI.
-	if saveErr := r.store.UpdateTaskCommitMessage(r.shutdownCtx, taskID, msg); saveErr != nil {
+	if saveErr := r.taskStore(taskID).UpdateTaskCommitMessage(r.shutdownCtx, taskID, msg); saveErr != nil {
 		logger.Runner.Warn("save commit message", "task", taskID, "error", saveErr)
 	}
 
@@ -369,7 +369,7 @@ func localFallbackCommitMessage(prompt, diffStat string) string {
 // ctx is the caller-supplied task context; a 90-second sub-deadline is derived
 // from it so that task cancellation or timeout propagates into the container.
 func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, prompt, diffStat, recentLog string) (string, error) {
-	task, err := r.store.GetTask(r.shutdownCtx, taskID)
+	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Warn("generate commit message: get task", "task", taskID, "error", err)
 	}
@@ -396,11 +396,11 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		spec := r.buildBaseContainerSpec(containerName, selectedModel, selectedSandbox)
 		spec.Cmd = buildAgentCmd(commitPrompt, selectedModel)
 
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 
 		handle, launchErr := r.backend.Launch(ctx, spec)
 		if launchErr != nil {
-			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
+			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 			return nil, fmt.Errorf("launch commit message container: %w", launchErr)
 		}
 		r.taskContainers.SetHandle(taskID, handle, nil)
@@ -408,7 +408,7 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		rawStdout, _ := io.ReadAll(handle.Stdout())
 		rawStderr, _ := io.ReadAll(handle.Stderr())
 		exitCode, _ := handle.Wait()
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 
 		if exitCode != 0 && ctx.Err() == nil {
 			return nil, fmt.Errorf("container exited with code %d: stderr=%s", exitCode, truncate(string(rawStderr), 200))
@@ -432,7 +432,7 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 	if err != nil {
 		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error()) {
 			logger.Runner.Warn("commit message generation: claude token limit hit; retrying with codex", "task", taskID)
-			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during commit message generation)",
 			})
@@ -446,7 +446,7 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("commit message generation: claude output reported token limit; retrying with codex", "task", taskID)
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit in commit message output)",
 		})
@@ -474,7 +474,7 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 	}
 
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		_ = r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityCommitMessage, store.TaskUsage{
+		_ = r.taskStore(taskID).AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityCommitMessage, store.TaskUsage{
 
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
@@ -482,7 +482,7 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 		})
-		if appErr := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+		if appErr := r.taskStore(taskID).AppendTurnUsage(taskID, store.TurnUsageRecord{
 			Turn:                 1,
 			Timestamp:            time.Now().UTC(),
 			InputTokens:          output.Usage.InputTokens,
@@ -556,7 +556,7 @@ func (r *Runner) rebaseAndMergeOne(
 	if !gitutil.IsGitRepo(repoPath) || !gitutil.HasCommits(repoPath) {
 		// Non-git workspace or empty git repo (no commits): the worktree was
 		// set up as a snapshot — copy changes back to the original directory.
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Extracting changes from sandbox to %s...", filepath.Base(repoPath)),
 		})
@@ -573,7 +573,7 @@ func (r *Runner) rebaseAndMergeOne(
 		if hash, err := gitutil.GetCommitHash(worktreePath); err == nil {
 			commitHashes[repoPath] = hash
 		}
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Changes extracted to %s.", filepath.Base(repoPath)),
 		})
@@ -599,7 +599,7 @@ func (r *Runner) rebaseAndMergeOne(
 	}
 	if !ahead {
 		logger.Runner.Info("no commits to merge, skipping", "task", taskID, "repo", repoPath)
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Skipping %s — no new commits to merge.", repoPath),
 		})
@@ -609,7 +609,7 @@ func (r *Runner) rebaseAndMergeOne(
 	// Rebase with conflict-resolution retry loop.
 	var rebaseErr error
 	for attempt := 1; attempt <= constants.MaxRebaseRetries; attempt++ {
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Rebasing %s onto %s (attempt %d/%d)...", repoPath, defBranch, attempt, constants.MaxRebaseRetries),
 		})
@@ -622,7 +622,7 @@ func (r *Runner) rebaseAndMergeOne(
 		// Emit a structured event with conflicted file paths for observability.
 		var ce *gitutil.ConflictError
 		if errors.As(rebaseErr, &ce) && len(ce.ConflictedFiles) > 0 {
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]any{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]any{
 
 				"error":            ce.Error(),
 				"phase":            "rebase",
@@ -644,7 +644,7 @@ func (r *Runner) rebaseAndMergeOne(
 
 		logger.Runner.Warn("rebase conflict, invoking resolver",
 			"task", taskID, "repo", repoPath, "attempt", attempt)
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d)...", repoPath, attempt),
 		})
@@ -654,7 +654,7 @@ func (r *Runner) rebaseAndMergeOne(
 		}
 	}
 
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": fmt.Sprintf("Fast-forward merging %s into %s...", branchName, defBranch),
 	})
@@ -667,7 +667,7 @@ func (r *Runner) rebaseAndMergeOne(
 		logger.Runner.Warn("get commit hash", "task", taskID, "repo", repoPath, "error", err)
 	} else {
 		commitHashes[repoPath] = hash
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Merged %s — commit %s", repoPath, hash[:8]),
 		})
@@ -704,7 +704,7 @@ func (r *Runner) resolveConflicts(
 		DefaultBranch: defBranch,
 	})
 
-	_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]any{
+	_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]any{
 
 		"phase":        "conflict_resolver",
 		"status":       "started",
@@ -720,16 +720,16 @@ func (r *Runner) resolveConflicts(
 
 	output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, override, "", nil, "", activityCommitMessage)
 
-	task, _ := r.store.GetTask(r.shutdownCtx, taskID)
+	task, _ := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	turns := 0
 	if task != nil {
 		turns = task.Turns + 1
 	}
-	_ = r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr)
+	_ = r.taskStore(taskID).SaveTurnOutput(taskID, turns, rawStdout, rawStderr)
 
 	if len(rawStderr) > 0 {
 		stderrFile := fmt.Sprintf("turn-%04d.stderr.txt", turns)
-		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 
 			"stderr_file": stderrFile,
 			"turn":        fmt.Sprintf("%d", turns),
@@ -738,7 +738,7 @@ func (r *Runner) resolveConflicts(
 	}
 
 	if err != nil {
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeError, map[string]any{
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeError, map[string]any{
 
 			"phase":        "conflict_resolver",
 			"status":       "failed",
@@ -751,7 +751,7 @@ func (r *Runner) resolveConflicts(
 		return fmt.Errorf("conflict resolver container: %w", err)
 	}
 	if output.IsError {
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeError, map[string]any{
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeError, map[string]any{
 
 			"phase":        "conflict_resolver",
 			"status":       "failed",
@@ -764,7 +764,7 @@ func (r *Runner) resolveConflicts(
 		return fmt.Errorf("conflict resolver reported error: %s", truncate(output.Result, 300))
 	}
 
-	_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]any{
+	_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]any{
 
 		"phase":        "conflict_resolver",
 		"status":       "succeeded",

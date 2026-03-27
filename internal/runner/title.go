@@ -17,7 +17,7 @@ import (
 // summarising the task prompt, then persists it via the store.
 // Errors are logged and silently dropped so callers can fire-and-forget.
 func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
-	task, err := r.store.GetTask(r.shutdownCtx, taskID)
+	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Warn("GenerateTitle get task failed", "task", taskID, "error", err)
 		return
@@ -50,11 +50,11 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		spec := r.buildBaseContainerSpec(containerName, mdl, selected)
 		spec.Cmd = buildAgentCmd(titlePrompt, mdl)
 
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 
 		handle, launchErr := r.backend.Launch(ctx, spec)
 		if launchErr != nil {
-			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 			return titleResult{err: fmt.Errorf("launch title container: %w", launchErr), model: mdl, sb: selected}
 		}
 		r.taskContainers.SetHandle(taskID, handle, nil)
@@ -62,7 +62,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		rawStdout, _ := io.ReadAll(handle.Stdout())
 		rawStderr, _ := io.ReadAll(handle.Stderr())
 		exitCode, _ := handle.Wait()
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 
 		if ctx.Err() != nil {
 			_ = handle.Kill()
@@ -102,7 +102,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		isLikelyTokenLimitError(res.err.Error()) {
 		logger.Runner.Warn("title generation: claude sandbox token limit hit; retrying with codex",
 			"task", taskID)
-		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit hit during title generation)",
 		})
@@ -113,7 +113,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		isLikelyTokenLimitError(res.output.Result, res.output.Subtype) {
 		logger.Runner.Warn("title generation: claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID)
-		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit in title output)",
 		})
@@ -135,13 +135,13 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		return
 	}
 
-	if err := r.store.UpdateTaskTitle(r.shutdownCtx, taskID, title); err != nil {
+	if err := r.taskStore(taskID).UpdateTaskTitle(r.shutdownCtx, taskID, title); err != nil {
 		logger.Runner.Warn("title generation: store update failed", "task", taskID, "error", err)
 	}
 
 	// Accumulate token/cost usage for the title generation sub-agent.
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		if err := r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityTitle, store.TaskUsage{
+		if err := r.taskStore(taskID).AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityTitle, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
@@ -150,7 +150,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		}); err != nil {
 			logger.Runner.Warn("title generation: accumulate usage failed", "task", taskID, "error", err)
 		}
-		if err := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+		if err := r.taskStore(taskID).AppendTurnUsage(taskID, store.TurnUsageRecord{
 			Turn:                 1,
 			Timestamp:            time.Now().UTC(),
 			InputTokens:          output.Usage.InputTokens,

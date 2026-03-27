@@ -121,7 +121,7 @@ func (r *Runner) CleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 // the public API). Safe to call multiple times — errors are logged as warnings.
 func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]string, branchName string) {
 	bgCtx := r.shutdownCtx
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
 
 	for repoPath, wt := range worktreePaths {
 		if !gitutil.IsGitRepo(repoPath) || !gitutil.HasCommits(repoPath) {
@@ -137,7 +137,7 @@ func (r *Runner) cleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]str
 	if err := os.RemoveAll(taskWorktreeDir); err != nil && !os.IsNotExist(err) {
 		logger.Runner.Warn("remove worktree dir", "task", taskID, "error", err)
 	}
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_cleanup", Label: "worktree_cleanup"})
 
 }
 

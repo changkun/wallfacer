@@ -488,7 +488,7 @@ func (r *Runner) runContainer(
 	defer r.taskContainers.Delete(taskID)
 
 	sb := sandbox.Claude
-	if task, err := r.store.GetTask(r.shutdownCtx, taskID); err == nil {
+	if task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID); err == nil {
 		sb = r.sandboxForTaskActivity(task, activity)
 	} else {
 		logger.Runner.Warn("runContainer: get task", "task", taskID, "error", err)
@@ -503,11 +503,11 @@ func (r *Runner) runContainer(
 		spec := r.buildContainerSpecForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
 
 		logger.Runner.Debug("exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox)
-		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(activity)})
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(activity)})
 
 		handle, launchErr := r.backend.Launch(ctx, spec)
 		if launchErr != nil {
-			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
+			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
 			r.containerCB.RecordFailure()
 			return nil, nil, nil, fmt.Errorf("launch container: %w", launchErr)
 		}
@@ -518,7 +518,7 @@ func (r *Runner) runContainer(
 		rawStdout, _ := io.ReadAll(handle.Stdout())
 		rawStderr, _ := io.ReadAll(handle.Stderr())
 		exitCode, waitErr := handle.Wait()
-		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
 
 		// Detect container runtime failures (exit code 125 = engine error).
 		if exitCode == 125 && ctx.Err() == nil {
@@ -580,7 +580,7 @@ func (r *Runner) runContainer(
 		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {
 			logger.Runner.Warn("claude sandbox token limit hit; retrying with codex",
 				"task", taskID, "activity", activity)
-			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit)",
 			})
@@ -593,7 +593,7 @@ func (r *Runner) runContainer(
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("claude sandbox reported token limit in output; retrying with codex",
 			"task", taskID, "activity", activity)
-		_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit in output)",
 		})

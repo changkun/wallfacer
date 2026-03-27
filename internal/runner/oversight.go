@@ -46,14 +46,14 @@ func (r *Runner) generateOversightLocked(taskID uuid.UUID) {
 	ctx := r.shutdownCtx
 
 	// Mark as generating so the UI can show a loading state.
-	_ = r.store.SaveOversight(taskID, store.TaskOversight{
+	_ = r.taskStore(taskID).SaveOversight(taskID, store.TaskOversight{
 		Status: store.OversightStatusGenerating,
 	})
 
 	log, err := r.buildActivityLog(ctx, taskID, 1)
 	if err != nil {
 		logger.Runner.Warn("oversight: build activity log", "task", taskID, "error", err)
-		_ = r.store.SaveOversight(taskID, store.TaskOversight{
+		_ = r.taskStore(taskID).SaveOversight(taskID, store.TaskOversight{
 			Status: store.OversightStatusFailed,
 			Error:  fmt.Sprintf("build activity log: %v", err),
 		})
@@ -62,7 +62,7 @@ func (r *Runner) generateOversightLocked(taskID uuid.UUID) {
 
 	if len(log) == 0 {
 		// No turns yet — nothing to summarize.
-		_ = r.store.SaveOversight(taskID, store.TaskOversight{
+		_ = r.taskStore(taskID).SaveOversight(taskID, store.TaskOversight{
 			Status: store.OversightStatusFailed,
 			Error:  "no agent activity found",
 		})
@@ -72,14 +72,14 @@ func (r *Runner) generateOversightLocked(taskID uuid.UUID) {
 	phases, err := r.runOversightAgent(taskID, store.SandboxActivityOversight, log)
 	if err != nil {
 		logger.Runner.Warn("oversight: agent failed", "task", taskID, "error", err)
-		_ = r.store.SaveOversight(taskID, store.TaskOversight{
+		_ = r.taskStore(taskID).SaveOversight(taskID, store.TaskOversight{
 			Status: store.OversightStatusFailed,
 			Error:  fmt.Sprintf("oversight agent: %v", err),
 		})
 		return
 	}
 
-	if err := r.store.SaveOversight(taskID, store.TaskOversight{
+	if err := r.taskStore(taskID).SaveOversight(taskID, store.TaskOversight{
 		Status:      store.OversightStatusReady,
 		GeneratedAt: time.Now(),
 		Phases:      phases,
@@ -110,14 +110,14 @@ func (r *Runner) GenerateTestOversight(taskID uuid.UUID, fromTurn int) {
 func (r *Runner) generateTestOversightLocked(taskID uuid.UUID, fromTurn int) {
 	ctx := r.shutdownCtx
 
-	_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
+	_ = r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
 		Status: store.OversightStatusGenerating,
 	})
 
 	log, err := r.buildActivityLog(ctx, taskID, fromTurn+1)
 	if err != nil {
 		logger.Runner.Warn("test oversight: build activity log", "task", taskID, "error", err)
-		_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
+		_ = r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
 			Status: store.OversightStatusFailed,
 			Error:  fmt.Sprintf("build activity log: %v", err),
 		})
@@ -125,7 +125,7 @@ func (r *Runner) generateTestOversightLocked(taskID uuid.UUID, fromTurn int) {
 	}
 
 	if len(log) == 0 {
-		_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
+		_ = r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
 			Status: store.OversightStatusFailed,
 			Error:  "no test agent activity found",
 		})
@@ -135,14 +135,14 @@ func (r *Runner) generateTestOversightLocked(taskID uuid.UUID, fromTurn int) {
 	phases, err := r.runOversightAgent(taskID, store.SandboxActivityOversightTest, log)
 	if err != nil {
 		logger.Runner.Warn("test oversight: agent failed", "task", taskID, "error", err)
-		_ = r.store.SaveTestOversight(taskID, store.TaskOversight{
+		_ = r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
 			Status: store.OversightStatusFailed,
 			Error:  fmt.Sprintf("oversight agent: %v", err),
 		})
 		return
 	}
 
-	if err := r.store.SaveTestOversight(taskID, store.TaskOversight{
+	if err := r.taskStore(taskID).SaveTestOversight(taskID, store.TaskOversight{
 		Status:      store.OversightStatusReady,
 		GeneratedAt: time.Now(),
 		Phases:      phases,
@@ -202,7 +202,7 @@ func (r *Runner) periodicOversightWorker(ctx context.Context, taskID uuid.UUID) 
 			}
 
 			// Skip if there is no agent output yet.
-			keys, err := r.store.ListBlobs(taskID, "outputs/turn-")
+			keys, err := r.taskStore(taskID).ListBlobs(taskID, "outputs/turn-")
 			if err == nil && len(keys) > 0 {
 				r.generateOversightLocked(taskID)
 			}
@@ -223,7 +223,7 @@ type turnActivity struct {
 // activity summary, cross-referencing event timestamps. fromTurn is the first
 // turn number to include (1-indexed); pass 1 to include all turns.
 func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID, fromTurn int) ([]turnActivity, error) {
-	keys, err := r.store.ListBlobs(taskID, "outputs/turn-")
+	keys, err := r.taskStore(taskID).ListBlobs(taskID, "outputs/turn-")
 	if err != nil {
 		return nil, nil
 	}
@@ -241,7 +241,7 @@ func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID, fromTur
 	slices.Sort(turnKeys)
 
 	// Build a turn→timestamp index from output events.
-	events, _ := r.store.GetEvents(ctx, taskID)
+	events, _ := r.taskStore(taskID).GetEvents(ctx, taskID)
 	turnTimestamps := buildTurnTimestamps(events)
 
 	var activities []turnActivity
@@ -250,7 +250,7 @@ func (r *Runner) buildActivityLog(ctx context.Context, taskID uuid.UUID, fromTur
 		if turnNum < fromTurn {
 			continue // Skip turns before the requested boundary.
 		}
-		raw, err := r.store.ReadBlob(taskID, key)
+		raw, err := r.taskStore(taskID).ReadBlob(taskID, key)
 		if err != nil {
 			continue
 		}
@@ -693,7 +693,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	containerName := "wallfacer-oversight-" + taskID.String()[:8]
 	_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
 
-	task, err := r.store.GetTask(r.shutdownCtx, taskID)
+	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	if err != nil {
 		logger.Runner.Warn("oversight: get task", "task", taskID, "error", err)
 	}
@@ -719,10 +719,10 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 
 		args := spec.Build()
 
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
 
 		stdout, stderr, runErr := cmdexec.New(r.command, args...).WithContext(runCtx).Capture()
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
 
 		if runCtx.Err() != nil {
 			return oversightRunResult{
@@ -773,7 +773,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	if res.err != nil {
 		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(res.err.Error()) {
 			logger.Runner.Warn("oversight: claude token limit hit; retrying with codex", "task", taskID, "agent", agent)
-			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during oversight)",
 			})
@@ -789,7 +789,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("oversight: claude output reported token limit; retrying with codex", "task", taskID, "agent", agent)
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit in oversight output)",
 		})
@@ -804,7 +804,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 
 	// Accumulate token/cost usage for this oversight sub-agent.
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 || output.TotalCostUSD > 0 {
-		if accErr := r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, agent, store.TaskUsage{
+		if accErr := r.taskStore(taskID).AccumulateSubAgentUsage(r.shutdownCtx, taskID, agent, store.TaskUsage{
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
 			CacheReadInputTokens: output.Usage.CacheReadInputTokens,
@@ -813,7 +813,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 		}); accErr != nil {
 			logger.Runner.Warn("oversight: accumulate usage failed", "task", taskID, "agent", agent, "error", accErr)
 		}
-		if appErr := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+		if appErr := r.taskStore(taskID).AppendTurnUsage(taskID, store.TurnUsageRecord{
 			Turn:                 1,
 			Timestamp:            time.Now().UTC(),
 			InputTokens:          output.Usage.InputTokens,

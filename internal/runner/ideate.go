@@ -137,7 +137,7 @@ func (r *Runner) buildIdeationPrompt(existingTasks []store.Task, contexts ...ide
 	var rejectedTitles []string
 	round := 0
 	if r.store != nil {
-		if hist, err := LoadHistory(r.store.DataDir()); err == nil {
+		if hist, err := LoadHistory(r.currentStore().DataDir()); err == nil {
 			rejectedTitles = hist.RejectedTitles()
 			round = hist.Round()
 		} else {
@@ -192,7 +192,7 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 
 	sb := sandbox.Claude
 	if taskID != uuid.Nil {
-		if task, err := r.store.GetTask(r.shutdownCtx, taskID); err == nil {
+		if task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID); err == nil {
 			sb = r.sandboxForTaskActivity(task, activityIdeaAgent)
 		}
 	}
@@ -201,13 +201,13 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 
 		logger.Runner.Debug("ideate exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox)
 		if taskID != uuid.Nil {
-			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
+			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
 		}
 
 		handle, launchErr := r.backend.Launch(ctx, spec)
 		if launchErr != nil {
 			if taskID != uuid.Nil {
-				_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
+				_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
 			}
 			return nil, nil, nil, fmt.Errorf("launch ideation container: %w", launchErr)
 		}
@@ -221,7 +221,7 @@ func (r *Runner) RunIdeation(ctx context.Context, taskID uuid.UUID, prompt strin
 		rawStderr, _ := io.ReadAll(handle.Stderr())
 		exitCode, waitErr := handle.Wait()
 		if taskID != uuid.Nil {
-			_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
+			_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityIdeaAgent)})
 		}
 
 		if ctx.Err() != nil {
@@ -337,11 +337,11 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 
 	// Set a human-readable title on the idea-agent card.
 	title := "Brainstorm " + time.Now().Format("Jan 2, 2006 15:04")
-	_ = r.store.UpdateTaskTitle(bgCtx, taskID, title)
+	_ = r.taskStore(taskID).UpdateTaskTitle(bgCtx, taskID, title)
 
 	// Collect tasks currently in backlog, in_progress, or waiting so the
 	// brainstorm agent can avoid proposing duplicates or conflicting ideas.
-	allTasks, _ := r.store.ListTasks(bgCtx, false)
+	allTasks, _ := r.taskStore(taskID).ListTasks(bgCtx, false)
 	var activeTasks []store.Task
 	for _, t := range allTasks {
 		if t.ID == taskID {
@@ -361,12 +361,12 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	ideationPrompt := strings.TrimSpace(task.ExecutionPrompt)
 	if ideationPrompt == "" {
 		ideationPrompt = r.buildIdeationPrompt(activeTasks, r.collectIdeationContextFromTasks(bgCtx, allTasks))
-		if err := r.store.UpdateTaskExecutionPrompt(bgCtx, taskID, ideationPrompt); err != nil {
+		if err := r.taskStore(taskID).UpdateTaskExecutionPrompt(bgCtx, taskID, ideationPrompt); err != nil {
 			logger.Runner.Warn("ideation task: set execution prompt on brainstorm card", "task", taskID, "error", err)
 		}
 	}
 
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": "Starting brainstorm agent — exploring workspaces to propose ideas...",
 	})
@@ -375,7 +375,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	r.emitIdeationRejectionEvents(bgCtx, taskID, rejections)
 
 	// Record rejected ideas to history so they are excluded from future prompts.
-	hist, histErr := LoadHistory(r.store.DataDir())
+	hist, histErr := LoadHistory(r.taskStore(taskID).DataDir())
 	if histErr != nil {
 		logger.Runner.Warn("ideation task: load history for recording", "task", taskID, "error", histErr)
 		hist = nil
@@ -399,11 +399,11 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// Always persist the raw container output as turn 1 so that the trace and
 	// oversight features work the same as for regular implementation tasks.
 	if len(rawStdout) > 0 {
-		if saveErr := r.store.SaveTurnOutput(taskID, 1, rawStdout, rawStderr); saveErr != nil {
+		if saveErr := r.taskStore(taskID).SaveTurnOutput(taskID, 1, rawStdout, rawStderr); saveErr != nil {
 			logger.Runner.Warn("ideation: save turn output", "task", taskID, "error", saveErr)
 		}
 		if len(rawStderr) > 0 {
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"stderr_file": "turn-0001.stderr.txt",
 				"turn":        "1",
@@ -415,15 +415,15 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// the brainstorm summary and the Turns counter is non-zero (enabling oversight).
 	if output != nil {
 		sessionID := output.SessionID
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeOutput, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeOutput, map[string]string{
 
 			"result":      output.Result,
 			"stop_reason": output.StopReason,
 			"session_id":  sessionID,
 		})
-		_ = r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, 1)
+		_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, 1)
 
-		_ = r.store.AccumulateSubAgentUsage(bgCtx, taskID, store.SandboxActivityIdeaAgent, store.TaskUsage{
+		_ = r.taskStore(taskID).AccumulateSubAgentUsage(bgCtx, taskID, store.SandboxActivityIdeaAgent, store.TaskUsage{
 
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
@@ -431,7 +431,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 		})
-		if appErr := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+		if appErr := r.taskStore(taskID).AppendTurnUsage(taskID, store.TurnUsageRecord{
 			Turn:                 1,
 			Timestamp:            time.Now().UTC(),
 			InputTokens:          output.Usage.InputTokens,
@@ -446,7 +446,7 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	} else if len(rawStdout) > 0 {
 		// No parsed output (e.g. container error before producing JSON); still
 		// increment Turns so the trace file is indexed if stdout was non-empty.
-		_ = r.store.UpdateTaskTurns(bgCtx, taskID, 1)
+		_ = r.taskStore(taskID).UpdateTaskTurns(bgCtx, taskID, 1)
 
 	}
 
@@ -463,10 +463,10 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 			sb.WriteString(line)
 			sb.WriteString("\n")
 		}
-		_ = r.store.UpdateTaskResult(bgCtx, taskID, strings.TrimSpace(sb.String()), "", "", 1)
+		_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, strings.TrimSpace(sb.String()), "", "", 1)
 
 	} else {
-		_ = r.store.UpdateTaskResult(bgCtx, taskID, "Brainstorm complete — no ideas were proposed.", "", "", 1)
+		_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, "Brainstorm complete — no ideas were proposed.", "", "", 1)
 
 	}
 
@@ -474,13 +474,13 @@ func (r *Runner) runIdeationTask(ctx context.Context, task *store.Task) error {
 	// Otherwise the brainstorm task will move to waiting for manual review;
 	// backlog tasks are created when the user approves (moves to done).
 	if r.isAutosubmitEnabled() {
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Brainstorm complete — creating %d idea task(s).", len(ideas)),
 		})
 		r.createIdeaBacklogTasks(bgCtx, taskID, ideas)
 	} else {
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Brainstorm complete — %d idea(s) proposed. Approve to create backlog tasks.", len(ideas)),
 		})
@@ -505,7 +505,7 @@ func ideaSummaryLines(ideas []IdeateResult) []string {
 // createIdeaBacklogTasks creates a backlog task for each proposed idea and
 // records accepted ideas in history.
 func (r *Runner) createIdeaBacklogTasks(ctx context.Context, parentTaskID uuid.UUID, ideas []IdeateResult) {
-	hist, histErr := LoadHistory(r.store.DataDir())
+	hist, histErr := LoadHistory(r.taskStore(parentTaskID).DataDir())
 	if histErr != nil {
 		logger.Runner.Warn("ideation: load history for recording", "task", parentTaskID, "error", histErr)
 		hist = nil
@@ -527,7 +527,7 @@ func (r *Runner) createIdeaBacklogTasks(ctx context.Context, parentTaskID uuid.U
 		if cardPrompt == "" {
 			cardPrompt = idea.Title
 		}
-		newTask, createErr := r.store.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: cardPrompt, Timeout: 60, Kind: store.TaskKindTask, Tags: tags})
+		newTask, createErr := r.taskStore(parentTaskID).CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: cardPrompt, Timeout: 60, Kind: store.TaskKindTask, Tags: tags})
 		if createErr != nil {
 			logger.Runner.Warn("ideation task: create idea task", "task", parentTaskID, "error", createErr)
 			continue
@@ -543,21 +543,21 @@ func (r *Runner) createIdeaBacklogTasks(ctx context.Context, parentTaskID uuid.U
 				logger.Runner.Warn("ideation task: append accepted idea to history", "title", idea.Title, "error", appErr)
 			}
 		}
-		_ = r.store.InsertEvent(ctx, newTask.ID, store.EventTypeStateChange,
+		_ = r.taskStore(parentTaskID).InsertEvent(ctx, newTask.ID, store.EventTypeStateChange,
 
 			store.NewStateChangeData("", store.TaskStatusBacklog, "", nil))
 		if idea.Title != "" {
-			_ = r.store.UpdateTaskTitle(ctx, newTask.ID, idea.Title)
+			_ = r.taskStore(parentTaskID).UpdateTaskTitle(ctx, newTask.ID, idea.Title)
 
 		}
-		if err := r.store.UpdateTaskExecutionPrompt(ctx, newTask.ID, idea.Prompt); err != nil {
+		if err := r.taskStore(parentTaskID).UpdateTaskExecutionPrompt(ctx, newTask.ID, idea.Prompt); err != nil {
 			logger.Runner.Warn("ideation task: set execution prompt", "task", newTask.ID, "error", err)
 		}
 		label := fmt.Sprintf("[%s %d] %s", idea.Priority, idea.ImpactScore, idea.Title)
 		if idea.Priority == "" {
 			label = idea.Title
 		}
-		_ = r.store.InsertEvent(ctx, parentTaskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(parentTaskID).InsertEvent(ctx, parentTaskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Created idea task: %s", label),
 		})
@@ -570,13 +570,13 @@ func (r *Runner) createIdeaBacklogTasks(ctx context.Context, parentTaskID uuid.U
 func (r *Runner) CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) error {
 	// The raw agent output is stored in the turn output file; the task Result
 	// field contains only the summary lines. Re-extract from the turn output.
-	rawStdout, readErr := r.store.ReadBlob(taskID, "outputs/turn-0001.json")
+	rawStdout, readErr := r.taskStore(taskID).ReadBlob(taskID, "outputs/turn-0001.json")
 	if readErr != nil {
 		return fmt.Errorf("read turn output: %w", readErr)
 	}
 
 	var rawStderr []byte
-	if data, err := r.store.ReadBlob(taskID, "outputs/turn-0001.stderr.txt"); err == nil {
+	if data, err := r.taskStore(taskID).ReadBlob(taskID, "outputs/turn-0001.stderr.txt"); err == nil {
 		rawStderr = data
 	}
 
@@ -590,7 +590,7 @@ func (r *Runner) CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) e
 		return fmt.Errorf("extract ideas: %w", extractErr)
 	}
 
-	_ = r.store.InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": fmt.Sprintf("Approved — creating %d idea task(s).", len(ideas)),
 	})
@@ -601,7 +601,7 @@ func (r *Runner) CreateIdeaBacklogTasks(ctx context.Context, taskID uuid.UUID) e
 // collectIdeationContext returns workspace and task-derived signals for prompt
 // construction so ideation suggestions can be prioritized by objective urgency.
 func (r *Runner) collectIdeationContext(ctx context.Context) ideationContext {
-	tasks, err := r.store.ListTasks(ctx, false)
+	tasks, err := r.currentStore().ListTasks(ctx, false)
 	if err != nil {
 		return r.collectIdeationContextFromTasks(ctx, nil)
 	}

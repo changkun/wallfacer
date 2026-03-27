@@ -1,6 +1,6 @@
 # Task 5: Replace r.store with taskStore() in Execution Path
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3, Task 4
 **Phase:** 2 (Runner Multi-Store Awareness)
 **Effort:** Large
@@ -56,3 +56,16 @@ to write to the wrong store after a workspace switch.
 
 - Do NOT change Handler or Manager.
 - Do NOT change non-execution-path code (board subscription, worktree GC).
+
+## Implementation notes
+
+- **`ideate.go` non-execution utilities**: `buildIdeationPrompt` (line 139-140)
+  and `collectIdeationContext` (line 604) use `r.currentStore()` instead of
+  `r.taskStore()` because they are non-execution-path utilities without a
+  taskID parameter — they serve the viewed workspace group.
+- **`createIdeaBacklogTasks`**: Uses `r.taskStore(parentTaskID)` since the
+  function parameter is `parentTaskID`, not `taskID`. New tasks created by
+  ideation belong to the same workspace group as the parent task.
+- **Total**: 231 `r.store.` references replaced across 10 files. 9 `r.store`
+  references remain in non-execution-path code (board.go, runner.go,
+  worktree_gc.go, worktree.go PruneUnknownWorktrees, ideate.go utilities).

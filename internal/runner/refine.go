@@ -26,7 +26,7 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	ctx, cancel := context.WithTimeout(r.shutdownCtx, constants.RefinementTimeout)
 	defer cancel()
 
-	task, err := r.store.GetTask(bgCtx, taskID)
+	task, err := r.taskStore(taskID).GetTask(bgCtx, taskID)
 	if err != nil {
 		logger.Runner.Error("refinement: get task", "task", taskID, "error", err)
 		return
@@ -34,27 +34,27 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 
 	prompt := r.buildRefinementPrompt(task, userInstructions, time.Now())
 
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "refinement", Label: "refinement"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "refinement", Label: "refinement"})
 
 	output, _, _, err := r.runRefinementContainer(ctx, taskID, prompt, "", r.sandboxForTaskActivity(task, activityRefinement))
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "refinement", Label: "refinement"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "refinement", Label: "refinement"})
 
 	if err != nil {
 		logger.Runner.Error("refinement container error", "task", taskID, "error", err)
 
 		// Don't overwrite a cleared job (task may have been reset).
-		cur, getErr := r.store.GetTask(bgCtx, taskID)
+		cur, getErr := r.taskStore(taskID).GetTask(bgCtx, taskID)
 		if getErr != nil || cur.CurrentRefinement == nil {
 			return
 		}
 		cur.CurrentRefinement.Status = store.RefinementJobStatusFailed
 		cur.CurrentRefinement.Error = err.Error()
-		_ = r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
+		_ = r.taskStore(taskID).UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
 
 		return
 	}
 
-	cur, getErr := r.store.GetTask(bgCtx, taskID)
+	cur, getErr := r.taskStore(taskID).GetTask(bgCtx, taskID)
 	if getErr != nil || cur.CurrentRefinement == nil {
 		return
 	}
@@ -63,7 +63,7 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	cur.CurrentRefinement.Status = store.RefinementJobStatusDone
 	cur.CurrentRefinement.Result = spec
 	cur.CurrentRefinement.Goal = goal
-	_ = r.store.UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
+	_ = r.taskStore(taskID).UpdateRefinementJob(bgCtx, taskID, cur.CurrentRefinement)
 
 	logger.Runner.Info("refinement complete", "task", taskID)
 }
@@ -235,7 +235,7 @@ func (r *Runner) runRefinementContainer(
 	if err != nil {
 		if initialSandbox == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr), string(rawStdout)) {
 			logger.Runner.Warn("refinement: claude token limit hit; retrying with codex", "task", taskID)
-			_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": "Sandbox fallback: claude → codex (token/rate limit hit during refinement)",
 			})
@@ -248,7 +248,7 @@ func (r *Runner) runRefinementContainer(
 	if initialSandbox == sandbox.Claude && output != nil && output.IsError &&
 		isLikelyTokenLimitError(output.Result, output.Subtype) {
 		logger.Runner.Warn("refinement: claude output reported token limit; retrying with codex", "task", taskID)
-		_ = r.store.InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": "Sandbox fallback: claude → codex (token/rate limit in refinement output)",
 		})
@@ -260,7 +260,7 @@ func (r *Runner) runRefinementContainer(
 
 	// Accumulate usage attributed to refinement sub-agent.
 	if output.Usage.InputTokens > 0 || output.Usage.OutputTokens > 0 {
-		_ = r.store.AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityRefinement, store.TaskUsage{
+		_ = r.taskStore(taskID).AccumulateSubAgentUsage(r.shutdownCtx, taskID, store.SandboxActivityRefinement, store.TaskUsage{
 
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
@@ -268,7 +268,7 @@ func (r *Runner) runRefinementContainer(
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 		})
-		if appErr := r.store.AppendTurnUsage(taskID, store.TurnUsageRecord{
+		if appErr := r.taskStore(taskID).AppendTurnUsage(taskID, store.TurnUsageRecord{
 			Turn:                 1,
 			Timestamp:            time.Now().UTC(),
 			InputTokens:          output.Usage.InputTokens,

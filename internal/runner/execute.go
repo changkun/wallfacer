@@ -106,25 +106,25 @@ func classifyFailure(err error, isError bool, result string) store.FailureCatego
 // when tryAutoRetry returns true, so the deferred guard does not overwrite
 // the backlog status.
 func (r *Runner) tryAutoRetry(bgCtx context.Context, taskID uuid.UUID, category store.FailureCategory) bool {
-	t, err := r.store.GetTask(bgCtx, taskID)
+	t, err := r.taskStore(taskID).GetTask(bgCtx, taskID)
 	if err != nil {
 		return false
 	}
 	if !store.IsAutoRetryEligible(*t, category) {
 		return false
 	}
-	if err := r.store.IncrementAutoRetryCount(bgCtx, taskID, category); err != nil {
+	if err := r.taskStore(taskID).IncrementAutoRetryCount(bgCtx, taskID, category); err != nil {
 		return false
 	}
 	// Re-read to get the updated count for the event message.
-	if updated, err := r.store.GetTask(bgCtx, taskID); err == nil {
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+	if updated, err := r.taskStore(taskID).GetTask(bgCtx, taskID); err == nil {
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"message": fmt.Sprintf("auto-retry %d/%d after %s",
 				updated.AutoRetryCount, constants.MaxAutoRetries, category),
 		})
 	}
-	_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusBacklog)
+	_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusBacklog)
 
 	return true
 }
@@ -137,7 +137,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	// Close the feedback_waiting span opened when the task entered waiting.
 	if resumedFromWaiting {
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 
 	}
 
@@ -151,14 +151,14 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 		if !statusSet {
 			category := store.FailureCategoryUnknown
-			_ = r.store.SetTaskFailureCategory(bgCtx, taskID, category)
+			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
 
 			if r.tryAutoRetry(bgCtx, taskID, category) {
 				return
 			}
-			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
 		}
@@ -167,7 +167,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// unbounded growth in the oversightMu sync.Map for long-running servers.
 	defer r.oversightMu.Delete(taskID.String())
 
-	task, err := r.store.GetTask(bgCtx, taskID)
+	task, err := r.taskStore(taskID).GetTask(bgCtx, taskID)
 	if err != nil {
 		logger.Runner.Error("get task", "task", taskID, "error", err)
 		return // defer moves to "failed"
@@ -175,7 +175,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	// Record the execution environment for reproducibility auditing.
 	execEnv := r.captureExecutionEnvironment(*task)
-	if err := r.store.UpdateTaskEnvironment(bgCtx, taskID, execEnv); err != nil {
+	if err := r.taskStore(taskID).UpdateTaskEnvironment(bgCtx, taskID, execEnv); err != nil {
 		slog.Warn("failed to record execution environment", "task", taskID, "err", err)
 		// non-fatal: continue execution
 	}
@@ -199,18 +199,18 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 		if runErr := r.runIdeationTask(ideaCtx, task); runErr != nil {
 			// Don't overwrite a cancelled status.
-			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
+			if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 				return
 			}
-			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
-			_ = r.store.SetTaskFailureCategory(bgCtx, taskID, classifyFailure(runErr, false, ""))
+			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, classifyFailure(runErr, false, ""))
 
-			_ = r.store.UpdateTaskResult(bgCtx, taskID, runErr.Error(), "", "", 0)
+			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, runErr.Error(), "", "", 0)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": runErr.Error()})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": runErr.Error()})
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
 			return
@@ -220,24 +220,24 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		// When auto-submit is enabled, transition straight through to done.
 		// When auto-submit is off, stop at waiting so the user can review
 		// proposed ideas before they are created as backlog tasks.
-		_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
+		_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 			store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
 
 		if r.isAutosubmitEnabled() {
-			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusCommitting)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerSystem, nil))
-			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusDone)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusCommitting, store.TaskStatusDone, store.TriggerSystem, nil))
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": "Ideation complete.",
 			})
@@ -295,7 +295,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 	}
 	if needSetup {
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
 
 		// Use ensureTaskWorktrees with the stored paths and branch name so
 		// that existing branches are reattached (preserving committed changes)
@@ -307,25 +307,25 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		} else {
 			worktreePaths, branchName, err = r.setupWorktrees(taskID)
 		}
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "worktree_setup", Label: "worktree_setup"})
 
 		if err != nil {
 			logger.Runner.Error("setup worktrees", "task", taskID, "error", err)
 			statusSet = true
-			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
-			_ = r.store.SetTaskFailureCategory(bgCtx, taskID, store.FailureCategoryWorktree)
+			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, store.FailureCategoryWorktree)
 
-			_ = r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", task.Turns)
+			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", task.Turns)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
 			return
 		}
-		if err := r.store.UpdateTaskWorktrees(bgCtx, taskID, worktreePaths, branchName); err != nil {
+		if err := r.taskStore(taskID).UpdateTaskWorktrees(bgCtx, taskID, worktreePaths, branchName); err != nil {
 			logger.Runner.Error("save worktree paths", "task", taskID, "error", err)
 		}
 	}
@@ -345,7 +345,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	// Prepare board context and sibling mounts in a single fused call.
 	var siblingMounts map[string]map[string]string
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: "board_context"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: "board_context"})
 
 	boardJSON, siblingMounts, boardErr := r.generateBoardContextAndMounts(taskID, task.MountWorktrees)
 	if boardErr != nil {
@@ -358,7 +358,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			logger.Runner.Warn("board context write failed", "task", taskID, "error", boardErr)
 		}
 	}
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "board_context", Label: "board_context"})
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "board_context", Label: "board_context"})
 
 	defer func() {
 		if boardDir != "" {
@@ -374,14 +374,14 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		// Refresh board.json and sibling mounts before each turn so they reflect latest state.
 		if boardDir != "" {
 			boardRefreshLabel := fmt.Sprintf("board_context_%d", turns)
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
 
 			if data, mounts, err := r.generateBoardContextAndMounts(taskID, task.MountWorktrees); err == nil {
 				_ = os.WriteFile(filepath.Join(boardDir, "board.json"), data, 0644)
 
 				siblingMounts = mounts
 			}
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "board_context", Label: boardRefreshLabel})
 
 		}
 
@@ -393,17 +393,17 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if isTestRun {
 			turnLabel = fmt.Sprintf("test_%d", turns)
 		}
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: turnLabel})
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 
 		output, rawStdout, rawStderr, err := r.runContainer(ctx, taskID, prompt, sessionID, worktreePaths, boardDir, siblingMounts, modelOverride, runActivity)
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: turnLabel})
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "agent_turn", Label: turnLabel})
 
-		if saveErr := r.store.SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
+		if saveErr := r.taskStore(taskID).SaveTurnOutput(taskID, turns, rawStdout, rawStderr); saveErr != nil {
 			logger.Runner.Error("save turn output", "task", taskID, "turn", turns, "error", saveErr)
 		}
 		if len(rawStderr) > 0 {
 			stderrFile := fmt.Sprintf("turn-%04d.stderr.txt", turns)
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"stderr_file": stderrFile,
 				"turn":        fmt.Sprintf("%d", turns),
@@ -422,7 +422,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			if sessionID != "" && strings.Contains(err.Error(), "empty output from container") {
 				logger.Runner.Warn("resume produced empty output, retrying without session",
 					"task", taskID, "session", sessionID)
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+				_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 					"result": "Session resume failed (empty output). Retrying with fresh session...",
 				})
@@ -437,30 +437,30 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 			logger.Runner.Error("container error", "task", taskID, "error", err)
 			// Don't overwrite a cancelled status.
-			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
+			if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 				statusSet = true
 				return
 			}
 			category := classifyFailure(err, false, "")
-			_ = r.store.SetTaskFailureCategory(bgCtx, taskID, category)
+			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
 
-			_ = r.store.UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", turns)
+			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, err.Error(), sessionID, "", turns)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeError, map[string]string{"error": err.Error()})
 
 			statusSet = true
 			if r.tryAutoRetry(bgCtx, taskID, category) {
 				return
 			}
-			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
 			return
 		}
 
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeOutput, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeOutput, map[string]string{
 
 			"result":      output.Result,
 			"stop_reason": output.StopReason,
@@ -474,13 +474,13 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			if output.SessionID != "" {
 				testSessionID = output.SessionID
 			}
-			_ = r.store.UpdateTaskTurns(bgCtx, taskID, turns)
+			_ = r.taskStore(taskID).UpdateTaskTurns(bgCtx, taskID, turns)
 
 		} else {
 			if output.SessionID != "" {
 				sessionID = output.SessionID
 			}
-			_ = r.store.UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, turns)
+			_ = r.taskStore(taskID).UpdateTaskResult(bgCtx, taskID, output.Result, sessionID, output.StopReason, turns)
 
 		}
 
@@ -490,7 +490,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		if isTestRun {
 			subAgent = store.SandboxActivityTest
 		}
-		_ = r.store.AccumulateSubAgentUsage(bgCtx, taskID, subAgent, store.TaskUsage{
+		_ = r.taskStore(taskID).AccumulateSubAgentUsage(bgCtx, taskID, subAgent, store.TaskUsage{
 
 			InputTokens:          output.Usage.InputTokens,
 			OutputTokens:         output.Usage.OutputTokens,
@@ -498,7 +498,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			CacheCreationTokens:  output.Usage.CacheCreationInputTokens,
 			CostUSD:              output.TotalCostUSD,
 		})
-		if err := r.store.AppendTurnUsage(task.ID, store.TurnUsageRecord{
+		if err := r.taskStore(taskID).AppendTurnUsage(task.ID, store.TurnUsageRecord{
 			Turn:                 turns,
 			Timestamp:            time.Now().UTC(),
 			InputTokens:          output.Usage.InputTokens,
@@ -514,7 +514,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 		}
 
 		// Budget guardrail: pause the task when accumulated spend exceeds user-set limits.
-		if currentTask, gErr := r.store.GetTask(bgCtx, taskID); gErr == nil {
+		if currentTask, gErr := r.taskStore(taskID).GetTask(bgCtx, taskID); gErr == nil {
 			u := currentTask.Usage
 			totalInputTokens := u.InputTokens + u.CacheReadInputTokens + u.CacheCreationTokens
 			budgetExceeded := (currentTask.MaxCostUSD > 0 && u.CostUSD >= currentTask.MaxCostUSD) ||
@@ -527,20 +527,20 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 					reason = fmt.Sprintf("token budget exceeded: %d of %d input tokens", totalInputTokens, currentTask.MaxInputTokens)
 				}
 				statusSet = true
-				_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
+				_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 
-				_ = r.store.SetTaskFailureCategory(bgCtx, taskID, store.FailureCategoryBudget)
+				_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, store.FailureCategoryBudget)
 
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+				_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 					store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]any{
+				_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]any{
 
 					"message":         reason,
 					"budget_exceeded": true,
 				})
 				r.GenerateOversightBackground(taskID)
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
+				_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 
 				return
 			}
@@ -554,7 +554,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			if sessionID != "" && strings.Contains(combinedErr, "No conversation found") {
 				logger.Runner.Warn("session not found, retrying without session",
 					"task", taskID, "session", sessionID)
-				_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+				_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 					"result": "Session expired or lost. Retrying with fresh session...",
 				})
@@ -567,15 +567,15 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				continue
 			}
 			category := classifyFailure(nil, true, output.Result)
-			_ = r.store.SetTaskFailureCategory(bgCtx, taskID, category)
+			_ = r.taskStore(taskID).SetTaskFailureCategory(bgCtx, taskID, category)
 
 			statusSet = true
 			if r.tryAutoRetry(bgCtx, taskID, category) {
 				return
 			}
-			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusFailed)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
 			return
@@ -592,16 +592,16 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			// Move to waiting for human review. Auto-submit (if enabled)
 			// will pick up the task and run the commit pipeline.
 			r.GenerateOversightBackground(taskID)
-			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": "Task complete — awaiting review.",
 			})
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 
 			return
 
@@ -620,7 +620,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 		default:
 			// Empty or unknown stop_reason — waiting for user feedback.
-			if cur, _ := r.store.GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
+			if cur, _ := r.taskStore(taskID).GetTask(bgCtx, taskID); cur != nil && cur.Status == store.TaskStatusCancelled {
 				statusSet = true
 				return
 			}
@@ -632,12 +632,12 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 				return
 			}
 			r.GenerateOversight(taskID)
-			_ = r.store.UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
+			_ = r.taskStore(taskID).UpdateTaskStatus(bgCtx, taskID, store.TaskStatusWaiting)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusWaiting, store.TriggerSystem, nil))
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "feedback_waiting", Label: "feedback_waiting"})
 
 			return
 		}
@@ -665,15 +665,15 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			if restoreStatus == store.TaskStatusFailed {
 				restoreStatus = store.TaskStatusWaiting
 			}
-			_ = r.store.ForceUpdateTaskStatus(bgCtx, taskID, restoreStatus)
+			_ = r.taskStore(taskID).ForceUpdateTaskStatus(bgCtx, taskID, restoreStatus)
 
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 				store.NewStateChangeData(store.TaskStatusInProgress, restoreStatus, store.TriggerSystem, nil))
 		}
 	}()
 
-	task, err := r.store.GetTask(bgCtx, taskID)
+	task, err := r.taskStore(taskID).GetTask(bgCtx, taskID)
 	if err != nil {
 		logger.Runner.Error("sync: get task", "task", taskID, "error", err)
 		return
@@ -686,21 +686,21 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 	ctx, cancel := context.WithTimeout(bgCtx, timeout)
 	defer cancel()
 
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": "Syncing worktrees with latest changes on default branch...",
 	})
 
 	for repoPath, worktreePath := range task.WorktreePaths {
 		if _, statErr := os.Stat(worktreePath); statErr != nil {
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": fmt.Sprintf("Skipping %s — worktree no longer exists on disk.", filepath.Base(repoPath)),
 			})
 			continue
 		}
 		if !gitutil.IsGitRepo(repoPath) {
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": fmt.Sprintf("Skipping %s — not a git repository, cannot sync.", filepath.Base(repoPath)),
 			})
@@ -723,14 +723,14 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 
 		n, _ := gitutil.CommitsBehind(repoPath, worktreePath)
 		if n == 0 {
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": fmt.Sprintf("%s is already up to date with %s.", filepath.Base(repoPath), defBranch),
 			})
 			continue
 		}
 
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Rebasing %s onto %s (%d new commit(s))...", filepath.Base(repoPath), defBranch, n),
 		})
@@ -755,7 +755,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			}
 			logger.Runner.Warn("sync rebase conflict, invoking resolver",
 				"task", taskID, "repo", repoPath, "attempt", attempt)
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": fmt.Sprintf("Conflict in %s — running resolver (attempt %d/%d)...",
 					filepath.Base(repoPath), attempt, constants.MaxRebaseRetries),
@@ -799,7 +799,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			// in_progress and hand off to the agent so it can resolve
 			// interactively. The rebase was aborted by RebaseOntoDefault, so
 			// the worktree is clean on the task branch.
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": fmt.Sprintf(
 					"Sync conflict in %s could not be automatically resolved — "+
@@ -807,7 +807,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 					filepath.Base(repoPath),
 				),
 			})
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]any{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]any{
 
 				"phase":        "conflict_resolver",
 				"status":       "handoff",
@@ -818,7 +818,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 				"result":       fmt.Sprintf("Automatic conflict resolver exhausted retries for %s. Handing off to the main agent for interactive resolution.", filepath.Base(repoPath)),
 			})
 			if !testStateInvalidated {
-				_ = r.store.UpdateTaskTestRun(bgCtx, taskID, false, "")
+				_ = r.taskStore(taskID).UpdateTaskTestRun(bgCtx, taskID, false, "")
 
 			}
 			conflictPrompt := fmt.Sprintf(
@@ -853,7 +853,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 		// Hand off to the agent to integrate those changes manually.
 		if stashPopErr != nil {
 			statusSet = true
-			_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+			_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 				"result": fmt.Sprintf(
 					"Rebase of %s succeeded, but restoring uncommitted changes failed "+
@@ -862,7 +862,7 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 					filepath.Base(repoPath)),
 			})
 			if !testStateInvalidated {
-				_ = r.store.UpdateTaskTestRun(bgCtx, taskID, false, "")
+				_ = r.taskStore(taskID).UpdateTaskTestRun(bgCtx, taskID, false, "")
 
 			}
 			stashPrompt := fmt.Sprintf(
@@ -881,12 +881,12 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 			return
 		}
 
-		_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+		_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 			"result": fmt.Sprintf("Successfully synced %s with %s.", filepath.Base(repoPath), defBranch),
 		})
 		if !testStateInvalidated && conflictDetected {
-			_ = r.store.UpdateTaskTestRun(bgCtx, taskID, false, "")
+			_ = r.taskStore(taskID).UpdateTaskTestRun(bgCtx, taskID, false, "")
 
 			testStateInvalidated = true
 		}
@@ -902,12 +902,12 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 	if restoreStatus == store.TaskStatusFailed {
 		restoreStatus = store.TaskStatusWaiting
 	}
-	_ = r.store.ForceUpdateTaskStatus(bgCtx, taskID, restoreStatus)
+	_ = r.taskStore(taskID).ForceUpdateTaskStatus(bgCtx, taskID, restoreStatus)
 
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeStateChange,
 
 		store.NewStateChangeData(store.TaskStatusInProgress, restoreStatus, store.TriggerSystem, nil))
-	_ = r.store.InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
+	_ = r.taskStore(taskID).InsertEvent(bgCtx, taskID, store.EventTypeSystem, map[string]string{
 
 		"result": "Sync complete. Worktrees are up to date with the default branch.",
 	})
@@ -917,16 +917,16 @@ func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus st
 // failSync transitions a task to "failed" after a sync error.
 func (r *Runner) failSync(ctx context.Context, taskID uuid.UUID, sessionID string, turns int, msg string) {
 	logger.Runner.Error("sync failed", "task", taskID, "error", msg)
-	_ = r.store.InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{"error": msg})
+	_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeError, map[string]string{"error": msg})
 
-	_ = r.store.UpdateTaskStatus(ctx, taskID, store.TaskStatusFailed)
+	_ = r.taskStore(taskID).UpdateTaskStatus(ctx, taskID, store.TaskStatusFailed)
 
-	_ = r.store.SetTaskFailureCategory(ctx, taskID, store.FailureCategorySyncError)
+	_ = r.taskStore(taskID).SetTaskFailureCategory(ctx, taskID, store.FailureCategorySyncError)
 
-	_ = r.store.InsertEvent(ctx, taskID, store.EventTypeStateChange,
+	_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeStateChange,
 
 		store.NewStateChangeData(store.TaskStatusInProgress, store.TaskStatusFailed, store.TriggerSystem, nil))
-	_ = r.store.UpdateTaskResult(ctx, taskID, "Sync failed: "+msg, sessionID, "sync_failed", turns)
+	_ = r.taskStore(taskID).UpdateTaskResult(ctx, taskID, "Sync failed: "+msg, sessionID, "sync_failed", turns)
 
 }
 
