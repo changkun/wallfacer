@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -881,5 +882,46 @@ func TestSwitchToSameGroupActiveGroupsUnchanged(t *testing.T) {
 	if len(keysBefore) != len(keysAfter) {
 		t.Fatalf("activeGroups count changed on no-op switch: before=%d after=%d",
 			len(keysBefore), len(keysAfter))
+	}
+}
+
+// TestSwitchKeepsStoreForWaitingTasks verifies that switching away from a group
+// with waiting tasks keeps its store open so watchers can still process them.
+func TestSwitchKeepsStoreForWaitingTasks(t *testing.T) {
+	m, _ := newTestManager(t)
+	wsA := t.TempDir()
+	snapA, err := m.Switch([]string{wsA})
+	if err != nil {
+		t.Fatalf("Switch to A: %v", err)
+	}
+	storeA := snapA.Store
+
+	// Create a task and move it to waiting (simulates a task that finished
+	// running but is waiting for user feedback).
+	ctx := context.Background()
+	task, err := storeA.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test", Timeout: 5})
+	if err != nil {
+		t.Fatalf("CreateTask: %v", err)
+	}
+	if err := storeA.UpdateTaskStatus(ctx, task.ID, store.TaskStatusInProgress); err != nil {
+		t.Fatalf("UpdateTaskStatus to InProgress: %v", err)
+	}
+	if err := storeA.UpdateTaskStatus(ctx, task.ID, store.TaskStatusWaiting); err != nil {
+		t.Fatalf("UpdateTaskStatus to Waiting: %v", err)
+	}
+
+	// taskCount is 0 (no RunBackground active), but the store has a waiting task.
+	// Switch to group B — A's store should remain open.
+	wsB := t.TempDir()
+	_, err = m.Switch([]string{wsB})
+	if err != nil {
+		t.Fatalf("Switch to B: %v", err)
+	}
+
+	if storeA.IsClosed() {
+		t.Fatal("expected group A store to remain open (has waiting task)")
+	}
+	if _, ok := m.StoreForKey(snapA.Key); !ok {
+		t.Fatal("expected group A to remain in activeGroups")
 	}
 }

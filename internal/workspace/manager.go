@@ -26,10 +26,22 @@ type Snapshot struct {
 }
 
 // activeGroup tracks a workspace group whose store is still open, either
-// because it is the currently viewed group or because it has running tasks.
+// because it is the currently viewed group or because it has active tasks.
 type activeGroup struct {
 	snapshot  Snapshot
-	taskCount atomic.Int32 // in-progress + committing tasks
+	taskCount atomic.Int32 // in-progress + committing tasks (managed by Runner)
+}
+
+// storeHasActiveTasks reports whether the store has any tasks in a non-terminal
+// state (backlog, in_progress, committing, waiting, failed). Used alongside
+// taskCount to decide whether a store can be safely closed.
+func storeHasActiveTasks(s *store.Store) bool {
+	if s == nil {
+		return false
+	}
+	return s.CountByStatus(store.TaskStatusInProgress) > 0 ||
+		s.CountByStatus(store.TaskStatusCommitting) > 0 ||
+		s.CountByStatus(store.TaskStatusWaiting) > 0
 }
 
 // pendingSwap carries the before/after snapshots and a cleanup callback
@@ -285,18 +297,19 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	}
 
 	// Decide whether the previous group's store should be closed.
+	// Keep the store alive if it has running tasks (taskCount > 0) OR
+	// non-terminal tasks (waiting, in_progress, committing) that watchers
+	// need to process.
 	previousKey := swap.previous.Key
 	var closePrevious bool
 	var previousStore *store.Store
 	if previousKey != key {
 		if ag, ok := m.activeGroups[previousKey]; ok {
-			if ag.taskCount.Load() == 0 {
-				// No running tasks — close the store and remove from activeGroups.
+			if ag.taskCount.Load() == 0 && !storeHasActiveTasks(ag.snapshot.Store) {
 				closePrevious = true
 				previousStore = ag.snapshot.Store
 				delete(m.activeGroups, previousKey)
 			}
-			// else: tasks are running, keep the store alive in activeGroups.
 		}
 	}
 
@@ -376,8 +389,9 @@ func (m *Manager) DecrementAndCleanup(key string) {
 	if newCount > 0 {
 		return
 	}
-	// Count reached zero. Clean up if this is not the viewed group.
-	if key != m.current.Key {
+	// Count reached zero. Clean up if this is not the viewed group AND
+	// the store has no non-terminal tasks (waiting, in_progress, committing).
+	if key != m.current.Key && !storeHasActiveTasks(ag.snapshot.Store) {
 		if ag.snapshot.Store != nil {
 			ag.snapshot.Store.Close()
 		}
