@@ -1430,3 +1430,54 @@ func TestRenameWorkspace_RejectsPathTraversal(t *testing.T) {
 		}
 	}
 }
+
+// --- activeGroupInfos tests ---
+
+// TestConfigResponseIncludesActiveGroups verifies that buildConfigResponse
+// includes the active_groups field with per-status task counts.
+func TestConfigResponseIncludesActiveGroups(t *testing.T) {
+	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
+	ctx := context.Background()
+
+	s, ok := h.currentStore()
+	if !ok || s == nil {
+		t.Fatal("expected store")
+	}
+	task1, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "p1", Timeout: 5})
+	_ = s.UpdateTaskStatus(ctx, task1.ID, store.TaskStatusInProgress)
+	task2, _ := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "p2", Timeout: 5})
+	_ = s.UpdateTaskStatus(ctx, task2.ID, store.TaskStatusInProgress)
+
+	resp := h.buildConfigResponse(ctx, nil)
+	raw, ok := resp["active_groups"]
+	if !ok {
+		t.Fatal("expected active_groups in config response")
+	}
+	infos, ok := raw.([]activeGroupInfo)
+	if !ok {
+		t.Fatalf("expected []activeGroupInfo, got %T", raw)
+	}
+	if len(infos) == 0 {
+		t.Fatal("expected at least one active group")
+	}
+	found := false
+	for _, info := range infos {
+		if info.InProgress == 2 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected an active group with 2 in-progress tasks, got %+v", infos)
+	}
+}
+
+// TestActiveGroupInfosNilManager verifies that activeGroupInfos returns
+// an empty slice when the workspace manager is nil.
+func TestActiveGroupInfosNilManager(t *testing.T) {
+	h := &Handler{workspace: nil}
+	infos := h.activeGroupInfos(context.Background())
+	if infos != nil {
+		t.Fatalf("expected nil, got %+v", infos)
+	}
+}

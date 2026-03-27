@@ -94,6 +94,40 @@ func defaultSandbox(cfg envconfig.Config) sandbox.Type {
 // buildConfigResponse assembles the full configuration payload returned by
 // GET /api/config and reused by UpdateWorkspaces after a workspace switch.
 // When cfg is nil (env file not readable), sandbox-related fields use safe defaults.
+// activeGroupInfo describes a workspace group with open stores,
+// including per-status task counts for the frontend to display.
+type activeGroupInfo struct {
+	Key        string `json:"key"`
+	InProgress int    `json:"in_progress"`
+	Waiting    int    `json:"waiting"`
+}
+
+// activeGroupInfos returns per-group task counts for all active workspace
+// groups (the viewed group plus any groups with running tasks).
+func (h *Handler) activeGroupInfos(ctx context.Context) []activeGroupInfo {
+	var infos []activeGroupInfo
+	if h.workspace == nil {
+		return infos
+	}
+	for _, snap := range h.workspace.AllActiveSnapshots() {
+		info := activeGroupInfo{Key: snap.Key}
+		if snap.Store != nil {
+			if tasks, err := snap.Store.ListTasks(ctx, false); err == nil {
+				for _, t := range tasks {
+					switch t.Status {
+					case store.TaskStatusInProgress, store.TaskStatusCommitting:
+						info.InProgress++
+					case store.TaskStatusWaiting:
+						info.Waiting++
+					}
+				}
+			}
+		}
+		infos = append(infos, info)
+	}
+	return infos
+}
+
 func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config) map[string]any {
 	promptsDir := h.runner.Prompts().PromptsDir()
 	workspaces := h.currentWorkspaces()
@@ -162,6 +196,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"default_model":            "",
 		"payload_limits":           payloadLimits,
 		"watcher_health":           watcherHealth,
+		"active_groups":            h.activeGroupInfos(ctx),
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun

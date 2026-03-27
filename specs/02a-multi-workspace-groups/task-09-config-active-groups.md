@@ -1,6 +1,6 @@
 # Task 9: Expose Per-Group Task Counts in Config API
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** 3 (Handler Changes)
 **Effort:** Small
