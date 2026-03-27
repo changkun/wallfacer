@@ -920,3 +920,63 @@ describe("renameWorkspaceBrowserEntry", () => {
     expect(apiFn).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// activeGroupBadgeHtml
+// ---------------------------------------------------------------------------
+
+describe("activeGroupBadgeHtml", () => {
+  function setup(activeGroupsJSON) {
+    const el = { innerHTML: "" };
+    const ctx = makeContext({
+      elements: [["settings-workspace-groups", el]],
+    });
+    loadScript(ctx, "state.js");
+    loadScript(ctx, "workspace.js");
+    // Set activeGroups inside the VM scope (let-scoped in state.js).
+    vm.runInContext(
+      `activeGroups = ${JSON.stringify(activeGroupsJSON)};`,
+      ctx,
+    );
+    return ctx;
+  }
+
+  it("renders running badge when in_progress > 0", () => {
+    const ctx = setup([{ key: "abc123", in_progress: 3, waiting: 0 }]);
+    const html = ctx.activeGroupBadgeHtml({ key: "abc123" });
+    expect(html).toContain("3 running");
+    expect(html).not.toContain("waiting");
+  });
+
+  it("renders waiting badge when waiting > 0", () => {
+    const ctx = setup([{ key: "abc123", in_progress: 0, waiting: 2 }]);
+    const html = ctx.activeGroupBadgeHtml({ key: "abc123" });
+    expect(html).toContain("2 waiting");
+    expect(html).not.toContain("running");
+  });
+
+  it("renders both badges when both > 0", () => {
+    const ctx = setup([{ key: "abc123", in_progress: 1, waiting: 1 }]);
+    const html = ctx.activeGroupBadgeHtml({ key: "abc123" });
+    expect(html).toContain("1 running");
+    expect(html).toContain("1 waiting");
+  });
+
+  it("returns empty string when both are 0", () => {
+    const ctx = setup([{ key: "abc123", in_progress: 0, waiting: 0 }]);
+    const html = ctx.activeGroupBadgeHtml({ key: "abc123" });
+    expect(html).toBe("");
+  });
+
+  it("returns empty string when key not found", () => {
+    const ctx = setup([{ key: "other", in_progress: 5, waiting: 0 }]);
+    const html = ctx.activeGroupBadgeHtml({ key: "abc123" });
+    expect(html).toBe("");
+  });
+
+  it("returns empty string when group has no key", () => {
+    const ctx = setup([{ key: "abc123", in_progress: 5, waiting: 0 }]);
+    const html = ctx.activeGroupBadgeHtml({ workspaces: ["/a"] });
+    expect(html).toBe("");
+  });
+});

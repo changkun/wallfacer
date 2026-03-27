@@ -51,6 +51,8 @@ let workspaceSelectionDraft = [];
 let workspaceGroupSwitchingIndex = -1;
 let workspaceGroupSwitching = false;
 let hiddenGroupIndices = new Set();
+// Per-group task counts from the config API: [{key, in_progress, waiting}, ...]
+let activeGroups = [];
 
 // Automation toggle state
 let autopilot = false;

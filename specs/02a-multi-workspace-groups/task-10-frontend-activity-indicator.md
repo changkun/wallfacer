@@ -1,6 +1,6 @@
 # Task 10: Frontend Per-Group Task Count Badges
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 9
 **Phase:** 4 (Frontend)
 **Effort:** Small

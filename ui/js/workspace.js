@@ -116,6 +116,9 @@ async function fetchConfig() {
     workspaceGroups = Array.isArray(cfg.workspace_groups)
       ? cfg.workspace_groups.slice()
       : [];
+    activeGroups = Array.isArray(cfg.active_groups)
+      ? cfg.active_groups
+      : [];
     workspaceBrowserPath =
       cfg.workspace_browser_path ||
       activeWorkspaces[0] ||
@@ -259,6 +262,38 @@ function workspaceGroupsEqual(a, b) {
   return true;
 }
 
+// activeGroupBadgeHtml returns HTML for task count badges if the given
+// workspace group has in-progress or waiting tasks. Returns "" when both are 0.
+function activeGroupBadgeHtml(group) {
+  var key = group.key || "";
+  if (!key) return "";
+  for (var i = 0; i < activeGroups.length; i++) {
+    if (activeGroups[i].key !== key) continue;
+    var info = activeGroups[i];
+    var parts = [];
+    if (info.in_progress > 0) {
+      parts.push(
+        '<span class="text-xs" style="color:var(--blue-400, #60a5fa);">' +
+          info.in_progress +
+          " running</span>",
+      );
+    }
+    if (info.waiting > 0) {
+      parts.push(
+        '<span class="text-xs" style="color:var(--amber-400, #fbbf24);">' +
+          info.waiting +
+          " waiting</span>",
+      );
+    }
+    return parts.length > 0
+      ? ' <span style="font-weight:400;margin-left:4px;">' +
+          parts.join(" ") +
+          "</span>"
+      : "";
+  }
+  return "";
+}
+
 function workspaceSwitchSpinnerHtml() {
   return '<span class="spinner" style="width:11px;height:11px;border-width:1.5px;vertical-align:middle;"></span>';
 }
@@ -292,6 +327,7 @@ function renderWorkspaceGroups() {
         (active
           ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:500;">Current</span>'
           : "") +
+        activeGroupBadgeHtml(group) +
         "</div>" +
         '<div style="display:flex;gap:6px;align-items:center;">' +
         '<button type="button" class="btn-icon" style="font-size:11px;padding:3px 8px;" onclick="useWorkspaceGroup(' +
@@ -357,11 +393,12 @@ function renderHeaderWorkspaceGroupTabs() {
     var cls = "workspace-group-tab";
     if (active) cls += " workspace-group-tab--active";
     if (switching) cls += " workspace-group-tab--switching";
+    var badge = activeGroupBadgeHtml(group);
     var label = switching
       ? workspaceSwitchSpinnerHtml() +
         " " +
         escapeHtml(workspaceGroupLabel(group))
-      : escapeHtml(workspaceGroupLabel(group));
+      : escapeHtml(workspaceGroupLabel(group)) + badge;
     var title = paths.join("\n");
     var closeBtn = active
       ? ""

@@ -13,6 +13,7 @@ import (
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
+	"changkun.de/x/wallfacer/prompts"
 )
 
 // ssrfHardenedTransport returns an http.Transport that re-checks the resolved
@@ -161,6 +162,22 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		}
 		groups = workspace.NormalizeGroups(groups)
 	}
+	// Enrich groups with their deterministic keys so the frontend can match
+	// them against activeGroupInfos entries.
+	type keyedGroup struct {
+		Name       string   `json:"name,omitempty"`
+		Workspaces []string `json:"workspaces"`
+		Key        string   `json:"key"`
+	}
+	keyedGroups := make([]keyedGroup, len(groups))
+	for i, g := range groups {
+		keyedGroups[i] = keyedGroup{
+			Name:       g.Name,
+			Workspaces: g.Workspaces,
+			Key:        prompts.InstructionsKey(g.Workspaces),
+		}
+	}
+
 	watcherNames := []string{"auto-promote", "auto-retry", "auto-test", "auto-submit", "auto-sync", "auto-refine"}
 	watcherHealth := make([]watcherHealthEntry, 0, len(watcherNames))
 	for _, name := range watcherNames {
@@ -172,7 +189,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	resp := map[string]any{
 		"workspaces":               workspaces,
 		"workspace_browser_path":   workspaceBrowserPath,
-		"workspace_groups":         groups,
+		"workspace_groups":         keyedGroups,
 		"instructions_path":        instructionsPath,
 		"prompts_dir":              promptsDir,
 		"sandbox_activities":       store.SandboxActivities,
