@@ -9,7 +9,6 @@ import (
 
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
-	"changkun.de/x/wallfacer/internal/store"
 )
 
 // workspaceBrowseEntry describes a single directory entry returned by
@@ -143,19 +142,6 @@ func (h *Handler) UpdateWorkspaces(w http.ResponseWriter, r *http.Request) {
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
-	}
-	if s, ok := h.currentStore(); ok && s != nil {
-		tasks, err := s.ListTasks(r.Context(), false)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		for _, task := range tasks {
-			if task.Status == store.TaskStatusInProgress || task.Status == store.TaskStatusCommitting {
-				http.Error(w, "cannot switch workspaces while tasks are in progress or committing", http.StatusConflict)
-				return
-			}
-		}
 	}
 
 	snap, err := h.workspace.Switch(req.Workspaces)

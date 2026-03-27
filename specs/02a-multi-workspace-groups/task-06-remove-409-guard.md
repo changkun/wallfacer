@@ -1,6 +1,6 @@
 # Task 6: Remove 409 Blocking Check in UpdateWorkspaces
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 2, Task 5
 **Phase:** 3 (Handler Changes)
 **Effort:** Small

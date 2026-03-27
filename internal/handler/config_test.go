@@ -1068,9 +1068,9 @@ func TestUpdateWorkspaces_SwitchesToNewWorkspace(t *testing.T) {
 	}
 }
 
-// TestUpdateWorkspaces_RejectsInProgressTasks verifies that workspace switching
-// is blocked when tasks are in progress.
-func TestUpdateWorkspaces_RejectsInProgressTasks(t *testing.T) {
+// TestUpdateWorkspaces_AllowedDuringInProgress verifies that workspace switching
+// succeeds even when tasks are in progress (multi-store support keeps old stores alive).
+func TestUpdateWorkspaces_AllowedDuringInProgress(t *testing.T) {
 	h, _, _ := newTestHandlerWithRealWorkspaceManager(t)
 
 	// Create a task and move it to in_progress.
@@ -1097,8 +1097,8 @@ func TestUpdateWorkspaces_RejectsInProgressTasks(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.UpdateWorkspaces(w, req)
 
-	if w.Code != http.StatusConflict {
-		t.Errorf("expected 409 when tasks in progress, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200 when switching with tasks in progress, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
