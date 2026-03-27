@@ -1,6 +1,6 @@
 # Task 8: Watcher Multi-Store Task Iteration
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1, Task 7
 **Phase:** 3 (Handler Changes)
 **Effort:** Large

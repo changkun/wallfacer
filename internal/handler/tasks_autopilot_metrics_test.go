@@ -113,7 +113,7 @@ func TestAutoRetrySuppressedBudget(t *testing.T) {
 	}
 
 	snap, _ := h.store.GetTask(ctx, task.ID)
-	h.tryAutoRetry(ctx, *snap)
+	h.tryAutoRetry(ctx, h.store, *snap)
 
 	if got := autopilotCounterValue(t, reg, "auto_retrier", "suppressed_budget"); got != 1 {
 		t.Errorf("expected suppressed_budget=1, got %v", got)
@@ -156,7 +156,7 @@ func TestAutoRetrySuppressedMaxCount(t *testing.T) {
 	}
 
 	snap, _ := h.store.GetTask(ctx, task.ID)
-	h.tryAutoRetry(ctx, *snap)
+	h.tryAutoRetry(ctx, h.store, *snap)
 
 	if got := autopilotCounterValue(t, reg, "auto_retrier", "suppressed_max_count"); got != 1 {
 		t.Errorf("expected suppressed_max_count=1, got %v", got)

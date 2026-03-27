@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -294,6 +295,50 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 	h.store = snap.Store
 	h.workspaces = snap.Workspaces
 	h.snapshotMu.Unlock()
+}
+
+// forEachActiveStore calls fn for every active workspace group's store.
+// When no workspace manager is configured, falls back to the viewed store.
+func (h *Handler) forEachActiveStore(fn func(s *store.Store, ws []string)) {
+	if h.workspace == nil {
+		h.snapshotMu.RLock()
+		s, ws := h.store, h.workspaces
+		h.snapshotMu.RUnlock()
+		if s != nil {
+			fn(s, ws)
+		}
+		return
+	}
+	for _, snap := range h.workspace.AllActiveSnapshots() {
+		if snap.Store != nil {
+			fn(snap.Store, snap.Workspaces)
+		}
+	}
+}
+
+// countGlobalInProgress returns the total number of non-test in-progress tasks
+// across ALL active workspace groups.
+func (h *Handler) countGlobalInProgress() int {
+	total := 0
+	h.forEachActiveStore(func(s *store.Store, _ []string) {
+		total += s.CountRegularInProgress()
+	})
+	return total
+}
+
+// countGlobalTestsInProgress returns the total number of test-run in-progress
+// tasks across ALL active workspace groups.
+func (h *Handler) countGlobalTestsInProgress(ctx context.Context) int {
+	total := 0
+	h.forEachActiveStore(func(s *store.Store, _ []string) {
+		inProgress, _ := s.ListTasksByStatus(ctx, store.TaskStatusInProgress)
+		for i := range inProgress {
+			if inProgress[i].IsTestRun {
+				total++
+			}
+		}
+	})
+	return total
 }
 
 // hasStore reports whether the handler has a configured store.

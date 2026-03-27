@@ -200,7 +200,7 @@ func TestTryAutoRetry_EligibleAfterManualRetryReset(t *testing.T) {
 	// Confirm that tryAutoRetry suppresses the task (budget exhausted).
 	failed, _ := h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
 	for _, ft := range failed {
-		h.tryAutoRetry(ctx, ft)
+		h.tryAutoRetry(ctx, h.store, ft)
 	}
 	// After suppression the task should still be in failed state.
 	snapshot, err := h.store.GetTask(ctx, task.ID)
@@ -230,7 +230,7 @@ func TestTryAutoRetry_EligibleAfterManualRetryReset(t *testing.T) {
 	// tryAutoRetry must now reset the task to backlog (budget restored).
 	failed, _ = h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
 	for _, ft := range failed {
-		h.tryAutoRetry(ctx, ft)
+		h.tryAutoRetry(ctx, h.store, ft)
 	}
 
 	after, err := h.store.GetTask(ctx, task.ID)
@@ -1045,7 +1045,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 			},
 		}
 
-		h.tryAutoRetry(ctx, task)
+		h.tryAutoRetry(ctx, h.store, task)
 
 		got, err := h.store.GetTask(ctx, created.ID)
 		if err != nil {
@@ -1082,7 +1082,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 			},
 		}
 
-		h.tryAutoRetry(ctx, task)
+		h.tryAutoRetry(ctx, h.store, task)
 
 		got, err := h.store.GetTask(ctx, created.ID)
 		if err != nil {
@@ -1118,7 +1118,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 			},
 		}
 
-		h.tryAutoRetry(ctx, task)
+		h.tryAutoRetry(ctx, h.store, task)
 
 		got, err := h.store.GetTask(ctx, created.ID)
 		if err != nil {
@@ -1154,7 +1154,7 @@ func TestTryAutoRetry_HandlerPath(t *testing.T) {
 			},
 		}
 
-		h.tryAutoRetry(ctx, task)
+		h.tryAutoRetry(ctx, h.store, task)
 
 		got, err := h.store.GetTask(ctx, created.ID)
 		if err != nil {

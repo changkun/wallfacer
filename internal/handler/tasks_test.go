@@ -1395,7 +1395,7 @@ func TestTryAutoRetry_ContainerCrash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	h.tryAutoRetry(ctx, *failed)
+	h.tryAutoRetry(ctx, h.store, *failed)
 
 	got, err := h.store.GetTask(ctx, task.ID)
 	if err != nil {
@@ -1424,7 +1424,7 @@ func TestTryAutoRetry_AgentError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	h.tryAutoRetry(ctx, *failed)
+	h.tryAutoRetry(ctx, h.store, *failed)
 
 	got, err := h.store.GetTask(ctx, task.ID)
 	if err != nil {
@@ -1461,7 +1461,7 @@ func TestTryAutoRetry_MaxRetries(t *testing.T) {
 	if got := failed.AutoRetryCount; got != constants.MaxAutoRetries {
 		t.Fatalf("AutoRetryCount = %d, want %d", got, constants.MaxAutoRetries)
 	}
-	h.tryAutoRetry(ctx, *failed)
+	h.tryAutoRetry(ctx, h.store, *failed)
 
 	got, err := h.store.GetTask(ctx, task.ID)
 	if err != nil {
@@ -1493,7 +1493,7 @@ func TestTryAutoRetry_CircuitOpen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTask: %v", err)
 	}
-	h.tryAutoRetry(ctx, *failed)
+	h.tryAutoRetry(ctx, h.store, *failed)
 
 	got, err := h.store.GetTask(ctx, task.ID)
 	if err != nil {
@@ -1547,7 +1547,7 @@ func TestTryAutoRetry_ManualRetriesDoNotBlock(t *testing.T) {
 
 	// tryAutoRetry should NOT be suppressed: AutoRetryCount=0 < constants.MaxAutoRetries
 	// and budget remains (container_crash starts with 2).
-	h.tryAutoRetry(ctx, *failed)
+	h.tryAutoRetry(ctx, h.store, *failed)
 
 	got, err := h.store.GetTask(ctx, task.ID)
 	if err != nil {

@@ -31,10 +31,10 @@ func (h *Handler) maxTestConcurrentTasks() int {
 }
 
 // countRegularInProgress returns the number of non-test in-progress tasks
-// from the store's secondary index. The context parameter is unused but
+// across ALL active workspace groups. The context parameter is unused but
 // matches the calling convention for store query methods.
 func (h *Handler) countRegularInProgress(_ context.Context) (int, error) {
-	return h.store.CountRegularInProgress(), nil
+	return h.countGlobalInProgress(), nil
 }
 
 // countRegularInProgress counts non-test in-progress tasks from a task slice.
@@ -142,10 +142,12 @@ var retryableCategories = map[store.FailureCategory]bool{
 // may have been missed while the server was down.
 func (h *Handler) StartAutoRetrier(ctx context.Context) {
 	retryAll := func(ctx context.Context) {
-		failed, _ := h.store.ListTasksByStatus(ctx, store.TaskStatusFailed)
-		for _, t := range failed {
-			h.tryAutoRetry(ctx, t)
-		}
+		h.forEachActiveStore(func(s *store.Store, _ []string) {
+			failed, _ := s.ListTasksByStatus(ctx, store.TaskStatusFailed)
+			for _, t := range failed {
+				h.tryAutoRetry(ctx, s, t)
+			}
+		})
 	}
 	watcher.Start(ctx, watcher.Config{
 		Wake:   h.newResubscribingWakeSource(),
@@ -197,6 +199,7 @@ func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) 
 // is a resume (waiting task with failed-test feedback) vs a fresh backlog promote.
 type autoPromoteCandidate struct {
 	task     store.Task
+	store    *store.Store // the store that owns this task
 	isResume bool
 	feedback string
 }
@@ -234,35 +237,38 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			// Phase 1 (no lock): build candidate list without holding promoteMu.
+			// Scan ALL active stores for eligible tasks.
 
 			// Check for auto-resume candidates first (waiting tasks with failed test feedback).
-			waitingTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-			if err != nil {
-				return nil, err
-			}
-			for i := range waitingTasks {
-				t := &waitingTasks[i]
-				if t.IsTestRun || t.PendingTestFeedback == "" || t.LastTestResult != "fail" {
-					continue
+			h.forEachActiveStore(func(s *store.Store, _ []string) {
+				waitingTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusWaiting)
+				if err != nil {
+					return
 				}
-				if t.SessionID == nil || *t.SessionID == "" {
-					continue
+				for i := range waitingTasks {
+					t := &waitingTasks[i]
+					if t.IsTestRun || t.PendingTestFeedback == "" || t.LastTestResult != "fail" {
+						continue
+					}
+					if t.SessionID == nil || *t.SessionID == "" {
+						continue
+					}
+					if t.TestFailCount >= constants.MaxTestFailRetries {
+						logger.Handler.Info("auto-promote: skipping task — test fail cap reached",
+							"task", t.ID, "test_fail_count", t.TestFailCount, "max", constants.MaxTestFailRetries)
+						continue
+					}
+					candidates = append(candidates, autoPromoteCandidate{
+						task:     *t,
+						store:    s,
+						isResume: true,
+						feedback: t.PendingTestFeedback,
+					})
 				}
-				// Cap: skip tasks that have failed too many consecutive tests.
-				if t.TestFailCount >= constants.MaxTestFailRetries {
-					logger.Handler.Info("auto-promote: skipping task — test fail cap reached",
-						"task", t.ID, "test_fail_count", t.TestFailCount, "max", constants.MaxTestFailRetries)
-					continue
-				}
-				candidates = append(candidates, autoPromoteCandidate{
-					task:     *t,
-					isResume: true,
-					feedback: t.PendingTestFeedback,
-				})
-			}
+			})
 
-			// Check available capacity for backlog promotion.
-			regularInProgress := h.store.CountRegularInProgress()
+			// Check available capacity for backlog promotion (global count).
+			regularInProgress := h.countGlobalInProgress()
 			availableSlots := h.maxConcurrentTasks() - regularInProgress
 			if availableSlots <= 0 && len(candidates) == 0 {
 				h.incAutopilotAction("auto_promoter", "skipped_capacity")
@@ -270,36 +276,38 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			}
 
 			if availableSlots > 0 {
-				backlogTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusBacklog)
-				if err != nil {
-					return nil, err
-				}
-
 				type cpCandidate struct {
 					task  store.Task
+					store *store.Store
 					score int
 				}
 				var cpCandidates []cpCandidate
 				var nextScheduled *time.Time
-				for i := range backlogTasks {
-					t := &backlogTasks[i]
-					if t.Kind == store.TaskKindIdeaAgent {
-						continue
+				h.forEachActiveStore(func(s *store.Store, _ []string) {
+					backlogTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusBacklog)
+					if err != nil {
+						return
 					}
-					if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
-						h.incAutopilotAction("auto_promoter", "skipped_scheduled")
-						if nextScheduled == nil || t.ScheduledAt.Before(*nextScheduled) {
-							nextScheduled = t.ScheduledAt
+					for i := range backlogTasks {
+						t := &backlogTasks[i]
+						if t.Kind == store.TaskKindIdeaAgent {
+							continue
 						}
-						continue
+						if t.ScheduledAt != nil && time.Now().Before(*t.ScheduledAt) {
+							h.incAutopilotAction("auto_promoter", "skipped_scheduled")
+							if nextScheduled == nil || t.ScheduledAt.Before(*nextScheduled) {
+								nextScheduled = t.ScheduledAt
+							}
+							continue
+						}
+						satisfied, err := s.AreDependenciesSatisfied(ctx, t.ID)
+						if err != nil || !satisfied {
+							h.incAutopilotAction("auto_promoter", "skipped_dependency")
+							continue
+						}
+						cpCandidates = append(cpCandidates, cpCandidate{task: *t, store: s, score: s.CriticalPathScore(t.ID)})
 					}
-					satisfied, err := h.store.AreDependenciesSatisfied(ctx, t.ID)
-					if err != nil || !satisfied {
-						h.incAutopilotAction("auto_promoter", "skipped_dependency")
-						continue
-					}
-					cpCandidates = append(cpCandidates, cpCandidate{task: *t, score: h.store.CriticalPathScore(t.ID)})
-				}
+				})
 				// Arm a precise timer for the soonest scheduled task so it is
 				// promoted within milliseconds of its due time rather than waiting
 				// for the next 60-second ticker tick.
@@ -320,7 +328,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 						if availableSlots <= 0 {
 							break
 						}
-						candidates = append(candidates, autoPromoteCandidate{task: cp.task})
+						candidates = append(candidates, autoPromoteCandidate{task: cp.task, store: cp.store})
 						availableSlots--
 					}
 				}
@@ -343,7 +351,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 			for _, c := range candidates {
 				if c.isResume {
 					// Auto-resume: re-verify eligibility with fresh state.
-					freshTask, err := h.store.GetTask(ctx, c.task.ID)
+					freshTask, err := c.store.GetTask(ctx, c.task.ID)
 					if err != nil || freshTask == nil {
 						continue
 					}
@@ -375,10 +383,10 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					continue
 				}
 
-				// Backlog promotion: re-verify capacity with a fresh count.
+				// Backlog promotion: re-verify capacity with a fresh count (global).
 				// Re-read in-progress count each iteration; prior iterations may
 				// have promoted tasks, increasing the count.
-				freshInProgress := h.store.CountRegularInProgress()
+				freshInProgress := h.countGlobalInProgress()
 				if freshInProgress >= h.maxConcurrentTasks() {
 					h.incAutopilotAction("auto_promoter", "skipped_capacity")
 					break
@@ -397,7 +405,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 					"task", c.task.ID, "position", c.task.Position,
 					"in_progress", freshInProgress)
 
-				if err := h.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
+				if err := c.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
 					logger.Handler.Error("auto-promote status update", "task", c.task.ID, "error", err)
 					h.breakers["auto-promote"].recordFailure(&c.task.ID, err.Error())
 					continue
@@ -428,7 +436,7 @@ func (h *Handler) tryAutoPromote(ctx context.Context) {
 //
 // It respects the container circuit breaker: if the circuit is open,
 // container_crash retries are suppressed to avoid cascading restarts.
-func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
+func (h *Handler) tryAutoRetry(ctx context.Context, s *store.Store, task store.Task) {
 	if task.Status != store.TaskStatusFailed {
 		return
 	}
@@ -462,7 +470,7 @@ func (h *Handler) tryAutoRetry(ctx context.Context, task store.Task) {
 	logger.Handler.Info("auto-retrying failed task",
 		"task", task.ID, "category", task.FailureCategory,
 		"retry_attempt", task.AutoRetryCount+1)
-	if err := h.store.ResetTaskForRetry(ctx, task.ID, task.Prompt, false); err != nil {
+	if err := s.ResetTaskForRetry(ctx, task.ID, task.Prompt, false); err != nil {
 		logger.Handler.Error("auto-retry reset failed", "task", task.ID, "error", err)
 		h.breakers["auto-retry"].recordFailure(&task.ID, err.Error())
 		return
@@ -508,87 +516,81 @@ func (h *Handler) checkAndSyncWaitingTasks(ctx context.Context) {
 		return
 	}
 
-	tasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-	if err != nil {
-		return
+	type syncCandidate struct {
+		task  store.Task
+		store *store.Store
 	}
+	var syncCandidates []syncCandidate
 
-	for i := range tasks {
-		t := &tasks[i]
-		if len(t.WorktreePaths) == 0 {
-			continue
+	h.forEachActiveStore(func(s *store.Store, _ []string) {
+		tasks, err := s.ListTasksByStatus(ctx, store.TaskStatusWaiting)
+		if err != nil {
+			return
 		}
+		for i := range tasks {
+			t := &tasks[i]
+			if len(t.WorktreePaths) == 0 {
+				continue
+			}
 
-		behind := false
-		fetchFailed := false
-		for repoPath, worktreePath := range t.WorktreePaths {
-			if !gitutil.IsGitRepo(repoPath) || !gitutil.HasOriginRemote(repoPath) {
-				// Non-git workspace or local-only repo: no remote to fetch, never behind.
-				continue
-			}
-			if _, err := os.Stat(worktreePath); err != nil {
-				// Worktree directory no longer exists on disk; skip silently.
-				continue
-			}
-			if !gitutil.IsGitRepo(worktreePath) {
-				// Directory exists but .git link is broken; skip silently.
-				continue
-			}
-			// Fetch from remote so CommitsBehind operates on up-to-date refs.
-			if fetchErr := gitutil.FetchOrigin(repoPath); fetchErr != nil {
-				logger.Handler.Warn("auto-sync: git fetch failed; skipping CommitsBehind for this task",
-					"task", t.ID, "repo", repoPath, "error", fetchErr)
-				if recErr := h.store.RecordFetchFailure(ctx, t.ID, fetchErr.Error()); recErr != nil {
-					logger.Handler.Warn("auto-sync: record fetch failure",
-						"task", t.ID, "error", recErr)
+			behind := false
+			fetchFailed := false
+			for repoPath, worktreePath := range t.WorktreePaths {
+				if !gitutil.IsGitRepo(repoPath) || !gitutil.HasOriginRemote(repoPath) {
+					continue
 				}
-				fetchFailed = true
-				break
+				if _, err := os.Stat(worktreePath); err != nil {
+					continue
+				}
+				if !gitutil.IsGitRepo(worktreePath) {
+					continue
+				}
+				if fetchErr := gitutil.FetchOrigin(repoPath); fetchErr != nil {
+					logger.Handler.Warn("auto-sync: git fetch failed; skipping CommitsBehind for this task",
+						"task", t.ID, "repo", repoPath, "error", fetchErr)
+					if recErr := s.RecordFetchFailure(ctx, t.ID, fetchErr.Error()); recErr != nil {
+						logger.Handler.Warn("auto-sync: record fetch failure",
+							"task", t.ID, "error", recErr)
+					}
+					fetchFailed = true
+					break
+				}
+				h.commitsBehindCache.invalidate(repoPath, worktreePath)
+				n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
+				if err != nil {
+					logger.Handler.Warn("auto-sync: check commits behind",
+						"task", t.ID, "repo", repoPath, "error", err)
+					continue
+				}
+				if n > 0 {
+					behind = true
+					break
+				}
 			}
-			// Invalidate any cached pre-fetch result so we always observe the
-			// post-fetch remote ref state. The fresh result is then cached for
-			// tryAutoTest and tryAutoSubmit to share within this polling window.
-			h.commitsBehindCache.invalidate(repoPath, worktreePath)
-			n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
-			if err != nil {
-				logger.Handler.Warn("auto-sync: check commits behind",
-					"task", t.ID, "repo", repoPath, "error", err)
+			if fetchFailed {
 				continue
 			}
-			if n > 0 {
-				behind = true
-				break
+			if err := s.ClearFetchFailure(ctx, t.ID); err != nil {
+				logger.Handler.Warn("auto-sync: clear fetch failure", "task", t.ID, "error", err)
+			}
+			if behind {
+				syncCandidates = append(syncCandidates, syncCandidate{task: *t, store: s})
 			}
 		}
+	})
 
-		// Skip sync-eligibility when fetch failed; local refs may be stale.
-		if fetchFailed {
-			continue
-		}
-
-		// All fetches succeeded: clear any previously recorded failure so that
-		// tryAutoSubmit's stale-fetch guard does not block this task.
-		if err := h.store.ClearFetchFailure(ctx, t.ID); err != nil {
-			logger.Handler.Warn("auto-sync: clear fetch failure", "task", t.ID, "error", err)
-		}
-
-		if !behind {
-			continue
-		}
-
+	for _, sc := range syncCandidates {
+		t := &sc.task
 		logger.Handler.Info("auto-sync: waiting task behind default branch, syncing",
 			"task", t.ID)
 
 		promoteMu.Lock()
-		// Re-read task status under lock: another watcher (auto-test,
-		// auto-submit) may have already transitioned this task since the
-		// snapshot was taken at the top of the cycle.
-		freshTask, freshErr := h.store.GetTask(ctx, t.ID)
+		freshTask, freshErr := sc.store.GetTask(ctx, t.ID)
 		if freshErr != nil || freshTask == nil || freshTask.Status != store.TaskStatusWaiting {
 			promoteMu.Unlock()
 			continue
 		}
-		if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusInProgress); err != nil {
+		if err := sc.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusInProgress); err != nil {
 			promoteMu.Unlock()
 			logger.Handler.Error("auto-sync: update task status", "task", t.ID, "error", err)
 			h.breakers["auto-sync"].recordFailure(&t.ID, err.Error())
@@ -639,6 +641,7 @@ func (h *Handler) StartAutoTester(ctx context.Context) {
 // autoTestCandidate holds an eligible waiting task and its pre-built test prompt.
 type autoTestCandidate struct {
 	task       store.Task
+	store      *store.Store
 	testPrompt string
 }
 
@@ -680,64 +683,60 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
 			// Phase 1 (no lock): build the list of eligible candidates.
-			// Git I/O (CommitsBehind) happens here so we don't hold promoteMu
-			// during potentially slow filesystem operations.
-			waitingTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-			if err != nil {
-				return nil, err
-			}
-
-			for i := range waitingTasks {
-				t := &waitingTasks[i]
-				// Skip tasks that already have a test result or are currently being tested.
-				if t.LastTestResult != "" || t.IsTestRun {
-					continue
+			// Scan ALL active stores. Git I/O (CommitsBehind) happens here so
+			// we don't hold promoteMu during potentially slow filesystem operations.
+			h.forEachActiveStore(func(s *store.Store, _ []string) {
+				waitingTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusWaiting)
+				if err != nil {
+					return
 				}
 
-				// Skip tasks with no worktrees (nothing to test yet).
-				if len(t.WorktreePaths) == 0 {
-					continue
-				}
-				if len(missingTaskWorktrees(t)) > 0 {
-					continue
-				}
-
-				// Only trigger if the worktree is up to date with the default branch.
-				behind := false
-				for repoPath, worktreePath := range t.WorktreePaths {
-					if !gitutil.IsGitRepo(repoPath) || !gitutil.HasOriginRemote(repoPath) {
-						// Non-git workspace or local-only repo: no remote to be behind.
+				for i := range waitingTasks {
+					t := &waitingTasks[i]
+					if t.LastTestResult != "" || t.IsTestRun {
 						continue
 					}
-					n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
-					if err != nil {
-						logger.Handler.Warn("auto-test: check commits behind",
-							"task", t.ID, "repo", repoPath, "error", err)
-						behind = true // treat errors conservatively
-						break
+					if len(t.WorktreePaths) == 0 {
+						continue
 					}
-					if n > 0 {
-						behind = true
-						break
+					if len(missingTaskWorktrees(t)) > 0 {
+						continue
 					}
-				}
-				if behind {
-					continue
-				}
 
-				implResult := ""
-				if t.Result != nil {
-					implResult = *t.Result
+					behind := false
+					for repoPath, worktreePath := range t.WorktreePaths {
+						if !gitutil.IsGitRepo(repoPath) || !gitutil.HasOriginRemote(repoPath) {
+							continue
+						}
+						n, err := h.commitsBehindCache.cachedCommitsBehind(repoPath, worktreePath)
+						if err != nil {
+							logger.Handler.Warn("auto-test: check commits behind",
+								"task", t.ID, "repo", repoPath, "error", err)
+							behind = true
+							break
+						}
+						if n > 0 {
+							behind = true
+							break
+						}
+					}
+					if behind {
+						continue
+					}
+
+					implResult := ""
+					if t.Result != nil {
+						implResult = *t.Result
+					}
+					diff := generateWorktreeDiff(t.WorktreePaths)
+					testPrompt := buildTestPrompt(t.Prompt, "", implResult, diff)
+					candidates = append(candidates, autoTestCandidate{task: *t, store: s, testPrompt: testPrompt})
 				}
-				diff := generateWorktreeDiff(t.WorktreePaths)
-				testPrompt := buildTestPrompt(t.Prompt, "", implResult, diff)
-				candidates = append(candidates, autoTestCandidate{task: *t, testPrompt: testPrompt})
-			}
+			})
 
 			if len(candidates) == 0 {
 				return nil, nil
 			}
-			// Return first candidate as signal that there is at least one eligible task.
 			first := &candidates[0].task
 			return first, nil
 		},
@@ -746,25 +745,8 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 			// Sharing promoteMu with tryAutoPromote prevents the two from racing to
 			// exceed maxConcurrentTasks simultaneously.
 
-			// Re-read for a fresh snapshot; state may have changed during the git checks above.
-			freshWaiting, err := h.store.ListTasksByStatus(ctx, store.TaskStatusWaiting)
-			if err != nil {
-				return false, nil
-			}
-			freshByID := make(map[uuid.UUID]store.Task, len(freshWaiting))
-			for _, t := range freshWaiting {
-				freshByID[t.ID] = t
-			}
-			freshInProgress, err := h.store.ListTasksByStatus(ctx, store.TaskStatusInProgress)
-			if err != nil {
-				return false, nil
-			}
-			testInProgress := 0
-			for _, t := range freshInProgress {
-				if t.IsTestRun {
-					testInProgress++
-				}
-			}
+			// Count test runners across ALL active stores.
+			testInProgress := h.countGlobalTestsInProgress(ctx)
 
 			maxTestTasks := h.maxTestConcurrentTasks()
 			triggered := false
@@ -777,27 +759,26 @@ func (h *Handler) tryAutoTest(ctx context.Context) {
 					break
 				}
 
-				// Re-verify eligibility using the fresh snapshot.
-				ft, ok := freshByID[c.task.ID]
-				if !ok || ft.Status != store.TaskStatusWaiting || ft.LastTestResult != "" || ft.IsTestRun {
+				// Re-verify eligibility using fresh state from the task's store.
+				ft, err := c.store.GetTask(ctx, c.task.ID)
+				if err != nil || ft == nil || ft.Status != store.TaskStatusWaiting || ft.LastTestResult != "" || ft.IsTestRun {
 					continue
 				}
-				if len(ft.WorktreePaths) == 0 || len(missingTaskWorktrees(&ft)) > 0 {
+				if len(ft.WorktreePaths) == 0 || len(missingTaskWorktrees(ft)) > 0 {
 					continue
 				}
 
 				logger.Handler.Info("auto-test: triggering test agent for waiting task", "task", c.task.ID)
 
-				if err := h.store.UpdateTaskTestRun(ctx, c.task.ID, true, ""); err != nil {
+				if err := c.store.UpdateTaskTestRun(ctx, c.task.ID, true, ""); err != nil {
 					logger.Handler.Error("auto-test: update test run flag", "task", c.task.ID, "error", err)
 					h.breakers["auto-test"].recordFailure(&c.task.ID, err.Error())
 					continue
 				}
-				if err := h.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
+				if err := c.store.UpdateTaskStatus(ctx, c.task.ID, store.TaskStatusInProgress); err != nil {
 					logger.Handler.Error("auto-test: update task status", "task", c.task.ID, "error", err)
 					h.breakers["auto-test"].recordFailure(&c.task.ID, err.Error())
-					// Roll back the IsTestRun flag so the task remains eligible for future test cycles.
-					if rbErr := h.store.UpdateTaskTestRun(ctx, c.task.ID, false, ""); rbErr != nil {
+					if rbErr := c.store.UpdateTaskTestRun(ctx, c.task.ID, false, ""); rbErr != nil {
 						logger.Handler.Error("auto-test: rollback IsTestRun flag", "task", c.task.ID, "error", rbErr)
 					}
 					continue
@@ -839,6 +820,7 @@ func (h *Handler) StartAutoSubmitter(ctx context.Context) {
 // and is ready for auto-submission.
 type autoSubmitCandidate struct {
 	task              store.Task
+	store             *store.Store
 	naturallyComplete bool
 }
 
@@ -877,13 +859,26 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 			h.incAutopilotPhase2Miss("auto_submitter")
 		},
 		Phase1: func(ctx context.Context) (*store.Task, error) {
-			tasks, err := h.store.ListTasks(ctx, false)
-			if err != nil {
-				return nil, err
+			// Scan ALL active stores for auto-submit candidates.
+			var allTasks []struct {
+				task  store.Task
+				store *store.Store
 			}
+			h.forEachActiveStore(func(s *store.Store, _ []string) {
+				tasks, err := s.ListTasks(ctx, false)
+				if err != nil {
+					return
+				}
+				for i := range tasks {
+					allTasks = append(allTasks, struct {
+						task  store.Task
+						store *store.Store
+					}{task: tasks[i], store: s})
+				}
+			})
 
-			for i := range tasks {
-				t := &tasks[i]
+			for i := range allTasks {
+				t := &allTasks[i].task
 				if t.Status != store.TaskStatusWaiting {
 					continue
 				}
@@ -954,7 +949,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 					continue
 				}
 
-				candidates = append(candidates, autoSubmitCandidate{task: *t, naturallyComplete: naturallyComplete})
+				candidates = append(candidates, autoSubmitCandidate{task: *t, store: allTasks[i].store, naturallyComplete: naturallyComplete})
 			}
 
 			if len(candidates) == 0 {
@@ -981,7 +976,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 				h.closeFeedbackWaitingSpan(ctx, t.ID)
 
 				if t.SessionID != nil && *t.SessionID != "" {
-					if err := h.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusCommitting); err != nil {
+					if err := c.store.UpdateTaskStatus(ctx, t.ID, store.TaskStatusCommitting); err != nil {
 						logger.Handler.Error("auto-submit: update task status", "task", t.ID, "error", err)
 						h.breakers["auto-submit"].recordFailure(&t.ID, err.Error())
 						continue
@@ -990,9 +985,7 @@ func (h *Handler) tryAutoSubmit(ctx context.Context) {
 						store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusCommitting, store.TriggerAutoSubmit, nil))
 					h.runCommitTransition(t.ID, *t.SessionID, store.TriggerAutoSubmit, "auto-submit: commit failed: ")
 				} else {
-					// No session — move directly to done (bypasses state machine
-					// since waiting→done is deliberately blocked to protect the commit pipeline).
-					if err := h.store.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
+					if err := c.store.ForceUpdateTaskStatus(ctx, t.ID, store.TaskStatusDone); err != nil {
 						logger.Handler.Error("auto-submit: update task status to done", "task", t.ID, "error", err)
 						h.breakers["auto-submit"].recordFailure(&t.ID, err.Error())
 						continue
@@ -1032,45 +1025,50 @@ func (h *Handler) tryAutoRefine(ctx context.Context) {
 		return
 	}
 
-	backlogTasks, err := h.store.ListTasksByStatus(ctx, store.TaskStatusBacklog)
-	if err != nil {
-		return
-	}
-
-	for i := range backlogTasks {
-		t := &backlogTasks[i]
-		// Skip idea-agent tasks — they are auto-generated stubs, not user tasks.
-		if t.Kind == store.TaskKindIdeaAgent {
-			continue
+	// Scan ALL active stores for backlog tasks needing refinement.
+	// Only trigger one per poll to avoid overwhelming the system.
+	refined := false
+	h.forEachActiveStore(func(s *store.Store, _ []string) {
+		if refined {
+			return
 		}
-		// Skip tasks that already have a completed or running refinement.
-		if t.CurrentRefinement != nil {
-			continue
-		}
-		if len(t.RefineSessions) > 0 {
-			continue
+		backlogTasks, err := s.ListTasksByStatus(ctx, store.TaskStatusBacklog)
+		if err != nil {
+			return
 		}
 
-		logger.Handler.Info("auto-refine: triggering refinement for backlog task", "task", t.ID)
+		for i := range backlogTasks {
+			t := &backlogTasks[i]
+			if t.Kind == store.TaskKindIdeaAgent {
+				continue
+			}
+			if t.CurrentRefinement != nil {
+				continue
+			}
+			if len(t.RefineSessions) > 0 {
+				continue
+			}
 
-		job := &store.RefinementJob{
-			ID:        uuid.New().String(),
-			CreatedAt: time.Now(),
-			Status:    store.RefinementJobStatusRunning,
-			Source:    "auto",
+			logger.Handler.Info("auto-refine: triggering refinement for backlog task", "task", t.ID)
+
+			job := &store.RefinementJob{
+				ID:        uuid.New().String(),
+				CreatedAt: time.Now(),
+				Status:    store.RefinementJobStatusRunning,
+				Source:    "auto",
+			}
+			if err := s.StartRefinementJobIfIdle(ctx, t.ID, job); err != nil {
+				continue
+			}
+
+			h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
+				"result": "Auto-refine: triggering refinement agent for backlog task.",
+			})
+			h.runner.RunRefinementBackground(t.ID, "")
+			h.incAutopilotAction("auto_refiner", "refined")
+			h.breakers["auto-refine"].recordSuccess()
+			refined = true
+			return
 		}
-		if err := h.store.StartRefinementJobIfIdle(ctx, t.ID, job); err != nil {
-			continue // already running or race — skip silently
-		}
-
-		h.insertEventOrLog(ctx, t.ID, store.EventTypeSystem, map[string]string{
-			"result": "Auto-refine: triggering refinement agent for backlog task.",
-		})
-		h.runner.RunRefinementBackground(t.ID, "")
-		h.incAutopilotAction("auto_refiner", "refined")
-		h.breakers["auto-refine"].recordSuccess()
-
-		// Only trigger one per poll to avoid overwhelming the system.
-		return
-	}
+	})
 }
