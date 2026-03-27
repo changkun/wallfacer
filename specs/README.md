@@ -51,7 +51,7 @@ Alternative `SandboxBackend` implementations. Independent of each other and of M
 | [01a-native-sandbox-linux.md](01a-native-sandbox-linux.md) | `BubblewrapBackend`, `NspawnBackend` — daemon-free, zero-install on most distros |
 | [01b-native-sandbox-macos.md](01b-native-sandbox-macos.md) | `VZBackend` (Virtualization.framework), `SandboxInitBackend` (sandbox_init) |
 | [01c-native-sandbox-windows.md](01c-native-sandbox-windows.md) | `JobObjectBackend`, `HyperVBackend` — native Windows isolation |
-| [01d-windows-support.md](01d-windows-support.md) | Tier 2 Windows host support (release binaries, path translation, e2e testing) |
+| [01d-windows-support.md](01d-windows-support.md) | **Complete** — Tier 2 Windows host support (release binaries, path translation, docs) |
 
 ## Branch from M2 — Multi-Workspace Groups
 
