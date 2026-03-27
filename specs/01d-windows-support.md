@@ -24,24 +24,7 @@ For containerization backend analysis, see `specs/01c-native-sandbox-windows.md`
 
 ### A. Container Path Translation
 
-**Status:** Not started
-**Effort:** Medium
-
-When the server runs on a Windows host, host paths like `C:\Users\alice\project`
-must be translated for container volume mounts. Docker Desktop automatically
-translates `C:\` to `/c/`; Podman Desktop expects `/mnt/c/`. The translation
-layer must handle both.
-
-**Changes:**
-- Add a path translation helper called from `ContainerSpec.Build()` in
-  `internal/sandbox/spec.go` (bind mounts already use `--mount` syntax, so
-  colon-in-path ambiguity is not an issue)
-- Handle drive letter mapping (`C:` → `/c/` for Docker, `/mnt/c/` for Podman)
-- Detect which runtime is in use (the runtime path is available on `ContainerSpec`)
-  and apply the correct mapping
-- Unit tests for edge cases (UNC paths, spaces, Unicode characters); existing
-  tests in `internal/sandbox/sandbox_test.go` already cover Unicode paths but
-  only with Unix-style paths
+**Status:** Done
 
 ### B. End-to-End Testing on Windows
 
