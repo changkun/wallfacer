@@ -4,9 +4,9 @@ Implementation roadmap for wallfacer. Numbered specs (`01-`–`08-`) form the cl
 
 ## Core Infrastructure
 
-| Spec | Delivers |
-|------|----------|
-| [epic-coordination.md](epic-coordination.md) | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking. Enables automated decomposition of all milestones below. |
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [epic-coordination.md](epic-coordination.md) | Not started | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking. Enables automated decomposition of all milestones below. |
 
 ## Cloud/Platform Milestone Graph
 
@@ -46,36 +46,36 @@ M7: Desktop App ────────────────┘ (ships after
 
 Alternative `SandboxBackend` implementations. Independent of each other and of M2–M8.
 
-| Spec | Delivers |
-|------|----------|
-| [01a-native-sandbox-linux.md](01a-native-sandbox-linux.md) | `BubblewrapBackend`, `NspawnBackend` — daemon-free, zero-install on most distros |
-| [01b-native-sandbox-macos.md](01b-native-sandbox-macos.md) | `VZBackend` (Virtualization.framework), `SandboxInitBackend` (sandbox_init) |
-| [01c-native-sandbox-windows.md](01c-native-sandbox-windows.md) | `JobObjectBackend`, `HyperVBackend` — native Windows isolation |
-| [01d-windows-support.md](01d-windows-support.md) | **Complete** — Tier 2 Windows host support (release binaries, path translation, docs) |
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [01a-native-sandbox-linux.md](01a-native-sandbox-linux.md) | Not started | `BubblewrapBackend`, `NspawnBackend` — daemon-free, zero-install on most distros |
+| [01b-native-sandbox-macos.md](01b-native-sandbox-macos.md) | Not started | `VZBackend` (Virtualization.framework), `SandboxInitBackend` (sandbox_init) |
+| [01c-native-sandbox-windows.md](01c-native-sandbox-windows.md) | Not started | `JobObjectBackend`, `HyperVBackend` — native Windows isolation |
+| [01d-windows-support.md](01d-windows-support.md) | **Complete** | Tier 2 Windows host support (release binaries, path translation, docs) |
 
 ## Branch from M2 — Multi-Workspace Groups
 
-| Spec | Delivers |
-|------|----------|
-| [02a-multi-workspace-groups.md](02a-multi-workspace-groups.md) | Multi-store manager, runner task-to-group mapping. Run tasks across workspace groups simultaneously. |
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [02a-multi-workspace-groups.md](02a-multi-workspace-groups.md) | Not started | Multi-store manager, runner task-to-group mapping. Run tasks across workspace groups simultaneously. |
 
 After M2 (store interfaces stable). Independent of M3. Can run in parallel with M3.
 
 ## Related to M4 — File Attachments & Host Mounts
 
-| Spec | Delivers |
-|------|----------|
-| [04a-file-image-attachments.md](04a-file-image-attachments.md) | Drag-and-drop file and image attachments for task prompts |
-| [04b-host-mounts.md](04b-host-mounts.md) | Per-task read-only host filesystem mounts into sandbox containers |
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [04a-file-image-attachments.md](04a-file-image-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
+| [04b-host-mounts.md](04b-host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
 
 ## Independent Enhancements
 
-| Spec | Delivers |
-|------|----------|
-| [90-oversight-risk-scoring.md](90-oversight-risk-scoring.md) | Real-time agent action risk assessment |
-| [91-visual-verification.md](91-visual-verification.md) | Visual verification for UI changes |
-| [92-live-serve.md](92-live-serve.md) | Build and run developed software from within Wallfacer |
-| [93-agent-abstraction.md](93-agent-abstraction.md) | Agent role abstraction, pluggable role descriptors, multi-agent communication |
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [90-oversight-risk-scoring.md](90-oversight-risk-scoring.md) | Not started | Real-time agent action risk assessment |
+| [91-visual-verification.md](91-visual-verification.md) | Not started | Visual verification for UI changes |
+| [92-live-serve.md](92-live-serve.md) | Not started | Build and run developed software from within Wallfacer |
+| [93-agent-abstraction.md](93-agent-abstraction.md) | Not started | Agent role abstraction, pluggable role descriptors, multi-agent communication |
 
 ## Ordering Rationale
 
