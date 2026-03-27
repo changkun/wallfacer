@@ -656,6 +656,58 @@ The agent parses this format to extract tasks for board creation and updates che
 
 **Recommended approach:** Implement the task-centric backend first (P1-P5). Then build the spec-centric UI as the planning frontend, which provides a better UX for the iterative planning loop while the kanban board remains the execution monitoring view.
 
+#### Two-Layer Document Model: Specs vs Task Specs
+
+Specs and the tasks derived from them serve different purposes and should live at different abstraction levels:
+
+| Layer | Focus | Content | Audience |
+|-------|-------|---------|----------|
+| **Spec** (strategy) | Vision, goals, constraints, architecture decisions | Why we're building this, what success looks like, key design choices, cross-cutting concerns, risk areas | Human planner |
+| **Task spec** (implementation) | Concrete implementation steps | Which files to change, what functions to add, acceptance criteria, test plan, dependency wiring | Agent executor |
+
+A spec like `01-sandbox-backends.md` says *"extract a `SandboxBackend` interface so we can swap container runtimes"* — it explains the motivation, the interface shape, and the migration strategy. A task spec derived from it says *"create `internal/sandbox/backend.go` with `Launch`, `ListContainers`, `Stop` methods; ensure backward compat with existing `os/exec` path; add tests in `backend_test.go`"* — it's an actionable work order.
+
+**The UI should support decomposition as a first-class operation:**
+
+1. **Break down** — Select a spec (or a section of a spec) in the focused view. The chat agent analyzes it against the codebase and proposes task specs: concrete implementation units with file lists, acceptance criteria, and estimated scope. Each task spec becomes a collapsible child node under the parent spec in the explorer.
+
+2. **Identify dependencies** — The agent infers dependencies from the task specs' file lists and interface references. The focused view shows a dependency graph overlay: which tasks must complete before others can start, which can run in parallel. The user can adjust by dragging edges or clicking to add/remove dependencies.
+
+3. **Dispatch** — Two dispatch granularities:
+   - **Dispatch a single task spec** — Creates one kanban card from the task spec and places it in the backlog. Useful for incremental execution or when the user wants to run a specific piece first.
+   - **Dispatch an entire epic/spec** — Creates all task specs as kanban cards with dependency wiring in one batch. The auto-promoter runs them in dependency order. Equivalent to "approve all phases" but triggered from the spec view.
+
+```
+Spec Explorer (with task specs)     Focused View
+
+specs/                              # 01: Sandbox Backends
+  01-sandbox-backends.md
+    task-define-interface.md  ●     ## Vision
+    task-local-backend.md     ●     Extract SandboxBackend interface...
+    task-refactor-runner.md   ○
+    task-retire-executor.md   ○     ## Tasks  [Dispatch All ▶]
+  02-storage-backends.md
+    task-storage-iface.md     ○     ● define-interface  [Dispatch ▶]
+    task-fs-backend.md        ○       Files: backend.go (new)
+                                      Depends on: —
+● = dispatched (on board)
+○ = draft (not yet dispatched)      ● local-backend  [Dispatched]
+                                      Files: backend_local.go, exec.go
+                                      Depends on: define-interface
+
+                                    ○ refactor-runner  [Dispatch ▶]
+                                      Files: runner.go, execute.go
+                                      Depends on: local-backend
+
+                                    ── Dependency Graph ──
+                                    define-iface ──▶ local-backend ──▶ refactor
+                                         └──────────▶ retire-executor ◀── refactor
+```
+
+**Task spec files** live alongside their parent spec, either as child markdown files in a subdirectory or as sections within the spec itself. The chat agent generates them, but the user can edit them directly in the focused view before dispatching. Once dispatched, the task spec content becomes the kanban card's prompt — the agent executing the task sees the full implementation detail.
+
+**Feedback loop:** When a dispatched task completes, the agent can update both the task spec (mark complete, add implementation notes) and the parent spec (update the strategy section if the implementation revealed something new). The focused view shows these updates live. This closes the loop between high-level planning and ground-level execution.
+
 ### Human-in-the-Loop Planning Workflow
 
 The UX above handles visualization. But the harder UX problem is *planning itself* — the iterative, multi-step process where a human and AI collaborate to turn a vague goal ("move to cloud") into a concrete, executable plan. This is not a one-shot operation. It requires drafting, reviewing, adjusting, approving, monitoring, and re-planning.
