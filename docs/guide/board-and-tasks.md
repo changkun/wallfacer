@@ -160,6 +160,20 @@ Press **Cmd+K** (or Ctrl+K) to open the command palette for fuzzy task search an
 
 Press **n** to open the new task form from anywhere on the board (focus lands on the prompt textarea so you can start typing immediately). Press **?** to see the full keyboard shortcuts reference. For the complete shortcut list, see [Keyboard Shortcuts](oversight-and-analytics.md#keyboard-shortcuts).
 
+### 📂 File Explorer
+
+The file explorer panel lets you browse workspace files directly in the web UI without leaving the board.
+
+**Opening the explorer:** Click the folder icon in the header toolbar, or press **E** on your keyboard. The panel appears on the left side of the board. Press **E** again or click the button to close it.
+
+**Browsing files:** Each active workspace appears as a root folder in the tree. Click a folder to expand it -- contents are loaded one level at a time from the server. Click again to collapse. Dot-prefixed entries (`.git`, `.env`, etc.) appear dimmed. Directories are listed first, then files, both in case-insensitive alphabetical order.
+
+**File preview:** Click any file to open a syntax-highlighted preview modal. The modal shows line-numbered code with language detection based on the file extension. Binary files and files exceeding 2 MB show a placeholder message instead of content. Press **Escape** or click outside the modal to close it.
+
+**Resizing:** Drag the right edge of the explorer panel to adjust its width (minimum 200 px, maximum 50% of the viewport). Double-click the resize handle to reset to the default 260 px. The panel width and open/closed state persist across page reloads via localStorage.
+
+**Keyboard navigation:** When focused inside the tree, use arrow keys to navigate between nodes. **Right arrow** expands a collapsed directory, **Left arrow** collapses an expanded one (or moves to the parent). **Enter** toggles directories or opens file preview.
+
 ---
 
 ## Advanced Topics
