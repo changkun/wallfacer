@@ -28,14 +28,10 @@ function closeContainerMonitor() {
 }
 
 function refreshContainerMonitor() {
-  // Preserve the scroll area height so the modal doesn't jump when
-  // we switch to the loading state.
-  var wrap = document.getElementById("container-monitor-table-wrap");
-  var scrollArea = wrap && wrap.parentElement;
-  if (scrollArea && wrap && !wrap.classList.contains("hidden")) {
-    scrollArea.style.minHeight = scrollArea.offsetHeight + "px";
-  }
-  setContainerMonitorState("loading");
+  // Show "Refreshing…" in the footer instead of swapping to the
+  // loading state, so the existing table stays visible.
+  var updated = document.getElementById("container-monitor-updated");
+  if (updated) updated.textContent = "Refreshing…";
   fetchContainers();
 }
 
@@ -66,8 +62,6 @@ function renderContainers(containers) {
 
   if (!containers || containers.length === 0) {
     setContainerMonitorState("empty");
-    var wrap = document.getElementById("container-monitor-table-wrap");
-    if (wrap && wrap.parentElement) wrap.parentElement.style.minHeight = "";
     return;
   }
 
@@ -165,12 +159,6 @@ function renderContainers(containers) {
   });
 
   setContainerMonitorState("table");
-
-  // Release the pinned height now that the table is visible again.
-  var scrollArea = document.getElementById("container-monitor-table-wrap");
-  if (scrollArea && scrollArea.parentElement) {
-    scrollArea.parentElement.style.minHeight = "";
-  }
 }
 
 function containerStateColor(state) {
