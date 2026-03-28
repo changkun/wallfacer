@@ -184,6 +184,7 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 | `WALLFACER_CONTAINER_MEMORY` | (no limit) | Memory limit per container, e.g. `"4g"` |
 | `WALLFACER_CONTAINER_CB_THRESHOLD` | `5` | Consecutive container runtime failures before the circuit breaker opens |
 | `WALLFACER_CONTAINER_CB_OPEN_SECONDS` | `30` | Seconds the circuit breaker stays open before probing |
+| `WALLFACER_TASK_WORKERS` | `true` | Enable per-task worker containers for container reuse. Each task gets a long-lived container that is reused across agent invocations (implementation turns, title, oversight, commit message). Set to `false` to always use ephemeral containers. |
 
 #### Automation
 

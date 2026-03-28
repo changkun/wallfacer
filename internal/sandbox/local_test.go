@@ -12,8 +12,7 @@ func TestLaunchEphemeralWhenDisabled(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt, nil)
-	b.enableTaskWorkers = false
+	b := NewLocalBackend(rt, LocalBackendConfig{EnableTaskWorkers: false})
 
 	spec := ContainerSpec{
 		Runtime: rt,
@@ -50,7 +49,7 @@ func TestLaunchEphemeralWithoutTaskID(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt, nil)
+	b := NewLocalBackend(rt, LocalBackendConfig{EnableTaskWorkers: true})
 
 	spec := ContainerSpec{
 		Runtime: rt,
@@ -86,7 +85,7 @@ func TestLaunchCreatesWorker(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt, nil)
+	b := NewLocalBackend(rt, LocalBackendConfig{EnableTaskWorkers: true})
 	taskID := "test-task-create"
 
 	spec := ContainerSpec{
@@ -126,7 +125,7 @@ func TestLaunchReusesWorker(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt, nil)
+	b := NewLocalBackend(rt, LocalBackendConfig{EnableTaskWorkers: true})
 	taskID := "test-task-reuse"
 
 	spec := ContainerSpec{
@@ -172,7 +171,7 @@ func TestWorkerMetricsRecorded(t *testing.T) {
 	ensureTestImage(t, rt)
 
 	reg := metrics.NewRegistry()
-	b := NewLocalBackend(rt, reg)
+	b := NewLocalBackend(rt, LocalBackendConfig{EnableTaskWorkers: true, Reg: reg})
 	taskID := "test-task-metrics"
 
 	spec := ContainerSpec{
@@ -208,7 +207,7 @@ func TestStopTaskWorker(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt, nil)
+	b := NewLocalBackend(rt, LocalBackendConfig{EnableTaskWorkers: true})
 	taskID := "test-task-stop"
 
 	spec := ContainerSpec{

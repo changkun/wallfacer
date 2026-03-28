@@ -371,13 +371,22 @@ func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 		}
 	}
 	r.containerCB = circuitbreaker.New(cbThreshold, time.Duration(cbOpenSec)*time.Second)
+	localCfg := sandbox.LocalBackendConfig{
+		EnableTaskWorkers: true, // default; overridden by envconfig if available
+		Reg:               cfg.Reg,
+	}
+	// Read WALLFACER_TASK_WORKERS from the env file if available.
+	if cfg.EnvFile != "" {
+		if parsed, err := envconfig.Parse(cfg.EnvFile); err == nil {
+			localCfg.EnableTaskWorkers = parsed.TaskWorkers
+		}
+	}
 	switch cfg.SandboxBackend {
 	case "", "local":
-		r.backend = sandbox.NewLocalBackend(r.command, cfg.Reg)
+		r.backend = sandbox.NewLocalBackend(r.command, localCfg)
 	default:
-		// Unknown backend value; fall back to local and log a warning.
 		logger.Runner.Warn("unknown sandbox backend, falling back to local", "backend", cfg.SandboxBackend)
-		r.backend = sandbox.NewLocalBackend(r.command, cfg.Reg)
+		r.backend = sandbox.NewLocalBackend(r.command, localCfg)
 	}
 	r.reg = cfg.Reg
 

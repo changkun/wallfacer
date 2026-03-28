@@ -50,6 +50,7 @@ type Config struct {
 	ContainerNetwork string // WALLFACER_CONTAINER_NETWORK
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
 	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
+	TaskWorkers      bool   // WALLFACER_TASK_WORKERS ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
@@ -85,6 +86,7 @@ var knownKeys = []string{
 	"WALLFACER_CONTAINER_NETWORK",
 	"WALLFACER_CONTAINER_CPUS",
 	"WALLFACER_CONTAINER_MEMORY",
+	"WALLFACER_TASK_WORKERS",
 	"WALLFACER_WORKSPACES",
 }
 
@@ -95,8 +97,8 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	// SandboxFast defaults to true; only an explicit "false" in the file disables it.
-	cfg := Config{SandboxFast: true}
+	// SandboxFast and TaskWorkers default to true; only an explicit "false" disables them.
+	cfg := Config{SandboxFast: true, TaskWorkers: true}
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
 		if !ok {
@@ -173,6 +175,8 @@ func Parse(path string) (Config, error) {
 			cfg.ContainerCPUs = v
 		case "WALLFACER_CONTAINER_MEMORY":
 			cfg.ContainerMemory = v
+		case "WALLFACER_TASK_WORKERS":
+			cfg.TaskWorkers = v != "false"
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
 		}

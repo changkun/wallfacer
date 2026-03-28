@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -25,19 +23,20 @@ type LocalBackend struct {
 	reg               *metrics.Registry       // optional; nil disables metric collection
 }
 
+// LocalBackendConfig holds optional settings for LocalBackend.
+type LocalBackendConfig struct {
+	EnableTaskWorkers bool              // WALLFACER_TASK_WORKERS (default true)
+	Reg               *metrics.Registry // optional; nil disables metric collection
+}
+
 // NewLocalBackend creates a LocalBackend that uses the given container runtime
 // binary (e.g. "/opt/podman/bin/podman" or "docker").
-// The optional registry enables Prometheus-compatible worker lifecycle metrics.
-func NewLocalBackend(command string, reg *metrics.Registry) *LocalBackend {
-	enable := true
-	if v := os.Getenv("WALLFACER_TASK_WORKERS"); strings.EqualFold(v, "false") || v == "0" {
-		enable = false
-	}
+func NewLocalBackend(command string, cfg LocalBackendConfig) *LocalBackend {
 	return &LocalBackend{
 		command:           command,
 		taskWorkers:       make(map[string]*taskWorker),
-		enableTaskWorkers: enable,
-		reg:               reg,
+		enableTaskWorkers: cfg.EnableTaskWorkers,
+		reg:               cfg.Reg,
 	}
 }
 

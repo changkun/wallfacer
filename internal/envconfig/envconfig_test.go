@@ -532,6 +532,30 @@ func TestUpdateSandboxFast(t *testing.T) {
 	}
 }
 
+// TestParseTaskWorkersDefaultsToTrue verifies TaskWorkers defaults to true when absent.
+func TestParseTaskWorkersDefaultsToTrue(t *testing.T) {
+	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !cfg.TaskWorkers {
+		t.Fatal("TaskWorkers = false; want true when absent")
+	}
+}
+
+// TestParseTaskWorkersDisabled verifies TaskWorkers is false when explicitly set to "false".
+func TestParseTaskWorkersDisabled(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_TASK_WORKERS=false\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.TaskWorkers {
+		t.Fatal("TaskWorkers = true; want false when configured false")
+	}
+}
+
 // TestUpdateAutoPush verifies that auto-push settings can be written and read back.
 func TestUpdateAutoPush(t *testing.T) {
 	content := "CLAUDE_CODE_OAUTH_TOKEN=tok\n"
