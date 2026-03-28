@@ -19,11 +19,10 @@ describe("header layout", () => {
     expect(html).toContain('id="automation-menu-btn"');
     expect(html).toContain('id="automation-menu"');
     expect(html).toContain('class="header-toggle-strip"');
-    expect(html.match(/class="header-toggle-chip"/g) || []).toHaveLength(8);
+    expect(html.match(/class="header-toggle-chip"/g) || []).toHaveLength(7);
     expect(html).toContain('id="autopilot-toggle"');
     expect(html).toContain('id="autotest-toggle"');
     expect(html).toContain('id="autosubmit-toggle"');
-    expect(html).toContain('id="dep-graph-toggle"');
     expect(html).not.toContain('class="app-header__secondary"');
   });
 

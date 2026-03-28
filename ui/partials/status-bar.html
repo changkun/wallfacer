@@ -60,6 +60,15 @@
   </div>
   <div class="status-bar__right">
     <button
+      id="status-bar-depgraph-btn"
+      class="status-bar-btn"
+      onclick="toggleDependencyGraph()"
+      title="Toggle dependency graph"
+      aria-expanded="false"
+    >
+      Dep Graph
+    </button>
+    <button
       id="status-bar-terminal-btn"
       class="status-bar-btn"
       onclick="toggleTerminalPanel()"

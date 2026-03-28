@@ -80,6 +80,11 @@
   background: var(--bg-raised);
   color: var(--text);
 }
+.status-bar-btn[aria-expanded="true"] {
+  background: var(--accent, #4e8cff);
+  color: #fff;
+  border-color: var(--accent, #4e8cff);
+}
 .status-bar-kbd {
   font-family: inherit;
   font-size: 10px;

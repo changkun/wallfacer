@@ -429,19 +429,32 @@
     _lastFingerprint = fingerprint;
 
     var subgraph = getSubgraph(tasks);
-    if (subgraph.length === 0) {
-      _hidePanel();
-      return;
-    }
-
     var panel = getOrCreatePanel();
     panel.style.display = "block";
 
-    var result = kahnLevels(subgraph);
-    var layout = computeLayout(result.levels, result.cycleNodes);
-
     var svg = document.getElementById("depgraph-svg");
     if (!svg) return;
+
+    // Show empty-state message when no dependency edges exist.
+    var emptyMsg = panel.querySelector(".depgraph-empty");
+    if (subgraph.length === 0) {
+      svg.style.display = "none";
+      if (!emptyMsg) {
+        emptyMsg = document.createElement("div");
+        emptyMsg.className = "depgraph-empty";
+        emptyMsg.style.cssText =
+          "padding:24px;text-align:center;color:var(--text-muted);font-size:12px;";
+        emptyMsg.textContent = "No dependency edges. Add depends-on links between tasks to see the graph.";
+        panel.appendChild(emptyMsg);
+      }
+      emptyMsg.style.display = "";
+      return;
+    }
+
+    if (emptyMsg) emptyMsg.style.display = "none";
+
+    var result = kahnLevels(subgraph);
+    var layout = computeLayout(result.levels, result.cycleNodes);
 
     var isCollapsed = localStorage.getItem("depgraph-collapsed") === "true";
     if (!isCollapsed) {

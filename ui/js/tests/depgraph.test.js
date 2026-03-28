@@ -33,6 +33,7 @@ function makeDom() {
     const _listeners = {};
     let _text = "";
     let _id = "";
+    let _className = "";
 
     const el = {
       tagName: tag,
@@ -55,6 +56,12 @@ function makeDom() {
       },
       set textContent(v) {
         _text = String(v || "");
+      },
+      get className() {
+        return _className;
+      },
+      set className(v) {
+        _className = String(v || "");
       },
 
       setAttribute(k, v) {
@@ -86,10 +93,18 @@ function makeDom() {
         else registry.set("__last_inserted", newEl);
       },
 
-      // Simple #id-selector backed by the shared registry.
+      // Simple selector: #id or .class, backed by registry and children.
       querySelector(sel) {
-        const m = sel.match(/^#(.+)$/);
-        return m ? registry.get(m[1]) || null : null;
+        const idMatch = sel.match(/^#(.+)$/);
+        if (idMatch) return registry.get(idMatch[1]) || null;
+        const classMatch = sel.match(/^\.(.+)$/);
+        if (classMatch) {
+          const cls = classMatch[1];
+          for (const child of _children) {
+            if (child.className === cls) return child;
+          }
+        }
+        return null;
       },
 
       addEventListener(ev, fn) {
@@ -306,12 +321,11 @@ describe("renderDependencyGraph", () => {
       renderDependencyGraph(tasks);
 
       const panel = registry.get("depgraph-panel");
+      // Panel is shown with an empty-state message when no dep edges exist.
       if (panel) {
-        // Panel was created but must be hidden.
-        expect(panel.style.display).toBe("none");
-      } else {
-        // Panel was never created — also acceptable.
-        expect(panel).toBeFalsy();
+        expect(panel.style.display).toBe("block");
+        const emptyMsg = panel.querySelector(".depgraph-empty");
+        expect(emptyMsg).toBeTruthy();
       }
     });
   });

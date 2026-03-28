@@ -27,6 +27,8 @@ describe("status-bar layout", () => {
     expect(html).toContain('id="status-bar-conn-dot"');
     expect(html).toContain('id="status-bar-in-progress"');
     expect(html).toContain('id="status-bar-waiting"');
+    expect(html).toContain('id="status-bar-depgraph-btn"');
+    expect(html).toContain("toggleDependencyGraph");
     expect(html).toContain('id="status-bar-terminal-btn"');
     expect(html).toContain("toggleTerminalPanel");
   });

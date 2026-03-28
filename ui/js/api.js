@@ -626,7 +626,6 @@ function updateAutomationActiveCount() {
     "autotest-toggle",
     "autosubmit-toggle",
     "autopush-toggle",
-    "dep-graph-toggle",
   ];
   var count = 0;
   ids.forEach(function (id) {

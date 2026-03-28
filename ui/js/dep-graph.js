@@ -186,10 +186,13 @@ function renderDependencyGraph(tasks) {
 }
 
 function toggleDependencyGraph() {
-  const cb = document.getElementById("dep-graph-toggle");
-  window.depGraphEnabled = cb ? cb.checked : !window.depGraphEnabled;
-  if (typeof updateAutomationActiveCount === "function")
-    updateAutomationActiveCount();
+  window.depGraphEnabled = !window.depGraphEnabled;
+  var btn = document.getElementById("status-bar-depgraph-btn");
+  if (btn)
+    btn.setAttribute(
+      "aria-expanded",
+      window.depGraphEnabled ? "true" : "false",
+    );
   if (typeof scheduleRender === "function") scheduleRender();
   else if (typeof render === "function") render();
 }
