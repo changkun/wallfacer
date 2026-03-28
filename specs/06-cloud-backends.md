@@ -145,4 +145,3 @@ wallfacer.example.com {
 |----------|--------|------|------------|-------------|
 | **VPS + Caddy** | Done | `WALLFACER_SERVER_API_KEY` | No | Personal use, development, early validation |
 | **K8s (DOKS/EKS/GKE)** | M6a + M6b + M6c + M2 cloud + M8a + M8 | OAuth2/OIDC | Yes | Growing business, multi-tenant |
-| **Shared stateless server** | Very High | Per-user sessions | Yes | Not recommended — near-complete rewrite |
