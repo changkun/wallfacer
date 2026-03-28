@@ -1,7 +1,7 @@
 # Plan: Host Shell Terminal Panel
 
-**Status:** Draft
-**Date:** 2026-03-22
+**Status:** Not Started
+**Date:** 2026-03-22 (revised 2026-03-28)
 
 ---
 
@@ -22,18 +22,18 @@ Populate the existing terminal panel stub with a fully interactive host shell (b
 ### Terminal Panel Stub
 
 - **HTML** (`ui/partials/status-bar.html`): Empty `<div id="status-bar-panel" class="status-bar-panel hidden">` with comment "Terminal stub panel (populated by future PRs)"
-- **Resize** (`ui/js/status-bar.js:132-179`): Drag-to-resize handle, 80–600px range, height persisted to `localStorage`
-- **Toggle**: Backtick key toggles visibility, Terminal button in status bar right section
+- **Resize** (`ui/js/status-bar.js:187-234`): Drag-to-resize handle, 80–600px range, height persisted to `localStorage`
+- **Toggle** (`ui/js/status-bar.js:134-178`): `_showTerminalPanel()` / `_hideTerminalPanel()` / `toggleTerminalPanel()`, backtick key toggles visibility, Terminal button in status bar right section, bottom panel cycling (Terminal → Dep Graph → Close)
 - **CSS** (`ui/css/status-bar.css`): Panel styles (flex column, 260px default height, overflow hidden)
 
 ### Existing Streaming Infrastructure
 
 | Component | Location | What it does |
 |-----------|----------|-------------|
-| `StreamLogs` handler | `internal/handler/stream.go:178` | Streams container logs via HTTP with `http.Flusher` |
+| `StreamLogs` handler | `internal/handler/stream.go:182` | Streams container logs via HTTP with `http.Flusher` |
 | Log consumer | `ui/js/modal-logs.js` | Consumes HTTP streams via Fetch Streams API |
 | ANSI converter | `ui/js/modal-ansi.js` | Converts ANSI escape codes to HTML spans |
-| SSE auth | `internal/handler/middleware.go:68` | `?token=` query param auth for streaming paths |
+| SSE auth | `internal/handler/middleware.go:68` | `isSSEPath` closure: `?token=` query param auth for `/api/tasks/stream`, `/api/git/stream`, and `/api/tasks/*/logs` |
 
 **Limitation:** All streaming is one-directional (server→client). Interactive terminal requires full-duplex communication — **WebSocket is needed** (the project's first).
 
