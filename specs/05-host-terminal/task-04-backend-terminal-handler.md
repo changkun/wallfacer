@@ -29,7 +29,7 @@ Implement the server-side WebSocket terminal handler that spawns a PTY-backed sh
    - Accept WebSocket upgrade via `websocket.Accept(w, r, nil)`.
    - Determine shell: `os.Getenv("SHELL")` → `/bin/bash` → `/bin/sh`.
    - Create `exec.CommandContext` with the shell, set `cmd.Dir = cwd`, set `cmd.Env` from `os.Environ()`.
-   - Spawn via `pty.StartWithSize(cmd, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)})`.
+   - Spawn via `pty.StartWithSize(cmd, uint16(rows), uint16(cols))` using `internal/pty`.
    - Launch two goroutines:
      - **PTY→WS**: Read from `ptmx` with 32 KB buffer, write binary WebSocket messages. Exit on read error.
      - **WS→PTY**: Read WebSocket messages, JSON-decode to dispatch by `type` field (`input`, `resize`, `ping`). Write decoded base64 `data` to `ptmx` for `input`. Call `pty.Setsize()` for `resize`. Send `{"type":"pong"}` text message for `ping`.
@@ -72,5 +72,5 @@ Implement the server-side WebSocket terminal handler that spawns a PTY-backed sh
 - Phase 1 only: one session per connection, no session registry
 - Do NOT handle multiple sessions or tabs (Phase 2)
 - Do NOT implement container exec (Phase 3)
-- Do NOT add Windows-specific ConPTY handling — gate on `runtime.GOOS != "windows"` if needed
+- Do NOT add Windows-specific ConPTY handling — the `internal/pty` package stubs Windows in Task 1
 - Do NOT modify any frontend files

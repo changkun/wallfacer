@@ -65,10 +65,11 @@ Standard Go PTY library. Wraps `posix_openpt`/`forkpty` on macOS/Linux, ConPTY o
 
 | Module | Purpose | Size |
 |--------|---------|------|
-| `github.com/creack/pty` | Cross-platform PTY allocation | ~200 LOC, no transitive deps |
 | `nhooyr.io/websocket` | WebSocket built on stdlib `net/http` | Fits existing `http.ServeMux` router; context-aware |
 
-The project currently has one dependency (`github.com/google/uuid`). These add two more.
+PTY allocation is handled by a small internal package (`internal/pty`, ~60 LOC) wrapping POSIX syscalls directly, avoiding the `creack/pty` dependency. Windows stubs return an error (Phase 1 is macOS/Linux only).
+
+The project currently has one dependency (`github.com/google/uuid`). This adds one more.
 
 ### WebSocket Endpoint
 
@@ -275,6 +276,9 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 | File | Purpose |
 |------|---------|
+| `internal/pty/pty.go` | Inline POSIX PTY allocation (~60 LOC, macOS/Linux) |
+| `internal/pty/pty_windows.go` | Windows stub (returns error) |
+| `internal/pty/pty_test.go` | PTY open, start, resize tests |
 | `internal/handler/terminal.go` | WebSocket handler, PTY lifecycle, message protocol |
 | `internal/handler/terminal_test.go` | Tests: WebSocket connect, resize, auth gate, opt-in gate, cleanup |
 | `ui/js/terminal.js` | xterm.js integration, WebSocket client, resize/reconnect |
@@ -286,7 +290,7 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 | File | Change |
 |------|--------|
-| `go.mod` / `go.sum` | Add `github.com/creack/pty`, `nhooyr.io/websocket` |
+| `go.mod` / `go.sum` | Add `nhooyr.io/websocket` |
 | `internal/envconfig/envconfig.go` | Add `TerminalEnabled` field |
 | `internal/handler/middleware.go` | Add `/api/terminal/ws` to `isSSEPath` |
 | `internal/handler/config.go` | Include `terminalEnabled` in config response |
@@ -304,7 +308,7 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 | # | Task | Depends on | Effort | Status |
 |---|------|-----------|--------|--------|
-| 1 | [Add Go dependencies](05-host-terminal/task-01-go-dependencies.md) | — | Small | Todo |
+| 1 | [WebSocket dep + inline PTY](05-host-terminal/task-01-go-dependencies.md) | — | Small | Todo |
 | 2 | [TerminalEnabled envconfig + config](05-host-terminal/task-02-envconfig-terminal-enabled.md) | — | Small | Todo |
 | 3 | [Vendor xterm.js assets](05-host-terminal/task-03-vendor-xtermjs.md) | — | Small | Todo |
 | 4 | [Backend terminal handler + route](05-host-terminal/task-04-backend-terminal-handler.md) | 1, 2 | Large | Todo |
@@ -314,7 +318,7 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 ```mermaid
 graph LR
-  1[Task 1: Go deps] --> 4[Task 4: Backend handler]
+  1[Task 1: WS dep + PTY] --> 4[Task 4: Backend handler]
   2[Task 2: Envconfig] --> 4
   2 --> 6[Task 6: Status bar + gate]
   3[Task 3: Vendor xterm.js] --> 5[Task 5: Frontend terminal.js]
