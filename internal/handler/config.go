@@ -214,7 +214,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"payload_limits":           payloadLimits,
 		"watcher_health":           watcherHealth,
 		"active_groups":            h.activeGroupInfos(ctx),
-		"terminal_enabled":         false,
+		"terminal_enabled":         true,
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun

@@ -52,7 +52,7 @@ type Config struct {
 	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
 	TaskWorkers      bool   // WALLFACER_TASK_WORKERS ("true"/"false"), defaults to true when unset
 	DependencyCaches bool   // WALLFACER_DEPENDENCY_CACHES ("true"/"false"), defaults to false
-	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to false
+	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to true when unset
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
@@ -101,8 +101,8 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	// SandboxFast and TaskWorkers default to true; only an explicit "false" disables them.
-	cfg := Config{SandboxFast: true, TaskWorkers: true}
+	// SandboxFast, TaskWorkers, and TerminalEnabled default to true; only an explicit "false" disables them.
+	cfg := Config{SandboxFast: true, TaskWorkers: true, TerminalEnabled: true}
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
 		if !ok {
@@ -184,7 +184,7 @@ func Parse(path string) (Config, error) {
 		case "WALLFACER_DEPENDENCY_CACHES":
 			cfg.DependencyCaches = v == "true"
 		case "WALLFACER_TERMINAL_ENABLED":
-			cfg.TerminalEnabled = v == "true"
+			cfg.TerminalEnabled = v != "false"
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
 		}

@@ -281,7 +281,7 @@ Optional variables (also in `.env`):
 - `WALLFACER_CONTAINER_MEMORY` — container memory limit (e.g. `"4g"`)
 - `WALLFACER_TASK_WORKERS` — enable per-task worker containers for container reuse (`true`/`false`, default: `true`)
 - `WALLFACER_DEPENDENCY_CACHES` — mount named volumes for dependency caches (npm, pip, cargo, go-build) that persist across container restarts (`true`/`false`, default: `false`)
-- `WALLFACER_TERMINAL_ENABLED` — enable integrated host terminal (`true`/`false`, default `false`)
+- `WALLFACER_TERMINAL_ENABLED` — enable integrated host terminal (`true`/`false`, default `true`)
 - `WALLFACER_WORKSPACES` — workspace paths (OS path-list separated)
 - `WALLFACER_ARCHIVED_TASKS_PER_PAGE` — pagination size for archived tasks
 - `WALLFACER_TOMBSTONE_RETENTION_DAYS` — days to retain soft-deleted task data (default: 7)

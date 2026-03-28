@@ -37,8 +37,8 @@ func newTerminalTestServer(t *testing.T, apiKey string, terminalEnabled bool) (*
 	ws := t.TempDir()
 	envPath := filepath.Join(t.TempDir(), ".env")
 	envContent := ""
-	if terminalEnabled {
-		envContent = "WALLFACER_TERMINAL_ENABLED=true\n"
+	if !terminalEnabled {
+		envContent = "WALLFACER_TERMINAL_ENABLED=false\n"
 	}
 	if apiKey != "" {
 		envContent += "WALLFACER_SERVER_API_KEY=" + apiKey + "\n"

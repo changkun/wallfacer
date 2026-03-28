@@ -31,16 +31,13 @@ type terminalSession struct {
 // HandleTerminalWS upgrades to a WebSocket connection and relays I/O
 // between the client and a host shell via a PTY.
 func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
-	// Gate on WALLFACER_TERMINAL_ENABLED.
+	// Gate on WALLFACER_TERMINAL_ENABLED (defaults to true for local use).
 	if h.envFile != "" {
 		cfg, err := envconfig.Parse(h.envFile)
-		if err != nil || !cfg.TerminalEnabled {
+		if err == nil && !cfg.TerminalEnabled {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "terminal disabled"})
 			return
 		}
-	} else {
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": "terminal disabled"})
-		return
 	}
 
 	cols := parseIntParam(r, "cols", 80)

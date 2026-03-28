@@ -243,7 +243,7 @@ Not SSE in the strict sense — this endpoint streams raw `text/plain` output. I
 
 `GET /api/terminal/ws` is the project's only WebSocket endpoint. It provides an interactive host shell via a PTY relay. Unlike the REST routes defined in `internal/apicontract/routes.go`, this endpoint is registered directly in `BuildMux` (`internal/cli/server.go`) because WebSocket upgrades don't follow REST request/response semantics.
 
-The handler (`internal/handler/terminal.go`) spawns a shell process attached to a PTY (`internal/pty/`) and relays I/O bidirectionally: binary PTY output flows server→client, and JSON-encoded input/resize/ping messages flow client→server. The feature is gated on `WALLFACER_TERMINAL_ENABLED` (opt-in, default `false`).
+The handler (`internal/handler/terminal.go`) spawns a shell process attached to a PTY (`internal/pty/`) and relays I/O bidirectionally: binary PTY output flows server→client, and JSON-encoded input/resize/ping messages flow client→server. The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable).
 
 Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers.
 

@@ -783,24 +783,24 @@ func TestUpdateWorkspaces_ClearsWithEmpty(t *testing.T) {
 	}
 }
 
-func TestParseTerminalEnabled(t *testing.T) {
-	path := writeEnvFile(t, "WALLFACER_TERMINAL_ENABLED=true\n")
-	cfg, err := envconfig.Parse(path)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	if !cfg.TerminalEnabled {
-		t.Error("TerminalEnabled = false; want true")
-	}
-}
-
-func TestParseTerminalEnabledDefault(t *testing.T) {
+func TestParseTerminalEnabledDefaultsToTrue(t *testing.T) {
 	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
 	cfg, err := envconfig.Parse(path)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
+	if !cfg.TerminalEnabled {
+		t.Error("TerminalEnabled = false; want true when absent")
+	}
+}
+
+func TestParseTerminalEnabledFalse(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_TERMINAL_ENABLED=false\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
 	if cfg.TerminalEnabled {
-		t.Error("TerminalEnabled = true; want false when absent")
+		t.Error("TerminalEnabled = true; want false when explicitly set to false")
 	}
 }

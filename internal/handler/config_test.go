@@ -1499,7 +1499,7 @@ func TestGetConfig_IncludesTerminalEnabled(t *testing.T) {
 	if !ok {
 		t.Fatal("terminal_enabled key missing from config response")
 	}
-	if te.(bool) != false {
-		t.Errorf("terminal_enabled = %v; want false by default", te)
+	if te.(bool) != true {
+		t.Errorf("terminal_enabled = %v; want true by default", te)
 	}
 }

@@ -195,7 +195,7 @@ All configuration lives in `~/.wallfacer/.env` (auto-generated on first run). Th
 | `WALLFACER_AUTO_PUSH` | `false` | Enable automatic `git push` after task completion |
 | `WALLFACER_AUTO_PUSH_THRESHOLD` | `1` | Minimum commits ahead of upstream before auto-push triggers |
 | `WALLFACER_SANDBOX_FAST` | `true` | Enable fast-mode sandbox hints |
-| `WALLFACER_TERMINAL_ENABLED` | `false` | Enable the integrated host terminal panel. When enabled, the Terminal button in the status bar opens an interactive shell running on the host machine via WebSocket + PTY. |
+| `WALLFACER_TERMINAL_ENABLED` | `true` | Enable the integrated host terminal panel. The Terminal button in the status bar opens an interactive shell running on the host machine via WebSocket + PTY. Set to `false` to disable. |
 
 #### Data & Pagination
 
