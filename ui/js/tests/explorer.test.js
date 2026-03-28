@@ -475,6 +475,57 @@ describe("_relativePath", () => {
   });
 });
 
+describe("_getFileIcon", () => {
+  it("returns folder SVG for directories", () => {
+    const { win } = makeContext();
+    const closed = win._getFileIcon("src", "dir", false);
+    const open = win._getFileIcon("src", "dir", true);
+    expect(closed).toContain("<svg");
+    expect(open).toContain("<svg");
+    expect(closed).not.toBe(open);
+  });
+
+  it("returns distinct SVGs for known extensions", () => {
+    const { win } = makeContext();
+    const goIcon = win._getFileIcon("main.go", "file", false);
+    const jsIcon = win._getFileIcon("app.js", "file", false);
+    const mdIcon = win._getFileIcon("README.md", "file", false);
+    expect(goIcon).toContain("<svg");
+    expect(jsIcon).toContain("<svg");
+    expect(mdIcon).toContain("<svg");
+    // Go and JS should have different stroke colors
+    expect(goIcon).toContain("#00ADD8");
+    expect(jsIcon).toContain("#F0DB4F");
+  });
+
+  it("returns default file SVG for unknown extensions", () => {
+    const { win } = makeContext();
+    const icon = win._getFileIcon("data.xyz", "file", false);
+    expect(icon).toContain("<svg");
+    expect(icon).toContain("var(--text-muted)");
+  });
+
+  it("matches special filenames", () => {
+    const { win } = makeContext();
+    const makefile = win._getFileIcon("Makefile", "file", false);
+    const dockerfile = win._getFileIcon("Dockerfile", "file", false);
+    expect(makefile).toContain("<svg");
+    expect(dockerfile).toContain("#2496ED"); // Docker blue
+  });
+
+  it("matches Dockerfile.dev pattern", () => {
+    const { win } = makeContext();
+    const icon = win._getFileIcon("Dockerfile.dev", "file", false);
+    expect(icon).toContain("#2496ED");
+  });
+
+  it("matches .gitignore as git file", () => {
+    const { win } = makeContext();
+    const icon = win._getFileIcon(".gitignore", "file", false);
+    expect(icon).toContain("#E44D26");
+  });
+});
+
 describe("_isEditDirty", () => {
   it("returns false when not in edit mode", () => {
     const { win } = makeContext();

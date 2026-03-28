@@ -599,6 +599,208 @@ function _renderTree() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// File icons (Task 11)
+// ---------------------------------------------------------------------------
+
+var _iconSvgAttrs =
+  'width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+
+function _svgWrap(color, paths) {
+  return (
+    "<svg " + _iconSvgAttrs + ' stroke="' + color + '">' + paths + "</svg>"
+  );
+}
+
+// Standard path fragments
+var _pFolder =
+  '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>';
+var _pFolderOpen =
+  '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="9" y1="9" x2="9" y2="21"></line>';
+var _pFile =
+  '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline>';
+var _pGear =
+  '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>';
+var _pImage =
+  '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline>';
+var _pDatabase =
+  '<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>';
+
+var _extIconMap = {
+  go: function () {
+    return _svgWrap("#00ADD8", _pFile);
+  },
+  js: function () {
+    return _svgWrap("#F0DB4F", _pFile);
+  },
+  mjs: function () {
+    return _svgWrap("#F0DB4F", _pFile);
+  },
+  cjs: function () {
+    return _svgWrap("#F0DB4F", _pFile);
+  },
+  jsx: function () {
+    return _svgWrap("#61DAFB", _pFile);
+  },
+  ts: function () {
+    return _svgWrap("#3178C6", _pFile);
+  },
+  tsx: function () {
+    return _svgWrap("#3178C6", _pFile);
+  },
+  css: function () {
+    return _svgWrap("#A86EDB", _pFile);
+  },
+  scss: function () {
+    return _svgWrap("#C76494", _pFile);
+  },
+  html: function () {
+    return _svgWrap("#E44D26", _pFile);
+  },
+  htm: function () {
+    return _svgWrap("#E44D26", _pFile);
+  },
+  json: function () {
+    return _svgWrap("#A0B840", _pFile);
+  },
+  md: function () {
+    return _svgWrap("#6CB6FF", _pFile);
+  },
+  mdx: function () {
+    return _svgWrap("#6CB6FF", _pFile);
+  },
+  yaml: function () {
+    return _svgWrap("#CB4B60", _pFile);
+  },
+  yml: function () {
+    return _svgWrap("#CB4B60", _pFile);
+  },
+  py: function () {
+    return _svgWrap("#3776AB", _pFile);
+  },
+  pyi: function () {
+    return _svgWrap("#3776AB", _pFile);
+  },
+  rs: function () {
+    return _svgWrap("#C4623F", _pFile);
+  },
+  sh: function () {
+    return _svgWrap("#4EAA25", _pFile);
+  },
+  bash: function () {
+    return _svgWrap("#4EAA25", _pFile);
+  },
+  zsh: function () {
+    return _svgWrap("#4EAA25", _pFile);
+  },
+  sql: function () {
+    return _svgWrap("#E8A838", _pDatabase);
+  },
+  env: function () {
+    return _svgWrap("var(--text-muted)", _pGear);
+  },
+  toml: function () {
+    return _svgWrap("var(--text-muted)", _pGear);
+  },
+  ini: function () {
+    return _svgWrap("var(--text-muted)", _pGear);
+  },
+  cfg: function () {
+    return _svgWrap("var(--text-muted)", _pGear);
+  },
+  png: function () {
+    return _svgWrap("#4EAA86", _pImage);
+  },
+  jpg: function () {
+    return _svgWrap("#4EAA86", _pImage);
+  },
+  jpeg: function () {
+    return _svgWrap("#4EAA86", _pImage);
+  },
+  gif: function () {
+    return _svgWrap("#C060C0", _pImage);
+  },
+  svg: function () {
+    return _svgWrap("#E44D26", _pImage);
+  },
+  webp: function () {
+    return _svgWrap("#4EAA86", _pImage);
+  },
+  ico: function () {
+    return _svgWrap("#4EAA86", _pImage);
+  },
+  txt: function () {
+    return _svgWrap("var(--text-muted)", _pFile);
+  },
+  log: function () {
+    return _svgWrap("var(--text-muted)", _pFile);
+  },
+};
+
+// Special full-filename matches (case-insensitive)
+var _nameIconMap = {
+  makefile: function () {
+    return _svgWrap("#6D8C2E", _pGear);
+  },
+  dockerfile: function () {
+    return _svgWrap("#2496ED", _pFile);
+  },
+  license: function () {
+    return _svgWrap("#D4A520", _pFile);
+  },
+  "claude.md": function () {
+    return _svgWrap("#D97757", _pFile);
+  },
+  "agents.md": function () {
+    return _svgWrap("#D97757", _pFile);
+  },
+};
+
+function _getFileIcon(name, type, expanded) {
+  if (type === "dir") {
+    return expanded
+      ? _svgWrap("var(--text-muted)", _pFolderOpen)
+      : _svgWrap("var(--text-muted)", _pFolder);
+  }
+
+  var lower = name.toLowerCase();
+
+  // Check special filenames first
+  if (_nameIconMap[lower]) return _nameIconMap[lower]();
+
+  // Dockerfile.* and docker-compose.* patterns
+  if (
+    lower.indexOf("dockerfile") === 0 ||
+    lower.indexOf("docker-compose") === 0
+  ) {
+    return _svgWrap("#2496ED", _pFile);
+  }
+
+  // .gitignore, .gitmodules, .gitattributes
+  if (
+    lower === ".gitignore" ||
+    lower === ".gitmodules" ||
+    lower === ".gitattributes"
+  ) {
+    return _svgWrap("#E44D26", _pFile);
+  }
+
+  // README.* variants
+  if (lower.indexOf("readme") === 0) {
+    return _svgWrap("#6CB6FF", _pFile);
+  }
+
+  // Extension-based lookup
+  var dot = lower.lastIndexOf(".");
+  if (dot >= 0) {
+    var ext = lower.slice(dot + 1);
+    if (_extIconMap[ext]) return _extIconMap[ext]();
+  }
+
+  // Default file icon
+  return _svgWrap("var(--text-muted)", _pFile);
+}
+
 function _renderNode(node, depth, container) {
   var el = document.createElement("div");
   var classes = "explorer-node";
@@ -628,6 +830,12 @@ function _renderNode(node, depth, container) {
     }
   }
   el.appendChild(toggle);
+
+  // File/folder icon
+  var iconSpan = document.createElement("span");
+  iconSpan.className = "explorer-node__icon";
+  iconSpan.innerHTML = _getFileIcon(node.name, node.type, node.expanded);
+  el.appendChild(iconSpan);
 
   // Name
   var nameSpan = document.createElement("span");
@@ -787,6 +995,7 @@ window._basename = _basename;
 window._classifyFileResponse = _classifyFileResponse;
 window._relativePath = _relativePath;
 window._isEditDirty = _isEditDirty;
+window._getFileIcon = _getFileIcon;
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", _initExplorer);
