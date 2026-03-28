@@ -46,7 +46,7 @@ func TestTaskWorkerEnsureRunning(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	})
+	}, "")
 	t.Cleanup(w.stop)
 
 	ctx := context.Background()
@@ -72,7 +72,7 @@ func TestTaskWorkerExec(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	})
+	}, "")
 	t.Cleanup(w.stop)
 
 	ctx := context.Background()
@@ -107,7 +107,7 @@ func TestTaskWorkerStop(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	})
+	}, "")
 
 	ctx := context.Background()
 	if err := w.ensureRunning(ctx); err != nil {
@@ -139,7 +139,7 @@ func TestTaskWorkerExecAfterStop(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	})
+	}, "")
 	t.Cleanup(w.stop)
 
 	ctx := context.Background()
@@ -178,7 +178,7 @@ func TestExecHandleKillDoesNotRemoveContainer(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	})
+	}, "")
 	t.Cleanup(w.stop)
 
 	ctx := context.Background()

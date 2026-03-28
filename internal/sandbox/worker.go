@@ -18,18 +18,21 @@ import (
 type taskWorker struct {
 	mu            sync.Mutex
 	command       string   // container runtime binary (podman/docker)
-	containerName string   // e.g. "wallfacer-task-abcd1234"
+	containerName string   // e.g. "wallfacer-worker-abcd1234"
 	createArgs    []string // args for podman create (no runtime binary, no "create" verb)
+	entrypoint    string   // entrypoint script to invoke via exec (e.g. "/usr/local/bin/entrypoint.sh")
 	alive         bool     // true when the container is running
 }
 
 // newTaskWorker creates a taskWorker. createArgs are the arguments for
-// `podman create` (excluding the binary path and "create" verb).
-func newTaskWorker(command, containerName string, createArgs []string) *taskWorker {
+// `podman create` (excluding the binary path). entrypoint is the script
+// to invoke via `podman exec` (since exec does not use the image ENTRYPOINT).
+func newTaskWorker(command, containerName string, createArgs []string, entrypoint string) *taskWorker {
 	return &taskWorker{
 		command:       command,
 		containerName: containerName,
 		createArgs:    createArgs,
+		entrypoint:    entrypoint,
 	}
 }
 
@@ -64,6 +67,8 @@ func (w *taskWorker) ensureRunning(ctx context.Context) error {
 
 	// Start the container.
 	if err := cmdexec.New(w.command, "start", w.containerName).WithContext(ctx).Run(); err != nil {
+		// Clean up the container we just created to avoid leaving it in "Created" state.
+		_ = cmdexec.New(w.command, "rm", "-f", w.containerName).Run()
 		return fmt.Errorf("worker start: %w", err)
 	}
 
@@ -79,9 +84,13 @@ func (w *taskWorker) exec(ctx context.Context, cmd []string) (Handle, error) {
 		return nil, fmt.Errorf("worker ensure running: %w", err)
 	}
 
-	// Build the exec command: <runtime> exec <name> <cmd...>
-	args := make([]string, 0, 2+len(cmd))
+	// Build the exec command. `podman exec` does not use the image's ENTRYPOINT,
+	// so we must invoke the entrypoint script explicitly when configured.
+	args := make([]string, 0, 3+len(cmd))
 	args = append(args, "exec", w.containerName)
+	if w.entrypoint != "" {
+		args = append(args, w.entrypoint)
+	}
 	args = append(args, cmd...)
 
 	c := exec.CommandContext(ctx, w.command, args...)

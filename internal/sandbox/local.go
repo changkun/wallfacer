@@ -85,7 +85,10 @@ func (b *LocalBackend) launchViaTaskWorker(ctx context.Context, spec ContainerSp
 	w, ok := b.taskWorkers[taskID]
 	if !ok {
 		workerName := "wallfacer-worker-" + taskID[:min(8, len(taskID))]
-		w = newTaskWorker(b.command, workerName, spec.BuildCreate())
+		// Override the spec name so BuildCreate() uses the worker name
+		// in --name, matching what ensureRunning() passes to podman start.
+		spec.Name = workerName
+		w = newTaskWorker(b.command, workerName, spec.BuildCreate(), "/usr/local/bin/entrypoint.sh")
 		b.taskWorkers[taskID] = w
 		b.workerCreates.Add(1)
 		b.incWorkerMetric("wallfacer_container_worker_creates_total")
