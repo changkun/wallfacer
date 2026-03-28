@@ -1,6 +1,6 @@
 # Task 9: CI Builds and Release Distribution
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 8
 **Phase:** Distribution
 **Effort:** Large

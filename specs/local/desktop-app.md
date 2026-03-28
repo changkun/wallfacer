@@ -1,6 +1,6 @@
 # Native Desktop App
 
-**Status:** Not started | **Date:** 2026-02-21
+**Status:** Complete | **Date:** 2026-02-21
 
 ## Goal
 

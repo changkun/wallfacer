@@ -30,7 +30,8 @@ make build          # Build Go binary + Claude & Codex sandbox images
 make build-binary   # Build just the Go binary
 make build-claude   # Build the Claude Code sandbox image
 make build-codex    # Build the OpenAI Codex sandbox image
-make build-desktop  # Build native desktop app for current platform (requires wails CLI)
+make install-wails  # Install the Wails CLI (tracked as tool in go.mod)
+make build-desktop  # Build native desktop app for current platform (uses go tool wails)
 make build-desktop-darwin   # Build macOS .app bundle
 make build-desktop-windows  # Build Windows .exe
 make build-desktop-linux    # Build Linux desktop binary
