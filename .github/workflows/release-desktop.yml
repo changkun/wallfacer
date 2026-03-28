@@ -1,0 +1,126 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-desktop:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            platform: darwin/universal
+            artifact: Wallfacer-darwin-universal.zip
+          - runner: windows-latest
+            platform: windows/amd64
+            artifact: Wallfacer-windows-amd64.exe
+          - runner: ubuntu-latest
+            platform: linux/amd64
+            artifact: Wallfacer-linux-amd64
+
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: Build desktop app
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          go tool wails build -tags desktop -skipbindings -s -platform ${{ matrix.platform }} \
+            -ldflags "-s -w -X changkun.de/x/wallfacer/internal/cli.Version=${VERSION}"
+
+      # --- macOS: code sign, notarize, and zip ---
+
+      - name: Import macOS signing certificate
+        if: runner.os == 'macOS' && env.APPLE_CERTIFICATE_P12 != ''
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > cert.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "" "$KEYCHAIN_PATH"
+          security import cert.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          rm cert.p12
+
+      - name: Sign macOS app
+        if: runner.os == 'macOS' && env.APPLE_CERTIFICATE_P12 != ''
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+        run: |
+          codesign --deep --force --options runtime \
+            --sign "Developer ID Application" \
+            build/bin/Wallfacer.app
+
+      - name: Notarize macOS app
+        if: runner.os == 'macOS' && env.APPLE_CERTIFICATE_P12 != ''
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent build/bin/Wallfacer.app Wallfacer-notarize.zip
+          xcrun notarytool submit Wallfacer-notarize.zip \
+            --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple build/bin/Wallfacer.app
+          rm Wallfacer-notarize.zip
+
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent build/bin/Wallfacer.app Wallfacer-darwin-universal.zip
+
+      # --- Windows: code sign and rename ---
+
+      - name: Sign Windows executable
+        if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE_P12 != ''
+        env:
+          WINDOWS_CERTIFICATE_P12: ${{ secrets.WINDOWS_CERTIFICATE_P12 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: powershell
+        run: |
+          $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_P12)
+          [IO.File]::WriteAllBytes("cert.p12", $certBytes)
+          & signtool sign /f cert.p12 /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+            /tr http://timestamp.digicert.com /td sha256 /fd sha256 `
+            build\bin\Wallfacer.exe
+          Remove-Item cert.p12
+
+      - name: Rename Windows executable
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: Move-Item build\bin\Wallfacer.exe Wallfacer-windows-amd64.exe
+
+      # --- Linux: rename ---
+
+      - name: Rename Linux binary
+        if: runner.os == 'Linux'
+        run: mv build/bin/Wallfacer Wallfacer-linux-amd64
+
+      # --- Upload ---
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}

@@ -92,6 +92,10 @@ $PREV_NOTES
 8. Be exciting, energetic, and inspiring — but grounded in what actually shipped
 9. Focus on user-facing impact, not internal refactoring
 10. Use **bold** for emphasis on key features
+11. If any desktop app changes shipped, include a "Desktop App" section with download links:
+    - **macOS:** \`Wallfacer-darwin-universal.zip\` — extract and drag to Applications
+    - **Windows:** \`Wallfacer-windows-amd64.exe\` — run directly (allow in SmartScreen on first launch)
+    - **Linux:** \`Wallfacer-linux-amd64\` — \`chmod +x\` and run (requires WebKitGTK)
 
 Output ONLY the release notes markdown, nothing else.
 ENDPROMPT
