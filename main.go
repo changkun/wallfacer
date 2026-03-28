@@ -32,6 +32,11 @@ func main() {
 		cli.RunExec(configDir, os.Args[2:])
 	case "run":
 		cli.RunServer(configDir, os.Args[2:], uiFiles, docsFiles)
+	case "desktop":
+		if err := cli.RunDesktop(configDir, os.Args[2:], uiFiles, docsFiles); err != nil {
+			fmt.Fprintln(os.Stderr, "wallfacer:", err)
+			os.Exit(1)
+		}
 	case "status":
 		cli.RunStatus(configDir, os.Args[2:])
 	case "-help", "--help", "-h":
