@@ -1,6 +1,6 @@
 # Task 3: System Tray — Static Skeleton
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 2
 **Phase:** System tray
 **Effort:** Medium
@@ -41,3 +41,12 @@ Add a system tray icon with a static menu containing "Open Dashboard" and "Quit"
 - Do NOT add polling, dynamic status, or automation toggles yet
 - Do NOT implement platform-specific icon variants (Windows .ico, etc.) yet
 - Keep the menu static — no task counts, no cost display
+
+## Implementation notes
+
+- **Systray library:** Wails v2 has no public systray API. Used `fyne.io/systray` instead, with `RunWithExternalLoop` to coexist with Wails' event loop.
+- **Icon format:** Generated programmatically as monochrome 22x22 and 44x44 PNGs (2x2 grid of squares). Used `SetTemplateIcon` for macOS template image support.
+- **Icon embedding:** Icons are embedded via `//go:embed` in `assets/icons/embed.go` (desktop build tag) so non-desktop builds are not affected.
+- **Window focus:** "Open Dashboard" uses `wailsRuntime.WindowShow()`. The `wailsCtx` is captured in `OnStartup` and shared with the tray callbacks.
+- **Quit:** "Quit" calls `wailsRuntime.Quit()` which triggers `OnShutdown`, which calls `tm.Stop()` then `sc.Shutdown()`.
+- **macOS hide-on-close:** `HideWindowOnClose: true` is set only on macOS (`runtime.GOOS == "darwin"`) so closing the window hides it instead of quitting.

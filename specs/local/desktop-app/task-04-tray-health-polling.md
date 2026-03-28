@@ -1,6 +1,6 @@
 # Task 4: System Tray — Health Polling and Dynamic State
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3
 **Phase:** System tray
 **Effort:** Medium
@@ -51,3 +51,11 @@ Add a 5-second poll loop to the tray that fetches health data from the server an
 - Do NOT add automation toggles yet (Task 5)
 - Do NOT implement platform-specific icon behaviors yet (Task 7)
 - The HTTP client should respect the server API key if configured (pass `Authorization: Bearer` header)
+
+## Implementation notes
+
+- **Systray library:** Continues using `fyne.io/systray` from Task 3 (Wails v2 has no public systray API).
+- **Icon variants:** Generated programmatically — `tray-active.png` has a green (#22C55E) dot in the bottom-right corner, `tray-attention.png` has an orange (#F97316) dot. Both at 1x (22px) and 2x (44px).
+- **ServerComponents.ServerAPIKey:** Added this field to `ServerComponents` so `RunDesktop` can pass the API key to the tray manager for authenticated health polling.
+- **Poll timeout:** HTTP client uses a 3-second timeout to avoid blocking the tray if the server is slow.
+- **Initial poll:** `poll()` is called immediately on startup, then every 5 seconds via ticker.
