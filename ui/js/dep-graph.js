@@ -186,6 +186,20 @@ function renderDependencyGraph(tasks) {
 }
 
 function toggleDependencyGraph() {
+  if (!window.depGraphEnabled) {
+    // Opening dep graph — close terminal panel first.
+    if (typeof _hideTerminalPanel === "function") _hideTerminalPanel();
+    if (typeof _showDepGraphPanel === "function") {
+      _showDepGraphPanel();
+      return;
+    }
+  } else {
+    if (typeof _hideDepGraphPanel === "function") {
+      _hideDepGraphPanel();
+      return;
+    }
+  }
+  // Fallback if status-bar helpers are not loaded yet.
   window.depGraphEnabled = !window.depGraphEnabled;
   var btn = document.getElementById("status-bar-depgraph-btn");
   if (btn)

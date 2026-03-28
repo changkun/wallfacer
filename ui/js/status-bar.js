@@ -3,8 +3,8 @@
 // workspace, in-progress count, waiting count, and a stub terminal panel.
 
 function initStatusBar() {
-  // Keyboard shortcut: backtick toggles the terminal panel when no
-  // input/textarea/select/contenteditable element is focused.
+  // Keyboard shortcut: backtick cycles bottom panels:
+  //   nothing open → terminal → dep graph → close (all hidden)
   document.addEventListener("keydown", function (e) {
     if (e.key !== "`") return;
     var tag = document.activeElement && document.activeElement.tagName;
@@ -14,7 +14,7 @@ function initStatusBar() {
       document.activeElement.getAttribute("contenteditable");
     if (ce !== null && ce !== "false") return;
     e.preventDefault();
-    toggleTerminalPanel();
+    _cycleBottomPanel();
   });
 
   updateStatusBar();
@@ -111,15 +111,70 @@ function _updateWorkspace() {
   el.style.display = label ? "" : "none";
 }
 
-function toggleTerminalPanel() {
+// Cycle: nothing → terminal → dep graph → close
+function _cycleBottomPanel() {
+  var termPanel = document.getElementById("status-bar-panel");
+  var termOpen = termPanel && !termPanel.classList.contains("hidden");
+  var depOpen = !!window.depGraphEnabled;
+
+  if (!termOpen && !depOpen) {
+    // Nothing open → show terminal
+    _showTerminalPanel();
+  } else if (termOpen && !depOpen) {
+    // Terminal open → close terminal, show dep graph
+    _hideTerminalPanel();
+    _showDepGraphPanel();
+  } else {
+    // Dep graph open (or both) → close all
+    _hideTerminalPanel();
+    _hideDepGraphPanel();
+  }
+}
+
+function _showTerminalPanel() {
   var panel = document.getElementById("status-bar-panel");
   var handle = document.getElementById("status-bar-panel-resize");
   var btn = document.getElementById("status-bar-terminal-btn");
+  if (panel) panel.classList.remove("hidden");
+  if (handle) handle.classList.remove("hidden");
+  if (btn) btn.setAttribute("aria-expanded", "true");
+}
+
+function _hideTerminalPanel() {
+  var panel = document.getElementById("status-bar-panel");
+  var handle = document.getElementById("status-bar-panel-resize");
+  var btn = document.getElementById("status-bar-terminal-btn");
+  if (panel) panel.classList.add("hidden");
+  if (handle) handle.classList.add("hidden");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+function _showDepGraphPanel() {
+  window.depGraphEnabled = true;
+  var btn = document.getElementById("status-bar-depgraph-btn");
+  if (btn) btn.setAttribute("aria-expanded", "true");
+  if (typeof scheduleRender === "function") scheduleRender();
+  else if (typeof render === "function") render();
+}
+
+function _hideDepGraphPanel() {
+  window.depGraphEnabled = false;
+  var btn = document.getElementById("status-bar-depgraph-btn");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+  if (typeof scheduleRender === "function") scheduleRender();
+  else if (typeof render === "function") render();
+}
+
+function toggleTerminalPanel() {
+  var panel = document.getElementById("status-bar-panel");
   if (!panel) return;
   var isHidden = panel.classList.contains("hidden");
-  panel.classList.toggle("hidden", !isHidden);
-  if (handle) handle.classList.toggle("hidden", !isHidden);
-  if (btn) btn.setAttribute("aria-expanded", isHidden ? "true" : "false");
+  if (isHidden) {
+    _hideDepGraphPanel();
+    _showTerminalPanel();
+  } else {
+    _hideTerminalPanel();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -226,18 +281,14 @@ function loadSystemStatus() {
       if (data.container_circuit) {
         var cc = data.container_circuit;
         var ccColor =
-          cc.state === "closed"
-            ? "var(--text-muted)"
-            : "var(--accent)";
+          cc.state === "closed" ? "var(--text-muted)" : "var(--accent)";
         lines.push(
           '<div>Circuit breaker: <strong style="color:' +
             ccColor +
             '">' +
             cc.state +
             "</strong>" +
-            (cc.failures > 0
-              ? " (" + cc.failures + " failures)"
-              : "") +
+            (cc.failures > 0 ? " (" + cc.failures + " failures)" : "") +
             "</div>",
         );
       }
@@ -253,7 +304,8 @@ function loadSystemStatus() {
           "</strong>";
         if (ws.creates > 0 || ws.execs > 0) {
           var total = (ws.execs || 0) + (ws.fallbacks || 0);
-          var ratio = total > 0 ? Math.round(((ws.execs || 0) / total) * 100) : 0;
+          var ratio =
+            total > 0 ? Math.round(((ws.execs || 0) / total) * 100) : 0;
           workerLine +=
             " &middot; Creates: " +
             (ws.creates || 0) +
@@ -280,7 +332,9 @@ function loadSystemStatus() {
             actParts.push(label);
           }
           lines.push(
-            '<div style="padding-left:12px;">' + actParts.join(" &middot; ") + "</div>",
+            '<div style="padding-left:12px;">' +
+              actParts.join(" &middot; ") +
+              "</div>",
           );
         }
       }
