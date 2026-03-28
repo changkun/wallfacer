@@ -185,6 +185,9 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `DELETE /api/images` — Remove a cached sandbox image
 - `GET /api/images/pull/stream` — SSE stream of pull progress
 
+### File Explorer
+- `GET /api/explorer/tree` — List one level of a workspace directory
+
 ### Admin
 - `POST /api/admin/rebuild-index` — Rebuild the in-memory search index from disk
 

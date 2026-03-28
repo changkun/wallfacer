@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 79,
+  "route_count": 80,
   "routes": [
     {
       "method": "GET",
@@ -671,6 +671,15 @@
       "description": "Rebuild the in-memory search index from disk; returns the number of repaired entries.",
       "tags": [
         "admin"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/explorer/tree",
+      "name": "ExplorerTree",
+      "description": "List one level of a workspace directory.",
+      "tags": [
+        "explorer"
       ]
     },
     {

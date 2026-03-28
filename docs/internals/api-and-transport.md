@@ -94,6 +94,8 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/tasks/{id}/spans` | Span timing statistics for a task |
 | `GET /api/tasks/{id}/oversight` | Oversight summary for a completed task |
 | `GET /api/tasks/{id}/oversight/test` | Test oversight summary for a task |
+| **File Explorer** | |
+| `GET /api/explorer/tree` | List one level of a workspace directory |
 | **Admin** | |
 | `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
 | **Refinement agent** | |

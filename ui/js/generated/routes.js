@@ -231,6 +231,13 @@ var Routes = {
     },
   },
 
+  explorer: {
+    // GET /api/explorer/tree
+    tree: function () {
+      return "/api/explorer/tree";
+    },
+  },
+
   tasks: {
     // GET /api/tasks
     list: function () {

@@ -496,6 +496,15 @@ var Routes = []Route{
 		Tags:        []string{"admin"},
 	},
 
+	// --- File explorer ---
+
+	{
+		Method: http.MethodGet, Pattern: "/api/explorer/tree", Name: "ExplorerTree",
+		JSName:      "tree",
+		Description: "List one level of a workspace directory.",
+		Tags:        []string{"explorer"},
+	},
+
 	// --- Refinement agent ---
 
 	{
