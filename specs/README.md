@@ -29,7 +29,7 @@ What has shipped vs what remains. Items marked ✅ are complete; ○ are not sta
 │
 ├── next ──────────────────────────
 │
-├──▶ ◐  M4: File Explorer (2/10)
+├──▶ ◐  M4: File Explorer (4/10)
 ├──▶ ○  M5: Host Terminal
 ├──▶ ○  M6: Cloud Deployment (overview)
 │    ├──▶ ○  M6a: Tenant Filesystem
@@ -37,7 +37,8 @@ What has shipped vs what remains. Items marked ✅ are complete; ○ are not sta
 │    └──▶ ○  M6c: Cloud Infrastructure (IaC per provider)
 ├──▶ ○  M7: Desktop App
 ├──▶ ○  M8a: Authentication (OAuth/OIDC login, sessions, identity)
-└──▶ ○  M8: Multi-Tenant (capstone, requires M8a)
+├──▶ ○  M8: Multi-Tenant (capstone, requires M8a)
+└──▶ ○  M8b: Tenant API (external API, webhooks; requires M8a + M8)
 
 ○  Epic Coordination (blocked on M4)
 ○  Independent: 90–93 (oversight, visual, live-serve, agent abstraction)
@@ -61,6 +62,9 @@ Full milestone dependency graph showing how everything relates.
                                  │    M8a: Authentication (OAuth, sessions) ─────────┤
                                  │                                                   │
                                  │    M6c: Cloud Infra (IaC per provider) ───────────┘
+                                 │                                                   │
+                                 │                                              M8b: Tenant API
+                                 │                                         (external API, webhooks)
                                  │      (DO, AWS, GCP, Alibaba, self-hosted)
                                  │
                                  ├──▶ Native Containerization (platform-specific)
@@ -92,6 +96,8 @@ M1 (sandbox interface) ───────────────────
 M2 (storage interface) ──▶ M2 cloud (PG, S3) ───────────────────────────────────┤
 M8a (authentication) ───────────────────────────────────────────────────────────┤
 M6c (cloud infra: DO, AWS, GCP, Alibaba, self-hosted IaC) ─────────────────────┘
+                                                                                │
+M8a (authentication) + M8 (multi-tenant) ──▶ M8b: Tenant API (external API, webhooks)
 ```
 
 ## Milestones
@@ -101,19 +107,21 @@ M6c (cloud infra: DO, AWS, GCP, Alibaba, self-hosted IaC) ───────�
 | **M1** | Sandbox backend interface | [01-sandbox-backends.md](01-sandbox-backends.md) | **Complete** | `sandbox.Backend`/`sandbox.Handle` + `LocalBackend` |
 | **M2** | Storage backend interface | [02-storage-backends.md](02-storage-backends.md) | **Enablers complete** | `StorageBackend` + `FilesystemBackend` + `ListBlobs`; cloud backends (PG, S3) deferred |
 | **M3** | Container reuse | [03-container-reuse.md](03-container-reuse.md) | **Complete** (core) | Per-task worker containers via `podman exec`; ~10x startup savings per turn |
-| **M4** | File explorer | [04-file-explorer.md](04-file-explorer.md) | **In progress** (2/10 tasks done) | Browse + edit workspace files in the web UI |
+| **M4** | File explorer | [04-file-explorer.md](04-file-explorer.md) | **In progress** (3/10 tasks done) | Browse + edit workspace files in the web UI |
 | **M5** | Host terminal | [05-host-terminal.md](05-host-terminal.md) | Not started | Interactive shell in the web UI (WebSocket + PTY) |
 | **M6** | Cloud deployment | [06-cloud-backends.md](06-cloud-backends.md) | Not started | Overview: VPS recipe (done), per-user instance architecture, sub-milestone index |
 | **M7** | Desktop app | [07-native-desktop-app.md](07-native-desktop-app.md) | Not started | Wails native wrapper (macOS .app, Windows .exe) |
 | **M8** | Multi-tenant (capstone) | [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) | Not started | Control plane, instance provisioning and lifecycle (auth via M8a) |
 
-## Branch from M8 — Authentication
+## Branches from M8 — Authentication & Tenant API
 
 | Spec | Status | Delivers |
 |------|--------|----------|
 | [08a-authentication.md](08a-authentication.md) | Not started | OAuth2/OIDC login (GitHub, Google, generic), session management, user identity model, trusted proxy mode for M8 |
+| [08b-tenant-api.md](08b-tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks, rate limiting. Programmatic access for CI/CD and scripting. |
 
-Implement before M8. Also independently useful for single-host deployments (replaces static API key with real login).
+M8a: Implement before M8. Also independently useful for single-host deployments (replaces static API key with real login).
+M8b: Implement after M8 control plane exists. Start with API key auth + task CRUD, then add webhooks.
 
 ## Branches from M1 — Native Sandbox Backends
 

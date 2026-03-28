@@ -1,6 +1,6 @@
 # Task 2: Backend File Content Reading
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** Phase 1 — Read-Only Browsing + Preview
 **Effort:** Medium
@@ -68,3 +68,9 @@ Add to `internal/handler/explorer_test.go`:
 - Do NOT implement file writing (Task 7)
 - Do NOT add frontend code
 - Do NOT add caching — file reads are direct from disk; caching is a future optimization
+
+## Implementation notes
+
+- **Non-existent path handling:** The spec assumed `isWithinWorkspace` would pass for non-existent paths, but it uses `filepath.EvalSymlinks` which requires the target to exist. Added a fallback in `ExplorerReadFile` that cleans the raw path and checks containment manually when `isWithinWorkspace` fails, returning 404 for paths within the workspace that don't exist.
+- **Binary detection:** Used `slices.Contains(data, 0)` instead of a manual loop, per linter suggestion.
+- **`ExplorerMaxFileSize` constant:** Added to `internal/constants/` rather than defining locally, since it's referenced by name in tests and follows the existing pattern for size limits.
