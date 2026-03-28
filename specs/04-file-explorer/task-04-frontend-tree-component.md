@@ -1,6 +1,6 @@
 # Task 4: Frontend Tree Component
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1, Task 3
 **Phase:** Phase 1 — Read-Only Browsing + Preview
 **Effort:** Large
@@ -82,3 +82,11 @@ Note: Most tree logic involves DOM manipulation and fetch calls, which are teste
 - Do NOT implement the Ctrl+E keyboard shortcut (Task 6)
 - Do NOT implement file editing
 - Keep tree state in memory only — no persistence of expanded nodes across page reloads
+
+## Implementation notes
+
+- The spec suggested separate `let` declarations for `_explorerOpen` and `_explorerWidth` state vars, but these were already managed by Task 3 via localStorage and panel DOM state, so no duplicate vars were needed.
+- `_openFilePreview()` is a stub as specified — will be implemented in Task 5.
+- Tree state uses a simple object graph (`_explorerRoots` array of node objects) rather than a Map/WeakMap, matching the vanilla JS style of the rest of the codebase.
+- `reloadExplorerTree()` is exposed globally so workspace.js can call it when the active workspace changes.
+- Pure helper functions (`_buildChildNodes`, `_getVisibleNodes`, `_findParent`, `_basename`) are exposed on `window` for testability.
