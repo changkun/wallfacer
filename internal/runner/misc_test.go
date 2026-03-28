@@ -666,10 +666,11 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 	})
 	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{repo: wt}, "", nil, "")
 
-	// The main repo's .git should be mounted at the same host path.
+	// The main repo's .git should be mounted. The source path is translated
+	// for the container runtime, but the destination is the raw host path
+	// (so git worktree references resolve inside the container on Unix hosts).
 	gitDir := filepath.Join(repo, ".git")
-	translatedGitDir := hostPath(gitDir, "podman")
-	expectedGitMount := "type=bind,src=" + translatedGitDir + ",dst=" + translatedGitDir
+	expectedGitMount := "type=bind,src=" + hostPath(gitDir, "podman") + ",dst=" + gitDir
 	if z := mountOpts("z"); z != "" {
 		expectedGitMount += "," + z
 	}
