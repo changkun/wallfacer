@@ -170,3 +170,30 @@ The poll runs only while the tray is active (always, since the tray persists as 
 ## Rejected Alternative: Electron
 
 Would run the Go binary as a child process. Adds ~150 MB for bundled Chromium, introduces a Node.js runtime, more complex build pipeline. No meaningful capability gain over Wails for this use case.
+
+---
+
+## Task Breakdown
+
+| # | Task | Depends on | Effort | Status |
+|---|------|-----------|--------|--------|
+| 1 | [Wails dependency & scaffold](desktop-app/task-01-wails-dependency.md) | — | Small | Todo |
+| 2 | [Desktop subcommand & Wails window](desktop-app/task-02-wails-window.md) | 1 | Medium | Todo |
+| 3 | [System tray — static skeleton](desktop-app/task-03-tray-skeleton.md) | 2 | Medium | Todo |
+| 4 | [System tray — health polling & dynamic state](desktop-app/task-04-tray-health-polling.md) | 3 | Medium | Todo |
+| 5 | [System tray — automation toggles](desktop-app/task-05-tray-toggles.md) | 4 | Medium | Todo |
+| 6 | [System tray — cost & stats display](desktop-app/task-06-tray-cost-display.md) | 4 | Small | Todo |
+| 7 | [Platform-specific behaviors](desktop-app/task-07-platform-behaviors.md) | 3 | Medium | Todo |
+| 8 | [App icons & build packaging](desktop-app/task-08-icons-packaging.md) | 2, 7 | Medium | Todo |
+
+```mermaid
+graph LR
+  1[Task 1: Wails dependency] --> 2[Task 2: Desktop window]
+  2 --> 3[Task 3: Tray skeleton]
+  3 --> 4[Task 4: Health polling]
+  4 --> 5[Task 5: Automation toggles]
+  4 --> 6[Task 6: Cost display]
+  3 --> 7[Task 7: Platform behaviors]
+  2 --> 8[Task 8: Icons & packaging]
+  7 --> 8
+```
