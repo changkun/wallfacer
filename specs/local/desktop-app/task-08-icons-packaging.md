@@ -1,6 +1,6 @@
 # Task 8: App Icons and Build Packaging
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 2, Task 7
 **Phase:** Packaging
 **Effort:** Medium
