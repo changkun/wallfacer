@@ -24,7 +24,8 @@ Local Product                          Cloud Platform
   ○ Container Exec
   ○ Oversight Risk Scoring             Shared Design
   ○ Visual Verification                  ○ Authentication
-  ○ Live Serve                           ○ Agent Abstraction
+  ○ OAuth Token Setup                    ○ Agent Abstraction
+  ○ Live Serve
                                          ○ Native Sandboxes (Linux/macOS/Win)
                                          ○ Overlay Snapshots
 ```
@@ -63,6 +64,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [oversight-risk-scoring.md](local/oversight-risk-scoring.md) | Not started | Real-time agent action risk assessment |
 | [visual-verification.md](local/visual-verification.md) | Not started | Visual verification for UI changes |
 | [live-serve.md](local/live-serve.md) | Not started | Build and run developed software from within Wallfacer |
+| [oauth-token-setup.md](local/oauth-token-setup.md) | Not started | Browser-based OAuth sign-in for Claude and Codex credentials |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
 
 ### Local product dependencies
@@ -77,7 +79,7 @@ Host Terminal (done) ──▶ Terminal Sessions ──▶ Container Exec
 
 File Explorer + Host Terminal ──▶ Desktop App (ships with all local UX built in)
 
-Independent: Oversight Risk Scoring, Visual Verification, Live Serve
+Independent: Oversight Risk Scoring, Visual Verification, Live Serve, OAuth Token Setup
 ```
 
 ---
