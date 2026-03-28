@@ -117,8 +117,7 @@ function _cycleBottomPanel() {
   var termPanel = document.getElementById("status-bar-panel");
   var termOpen = termPanel && !termPanel.classList.contains("hidden");
   var depOpen = !!window.depGraphEnabled;
-  var termAvailable =
-    typeof terminalEnabled !== "undefined" && terminalEnabled;
+  var termAvailable = typeof terminalEnabled !== "undefined" && terminalEnabled;
 
   if (!termOpen && !depOpen) {
     if (termAvailable) {

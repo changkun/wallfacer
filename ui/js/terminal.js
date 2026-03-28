@@ -7,7 +7,9 @@ var _termReconnectTimer = null;
 var _termReconnectDelay = 1000;
 
 function _getCSSVar(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
 }
 
 /**
@@ -101,7 +103,8 @@ function connectTerminal() {
   var rows = _term.rows || 24;
   var url = proto + "//" + location.host + "/api/terminal/ws";
   url += "?cols=" + cols + "&rows=" + rows;
-  var token = typeof getWallfacerToken === "function" ? getWallfacerToken() : "";
+  var token =
+    typeof getWallfacerToken === "function" ? getWallfacerToken() : "";
   if (token) url += "&token=" + encodeURIComponent(token);
 
   var ws = new WebSocket(url);

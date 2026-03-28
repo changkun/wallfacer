@@ -12,17 +12,21 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"changkun.de/x/wallfacer/internal/logger"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // RunDesktop launches the native desktop window backed by the wallfacer HTTP server.
 // The HTTP server starts in a background goroutine and a Wails WebView
-// window proxies all requests to it.
+// window proxies all requests to it. A system tray icon provides
+// "Open Dashboard" and "Quit" actions.
 func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	fs := flag.NewFlagSet("desktop", flag.ExitOnError)
 
@@ -66,20 +70,49 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	}
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
-	err := wails.Run(&options.App{
-		Title:  "Wallfacer",
-		Width:  1400,
-		Height: 900,
+	// wailsCtx is set by OnStartup and used by the tray to show/focus the window.
+	var wailsCtx context.Context
+
+	// Set up the system tray before wails.Run so it is ready when the app starts.
+	tm := NewTrayManager(
+		func() {
+			// "Open Dashboard" — show and focus the window.
+			if wailsCtx != nil {
+				wailsRuntime.WindowShow(wailsCtx)
+			}
+		},
+		func() {
+			// "Quit" — trigger graceful shutdown and exit.
+			if wailsCtx != nil {
+				wailsRuntime.Quit(wailsCtx)
+			}
+		},
+	)
+	tm.Start()
+
+	appOpts := &options.App{
+		Title:             "Wallfacer",
+		Width:             1400,
+		Height:            900,
+		HideWindowOnClose: runtime.GOOS == "darwin",
 		AssetServer: &assetserver.Options{
 			Handler: proxy,
 		},
-		OnStartup: func(_ context.Context) {
+		OnStartup: func(ctx context.Context) {
+			wailsCtx = ctx
 			logger.Main.Info("desktop window opened")
 		},
 		OnShutdown: func(_ context.Context) {
+			tm.Stop()
 			sc.Shutdown()
 		},
-	})
+	}
 
-	return err
+	// On macOS, use the accessory activation policy so the app lives in
+	// the system tray without a persistent dock icon when the window is hidden.
+	if runtime.GOOS == "darwin" {
+		appOpts.Mac = &mac.Options{}
+	}
+
+	return wails.Run(appOpts)
 }
