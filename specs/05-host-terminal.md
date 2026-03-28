@@ -1,7 +1,6 @@
 # Plan: Host Shell Terminal Panel
 
-**Status:** Complete (Phase 1)
-**Date:** 2026-03-22 (revised 2026-03-28)
+**Status:** Complete | **Date:** 2026-03-22 → 2026-03-28
 
 ---
 
@@ -224,6 +223,34 @@ If `GET /api/config` returns `terminalEnabled: false`:
 
 ---
 
+## Outcome
+
+Phase 1 (single terminal session) is fully implemented across 7 tasks. The terminal panel provides a working interactive host shell in the browser via xterm.js and a WebSocket-backed PTY relay, with theme integration, reconnection, and a visibility gate.
+
+### What Shipped
+
+- **1 WebSocket endpoint** (`GET /api/terminal/ws`) registered directly in `BuildMux` — the project's first WebSocket route
+- **Inline PTY package** (`internal/pty/`, ~100 LOC across 4 files): macOS and Linux PTY allocation via raw POSIX ioctls, Windows stub
+- **Terminal handler** (`internal/handler/terminal.go`): WebSocket accept, shell spawn, bidirectional PTY relay, JSON message protocol (input/resize/ping), SIGHUP/SIGKILL cleanup, cwd validation against workspaces
+- **Frontend terminal module** (`ui/js/terminal.js`, ~170 lines): xterm.js init with CSS-var theme, WebSocket connect/disconnect, exponential backoff reconnection, ResizeObserver integration
+- **Status bar integration**: `connectTerminal()` on panel open, WebSocket kept alive while hidden, visibility gate hides Terminal button when disabled, backtick cycle skips terminal when disabled
+- **25 tests** (3 PTY + 7 handler WebSocket + 10 terminal.js + 5 status-bar integration)
+- **Vendored xterm.js 5.5.0** + fit addon 0.10.0
+
+### Design Evolution
+
+1. **Dropped `creack/pty` dependency.** The spec originally proposed `github.com/creack/pty` for PTY allocation. Replaced with `internal/pty/` (~100 LOC) wrapping POSIX ioctls directly — macOS uses `TIOCPTYGRANT`/`TIOCPTYUNLK`/`TIOCPTYGNAME`, Linux uses `TIOCSPTLCK`/`TIOCGPTN`. No cgo required.
+
+2. **Switched `nhooyr.io/websocket` → `github.com/coder/websocket`.** The `nhooyr.io` module is deprecated (ownership transferred to Coder). Same API, new import path. Avoids staticcheck SA1019 lint errors.
+
+3. **Added `Hijack()` to `statusResponseWriter`.** The logging middleware wraps `http.ResponseWriter` with `statusResponseWriter` for status capture. WebSocket upgrades require `http.Hijacker`. Added `Hijack()` delegation (`d620e64`).
+
+4. **Changed `WALLFACER_TERMINAL_ENABLED` default to `true`.** The spec defaulted to `false` (opt-in) citing security. Since Wallfacer is currently a local-only tool where the user already has full host access, the opt-in gate adds friction with no security benefit. Changed to `true` (`4c042b8`).
+
+5. **Theme re-application on connect.** The spec described setting the theme once at init. Added `_buildTermTheme()` helper that re-reads CSS vars on every `connectTerminal()` call, so light/dark theme switches take effect when the panel is reopened. Also added CSS `background: var(--bg-card)` overrides on `.xterm` containers (`d79cbd6`).
+
+---
+
 ## Phasing
 
 ### Phase 1: Single Terminal Session
@@ -235,38 +262,13 @@ If `GET /api/config` returns `terminalEnabled: false`:
 
 **Complexity: Medium.** Backend WebSocket+PTY relay is the main effort (~60%). Frontend xterm.js integration is straightforward (~25%). Config/auth plumbing is minimal (~15%).
 
-### Phase 2: Multiple Sessions with Tabs
+### Phase 2: Multiple Sessions with Tabs (Future)
 
-- Tab bar above the terminal in the panel
-- Session registry in handler (`map[string]*TerminalSession`)
-- New messages: `create_session`, `switch_session`, `close_session`
-- Tabs show session names (numbered or named by cwd basename)
+See [05a-terminal-sessions.md](05a-terminal-sessions.md).
 
-### Phase 3: Container Exec Integration
+### Phase 3: Container Exec Integration (Future)
 
-- "Container Shell" tab type that attaches to running task containers
-- Spawns `podman exec -it <container> bash` instead of host shell
-- Dropdown to select from running containers (data from `GET /api/containers`)
-- Replaces `wallfacer exec` CLI for many use cases
-
-### Cloud Deployment Note
-
-In cloud deployment (K8s backend per [01-sandbox-backends.md](01-sandbox-backends.md)), the host shell (Phases 1–2) has limited utility — the API server is a stateless pod with no meaningful workspace on its local filesystem.
-
-**Phase 3 becomes the primary terminal mode in cloud.** Container exec is the natural way to get a shell in the workspace:
-- For `LocalBackend`: `podman exec` into a running task container (as designed above)
-- For `K8sBackend`: `kubectl exec` into the task pod, relayed via the same WebSocket protocol
-- For long-lived workers (see [03-container-reuse.md](03-container-reuse.md)): exec into the aux or impl worker container
-
-The WebSocket protocol and xterm.js frontend are backend-agnostic — only the PTY spawn mechanism changes. The handler can dispatch based on the active `SandboxBackend`:
-
-| Backend | Host shell | Container exec |
-|---------|-----------|---------------|
-| Local | PTY via `creack/pty` (Phase 1) | `podman exec` via PTY (Phase 3) |
-| K8s | Disabled or shells into server pod (limited) | `kubectl exec` via SPDY/WebSocket relay |
-| Remote Docker | Disabled | `docker -H <remote> exec` via PTY |
-
-**Recommendation:** Implement Phases 1–2 for local. When implementing K8s backend, prioritize Phase 3 as the default terminal mode and consider disabling host shell in cloud deployments (or gating it behind an additional `WALLFACER_TERMINAL_HOST_SHELL` flag).
+See [05b-terminal-container-exec.md](05b-terminal-container-exec.md).
 
 ---
 
@@ -276,31 +278,38 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 | File | Purpose |
 |------|---------|
-| `internal/pty/pty.go` | Inline POSIX PTY allocation (~60 LOC, macOS/Linux) |
+| `internal/pty/pty.go` | Shared PTY helpers: `StartWithSize`, `Setsize` (`//go:build !windows`) |
+| `internal/pty/open_darwin.go` | macOS PTY allocation via `TIOCPTYGRANT`/`TIOCPTYUNLK`/`TIOCPTYGNAME` |
+| `internal/pty/open_linux.go` | Linux PTY allocation via `TIOCSPTLCK`/`TIOCGPTN` |
 | `internal/pty/pty_windows.go` | Windows stub (returns error) |
 | `internal/pty/pty_test.go` | PTY open, start, resize tests |
-| `internal/handler/terminal.go` | WebSocket handler, PTY lifecycle, message protocol |
-| `internal/handler/terminal_test.go` | Tests: WebSocket connect, resize, auth gate, opt-in gate, cleanup |
-| `ui/js/terminal.js` | xterm.js integration, WebSocket client, resize/reconnect |
-| `ui/js/vendor/xterm.min.js` | Vendored xterm.js core |
-| `ui/js/vendor/xterm-addon-fit.min.js` | Vendored fit addon |
+| `internal/handler/terminal.go` | WebSocket handler, PTY lifecycle, message protocol (`//go:build !windows`) |
+| `internal/handler/terminal_windows.go` | Windows stub (returns 501) |
+| `internal/handler/terminal_test.go` | 7 tests: connect, resize, ping, shell exit, auth, disabled gate, cwd validation |
+| `ui/js/terminal.js` | xterm.js integration, WebSocket client, resize/reconnect, theme sync |
+| `ui/js/tests/terminal.test.js` | 10 vitest tests for terminal module |
+| `ui/js/vendor/xterm.min.js` | Vendored xterm.js 5.5.0 core |
+| `ui/js/vendor/xterm-addon-fit.min.js` | Vendored fit addon 0.10.0 |
 | `ui/css/vendor/xterm.css` | Vendored xterm.js styles |
 
 ### Modified Files
 
 | File | Change |
 |------|--------|
-| `go.mod` / `go.sum` | Add `nhooyr.io/websocket` |
-| `internal/envconfig/envconfig.go` | Add `TerminalEnabled` field |
+| `go.mod` / `go.sum` | Add `github.com/coder/websocket` (was `nhooyr.io/websocket`) |
+| `internal/envconfig/envconfig.go` | Add `TerminalEnabled` field (default `true`) |
 | `internal/handler/middleware.go` | Add `/api/terminal/ws` to `isSSEPath` |
-| `internal/handler/config.go` | Include `terminalEnabled` in config response |
-| `internal/cli/server.go` | Register `/api/terminal/ws` in `BuildMux` |
+| `internal/handler/config.go` | Include `terminal_enabled` in config response |
+| `internal/cli/server.go` | Register `/api/terminal/ws` in `BuildMux`; add `Hijack()` to `statusResponseWriter` |
 | `ui/partials/initial-layout.html` | Add `<link>` for xterm.css, `<script>` for xterm vendor files |
 | `ui/partials/scripts.html` | Add `<script src="/js/terminal.js">` |
-| `ui/js/status-bar.js` | Call `connectTerminal()`/`fitAddon.fit()` from `toggleTerminalPanel()` |
-| `ui/css/status-bar.css` | xterm container fill styles, reconnection overlay |
+| `ui/js/status-bar.js` | Call `connectTerminal()` from `_showTerminalPanel()`; visibility gate; `applyTerminalVisibility()` |
+| `ui/js/state.js` | Add `terminalEnabled` global |
+| `ui/js/workspace.js` | Set `terminalEnabled` from config; call `initTerminal()` when enabled |
+| `ui/css/status-bar.css` | xterm container fill styles, dark-mode background overrides, reconnection overlay |
 | `docs/guide/configuration.md` | Document `WALLFACER_TERMINAL_ENABLED` |
-| `CLAUDE.md` | Add terminal endpoint and env var |
+| `AGENTS.md` | Add terminal endpoint and env var |
+| `docs/internals/api-and-transport.md` | WebSocket terminal section; updated auth middleware description |
 
 ---
 

@@ -30,7 +30,9 @@ What has shipped vs what remains. Items marked ✅ are complete; ○ are not sta
 ├── next ──────────────────────────
 │
 ├──▶ ✅ M4: File Explorer
-├──▶ ✅ M5: Host Terminal (Phase 1)
+├──▶ ✅ M5: Host Terminal
+│    ├──▶ ○  M5a: Terminal Sessions (tabs)
+│    └──▶ ○  M5b: Container Exec
 ├──▶ ○  M6: Cloud Deployment (overview)
 │    ├──▶ ○  M6a: Tenant Filesystem
 │    ├──▶ ○  M6b: K8s Sandbox Backend
@@ -80,6 +82,10 @@ Full milestone dependency graph showing how everything relates.
          └──▶ 04b: Host Mounts
                                  │
  M5: Host Terminal (local) ──────┼────────────────────────▶│ (Phase 3)
+         │
+         ├──▶ 05a: Terminal Sessions (tabs)
+         └──▶ 05b: Container Exec
+                                 │
  M7: Desktop App ────────────────┘ (ships after M4+M5 UX)
 
  Independent (no milestone deps)
@@ -108,7 +114,7 @@ M8a (authentication) + M8 (multi-tenant) ──▶ M8b: Tenant API (external API
 | **M2** | Storage backend interface | [02-storage-backends.md](02-storage-backends.md) | **Enablers complete** | `StorageBackend` + `FilesystemBackend` + `ListBlobs`; cloud backends (PG, S3) deferred |
 | **M3** | Container reuse | [03-container-reuse.md](03-container-reuse.md) | **Complete** (core) | Per-task worker containers via `podman exec`; ~10x startup savings per turn |
 | **M4** | File explorer | [04-file-explorer.md](04-file-explorer.md) | **Complete** | Browse + edit workspace files in the web UI |
-| **M5** | Host terminal | [05-host-terminal.md](05-host-terminal.md) | **Complete** (Phase 1) | Interactive shell in the web UI (WebSocket + PTY) |
+| **M5** | Host terminal | [05-host-terminal.md](05-host-terminal.md) | **Complete** | Interactive shell in the web UI (WebSocket + PTY) |
 | **M6** | Cloud deployment | [06-cloud-backends.md](06-cloud-backends.md) | Not started | Overview: VPS recipe (done), per-user instance architecture, sub-milestone index |
 | **M7** | Desktop app | [07-native-desktop-app.md](07-native-desktop-app.md) | Not started | Wails native wrapper (macOS .app, Windows .exe) |
 | **M8** | Multi-tenant (capstone) | [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) | Not started | Control plane, instance provisioning and lifecycle (auth via M8a) |
@@ -157,6 +163,13 @@ After M3 (per-task workers complete). Independent of M4–M8.
 | [04a-file-image-attachments.md](04a-file-image-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
 | [04b-host-mounts.md](04b-host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
 | [04c-file-panel-viewer.md](04c-file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview (images, video, PDF) |
+
+## Branches from M5 — Terminal Extensions
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [05a-terminal-sessions.md](05a-terminal-sessions.md) | Not started | Multiple concurrent terminal sessions with a tab bar |
+| [05b-terminal-container-exec.md](05b-terminal-container-exec.md) | Not started | Attach to running task containers from the terminal panel |
 
 ## Branches from M6 — Cloud Deployment
 
