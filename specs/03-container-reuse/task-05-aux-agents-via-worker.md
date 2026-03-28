@@ -1,6 +1,6 @@
 # Task 5: Verify Auxiliary Agents Through Per-Task Worker
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3
 **Phase:** 2 (Worker Lifecycle Management)
 **Effort:** Small

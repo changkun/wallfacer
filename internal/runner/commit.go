@@ -394,6 +394,7 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 		selectedModel := r.modelFromEnvForSandbox(selectedSandbox)
 
 		spec := r.buildBaseContainerSpec(containerName, selectedModel, selectedSandbox)
+		spec.Labels = map[string]string{"wallfacer.task.id": taskID.String()}
 		spec.Cmd = buildAgentCmd(commitPrompt, selectedModel)
 
 		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})

@@ -48,6 +48,7 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 		mdl := r.titleModelFromEnvForSandbox(selected)
 
 		spec := r.buildBaseContainerSpec(containerName, mdl, selected)
+		spec.Labels = map[string]string{"wallfacer.task.id": taskID.String()}
 		spec.Cmd = buildAgentCmd(titlePrompt, mdl)
 
 		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
