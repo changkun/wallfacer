@@ -1,6 +1,6 @@
 # Task 6: Health Check and Graceful Fallback
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3
 **Phase:** 3 (Robustness)
 **Effort:** Medium
@@ -48,3 +48,18 @@ containers so the system never breaks.
 - Do NOT change the `Backend` interface.
 - The periodic health check is optional — the on-demand check in
   `ensureRunning()` is the primary mechanism.
+
+## Implementation notes
+
+All three items were already implemented in tasks 1 and 3:
+- **Health check in `ensureRunning()`**: Implemented in task 1 — runs
+  `podman inspect` to verify container is running, recreates on failure.
+- **Graceful fallback in `Launch()`**: Implemented in task 3 — wraps
+  worker path with error handling, falls back to ephemeral on failure.
+- **Periodic health check**: Deferred as optional. The on-demand check
+  in `ensureRunning()` is the primary mechanism and is sufficient.
+
+Existing tests cover all three spec test cases:
+- `TestTaskWorkerExecAfterStop` covers crash recovery
+- `TestLaunchCreatesWorker` covers ephemeral fallback (worker fails, falls back)
+- Periodic health check test deferred with the feature
