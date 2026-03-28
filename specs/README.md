@@ -22,7 +22,7 @@ What has shipped vs what remains. Items marked ✅ are complete; ○ are not sta
 │
 ├──▶ ✅ M2: Storage Backend Interface (enablers complete)
 │    ├──▶ ✅ M2a: Multi-Workspace Groups
-│    └──▶ ○  M6: Cloud Backends (PG, S3, K8s — deferred)
+│    └──▶ ○  M2 cloud tasks (PG, S3 — deferred in M2 spec)
 │
 ├──▶ ✅ M3: Container Reuse (core)
 │    └──▶ ○  M3a: Overlay Snapshots / CRIU
@@ -31,6 +31,9 @@ What has shipped vs what remains. Items marked ✅ are complete; ○ are not sta
 │
 ├──▶ ○  M4: File Explorer
 ├──▶ ○  M5: Host Terminal
+├──▶ ○  M6: Cloud Deployment (overview)
+│    ├──▶ ○  M6a: Tenant Filesystem
+│    └──▶ ○  M6b: K8s Sandbox Backend
 ├──▶ ○  M7: Desktop App
 └──▶ ○  M8: Multi-Tenant (capstone)
 
@@ -46,11 +49,12 @@ Full milestone dependency graph showing how everything relates.
 ```
                                  ┌──▶ M3: Container Reuse ──▶ M3a: Overlay Snapshots / CRIU
                                  │
- M1: Sandbox Backend Interface ──┼──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
-                                 │           ▲                     (capstone)
-                                 │   M2: Storage Interface ─┤
-                                 │           │               │
-                                 │           └──▶ M2a: Multi-Workspace Groups
+ M1: Sandbox Backend Interface ──┼──▶ M6a: Tenant Filesystem ──▶ M6b: K8s Sandbox ──┐
+                                 │            ▲                                      │
+                                 │    M2: Storage Interface ─┐                       ├──▶ M8: Multi-Tenant
+                                 │            │              │                       │       (capstone)
+                                 │            ├──▶ M2a: Multi-Workspace Groups       │
+                                 │            └──▶ M2 cloud (PG, S3) ───────────────┘
                                  │
                                  ├──▶ Native Containerization (platform-specific)
                                  │     ├─ M1a: Linux  (bubblewrap, systemd-nspawn)
@@ -74,6 +78,13 @@ Full milestone dependency graph showing how everything relates.
    └─ 93: Agent Abstraction
 ```
 
+**Cloud deployment dependency chain:**
+```
+M2 (storage interface) ──▶ M6a (tenant filesystem) ──▶ M6b (K8s sandbox) ──▶ M8 (multi-tenant)
+M1 (sandbox interface) ─────────────────────────────▶ M6b                        ▲
+M2 (storage interface) ──▶ M2 cloud (PG, S3) ───────────────────────────────────┘
+```
+
 ## Milestones
 
 | # | Milestone | Spec | Status | Delivers |
@@ -83,7 +94,7 @@ Full milestone dependency graph showing how everything relates.
 | **M3** | Container reuse | [03-container-reuse.md](03-container-reuse.md) | **Complete** (core) | Per-task worker containers via `podman exec`; ~10x startup savings per turn |
 | **M4** | File explorer | [04-file-explorer.md](04-file-explorer.md) | Not started | Browse + edit workspace files in the web UI |
 | **M5** | Host terminal | [05-host-terminal.md](05-host-terminal.md) | Not started | Interactive shell in the web UI (WebSocket + PTY) |
-| **M6** | Cloud backends | [06-cloud-backends.md](06-cloud-backends.md) | Not started | K8s backend, PostgreSQL, S3, migration tool |
+| **M6** | Cloud deployment | [06-cloud-backends.md](06-cloud-backends.md) | Not started | Overview: VPS recipe (done), per-user instance architecture, sub-milestone index |
 | **M7** | Desktop app | [07-native-desktop-app.md](07-native-desktop-app.md) | Not started | Wails native wrapper (macOS .app, Windows .exe) |
 | **M8** | Multi-tenant (capstone) | [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) | Not started | Control plane, auth, instance lifecycle, cloud file/terminal access |
 
@@ -121,6 +132,15 @@ After M3 (per-task workers complete). Independent of M4–M8.
 | [04a-file-image-attachments.md](04a-file-image-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
 | [04b-host-mounts.md](04b-host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
 
+## Branches from M6 — Cloud Deployment
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [06a-tenant-filesystem.md](06a-tenant-filesystem.md) | Not started | Per-tenant persistent volume, repo provisioner (clone/fetch/creds), workspace group cloud mapping, config persistence across hibernate/wake |
+| [06b-k8s-sandbox.md](06b-k8s-sandbox.md) | Not started | `K8sBackend` implementing `sandbox.Backend` — K8s Jobs with PVC mounts, pod log streaming, exec |
+
+M6a depends on M1 + M2. M6b depends on M1 + M6a. Both feed into M8.
+
 ## Independent Enhancements
 
 | Spec | Status | Delivers |
@@ -135,7 +155,10 @@ After M3 (per-task workers complete). Independent of M4–M8.
 - **Epic coordination depends on M4 (file explorer)** for its spec management UX. The backend pieces (planner task kind, board.json context, gate tasks) are independent, but the full UX — browsing specs, focused markdown view, chat-driven iteration — requires the file explorer panel. Implement M4 Phase 1 first, then epic coordination.
 - **M1–M2 first:** Pure refactors creating abstraction seams all downstream milestones plug into. Low risk, high leverage.
 - **M3 after M1:** Container reuse modifies the same `internal/runner/` files. Doing it right after M1 avoids revisiting them later.
-- **M2.5 after M2:** Multi-workspace groups modifies store lifecycle; wait for `StorageBackend` interfaces to stabilize. Can run in parallel with M3.
+- **M2a after M2:** Multi-workspace groups modifies store lifecycle; wait for `StorageBackend` interfaces to stabilize. Can run in parallel with M3.
 - **M4–M5 before M6:** Deliver user-visible value with no cloud dependency. Exercise different code paths (`internal/handler/` + `ui/`).
+- **M6a before M6b:** Tenant filesystem is the foundation — repos, worktrees, and config must have a cloud home before K8s can mount them into pods.
+- **M6b after M6a:** K8s sandbox backend consumes the tenant volume layout. Without M6a, there's nothing to mount.
+- **M2 cloud tasks parallel with M6a/M6b:** Task data storage (PG + S3) is independent of the filesystem layer. Can be built concurrently.
 - **M7 after M4–M5:** Desktop app ships with file explorer + terminal already built in. Fully independent — can move earlier.
-- **M8 last:** Capstone wiring everything together. Picks up deferred cloud phases from M3/M4/M5.
+- **M8 last:** Capstone wiring M6a (tenant FS) + M6b (K8s sandbox) + M2 cloud (PG/S3) + control plane (auth, provisioning).
