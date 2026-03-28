@@ -63,6 +63,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [oversight-risk-scoring.md](local/oversight-risk-scoring.md) | Not started | Real-time agent action risk assessment |
 | [visual-verification.md](local/visual-verification.md) | Not started | Visual verification for UI changes |
 | [live-serve.md](local/live-serve.md) | Not started | Build and run developed software from within Wallfacer |
+| [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
 
 ### Local product dependencies
 
