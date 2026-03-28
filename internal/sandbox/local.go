@@ -26,6 +26,10 @@ type LocalBackend struct {
 	workerCreates   atomic.Uint64
 	workerExecs     atomic.Uint64
 	workerFallbacks atomic.Uint64
+
+	// Per-activity breakdown of creates/execs.
+	activityStatsMu sync.Mutex
+	activityStats   map[string]*[2]atomic.Uint64 // [0]=creates, [1]=execs
 }
 
 // LocalBackendConfig holds optional settings for LocalBackend.
@@ -42,7 +46,23 @@ func NewLocalBackend(command string, cfg LocalBackendConfig) *LocalBackend {
 		taskWorkers:       make(map[string]*taskWorker),
 		enableTaskWorkers: cfg.EnableTaskWorkers,
 		reg:               cfg.Reg,
+		activityStats:     make(map[string]*[2]atomic.Uint64),
 	}
+}
+
+// incActivityStat increments a per-activity counter (0=creates, 1=execs).
+func (b *LocalBackend) incActivityStat(activity string, idx int) {
+	if activity == "" {
+		return
+	}
+	b.activityStatsMu.Lock()
+	counters, ok := b.activityStats[activity]
+	if !ok {
+		counters = &[2]atomic.Uint64{}
+		b.activityStats[activity] = counters
+	}
+	b.activityStatsMu.Unlock()
+	counters[idx].Add(1)
 }
 
 // incWorkerMetric increments a worker lifecycle counter. No-op when reg is nil.
@@ -61,6 +81,7 @@ func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, 
 	taskID := spec.Labels["wallfacer.task.id"]
 
 	if taskID != "" && b.enableTaskWorkers {
+		activity := spec.Labels["wallfacer.task.activity"]
 		h, err := b.launchViaTaskWorker(ctx, spec, taskID)
 		if err != nil {
 			// Worker failed — fall back to ephemeral.
@@ -71,6 +92,7 @@ func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, 
 			return b.launchEphemeral(ctx, spec)
 		}
 		b.workerExecs.Add(1)
+		b.incActivityStat(activity, 1)
 		b.incWorkerMetric("wallfacer_container_worker_execs_total")
 		return h, nil
 	}
@@ -91,6 +113,7 @@ func (b *LocalBackend) launchViaTaskWorker(ctx context.Context, spec ContainerSp
 		w = newTaskWorker(b.command, workerName, spec.BuildCreate(), "/usr/local/bin/entrypoint.sh")
 		b.taskWorkers[taskID] = w
 		b.workerCreates.Add(1)
+		b.incActivityStat(spec.Labels["wallfacer.task.activity"], 0)
 		b.incWorkerMetric("wallfacer_container_worker_creates_total")
 	}
 	b.taskWorkersMu.Unlock()
@@ -170,12 +193,24 @@ func (b *LocalBackend) WorkerStats() WorkerStatsInfo {
 	b.taskWorkersMu.Lock()
 	active := len(b.taskWorkers)
 	b.taskWorkersMu.Unlock()
+
+	b.activityStatsMu.Lock()
+	byActivity := make(map[string]ActivityCounter, len(b.activityStats))
+	for k, v := range b.activityStats {
+		byActivity[k] = ActivityCounter{
+			Creates: v[0].Load(),
+			Execs:   v[1].Load(),
+		}
+	}
+	b.activityStatsMu.Unlock()
+
 	return WorkerStatsInfo{
 		Enabled:       b.enableTaskWorkers,
 		ActiveWorkers: active,
 		Creates:       b.workerCreates.Load(),
 		Execs:         b.workerExecs.Load(),
 		Fallbacks:     b.workerFallbacks.Load(),
+		ByActivity:    byActivity,
 	}
 }
 

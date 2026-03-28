@@ -266,6 +266,20 @@ function loadSystemStatus() {
         }
         workerLine += "</div>";
         lines.push(workerLine);
+
+        // Per-activity breakdown.
+        if (ws.by_activity && Object.keys(ws.by_activity).length > 0) {
+          var actParts = [];
+          for (var act in ws.by_activity) {
+            var a = ws.by_activity[act];
+            actParts.push(
+              act + ": " + (a.creates || 0) + "c/" + (a.execs || 0) + "e",
+            );
+          }
+          lines.push(
+            '<div style="padding-left:12px;">' + actParts.join(" &middot; ") + "</div>",
+          );
+        }
       }
 
       // Task states.

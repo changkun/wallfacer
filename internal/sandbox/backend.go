@@ -78,11 +78,18 @@ type WorkerManager interface {
 
 // WorkerStatsInfo holds aggregate worker lifecycle statistics.
 type WorkerStatsInfo struct {
-	Enabled       bool   `json:"enabled"`
-	ActiveWorkers int    `json:"active_workers"`
-	Creates       uint64 `json:"creates"`
-	Execs         uint64 `json:"execs"`
-	Fallbacks     uint64 `json:"fallbacks"`
+	Enabled       bool                       `json:"enabled"`
+	ActiveWorkers int                        `json:"active_workers"`
+	Creates       uint64                     `json:"creates"`
+	Execs         uint64                     `json:"execs"`
+	Fallbacks     uint64                     `json:"fallbacks"`
+	ByActivity    map[string]ActivityCounter `json:"by_activity,omitempty"`
+}
+
+// ActivityCounter holds per-activity create/exec counts.
+type ActivityCounter struct {
+	Creates uint64 `json:"creates"`
+	Execs   uint64 `json:"execs"`
 }
 
 // ContainerInfo holds runtime metadata about a container, used by List()

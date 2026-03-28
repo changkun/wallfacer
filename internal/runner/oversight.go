@@ -710,7 +710,7 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	runWithSandbox := func(selectedSandbox sandbox.Type) oversightRunResult {
 		model := r.titleModelFromEnvForSandbox(selectedSandbox)
 		spec := r.buildBaseContainerSpec(containerName, model, selectedSandbox)
-		spec.Labels = map[string]string{"wallfacer.task.id": taskID.String()}
+		spec.Labels = map[string]string{"wallfacer.task.id": taskID.String(), "wallfacer.task.activity": "oversight"}
 		// Note: oversight agent uses no workspace mounts, no instructions mount,
 		// no -w workdir, and the Cmd order is --output-format before --verbose.
 		spec.Cmd = []string{"-p", prompt, "--output-format", "stream-json", "--verbose"}

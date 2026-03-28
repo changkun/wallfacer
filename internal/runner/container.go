@@ -539,6 +539,9 @@ func (r *Runner) runContainer(
 		}
 
 		spec := r.buildContainerSpecForSandbox(containerName, taskID.String(), prompt, sessionID, worktreeOverrides, boardDir, siblingMounts, modelOverride, selectedSandbox)
+		if spec.Labels != nil {
+			spec.Labels["wallfacer.task.activity"] = string(activity)
+		}
 
 		logger.Runner.Debug("exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox)
 		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(activity)})
