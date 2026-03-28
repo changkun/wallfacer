@@ -184,11 +184,15 @@ func BuildExec(containerName string, cmd []string) []string {
 	return args
 }
 
-// translateHostPath converts a Windows host path to a container-visible path
+// TranslateHostPath converts a Windows host path to a container-visible path
 // when running on Windows. On non-Windows systems this is a no-op.
 //
 // Docker Desktop maps C:\ to /c/, while Podman Desktop maps C:\ to /mnt/c/.
 // The runtime binary path is used to detect which mapping to apply.
+func TranslateHostPath(hostPath, runtimeBin string) string {
+	return translateHostPath(hostPath, runtimeBin)
+}
+
 func translateHostPath(hostPath, runtimeBin string) string {
 	if runtime.GOOS != "windows" {
 		return hostPath

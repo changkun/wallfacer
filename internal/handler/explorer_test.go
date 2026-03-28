@@ -374,7 +374,7 @@ func TestExplorerReadFile_MissingParams(t *testing.T) {
 
 func writeFileRequest(t *testing.T, path, workspace, content string) *http.Request {
 	t.Helper()
-	body := `{"path":"` + path + `","workspace":"` + workspace + `","content":` + jsonString(content) + `}`
+	body := `{"path":` + jsonString(path) + `,"workspace":` + jsonString(workspace) + `,"content":` + jsonString(content) + `}`
 	return httptest.NewRequest(http.MethodPut, "/api/explorer/file", strings.NewReader(body))
 }
 

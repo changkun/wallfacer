@@ -1286,9 +1286,16 @@ func TestDefaultSandbox_EmptyConfigReturnsClaude(t *testing.T) {
 
 // --- MkdirWorkspace ---
 
+// jsonStr returns the JSON-encoded form of s (with surrounding quotes).
+// Needed for Windows paths that contain backslashes.
+func jsonStr(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}
+
 func TestMkdirWorkspace_CreatesDirectory(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
-	body := `{"path":"` + ws + `","name":"new-folder"}`
+	body := `{"path":` + jsonStr(ws) + `,"name":"new-folder"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/mkdir", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.MkdirWorkspace(w, req)
@@ -1329,7 +1336,7 @@ func TestMkdirWorkspace_RejectsPathTraversal(t *testing.T) {
 	h, ws := newTestHandlerWithWorkspaces(t)
 	cases := []string{"..", "../escape", "a/b"}
 	for _, name := range cases {
-		body := `{"path":"` + ws + `","name":"` + name + `"}`
+		body := `{"path":` + jsonStr(ws) + `,"name":"` + name + `"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/workspaces/mkdir", strings.NewReader(body))
 		w := httptest.NewRecorder()
 		h.MkdirWorkspace(w, req)
@@ -1347,7 +1354,7 @@ func TestMkdirWorkspace_ConflictOnExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	body := `{"path":"` + ws + `","name":"existing"}`
+	body := `{"path":` + jsonStr(ws) + `,"name":"existing"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/mkdir", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.MkdirWorkspace(w, req)
@@ -1366,7 +1373,7 @@ func TestRenameWorkspace_RenamesDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	body := `{"path":"` + old + `","name":"new-name"}`
+	body := `{"path":` + jsonStr(old) + `,"name":"new-name"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/rename", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.RenameWorkspace(w, req)
@@ -1401,7 +1408,7 @@ func TestRenameWorkspace_ConflictOnExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	body := `{"path":"` + src + `","name":"target"}`
+	body := `{"path":` + jsonStr(src) + `,"name":"target"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/rename", strings.NewReader(body))
 	w := httptest.NewRecorder()
 	h.RenameWorkspace(w, req)
@@ -1420,7 +1427,7 @@ func TestRenameWorkspace_RejectsPathTraversal(t *testing.T) {
 
 	cases := []string{"..", "a/b"}
 	for _, name := range cases {
-		body := `{"path":"` + src + `","name":"` + name + `"}`
+		body := `{"path":` + jsonStr(src) + `,"name":"` + name + `"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/workspaces/rename", strings.NewReader(body))
 		w := httptest.NewRecorder()
 		h.RenameWorkspace(w, req)

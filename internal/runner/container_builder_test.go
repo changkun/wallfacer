@@ -424,7 +424,7 @@ func TestBuildIdeationContainerArgsSingleWorkspaceReadOnly(t *testing.T) {
 	args := r.buildIdeationContainerArgs("ideate-test", "prompt", "claude")
 
 	// The workspace mount must be read-only.
-	wantMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename + "," + expectedBuildROSuffix()
+	wantMount := "type=bind,src=" + hostPath(ws, "podman") + ",dst=/workspace/" + basename + "," + expectedBuildROSuffix()
 	if !argsContainSubstring(args, wantMount) {
 		t.Errorf("expected read-only mount %q; args: %v", wantMount, args)
 	}

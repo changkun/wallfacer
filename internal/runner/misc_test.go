@@ -626,7 +626,7 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{ws: wt}, "", nil, "")
 	basename := filepath.Base(ws)
 	zOpt := mountOpts("z")
-	expectedMount := "type=bind,src=" + wt + ",dst=/workspace/" + basename
+	expectedMount := "type=bind,src=" + hostPath(wt, "podman") + ",dst=/workspace/" + basename
 	if zOpt != "" {
 		expectedMount += "," + zOpt
 	}
@@ -634,7 +634,7 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 		t.Fatalf("expected worktree override mount %q; got: %v", expectedMount, args)
 	}
 	// Original workspace path must NOT appear as the host path.
-	unexpectedMount := "type=bind,src=" + ws + ",dst=/workspace/" + basename
+	unexpectedMount := "type=bind,src=" + hostPath(ws, "podman") + ",dst=/workspace/" + basename
 	if zOpt != "" {
 		unexpectedMount += "," + zOpt
 	}
@@ -668,7 +668,8 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 
 	// The main repo's .git should be mounted at the same host path.
 	gitDir := filepath.Join(repo, ".git")
-	expectedGitMount := "type=bind,src=" + gitDir + ",dst=" + gitDir
+	translatedGitDir := hostPath(gitDir, "podman")
+	expectedGitMount := "type=bind,src=" + translatedGitDir + ",dst=" + translatedGitDir
 	if z := mountOpts("z"); z != "" {
 		expectedGitMount += "," + z
 	}
