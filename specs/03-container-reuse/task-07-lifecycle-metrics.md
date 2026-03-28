@@ -1,6 +1,6 @@
 # Task 7: Worker Lifecycle Timing Metrics
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3
 **Phase:** 3 (Robustness)
 **Effort:** Small

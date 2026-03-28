@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 )
 
@@ -21,11 +22,13 @@ type LocalBackend struct {
 	taskWorkers       map[string]*taskWorker  // key = task ID string
 	taskWorkersMu     sync.Mutex
 	enableTaskWorkers bool                    // WALLFACER_TASK_WORKERS (default true)
+	reg               *metrics.Registry       // optional; nil disables metric collection
 }
 
 // NewLocalBackend creates a LocalBackend that uses the given container runtime
 // binary (e.g. "/opt/podman/bin/podman" or "docker").
-func NewLocalBackend(command string) *LocalBackend {
+// The optional registry enables Prometheus-compatible worker lifecycle metrics.
+func NewLocalBackend(command string, reg *metrics.Registry) *LocalBackend {
 	enable := true
 	if v := os.Getenv("WALLFACER_TASK_WORKERS"); strings.EqualFold(v, "false") || v == "0" {
 		enable = false
@@ -34,7 +37,16 @@ func NewLocalBackend(command string) *LocalBackend {
 		command:           command,
 		taskWorkers:       make(map[string]*taskWorker),
 		enableTaskWorkers: enable,
+		reg:               reg,
 	}
+}
+
+// incWorkerMetric increments a worker lifecycle counter. No-op when reg is nil.
+func (b *LocalBackend) incWorkerMetric(name string) {
+	if b.reg == nil {
+		return
+	}
+	b.reg.Counter(name, "").Inc(nil)
 }
 
 // Launch starts a container from spec and returns a handle for interacting
@@ -50,8 +62,10 @@ func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, 
 			// Worker failed — fall back to ephemeral.
 			logger.Runner.Warn("task worker failed, falling back to ephemeral",
 				"task", taskID, "error", err)
+			b.incWorkerMetric("wallfacer_container_worker_fallbacks_total")
 			return b.launchEphemeral(ctx, spec)
 		}
+		b.incWorkerMetric("wallfacer_container_worker_execs_total")
 		return h, nil
 	}
 
@@ -67,6 +81,7 @@ func (b *LocalBackend) launchViaTaskWorker(ctx context.Context, spec ContainerSp
 		workerName := "wallfacer-worker-" + taskID[:min(8, len(taskID))]
 		w = newTaskWorker(b.command, workerName, spec.BuildCreate())
 		b.taskWorkers[taskID] = w
+		b.incWorkerMetric("wallfacer_container_worker_creates_total")
 	}
 	b.taskWorkersMu.Unlock()
 

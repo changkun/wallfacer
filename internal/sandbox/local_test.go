@@ -4,13 +4,15 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"changkun.de/x/wallfacer/internal/metrics"
 )
 
 func TestLaunchEphemeralWhenDisabled(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt)
+	b := NewLocalBackend(rt, nil)
 	b.enableTaskWorkers = false
 
 	spec := ContainerSpec{
@@ -48,7 +50,7 @@ func TestLaunchEphemeralWithoutTaskID(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt)
+	b := NewLocalBackend(rt, nil)
 
 	spec := ContainerSpec{
 		Runtime: rt,
@@ -84,7 +86,7 @@ func TestLaunchCreatesWorker(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt)
+	b := NewLocalBackend(rt, nil)
 	taskID := "test-task-create"
 
 	spec := ContainerSpec{
@@ -124,7 +126,7 @@ func TestLaunchReusesWorker(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt)
+	b := NewLocalBackend(rt, nil)
 	taskID := "test-task-reuse"
 
 	spec := ContainerSpec{
@@ -165,11 +167,48 @@ func TestLaunchReusesWorker(t *testing.T) {
 	b.StopTaskWorker(taskID)
 }
 
+func TestWorkerMetricsRecorded(t *testing.T) {
+	rt := containerRuntime(t)
+	ensureTestImage(t, rt)
+
+	reg := metrics.NewRegistry()
+	b := NewLocalBackend(rt, reg)
+	taskID := "test-task-metrics"
+
+	spec := ContainerSpec{
+		Runtime: rt,
+		Name:    "wallfacer-test-metrics-" + t.Name(),
+		Image:   testImage,
+		Labels:  map[string]string{"wallfacer.task.id": taskID},
+		Cmd:     []string{"echo", "metrics"},
+	}
+
+	// Launch creates a worker (create counter) then either execs (exec counter)
+	// or falls back (fallback counter).
+	h, err := b.Launch(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Launch: %v", err)
+	}
+	h.Wait()
+	b.StopTaskWorker(taskID)
+
+	// Verify at least one of creates or fallbacks was counted.
+	var buf strings.Builder
+	reg.WritePrometheus(&buf)
+	output := buf.String()
+	hasCreate := strings.Contains(output, "wallfacer_container_worker_creates_total")
+	hasFallback := strings.Contains(output, "wallfacer_container_worker_fallbacks_total")
+	hasExec := strings.Contains(output, "wallfacer_container_worker_execs_total")
+	if !hasCreate && !hasFallback && !hasExec {
+		t.Errorf("expected at least one worker metric, got:\n%s", output)
+	}
+}
+
 func TestStopTaskWorker(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
 
-	b := NewLocalBackend(rt)
+	b := NewLocalBackend(rt, nil)
 	taskID := "test-task-stop"
 
 	spec := ContainerSpec{
