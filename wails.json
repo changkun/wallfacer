@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Wallfacer",
+  "outputfilename": "Wallfacer",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "changkun",
+    "email": ""
+  },
+  "info": {
+    "companyName": "latere.ai",
+    "productName": "Wallfacer",
+    "productVersion": "0.0.0",
+    "copyright": "Copyright 2025 latere.ai",
+    "comments": "AI task board runner"
+  }
+}

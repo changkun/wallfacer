@@ -10,7 +10,7 @@ NAME             := wallfacer
 -include .env
 export
 
-.PHONY: build build-binary build-claude build-codex server run shell clean ui-css api-contract fmt fmt-go fmt-js lint test test-backend test-frontend commit-seq push-once release-notes release
+.PHONY: build build-binary build-claude build-codex build-desktop build-desktop-darwin build-desktop-windows build-desktop-linux server run shell clean ui-css api-contract fmt fmt-go fmt-js lint test test-backend test-frontend commit-seq push-once release-notes release
 
 # Build the wallfacer binary and both sandbox images.
 build: build-binary build-claude build-codex
@@ -25,6 +25,22 @@ endif
 
 build-binary:
 	go build -trimpath -ldflags "$(LDFLAGS)" -o wallfacer .
+
+# Build the native desktop app for the current platform (requires wails CLI).
+build-desktop:
+	wails build -tags desktop
+
+# Build macOS universal .app bundle.
+build-desktop-darwin:
+	wails build -tags desktop -platform darwin/universal
+
+# Build Windows .exe.
+build-desktop-windows:
+	wails build -tags desktop -platform windows/amd64
+
+# Build Linux desktop binary.
+build-desktop-linux:
+	wails build -tags desktop -platform linux/amd64
 
 # Build the Claude Code sandbox image and tag it with both the local name and the ghcr.io
 # name so that 'wallfacer run' finds it under the default image reference.

@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -397,4 +399,36 @@ func TestPlatformTraySetup(t *testing.T) {
 	// event loop, so we only verify the function signature.
 	_ = fn
 	_ = called
+}
+
+func TestAppIconFilesExist(t *testing.T) {
+	root := repoRoot(t)
+	icons := []string{
+		"assets/icons/appicon.png",
+		"assets/icons/appicon.ico",
+		"assets/icons/appicon.icns",
+	}
+	for _, icon := range icons {
+		path := filepath.Join(root, icon)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Errorf("%s: %v", icon, err)
+			continue
+		}
+		if info.Size() == 0 {
+			t.Errorf("%s: file is empty", icon)
+		}
+	}
+}
+
+func TestWailsJSONExists(t *testing.T) {
+	root := repoRoot(t)
+	path := filepath.Join(root, "wails.json")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("wails.json: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("wails.json is empty")
+	}
 }

@@ -1,0 +1,15 @@
+{
+  "fixed": {
+    "file_version": "0.0.0"
+  },
+  "info": {
+    "0000": {
+      "ProductVersion": "0.0.0",
+      "CompanyName": "latere.ai",
+      "FileDescription": "Wallfacer Desktop",
+      "LegalCopyright": "Copyright 2025 latere.ai",
+      "ProductName": "Wallfacer",
+      "Comments": "AI task board runner"
+    }
+  }
+}

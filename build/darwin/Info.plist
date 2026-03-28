@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleName</key>
+	<string>Wallfacer</string>
+	<key>CFBundleDisplayName</key>
+	<string>Wallfacer</string>
+	<key>CFBundleIdentifier</key>
+	<string>ai.latere.wallfacer</string>
+	<key>CFBundleVersion</key>
+	<string>{{.Info.ProductVersion}}</string>
+	<key>CFBundleShortVersionString</key>
+	<string>{{.Info.ProductVersion}}</string>
+	<key>CFBundleExecutable</key>
+	<string>{{.Name}}</string>
+	<key>CFBundleIconFile</key>
+	<string>iconfile</string>
+	<key>LSUIElement</key>
+	<false/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true/>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.15.0</string>
+</dict>
+</plist>
