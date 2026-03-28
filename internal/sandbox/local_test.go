@@ -26,7 +26,7 @@ func TestLaunchEphemeralWhenDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Launch: %v", err)
 	}
-	defer h.Kill()
+	defer func() { _ = h.Kill() }()
 
 	buf := make([]byte, 256)
 	n, _ := h.Stdout().Read(buf)
@@ -34,7 +34,7 @@ func TestLaunchEphemeralWhenDisabled(t *testing.T) {
 	if output != "ephemeral" {
 		t.Fatalf("expected 'ephemeral', got %q", output)
 	}
-	h.Wait()
+	_, _ = h.Wait()
 
 	// No worker should have been created.
 	b.taskWorkersMu.Lock()
@@ -63,7 +63,7 @@ func TestLaunchEphemeralWithoutTaskID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Launch: %v", err)
 	}
-	defer h.Kill()
+	defer func() { _ = h.Kill() }()
 
 	buf := make([]byte, 256)
 	n, _ := h.Stdout().Read(buf)
@@ -71,7 +71,7 @@ func TestLaunchEphemeralWithoutTaskID(t *testing.T) {
 	if output != "no-id" {
 		t.Fatalf("expected 'no-id', got %q", output)
 	}
-	h.Wait()
+	_, _ = h.Wait()
 
 	b.taskWorkersMu.Lock()
 	count := len(b.taskWorkers)
@@ -107,7 +107,7 @@ func TestLaunchCreatesWorker(t *testing.T) {
 	if output != "worker-output" {
 		t.Fatalf("expected 'worker-output', got %q", output)
 	}
-	h.Wait()
+	_, _ = h.Wait()
 
 	// Worker should exist in the map.
 	b.taskWorkersMu.Lock()
@@ -141,7 +141,7 @@ func TestLaunchReusesWorker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first Launch: %v", err)
 	}
-	h1.Wait()
+	_, _ = h1.Wait()
 
 	b.taskWorkersMu.Lock()
 	w1 := b.taskWorkers[taskID]
@@ -153,7 +153,7 @@ func TestLaunchReusesWorker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second Launch: %v", err)
 	}
-	h2.Wait()
+	_, _ = h2.Wait()
 
 	b.taskWorkersMu.Lock()
 	w2 := b.taskWorkers[taskID]
@@ -188,7 +188,7 @@ func TestWorkerMetricsRecorded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Launch: %v", err)
 	}
-	h.Wait()
+	_, _ = h.Wait()
 	b.StopTaskWorker(taskID)
 
 	// Verify at least one of creates or fallbacks was counted.
@@ -222,7 +222,7 @@ func TestStopTaskWorker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Launch: %v", err)
 	}
-	h.Wait()
+	_, _ = h.Wait()
 
 	b.StopTaskWorker(taskID)
 

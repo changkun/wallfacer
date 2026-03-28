@@ -158,12 +158,12 @@ func TestPipe_WithBufferSize(t *testing.T) {
 // created via StartReader does not panic. This is a regression test for a bug
 // where Close() unconditionally called p.pr.Close() but StartReader sets pr
 // to nil, causing a nil pointer dereference.
-func TestStartReader_CloseDoesNotPanic(t *testing.T) {
+func TestStartReader_CloseDoesNotPanic(_ *testing.T) {
 	r := strings.NewReader("line1\nline2\n")
 	p := StartReader(io.NopCloser(r))
 
 	// Drain lines so the scanner goroutine exits.
-	for range p.Lines() {
+	for range p.Lines() { //nolint:revive // intentionally empty drain loop
 	}
 	<-p.Done()
 

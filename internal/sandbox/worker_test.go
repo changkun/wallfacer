@@ -194,7 +194,7 @@ func TestExecHandleKillDoesNotRemoveContainer(t *testing.T) {
 		t.Fatalf("Kill: %v", err)
 	}
 	// Reap the process so it doesn't leak.
-	h.Wait()
+	_, _ = h.Wait()
 
 	// Worker container should still exist and be running.
 	out, inspErr := exec.Command(rt, "inspect",

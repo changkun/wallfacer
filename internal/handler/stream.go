@@ -107,7 +107,9 @@ func (h *Handler) StreamTasks(w http.ResponseWriter, r *http.Request) {
 		}
 		// Include cross-group task counts in the initial payload.
 		if agData, err := json.Marshal(h.activeGroupInfos(r.Context())); err == nil {
-			fmt.Fprintf(w, "event: active_groups\ndata: %s\n\n", agData)
+			if _, err := fmt.Fprintf(w, "event: active_groups\ndata: %s\n\n", agData); err != nil {
+				return
+			}
 		}
 		flusher.Flush()
 	}
