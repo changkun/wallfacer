@@ -1,6 +1,6 @@
 # Task 7: Frontend Tests and Documentation
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 5, Task 6
 **Phase:** Phase 1 — Read-Only Browsing + Preview
 **Effort:** Medium
@@ -59,3 +59,11 @@ The frontend tests themselves ARE this task's deliverable. Run `cd ui && npx vit
 - Do NOT add integration/E2E tests — unit tests for pure logic only
 - Do NOT modify backend code
 - Documentation should only cover Phase 1 (read-only browsing + preview)
+
+## Implementation notes
+
+- Tests were already created incrementally during Tasks 4 and 5 (`ui/js/tests/explorer.test.js`, 18 tests covering `_basename`, `_buildChildNodes`, `_getVisibleNodes`, `_findParent`, `_classifyFileResponse`, `_relativePath`, and init behavior). No additional tests needed.
+- CLAUDE.md already had the explorer API routes documented (added during Task 1/2). The `ui/js/explorer.js` file is covered by the existing `ui/index.html + ui/js/` line.
+- `docs/internals/api-and-transport.md` already had the explorer endpoints documented.
+- Added File Explorer section to `docs/guide/board-and-tasks.md` in the Essentials section, covering panel toggle, tree browsing, file preview, resize, and keyboard navigation.
+- The spec mentioned `Ctrl+E` as the shortcut, but it was changed to bare `E` in Task 6 due to browser conflicts. Documentation uses the correct `E` key.
