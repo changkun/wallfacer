@@ -37,36 +37,53 @@ type IndexViewData struct {
 	ServerAPIKey string
 }
 
-// RunServer implements the `wallfacer run` subcommand.
-// uiFS and docsFS are the embedded (or on-disk) filesystems containing the
-// ui/ and docs/ directory trees respectively.
-func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
-	fs := flag.NewFlagSet("run", flag.ExitOnError)
+// ServerConfig holds the parsed flag values shared by RunServer and RunDesktop.
+type ServerConfig struct {
+	LogFormat    string
+	Addr         string
+	DataDir      string
+	ContainerCmd string
+	SandboxImage string
+	EnvFile      string
+}
 
-	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
-	addr := fs.String("addr", envOrDefault("ADDR", ":8080"), "listen address")
-	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
-	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", detectContainerRuntime()), "container runtime command (podman or docker)")
-	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), "sandbox container image")
-	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
-	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
+// ServerComponents holds the initialized server components returned by initServer.
+type ServerComponents struct {
+	Srv     *http.Server
+	Ln      net.Listener
+	Runner  *runner.Runner
+	Handler *handler.Handler
+	WsMgr   *workspace.Manager
+	Ctx     context.Context
+	Stop    context.CancelFunc
 
-	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags]\n\n")
-		fmt.Fprintf(os.Stderr, "Start the task board server and open the web UI.\n\n")
-		fmt.Fprintf(os.Stderr, "Flags:\n")
-		fs.PrintDefaults()
+	// ActualPort is the TCP port the listener is bound to.
+	ActualPort int
+}
+
+// Shutdown performs a graceful shutdown: drains HTTP connections and waits
+// for background runner goroutines to finish.
+func (sc *ServerComponents) Shutdown() {
+	sc.Stop()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := sc.Srv.Shutdown(shutdownCtx); err != nil {
+		logger.Main.Error("http server shutdown", "error", err)
 	}
-	_ = fs.Parse(args)
+	sc.Runner.Shutdown()
+	logger.Main.Info("shutdown complete")
+}
 
-	// Re-initialize loggers with the format chosen by the user.
-	logger.Init(*logFormat)
-
-	// Auto-initialize config directory and .env template.
-	initConfigDir(configDir, *envFile)
+// initServer performs the full server initialization sequence shared by
+// RunServer and RunDesktop. It creates the workspace manager, runner, handler,
+// HTTP mux, listener, and http.Server. The caller is responsible for starting
+// srv.Serve and managing the lifecycle (signals, shutdown).
+func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerComponents {
+	logger.Init(cfg.LogFormat)
+	initConfigDir(configDir, cfg.EnvFile)
 
 	var workspaces []string
-	wsMgr, err := workspace.NewManager(configDir, *dataDir, *envFile, workspaces)
+	wsMgr, err := workspace.NewManager(configDir, cfg.DataDir, cfg.EnvFile, workspaces)
 	if err != nil {
 		logger.Fatal("workspace manager", "error", err)
 	}
@@ -75,7 +92,6 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	if s != nil {
 		logger.Main.Info("store loaded", "path", snapshot.ScopedDataDir)
 
-		// Purge tombstoned tasks older than the retention period.
 		tombstoneRetentionDays := constants.DefaultTombstoneRetentionDays
 		if v, err := strconv.Atoi(os.Getenv("WALLFACER_TOMBSTONE_RETENTION_DAYS")); err == nil && v > 0 {
 			tombstoneRetentionDays = v
@@ -88,10 +104,6 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		logger.Fatal("create worktrees dir", "error", err)
 	}
 
-	// tmpDir is used for ephemeral files that are bind-mounted into containers.
-	// It must live under a path that the container runtime exposes to the host
-	// filesystem (on macOS Docker Desktop this means under $HOME, not $TMPDIR
-	// which resolves to /var/folders/... and is not shared with the VM).
 	tmpDir := filepath.Join(configDir, "tmp")
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		logger.Fatal("create tmp dir", "error", err)
@@ -101,30 +113,24 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		logger.Main.Info("workspace instructions", "path", snapshot.InstructionsPath)
 	}
 
-	resolvedImage := ensureImage(*containerCmd, *sandboxImage)
+	resolvedImage := ensureImage(cfg.ContainerCmd, cfg.SandboxImage)
 	codexAuthPath := ""
 	if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 		codexAuthPath = filepath.Join(home, ".codex")
 	}
 
-	// Read initial container settings from env file (if present) so the runner
-	// starts with the configured policies without waiting for the first
-	// container launch to re-read the file.
 	envCfg := envconfig.Config{}
-	if cfg, err := envconfig.Parse(*envFile); err == nil {
-		envCfg = cfg
+	if parsed, err := envconfig.Parse(cfg.EnvFile); err == nil {
+		envCfg = parsed
 	}
 
-	// Build the Prometheus metrics registry early so it can be threaded into
-	// the runner (for worktree health counters) and handler (for autopilot
-	// action counters).
 	reg := metrics.NewRegistry()
 
 	promptsDir := filepath.Join(configDir, "prompts")
 	r := runner.NewRunner(s, runner.RunnerConfig{
-		Command:          *containerCmd,
+		Command:          cfg.ContainerCmd,
 		SandboxImage:     resolvedImage,
-		EnvFile:          *envFile,
+		EnvFile:          cfg.EnvFile,
 		Workspaces:       workspaces,
 		WorktreesDir:     worktreesDir,
 		TmpDir:           tmpDir,
@@ -141,10 +147,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 
 	r.PruneUnknownWorktrees()
 
-	// Set up signal-based context so background workers stop on SIGTERM/Interrupt.
-	// Created before recovery so orphan monitors can be cancelled on shutdown.
 	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
-	defer stop()
 
 	if s != nil {
 		runner.RecoverOrphanedTasks(ctx, s, r)
@@ -161,34 +164,14 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 	r.SetAutosubmitFunc(h.AutosubmitEnabled)
 	r.SetIdeationExploitRatioFunc(h.IdeationExploitRatio)
 
-	// Start the auto-promoter: watches for state changes and promotes
-	// backlog tasks to in_progress when capacity is available.
 	h.StartAutoPromoter(ctx)
 	h.StartAutoRetrier(ctx)
-
-	// Start the ideation watcher: when ideation is enabled and an idea-agent
-	// task completes, automatically enqueues the next one.
 	h.StartIdeationWatcher(ctx)
-
-	// Start the waiting-sync watcher: periodically checks waiting tasks and
-	// automatically syncs any whose worktrees have fallen behind the default branch.
 	h.StartWaitingSyncWatcher(ctx)
-
-	// Start the auto-tester: triggers the test agent for waiting tasks that are
-	// untested and not behind the default branch tip, when auto-test is enabled.
 	h.StartAutoTester(ctx)
-
-	// Start the auto-submitter: moves waiting tasks to done when they are
-	// verified (pass), not behind the default branch, and conflict-free.
 	h.StartAutoSubmitter(ctx)
-
-	// Start the auto-refiner: triggers refinement for backlog tasks that
-	// have not yet been refined, when auto-refine is enabled.
 	h.StartAutoRefiner(ctx)
 
-	// Register scrape-time gauge collectors. HTTP counter and histogram are
-	// created inside loggingMiddleware so they are available via the same
-	// registry for /metrics.
 	reg.Gauge(
 		"wallfacer_tasks_total",
 		"Number of tasks grouped by status and archived flag.",
@@ -253,7 +236,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 			if !ok {
 				return nil
 			}
-			tasks, err := active.ListTasks(context.Background(), false /* exclude archived */)
+			tasks, err := active.ListTasks(context.Background(), false)
 			if err != nil {
 				return nil
 			}
@@ -295,42 +278,86 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 
 	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS)
 
-	host, _, _ := net.SplitHostPort(*addr)
-	ln, err := net.Listen("tcp", *addr)
+	host, _, _ := net.SplitHostPort(cfg.Addr)
+	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
-		logger.Main.Warn("requested address unavailable, finding free port", "addr", *addr, "error", err)
+		logger.Main.Warn("requested address unavailable, finding free port", "addr", cfg.Addr, "error", err)
 		ln, err = net.Listen("tcp", net.JoinHostPort(host, "0"))
 		if err != nil {
 			logger.Fatal("listen", "error", err)
 		}
 	}
 
-	actualHostPort := normalizeBrowserVisibleHostPort(*addr, ln.Addr())
+	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
-	if !*noBrowser {
-		browserHost := host
-		if browserHost == "" || browserHost == "0.0.0.0" || browserHost == "::" || browserHost == "[::]" {
-			browserHost = "localhost"
-		}
-		go openBrowser(fmt.Sprintf("http://%s:%d", browserHost, actualPort))
-	}
 
 	srv := &http.Server{
 		Handler:     loggingMiddleware(handler.CSRFMiddleware(actualHostPort)(handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)), reg),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
 
-	// Serve in a background goroutine so we can react to the shutdown signal.
+	return &ServerComponents{
+		Srv:        srv,
+		Ln:         ln,
+		Runner:     r,
+		Handler:    h,
+		WsMgr:      wsMgr,
+		Ctx:        ctx,
+		Stop:       stop,
+		ActualPort: actualPort,
+	}
+}
+
+// RunServer implements the `wallfacer run` subcommand.
+// uiFS and docsFS are the embedded (or on-disk) filesystems containing the
+// ui/ and docs/ directory trees respectively.
+func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
+	fs := flag.NewFlagSet("run", flag.ExitOnError)
+
+	logFormat := fs.String("log-format", envOrDefault("LOG_FORMAT", "text"), `log output format: "text" or "json"`)
+	addr := fs.String("addr", envOrDefault("ADDR", ":8080"), "listen address")
+	dataDir := fs.String("data", envOrDefault("DATA_DIR", filepath.Join(configDir, "data")), "data directory")
+	containerCmd := fs.String("container", envOrDefault("CONTAINER_CMD", detectContainerRuntime()), "container runtime command (podman or docker)")
+	sandboxImage := fs.String("image", envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), "sandbox container image")
+	envFile := fs.String("env-file", envOrDefault("ENV_FILE", filepath.Join(configDir, ".env")), "env file for container (Claude token)")
+	noBrowser := fs.Bool("no-browser", false, "do not open browser on start")
+
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: wallfacer run [flags]\n\n")
+		fmt.Fprintf(os.Stderr, "Start the task board server and open the web UI.\n\n")
+		fmt.Fprintf(os.Stderr, "Flags:\n")
+		fs.PrintDefaults()
+	}
+	_ = fs.Parse(args)
+
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    *logFormat,
+		Addr:         *addr,
+		DataDir:      *dataDir,
+		ContainerCmd: *containerCmd,
+		SandboxImage: *sandboxImage,
+		EnvFile:      *envFile,
+	}, uiFS, docsFS)
+	defer sc.Stop()
+
+	if !*noBrowser {
+		host, _, _ := net.SplitHostPort(*addr)
+		browserHost := host
+		if browserHost == "" || browserHost == "0.0.0.0" || browserHost == "::" || browserHost == "[::]" {
+			browserHost = "localhost"
+		}
+		go openBrowser(fmt.Sprintf("http://%s:%d", browserHost, sc.ActualPort))
+	}
+
 	srvErr := make(chan error, 1)
 	go func() {
-		srvErr <- srv.Serve(ln)
+		srvErr <- sc.Srv.Serve(sc.Ln)
 	}()
 
-	logger.Main.Info("listening", "addr", ln.Addr().String())
+	logger.Main.Info("listening", "addr", sc.Ln.Addr().String())
 
-	// Block until a shutdown signal arrives or the server exits on its own.
 	select {
-	case <-ctx.Done():
+	case <-sc.Ctx.Done():
 		logger.Main.Info("received shutdown signal, shutting down gracefully")
 	case err := <-srvErr:
 		if err != nil && err != http.ErrServerClosed {
@@ -339,20 +366,7 @@ func RunServer(configDir string, args []string, uiFS, docsFS fs.FS) {
 		return
 	}
 
-	// Give in-flight HTTP requests up to 5 seconds to complete.
-	// SSE handlers exit promptly because their request contexts (derived from
-	// the base context set above) are already cancelled at this point.
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		logger.Main.Error("http server shutdown", "error", err)
-	}
-
-	// Wait for background runner goroutines (oversight generation, title
-	// generation, etc.) to finish before the process exits.
-	r.Shutdown()
-
-	logger.Main.Info("shutdown complete")
+	sc.Shutdown()
 }
 
 // BuildMux constructs the HTTP request router.

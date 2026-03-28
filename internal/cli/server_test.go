@@ -18,6 +18,42 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 )
 
+// TestInitServer verifies that initServer returns valid components with a
+// bound listener.
+func TestInitServer(t *testing.T) {
+	configDir := t.TempDir()
+	envFile := filepath.Join(configDir, ".env")
+	if err := os.WriteFile(envFile, []byte("# empty\n"), 0600); err != nil {
+		t.Fatalf("write env file: %v", err)
+	}
+
+	sc := initServer(configDir, ServerConfig{
+		LogFormat:    "text",
+		Addr:         ":0",
+		DataDir:      filepath.Join(configDir, "data"),
+		ContainerCmd: "true",
+		SandboxImage: "wallfacer:latest",
+		EnvFile:      envFile,
+	}, testFS(t), testFS(t))
+	defer sc.Shutdown()
+
+	if sc.Srv == nil {
+		t.Fatal("expected non-nil http.Server")
+	}
+	if sc.Ln == nil {
+		t.Fatal("expected non-nil Listener")
+	}
+	if sc.Runner == nil {
+		t.Fatal("expected non-nil Runner")
+	}
+	if sc.Handler == nil {
+		t.Fatal("expected non-nil Handler")
+	}
+	if sc.ActualPort == 0 {
+		t.Fatal("expected non-zero port")
+	}
+}
+
 // TestStatusResponseWriter_WriteHeaderAndFlush verifies that the
 // statusResponseWriter captures the status code and delegates Flush.
 func TestStatusResponseWriter_WriteHeaderAndFlush(t *testing.T) {
