@@ -33,9 +33,11 @@ What has shipped vs what remains. Items marked ✅ are complete; ○ are not sta
 ├──▶ ○  M5: Host Terminal
 ├──▶ ○  M6: Cloud Deployment (overview)
 │    ├──▶ ○  M6a: Tenant Filesystem
-│    └──▶ ○  M6b: K8s Sandbox Backend
+│    ├──▶ ○  M6b: K8s Sandbox Backend
+│    └──▶ ○  M6c: Cloud Infrastructure (IaC per provider)
 ├──▶ ○  M7: Desktop App
-└──▶ ○  M8: Multi-Tenant (capstone)
+├──▶ ○  M8a: Authentication (OAuth/OIDC login, sessions, identity)
+└──▶ ○  M8: Multi-Tenant (capstone, requires M8a)
 
 ○  Epic Coordination (blocked on M4)
 ○  Independent: 90–93 (oversight, visual, live-serve, agent abstraction)
@@ -54,7 +56,12 @@ Full milestone dependency graph showing how everything relates.
                                  │    M2: Storage Interface ─┐                       ├──▶ M8: Multi-Tenant
                                  │            │              │                       │       (capstone)
                                  │            ├──▶ M2a: Multi-Workspace Groups       │
-                                 │            └──▶ M2 cloud (PG, S3) ───────────────┘
+                                 │            └──▶ M2 cloud (PG, S3) ───────────────┤
+                                 │                                                   │
+                                 │    M8a: Authentication (OAuth, sessions) ─────────┤
+                                 │                                                   │
+                                 │    M6c: Cloud Infra (IaC per provider) ───────────┘
+                                 │      (DO, AWS, GCP, Alibaba, self-hosted)
                                  │
                                  ├──▶ Native Containerization (platform-specific)
                                  │     ├─ M1a: Linux  (bubblewrap, systemd-nspawn)
@@ -82,7 +89,8 @@ Full milestone dependency graph showing how everything relates.
 ```
 M2 (storage interface) ──▶ M6a (tenant filesystem) ──▶ M6b (K8s sandbox) ──▶ M8 (multi-tenant)
 M1 (sandbox interface) ─────────────────────────────▶ M6b                        ▲
-M2 (storage interface) ──▶ M2 cloud (PG, S3) ───────────────────────────────────┘
+M2 (storage interface) ──▶ M2 cloud (PG, S3) ───────────────────────────────────┤
+M8a (authentication) ───────────────────────────────────────────────────────────┘
 ```
 
 ## Milestones
@@ -96,7 +104,15 @@ M2 (storage interface) ──▶ M2 cloud (PG, S3) ─────────�
 | **M5** | Host terminal | [05-host-terminal.md](05-host-terminal.md) | Not started | Interactive shell in the web UI (WebSocket + PTY) |
 | **M6** | Cloud deployment | [06-cloud-backends.md](06-cloud-backends.md) | Not started | Overview: VPS recipe (done), per-user instance architecture, sub-milestone index |
 | **M7** | Desktop app | [07-native-desktop-app.md](07-native-desktop-app.md) | Not started | Wails native wrapper (macOS .app, Windows .exe) |
-| **M8** | Multi-tenant (capstone) | [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) | Not started | Control plane, auth, instance lifecycle, cloud file/terminal access |
+| **M8** | Multi-tenant (capstone) | [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) | Not started | Control plane, instance provisioning and lifecycle (auth via M8a) |
+
+## Branch from M8 — Authentication
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [08a-authentication.md](08a-authentication.md) | Not started | OAuth2/OIDC login (GitHub, Google, generic), session management, user identity model, trusted proxy mode for M8 |
+
+Implement before M8. Also independently useful for single-host deployments (replaces static API key with real login).
 
 ## Branches from M1 — Native Sandbox Backends
 
