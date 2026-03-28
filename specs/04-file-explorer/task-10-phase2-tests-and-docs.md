@@ -1,6 +1,6 @@
 # Task 10: Phase 2 Tests and Documentation
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 9
 **Phase:** Phase 2 — File Editing + Saving
 **Effort:** Small
@@ -52,3 +52,8 @@ No new test code — this task verifies existing tests from Tasks 1-9 all pass t
 - Do NOT implement Phase 3 features (git status indicators, file search, create/delete)
 - Do NOT refactor code from earlier tasks unless a bug is found during verification
 - Documentation should cover Phase 1 + Phase 2 comprehensively
+
+## Implementation notes
+
+- All documentation was already in place from earlier tasks: CLAUDE.md had explorer routes (Task 1/2), docs/internals/api-and-transport.md had all three endpoints (Task 1/2), and docs/guide/board-and-tasks.md had both browsing and editing sections (Tasks 7, 9).
+- Full verification passed: 658 frontend tests, all backend tests, lint and fmt clean.
