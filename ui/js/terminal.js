@@ -14,6 +14,15 @@ function _getCSSVar(name) {
  * initTerminal — create xterm.js instance and mount into the panel.
  * Does NOT connect; connection happens on first panel open.
  */
+function _buildTermTheme() {
+  return {
+    background: _getCSSVar("--bg-card") || "#272420",
+    foreground: _getCSSVar("--text") || "#cccccc",
+    cursor: _getCSSVar("--accent") || "#4e8cff",
+    selectionBackground: "rgba(78,140,255,0.3)",
+  };
+}
+
 function initTerminal() {
   if (_term) return;
   if (typeof Terminal === "undefined") return;
@@ -22,12 +31,7 @@ function initTerminal() {
     cursorBlink: true,
     fontSize: 13,
     fontFamily: '"SF Mono", Menlo, Monaco, "Courier New", monospace',
-    theme: {
-      background: _getCSSVar("--bg-card") || "#1e1e1e",
-      foreground: _getCSSVar("--text") || "#cccccc",
-      cursor: _getCSSVar("--accent") || "#4e8cff",
-      selectionBackground: "rgba(78,140,255,0.3)",
-    },
+    theme: _buildTermTheme(),
   });
 
   _fitAddon = new FitAddon.FitAddon();
@@ -64,6 +68,9 @@ function initTerminal() {
  */
 function connectTerminal() {
   if (!_term) return;
+
+  // Re-apply theme in case user switched light/dark since init.
+  _term.options.theme = _buildTermTheme();
 
   if (_termWs && _termWs.readyState === WebSocket.OPEN) {
     try {

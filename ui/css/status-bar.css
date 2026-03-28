@@ -121,9 +121,14 @@
 }
 #status-bar-panel .xterm {
   height: 100%;
+  background: var(--bg-card);
 }
 #status-bar-panel .xterm-viewport {
   overflow-y: auto;
+  background: var(--bg-card) !important;
+}
+#status-bar-panel .xterm-screen {
+  background: var(--bg-card);
 }
 .terminal-reconnecting {
   position: absolute;

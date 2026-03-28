@@ -21,6 +21,7 @@ function makeContext(overrides = {}) {
     onResize: vi.fn(),
     cols: 80,
     rows: 24,
+    options: {},
   };
 
   const mockFitInstance = {
