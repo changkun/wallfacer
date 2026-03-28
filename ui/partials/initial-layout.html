@@ -16,12 +16,15 @@
     />
     <link rel="stylesheet" href="/css/tailwind.css" />
     <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="stylesheet" href="/css/vendor/xterm.css" />
     {{if .ServerAPIKey}}
     <meta name="wallfacer-token" content="{{.ServerAPIKey}}" />
     {{end}}
     <script src="/js/vendor/sortable.min.js"></script>
     <script src="/js/vendor/marked.min.js"></script>
     <script src="/js/vendor/highlight.min.js"></script>
+    <script src="/js/vendor/xterm.min.js"></script>
+    <script src="/js/vendor/xterm-addon-fit.min.js"></script>
   </head>
   <body class="h-screen overflow-hidden flex flex-col">
     <div
