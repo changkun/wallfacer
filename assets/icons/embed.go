@@ -22,3 +22,6 @@ var TrayAttention []byte
 
 //go:embed tray-attention@2x.png
 var TrayAttention2x []byte
+
+//go:embed tray.ico
+var TrayICO []byte

@@ -93,17 +93,28 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	)
 	tm.Start()
 
+	// On macOS and Windows, closing the window hides it to the tray
+	// instead of quitting. The user can quit via the tray menu.
+	hideOnClose := runtime.GOOS == "darwin" || runtime.GOOS == "windows"
+
 	appOpts := &options.App{
 		Title:             "Wallfacer",
 		Width:             1400,
 		Height:            900,
-		HideWindowOnClose: runtime.GOOS == "darwin",
+		HideWindowOnClose: hideOnClose,
 		AssetServer: &assetserver.Options{
 			Handler: proxy,
 		},
 		OnStartup: func(ctx context.Context) {
 			wailsCtx = ctx
 			logger.Main.Info("desktop window opened")
+		},
+		OnBeforeClose: func(ctx context.Context) bool {
+			if hideOnClose {
+				wailsRuntime.WindowHide(ctx)
+				return true // prevent actual close
+			}
+			return false
 		},
 		OnShutdown: func(_ context.Context) {
 			tm.Stop()

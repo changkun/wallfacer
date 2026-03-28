@@ -92,6 +92,7 @@ func (tm *TrayManager) Stop() {
 func (tm *TrayManager) onReady() {
 	systray.SetTemplateIcon(icons.Tray, icons.Tray)
 	systray.SetTooltip("Wallfacer")
+	platformTraySetup(tm.showWindow)
 
 	mOpen := systray.AddMenuItem("Open Dashboard", "Show the Wallfacer window")
 	systray.AddSeparator()
