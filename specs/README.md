@@ -1,215 +1,202 @@
 # Specs
 
-Implementation roadmap for wallfacer. Numbered specs (`01-`–`08-`) form the cloud/platform milestone sequence. Unnumbered specs are core improvements independent of cloud deployment.
-
-## Core Infrastructure
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [epic-coordination.md](epic-coordination.md) | Not started | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking. UX depends on M4 (file explorer) for spec browsing and chat-driven iteration. |
+Wallfacer roadmap. Three tracks run in parallel, connected by shared design foundations.
 
 ## Status Quo
 
-What has shipped vs what remains. Items marked ✅ are complete; ○ are not started.
+What has shipped vs what remains. ✅ = complete, ○ = not started.
 
 ```
-✅ M1: Sandbox Backend Interface
-│
-├──▶ ✅ M1d: Windows Support
-├──▶ ○  M1a: Native Sandbox (Linux)
-├──▶ ○  M1b: Native Sandbox (macOS)
-├──▶ ○  M1c: Native Sandbox (Windows)
-│
-├──▶ ✅ M2: Storage Backend Interface (enablers complete)
-│    ├──▶ ✅ M2a: Multi-Workspace Groups
-│    └──▶ ○  M2 cloud tasks (PG, S3 — deferred in M2 spec)
-│
-├──▶ ✅ M3: Container Reuse (core)
-│    └──▶ ○  M3a: Overlay Snapshots / CRIU
-│
-├── next ──────────────────────────
-│
-├──▶ ✅ M4: File Explorer
-├──▶ ✅ M5: Host Terminal
-│    ├──▶ ○  M5a: Terminal Sessions (tabs)
-│    └──▶ ○  M5b: Container Exec
-├──▶ ○  M6: Cloud Deployment (overview)
-│    ├──▶ ○  M6a: Tenant Filesystem
-│    ├──▶ ○  M6b: K8s Sandbox Backend
-│    └──▶ ○  M6c: Cloud Infrastructure (IaC per provider)
-├──▶ ○  M7: Desktop App
-├──▶ ○  M8a: Authentication (OAuth/OIDC login, sessions, identity)
-├──▶ ○  M8: Multi-Tenant (capstone, requires M8a)
-└──▶ ○  M8b: Tenant API (external API, webhooks; requires M8a + M8)
+Foundations (complete)
+  ✅ Sandbox Backend Interface
+  ✅ Storage Backend Interface
+  ✅ Container Reuse
+  ✅ File Explorer
+  ✅ Host Terminal
 
-○  Epic Coordination (blocked on M4)
-○  Independent: 90–93 (oversight, visual, live-serve, agent abstraction)
-○  Attachments: 04a (file/image), 04b (host mounts)
+Local Product                          Cloud Platform
+  ○ Epic Coordination                    ○ Cloud Deployment (overview)
+  ○ Desktop App                          ○ Tenant Filesystem
+  ○ File/Image Attachments               ○ K8s Sandbox Backend
+  ○ Host Mounts                          ○ Cloud Infrastructure
+  ○ File Panel Viewer                    ○ Multi-Tenant (capstone)
+  ○ Terminal Sessions                    ○ Tenant API
+  ○ Container Exec
+  ○ Oversight Risk Scoring             Shared Design
+  ○ Visual Verification                  ○ Authentication
+  ○ Live Serve                           ○ Agent Abstraction
+                                         ○ Native Sandboxes (Linux/macOS/Win)
+                                         ○ Overlay Snapshots
 ```
 
-## Overall Plan
+---
 
-Full milestone dependency graph showing how everything relates.
+## Foundations (Complete)
+
+Abstraction interfaces that all tracks build on. These are done and stable.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [sandbox-backends.md](foundations/sandbox-backends.md) | **Complete** | `sandbox.Backend` / `sandbox.Handle` + `LocalBackend` |
+| [storage-backends.md](foundations/storage-backends.md) | **Complete** (enablers) | `StorageBackend` + `FilesystemBackend`; cloud backends (PG, S3) deferred to cloud track |
+| [multi-workspace-groups.md](foundations/multi-workspace-groups.md) | **Complete** | Multi-store manager, runtime workspace switching |
+| [container-reuse.md](foundations/container-reuse.md) | **Complete** | Per-task worker containers via `podman exec` |
+| [file-explorer.md](foundations/file-explorer.md) | **Complete** | Browse + edit workspace files in the web UI |
+| [host-terminal.md](foundations/host-terminal.md) | **Complete** | Interactive shell in the web UI (WebSocket + PTY) |
+| [windows-support.md](foundations/windows-support.md) | **Complete** | Tier 2 Windows host support |
+
+---
+
+## Local Product
+
+Desktop experience and developer workflow improvements. No cloud dependency. Ships value to single-user deployments.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [epic-coordination.md](local/epic-coordination.md) | Not started | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking |
+| [desktop-app.md](local/desktop-app.md) | Not started | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
+| [file-attachments.md](local/file-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
+| [host-mounts.md](local/host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
+| [file-panel-viewer.md](local/file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview |
+| [terminal-sessions.md](local/terminal-sessions.md) | Not started | Multiple concurrent terminal sessions with tab bar |
+| [terminal-container-exec.md](local/terminal-container-exec.md) | Not started | Attach to running task containers from the terminal panel |
+| [oversight-risk-scoring.md](local/oversight-risk-scoring.md) | Not started | Real-time agent action risk assessment |
+| [visual-verification.md](local/visual-verification.md) | Not started | Visual verification for UI changes |
+| [live-serve.md](local/live-serve.md) | Not started | Build and run developed software from within Wallfacer |
+
+### Local product dependencies
 
 ```
-                                 ┌──▶ M3: Container Reuse ──▶ M3a: Overlay Snapshots / CRIU
-                                 │
- M1: Sandbox Backend Interface ──┼──▶ M6a: Tenant Filesystem ──▶ M6b: K8s Sandbox ──┐
-                                 │            ▲                                      │
-                                 │    M2: Storage Interface ─┐                       ├──▶ M8: Multi-Tenant
-                                 │            │              │                       │       (capstone)
-                                 │            ├──▶ M2a: Multi-Workspace Groups       │
-                                 │            └──▶ M2 cloud (PG, S3) ───────────────┤
-                                 │                                                   │
-                                 │    M8a: Authentication (OAuth, sessions) ─────────┤
-                                 │                                                   │
-                                 │    M6c: Cloud Infra (IaC per provider) ───────────┘
-                                 │                                                   │
-                                 │                                              M8b: Tenant API
-                                 │                                         (external API, webhooks)
-                                 │      (DO, AWS, GCP, Alibaba, self-hosted)
-                                 │
-                                 ├──▶ Native Containerization (platform-specific)
-                                 │     ├─ M1a: Linux  (bubblewrap, systemd-nspawn)
-                                 │     ├─ M1b: macOS  (Virtualization.framework, sandbox_init)
-                                 │     ├─ M1c: Windows (Job Objects, Hyper-V)
-                                 │     └─ M1d: Windows Support (tier 2 host)
-                                 │
- M4: File Explorer (local) ──────┼────────────────────────▶│ (Phase 4)
-         │                       │
-         ├──▶ Epic Coordination (spec management UX)
-         ├──▶ 04a: File/Image Attachments
-         └──▶ 04b: Host Mounts
-                                 │
- M5: Host Terminal (local) ──────┼────────────────────────▶│ (Phase 3)
-         │
-         ├──▶ 05a: Terminal Sessions (tabs)
-         └──▶ 05b: Container Exec
-                                 │
- M7: Desktop App ────────────────┘ (ships after M4+M5 UX)
+File Explorer (done) ──▶ Epic Coordination
+                     ──▶ File Attachments
+                     ──▶ Host Mounts
+                     ──▶ File Panel Viewer
 
- Independent (no milestone deps)
-   ├─ 90: Oversight Risk Scoring
-   ├─ 91: Visual Verification
-   ├─ 92: Live Serve
-   └─ 93: Agent Abstraction
+Host Terminal (done) ──▶ Terminal Sessions ──▶ Container Exec
+
+File Explorer + Host Terminal ──▶ Desktop App (ships with all local UX built in)
+
+Independent: Oversight Risk Scoring, Visual Verification, Live Serve
 ```
 
-**Cloud deployment dependency chain:**
+---
+
+## Cloud Platform
+
+Multi-tenant hosted service. Builds on sandbox and storage interfaces.
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [cloud-backends.md](cloud/cloud-backends.md) | Not started | Overview: VPS recipe, per-user instance architecture, sub-milestone index |
+| [tenant-filesystem.md](cloud/tenant-filesystem.md) | Not started | Per-tenant persistent volume, repo provisioner, workspace group cloud mapping |
+| [k8s-sandbox.md](cloud/k8s-sandbox.md) | Not started | `K8sBackend` — K8s Jobs with PVC mounts, pod log streaming, exec |
+| [cloud-infrastructure.md](cloud/cloud-infrastructure.md) | Not started | Per-provider IaC modules (DO, AWS, GCP, Alibaba, self-hosted) |
+| [multi-tenant.md](cloud/multi-tenant.md) | Not started | Control plane, instance provisioning and lifecycle |
+| [tenant-api.md](cloud/tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks |
+
+### Cloud platform dependencies
+
 ```
-M2 (storage interface) ──▶ M6a (tenant filesystem) ──▶ M6b (K8s sandbox) ──▶ M8 (multi-tenant)
-M1 (sandbox interface) ─────────────────────────────▶ M6b                        ▲
-M2 (storage interface) ──▶ M2 cloud (PG, S3) ───────────────────────────────────┤
-M8a (authentication) ───────────────────────────────────────────────────────────┤
-M6c (cloud infra: DO, AWS, GCP, Alibaba, self-hosted IaC) ─────────────────────┘
-                                                                                │
-M8a (authentication) + M8 (multi-tenant) ──▶ M8b: Tenant API (external API, webhooks)
+Sandbox + Storage Interfaces ──▶ Tenant FS ──▶ K8s Sandbox ──┐
+Storage Interface ──────────▶ Cloud Storage (PG, S3) ────────┤
+Authentication (shared) ─────────────────────────────────────┤
+Cloud Infrastructure (IaC) ──────────────────────────────────┤
+                                                              ▼
+                                                       Multi-Tenant
+                                                              │
+                                                       Tenant API
 ```
 
-## Milestones
-
-| # | Milestone | Spec | Status | Delivers |
-|---|-----------|------|--------|----------|
-| **M1** | Sandbox backend interface | [01-sandbox-backends.md](01-sandbox-backends.md) | **Complete** | `sandbox.Backend`/`sandbox.Handle` + `LocalBackend` |
-| **M2** | Storage backend interface | [02-storage-backends.md](02-storage-backends.md) | **Enablers complete** | `StorageBackend` + `FilesystemBackend` + `ListBlobs`; cloud backends (PG, S3) deferred |
-| **M3** | Container reuse | [03-container-reuse.md](03-container-reuse.md) | **Complete** (core) | Per-task worker containers via `podman exec`; ~10x startup savings per turn |
-| **M4** | File explorer | [04-file-explorer.md](04-file-explorer.md) | **Complete** | Browse + edit workspace files in the web UI |
-| **M5** | Host terminal | [05-host-terminal.md](05-host-terminal.md) | **Complete** | Interactive shell in the web UI (WebSocket + PTY) |
-| **M6** | Cloud deployment | [06-cloud-backends.md](06-cloud-backends.md) | Not started | Overview: VPS recipe (done), per-user instance architecture, sub-milestone index |
-| **M7** | Desktop app | [07-native-desktop-app.md](07-native-desktop-app.md) | Not started | Wails native wrapper (macOS .app, Windows .exe) |
-| **M8** | Multi-tenant (capstone) | [08-cloud-multi-tenant.md](08-cloud-multi-tenant.md) | Not started | Control plane, instance provisioning and lifecycle (auth via M8a) |
-
-## Branches from M8 — Authentication & Tenant API
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [08a-authentication.md](08a-authentication.md) | Not started | OAuth2/OIDC login (GitHub, Google, generic), session management, user identity model, trusted proxy mode for M8 |
-| [08b-tenant-api.md](08b-tenant-api.md) | Not started | Versioned external API (`/api/v1/`), per-tenant API keys, webhooks, rate limiting. Programmatic access for CI/CD and scripting. |
-
-M8a: Implement before M8. Also independently useful for single-host deployments (replaces static API key with real login).
-M8b: Implement after M8 control plane exists. Start with API key auth + task CRUD, then add webhooks.
-
-## Branches from M1 — Native Sandbox Backends
-
-Alternative `SandboxBackend` implementations. Independent of each other and of M2–M8.
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [01a-native-sandbox-linux.md](01a-native-sandbox-linux.md) | Not started | `BubblewrapBackend`, `NspawnBackend` — daemon-free, zero-install on most distros |
-| [01b-native-sandbox-macos.md](01b-native-sandbox-macos.md) | Not started | `VZBackend` (Virtualization.framework), `SandboxInitBackend` (sandbox_init) |
-| [01c-native-sandbox-windows.md](01c-native-sandbox-windows.md) | Not started | `JobObjectBackend`, `HyperVBackend` — native Windows isolation |
-| [01d-windows-support.md](01d-windows-support.md) | **Complete** | Tier 2 Windows host support (release binaries, path translation, docs) |
-
-## Branch from M2 — Multi-Workspace Groups
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [02a-multi-workspace-groups.md](02a-multi-workspace-groups.md) | **Complete** | Multi-store manager, runner task-to-group mapping. Run tasks across workspace groups simultaneously. |
-
-After M2 (store interfaces stable). Independent of M3. Can run in parallel with M3.
-
-## Branch from M3 — Overlay Snapshots
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [03a-overlay-snapshots.md](03a-overlay-snapshots.md) | Not started | Overlay snapshot cloning for warm worker creation, CRIU checkpoint/restore for sync acceleration |
-
-After M3 (per-task workers complete). Independent of M4–M8.
-
-## Related to M4 — File Attachments & Host Mounts
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [04a-file-image-attachments.md](04a-file-image-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
-| [04b-host-mounts.md](04b-host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
-| [04c-file-panel-viewer.md](04c-file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview (images, video, PDF) |
-
-## Branches from M5 — Terminal Extensions
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [05a-terminal-sessions.md](05a-terminal-sessions.md) | Not started | Multiple concurrent terminal sessions with a tab bar |
-| [05b-terminal-container-exec.md](05b-terminal-container-exec.md) | Not started | Attach to running task containers from the terminal panel |
-
-## Branches from M6 — Cloud Deployment
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [06a-tenant-filesystem.md](06a-tenant-filesystem.md) | Not started | Per-tenant persistent volume, repo provisioner (clone/fetch/creds), workspace group cloud mapping, config persistence across hibernate/wake |
-| [06b-k8s-sandbox.md](06b-k8s-sandbox.md) | Not started | `K8sBackend` implementing `sandbox.Backend` — K8s Jobs with PVC mounts, pod log streaming, exec |
-| [06c-cloud-infrastructure.md](06c-cloud-infrastructure.md) | Not started | Per-provider IaC modules (DO, AWS, GCP, Alibaba, self-hosted), base K8s manifests, deployment docs |
-
-M6a depends on M1 + M2. M6b depends on M1 + M6a. M6c depends on M6a + M6b + M2 cloud + M8. All feed into M8.
-
-## Independent Enhancements
-
-| Spec | Status | Delivers |
-|------|--------|----------|
-| [90-oversight-risk-scoring.md](90-oversight-risk-scoring.md) | Not started | Real-time agent action risk assessment |
-| [91-visual-verification.md](91-visual-verification.md) | Not started | Visual verification for UI changes |
-| [92-live-serve.md](92-live-serve.md) | Not started | Build and run developed software from within Wallfacer |
-| [93-agent-abstraction.md](93-agent-abstraction.md) | Not started | Agent role abstraction, pluggable role descriptors, multi-agent communication |
-
-## Deployment Scaling Strategy
+### Scaling strategy
 
 Two modes, no intermediate step:
 
-1. **VPS (today):** Single VM, single user, filesystem storage, local containers. ~$48–96/mo on DO. This is the development and personal environment.
-2. **K8s (when scaling):** Go straight to managed K8s. Each tenant gets a wallfacer pod + PVC. Task containers dispatch as K8s Jobs on shared nodes. Validated by running yourself as tenant #1 on the cluster.
+1. **VPS (today):** Single VM, single user, filesystem storage, local containers.
+2. **K8s (when scaling):** Managed K8s. Each tenant gets a wallfacer pod + PVC. Task containers dispatch as K8s Jobs.
 
-**Why no VM-per-tenant intermediate?** The wallfacer binary is identical in both modes. Building a VM provisioner for the control plane then replacing it with K8s pod provisioning is wasted work. On DO, DOKS control plane is free — the cost premium over VPS is ~$32/mo (managed PG + Spaces + LB). See [06-cloud-backends.md](06-cloud-backends.md) for full cost estimates.
+Why no VM-per-tenant intermediate? The wallfacer binary is identical in both modes. Building a VM provisioner then replacing it with K8s is wasted work. See [cloud-backends.md](cloud/cloud-backends.md) for cost estimates.
+
+---
+
+## Shared Design
+
+Specs that serve both tracks. These define interfaces and behaviors that local product and cloud platform both depend on.
+
+| Spec | Status | Serves | Delivers |
+|------|--------|--------|----------|
+| [authentication.md](shared/authentication.md) | Not started | Both | OAuth2/OIDC login, session management, user identity. Locally: replaces static API key with real login. Cloud: prerequisite for multi-tenant. |
+| [agent-abstraction.md](shared/agent-abstraction.md) | Not started | Both | Pluggable agent roles, unified container lifecycle, inter-agent communication. Eliminates role duplication that both tracks would inherit. |
+| [native-sandbox-linux.md](shared/native-sandbox-linux.md) | Not started | Local | `BubblewrapBackend`, `NspawnBackend` — daemon-free sandboxing |
+| [native-sandbox-macos.md](shared/native-sandbox-macos.md) | Not started | Local | `VZBackend`, `SandboxInitBackend` — macOS-native isolation |
+| [native-sandbox-windows.md](shared/native-sandbox-windows.md) | Not started | Local | `JobObjectBackend`, `HyperVBackend` — Windows-native isolation |
+| [overlay-snapshots.md](shared/overlay-snapshots.md) | Not started | Both | Overlay snapshot cloning, CRIU checkpoint/restore. Accelerates both local workers and cloud pod startup. |
+
+### Why these are shared
+
+**Authentication** is the clearest cross-track spec. A single-host deployment gets real login instead of a bearer token. The cloud track needs it as a prerequisite for multi-tenant. Implementing it once serves both.
+
+**Agent abstraction** refactors `internal/runner/` — the execution engine that both tracks use. Without it, every new agent role requires touching 6+ files with duplicated launch/parse/usage logic. Both tracks add new roles (cloud adds K8s-aware agents, local product adds planning/gate agents from epic coordination).
+
+**Native sandboxes** are alternatives to the container-based `LocalBackend`. They eliminate the Docker/Podman dependency for local deployments and the desktop app.
+
+**Overlay snapshots** accelerates container startup for both local workers and cloud K8s pods.
+
+---
+
+## Dependency Graph
+
+How the three tracks connect through shared design and foundations.
+
+```
+ ═══ Foundations (complete) ═══════════════════════════════════════════════
+
+ Sandbox Interface ──┬── Storage Interface ──── Container Reuse
+                     │                │
+ File Explorer ──────┤   Multi-Workspace        Host Terminal
+                     │
+ ═══ Shared Design ══╪════════════════════════════════════════════════════
+                     │
+ Authentication ─────┤   Agent Abstraction    Overlay Snapshots
+ Native Sandboxes    │
+                     │
+ ═══ Local Product ══╪════════════════════════════════════════════════════
+                     │
+ Epic Coordination ──┤   Terminal Sessions ──▶ Container Exec
+ File Attachments    │   Oversight Risk Scoring
+ Host Mounts         │   Visual Verification
+ File Panel Viewer   │   Live Serve
+ Desktop App ────────┘
+                     │
+ ═══ Cloud Platform ═╪════════════════════════════════════════════════════
+                     │
+ Tenant FS ──▶ K8s Sandbox ──┐
+ Cloud Storage (PG, S3) ────┤
+ Authentication (shared) ───┼──▶ Multi-Tenant ──▶ Tenant API
+ Cloud Infrastructure ──────┘
+```
+
+---
 
 ## Ordering Rationale
 
-- **Epic coordination depends on M4 (file explorer)** for its spec management UX. The backend pieces (planner task kind, board.json context, gate tasks) are independent, but the full UX — browsing specs, focused markdown view, chat-driven iteration — requires the file explorer panel. Implement M4 Phase 1 first, then epic coordination.
-- **M1–M2 first:** Pure refactors creating abstraction seams all downstream milestones plug into. Low risk, high leverage.
-- **M3 after M1:** Container reuse modifies the same `internal/runner/` files. Doing it right after M1 avoids revisiting them later.
-- **M2a after M2:** Multi-workspace groups modifies store lifecycle; wait for `StorageBackend` interfaces to stabilize. Can run in parallel with M3.
-- **M4–M5 before M6:** Deliver user-visible value with no cloud dependency. Exercise different code paths (`internal/handler/` + `ui/`).
-- **M6a before M6b:** Tenant filesystem is the foundation — repos, worktrees, and config must have a cloud home before K8s can mount them into pods.
-- **M6b after M6a:** K8s sandbox backend consumes the tenant volume layout. Without M6a, there's nothing to mount.
-- **M2 cloud tasks parallel with M6a/M6b:** Task data storage (PG + S3) is independent of the filesystem layer. Can be built concurrently.
-- **M7 after M4–M5:** Desktop app ships with file explorer + terminal already built in. Fully independent — can move earlier.
-- **M6c after M6a+M6b+M8:** Cloud infrastructure IaC is a leaf — it provisions the managed services that the application layer consumes. Can draft modules early but end-to-end testing requires all cloud milestones. DO first (primary target), then self-hosted, then enterprise clouds.
-- **M8a before M8:** Authentication is independently useful (replaces static API key) and required by M8.
-- **M8 last:** Capstone wiring M6a (tenant FS) + M6b (K8s sandbox) + M2 cloud (PG/S3) + M8a (auth) + control plane (provisioning).
+**Within local product:**
+- Epic coordination can start now (file explorer done, no blockers).
+- Terminal extensions are sequential: sessions first, then container exec.
+- Desktop app ships after local UX features are built.
+- Oversight, visual verification, live serve are independent — start anytime.
+
+**Within cloud platform:**
+- Tenant filesystem first — repos and worktrees need a cloud home before K8s can mount them.
+- K8s sandbox consumes the tenant volume layout.
+- Cloud storage (PG, S3) can run in parallel with tenant FS / K8s sandbox.
+- Cloud infrastructure (IaC) is a leaf — provisions managed services.
+- Multi-tenant is the capstone wiring everything together. Tenant API comes after.
+
+**Cross-track:**
+- Authentication should be early — useful for both tracks and blocks multi-tenant.
+- Agent abstraction reduces duplication before either track adds new agent roles.
+- Native sandboxes are independent — start when the desktop app needs them.
+
+**Between tracks:**
+- The two tracks are independent after shared foundations. They can run in parallel.
+- The only hard cross-track dependency: multi-tenant requires authentication.

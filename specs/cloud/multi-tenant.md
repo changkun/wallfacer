@@ -23,8 +23,8 @@ Each instance is a full wallfacer process with its own:
 - In-memory store (`internal/store.Store`)
 - Workspace directories (cloned from user's repos)
 - Automation loops (auto-promote, auto-retry, etc.)
-- Container execution (via sandbox executor — see `01-sandbox-backends.md`)
-- Data directory (backed by cloud storage — see `02-storage-backends.md`)
+- Container execution (via sandbox executor — see `foundations/sandbox-backends.md`)
+- Data directory (backed by cloud storage — see `foundations/storage-backends.md`)
 
 ### Why not a shared multi-user server?
 
@@ -80,8 +80,8 @@ User login → Provision instance → Route traffic → Idle timeout → Hiberna
 **Instance configuration per user:**
 - Workspace repos (cloned or mounted from shared storage)
 - API keys (per-user `ANTHROPIC_API_KEY` or shared org key)
-- Sandbox executor config (see `01-sandbox-backends.md`)
-- Data directory (per-user, backed by cloud storage — see `02-storage-backends.md`)
+- Sandbox executor config (see `foundations/sandbox-backends.md`)
+- Data directory (per-user, backed by cloud storage — see `foundations/storage-backends.md`)
 
 ### 3. Traffic Router
 
@@ -155,8 +155,8 @@ Minimal changes to the wallfacer server itself:
 | Accept external auth | `internal/handler/middleware.go` | Trust `X-Forwarded-User` header from control plane (when behind trusted proxy) |
 | Report health | `GET /api/debug/health` | Already exists; control plane polls this |
 | Graceful hibernate | `internal/cli/server.go` | New signal handler that flushes state and exits cleanly |
-| Cloud storage backend | `internal/store/` | See `02-storage-backends.md` |
-| Remote sandbox executor | `internal/runner/executor.go` | See `01-sandbox-backends.md` |
+| Cloud storage backend | `internal/store/` | See `foundations/storage-backends.md` |
+| Remote sandbox executor | `internal/runner/executor.go` | See `foundations/sandbox-backends.md` |
 
 ---
 
@@ -168,7 +168,7 @@ To save resources, idle instances should hibernate (stop the process, persist st
 
 1. Control plane detects incoming request for hibernated instance
 2. Provision new instance with same data directory
-3. Wallfacer loads state from cloud storage (see `02-storage-backends.md`)
+3. Wallfacer loads state from cloud storage (see `foundations/storage-backends.md`)
 4. Route traffic to new instance
 
 **Idle detection:** No HTTP requests for N minutes (configurable). The control plane tracks `last_active` per instance.
@@ -200,5 +200,5 @@ To save resources, idle instances should hibernate (stop the process, persist st
 
 ### Dependencies on Other Epics
 
-- **Cloud Data Storage** (`02-storage-backends.md`): Required for hibernate/wake — instance state must survive process restarts. Without cloud storage, instances lose all task data on restart.
-- **Sandbox Executor** (`01-sandbox-backends.md`): Required if instances should not run containers locally. Without it, each instance needs a local container runtime (Docker socket mount), which works but limits density.
+- **Cloud Data Storage** (`foundations/storage-backends.md`): Required for hibernate/wake — instance state must survive process restarts. Without cloud storage, instances lose all task data on restart.
+- **Sandbox Executor** (`foundations/sandbox-backends.md`): Required if instances should not run containers locally. Without it, each instance needs a local container runtime (Docker socket mount), which works but limits density.

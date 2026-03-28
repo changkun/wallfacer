@@ -1,4 +1,4 @@
-# M1: Pluggable Sandbox Backends
+# Pluggable Sandbox Backends
 
 **Status:** Complete | **Date:** 2026-03-23 → 2026-03-26
 
@@ -58,7 +58,7 @@ type Handle interface {
 ### Key Decisions
 
 - **Stdout and Stderr are separate streams.** Merging via `io.MultiReader` was tried but causes back-pressure deadlocks when SSE clients aren't connected. The runner reads them sequentially; SSE log streaming uses `podman logs -f` independently.
-- **No Suspend/Resume.** The agent CLI is one-shot. Container reuse ([03-container-reuse.md](03-container-reuse.md)) can add `podman pause`/`unpause` as an internal `LocalBackend` optimization.
+- **No Suspend/Resume.** The agent CLI is one-shot. Container reuse ([container-reuse.md](container-reuse.md)) can add `podman pause`/`unpause` as an internal `LocalBackend` optimization.
 - **Timeout is task-level.** The runner enforces `task.Timeout` and calls `handle.Kill()`. The backend does not have its own timeout.
 - **`ContainerSpec` is declarative, `Build()` is local-only.** `ContainerSpec` describes what to run. `Build()` converts it to podman/docker CLI args — a concern of `LocalBackend`, not the interface. Future K8s backends map `ContainerSpec` fields to Job specs directly.
 - **Log streaming stays decoupled.** SSE endpoints spawn `podman logs -f` via `logpipe` rather than tee-ing `handle.Stdout()`. This avoids back-pressure, supports late-joining clients with `--tail`, and keeps output parsing independent from streaming.
@@ -100,7 +100,7 @@ Kill methods (`KillContainer`, `KillRefineContainer`, `KillIdeateContainer`) rou
 
 The spec originated on 2026-03-23 as **"Cloud Sandbox Executor"** — part of a cloud deployment epic alongside multi-tenant and cloud data storage specs. The initial design proposed three backends (`LocalBackend`, `K8sBackend`, `RemoteDockerBackend`), a three-phase implementation plan, and extensive cloud worktree management via shared PVC/NFS. Several aspects changed during implementation:
 
-1. **Scope narrowed.** Only Phase 1 (interface extraction + `LocalBackend`) shipped. K8s and remote Docker backends were deferred to M6.
+1. **Scope narrowed.** Only Phase 1 (interface extraction + `LocalBackend`) shipped. K8s and remote Docker backends were deferred to cloud deployment.
 
 2. **Separate stdout/stderr.** The initial design specified a single `Stdout() io.ReadCloser` returning combined output. Implementation split into `Stdout()` and `Stderr()` after `io.MultiReader` caused back-pressure deadlocks when SSE clients weren't connected.
 
@@ -112,8 +112,8 @@ The spec originated on 2026-03-23 as **"Cloud Sandbox Executor"** — part of a 
 
 6. **Log streaming kept decoupled.** The initial design implied unifying output parsing and live streaming via the handle. Implementation kept SSE endpoints using `podman logs -f` via `logpipe` independently, avoiding back-pressure and supporting late-joining clients.
 
-7. **Cloud worktree management dropped.** Described in the original as "the biggest architectural challenge," it was deferred entirely to M6.
+7. **Cloud worktree management dropped.** Described in the original as "the biggest architectural challenge," it was deferred entirely to cloud deployment.
 
 ## Future Work
 
-Remote backend implementations (K8s, remote Docker) and cloud worktree management are scoped under [M6: Cloud Backends](06-cloud-backends.md).
+Remote backend implementations (K8s, remote Docker) and cloud worktree management are scoped under [Cloud Backends](../cloud/cloud-backends.md).

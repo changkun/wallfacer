@@ -1089,7 +1089,7 @@ The epic coordination UX is fundamentally about **managing and iterating on spec
 2. **A focused markdown viewer/editor** for reading and updating specs inline
 3. **Chat-driven spec iteration** where a background agent updates spec files based on conversation, and the focused view reflects changes live
 
-This means the file explorer panel from [04-file-explorer.md](04-file-explorer.md) (at minimum Phase 1: read-only browsing + preview) is a prerequisite for the full epic coordination UX. The planner task creation dialog should allow selecting a spec file from the explorer rather than requiring the user to type a file path.
+This means the file explorer panel from [file-explorer.md](../foundations/file-explorer.md) (at minimum Phase 1: read-only browsing + preview) is a prerequisite for the full epic coordination UX. The planner task creation dialog should allow selecting a spec file from the explorer rather than requiring the user to type a file path.
 
 The envisioned workflow: the user opens a spec in the focused markdown view, iterates on it via a chat stream (the planner agent proposes changes, the user reviews in the markdown view), then breaks the finalized spec into kanban tasks that appear in the existing board. The spec file itself gets updated as tasks execute and reveal new information — closing the loop between planning and execution.
 

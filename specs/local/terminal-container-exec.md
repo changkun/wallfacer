@@ -7,7 +7,7 @@
 
 ## Problem
 
-The host terminal ([05-host-terminal.md](05-host-terminal.md)) runs a shell on the host machine. To inspect or debug a running task container, users must use `wallfacer exec <task-id>` from a separate terminal. A "Container Shell" tab type that attaches to running task containers would eliminate this context switch.
+The host terminal ([host-terminal.md](../foundations/host-terminal.md)) runs a shell on the host machine. To inspect or debug a running task container, users must use `wallfacer exec <task-id>` from a separate terminal. A "Container Shell" tab type that attaches to running task containers would eliminate this context switch.
 
 ## Goal
 
@@ -15,7 +15,7 @@ Add a container exec terminal mode that spawns `podman exec -it <container> bash
 
 ## Design Sketch
 
-- **"Container Shell" tab type** in the terminal panel (alongside host shell tabs from [05a-terminal-sessions.md](05a-terminal-sessions.md)).
+- **"Container Shell" tab type** in the terminal panel (alongside host shell tabs from [terminal-sessions.md](terminal-sessions.md)).
 - **Container selector** dropdown populated from `GET /api/containers`.
 - Spawns `podman exec -it <container> bash` via PTY instead of a host shell.
 - Same WebSocket relay protocol as the host terminal.
@@ -23,7 +23,7 @@ Add a container exec terminal mode that spawns `podman exec -it <container> bash
 
 ### Cloud Deployment
 
-In cloud deployment (K8s backend per [01-sandbox-backends.md](01-sandbox-backends.md)), the host shell has limited utility — the API server is a stateless pod. Container exec becomes the primary terminal mode:
+In cloud deployment (K8s backend per [sandbox-backends.md](../foundations/sandbox-backends.md)), the host shell has limited utility — the API server is a stateless pod. Container exec becomes the primary terminal mode:
 
 | Backend | Host shell | Container exec |
 |---------|-----------|---------------|
@@ -35,5 +35,5 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 ## Dependencies
 
-- Requires M5 Phase 1 (complete).
-- Ideally after [05a-terminal-sessions.md](05a-terminal-sessions.md) (tab infrastructure).
+- Requires host terminal (complete).
+- Ideally after [terminal-sessions.md](terminal-sessions.md) (tab infrastructure).

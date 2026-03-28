@@ -10,12 +10,18 @@ For detailed documentation see `docs/`. The user manual is at `docs/guide/usage.
 
 ## Specs & Roadmap
 
-Design specs live in `specs/`, numbered by milestone order. The roadmap and dependency graph are in [`specs/README.md`](specs/README.md). When creating or modifying a spec:
+Design specs live in `specs/`, organized by track:
+- `specs/foundations/` — completed abstraction interfaces (sandbox, storage, container reuse, file explorer, terminal)
+- `specs/local/` — local product and UX (epic coordination, desktop app, attachments, terminal extensions, enhancements)
+- `specs/cloud/` — cloud platform (tenant filesystem, K8s sandbox, multi-tenant, tenant API)
+- `specs/shared/` — cross-track specs (authentication, agent abstraction, native sandboxes, overlay snapshots)
 
-- **Read `specs/README.md` first** to understand the milestone ordering and dependency graph.
-- **Number new specs** to reflect their position: main milestones use `NN-name.md` (e.g., `01-`, `02-`), branch-outs use `NNx-name.md` (e.g., `01a-`, `02a-`), and independent enhancements use `9N-name.md`.
-- **Assess cross-impacts** with existing milestones. If a new spec modifies interfaces defined in M1 (`SandboxBackend`) or M2 (`StorageBackend`), it must declare the dependency and be placed after those milestones.
-- **Update `specs/README.md`** when adding a spec — add it to the appropriate milestone table, branch-out section, or independent enhancements list.
+The roadmap and dependency graph are in [`specs/README.md`](specs/README.md). When creating or modifying a spec:
+
+- **Read `specs/README.md` first** to understand the track organization and dependency graph.
+- **Place new specs** in the appropriate track directory. Use descriptive filenames without numeric prefixes (e.g., `specs/local/live-serve.md`).
+- **Assess cross-impacts** with existing specs. If a new spec modifies interfaces defined in foundations (`SandboxBackend`, `StorageBackend`), it must declare the dependency.
+- **Update `specs/README.md`** when adding a spec — add it to the appropriate track table.
 
 ## Build & Run Commands
 

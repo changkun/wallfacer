@@ -6,17 +6,17 @@
 
 Wallfacer's only access control is a shared bearer token (`WALLFACER_SERVER_API_KEY`). There is no concept of user identity — every request is anonymous once the token matches. This blocks two things:
 
-1. **Cloud multi-tenant (M8):** The control plane needs to map authenticated users to per-user instances. M8 assumes auth exists but doesn't specify how it works.
+1. **Cloud multi-tenant:** The control plane needs to map authenticated users to per-user instances. The control plane assumes auth exists but doesn't specify how it works.
 2. **Single-host access control:** Even a personal VPS deployment benefits from real login (OAuth) over a manually-rotated static token. Teams sharing a single instance today have zero auditability.
 
-Authentication is a prerequisite for M8, not part of it. It is also independently useful: a single-user deployment can adopt OAuth login without any multi-tenant infrastructure.
+Authentication is a prerequisite for multi-tenant, not part of it. It is also independently useful: a single-user deployment can adopt OAuth login without any multi-tenant infrastructure.
 
 ---
 
 ## Scope
 
 This spec covers identity and session management. It does **not** cover:
-- Instance provisioning or traffic routing (M8)
+- Instance provisioning or traffic routing (multi-tenant spec)
 - Role-based access control beyond admin/member distinction
 - Fine-grained per-workspace permissions (future spec if needed)
 
@@ -90,7 +90,7 @@ const (
 )
 ```
 
-**Storage:** Users and sessions are stored via the existing `StorageBackend` interface (M2). For filesystem backend, this is a JSON file in the data directory. For cloud deployments, PostgreSQL or equivalent.
+**Storage:** Users and sessions are stored via the existing `StorageBackend` interface. For filesystem backend, this is a JSON file in the data directory. For cloud deployments, PostgreSQL or equivalent.
 
 **First user is admin.** The first user to log in becomes admin. Subsequent users are members. Admins can promote/demote via API.
 
@@ -129,9 +129,9 @@ The current `WALLFACER_SERVER_API_KEY` mechanism continues to work:
 
 When OAuth is enabled, the `WALLFACER_SERVER_API_KEY` serves as a service account token for non-browser clients (CI, CLI tools, the future control plane). Requests with a valid `Authorization: Bearer <api-key>` header bypass OAuth and are treated as admin.
 
-### Multi-Tenant Integration (M8)
+### Multi-Tenant Integration
 
-When deployed behind an M8 control plane:
+When deployed behind the multi-tenant control plane:
 
 - The control plane handles authentication itself and sets `X-Forwarded-User` / `X-Forwarded-Email` headers
 - Wallfacer trusts these headers when configured with `WALLFACER_TRUSTED_PROXY` (comma-separated CIDRs)
@@ -236,17 +236,17 @@ When auth is not configured, the UI behaves exactly as today — no login page, 
 5. **User management API** — CRUD, role assignment, admin bootstrap
 6. **Google OIDC provider** — Second provider validates the multi-provider abstraction
 7. **Generic OIDC provider** — Covers corporate IdPs (Okta, Auth0, Keycloak, etc.)
-8. **Trusted proxy mode** — `X-Forwarded-User` support for M8 control plane integration
+8. **Trusted proxy mode** — `X-Forwarded-User` support for multi-tenant control plane integration
 9. **Email allow-list** — Domain/address filtering
 
 ### Dependencies
 
-- **M2 (Storage Backend Interface):** User and session persistence uses `StorageBackend`. Filesystem backend is sufficient for single-host; cloud backends needed for M8.
-- **M8 (Multi-Tenant):** Consumes this spec's trusted proxy mode. M8 does not need to implement its own auth — it delegates to this.
+- **Storage Backend Interface:** User and session persistence uses `StorageBackend`. Filesystem backend is sufficient for single-host; cloud backends needed for multi-tenant.
+- **Multi-Tenant:** Consumes this spec's trusted proxy mode. Multi-tenant does not need to implement its own auth — it delegates to this.
 
-### What M8 No Longer Needs to Cover
+### What Multi-Tenant No Longer Needs to Cover
 
-With this spec implemented, M8 can remove:
+With this spec implemented, Multi-tenant can remove:
 - Section "1. Authentication Gateway" (fully covered here)
 - The `users` table from "Data Model Changes" (moved here)
 - OAuth/OIDC library selection (decided here)

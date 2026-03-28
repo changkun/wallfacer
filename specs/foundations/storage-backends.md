@@ -1,4 +1,4 @@
-# M2: Pluggable Storage Backends
+# Pluggable Storage Backends
 
 **Status:** Enablers complete (tasks 1–3); cloud backends deferred | **Date:** 2026-03-23
 
@@ -6,8 +6,8 @@
 
 The wallfacer store (`internal/store/`) persists all task data to the local filesystem at `~/.wallfacer/data/<workspace-key>/<task-uuid>/`. State is loaded into memory at startup and kept in sync via atomic file writes. This works for single-machine deployment but breaks cloud deployment in two ways:
 
-1. **Instance lifecycle:** Per-user instances (see `08-cloud-multi-tenant.md`) need to hibernate and wake. If task data is on a local ephemeral disk, it's lost when the instance stops.
-2. **Shared access:** If the sandbox executor runs containers remotely (see `01-sandbox-backends.md`), task outputs written inside sandbox pods need to reach the wallfacer server's store.
+1. **Instance lifecycle:** Per-user instances (see `cloud/multi-tenant.md`) need to hibernate and wake. If task data is on a local ephemeral disk, it's lost when the instance stops.
+2. **Shared access:** If the sandbox executor runs containers remotely (see `foundations/sandbox-backends.md`), task outputs written inside sandbox pods need to reach the wallfacer server's store.
 
 ## Current Architecture
 
@@ -282,15 +282,15 @@ WALLFACER_BLOB_REGION=us-east-1
 
 ## Implementation Tasks
 
-Detailed task breakdowns are in [`02-storage-backends/`](02-storage-backends/).
+Detailed task breakdowns are in [`storage-backends/`](storage-backends/).
 
 ### Enablers (complete)
 
 | # | Task | Status | Effort |
 |---|------|--------|--------|
-| 1 | [Extract `StorageBackend` interface](02-storage-backends/task-01-extract-interface.md) | **Done** | Medium |
-| 2 | [Implement `FilesystemBackend`](02-storage-backends/task-02-filesystem-backend.md) | **Done** | Large |
-| 3 | [Replace `OutputsDir` with backend methods](02-storage-backends/task-03-replace-outputsdir.md) | **Done** | Small |
+| 1 | [Extract `StorageBackend` interface](storage-backends/task-01-extract-interface.md) | **Done** | Medium |
+| 2 | [Implement `FilesystemBackend`](storage-backends/task-02-filesystem-backend.md) | **Done** | Large |
+| 3 | [Replace `OutputsDir` with backend methods](storage-backends/task-03-replace-outputsdir.md) | **Done** | Small |
 
 ### Cloud backends (deferred)
 
@@ -298,13 +298,13 @@ These depend on a concrete cloud deployment target. Implement when needed.
 
 | # | Task | Depends on | Effort |
 |---|------|-----------|--------|
-| 4 | [Implement `DatabaseBackend` (PostgreSQL)](02-storage-backends/task-04-database-backend.md) | 2 | Large |
-| 5 | [Implement `ObjectStorageBackend` (S3/GCS)](02-storage-backends/task-05-object-storage-backend.md) | 2 | Medium |
-| 6 | [Implement `CompositeBackend`](02-storage-backends/task-06-composite-backend.md) | 4, 5 | Small |
-| 7 | [Add `wallfacer migrate` command](02-storage-backends/task-07-migrate-command.md) | 6 | Medium |
-| 8 | [Cloud-native search](02-storage-backends/task-08-cloud-search.md) | 4 | Medium |
+| 4 | [Implement `DatabaseBackend` (PostgreSQL)](storage-backends/task-04-database-backend.md) | 2 | Large |
+| 5 | [Implement `ObjectStorageBackend` (S3/GCS)](storage-backends/task-05-object-storage-backend.md) | 2 | Medium |
+| 6 | [Implement `CompositeBackend`](storage-backends/task-06-composite-backend.md) | 4, 5 | Small |
+| 7 | [Add `wallfacer migrate` command](storage-backends/task-07-migrate-command.md) | 6 | Medium |
+| 8 | [Cloud-native search](storage-backends/task-08-cloud-search.md) | 4 | Medium |
 
 ### Dependencies
 
-- **M1: Sandbox Backends** (`01-sandbox-backends.md`) — complete. The `sandbox.Backend` interface is in place. If future remote backends write outputs inside sandbox pods, the storage backend abstraction handles where those bytes go.
-- **Multi-Tenant** (`08-cloud-multi-tenant.md`): Instance provisioning needs to configure the storage backend per user. The database schema includes a `workspace` column for data isolation.
+- **Sandbox Backends** (`foundations/sandbox-backends.md`) — complete. The `sandbox.Backend` interface is in place. If future remote backends write outputs inside sandbox pods, the storage backend abstraction handles where those bytes go.
+- **Multi-Tenant** ([cloud/multi-tenant.md](../cloud/multi-tenant.md)): Instance provisioning needs to configure the storage backend per user. The database schema includes a `workspace` column for data isolation.

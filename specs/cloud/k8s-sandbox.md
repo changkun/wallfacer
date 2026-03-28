@@ -1,12 +1,12 @@
-# M6b: K8s Sandbox Backend
+# K8s Sandbox Backend
 
 **Status:** Not started | **Date:** 2026-03-28
 
 ## Problem
 
-The `LocalBackend` (`internal/sandbox/`) launches containers via `os/exec` on the host. This works for single-machine deployment but limits cloud deployment: per-user instances (M8) need to dispatch sandbox containers to a shared cluster without giving each instance a local container runtime.
+The `LocalBackend` (`internal/sandbox/`) launches containers via `os/exec` on the host. This works for single-machine deployment but limits cloud deployment: per-user instances (multi-tenant) need to dispatch sandbox containers to a shared cluster without giving each instance a local container runtime.
 
-The `sandbox.Backend` interface (M1) already abstracts container lifecycle. This spec implements `K8sBackend` — a backend that dispatches containers as Kubernetes Jobs.
+The `sandbox.Backend` interface (sandbox backends) already abstracts container lifecycle. This spec implements `K8sBackend` — a backend that dispatches containers as Kubernetes Jobs.
 
 ## Design
 
@@ -17,7 +17,7 @@ The `sandbox.Backend` interface (M1) already abstracts container lifecycle. This
 type K8sBackend struct {
     client    kubernetes.Interface
     namespace string              // per-tenant or shared namespace
-    pvcName   string              // tenant volume PVC name (from M6a)
+    pvcName   string              // tenant volume PVC name (from tenant filesystem)
 }
 ```
 
@@ -36,7 +36,7 @@ type K8sBackend struct {
 
 ### Volume Mount Assembly
 
-The tenant filesystem (M6a) provides repos and worktrees on a PVC. The K8s backend translates `ContainerSpec.Volumes` into PVC subPath mounts:
+The tenant filesystem (tenant filesystem) provides repos and worktrees on a PVC. The K8s backend translates `ContainerSpec.Volumes` into PVC subPath mounts:
 
 ```go
 // Local backend (current):
@@ -80,7 +80,7 @@ type k8sHandle struct {
 | `"slirp4netns"` | Not applicable; map to default cluster networking |
 | (empty/default) | Default cluster networking; egress allowed |
 
-For multi-tenant (M8), per-tenant NetworkPolicies restrict cross-tenant traffic. This is an M8 concern — this spec just ensures the backend can apply pod-level network restrictions.
+For multi-tenant (multi-tenant), per-tenant NetworkPolicies restrict cross-tenant traffic. This is a multi-tenant concern — this spec just ensures the backend can apply pod-level network restrictions.
 
 ### Image Management
 
@@ -93,7 +93,7 @@ Currently `GET /api/images` checks `podman images` locally. For K8s:
 
 `ContainerSpec.CPUs` and `ContainerSpec.Memory` map directly to `resources.limits`. The K8s backend can also set `resources.requests` to a fraction of limits for bin-packing efficiency.
 
-Optional: per-tenant resource quotas via K8s `ResourceQuota` objects (M8 concern).
+Optional: per-tenant resource quotas via K8s `ResourceQuota` objects (multi-tenant concern).
 
 ---
 
@@ -101,11 +101,11 @@ Optional: per-tenant resource quotas via K8s `ResourceQuota` objects (M8 concern
 
 | # | Task | Depends on | Effort |
 |---|------|-----------|--------|
-| 1 | Implement `K8sBackend.Launch()` — Job creation with PVC mounts | M6a | Large |
+| 1 | Implement `K8sBackend.Launch()` — Job creation with PVC mounts | Tenant FS | Large |
 | 2 | Implement `k8sHandle` — Wait, Stop, State via pod watch | 1 | Medium |
 | 3 | Implement `k8sHandle.Logs()` — streaming pod logs | 2 | Small |
 | 4 | Implement `k8sHandle.Exec()` — exec into running pod | 2 | Medium |
-| 5 | Volume mount translation — host paths to PVC subPaths | M6a | Medium |
+| 5 | Volume mount translation — host paths to PVC subPaths | Tenant FS | Medium |
 | 6 | Network policy support — apply deny-all for `Network: "none"` | 1 | Small |
 | 7 | Image management API — adapt `GET /api/images` for K8s | 1 | Small |
 | 8 | Add `k8s` as `WALLFACER_SANDBOX_BACKEND` value; config wiring | 1 | Small |
@@ -117,12 +117,12 @@ Optional: per-tenant resource quotas via K8s `ResourceQuota` objects (M8 concern
 
 ## Dependencies
 
-- **M1 (Sandbox Backend Interface)** — complete. Implements `sandbox.Backend` and `sandbox.Handle`.
-- **M6a (Tenant Filesystem)** — provides the PVC layout (repos, worktrees, config) that this backend mounts into pods.
+- **Sandbox Backend Interface** — complete. Implements `sandbox.Backend` and `sandbox.Handle`.
+- **Tenant Filesystem** — provides the PVC layout (repos, worktrees, config) that this backend mounts into pods.
 
 ## What depends on this
 
-- **M8 (Multi-Tenant)** — the control plane configures `K8sBackend` per tenant (namespace, PVC name, resource quotas).
+- **Multi-Tenant** — the control plane configures `K8sBackend` per tenant (namespace, PVC name, resource quotas).
 
 ## Deferred: Remote Docker Backend
 

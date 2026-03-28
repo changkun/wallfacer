@@ -1,4 +1,4 @@
-# M8b: Tenant API
+# Tenant API
 
 **Status:** Not started | **Date:** 2026-03-28
 
@@ -86,7 +86,7 @@ The tenant API uses per-tenant API keys, distinct from the internal `WALLFACER_S
 Authorization: Bearer wf_live_<base64-encoded-key>
 ```
 
-Keys are scoped to a single tenant and managed by the control plane (M8):
+Keys are scoped to a single tenant and managed by the control plane (multi-tenant):
 
 ```sql
 CREATE TABLE api_keys (
@@ -120,7 +120,7 @@ Client ──Bearer token──▶ Control Plane ──validates key──▶ ro
                       (trusts X-Tenant-ID from control plane)
 ```
 
-The wallfacer instance itself does not validate API keys — the control plane is the auth boundary. The instance receives requests with a trusted `X-Tenant-ID` header (same pattern as M8's `X-Forwarded-User`).
+The wallfacer instance itself does not validate API keys — the control plane is the auth boundary. The instance receives requests with a trusted `X-Tenant-ID` header (same pattern as the control plane's `X-Forwarded-User`).
 
 ## Webhooks
 
@@ -352,10 +352,10 @@ def handle_webhook():
 
 | Dependency | Why |
 |-----------|-----|
-| **M8a: Authentication** | Tenant identity required for API key scoping |
-| **M8: Multi-Tenant** | Control plane required for key management, rate limiting, and webhook dispatch |
+| **Authentication** | Tenant identity required for API key scoping |
+| **Multi-Tenant** | Control plane required for key management, rate limiting, and webhook dispatch |
 
-This spec is a branch from M8. It can be implemented incrementally after the control plane exists — start with API key auth + task CRUD, then add webhooks.
+This spec is a branch from multi-tenant. It can be implemented incrementally after the control plane exists — start with API key auth + task CRUD, then add webhooks.
 
 ## Implementation Order
 

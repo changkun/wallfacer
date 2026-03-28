@@ -7,7 +7,7 @@
 
 ## Problem
 
-Phase 1 of the host terminal ([05-host-terminal.md](05-host-terminal.md)) provides a single shell session per browser tab. Users who need multiple shells (e.g., one for builds, one for logs, one for git) must open separate browser tabs. A tabbed terminal — like VS Code's — would allow multiple sessions within the same panel.
+Phase 1 of the host terminal ([host-terminal.md](../foundations/host-terminal.md)) provides a single shell session per browser tab. Users who need multiple shells (e.g., one for builds, one for logs, one for git) must open separate browser tabs. A tabbed terminal — like VS Code's — would allow multiple sessions within the same panel.
 
 ## Goal
 
@@ -24,4 +24,4 @@ Add a tab bar above the terminal panel supporting multiple concurrent shell sess
 
 ## Dependencies
 
-- Requires M5 Phase 1 (complete).
+- Requires host terminal (complete).

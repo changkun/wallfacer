@@ -1,11 +1,11 @@
-# M3a: Overlay Snapshots & CRIU Checkpoint/Restore
+# Overlay Snapshots & CRIU Checkpoint/Restore
 
 **Status:** Not started
-**Depends on:** [M3: Container Reuse](03-container-reuse.md) — complete
+**Depends on:** [Container Reuse](../foundations/container-reuse.md) — complete
 
 ## Problem
 
-Per-task workers (M3) eliminated per-invocation container create/destroy overhead, reducing startup from 0.5–2 s to ~100 ms per exec. But two performance bottlenecks remain:
+Per-task workers eliminated per-invocation container create/destroy overhead, reducing startup from 0.5–2 s to ~100 ms per exec. But two performance bottlenecks remain:
 
 1. **Cold-start penalty on worker creation.** The first invocation for each task still pays full container startup (namespace, cgroup, overlay mount). For burst workloads — e.g., 20 tasks promoted simultaneously — this produces a thundering herd of `podman create` + `podman start` calls competing for kernel resources.
 
@@ -221,7 +221,7 @@ Pruning uses `podman rmi` for snapshot images and `rm` for checkpoint archives.
 
 ## Performance Expectations
 
-| Scenario | Current (M3) | With snapshots | With CRIU |
+| Scenario | Current | With snapshots | With CRIU |
 |----------|-------------|----------------|-----------|
 | Worker cold create | 0.5–2 s | 0.2–0.5 s (warm image, pre-populated layers) | N/A |
 | Worker recreation after sync | 0.5–2 s (cold) | 0.2–0.5 s (from snapshot) | ~0.1–0.3 s (restore) |
@@ -230,7 +230,7 @@ Pruning uses `podman rmi` for snapshot images and `rm` for checkpoint archives.
 
 ## Non-Goals
 
-- **Cross-host snapshot sharing.** Snapshots are local to the machine. Cloud backends (M6) would need a registry-based approach, which is out of scope.
+- **Cross-host snapshot sharing.** Snapshots are local to the machine. Cloud backends would need a registry-based approach, which is out of scope.
 - **Live migration.** CRIU supports live migration but this spec only uses checkpoint/restore for local acceleration.
 - **Replacing named volume caches.** Snapshots and named volumes are complementary. Named volumes persist package manager caches across container restarts; snapshots preserve broader filesystem state (build artifacts, tool configs).
 - **Windows/macOS CRIU.** CRIU is Linux-only. The snapshot path (overlay) works everywhere podman/docker runs. CRIU is a Linux-only optimization.

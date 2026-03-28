@@ -358,7 +358,7 @@ type WorkspaceFS interface {
 - **K8s implementation:** Proxies via `kubectl exec` into a sidecar or uses the K8s API to read from PVCs
 - **Remote Docker:** Proxies via `docker exec` or `docker cp`
 
-This aligns with the `SandboxBackend` abstraction in [01-sandbox-backends.md](01-sandbox-backends.md) — the backend knows where files live. A `SandboxBackend.FileAccess()` method could return a `WorkspaceFS` for the active backend.
+This aligns with the `SandboxBackend` abstraction in [sandbox-backends.md](sandbox-backends.md) — the backend knows where files live. A `SandboxBackend.FileAccess()` method could return a `WorkspaceFS` for the active backend.
 
 **Recommendation:** Defer to Phase 4. Phases 1–3 deliver full value for the local and shared-volume deployments that exist today. The `WorkspaceFS` interface is a clean extension point that doesn't require rearchitecting the handlers — just swap the `os.*` calls for interface calls.
 

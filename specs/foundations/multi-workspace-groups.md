@@ -1,4 +1,4 @@
-# M2a: Multiple Concurrent Workspace Groups
+# Multiple Concurrent Workspace Groups
 
 **Status:** Complete | **Date:** 2026-03-27
 
@@ -73,4 +73,4 @@ The spec originated as a detailed five-phase implementation plan with code block
 
 ## Future Work
 
-None planned. The feature is complete. Remote backends ([M6](06-cloud-backends.md)) will need to ensure their store lifecycle integrates with `activeGroups` when implemented.
+None planned. The feature is complete. Remote backends ([Cloud Backends](../cloud/cloud-backends.md)) will need to ensure their store lifecycle integrates with `activeGroups` when implemented.

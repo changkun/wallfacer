@@ -13,11 +13,11 @@ are trivial to install, covering a range of isolation depths.
 ## Scope
 
 This spec covers Linux-native alternatives to Docker/Podman that can back the
-`SandboxBackend` interface (see [01-sandbox-backends.md](01-sandbox-backends.md)).
+`SandboxBackend` interface (see [sandbox-backends.md](../foundations/sandbox-backends.md)).
 The goal is to support at least one option that ships with a stock Linux
 installation with no extra packages.
 
-**Prerequisite:** [01-sandbox-backends.md](01-sandbox-backends.md) Phase 1 must
+**Prerequisite:** [sandbox-backends.md](../foundations/sandbox-backends.md) Phase 1 must
 be complete. Each native executor is implemented as a `SandboxBackend` (not the
 retired `ContainerExecutor`), receiving a structured `ContainerSpec` via
 `Launch(ctx, spec)` instead of parsing CLI args. The returned `SandboxHandle`

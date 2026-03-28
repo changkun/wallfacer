@@ -18,9 +18,9 @@ runtime; the isolation logic is compiled into the Wallfacer binary.
 ## Scope
 
 This spec covers macOS-only isolation techniques that can replace `LocalBackend`
-as alternative `sandbox.Backend` implementations (see [01-sandbox-backends.md](01-sandbox-backends.md)).
+as alternative `sandbox.Backend` implementations (see [sandbox-backends.md](../foundations/sandbox-backends.md)).
 
-**Prerequisite:** [01-sandbox-backends.md](01-sandbox-backends.md) — **complete** (v0.0.6).
+**Prerequisite:** [sandbox-backends.md](../foundations/sandbox-backends.md) — **complete** (v0.0.6).
 Each native backend implements `sandbox.Backend` (`internal/sandbox/`), receiving
 a structured `sandbox.ContainerSpec` via `Launch(ctx, spec)`. The returned
 `sandbox.Handle` tracks lifecycle states and streams output via `Stdout()`/`Stderr()`.

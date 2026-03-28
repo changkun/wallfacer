@@ -264,11 +264,11 @@ Phase 1 (single terminal session) is fully implemented across 7 tasks. The termi
 
 ### Phase 2: Multiple Sessions with Tabs (Future)
 
-See [05a-terminal-sessions.md](05a-terminal-sessions.md).
+See [terminal-sessions.md](../local/terminal-sessions.md).
 
 ### Phase 3: Container Exec Integration (Future)
 
-See [05b-terminal-container-exec.md](05b-terminal-container-exec.md).
+See [terminal-container-exec.md](../local/terminal-container-exec.md).
 
 ---
 
@@ -317,13 +317,13 @@ See [05b-terminal-container-exec.md](05b-terminal-container-exec.md).
 
 | # | Task | Depends on | Effort | Status |
 |---|------|-----------|--------|--------|
-| 1 | [WebSocket dep + inline PTY](05-host-terminal/task-01-go-dependencies.md) | — | Small | Done |
-| 2 | [TerminalEnabled envconfig + config](05-host-terminal/task-02-envconfig-terminal-enabled.md) | — | Small | Done |
-| 3 | [Vendor xterm.js assets](05-host-terminal/task-03-vendor-xtermjs.md) | — | Small | Done |
-| 4 | [Backend terminal handler + route](05-host-terminal/task-04-backend-terminal-handler.md) | 1, 2 | Large | Done |
-| 5 | [Frontend terminal.js](05-host-terminal/task-05-frontend-terminal-js.md) | 3 | Medium | Done |
-| 6 | [Status bar integration + visibility gate](05-host-terminal/task-06-statusbar-integration.md) | 2, 4, 5 | Medium | Done |
-| 7 | [Documentation](05-host-terminal/task-07-documentation.md) | 4, 6 | Small | Done |
+| 1 | [WebSocket dep + inline PTY](host-terminal/task-01-go-dependencies.md) | — | Small | Done |
+| 2 | [TerminalEnabled envconfig + config](host-terminal/task-02-envconfig-terminal-enabled.md) | — | Small | Done |
+| 3 | [Vendor xterm.js assets](host-terminal/task-03-vendor-xtermjs.md) | — | Small | Done |
+| 4 | [Backend terminal handler + route](host-terminal/task-04-backend-terminal-handler.md) | 1, 2 | Large | Done |
+| 5 | [Frontend terminal.js](host-terminal/task-05-frontend-terminal-js.md) | 3 | Medium | Done |
+| 6 | [Status bar integration + visibility gate](host-terminal/task-06-statusbar-integration.md) | 2, 4, 5 | Medium | Done |
+| 7 | [Documentation](host-terminal/task-07-documentation.md) | 4, 6 | Small | Done |
 
 ```mermaid
 graph LR

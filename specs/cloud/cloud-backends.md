@@ -1,4 +1,4 @@
-# M6: Cloud Deployment
+# Cloud Deployment
 
 **Status:** Not started | **Date:** 2026-03-28
 
@@ -57,10 +57,10 @@ Per instance, the layers connect as:
 
 | Layer | Component | Storage |
 |-------|-----------|---------|
-| **Task data** (metadata, events, blobs) | `StorageBackend` (M2) | PostgreSQL + S3 |
-| **Filesystem** (repos, worktrees, config) | Tenant volume (M6a) | PVC per tenant |
-| **Sandbox execution** | `K8sBackend` (M6b) | K8s Jobs mounting tenant PVC |
-| **Identity & lifecycle** | Control plane (M8) | Control plane DB |
+| **Task data** (metadata, events, blobs) | `StorageBackend` | PostgreSQL + S3 |
+| **Filesystem** (repos, worktrees, config) | Tenant volume | PVC per tenant |
+| **Sandbox execution** | `K8sBackend` | K8s Jobs mounting tenant PVC |
+| **Identity & lifecycle** | Control plane | Control plane DB |
 
 **Why skip VM-per-tenant?** The wallfacer binary doesn't change between modes — the same code runs on a VM or in a K8s pod. A VM-per-tenant intermediate step would require building a VM provisioner in the control plane, then throwing it away when migrating to K8s. Going straight to K8s avoids that wasted work. On DigitalOcean, DOKS control plane is free, so the cost premium over VPS is ~$32/mo (managed PG + Spaces + LB) — worth it to avoid a migration.
 
@@ -79,25 +79,25 @@ Per instance, the layers connect as:
 
 | Sub-milestone | Spec | Delivers |
 |---------------|------|----------|
-| **M6a: Tenant Filesystem** | [06a-tenant-filesystem.md](06a-tenant-filesystem.md) | Per-tenant PVC, repo provisioner, workspace group cloud mapping, config persistence across hibernate/wake |
-| **M6b: K8s Sandbox Backend** | [06b-k8s-sandbox.md](06b-k8s-sandbox.md) | `K8sBackend` implementing `sandbox.Backend` — dispatches containers as K8s Jobs with PVC mounts |
-| **M6c: Cloud Infrastructure** | [06c-cloud-infrastructure.md](06c-cloud-infrastructure.md) | Per-provider IaC modules (DO first, then AWS/GCP/Alibaba/self-hosted) |
-| **M2 cloud tasks** | [02-storage-backends.md](02-storage-backends.md) (tasks 4–8) | PostgreSQL + S3 backends for task data, composite backend, migration tool |
+| **Tenant Filesystem** | [tenant-filesystem.md](tenant-filesystem.md) | Per-tenant PVC, repo provisioner, workspace group cloud mapping, config persistence across hibernate/wake |
+| **K8s Sandbox Backend** | [k8s-sandbox.md](k8s-sandbox.md) | `K8sBackend` implementing `sandbox.Backend` — dispatches containers as K8s Jobs with PVC mounts |
+| **Cloud Infrastructure** | [cloud-infrastructure.md](cloud-infrastructure.md) | Per-provider IaC modules (DO first, then AWS/GCP/Alibaba/self-hosted) |
+| **Cloud Storage** | [storage-backends.md](../foundations/storage-backends.md) (tasks 4–8) | PostgreSQL + S3 backends for task data, composite backend, migration tool |
 
 ```
-                     M6a: Tenant Filesystem
+                     Tenant Filesystem
                     (repos, PVC, config)
                             │
                             ▼
-M1 (sandbox) ──────▶ M6b: K8s Sandbox ──────▶ M8: Multi-Tenant
+Sandbox Interface ──────▶ K8s Sandbox ──────▶ Multi-Tenant
                     (Jobs, PVC mounts)              ▲
                                                     │
-M2 (storage) ──────▶ M2 cloud tasks ──────────────┤
+Storage Interface ──────▶ Cloud Storage (PG, S3) ──────────────┤
                     (PG, S3, migration)             │
                                                     │
-M8a (auth) ────────────────────────────────────────┤
+Authentication ────────────────────────────────────────┤
                                                     │
-M6c (IaC: DO, AWS, GCP, Alibaba) ─────────────────┘
+Cloud Infra (IaC) ─────────────────┘
 ```
 
 ---
@@ -144,7 +144,7 @@ wallfacer.example.com {
 | Approach | Effort | Auth | Multi-user | When to use |
 |----------|--------|------|------------|-------------|
 | **VPS + Caddy** | Done | `WALLFACER_SERVER_API_KEY` | No | Personal use, development, early validation |
-| **K8s (DOKS/EKS/GKE)** | M6a + M6b + M6c + M2 cloud + M8a + M8 | OAuth2/OIDC | Yes | Growing business, multi-tenant |
+| **K8s (DOKS/EKS/GKE)** | All cloud + auth specs | OAuth2/OIDC | Yes | Growing business, multi-tenant |
 
 ---
 
@@ -169,7 +169,7 @@ All three turn wallfacer into a credential management platform, which is a diffe
 Tracing the idea → implementation → serve pipeline, the only credentials the sandbox agent genuinely needs are:
 
 1. **LLM API key** — already handled (`.env`)
-2. **Git read/write** — already handled (M6a: per-tenant SSH keys / HTTPS tokens)
+2. **Git read/write** — already handled (per-tenant SSH keys / HTTPS tokens)
 
 Everything else separates cleanly into concerns *outside* the sandbox:
 
@@ -178,8 +178,8 @@ Everything else separates cleanly into concerns *outside* the sandbox:
 | **Create PR from completed task** | CI/CD or control plane webhook | Wallfacer pushes branch → GitHub Action or control plane API call creates PR. One GitHub App token in the control plane, not per-tenant. |
 | **Notify user (Slack, email)** | Control plane | One bot/webhook token, shared. Not a sandbox concern. |
 | **Run CI checks** | GitHub Actions / external CI | Triggered by push, not by wallfacer. |
-| **Application secrets (DB, APIs)** | `serve.env` (M92) | Secrets for the *built app*, not for the agent. Already designed. |
-| **Deploy** | CD pipeline or live-serve (M92) | Separate from task execution. |
+| **Application secrets (DB, APIs)** | `serve.env` (live-serve spec) | Secrets for the *built app*, not for the agent. Already designed. |
+| **Deploy** | CD pipeline or live-serve (live-serve spec) | Separate from task execution. |
 
 The integrations feel essential locally because they're interleaved with the dev workflow. In an automated pipeline, they separate into "what the agent needs" (LLM + git) and "what happens around the agent" (CI/CD, notifications, deployment), which are better handled by dedicated systems.
 
@@ -188,4 +188,4 @@ The integrations feel essential locally because they're interleaved with the dev
 - **Local mode** remains the power-user environment with full host credential access. This is a feature, not a limitation — local mode is strictly more capable for integration-heavy workflows.
 - **Cloud mode** is scoped to: receive task → execute in sandbox (LLM + git) → push result. The surrounding pipeline (PR creation, CI, notifications, deployment) connects via webhooks and the control plane, not per-tenant credentials in sandboxes.
 - **No VM-per-tenant mode.** The flexibility gain doesn't justify the security liability and operational burden. K8s remains the only multi-tenant target.
-- **Control plane integrations** (one GitHub App, one Slack bot, one notification webhook) are in scope for M8, but these are control-plane-level credentials, not per-tenant secrets.
+- **Control plane integrations** (one GitHub App, one Slack bot, one notification webhook) are in scope for multi-tenant, but these are control-plane-level credentials, not per-tenant secrets.

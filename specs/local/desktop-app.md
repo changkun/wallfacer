@@ -1,4 +1,4 @@
-# M7: Native Desktop App
+# Native Desktop App
 
 **Status:** Not started | **Date:** 2026-02-21
 

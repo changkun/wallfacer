@@ -1,10 +1,10 @@
-# M6c: Cloud Infrastructure
+# Cloud Infrastructure
 
 **Status:** Not started | **Date:** 2026-03-28
 
 ## Problem
 
-M6a (tenant filesystem), M6b (K8s sandbox), and M2 cloud tasks (PG + S3) define what wallfacer needs from cloud infrastructure — but not how that infrastructure is provisioned across different cloud providers. Each provider offers managed equivalents of K8s, PostgreSQL, S3-compatible storage, and block volumes, but provisioning and configuration differ.
+Tenant filesystem, K8s sandbox, and cloud storage tasks (PG + S3) define what wallfacer needs from cloud infrastructure — but not how that infrastructure is provisioned across different cloud providers. Each provider offers managed equivalents of K8s, PostgreSQL, S3-compatible storage, and block volumes, but provisioning and configuration differ.
 
 Wallfacer needs to support:
 - **DigitalOcean** — primary target for personal/small-team use (lower cost, simpler ops)
@@ -53,22 +53,22 @@ These are already defined in other specs. Summarized here to show why no cloud-s
 
 ### Compute: Kubernetes API
 
-`K8sBackend` (M6b) uses `client-go` to create Jobs, watch pods, stream logs, and exec into containers. Every managed K8s offering exposes the same API. The backend needs:
+`K8sBackend` uses `client-go` to create Jobs, watch pods, stream logs, and exec into containers. Every managed K8s offering exposes the same API. The backend needs:
 
 - **Kubeconfig** — provided by the managed K8s service or via in-cluster config when wallfacer runs as a pod
-- **Namespace** — per-tenant (M8) or shared
+- **Namespace** — per-tenant or shared
 - **StorageClass name** — for PVC provisioning (cloud-specific, passed as config)
 
 ### Storage: PostgreSQL Wire Protocol
 
-The PG `StorageBackend` (M2 task 4) connects via `DATABASE_URL`. Every managed PG service speaks the same protocol. The backend needs:
+The PG `StorageBackend` connects via `DATABASE_URL`. Every managed PG service speaks the same protocol. The backend needs:
 
 - **DSN** — `postgres://user:pass@host:5432/wallfacer?sslmode=require`
 - **Connection pooling** — managed services may provide PgBouncer or equivalent; the application uses `database/sql` with pool settings
 
 ### Blobs: S3-Compatible API
 
-The S3 `ObjectStorageBackend` (M2 task 5) uses the S3 API. Most providers offer S3-compatible endpoints:
+The S3 `ObjectStorageBackend` uses the S3 API. Most providers offer S3-compatible endpoints:
 
 | Provider | Service | S3 compatible? | Notes |
 |----------|---------|----------------|-------|
@@ -87,7 +87,7 @@ The blob backend needs:
 
 ### Volumes: PVC via StorageClass
 
-Tenant volumes (M6a) are Kubernetes PVCs. The cloud-specific part is the `StorageClass`:
+Tenant volumes are Kubernetes PVCs. The cloud-specific part is the `StorageClass`:
 
 | Provider | StorageClass driver | Volume type |
 |----------|-------------------|-------------|
@@ -111,7 +111,7 @@ Each cloud provider gets a Terraform (OpenTofu) module that provisions the full 
 deploy/
 ├── base/                          # Shared K8s manifests (Helm chart or Kustomize)
 │   ├── wallfacer-server/          # Server Deployment, Service, PVC templates
-│   ├── control-plane/             # Control plane Deployment (M8)
+│   ├── control-plane/             # Control plane Deployment
 │   └── common/                    # RBAC, NetworkPolicies, StorageClass references
 │
 ├── digitalocean/                  # DO-specific Terraform
@@ -148,13 +148,13 @@ deploy/
 
 | Resource | Purpose | Used by |
 |----------|---------|---------|
-| Managed K8s cluster | Sandbox pod execution, server hosting | M6b, M8 |
-| Managed PostgreSQL | Task data storage | M2 cloud |
-| S3-compatible bucket | Blob storage (outputs, oversight) | M2 cloud |
-| Container registry | Sandbox images (Claude, Codex) | M6b |
-| Block storage (StorageClass) | Tenant PVCs | M6a |
-| Load balancer + TLS cert | HTTPS ingress | M8 |
-| DNS record | `wallfacer.example.com` | M8 |
+| Managed K8s cluster | Sandbox pod execution, server hosting | K8s sandbox, multi-tenant |
+| Managed PostgreSQL | Task data storage | Cloud storage |
+| S3-compatible bucket | Blob storage (outputs, oversight) | Cloud storage |
+| Container registry | Sandbox images (Claude, Codex) | K8s sandbox |
+| Block storage (StorageClass) | Tenant PVCs | Tenant filesystem |
+| Load balancer + TLS cert | HTTPS ingress | Multi-tenant |
+| DNS record | `wallfacer.example.com` | Multi-tenant |
 | IAM / service accounts | K8s ↔ cloud service auth | All |
 
 ### Module Outputs → Application Config
@@ -208,7 +208,7 @@ These outputs are injected into the wallfacer server as environment variables (v
 **Constraints:**
 - DOKS node pools: max 100 nodes per pool (sufficient for early deployment)
 - Spaces: S3-compatible but no lifecycle policies via S3 API (use DO API for TTL rules)
-- DO Volumes: max 16TB per volume, ReadWriteOnce only (no ReadWriteMany — confirms M6a's pod affinity recommendation)
+- DO Volumes: max 16TB per volume, ReadWriteOnce only (no ReadWriteMany — confirms tenant filesystem pod affinity recommendation)
 - No managed Redis (use in-cluster if needed for control plane sessions)
 
 **Sizing estimate (small deployment, ~10 tenants):**
@@ -290,7 +290,7 @@ Enterprise modules. Each reuses `deploy/base/` manifests and adds provider-speci
 
 | # | Task | Depends on | Effort |
 |---|------|-----------|--------|
-| 1 | Write `deploy/base/` K8s manifests (server, control-plane, RBAC, NetworkPolicy) | M6b, M8 | Medium |
+| 1 | Write `deploy/base/` K8s manifests (server, control-plane, RBAC, NetworkPolicy) | K8s sandbox, multi-tenant | Medium |
 | 2 | Write `deploy/digitalocean/` Terraform module | 1 | Medium |
 | 3 | End-to-end deployment test on DO | 2 | Medium |
 | 4 | Write `deploy/self-hosted/` module (MinIO + PG in-cluster) | 1 | Small |
@@ -305,12 +305,12 @@ Tasks 5–7 are independent and can be built in parallel.
 
 ## Dependencies
 
-- **M6a (Tenant Filesystem)** — defines the PVC layout that StorageClass provisions
-- **M6b (K8s Sandbox Backend)** — defines the K8s resource types (Jobs, PVCs, NetworkPolicies) that IaC must support
-- **M2 cloud tasks** — defines PG schema and S3 bucket structure
-- **M8 (Multi-Tenant)** — defines control plane deployment, DNS, TLS, auth
+- **Tenant Filesystem** — defines the PVC layout that StorageClass provisions
+- **K8s Sandbox Backend** — defines the K8s resource types (Jobs, PVCs, NetworkPolicies) that IaC must support
+- **Cloud Storage** — defines PG schema and S3 bucket structure
+- **Multi-Tenant** — defines control plane deployment, DNS, TLS, auth
 
-This spec can begin in parallel with M6a/M6b (base manifests evolve alongside the application), but full end-to-end testing requires all of M6a + M6b + M2 cloud + M8.
+This spec can begin in parallel with tenant filesystem/K8s sandbox (base manifests evolve alongside the application), but full end-to-end testing requires all of tenant FS + K8s sandbox + cloud storage + multi-tenant.
 
 ## What depends on this
 

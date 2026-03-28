@@ -1,7 +1,7 @@
-# 93 — Agent Role Abstraction & Multi-Agent Communication
+# Agent Role Abstraction & Multi-Agent Communication
 
 **Status:** Investigation / Design
-**Dependencies:** M1 (sandbox.Backend), M3 (container reuse)
+**Dependencies:** [Sandbox Backends](../foundations/sandbox-backends.md), [Container Reuse](../foundations/container-reuse.md)
 **Scope:** `internal/runner/`, `internal/store/`, `prompts/`
 
 ## Problem Statement
@@ -271,7 +271,7 @@ During implementation, an agent encounters a domain it's unfamiliar with and spa
 
 4. **Should agent graphs be user-definable?** If yes, this implies a configuration format (YAML/JSON workflow definitions), validation, and a UI for building pipelines. This is a much larger scope.
 
-5. **How does this interact with M3 (Container Reuse)?** M3 introduces long-lived aux worker containers. The agent abstraction should be compatible — a reusable container is just a persistent `sandbox.Handle` that multiple agent invocations share.
+5. **How does this interact with container reuse?** Container reuse introduces long-lived aux worker containers. The agent abstraction should be compatible — a reusable container is just a persistent `sandbox.Handle` that multiple agent invocations share.
 
 6. **MCP as the communication protocol?** Claude Code already supports MCP tools. If the orchestrator exposed an MCP server, agents could use tool calls to communicate. This is architecturally clean but adds infrastructure complexity.
 

@@ -1,14 +1,14 @@
-# 04c: Inline File Panel Viewer
+# Inline File Panel Viewer
 
 **Status:** Not started
 **Date:** 2026-03-28
-**Depends on:** M4 (file explorer)
+**Depends on:** [File Explorer](../foundations/file-explorer.md)
 
 ---
 
 ## Problem Statement
 
-The file explorer (M4) previews files in a centered popup modal. This is disruptive: the modal obscures the board, blocks interaction with tasks, and makes browsing multiple files tedious since each file opens a new modal that must be closed before opening the next. Users familiar with VS Code expect files to open in an inline panel within the main layout, with tabs for switching between open files.
+The file explorer previews files in a centered popup modal. This is disruptive: the modal obscures the board, blocks interaction with tasks, and makes browsing multiple files tedious since each file opens a new modal that must be closed before opening the next. Users familiar with VS Code expect files to open in an inline panel within the main layout, with tabs for switching between open files.
 
 Additionally, the current preview only handles text and binary placeholders. Images, videos, PDFs, and other media formats show a generic "Binary file (X KB)" message with no visual preview.
 
@@ -53,7 +53,7 @@ When a file is opened, the board grid slides right (or is replaced) to make room
 
 ### File Panel Content
 
-The file panel reuses the existing rendering from M4 but in a panel instead of a modal:
+The file panel reuses the existing rendering from the file explorer but in a panel instead of a modal:
 
 | File type | Rendering |
 |-----------|-----------|
@@ -67,7 +67,7 @@ The file panel reuses the existing rendering from M4 but in a panel instead of a
 
 ### Edit Mode
 
-Edit mode (from M4 Task 9) works the same way in the panel — the Edit/Save/Discard buttons appear in the tab's toolbar area instead of a modal header. Dirty tabs show a dot indicator on the tab title.
+Edit mode (from file explorer Phase 2) works the same way in the panel — the Edit/Save/Discard buttons appear in the tab's toolbar area instead of a modal header. Dirty tabs show a dot indicator on the tab title.
 
 ### Keyboard Shortcuts
 

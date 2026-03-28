@@ -1,7 +1,7 @@
-# M3: Sandbox Reuse
+# Sandbox Reuse
 
 **Status:** Complete (core) | **Date:** 2026-03-27
-**Depends on:** [M1: Pluggable Sandbox Backends](01-sandbox-backends.md) — complete
+**Depends on:** [Pluggable Sandbox Backends](sandbox-backends.md) — complete
 
 ## Problem
 

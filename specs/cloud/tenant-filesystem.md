@@ -1,4 +1,4 @@
-# M6a: Tenant Filesystem
+# Tenant Filesystem
 
 **Status:** Not started | **Date:** 2026-03-28
 
@@ -9,12 +9,12 @@ Wallfacer's local deployment stores everything under `~/.wallfacer/` and the use
 | Concern | Local path | Lifecycle | Cloud question |
 |---------|-----------|-----------|----------------|
 | **Git repos** (source code) | `~/repos/myproject/` | User-managed | Who clones? Where? How are creds managed? |
-| **Task data** | `~/.wallfacer/data/<ws-key>/` | Store-managed | Solved by M2 (PG + S3) |
+| **Task data** | `~/.wallfacer/data/<ws-key>/` | Store-managed | Solved by cloud storage (PG + S3) |
 | **Worktrees** | `~/.wallfacer/worktrees/<task-uuid>/` | Ephemeral per task | Must be accessible to both server and sandbox pod |
 | **Config/state** | `~/.wallfacer/{.env, workspace-groups.json, prompts/}` | Long-lived per tenant | Must survive hibernate/wake cycles |
 | **Ephemera** | `~/.wallfacer/tmp/` (board snapshots) | Throwaway | Instance-local, no persistence needed |
 
-M2 handles task data (row 2). This spec handles the remaining four rows and the connections between them. Without this, the K8s sandbox backend (M6b) has no filesystem to mount into pods, and the multi-tenant control plane (M8) has no way to provision or persist a tenant's working state.
+Cloud storage handles task data (row 2). This spec handles the remaining four rows and the connections between them. Without this, the K8s sandbox backend (K8s sandbox) has no filesystem to mount into pods, and the multi-tenant control plane (multi-tenant control plane) has no way to provision or persist a tenant's working state.
 
 ## Current Local Architecture
 
@@ -24,7 +24,7 @@ M2 handles task data (row 2). This spec handles the remaining four rows and the 
 ├── workspace-groups.json              # Persisted workspace group definitions
 ├── instructions/                      # Per-group AGENTS.md files (keyed by SHA-256 of sorted paths)
 ├── prompts/                           # User-overridden system prompt templates
-├── data/                              # Task data (owned by StorageBackend — M2)
+├── data/                              # Task data (owned by StorageBackend — cloud storage)
 │   └── <workspace-key>/
 │       └── <task-uuid>/
 │           ├── task.json
@@ -73,7 +73,7 @@ Each tenant gets a single persistent volume that holds everything except task da
 
 **What's NOT on the tenant volume:**
 - `.env` — injected by the control plane as environment variables or a mounted secret (see Config Persistence below)
-- `data/` — handled by `StorageBackend` (M2's PG + S3 backends); the store doesn't touch this volume
+- `data/` — handled by `StorageBackend` (cloud storage's PG + S3 backends); the store doesn't touch this volume
 - Container images — pulled by the kubelet (K8s) or container runtime
 
 **Volume type options:**
@@ -162,7 +162,7 @@ This means `Snapshot.Workspaces` still contains absolute paths (for the runner a
 | `prompts/` overrides | Tenant volume (`config/prompts/`) | User customizations; must survive hibernate |
 | `instructions/` (AGENTS.md) | Tenant volume (`config/instructions/`) | Generated from templates + repo files; *could* be regenerated but preserving avoids re-init churn |
 
-On **hibernate**: the tenant volume persists (PVC is retained). Task data is already in cloud storage (M2). The instance pod is deleted.
+On **hibernate**: the tenant volume persists (PVC is retained). Task data is already in cloud storage (cloud storage). The instance pod is deleted.
 
 On **wake**: a new pod is scheduled with the same PVC mounted. The wallfacer process starts, loads `workspace-groups.json` from the volume, connects to cloud storage for task data, and resumes. No migration or re-clone needed (repos are on the volume).
 
@@ -182,7 +182,7 @@ Volume: hostPath /home/user/.wallfacer/worktrees/<task-uuid>/project-a → /work
 Volume: PVC subPath worktrees/<task-uuid>/project-a → /workspace/project-a
 ```
 
-The runner's `buildContainerSpecForSandbox()` needs to emit PVC-based volume mounts instead of host path mounts. This is a concern for M6b (K8s Sandbox Backend) — this spec just ensures the filesystem layout supports it.
+The runner's `buildContainerSpecForSandbox()` needs to emit PVC-based volume mounts instead of host path mounts. This is a concern for K8s sandbox backend — this spec just ensures the filesystem layout supports it.
 
 **Worktree GC** works the same: `PruneUnknownWorktrees()` and `StartWorktreeGC()` scan the `worktrees/` directory on the tenant volume.
 
@@ -212,7 +212,7 @@ The workspace manager takes a `RepoResolver` at construction. `Switch()` calls `
 
 ### Runner
 
-No changes to worktree logic itself. The runner already receives workspace paths from the snapshot. Volume mount assembly changes are in M6b (K8s sandbox backend).
+No changes to worktree logic itself. The runner already receives workspace paths from the snapshot. Volume mount assembly changes are in K8s sandbox backend spec.
 
 ### New: Repo Provisioner
 
@@ -249,11 +249,11 @@ func (p *RepoProvisioner) ListRepos() ([]string, error)
 
 ## Dependencies
 
-- **M1 (Sandbox Backend Interface)** — complete. `ContainerSpec.Volumes` is the mount point.
-- **M2 (Storage Backend Interface)** — complete (enablers). Task data goes through `StorageBackend`, not the tenant volume.
-- **M2a (Multi-Workspace Groups)** — complete. Workspace key mechanics and multi-group lifecycle are the foundation this builds on.
+- **Sandbox Backend Interface** — complete. `ContainerSpec.Volumes` is the mount point.
+- **Storage Backend Interface** — complete (enablers). Task data goes through `StorageBackend`, not the tenant volume.
+- **Multi-Workspace Groups** — complete. Workspace key mechanics and multi-group lifecycle are the foundation this builds on.
 
 ## What depends on this
 
-- **M6b (K8s Sandbox Backend)** — needs the tenant volume layout and `RepoResolver` to assemble pod volume mounts.
-- **M8 (Multi-Tenant)** — the control plane calls the repo provisioner to set up tenant workspaces, and manages credential secrets.
+- **K8s Sandbox Backend** — needs the tenant volume layout and `RepoResolver` to assemble pod volume mounts.
+- **Multi-Tenant** — the control plane calls the repo provisioner to set up tenant workspaces, and manages credential secrets.

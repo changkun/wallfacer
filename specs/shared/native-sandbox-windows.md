@@ -9,9 +9,9 @@ Windows-native story: Docker Desktop requires a licence for commercial use and r
 containers inside a WSL2 or Hyper-V Linux VM, while Podman for Windows is early-stage.
 
 This spec explores Windows-native isolation alternatives that can be implemented as
-`SandboxBackend` implementations (see [01-sandbox-backends.md](01-sandbox-backends.md)).
+`SandboxBackend` implementations (see [sandbox-backends.md](../foundations/sandbox-backends.md)).
 
-**Prerequisite:** [01-sandbox-backends.md](01-sandbox-backends.md) Phase 1 must
+**Prerequisite:** [sandbox-backends.md](../foundations/sandbox-backends.md) Phase 1 must
 be complete. Each native executor is implemented as a `SandboxBackend`, receiving
 a structured `ContainerSpec` via `Launch(ctx, spec)` instead of parsing CLI args.
 The returned `SandboxHandle` tracks lifecycle states (`Creating` → `Running` →
