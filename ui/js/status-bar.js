@@ -192,3 +192,92 @@ if (document.readyState === "loading") {
   initStatusBar();
   _initPanelResize();
 }
+
+// --- System status (About tab) ---
+
+// loadSystemStatus fetches runtime debug info and renders it in the
+// About tab's system status section.
+function loadSystemStatus() {
+  var container = document.getElementById("about-system-status");
+  var content = document.getElementById("about-system-status-content");
+  if (!container || !content) return;
+
+  api(Routes.debug.runtime())
+    .then(function (data) {
+      var lines = [];
+
+      // Goroutines and memory.
+      lines.push(
+        "<div>Goroutines: <strong>" +
+          (data.go_goroutine_count || 0) +
+          "</strong> &middot; Heap: <strong>" +
+          formatBytes(data.go_heap_alloc_bytes || 0) +
+          "</strong></div>",
+      );
+
+      // Active containers.
+      lines.push(
+        "<div>Active containers: <strong>" +
+          (data.active_containers || 0) +
+          "</strong></div>",
+      );
+
+      // Container circuit breaker.
+      if (data.container_circuit) {
+        var cc = data.container_circuit;
+        var ccColor =
+          cc.state === "closed"
+            ? "var(--text-muted)"
+            : "var(--accent)";
+        lines.push(
+          '<div>Circuit breaker: <strong style="color:' +
+            ccColor +
+            '">' +
+            cc.state +
+            "</strong>" +
+            (cc.failures > 0
+              ? " (" + cc.failures + " failures)"
+              : "") +
+            "</div>",
+        );
+      }
+
+      // Worker stats.
+      if (data.worker_stats) {
+        var ws = data.worker_stats;
+        lines.push(
+          "<div>Task workers: <strong>" +
+            (ws.enabled ? "enabled" : "disabled") +
+            "</strong> &middot; Active: <strong>" +
+            (ws.active_workers || 0) +
+            "</strong></div>",
+        );
+      }
+
+      // Task states.
+      if (data.task_states) {
+        var ts = data.task_states;
+        var parts = [];
+        if (ts.in_progress) parts.push(ts.in_progress + " running");
+        if (ts.waiting) parts.push(ts.waiting + " waiting");
+        if (ts.backlog) parts.push(ts.backlog + " backlog");
+        if (ts.done) parts.push(ts.done + " done");
+        if (ts.failed) parts.push(ts.failed + " failed");
+        if (parts.length > 0) {
+          lines.push("<div>Tasks: " + parts.join(" &middot; ") + "</div>");
+        }
+      }
+
+      content.innerHTML = lines.join("");
+      container.style.display = "";
+    })
+    .catch(function () {
+      container.style.display = "none";
+    });
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}

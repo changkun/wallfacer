@@ -64,6 +64,9 @@ function setSettingsTab(tabName) {
   if (tabName === "sandbox" && typeof loadImageStatus === "function") {
     loadImageStatus();
   }
+  if (tabName === "about" && typeof loadSystemStatus === "function") {
+    loadSystemStatus();
+  }
 
   return didSetActive;
 }
