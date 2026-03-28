@@ -2,6 +2,7 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "Wallfacer",
   "outputfilename": "Wallfacer",
+  "frontend:dir": "ui",
   "frontend:install": "",
   "frontend:build": "",
   "frontend:dev:watcher": "",

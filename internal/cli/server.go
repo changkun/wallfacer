@@ -45,6 +45,7 @@ type ServerConfig struct {
 	ContainerCmd string
 	SandboxImage string
 	EnvFile      string
+	SkipCSRF     bool // Desktop mode: requests come from the local WebView, not a browser.
 }
 
 // ServerComponents holds the initialized server components returned by initServer.
@@ -279,8 +280,6 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		"Total number of autonomous actions taken by autopilot watchers, by watcher and outcome.",
 	)
 
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS)
-
 	host, _, _ := net.SplitHostPort(cfg.Addr)
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
@@ -294,8 +293,14 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
+	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS)
+
+	srvHandler := handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
+	if !cfg.SkipCSRF {
+		srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
+	}
 	srv := &http.Server{
-		Handler:     loggingMiddleware(handler.CSRFMiddleware(actualHostPort)(handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)), reg),
+		Handler:     loggingMiddleware(srvHandler, reg),
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
 	}
 

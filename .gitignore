@@ -5,3 +5,7 @@ wallfacer
 coverage.out
 coverage_handler.out
 ui/node_modules/
+ui/wailsjs/
+build/bin/
+build/appicon.png
+.DS_Store
