@@ -188,6 +188,10 @@ function _toggleNode(node) {
 // ---------------------------------------------------------------------------
 
 var _previewFocusReturn = null;
+var _previewNode = null; // currently previewed node
+var _previewRawContent = null; // raw text content for edit mode
+var _editOriginalContent = null; // content when edit started (for dirty detection)
+var _editMode = false;
 
 // Classify a file response into {type, content, size, max}.
 // Exported via window for testing.
@@ -220,8 +224,48 @@ function _relativePath(fullPath, workspace) {
   return fullPath;
 }
 
+function _renderHighlightedContent(content, filename) {
+  var lang = typeof extToLang === "function" ? extToLang(filename) : null;
+  var highlighted = "";
+  try {
+    if (lang && typeof hljs !== "undefined") {
+      highlighted = hljs.highlight(content, { language: lang }).value;
+    } else if (typeof hljs !== "undefined") {
+      highlighted = hljs.highlightAuto(content).value;
+    } else {
+      highlighted = escapeHtml(content);
+    }
+  } catch (_) {
+    highlighted = escapeHtml(content);
+  }
+
+  var lines =
+    typeof splitHighlightedLines === "function"
+      ? splitHighlightedLines(highlighted)
+      : highlighted.split("\n");
+
+  var html = '<pre class="explorer-preview__code"><code>';
+  for (var i = 0; i < lines.length; i++) {
+    html +=
+      '<span class="explorer-preview__line">' +
+      '<span class="explorer-preview__ln">' +
+      (i + 1) +
+      "</span>" +
+      '<span class="explorer-preview__lc">' +
+      (lines[i] || " ") +
+      "</span>" +
+      "</span>";
+  }
+  html += "</code></pre>";
+  return html;
+}
+
 function _openFilePreview(node) {
   _previewFocusReturn = document.activeElement;
+  _previewNode = node;
+  _previewRawContent = null;
+  _editOriginalContent = null;
+  _editMode = false;
 
   // Create or show backdrop
   var backdrop = document.getElementById("explorer-preview-backdrop");
@@ -246,11 +290,17 @@ function _openFilePreview(node) {
     '<span class="explorer-preview__path">' +
     escapeHtml(relPath) +
     "</span>" +
+    '<div class="explorer-preview__actions">' +
+    '<button id="explorer-edit-btn" class="explorer-preview__edit-btn" onclick="_enterEditMode()" style="display:none">Edit</button>' +
+    '<button id="explorer-save-btn" class="explorer-preview__save-btn" onclick="_saveFile()" style="display:none">Save</button>' +
+    '<button id="explorer-discard-btn" class="explorer-preview__discard-btn" onclick="_discardEdit()" style="display:none">Discard</button>' +
     '<button class="explorer-preview__close" onclick="closeExplorerPreview()">&times;</button>' +
+    "</div>" +
     "</div>" +
     '<div class="explorer-preview__content">' +
     '<div class="explorer-preview__placeholder">Loading\u2026</div>' +
     "</div>" +
+    '<div id="explorer-edit-error" class="explorer-preview__error" style="display:none"></div>' +
     "</div>";
 
   var contentEl = backdrop.querySelector(".explorer-preview__content");
@@ -305,42 +355,15 @@ function _openFilePreview(node) {
         return;
       }
 
-      // Text file — syntax highlight
-      var content = result.content;
-      var lang =
-        typeof extToLang === "function" ? extToLang(node.name) : null;
-      var highlighted = "";
-      try {
-        if (lang && typeof hljs !== "undefined") {
-          highlighted = hljs.highlight(content, { language: lang }).value;
-        } else if (typeof hljs !== "undefined") {
-          highlighted = hljs.highlightAuto(content).value;
-        } else {
-          highlighted = escapeHtml(content);
-        }
-      } catch (_) {
-        highlighted = escapeHtml(content);
-      }
+      // Text file — store raw content and show Edit button
+      _previewRawContent = result.content;
+      var editBtn = document.getElementById("explorer-edit-btn");
+      if (editBtn) editBtn.style.display = "";
 
-      var lines =
-        typeof splitHighlightedLines === "function"
-          ? splitHighlightedLines(highlighted)
-          : highlighted.split("\n");
-
-      var html = '<pre class="explorer-preview__code"><code>';
-      for (var i = 0; i < lines.length; i++) {
-        html +=
-          '<span class="explorer-preview__line">' +
-          '<span class="explorer-preview__ln">' +
-          (i + 1) +
-          "</span>" +
-          '<span class="explorer-preview__lc">' +
-          (lines[i] || " ") +
-          "</span>" +
-          "</span>";
-      }
-      html += "</code></pre>";
-      contentEl.innerHTML = html;
+      contentEl.innerHTML = _renderHighlightedContent(
+        result.content,
+        node.name,
+      );
     })
     .catch(function (err) {
       if (contentEl) {
@@ -352,7 +375,164 @@ function _openFilePreview(node) {
     });
 }
 
+// ---------------------------------------------------------------------------
+// Edit mode (Task 9)
+// ---------------------------------------------------------------------------
+
+function _isEditDirty() {
+  if (!_editMode) return false;
+  var ta = document.getElementById("explorer-edit-textarea");
+  if (!ta) return false;
+  return ta.value !== _editOriginalContent;
+}
+
+function _enterEditMode() {
+  _editMode = true;
+  _editOriginalContent = _previewRawContent;
+
+  var backdrop = document.getElementById("explorer-preview-backdrop");
+  if (!backdrop) return;
+
+  var contentEl = backdrop.querySelector(".explorer-preview__content");
+  if (contentEl) {
+    contentEl.innerHTML =
+      '<textarea id="explorer-edit-textarea" class="explorer-preview__textarea" spellcheck="false" autocomplete="off"></textarea>';
+    var ta = document.getElementById("explorer-edit-textarea");
+    if (ta) {
+      ta.value = _previewRawContent || "";
+      ta.addEventListener("keydown", function (e) {
+        if (e.key === "Tab" && !e.shiftKey) {
+          e.preventDefault();
+          var start = ta.selectionStart;
+          var end = ta.selectionEnd;
+          ta.value =
+            ta.value.substring(0, start) + "\t" + ta.value.substring(end);
+          ta.selectionStart = ta.selectionEnd = start + 1;
+        }
+      });
+      ta.focus();
+    }
+  }
+
+  // Toggle button visibility
+  var editBtn = document.getElementById("explorer-edit-btn");
+  var saveBtn = document.getElementById("explorer-save-btn");
+  var discardBtn = document.getElementById("explorer-discard-btn");
+  if (editBtn) editBtn.style.display = "none";
+  if (saveBtn) saveBtn.style.display = "";
+  if (discardBtn) discardBtn.style.display = "";
+
+  // Clear any previous error
+  var errEl = document.getElementById("explorer-edit-error");
+  if (errEl) errEl.style.display = "none";
+}
+
+function _saveFile() {
+  var ta = document.getElementById("explorer-edit-textarea");
+  var saveBtn = document.getElementById("explorer-save-btn");
+  var errEl = document.getElementById("explorer-edit-error");
+  if (!ta || !_previewNode) return;
+
+  var content = ta.value;
+
+  // Loading state
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving\u2026";
+  }
+  if (errEl) errEl.style.display = "none";
+
+  api(Routes.explorer.writeFile(), {
+    method: "PUT",
+    body: JSON.stringify({
+      path: _previewNode.path,
+      workspace: _previewNode.workspace,
+      content: content,
+    }),
+  })
+    .then(function () {
+      // Update stored content and exit edit mode
+      _previewRawContent = content;
+      _editOriginalContent = null;
+      _editMode = false;
+
+      // Re-render preview with updated content
+      var backdrop = document.getElementById("explorer-preview-backdrop");
+      if (backdrop) {
+        var contentEl = backdrop.querySelector(".explorer-preview__content");
+        if (contentEl) {
+          contentEl.innerHTML = _renderHighlightedContent(
+            content,
+            _previewNode.name,
+          );
+        }
+      }
+
+      // Toggle buttons back
+      var editBtn = document.getElementById("explorer-edit-btn");
+      var discardBtn = document.getElementById("explorer-discard-btn");
+      if (editBtn) editBtn.style.display = "";
+      if (saveBtn) {
+        saveBtn.style.display = "none";
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save";
+      }
+      if (discardBtn) discardBtn.style.display = "none";
+    })
+    .catch(function (err) {
+      if (errEl) {
+        errEl.textContent = err.message || "Failed to save file";
+        errEl.style.display = "";
+      }
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save";
+      }
+    });
+}
+
+function _discardEdit() {
+  if (_isEditDirty()) {
+    if (!confirm("You have unsaved changes. Discard?")) return;
+  }
+
+  _editMode = false;
+  _editOriginalContent = null;
+
+  // Re-render preview
+  var backdrop = document.getElementById("explorer-preview-backdrop");
+  if (backdrop) {
+    var contentEl = backdrop.querySelector(".explorer-preview__content");
+    if (contentEl && _previewNode) {
+      contentEl.innerHTML = _renderHighlightedContent(
+        _previewRawContent || "",
+        _previewNode.name,
+      );
+    }
+  }
+
+  // Toggle buttons
+  var editBtn = document.getElementById("explorer-edit-btn");
+  var saveBtn = document.getElementById("explorer-save-btn");
+  var discardBtn = document.getElementById("explorer-discard-btn");
+  if (editBtn) editBtn.style.display = "";
+  if (saveBtn) saveBtn.style.display = "none";
+  if (discardBtn) discardBtn.style.display = "none";
+
+  var errEl = document.getElementById("explorer-edit-error");
+  if (errEl) errEl.style.display = "none";
+}
+
 function closeExplorerPreview() {
+  if (_isEditDirty()) {
+    if (!confirm("You have unsaved changes. Discard?")) return;
+  }
+
+  _editMode = false;
+  _editOriginalContent = null;
+  _previewRawContent = null;
+  _previewNode = null;
+
   var backdrop = document.getElementById("explorer-preview-backdrop");
   if (backdrop) {
     backdrop.classList.add("hidden");
@@ -591,6 +771,9 @@ function _initExplorer() {
 window.toggleExplorer = toggleExplorer;
 window.reloadExplorerTree = reloadExplorerTree;
 window.closeExplorerPreview = closeExplorerPreview;
+window._enterEditMode = _enterEditMode;
+window._saveFile = _saveFile;
+window._discardEdit = _discardEdit;
 
 // Expose internals for testing
 window._buildChildNodes = _buildChildNodes;
@@ -599,6 +782,7 @@ window._findParent = _findParent;
 window._basename = _basename;
 window._classifyFileResponse = _classifyFileResponse;
 window._relativePath = _relativePath;
+window._isEditDirty = _isEditDirty;
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", _initExplorer);

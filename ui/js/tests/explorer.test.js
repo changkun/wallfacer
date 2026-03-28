@@ -169,7 +169,13 @@ function makeContext(opts = {}) {
         readFile: function () {
           return "/api/explorer/file";
         },
+        writeFile: function () {
+          return "/api/explorer/file";
+        },
       },
+    },
+    confirm: function () {
+      return true;
     },
     api: function (url) {
       apiCalls.push(url);
@@ -381,6 +387,14 @@ describe("_relativePath", () => {
   it("handles workspace path with trailing separator", () => {
     const { win } = makeContext();
     expect(win._relativePath("/ws/file.txt", "/ws")).toBe("file.txt");
+  });
+});
+
+describe("_isEditDirty", () => {
+  it("returns false when not in edit mode", () => {
+    const { win } = makeContext();
+    // _isEditDirty relies on _editMode being false and no textarea in DOM
+    expect(win._isEditDirty()).toBe(false);
   });
 });
 
