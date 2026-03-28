@@ -1,6 +1,6 @@
 # Task 10: Worker Lifecycle Stats in Settings Panel
 
-**Status:** Done
+**Status:** Done (fully implemented)
 **Depends on:** Task 7
 **Phase:** 3 (Robustness)
 **Effort:** Small
@@ -59,3 +59,13 @@ This task makes them visible in the frontend.
 
 - Do NOT add per-task span events (the aggregate view is sufficient).
 - Do NOT change the metrics endpoint format.
+
+## Implementation notes
+
+- **Backend (item 1)**: `worker_stats` added to `GET /api/debug/runtime`
+  with `enabled` and `active_workers` fields. `WorkerStats()` method added
+  to `WorkerManager` interface, implemented by `LocalBackend`.
+- **Frontend (item 2)**: System Status section added to Settings > About
+  tab. Fetches runtime data on tab open and shows goroutines, heap,
+  active containers, circuit breaker state, task worker status, and task
+  counts. Implemented in `loadSystemStatus()` in `status-bar.js`.

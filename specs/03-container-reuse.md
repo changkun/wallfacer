@@ -147,7 +147,7 @@ Prometheus counters track worker lifecycle:
 - `wallfacer_container_worker_execs_total`
 - `wallfacer_container_worker_fallbacks_total`
 
-`GET /api/debug/runtime` includes `worker_stats` with enabled flag and active worker count.
+`GET /api/debug/runtime` includes `worker_stats` with enabled flag and active worker count. The Settings > About tab displays these stats alongside goroutine count, heap size, active containers, and circuit breaker state.
 
 ### Configuration
 
@@ -180,5 +180,4 @@ The spec originated as a hybrid design with two worker types: **shared aux worke
 ## Future Work
 
 - **Cleanup task (task-11):** After production verification (~2 weeks), remove `WALLFACER_TASK_WORKERS` flag and ephemeral fallback. Workers become the only strategy for task-scoped containers.
-- **Worker stats UI (task-10 partial):** `worker_stats` is exposed in the API but not yet rendered in the frontend settings panel.
 - **Overlay snapshots / CRIU:** Deferred — high complexity for diminishing returns vs. named volume caches.
