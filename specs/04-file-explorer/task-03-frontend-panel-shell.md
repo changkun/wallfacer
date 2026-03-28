@@ -1,6 +1,6 @@
 # Task 3: Frontend Panel Shell
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1 (routes must exist in generated routes.js)
 **Phase:** Phase 1 — Read-Only Browsing + Preview
 **Effort:** Medium
@@ -67,3 +67,8 @@ No frontend tests needed for this task — the resize/toggle behavior is DOM-dep
 - Do NOT implement file preview modal (Task 5)
 - Do NOT implement keyboard shortcuts beyond the toggle button click handler (Task 6)
 - The explorer-panel should show an empty tree container — Task 4 fills it
+
+## Implementation notes
+
+- The spec called for wrapping board-grid inside `board.html`. Instead, the flex wrapper `<div class="board-with-explorer">` is placed in `ui/index.html` around both the `explorer-panel.html` and `board.html` template includes. This avoids modifying `board.html` and keeps the wrapper at the composition layer.
+- The `Ctrl+E` shortcut is listed in the keyboard shortcuts modal for discoverability, but the actual keydown handler is deferred to Task 6 per the boundary rules.

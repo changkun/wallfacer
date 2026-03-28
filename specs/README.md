@@ -29,7 +29,7 @@ What has shipped vs what remains. Items marked ✅ are complete; ○ are not sta
 │
 ├── next ──────────────────────────
 │
-├──▶ ◐  M4: File Explorer (1/10)
+├──▶ ◐  M4: File Explorer (2/10)
 ├──▶ ○  M5: Host Terminal
 ├──▶ ○  M6: Cloud Deployment (overview)
 │    ├──▶ ○  M6a: Tenant Filesystem
@@ -101,7 +101,7 @@ M6c (cloud infra: DO, AWS, GCP, Alibaba, self-hosted IaC) ───────�
 | **M1** | Sandbox backend interface | [01-sandbox-backends.md](01-sandbox-backends.md) | **Complete** | `sandbox.Backend`/`sandbox.Handle` + `LocalBackend` |
 | **M2** | Storage backend interface | [02-storage-backends.md](02-storage-backends.md) | **Enablers complete** | `StorageBackend` + `FilesystemBackend` + `ListBlobs`; cloud backends (PG, S3) deferred |
 | **M3** | Container reuse | [03-container-reuse.md](03-container-reuse.md) | **Complete** (core) | Per-task worker containers via `podman exec`; ~10x startup savings per turn |
-| **M4** | File explorer | [04-file-explorer.md](04-file-explorer.md) | **In progress** (1/10 tasks done) | Browse + edit workspace files in the web UI |
+| **M4** | File explorer | [04-file-explorer.md](04-file-explorer.md) | **In progress** (2/10 tasks done) | Browse + edit workspace files in the web UI |
 | **M5** | Host terminal | [05-host-terminal.md](05-host-terminal.md) | Not started | Interactive shell in the web UI (WebSocket + PTY) |
 | **M6** | Cloud deployment | [06-cloud-backends.md](06-cloud-backends.md) | Not started | Overview: VPS recipe (done), per-user instance architecture, sub-milestone index |
 | **M7** | Desktop app | [07-native-desktop-app.md](07-native-desktop-app.md) | Not started | Wails native wrapper (macOS .app, Windows .exe) |
