@@ -188,9 +188,15 @@ func TestBuildCreate(t *testing.T) {
 	if strings.Contains(joined, "--rm") {
 		t.Error("BuildCreate must not include --rm")
 	}
-	// Must include sleep entrypoint.
-	if !strings.Contains(joined, `["sleep","infinity"]`) {
-		t.Errorf("expected sleep entrypoint, got: %s", joined)
+	// Must include sleep entrypoint and infinity argument.
+	if !strings.Contains(joined, "--entrypoint sleep") {
+		t.Errorf("expected --entrypoint sleep, got: %s", joined)
+	}
+	// "infinity" should appear after the image as the CMD.
+	imageIdx := strings.Index(joined, "wallfacer-claude:latest")
+	infinityIdx := strings.Index(joined, "infinity")
+	if imageIdx < 0 || infinityIdx < 0 || infinityIdx <= imageIdx {
+		t.Errorf("expected 'infinity' after image, got: %s", joined)
 	}
 	// Must NOT include the original Cmd.
 	if strings.Contains(joined, "do something") {

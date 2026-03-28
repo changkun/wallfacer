@@ -44,8 +44,8 @@ func TestTaskWorkerEnsureRunning(t *testing.T) {
 	name := "wallfacer-test-worker-ensure-" + t.Name()
 	w := newTaskWorker(rt, name, []string{
 		"create", "--name", name,
-		"--entrypoint", `["sleep","infinity"]`,
-		testImage,
+		"--entrypoint", "sleep",
+		testImage, "infinity",
 	})
 	t.Cleanup(w.stop)
 
@@ -70,8 +70,8 @@ func TestTaskWorkerExec(t *testing.T) {
 	name := "wallfacer-test-worker-exec-" + t.Name()
 	w := newTaskWorker(rt, name, []string{
 		"create", "--name", name,
-		"--entrypoint", `["sleep","infinity"]`,
-		testImage,
+		"--entrypoint", "sleep",
+		testImage, "infinity",
 	})
 	t.Cleanup(w.stop)
 
@@ -105,8 +105,8 @@ func TestTaskWorkerStop(t *testing.T) {
 	name := "wallfacer-test-worker-stop-" + t.Name()
 	w := newTaskWorker(rt, name, []string{
 		"create", "--name", name,
-		"--entrypoint", `["sleep","infinity"]`,
-		testImage,
+		"--entrypoint", "sleep",
+		testImage, "infinity",
 	})
 
 	ctx := context.Background()
@@ -137,8 +137,8 @@ func TestTaskWorkerExecAfterStop(t *testing.T) {
 	name := "wallfacer-test-worker-recover-" + t.Name()
 	w := newTaskWorker(rt, name, []string{
 		"create", "--name", name,
-		"--entrypoint", `["sleep","infinity"]`,
-		testImage,
+		"--entrypoint", "sleep",
+		testImage, "infinity",
 	})
 	t.Cleanup(w.stop)
 
@@ -176,8 +176,8 @@ func TestExecHandleKillDoesNotRemoveContainer(t *testing.T) {
 	name := "wallfacer-test-worker-kill-" + t.Name()
 	w := newTaskWorker(rt, name, []string{
 		"create", "--name", name,
-		"--entrypoint", `["sleep","infinity"]`,
-		testImage,
+		"--entrypoint", "sleep",
+		testImage, "infinity",
 	})
 	t.Cleanup(w.stop)
 

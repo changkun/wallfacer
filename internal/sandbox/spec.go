@@ -115,7 +115,7 @@ func (s ContainerSpec) BuildCreate() []string {
 		network = "host"
 	}
 	args := []string{"create", "--network=" + network, "--name", s.Name,
-		"--entrypoint", `["sleep","infinity"]`}
+		"--entrypoint", "sleep"}
 
 	for k := range sortedkeys.Of(s.Labels) {
 		args = append(args, "--label", k+"="+s.Labels[k])
@@ -167,7 +167,7 @@ func (s ContainerSpec) BuildCreate() []string {
 
 	args = append(args, s.ExtraFlags...)
 	args = append(args, s.Image)
-	// No Cmd — the sleep entrypoint keeps the container alive.
+	args = append(args, "infinity") // CMD: sleep entrypoint argument
 
 	return args
 }
