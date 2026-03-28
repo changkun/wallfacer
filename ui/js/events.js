@@ -16,6 +16,7 @@ document.addEventListener("keydown", (e) => {
         { id: "container-monitor-modal", close: closeContainerMonitor },
         { id: "instructions-modal", close: closeInstructionsEditor },
         { id: "settings-modal", close: closeSettings },
+        { id: "keyboard-shortcuts-modal", close: closeKeyboardShortcuts },
         { id: "modal", close: closeModal },
       ])
     )
@@ -28,9 +29,10 @@ document.getElementById("alert-modal").addEventListener("click", (e) => {
   if (e.target === document.getElementById("alert-modal")) closeAlert();
 });
 
-// Global shortcut: "n" opens the new task form
+// Global shortcut: "n" opens the new task form, "?" opens keyboard shortcuts
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "n" || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key !== "n" && e.key !== "?") return;
   var tag = document.activeElement && document.activeElement.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
   var ce =
@@ -39,13 +41,15 @@ document.addEventListener("keydown", (e) => {
   if (ce !== null && ce !== "false") return;
   // Don't open if any modal is visible
   var modals = ["modal", "alert-modal", "stats-modal", "usage-stats-modal",
-    "container-monitor-modal", "instructions-modal", "settings-modal"];
+    "container-monitor-modal", "instructions-modal", "settings-modal",
+    "keyboard-shortcuts-modal"];
   for (var i = 0; i < modals.length; i++) {
     var m = document.getElementById(modals[i]);
     if (m && !m.classList.contains("hidden")) return;
   }
   e.preventDefault();
-  showNewTaskForm();
+  if (e.key === "n") showNewTaskForm();
+  if (e.key === "?") openKeyboardShortcuts();
 });
 
 // New task textarea: Ctrl/Cmd+Enter to save, Escape to cancel
