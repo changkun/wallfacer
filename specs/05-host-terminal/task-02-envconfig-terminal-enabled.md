@@ -1,6 +1,6 @@
 # Task 2: Add TerminalEnabled to Envconfig and Config Response
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Phase 1 — Single Terminal Session
 **Effort:** Small
