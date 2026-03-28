@@ -1,6 +1,6 @@
 # Task 4: Runner Worker Cleanup on Task Completion
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3
 **Phase:** 2 (Worker Lifecycle Management)
 **Effort:** Medium

@@ -237,6 +237,10 @@ func (r *Runner) ideationExploitRatio() float64 {
 // must be called at most once.
 func (r *Runner) Shutdown() {
 	r.shutdownCancel()
+	// Stop all per-task worker containers before waiting for background goroutines.
+	if wm, ok := r.backend.(sandbox.WorkerManager); ok {
+		wm.ShutdownWorkers()
+	}
 	// Signal the board-cache-invalidator goroutine to exit and wait for it.
 	close(r.shutdownCh)
 	r.boardSubscriptionWg.Wait()
@@ -281,6 +285,7 @@ func (r *Runner) RunBackground(taskID uuid.UUID, prompt, sessionID string, resum
 				r.workspaceManager.DecrementAndCleanup(wsKey)
 			}
 		}()
+		defer r.StopTaskWorker(taskID)
 		r.Run(taskID, prompt, sessionID, resumedFromWaiting)
 	})
 }
@@ -697,6 +702,15 @@ func (r *Runner) RefineContainerName(taskID uuid.UUID) string {
 func (r *Runner) KillContainer(taskID uuid.UUID) {
 	if h := r.taskContainers.GetHandle(taskID); h != nil {
 		_ = h.Kill()
+	}
+}
+
+// StopTaskWorker stops the per-task worker container for the given task, if
+// the backend supports worker management. No-op when the backend does not
+// implement sandbox.WorkerManager or when no worker exists for the task.
+func (r *Runner) StopTaskWorker(taskID uuid.UUID) {
+	if wm, ok := r.backend.(sandbox.WorkerManager); ok {
+		wm.StopTaskWorker(taskID.String())
 	}
 }
 

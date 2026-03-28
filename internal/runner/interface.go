@@ -32,6 +32,7 @@ type Interface interface {
 	RefineContainerName(taskID uuid.UUID) string
 	KillContainer(taskID uuid.UUID)
 	KillRefineContainer(taskID uuid.UUID)
+	StopTaskWorker(taskID uuid.UUID)
 
 	// Container circuit breaker.
 	ContainerCircuitAllow() bool

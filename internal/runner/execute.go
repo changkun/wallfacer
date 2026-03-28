@@ -650,6 +650,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 // in_progress and Run() is invoked so the agent can resolve them
 // interactively; the task returns to prevStatus only after the agent finishes.
 func (r *Runner) SyncWorktrees(taskID uuid.UUID, sessionID string, prevStatus store.TaskStatus) {
+	// Stop the per-task worker before rebasing — the worker holds bind mounts
+	// to the worktree. It will be auto-recreated on the next Launch() call.
+	r.StopTaskWorker(taskID)
+
 	bgCtx := r.shutdownCtx
 	testStateInvalidated := false
 

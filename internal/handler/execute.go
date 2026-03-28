@@ -361,6 +361,8 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	if oldStatus == store.TaskStatusInProgress {
 		h.runner.KillContainer(id)
 	}
+	// Stop the per-task worker container (no-op if workers are disabled).
+	h.runner.StopTaskWorker(id)
 
 	// If a refinement is actively running, mark it as failed so the UI
 	// reflects the correct state (same pattern as CancelRefinement).

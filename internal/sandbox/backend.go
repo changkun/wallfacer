@@ -64,6 +64,16 @@ type Handle interface {
 	Name() string
 }
 
+// WorkerManager is an optional interface that backends can implement to
+// support per-task worker containers. The runner uses this to clean up
+// workers when tasks complete, are cancelled, or during sync operations.
+type WorkerManager interface {
+	// StopTaskWorker stops and removes the worker for the given task ID.
+	StopTaskWorker(taskID string)
+	// ShutdownWorkers stops all active task workers.
+	ShutdownWorkers()
+}
+
 // ContainerInfo holds runtime metadata about a container, used by List()
 // and the container monitor UI.
 type ContainerInfo struct {
