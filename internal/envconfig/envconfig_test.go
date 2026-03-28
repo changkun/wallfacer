@@ -782,3 +782,25 @@ func TestUpdateWorkspaces_ClearsWithEmpty(t *testing.T) {
 		t.Error("expected old workspace path to be cleared")
 	}
 }
+
+func TestParseTerminalEnabled(t *testing.T) {
+	path := writeEnvFile(t, "WALLFACER_TERMINAL_ENABLED=true\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !cfg.TerminalEnabled {
+		t.Error("TerminalEnabled = false; want true")
+	}
+}
+
+func TestParseTerminalEnabledDefault(t *testing.T) {
+	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
+	cfg, err := envconfig.Parse(path)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if cfg.TerminalEnabled {
+		t.Error("TerminalEnabled = true; want false when absent")
+	}
+}

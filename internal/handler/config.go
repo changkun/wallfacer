@@ -214,6 +214,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 		"payload_limits":           payloadLimits,
 		"watcher_health":           watcherHealth,
 		"active_groups":            h.activeGroupInfos(ctx),
+		"terminal_enabled":         false,
 	}
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun
@@ -242,6 +243,7 @@ func (h *Handler) buildConfigResponse(ctx context.Context, cfg *envconfig.Config
 	resp["sandbox_reasons"] = sandboxReasons
 	resp["activity_sandboxes"] = cfg.SandboxByActivity()
 	resp["default_model"] = cfg.DefaultModel
+	resp["terminal_enabled"] = cfg.TerminalEnabled
 	return resp
 }
 

@@ -1481,3 +1481,25 @@ func TestActiveGroupInfosNilManager(t *testing.T) {
 		t.Fatalf("expected nil, got %+v", infos)
 	}
 }
+
+func TestGetConfig_IncludesTerminalEnabled(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	te, ok := resp["terminal_enabled"]
+	if !ok {
+		t.Fatal("terminal_enabled key missing from config response")
+	}
+	if te.(bool) != false {
+		t.Errorf("terminal_enabled = %v; want false by default", te)
+	}
+}

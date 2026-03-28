@@ -468,6 +468,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerNetwork     *string                                `json:"container_network"`
 		ContainerCPUs        *string                                `json:"container_cpus"`
 		ContainerMemory      *string                                `json:"container_memory"`
+		TerminalEnabled      *bool                                  `json:"terminal_enabled"`
 	}
 	if !decodeJSONBody(w, r, &req) {
 		return
@@ -563,6 +564,15 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		sandboxFast = &v
 	}
 
+	var terminalEnabled *string
+	if req.TerminalEnabled != nil {
+		v := "false"
+		if *req.TerminalEnabled {
+			v = "true"
+		}
+		terminalEnabled = &v
+	}
+
 	// Validate the base URL if provided to prevent SSRF.
 	if req.BaseURL != nil && *req.BaseURL != "" {
 		if err := validateBaseURL(*req.BaseURL); err != nil {
@@ -597,6 +607,7 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerNetwork:     req.ContainerNetwork,
 		ContainerCPUs:        req.ContainerCPUs,
 		ContainerMemory:      req.ContainerMemory,
+		TerminalEnabled:      terminalEnabled,
 	}); err != nil {
 		http.Error(w, "failed to update env file: "+err.Error(), http.StatusInternalServerError)
 		return

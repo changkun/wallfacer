@@ -52,6 +52,7 @@ type Config struct {
 	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
 	TaskWorkers      bool   // WALLFACER_TASK_WORKERS ("true"/"false"), defaults to true when unset
 	DependencyCaches bool   // WALLFACER_DEPENDENCY_CACHES ("true"/"false"), defaults to false
+	TerminalEnabled  bool   // WALLFACER_TERMINAL_ENABLED ("true"/"false"), defaults to false
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
@@ -89,6 +90,7 @@ var knownKeys = []string{
 	"WALLFACER_CONTAINER_MEMORY",
 	"WALLFACER_TASK_WORKERS",
 	"WALLFACER_DEPENDENCY_CACHES",
+	"WALLFACER_TERMINAL_ENABLED",
 	"WALLFACER_WORKSPACES",
 }
 
@@ -181,6 +183,8 @@ func Parse(path string) (Config, error) {
 			cfg.TaskWorkers = v != "false"
 		case "WALLFACER_DEPENDENCY_CACHES":
 			cfg.DependencyCaches = v == "true"
+		case "WALLFACER_TERMINAL_ENABLED":
+			cfg.TerminalEnabled = v == "true"
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
 		}
@@ -340,6 +344,7 @@ type Updates struct {
 	ContainerNetwork     *string
 	ContainerCPUs        *string
 	ContainerMemory      *string
+	TerminalEnabled      *string
 	Workspaces           *string
 }
 
@@ -368,6 +373,7 @@ func Update(path string, u Updates) error {
 		"WALLFACER_CONTAINER_NETWORK":       u.ContainerNetwork,
 		"WALLFACER_CONTAINER_CPUS":          u.ContainerCPUs,
 		"WALLFACER_CONTAINER_MEMORY":        u.ContainerMemory,
+		"WALLFACER_TERMINAL_ENABLED":        u.TerminalEnabled,
 		"WALLFACER_WORKSPACES":              u.Workspaces,
 	}
 	return updateFile(path, updates)
