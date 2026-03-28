@@ -1,6 +1,6 @@
 # Task 2: Desktop Subcommand with Wails Window
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** Core window
 **Effort:** Medium
@@ -38,3 +38,9 @@ Implement the `desktop` subcommand so it starts the existing HTTP server and ope
 - Do NOT add app icons or packaging
 - Do NOT change the HTTP handler, routes, or middleware
 - Keep the refactored `initServer()` minimal — extract only what both paths share
+
+## Implementation notes
+
+- **URL field:** The spec prescribed `URL: "http://localhost:<port>"` on `options.App`, but Wails v2 has no `URL` field. Instead, `AssetServer.Handler` is set to an `httputil.NewSingleHostReverseProxy` that proxies all WebView requests to the running HTTP server. This achieves the same result — the WebView renders the task board served by the local HTTP server — without using embedded assets.
+- **Default addr:** `RunDesktop` defaults to `:0` (random port) instead of `:8080` since the port is not user-visible (the WebView connects via the reverse proxy).
+- **initServer return type:** Uses a `ServerComponents` struct (with `Srv`, `Ln`, `Runner`, `Handler`, `WsMgr`, `Ctx`, `Stop`, `ActualPort`) plus a `Shutdown()` method, rather than returning bare values.

@@ -1,6 +1,6 @@
 # Task 1: Add Wails v2 Dependency and Project Scaffold
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Setup
 **Effort:** Small
