@@ -166,12 +166,35 @@ function makeContext(opts = {}) {
         tree: function () {
           return "/api/explorer/tree";
         },
+        readFile: function () {
+          return "/api/explorer/file";
+        },
       },
     },
     api: function (url) {
       apiCalls.push(url);
       var response = opts.apiResponse || [];
       return Promise.resolve(response);
+    },
+    fetch: function () {
+      return Promise.resolve({ ok: true, status: 200, headers: new Map(), text: function () { return Promise.resolve(""); } });
+    },
+    escapeHtml: function (s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    },
+    extToLang: function () {
+      return null;
+    },
+    splitHighlightedLines: function (html) {
+      return html.split("\n");
+    },
+    hljs: {
+      highlight: function (code) {
+        return { value: code };
+      },
+      highlightAuto: function (code) {
+        return { value: code };
+      },
     },
     console,
   });
@@ -297,12 +320,75 @@ describe("_findParent", () => {
   });
 });
 
+describe("_classifyFileResponse", () => {
+  it("classifies 413 as large file", () => {
+    const { win } = makeContext();
+    const result = win._classifyFileResponse(
+      413,
+      "application/json",
+      JSON.stringify({ error: "file too large", size: 5242880, max: 2097152 }),
+    );
+    expect(result.type).toBe("large");
+    expect(result.size).toBe(5242880);
+    expect(result.max).toBe(2097152);
+  });
+
+  it("classifies JSON with binary:true as binary", () => {
+    const { win } = makeContext();
+    const result = win._classifyFileResponse(
+      200,
+      "application/json",
+      { binary: true, size: 1024 },
+    );
+    expect(result.type).toBe("binary");
+    expect(result.size).toBe(1024);
+  });
+
+  it("classifies text/plain as text with content", () => {
+    const { win } = makeContext();
+    const result = win._classifyFileResponse(
+      200,
+      "text/plain; charset=utf-8",
+      "hello world",
+    );
+    expect(result.type).toBe("text");
+    expect(result.content).toBe("hello world");
+  });
+
+  it("returns text type for unknown content types", () => {
+    const { win } = makeContext();
+    const result = win._classifyFileResponse(200, "", "some content");
+    expect(result.type).toBe("text");
+    expect(result.content).toBe("some content");
+  });
+});
+
+describe("_relativePath", () => {
+  it("strips workspace prefix from path", () => {
+    const { win } = makeContext();
+    expect(win._relativePath("/home/user/project/src/main.go", "/home/user/project")).toBe(
+      "src/main.go",
+    );
+  });
+
+  it("returns full path if workspace is not a prefix", () => {
+    const { win } = makeContext();
+    expect(win._relativePath("/other/path/file.go", "/home/user/project")).toBe(
+      "/other/path/file.go",
+    );
+  });
+
+  it("handles workspace path with trailing separator", () => {
+    const { win } = makeContext();
+    expect(win._relativePath("/ws/file.txt", "/ws")).toBe("file.txt");
+  });
+});
+
 describe("explorer init", () => {
   it("loads roots when panel was previously open", () => {
-    const { store, registry } = makeContext({
+    const { store } = makeContext({
       workspaces: ["/home/user/project"],
     });
-    // Panel was opened during init — check localStorage was checked
     expect(store).toBeDefined();
   });
 
@@ -310,9 +396,7 @@ describe("explorer init", () => {
     const { registry } = makeContext({
       workspaces: ["/home/user/project"],
     });
-    // Panel starts hidden (display:none) so button should not be expanded
     const btn = registry.get("explorer-toggle-btn");
-    // Button exists in registry
     expect(btn).toBeDefined();
   });
 });

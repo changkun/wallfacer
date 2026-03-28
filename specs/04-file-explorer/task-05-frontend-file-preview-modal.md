@@ -1,6 +1,6 @@
 # Task 5: Frontend File Preview Modal
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 2, Task 4
 **Phase:** Phase 1 — Read-Only Browsing + Preview
 **Effort:** Medium
@@ -76,3 +76,11 @@ Add to `ui/js/tests/explorer.test.js`:
 - Do NOT add "Edit" button to the modal yet
 - Do NOT modify `modal-diff.js` — reuse its global functions as-is
 - Keep the modal independent from the task detail modal (`openModal`/`closeModal`) — this is a separate modal for file preview
+
+## Implementation notes
+
+- Used raw `fetch()` instead of `api()` because the readFile endpoint returns `text/plain` for text files, not JSON, and `api()` always calls `.json()`.
+- Extracted `_classifyFileResponse()` as a pure testable helper for response classification logic.
+- Added `_relativePath()` helper to strip workspace prefix for cleaner path display in the modal header.
+- The modal DOM is created dynamically on first open and reused (innerHTML replaced) for subsequent opens, rather than a static HTML partial — matching the depgraph panel pattern.
+- Escape key integration uses the existing `closeFirstVisibleModal` pattern in events.js.

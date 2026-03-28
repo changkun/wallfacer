@@ -10,6 +10,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (
       closeFirstVisibleModal([
+        { id: "explorer-preview-backdrop", close: closeExplorerPreview },
         { id: "alert-modal", close: closeAlert },
         { id: "stats-modal", close: closeStatsModal },
         { id: "usage-stats-modal", close: closeUsageStats },

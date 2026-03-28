@@ -183,9 +183,185 @@ function _toggleNode(node) {
   }
 }
 
-// Stub for Task 5 — file preview modal.
-function _openFilePreview(_node) {
-  // Will be implemented in Task 5.
+// ---------------------------------------------------------------------------
+// File preview modal (Task 5)
+// ---------------------------------------------------------------------------
+
+var _previewFocusReturn = null;
+
+// Classify a file response into {type, content, size, max}.
+// Exported via window for testing.
+function _classifyFileResponse(status, contentType, body) {
+  if (status === 413) {
+    var parsed = typeof body === "string" ? JSON.parse(body) : body;
+    return { type: "large", size: parsed.size || 0, max: parsed.max || 0 };
+  }
+  if (contentType && contentType.indexOf("application/json") !== -1) {
+    var json = typeof body === "string" ? JSON.parse(body) : body;
+    if (json.binary) {
+      return { type: "binary", size: json.size || 0 };
+    }
+  }
+  return { type: "text", content: typeof body === "string" ? body : "" };
+}
+
+function _formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function _relativePath(fullPath, workspace) {
+  if (fullPath.indexOf(workspace) === 0) {
+    var rel = fullPath.slice(workspace.length);
+    if (rel.charAt(0) === "/" || rel.charAt(0) === "\\") rel = rel.slice(1);
+    return rel || _basename(fullPath);
+  }
+  return fullPath;
+}
+
+function _openFilePreview(node) {
+  _previewFocusReturn = document.activeElement;
+
+  // Create or show backdrop
+  var backdrop = document.getElementById("explorer-preview-backdrop");
+  if (!backdrop) {
+    backdrop = document.createElement("div");
+    backdrop.id = "explorer-preview-backdrop";
+    backdrop.className =
+      "explorer-preview-backdrop fixed inset-0 z-50 items-center justify-center p-4";
+    backdrop.addEventListener("click", function (e) {
+      if (e.target === backdrop) closeExplorerPreview();
+    });
+    document.body.appendChild(backdrop);
+  }
+  backdrop.classList.remove("hidden");
+  backdrop.style.display = "";
+
+  var relPath = _relativePath(node.path, node.workspace);
+
+  backdrop.innerHTML =
+    '<div class="explorer-preview" onclick="event.stopPropagation()">' +
+    '<div class="explorer-preview__header">' +
+    '<span class="explorer-preview__path">' +
+    escapeHtml(relPath) +
+    "</span>" +
+    '<button class="explorer-preview__close" onclick="closeExplorerPreview()">&times;</button>' +
+    "</div>" +
+    '<div class="explorer-preview__content">' +
+    '<div class="explorer-preview__placeholder">Loading\u2026</div>' +
+    "</div>" +
+    "</div>";
+
+  var contentEl = backdrop.querySelector(".explorer-preview__content");
+
+  var url =
+    Routes.explorer.readFile() +
+    "?path=" +
+    encodeURIComponent(node.path) +
+    "&workspace=" +
+    encodeURIComponent(node.workspace);
+
+  fetch(url)
+    .then(function (res) {
+      var ct = res.headers.get("content-type") || "";
+      if (res.status === 413) {
+        return res.text().then(function (body) {
+          return _classifyFileResponse(413, ct, body);
+        });
+      }
+      if (!res.ok) {
+        return res.text().then(function (text) {
+          throw new Error(text || "Failed to load file");
+        });
+      }
+      if (ct.indexOf("application/json") !== -1) {
+        return res.json().then(function (json) {
+          return _classifyFileResponse(res.status, ct, json);
+        });
+      }
+      return res.text().then(function (text) {
+        return _classifyFileResponse(res.status, ct, text);
+      });
+    })
+    .then(function (result) {
+      if (!contentEl) return;
+
+      if (result.type === "large") {
+        contentEl.innerHTML =
+          '<div class="explorer-preview__placeholder">File too large to preview (' +
+          _formatSize(result.size) +
+          ", max " +
+          _formatSize(result.max) +
+          ").</div>";
+        return;
+      }
+
+      if (result.type === "binary") {
+        contentEl.innerHTML =
+          '<div class="explorer-preview__placeholder">Binary file (' +
+          _formatSize(result.size) +
+          ")</div>";
+        return;
+      }
+
+      // Text file — syntax highlight
+      var content = result.content;
+      var lang =
+        typeof extToLang === "function" ? extToLang(node.name) : null;
+      var highlighted = "";
+      try {
+        if (lang && typeof hljs !== "undefined") {
+          highlighted = hljs.highlight(content, { language: lang }).value;
+        } else if (typeof hljs !== "undefined") {
+          highlighted = hljs.highlightAuto(content).value;
+        } else {
+          highlighted = escapeHtml(content);
+        }
+      } catch (_) {
+        highlighted = escapeHtml(content);
+      }
+
+      var lines =
+        typeof splitHighlightedLines === "function"
+          ? splitHighlightedLines(highlighted)
+          : highlighted.split("\n");
+
+      var html = '<pre class="explorer-preview__code"><code>';
+      for (var i = 0; i < lines.length; i++) {
+        html +=
+          '<span class="explorer-preview__line">' +
+          '<span class="explorer-preview__ln">' +
+          (i + 1) +
+          "</span>" +
+          '<span class="explorer-preview__lc">' +
+          (lines[i] || " ") +
+          "</span>" +
+          "</span>";
+      }
+      html += "</code></pre>";
+      contentEl.innerHTML = html;
+    })
+    .catch(function (err) {
+      if (contentEl) {
+        contentEl.innerHTML =
+          '<div class="explorer-preview__placeholder">' +
+          escapeHtml(err.message || "Failed to load file") +
+          "</div>";
+      }
+    });
+}
+
+function closeExplorerPreview() {
+  var backdrop = document.getElementById("explorer-preview-backdrop");
+  if (backdrop) {
+    backdrop.classList.add("hidden");
+    backdrop.style.display = "none";
+  }
+  if (_previewFocusReturn && typeof _previewFocusReturn.focus === "function") {
+    _previewFocusReturn.focus();
+    _previewFocusReturn = null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -414,12 +590,15 @@ function _initExplorer() {
 // Expose globally
 window.toggleExplorer = toggleExplorer;
 window.reloadExplorerTree = reloadExplorerTree;
+window.closeExplorerPreview = closeExplorerPreview;
 
 // Expose internals for testing
 window._buildChildNodes = _buildChildNodes;
 window._getVisibleNodes = _getVisibleNodes;
 window._findParent = _findParent;
 window._basename = _basename;
+window._classifyFileResponse = _classifyFileResponse;
+window._relativePath = _relativePath;
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", _initExplorer);

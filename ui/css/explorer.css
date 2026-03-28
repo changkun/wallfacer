@@ -125,3 +125,108 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ===== File Preview Modal ===== */
+.explorer-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+}
+[data-theme="dark"] .explorer-preview-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+.explorer-preview {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-width: min(80vw, 1100px);
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.explorer-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.explorer-preview__path {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.explorer-preview__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: var(--text-muted);
+  line-height: 1;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.explorer-preview__close:hover {
+  color: var(--text);
+}
+.explorer-preview__content {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+.explorer-preview__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.explorer-preview__code {
+  margin: 0;
+  padding: 8px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+  background: transparent;
+}
+.explorer-preview__code code {
+  display: block;
+}
+.explorer-preview__line {
+  display: flex;
+  padding: 0 12px 0 0;
+}
+.explorer-preview__line:hover {
+  background: var(--bg-raised);
+}
+.explorer-preview__ln {
+  display: inline-block;
+  width: 48px;
+  min-width: 48px;
+  text-align: right;
+  padding-right: 12px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  user-select: none;
+  flex-shrink: 0;
+}
+.explorer-preview__lc {
+  white-space: pre;
+  flex: 1;
+  min-width: 0;
+}
