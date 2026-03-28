@@ -38,7 +38,7 @@ M7: Desktop App ────────────────┘ (ships after
 |---|-----------|------|--------|----------|
 | **M1** | Sandbox backend interface | [01-sandbox-backends.md](01-sandbox-backends.md) | **Complete** | `sandbox.Backend`/`sandbox.Handle` + `LocalBackend` |
 | **M2** | Storage backend interface | [02-storage-backends.md](02-storage-backends.md) | **Enablers complete** | `StorageBackend` + `FilesystemBackend` + `ListBlobs`; cloud backends (PG, S3) deferred |
-| **M3** | Container reuse | [03-container-reuse.md](03-container-reuse.md) | Not started | Aux worker containers for title/oversight/commit (~10x startup savings) |
+| **M3** | Container reuse | [03-container-reuse.md](03-container-reuse.md) | **Complete** (core) | Per-task worker containers via `podman exec`; ~10x startup savings per turn |
 | **M4** | File explorer | [04-file-explorer.md](04-file-explorer.md) | Not started | Browse + edit workspace files in the web UI |
 | **M5** | Host terminal | [05-host-terminal.md](05-host-terminal.md) | Not started | Interactive shell in the web UI (WebSocket + PTY) |
 | **M6** | Cloud backends | [06-cloud-backends.md](06-cloud-backends.md) | Not started | K8s backend, PostgreSQL, S3, migration tool |
