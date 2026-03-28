@@ -1,6 +1,6 @@
 # Task 12: Preview Syntax Highlighting and Markdown Rendering
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 5
 **Phase:** Phase 1 — Read-Only Browsing + Preview
 **Effort:** Small
