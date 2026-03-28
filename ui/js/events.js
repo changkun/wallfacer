@@ -40,9 +40,16 @@ document.addEventListener("keydown", (e) => {
     document.activeElement.getAttribute("contenteditable");
   if (ce !== null && ce !== "false") return;
   // Don't open if any modal is visible
-  var modals = ["modal", "alert-modal", "stats-modal", "usage-stats-modal",
-    "container-monitor-modal", "instructions-modal", "settings-modal",
-    "keyboard-shortcuts-modal"];
+  var modals = [
+    "modal",
+    "alert-modal",
+    "stats-modal",
+    "usage-stats-modal",
+    "container-monitor-modal",
+    "instructions-modal",
+    "settings-modal",
+    "keyboard-shortcuts-modal",
+  ];
   for (var i = 0; i < modals.length; i++) {
     var m = document.getElementById(modals[i]);
     if (m && !m.classList.contains("hidden")) return;

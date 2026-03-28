@@ -60,10 +60,16 @@ function fetchContainersQuiet() {
   var request =
     typeof apiGet === "function"
       ? apiGet("/api/containers", {})
-      : fetch("/api/containers").then(function (res) { return res.json(); });
+      : fetch("/api/containers").then(function (res) {
+          return res.json();
+        });
   request
-    .then(function (data) { renderContainers(data); })
-    .catch(function (err) { setContainerMonitorState("error", String(err)); });
+    .then(function (data) {
+      renderContainers(data);
+    })
+    .catch(function (err) {
+      setContainerMonitorState("error", String(err));
+    });
 }
 
 function renderContainers(containers) {

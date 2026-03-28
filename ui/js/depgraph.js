@@ -444,7 +444,8 @@
         emptyMsg.className = "depgraph-empty";
         emptyMsg.style.cssText =
           "padding:24px;text-align:center;color:var(--text-muted);font-size:12px;";
-        emptyMsg.textContent = "No dependency edges. Add depends-on links between tasks to see the graph.";
+        emptyMsg.textContent =
+          "No dependency edges. Add depends-on links between tasks to see the graph.";
         panel.appendChild(emptyMsg);
       }
       emptyMsg.style.display = "";
