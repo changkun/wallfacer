@@ -55,7 +55,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | Spec | Status | Delivers |
 |------|--------|----------|
 | [epic-coordination.md](local/epic-coordination.md) | Not started | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking |
-| [desktop-app.md](local/desktop-app.md) | **In progress** (6/9 tasks done) | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
+| [desktop-app.md](local/desktop-app.md) | **In progress** (7/9 tasks done) | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
 | [file-attachments.md](local/file-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
 | [host-mounts.md](local/host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
 | [file-panel-viewer.md](local/file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview |

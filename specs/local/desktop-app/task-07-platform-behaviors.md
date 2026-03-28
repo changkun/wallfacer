@@ -1,6 +1,6 @@
 # Task 7: Platform-Specific Tray and Window Behaviors
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3
 **Phase:** Platform polish
 **Effort:** Medium
@@ -47,3 +47,12 @@ Implement the platform-specific behaviors for macOS, Windows, and Linux as descr
 - Do NOT add code signing or notarization in this task (that's packaging, Task 8)
 - Do NOT change the tray menu structure — only platform-specific behaviors
 - Do NOT add Linux desktop file or freedesktop integration yet
+
+## Implementation notes
+
+- **Balloon notification (Windows):** `fyne.io/systray` does not support Windows balloon/toast notifications. Skipped — the tray icon appearance is sufficient indication.
+- **Dock icon click (macOS):** Wails v2 has no public API for dock icon reopen events (`applicationShouldHandleReopen`). Users can reopen via "Open Dashboard" in the tray menu or by left-clicking the tray icon.
+- **Cmd+Q (macOS):** Already handled natively by Wails — triggers `OnShutdown` which runs `tm.Stop()` + `sc.Shutdown()`. No additional code needed.
+- **Left-click tray:** Used `systray.SetOnTapped(showWindow)` on all platforms for consistency — left-click shows the window, right-click opens the menu.
+- **OnBeforeClose:** Added to `desktop.go` for macOS and Windows — returns `true` to prevent quit and calls `WindowHide()` instead. On Linux, window close quits normally.
+- **Windows .ico:** Generated programmatically with 16x16 and 32x32 PNG-encoded variants in ICO container format.
