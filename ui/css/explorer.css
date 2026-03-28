@@ -63,7 +63,7 @@
   opacity: 0.4;
 }
 
-/* --- Tree node styles (prepared for Task 4) --- */
+/* --- Tree node styles --- */
 .explorer-node {
   display: flex;
   align-items: center;
@@ -81,6 +81,10 @@
 .explorer-node:hover {
   background: var(--bg-raised);
 }
+.explorer-node:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 .explorer-node--dir {
   font-weight: 500;
 }
@@ -89,4 +93,35 @@
 }
 .explorer-node--hidden {
   opacity: 0.5;
+}
+
+/* Disclosure triangle */
+.explorer-node__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex-shrink: 0;
+  font-size: 8px;
+  color: var(--text-muted);
+}
+.explorer-node--loading .explorer-node__toggle,
+.explorer-node__toggle.explorer-node--loading {
+  font-size: 10px;
+  animation: explorer-pulse 1s infinite;
+}
+@keyframes explorer-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Name label */
+.explorer-node__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
