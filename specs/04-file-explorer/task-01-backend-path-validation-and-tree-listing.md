@@ -1,6 +1,6 @@
 # Task 1: Backend Path Validation and Tree Listing
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Phase 1 — Read-Only Browsing + Preview
 **Effort:** Medium
