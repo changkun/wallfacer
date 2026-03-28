@@ -4,6 +4,7 @@ package cli
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -190,5 +191,89 @@ func TestPollHealthWithAPIKey(t *testing.T) {
 	}
 	if data.UptimeSeconds != 10.0 {
 		t.Errorf("uptime = %f, want 10.0", data.UptimeSeconds)
+	}
+}
+
+func TestParseConfigToggles(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"autopilot":  true,
+			"autotest":   false,
+			"autosubmit": true,
+			"autosync":   false,
+			// Extra fields the config returns that we don't use.
+			"workspaces": []string{"/tmp"},
+			"autorefine": true,
+			"autopush":   false,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	tm := NewTrayManager(func() {}, func() {}, srv.URL, "")
+	cfg, err := tm.fetchConfig()
+	if err != nil {
+		t.Fatalf("fetchConfig() error: %v", err)
+	}
+	if !cfg.Autopilot {
+		t.Error("autopilot: want true, got false")
+	}
+	if cfg.Autotest {
+		t.Error("autotest: want false, got true")
+	}
+	if !cfg.Autosubmit {
+		t.Error("autosubmit: want true, got false")
+	}
+	if cfg.Autosync {
+		t.Error("autosync: want false, got true")
+	}
+}
+
+func TestToggleSendsCorrectPayload(t *testing.T) {
+	var gotBody string
+	var gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/config" && r.Method == "PUT" {
+			gotMethod = r.Method
+			b, _ := io.ReadAll(r.Body)
+			gotBody = string(b)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	tm := NewTrayManager(func() {}, func() {}, srv.URL, "")
+	if err := tm.toggleConfig("autopilot", false); err != nil {
+		t.Fatalf("toggleConfig error: %v", err)
+	}
+	if gotMethod != "PUT" {
+		t.Errorf("method = %q, want PUT", gotMethod)
+	}
+	// Parse and verify the JSON body.
+	var parsed map[string]bool
+	if err := json.Unmarshal([]byte(gotBody), &parsed); err != nil {
+		t.Fatalf("parse body: %v (body=%q)", err, gotBody)
+	}
+	if v, ok := parsed["autopilot"]; !ok || v != false {
+		t.Errorf("body autopilot = %v, want false (body=%q)", v, gotBody)
+	}
+	if len(parsed) != 1 {
+		t.Errorf("expected exactly 1 field in body, got %d (body=%q)", len(parsed), gotBody)
+	}
+}
+
+func TestToggleFailurePreservesState(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	tm := NewTrayManager(func() {}, func() {}, srv.URL, "")
+	err := tm.toggleConfig("autopilot", true)
+	if err == nil {
+		t.Fatal("expected error from failing PUT")
 	}
 }

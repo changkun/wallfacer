@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/assets/icons"
@@ -32,6 +33,12 @@ type TrayManager struct {
 	mWaiting    *systray.MenuItem
 	mBacklog    *systray.MenuItem
 	mUptime     *systray.MenuItem
+
+	// Automation toggle menu items.
+	mAutopilot  *systray.MenuItem
+	mAutotest   *systray.MenuItem
+	mAutosubmit *systray.MenuItem
+	mAutosync   *systray.MenuItem
 
 	// Last known icon state to avoid redundant SetIcon calls.
 	lastIconState string
@@ -87,6 +94,12 @@ func (tm *TrayManager) onReady() {
 	tm.mBacklog.Disable()
 	systray.AddSeparator()
 
+	tm.mAutopilot = systray.AddMenuItemCheckbox("Autopilot", "Toggle autopilot", false)
+	tm.mAutotest = systray.AddMenuItemCheckbox("Auto-test", "Toggle auto-test", false)
+	tm.mAutosubmit = systray.AddMenuItemCheckbox("Auto-submit", "Toggle auto-submit", false)
+	tm.mAutosync = systray.AddMenuItemCheckbox("Auto-sync", "Toggle auto-sync", false)
+	systray.AddSeparator()
+
 	tm.mUptime = systray.AddMenuItem("Uptime: —", "")
 	tm.mUptime.Disable()
 	systray.AddSeparator()
@@ -99,6 +112,14 @@ func (tm *TrayManager) onReady() {
 			select {
 			case <-mOpen.ClickedCh:
 				tm.showWindow()
+			case <-tm.mAutopilot.ClickedCh:
+				tm.handleToggle("autopilot", tm.mAutopilot)
+			case <-tm.mAutotest.ClickedCh:
+				tm.handleToggle("autotest", tm.mAutotest)
+			case <-tm.mAutosubmit.ClickedCh:
+				tm.handleToggle("autosubmit", tm.mAutosubmit)
+			case <-tm.mAutosync.ClickedCh:
+				tm.handleToggle("autosync", tm.mAutosync)
 			case <-mQuit.ClickedCh:
 				tm.quit()
 				return
@@ -110,13 +131,15 @@ func (tm *TrayManager) onReady() {
 
 	// Poll loop goroutine.
 	go func() {
-		tm.poll() // initial poll
+		tm.poll()       // initial health poll
+		tm.pollConfig() // initial config poll
 		ticker := time.NewTicker(trayPollInterval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
 				tm.poll()
+				tm.pollConfig()
 			case <-tm.done:
 				return
 			}
@@ -225,4 +248,92 @@ func formatDuration(seconds float64) string {
 		return fmt.Sprintf("%dh %dm", h, m)
 	}
 	return fmt.Sprintf("%dm", m)
+}
+
+// configData is the subset of the /api/config response we care about.
+type configData struct {
+	Autopilot  bool `json:"autopilot"`
+	Autotest   bool `json:"autotest"`
+	Autosubmit bool `json:"autosubmit"`
+	Autosync   bool `json:"autosync"`
+}
+
+// pollConfig fetches the config endpoint and updates the toggle check states.
+func (tm *TrayManager) pollConfig() {
+	cfg, err := tm.fetchConfig()
+	if err != nil {
+		logger.Main.Debug("tray config poll failed", "error", err)
+		return
+	}
+	setChecked(tm.mAutopilot, cfg.Autopilot)
+	setChecked(tm.mAutotest, cfg.Autotest)
+	setChecked(tm.mAutosubmit, cfg.Autosubmit)
+	setChecked(tm.mAutosync, cfg.Autosync)
+}
+
+// setChecked sets a menu item's checked state.
+func setChecked(item *systray.MenuItem, checked bool) {
+	if checked {
+		item.Check()
+	} else {
+		item.Uncheck()
+	}
+}
+
+// fetchConfig performs an HTTP GET to the config endpoint.
+func (tm *TrayManager) fetchConfig() (*configData, error) {
+	req, err := http.NewRequest("GET", tm.serverURL+"/api/config", nil)
+	if err != nil {
+		return nil, err
+	}
+	if tm.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+tm.apiKey)
+	}
+	resp, err := tm.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("config returned %d", resp.StatusCode)
+	}
+	var data configData
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+// handleToggle sends a PUT /api/config to invert the given toggle.
+// On success, the menu item's check state is updated. On failure, the
+// state is left unchanged.
+func (tm *TrayManager) handleToggle(field string, item *systray.MenuItem) {
+	newValue := !item.Checked()
+	if err := tm.toggleConfig(field, newValue); err != nil {
+		logger.Main.Error("tray toggle failed", "field", field, "error", err)
+		return
+	}
+	setChecked(item, newValue)
+}
+
+// toggleConfig sends a PUT /api/config with a single toggled field.
+func (tm *TrayManager) toggleConfig(field string, value bool) error {
+	body := fmt.Sprintf(`{%q: %t}`, field, value)
+	req, err := http.NewRequest("PUT", tm.serverURL+"/api/config", strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if tm.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+tm.apiKey)
+	}
+	resp, err := tm.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("config PUT returned %d", resp.StatusCode)
+	}
+	return nil
 }
