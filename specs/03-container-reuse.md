@@ -1,7 +1,7 @@
 # Sandbox Reuse
 
-**Status:** Not started | **Date:** 2026-03-21
-**Depends on:** [M1: Pluggable Sandbox Backends](01-sandbox-backends.md) — complete (v0.0.6)
+**Status:** Not started
+**Depends on:** [M1: Pluggable Sandbox Backends](01-sandbox-backends.md) — complete
 
 ## Problem
 
@@ -161,15 +161,29 @@ accepts prompts via stdin/socket — which Claude CLI does not support.
 
 **Verdict:** Fundamentally incompatible with the current architecture.
 
-### Strategy D: Hybrid (Recommended)
+### Strategy D: Per-Task Worker (Recommended)
 
-Combine strategies based on mount profile:
+Each task gets a single long-lived container that serves **all** its agent
+invocations — implementation turns, title generation, oversight summaries,
+and commit messages. The container is created at the task's first turn and
+destroyed when the task completes or is cancelled.
 
 | Profile | Strategy | Rationale |
 |---------|----------|-----------|
-| A (Implementation) | Long-lived per-task worker | Eliminates per-turn container churn; worktree mounts fixed per task |
-| B (Refinement/Ideation) | Ephemeral (no change) | Infrequent; each run is independent |
-| C (Title/Oversight/Commit) | Shared long-lived worker | Highest frequency, identical mounts, biggest startup savings |
+| A (Implementation) | Per-task worker | Eliminates per-turn container churn; worktree mounts fixed per task |
+| B (Refinement/Ideation) | Ephemeral (no change) | Infrequent; each run is independent; different workspace mount mode |
+| C (Title/Oversight/Commit) | **Per-task worker** (same container as A) | Clean context isolation between tasks; no cross-task session leakage |
+
+**Why not a shared aux worker for Profile C?** A shared container serving
+title/oversight/commit for multiple tasks risks session state leakage
+(Claude CLI writes to `~/.claude/` inside the container), accumulated temp
+files, and stale caches affecting unrelated tasks. Per-task workers provide
+complete isolation with the same startup savings (the container already exists
+for implementation turns).
+
+**Tradeoff:** Tasks that only run auxiliary agents (e.g. a title-only
+re-generation on a completed task) still create an ephemeral container. This
+is acceptable — these are rare, and the ephemeral fallback is always available.
 
 ---
 
@@ -229,7 +243,7 @@ to later — they add significant complexity for diminishing returns.
 ### Architecture
 
 The first implementation targets `LocalBackend` (`internal/sandbox/local.go`). The
-backend tracks two kinds of workers alongside ephemeral containers:
+backend tracks per-task workers alongside ephemeral containers:
 
 ```go
 // internal/sandbox/local.go (extend existing LocalBackend)
@@ -237,107 +251,83 @@ backend tracks two kinds of workers alongside ephemeral containers:
 type LocalBackend struct {
     command string // "podman" or "docker" (existing field)
 
-    // Worker management (container reuse optimization)
-    auxWorkers   map[sandbox.Type]*auxWorker // shared Profile C workers
-    auxWorkersMu sync.Mutex
+    // Per-task worker containers (reuse optimization)
+    taskWorkers   map[uuid.UUID]*taskWorker
+    taskWorkersMu sync.Mutex
 
-    implWorkers   map[uuid.UUID]*implWorker // per-task Profile A workers
-    implWorkersMu sync.Mutex
-
-    enableAuxWorkers  bool // WALLFACER_AUX_WORKERS (default true)
-    enableImplWorkers bool // WALLFACER_IMPL_WORKERS (default true)
+    enableTaskWorkers bool // WALLFACER_TASK_WORKERS (default true)
 }
 ```
 
-When `Launch()` is called, the backend decides the execution strategy based on the
-container spec's mount profile and configuration:
+When `Launch()` is called, the backend checks whether a worker exists for the
+task. The task ID is available via the container spec's labels
+(`wallfacer.task-id`):
 
 ```go
 func (b *LocalBackend) Launch(ctx context.Context, spec sandbox.ContainerSpec) (sandbox.Handle, error) {
-    profile := spec.MountProfile() // A, B, or C based on spec shape
+    taskID := spec.Labels["wallfacer.task-id"]
 
-    switch {
-    case profile == ProfileC && b.enableAuxWorkers:
-        return b.launchViaAuxWorker(ctx, spec)
-    case profile == ProfileA && b.enableImplWorkers:
-        return b.launchViaImplWorker(ctx, spec)
-    default:
-        return b.launchEphemeral(ctx, spec) // current behavior
+    if taskID != "" && b.enableTaskWorkers {
+        return b.launchViaTaskWorker(ctx, spec, taskID)
     }
+    return b.launchEphemeral(ctx, spec) // current behavior
 }
 ```
 
 The returned `Handle` is identical regardless of execution strategy — the runner
 never knows whether the container was ephemeral or a worker exec.
 
-### Profile C: Shared Auxiliary Worker
+### Per-Task Worker
 
-A single long-lived container per sandbox type serves all title, oversight, and commit
-message invocations.
-
-```
-Server Start
-  → podman create --name wallfacer-aux-claude \
-      --entrypoint '["sleep", "infinity"]' \
-      -v claude-config:/home/claude/.claude \
-      --env-file ~/.wallfacer/.env \
-      --network host \
-      wallfacer-claude:latest
-  → podman start wallfacer-aux-claude
-
-Title/Oversight/Commit invocation (via Launch → launchViaAuxWorker):
-  → podman exec wallfacer-aux-claude \
-      /usr/local/bin/entrypoint.sh \
-      -p "<prompt>" --verbose --output-format stream-json
-
-Server Shutdown:
-  → podman rm -f wallfacer-aux-claude
-```
-
-**Concurrency:** Multiple `podman exec` processes can run concurrently in the same
-container. Claude CLI's session state in `claude-config` uses file-level locking. If
-contention is observed, serialize access with a `sync.Mutex` in the `auxWorker` — since
-auxiliary agents are fast (5–30 s), FIFO queuing is acceptable.
-
-**Handle state mapping:** The `Handle` returned by `launchViaAuxWorker` wraps the
-`podman exec` process. State transitions work the same as ephemeral handles:
-`Creating` (exec starting) → `Running` → `Streaming` → `Stopped`/`Failed`.
-
-### Profile A: Per-Task Implementation Worker
-
-Instead of creating a new container each turn, create a long-lived worker per task at
-first turn and reuse it across the turn loop.
+Each task gets a single long-lived container at its first invocation. All
+subsequent invocations for the same task (implementation turns, title, oversight,
+commit message) reuse the same container via `podman exec`.
 
 ```
-Task starts (first turn):
-  → podman create --name wallfacer-impl-<uuid8> \
+Task starts (first invocation — implementation, title, etc.):
+  → podman create --name wallfacer-task-<uuid8> \
       --entrypoint '["sleep", "infinity"]' \
       -v claude-config:/home/claude/.claude \
       --mount type=bind,src=<worktree>,dst=/workspace/<repo> \
       --mount type=bind,src=<repo>/.git,dst=<repo>/.git \
       ... (board context, instructions, sibling mounts)
       wallfacer-claude:latest
-  → podman start wallfacer-impl-<uuid8>
+  → podman start wallfacer-task-<uuid8>
 
-Each turn (via Launch → launchViaImplWorker):
+Each subsequent invocation (via Launch → launchViaTaskWorker):
   → (refresh board.json on host — visible via bind mount)
-  → podman exec wallfacer-impl-<uuid8> \
+  → podman exec wallfacer-task-<uuid8> \
       /usr/local/bin/entrypoint.sh \
-      -p "<prompt>" --resume <sessionID> --verbose --output-format stream-json
+      -p "<prompt>" [--resume <sessionID>] --verbose --output-format stream-json
 
 Task completes / cancelled:
-  → podman rm -f wallfacer-impl-<uuid8>
+  → podman rm -f wallfacer-task-<uuid8>
 ```
 
-**Board context refresh:** Board context is mounted as a bind mount from a host directory.
-Before each turn, the host writes an updated `board.json` to this directory. The container
-sees the update immediately via the bind mount — no container restart needed.
+**Context isolation:** Since the container is scoped to a single task, there is
+no cross-task session leakage, no stale caches from unrelated tasks, and no
+concurrency contention on `claude-config`. Each task has a clean environment.
 
-**Sibling worktree mounts:** Sibling task worktrees are mounted read-only at container
-creation time. New sibling tasks started after the container was created will not be
-visible. This is acceptable — the board.json manifest still lists them, and the agent
-can reference their prompts/status even without filesystem access. If full sibling
-visibility is required, the worker must be recreated when the sibling set changes (rare).
+**Profile C invocations (title/oversight/commit):** These run in the same
+per-task container. They don't need workspace mounts themselves, but having them
+is harmless — the container already has them for implementation turns. The
+benefit is avoiding a separate container lifecycle for these short-lived agents.
+
+**Fallback:** Invocations without a task ID (e.g. ideation, refinement) use
+ephemeral containers as before.
+
+**Handle state mapping:** The `Handle` returned by `launchViaTaskWorker` wraps
+the `podman exec` process. State transitions work the same as ephemeral handles:
+`Creating` (exec starting) → `Running` → `Streaming` → `Stopped`/`Failed`.
+
+**Board context refresh:** Board context is mounted as a bind mount from a host
+directory. Before each turn, the host writes an updated `board.json` to this
+directory. The container sees the update immediately — no restart needed.
+
+**Sibling worktree mounts:** Sibling task worktrees are mounted read-only at
+container creation time. New sibling tasks started after the container was
+created will not be visible. This is acceptable — `board.json` still lists them,
+and the agent can reference their prompts/status even without filesystem access.
 
 ### Worktree Impact
 
@@ -368,34 +358,21 @@ worker's bind mount still points to the same path, so no worker restart is neede
 ```go
 // internal/sandbox/worker.go
 
-// auxWorker manages a long-lived container that serves auxiliary agent
-// invocations (title, oversight, commit message) via podman exec.
-type auxWorker struct {
+// taskWorker manages a long-lived per-task container that serves all agent
+// invocations for that task (implementation turns, title, oversight, commit
+// message) via podman exec.
+type taskWorker struct {
     mu            sync.Mutex
     command       string          // container runtime binary
     containerName string
     spec          ContainerSpec   // create-mode spec (no --rm, sleep entrypoint)
     alive         bool
-}
-
-func (w *auxWorker) ensureRunning(ctx context.Context) error
-func (w *auxWorker) exec(ctx context.Context, cmd []string) (Handle, error)
-func (w *auxWorker) stop()
-
-// implWorker manages a long-lived per-task container that serves
-// implementation turns via podman exec.
-type implWorker struct {
-    mu            sync.Mutex
-    command       string
-    containerName string
-    spec          ContainerSpec
-    alive         bool
     taskID        uuid.UUID
 }
 
-func (w *implWorker) ensureRunning(ctx context.Context) error
-func (w *implWorker) exec(ctx context.Context, cmd []string) (Handle, error)
-func (w *implWorker) stop()
+func (w *taskWorker) ensureRunning(ctx context.Context) error
+func (w *taskWorker) exec(ctx context.Context, cmd []string) (Handle, error)
+func (w *taskWorker) stop()
 ```
 
 Workers call `podman`/`docker` directly via `cmdexec` — they are implementation
@@ -403,7 +380,7 @@ details of `LocalBackend`, not `Backend` interface methods.
 
 ### Health Checks and Recovery
 
-`auxWorker.ensureRunning()`:
+`taskWorker.ensureRunning()`:
 1. If `alive`, check `podman inspect --format '{{.State.Running}}' <name>` — if true, return nil
 2. `podman rm -f <name>` — clean up dead container
 3. `podman create <name> ...` + `podman start <name>`
@@ -414,27 +391,16 @@ optimization and falls back to ephemeral `podman run --rm`.
 
 ### ContainerSpec Changes
 
-`ContainerSpec` needs a method to identify its mount profile so `LocalBackend.Launch()`
-can route to the right strategy:
-
-```go
-// MountProfile returns the mount profile for this spec based on its shape.
-// Profile A: has worktree bind mounts (implementation/test)
-// Profile B: has workspace read-only mounts (refinement/ideation)
-// Profile C: minimal, claude-config only (title/oversight/commit)
-func (s ContainerSpec) MountProfile() MountProfile
-```
-
-Alternatively, the caller can pass a hint via a label or a new field. The profile
-detection should be simple — Profile A has RW worktree mounts, Profile C has no
-workspace mounts at all.
+No new methods needed on `ContainerSpec`. The task ID is already present as a
+label (`wallfacer.task-id`) on every task-scoped container spec. `Launch()`
+reads this label to decide whether to route through a per-task worker. Specs
+without a task ID label (ideation, refinement) use ephemeral containers.
 
 ### Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WALLFACER_AUX_WORKERS` | `true` | Enable shared auxiliary worker containers |
-| `WALLFACER_IMPL_WORKERS` | `true` | Enable per-task implementation workers |
+| `WALLFACER_TASK_WORKERS` | `true` | Enable per-task worker containers |
 
 When disabled, `LocalBackend.Launch()` always uses ephemeral containers. Future backends
 will have their own reuse configuration as appropriate to their runtime model.
@@ -444,29 +410,28 @@ will have their own reuse configuration as appropriate to their runtime model.
 ## Implementation Plan
 
 M1 (Pluggable Sandbox Backends) is complete. `LocalBackend` is in `internal/sandbox/local.go`.
+M2.5 (Multi-Workspace Groups) is complete — `activeGroups` and per-task store resolution are in place, so workers can be scoped per workspace group if needed.
 
-### Phase 1: Auxiliary Workers (Profile C)
+### Phase 1: Per-Task Worker Foundation
 
-1. Add `auxWorker` type in `internal/sandbox/worker.go`
+1. Add `taskWorker` type in `internal/sandbox/worker.go`
 2. Implement `ensureRunning`, `exec` (returns `Handle`), `stop`, health check
-3. Add `MountProfile()` to `ContainerSpec` in `internal/sandbox/spec.go` for routing decisions
-4. Wire `LocalBackend.Launch()` in `internal/sandbox/local.go` to route Profile C specs through aux workers
-5. Add integration test: launch worker, exec title generation, verify output matches ephemeral
-6. Feature-flagged behind `WALLFACER_AUX_WORKERS`
+3. Wire `LocalBackend.Launch()` in `internal/sandbox/local.go` to route task-scoped specs through per-task workers
+4. Add integration test: launch worker, exec implementation turn, verify output matches ephemeral
+5. Feature-flagged behind `WALLFACER_TASK_WORKERS`
 
-### Phase 2: Auxiliary Workers — Full Rollout
+### Phase 2: Worker Lifecycle Management
 
-1. Verify oversight and commit message work through aux worker (they should — same Profile C)
-2. Test concurrent exec behavior under load (multiple tasks completing simultaneously)
-3. Add lifecycle timing metrics (worker create, exec, health check)
+1. Handle worker cleanup on task completion/cancellation/failure (registered via runner cleanup hooks)
+2. Handle worker recreation on sync operations (kill before rebase, recreate on next turn)
+3. Verify title, oversight, and commit message agents work through the per-task worker
+4. Test concurrent tasks with separate workers under load
 
-### Phase 3: Implementation Workers (Profile A)
+### Phase 3: Robustness
 
-1. Add `implWorker` type for per-task long-lived containers
-2. Wire `LocalBackend.Launch()` to route Profile A specs through impl workers
-3. Handle worker recreation on sync operations (kill before rebase, recreate on next turn)
-4. Handle worker cleanup on task completion/cancellation/failure
-5. Feature-flagged behind `WALLFACER_IMPL_WORKERS`
+1. Add health check recovery (detect dead workers, recreate transparently)
+2. Add lifecycle timing metrics (worker create, exec, health check)
+3. Graceful degradation: if worker creation fails, fall back to ephemeral
 
 ### Phase 4: Filesystem Reuse (Optional Follow-Up)
 
@@ -484,15 +449,14 @@ M1 (Pluggable Sandbox Backends) is complete. `LocalBackend` is in `internal/sand
 
 ## Performance Expectations
 
-| Scenario | Current (ephemeral) | With workers |
+| Scenario | Current (ephemeral) | With per-task workers |
 |----------|-------------------|--------------|
-| Single auxiliary invocation | 0.5–2 s startup + agent time | ~50–100 ms exec + agent time |
-| 3-turn implementation task | 3 × (0.5–2 s) startup | 1 × (0.5–2 s) create + 3 × ~100 ms exec |
-| 5 concurrent tasks, each with title + 3 turns + oversight + commit | ~30 container cycles | ~5 impl creates + ~15 exec + shared aux exec |
+| 3-turn implementation task + title + oversight + commit | 6 × (0.5–2 s) startup | 1 × (0.5–2 s) create + 6 × ~100 ms exec |
+| 5 concurrent tasks, each 6 invocations | ~30 container cycles | 5 creates + 30 exec calls |
 
-The biggest win is for auxiliary agents: title + oversight + commit currently cost
-~1.5–6 s of pure container overhead per task. With a shared worker, this drops to
-~150–300 ms total.
+Per task, container overhead drops from ~3–12 s (6 ephemeral launches) to
+~0.5–2 s (1 create) + ~0.6 s (6 execs). The biggest win is eliminating
+per-turn startup for auto-continue loops (3+ turns).
 
 ---
 
@@ -500,9 +464,8 @@ The biggest win is for auxiliary agents: title + oversight + commit currently co
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Worker container dies mid-task | Aux/impl invocation fails | `ensureRunning` detects and recreates; fallback to ephemeral |
-| Filesystem state accumulation | Stale caches, temp files affect behavior | Profile C has no workspace mounts; Profile A workers are per-task and short-lived |
-| `claude-config` contention | Concurrent exec corrupts session state | Claude CLI uses file locking; add `sync.Mutex` if needed |
+| Worker container dies mid-task | Agent invocation fails | `ensureRunning` detects and recreates; fallback to ephemeral |
+| Filesystem state accumulation | Stale caches, temp files affect behavior | Workers are per-task and short-lived; no cross-task contamination |
 | `podman exec` not available | Some container runtimes may not support exec | Feature flag disables workers; fallback to ephemeral |
-| Stale sibling mounts (Profile A) | New sibling tasks not visible in container | Board.json still lists them; accept limitation or recreate worker |
+| Stale sibling mounts | New sibling tasks not visible in container | Board.json still lists them; accept limitation or recreate worker |
 | Backend interface change | If `Backend` interface changes, workers need updating | Workers are internal to each backend; no interface coupling |
