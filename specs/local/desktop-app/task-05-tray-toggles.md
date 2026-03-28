@@ -1,6 +1,6 @@
 # Task 5: System Tray — Automation Toggles
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 4
 **Phase:** System tray
 **Effort:** Medium
