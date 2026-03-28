@@ -1,6 +1,6 @@
 # Task 1: Add WebSocket Dependency and Inline PTY Helper
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Phase 1 — Single Terminal Session
 **Effort:** Small
