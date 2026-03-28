@@ -90,7 +90,8 @@ Full milestone dependency graph showing how everything relates.
 M2 (storage interface) ──▶ M6a (tenant filesystem) ──▶ M6b (K8s sandbox) ──▶ M8 (multi-tenant)
 M1 (sandbox interface) ─────────────────────────────▶ M6b                        ▲
 M2 (storage interface) ──▶ M2 cloud (PG, S3) ───────────────────────────────────┤
-M8a (authentication) ───────────────────────────────────────────────────────────┘
+M8a (authentication) ───────────────────────────────────────────────────────────┤
+M6c (cloud infra: DO, AWS, GCP, Alibaba, self-hosted IaC) ─────────────────────┘
 ```
 
 ## Milestones
@@ -154,8 +155,9 @@ After M3 (per-task workers complete). Independent of M4–M8.
 |------|--------|----------|
 | [06a-tenant-filesystem.md](06a-tenant-filesystem.md) | Not started | Per-tenant persistent volume, repo provisioner (clone/fetch/creds), workspace group cloud mapping, config persistence across hibernate/wake |
 | [06b-k8s-sandbox.md](06b-k8s-sandbox.md) | Not started | `K8sBackend` implementing `sandbox.Backend` — K8s Jobs with PVC mounts, pod log streaming, exec |
+| [06c-cloud-infrastructure.md](06c-cloud-infrastructure.md) | Not started | Per-provider IaC modules (DO, AWS, GCP, Alibaba, self-hosted), base K8s manifests, deployment docs |
 
-M6a depends on M1 + M2. M6b depends on M1 + M6a. Both feed into M8.
+M6a depends on M1 + M2. M6b depends on M1 + M6a. M6c depends on M6a + M6b + M2 cloud + M8. All feed into M8.
 
 ## Independent Enhancements
 
@@ -177,4 +179,6 @@ M6a depends on M1 + M2. M6b depends on M1 + M6a. Both feed into M8.
 - **M6b after M6a:** K8s sandbox backend consumes the tenant volume layout. Without M6a, there's nothing to mount.
 - **M2 cloud tasks parallel with M6a/M6b:** Task data storage (PG + S3) is independent of the filesystem layer. Can be built concurrently.
 - **M7 after M4–M5:** Desktop app ships with file explorer + terminal already built in. Fully independent — can move earlier.
-- **M8 last:** Capstone wiring M6a (tenant FS) + M6b (K8s sandbox) + M2 cloud (PG/S3) + control plane (auth, provisioning).
+- **M6c after M6a+M6b+M8:** Cloud infrastructure IaC is a leaf — it provisions the managed services that the application layer consumes. Can draft modules early but end-to-end testing requires all cloud milestones. DO first (primary target), then self-hosted, then enterprise clouds.
+- **M8a before M8:** Authentication is independently useful (replaces static API key) and required by M8.
+- **M8 last:** Capstone wiring M6a (tenant FS) + M6b (K8s sandbox) + M2 cloud (PG/S3) + M8a (auth) + control plane (provisioning).
