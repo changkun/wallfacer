@@ -177,6 +177,18 @@ The spec originated as a hybrid design with two worker types: **shared aux worke
 
 5. **Dependency caches opt-in.** Originally unscoped. Made opt-in (`WALLFACER_DEPENDENCY_CACHES=false` default) because persistent caches can affect reproducibility.
 
+## Bugs Found and Fixed
+
+1. **`BuildCreate()` entrypoint format** — `--entrypoint '["sleep","infinity"]'` (JSON array) was not parsed correctly by podman when passed via Go's `exec.Command`. Fix: use `--entrypoint sleep` as a plain string with `infinity` as the CMD argument after the image.
+
+2. **Container name mismatch** — `BuildCreate()` used the spec's original name (e.g., `wallfacer-title-xxx`) for `--name`, but `ensureRunning()` used the worker name (`wallfacer-worker-xxx`) for `podman start`. The container was created with one name and started with another → exit 125. Fix: override `spec.Name` with the worker name before calling `BuildCreate()`. Also clean up the container on start failure to avoid leaving "Created" containers.
+
+3. **`podman exec` skips ENTRYPOINT** — `podman exec` does not invoke the image's ENTRYPOINT automatically (only `podman run` does). The agent command (`-p "..."`) was passed directly → "executable `-p` not found". Fix: `exec` now explicitly calls `/usr/local/bin/entrypoint.sh` before the command args. The entrypoint path is configurable per worker.
+
+4. **Premature worker cleanup** — `StopTaskWorker` was deferred in `RunBackground`, so it ran when `Run()` returned. But title, oversight, and commit agents launch as separate background goroutines AFTER `Run()`. Each found no worker and created a new one, inflating the create count. Fix: moved cleanup to `CleanupWorktrees` (commit pipeline) so the worker lives until all agents finish.
+
+5. **Worker leak on terminal state shortcuts** — Some paths to Done skip the commit pipeline (idea-agent completion, auto-submit without session). Workers leaked because `CleanupWorktrees` was never called. Fix: added `StopTaskWorker` to all `ForceUpdateTaskStatus → Done` paths and to archive handlers as a safety net.
+
 ## Future Work
 
 - **Cleanup task (task-11):** After production verification (~2 weeks), remove `WALLFACER_TASK_WORKERS` flag and ephemeral fallback. Workers become the only strategy for task-scoped containers.
