@@ -183,10 +183,20 @@ function makeContext(opts = {}) {
       return Promise.resolve(response);
     },
     fetch: function () {
-      return Promise.resolve({ ok: true, status: 200, headers: new Map(), text: function () { return Promise.resolve(""); } });
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: new Map(),
+        text: function () {
+          return Promise.resolve("");
+        },
+      });
     },
     escapeHtml: function (s) {
-      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
     },
     extToLang: function () {
       return null;
@@ -235,8 +245,18 @@ describe("_buildChildNodes", () => {
     const { win } = makeContext();
     const entries = [
       { name: "src", type: "dir", modified: "2025-01-01T00:00:00Z" },
-      { name: "README.md", type: "file", size: 100, modified: "2025-01-01T00:00:00Z" },
-      { name: ".gitignore", type: "file", size: 50, modified: "2025-01-01T00:00:00Z" },
+      {
+        name: "README.md",
+        type: "file",
+        size: 100,
+        modified: "2025-01-01T00:00:00Z",
+      },
+      {
+        name: ".gitignore",
+        type: "file",
+        size: 50,
+        modified: "2025-01-01T00:00:00Z",
+      },
     ];
 
     const nodes = win._buildChildNodes(entries, "/ws/project", "/ws/project");
@@ -278,10 +298,28 @@ describe("_getVisibleNodes", () => {
 
   it("includes children of expanded nodes in DFS order", () => {
     const { win } = makeContext();
-    const child1 = { path: "/a/x", name: "x", type: "file", expanded: false, children: null };
-    const child2 = { path: "/a/y", name: "y", type: "file", expanded: false, children: null };
+    const child1 = {
+      path: "/a/x",
+      name: "x",
+      type: "file",
+      expanded: false,
+      children: null,
+    };
+    const child2 = {
+      path: "/a/y",
+      name: "y",
+      type: "file",
+      expanded: false,
+      children: null,
+    };
     const roots = [
-      { path: "/a", name: "a", type: "dir", expanded: true, children: [child1, child2] },
+      {
+        path: "/a",
+        name: "a",
+        type: "dir",
+        expanded: true,
+        children: [child1, child2],
+      },
       { path: "/b", name: "b", type: "dir", expanded: false, children: null },
     ];
     const visible = win._getVisibleNodes(roots);
@@ -291,9 +329,21 @@ describe("_getVisibleNodes", () => {
 
   it("does not include children of collapsed nodes", () => {
     const { win } = makeContext();
-    const child = { path: "/a/x", name: "x", type: "file", expanded: false, children: null };
+    const child = {
+      path: "/a/x",
+      name: "x",
+      type: "file",
+      expanded: false,
+      children: null,
+    };
     const roots = [
-      { path: "/a", name: "a", type: "dir", expanded: false, children: [child] },
+      {
+        path: "/a",
+        name: "a",
+        type: "dir",
+        expanded: false,
+        children: [child],
+      },
     ];
     const visible = win._getVisibleNodes(roots);
     expect(visible).toHaveLength(1);
@@ -303,24 +353,60 @@ describe("_getVisibleNodes", () => {
 describe("_findParent", () => {
   it("returns the parent node", () => {
     const { win } = makeContext();
-    const child = { path: "/a/x", name: "x", type: "file", expanded: false, children: null };
-    const root = { path: "/a", name: "a", type: "dir", expanded: true, children: [child] };
+    const child = {
+      path: "/a/x",
+      name: "x",
+      type: "file",
+      expanded: false,
+      children: null,
+    };
+    const root = {
+      path: "/a",
+      name: "a",
+      type: "dir",
+      expanded: true,
+      children: [child],
+    };
     const found = win._findParent([root], child);
     expect(found).toBe(root);
   });
 
   it("returns null for root nodes", () => {
     const { win } = makeContext();
-    const root = { path: "/a", name: "a", type: "dir", expanded: false, children: null };
+    const root = {
+      path: "/a",
+      name: "a",
+      type: "dir",
+      expanded: false,
+      children: null,
+    };
     const found = win._findParent([root], root);
     expect(found).toBeNull();
   });
 
   it("finds deeply nested parents", () => {
     const { win } = makeContext();
-    const grandchild = { path: "/a/b/c", name: "c", type: "file", expanded: false, children: null };
-    const child = { path: "/a/b", name: "b", type: "dir", expanded: true, children: [grandchild] };
-    const root = { path: "/a", name: "a", type: "dir", expanded: true, children: [child] };
+    const grandchild = {
+      path: "/a/b/c",
+      name: "c",
+      type: "file",
+      expanded: false,
+      children: null,
+    };
+    const child = {
+      path: "/a/b",
+      name: "b",
+      type: "dir",
+      expanded: true,
+      children: [grandchild],
+    };
+    const root = {
+      path: "/a",
+      name: "a",
+      type: "dir",
+      expanded: true,
+      children: [child],
+    };
     const found = win._findParent([root], grandchild);
     expect(found).toBe(child);
   });
@@ -341,11 +427,10 @@ describe("_classifyFileResponse", () => {
 
   it("classifies JSON with binary:true as binary", () => {
     const { win } = makeContext();
-    const result = win._classifyFileResponse(
-      200,
-      "application/json",
-      { binary: true, size: 1024 },
-    );
+    const result = win._classifyFileResponse(200, "application/json", {
+      binary: true,
+      size: 1024,
+    });
     expect(result.type).toBe("binary");
     expect(result.size).toBe(1024);
   });
@@ -372,9 +457,9 @@ describe("_classifyFileResponse", () => {
 describe("_relativePath", () => {
   it("strips workspace prefix from path", () => {
     const { win } = makeContext();
-    expect(win._relativePath("/home/user/project/src/main.go", "/home/user/project")).toBe(
-      "src/main.go",
-    );
+    expect(
+      win._relativePath("/home/user/project/src/main.go", "/home/user/project"),
+    ).toBe("src/main.go");
   });
 
   it("returns full path if workspace is not a prefix", () => {

@@ -157,7 +157,11 @@ function _expandNode(node) {
 
   api(url)
     .then(function (entries) {
-      node.children = _buildChildNodes(entries || [], node.path, node.workspace);
+      node.children = _buildChildNodes(
+        entries || [],
+        node.path,
+        node.workspace,
+      );
       node.expanded = true;
       node.loading = false;
       _renderTree();
