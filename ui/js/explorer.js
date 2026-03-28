@@ -176,19 +176,25 @@ function _expandNode(node) {
     });
 }
 
-// Re-fetch children for every expanded node in the tree so newly created
-// (or deleted) files become visible without a full tree reload.
+// Re-fetch children for every expanded directory so newly created (or
+// deleted) files become visible without a full tree reload.  Collects all
+// expanded nodes first, then kicks off parallel fetches — avoids the race
+// where _expandNode replaces children before the recursive walk reaches them.
 function _refreshExpandedNodes() {
-  function walk(nodes) {
+  var queue = [];
+  function collect(nodes) {
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
       if (n.expanded && n.type === "dir") {
-        _expandNode(n); // re-fetches children and re-renders
-        if (n.children) walk(n.children);
+        queue.push(n);
+        if (n.children) collect(n.children);
       }
     }
   }
-  walk(_explorerRoots);
+  collect(_explorerRoots);
+  for (var i = 0; i < queue.length; i++) {
+    _expandNode(queue[i]);
+  }
 }
 
 function _collapseNode(node) {
