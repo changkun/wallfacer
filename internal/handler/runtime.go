@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -23,6 +24,7 @@ type runtimeStatusResponse struct {
 	TaskStates       map[store.TaskStatus]int `json:"task_states"`
 	ActiveContainers int                      `json:"active_containers"`
 	ContainerCircuit containerCircuitStatus   `json:"container_circuit"`
+	WorkerStats      sandbox.WorkerStatsInfo  `json:"worker_stats"`
 	Timestamp        time.Time                `json:"timestamp"`
 }
 
@@ -74,6 +76,7 @@ func (h *Handler) GetRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 			State:    h.runner.ContainerCircuitState(),
 			Failures: h.runner.ContainerCircuitFailures(),
 		},
-		Timestamp: time.Now().UTC(),
+		WorkerStats: h.runner.WorkerStats(),
+		Timestamp:   time.Now().UTC(),
 	})
 }

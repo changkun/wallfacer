@@ -137,3 +137,32 @@ func TestGetRuntimeStatus_TimestampPresent(t *testing.T) {
 		t.Error("expected non-zero timestamp")
 	}
 }
+
+// TestDebugRuntimeIncludesWorkerStats verifies the runtime endpoint includes
+// the worker_stats field.
+func TestDebugRuntimeIncludesWorkerStats(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/debug/runtime", nil)
+	w := httptest.NewRecorder()
+	h.GetRuntimeStatus(w, req)
+
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(w.Body).Decode(&raw); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	ws, ok := raw["worker_stats"]
+	if !ok {
+		t.Fatal("expected worker_stats in runtime response")
+	}
+	var stats struct {
+		Enabled       bool `json:"enabled"`
+		ActiveWorkers int  `json:"active_workers"`
+	}
+	if err := json.Unmarshal(ws, &stats); err != nil {
+		t.Fatalf("unmarshal worker_stats: %v", err)
+	}
+	// Default test handler has no worker manager, so stats should be zero.
+	if stats.ActiveWorkers != 0 {
+		t.Errorf("expected 0 active workers, got %d", stats.ActiveWorkers)
+	}
+}

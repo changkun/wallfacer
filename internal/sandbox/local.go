@@ -154,6 +154,17 @@ func (b *LocalBackend) ShutdownWorkers() {
 	}
 }
 
+// WorkerStats returns aggregate statistics about the worker lifecycle.
+func (b *LocalBackend) WorkerStats() WorkerStatsInfo {
+	b.taskWorkersMu.Lock()
+	active := len(b.taskWorkers)
+	b.taskWorkersMu.Unlock()
+	return WorkerStatsInfo{
+		Enabled:       b.enableTaskWorkers,
+		ActiveWorkers: active,
+	}
+}
+
 // List returns info about all running wallfacer containers by shelling out
 // to `<runtime> ps -a --filter name=wallfacer --format json`.
 func (b *LocalBackend) List(ctx context.Context) ([]ContainerInfo, error) {

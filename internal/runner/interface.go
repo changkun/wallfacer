@@ -33,6 +33,7 @@ type Interface interface {
 	KillContainer(taskID uuid.UUID)
 	KillRefineContainer(taskID uuid.UUID)
 	StopTaskWorker(taskID uuid.UUID)
+	WorkerStats() sandbox.WorkerStatsInfo
 
 	// Container circuit breaker.
 	ContainerCircuitAllow() bool

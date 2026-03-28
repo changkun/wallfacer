@@ -1,6 +1,6 @@
 # Task 10: Worker Lifecycle Stats in Settings Panel
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 7
 **Phase:** 3 (Robustness)
 **Effort:** Small

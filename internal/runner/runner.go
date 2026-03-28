@@ -714,6 +714,15 @@ func (r *Runner) KillContainer(taskID uuid.UUID) {
 	}
 }
 
+// WorkerStats returns aggregate worker lifecycle statistics. Returns an empty
+// result when the backend does not support worker management.
+func (r *Runner) WorkerStats() sandbox.WorkerStatsInfo {
+	if wm, ok := r.backend.(sandbox.WorkerManager); ok {
+		return wm.WorkerStats()
+	}
+	return sandbox.WorkerStatsInfo{}
+}
+
 // StopTaskWorker stops the per-task worker container for the given task, if
 // the backend supports worker management. No-op when the backend does not
 // implement sandbox.WorkerManager or when no worker exists for the task.

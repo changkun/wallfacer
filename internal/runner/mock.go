@@ -130,6 +130,9 @@ func (m *MockRunner) KillContainer(taskID uuid.UUID) {
 // StopTaskWorker is a no-op in the mock.
 func (m *MockRunner) StopTaskWorker(_ uuid.UUID) {}
 
+// WorkerStats returns empty stats in the mock.
+func (m *MockRunner) WorkerStats() sandbox.WorkerStatsInfo { return sandbox.WorkerStatsInfo{} }
+
 // KillRefineContainer records a kill-refine-container call.
 func (m *MockRunner) KillRefineContainer(taskID uuid.UUID) {
 	m.mu.Lock()

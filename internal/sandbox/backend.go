@@ -72,6 +72,14 @@ type WorkerManager interface {
 	StopTaskWorker(taskID string)
 	// ShutdownWorkers stops all active task workers.
 	ShutdownWorkers()
+	// WorkerStats returns aggregate worker lifecycle statistics.
+	WorkerStats() WorkerStatsInfo
+}
+
+// WorkerStatsInfo holds aggregate worker lifecycle statistics.
+type WorkerStatsInfo struct {
+	Enabled       bool `json:"enabled"`
+	ActiveWorkers int  `json:"active_workers"`
 }
 
 // ContainerInfo holds runtime metadata about a container, used by List()
