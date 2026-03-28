@@ -1,6 +1,6 @@
 # Task 1: Add taskWorker Type
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** 1 (Per-Task Worker Foundation)
 **Effort:** Medium
