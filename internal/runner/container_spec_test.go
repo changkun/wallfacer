@@ -1,11 +1,15 @@
 package runner
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	"changkun.de/x/wallfacer/internal/sandbox"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 func TestContainerSpecBasicRoundTrip(t *testing.T) {
@@ -391,4 +395,56 @@ func ternary(cond bool, a, b string) string {
 		return a
 	}
 	return b
+}
+
+func TestCacheVolumeMountsPresent(t *testing.T) {
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, []byte("WALLFACER_DEPENDENCY_CACHES=true\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dataDir := t.TempDir()
+	s, err := store.NewFileStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	r := NewRunner(s, RunnerConfig{EnvFile: envFile})
+	spec := r.buildBaseContainerSpec("test-container", "", sandbox.Claude)
+
+	found := map[string]bool{}
+	for _, v := range spec.Volumes {
+		if v.Named && strings.HasPrefix(v.Host, "wallfacer-cache-") {
+			found[v.Container] = true
+		}
+	}
+	for _, want := range []string{"/home/claude/.npm", "/home/claude/.cache/pip", "/home/claude/.cargo/registry", "/home/claude/.cache/go-build"} {
+		if !found[want] {
+			t.Errorf("expected cache volume for %s", want)
+		}
+	}
+}
+
+func TestCacheVolumesNotPresentWhenDisabled(t *testing.T) {
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, []byte(""), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dataDir := t.TempDir()
+	s, err := store.NewFileStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	r := NewRunner(s, RunnerConfig{EnvFile: envFile})
+	spec := r.buildBaseContainerSpec("test-container", "", sandbox.Claude)
+
+	for _, v := range spec.Volumes {
+		if v.Named && strings.HasPrefix(v.Host, "wallfacer-cache-") {
+			t.Errorf("unexpected cache volume: %s → %s", v.Host, v.Container)
+		}
+	}
 }

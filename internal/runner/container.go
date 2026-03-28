@@ -293,10 +293,48 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.
 		Named:     true,
 	})
 	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)
+	spec.Volumes = r.appendDependencyCacheVolumes(spec.Volumes)
 	spec.Network = r.resolvedContainerNetwork()
 	spec.CPUs = r.resolvedContainerCPUs()
 	spec.Memory = r.resolvedContainerMemory()
 	return spec
+}
+
+// dependencyCacheVolumes are the common dependency cache directories
+// mounted as named volumes so warm caches persist across container lifetimes.
+var dependencyCacheVolumes = []struct {
+	suffix    string // volume name suffix (e.g. "npm")
+	container string // container path
+}{
+	{"npm", "/home/claude/.npm"},
+	{"pip", "/home/claude/.cache/pip"},
+	{"cargo", "/home/claude/.cargo/registry"},
+	{"go-build", "/home/claude/.cache/go-build"},
+}
+
+// appendDependencyCacheVolumes adds named volumes for dependency caches when
+// WALLFACER_DEPENDENCY_CACHES is enabled. Volume names include the workspace
+// key so different workspace groups don't share caches.
+func (r *Runner) appendDependencyCacheVolumes(volumes []sandbox.VolumeMount) []sandbox.VolumeMount {
+	if r.envFile == "" {
+		return volumes
+	}
+	cfg, err := envconfig.Parse(r.envFile)
+	if err != nil || !cfg.DependencyCaches {
+		return volumes
+	}
+	wsKey := r.currentWSKey()
+	if wsKey == "" {
+		wsKey = "default"
+	}
+	for _, cache := range dependencyCacheVolumes {
+		volumes = append(volumes, sandbox.VolumeMount{
+			Host:      "wallfacer-cache-" + cache.suffix + "-" + wsKey,
+			Container: cache.container,
+			Named:     true,
+		})
+	}
+	return volumes
 }
 
 // sandboxImageForSandbox derives the container image name for the given sandbox type.

@@ -51,6 +51,7 @@ type Config struct {
 	ContainerCPUs    string // WALLFACER_CONTAINER_CPUS   e.g. "2.0" (empty = no limit)
 	ContainerMemory  string // WALLFACER_CONTAINER_MEMORY e.g. "4g"  (empty = no limit)
 	TaskWorkers      bool   // WALLFACER_TASK_WORKERS ("true"/"false"), defaults to true when unset
+	DependencyCaches bool   // WALLFACER_DEPENDENCY_CACHES ("true"/"false"), defaults to false
 
 	Workspaces []string // WALLFACER_WORKSPACES (path-list separated absolute paths)
 }
@@ -87,6 +88,7 @@ var knownKeys = []string{
 	"WALLFACER_CONTAINER_CPUS",
 	"WALLFACER_CONTAINER_MEMORY",
 	"WALLFACER_TASK_WORKERS",
+	"WALLFACER_DEPENDENCY_CACHES",
 	"WALLFACER_WORKSPACES",
 }
 
@@ -177,6 +179,8 @@ func Parse(path string) (Config, error) {
 			cfg.ContainerMemory = v
 		case "WALLFACER_TASK_WORKERS":
 			cfg.TaskWorkers = v != "false"
+		case "WALLFACER_DEPENDENCY_CACHES":
+			cfg.DependencyCaches = v == "true"
 		case "WALLFACER_WORKSPACES":
 			cfg.Workspaces = ParseWorkspaces(v)
 		}

@@ -1,6 +1,6 @@
 # Task 9: Named Volume Caches for Dependencies (Optional)
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3
 **Phase:** 4 (Filesystem Reuse)
 **Effort:** Medium
