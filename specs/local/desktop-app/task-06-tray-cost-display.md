@@ -1,6 +1,6 @@
 # Task 6: System Tray — Cost and Stats Display
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 4
 **Phase:** System tray
 **Effort:** Small
