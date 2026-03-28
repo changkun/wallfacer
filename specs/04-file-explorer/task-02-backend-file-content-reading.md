@@ -1,0 +1,70 @@
+# Task 2: Backend File Content Reading
+
+**Status:** Todo
+**Depends on:** Task 1
+**Phase:** Phase 1 — Read-Only Browsing + Preview
+**Effort:** Medium
+
+## Goal
+
+Implement the `ExplorerReadFile` handler that returns file contents for preview, with binary detection and size limits. This completes the read-only backend API.
+
+## What to do
+
+1. Add to `internal/handler/explorer.go`:
+
+   a. `ExplorerReadFile(w http.ResponseWriter, r *http.Request)` handler:
+      - Parse query params: `path` (required), `workspace` (required)
+      - Validate workspace via `h.isAllowedWorkspace(workspace)`
+      - Validate path via `isWithinWorkspace(path, workspace)`
+      - `os.Stat()` to get file info; reject directories with 400
+      - Check file size against 2 MB limit (`2 * 1024 * 1024`); return 413 with `{"error": "file too large", "size": <n>, "max": 2097152}` if exceeded
+      - Read first 8192 bytes to detect binary (check for null bytes)
+      - If binary: return JSON `{"binary": true, "size": <n>}` with `Content-Type: application/json` and `X-File-Binary: true` header
+      - If text: read full file, set `Content-Type: text/plain; charset=utf-8`, write raw content
+      - Always set `X-File-Size: <bytes>` header
+
+   b. Binary detection helper:
+      ```go
+      func isBinaryContent(data []byte) bool {
+          for _, b := range data {
+              if b == 0 {
+                  return true
+              }
+          }
+          return false
+      }
+      ```
+
+2. Add the max file size constant to `internal/constants/` if appropriate, or define it locally in explorer.go.
+
+3. Register the route in `internal/apicontract/routes.go`:
+   ```go
+   {
+       Method:      http.MethodGet,
+       Pattern:     "/api/explorer/file",
+       Name:        "ExplorerReadFile",
+       Description: "Read file contents from a workspace",
+       Tags:        []string{"explorer"},
+   }
+   ```
+
+4. Run `make api-contract` to regenerate routes.
+
+## Tests
+
+Add to `internal/handler/explorer_test.go`:
+
+- `TestExplorerReadFile_TextFile` — create a text file, verify raw content returned with correct Content-Type and X-File-Size header
+- `TestExplorerReadFile_BinaryFile` — create file with null bytes, verify JSON response with `binary: true` and `X-File-Binary` header
+- `TestExplorerReadFile_LargeFile` — create file > 2 MB, verify 413 response with size info
+- `TestExplorerReadFile_NotFound` — verify 404 for non-existent file
+- `TestExplorerReadFile_Directory` — verify 400 when path points to a directory
+- `TestExplorerReadFile_OutsideWorkspace` — verify rejection when path escapes workspace boundary
+- `TestExplorerReadFile_MissingParams` — verify 400 when params are missing
+
+## Boundaries
+
+- Do NOT implement file writing (Task 7)
+- Do NOT add frontend code
+- Do NOT add caching — file reads are direct from disk; caching is a future optimization
