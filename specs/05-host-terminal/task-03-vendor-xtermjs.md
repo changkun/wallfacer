@@ -1,6 +1,6 @@
 # Task 3: Vendor xterm.js Assets
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Phase 1 — Single Terminal Session
 **Effort:** Small
