@@ -11,6 +11,7 @@ var _explorerStorageKeyWidth = "wallfacer-explorer-width";
 // --- Tree state ---
 var _explorerRoots = [];
 var _explorerLoaded = false;
+var _explorerRefreshTimer = null;
 
 // ---------------------------------------------------------------------------
 // Toggle & resize (Task 3)
@@ -34,6 +35,23 @@ function toggleExplorer() {
     } else {
       _refreshExpandedNodes();
     }
+    _startExplorerRefreshPoll();
+  } else {
+    _stopExplorerRefreshPoll();
+  }
+}
+
+function _startExplorerRefreshPoll() {
+  _stopExplorerRefreshPoll();
+  _explorerRefreshTimer = setInterval(function () {
+    if (_explorerLoaded) _refreshExpandedNodes();
+  }, 3000);
+}
+
+function _stopExplorerRefreshPoll() {
+  if (_explorerRefreshTimer) {
+    clearInterval(_explorerRefreshTimer);
+    _explorerRefreshTimer = null;
   }
 }
 
@@ -1033,21 +1051,10 @@ function _initExplorer() {
   _initExplorerResize();
   _initExplorerKeyboard();
 
-  // Refresh expanded directories when the user mouses into the panel,
-  // so files created in the terminal appear without a manual toggle.
-  var _refreshPending = false;
-  panel.addEventListener("mouseenter", function () {
-    if (!_explorerLoaded || _refreshPending) return;
-    _refreshPending = true;
-    setTimeout(function () {
-      _refreshPending = false;
-      _refreshExpandedNodes();
-    }, 300);
-  });
-
   // Load tree if panel is already visible
   if (panel.style.display !== "none") {
     _loadExplorerRoots();
+    _startExplorerRefreshPoll();
   }
 }
 
