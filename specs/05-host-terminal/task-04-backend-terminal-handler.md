@@ -1,6 +1,6 @@
 # Task 4: Backend Terminal WebSocket Handler
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 1, 2
 **Phase:** Phase 1 — Single Terminal Session
 **Effort:** Large
