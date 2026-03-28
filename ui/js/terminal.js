@@ -60,6 +60,20 @@ function initTerminal() {
       }
     }).observe(panel);
   }
+
+  // Wire terminal events once — they check _termWs on each invocation.
+  _term.onData(function (data) {
+    if (_termWs && _termWs.readyState === WebSocket.OPEN) {
+      _termWs.send(JSON.stringify({ type: "input", data: btoa(data) }));
+    }
+  });
+  _term.onResize(function (size) {
+    if (_termWs && _termWs.readyState === WebSocket.OPEN) {
+      _termWs.send(
+        JSON.stringify({ type: "resize", cols: size.cols, rows: size.rows }),
+      );
+    }
+  });
 }
 
 /**
@@ -122,22 +136,6 @@ function connectTerminal() {
   ws.onerror = function () {
     // Error details logged by the browser; onclose handles reconnection.
   };
-
-  // Relay keyboard input to the server.
-  _term.onData(function (data) {
-    if (_termWs && _termWs.readyState === WebSocket.OPEN) {
-      _termWs.send(JSON.stringify({ type: "input", data: btoa(data) }));
-    }
-  });
-
-  // Relay resize events to the server.
-  _term.onResize(function (size) {
-    if (_termWs && _termWs.readyState === WebSocket.OPEN) {
-      _termWs.send(
-        JSON.stringify({ type: "resize", cols: size.cols, rows: size.rows }),
-      );
-    }
-  });
 }
 
 /**
