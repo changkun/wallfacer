@@ -1,6 +1,6 @@
 # Task 5: Frontend Terminal Module
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 3
 **Phase:** Phase 1 — Single Terminal Session
 **Effort:** Medium
