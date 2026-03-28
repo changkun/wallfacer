@@ -174,6 +174,7 @@ async function fetchConfig() {
     updateAutomationActiveCount();
     if (typeof updateWatcherHealth === "function")
       updateWatcherHealth(cfg.watcher_health || []);
+    if (typeof reloadExplorerTree === "function") reloadExplorerTree();
   } catch (e) {
     console.error("fetchConfig:", e);
   }
