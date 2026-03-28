@@ -132,6 +132,18 @@ function makeDom() {
     createElementNS(_ns, tag) {
       return makeEl(tag);
     },
+    querySelector(sel) {
+      // Support class selectors by scanning the registry
+      const classMatch = sel.match(/^\.(.+)$/);
+      if (classMatch) {
+        for (const el of registry.values()) {
+          if (el.className && el.className.includes(classMatch[1])) return el;
+        }
+      }
+      const idMatch = sel.match(/^#(.+)$/);
+      if (idMatch) return registry.get(idMatch[1]) || null;
+      return null;
+    },
     body,
   };
 

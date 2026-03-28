@@ -372,10 +372,12 @@
     svg.style.display = collapsed ? "none" : "block";
     panel.appendChild(svg);
 
-    // Insert after the #board container.
-    var board = document.getElementById("board");
-    if (board) {
-      board.insertAdjacentElement("afterend", panel);
+    // Insert after the board-with-explorer wrapper (or #board if no wrapper).
+    var wrapper =
+      document.querySelector(".board-with-explorer") ||
+      document.getElementById("board");
+    if (wrapper) {
+      wrapper.insertAdjacentElement("afterend", panel);
     } else {
       document.body.appendChild(panel);
     }
