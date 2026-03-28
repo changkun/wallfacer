@@ -331,3 +331,71 @@ describe("toggleTerminalPanel", () => {
     expect(elements["status-bar-terminal-btn"]._ariaExpanded).toBe("false");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Terminal integration tests
+// ---------------------------------------------------------------------------
+
+describe("terminal integration", () => {
+  it("_showTerminalPanel calls connectTerminal", () => {
+    const connectCalled = { value: false };
+    const { ctx, elements } = makeStatusBarContext({
+      connectTerminal: () => {
+        connectCalled.value = true;
+      },
+      terminalEnabled: true,
+    });
+    loadStatusBar(ctx);
+    ctx.toggleTerminalPanel();
+    expect(connectCalled.value).toBe(true);
+  });
+
+  it("_hideTerminalPanel does not call disconnectTerminal", () => {
+    const disconnectCalled = { value: false };
+    const { ctx } = makeStatusBarContext({
+      connectTerminal: () => {},
+      disconnectTerminal: () => {
+        disconnectCalled.value = true;
+      },
+      terminalEnabled: true,
+    });
+    loadStatusBar(ctx);
+    ctx.toggleTerminalPanel(); // open
+    ctx.toggleTerminalPanel(); // close
+    expect(disconnectCalled.value).toBe(false);
+  });
+
+  it("terminal button hidden when terminalEnabled is false", () => {
+    const { ctx, elements } = makeStatusBarContext({
+      terminalEnabled: false,
+    });
+    loadStatusBar(ctx);
+    ctx.applyTerminalVisibility();
+    expect(
+      elements["status-bar-terminal-btn"].classList.contains("hidden"),
+    ).toBe(true);
+  });
+
+  it("terminal button visible when terminalEnabled is true", () => {
+    const { ctx, elements } = makeStatusBarContext({
+      terminalEnabled: true,
+    });
+    loadStatusBar(ctx);
+    ctx.applyTerminalVisibility();
+    expect(
+      elements["status-bar-terminal-btn"].classList.contains("hidden"),
+    ).toBe(false);
+  });
+
+  it("toggleTerminalPanel is no-op when terminalEnabled is false", () => {
+    const { ctx, elements } = makeStatusBarContext({
+      terminalEnabled: false,
+    });
+    loadStatusBar(ctx);
+    ctx.toggleTerminalPanel();
+    // Panel should remain hidden
+    expect(elements["status-bar-panel"].classList.contains("hidden")).toBe(
+      true,
+    );
+  });
+});

@@ -62,6 +62,9 @@ let autosubmit = false;
 let autosync = false;
 let autopush = false;
 
+// Terminal feature gate (set by fetchConfig from server)
+let terminalEnabled = false;
+
 // Max parallel tasks (loaded from /api/env, 0 = not yet loaded)
 let maxParallelTasks = 0;
 

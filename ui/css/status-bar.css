@@ -119,6 +119,24 @@
 .status-bar-panel.hidden {
   display: none;
 }
+#status-bar-panel .xterm {
+  height: 100%;
+}
+#status-bar-panel .xterm-viewport {
+  overflow-y: auto;
+}
+.terminal-reconnecting {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  opacity: 0.85;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  z-index: 10;
+}
 @media (max-width: 768px) {
   #status-bar,
   #status-bar-panel,

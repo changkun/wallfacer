@@ -175,6 +175,12 @@ async function fetchConfig() {
     if (typeof updateWatcherHealth === "function")
       updateWatcherHealth(cfg.watcher_health || []);
     if (typeof reloadExplorerTree === "function") reloadExplorerTree();
+
+    // Terminal feature gate: init xterm.js when enabled.
+    terminalEnabled = !!cfg.terminal_enabled;
+    if (typeof applyTerminalVisibility === "function")
+      applyTerminalVisibility();
+    if (terminalEnabled && typeof initTerminal === "function") initTerminal();
   } catch (e) {
     console.error("fetchConfig:", e);
   }

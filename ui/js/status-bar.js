@@ -112,20 +112,24 @@ function _updateWorkspace() {
 }
 
 // Cycle: nothing → terminal → dep graph → close
+// When terminal is disabled, skip the terminal step.
 function _cycleBottomPanel() {
   var termPanel = document.getElementById("status-bar-panel");
   var termOpen = termPanel && !termPanel.classList.contains("hidden");
   var depOpen = !!window.depGraphEnabled;
+  var termAvailable =
+    typeof terminalEnabled !== "undefined" && terminalEnabled;
 
   if (!termOpen && !depOpen) {
-    // Nothing open → show terminal
-    _showTerminalPanel();
+    if (termAvailable) {
+      _showTerminalPanel();
+    } else {
+      _showDepGraphPanel();
+    }
   } else if (termOpen && !depOpen) {
-    // Terminal open → close terminal, show dep graph
     _hideTerminalPanel();
     _showDepGraphPanel();
   } else {
-    // Dep graph open (or both) → close all
     _hideTerminalPanel();
     _hideDepGraphPanel();
   }
@@ -138,6 +142,7 @@ function _showTerminalPanel() {
   if (panel) panel.classList.remove("hidden");
   if (handle) handle.classList.remove("hidden");
   if (btn) btn.setAttribute("aria-expanded", "true");
+  if (typeof connectTerminal === "function") connectTerminal();
 }
 
 function _hideTerminalPanel() {
@@ -168,6 +173,13 @@ function _hideDepGraphPanel() {
 function toggleTerminalPanel() {
   var panel = document.getElementById("status-bar-panel");
   if (!panel) return;
+  if (typeof terminalEnabled !== "undefined" && !terminalEnabled) {
+    // Terminal disabled — show a message if panel is somehow opened.
+    if (!panel.classList.contains("hidden")) {
+      _hideTerminalPanel();
+    }
+    return;
+  }
   var isHidden = panel.classList.contains("hidden");
   if (isHidden) {
     _hideDepGraphPanel();
@@ -233,10 +245,22 @@ function _initPanelResize() {
   });
 }
 
+// Apply terminal visibility gate based on terminalEnabled global.
+function applyTerminalVisibility() {
+  var btn = document.getElementById("status-bar-terminal-btn");
+  if (!btn) return;
+  if (typeof terminalEnabled !== "undefined" && terminalEnabled) {
+    btn.classList.remove("hidden");
+  } else {
+    btn.classList.add("hidden");
+  }
+}
+
 // Expose globally to fit the existing vanilla-JS pattern
 window.initStatusBar = initStatusBar;
 window.updateStatusBar = updateStatusBar;
 window.toggleTerminalPanel = toggleTerminalPanel;
+window.applyTerminalVisibility = applyTerminalVisibility;
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", function () {
