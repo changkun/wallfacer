@@ -74,6 +74,7 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	var wailsCtx context.Context
 
 	// Set up the system tray before wails.Run so it is ready when the app starts.
+	serverURL := fmt.Sprintf("http://localhost:%d", sc.ActualPort)
 	tm := NewTrayManager(
 		func() {
 			// "Open Dashboard" — show and focus the window.
@@ -87,6 +88,8 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 				wailsRuntime.Quit(wailsCtx)
 			}
 		},
+		serverURL,
+		sc.ServerAPIKey,
 	)
 	tm.Start()
 

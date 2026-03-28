@@ -5,12 +5,12 @@ go 1.25.7
 require github.com/google/uuid v1.6.0
 
 require (
+	fyne.io/systray v1.12.0
 	github.com/coder/websocket v1.8.14
 	github.com/wailsapp/wails/v2 v2.12.0
 )
 
 require (
-	fyne.io/systray v1.12.0 // indirect
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect

@@ -59,6 +59,9 @@ type ServerComponents struct {
 
 	// ActualPort is the TCP port the listener is bound to.
 	ActualPort int
+
+	// ServerAPIKey is the configured API key for server authentication.
+	ServerAPIKey string
 }
 
 // Shutdown performs a graceful shutdown: drains HTTP connections and waits
@@ -297,14 +300,15 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	}
 
 	return &ServerComponents{
-		Srv:        srv,
-		Ln:         ln,
-		Runner:     r,
-		Handler:    h,
-		WsMgr:      wsMgr,
-		Ctx:        ctx,
-		Stop:       stop,
-		ActualPort: actualPort,
+		Srv:          srv,
+		Ln:           ln,
+		Runner:       r,
+		Handler:      h,
+		WsMgr:        wsMgr,
+		Ctx:          ctx,
+		Stop:         stop,
+		ActualPort:   actualPort,
+		ServerAPIKey: envCfg.ServerAPIKey,
 	}
 }
 
