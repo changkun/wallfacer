@@ -28,6 +28,26 @@ document.getElementById("alert-modal").addEventListener("click", (e) => {
   if (e.target === document.getElementById("alert-modal")) closeAlert();
 });
 
+// Global shortcut: "n" opens the new task form
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "n" || e.ctrlKey || e.metaKey || e.altKey) return;
+  var tag = document.activeElement && document.activeElement.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  var ce =
+    document.activeElement &&
+    document.activeElement.getAttribute("contenteditable");
+  if (ce !== null && ce !== "false") return;
+  // Don't open if any modal is visible
+  var modals = ["modal", "alert-modal", "stats-modal", "usage-stats-modal",
+    "container-monitor-modal", "instructions-modal", "settings-modal"];
+  for (var i = 0; i < modals.length; i++) {
+    var m = document.getElementById(modals[i]);
+    if (m && !m.classList.contains("hidden")) return;
+  }
+  e.preventDefault();
+  showNewTaskForm();
+});
+
 // New task textarea: Ctrl/Cmd+Enter to save, Escape to cancel
 document.getElementById("new-prompt").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
