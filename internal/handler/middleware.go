@@ -66,7 +66,7 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler { return next }
 	}
 	isSSEPath := func(path string) bool {
-		if path == "/api/tasks/stream" || path == "/api/git/stream" {
+		if path == "/api/tasks/stream" || path == "/api/git/stream" || path == "/api/terminal/ws" {
 			return true
 		}
 		return strings.HasPrefix(path, "/api/tasks/") && strings.HasSuffix(path, "/logs")

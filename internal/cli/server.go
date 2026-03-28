@@ -770,6 +770,10 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		mux.Handle(route.FullPattern(), registered)
 	}
 
+	// WebSocket endpoint: interactive host terminal. Not in apicontract because
+	// WebSocket upgrades don't follow REST request/response semantics.
+	mux.HandleFunc("GET /api/terminal/ws", h.HandleTerminalWS)
+
 	// Prometheus metrics endpoint (not an API route; excluded from the contract).
 	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
