@@ -15,8 +15,12 @@ import (
 	"fyne.io/systray"
 )
 
-// trayPollInterval is the interval between health endpoint polls.
-const trayPollInterval = 5 * time.Second
+const (
+	// trayPollInterval is the interval between health and config polls.
+	trayPollInterval = 5 * time.Second
+	// trayStatsPollInterval is the interval between stats polls.
+	trayStatsPollInterval = 30 * time.Second
+)
 
 // TrayManager manages the system tray icon and menu for the desktop app.
 type TrayManager struct {
@@ -32,6 +36,7 @@ type TrayManager struct {
 	mInProgress *systray.MenuItem
 	mWaiting    *systray.MenuItem
 	mBacklog    *systray.MenuItem
+	mCost       *systray.MenuItem
 	mUptime     *systray.MenuItem
 
 	// Automation toggle menu items.
@@ -42,6 +47,11 @@ type TrayManager struct {
 
 	// Last known icon state to avoid redundant SetIcon calls.
 	lastIconState string
+
+	// Cost values updated by stats poll.
+	todayCost float64
+	totalCost float64
+	costValid bool // true after at least one successful stats poll
 }
 
 // NewTrayManager creates a TrayManager. showWindow is called when the user
@@ -100,6 +110,8 @@ func (tm *TrayManager) onReady() {
 	tm.mAutosync = systray.AddMenuItemCheckbox("Auto-sync", "Toggle auto-sync", false)
 	systray.AddSeparator()
 
+	tm.mCost = systray.AddMenuItem("Today: — · Total: —", "")
+	tm.mCost.Disable()
 	tm.mUptime = systray.AddMenuItem("Uptime: —", "")
 	tm.mUptime.Disable()
 	systray.AddSeparator()
@@ -133,13 +145,18 @@ func (tm *TrayManager) onReady() {
 	go func() {
 		tm.poll()       // initial health poll
 		tm.pollConfig() // initial config poll
-		ticker := time.NewTicker(trayPollInterval)
-		defer ticker.Stop()
+		tm.pollStats()  // initial stats poll
+		healthTicker := time.NewTicker(trayPollInterval)
+		statsTicker := time.NewTicker(trayStatsPollInterval)
+		defer healthTicker.Stop()
+		defer statsTicker.Stop()
 		for {
 			select {
-			case <-ticker.C:
+			case <-healthTicker.C:
 				tm.poll()
 				tm.pollConfig()
+			case <-statsTicker.C:
+				tm.pollStats()
 			case <-tm.done:
 				return
 			}
@@ -176,7 +193,11 @@ func (tm *TrayManager) poll() {
 	}
 
 	// Update tooltip.
-	systray.SetTooltip(formatTooltip(data.TasksByStatus, data.UptimeSeconds))
+	costStr := ""
+	if tm.costValid {
+		costStr = formatCostShort(tm.todayCost)
+	}
+	systray.SetTooltip(formatTooltip(data.TasksByStatus, data.UptimeSeconds, costStr))
 
 	// Update menu labels.
 	inProgress := data.TasksByStatus["in_progress"] + data.TasksByStatus["committing"]
@@ -228,15 +249,19 @@ func iconState(tasksByStatus map[string]int) string {
 	return "idle"
 }
 
-// formatTooltip builds a tooltip string from task status and uptime.
-func formatTooltip(tasksByStatus map[string]int, uptimeSeconds float64) string {
+// formatTooltip builds a tooltip string from task status, uptime, and optional cost.
+// todayCost is the formatted cost string (e.g., "$3.42"); pass "" if unavailable.
+func formatTooltip(tasksByStatus map[string]int, uptimeSeconds float64, todayCost string) string {
 	running := tasksByStatus["in_progress"] + tasksByStatus["committing"]
 	waiting := tasksByStatus["waiting"]
 	if running == 0 && waiting == 0 {
 		return "Wallfacer — Idle"
 	}
-	return fmt.Sprintf("Wallfacer — %d running · %d waiting · uptime %s",
-		running, waiting, formatDuration(uptimeSeconds))
+	tooltip := fmt.Sprintf("Wallfacer — %d running · %d waiting", running, waiting)
+	if todayCost != "" {
+		tooltip += " · " + todayCost + " today"
+	}
+	return tooltip
 }
 
 // formatDuration formats seconds into a human-readable duration like "2h 15m".
@@ -314,6 +339,74 @@ func (tm *TrayManager) handleToggle(field string, item *systray.MenuItem) {
 		return
 	}
 	setChecked(item, newValue)
+}
+
+// statsData is the subset of the /api/stats response we care about.
+type statsData struct {
+	TotalCostUSD float64 `json:"total_cost_usd"`
+	DailyUsage   []struct {
+		Date    string  `json:"date"`
+		CostUSD float64 `json:"cost_usd"`
+	} `json:"daily_usage"`
+}
+
+// pollStats fetches the stats endpoint and updates cost display.
+func (tm *TrayManager) pollStats() {
+	data, err := tm.fetchStats()
+	if err != nil {
+		logger.Main.Debug("tray stats poll failed", "error", err)
+		if !tm.costValid {
+			tm.mCost.SetTitle("Today: — · Total: —")
+		}
+		return
+	}
+
+	tm.totalCost = data.TotalCostUSD
+	tm.todayCost = extractTodayCost(data)
+	tm.costValid = true
+
+	tm.mCost.SetTitle(fmt.Sprintf("Today: %s · Total: %s",
+		formatCostShort(tm.todayCost), formatCostShort(tm.totalCost)))
+}
+
+// fetchStats performs an HTTP GET to the stats endpoint.
+func (tm *TrayManager) fetchStats() (*statsData, error) {
+	req, err := http.NewRequest("GET", tm.serverURL+"/api/stats", nil)
+	if err != nil {
+		return nil, err
+	}
+	if tm.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+tm.apiKey)
+	}
+	resp, err := tm.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("stats returned %d", resp.StatusCode)
+	}
+	var data statsData
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+// extractTodayCost finds today's cost from the daily_usage array.
+func extractTodayCost(data *statsData) float64 {
+	today := time.Now().Format("2006-01-02")
+	for _, d := range data.DailyUsage {
+		if d.Date == today {
+			return d.CostUSD
+		}
+	}
+	return 0
+}
+
+// formatCostShort formats a USD cost as "$X.XX" with 2 decimal places.
+func formatCostShort(usd float64) string {
+	return fmt.Sprintf("$%.2f", usd)
 }
 
 // toggleConfig sends a PUT /api/config with a single toggled field.

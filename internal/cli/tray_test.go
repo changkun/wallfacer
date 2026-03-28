@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // TestTrayManagerNew verifies that NewTrayManager initializes without panic
@@ -65,39 +66,44 @@ func TestIconState(t *testing.T) {
 
 func TestFormatTooltip(t *testing.T) {
 	tests := []struct {
-		name   string
-		tasks  map[string]int
-		uptime float64
-		want   string
+		name      string
+		tasks     map[string]int
+		uptime    float64
+		todayCost string
+		want      string
 	}{
 		{
 			"idle",
 			map[string]int{},
 			3600,
+			"",
 			"Wallfacer — Idle",
 		},
 		{
-			"running only",
+			"running no cost",
 			map[string]int{"in_progress": 2, "committing": 1},
 			8100,
-			"Wallfacer — 3 running · 0 waiting · uptime 2h 15m",
+			"",
+			"Wallfacer — 3 running · 0 waiting",
 		},
 		{
-			"running and waiting",
+			"running with cost",
 			map[string]int{"in_progress": 1, "waiting": 2},
 			300,
-			"Wallfacer — 1 running · 2 waiting · uptime 5m",
+			"$3.42",
+			"Wallfacer — 1 running · 2 waiting · $3.42 today",
 		},
 		{
-			"waiting only shows tooltip",
+			"waiting only with cost",
 			map[string]int{"waiting": 1},
 			60,
-			"Wallfacer — 0 running · 1 waiting · uptime 1m",
+			"$0.50",
+			"Wallfacer — 0 running · 1 waiting · $0.50 today",
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := formatTooltip(tc.tasks, tc.uptime)
+			got := formatTooltip(tc.tasks, tc.uptime, tc.todayCost)
 			if got != tc.want {
 				t.Errorf("formatTooltip() = %q, want %q", got, tc.want)
 			}
@@ -275,5 +281,86 @@ func TestToggleFailurePreservesState(t *testing.T) {
 	err := tm.toggleConfig("autopilot", true)
 	if err == nil {
 		t.Fatal("expected error from failing PUT")
+	}
+}
+
+func TestParseStatsResponse(t *testing.T) {
+	today := time.Now().Format("2006-01-02")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"total_cost_usd": 156.42,
+			"daily_usage": []map[string]any{
+				{"date": "2026-01-01", "cost_usd": 10.0},
+				{"date": today, "cost_usd": 3.42},
+				{"date": "2026-01-03", "cost_usd": 5.0},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	tm := NewTrayManager(func() {}, func() {}, srv.URL, "")
+	data, err := tm.fetchStats()
+	if err != nil {
+		t.Fatalf("fetchStats() error: %v", err)
+	}
+	if data.TotalCostUSD != 156.42 {
+		t.Errorf("total_cost_usd = %f, want 156.42", data.TotalCostUSD)
+	}
+	todayCost := extractTodayCost(data)
+	if todayCost != 3.42 {
+		t.Errorf("today's cost = %f, want 3.42", todayCost)
+	}
+}
+
+func TestExtractTodayCostMissing(t *testing.T) {
+	data := &statsData{
+		TotalCostUSD: 100,
+		DailyUsage: []struct {
+			Date    string  `json:"date"`
+			CostUSD float64 `json:"cost_usd"`
+		}{
+			{Date: "2020-01-01", CostUSD: 50},
+		},
+	}
+	cost := extractTodayCost(data)
+	if cost != 0 {
+		t.Errorf("expected 0 for missing date, got %f", cost)
+	}
+}
+
+func TestFormatCostShort(t *testing.T) {
+	tests := []struct {
+		input float64
+		want  string
+	}{
+		{0, "$0.00"},
+		{0.5, "$0.50"},
+		{3.42, "$3.42"},
+		{1234.567, "$1234.57"},
+		{0.001, "$0.00"},
+	}
+	for _, tc := range tests {
+		got := formatCostShort(tc.input)
+		if got != tc.want {
+			t.Errorf("formatCostShort(%v) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestStatsErrorFallback(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "server error", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	tm := NewTrayManager(func() {}, func() {}, srv.URL, "")
+	_, err := tm.fetchStats()
+	if err == nil {
+		t.Fatal("expected error from failing stats endpoint")
+	}
+	// Verify costValid stays false when stats fail.
+	if tm.costValid {
+		t.Error("costValid should be false before successful poll")
 	}
 }
