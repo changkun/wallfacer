@@ -11,7 +11,7 @@ Implementation roadmap for wallfacer. Numbered specs (`01-`–`08-`) form the cl
 ## Cloud/Platform Milestone Graph
 
 ```
-                                ┌──▶ M3: Container Reuse
+                                ┌──▶ M3: Container Reuse ──▶ M3a: Overlay Snapshots / CRIU
                                 │
 M1: Sandbox Backend Interface ──┼──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
                                 │           ▲                     (capstone)
@@ -63,6 +63,14 @@ Alternative `SandboxBackend` implementations. Independent of each other and of M
 | [02a-multi-workspace-groups.md](02a-multi-workspace-groups.md) | **Complete** | Multi-store manager, runner task-to-group mapping. Run tasks across workspace groups simultaneously. |
 
 After M2 (store interfaces stable). Independent of M3. Can run in parallel with M3.
+
+## Branch from M3 — Overlay Snapshots
+
+| Spec | Status | Delivers |
+|------|--------|----------|
+| [03a-overlay-snapshots.md](03a-overlay-snapshots.md) | Not started | Overlay snapshot cloning for warm worker creation, CRIU checkpoint/restore for sync acceleration |
+
+After M3 (per-task workers complete). Independent of M4–M8.
 
 ## Related to M4 — File Attachments & Host Mounts
 
