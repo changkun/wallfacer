@@ -1,6 +1,6 @@
 # Task 11: File Icons in Explorer Tree
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 4
 **Phase:** Phase 1 — Read-Only Browsing + Preview
 **Effort:** Small–Medium
