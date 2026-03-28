@@ -1033,6 +1033,18 @@ function _initExplorer() {
   _initExplorerResize();
   _initExplorerKeyboard();
 
+  // Refresh expanded directories when the user mouses into the panel,
+  // so files created in the terminal appear without a manual toggle.
+  var _refreshPending = false;
+  panel.addEventListener("mouseenter", function () {
+    if (!_explorerLoaded || _refreshPending) return;
+    _refreshPending = true;
+    setTimeout(function () {
+      _refreshPending = false;
+      _refreshExpandedNodes();
+    }, 300);
+  });
+
   // Load tree if panel is already visible
   if (panel.style.display !== "none") {
     _loadExplorerRoots();
