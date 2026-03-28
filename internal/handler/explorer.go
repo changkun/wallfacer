@@ -2,13 +2,20 @@ package handler
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/constants"
 )
+
+// maxFileWriteSize is the maximum content size accepted by ExplorerWriteFile (2 MB).
+const maxFileWriteSize = 2 << 20
 
 // explorerEntry is a single directory or file entry returned by ExplorerTree.
 type explorerEntry struct {
@@ -104,4 +111,198 @@ func (h *Handler) ExplorerTree(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// isBinaryContent reports whether data contains a null byte, indicating
+// binary content.
+func isBinaryContent(data []byte) bool {
+	return slices.Contains(data, 0)
+}
+
+// ExplorerReadFile returns file contents for preview, with binary detection
+// and size limits.
+func (h *Handler) ExplorerReadFile(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	workspace := r.URL.Query().Get("workspace")
+
+	if path == "" || workspace == "" {
+		http.Error(w, "path and workspace query params required", http.StatusBadRequest)
+		return
+	}
+
+	if !h.isAllowedWorkspace(workspace) {
+		http.Error(w, "workspace not configured", http.StatusBadRequest)
+		return
+	}
+
+	resolved, err := isWithinWorkspace(path, workspace)
+	if err != nil {
+		// isWithinWorkspace fails for non-existent paths because
+		// EvalSymlinks requires the target to exist. Distinguish a
+		// genuinely missing file from a path-escape attempt by
+		// cleaning the raw path and checking containment manually.
+		cleaned := filepath.Clean(path)
+		wsClean := filepath.Clean(workspace)
+		if cleaned == wsClean || strings.HasPrefix(cleaned, wsClean+string(filepath.Separator)) {
+			// Path is within workspace but doesn't exist.
+			http.Error(w, "file not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	info, err := os.Stat(resolved)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			http.Error(w, "file not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to stat file", http.StatusInternalServerError)
+		return
+	}
+
+	if info.IsDir() {
+		http.Error(w, "path is a directory", http.StatusBadRequest)
+		return
+	}
+
+	size := info.Size()
+	w.Header().Set("X-File-Size", strconv.FormatInt(size, 10))
+
+	if size > constants.ExplorerMaxFileSize {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{
+			"error": "file too large",
+			"size":  size,
+			"max":   constants.ExplorerMaxFileSize,
+		})
+		return
+	}
+
+	f, err := os.Open(resolved)
+	if err != nil {
+		http.Error(w, "failed to open file", http.StatusInternalServerError)
+		return
+	}
+	defer func() { _ = f.Close() }()
+
+	// Read first 8192 bytes to detect binary content.
+	head := make([]byte, 8192)
+	n, err := f.Read(head)
+	if err != nil && err != io.EOF {
+		http.Error(w, "failed to read file", http.StatusInternalServerError)
+		return
+	}
+	head = head[:n]
+
+	if isBinaryContent(head) {
+		w.Header().Set("X-File-Binary", "true")
+		writeJSON(w, http.StatusOK, map[string]any{
+			"binary": true,
+			"size":   size,
+		})
+		return
+	}
+
+	// Text file: write the head we already read, then copy the rest.
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(head)
+	_, _ = io.Copy(w, f)
+}
+
+// isGitPath reports whether p refers to a path inside a .git directory.
+func isGitPath(p string) bool {
+	return strings.Contains(p, "/.git/") || strings.HasSuffix(p, "/.git") ||
+		strings.Contains(p, "\\.git\\") || strings.HasSuffix(p, "\\.git")
+}
+
+// ExplorerWriteFile writes content to a file in a workspace using atomic
+// temp-file + rename. It rejects paths inside .git directories, content
+// exceeding 2 MB, and paths whose parent directory does not exist.
+func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path      string `json:"path"`
+		Workspace string `json:"workspace"`
+		Content   string `json:"content"`
+	}
+	if !decodeJSONBody(w, r, &req) {
+		return
+	}
+
+	if req.Path == "" || req.Workspace == "" {
+		http.Error(w, "path and workspace are required", http.StatusBadRequest)
+		return
+	}
+
+	if !h.isAllowedWorkspace(req.Workspace) {
+		http.Error(w, "workspace not configured", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.Content) > maxFileWriteSize {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
+			"error": "content exceeds " + strconv.Itoa(maxFileWriteSize) + " byte limit",
+		})
+		return
+	}
+
+	if isGitPath(req.Path) {
+		http.Error(w, "writing to .git directories is not allowed", http.StatusBadRequest)
+		return
+	}
+
+	resolved, err := isWithinWorkspace(req.Path, req.Workspace)
+	if err != nil {
+		// isWithinWorkspace fails for non-existent paths because
+		// EvalSymlinks requires the target to exist. For writes the
+		// target file may not exist yet; do a manual containment check.
+		cleaned := filepath.Clean(req.Path)
+		wsClean := filepath.Clean(req.Workspace)
+		if cleaned == wsClean || strings.HasPrefix(cleaned, wsClean+string(filepath.Separator)) {
+			resolved = cleaned
+		} else {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Verify parent directory exists — do not create missing directories.
+	dir := filepath.Dir(resolved)
+	if _, err := os.Stat(dir); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			http.Error(w, "parent directory does not exist", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "failed to stat parent directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Atomic write: temp file in the same directory, then rename.
+	tmp, err := os.CreateTemp(dir, ".wallfacer-write-*")
+	if err != nil {
+		http.Error(w, "failed to create temp file", http.StatusInternalServerError)
+		return
+	}
+	tmpName := tmp.Name()
+
+	data := []byte(req.Content)
+	_, writeErr := tmp.Write(data)
+	closeErr := tmp.Close()
+	if writeErr != nil || closeErr != nil {
+		_ = os.Remove(tmpName)
+		http.Error(w, "failed to write file", http.StatusInternalServerError)
+		return
+	}
+
+	if err := os.Rename(tmpName, resolved); err != nil {
+		_ = os.Remove(tmpName)
+		http.Error(w, "failed to rename temp file", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status": "ok",
+		"size":   len(data),
+	})
 }

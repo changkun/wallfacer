@@ -504,6 +504,18 @@ var Routes = []Route{
 		Description: "List one level of a workspace directory.",
 		Tags:        []string{"explorer"},
 	},
+	{
+		Method: http.MethodGet, Pattern: "/api/explorer/file", Name: "ExplorerReadFile",
+		JSName:      "readFile",
+		Description: "Read file contents from a workspace.",
+		Tags:        []string{"explorer"},
+	},
+	{
+		Method: http.MethodPut, Pattern: "/api/explorer/file", Name: "ExplorerWriteFile",
+		JSName:      "writeFile",
+		Description: "Write file contents to a workspace.",
+		Tags:        []string{"explorer"},
+	},
 
 	// --- Refinement agent ---
 

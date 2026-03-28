@@ -118,6 +118,9 @@ const (
 	BodyLimitFeedback     int64 = 512 << 10 // 512 KiB
 )
 
+// ExplorerMaxFileSize is the maximum file size the explorer will read (2 MiB).
+const ExplorerMaxFileSize int64 = 2 * 1024 * 1024
+
 // DefaultMaxTurnOutputBytes is the default per-turn stdout/stderr output size
 // budget. Outputs exceeding this limit are truncated server-side.
 const DefaultMaxTurnOutputBytes = 8 * 1024 * 1024 // 8 MB

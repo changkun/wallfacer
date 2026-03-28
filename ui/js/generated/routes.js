@@ -236,6 +236,14 @@ var Routes = {
     tree: function () {
       return "/api/explorer/tree";
     },
+    // GET /api/explorer/file
+    readFile: function () {
+      return "/api/explorer/file";
+    },
+    // PUT /api/explorer/file
+    writeFile: function () {
+      return "/api/explorer/file";
+    },
   },
 
   tasks: {

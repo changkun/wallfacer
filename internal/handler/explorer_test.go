@@ -6,7 +6,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"changkun.de/x/wallfacer/internal/constants"
 )
 
 func TestExplorerTree_Basic(t *testing.T) {
@@ -191,5 +194,376 @@ func TestIsWithinWorkspace_ExactWorkspaceRoot(t *testing.T) {
 	}
 	if got == "" {
 		t.Error("expected non-empty resolved path")
+	}
+}
+
+// --- ExplorerReadFile tests ---
+
+func TestExplorerReadFile_TextFile(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	content := "hello world\nline two\n"
+	fp := filepath.Join(ws, "readme.txt")
+	if err := os.WriteFile(fp, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file?path="+fp+"&workspace="+ws, nil)
+	w := httptest.NewRecorder()
+	h.ExplorerReadFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
+		t.Errorf("expected text/plain content type, got %q", ct)
+	}
+	if w.Body.String() != content {
+		t.Errorf("expected %q, got %q", content, w.Body.String())
+	}
+	if sz := w.Header().Get("X-File-Size"); sz == "" {
+		t.Error("expected X-File-Size header")
+	}
+	if w.Header().Get("X-File-Binary") != "" {
+		t.Error("text file should not have X-File-Binary header")
+	}
+}
+
+func TestExplorerReadFile_BinaryFile(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	// Create a file with null bytes (binary).
+	data := []byte("ELF\x00\x01\x02\x03")
+	fp := filepath.Join(ws, "binary.bin")
+	if err := os.WriteFile(fp, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file?path="+fp+"&workspace="+ws, nil)
+	w := httptest.NewRecorder()
+	h.ExplorerReadFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if w.Header().Get("X-File-Binary") != "true" {
+		t.Error("expected X-File-Binary: true header")
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp["binary"] != true {
+		t.Errorf("expected binary=true, got %v", resp["binary"])
+	}
+	if resp["size"] == nil {
+		t.Error("expected size field in response")
+	}
+}
+
+func TestExplorerReadFile_LargeFile(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	// Create a file larger than the limit.
+	fp := filepath.Join(ws, "huge.txt")
+	size := constants.ExplorerMaxFileSize + 1
+	if err := os.WriteFile(fp, make([]byte, size), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file?path="+fp+"&workspace="+ws, nil)
+	w := httptest.NewRecorder()
+	h.ExplorerReadFile(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp["error"] != "file too large" {
+		t.Errorf("expected 'file too large' error, got %v", resp["error"])
+	}
+	if resp["max"] == nil || resp["size"] == nil {
+		t.Error("expected max and size fields in response")
+	}
+}
+
+func TestExplorerReadFile_NotFound(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	fp := filepath.Join(ws, "nonexistent.txt")
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file?path="+fp+"&workspace="+ws, nil)
+	w := httptest.NewRecorder()
+	h.ExplorerReadFile(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestExplorerReadFile_Directory(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	dir := filepath.Join(ws, "subdir")
+	if err := os.Mkdir(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file?path="+dir+"&workspace="+ws, nil)
+	w := httptest.NewRecorder()
+	h.ExplorerReadFile(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "directory") {
+		t.Errorf("expected error about directory, got %q", w.Body.String())
+	}
+}
+
+func TestExplorerReadFile_OutsideWorkspace(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+
+	// Use a path outside the configured workspace.
+	outside := t.TempDir()
+	fp := filepath.Join(outside, "secret.txt")
+	if err := os.WriteFile(fp, []byte("secret"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// The workspace param must be a configured one, but the path escapes it.
+	// Since 'outside' is not a configured workspace, this will fail at
+	// workspace validation.
+	req := httptest.NewRequest(http.MethodGet, "/api/explorer/file?path="+fp+"&workspace="+outside, nil)
+	w := httptest.NewRecorder()
+	h.ExplorerReadFile(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestExplorerReadFile_MissingParams(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{"missing both", "/api/explorer/file"},
+		{"missing path", "/api/explorer/file?workspace=" + ws},
+		{"missing workspace", "/api/explorer/file?path=/tmp/x"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.url, nil)
+			w := httptest.NewRecorder()
+			h.ExplorerReadFile(w, req)
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("expected 400, got %d", w.Code)
+			}
+		})
+	}
+}
+
+// --- ExplorerWriteFile tests ---
+
+func writeFileRequest(t *testing.T, path, workspace, content string) *http.Request {
+	t.Helper()
+	body := `{"path":"` + path + `","workspace":"` + workspace + `","content":` + jsonString(content) + `}`
+	return httptest.NewRequest(http.MethodPut, "/api/explorer/file", strings.NewReader(body))
+}
+
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
+}
+
+func TestExplorerWriteFile_Success(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	fp := filepath.Join(ws, "hello.txt")
+	// Create the file first so isWithinWorkspace can resolve it.
+	if err := os.WriteFile(fp, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	content := "new content\nline two\n"
+	req := writeFileRequest(t, fp, ws, content)
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp["status"] != "ok" {
+		t.Errorf("expected status=ok, got %v", resp["status"])
+	}
+	if int(resp["size"].(float64)) != len(content) {
+		t.Errorf("expected size=%d, got %v", len(content), resp["size"])
+	}
+
+	// Read back and verify.
+	got, err := os.ReadFile(fp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != content {
+		t.Errorf("file content mismatch: got %q, want %q", got, content)
+	}
+}
+
+func TestExplorerWriteFile_AtomicWrite(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	fp := filepath.Join(ws, "atomic.txt")
+	original := "original content"
+	if err := os.WriteFile(fp, []byte(original), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write new content; after the call the file should contain the new
+	// content completely (no partial writes visible).
+	newContent := "replaced atomically"
+	req := writeFileRequest(t, fp, ws, newContent)
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	got, err := os.ReadFile(fp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != newContent {
+		t.Errorf("expected %q, got %q", newContent, got)
+	}
+
+	// Verify no leftover temp files in the directory.
+	entries, err := os.ReadDir(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".wallfacer-write-") {
+			t.Errorf("leftover temp file: %s", e.Name())
+		}
+	}
+}
+
+func TestExplorerWriteFile_GitPathRejection(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	gitDir := filepath.Join(ws, ".git")
+	if err := os.Mkdir(gitDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	gitFile := filepath.Join(gitDir, "config")
+	if err := os.WriteFile(gitFile, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	paths := []string{
+		filepath.Join(ws, ".git/config"),
+		filepath.Join(ws, ".git"),
+	}
+
+	for _, p := range paths {
+		t.Run(p, func(t *testing.T) {
+			req := writeFileRequest(t, p, ws, "hacked")
+			w := httptest.NewRecorder()
+			h.ExplorerWriteFile(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("expected 400 for git path %q, got %d: %s", p, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestExplorerWriteFile_OutsideWorkspace(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	outside := t.TempDir()
+	fp := filepath.Join(outside, "secret.txt")
+	if err := os.WriteFile(fp, []byte("secret"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := writeFileRequest(t, fp, ws, "overwrite attempt")
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestExplorerWriteFile_TooLarge(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	fp := filepath.Join(ws, "big.txt")
+	if err := os.WriteFile(fp, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Content exceeding 2 MB.
+	bigContent := strings.Repeat("x", maxFileWriteSize+1)
+	req := writeFileRequest(t, fp, ws, bigContent)
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("expected 413, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestExplorerWriteFile_WorkspaceNotConfigured(t *testing.T) {
+	h, _ := newTestHandlerWithWorkspaces(t)
+
+	bogus := t.TempDir()
+	fp := filepath.Join(bogus, "file.txt")
+	if err := os.WriteFile(fp, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := writeFileRequest(t, fp, bogus, "content")
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "workspace not configured") {
+		t.Errorf("expected 'workspace not configured' error, got %q", w.Body.String())
+	}
+}
+
+func TestExplorerWriteFile_CreateParentDirs(t *testing.T) {
+	h, ws := newTestHandlerWithWorkspaces(t)
+
+	// Parent directory "nonexistent" does not exist.
+	fp := filepath.Join(ws, "nonexistent", "file.txt")
+
+	req := writeFileRequest(t, fp, ws, "content")
+	w := httptest.NewRecorder()
+	h.ExplorerWriteFile(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing parent dir, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "parent directory") {
+		t.Errorf("expected error about parent directory, got %q", w.Body.String())
 	}
 }
