@@ -22,7 +22,7 @@ Populate the existing terminal panel stub with a fully interactive host shell (b
 ### Terminal Panel Stub
 
 - **HTML** (`ui/partials/status-bar.html`): Empty `<div id="status-bar-panel" class="status-bar-panel hidden">` with comment "Terminal stub panel (populated by future PRs)"
-- **Resize** (`ui/js/status-bar.js:125-179`): Drag-to-resize handle, 80–600px range, height persisted to `localStorage`
+- **Resize** (`ui/js/status-bar.js:132-179`): Drag-to-resize handle, 80–600px range, height persisted to `localStorage`
 - **Toggle**: Backtick key toggles visibility, Terminal button in status bar right section
 - **CSS** (`ui/css/status-bar.css`): Panel styles (flex column, 260px default height, overflow hidden)
 
@@ -30,16 +30,16 @@ Populate the existing terminal panel stub with a fully interactive host shell (b
 
 | Component | Location | What it does |
 |-----------|----------|-------------|
-| `StreamLogs` handler | `internal/handler/stream.go:175` | Streams container logs via HTTP with `http.Flusher` |
+| `StreamLogs` handler | `internal/handler/stream.go:178` | Streams container logs via HTTP with `http.Flusher` |
 | Log consumer | `ui/js/modal-logs.js` | Consumes HTTP streams via Fetch Streams API |
 | ANSI converter | `ui/js/modal-ansi.js` | Converts ANSI escape codes to HTML spans |
-| SSE auth | `internal/handler/middleware.go:66` | `?token=` query param auth for streaming paths |
+| SSE auth | `internal/handler/middleware.go:68` | `?token=` query param auth for streaming paths |
 
 **Limitation:** All streaming is one-directional (server→client). Interactive terminal requires full-duplex communication — **WebSocket is needed** (the project's first).
 
 ### CLI `exec` Command
 
-`internal/cli/exec.go` uses `syscall.Exec` to replace the process with `podman exec -it`. This is terminal-only (requires PTY) and cannot work over HTTP.
+`internal/cli/exec.go` uses `cmdexec` (wrapper around `os/exec`) to launch `podman exec -it`. This is terminal-only (requires a local PTY) and cannot work over HTTP.
 
 ---
 
@@ -77,7 +77,7 @@ GET /api/terminal/ws?token=<key>&cols=<n>&rows=<n>&cwd=<path>
 ```
 
 - **Not registered via `apicontract/routes.go`** — WebSocket upgrades don't follow REST request/response semantics. Registered directly in `BuildMux` (like `/metrics`), with a comment explaining why.
-- **Auth:** Add `/api/terminal/ws` to `isSSEPath` in `middleware.go` so it accepts `?token=` authentication (browser `WebSocket` constructor cannot set custom headers).
+- **Auth:** Add `/api/terminal/ws` to `isSSEPath` in `middleware.go` so it accepts `?token=` authentication (browser `WebSocket` constructor cannot set custom headers). The function currently checks `/api/tasks/stream`, `/api/git/stream`, and `/api/tasks/*/logs`.
 
 ### Opt-In Configuration
 
@@ -151,7 +151,7 @@ Download and place alongside existing vendored libraries:
 | `xterm-addon-fit.min.js` | `ui/js/vendor/xterm-addon-fit.min.js` | ~3 KB |
 | `xterm.css` | `ui/css/vendor/xterm.css` | ~5 KB |
 
-Loaded via `<script>` and `<link>` tags in `initial-layout.html`, matching the pattern for `sortable.min.js`, `marked.min.js`, `highlight.min.js`. Embedded via existing `//go:embed ui` — no build step changes.
+Loaded via `<script>` and `<link>` tags in `initial-layout.html`, matching the existing pattern for vendored libraries (`sortable.min.js`, `marked.min.js`, `highlight.min.js` in `ui/js/vendor/`). Embedded via existing `//go:embed ui` — no build step changes.
 
 ### New File: `ui/js/terminal.js`
 
@@ -159,7 +159,7 @@ Loaded via `<script>` and `<link>` tags in `initial-layout.html`, matching the p
 
 - **`initTerminal()`** — Called on DOMContentLoaded. Creates `xterm.Terminal` instance with theme from CSS vars (`--bg-card`, `--text`, `--accent`). Attaches `FitAddon`. Mounts into `#status-bar-panel`. Does NOT connect yet — waits for first panel open.
 
-- **`connectTerminal()`** — Called when panel becomes visible. Builds WebSocket URL (`ws(s)://` + host + `/api/terminal/ws?token=...&cols=...&rows=...`). Token from `getWallfacerToken()` in `transport.js`. Wires up:
+- **`connectTerminal()`** — Called when panel becomes visible. Builds WebSocket URL (`ws(s)://` + host + `/api/terminal/ws?token=...&cols=...&rows=...`). Token appended via `withAuthToken()` in `transport.js` (wraps `getWallfacerToken()`). Wires up:
   - `ws.onmessage` → `terminal.write(data)`
   - `terminal.onData` → send `{"type":"input","data":"<base64>"}`
   - `terminal.onResize` → send `{"type":"resize","cols":N,"rows":N}`
