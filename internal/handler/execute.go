@@ -282,6 +282,7 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 		if createErr := h.runner.CreateIdeaBacklogTasks(r.Context(), id); createErr != nil {
 			logger.Handler.Warn("complete idea-agent task: create backlog tasks", "task", id, "error", createErr)
 		}
+		h.runner.StopTaskWorker(id)
 		if err := h.store.ForceUpdateTaskStatus(r.Context(), id, store.TaskStatusDone); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -446,6 +447,8 @@ func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, id := range archived {
+		// Safety net: stop any leaked worker containers.
+		h.runner.StopTaskWorker(id)
 		h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange, map[string]string{
 			"to":      "archived",
 			"trigger": string(store.TriggerUser),
@@ -465,6 +468,8 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		http.Error(w, "only done or cancelled tasks can be archived", http.StatusBadRequest)
 		return
 	}
+	// Safety net: stop any leaked worker containers.
+	h.runner.StopTaskWorker(id)
 	if err := h.store.SetTaskArchived(r.Context(), id, true); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
