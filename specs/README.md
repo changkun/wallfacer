@@ -156,6 +156,7 @@ After M3 (per-task workers complete). Independent of M4–M8.
 |------|--------|----------|
 | [04a-file-image-attachments.md](04a-file-image-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
 | [04b-host-mounts.md](04b-host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
+| [04c-file-panel-viewer.md](04c-file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview (images, video, PDF) |
 
 ## Branches from M6 — Cloud Deployment
 
