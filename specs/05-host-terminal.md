@@ -297,3 +297,29 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 | `ui/css/status-bar.css` | xterm container fill styles, reconnection overlay |
 | `docs/guide/configuration.md` | Document `WALLFACER_TERMINAL_ENABLED` |
 | `CLAUDE.md` | Add terminal endpoint and env var |
+
+---
+
+## Task Breakdown
+
+| # | Task | Depends on | Effort | Status |
+|---|------|-----------|--------|--------|
+| 1 | [Add Go dependencies](05-host-terminal/task-01-go-dependencies.md) | — | Small | Todo |
+| 2 | [TerminalEnabled envconfig + config](05-host-terminal/task-02-envconfig-terminal-enabled.md) | — | Small | Todo |
+| 3 | [Vendor xterm.js assets](05-host-terminal/task-03-vendor-xtermjs.md) | — | Small | Todo |
+| 4 | [Backend terminal handler + route](05-host-terminal/task-04-backend-terminal-handler.md) | 1, 2 | Large | Todo |
+| 5 | [Frontend terminal.js](05-host-terminal/task-05-frontend-terminal-js.md) | 3 | Medium | Todo |
+| 6 | [Status bar integration + visibility gate](05-host-terminal/task-06-statusbar-integration.md) | 2, 4, 5 | Medium | Todo |
+| 7 | [Documentation](05-host-terminal/task-07-documentation.md) | 4, 6 | Small | Todo |
+
+```mermaid
+graph LR
+  1[Task 1: Go deps] --> 4[Task 4: Backend handler]
+  2[Task 2: Envconfig] --> 4
+  2 --> 6[Task 6: Status bar + gate]
+  3[Task 3: Vendor xterm.js] --> 5[Task 5: Frontend terminal.js]
+  4 --> 6
+  5 --> 6
+  4 --> 7[Task 7: Docs]
+  6 --> 7
+```
