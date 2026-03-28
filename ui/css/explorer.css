@@ -1,0 +1,92 @@
+/* ===== Explorer Panel ===== */
+
+/* Flex wrapper: explorer panel + board grid side by side */
+.board-with-explorer {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.board-with-explorer > .board-grid {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Panel shell */
+.explorer-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  min-width: 200px;
+  max-width: 50vw;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Title bar */
+.explorer-panel__header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px 8px;
+  flex-shrink: 0;
+}
+.explorer-panel__title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* Scrollable tree container */
+.explorer-panel__tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 4px 8px;
+}
+
+/* Vertical resize handle on right edge */
+.explorer-panel__resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+}
+.explorer-panel__resize-handle:hover,
+.explorer-panel__resize-handle--active {
+  background: var(--accent);
+  opacity: 0.4;
+}
+
+/* --- Tree node styles (prepared for Task 4) --- */
+.explorer-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.explorer-node:hover {
+  background: var(--bg-raised);
+}
+.explorer-node--dir {
+  font-weight: 500;
+}
+.explorer-node--file {
+  font-weight: 400;
+}
+.explorer-node--hidden {
+  opacity: 0.5;
+}
