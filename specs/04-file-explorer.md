@@ -1,7 +1,6 @@
 # Plan: File Explorer Panel
 
-**Status:** Draft
-**Date:** 2026-03-22
+**Status:** Complete | **Date:** 2026-03-22 → 2026-03-28
 
 ---
 
@@ -300,6 +299,35 @@ Each node: `{ path, name, type, expanded, children, loading }`
 
 **Complexity:** Low-Medium.
 
+---
+
+## Outcome
+
+Phase 1 (read-only browsing + preview) and Phase 2 (file editing + saving) are fully implemented across 12 tasks. The explorer provides a VS Code-style side panel with lazy-loading directory trees, syntax-highlighted file preview, rendered markdown view, inline editing with atomic saves, and file-type-specific icons.
+
+### What Shipped
+
+- **3 API endpoints** in `internal/handler/explorer.go`: tree listing, file reading (with binary detection and size limits), and file writing (with `.git/` protection and atomic writes)
+- **Explorer panel** (`ui/js/explorer.js`, ~800 lines): toggle, resize, tree component with keyboard navigation, file preview modal with syntax highlighting, markdown rendering with Raw/Preview toggle, edit mode with save/discard and dirty-state warnings, VS Code-style file icons for ~20 file types
+- **19 frontend tests** covering pure logic (basename, child node building, visible node traversal, parent finding, file response classification, relative path, dirty detection, file icons, markdown toggle)
+- **Backend tests** for path validation, workspace boundary enforcement, binary detection, size limits, `.git/` write rejection, atomic writes
+
+### Design Evolution
+
+1. **Keyboard shortcut changed.** The spec proposed `Ctrl+E` / `Cmd+E` for the panel toggle. This was changed to bare `E` key because `Ctrl+E` conflicts with the browser's address bar focus shortcut. The bare-key pattern matches existing shortcuts (`N` for new task, `?` for help, `` ` `` for terminal).
+
+2. **Flex wrapper placement.** The spec proposed wrapping the board-grid inside `ui/partials/board.html`. Instead, the `<div class="board-with-explorer">` wrapper was placed in `ui/index.html` around both the explorer-panel and board template includes, keeping each partial self-contained.
+
+3. **hljs scoping fix.** Syntax highlighting colors were scoped under `.diff-block-modal .hljs-*` and didn't apply to explorer previews. Fixed by adding `.explorer-preview .hljs-*` selectors to each rule block in `diffs.css`.
+
+4. **Markdown rendered view.** Added rendered markdown as the default view for `.md`/`.mdx` files with a Raw/Preview toggle, reusing the existing `renderMarkdown()` helper and `marked` library.
+
+5. **File icons added.** Not in the original spec — added as Task 11 to provide VS Code-style file/folder icons using inline SVGs with distinct colors per file type.
+
+6. **Explorer tree reload.** The tree didn't populate on first page load because `_initExplorer()` ran before `fetchConfig()` set `activeWorkspaces`. Fixed by calling `reloadExplorerTree()` at the end of `fetchConfig()`.
+
+7. **Dep graph layout regression.** The `board-with-explorer` flex wrapper caused the dependency graph panel to appear beside the board instead of below it. Fixed by inserting the panel after the wrapper element instead of after `#board`.
+
 ### Phase 3: Advanced Features (Future)
 
 - **Git status indicators** — decorate tree nodes with modified/staged/untracked from `GET /api/git/status`
@@ -359,6 +387,7 @@ The file explorer is a prerequisite for the epic coordination UX ([epic-coordina
 | `ui/css/styles.css` | `@import "explorer.css"` |
 | `ui/partials/initial-layout.html` | Explorer toggle button in header |
 | `ui/partials/scripts.html` | `<script>` tag for `explorer.js` |
-| `ui/partials/board.html` | Wrap board-grid in flex container with explorer panel |
+| `ui/index.html` | Wrap board template in flex container with explorer panel |
+| `ui/css/diffs.css` | Extend hljs token colors to `.explorer-preview` scope |
 | `docs/guide/board-and-tasks.md` | Document file explorer feature |
 | `CLAUDE.md` | Add explorer API routes |
