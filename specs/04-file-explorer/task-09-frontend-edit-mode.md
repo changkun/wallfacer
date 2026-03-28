@@ -1,6 +1,6 @@
 # Task 9: Frontend Edit Mode
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 5, Task 8
 **Phase:** Phase 2 — File Editing + Saving
 **Effort:** Medium
@@ -70,3 +70,9 @@ Add to `ui/js/tests/explorer.test.js`:
 - Do NOT add undo/redo beyond browser's native textarea undo
 - Do NOT add syntax highlighting in the textarea (it's a plain textarea, not a code editor)
 - Keep confirmation prompts as simple `confirm()` dialogs — no custom modal-in-modal
+
+## Implementation notes
+
+- Shift+Tab dedent was not implemented (spec marked it as nice-to-have, not required).
+- The highlighted content rendering was extracted into `_renderHighlightedContent()` to avoid duplication between initial preview render and post-save re-render.
+- The `_isEditDirty()` function was exposed on `window` for testability. Full DOM-dependent dirty detection (with textarea value comparison) is exercised visually; the unit test covers the non-edit-mode path.
