@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"strings"
+	"sync"
 	"sync/atomic"
 
 	"changkun.de/x/wallfacer/internal/logger"
@@ -14,19 +17,64 @@ import (
 // LocalBackend implements Backend using a local container runtime
 // (podman or docker) via os/exec.
 type LocalBackend struct {
-	command string // path to podman or docker binary
+	command           string                  // path to podman or docker binary
+	taskWorkers       map[string]*taskWorker  // key = task ID string
+	taskWorkersMu     sync.Mutex
+	enableTaskWorkers bool                    // WALLFACER_TASK_WORKERS (default true)
 }
 
 // NewLocalBackend creates a LocalBackend that uses the given container runtime
 // binary (e.g. "/opt/podman/bin/podman" or "docker").
 func NewLocalBackend(command string) *LocalBackend {
-	return &LocalBackend{command: command}
+	enable := true
+	if v := os.Getenv("WALLFACER_TASK_WORKERS"); strings.EqualFold(v, "false") || v == "0" {
+		enable = false
+	}
+	return &LocalBackend{
+		command:           command,
+		taskWorkers:       make(map[string]*taskWorker),
+		enableTaskWorkers: enable,
+	}
 }
 
 // Launch starts a container from spec and returns a handle for interacting
-// with it. The container process is started non-blocking; call handle.Wait()
-// to block until it exits.
+// with it. When task workers are enabled and the spec has a task ID label,
+// the invocation is routed through a per-task worker container (reusing it
+// across turns). Otherwise, an ephemeral container is created.
 func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, error) {
+	taskID := spec.Labels["wallfacer.task.id"]
+
+	if taskID != "" && b.enableTaskWorkers {
+		h, err := b.launchViaTaskWorker(ctx, spec, taskID)
+		if err != nil {
+			// Worker failed — fall back to ephemeral.
+			logger.Runner.Warn("task worker failed, falling back to ephemeral",
+				"task", taskID, "error", err)
+			return b.launchEphemeral(ctx, spec)
+		}
+		return h, nil
+	}
+
+	return b.launchEphemeral(ctx, spec)
+}
+
+// launchViaTaskWorker routes the invocation through a per-task worker
+// container, creating one if it doesn't exist yet.
+func (b *LocalBackend) launchViaTaskWorker(ctx context.Context, spec ContainerSpec, taskID string) (Handle, error) {
+	b.taskWorkersMu.Lock()
+	w, ok := b.taskWorkers[taskID]
+	if !ok {
+		workerName := "wallfacer-worker-" + taskID[:min(8, len(taskID))]
+		w = newTaskWorker(b.command, workerName, spec.BuildCreate())
+		b.taskWorkers[taskID] = w
+	}
+	b.taskWorkersMu.Unlock()
+
+	return w.exec(ctx, spec.Cmd)
+}
+
+// launchEphemeral creates an ephemeral container (the original behavior).
+func (b *LocalBackend) launchEphemeral(ctx context.Context, spec ContainerSpec) (Handle, error) {
 	name := spec.Name
 	args := spec.Build()
 
@@ -62,6 +110,34 @@ func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, 
 
 	h.state.Store(int32(StateRunning))
 	return h, nil
+}
+
+// StopTaskWorker stops and removes the worker for the given task ID.
+// Called by the runner when a task completes, is cancelled, or fails.
+func (b *LocalBackend) StopTaskWorker(taskID string) {
+	b.taskWorkersMu.Lock()
+	w, ok := b.taskWorkers[taskID]
+	delete(b.taskWorkers, taskID)
+	b.taskWorkersMu.Unlock()
+
+	if ok {
+		w.stop()
+	}
+}
+
+// ShutdownWorkers stops all active task workers. Called during server shutdown.
+func (b *LocalBackend) ShutdownWorkers() {
+	b.taskWorkersMu.Lock()
+	workers := make([]*taskWorker, 0, len(b.taskWorkers))
+	for _, w := range b.taskWorkers {
+		workers = append(workers, w)
+	}
+	b.taskWorkers = make(map[string]*taskWorker)
+	b.taskWorkersMu.Unlock()
+
+	for _, w := range workers {
+		w.stop()
+	}
 }
 
 // List returns info about all running wallfacer containers by shelling out

@@ -1,6 +1,6 @@
 # Task 3: Wire LocalBackend.Launch() to Route Through Per-Task Workers
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1, Task 2
 **Phase:** 1 (Per-Task Worker Foundation)
 **Effort:** Medium
