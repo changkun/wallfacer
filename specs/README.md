@@ -8,28 +8,70 @@ Implementation roadmap for wallfacer. Numbered specs (`01-`–`08-`) form the cl
 |------|--------|----------|
 | [epic-coordination.md](epic-coordination.md) | Not started | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking. UX depends on M4 (file explorer) for spec browsing and chat-driven iteration. |
 
-## Cloud/Platform Milestone Graph
+## Status Quo
+
+What has shipped vs what remains. Items marked ✅ are complete; ○ are not started.
 
 ```
-                                ┌──▶ M3: Container Reuse ──▶ M3a: Overlay Snapshots / CRIU
-                                │
-M1: Sandbox Backend Interface ──┼──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
-                                │           ▲                     (capstone)
-                                │   M2: Storage Interface ─┤
-                                │           │               │
-                                │           └──▶ M2.5: Multi-Workspace Groups
-                                │
-                                ├──▶ Native Containerization (platform-specific)
-                                │     ├─ Linux  (bubblewrap, systemd-nspawn)
-                                │     ├─ macOS  (Virtualization.framework, sandbox_init)
-                                │     └─ Windows (Job Objects, Hyper-V)
-                                │
-M4: File Explorer (local) ──────┼────────────────────────▶│ (Phase 4)
-        │                       │
-        └──▶ Epic Coordination (spec management UX)
-                                │
-M5: Host Terminal (local) ──────┼────────────────────────▶│ (Phase 3)
-M7: Desktop App ────────────────┘ (ships after UX)
+✅ M1: Sandbox Backend Interface
+│
+├──▶ ✅ M1d: Windows Support
+├──▶ ○  M1a: Native Sandbox (Linux)
+├──▶ ○  M1b: Native Sandbox (macOS)
+├──▶ ○  M1c: Native Sandbox (Windows)
+│
+├──▶ ✅ M2: Storage Backend Interface (enablers complete)
+│    ├──▶ ✅ M2a: Multi-Workspace Groups
+│    └──▶ ○  M6: Cloud Backends (PG, S3, K8s — deferred)
+│
+├──▶ ✅ M3: Container Reuse (core)
+│    └──▶ ○  M3a: Overlay Snapshots / CRIU
+│
+├── next ──────────────────────────
+│
+├──▶ ○  M4: File Explorer
+├──▶ ○  M5: Host Terminal
+├──▶ ○  M7: Desktop App
+└──▶ ○  M8: Multi-Tenant (capstone)
+
+○  Epic Coordination (blocked on M4)
+○  Independent: 90–93 (oversight, visual, live-serve, agent abstraction)
+○  Attachments: 04a (file/image), 04b (host mounts)
+```
+
+## Overall Plan
+
+Full milestone dependency graph showing how everything relates.
+
+```
+                                 ┌──▶ M3: Container Reuse ──▶ M3a: Overlay Snapshots / CRIU
+                                 │
+ M1: Sandbox Backend Interface ──┼──▶ M6: Cloud Backends ──▶ M8: Multi-Tenant
+                                 │           ▲                     (capstone)
+                                 │   M2: Storage Interface ─┤
+                                 │           │               │
+                                 │           └──▶ M2a: Multi-Workspace Groups
+                                 │
+                                 ├──▶ Native Containerization (platform-specific)
+                                 │     ├─ M1a: Linux  (bubblewrap, systemd-nspawn)
+                                 │     ├─ M1b: macOS  (Virtualization.framework, sandbox_init)
+                                 │     ├─ M1c: Windows (Job Objects, Hyper-V)
+                                 │     └─ M1d: Windows Support (tier 2 host)
+                                 │
+ M4: File Explorer (local) ──────┼────────────────────────▶│ (Phase 4)
+         │                       │
+         ├──▶ Epic Coordination (spec management UX)
+         ├──▶ 04a: File/Image Attachments
+         └──▶ 04b: Host Mounts
+                                 │
+ M5: Host Terminal (local) ──────┼────────────────────────▶│ (Phase 3)
+ M7: Desktop App ────────────────┘ (ships after M4+M5 UX)
+
+ Independent (no milestone deps)
+   ├─ 90: Oversight Risk Scoring
+   ├─ 91: Visual Verification
+   ├─ 92: Live Serve
+   └─ 93: Agent Abstraction
 ```
 
 ## Milestones
