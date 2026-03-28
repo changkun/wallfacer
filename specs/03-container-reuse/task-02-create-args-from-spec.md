@@ -1,6 +1,6 @@
 # Task 2: Build Worker Create Args from ContainerSpec
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** 1 (Per-Task Worker Foundation)
 **Effort:** Small

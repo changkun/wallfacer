@@ -166,3 +166,93 @@ func TestContainerSpecBuild(t *testing.T) {
 		t.Errorf("args missing image: %v", args)
 	}
 }
+
+func TestBuildCreate(t *testing.T) {
+	spec := ContainerSpec{
+		Runtime: "podman",
+		Name:    "wallfacer-task-abc",
+		Image:   "wallfacer-claude:latest",
+		Network: "host",
+		Labels:  map[string]string{"wallfacer.task-id": "abc123"},
+		EnvFile: "/home/user/.wallfacer/.env",
+		Cmd:     []string{"-p", "do something", "--verbose"},
+	}
+	args := spec.BuildCreate()
+	joined := strings.Join(args, " ")
+
+	// Must start with "create", not "run".
+	if args[0] != "create" {
+		t.Errorf("expected first arg 'create', got %q", args[0])
+	}
+	// Must NOT include --rm.
+	if strings.Contains(joined, "--rm") {
+		t.Error("BuildCreate must not include --rm")
+	}
+	// Must include sleep entrypoint.
+	if !strings.Contains(joined, `["sleep","infinity"]`) {
+		t.Errorf("expected sleep entrypoint, got: %s", joined)
+	}
+	// Must NOT include the original Cmd.
+	if strings.Contains(joined, "do something") {
+		t.Error("BuildCreate must not include the agent command")
+	}
+	// Must include name, image, labels, env-file.
+	if !strings.Contains(joined, "--name wallfacer-task-abc") {
+		t.Errorf("missing --name: %s", joined)
+	}
+	if !strings.Contains(joined, "wallfacer-claude:latest") {
+		t.Errorf("missing image: %s", joined)
+	}
+	if !strings.Contains(joined, "wallfacer.task-id=abc123") {
+		t.Errorf("missing label: %s", joined)
+	}
+	if !strings.Contains(joined, "--env-file") {
+		t.Errorf("missing --env-file: %s", joined)
+	}
+}
+
+func TestBuildCreatePreservesAllMounts(t *testing.T) {
+	spec := ContainerSpec{
+		Runtime: "podman",
+		Name:    "test-worker",
+		Image:   "test:latest",
+		Volumes: []VolumeMount{
+			{Host: "claude-config", Container: "/home/claude/.claude", Named: true},
+			{Host: "/host/worktree", Container: "/workspace/repo", Options: "z"},
+			{Host: "/host/instructions", Container: "/workspace/AGENTS.md", Options: "ro"},
+		},
+		Cmd: []string{"echo", "ignored"},
+	}
+	args := spec.BuildCreate()
+	joined := strings.Join(args, " ")
+
+	if !strings.Contains(joined, "-v claude-config:/home/claude/.claude") {
+		t.Errorf("missing named volume: %s", joined)
+	}
+	if !strings.Contains(joined, "src=/host/worktree") {
+		t.Errorf("missing bind mount for worktree: %s", joined)
+	}
+	if !strings.Contains(joined, "src=/host/instructions") {
+		t.Errorf("missing bind mount for instructions: %s", joined)
+	}
+	// Cmd must not appear.
+	if strings.Contains(joined, "ignored") {
+		t.Error("BuildCreate must not include Cmd")
+	}
+}
+
+func TestBuildExec(t *testing.T) {
+	args := BuildExec("wallfacer-task-abc", []string{"/usr/local/bin/entrypoint.sh", "-p", "hello"})
+	if len(args) != 5 {
+		t.Fatalf("expected 5 args, got %d: %v", len(args), args)
+	}
+	if args[0] != "exec" {
+		t.Errorf("expected 'exec', got %q", args[0])
+	}
+	if args[1] != "wallfacer-task-abc" {
+		t.Errorf("expected container name, got %q", args[1])
+	}
+	if args[2] != "/usr/local/bin/entrypoint.sh" {
+		t.Errorf("expected command, got %q", args[2])
+	}
+}

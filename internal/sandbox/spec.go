@@ -105,6 +105,81 @@ func (s ContainerSpec) Build() []string {
 	return args
 }
 
+// BuildCreate returns the argument slice for `podman create` with a sleep
+// entrypoint. The container stays alive and subsequent invocations use
+// `podman exec`. Unlike Build(), this omits --rm and replaces the agent
+// command with a sleep entrypoint.
+func (s ContainerSpec) BuildCreate() []string {
+	network := s.Network
+	if network == "" {
+		network = "host"
+	}
+	args := []string{"create", "--network=" + network, "--name", s.Name,
+		"--entrypoint", `["sleep","infinity"]`}
+
+	for k := range sortedkeys.Of(s.Labels) {
+		args = append(args, "--label", k+"="+s.Labels[k])
+	}
+
+	if s.EnvFile != "" {
+		args = append(args, "--env-file", s.EnvFile)
+	}
+
+	for k := range sortedkeys.Of(s.Env) {
+		args = append(args, "-e", k+"="+s.Env[k])
+	}
+
+	for _, v := range s.Volumes {
+		if v.Named {
+			mount := v.Host + ":" + v.Container
+			if v.Options != "" {
+				mount += ":" + v.Options
+			}
+			args = append(args, "-v", mount)
+		} else {
+			hostPath := translateHostPath(v.Host, s.Runtime)
+			var parts []string
+			parts = append(parts, "type=bind", "src="+hostPath, "dst="+v.Container)
+			if v.Options != "" {
+				for opt := range strings.SplitSeq(v.Options, ",") {
+					opt = strings.TrimSpace(opt)
+					if opt == "ro" {
+						parts = append(parts, "readonly")
+					} else if opt != "" {
+						parts = append(parts, opt)
+					}
+				}
+			}
+			args = append(args, "--mount", strings.Join(parts, ","))
+		}
+	}
+
+	if s.WorkDir != "" {
+		args = append(args, "-w", s.WorkDir)
+	}
+
+	if s.CPUs != "" {
+		args = append(args, "--cpus", s.CPUs)
+	}
+	if s.Memory != "" {
+		args = append(args, "--memory", s.Memory)
+	}
+
+	args = append(args, s.ExtraFlags...)
+	args = append(args, s.Image)
+	// No Cmd — the sleep entrypoint keeps the container alive.
+
+	return args
+}
+
+// BuildExec returns the argument slice for `podman exec <name> <cmd...>`.
+func BuildExec(containerName string, cmd []string) []string {
+	args := make([]string, 0, 2+len(cmd))
+	args = append(args, "exec", containerName)
+	args = append(args, cmd...)
+	return args
+}
+
 // translateHostPath converts a Windows host path to a container-visible path
 // when running on Windows. On non-Windows systems this is a no-op.
 //
