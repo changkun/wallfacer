@@ -6,16 +6,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"io/fs"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"changkun.de/x/wallfacer/internal/logger"
 
@@ -68,7 +65,6 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	logger.Main.Info("desktop server listening", "addr", sc.Ln.Addr().String())
 
 	serverURL := fmt.Sprintf("http://localhost:%d", sc.ActualPort)
-	serverHost := fmt.Sprintf("localhost:%d", sc.ActualPort)
 
 	// wailsCtx is set by OnStartup and used by the tray to show/focus the window.
 	var wailsCtx context.Context
@@ -92,18 +88,12 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 
 	hideOnClose := runtime.GOOS == "darwin" || runtime.GOOS == "windows"
 
-	// Proxy handler that forwards both HTTP and WebSocket requests to the
-	// real server. The standard httputil.ReverseProxy handles HTTP; for
-	// WebSocket upgrades we tunnel the raw TCP connection.
+	// Reverse proxy for HTTP requests. WebSocket upgrades cannot go through
+	// the Wails AssetServer (no Hijacker support), so the terminal JS
+	// connects directly to the real server via the wallfacer-server-host
+	// meta tag injected by initServer.
 	target, _ := url.Parse(serverURL)
-	httpProxy := httputil.NewSingleHostReverseProxy(target)
-	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isWebSocketUpgrade(r) {
-			proxyWebSocket(w, r, serverHost)
-			return
-		}
-		httpProxy.ServeHTTP(w, r)
-	})
+	proxy := httputil.NewSingleHostReverseProxy(target)
 
 	appOpts := &options.App{
 		Title:             "Wallfacer",
@@ -111,7 +101,7 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 		Height:            900,
 		HideWindowOnClose: hideOnClose,
 		AssetServer: &assetserver.Options{
-			Handler: proxyHandler,
+			Handler: proxy,
 		},
 		OnStartup: func(ctx context.Context) {
 			wailsCtx = ctx
@@ -137,60 +127,4 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	}
 
 	return wails.Run(appOpts)
-}
-
-// isWebSocketUpgrade checks if the request is a WebSocket upgrade.
-func isWebSocketUpgrade(r *http.Request) bool {
-	return strings.EqualFold(r.Header.Get("Connection"), "Upgrade") &&
-		strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
-}
-
-// proxyWebSocket tunnels a WebSocket connection by hijacking the client
-// connection and opening a raw TCP connection to the backend server.
-func proxyWebSocket(w http.ResponseWriter, r *http.Request, targetHost string) {
-	// Connect to the backend server.
-	backendConn, err := net.Dial("tcp", targetHost)
-	if err != nil {
-		http.Error(w, "websocket proxy: dial failed", http.StatusBadGateway)
-		return
-	}
-	defer backendConn.Close()
-
-	// Hijack the client connection.
-	hj, ok := w.(http.Hijacker)
-	if !ok {
-		http.Error(w, "websocket proxy: hijack not supported", http.StatusInternalServerError)
-		return
-	}
-	clientConn, clientBuf, err := hj.Hijack()
-	if err != nil {
-		http.Error(w, "websocket proxy: hijack failed", http.StatusInternalServerError)
-		return
-	}
-	defer clientConn.Close()
-
-	// Forward the original HTTP upgrade request to the backend.
-	if err := r.Write(backendConn); err != nil {
-		return
-	}
-
-	// Flush any buffered data from the hijacked reader.
-	if clientBuf.Reader.Buffered() > 0 {
-		buffered := make([]byte, clientBuf.Reader.Buffered())
-		if _, err := clientBuf.Read(buffered); err == nil {
-			backendConn.Write(buffered)
-		}
-	}
-
-	// Bidirectional copy.
-	done := make(chan struct{}, 2)
-	go func() {
-		io.Copy(clientConn, backendConn)
-		done <- struct{}{}
-	}()
-	go func() {
-		io.Copy(backendConn, clientConn)
-		done <- struct{}{}
-	}()
-	<-done
 }

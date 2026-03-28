@@ -98,10 +98,20 @@ function connectTerminal() {
     return;
   }
 
-  var proto = location.protocol === "https:" ? "wss:" : "ws:";
   var cols = _term.cols || 80;
   var rows = _term.rows || 24;
-  var url = proto + "//" + location.host + "/api/terminal/ws";
+  // In desktop mode (Wails), the AssetServer proxy cannot forward WebSocket
+  // upgrades. Connect directly to the real server via the meta tag.
+  var serverHostMeta = document.querySelector(
+    'meta[name="wallfacer-server-host"]',
+  );
+  var wsHost = serverHostMeta ? serverHostMeta.content : location.host;
+  var proto = serverHostMeta
+    ? "ws:"
+    : location.protocol === "https:"
+      ? "wss:"
+      : "ws:";
+  var url = proto + "//" + wsHost + "/api/terminal/ws";
   url += "?cols=" + cols + "&rows=" + rows;
   var token =
     typeof getWallfacerToken === "function" ? getWallfacerToken() : "";

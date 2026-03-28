@@ -35,6 +35,7 @@ import (
 // IndexViewData holds the data passed to the index.html template.
 type IndexViewData struct {
 	ServerAPIKey string
+	ServerHost   string // Desktop mode: real "localhost:<port>" for direct WebSocket connections.
 }
 
 // ServerConfig holds the parsed flag values shared by RunServer and RunDesktop.
@@ -293,7 +294,14 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	actualHostPort := normalizeBrowserVisibleHostPort(cfg.Addr, ln.Addr())
 	actualPort := ln.Addr().(*net.TCPAddr).Port
 
-	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS)
+	indexData := IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}
+	if cfg.SkipCSRF {
+		// Desktop mode: the Wails AssetServer proxy cannot forward WebSocket
+		// upgrades (no Hijacker support), so the frontend needs the real
+		// server host for direct WebSocket connections.
+		indexData.ServerHost = fmt.Sprintf("localhost:%d", actualPort)
+	}
+	mux := BuildMux(h, reg, indexData, uiFS, docsFS)
 
 	srvHandler := handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
 	if !cfg.SkipCSRF {
