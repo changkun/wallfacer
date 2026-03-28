@@ -27,9 +27,13 @@ function toggleExplorer() {
   var btn = document.getElementById("explorer-toggle-btn");
   if (btn) btn.setAttribute("aria-expanded", String(isHidden));
 
-  // Load tree on first open
-  if (isHidden && !_explorerLoaded) {
-    _loadExplorerRoots();
+  if (isHidden) {
+    // Load tree on first open, refresh expanded dirs on subsequent opens.
+    if (!_explorerLoaded) {
+      _loadExplorerRoots();
+    } else {
+      _refreshExpandedNodes();
+    }
   }
 }
 
@@ -170,6 +174,21 @@ function _expandNode(node) {
       node.loading = false;
       _renderTree();
     });
+}
+
+// Re-fetch children for every expanded node in the tree so newly created
+// (or deleted) files become visible without a full tree reload.
+function _refreshExpandedNodes() {
+  function walk(nodes) {
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.expanded && n.type === "dir") {
+        _expandNode(n); // re-fetches children and re-renders
+        if (n.children) walk(n.children);
+      }
+    }
+  }
+  walk(_explorerRoots);
 }
 
 function _collapseNode(node) {
