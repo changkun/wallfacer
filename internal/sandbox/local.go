@@ -16,11 +16,11 @@ import (
 // LocalBackend implements Backend using a local container runtime
 // (podman or docker) via os/exec.
 type LocalBackend struct {
-	command           string                  // path to podman or docker binary
-	taskWorkers       map[string]*taskWorker  // key = task ID string
+	command           string                 // path to podman or docker binary
+	taskWorkers       map[string]*taskWorker // key = task ID string
 	taskWorkersMu     sync.Mutex
-	enableTaskWorkers bool                    // WALLFACER_TASK_WORKERS (default true)
-	reg               *metrics.Registry       // optional; nil disables metric collection
+	enableTaskWorkers bool              // WALLFACER_TASK_WORKERS (default true)
+	reg               *metrics.Registry // optional; nil disables metric collection
 
 	// Atomic counters for worker lifecycle (also sent to Prometheus via reg).
 	workerCreates   atomic.Uint64
