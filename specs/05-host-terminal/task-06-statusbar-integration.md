@@ -1,6 +1,6 @@
 # Task 6: Status Bar Integration and Visibility Gate
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 2, 4, 5
 **Phase:** Phase 1 — Single Terminal Session
 **Effort:** Medium
