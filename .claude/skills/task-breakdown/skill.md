@@ -96,12 +96,43 @@ Check that:
 - The dependency graph allows parallel execution where possible
 - Each task's "What to do" section references real file paths and function names
 
-## Step 6: Commit
+## Step 6: Document dependencies in the spec
 
-Stage the new task folder and files. Commit with a message like:
-`specs: break down <spec-name> into implementable tasks`
+Append a `## Task Breakdown` section to the original spec file (if one does not
+already exist). Include a summary table and a Mermaid dependency graph:
 
-## Step 7: Summary
+````markdown
+## Task Breakdown
+
+| # | Task | Depends on | Effort | Status |
+|---|------|-----------|--------|--------|
+| 1 | [Short title](folder/task-01-name.md) | — | Small | Todo |
+| 2 | [Short title](folder/task-02-name.md) | 1 | Medium | Todo |
+| 3 | [Short title](folder/task-03-name.md) | 1 | Small | Todo |
+| 4 | [Short title](folder/task-04-name.md) | 2, 3 | Large | Todo |
+
+```mermaid
+graph LR
+  1[Task 1: Short title] --> 2[Task 2: Short title]
+  1 --> 3[Task 3: Short title]
+  2 --> 4[Task 4: Short title]
+  3 --> 4
+```
+````
+
+Use relative links from the spec to the task files. Tasks with no dependencies
+should appear as root nodes. The graph makes the critical path and parallelism
+opportunities visible at a glance.
+
+If the spec already has a `## Task Breakdown` section, replace its contents with
+the updated table and graph.
+
+## Step 7: Commit
+
+Stage the new task folder, task files, and the updated spec. Commit with a
+message like: `specs: break down <spec-name> into implementable tasks`
+
+## Step 8: Summary
 
 Report to the user:
 - Total number of tasks created
