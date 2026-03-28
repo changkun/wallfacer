@@ -111,6 +111,9 @@ func (r *Runner) EnsureTaskWorktrees(taskID uuid.UUID, existing map[string]strin
 
 // CleanupWorktrees is the exported variant of cleanupWorktrees for handler use.
 func (r *Runner) CleanupWorktrees(taskID uuid.UUID, worktreePaths map[string]string, branchName string) {
+	// Stop the per-task worker container before removing worktrees.
+	// This is the final cleanup point — title/oversight/commit are done by now.
+	r.StopTaskWorker(taskID)
 	r.worktreeMu.Lock()
 	defer r.worktreeMu.Unlock()
 	r.cleanupWorktrees(taskID, worktreePaths, branchName)
