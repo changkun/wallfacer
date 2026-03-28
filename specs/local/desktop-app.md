@@ -185,6 +185,7 @@ Would run the Go binary as a child process. Adds ~150 MB for bundled Chromium, i
 | 6 | [System tray — cost & stats display](desktop-app/task-06-tray-cost-display.md) | 4 | Small | Todo |
 | 7 | [Platform-specific behaviors](desktop-app/task-07-platform-behaviors.md) | 3 | Medium | Todo |
 | 8 | [App icons & build packaging](desktop-app/task-08-icons-packaging.md) | 2, 7 | Medium | Todo |
+| 9 | [CI builds & release distribution](desktop-app/task-09-ci-distribution.md) | 8 | Large | Todo |
 
 ```mermaid
 graph LR
@@ -196,4 +197,5 @@ graph LR
   3 --> 7[Task 7: Platform behaviors]
   2 --> 8[Task 8: Icons & packaging]
   7 --> 8
+  8 --> 9[Task 9: CI & distribution]
 ```

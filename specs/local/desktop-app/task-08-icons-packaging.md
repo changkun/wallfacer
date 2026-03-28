@@ -22,7 +22,7 @@ Create app icon assets and Makefile targets to produce distributable binaries: `
 ### macOS Packaging
 3. Create `build/darwin/Info.plist` with:
    - `CFBundleName: Wallfacer`
-   - `CFBundleIdentifier: de.changkun.wallfacer`
+   - `CFBundleIdentifier: ai.latere.wallfacer`
    - `CFBundleVersion` and `CFBundleShortVersionString` from build flags
    - `LSUIElement: false` (show in dock)
 4. Wails build produces `.app` bundle automatically when targeting macOS
