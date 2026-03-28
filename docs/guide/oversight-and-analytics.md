@@ -273,11 +273,22 @@ Server-side search requires at least 2 characters after the `@` prefix and debou
 
 ### Keyboard Shortcuts
 
-| Shortcut | Action |
-|---|---|
-| `/` | Focus the search bar |
-| `Cmd+K` / `Ctrl+K` | Open command palette |
-| `Escape` | Close search panel, command palette, or blur search bar |
+| Shortcut | Context | Action |
+|---|---|---|
+| `n` | Board | Open new task form |
+| `/` | Board | Focus the search bar |
+| `Cmd+K` / `Ctrl+K` | Board | Open command palette |
+| `` ` `` | Board | Toggle terminal panel |
+| `?` | Board | Show keyboard shortcuts help |
+| `Escape` | Any | Close topmost modal or blur search bar |
+| `Ctrl+Enter` / `Cmd+Enter` | New task form | Save task |
+| `Escape` | New task form | Cancel |
+| `Enter` / `Space` | Focused card | Open task detail |
+| `Arrow keys` | Focused card | Navigate between cards |
+| `s` | Focused backlog card | Start task |
+| `d` | Focused waiting card | Mark as done |
+
+Board shortcuts are suppressed when focus is in a text input or when a modal is open.
 
 ---
 
