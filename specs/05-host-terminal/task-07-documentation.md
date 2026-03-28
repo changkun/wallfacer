@@ -1,6 +1,6 @@
 # Task 7: Documentation
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 4, 6
 **Phase:** Phase 1 — Single Terminal Session
 **Effort:** Small

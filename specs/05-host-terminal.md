@@ -1,6 +1,6 @@
 # Plan: Host Shell Terminal Panel
 
-**Status:** Not Started
+**Status:** Complete (Phase 1)
 **Date:** 2026-03-22 (revised 2026-03-28)
 
 ---
@@ -308,13 +308,13 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 | # | Task | Depends on | Effort | Status |
 |---|------|-----------|--------|--------|
-| 1 | [WebSocket dep + inline PTY](05-host-terminal/task-01-go-dependencies.md) | — | Small | Todo |
-| 2 | [TerminalEnabled envconfig + config](05-host-terminal/task-02-envconfig-terminal-enabled.md) | — | Small | Todo |
-| 3 | [Vendor xterm.js assets](05-host-terminal/task-03-vendor-xtermjs.md) | — | Small | Todo |
-| 4 | [Backend terminal handler + route](05-host-terminal/task-04-backend-terminal-handler.md) | 1, 2 | Large | Todo |
-| 5 | [Frontend terminal.js](05-host-terminal/task-05-frontend-terminal-js.md) | 3 | Medium | Todo |
-| 6 | [Status bar integration + visibility gate](05-host-terminal/task-06-statusbar-integration.md) | 2, 4, 5 | Medium | Todo |
-| 7 | [Documentation](05-host-terminal/task-07-documentation.md) | 4, 6 | Small | Todo |
+| 1 | [WebSocket dep + inline PTY](05-host-terminal/task-01-go-dependencies.md) | — | Small | Done |
+| 2 | [TerminalEnabled envconfig + config](05-host-terminal/task-02-envconfig-terminal-enabled.md) | — | Small | Done |
+| 3 | [Vendor xterm.js assets](05-host-terminal/task-03-vendor-xtermjs.md) | — | Small | Done |
+| 4 | [Backend terminal handler + route](05-host-terminal/task-04-backend-terminal-handler.md) | 1, 2 | Large | Done |
+| 5 | [Frontend terminal.js](05-host-terminal/task-05-frontend-terminal-js.md) | 3 | Medium | Done |
+| 6 | [Status bar integration + visibility gate](05-host-terminal/task-06-statusbar-integration.md) | 2, 4, 5 | Medium | Done |
+| 7 | [Documentation](05-host-terminal/task-07-documentation.md) | 4, 6 | Small | Done |
 
 ```mermaid
 graph LR
