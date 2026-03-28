@@ -173,7 +173,8 @@ func (b *LocalBackend) StopTaskWorker(taskID string) {
 	}
 }
 
-// ShutdownWorkers stops all active task workers. Called during server shutdown.
+// ShutdownWorkers stops all active task workers in parallel.
+// Called during server shutdown.
 func (b *LocalBackend) ShutdownWorkers() {
 	b.taskWorkersMu.Lock()
 	workers := make([]*taskWorker, 0, len(b.taskWorkers))
@@ -183,9 +184,15 @@ func (b *LocalBackend) ShutdownWorkers() {
 	b.taskWorkers = make(map[string]*taskWorker)
 	b.taskWorkersMu.Unlock()
 
+	var wg sync.WaitGroup
 	for _, w := range workers {
-		w.stop()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			w.stop()
+		}()
 	}
+	wg.Wait()
 }
 
 // WorkerStats returns aggregate statistics about the worker lifecycle.
