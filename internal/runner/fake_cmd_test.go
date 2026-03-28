@@ -32,7 +32,7 @@ func runFakeCmd(mode string) {
 		// Skip container lifecycle subcommands without advancing the counter.
 		if len(os.Args) > 1 {
 			switch os.Args[1] {
-			case "rm", "kill", "inspect", "ps":
+			case "rm", "kill", "inspect", "ps", "create", "start":
 				os.Exit(0)
 			}
 		}

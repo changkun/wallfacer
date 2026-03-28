@@ -294,10 +294,23 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.
 	})
 	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)
 	spec.Volumes = r.appendDependencyCacheVolumes(spec.Volumes)
+	spec.Entrypoint = entrypointForSandbox(sb)
 	spec.Network = r.resolvedContainerNetwork()
 	spec.CPUs = r.resolvedContainerCPUs()
 	spec.Memory = r.resolvedContainerMemory()
 	return spec
+}
+
+// entrypointForSandbox returns the entrypoint script path for the given
+// sandbox type. This is needed because podman exec does not invoke the
+// image ENTRYPOINT automatically; worker containers must prepend it.
+func entrypointForSandbox(sb sandbox.Type) string {
+	switch sb {
+	case sandbox.Codex:
+		return "/usr/local/bin/entrypoint.sh"
+	default:
+		return "/usr/local/bin/entrypoint.sh"
+	}
 }
 
 // dependencyCacheVolumes are the common dependency cache directories

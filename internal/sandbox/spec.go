@@ -34,6 +34,10 @@ type ContainerSpec struct {
 	CPUs   string   // e.g. "2.0" → --cpus 2.0
 	Memory string   // e.g. "4g"  → --memory 4g
 	Cmd    []string // appended after image
+	// Entrypoint is the script to invoke via exec in worker containers.
+	// podman exec does not invoke the image ENTRYPOINT automatically, so
+	// it must be specified explicitly. Empty means no entrypoint prefix.
+	Entrypoint string
 }
 
 // Build returns the complete argument slice starting with "run".
