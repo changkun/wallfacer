@@ -245,13 +245,27 @@ function loadSystemStatus() {
       // Worker stats.
       if (data.worker_stats) {
         var ws = data.worker_stats;
-        lines.push(
+        var workerLine =
           "<div>Task workers: <strong>" +
-            (ws.enabled ? "enabled" : "disabled") +
-            "</strong> &middot; Active: <strong>" +
-            (ws.active_workers || 0) +
-            "</strong></div>",
-        );
+          (ws.enabled ? "enabled" : "disabled") +
+          "</strong> &middot; Active: <strong>" +
+          (ws.active_workers || 0) +
+          "</strong>";
+        if (ws.creates > 0 || ws.execs > 0) {
+          var total = (ws.execs || 0) + (ws.fallbacks || 0);
+          var ratio = total > 0 ? Math.round(((ws.execs || 0) / total) * 100) : 0;
+          workerLine +=
+            " &middot; Creates: " +
+            (ws.creates || 0) +
+            " &middot; Execs: " +
+            (ws.execs || 0) +
+            (ws.fallbacks > 0 ? " &middot; Fallbacks: " + ws.fallbacks : "") +
+            " &middot; Reuse: <strong>" +
+            ratio +
+            "%</strong>";
+        }
+        workerLine += "</div>";
+        lines.push(workerLine);
       }
 
       // Task states.

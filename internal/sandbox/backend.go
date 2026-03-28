@@ -78,8 +78,11 @@ type WorkerManager interface {
 
 // WorkerStatsInfo holds aggregate worker lifecycle statistics.
 type WorkerStatsInfo struct {
-	Enabled       bool `json:"enabled"`
-	ActiveWorkers int  `json:"active_workers"`
+	Enabled       bool   `json:"enabled"`
+	ActiveWorkers int    `json:"active_workers"`
+	Creates       uint64 `json:"creates"`
+	Execs         uint64 `json:"execs"`
+	Fallbacks     uint64 `json:"fallbacks"`
 }
 
 // ContainerInfo holds runtime metadata about a container, used by List()

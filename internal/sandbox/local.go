@@ -21,6 +21,11 @@ type LocalBackend struct {
 	taskWorkersMu     sync.Mutex
 	enableTaskWorkers bool                    // WALLFACER_TASK_WORKERS (default true)
 	reg               *metrics.Registry       // optional; nil disables metric collection
+
+	// Atomic counters for worker lifecycle (also sent to Prometheus via reg).
+	workerCreates   atomic.Uint64
+	workerExecs     atomic.Uint64
+	workerFallbacks atomic.Uint64
 }
 
 // LocalBackendConfig holds optional settings for LocalBackend.
@@ -61,9 +66,11 @@ func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, 
 			// Worker failed — fall back to ephemeral.
 			logger.Runner.Warn("task worker failed, falling back to ephemeral",
 				"task", taskID, "error", err)
+			b.workerFallbacks.Add(1)
 			b.incWorkerMetric("wallfacer_container_worker_fallbacks_total")
 			return b.launchEphemeral(ctx, spec)
 		}
+		b.workerExecs.Add(1)
 		b.incWorkerMetric("wallfacer_container_worker_execs_total")
 		return h, nil
 	}
@@ -80,6 +87,7 @@ func (b *LocalBackend) launchViaTaskWorker(ctx context.Context, spec ContainerSp
 		workerName := "wallfacer-worker-" + taskID[:min(8, len(taskID))]
 		w = newTaskWorker(b.command, workerName, spec.BuildCreate())
 		b.taskWorkers[taskID] = w
+		b.workerCreates.Add(1)
 		b.incWorkerMetric("wallfacer_container_worker_creates_total")
 	}
 	b.taskWorkersMu.Unlock()
@@ -162,6 +170,9 @@ func (b *LocalBackend) WorkerStats() WorkerStatsInfo {
 	return WorkerStatsInfo{
 		Enabled:       b.enableTaskWorkers,
 		ActiveWorkers: active,
+		Creates:       b.workerCreates.Load(),
+		Execs:         b.workerExecs.Load(),
+		Fallbacks:     b.workerFallbacks.Load(),
 	}
 }
 
