@@ -54,8 +54,7 @@ func TestTaskStoreResolution(t *testing.T) {
 	// by mapping a task to the viewed group's key.
 	snap := mgr.Snapshot()
 
-	_, r := setupTestRunner(t, nil)
-	r.workspaceManager = mgr
+	_, r := setupTestRunnerWithManager(t, nil, mgr)
 
 	taskID := uuid.New()
 	r.taskWSKey.Store(taskID, snap.Key)
@@ -75,8 +74,8 @@ func TestTaskStoreFallback(t *testing.T) {
 	}
 	t.Cleanup(func() { storeA.Close() })
 
-	_, r := setupTestRunner(t, nil)
-	r.workspaceManager = workspace.NewStatic(storeA, nil, "")
+	mgr := workspace.NewStatic(storeA, nil, "")
+	_, r := setupTestRunnerWithManager(t, nil, mgr)
 
 	// Apply a snapshot so currentStore returns storeA.
 	r.storeMu.Lock()
@@ -106,8 +105,7 @@ func TestRunBackgroundCapturesWSKey(t *testing.T) {
 	mgr := workspace.NewStatic(s, []string{"/ws/a"}, "")
 	snap := mgr.Snapshot()
 
-	_, r := setupTestRunner(t, nil)
-	r.workspaceManager = mgr
+	_, r := setupTestRunnerWithManager(t, nil, mgr)
 	r.applyWorkspaceSnapshot(snap)
 
 	taskID := uuid.New()
@@ -146,8 +144,7 @@ func TestRunBackgroundIncrementsTaskCount(t *testing.T) {
 	mgr := workspace.NewStatic(s, []string{"/ws/a"}, "")
 	snap := mgr.Snapshot()
 
-	_, r := setupTestRunner(t, nil)
-	r.workspaceManager = mgr
+	_, r := setupTestRunnerWithManager(t, nil, mgr)
 	r.applyWorkspaceSnapshot(snap)
 
 	// Launch two tasks to verify count increments.
@@ -183,8 +180,7 @@ func TestRunBackgroundCleansUpOnCompletion(t *testing.T) {
 	// Manually increment to simulate pre-existing task count.
 	mgr.IncrementTaskCount(snap.Key)
 
-	_, r := setupTestRunner(t, nil)
-	r.workspaceManager = mgr
+	_, r := setupTestRunnerWithManager(t, nil, mgr)
 	r.applyWorkspaceSnapshot(snap)
 
 	taskID := uuid.New()
@@ -215,8 +211,7 @@ func TestTaskStoreFallbackOnMissingGroup(t *testing.T) {
 
 	mgr := workspace.NewStatic(storeA, nil, "")
 
-	_, r := setupTestRunner(t, nil)
-	r.workspaceManager = mgr
+	_, r := setupTestRunnerWithManager(t, nil, mgr)
 	r.storeMu.Lock()
 	r.store = storeA
 	r.storeMu.Unlock()

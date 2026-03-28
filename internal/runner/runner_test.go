@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
+	"changkun.de/x/wallfacer/internal/workspace"
 	"github.com/google/uuid"
 )
 
@@ -54,6 +56,14 @@ func setupTestRepo(t *testing.T) string {
 // The container command is a dummy since we're testing host-side operations.
 func setupTestRunner(t *testing.T, workspaces []string) (*store.Store, *Runner) {
 	t.Helper()
+	return setupTestRunnerWithManager(t, workspaces, nil)
+}
+
+// setupTestRunnerWithManager is like setupTestRunner but accepts an optional
+// workspace manager. Passing the manager at construction avoids data races
+// with the board subscription goroutine that reads workspaceManager.
+func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspace.Manager) (*store.Store, *Runner) {
+	t.Helper()
 	dataDir := t.TempDir()
 	s, err := store.NewFileStore(dataDir)
 	if err != nil {
@@ -67,11 +77,12 @@ func setupTestRunner(t *testing.T, workspaces []string) (*store.Store, *Runner) 
 	}
 
 	runner := NewRunner(s, RunnerConfig{
-		Command:      "echo", // dummy — not used for host-side operations
-		SandboxImage: "test:latest",
-		EnvFile:      "",
-		Workspaces:   workspaces,
-		WorktreesDir: worktreesDir,
+		Command:          "echo", // dummy — not used for host-side operations
+		SandboxImage:     "test:latest",
+		EnvFile:          "",
+		Workspaces:       workspaces,
+		WorktreesDir:     worktreesDir,
+		WorkspaceManager: mgr,
 	})
 	return s, runner
 }
@@ -109,6 +120,13 @@ func containsConsecutive(slice []string, needle1, needle2 string) bool {
 	return false
 }
 
+// hostPath translates a host filesystem path through the same path conversion
+// that ContainerSpec.Build applies. On non-Windows systems this is a no-op.
+// runtimeBin should match the runner's Command field (e.g. "podman").
+func hostPath(path, runtimeBin string) string {
+	return sandbox.TranslateHostPath(path, runtimeBin)
+}
+
 // ---------------------------------------------------------------------------
 // Runner.buildContainerArgs — CLAUDE.md mount
 // ---------------------------------------------------------------------------
@@ -125,7 +143,7 @@ func TestContainerArgsMountsCLAUDEMD(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, instructionsFile)
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
+	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("args should contain --mount %q; got: %v", expectedMount, args)
 	}
@@ -208,14 +226,14 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
+	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("single workspace: CLAUDE.md should be mounted at /workspace/CLAUDE.md; got args: %v", args)
 	}
 
 	// Must NOT be mounted inside the workspace subdirectory.
 	basename := filepath.Base(ws)
-	wrongMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/" + basename + "/CLAUDE.md," + expectedBuildROSuffix()
+	wrongMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/" + basename + "/CLAUDE.md," + expectedBuildROSuffix()
 	if containsConsecutive(args, "--mount", wrongMount) {
 		t.Fatalf("single workspace: CLAUDE.md should NOT be at /workspace/%s/CLAUDE.md", basename)
 	}
@@ -247,7 +265,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	})
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
+	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("multi workspace: CLAUDE.md should be at /workspace/CLAUDE.md; got args: %v", args)
 	}
@@ -264,7 +282,7 @@ func TestContainerArgsCodexMountsAGENTSMD(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, instructionsFile)
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
 
-	expectedMount := "type=bind,src=" + instructionsFile + ",dst=/workspace/AGENTS.md," + expectedBuildROSuffix()
+	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/AGENTS.md," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("codex sandbox: AGENTS.md should be mounted at /workspace/AGENTS.md; got args: %v", args)
 	}
@@ -295,7 +313,7 @@ func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
 	})
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
 
-	expectedMount := "type=bind,src=" + codexAuthDir + ",dst=/home/codex/.codex," + expectedBuildROSuffix()
+	expectedMount := "type=bind,src=" + hostPath(codexAuthDir, "podman") + ",dst=/home/codex/.codex," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
 		t.Fatalf("codex sandbox: expected host codex auth cache mount %q; got args: %v", expectedMount, args)
 	}
@@ -428,7 +446,7 @@ func TestBuildContainerArgs_BoardMount(t *testing.T) {
 	runner := newTestRunnerWithInstructions(t, "")
 	boardDir := t.TempDir()
 	args := runner.buildContainerArgs("name", "", "prompt", "", nil, boardDir, nil, "")
-	expected := "type=bind,src=" + boardDir + ",dst=/workspace/.tasks," + expectedBuildROSuffix()
+	expected := "type=bind,src=" + hostPath(boardDir, "podman") + ",dst=/workspace/.tasks," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expected) {
 		t.Fatalf("expected board mount %q in args; got: %v", expected, args)
 	}
@@ -455,7 +473,7 @@ func TestBuildContainerArgs_SiblingMounts(t *testing.T) {
 		"abcd1234": {"/home/user/myrepo": siblingDir},
 	}
 	args := runner.buildContainerArgs("name", "", "prompt", "", nil, "", siblingMounts, "")
-	expected := "type=bind,src=" + siblingDir + ",dst=/workspace/.tasks/worktrees/abcd1234/myrepo," + expectedBuildROSuffix()
+	expected := "type=bind,src=" + hostPath(siblingDir, "podman") + ",dst=/workspace/.tasks/worktrees/abcd1234/myrepo," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expected) {
 		t.Fatalf("expected sibling mount %q in args; got: %v", expected, args)
 	}
