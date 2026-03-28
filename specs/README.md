@@ -168,6 +168,15 @@ M6a depends on M1 + M2. M6b depends on M1 + M6a. M6c depends on M6a + M6b + M2 c
 | [92-live-serve.md](92-live-serve.md) | Not started | Build and run developed software from within Wallfacer |
 | [93-agent-abstraction.md](93-agent-abstraction.md) | Not started | Agent role abstraction, pluggable role descriptors, multi-agent communication |
 
+## Deployment Scaling Strategy
+
+Two modes, no intermediate step:
+
+1. **VPS (today):** Single VM, single user, filesystem storage, local containers. ~$48–96/mo on DO. This is the development and personal environment.
+2. **K8s (when scaling):** Go straight to managed K8s. Each tenant gets a wallfacer pod + PVC. Task containers dispatch as K8s Jobs on shared nodes. Validated by running yourself as tenant #1 on the cluster.
+
+**Why no VM-per-tenant intermediate?** The wallfacer binary is identical in both modes. Building a VM provisioner for the control plane then replacing it with K8s pod provisioning is wasted work. On DO, DOKS control plane is free — the cost premium over VPS is ~$32/mo (managed PG + Spaces + LB). See [06-cloud-backends.md](06-cloud-backends.md) for full cost estimates.
+
 ## Ordering Rationale
 
 - **Epic coordination depends on M4 (file explorer)** for its spec management UX. The backend pieces (planner task kind, board.json context, gate tasks) are independent, but the full UX — browsing specs, focused markdown view, chat-driven iteration — requires the file explorer panel. Implement M4 Phase 1 first, then epic coordination.
