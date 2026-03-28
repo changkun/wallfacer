@@ -68,6 +68,79 @@ The file explorer is a collapsible panel on the left side of the board, between 
 - **Toggle button** in the header (file tree icon), keyboard shortcut `Ctrl+E` / `Cmd+E`
 - **File click** opens a preview/edit modal overlay (reusing the existing modal pattern), not inside the side panel itself — keeps the panel narrow and focused on navigation
 
+### User Experience
+
+#### Opening the Explorer
+
+The explorer panel is hidden by default. Users open it via:
+
+1. **Header button** — a file-tree icon in the header bar, placed before the existing settings/docs buttons. Clicking toggles the panel open/closed.
+2. **Keyboard shortcut** — `Ctrl+E` (Linux/Windows) or `Cmd+E` (macOS). Same toggle behavior.
+
+When the panel opens, it slides in from the left, pushing the board grid narrower. The board columns reflow to fit the remaining width. When closed, the board reclaims the full width. The transition should feel instant (no animation delay).
+
+#### Browsing the Tree
+
+Each active workspace appears as a root node in the tree, labeled by its directory basename (e.g., `wallfacer` for `/home/user/dev/wallfacer`). On first open, the panel fetches the top-level listing for each workspace root.
+
+- **Expand a directory**: Click the directory name or press Enter when focused. A loading indicator appears briefly while children are fetched. Children render indented below the parent with a disclosure triangle (▶ → ▼).
+- **Collapse a directory**: Click again or press Enter. Children are removed from the DOM (state discarded to keep memory lean).
+- **Navigate with keyboard**: Arrow keys move focus up/down through visible nodes. Right arrow expands a collapsed directory; left arrow collapses an expanded one or moves focus to the parent.
+- **Sorting**: Directories appear first, then files, each group sorted alphabetically (case-insensitive). Hidden entries (`.`-prefixed like `.github`, `.env`) are included but rendered with dimmed text so they don't dominate the tree.
+- **Lazy loading**: Only one level is fetched at a time. Deep directory trees don't cause upfront load — users drill down as needed.
+
+#### Previewing a File
+
+Clicking a file name (or pressing Enter on a focused file node) opens a **modal overlay** centered on the screen:
+
+- **Title bar**: Full file path relative to the workspace root (e.g., `src/internal/handler/config.go`)
+- **Content area**: Syntax-highlighted code with line numbers. Highlighting uses the existing `extToLang()` mapping (40+ extensions) and highlight.js. For unknown extensions, content renders as plain text.
+- **Binary files**: If the file is detected as binary (null bytes in first 8 KB), the modal shows a placeholder: "Binary file (12.4 KB)" instead of content.
+- **Large files**: Files over 2 MB return a 413 error; the modal shows: "File too large to preview (3.2 MB, max 2 MB)."
+- **Close**: Click the backdrop, press Escape, or click the X button.
+
+The modal pattern matches existing modals in the UI (task detail, diff viewer, oversight) — same backdrop, same close behavior, same z-index layering.
+
+#### Editing a File (Phase 2)
+
+In the file preview modal, an "Edit" button in the title bar switches to edit mode:
+
+- The highlighted `<pre>` block is replaced by a monospace `<textarea>` with the raw file content.
+- Tab key inserts a tab character (not focus-shift).
+- "Save" button writes via `PUT /api/explorer/file` and returns to preview mode with updated content.
+- "Discard" button reverts to preview mode without saving.
+- If the user closes the modal with unsaved changes, a confirmation prompt appears: "You have unsaved changes. Discard?"
+- Save errors (permission denied, disk full) display inline in the modal, not as a separate alert.
+
+#### Resize Behavior
+
+The vertical drag handle on the panel's right edge follows the same interaction pattern as the terminal panel's horizontal resize:
+
+- Drag to resize between a minimum (200px) and maximum (50% of viewport width).
+- Width is persisted to `localStorage` and restored on next visit.
+- The board grid adjusts in real time during drag (no snap-on-release).
+- Double-clicking the handle resets to the default width (260px).
+
+#### Relationship to Terminal Panel
+
+The explorer (left side panel) and terminal (bottom panel) are independent and can be open simultaneously:
+
+```
++--header----------------------------------------------+
+| [Explorer] ... [other buttons]                       |
++------+-----------------------------------------------+
+|      |                                               |
+| File |  board-grid (4 kanban columns)                |
+| Tree |                                               |
+|      |                                               |
++------+-----------------------------------------------+
+|      | terminal panel                                |
++------+-----------------------------------------------+
++--status-bar------------------------------------------+
+```
+
+The terminal panel spans the full width below the board (including under the explorer panel). When both are open, the board grid occupies the remaining rectangle. This avoids complex corner-case layout logic — each panel owns one axis (explorer = horizontal, terminal = vertical).
+
 ### Backend: Three New API Endpoints
 
 #### 1. `GET /api/explorer/tree` — Directory Listing
