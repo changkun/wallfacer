@@ -1,6 +1,6 @@
 # Task 8: Backend File Writing
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** Phase 2 — File Editing + Saving
 **Effort:** Medium
@@ -66,3 +66,7 @@ Add to `internal/handler/explorer_test.go`:
 - Do NOT add file creation or deletion endpoints (Phase 3)
 - Do NOT add file locking or conflict detection
 - Authentication and CSRF are already handled by middleware — no extra auth logic needed
+
+## Implementation notes
+
+- **Non-existent target files:** `isWithinWorkspace` uses `filepath.EvalSymlinks` which fails for non-existent paths. Since write targets may not exist yet (creating new files), the handler falls back to a manual containment check (`filepath.Clean` + `strings.HasPrefix`) when `isWithinWorkspace` errors, then verifies the parent directory exists. This is the same pattern used by `ExplorerReadFile` for 404 detection.

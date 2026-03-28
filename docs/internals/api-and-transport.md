@@ -97,6 +97,7 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | **File Explorer** | |
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/file` | Read file contents from a workspace |
+| `PUT /api/explorer/file` | Write file contents to a workspace |
 | **Admin** | |
 | `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
 | **Refinement agent** | |
