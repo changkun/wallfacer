@@ -15,7 +15,7 @@ function showContainerMonitor(e) {
   fetchContainers();
 
   // Auto-refresh every 5 seconds while the modal is open.
-  containerMonitorInterval = setInterval(fetchContainers, 5000);
+  containerMonitorInterval = setInterval(fetchContainersQuiet, 5000);
 }
 
 function closeContainerMonitor() {
@@ -28,11 +28,9 @@ function closeContainerMonitor() {
 }
 
 function refreshContainerMonitor() {
-  // Show "Refreshing…" in the footer instead of swapping to the
-  // loading state, so the existing table stays visible.
   var updated = document.getElementById("container-monitor-updated");
   if (updated) updated.textContent = "Refreshing…";
-  fetchContainers();
+  fetchContainersQuiet();
 }
 
 function setContainerMonitorState(state) {
@@ -48,12 +46,24 @@ function setContainerMonitorState(state) {
   return containerMonitorStateCtrl(state);
 }
 
+// Initial fetch — shows loading state.
 function fetchContainers() {
   loadJsonEndpoint(
     "/api/containers",
     renderContainers,
     setContainerMonitorState,
   );
+}
+
+// Quiet fetch — keeps existing content visible, only shows error on failure.
+function fetchContainersQuiet() {
+  var request =
+    typeof apiGet === "function"
+      ? apiGet("/api/containers", {})
+      : fetch("/api/containers").then(function (res) { return res.json(); });
+  request
+    .then(function (data) { renderContainers(data); })
+    .catch(function (err) { setContainerMonitorState("error", String(err)); });
 }
 
 function renderContainers(containers) {
