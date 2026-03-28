@@ -204,6 +204,9 @@ function makeContext(opts = {}) {
     splitHighlightedLines: function (html) {
       return html.split("\n");
     },
+    renderMarkdown: function (text) {
+      return "<div>" + text + "</div>";
+    },
     hljs: {
       highlight: function (code) {
         return { value: code };
@@ -529,8 +532,14 @@ describe("_getFileIcon", () => {
 describe("_isEditDirty", () => {
   it("returns false when not in edit mode", () => {
     const { win } = makeContext();
-    // _isEditDirty relies on _editMode being false and no textarea in DOM
     expect(win._isEditDirty()).toBe(false);
+  });
+});
+
+describe("_toggleMarkdownView", () => {
+  it("is exposed on window", () => {
+    const { win } = makeContext();
+    expect(typeof win._toggleMarkdownView).toBe("function");
   });
 });
 

@@ -264,6 +264,24 @@ function _renderHighlightedContent(content, filename) {
   return html;
 }
 
+function _toggleMarkdownView() {
+  var rendered = document.getElementById("explorer-md-rendered");
+  var raw = document.getElementById("explorer-md-raw");
+  var btn = document.getElementById("explorer-md-toggle-btn");
+  if (!rendered || !raw || !btn) return;
+
+  var showingRendered = !rendered.classList.contains("hidden");
+  if (showingRendered) {
+    rendered.classList.add("hidden");
+    raw.classList.remove("hidden");
+    btn.textContent = "Preview";
+  } else {
+    rendered.classList.remove("hidden");
+    raw.classList.add("hidden");
+    btn.textContent = "Raw";
+  }
+}
+
 function _openFilePreview(node) {
   _previewFocusReturn = document.activeElement;
   _previewNode = node;
@@ -295,6 +313,7 @@ function _openFilePreview(node) {
     escapeHtml(relPath) +
     "</span>" +
     '<div class="explorer-preview__actions">' +
+    '<button id="explorer-md-toggle-btn" class="explorer-preview__edit-btn" onclick="_toggleMarkdownView()" style="display:none">Raw</button>' +
     '<button id="explorer-edit-btn" class="explorer-preview__edit-btn" onclick="_enterEditMode()" style="display:none">Edit</button>' +
     '<button id="explorer-save-btn" class="explorer-preview__save-btn" onclick="_saveFile()" style="display:none">Save</button>' +
     '<button id="explorer-discard-btn" class="explorer-preview__discard-btn" onclick="_discardEdit()" style="display:none">Discard</button>' +
@@ -364,10 +383,26 @@ function _openFilePreview(node) {
       var editBtn = document.getElementById("explorer-edit-btn");
       if (editBtn) editBtn.style.display = "";
 
-      contentEl.innerHTML = _renderHighlightedContent(
-        result.content,
-        node.name,
-      );
+      // Markdown files: show rendered view by default with Raw toggle
+      var lowerName = node.name.toLowerCase();
+      var isMd = lowerName.endsWith(".md") || lowerName.endsWith(".mdx");
+      if (isMd && typeof renderMarkdown === "function") {
+        var mdToggle = document.getElementById("explorer-md-toggle-btn");
+        if (mdToggle) mdToggle.style.display = "";
+
+        contentEl.innerHTML =
+          '<div id="explorer-md-rendered" class="explorer-preview__markdown prose-content">' +
+          renderMarkdown(result.content) +
+          "</div>" +
+          '<div id="explorer-md-raw" class="hidden">' +
+          _renderHighlightedContent(result.content, node.name) +
+          "</div>";
+      } else {
+        contentEl.innerHTML = _renderHighlightedContent(
+          result.content,
+          node.name,
+        );
+      }
     })
     .catch(function (err) {
       if (contentEl) {
@@ -984,6 +1019,7 @@ window.toggleExplorer = toggleExplorer;
 window.reloadExplorerTree = reloadExplorerTree;
 window.closeExplorerPreview = closeExplorerPreview;
 window._enterEditMode = _enterEditMode;
+window._toggleMarkdownView = _toggleMarkdownView;
 window._saveFile = _saveFile;
 window._discardEdit = _discardEdit;
 
