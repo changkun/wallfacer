@@ -9,8 +9,7 @@
 [![Stars](https://img.shields.io/github/stars/changkun/wallfacer?style=social)](https://github.com/changkun/wallfacer/stargazers)
 [![Last Commit](https://img.shields.io/github/last-commit/changkun/wallfacer)](https://github.com/changkun/wallfacer/commits/main)
 
-Wallfacer is a task-board orchestration system for autonomous coding agents.
-Create tasks, run them in isolated sandboxes, review diffs, and keep shipping with minimal manual overhead.
+Wallfacer is a self-operating engineering platform. It orchestrates autonomous coding agents across a task board, executes them in isolated sandboxes, and gives you full oversight over every decision they make — live logs, diffs, costs, and timelines — so you stay in control while shipping at machine speed.
 
 ![Wallfacer teaser](./images/overview.png)
 
@@ -38,19 +37,21 @@ A browser window opens automatically. Add your Claude credential (OAuth token vi
 
 ## Why Wallfacer
 
-- **Autonomous delivery loop**: backlog -> implementation -> testing -> review -> merge-ready output
-- **Self-development capability**: wallfacer can run tasks that improve wallfacer itself
-- **Isolation by default**: per-task containers and per-task git worktrees for safe parallelism
-- **Operator visibility**: live logs, traces, timelines, and usage/cost tracking
-- **Model/runtime flexibility**: support for Claude Code, Codex, and custom sandbox setups
+- **Autonomous delivery loop**: backlog, refinement, implementation, testing, review, merge-ready output — end to end
+- **Self-development capability**: wallfacer runs tasks that improve wallfacer itself, creating a compounding engineering loop
+- **Isolation by default**: per-task containers and per-task git worktrees for safe parallelism across many concurrent tasks
+- **Full operator visibility**: live logs, traces, timelines, diffs, usage/cost tracking, per-turn token breakdown
+- **Integrated development environment**: built-in file explorer, host terminal, workspace management — all in the browser
+- **Model/runtime flexibility**: Claude Code, Codex, and custom sandbox setups with per-role routing
 
 ## Capability Stack
 
-- **Execution engine**: isolated containers, per-task git worktrees, safe parallel runs, circuit breaker, resource limits
-- **Autonomous loop**: refinement, implementation, testing, auto-submit, autopilot promotion, auto-retry, cost/token budgets
-- **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility, per-turn breakdown, task search
-- **Repo operations**: branch switching, sync/rebase helpers, auto commit and push, task forking
-- **Flexible runtime**: Podman/Docker support, workspace-level instructions, Claude + Codex backends, system prompt customization
+- **Execution engine**: isolated containers, per-task git worktrees, worker container reuse, safe parallel runs, circuit breaker, resource limits, dependency caching
+- **Autonomous loop**: prompt refinement, implementation, testing, auto-submit, autopilot promotion, auto-retry, cost/token budgets, failure categorization
+- **Oversight layer**: live logs, timelines, traces, diff review, usage/cost visibility, per-turn breakdown, task search, oversight summaries
+- **Repo operations**: multi-workspace groups, branch switching, sync/rebase helpers, auto commit and push, task forking
+- **Development tools**: file explorer with editor, interactive host terminal, prompt templates, system prompt customization
+- **Flexible runtime**: Podman/Docker support, workspace-level AGENTS.md instructions, Claude + Codex backends, per-role sandbox routing
 
 For a complete walkthrough of workflows and controls, see [Usage Guide](docs/guide/usage.md).
 For implementation details and architecture, see [Technical Internals](docs/internals/internals.md).
@@ -61,7 +62,7 @@ For implementation details and architecture, see [Technical Internals](docs/inte
 
 ![Wallfacer board overview](./images/overview.png)
 
-Coordinate many agent tasks in one place, move cards across the lifecycle, and keep execution throughput high without losing control.
+Coordinate many agent tasks in one place, move cards across the lifecycle, and keep execution throughput high without losing control. Batch-create tasks with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens.
 
 ### Oversight That Is Actually Actionable
 
@@ -73,13 +74,25 @@ Coordinate many agent tasks in one place, move cards across the lifecycle, and k
 
 ![Oversight view 2](./images/oversight2.png)
 
-Inspect what happened, when it happened, and why it happened before you accept any automated output.
+Inspect what happened, when it happened, and why it happened before you accept any automated output. Every task produces a structured event timeline, diff against the default branch, and AI-generated oversight summary.
 
 ### Cost and Usage Visibility
 
 ![Usage and cost breakdown](./images/usage.png)
 
-Track token usage and cost by task/activity so operations stay measurable as automation scales.
+Track token usage and cost by task, activity, and turn so operations stay measurable as automation scales. Per-role breakdown (implementation, testing, refinement, oversight) shows exactly where budget goes.
+
+## Roadmap
+
+Development is organized into three parallel tracks with shared foundations. See [`specs/README.md`](specs/README.md) for the full dependency graph and spec index.
+
+**Foundations** (complete) — Sandbox backend interface, storage backend interface, container reuse, file explorer, host terminal, multi-workspace groups, Windows support.
+
+**Local Product** — Desktop experience and developer workflow: epic coordination, native desktop app, file/image attachments, host mounts, file panel viewer, terminal sessions, container exec, oversight risk scoring, visual verification, live serve.
+
+**Cloud Platform** — Multi-tenant hosted service: tenant filesystem, K8s sandbox backend, cloud infrastructure, multi-tenant control plane, tenant API.
+
+**Shared Design** — Cross-track specs: authentication, agent abstraction, native sandboxes (Linux/macOS/Windows), overlay snapshots.
 
 ## Documentation
 
@@ -110,20 +123,16 @@ Track token usage and cost by task/activity so operations stay measurable as aut
 
 ## Origin Story
 
-Wallfacer started as a practical response to a repeated workflow: write a task prompt, run an agent, inspect output, and do it again. The bottleneck was not coding speed, it was coordination and visibility across many concurrent agent tasks. A task board became the control surface.
+Wallfacer started as a practical response to a repeated workflow: write a task prompt, run an agent, inspect output, and do it again. The bottleneck was not coding speed — it was coordination and visibility across many concurrent agent tasks. A task board became the control surface.
 
 The first version was a Go server with a minimal web UI. Tasks moved from backlog to in progress, executed in isolated containers, and landed in done when complete. Git worktrees provided branch-level isolation so many tasks could run in parallel without collisions.
 
-Wallfacer is now beyond simple task execution. It has become a fully automated engineering team: planning and refinement, implementation, test verification, commit and sync workflows, and continuous operation controls such as autopilot.
+Since then, Wallfacer has evolved into a self-operating engineering platform. The execution engine gained container reuse, circuit breakers, dependency caching, and multi-workspace groups. An autonomous loop handles prompt refinement, implementation, testing, auto-retry, and autopilot promotion. A full oversight layer — live logs, timelines, traces, diffs, and per-turn cost breakdown — ensures every agent decision is auditable before results are accepted.
 
-Just as importantly, automation is paired with oversight. Operators can inspect live logs, timelines, traces, diffs, and usage/cost signals before accepting results. The goal is not blind autonomy; it is high-throughput engineering with clear, auditable control.
+The integrated development environment now includes a file explorer with editor, an interactive host terminal, system prompt customization, and prompt templates — all accessible from the browser. The goal is not blind autonomy; it is high-throughput engineering with clear, auditable control.
 
-Most recent capabilities were developed by wallfacer itself, creating a compounding loop where the system continuously improves its own engineering process.
+Most of Wallfacer's recent capabilities were developed by Wallfacer itself, creating a compounding loop where the system continuously improves its own engineering process.
 
 ## License
 
 See [LICENSE](LICENSE).
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=changkun/wallfacer&type=Date)](https://star-history.com/#changkun/wallfacer&Date)
