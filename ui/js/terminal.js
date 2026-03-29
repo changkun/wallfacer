@@ -37,13 +37,84 @@ function _getCSSVar(name) {
  * initTerminal — create xterm.js instance and mount into the panel.
  * Does NOT connect; connection happens on first panel open.
  */
+// ANSI color palettes tuned for dark and light backgrounds.
+// Modeled after VSCode's default terminal themes.
+var _darkAnsiColors = {
+  black: "#3c3c3c",
+  red: "#f14c4c",
+  green: "#23d18b",
+  yellow: "#f5f543",
+  blue: "#3b8eea",
+  magenta: "#d670d6",
+  cyan: "#29b8db",
+  white: "#cccccc",
+  brightBlack: "#666666",
+  brightRed: "#f14c4c",
+  brightGreen: "#23d18b",
+  brightYellow: "#f5f543",
+  brightBlue: "#3b8eea",
+  brightMagenta: "#d670d6",
+  brightCyan: "#29b8db",
+  brightWhite: "#e5e5e5",
+};
+var _lightAnsiColors = {
+  black: "#3c3c3c",
+  red: "#cd3131",
+  green: "#00bc70",
+  yellow: "#949800",
+  blue: "#0451a5",
+  magenta: "#bc05bc",
+  cyan: "#0598bc",
+  white: "#555555",
+  brightBlack: "#666666",
+  brightRed: "#cd3131",
+  brightGreen: "#14ce14",
+  brightYellow: "#b5ba00",
+  brightBlue: "#0451a5",
+  brightMagenta: "#bc05bc",
+  brightCyan: "#0598bc",
+  brightWhite: "#3c3c3c",
+};
+
 function _buildTermTheme() {
+  var bg = _getCSSVar("--bg") || "#1a1917";
+  var fg = _getCSSVar("--text") || "#cccccc";
+  // Detect light vs dark by checking luminance of the background.
+  var isLight = _isLightColor(bg);
+  var ansi = isLight ? _lightAnsiColors : _darkAnsiColors;
   return {
-    background: _getCSSVar("--bg") || "#1a1917",
-    foreground: _getCSSVar("--text") || "#cccccc",
-    cursor: _getCSSVar("--accent") || "#4e8cff",
-    selectionBackground: "rgba(78,140,255,0.3)",
+    background: bg,
+    foreground: fg,
+    cursor: _getCSSVar("--accent") || "#d97757",
+    selectionBackground: isLight
+      ? "rgba(0,0,0,0.15)"
+      : "rgba(78,140,255,0.3)",
+    black: ansi.black,
+    red: ansi.red,
+    green: ansi.green,
+    yellow: ansi.yellow,
+    blue: ansi.blue,
+    magenta: ansi.magenta,
+    cyan: ansi.cyan,
+    white: ansi.white,
+    brightBlack: ansi.brightBlack,
+    brightRed: ansi.brightRed,
+    brightGreen: ansi.brightGreen,
+    brightYellow: ansi.brightYellow,
+    brightBlue: ansi.brightBlue,
+    brightMagenta: ansi.brightMagenta,
+    brightCyan: ansi.brightCyan,
+    brightWhite: ansi.brightWhite,
   };
+}
+
+function _isLightColor(hex) {
+  hex = hex.replace("#", "");
+  var r = parseInt(hex.substring(0, 2), 16);
+  var g = parseInt(hex.substring(2, 4), 16);
+  var b = parseInt(hex.substring(4, 6), 16);
+  // Relative luminance threshold.
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 128;
 }
 
 function initTerminal() {
