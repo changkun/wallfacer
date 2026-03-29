@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
-	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 

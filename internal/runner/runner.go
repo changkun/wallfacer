@@ -21,10 +21,10 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
 	"changkun.de/x/wallfacer/internal/pkg/syncmap"
 	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
-	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 
@@ -136,7 +136,7 @@ type Runner struct {
 		mounts     map[string]map[string]string // shortID → (repoPath → worktreePath)
 	}
 	boardChangeSeq      atomic.Uint64  // incremented on every store notification
-	shutdownCh          chan struct{}   // closed by Shutdown to stop the subscription goroutine
+	shutdownCh          chan struct{}  // closed by Shutdown to stop the subscription goroutine
 	shutdownOnce        sync.Once      // ensures Shutdown runs at most once
 	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
 	shutdownCtx         context.Context

@@ -244,7 +244,6 @@ func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
 	return prefix + "wallfacer-codex" + tag + digest
 }
 
-
 // resolveContainerByPrefix searches the newline-separated output of
 // `<runtime> ps --format {{.Names}}` for a container whose name contains
 // the given task-ID prefix as a substring. It returns the matching container

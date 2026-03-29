@@ -19,12 +19,12 @@ var instance struct {
 	busName   string // unique D-Bus name, e.g. org.kde.StatusNotifierItem-<pid>-1
 	iconW     int32
 	iconH     int32
-	iconARGB  []byte           // ARGB pixel data for IconPixmap property
+	iconARGB  []byte // ARGB pixel data for IconPixmap property
 	tooltip   string
-	items     []linuxMenuItem  // ordered menu entries
-	menuRev   uint32           // incremented on every menu mutation; signals LayoutUpdated
+	items     []linuxMenuItem // ordered menu entries
+	menuRev   uint32          // incremented on every menu mutation; signals LayoutUpdated
 	mu        sync.Mutex
-	hasTapped bool             // true when a left-click callback is registered
+	hasTapped bool // true when a left-click callback is registered
 }
 
 // linuxMenuItem is the Go-side representation of a single menu entry,

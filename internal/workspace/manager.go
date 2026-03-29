@@ -11,8 +11,8 @@ import (
 
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/pkg/set"
-	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/prompts"
+	"changkun.de/x/wallfacer/internal/store"
 )
 
 // Snapshot holds the immutable state of a workspace configuration at a point in time.
@@ -64,9 +64,9 @@ type Manager struct {
 	dataDir   string // per-workspace scoped data directories
 	envFile   string // .env file path for persisting WALLFACER_WORKSPACES
 
-	mu           sync.RWMutex           // guards current, nextGen, and activeGroups
-	current      Snapshot               // the currently "viewed" workspace group
-	nextGen      uint64                 // next generation counter to assign
+	mu           sync.RWMutex            // guards current, nextGen, and activeGroups
+	current      Snapshot                // the currently "viewed" workspace group
+	nextGen      uint64                  // next generation counter to assign
 	activeGroups map[string]*activeGroup // key = Snapshot.Key; groups with open stores
 
 	subsMu    sync.Mutex // guards subs and nextSubID; separate from mu to avoid lock ordering issues

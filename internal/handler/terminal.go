@@ -37,7 +37,7 @@ type sessionRegistry struct {
 	mu       sync.Mutex
 	sessions map[string]*terminalSession
 	active   string          // ID of the currently active session
-	switchCh chan struct{}    // signaled when active session changes
+	switchCh chan struct{}   // signaled when active session changes
 	connCtx  context.Context // connection-level context
 }
 

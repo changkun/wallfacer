@@ -239,4 +239,3 @@ func TestWrite_EncodingError(t *testing.T) {
 		t.Fatalf("expected application/json, got %s", ct)
 	}
 }
-
