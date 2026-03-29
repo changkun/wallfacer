@@ -487,7 +487,7 @@ Poll every 3 seconds during `in_progress` status (same pattern as oversight "gen
 | `internal/store/tasks_update.go` | Handle `RiskPolicyRules` in `UpdateTaskBacklog` |
 | `internal/handler/tasks.go` | Accept + validate `risk_policy_rules` in `CreateTask`/`UpdateTask` |
 | `internal/store/risk_test.go` (new) | Round-trip tests, capping, notify verification |
-| `cmd/gen-clone/` | Regenerate `tasks_clone_gen.go` (`RiskPolicyRules` slice needs cloning) |
+| `scripts/gen-clone.go` | Regenerate `tasks_clone_gen.go` (`RiskPolicyRules` slice needs cloning) |
 
 **Effort:** Low. Additive fields, `omitempty` for backward compatibility.
 

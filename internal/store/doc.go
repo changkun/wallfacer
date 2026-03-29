@@ -18,7 +18,7 @@
 // during execution), [cli] (server startup and status display), [workspace] (scoped
 // store per workspace set), and [envconfig].
 // The [Task] struct is the core domain model — changes to its fields require
-// re-running go generate for the deep-clone function (cmd/gen-clone).
+// re-running go generate for the deep-clone function (scripts/gen-clone.go).
 //
 // # Usage
 //

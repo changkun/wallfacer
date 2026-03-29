@@ -255,7 +255,7 @@ type PayloadLimits struct {
 	PromptHistory  int `json:"prompt_history"`
 }
 
-//go:generate go run ../../cmd/gen-clone/main.go
+//go:generate go run ../../scripts/gen-clone.go
 
 // Task is the core domain model: a unit of work executed by an agent.
 type Task struct {

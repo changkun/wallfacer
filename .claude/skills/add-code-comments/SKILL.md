@@ -44,7 +44,7 @@ instructions from the "Sub-agent instructions" section below.
 
 | Agent | Packages |
 |-------|----------|
-| `entry-points` | `main.go`, `doc.go`, `cmd/gen-clone/` |
+| `entry-points` | `main.go`, `doc.go`, `scripts/gen-clone.go` |
 | `cli` | `internal/cli/` |
 | `apicontract-constants-sandbox` | `internal/apicontract/`, `internal/constants/`, `internal/sandbox/` |
 | `envconfig-logger-metrics` | `internal/envconfig/`, `internal/logger/`, `internal/metrics/` |
