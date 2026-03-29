@@ -3,16 +3,14 @@ package runner
 import (
 	"context"
 	"fmt"
-	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/pkg/dircp"
 )
 
 // setupNonGitSnapshot copies ws into snapshotPath and initialises a local git
@@ -23,7 +21,7 @@ func setupNonGitSnapshot(ws, snapshotPath string) error {
 	if err := os.MkdirAll(snapshotPath, 0755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
-	if err := copyDirContents(ws, snapshotPath); err != nil {
+	if err := dircp.Copy(ws, snapshotPath); err != nil {
 		if rmErr := os.RemoveAll(snapshotPath); rmErr != nil {
 			logger.Runner.Warn("snapshot cleanup failed after copy error", "path", snapshotPath, "error", rmErr)
 		}
@@ -76,7 +74,7 @@ func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
 	// are not removed from the original workspace.
 	logger.Runner.Warn("rsync not found; falling back to copy (deletions will not propagate to workspace)",
 		"snapshot", snapshotPath, "target", targetPath)
-	if err := copyDirContents(snapshotPath, targetPath); err != nil {
+	if err := dircp.Copy(snapshotPath, targetPath); err != nil {
 		return fmt.Errorf("copy snapshot to workspace: %w", err)
 	}
 	// Remove the .git directory that the copy may have brought over from the snapshot.
@@ -84,71 +82,6 @@ func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
 		logger.Runner.Warn("failed to remove .git from extracted snapshot", "path", targetPath, "error", err)
 	}
 	return nil
-}
-
-// copyDirContents copies all files and directories from src into dst,
-// preserving directory structure. On Unix, it tries `cp -a src/. dst`
-// first for speed and falls back to a pure-Go walk on failure or on Windows.
-func copyDirContents(src, dst string) error {
-	if runtime.GOOS != "windows" {
-		out, err := cmdexec.New("cp", "-a", src+"/.", dst).Combined()
-		if err == nil {
-			return nil
-		}
-		logger.Runner.Warn("cp -a failed, falling back to Go copy",
-			"src", src, "dst", dst, "error", fmt.Sprintf("%v: %s", err, out))
-	}
-	return copyDirContentsGo(src, dst)
-}
-
-// copyDirContentsGo is a pure-Go recursive directory copy.
-func copyDirContentsGo(src, dst string) error {
-	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		if rel == "." {
-			return nil
-		}
-		target := filepath.Join(dst, rel)
-		if d.IsDir() {
-			return os.MkdirAll(target, 0755)
-		}
-		if d.Type()&fs.ModeSymlink != 0 {
-			link, err := os.Readlink(path)
-			if err != nil {
-				return err
-			}
-			return os.Symlink(link, target)
-		}
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		return copyFile(path, target, info.Mode())
-	})
-}
-
-// copyFile copies a single file preserving permissions.
-func copyFile(src, dst string, mode fs.FileMode) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = in.Close() }()
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = out.Close() }()
-	if _, err := io.Copy(out, in); err != nil {
-		return err
-	}
-	return out.Close()
 }
 
 // computeSnapshotDiff computes a unified diff of all changes in a snapshot
