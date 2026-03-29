@@ -25,12 +25,13 @@ import (
 
 // terminalSession holds the state for a single PTY-backed shell session.
 type terminalSession struct {
-	id       string
-	ptmx     *os.File
-	cmd      *exec.Cmd
-	cancel   context.CancelFunc
-	done     chan struct{} // closed when the shell process exits
-	outputCh chan []byte   // PTY output pumped by a reader goroutine
+	id        string
+	container string       // container name; empty for host shell sessions
+	ptmx      *os.File
+	cmd       *exec.Cmd
+	cancel    context.CancelFunc
+	done      chan struct{} // closed when the shell process exits
+	outputCh  chan []byte   // PTY output pumped by a reader goroutine
 }
 
 // sessionRegistry manages multiple terminal sessions per WebSocket connection.
@@ -38,8 +39,9 @@ type sessionRegistry struct {
 	mu       sync.Mutex
 	sessions map[string]*terminalSession
 	active   string          // ID of the currently active session
-	switchCh chan struct{}   // signaled when active session changes
+	switchCh chan struct{}    // signaled when active session changes
 	connCtx  context.Context // connection-level context
+	runtime  string          // container runtime path (podman/docker)
 }
 
 // create spawns a new PTY-backed shell session and registers it as the active session.
@@ -95,6 +97,60 @@ func (r *sessionRegistry) create(shell, cwd string, cols, rows int) (string, err
 	r.mu.Unlock()
 
 	// Signal the relay to pick up the new active session.
+	r.notifySwitch()
+
+	return id, nil
+}
+
+// createContainerExec spawns a shell inside a running container and registers it as the active session.
+func (r *sessionRegistry) createContainerExec(containerName string, cols, rows int) (string, error) {
+	id := uuid.New().String()
+	ctx, cancel := context.WithCancel(r.connCtx)
+
+	cmd := exec.CommandContext(ctx, r.runtime, "exec", "-it", containerName, "bash")
+
+	ptmx, err := pty.StartWithSize(cmd, uint16(rows), uint16(cols))
+	if err != nil {
+		cancel()
+		return "", err
+	}
+
+	outputCh := make(chan []byte, 64)
+	sess := &terminalSession{
+		id:        id,
+		container: containerName,
+		ptmx:      ptmx,
+		cmd:       cmd,
+		cancel:    cancel,
+		done:      make(chan struct{}),
+		outputCh:  outputCh,
+	}
+
+	go func() {
+		defer close(outputCh)
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := ptmx.Read(buf)
+			if n > 0 {
+				data := make([]byte, n)
+				copy(data, buf[:n])
+				select {
+				case outputCh <- data:
+				case <-ctx.Done():
+					return
+				}
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	r.mu.Lock()
+	r.sessions[id] = sess
+	r.active = id
+	r.mu.Unlock()
+
 	r.notifySwitch()
 
 	return id, nil
@@ -260,6 +316,7 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		sessions: make(map[string]*terminalSession),
 		switchCh: make(chan struct{}, 1),
 		connCtx:  connCtx,
+		runtime:  h.runner.Command(),
 	}
 
 	sessionID, err := registry.create(shell, cwd, cols, rows)
@@ -366,8 +423,14 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 			case "ping":
 				_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"pong"}`))
 			case "create_session":
-				newID, err := registry.create(shell, cwd, cols, rows)
-				if err != nil {
+				var newID string
+				var createErr error
+				if msg.Container != "" {
+					newID, createErr = registry.createContainerExec(msg.Container, cols, rows)
+				} else {
+					newID, createErr = registry.create(shell, cwd, cols, rows)
+				}
+				if createErr != nil {
 					_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"error","data":"failed to create session"}`))
 					continue
 				}
@@ -421,25 +484,27 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 
 // terminalMessage is the JSON envelope for client→server messages.
 type terminalMessage struct {
-	Type    string `json:"type"`
-	Data    string `json:"data,omitempty"`
-	Cols    int    `json:"cols,omitempty"`
-	Rows    int    `json:"rows,omitempty"`
-	Session string `json:"session,omitempty"`
+	Type      string `json:"type"`
+	Data      string `json:"data,omitempty"`
+	Cols      int    `json:"cols,omitempty"`
+	Rows      int    `json:"rows,omitempty"`
+	Session   string `json:"session,omitempty"`
+	Container string `json:"container,omitempty"`
 }
 
 // sessionInfo describes a session in the sessions list message.
 type sessionInfo struct {
-	ID     string `json:"id"`
-	Active bool   `json:"active"`
+	ID        string `json:"id"`
+	Active    bool   `json:"active"`
+	Container string `json:"container,omitempty"`
 }
 
 // sendSessionsList sends the current sessions list to the client.
 func (r *sessionRegistry) sendSessionsList(conn *websocket.Conn) {
 	r.mu.Lock()
 	infos := make([]sessionInfo, 0, len(r.sessions))
-	for id := range r.sessions {
-		infos = append(infos, sessionInfo{ID: id, Active: id == r.active})
+	for id, sess := range r.sessions {
+		infos = append(infos, sessionInfo{ID: id, Active: id == r.active, Container: sess.container})
 	}
 	r.mu.Unlock()
 
