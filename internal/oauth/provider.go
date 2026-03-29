@@ -12,13 +12,17 @@ type Provider struct {
 	CallbackPath string   // callback URL path (default "/callback")
 }
 
-// ClaudeProvider is the OAuth configuration for Claude Code.
+// ClaudeProvider is the OAuth configuration for Claude.
+// Uses the same client ID and fixed port as the Pi coding agent
+// (claude.ai OAuth with port 53692).
 var ClaudeProvider = Provider{
 	Name:         "claude",
-	AuthorizeURL: "https://platform.claude.com/oauth/authorize",
+	AuthorizeURL: "https://claude.ai/oauth/authorize",
 	TokenURL:     "https://platform.claude.com/v1/oauth/token",
-	ClientID:     "https://claude.ai/oauth/claude-code-client-metadata",
+	ClientID:     "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+	Scopes:       []string{"org:create_api_key", "user:profile", "user:inference"},
 	TokenEnvKey:  "CLAUDE_CODE_OAUTH_TOKEN",
+	FixedPort:    53692,
 }
 
 // CodexProvider is the OAuth configuration for OpenAI Codex.
