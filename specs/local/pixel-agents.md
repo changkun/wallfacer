@@ -405,7 +405,7 @@ Replace placeholder sprites with LimeZu art assets.
 | 10 | [Spawn and despawn effects](pixel-agents/task-10-spawn-despawn-effects.md) | 7 | Small | Done |
 | 11 | [Speech bubbles](pixel-agents/task-11-speech-bubbles.md) | 7 | Small | Done |
 | 12 | [Interaction and modal integration](pixel-agents/task-12-interaction.md) | 5, 8 | Medium | Done |
-| 13 | [Art integration and asset detection](pixel-agents/task-13-art-integration.md) | 3 | Medium | Todo |
+| 13 | [Art integration and asset detection](pixel-agents/task-13-art-integration.md) | 3 | Medium | Done |
 | 14 | [Polish: preferences, minimap, a11y](pixel-agents/task-14-polish.md) | 5, 12 | Medium | Todo |
 
 ```mermaid
