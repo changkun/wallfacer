@@ -412,14 +412,179 @@ describe("tab bar", () => {
 
   it("add button fires callback", () => {
     const ctx = makeTabContext();
+    ctx.initTerminal();
+    // Override the handler after initTerminal (which wires WebSocket-sending handlers).
     let addCalled = false;
     ctx.setTabAddHandler(() => {
       addCalled = true;
     });
-    ctx.initTerminal();
     // Simulate click on + button.
     const addBtn = ctx.document._addBtn;
     if (addBtn._listeners.click) addBtn._listeners.click();
     expect(addCalled).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// session wiring
+// ---------------------------------------------------------------------------
+
+describe("session wiring", () => {
+  function makeSessionContext() {
+    const dom = makeDom();
+    const ctx = loadTerminal(makeContext({ document: dom }));
+    ctx.initTerminal();
+    ctx.connectTerminal();
+    return ctx;
+  }
+
+  it("tab add sends create_session message", () => {
+    const ctx = makeSessionContext();
+    ctx._mockWs.readyState = 1;
+    // Trigger tab add callback.
+    ctx._onTabAdd();
+    expect(ctx._mockWs.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "create_session" }),
+    );
+  });
+
+  it("tab click sends switch_session message", () => {
+    const ctx = makeSessionContext();
+    ctx._mockWs.readyState = 1;
+    ctx._onTabClick("sess-1");
+    expect(ctx._mockWs.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "switch_session", session: "sess-1" }),
+    );
+  });
+
+  it("tab close sends close_session message", () => {
+    const ctx = makeSessionContext();
+    ctx._mockWs.readyState = 1;
+    ctx._onTabClose("sess-1");
+    expect(ctx._mockWs.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: "close_session", session: "sess-1" }),
+    );
+  });
+
+  it("sessions list populates tabs", () => {
+    const ctx = makeSessionContext();
+    const onmessage = ctx._mockWs.onmessage;
+    // Simulate sessions message.
+    onmessage({
+      data: JSON.stringify({
+        type: "sessions",
+        sessions: [
+          { id: "s1", active: true },
+          { id: "s2", active: false },
+        ],
+      }),
+    });
+    const tabs = ctx.document._tabList._children;
+    expect(tabs.length).toBe(2);
+    expect(tabs[0]._attrs["data-session-id"]).toBe("s1");
+    expect(tabs[1]._attrs["data-session-id"]).toBe("s2");
+    // Active tab should be marked.
+    expect(tabs[0]._attrs["aria-selected"]).toBe("true");
+  });
+
+  it("session_switched restores buffer", () => {
+    const dom = makeDom();
+    // Need ArrayBuffer in the VM context for instanceof check.
+    const ctx = loadTerminal(
+      makeContext({
+        document: dom,
+        ArrayBuffer: ArrayBuffer,
+      }),
+    );
+    ctx.initTerminal();
+    ctx.connectTerminal();
+    const onmessage = ctx._mockWs.onmessage;
+    // Set up sessions.
+    onmessage({
+      data: JSON.stringify({
+        type: "sessions",
+        sessions: [{ id: "s1", active: true }],
+      }),
+    });
+    // Simulate some binary output for s1.
+    const data = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
+    onmessage({ data: data.buffer });
+    // Verify binary data was written and buffered.
+    expect(ctx._mockTermInstance.write).toHaveBeenCalled();
+    ctx._mockTermInstance.write.mockClear();
+    ctx._mockTermInstance.clear.mockClear();
+    // Add second session and switch.
+    onmessage({
+      data: JSON.stringify({
+        type: "sessions",
+        sessions: [
+          { id: "s1", active: false },
+          { id: "s2", active: true },
+        ],
+      }),
+    });
+    // Switch back to s1 — should restore buffer.
+    onmessage({
+      data: JSON.stringify({ type: "session_switched", session: "s1" }),
+    });
+    expect(ctx._mockTermInstance.clear).toHaveBeenCalled();
+    expect(ctx._mockTermInstance.write).toHaveBeenCalled();
+  });
+
+  it("session_exited removes tab and shows message", () => {
+    const ctx = makeSessionContext();
+    const onmessage = ctx._mockWs.onmessage;
+    // Set up session.
+    onmessage({
+      data: JSON.stringify({
+        type: "sessions",
+        sessions: [{ id: "s1", active: true }],
+      }),
+    });
+    expect(ctx.document._tabList._children.length).toBe(1);
+    // Session exits.
+    onmessage({
+      data: JSON.stringify({ type: "session_exited", session: "s1" }),
+    });
+    expect(ctx.document._tabList._children.length).toBe(0);
+    // Check that "Session ended" was written.
+    const writeCalls = ctx._mockTermInstance.write.mock.calls;
+    const lastWrite = writeCalls[writeCalls.length - 1][0];
+    expect(typeof lastWrite === "string" && lastWrite.includes("Session ended")).toBe(true);
+  });
+
+  it("session_closed removes tab", () => {
+    const ctx = makeSessionContext();
+    const onmessage = ctx._mockWs.onmessage;
+    // Set up two sessions.
+    onmessage({
+      data: JSON.stringify({
+        type: "sessions",
+        sessions: [
+          { id: "s1", active: true },
+          { id: "s2", active: false },
+        ],
+      }),
+    });
+    expect(ctx.document._tabList._children.length).toBe(2);
+    // Close s2.
+    onmessage({
+      data: JSON.stringify({ type: "session_closed", session: "s2" }),
+    });
+    expect(ctx.document._tabList._children.length).toBe(1);
+  });
+
+  it("disconnect clears all session state", () => {
+    const ctx = makeSessionContext();
+    const onmessage = ctx._mockWs.onmessage;
+    onmessage({
+      data: JSON.stringify({
+        type: "sessions",
+        sessions: [{ id: "s1", active: true }],
+      }),
+    });
+    expect(ctx.document._tabList._children.length).toBe(1);
+    ctx.disconnectTerminal();
+    expect(ctx.document._tabList._children.length).toBe(0);
   });
 });

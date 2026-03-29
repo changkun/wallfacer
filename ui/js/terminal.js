@@ -9,6 +9,9 @@ var _termTabCounter = 0;
 var _onTabClick = function () {};
 var _onTabClose = function () {};
 var _onTabAdd = function () {};
+var _sessions = {}; // sessionId → { buffer: [Uint8Array...] }
+var _activeSessionId = null;
+var _sessionBufferLimit = 100000; // ~100KB per session
 
 // In desktop mode (Wails), the reverse proxy can't forward WebSocket upgrades.
 // Discover the real server port via /api/desktop-port and connect directly.
@@ -90,6 +93,23 @@ function initTerminal() {
     });
   }
 
+  // Wire tab callbacks to send WebSocket session messages.
+  setTabClickHandler(function (id) {
+    if (_termWs && _termWs.readyState === WebSocket.OPEN) {
+      _termWs.send(JSON.stringify({ type: "switch_session", session: id }));
+    }
+  });
+  setTabCloseHandler(function (id) {
+    if (_termWs && _termWs.readyState === WebSocket.OPEN) {
+      _termWs.send(JSON.stringify({ type: "close_session", session: id }));
+    }
+  });
+  setTabAddHandler(function () {
+    if (_termWs && _termWs.readyState === WebSocket.OPEN) {
+      _termWs.send(JSON.stringify({ type: "create_session" }));
+    }
+  });
+
   // Wire terminal events once — they check _termWs on each invocation.
   _term.onData(function (data) {
     if (_termWs && _termWs.readyState === WebSocket.OPEN) {
@@ -157,13 +177,53 @@ function connectTerminal() {
 
   ws.onmessage = function (event) {
     if (event.data instanceof ArrayBuffer) {
-      _term.write(new Uint8Array(event.data));
+      var bytes = new Uint8Array(event.data);
+      _term.write(bytes);
+      // Buffer output for the active session.
+      if (_activeSessionId && _sessions[_activeSessionId]) {
+        var buf = _sessions[_activeSessionId].buffer;
+        buf.push(bytes);
+        // Trim if over limit.
+        var total = 0;
+        for (var i = 0; i < buf.length; i++) total += buf[i].length;
+        while (total > _sessionBufferLimit && buf.length > 0) {
+          total -= buf[0].length;
+          buf.shift();
+        }
+      }
+      return;
     }
-    // Text messages (pong) are silently ignored.
+    // Text message — parse JSON.
+    var msg;
+    try {
+      msg = JSON.parse(event.data);
+    } catch (e) {
+      return;
+    }
+    switch (msg.type) {
+      case "sessions":
+        _handleSessionsList(msg.sessions);
+        break;
+      case "session_created":
+        // Tab is added by the sessions list that follows immediately.
+        break;
+      case "session_switched":
+        _handleSessionSwitched(msg.session);
+        break;
+      case "session_closed":
+        _handleSessionClosed(msg.session);
+        break;
+      case "session_exited":
+        _handleSessionExited(msg.session);
+        break;
+      case "pong":
+        break;
+    }
   };
 
   ws.onclose = function (event) {
     _termWs = null;
+    _clearSessionState();
     if (event.code !== 1000) {
       _term.write("\r\n\x1b[33mDisconnected. Reconnecting...\x1b[0m\r\n");
       _scheduleReconnect();
@@ -187,6 +247,7 @@ function disconnectTerminal() {
     _termWs.close(1000);
     _termWs = null;
   }
+  _clearSessionState();
 }
 
 /**
@@ -207,6 +268,73 @@ function _scheduleReconnect() {
     // Exponential backoff: 1s → 2s → 4s → ... → 30s max.
     _termReconnectDelay = Math.min(_termReconnectDelay * 2, 30000);
   }, _termReconnectDelay);
+}
+
+// --- Session message handlers ---
+
+function _clearSessionState() {
+  for (var id in _sessions) {
+    removeTerminalTab(id);
+  }
+  _sessions = {};
+  _activeSessionId = null;
+  _termTabCounter = 0;
+}
+
+function _handleSessionsList(sessions) {
+  if (!sessions) return;
+  // Build a set of IDs from the server.
+  var serverIds = {};
+  for (var i = 0; i < sessions.length; i++) {
+    serverIds[sessions[i].id] = true;
+  }
+  // Remove tabs for sessions no longer on the server.
+  for (var id in _sessions) {
+    if (!serverIds[id]) {
+      removeTerminalTab(id);
+      delete _sessions[id];
+    }
+  }
+  // Add tabs for new sessions.
+  for (var j = 0; j < sessions.length; j++) {
+    var s = sessions[j];
+    if (!_sessions[s.id]) {
+      _sessions[s.id] = { buffer: [] };
+      addTerminalTab(s.id);
+    }
+    if (s.active) {
+      _activeSessionId = s.id;
+      activateTerminalTab(s.id);
+    }
+  }
+}
+
+function _handleSessionSwitched(id) {
+  _activeSessionId = id;
+  activateTerminalTab(id);
+  // Restore the target session's buffer.
+  if (_term) {
+    _term.clear();
+    if (_sessions[id]) {
+      var buf = _sessions[id].buffer;
+      for (var i = 0; i < buf.length; i++) {
+        _term.write(buf[i]);
+      }
+    }
+  }
+}
+
+function _handleSessionClosed(id) {
+  removeTerminalTab(id);
+  delete _sessions[id];
+}
+
+function _handleSessionExited(id) {
+  if (id === _activeSessionId && _term) {
+    _term.write("\r\n\x1b[33mSession ended.\x1b[0m\r\n");
+  }
+  removeTerminalTab(id);
+  delete _sessions[id];
 }
 
 // --- Terminal tab management ---
