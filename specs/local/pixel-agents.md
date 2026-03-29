@@ -393,6 +393,32 @@ Replace placeholder sprites with LimeZu art assets.
 | `ui/assets/office/effects/bubbles.png` | New (committed) | 5 |
 | `.gitignore` | Done | 1 |
 
+## Outcome
+
+The pixel office view shipped as a bottom panel (like Terminal and Dep Graph) toggled via the status bar "Office" button or Ctrl+` cycling. Each active task is represented by a LimeZu pixel art character sitting at a workstation. The office uses real sprite assets from the purchased LimeZu Modern Office and Modern Interiors packs, with programmatic fallback placeholders when assets are absent.
+
+### What Shipped
+
+- **12 JS modules** in `ui/js/office/` (~2,800 lines): tileMap, spriteCache, camera, pathfinding, effects, bubbles, character, characterManager, renderer, interaction, minimap, office
+- **14 test files** (~3,400 lines) with 856 total frontend tests passing
+- **No backend changes** — purely frontend, consuming the existing SSE task stream
+- **LimeZu sprite integration** — 20 character sheets (16×32 sprites), furniture from office_sheet.png, served from embedded FS via `/assets/` route
+- **Key features**: character state machine (7 states), BFS pathfinding, matrix spawn/despawn effects, speech bubbles (waiting/failed/committing), click-to-select with task modal integration, desk persistence via localStorage, minimap for large offices, camera follow, screen-reader accessibility summary
+
+### Design Evolution
+
+1. **Bottom panel instead of fullscreen view** — The spec designed the office as a fullscreen replacement for the board (swap `display:none`). During implementation, the user requested it as a bottom panel like Terminal/Dep Graph, keeping the board visible above. This is a better fit for ambient awareness.
+
+2. **Characters are 16×32, not 16×16** — The spec assumed 16×16 character sprites matching the tile grid. The actual LimeZu premade characters are 16×32 (2 tiles tall), requiring the renderer to offset sprites upward and the layout to include head-room rows.
+
+3. **Programmatic furniture rendering** — The spec planned to extract individual furniture PNGs from the sprite sheets. The actual sheet layout made pixel-coordinate mapping fragile, so furniture uses a hybrid approach: real LimeZu sprites for desks, chairs, sofas, bookshelves, and plants where coordinates were verified, with programmatic drawing for PC monitors.
+
+4. **Horizontal row layout** — The spec designed desk clusters in rows of 4 (2×2 facing each other). The bottom panel's wide-short aspect ratio made this unreadable, so the layout was redesigned as a single horizontal row of workstations with a common area on the left.
+
+5. **No random wandering** — The spec included idle characters wandering to random tiles. This was disabled because it looked chaotic in the compact panel view — characters now stay at their assigned desks.
+
+6. **Ctrl+` panel cycling** — Not in the original spec. Added to match the existing Terminal/Dep Graph cycling pattern: nothing → terminal → dep graph → office → close.
+
 ## What This Does NOT Require
 
 - **No backend changes**: The office view is purely frontend. It consumes the existing SSE task stream.
