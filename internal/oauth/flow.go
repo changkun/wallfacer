@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/logger"
 )
 
 // FlowState represents the state of an OAuth flow.
@@ -217,6 +219,13 @@ func exchangeToken(client *http.Client, provider Provider, code, verifier, redir
 			"code_verifier": verifier,
 			"client_id":     provider.ClientID,
 		})
+		logger.Handler.Info("oauth: token exchange request",
+			"url", provider.TokenURL,
+			"redirect_uri", redirectURI,
+			"client_id", provider.ClientID,
+			"code_len", len(code),
+			"verifier_len", len(verifier),
+		)
 		resp, err = client.Post(provider.TokenURL, "application/json", bytes.NewReader(payload))
 	} else {
 		data := url.Values{
@@ -239,6 +248,11 @@ func exchangeToken(client *http.Client, provider Provider, code, verifier, redir
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		logger.Handler.Error("oauth: token exchange failed",
+			"status", resp.StatusCode,
+			"body", string(body),
+			"redirect_uri", redirectURI,
+		)
 		return "", fmt.Errorf("token endpoint returned %d: %s", resp.StatusCode, body)
 	}
 
