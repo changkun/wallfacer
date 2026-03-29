@@ -95,20 +95,49 @@ function initTerminal() {
   }
 
   // Wire tab callbacks to send WebSocket session messages.
+  // Each callback refocuses xterm after sending, since clicking a tab/button
+  // moves browser focus away from xterm's internal textarea.
   setTabClickHandler(function (id) {
     if (_termWs && _termWs.readyState === WebSocket.OPEN) {
       _termWs.send(JSON.stringify({ type: "switch_session", session: id }));
     }
+    if (_term) _term.focus();
   });
   setTabCloseHandler(function (id) {
     if (_termWs && _termWs.readyState === WebSocket.OPEN) {
       _termWs.send(JSON.stringify({ type: "close_session", session: id }));
     }
+    if (_term) _term.focus();
   });
   setTabAddHandler(function () {
     if (_termWs && _termWs.readyState === WebSocket.OPEN) {
       _termWs.send(JSON.stringify({ type: "create_session" }));
     }
+    if (_term) _term.focus();
+  });
+
+  // Intercept Cmd+Backspace on macOS and send Ctrl+U (kill line backward).
+  // The browser eats Cmd+key combos before xterm sees them, so we catch
+  // the raw DOM keydown event and inject the escape sequence manually.
+  _term.attachCustomKeyEventHandler(function (e) {
+    if (e.type !== "keydown") return true;
+    if (e.metaKey && e.key === "Backspace") {
+      // Ctrl+U = \x15 (kill from cursor to start of line).
+      if (_termWs && _termWs.readyState === WebSocket.OPEN) {
+        _termWs.send(JSON.stringify({ type: "input", data: btoa("\x15") }));
+      }
+      e.preventDefault();
+      return false;
+    }
+    if (e.metaKey && e.key === "k") {
+      // Ctrl+K = \x0b (kill from cursor to end of line).
+      if (_termWs && _termWs.readyState === WebSocket.OPEN) {
+        _termWs.send(JSON.stringify({ type: "input", data: btoa("\x0b") }));
+      }
+      e.preventDefault();
+      return false;
+    }
+    return true;
   });
 
   // Wire terminal events once — they check _termWs on each invocation.
@@ -322,6 +351,7 @@ function _handleSessionsList(sessions) {
       activateTerminalTab(s.id);
     }
   }
+  if (_term && _activeSessionId) _term.focus();
 }
 
 function _handleSessionSwitched(id) {

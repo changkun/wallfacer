@@ -99,6 +99,7 @@ function makeContext(overrides = {}) {
     clear: vi.fn(),
     onData: vi.fn(),
     onResize: vi.fn(),
+    attachCustomKeyEventHandler: vi.fn(),
     cols: 80,
     rows: 24,
     options: {},
