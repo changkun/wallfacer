@@ -58,9 +58,9 @@ func TestTTLCache_SetPermanent(t *testing.T) {
 	}
 }
 
-// TestTTLCache_MaxSize_EvictsOldest verifies that exceeding MaxSize evicts
-// the oldest permanent entry (FIFO order).
-func TestTTLCache_MaxSize_EvictsOldest(t *testing.T) {
+// TestTTLCache_MaxSize_EvictsLRU verifies that exceeding MaxSize evicts
+// the least recently used permanent entry.
+func TestTTLCache_MaxSize_EvictsLRU(t *testing.T) {
 	c := New[string, int](time.Minute, WithMaxSize[string, int](2))
 
 	c.SetPermanent("a", 1)
@@ -75,6 +75,37 @@ func TestTTLCache_MaxSize_EvictsOldest(t *testing.T) {
 	}
 	if v, ok := c.Get("c"); !ok || v != 3 {
 		t.Fatalf("expected 'c' to exist, got (%d, %v)", v, ok)
+	}
+}
+
+// TestTTLCache_MaxSize_GetPromotes verifies that accessing a permanent entry
+// promotes it to most-recently-used, preventing eviction.
+func TestTTLCache_MaxSize_GetPromotes(t *testing.T) {
+	c := New[string, int](time.Minute, WithMaxSize[string, int](3))
+
+	c.SetPermanent("a", 1)
+	c.SetPermanent("b", 2)
+	c.SetPermanent("c", 3)
+
+	// Access "a" to promote it — now "b" is LRU.
+	if _, ok := c.Get("a"); !ok {
+		t.Fatal("expected hit for 'a'")
+	}
+
+	// Insert "d" — should evict "b" (LRU), not "a" (recently accessed).
+	c.SetPermanent("d", 4)
+
+	if _, ok := c.Get("a"); !ok {
+		t.Fatal("expected 'a' to survive (was promoted by Get), but it was evicted")
+	}
+	if _, ok := c.Get("b"); ok {
+		t.Fatal("expected 'b' to be evicted (LRU), but it survived")
+	}
+	if _, ok := c.Get("c"); !ok {
+		t.Fatal("expected 'c' to survive")
+	}
+	if _, ok := c.Get("d"); !ok {
+		t.Fatal("expected 'd' to survive")
 	}
 }
 

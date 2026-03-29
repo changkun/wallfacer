@@ -198,8 +198,8 @@ func TestDiffETag(t *testing.T) {
 	}
 }
 
-// TestDiffCacheLRUEviction verifies that the cache evicts the oldest immutable
-// entry when MaxImmutableDiffEntries is exceeded.
+// TestDiffCacheLRUEviction verifies that the cache evicts the least recently
+// used immutable entry when MaxImmutableDiffEntries is exceeded.
 func TestDiffCacheLRUEviction(t *testing.T) {
 	c := newDiffCache()
 

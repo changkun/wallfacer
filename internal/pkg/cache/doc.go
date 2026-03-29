@@ -2,8 +2,8 @@
 // bounded LRU eviction.
 //
 // It supports generic key-value storage with per-entry expiration, permanent
-// entries that bypass TTL, and an optional maximum size that evicts the oldest
-// entries when exceeded. A pluggable clock interface enables deterministic
+// entries that bypass TTL, and an optional maximum size that evicts the least
+// recently used entries when exceeded. A pluggable clock interface enables deterministic
 // testing without real time delays.
 //
 // # Connected packages
