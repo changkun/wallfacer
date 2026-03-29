@@ -62,9 +62,9 @@ func NewCallbackServer(ctx context.Context) (*CallbackServer, error) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if result.Error != "" {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, callbackPageHTML, "Authorization failed: "+result.Error+". "+result.ErrorDescription)
+			_, _ = fmt.Fprintf(w, callbackPageHTML, "Authorization failed: "+result.Error+". "+result.ErrorDescription)
 		} else {
-			fmt.Fprintf(w, callbackPageHTML, "Authorization successful. You can close this tab.")
+			_, _ = fmt.Fprintf(w, callbackPageHTML, "Authorization successful. You can close this tab.")
 		}
 
 		select {

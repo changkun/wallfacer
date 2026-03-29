@@ -141,7 +141,7 @@ func TestExchangeToken(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"access_token": "tok_abc123"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"access_token": "tok_abc123"})
 	}))
 	defer ts.Close()
 
@@ -158,9 +158,9 @@ func TestExchangeToken(t *testing.T) {
 }
 
 func TestExchangeToken_ErrorResponse(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
 	}))
 	defer ts.Close()
 
@@ -175,9 +175,9 @@ func TestExchangeToken_ErrorResponse(t *testing.T) {
 
 func TestManager_FullFlow(t *testing.T) {
 	// Mock token endpoint.
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"access_token": "full-flow-token"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"access_token": "full-flow-token"})
 	}))
 	defer ts.Close()
 
@@ -209,7 +209,7 @@ func TestManager_FullFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("callback GET: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// Poll until success or timeout.
 	deadline := time.After(5 * time.Second)

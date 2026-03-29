@@ -15,6 +15,7 @@ import (
 // FlowState represents the state of an OAuth flow.
 type FlowState string
 
+// OAuth flow states.
 const (
 	FlowPending FlowState = "pending"
 	FlowSuccess FlowState = "success"
@@ -211,7 +212,7 @@ func exchangeToken(client *http.Client, provider Provider, code, verifier, redir
 	if err != nil {
 		return "", fmt.Errorf("POST %s: %w", provider.TokenURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -537,7 +537,7 @@ func TestRelayDispatcher_LastSessionExit(t *testing.T) {
 
 // readTextMessage reads WebSocket messages until a text message matching the
 // given type is found, or the deadline expires.
-func readTextMessage(t *testing.T, ctx context.Context, conn *websocket.Conn, msgType string, timeout time.Duration) json.RawMessage {
+func readTextMessage(t *testing.T, ctx context.Context, conn *websocket.Conn, msgType string, timeout time.Duration) json.RawMessage { //nolint:revive // testing.T conventionally precedes context in test helpers
 	t.Helper()
 	deadline := time.After(timeout)
 	for {

@@ -30,7 +30,7 @@ func TestCallbackServer_ReceivesCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 200 {
 		t.Errorf("status = %d; want 200", resp.StatusCode)
 	}
@@ -65,7 +65,7 @@ func TestCallbackServer_ReceivesError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != 400 {
 		t.Errorf("status = %d; want 400", resp.StatusCode)
 	}
