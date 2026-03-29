@@ -9,3 +9,10 @@ ui/wailsjs/
 build/bin/
 build/appicon.png
 .DS_Store
+
+# Pixel office assets (licensed, not redistributable)
+ui/assets/office/characters/*.png
+ui/assets/office/furniture/*.png
+ui/assets/office/tiles/*.png
+!ui/assets/office/effects/bubbles.png
+!ui/assets/office/README.md
