@@ -1,6 +1,6 @@
 # Task 6: Desktop Browser Launch Integration
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 5
 **Phase:** Desktop integration
 **Effort:** Small
