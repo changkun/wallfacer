@@ -1,7 +1,18 @@
-# Spec Document Model
+---
+title: Spec Document Model
+status: drafted
+track: local
+depends_on:
+  - specs/local/spec-coordination.md
+affects: []
+effort: large
+created: 2026-03-29
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Parent spec:** [spec-coordination.md](spec-coordination.md)
-**Date:** 2026-03-29
+# Spec Document Model
 
 Defines the properties, lifecycle, and tree structure of spec documents.
 
@@ -81,6 +92,47 @@ specs/
 ```
 
 Child specs are named descriptively without numeric prefixes. Execution order is determined by `depends_on`, not filename order. The directory nesting mirrors the tree structure — you can always tell a spec's depth from its file path.
+
+---
+
+## Spec Validation
+
+A spec validator checks structural correctness of spec documents. It runs on individual specs and across the full spec tree.
+
+### Per-Spec Validation
+
+| Rule | Severity | Description |
+|------|----------|-------------|
+| **Required fields** | error | `title`, `status`, `track`, `effort`, `created`, `updated`, `author` must be present |
+| **Valid status** | error | `status` must be one of: `vague`, `drafted`, `validated`, `complete`, `stale` |
+| **Valid track** | error | `track` must match the spec's filesystem location (`specs/<track>/...`) |
+| **Valid effort** | error | `effort` must be one of: `small`, `medium`, `large`, `xlarge` |
+| **Date format** | error | `created` and `updated` must be valid ISO dates; `updated` ≥ `created` |
+| **Dispatch consistency** | error | Non-leaf specs must have `dispatched_task_id: null`. Leaf specs may have null or a valid UUID |
+| **`depends_on` targets exist** | error | Every path in `depends_on` must resolve to an existing spec file |
+| **`affects` paths exist** | warning | Every path in `affects` should resolve to an existing file or directory in the codebase. Warning (not error) because code may not exist yet for `vague`/`drafted` specs |
+| **No self-dependency** | error | A spec cannot appear in its own `depends_on` |
+| **Body not empty** | warning | Specs beyond `vague` status should have meaningful content below the frontmatter |
+
+### Cross-Spec Validation (Tree-Wide)
+
+| Rule | Severity | Description |
+|------|----------|-------------|
+| **DAG is acyclic** | error | The `depends_on` graph must have no cycles. Report the full cycle path on violation |
+| **No orphan directories** | warning | A `<name>/` subdirectory should have a corresponding `<name>.md` parent spec |
+| **No orphan specs** | warning | A `<name>.md` file with a `<name>/` subdirectory should have at least one child spec in it |
+| **Status consistency** | warning | A `complete` non-leaf spec should not have incomplete leaves in its subtree |
+| **Stale propagation** | warning | If a spec is `stale`, dependents that are still `validated` should be flagged for review |
+| **Track consistency** | warning | All specs in `specs/<track>/` should have `track: <track>` in frontmatter |
+| **Unique dispatches** | error | No two specs may share the same `dispatched_task_id` |
+
+### When to Run
+
+- **On spec creation or edit** — validate the changed spec and re-check cross-spec rules affected by the change (cycles, status consistency).
+- **Before dispatch** — a leaf spec must pass all error-level rules before it can be dispatched as a task.
+- **On demand** — full tree validation as a CLI command or UI action, surfacing all warnings and errors across the spec tree.
+
+Validation results are not stored — they are computed fresh each time, like progress tracking and impact analysis.
 
 ---
 
@@ -188,6 +240,38 @@ When leaf specs are dispatched, `depends_on` becomes `DependsOn` on the kanban b
 - **Upward through the tree** (children → parent): When children complete, the parent's progress updates. If implementation diverges from the parent's design, the parent should be updated.
 - **Downward through the tree** (parent → children): If a parent spec is modified, its children may be invalidated. See [spec-drift-detection.md](spec-drift-detection.md).
 - **Along DAG edges** (dependency → dependent): If a completed dependency drifts, specs that depend on it get warnings. This follows `depends_on` edges regardless of tree position.
+
+### Impact Analysis (Reverse Dependencies)
+
+`depends_on` answers "what blocks me?" The reverse question — "what do I impact?" — is equally important. When a spec completes, changes, or goes stale, the system needs to surface every spec that transitively depends on it so those can be reviewed.
+
+**This is a computed property, not a stored field.** The reverse index is derived on the fly by inverting all `depends_on` edges across the spec tree. No `impacted_by` or `depended_on_by` frontmatter is needed — that would duplicate information and drift out of sync.
+
+Given the DAG from the example above:
+
+```
+Impact of define-interface.md:
+  direct:     local-backend.md, update-registry.md
+  transitive: refactor-launch.md, refactor-listing.md, retire-executor.md,
+              container-reuse.md (cross-tree)
+
+Impact of local-backend.md:
+  direct:     refactor-launch.md
+  transitive: refactor-listing.md, retire-executor.md
+```
+
+**When to surface impact:**
+
+| Event | Action |
+|-------|--------|
+| Spec reaches `complete` | Show dependents that are now unblocked (ready to dispatch or break down) |
+| Spec moves to `stale` | Warn all transitive dependents — their assumptions may be invalid |
+| Spec design changes (edited while `validated`) | Flag direct dependents for review; they may need updating |
+| `affects` files modified outside spec work | See [spec-drift-detection.md](spec-drift-detection.md) for file-level impact |
+
+**Impact scope for non-leaf specs:** When a non-leaf spec changes, the impact includes both (a) specs that `depends_on` it directly, and (b) specs that depend on any leaf in its subtree, since the non-leaf's design governs its children's implementation.
+
+The impact query composes with progress tracking: a non-leaf dependent shows how many of its own leaves are affected, not just a binary flag.
 
 ---
 
