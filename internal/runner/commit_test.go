@@ -570,6 +570,58 @@ func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Empty instructions file cleanup before git add -A
+// ---------------------------------------------------------------------------
+
+// TestHostStageAndCommitCleansUpEmptyInstructionsFiles verifies that empty
+// CLAUDE.md or AGENTS.md files (left behind as bind-mount points by podman)
+// are removed before staging so they don't get committed.
+func TestHostStageAndCommitCleansUpEmptyInstructionsFiles(t *testing.T) {
+	repo := setupTestRepo(t)
+	worktreesDir := t.TempDir()
+	s, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+	runner := NewRunner(s, RunnerConfig{
+		Command:      "echo",
+		SandboxImage: "test:latest",
+		Workspaces:   []string{repo},
+		WorktreesDir: worktreesDir,
+	})
+	t.Cleanup(func() { runner.Shutdown() })
+
+	taskID := uuid.New()
+	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { runner.cleanupWorktrees(taskID, worktreePaths, branchName) })
+
+	wt := worktreePaths[repo]
+
+	// Simulate the empty mount-point files that podman leaves behind.
+	for _, f := range []string{"CLAUDE.md", "AGENTS.md"} {
+		if err := os.WriteFile(filepath.Join(wt, f), nil, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Run staging (will fail at commit message generation, but that's fine —
+	// we only care that the empty files are removed before staging).
+	_, _ = runner.hostStageAndCommit(context.Background(), taskID, worktreePaths, "test cleanup")
+
+	// After the call, the empty files should have been removed.
+	for _, f := range []string{"CLAUDE.md", "AGENTS.md"} {
+		p := filepath.Join(wt, f)
+		if _, err := os.Stat(p); err == nil {
+			t.Errorf("expected %s to be removed from worktree; file still exists", f)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // localFallbackCommitMessage unit tests
 // ---------------------------------------------------------------------------
 

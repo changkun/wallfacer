@@ -238,6 +238,20 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 			missing = append(missing, repoPath)
 			continue
 		}
+		// Clean up empty instructions files left behind as bind-mount points.
+		// When podman bind-mounts a file (e.g. CLAUDE.md) into a directory
+		// that is itself a bind mount (the worktree), and the target file
+		// doesn't exist in the underlying directory, podman creates an empty
+		// file as the mount point. The mount is removed when the container
+		// exits, but the empty file persists. Remove it before staging so
+		// it doesn't get committed.
+		for _, instrFile := range []string{prompts.ClaudeInstructionsFilename, prompts.CodexInstructionsFilename} {
+			p := filepath.Join(worktreePath, instrFile)
+			if info, err := os.Stat(p); err == nil && info.Size() == 0 {
+				_ = os.Remove(p)
+			}
+		}
+
 		if out, err := cmdexec.Git(worktreePath, "add", "-A").WithContext(ctx).Combined(); err != nil {
 			if ctx.Err() != nil {
 				return false, fmt.Errorf("context canceled during git add: %w", ctx.Err())
