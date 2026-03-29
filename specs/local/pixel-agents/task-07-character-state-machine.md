@@ -1,6 +1,6 @@
 # Task 7: Character State Machine and Animation
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3 (SpriteCache), Task 6 (Pathfinding)
 **Phase:** Phase 2 (Character System)
 **Effort:** Medium
