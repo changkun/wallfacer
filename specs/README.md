@@ -23,7 +23,8 @@ Local Product                          Cloud Platform
   ✅ Terminal Sessions                    ○ Tenant API
   ✅ Container Exec
   ○ Oversight Risk Scoring             Shared Design
-  ○ Visual Verification                  ○ Authentication
+  ○ Validation Barrier                   ○ Authentication
+  ○ Visual Verification
   ○ OAuth Token Setup                    ○ Agent Abstraction
   ○ Live Serve
   ○ Terminal UI (TUI mode)
@@ -71,6 +72,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [live-serve.md](local/live-serve.md) | Not started | Build and run developed software from within Wallfacer |
 | [oauth-token-setup.md](local/oauth-token-setup.md) | Not started | Browser-based OAuth sign-in for Claude and Codex credentials |
 | [pixel-agents.md](local/pixel-agents.md) | **Complete** | Pixel art office view — animated characters representing task agents |
+| [validation-barrier.md](local/validation-barrier.md) | Not started | User-defined test criteria persisted on tasks for targeted verification |
 | [terminal-ui.md](local/terminal-ui.md) | Not started | Full TUI mode — interactive terminal board, log streaming, task lifecycle via Bubble Tea |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
 
@@ -86,7 +88,7 @@ Host Terminal (done) ──▶ Terminal Sessions (done) ──▶ Container Exec
 
 File Explorer + Host Terminal ──▶ Desktop App (done)
 
-Independent: Oversight Risk Scoring, Visual Verification, Live Serve, OAuth Token Setup, Terminal UI, Pixel Agent Avatars (done)
+Independent: Oversight Risk Scoring, Validation Barrier, Visual Verification, Live Serve, OAuth Token Setup, Terminal UI, Pixel Agent Avatars (done)
 ```
 
 ---
