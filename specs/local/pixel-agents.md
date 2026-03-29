@@ -390,3 +390,44 @@ Replace placeholder sprites with LimeZu art assets.
 - **No database changes**: Character state is ephemeral (in-memory JS), desk layout is computed.
 - **No build toolchain**: Sprites are static PNGs served from the embedded FS. JS is vanilla (no bundler).
 - **No replacement of the board view**: The office is an optional secondary view. The board remains the default and primary interface.
+
+## Task Breakdown
+
+| # | Task | Depends on | Effort | Status |
+|---|------|-----------|--------|--------|
+| 1 | [Asset scaffolding](pixel-agents/task-01-asset-scaffolding.md) | — | Small | Todo |
+| 2 | [TileMap and layout algorithm](pixel-agents/task-02-tilemap-and-layout.md) | — | Medium | Todo |
+| 3 | [SpriteCache with placeholders](pixel-agents/task-03-sprite-cache.md) | 1 | Medium | Todo |
+| 4 | [Camera](pixel-agents/task-04-camera.md) | — | Small | Todo |
+| 5 | [Renderer and view toggle](pixel-agents/task-05-renderer-and-view-toggle.md) | 2, 3, 4 | Large | Todo |
+| 6 | [Pathfinding](pixel-agents/task-06-pathfinding.md) | 2 | Small | Todo |
+| 7 | [Character state machine and animation](pixel-agents/task-07-character-state-machine.md) | 3, 6 | Medium | Todo |
+| 8 | [CharacterManager and desk persistence](pixel-agents/task-08-character-manager.md) | 2, 7 | Medium | Todo |
+| 9 | [SSE task state integration](pixel-agents/task-09-sse-integration.md) | 5, 8 | Medium | Todo |
+| 10 | [Spawn and despawn effects](pixel-agents/task-10-spawn-despawn-effects.md) | 7 | Small | Todo |
+| 11 | [Speech bubbles](pixel-agents/task-11-speech-bubbles.md) | 7 | Small | Todo |
+| 12 | [Interaction and modal integration](pixel-agents/task-12-interaction.md) | 5, 8 | Medium | Todo |
+| 13 | [Art integration and asset detection](pixel-agents/task-13-art-integration.md) | 3 | Medium | Todo |
+| 14 | [Polish: preferences, minimap, a11y](pixel-agents/task-14-polish.md) | 5, 12 | Medium | Todo |
+
+```mermaid
+graph LR
+  1[1: Asset scaffolding] --> 3[3: SpriteCache]
+  2[2: TileMap] --> 5[5: Renderer + toggle]
+  3 --> 5
+  4[4: Camera] --> 5
+  2 --> 6[6: Pathfinding]
+  3 --> 7[7: Character]
+  6 --> 7
+  2 --> 8[8: CharacterManager]
+  7 --> 8
+  5 --> 9[9: SSE integration]
+  8 --> 9
+  7 --> 10[10: Spawn/despawn FX]
+  7 --> 11[11: Speech bubbles]
+  5 --> 12[12: Interaction]
+  8 --> 12
+  3 --> 13[13: Art integration]
+  5 --> 14[14: Polish]
+  12 --> 14
+```
