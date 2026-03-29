@@ -13,23 +13,32 @@ asset detection, and wire the toggle button visibility to asset availability.
 ## What to do
 
 1. Update `ui/js/office/spriteCache.js` with LimeZu sprite definitions:
-   - Character sprite sheets (from Modern Interiors Character Generator):
-     - Sheet layout: 4 rows (down, left, right, up) × N columns per animation
-     - Walk: 4 frames per direction
-     - Idle: 1 frame per direction (first walk frame)
-     - Define `CHARACTER_FRAMES` mapping: `{ walk: [0,1,2,3], idle: [0] }`
-     - Frame size: 16×16 px (or 16×24 if the generator outputs taller sprites —
-       verify after purchase and update accordingly)
-   - Furniture sprites (from Modern Office):
-     - `FURNITURE_DEFS` mapping type → `{ file, frames, frameSize }`
-     - PC: 2 frames (off, on) at 16×16
-     - Desk: single frame at 32×16 (2 tiles wide)
-     - Chair: single frame at 16×16
-     - Other items: single frames at their tile sizes
-   - Tile sprites (from Modern Interiors):
-     - Floor: tile variants (4–8 slight variations for visual interest)
-     - Wall: auto-tile set (define which sub-sprites to use for each
-       wall configuration: top, bottom, left, right, corners)
+   - **Character sheets** (896×656 px each, 16×16 frame grid = 56 cols × 41 rows):
+     - Each `char_NN.png` is a full animation sheet from Modern Interiors
+       Premade Characters. Layout documented in pack's
+       `Spritesheet_animations_GUIDE.png`.
+     - Define `CHARACTER_ANIMS` mapping animation name → row ranges and
+       frame counts per direction (down, left, right, up):
+       - `idle`: row 0, 1 frame per direction
+       - `walk`: rows 1–2, 6 frames per direction
+       - `sit`: row 3, transition frames
+       - `sitting_idle`: rows 5–6
+       - `typing`: rows 7–10 (PC work animations)
+     - Exact row/column offsets must be verified against the guide PNG and
+       a sample character sheet — the guide shows frame positions visually.
+   - **Furniture sheet** (`office_sheet.png`, 256×848 px, 16×53 tile grid):
+     - All furniture is in one sheet, not individual files.
+     - Define `FURNITURE_DEFS` mapping type → `{ sx, sy, sw, sh, frames }`:
+       - Desk, chair, PC (on/off), monitor, whiteboard, bookshelf, sofa,
+         plant, coffee machine — identify pixel regions in the sheet.
+     - PC/monitor items have 2+ frames (off, on states) in adjacent cells.
+   - **Tile sheets** (from Modern Interiors Room Builder subfiles):
+     - `floor.png` (240×640): 5 columns of floor styles, each 3 tiles
+       wide (48px) with multiple pattern rows. Pick one office-appropriate
+       style and define its region.
+     - `wall.png` (512×640): Wall auto-tile column groups. Each group has
+       all edge/corner/fill variants. Define which sub-region to use for
+       each wall configuration (top, bottom, left, right, corners, fills).
 
 2. Implement `detectAssets()` in `spriteCache.js`:
    - Attempt to load `ui/assets/office/characters/char_00.png` via `Image()`
@@ -44,15 +53,13 @@ asset detection, and wire the toggle button visibility to asset availability.
        show button anyway with placeholder sprites
      - If assets not available and no dev flag: keep button hidden
 
-4. Update `ui/assets/office/README.md` with exact file naming and placement
-   instructions now that sprite definitions are finalized.
-
 ## Tests
 
 - `spriteCache-art.test.js`:
-  - `CHARACTER_FRAMES.walk` has 4 entries
-  - `FURNITURE_DEFS.PC.frames` equals 2
-  - `FURNITURE_DEFS.DESK.frameSize` equals `{w: 32, h: 16}`
+  - `CHARACTER_ANIMS.walk` defines frames for 4 directions
+  - `CHARACTER_ANIMS.typing` defines frames (rows 7–10 region)
+  - `FURNITURE_DEFS.PC.frames` >= 2 (off/on states)
+  - `FURNITURE_DEFS.DESK` has `sx, sy, sw, sh` within 256×848 bounds
   - `detectAssets()` with mock Image success → `assetAvailable()` returns true
   - `detectAssets()` with mock Image error → `assetAvailable()` returns false
   - Placeholder mode: all sprites render without errors when assets missing
@@ -60,5 +67,5 @@ asset detection, and wire the toggle button visibility to asset availability.
 ## Boundaries
 
 - Do NOT modify the rendering pipeline — just update sprite definitions
-- Do NOT create or modify actual PNG files (that's manual art work)
+- Do NOT create or modify actual PNG files — assets are full sheets placed manually
 - Do NOT change the character state machine or animation logic

@@ -39,16 +39,17 @@ Both views stay mounted in the DOM; toggling swaps `display: none`. This keeps S
 
 #### Sprites
 
-Characters are 16×16 pixel top-down sprites (matching the LimeZu tileset grid), rendered at integer zoom (3× or 4× depending on viewport). Each character has animation sets per direction (down, left, right, up):
+Characters are 16×16 pixel top-down sprites (matching the LimeZu tileset grid), rendered at integer zoom (3× or 4× depending on viewport). Each character sheet is **896×656 px** (56×41 frames at 16×16). The full animation layout is documented in the pack's `Spritesheet_animations_GUIDE.png`. Key animation sets used:
 
-| Animation | Frames | Trigger |
-|-----------|--------|---------|
-| **typing** | 2 | Task is `in_progress` (agent executing) |
-| **reading** | 2 | Task is `in_progress` and current tool is a read-type tool |
-| **walk** | 4 | Character moving between tiles |
-| **idle** | 1 | Task is `backlog` or `done` |
+| Animation | Sheet rows | Frames | Trigger |
+|-----------|-----------|--------|---------|
+| **idle** | 0 | 1 per dir | Task is `backlog` or `done` |
+| **walk** | 1–2 | 6 per dir | Character moving between tiles |
+| **sit** | 3 | varies | Transition to desk |
+| **sitting idle** | 5–6 | varies | Seated at desk (passive) |
+| **typing** | 7–10 | varies | Task is `in_progress` (agent executing) |
 
-Characters are generated using the **LimeZu Modern Interiors Character Generator** (included in the paid pack), which provides 9 skin tones × 29 hairstyles × 15 accessories — enough combinatorial variety that each task gets a visually distinct character without hue-shifting hacks. A set of pre-generated character sprite sheets ships with Wallfacer; additional characters are generated deterministically from the task UUID as a seed.
+20 pre-made character sheets (`char_00.png` – `char_19.png`) ship with Wallfacer, copied from the Modern Interiors Premade Characters. Each task is assigned a character deterministically from the task UUID as a seed.
 
 #### State Machine
 
@@ -133,7 +134,7 @@ Layout algorithm:
 
 #### Furniture Catalog
 
-Minimal set of furniture sprites:
+All furniture is sliced from `furniture/office_sheet.png` (256×848, 16px grid) at runtime. The `SpriteCache` defines pixel regions for each item type.
 
 | Item | Size (tiles) | States |
 |------|-------------|--------|
@@ -227,26 +228,20 @@ The office view uses the [LimeZu](https://limezu.itch.io/) pixel art packs, chos
 ui/assets/office/              # .gitignored
 ├── README.md                  # purchase links and placement instructions (committed)
 ├── characters/
-│   ├── char_00.png            # pre-generated from LimeZu Character Generator
+│   ├── char_00.png            # 896×656 premade character sheet (from Modern Interiors)
 │   ├── ...
-│   └── char_19.png            # 20 pre-generated characters for variety
+│   └── char_19.png            # 20 premade characters
 ├── furniture/
-│   ├── desk.png               # from Modern Office pack
-│   ├── chair.png
-│   ├── pc.png                 # includes on/off animation frames
-│   ├── sofa.png
-│   ├── plant.png
-│   ├── coffee.png
-│   ├── whiteboard.png
-│   └── bookshelf.png
+│   ├── office_sheet.png       # 256×848 full furniture sheet (Modern_Office_16x16.png)
+│   └── room_builder.png       # Room builder sheet from Modern Office
 ├── tiles/
-│   ├── floor.png              # from Modern Interiors
-│   └── wall.png               # wall auto-tile set
+│   ├── floor.png              # 240×640 floor tile set (Room_Builder_Floors_16x16.png)
+│   └── wall.png               # 512×640 wall auto-tile set (Room_Builder_Walls_16x16.png)
 └── effects/
     └── bubbles.png            # custom speech bubble sprites (hand-drawn, committed)
 ```
 
-Sprites are loaded at startup via `Image()` and sliced into animation frames in JS. No build step required — raw PNGs served from the embedded filesystem. The `bubbles.png` and `README.md` are small enough to be committed directly.
+All sprites are full sheets loaded at startup via `Image()` and sliced into frames at runtime by the `SpriteCache` using pixel coordinates. No extraction of individual PNGs needed — the renderer reads directly from sheets. No build step required — raw PNGs served from the embedded filesystem. The `bubbles.png` and `README.md` are small enough to be committed directly.
 
 ## Implementation Phases
 
@@ -321,21 +316,24 @@ Click, hover, and keyboard interactions.
 
 Replace placeholder sprites with LimeZu art assets.
 
-- Purchase [Modern Office](https://limezu.itch.io/modernoffice) ($2.50) and [Modern Interiors](https://limezu.itch.io/moderninteriors) (~$5–10)
-- Use the Character Generator (included in Modern Interiors) to pre-generate 20 diverse character sprite sheets with walk animations
-- Extract and slice furniture sprites from Modern Office: desks, chairs, PCs (on/off states), whiteboards, bookshelves, sofas, plants, coffee machines
-- Extract floor and wall tiles from Modern Interiors
+- ~~Purchase~~ **Done**: Modern Office ($2.50) and Modern Interiors (~$5–10) purchased
+- ~~Extract assets~~ **Done**: Full sprite sheets placed (not individual PNGs):
+  - `characters/char_00.png` – `char_19.png` — 20 premade character sheets (896×656 each)
+  - `furniture/office_sheet.png` — Full furniture sheet (256×848)
+  - `furniture/room_builder.png` — Office room builder walls
+  - `tiles/floor.png` — Floor tile set (240×640)
+  - `tiles/wall.png` — Wall auto-tile set (512×640)
+- Define sprite slicing coordinates in `SpriteCache` for each sheet (character animations by row, furniture items by pixel region, tile variants by column group)
 - Hand-draw speech bubble sprites (11×13 px) — small enough to create custom and commit directly
-- Write `ui/assets/office/README.md` with purchase links and placement instructions
-- Add `.gitignore` entries for `ui/assets/office/` (except README.md and bubbles.png)
+- ~~Write README~~ **Done**: `ui/assets/office/README.md` documents setup
+- ~~Add .gitignore~~ **Done**: Office asset exclusions in place
 - Add build-time asset detection: if sprites are missing, hide the office view toggle gracefully
 
 **Files:**
-- `ui/assets/office/` — Extracted and sliced PNG sprite sheets (.gitignored)
+- `ui/assets/office/` — Full sprite sheets (.gitignored)
 - `ui/assets/office/README.md` — Setup instructions (committed)
 - `ui/assets/office/effects/bubbles.png` — Custom speech bubbles (committed)
 - `ui/js/office/spriteCache.js` — Update slicing coordinates for LimeZu sprite layouts
-- `.gitignore` — Add office asset exclusions
 
 ### Phase 6 — Polish and Persistence
 
@@ -378,10 +376,10 @@ Replace placeholder sprites with LimeZu art assets.
 | `ui/js/office/bubbles.js` | New | 3 |
 | `ui/js/office/interaction.js` | New | 4 |
 | `ui/js/office/minimap.js` | New | 6 |
-| `ui/assets/office/**` | New (.gitignored) | 5 |
-| `ui/assets/office/README.md` | New (committed) | 5 |
+| `ui/assets/office/**` | Done (.gitignored, sheets placed) | 1, 5 |
+| `ui/assets/office/README.md` | Done (committed) | 1 |
 | `ui/assets/office/effects/bubbles.png` | New (committed) | 5 |
-| `.gitignore` | Modify | 5 |
+| `.gitignore` | Done | 1 |
 
 ## What This Does NOT Require
 
