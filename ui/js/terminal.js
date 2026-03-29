@@ -6,12 +6,6 @@ var _termWs = null;
 var _termReconnectTimer = null;
 var _termReconnectDelay = 1000;
 
-// In desktop mode, the Wails AssetServer middleware handles WebSocket
-// upgrades by tunneling them to the real server. If that fails (e.g. the
-// middleware's ResponseWriter doesn't support Hijack), the terminal falls
-// back to a direct connection using the port from /api/desktop-port.
-var _directServerHost = null;
-
 function _getCSSVar(name) {
   return getComputedStyle(document.documentElement)
     .getPropertyValue(name)

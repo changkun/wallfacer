@@ -6,23 +6,6 @@
   padding: 8px 24px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in oklab, var(--bg) 92%, var(--bg-card));
-  /* Desktop: make header draggable as window title bar (Wails recognizes this). */
-  --wails-draggable: drag;
-}
-
-/* Inset left padding for macOS traffic lights in desktop mode. */
-html.wails-desktop .app-header {
-  padding-left: 96px;
-}
-
-/* Interactive elements must not be draggable. */
-.app-header button,
-.app-header input,
-.app-header a,
-.app-header select,
-.app-header [role="button"],
-.app-header .workspace-group-tab {
-  --wails-draggable: no-drag;
 }
 
 .app-header__primary {

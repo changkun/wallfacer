@@ -6,16 +6,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"io/fs"
-	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"changkun.de/x/wallfacer/internal/logger"
 
@@ -91,21 +86,15 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 
 	hideOnClose := runtime.GOOS == "darwin" || runtime.GOOS == "windows"
 
-	target, _ := url.Parse(serverURL)
-	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	// Middleware intercepts WebSocket upgrade requests and proxies them
-	// directly via TCP tunnel. Regular HTTP requests fall through to the
-	// reverse proxy Handler.
-	wsMiddleware := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if isWebSocketUpgrade(r) {
-				proxyWebSocket(w, r, fmt.Sprintf("localhost:%d", sc.ActualPort))
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
+	// Minimal asset handler for the initial Wails page. OnDomReady navigates
+	// to the real HTTP server so all transports (HTTP, SSE, WebSocket) work
+	// natively without a proxy layer.
+	serverHost := fmt.Sprintf("localhost:%d", sc.ActualPort)
+	loadingPage := fmt.Sprintf(`<!doctype html><html><body style="background:#1e293b"></body></html>`)
+	initialHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, loadingPage)
+	})
 
 	appOpts := &options.App{
 		Title:             "Wallfacer",
@@ -113,12 +102,19 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 		Height:            900,
 		HideWindowOnClose: hideOnClose,
 		AssetServer: &assetserver.Options{
-			Handler:    proxy,
-			Middleware: wsMiddleware,
+			Handler: initialHandler,
 		},
 		OnStartup: func(ctx context.Context) {
 			wailsCtx = ctx
 			logger.Main.Info("desktop window opened")
+		},
+		OnDomReady: func(ctx context.Context) {
+			// Navigate to the real server only if not already there.
+			// This prevents an infinite redirect loop since OnDomReady
+			// fires after every navigation.
+			js := fmt.Sprintf(`if (location.host !== %q) { location.href = %q; }`,
+				serverHost, serverURL)
+			wailsRuntime.WindowExecJS(ctx, js)
 		},
 		OnShutdown: func(_ context.Context) {
 			tm.Stop()
@@ -127,67 +123,8 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	}
 
 	if runtime.GOOS == "darwin" {
-		appOpts.Mac = &mac.Options{
-			TitleBar: mac.TitleBarHiddenInset(),
-		}
-		appOpts.CSSDragProperty = "--wails-draggable"
-		appOpts.CSSDragValue = "drag"
-	}
-	if runtime.GOOS == "windows" {
-		appOpts.Frameless = true
-		appOpts.CSSDragProperty = "--wails-draggable"
-		appOpts.CSSDragValue = "drag"
+		appOpts.Mac = &mac.Options{}
 	}
 
 	return wails.Run(appOpts)
-}
-
-// isWebSocketUpgrade checks if the request is a WebSocket upgrade.
-func isWebSocketUpgrade(r *http.Request) bool {
-	for _, v := range r.Header.Values("Connection") {
-		if strings.EqualFold(v, "Upgrade") {
-			return strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
-		}
-	}
-	return false
-}
-
-// proxyWebSocket tunnels a WebSocket connection by hijacking the client
-// connection and opening a raw TCP connection to the backend server.
-func proxyWebSocket(w http.ResponseWriter, r *http.Request, targetHost string) {
-	backendConn, err := net.Dial("tcp", targetHost)
-	if err != nil {
-		logger.Main.Error("ws proxy: dial failed", "error", err)
-		http.Error(w, "websocket proxy: dial failed", http.StatusBadGateway)
-		return
-	}
-	defer backendConn.Close()
-
-	hj, ok := w.(http.Hijacker)
-	if !ok {
-		logger.Main.Error("ws proxy: ResponseWriter does not implement Hijacker")
-		http.Error(w, "websocket proxy: hijack not supported", http.StatusInternalServerError)
-		return
-	}
-	clientConn, clientBuf, err := hj.Hijack()
-	if err != nil {
-		logger.Main.Error("ws proxy: hijack failed", "error", err)
-		return
-	}
-	defer clientConn.Close()
-
-	if err := r.Write(backendConn); err != nil {
-		return
-	}
-	if clientBuf.Reader.Buffered() > 0 {
-		buffered := make([]byte, clientBuf.Reader.Buffered())
-		if _, err := clientBuf.Read(buffered); err == nil {
-			backendConn.Write(buffered)
-		}
-	}
-
-	done := make(chan struct{}, 2)
-	go func() { io.Copy(clientConn, backendConn); done <- struct{}{} }()
-	go func() { io.Copy(backendConn, clientConn); done <- struct{}{} }()
-	<-done
 }
