@@ -1,6 +1,6 @@
 # Task 2: TileMap and Layout Algorithm
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Phase 1 (Rendering Foundation)
 **Effort:** Medium

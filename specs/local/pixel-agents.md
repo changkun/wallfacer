@@ -394,7 +394,7 @@ Replace placeholder sprites with LimeZu art assets.
 | # | Task | Depends on | Effort | Status |
 |---|------|-----------|--------|--------|
 | 1 | [Asset scaffolding](pixel-agents/task-01-asset-scaffolding.md) | — | Small | Done |
-| 2 | [TileMap and layout algorithm](pixel-agents/task-02-tilemap-and-layout.md) | — | Medium | Todo |
+| 2 | [TileMap and layout algorithm](pixel-agents/task-02-tilemap-and-layout.md) | — | Medium | Done |
 | 3 | [SpriteCache with placeholders](pixel-agents/task-03-sprite-cache.md) | 1 | Medium | Todo |
 | 4 | [Camera](pixel-agents/task-04-camera.md) | — | Small | Todo |
 | 5 | [Renderer and view toggle](pixel-agents/task-05-renderer-and-view-toggle.md) | 2, 3, 4 | Large | Todo |
