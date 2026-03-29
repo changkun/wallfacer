@@ -274,11 +274,24 @@ async function testSandboxConfig(sandbox) {
       body: JSON.stringify(payload),
     });
     statusEl.textContent = summarizeSandboxTestResult(resp);
+
+    // Show re-auth prompt if token is invalid and OAuth is available.
+    if (resp.reauth_available) {
+      var reauthSpan = document.createElement("span");
+      reauthSpan.style.marginLeft = "8px";
+      reauthSpan.innerHTML =
+        '<button class="btn btn-sm" style="font-size:11px" onclick="startOAuthFlow(\'' +
+        sandbox +
+        "')\">Sign in again</button>";
+      statusEl.appendChild(reauthSpan);
+    }
+
     setTimeout(() => {
       if (
         statusEl.textContent.startsWith("status failed") ||
         statusEl.textContent.includes("FAIL") ||
-        statusEl.textContent.startsWith("No response")
+        statusEl.textContent.startsWith("No response") ||
+        resp.reauth_available
       )
         return;
       statusEl.textContent = "";
@@ -445,6 +458,9 @@ async function loadEnvConfig() {
   // Update OAuth sign-in button visibility based on base URLs.
   _updateOAuthButtonVisibility();
 
+  // First-launch hints: emphasize sign-in buttons when no credentials exist.
+  _updateFirstLaunchHints(cfg);
+
   // Add input listeners for dynamic visibility (only once).
   var claudeBase = document.getElementById("env-claude-base-url");
   if (claudeBase && claudeBase.addEventListener && !claudeBase._oauthListenerAdded) {
@@ -577,6 +593,51 @@ function cancelOAuthFlow(provider) {
   var url = Routes.auth.cancel().replace("{provider}", provider);
   api(url, { method: "POST" }).catch(function () {});
   _stopOAuthPolling(provider, "Cancelled.");
+}
+
+var _firstLaunchToastShown = false;
+
+function _updateFirstLaunchHints(cfg) {
+  var claudeHasToken = cfg.oauth_token && cfg.oauth_token !== "(not set)";
+  var claudeHasKey = cfg.api_key && cfg.api_key !== "(not set)";
+  var claudeHasCreds = claudeHasToken || claudeHasKey;
+
+  var codexHasKey =
+    cfg.openai_api_key && cfg.openai_api_key !== "(not set)";
+
+  // Emphasize sign-in buttons when no credentials exist.
+  var claudeBtn = document.getElementById("claude-oauth-signin-btn");
+  if (claudeBtn) {
+    if (!claudeHasCreds) {
+      claudeBtn.classList.add("btn-primary");
+    } else {
+      claudeBtn.classList.remove("btn-primary");
+    }
+  }
+  var codexBtn = document.getElementById("codex-oauth-signin-btn");
+  if (codexBtn) {
+    if (!codexHasKey) {
+      codexBtn.classList.add("btn-primary");
+    } else {
+      codexBtn.classList.remove("btn-primary");
+    }
+  }
+
+  // Show/hide hint text.
+  var claudeHint = document.getElementById("claude-no-creds-hint");
+  if (claudeHint) claudeHint.style.display = claudeHasCreds ? "none" : "";
+  var codexHint = document.getElementById("codex-no-creds-hint");
+  if (codexHint) codexHint.style.display = codexHasKey ? "none" : "";
+
+  // First-launch toast: show once if no credentials for any provider.
+  if (!_firstLaunchToastShown && !claudeHasCreds && !codexHasKey) {
+    _firstLaunchToastShown = true;
+    if (typeof showAlert === "function") {
+      showAlert(
+        "No API credentials configured. Open Settings to sign in or enter your API keys.",
+      );
+    }
+  }
 }
 
 function _updateOAuthButtonVisibility() {
