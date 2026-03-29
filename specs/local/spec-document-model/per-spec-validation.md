@@ -1,6 +1,6 @@
 ---
 title: Per-Spec Validation
-status: validated
+status: complete
 track: local
 depends_on:
   - specs/local/spec-document-model/spec-model-types.md
@@ -83,3 +83,8 @@ Use `t.TempDir()` to create test file structures for `depends_on`/`affects` exis
 - Do NOT implement cross-spec validation (DAG cycles, orphan detection, status consistency across tree).
 - Do NOT implement validation CLI or HTTP endpoint.
 - Do NOT modify the `Spec` struct.
+
+## Implementation notes
+
+- **Type names avoid stutter**: `ValidationSeverity` -> `Severity`, `ValidationResult` -> `Result` (consistent with package convention).
+- **`date-format` rule omitted**: Date format validation already happens during YAML parsing in `Date.UnmarshalYAML`. A spec with an invalid date format would fail to parse entirely (never reaching validation). The `required-fields` check catches missing/zero dates instead.

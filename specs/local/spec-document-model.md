@@ -297,7 +297,7 @@ The regime is not a system mode — it's an emergent property of how the human a
 | [Spec model types](spec-document-model/spec-model-types.md) | — | medium | complete |
 | [Spec lifecycle](spec-document-model/spec-lifecycle.md) | spec-model-types | small | complete |
 | [Spec tree builder](spec-document-model/spec-tree-builder.md) | spec-model-types | medium | complete |
-| [Per-spec validation](spec-document-model/per-spec-validation.md) | spec-model-types, spec-lifecycle | medium | validated |
+| [Per-spec validation](spec-document-model/per-spec-validation.md) | spec-model-types, spec-lifecycle | medium | complete |
 | [Cross-spec validation](spec-document-model/cross-spec-validation.md) | spec-tree-builder, per-spec-validation | medium | validated |
 | [Progress tracking](spec-document-model/progress-tracking.md) | spec-tree-builder | small | validated |
 | [Impact analysis](spec-document-model/impact-analysis.md) | spec-tree-builder | medium | validated |
