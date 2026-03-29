@@ -1,6 +1,6 @@
 # Task 3: Session Control WebSocket Messages
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 2
 **Phase:** Backend protocol
 **Effort:** Small
