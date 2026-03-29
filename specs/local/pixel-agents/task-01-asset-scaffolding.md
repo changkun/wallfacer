@@ -1,6 +1,6 @@
 # Task 1: Asset Scaffolding
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Phase 5 (Art Integration) — pulled forward as prerequisite
 **Effort:** Small
