@@ -55,3 +55,17 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 - Requires host terminal (complete).
 - Requires [terminal-sessions.md](terminal-sessions.md) (complete) — container shell tabs use the session/tab registry to coexist with host shell tabs.
+
+## Task Breakdown
+
+| # | Task | Depends on | Effort | Status |
+|---|------|-----------|--------|--------|
+| 1 | [Backend container session](terminal-container-exec/task-01-backend-container-session.md) | — | Medium | Todo |
+| 2 | [Container selector UI](terminal-container-exec/task-02-container-selector-ui.md) | 1 | Medium | Todo |
+| 3 | [Documentation](terminal-container-exec/task-03-docs.md) | 2 | Small | Todo |
+
+```mermaid
+graph LR
+  1[Task 1: Backend container session] --> 2[Task 2: Container selector UI]
+  2 --> 3[Task 3: Documentation]
+```
