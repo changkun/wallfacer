@@ -101,16 +101,28 @@ func (b *LocalBackend) Launch(ctx context.Context, spec ContainerSpec) (Handle, 
 }
 
 // launchViaTaskWorker routes the invocation through a per-task worker
-// container, creating one if it doesn't exist yet.
+// container, creating one if it doesn't exist yet. If the existing worker
+// was created from a lighter spec (e.g. title generation with no workspace
+// mounts) and the new spec has more volumes, the worker is torn down and
+// recreated so the container has the correct mounts.
 func (b *LocalBackend) launchViaTaskWorker(ctx context.Context, spec ContainerSpec, taskID string) (Handle, error) {
 	b.taskWorkersMu.Lock()
 	w, ok := b.taskWorkers[taskID]
+	if ok && len(spec.Volumes) > w.volumeCount {
+		// The new spec has more mounts than the worker was created with
+		// (e.g., title spec had 0 workspace mounts, implementation has 5).
+		// Tear down the old worker so we recreate with the full spec.
+		w.stop()
+		delete(b.taskWorkers, taskID)
+		ok = false
+		b.incWorkerMetric("wallfacer_container_worker_upgrades_total")
+	}
 	if !ok {
 		workerName := "wallfacer-worker-" + taskID[:min(8, len(taskID))]
 		// Override the spec name so BuildCreate() uses the worker name
 		// in --name, matching what ensureRunning() passes to podman start.
 		spec.Name = workerName
-		w = newTaskWorker(b.command, workerName, spec.BuildCreate(), spec.Entrypoint)
+		w = newTaskWorker(b.command, workerName, spec.BuildCreate(), spec.Entrypoint, len(spec.Volumes))
 		b.taskWorkers[taskID] = w
 		b.workerCreates.Add(1)
 		b.incActivityStat(spec.Labels["wallfacer.task.activity"], 0)
@@ -118,7 +130,7 @@ func (b *LocalBackend) launchViaTaskWorker(ctx context.Context, spec ContainerSp
 	}
 	b.taskWorkersMu.Unlock()
 
-	return w.exec(ctx, spec.Cmd)
+	return w.exec(ctx, spec.Cmd, spec.WorkDir)
 }
 
 // launchEphemeral creates an ephemeral container (the original behavior).

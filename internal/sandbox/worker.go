@@ -21,18 +21,22 @@ type taskWorker struct {
 	containerName string   // e.g. "wallfacer-worker-abcd1234"
 	createArgs    []string // args for podman create (no runtime binary, no "create" verb)
 	entrypoint    string   // entrypoint script to invoke via exec (e.g. "/usr/local/bin/entrypoint.sh")
+	volumeCount   int      // number of volumes in the spec that created this worker
 	alive         bool     // true when the container is running
 }
 
 // newTaskWorker creates a taskWorker. createArgs are the arguments for
 // `podman create` (excluding the binary path). entrypoint is the script
 // to invoke via `podman exec` (since exec does not use the image ENTRYPOINT).
-func newTaskWorker(command, containerName string, createArgs []string, entrypoint string) *taskWorker {
+// volumeCount records how many volumes the creating spec had, so the caller
+// can detect when a subsequent spec needs more mounts and recreate the worker.
+func newTaskWorker(command, containerName string, createArgs []string, entrypoint string, volumeCount int) *taskWorker {
 	return &taskWorker{
 		command:       command,
 		containerName: containerName,
 		createArgs:    createArgs,
 		entrypoint:    entrypoint,
+		volumeCount:   volumeCount,
 	}
 }
 
@@ -61,6 +65,7 @@ func (w *taskWorker) ensureRunning(ctx context.Context) error {
 	}
 
 	// Create the container with a sleep entrypoint.
+	logger.Runner.Debug("worker create", "container", w.containerName, "volumes", w.volumeCount, "createArgs", w.createArgs)
 	if err := cmdexec.New(w.command, w.createArgs...).WithContext(ctx).Run(); err != nil {
 		return fmt.Errorf("worker create: %w", err)
 	}
@@ -77,21 +82,29 @@ func (w *taskWorker) ensureRunning(ctx context.Context) error {
 }
 
 // exec runs a command inside the worker container via podman/docker exec.
+// workDir is passed as -w to the exec call so the agent starts in the correct
+// directory (podman/docker exec does not inherit -w from create).
 // The returned Handle has the same interface as an ephemeral container handle.
-func (w *taskWorker) exec(ctx context.Context, cmd []string) (Handle, error) {
+func (w *taskWorker) exec(ctx context.Context, cmd []string, workDir string) (Handle, error) {
 	// Ensure the worker container is alive (acquires and releases w.mu).
 	if err := w.ensureRunning(ctx); err != nil {
 		return nil, fmt.Errorf("worker ensure running: %w", err)
 	}
 
-	// Build the exec command. `podman exec` does not use the image's ENTRYPOINT,
-	// so we must invoke the entrypoint script explicitly when configured.
-	args := make([]string, 0, 3+len(cmd))
-	args = append(args, "exec", w.containerName)
+	// Build the exec command. podman exec does not use the image ENTRYPOINT
+	// or the -w from create, so we must set both explicitly.
+	args := make([]string, 0, 5+len(cmd))
+	args = append(args, "exec")
+	if workDir != "" {
+		args = append(args, "-w", workDir)
+	}
+	args = append(args, w.containerName)
 	if w.entrypoint != "" {
 		args = append(args, w.entrypoint)
 	}
 	args = append(args, cmd...)
+
+	logger.Runner.Debug("worker exec", "container", w.containerName, "workdir", workDir, "args", args)
 
 	c := exec.CommandContext(ctx, w.command, args...)
 

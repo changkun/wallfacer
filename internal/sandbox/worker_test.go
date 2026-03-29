@@ -48,7 +48,7 @@ func TestTaskWorkerEnsureRunning(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	}, "")
+	}, "", 0)
 	t.Cleanup(w.stop)
 
 	ctx := context.Background()
@@ -76,11 +76,11 @@ func TestTaskWorkerExec(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	}, "")
+	}, "", 0)
 	t.Cleanup(w.stop)
 
 	ctx := context.Background()
-	h, err := w.exec(ctx, []string{"echo", "hello world"})
+	h, err := w.exec(ctx, []string{"echo", "hello world"}, "")
 	if err != nil {
 		t.Fatalf("exec: %v", err)
 	}
@@ -102,6 +102,39 @@ func TestTaskWorkerExec(t *testing.T) {
 	}
 }
 
+// TestTaskWorkerExecWorkDir verifies that exec uses -w to set the working
+// directory inside the container when workDir is configured.
+func TestTaskWorkerExecWorkDir(t *testing.T) {
+	rt := containerRuntime(t)
+	ensureTestImage(t, rt)
+
+	name := "wallfacer-test-worker-workdir-" + t.Name()
+	w := newTaskWorker(rt, name, []string{
+		"create", "--name", name,
+		"--entrypoint", "sleep",
+		testImage, "infinity",
+	}, "", 0)
+	t.Cleanup(w.stop)
+
+	ctx := context.Background()
+	h, err := w.exec(ctx, []string{"pwd"}, "/tmp")
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+
+	buf := make([]byte, 256)
+	n, _ := h.Stdout().Read(buf)
+	output := strings.TrimSpace(string(buf[:n]))
+	if output != "/tmp" {
+		t.Fatalf("expected workdir /tmp, got %q", output)
+	}
+
+	exitCode, _ := h.Wait()
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+}
+
 // TestTaskWorkerStop verifies that stop removes the container and marks the
 // worker as not alive.
 func TestTaskWorkerStop(t *testing.T) {
@@ -113,7 +146,7 @@ func TestTaskWorkerStop(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	}, "")
+	}, "", 0)
 
 	ctx := context.Background()
 	if err := w.ensureRunning(ctx); err != nil {
@@ -147,7 +180,7 @@ func TestTaskWorkerExecAfterStop(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	}, "")
+	}, "", 0)
 	t.Cleanup(w.stop)
 
 	ctx := context.Background()
@@ -159,7 +192,7 @@ func TestTaskWorkerExecAfterStop(t *testing.T) {
 	w.stop()
 
 	// Exec after stop should recreate the container.
-	h, err := w.exec(ctx, []string{"echo", "recovered"})
+	h, err := w.exec(ctx, []string{"echo", "recovered"}, "")
 	if err != nil {
 		t.Fatalf("exec after stop: %v", err)
 	}
@@ -189,13 +222,13 @@ func TestExecHandleKillDoesNotRemoveContainer(t *testing.T) {
 		"create", "--name", name,
 		"--entrypoint", "sleep",
 		testImage, "infinity",
-	}, "")
+	}, "", 0)
 	t.Cleanup(w.stop)
 
 	ctx := context.Background()
 
 	// Start a long-running exec.
-	h, err := w.exec(ctx, []string{"sleep", "60"})
+	h, err := w.exec(ctx, []string{"sleep", "60"}, "")
 	if err != nil {
 		t.Fatalf("exec: %v", err)
 	}
