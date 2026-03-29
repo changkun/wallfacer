@@ -41,9 +41,21 @@ function makeMockCtx() {
       calls.push({ op: "fillText", args });
     },
     fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 1,
+    globalAlpha: 1,
     font: "",
     textAlign: "",
     textBaseline: "",
+    beginPath() { calls.push({ op: "beginPath" }); },
+    closePath() {},
+    arc() {},
+    arcTo() {},
+    moveTo() {},
+    lineTo() {},
+    fill() { calls.push({ op: "fill" }); },
+    stroke() {},
+    strokeRect(...args) { calls.push({ op: "strokeRect", args }); },
   };
 }
 
@@ -69,9 +81,20 @@ function makeContext() {
       return {
         imageSmoothingEnabled: true,
         fillStyle: "",
+        strokeStyle: "",
+        lineWidth: 1,
         fillRect(x, y, w, h) {
           self._draws.push({ op: "fillRect", x, y, w, h });
         },
+        strokeRect() {},
+        beginPath() {},
+        closePath() {},
+        arc() {},
+        arcTo() {},
+        moveTo() {},
+        lineTo() {},
+        fill() {},
+        stroke() {},
         drawImage() {},
       };
     }
@@ -150,7 +173,7 @@ describe("OfficeRenderer", () => {
     renderer.render(0);
 
     const ops = mockCtx.calls.map((c) => c.op);
-    expect(ops).toContain("clearRect");
+    expect(ops).toContain("fillRect"); // background clear
     expect(ops).toContain("save");
     expect(ops).toContain("scale");
     expect(ops).toContain("restore");

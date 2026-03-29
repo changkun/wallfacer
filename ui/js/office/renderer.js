@@ -4,20 +4,24 @@
   var T = window._officeTileTypes;
   var TILE = 16; // pixels per tile at 1x zoom
 
-  // Placeholder colors (used when sprite sheets haven't loaded yet).
-  var FURNITURE_COLORS = {
-    desk: "#8B7355",
-    chair: "#5C4033",
-    pc: "#2C3E50",
-    sofa: "#6A5ACD",
-    plant: "#2E8B57",
-    coffee: "#8B4513",
-    whiteboard: "#E8E8E8",
-    bookshelf: "#A0522D",
-  };
-  var FLOOR_COLOR = "#E8DCC8";
-  var WALL_COLOR = "#6B6B6B";
+  // ---- Colors for programmatic rendering ----
+  var FLOOR_COLOR = "#D4C9A8";
+  var FLOOR_COLOR_ALT = "#CFC29E";
+  var WALL_COLOR_TOP = "#5B5E6B";
+  var WALL_COLOR_FACE = "#787B8A";
+  var VOID_COLOR = "#3A3D4A";
   var CHARACTER_COLOR = "#4A90D9";
+
+  var FURNITURE_STYLE = {
+    desk:       { fill: "#B8956A", stroke: "#8B7355", label: "" },
+    chair:      { fill: "#6B5B4F", stroke: "#4A3C32", label: "" },
+    pc:         { fill: "#3B4252", stroke: "#2E3440", label: "" },
+    sofa:       { fill: "#7B68AE", stroke: "#5B4E8A", label: "" },
+    plant:      { fill: "#4CAF50", stroke: "#388E3C", label: "" },
+    coffee:     { fill: "#795548", stroke: "#5D4037", label: "" },
+    whiteboard: { fill: "#ECEFF4", stroke: "#D8DEE9", label: "" },
+    bookshelf:  { fill: "#A0522D", stroke: "#8B4513", label: "" },
+  };
 
   // ---- OfficeRenderer ----
 
@@ -42,49 +46,16 @@
     this._running = false;
     this._boundRender = this.render.bind(this);
 
-    // Loaded sprite sheet images (set by loadSprites)
-    this._officeSheet = null;
-    this._floorSheet = null;
-    this._wallSheet = null;
-    this._charSheets = []; // char_00..char_19
+    // Loaded sprite sheet images
+    this._charSheets = [];
   }
-
-  // ---- Sprite loading ----
 
   OfficeRenderer.prototype.loadSprites = function () {
     var self = this;
-
-    // Load office furniture sheet
-    var officeImg = new Image();
-    officeImg.onload = function () {
-      self._officeSheet = officeImg;
-      self._floorDirty = true;
-    };
-    officeImg.src = "/assets/office/furniture/office_sheet.png";
-
-    // Load floor tile sheet
-    var floorImg = new Image();
-    floorImg.onload = function () {
-      self._floorSheet = floorImg;
-      self._floorDirty = true;
-    };
-    floorImg.src = "/assets/office/tiles/floor.png";
-
-    // Load wall tile sheet
-    var wallImg = new Image();
-    wallImg.onload = function () {
-      self._wallSheet = wallImg;
-      self._floorDirty = true;
-    };
-    wallImg.src = "/assets/office/tiles/wall.png";
-
-    // Load character sheets
     for (var i = 0; i < 20; i++) {
       (function (idx) {
         var img = new Image();
-        img.onload = function () {
-          self._charSheets[idx] = img;
-        };
+        img.onload = function () { self._charSheets[idx] = img; };
         var num = idx < 10 ? "0" + idx : "" + idx;
         img.src = "/assets/office/characters/char_" + num + ".png";
       })(i);
@@ -133,7 +104,9 @@
     var cam = this._camera;
     var zoom = cam.zoom;
 
-    ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+    // Background
+    ctx.fillStyle = VOID_COLOR;
+    ctx.fillRect(0, 0, this._canvas.width, this._canvas.height);
 
     if (!this._tileMap) {
       this._rafId = requestAnimationFrame(this._boundRender);
@@ -141,7 +114,10 @@
     }
 
     ctx.save();
-    ctx.translate(-cam.x * zoom, -cam.y * zoom);
+    ctx.translate(
+      Math.round(-cam.x * zoom),
+      Math.round(-cam.y * zoom)
+    );
     ctx.scale(zoom, zoom);
 
     this._drawFloor(ctx);
@@ -150,11 +126,10 @@
     this._drawSelection(ctx);
 
     ctx.restore();
-
     this._rafId = requestAnimationFrame(this._boundRender);
   };
 
-  // ---- Floor + walls ----
+  // ---- Floor + walls (cached to offscreen canvas) ----
 
   OfficeRenderer.prototype._drawFloor = function (ctx) {
     var map = this._tileMap;
@@ -169,9 +144,15 @@
         for (var x = 0; x < map.width; x++) {
           var tile = map.tileAt(x, y);
           if (tile === T.FLOOR) {
-            this._drawFloorTile(fctx, x, y);
+            // Checkerboard for subtle texture
+            fctx.fillStyle = (x + y) % 2 === 0 ? FLOOR_COLOR : FLOOR_COLOR_ALT;
+            fctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+            // Subtle grid line
+            fctx.strokeStyle = "rgba(0,0,0,0.05)";
+            fctx.lineWidth = 0.5;
+            fctx.strokeRect(x * TILE + 0.5, y * TILE + 0.5, TILE - 1, TILE - 1);
           } else if (tile === T.WALL) {
-            this._drawWallTile(fctx, x, y);
+            this._drawWallTile(fctx, map, x, y);
           }
         }
       }
@@ -180,56 +161,32 @@
     ctx.drawImage(this._floorCanvas, 0, 0);
   };
 
-  OfficeRenderer.prototype._drawFloorTile = function (ctx, x, y) {
-    if (this._floorSheet) {
-      // Pick a tile variant based on position for visual variety
-      // floor.png: 240×640, first column style is 48px wide (3 tiles × 16px)
-      // Use row 0 (neutral style), pick 1 of 3 variants by (x+y) % 3
-      var variant = (x + y) % 3;
-      ctx.drawImage(
-        this._floorSheet,
-        variant * TILE, 0, TILE, TILE,
-        x * TILE, y * TILE, TILE, TILE,
-      );
+  OfficeRenderer.prototype._drawWallTile = function (fctx, map, x, y) {
+    var px = x * TILE;
+    var py = y * TILE;
+
+    // Check if this is a top-edge wall (floor below) or side/bottom wall
+    var floorBelow = y < map.height - 1 && map.tileAt(x, y + 1) !== T.WALL;
+    var floorAbove = y > 0 && map.tileAt(x, y - 1) !== T.WALL;
+
+    if (floorAbove) {
+      // Top face of wall (darker, like looking at the top edge)
+      fctx.fillStyle = WALL_COLOR_TOP;
+      fctx.fillRect(px, py, TILE, TILE);
+      // Bottom edge highlight
+      fctx.fillStyle = "rgba(255,255,255,0.1)";
+      fctx.fillRect(px, py + TILE - 2, TILE, 2);
+    } else if (floorBelow) {
+      // Front face of wall (lighter)
+      fctx.fillStyle = WALL_COLOR_FACE;
+      fctx.fillRect(px, py, TILE, TILE);
+      // Top edge shadow
+      fctx.fillStyle = "rgba(0,0,0,0.15)";
+      fctx.fillRect(px, py, TILE, 2);
     } else {
-      ctx.fillStyle = FLOOR_COLOR;
-      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-    }
-  };
-
-  OfficeRenderer.prototype._drawWallTile = function (ctx, x, y) {
-    if (this._wallSheet) {
-      // wall.png: auto-tile set. Use a simple approach:
-      // Detect which edges are exposed (adjacent to non-wall) and pick
-      // the appropriate sub-tile from the first wall style.
-      // For now, use center fill tile at (16, 16) in the sheet.
-      var map = this._tileMap;
-      var hasTop = y > 0 && map.tileAt(x, y - 1) === T.WALL;
-      var hasBot = y < map.height - 1 && map.tileAt(x, y + 1) === T.WALL;
-      var hasLeft = x > 0 && map.tileAt(x - 1, y) === T.WALL;
-      var hasRight = x < map.width - 1 && map.tileAt(x + 1, y) === T.WALL;
-
-      // Simple auto-tile: 3×3 grid at (0,0) in wall sheet
-      // [TL, T, TR] = row 0, [L, C, R] = row 1, [BL, B, BR] = row 2
-      var srcCol = 1; // center
-      var srcRow = 1;
-      if (!hasTop && !hasLeft) { srcCol = 0; srcRow = 0; }
-      else if (!hasTop && !hasRight) { srcCol = 2; srcRow = 0; }
-      else if (!hasBot && !hasLeft) { srcCol = 0; srcRow = 2; }
-      else if (!hasBot && !hasRight) { srcCol = 2; srcRow = 2; }
-      else if (!hasTop) { srcCol = 1; srcRow = 0; }
-      else if (!hasBot) { srcCol = 1; srcRow = 2; }
-      else if (!hasLeft) { srcCol = 0; srcRow = 1; }
-      else if (!hasRight) { srcCol = 2; srcRow = 1; }
-
-      ctx.drawImage(
-        this._wallSheet,
-        srcCol * TILE, srcRow * TILE, TILE, TILE,
-        x * TILE, y * TILE, TILE, TILE,
-      );
-    } else {
-      ctx.fillStyle = WALL_COLOR;
-      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      // Interior or side wall
+      fctx.fillStyle = WALL_COLOR_TOP;
+      fctx.fillRect(px, py, TILE, TILE);
     }
   };
 
@@ -243,26 +200,20 @@
       var f = this._furniture[i];
       drawables.push({
         _isChar: false,
-        x: f.x,
-        y: f.y,
-        width: f.width || 1,
-        height: f.height || 1,
-        type: f.type,
-        state: f.state,
+        x: f.x, y: f.y,
+        width: f.width || 1, height: f.height || 1,
+        type: f.type, state: f.state,
       });
     }
 
     if (this._characterManager) {
       var chars = this._characterManager.getDrawables();
       for (var c = 0; c < chars.length; c++) {
-        var ch = chars[c];
         drawables.push({
           _isChar: true,
-          x: ch.x,
-          y: ch.y,
-          width: 1,
-          height: 1,
-          _charInfo: ch,
+          x: chars[c].x, y: chars[c].y,
+          width: 1, height: 1,
+          _charInfo: chars[c],
         });
       }
     }
@@ -272,50 +223,142 @@
     });
 
     for (var d = 0; d < drawables.length; d++) {
-      var item = drawables[d];
-      if (item._isChar) {
-        this._drawCharacter(ctx, item._charInfo);
+      if (drawables[d]._isChar) {
+        this._drawCharacter(ctx, drawables[d]._charInfo);
       } else {
-        this._drawFurnitureItem(ctx, item);
+        this._drawFurnitureItem(ctx, drawables[d]);
       }
     }
   };
 
-  // ---- Furniture ----
+  // ---- Furniture (clean programmatic rendering) ----
 
   OfficeRenderer.prototype._drawFurnitureItem = function (ctx, f) {
     var fw = f.width * TILE;
     var fh = f.height * TILE;
     var fx = f.x * TILE;
     var fy = f.y * TILE;
+    var style = FURNITURE_STYLE[f.type];
+    if (!style) style = { fill: "#888", stroke: "#666" };
 
-    if (this._officeSheet) {
-      var defs = window._officeFurnitureDefs;
-      var def = defs && defs[f.type];
-      if (def) {
-        // For multi-frame items (e.g. PC on/off), pick frame based on state
-        var frameOffset = 0;
-        if (f.type === "pc" && f.state === "on" && def.frames > 1) {
-          frameOffset = def.sw; // next frame is adjacent in the sheet
-        }
-        ctx.drawImage(
-          this._officeSheet,
-          def.sx + frameOffset, def.sy, def.sw, def.sh,
-          fx, fy, fw, fh,
-        );
-        return;
+    // Rounded rectangle body
+    var r = 1.5;
+    ctx.fillStyle = style.fill;
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = 0.5;
+    _roundRect(ctx, fx + 0.5, fy + 0.5, fw - 1, fh - 1, r);
+    ctx.fill();
+    ctx.stroke();
+
+    // Type-specific details
+    if (f.type === "desk") {
+      // Wood grain lines
+      ctx.strokeStyle = "rgba(0,0,0,0.12)";
+      ctx.lineWidth = 0.3;
+      for (var i = 3; i < fw - 2; i += 4) {
+        ctx.beginPath();
+        ctx.moveTo(fx + i, fy + 2);
+        ctx.lineTo(fx + i, fy + fh - 2);
+        ctx.stroke();
       }
+    } else if (f.type === "pc") {
+      // Screen
+      var isOn = f.state === "on";
+      ctx.fillStyle = isOn ? "#88C0D0" : "#434C5E";
+      ctx.fillRect(fx + 2, fy + 1, fw - 4, fh - 5);
+      // Screen glow when on
+      if (isOn) {
+        ctx.fillStyle = "rgba(136,192,208,0.3)";
+        ctx.fillRect(fx, fy + fh - 3, fw, 3);
+      }
+      // Stand
+      ctx.fillStyle = style.stroke;
+      ctx.fillRect(fx + fw / 2 - 1, fy + fh - 3, 2, 2);
+      ctx.fillRect(fx + fw / 2 - 2, fy + fh - 1, 4, 1);
+    } else if (f.type === "chair") {
+      // Seat circle
+      ctx.fillStyle = style.fill;
+      ctx.beginPath();
+      ctx.arc(fx + fw / 2, fy + fh / 2, fw / 2 - 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = style.stroke;
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    } else if (f.type === "plant") {
+      // Pot
+      ctx.fillStyle = "#8B4513";
+      ctx.fillRect(fx + 3, fy + fh - 5, fw - 6, 5);
+      // Leaves
+      ctx.fillStyle = "#4CAF50";
+      ctx.beginPath();
+      ctx.arc(fx + fw / 2, fy + fh / 2 - 2, fw / 2 - 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#66BB6A";
+      ctx.beginPath();
+      ctx.arc(fx + fw / 2 - 1, fy + fh / 2 - 3, fw / 3, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (f.type === "coffee") {
+      // Machine body
+      ctx.fillStyle = "#5D4037";
+      ctx.fillRect(fx + 2, fy + 2, fw - 4, fh - 2);
+      // Red indicator
+      ctx.fillStyle = "#E53935";
+      ctx.fillRect(fx + 3, fy + 3, 2, 2);
+    } else if (f.type === "whiteboard") {
+      // White surface
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(fx + 1, fy + 1, fw - 2, fh - 4);
+      // Border
+      ctx.strokeStyle = "#B0BEC5";
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(fx + 1, fy + 1, fw - 2, fh - 4);
+      // Marker scribbles
+      ctx.strokeStyle = "rgba(41,98,255,0.3)";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(fx + 3, fy + 4);
+      ctx.lineTo(fx + fw - 4, fy + 4);
+      ctx.moveTo(fx + 3, fy + 6);
+      ctx.lineTo(fx + fw / 2, fy + 6);
+      ctx.stroke();
+    } else if (f.type === "bookshelf") {
+      // Shelves
+      for (var s = 0; s < 3; s++) {
+        var sy = fy + 2 + s * (fh / 3);
+        ctx.fillStyle = "#6D4C41";
+        ctx.fillRect(fx + 1, sy + fh / 3 - 2, fw - 2, 1);
+        // Books
+        var colors = ["#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA"];
+        for (var b = 0; b < 3; b++) {
+          ctx.fillStyle = colors[(s * 3 + b) % colors.length];
+          ctx.fillRect(fx + 2 + b * 4, sy, 3, fh / 3 - 3);
+        }
+      }
+    } else if (f.type === "sofa") {
+      // Cushion
+      ctx.fillStyle = "#9575CD";
+      _roundRect(ctx, fx + 1, fy + 2, fw - 2, fh - 4, 2);
+      ctx.fill();
+      // Armrests
+      ctx.fillStyle = "#7E57C2";
+      ctx.fillRect(fx, fy + 1, 2, fh - 2);
+      ctx.fillRect(fx + fw - 2, fy + 1, 2, fh - 2);
     }
-
-    // Placeholder fallback
-    ctx.fillStyle = FURNITURE_COLORS[f.type] || "#999";
-    ctx.fillRect(fx, fy, fw, fh);
-    ctx.fillStyle = "#FFF";
-    ctx.font = "3px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(f.type.charAt(0).toUpperCase(), fx + fw / 2, fy + fh / 2);
   };
+
+  function _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
 
   // ---- Characters ----
 
@@ -324,14 +367,13 @@
     var py = info.y * TILE;
     var effect = info.effect;
 
-    // Get the character sprite sheet
-    var sheet = this._charSheets[info.spriteIndex % this._charSheets.length];
-    var anims = window._officeCharacterAnims;
-
     if (effect && !effect.isComplete()) {
-      this._drawCharacterWithEffect(ctx, info, px, py, effect, sheet);
+      this._drawCharacterWithEffect(ctx, info, px, py, effect);
       return;
     }
+
+    var sheet = this._charSheets[info.spriteIndex % 20];
+    var anims = window._officeCharacterAnims;
 
     if (sheet && anims) {
       this._drawCharacterSprite(ctx, info, px, py, sheet, anims);
@@ -341,15 +383,12 @@
   };
 
   OfficeRenderer.prototype._drawCharacterSprite = function (ctx, info, px, py, sheet, anims) {
-    // Map animType + direction to sheet coordinates
     var animName = info.animType || "idle";
     var dirs = ["down", "up", "left", "right"];
     var dirName = dirs[info.direction] || "down";
 
-    var animDef = anims[animName];
-    if (!animDef) animDef = anims.idle;
-    var dirDef = animDef[dirName];
-    if (!dirDef) dirDef = animDef.down || { row: 0, col: 0, frames: 1 };
+    var animDef = anims[animName] || anims.idle;
+    var dirDef = animDef[dirName] || animDef.down || { row: 0, col: 0, frames: 1 };
 
     var frameIdx = info.frameIndex % dirDef.frames;
     var srcCol = dirDef.col + frameIdx;
@@ -363,36 +402,30 @@
   };
 
   OfficeRenderer.prototype._drawCharacterPlaceholder = function (ctx, info, px, py) {
+    // Body
     ctx.fillStyle = CHARACTER_COLOR;
     ctx.beginPath();
     ctx.arc(px + TILE / 2, py + TILE / 2, TILE / 2 - 1, 0, Math.PI * 2);
     ctx.fill();
-
+    // Eye dot (direction indicator)
     ctx.fillStyle = "#FFF";
     ctx.beginPath();
-    var dotX = px + TILE / 2;
-    var dotY = py + TILE / 2;
-    var off = TILE / 3;
-    if (info.direction === 0) dotY += off;
-    else if (info.direction === 1) dotX -= off;
-    else if (info.direction === 2) dotX += off;
-    else if (info.direction === 3) dotY -= off;
-    ctx.arc(dotX, dotY, 1.5, 0, Math.PI * 2);
+    var dx = px + TILE / 2, dy = py + TILE / 2, off = TILE / 3;
+    if (info.direction === 0) dy += off;
+    else if (info.direction === 1) dx -= off;
+    else if (info.direction === 2) dx += off;
+    else if (info.direction === 3) dy -= off;
+    ctx.arc(dx, dy, 1.5, 0, Math.PI * 2);
     ctx.fill();
   };
 
-  OfficeRenderer.prototype._drawCharacterWithEffect = function (ctx, info, px, py, effect, sheet) {
+  OfficeRenderer.prototype._drawCharacterWithEffect = function (ctx, info, px, py, effect) {
     for (var row = 0; row < TILE; row++) {
       var alpha = effect.getAlphaMask(0, row);
       if (alpha > 0) {
         ctx.globalAlpha = alpha;
-        if (sheet) {
-          // Draw one scanline of the character sprite
-          ctx.drawImage(sheet, 0, 0 + row, TILE, 1, px, py + row, TILE, 1);
-        } else {
-          ctx.fillStyle = CHARACTER_COLOR;
-          ctx.fillRect(px, py + row, TILE, 1);
-        }
+        ctx.fillStyle = CHARACTER_COLOR;
+        ctx.fillRect(px, py + row, TILE, 1);
       }
       var trail = effect.getTrailColor(0, row);
       if (trail) {
@@ -410,10 +443,8 @@
     if (!this._interaction || !this._characterManager) return;
     var selId = this._interaction.getSelectedId();
     if (!selId) return;
-
     var ch = this._characterManager.getCharacterByTaskId(selId);
     if (!ch || ch.dead) return;
-
     ctx.strokeStyle = "#FFF";
     ctx.lineWidth = 1 / this._camera.zoom;
     ctx.strokeRect(ch.x * TILE - 1, ch.y * TILE - 1, TILE + 2, TILE + 2);
@@ -423,7 +454,6 @@
     if (!this._characterManager) return;
     var drawBubble = window._officeDrawBubble;
     if (!drawBubble) return;
-
     var chars = this._characterManager.getDrawables();
     for (var i = 0; i < chars.length; i++) {
       var ch = chars[i];
@@ -443,7 +473,6 @@
     var canvasH = this._canvas.height;
     if (canvasW === 0 || canvasH === 0) return;
 
-    // Find the integer zoom that fits the office
     var zoomX = canvasW / worldW;
     var zoomY = canvasH / worldH;
     var fitZoom = Math.floor(Math.min(zoomX, zoomY));
@@ -451,8 +480,6 @@
     if (fitZoom > 6) fitZoom = 6;
 
     this._camera.zoom = fitZoom;
-
-    // Center: camera (x,y) is the top-left world coordinate visible
     var viewW = canvasW / fitZoom;
     var viewH = canvasH / fitZoom;
     this._camera.x = (worldW - viewW) / 2;
