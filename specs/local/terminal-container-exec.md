@@ -1,7 +1,6 @@
 # Terminal: Container Exec Integration
 
-**Status:** Not started
-**Date:** 2026-03-28
+**Status:** Complete | **Date:** 2026-03-28 → 2026-03-30
 
 ---
 
@@ -55,6 +54,28 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 - Requires host terminal (complete).
 - Requires [terminal-sessions.md](terminal-sessions.md) (complete) — container shell tabs use the session/tab registry to coexist with host shell tabs.
+
+## Outcome
+
+Container exec is fully integrated into the terminal panel. Users can click the container picker button (box icon) in the tab bar to see running task containers and open an interactive shell inside any of them, replacing the need for `wallfacer exec` from a separate terminal.
+
+### What Shipped
+
+- **Backend** (`internal/handler/terminal.go`): `createContainerExec()` method on `sessionRegistry` spawns `<runtime> exec -it <container> bash` via PTY. `container` field on `terminalMessage` for `create_session` requests. `container` field on `sessionInfo` in the `sessions` list response. `runtime` field on `sessionRegistry` populated from `runner.Command()`.
+- **Container picker** (`ui/js/terminal.js`): dropdown fetches `GET /api/containers`, shows running containers with task titles, clicking an item sends `create_session` with container name. Uses `position: fixed` to escape the panel's `overflow: hidden` clipping. Dismiss on click-outside or Escape.
+- **Container tab labels**: sessions with a `container` field display the container name instead of "Shell N".
+- **22 backend terminal tests**, **32 frontend terminal tests** — all passing.
+- **Docs**: WebSocket protocol table updated with `container` field, CLAUDE.md and AGENTS.md updated.
+
+### Design Evolution
+
+1. **Extended `create_session` instead of a separate WebSocket endpoint.** The original spec proposed a new `/api/terminal/container/ws` endpoint. The refined design added an optional `container` field to the existing `create_session` message, reusing the entire session registry, relay dispatcher, and tab infrastructure unchanged.
+
+2. **`position: fixed` for container picker.** The initial implementation used `position: absolute` inside the tab bar, but `#status-bar-panel` has `overflow: hidden` which clipped the dropdown. Fixed by using `position: fixed` on `document.body` with coordinates calculated from the button's bounding rect.
+
+3. **Screen clear on session switch.** `_term.clear()` only clears scrollback, not the visible viewport. Added `_clearTermScreen()` that also writes `ESC[2J ESC[H` (ANSI clear screen + cursor home) to fully wipe the display before replaying a new session's buffer.
+
+4. **SandboxBackend dispatch deferred.** The spec called for dispatching via `SandboxBackend` interface. The implementation uses `runner.Command()` directly for the container runtime path, which is simpler and sufficient for the local backend. K8s/remote Docker dispatch remains future work in the Cloud Deployment section.
 
 ## Task Breakdown
 
