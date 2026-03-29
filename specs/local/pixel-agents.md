@@ -1,6 +1,6 @@
 # Plan: Pixel Agent Avatars
 
-**Status:** Draft
+**Status:** Done
 **Date:** 2026-03-29
 **Last reviewed:** 2026-03-29
 
@@ -406,7 +406,7 @@ Replace placeholder sprites with LimeZu art assets.
 | 11 | [Speech bubbles](pixel-agents/task-11-speech-bubbles.md) | 7 | Small | Done |
 | 12 | [Interaction and modal integration](pixel-agents/task-12-interaction.md) | 5, 8 | Medium | Done |
 | 13 | [Art integration and asset detection](pixel-agents/task-13-art-integration.md) | 3 | Medium | Done |
-| 14 | [Polish: preferences, minimap, a11y](pixel-agents/task-14-polish.md) | 5, 12 | Medium | Todo |
+| 14 | [Polish: preferences, minimap, a11y](pixel-agents/task-14-polish.md) | 5, 12 | Medium | Done |
 
 ```mermaid
 graph LR

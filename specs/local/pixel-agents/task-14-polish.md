@@ -1,6 +1,6 @@
 # Task 14: Polish — Preferences, Minimap, Accessibility
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 5 (Renderer + view toggle), Task 12 (Interaction)
 **Phase:** Phase 6 (Polish and Persistence)
 **Effort:** Medium

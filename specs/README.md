@@ -26,7 +26,7 @@ Local Product                          Cloud Platform
   ○ Visual Verification                  ○ Authentication
   ○ OAuth Token Setup                    ○ Agent Abstraction
   ○ Live Serve
-  ○ Pixel Agent Avatars
+  ✅ Pixel Agent Avatars
                                          ○ Native Sandboxes (Linux/macOS/Win)
                                          ○ Overlay Snapshots
 ```
@@ -69,7 +69,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [visual-verification.md](local/visual-verification.md) | Not started | Visual verification for UI changes |
 | [live-serve.md](local/live-serve.md) | Not started | Build and run developed software from within Wallfacer |
 | [oauth-token-setup.md](local/oauth-token-setup.md) | Not started | Browser-based OAuth sign-in for Claude and Codex credentials |
-| [pixel-agents.md](local/pixel-agents.md) | Draft | Pixel art office view — animated characters representing task agents |
+| [pixel-agents.md](local/pixel-agents.md) | **Complete** | Pixel art office view — animated characters representing task agents |
 | [rebrand-module-path.md](local/rebrand-module-path.md) | Not started | Migrate module path and image refs from `changkun.de/x/wallfacer` to `latere.ai/wallfacer` |
 
 ### Local product dependencies
