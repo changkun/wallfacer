@@ -107,7 +107,7 @@
     var zoom = cam.zoom;
 
     // Background
-    ctx.fillStyle = VOID_COLOR;
+    ctx.fillStyle = FLOOR_COLOR;
     ctx.fillRect(0, 0, this._canvas.width, this._canvas.height);
 
     if (!this._tileMap) {
@@ -506,17 +506,15 @@
     var canvasH = this._canvas.height;
     if (canvasW === 0 || canvasH === 0) return;
 
-    var zoomX = canvasW / worldW;
-    var zoomY = canvasH / worldH;
-    var fitZoom = Math.floor(Math.min(zoomX, zoomY));
-    if (fitZoom < 2) fitZoom = 2;
-    if (fitZoom > 6) fitZoom = 6;
+    // Use fractional zoom to fill the panel. Fit to height so the office
+    // fills the panel vertically, then center horizontally.
+    var fitZoom = canvasH / worldH;
+    if (fitZoom < 1) fitZoom = 1;
 
     this._camera.zoom = fitZoom;
     var viewW = canvasW / fitZoom;
-    var viewH = canvasH / fitZoom;
     this._camera.x = (worldW - viewW) / 2;
-    this._camera.y = (worldH - viewH) / 2;
+    this._camera.y = 0;
   };
 
   // ---- Exports ----
