@@ -537,7 +537,7 @@ func TestRelayDispatcher_LastSessionExit(t *testing.T) {
 
 // readTextMessage reads WebSocket messages until a text message matching the
 // given type is found, or the deadline expires.
-func readTextMessage(t *testing.T, conn *websocket.Conn, ctx context.Context, msgType string, timeout time.Duration) json.RawMessage {
+func readTextMessage(t *testing.T, ctx context.Context, conn *websocket.Conn, msgType string, timeout time.Duration) json.RawMessage {
 	t.Helper()
 	deadline := time.After(timeout)
 	for {
@@ -581,7 +581,7 @@ func TestTerminalWS_CreateSession(t *testing.T) {
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read the initial sessions list.
-	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	raw := readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 	var sessionsMsg struct {
 		Sessions []sessionInfo `json:"sessions"`
 	}
@@ -598,7 +598,7 @@ func TestTerminalWS_CreateSession(t *testing.T) {
 	}
 
 	// Expect session_created response.
-	raw = readTextMessage(t, conn, ctx, "session_created", 3*time.Second)
+	raw = readTextMessage(t, ctx, conn, "session_created", 3*time.Second)
 	var created struct {
 		Session string `json:"session"`
 	}
@@ -610,7 +610,7 @@ func TestTerminalWS_CreateSession(t *testing.T) {
 	}
 
 	// Expect updated sessions list with 2 sessions.
-	raw = readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	raw = readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
 		t.Fatalf("unmarshal sessions: %v", err)
 	}
@@ -639,7 +639,7 @@ func TestTerminalWS_SwitchSession(t *testing.T) {
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read initial sessions list to get the first session ID.
-	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	raw := readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 	var sessionsMsg struct {
 		Sessions []sessionInfo `json:"sessions"`
 	}
@@ -652,8 +652,8 @@ func TestTerminalWS_SwitchSession(t *testing.T) {
 	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"create_session"}`)); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	readTextMessage(t, conn, ctx, "session_created", 3*time.Second)
-	readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	readTextMessage(t, ctx, conn, "session_created", 3*time.Second)
+	readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 
 	// Switch back to the first session.
 	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"switch_session","session":"`+firstID+`"}`)); err != nil {
@@ -661,7 +661,7 @@ func TestTerminalWS_SwitchSession(t *testing.T) {
 	}
 
 	// Expect session_switched response.
-	raw = readTextMessage(t, conn, ctx, "session_switched", 3*time.Second)
+	raw = readTextMessage(t, ctx, conn, "session_switched", 3*time.Second)
 	var switched struct {
 		Session string `json:"session"`
 	}
@@ -673,7 +673,7 @@ func TestTerminalWS_SwitchSession(t *testing.T) {
 	}
 
 	// Expect updated sessions list.
-	raw = readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	raw = readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -699,7 +699,7 @@ func TestTerminalWS_SwitchInvalidSession(t *testing.T) {
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read initial sessions list.
-	readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 
 	// Switch to nonexistent session.
 	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"switch_session","session":"nonexistent"}`)); err != nil {
@@ -707,7 +707,7 @@ func TestTerminalWS_SwitchInvalidSession(t *testing.T) {
 	}
 
 	// Expect error response.
-	raw := readTextMessage(t, conn, ctx, "error", 3*time.Second)
+	raw := readTextMessage(t, ctx, conn, "error", 3*time.Second)
 	var errMsg struct {
 		Data string `json:"data"`
 	}
@@ -733,7 +733,7 @@ func TestTerminalWS_CloseSession(t *testing.T) {
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read initial sessions.
-	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	raw := readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 	var sessionsMsg struct {
 		Sessions []sessionInfo `json:"sessions"`
 	}
@@ -746,8 +746,8 @@ func TestTerminalWS_CloseSession(t *testing.T) {
 	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"create_session"}`)); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	readTextMessage(t, conn, ctx, "session_created", 3*time.Second)
-	readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	readTextMessage(t, ctx, conn, "session_created", 3*time.Second)
+	readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 
 	// Close the first (non-active) session.
 	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"close_session","session":"`+firstID+`"}`)); err != nil {
@@ -755,7 +755,7 @@ func TestTerminalWS_CloseSession(t *testing.T) {
 	}
 
 	// Expect session_closed response.
-	raw = readTextMessage(t, conn, ctx, "session_closed", 3*time.Second)
+	raw = readTextMessage(t, ctx, conn, "session_closed", 3*time.Second)
 	var closed struct {
 		Session string `json:"session"`
 	}
@@ -767,7 +767,7 @@ func TestTerminalWS_CloseSession(t *testing.T) {
 	}
 
 	// Expect sessions list with 1 remaining session.
-	raw = readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	raw = readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -789,7 +789,7 @@ func TestTerminalWS_CloseLastSession(t *testing.T) {
 	}
 
 	// Read initial sessions to get the session ID.
-	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	raw := readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 	var sessionsMsg struct {
 		Sessions []sessionInfo `json:"sessions"`
 	}
@@ -834,7 +834,7 @@ func TestTerminalWS_SessionsList(t *testing.T) {
 	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Initial sessions list should have 1 session marked active.
-	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	raw := readTextMessage(t, ctx, conn, "sessions", 3*time.Second)
 	var sessionsMsg struct {
 		Sessions []sessionInfo `json:"sessions"`
 	}
@@ -882,5 +882,54 @@ func TestTerminalWS_CwdValidation(t *testing.T) {
 	msg := `{"type":"input","data":"` + input + `"}`
 	if err := conn.Write(ctx, websocket.MessageText, []byte(msg)); err != nil {
 		t.Fatalf("write: %v", err)
+	}
+}
+
+func TestTerminalMessage_ContainerField(t *testing.T) {
+	// Verify the Container field round-trips through JSON.
+	msg := terminalMessage{
+		Type:      "create_session",
+		Container: "wallfacer-worker-abc123",
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded terminalMessage
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if decoded.Container != "wallfacer-worker-abc123" {
+		t.Errorf("Container = %q; want %q", decoded.Container, "wallfacer-worker-abc123")
+	}
+
+	// Verify omitempty: no container field when empty.
+	msg2 := terminalMessage{Type: "create_session"}
+	data2, _ := json.Marshal(msg2)
+	if strings.Contains(string(data2), "container") {
+		t.Errorf("empty Container should be omitted; got %s", data2)
+	}
+}
+
+func TestSessionInfo_ContainerField(t *testing.T) {
+	// Verify container session info includes the container field.
+	info := sessionInfo{
+		ID:        "sess-1",
+		Active:    true,
+		Container: "wallfacer-worker-abc123",
+	}
+	data, err := json.Marshal(info)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(data), `"container":"wallfacer-worker-abc123"`) {
+		t.Errorf("sessionInfo JSON missing container; got %s", data)
+	}
+
+	// Verify omitempty: no container field for host sessions.
+	info2 := sessionInfo{ID: "sess-2", Active: false}
+	data2, _ := json.Marshal(info2)
+	if strings.Contains(string(data2), "container") {
+		t.Errorf("host session should not have container field; got %s", data2)
 	}
 }

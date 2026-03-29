@@ -284,7 +284,7 @@ func nativeStart() {
 			introspect.IntrospectData,
 		},
 	}
-	conn.Export(introspect.NewIntrospectable(&sniIntro), "/StatusNotifierItem",
+	_ = conn.Export(introspect.NewIntrospectable(&sniIntro), "/StatusNotifierItem",
 		"org.freedesktop.DBus.Introspectable")
 
 	// Introspection for DBusMenu.
@@ -321,7 +321,7 @@ func nativeStart() {
 			introspect.IntrospectData,
 		},
 	}
-	conn.Export(introspect.NewIntrospectable(&menuIntro), "/StatusNotifierItem/menu",
+	_ = conn.Export(introspect.NewIntrospectable(&menuIntro), "/StatusNotifierItem/menu",
 		"org.freedesktop.DBus.Introspectable")
 
 	// Register with the StatusNotifierWatcher.
