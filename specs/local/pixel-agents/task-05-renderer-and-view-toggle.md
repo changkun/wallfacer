@@ -1,6 +1,6 @@
 # Task 5: Renderer and View Toggle
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 2 (TileMap), Task 3 (SpriteCache), Task 4 (Camera)
 **Phase:** Phase 1 (Rendering Foundation)
 **Effort:** Large
