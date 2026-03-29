@@ -530,7 +530,12 @@ async function startOAuthFlow(provider) {
       window.open(result.authorize_url, "_blank");
     }
 
-    if (status) status.textContent = "Waiting for browser...";
+    if (status) {
+      status.innerHTML =
+        'Waiting for browser... <a href="#" style="color:var(--accent);font-size:11px" onclick="cancelOAuthFlow(\'' +
+        provider +
+        "'); return false\">Cancel</a>";
+    }
 
     // Poll for completion.
     _startOAuthPolling(provider);
@@ -586,7 +591,9 @@ function _stopOAuthPolling(provider, errorMessage) {
   var btn = document.getElementById(provider + "-oauth-signin-btn");
   var status = document.getElementById(provider + "-oauth-status");
   if (btn) btn.disabled = false;
-  if (status && errorMessage) status.textContent = errorMessage;
+  if (status) {
+    status.textContent = errorMessage || "";
+  }
 }
 
 function cancelOAuthFlow(provider) {
