@@ -11,7 +11,7 @@
 
 Wallfacer is a self-operating engineering platform. It orchestrates autonomous coding agents across a task board, executes them in isolated sandboxes, and gives you full oversight over every decision they make — live logs, diffs, costs, and timelines — so you stay in control while shipping at machine speed.
 
-![Wallfacer teaser](./images/overview.png)
+![Wallfacer teaser](./assets/overview.png)
 
 ## Quick Start
 
@@ -60,7 +60,7 @@ For implementation details and architecture, see [Technical Internals](docs/inte
 
 ### Mission Control Board
 
-![Wallfacer board overview](./images/overview.png)
+![Wallfacer board overview](./assets/overview.png)
 
 Coordinate many agent tasks in one place, move cards across the lifecycle, and keep execution throughput high without losing control. Batch-create tasks with dependency wiring, refine prompts before execution, and let autopilot promote backlog items as capacity opens.
 
@@ -68,17 +68,17 @@ Coordinate many agent tasks in one place, move cards across the lifecycle, and k
 
 **Execution oversight**
 
-![Oversight view 1](./images/oversight1.png)
+![Oversight view 1](./assets/oversight1.png)
 
 **Timeline and phase detail**
 
-![Oversight view 2](./images/oversight2.png)
+![Oversight view 2](./assets/oversight2.png)
 
 Inspect what happened, when it happened, and why it happened before you accept any automated output. Every task produces a structured event timeline, diff against the default branch, and AI-generated oversight summary.
 
 ### Cost and Usage Visibility
 
-![Usage and cost breakdown](./images/usage.png)
+![Usage and cost breakdown](./assets/usage.png)
 
 Track token usage and cost by task, activity, and turn so operations stay measurable as automation scales. Per-role breakdown (implementation, testing, refinement, oversight) shows exactly where budget goes.
 
