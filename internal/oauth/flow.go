@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -205,15 +206,28 @@ func (m *Manager) runFlow(flow *Flow, redirectURI string) {
 // exchangeToken sends the authorization code to the token endpoint and
 // returns the access token (or api_key) from the response.
 func exchangeToken(client *http.Client, provider Provider, code, verifier, redirectURI string) (string, error) {
-	data := url.Values{
-		"grant_type":    {"authorization_code"},
-		"code":          {code},
-		"redirect_uri":  {redirectURI},
-		"code_verifier": {verifier},
-		"client_id":     {provider.ClientID},
-	}
+	var resp *http.Response
+	var err error
 
-	resp, err := client.PostForm(provider.TokenURL, data)
+	if provider.JSONTokenReq {
+		payload, _ := json.Marshal(map[string]string{
+			"grant_type":    "authorization_code",
+			"code":          code,
+			"redirect_uri":  redirectURI,
+			"code_verifier": verifier,
+			"client_id":     provider.ClientID,
+		})
+		resp, err = client.Post(provider.TokenURL, "application/json", bytes.NewReader(payload))
+	} else {
+		data := url.Values{
+			"grant_type":    {"authorization_code"},
+			"code":          {code},
+			"redirect_uri":  {redirectURI},
+			"code_verifier": {verifier},
+			"client_id":     {provider.ClientID},
+		}
+		resp, err = client.PostForm(provider.TokenURL, data)
+	}
 	if err != nil {
 		return "", fmt.Errorf("POST %s: %w", provider.TokenURL, err)
 	}

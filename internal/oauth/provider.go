@@ -10,6 +10,7 @@ type Provider struct {
 	TokenEnvKey  string   // env var name to write the token to (e.g. "CLAUDE_CODE_OAUTH_TOKEN")
 	FixedPort    int      // fixed callback port (0 = random); some providers require a specific port
 	CallbackPath string   // callback URL path (default "/callback")
+	JSONTokenReq bool     // if true, POST token exchange as JSON instead of form-encoded
 }
 
 // ClaudeProvider is the OAuth configuration for Claude.
@@ -23,6 +24,7 @@ var ClaudeProvider = Provider{
 	Scopes:       []string{"org:create_api_key", "user:profile", "user:inference"},
 	TokenEnvKey:  "CLAUDE_CODE_OAUTH_TOKEN",
 	FixedPort:    53692,
+	JSONTokenReq: true,
 }
 
 // CodexProvider is the OAuth configuration for OpenAI Codex.
