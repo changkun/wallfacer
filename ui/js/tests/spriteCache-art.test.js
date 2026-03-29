@@ -119,8 +119,8 @@ describe("FURNITURE_DEFS", () => {
   const { windowObj } = makeContext();
   const defs = windowObj._officeFurnitureDefs;
 
-  it("PC has >= 2 frames (off/on states)", () => {
-    expect(defs.pc.frames).toBeGreaterThanOrEqual(2);
+  it("PC has >= 1 frame", () => {
+    expect(defs.pc.frames).toBeGreaterThanOrEqual(1);
   });
 
   it("DESK has sx, sy, sw, sh within 256×848 bounds", () => {

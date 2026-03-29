@@ -26,8 +26,8 @@
   // ---- Frame counts per animation ----
   var FRAME_COUNTS = {
     idle: 1,
-    walk: 4,
-    typing: 2,
+    walk: 6,
+    typing: 6,
     reading: 2,
   };
 

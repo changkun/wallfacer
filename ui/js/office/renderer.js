@@ -55,7 +55,10 @@
     var self = this;
     // Load office furniture sheet
     var officeImg = new Image();
-    officeImg.onload = function () { self._officeSheet = officeImg; self._floorDirty = true; };
+    officeImg.onload = function () {
+      self._officeSheet = officeImg;
+      self._floorDirty = true;
+    };
     officeImg.src = "/assets/office/furniture/office_sheet.png";
 
     for (var i = 0; i < 20; i++) {
@@ -200,9 +203,16 @@
   OfficeRenderer.prototype._drawScene = function (ctx) {
     var drawables = this._drawables;
     drawables.length = 0;
+    var pcOverlays = [];
 
     for (var i = 0; i < this._furniture.length; i++) {
       var f = this._furniture[i];
+      // PC monitors are drawn in a separate overlay pass so they
+      // always appear on top of desks regardless of Z-sort order.
+      if (f.type === "pc") {
+        pcOverlays.push(f);
+        continue;
+      }
       drawables.push({
         _isChar: false,
         x: f.x,
@@ -239,18 +249,31 @@
         this._drawFurnitureItem(ctx, drawables[d]);
       }
     }
+
+    // Draw PC monitors on top of desks
+    for (var p = 0; p < pcOverlays.length; p++) {
+      var pc = pcOverlays[p];
+      this._drawFurnitureItem(ctx, {
+        x: pc.x,
+        y: pc.y,
+        width: pc.width || 1,
+        height: pc.height || 1,
+        type: pc.type,
+        state: pc.state,
+      });
+    }
   };
 
   // ---- Furniture (clean programmatic rendering) ----
 
-  // Sprite coordinates in office_sheet.png (verified at 5x zoom)
+  // Sprite coordinates in office_sheet.png (verified via pixel inspection)
   var SPRITE_MAP = {
-    desk:       { sx: 0,   sy: 96,  sw: 32, sh: 32 },  // 2x2 desk with legs
-    chair:      { sx: 64,  sy: 128, sw: 16, sh: 32 },  // office chair with armrest (1x2)
-    pc:         null,                                     // drawn programmatically
-    sofa:       { sx: 0,   sy: 320, sw: 32, sh: 32 },  // grey couch (2x2)
-    plant:      { sx: 96,  sy: 112, sw: 16, sh: 16 },  // small green bush (1x1)
-    bookshelf:  { sx: 112, sy: 208, sw: 16, sh: 32 },  // bookshelf with items (1x2)
+    desk: { sx: 64, sy: 480, sw: 32, sh: 32 }, // flat beige desk with front face
+    chair: { sx: 64, sy: 128, sw: 16, sh: 32 }, // office chair facing left (1x2)
+    pc: { sx: 224, sy: 192, sw: 16, sh: 16 }, // blue-screen monitor on stand
+    sofa: { sx: 0, sy: 320, sw: 32, sh: 16 }, // grey 2-seat couch (2x1 sprite)
+    plant: { sx: 96, sy: 112, sw: 16, sh: 16 }, // small green bush (1x1)
+    bookshelf: { sx: 112, sy: 208, sw: 16, sh: 32 }, // bookshelf with books (1x2)
   };
 
   OfficeRenderer.prototype._drawFurnitureItem = function (ctx, f) {
@@ -259,32 +282,39 @@
     var fx = f.x * TILE;
     var fy = f.y * TILE;
 
-    // PC/monitor: draw as a small colored screen indicator on the desk
+    if (this._officeSheet) {
+      var sprite = SPRITE_MAP[f.type];
+      if (sprite) {
+        // Draw sprite at natural size, bottom-aligned in tile area.
+        // This handles sprites smaller than their tile footprint (e.g.
+        // sofa is 32x16 sprite in a 2x2 tile area).
+        ctx.drawImage(
+          this._officeSheet,
+          sprite.sx,
+          sprite.sy,
+          sprite.sw,
+          sprite.sh,
+          fx,
+          fy + fh - sprite.sh,
+          sprite.sw,
+          sprite.sh,
+        );
+        return;
+      }
+    }
+
+    // PC/monitor programmatic fallback (used when sprite sheet not loaded)
     if (f.type === "pc") {
       var isOn = f.state === "on";
       ctx.fillStyle = isOn ? "#5BA3D9" : "#434C5E";
       ctx.fillRect(fx + 2, fy + 2, fw - 4, fh - 6);
-      // Screen border
       ctx.strokeStyle = "#2E3440";
       ctx.lineWidth = 0.5;
       ctx.strokeRect(fx + 2, fy + 2, fw - 4, fh - 6);
-      // Stand
       ctx.fillStyle = "#2E3440";
-      ctx.fillRect(fx + fw/2 - 2, fy + fh - 4, 4, 3);
-      ctx.fillRect(fx + fw/2 - 3, fy + fh - 1, 6, 1);
+      ctx.fillRect(fx + fw / 2 - 2, fy + fh - 4, 4, 3);
+      ctx.fillRect(fx + fw / 2 - 3, fy + fh - 1, 6, 1);
       return;
-    }
-
-    if (this._officeSheet) {
-      var sprite = SPRITE_MAP[f.type];
-      if (sprite) {
-        ctx.drawImage(
-          this._officeSheet,
-          sprite.sx, sprite.sy, sprite.sw, sprite.sh,
-          fx, fy, fw, fh,
-        );
-        return;
-      }
     }
 
     // Placeholder fallback
@@ -354,8 +384,14 @@
     // Draw 16x32 sprite: feet at bottom of tile, head extends upward
     ctx.drawImage(
       sheet,
-      srcCol * TILE, srcY, TILE, charH,
-      px, py + TILE - charH, TILE, charH,
+      srcCol * TILE,
+      srcY,
+      TILE,
+      charH,
+      px,
+      py + TILE - charH,
+      TILE,
+      charH,
     );
   };
 
@@ -391,18 +427,21 @@
     py,
     effect,
   ) {
-    for (var row = 0; row < TILE; row++) {
+    // Characters are 16x32 (2 tiles tall), drawn with feet at py+TILE
+    var charH = 32;
+    var startY = py + TILE - charH;
+    for (var row = 0; row < charH; row++) {
       var alpha = effect.getAlphaMask(0, row);
       if (alpha > 0) {
         ctx.globalAlpha = alpha;
         ctx.fillStyle = CHARACTER_COLOR;
-        ctx.fillRect(px, py + row, TILE, 1);
+        ctx.fillRect(px, startY + row, TILE, 1);
       }
       var trail = effect.getTrailColor(0, row);
       if (trail) {
         ctx.globalAlpha = 1;
         ctx.fillStyle = trail;
-        ctx.fillRect(px, py + row, TILE, 1);
+        ctx.fillRect(px, startY + row, TILE, 1);
       }
     }
     ctx.globalAlpha = 1;

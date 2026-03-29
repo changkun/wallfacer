@@ -157,7 +157,7 @@ describe("Character animation", () => {
     }
     expect(frames.has(0)).toBe(true);
     expect(frames.has(1)).toBe(true);
-    expect(frames.size).toBe(2);
+    expect(frames.size).toBe(6);
   });
 
   it("walk animation cycles through 4 frames", () => {
@@ -175,7 +175,7 @@ describe("Character animation", () => {
         frames.add(ch.getDrawInfo().frameIndex);
       }
     }
-    expect(frames.size).toBe(4);
+    expect(frames.size).toBe(6);
   });
 });
 

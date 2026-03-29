@@ -167,25 +167,26 @@
       left: { megaRow: 1, col: 12, frames: 6 },
       right: { megaRow: 1, col: 18, frames: 6 },
     },
+    // Mega-row 8: seated/typing animation (same directional layout as walk)
     typing: {
-      down: { megaRow: 0, col: 0, frames: 1 },
-      up: { megaRow: 0, col: 1, frames: 1 },
-      left: { megaRow: 0, col: 2, frames: 1 },
-      right: { megaRow: 0, col: 3, frames: 1 },
+      down: { megaRow: 8, col: 0, frames: 6 },
+      up: { megaRow: 8, col: 6, frames: 6 },
+      left: { megaRow: 8, col: 12, frames: 6 },
+      right: { megaRow: 8, col: 18, frames: 6 },
     },
   };
 
   // Furniture sheet: office_sheet.png, 256×848 px, 16px grid (16 cols × 53 rows).
   // Pixel regions for individual furniture items within the sheet.
   var FURNITURE_DEFS = {
-    desk: { sx: 0, sy: 0, sw: 32, sh: 16, frames: 1 },
-    chair: { sx: 0, sy: 16, sw: 16, sh: 16, frames: 1 },
-    pc: { sx: 32, sy: 0, sw: 16, sh: 16, frames: 2 }, // off, on
-    sofa: { sx: 0, sy: 32, sw: 32, sh: 16, frames: 1 },
-    plant: { sx: 48, sy: 0, sw: 16, sh: 16, frames: 1 },
+    desk: { sx: 64, sy: 480, sw: 32, sh: 32, frames: 1 },
+    chair: { sx: 64, sy: 128, sw: 16, sh: 32, frames: 1 },
+    pc: { sx: 224, sy: 192, sw: 16, sh: 16, frames: 1 },
+    sofa: { sx: 0, sy: 320, sw: 32, sh: 16, frames: 1 },
+    plant: { sx: 96, sy: 112, sw: 16, sh: 16, frames: 1 },
     coffee: { sx: 64, sy: 0, sw: 16, sh: 16, frames: 1 },
     whiteboard: { sx: 0, sy: 48, sw: 32, sh: 16, frames: 1 },
-    bookshelf: { sx: 64, sy: 16, sw: 16, sh: 32, frames: 1 },
+    bookshelf: { sx: 112, sy: 208, sw: 16, sh: 32, frames: 1 },
   };
 
   // Tile sheet regions.
