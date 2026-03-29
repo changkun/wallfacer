@@ -750,6 +750,11 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"StreamRefineLogs": withID(h.StreamRefineLogs),
 		"RefineApply":      withID(h.RefineApply),
 		"RefineDismiss":    withID(h.RefineDismiss),
+
+		// OAuth authentication
+		"StartOAuth":  http.HandlerFunc(h.StartOAuth),
+		"OAuthStatus": http.HandlerFunc(h.OAuthStatus),
+		"CancelOAuth": http.HandlerFunc(h.CancelOAuth),
 	}
 
 	// bodyLimits restricts request body size for write endpoints. Routes
