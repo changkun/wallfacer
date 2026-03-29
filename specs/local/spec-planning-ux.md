@@ -70,7 +70,7 @@ A split-pane view for planning work:
 +----------+---------------------------+-----------------------+
 ```
 
-**Left pane — Spec Explorer:** Tree rooted at `specs/`. Shows spec files with status badges and progress indicators (e.g., "3/5" next to non-leaf specs). Clicking opens in the focused view. Collapsible subtrees. Reuses file explorer infrastructure.
+**Left pane — Spec Explorer:** Tree rooted at `specs/`. Shows spec files with status badges and recursive progress indicators (e.g., "4/6" counting all leaves in the subtree, not just direct children). Clicking opens in the focused view. Collapsible subtrees at any depth. Reuses file explorer infrastructure.
 
 **Center pane — Focused Markdown View:** Renders the selected spec as formatted markdown. Live updates when the agent modifies it. Children listed with status. If it's a leaf spec, shows dispatch button.
 
@@ -111,7 +111,6 @@ For the agent to read and update specs, leaf specs follow a light convention:
 ---
 title: Define SandboxBackend interface
 status: validated
-parent: specs/foundations/sandbox-backends.md
 depends_on: []
 affects:
   - internal/sandbox/backend.go
@@ -188,12 +187,13 @@ Progress is visible at every level of the spec tree.
 ```
 specs/
   foundations/
-    ✅ sandbox-backends.md              5/5 ✓
+    ✅ sandbox-backends.md              6/6 ✓
       ✅ define-interface.md
       ✅ local-backend.md
-      ✅ refactor-runner.md
-      ✅ move-listing.md
-      ✅ retire-executor.md
+      ✅ runner-migration.md            3/3 ✓
+        ✅ refactor-launch.md
+        ✅ refactor-listing.md
+        ✅ retire-executor.md
     ✅ storage-backends.md              3/3 ✓
   local/
     📝 spec-coordination.md             0/3
@@ -202,20 +202,22 @@ specs/
       💭 spec-drift-detection.md
 ```
 
-Non-leaf specs show `done/total` counts. Status icons reflect the spec's own status, not children.
+Non-leaf specs show `done/total` counts that recursively aggregate all leaves in their subtree. `sandbox-backends.md` shows 6/6 (all leaves), and `runner-migration.md` shows 3/3 (its own leaves). Status icons reflect the spec's own status, not children.
 
 ### In the Focused View
 
 Non-leaf specs show a children summary section:
 
 ```
-## Children                                    3/5 done
+## Children                                    4/6 leaves done
 
 ✅ define-interface — complete ($0.42)
 ✅ local-backend — complete ($0.89)
-✅ refactor-runner — complete ($1.23)
-○  move-listing — validated, not dispatched
-○  retire-executor — drafted
+  runner-migration — 2/3 leaves done
+    ✅ refactor-launch — complete ($0.67)
+    ✅ refactor-listing — complete ($0.56)
+    ○  retire-executor — validated, not dispatched
+○  update-registry — drafted
 
 Total cost: $2.54
 ```

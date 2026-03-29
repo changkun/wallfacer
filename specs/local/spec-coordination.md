@@ -39,7 +39,7 @@ Spec (too big to execute directly)
 
 - **Non-leaf specs** describe *what* and *why*: problem, motivation, design decisions, cross-cutting concerns. They point to child specs via a children list.
 - **Leaf specs** describe *how*: which files to change, acceptance criteria, dependencies on sibling leaves. They are granular enough for a single agent task (2-5 files, one clear goal).
-- **Depth is organic.** A small feature might be a single leaf spec. A large initiative might be 3 levels deep. The user decides when a spec is small enough to execute directly.
+- **Depth is arbitrary.** A small feature might be a single leaf spec. A large initiative might be many levels deep. The user decides when a spec is small enough to execute directly — if it's not, break it down further. There is no limit on nesting depth.
 
 ### The Workflow
 
@@ -64,16 +64,16 @@ When a dispatched task completes, the leaf spec is updated:
 - The `dispatched_task_id` links to the completed kanban task
 - Implementation notes are added if the result diverged from the plan
 
-Non-leaf specs track progress by aggregating their children: "3/5 children done." When all children are done, the parent spec can be marked complete (after reviewing whether the implementation matches the design).
+Non-leaf specs track progress by recursively aggregating all leaves in their subtree: "4/6 leaves done." A non-leaf child contributes its own subtree's leaf counts, not a single count. When all leaves in a subtree are done, the root of that subtree can be marked complete (after reviewing whether the implementation matches the design).
 
 ### Cross-Task Context
 
-Tasks dispatched from the same parent spec are related work. The board context generator can use this relationship to provide richer context:
-- Sibling leaf specs (same parent) get higher truncation limits in board.json
-- Direct dependencies get full context (prompt + result + diff summary)
-- Unrelated tasks keep current limits
+The spec DAG provides relationship information for richer board context. The board context generator uses two signals:
+- **Dependency edges** (`depends_on`): direct dependencies get full context (prompt + result + diff summary), regardless of where they sit in the filesystem tree
+- **Filesystem proximity** (same parent directory): sibling leaf specs get higher truncation limits in board.json
+- **Unrelated tasks** keep current limits
 
-This replaces the tiered truncation policy from the previous design without needing epic tags — the spec tree provides the relationship information.
+This replaces the tiered truncation policy from the previous design without needing epic tags — the dependency DAG and filesystem tree provide the relationship information.
 
 ---
 
@@ -81,8 +81,8 @@ This replaces the tiered truncation policy from the previous design without need
 
 | Previous concept | Replaced by |
 |---|---|
-| Epic tags (`epic:<slug>`) | Spec tree parentage |
-| Phase tags (`phase:<N>`) | Spec tree depth / ordering |
+| Epic tags (`epic:<slug>`) | Filesystem tree (directory nesting) |
+| Phase tags (`phase:<N>`) | Dependency DAG (`depends_on` edges) |
 | Planner task kind | Agent-assisted spec decomposition via chat |
 | Gate task kind | Verification as a leaf spec (user decides if/when to add one) |
 | Epic filter bar | Spec explorer with tree navigation |
