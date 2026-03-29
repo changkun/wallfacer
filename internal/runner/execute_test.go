@@ -51,15 +51,7 @@ func setupRunnerWithCmd(t testing.TB, workspaces []string, cmd string) (*store.S
 		Workspaces:   workspaces,
 		WorktreesDir: worktreesDir,
 	})
-	// Cleanups are called in LIFO order. Register WaitBackground first so it
-	// runs second; register the subscription shutdown second so it runs first,
-	// ensuring the board-cache-invalidator goroutine has exited cleanly (and
-	// unsubscribed from the store) before the store is closed.
-	t.Cleanup(r.WaitBackground)
-	t.Cleanup(func() {
-		close(r.shutdownCh)
-		r.boardSubscriptionWg.Wait()
-	})
+	t.Cleanup(func() { r.Shutdown() })
 	return s, r
 }
 
