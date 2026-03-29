@@ -150,6 +150,7 @@ function makeContext() {
     JSON,
     Promise,
     performance: { now: () => Date.now() },
+    location: { search: "?office=dev" },
     registerTaskChangeListener() {},
     requestAnimationFrame() {
       return 1;

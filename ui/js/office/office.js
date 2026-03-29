@@ -51,11 +51,24 @@
     // Generate initial empty layout
     updateLayout(0);
 
-    // Show toggle button
+    // Detect assets and show toggle button accordingly
     var btn = document.getElementById("office-toggle");
+    var devMode =
+      typeof location !== "undefined" &&
+      location.search &&
+      location.search.indexOf("office=dev") !== -1;
+
     if (btn) {
-      btn.classList.remove("hidden");
       btn.addEventListener("click", toggleOffice);
+      if (devMode) {
+        btn.classList.remove("hidden");
+      } else if (typeof window._officeDetectAssets === "function") {
+        window._officeDetectAssets().then(function (available) {
+          if (available) {
+            btn.classList.remove("hidden");
+          }
+        });
+      }
     }
 
     // Register for task state changes from SSE
