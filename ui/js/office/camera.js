@@ -55,13 +55,19 @@
     var viewW = this._canvasW / this.zoom;
     var viewH = this._canvasH / this.zoom;
 
-    var maxX = Math.max(0, worldWidth - viewW);
-    var maxY = Math.max(0, worldHeight - viewH);
-
-    if (this.x < 0) this.x = 0;
-    if (this.y < 0) this.y = 0;
-    if (this.x > maxX) this.x = maxX;
-    if (this.y > maxY) this.y = maxY;
+    if (viewW >= worldWidth) {
+      // World fits in viewport — center it
+      this.x = (worldWidth - viewW) / 2;
+    } else {
+      if (this.x < 0) this.x = 0;
+      if (this.x > worldWidth - viewW) this.x = worldWidth - viewW;
+    }
+    if (viewH >= worldHeight) {
+      this.y = (worldHeight - viewH) / 2;
+    } else {
+      if (this.y < 0) this.y = 0;
+      if (this.y > worldHeight - viewH) this.y = worldHeight - viewH;
+    }
   };
 
   Camera.prototype.resize = function (canvasWidth, canvasHeight) {
