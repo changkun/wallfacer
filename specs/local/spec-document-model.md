@@ -287,3 +287,29 @@ Not all specs need the same level of human involvement. Two regimes, determined 
 The regime is not a system mode — it's an emergent property of how the human and agent interact. The system infers it from spec maturity: `vague`/`drafted` specs are human-driven; `validated` specs can be agent-driven.
 
 **Transition:** Human-driven → agent-driven when spec reaches `validated` and human approves. Agent-driven → human-driven when drift is detected or execution reveals the design was wrong.
+
+---
+
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Spec model types](spec-document-model/spec-model-types.md) | — | medium | validated |
+| [Spec lifecycle](spec-document-model/spec-lifecycle.md) | spec-model-types | small | validated |
+| [Spec tree builder](spec-document-model/spec-tree-builder.md) | spec-model-types | medium | validated |
+| [Per-spec validation](spec-document-model/per-spec-validation.md) | spec-model-types, spec-lifecycle | medium | validated |
+| [Cross-spec validation](spec-document-model/cross-spec-validation.md) | spec-tree-builder, per-spec-validation | medium | validated |
+| [Progress tracking](spec-document-model/progress-tracking.md) | spec-tree-builder | small | validated |
+| [Impact analysis](spec-document-model/impact-analysis.md) | spec-tree-builder | medium | validated |
+
+```mermaid
+graph LR
+  A[Spec model types] --> B[Spec lifecycle]
+  A --> C[Spec tree builder]
+  A --> D[Per-spec validation]
+  B --> D
+  C --> E[Cross-spec validation]
+  D --> E
+  C --> F[Progress tracking]
+  C --> G[Impact analysis]
+```
