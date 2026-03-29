@@ -1,7 +1,6 @@
 # Terminal: Multiple Sessions with Tabs
 
-**Status:** Done
-**Date:** 2026-03-28
+**Status:** Complete | **Date:** 2026-03-28 → 2026-03-29
 
 ---
 
@@ -33,6 +32,32 @@ Add a tab bar above the terminal panel supporting multiple concurrent shell sess
 
 - Requires host terminal (complete).
 - Required by [terminal-container-exec.md](terminal-container-exec.md) (container shell tabs need the session/tab registry).
+
+## Outcome
+
+Multi-session terminal tabs are fully implemented across 6 tasks. The terminal panel now supports creating, switching, and closing shell sessions via a VS Code-style tab bar, with per-session output buffering and theme-aware ANSI color palettes for both light and dark modes.
+
+### What Shipped
+
+- **Backend session management** (`internal/handler/terminal.go`): `sessionRegistry` with `create`, `switchTo`, `remove`, `closeAll`, `activeSession` methods; per-session PTY reader goroutines pumping into `outputCh` channels; relay dispatcher that `select`s on the active session's channel for instant switching; process monitor with auto-fallback on session exit
+- **6 new WebSocket message types**: client sends `create_session`, `switch_session`, `close_session`; server responds with `session_created`, `session_switched`, `session_closed`, `session_exited`, `sessions` (list), `error`
+- **Tab bar UI** (`ui/js/terminal.js`, `ui/partials/status-bar.html`, `ui/css/status-bar.css`): tab bar above xterm canvas with "+" button, per-tab close button, active tab highlighting, `mousedown preventDefault` to prevent focus theft
+- **Frontend session wiring** (`ui/js/terminal.js`): session state tracking, per-session output buffering (~100KB cap), buffer replay on switch, tab population from server sessions list, automatic cleanup on disconnect/reconnect
+- **Theme-aware ANSI colors**: full 16-color palettes for dark and light modes (modeled after VSCode defaults), auto-detection via background luminance, live update on theme switch via `MutationObserver`
+- **20 backend tests** (7 existing + 4 registry + 3 dispatcher + 6 session message tests)
+- **28 frontend tests** (11 existing + 9 tab bar + 8 session wiring tests)
+
+### Design Evolution
+
+1. **Per-session reader goroutines instead of blocking read loop.** The spec proposed `sync.Cond` or per-session context pause/resume for the PTY→WS relay. The initial implementation used a single blocking `ptmx.Read()` loop that checked `switchCh` between reads, but this blocked on idle sessions. Fixed by giving each session its own reader goroutine that pumps PTY output into a channel (`outputCh`), allowing the relay `select` to respond to `switchCh` instantly.
+
+2. **`_term.clear()` instead of `_term.reset()` on session switch.** The spec suggested `reset()` for buffer clearing, but `reset()` also clears theme and font settings. Using `clear()` preserves terminal configuration.
+
+3. **`mousedown preventDefault` on tab elements.** Not in the original spec — discovered during debugging that clicking tabs stole focus from xterm's internal textarea, causing keystrokes to trigger global shortcuts (e.g., 'e' opening the file explorer). Fixed by preventing default on `mousedown` for all tab bar elements.
+
+4. **ANSI color palettes and theme switching.** Not in the original spec — the xterm.js theme only set background/foreground/cursor, leaving ANSI colors at defaults designed for pure black backgrounds. Added full 16-color palettes for both modes and a `MutationObserver` to reapply on theme change.
+
+5. **`macOptionIsMeta` and Cmd+Backspace mapping.** Not in the original spec — added `macOptionIsMeta: true` for proper Option-as-Meta keybindings and `attachCustomKeyEventHandler` to map Cmd+Backspace to Ctrl+U (kill line) and Cmd+K to Ctrl+K (kill to end of line).
 
 ## Task Breakdown
 

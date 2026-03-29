@@ -7,11 +7,11 @@
 
 ## Current State
 
-- **Host terminal** is complete: `/api/terminal/ws` WebSocket handler in `internal/handler/terminal.go`, xterm.js client in `ui/js/terminal.js`, PTY spawning via `internal/pty/`. Single-session only.
+- **Host terminal** is complete: `/api/terminal/ws` WebSocket handler in `internal/handler/terminal.go`, xterm.js client in `ui/js/terminal.js`, PTY spawning via `internal/pty/`.
+- **Terminal sessions** ([terminal-sessions.md](terminal-sessions.md)) is complete — multi-session tab bar with `sessionRegistry`, relay dispatcher, per-session reader goroutines, and `create_session`/`switch_session`/`close_session` WebSocket messages.
 - **`GET /api/containers`** exists in `internal/handler/containers.go` — returns `[]sandbox.ContainerInfo` (ID, Name, TaskID, TaskTitle, Image, State, Status, CreatedAt) for running wallfacer sandbox containers.
 - **CLI `wallfacer exec`** (`internal/cli/exec.go`) attaches to containers via `podman exec -it` with `syscall.Exec()` process replacement. Not available from the web UI.
 - **`SandboxBackend` interface** (`internal/sandbox/backend.go`) defines `Launch` and `List` methods with a local implementation. The terminal handler does not use this interface.
-- **Terminal sessions** ([terminal-sessions.md](terminal-sessions.md)) is not started — no tab infrastructure exists yet.
 
 ## Problem
 
