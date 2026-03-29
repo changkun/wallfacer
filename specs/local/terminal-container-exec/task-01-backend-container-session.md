@@ -1,6 +1,6 @@
 # Task 1: Backend Container Session Creation
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Backend
 **Effort:** Medium

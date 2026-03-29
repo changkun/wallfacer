@@ -60,7 +60,7 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 
 | # | Task | Depends on | Effort | Status |
 |---|------|-----------|--------|--------|
-| 1 | [Backend container session](terminal-container-exec/task-01-backend-container-session.md) | — | Medium | Todo |
+| 1 | [Backend container session](terminal-container-exec/task-01-backend-container-session.md) | — | Medium | Done |
 | 2 | [Container selector UI](terminal-container-exec/task-02-container-selector-ui.md) | 1 | Medium | Todo |
 | 3 | [Documentation](terminal-container-exec/task-03-docs.md) | 2 | Small | Todo |
 
