@@ -25,7 +25,9 @@ func newRunnerForArgTest(t *testing.T, cfg RunnerConfig) *Runner {
 	if cfg.WorktreesDir == "" {
 		cfg.WorktreesDir = t.TempDir()
 	}
-	return NewRunner(s, cfg)
+	r := NewRunner(s, cfg)
+	t.Cleanup(func() { r.Shutdown() })
+	return r
 }
 
 // argsContainSubstring returns true if any element of args contains sub.

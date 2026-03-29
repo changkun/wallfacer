@@ -917,6 +917,7 @@ func TestSaveAndGetOversight(t *testing.T) {
 // returns 0 (disabled).
 func TestOversightIntervalFromEnvMissingFile(t *testing.T) {
 	r := NewRunner(nil, RunnerConfig{EnvFile: "/nonexistent/path/.env"})
+	t.Cleanup(func() { r.Shutdown() })
 	if got := r.oversightIntervalFromEnv(); got != 0 {
 		t.Fatalf("expected 0 for missing file, got %v", got)
 	}
@@ -926,6 +927,7 @@ func TestOversightIntervalFromEnvMissingFile(t *testing.T) {
 // returns 0 without attempting to read anything.
 func TestOversightIntervalFromEnvEmptyPath(t *testing.T) {
 	r := NewRunner(nil, RunnerConfig{EnvFile: ""})
+	t.Cleanup(func() { r.Shutdown() })
 	if got := r.oversightIntervalFromEnv(); got != 0 {
 		t.Fatalf("expected 0 for empty env path, got %v", got)
 	}
@@ -939,6 +941,7 @@ func TestOversightIntervalFromEnvAbsentKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewRunner(nil, RunnerConfig{EnvFile: envPath})
+	t.Cleanup(func() { r.Shutdown() })
 	if got := r.oversightIntervalFromEnv(); got != 0 {
 		t.Fatalf("expected 0 when key absent, got %v", got)
 	}
@@ -952,6 +955,7 @@ func TestOversightIntervalFromEnvValidValue(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewRunner(nil, RunnerConfig{EnvFile: envPath})
+	t.Cleanup(func() { r.Shutdown() })
 	got := r.oversightIntervalFromEnv()
 	if got != 5*time.Minute {
 		t.Fatalf("expected 5m, got %v", got)
@@ -966,6 +970,7 @@ func TestOversightIntervalFromEnvInvalidValue(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewRunner(nil, RunnerConfig{EnvFile: envPath})
+	t.Cleanup(func() { r.Shutdown() })
 	if got := r.oversightIntervalFromEnv(); got != 0 {
 		t.Fatalf("expected 0 for invalid value, got %v", got)
 	}
@@ -984,6 +989,7 @@ func TestPeriodicOversightWorkerExitsOnContextCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewRunner(nil, RunnerConfig{EnvFile: envPath})
+	t.Cleanup(func() { r.Shutdown() })
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -1010,6 +1016,7 @@ func TestPeriodicOversightWorkerDisabledExitsImmediately(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewRunner(nil, RunnerConfig{EnvFile: envPath})
+	t.Cleanup(func() { r.Shutdown() })
 
 	done := make(chan struct{})
 	go func() {
@@ -1549,6 +1556,7 @@ func TestPeriodicOversightWorker_DisabledReturnsImmediately(t *testing.T) {
 	// NewRunner with an empty RunnerConfig means envFile == "" →
 	// oversightIntervalFromEnv returns 0 → worker exits immediately.
 	r := NewRunner(s, RunnerConfig{})
+	t.Cleanup(func() { r.Shutdown() })
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1588,6 +1596,7 @@ func TestPeriodicOversightWorker_ContextCancellation(t *testing.T) {
 	defer s.Close()
 
 	r := NewRunner(s, RunnerConfig{EnvFile: envPath})
+	t.Cleanup(func() { r.Shutdown() })
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -1620,6 +1629,7 @@ func TestPeriodicOversightWorker_EnvFileMissing(t *testing.T) {
 	defer s.Close()
 
 	r := NewRunner(s, RunnerConfig{EnvFile: "/does/not/exist/.env"})
+	t.Cleanup(func() { r.Shutdown() })
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

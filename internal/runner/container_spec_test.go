@@ -411,6 +411,7 @@ func TestCacheVolumeMountsPresent(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	r := NewRunner(s, RunnerConfig{EnvFile: envFile})
+	t.Cleanup(func() { r.Shutdown() })
 	spec := r.buildBaseContainerSpec("test-container", "", sandbox.Claude)
 
 	found := map[string]bool{}
@@ -440,6 +441,7 @@ func TestCacheVolumesNotPresentWhenDisabled(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	r := NewRunner(s, RunnerConfig{EnvFile: envFile})
+	t.Cleanup(func() { r.Shutdown() })
 	spec := r.buildBaseContainerSpec("test-container", "", sandbox.Claude)
 
 	for _, v := range spec.Volumes {

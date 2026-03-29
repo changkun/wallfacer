@@ -28,11 +28,13 @@ func runnerWithCmd(t *testing.T, cmd string) *Runner {
 	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	return NewRunner(s, RunnerConfig{
+	r := NewRunner(s, RunnerConfig{
 		Command:      cmd,
 		SandboxImage: "test:latest",
 		WorktreesDir: worktreesDir,
 	})
+	t.Cleanup(func() { r.Shutdown() })
+	return r
 }
 
 // validStreamJSON is a minimal well-formed stream-json result object that
@@ -181,6 +183,7 @@ func TestHostStageAndCommitUsesGeneratedMessage(t *testing.T) {
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 
 	taskID := uuid.New()
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
@@ -230,6 +233,7 @@ func TestHostStageAndCommitFallsBackOnCommitMessageFailure(t *testing.T) {
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 
 	taskID := uuid.New()
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
@@ -318,6 +322,7 @@ func TestHostStageAndCommitSucceedsWhenSomeWorktreesMissing(t *testing.T) {
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 
 	taskID := uuid.New()
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
@@ -389,6 +394,7 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 
 	ctx := context.Background()
 	task, err := s.CreateTaskWithOptions(ctx, store.TaskCreateOptions{Prompt: "test commit spans", Timeout: 5})
@@ -532,6 +538,7 @@ func TestHostStageAndCommitRespectsContextCancellation(t *testing.T) {
 		Workspaces:   []string{repo},
 		WorktreesDir: worktreesDir,
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 
 	taskID := uuid.New()
 	worktreePaths, branchName, err := runner.setupWorktrees(taskID)
@@ -671,6 +678,7 @@ func TestMaybeAutoPush_NoEnvFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewRunner(s, RunnerConfig{EnvFile: "", WorktreesDir: worktreesDir})
+	t.Cleanup(func() { r.Shutdown() })
 	// Should not panic; nothing to verify since it's a no-op when envFile is empty.
 	r.maybeAutoPush(context.Background(), uuid.New(), map[string]string{})
 }
@@ -692,6 +700,7 @@ func TestMaybeAutoPush_AutoPushDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewRunner(s, RunnerConfig{EnvFile: envFile, WorktreesDir: worktreesDir})
+	t.Cleanup(func() { r.Shutdown() })
 	// Should complete without error; auto-push is disabled.
 	r.maybeAutoPush(context.Background(), uuid.New(), map[string]string{})
 }
@@ -714,6 +723,7 @@ func TestMaybeAutoPush_NonGitDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewRunner(s, RunnerConfig{EnvFile: envFile, WorktreesDir: worktreesDir})
+	t.Cleanup(func() { r.Shutdown() })
 
 	task, err := s.CreateTaskWithOptions(context.Background(), store.TaskCreateOptions{Prompt: "test", Timeout: 30})
 	if err != nil {
@@ -739,6 +749,7 @@ func TestMaybeAutoPush_MissingEnvFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewRunner(s, RunnerConfig{EnvFile: envFile, WorktreesDir: worktreesDir})
+	t.Cleanup(func() { r.Shutdown() })
 	// envconfig.Parse will fail → maybeAutoPush returns early without panic.
 	r.maybeAutoPush(context.Background(), uuid.New(), map[string]string{})
 }

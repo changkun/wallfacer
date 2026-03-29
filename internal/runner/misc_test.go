@@ -38,6 +38,7 @@ func TestWorkspacesEmpty(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{Command: "echo"})
+	t.Cleanup(func() { r.Shutdown() })
 	if r.Workspaces() != nil {
 		t.Fatal("expected nil when workspaces is empty")
 	}
@@ -56,6 +57,7 @@ func TestWorkspacesMultiple(t *testing.T) {
 		Command:    "echo",
 		Workspaces: []string{"/a", "/b", "/c"},
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	ws := r.Workspaces()
 	if len(ws) != 3 {
 		t.Fatalf("expected 3 workspaces, got %d: %v", len(ws), ws)
@@ -79,6 +81,7 @@ func TestWorkspacesMethod_PathsWithSpaces(t *testing.T) {
 		Command:    "echo",
 		Workspaces: []string{pathWithSpaces, "/normal/path"},
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	ws := r.Workspaces()
 	if len(ws) != 2 {
 		t.Fatalf("expected 2 workspaces, got %d: %v", len(ws), ws)
@@ -599,6 +602,7 @@ func TestBuildContainerArgsWithEnvFile(t *testing.T) {
 		SandboxImage: "test:latest",
 		EnvFile:      envFile,
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
 	if !containsConsecutive(args, "--env-file", envFile) {
 		t.Fatalf("expected --env-file %s in args; got: %v", envFile, args)
@@ -623,6 +627,7 @@ func TestBuildContainerArgsWorktreeOverride(t *testing.T) {
 		SandboxImage: "test:latest",
 		Workspaces:   []string{ws},
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{ws: wt}, "", nil, "")
 	basename := filepath.Base(ws)
 	zOpt := mountOpts("z")
@@ -664,6 +669,7 @@ func TestBuildContainerArgsWorktreeGitDirMount(t *testing.T) {
 		SandboxImage: "test:latest",
 		Workspaces:   []string{repo},
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	args := r.buildContainerArgs("name", "", "prompt", "", map[string]string{repo: wt}, "", nil, "")
 
 	// The main repo's .git should be mounted. The source path is translated
@@ -696,6 +702,7 @@ func TestBuildContainerArgsNoGitDirMountWithoutWorktree(t *testing.T) {
 		SandboxImage: "test:latest",
 		Workspaces:   []string{repo},
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	// No worktree override — direct mount of workspace.
 	args := r.buildContainerArgs("name", "", "prompt", "", nil, "", nil, "")
 
@@ -1094,6 +1101,7 @@ func TestRunnerEnvFile(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{Command: "echo", EnvFile: envFile})
+	t.Cleanup(func() { r.Shutdown() })
 	if r.EnvFile() != envFile {
 		t.Errorf("EnvFile() = %q, want %q", r.EnvFile(), envFile)
 	}
@@ -1109,6 +1117,7 @@ func TestRunnerWorktreesDir(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 	wtDir := filepath.Join(t.TempDir(), "worktrees")
 	r := NewRunner(s, RunnerConfig{Command: "echo", WorktreesDir: wtDir})
+	t.Cleanup(func() { r.Shutdown() })
 	if r.WorktreesDir() != wtDir {
 		t.Errorf("WorktreesDir() = %q, want %q", r.WorktreesDir(), wtDir)
 	}
@@ -1136,6 +1145,7 @@ func TestRunnerInstructionsPath(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 	r := NewRunner(s, RunnerConfig{Command: "echo", InstructionsPath: instructionsFile})
+	t.Cleanup(func() { r.Shutdown() })
 	if r.InstructionsPath() != instructionsFile {
 		t.Errorf("InstructionsPath() = %q, want %q", r.InstructionsPath(), instructionsFile)
 	}
@@ -1294,6 +1304,7 @@ func TestModelFromEnv_WithEnvFile(t *testing.T) {
 		Command: "echo",
 		EnvFile: envFile,
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	result := r.modelFromEnv()
 	if result != "claude-opus-4-5" {
 		t.Errorf("modelFromEnv = %q, want %q", result, "claude-opus-4-5")
@@ -1314,6 +1325,7 @@ func TestModelFromEnv_BadEnvFile(t *testing.T) {
 		Command: "echo",
 		EnvFile: "/nonexistent/path/.env",
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	result := r.modelFromEnv()
 	if result != "" {
 		t.Errorf("modelFromEnv with bad env file = %q, want %q", result, "")
@@ -1348,6 +1360,7 @@ func TestTitleModelFromEnv_WithTitleModel(t *testing.T) {
 		Command: "echo",
 		EnvFile: envFile,
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	result := r.titleModelFromEnv()
 	if result != "claude-haiku-4-5" {
 		t.Errorf("titleModelFromEnv = %q, want %q", result, "claude-haiku-4-5")
@@ -1371,6 +1384,7 @@ func TestTitleModelFromEnv_FallsBackToDefaultModel(t *testing.T) {
 		Command: "echo",
 		EnvFile: envFile,
 	})
+	t.Cleanup(func() { r.Shutdown() })
 	result := r.titleModelFromEnv()
 	if result != "claude-opus-4-5" {
 		t.Errorf("titleModelFromEnv fallback = %q, want %q", result, "claude-opus-4-5")

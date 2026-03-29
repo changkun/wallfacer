@@ -22,6 +22,7 @@ func TestCaptureExecutionEnvironment_ModelFromEnvconfig(t *testing.T) {
 		SandboxImage: "wallfacer:latest",
 		EnvFile:      envFile,
 	})
+	t.Cleanup(func() { r.Shutdown() })
 
 	task := store.Task{Sandbox: ""}
 	env := r.captureExecutionEnvironment(task)
@@ -48,6 +49,7 @@ func TestCaptureExecutionEnvironment_InstructionsHash(t *testing.T) {
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instrFile,
 	})
+	t.Cleanup(func() { r.Shutdown() })
 
 	task := store.Task{}
 	env := r.captureExecutionEnvironment(task)
@@ -66,6 +68,7 @@ func TestCaptureExecutionEnvironment_MissingInstructions(t *testing.T) {
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: "/nonexistent/path/CLAUDE.md",
 	})
+	t.Cleanup(func() { r.Shutdown() })
 
 	task := store.Task{}
 	env := r.captureExecutionEnvironment(task)
@@ -83,6 +86,7 @@ func TestCaptureExecutionEnvironment_ContainerDigestEmpty(t *testing.T) {
 		Command:      "false", // always exits non-zero
 		SandboxImage: "wallfacer:latest",
 	})
+	t.Cleanup(func() { r.Shutdown() })
 
 	task := store.Task{}
 	env := r.captureExecutionEnvironment(task)
@@ -99,6 +103,7 @@ func TestCaptureExecutionEnvironment_ContainerImage(t *testing.T) {
 		Command:      "echo",
 		SandboxImage: "wallfacer:latest",
 	})
+	t.Cleanup(func() { r.Shutdown() })
 
 	task := store.Task{}
 	env := r.captureExecutionEnvironment(task)
@@ -115,6 +120,7 @@ func TestCaptureExecutionEnvironment_Sandbox(t *testing.T) {
 		Command:      "echo",
 		SandboxImage: "wallfacer:latest",
 	})
+	t.Cleanup(func() { r.Shutdown() })
 
 	// No sandbox set → defaults to "claude".
 	env := r.captureExecutionEnvironment(store.Task{})
@@ -142,6 +148,7 @@ func TestCaptureExecutionEnvironment_TaskModelOverride(t *testing.T) {
 		SandboxImage: "wallfacer:latest",
 		EnvFile:      envFile,
 	})
+	t.Cleanup(func() { r.Shutdown() })
 
 	task := store.Task{Model: "override-model"}
 	env := r.captureExecutionEnvironment(task)

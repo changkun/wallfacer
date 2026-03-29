@@ -84,6 +84,7 @@ func setupTestRunnerWithManager(t *testing.T, workspaces []string, mgr *workspac
 		WorktreesDir:     worktreesDir,
 		WorkspaceManager: mgr,
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 	return s, runner
 }
 
@@ -102,11 +103,13 @@ func newTestRunnerWithInstructions(t *testing.T, instructionsPath string) *Runne
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	return NewRunner(s, RunnerConfig{
+	r := NewRunner(s, RunnerConfig{
 		Command:          "podman",
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instructionsPath,
 	})
+	t.Cleanup(func() { r.Shutdown() })
+	return r
 }
 
 // containsConsecutive returns true if slice contains needle1 immediately
@@ -224,6 +227,7 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws},
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
@@ -263,6 +267,7 @@ func TestContainerArgsMultiWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws1, ws2},
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
@@ -311,6 +316,7 @@ func TestContainerArgsCodexMountsHostAuthCache(t *testing.T) {
 		InstructionsPath: instructionsFile,
 		CodexAuthPath:    codexAuthDir,
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
 
 	expectedMount := "type=bind,src=" + hostPath(codexAuthDir, "podman") + ",dst=/home/codex/.codex," + expectedBuildROSuffix()
@@ -336,6 +342,7 @@ func TestContainerArgsCodexUsesCodexImage(t *testing.T) {
 		SandboxImage:     "wallfacer:latest",
 		InstructionsPath: instructionsFile,
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 	args := runner.buildContainerArgsForSandbox("test-container", "", "do something", "", nil, "", nil, "", "codex")
 
 	found := false
@@ -363,6 +370,7 @@ func TestHostCodexAuthStatus_Valid(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	r := NewRunner(s, RunnerConfig{CodexAuthPath: codexAuthDir})
+	t.Cleanup(func() { r.Shutdown() })
 	ok, reason := r.HostCodexAuthStatus(time.Now())
 	if !ok {
 		t.Fatalf("expected host codex auth to be valid, got false: %s", reason)
@@ -382,6 +390,7 @@ func TestHostCodexAuthStatus_MissingTokens(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 
 	r := NewRunner(s, RunnerConfig{CodexAuthPath: codexAuthDir})
+	t.Cleanup(func() { r.Shutdown() })
 	ok, _ := r.HostCodexAuthStatus(time.Now())
 	if ok {
 		t.Fatalf("expected invalid host codex auth when no tokens are present")
@@ -411,6 +420,7 @@ func TestContainerArgsCLAUDEMDMountPosition(t *testing.T) {
 		InstructionsPath: instructionsFile,
 		Workspaces:       []string{ws},
 	})
+	t.Cleanup(func() { runner.Shutdown() })
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
 	claudeMDIdx := -1

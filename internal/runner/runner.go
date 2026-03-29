@@ -120,6 +120,7 @@ type Runner struct {
 	}
 	boardChangeSeq      atomic.Uint64  // incremented on every store notification
 	shutdownCh          chan struct{}  // closed by Shutdown to stop the subscription goroutine
+	shutdownOnce        sync.Once      // ensures Shutdown runs at most once
 	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
 	shutdownCtx         context.Context
 	shutdownCancel      context.CancelFunc
@@ -236,33 +237,35 @@ func (r *Runner) ideationExploitRatio() float64 {
 // to completion independently and will be recovered on the next server start.
 // must be called at most once.
 func (r *Runner) Shutdown() {
-	r.shutdownCancel()
-	// Stop all per-task worker containers before waiting for background goroutines.
-	if wm, ok := r.backend.(sandbox.WorkerManager); ok {
-		wm.ShutdownWorkers()
-	}
-	// Signal the board-cache-invalidator goroutine to exit and wait for it.
-	close(r.shutdownCh)
-	r.boardSubscriptionWg.Wait()
+	r.shutdownOnce.Do(func() {
+		r.shutdownCancel()
+		// Stop all per-task worker containers before waiting for background goroutines.
+		if wm, ok := r.backend.(sandbox.WorkerManager); ok {
+			wm.ShutdownWorkers()
+		}
+		// Signal the board-cache-invalidator goroutine to exit and wait for it.
+		close(r.shutdownCh)
+		r.boardSubscriptionWg.Wait()
 
-	done := make(chan struct{})
-	go func() {
-		r.backgroundWg.Wait()
-		close(done)
-	}()
+		done := make(chan struct{})
+		go func() {
+			r.backgroundWg.Wait()
+			close(done)
+		}()
 
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-done:
-			return
-		case <-ticker.C:
-			if pending := r.backgroundWg.Pending(); len(pending) > 0 {
-				logger.Main.Info("shutdown waiting for background goroutines", "pending", strings.Join(pending, ", "))
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if pending := r.backgroundWg.Pending(); len(pending) > 0 {
+					logger.Main.Info("shutdown waiting for background goroutines", "pending", strings.Join(pending, ", "))
+				}
 			}
 		}
-	}
+	})
 }
 
 // RunBackground launches Run in a background goroutine tracked by backgroundWg.
