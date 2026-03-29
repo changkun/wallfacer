@@ -564,11 +564,16 @@ function _renderContainerPicker(containers) {
     }
   }
 
-  var tabBar = document.getElementById("terminal-tab-bar");
-  if (tabBar) {
-    tabBar.appendChild(picker);
-    _containerPickerEl = picker;
+  // Position the picker above the container button using fixed positioning
+  // to escape the panel's overflow:hidden clipping.
+  var containerBtn = document.getElementById("terminal-container-btn");
+  if (containerBtn) {
+    var btnRect = containerBtn.getBoundingClientRect();
+    picker.style.bottom = window.innerHeight - btnRect.top + 4 + "px";
+    picker.style.right = window.innerWidth - btnRect.right + "px";
   }
+  document.body.appendChild(picker);
+  _containerPickerEl = picker;
 
   // Dismiss on click outside or Escape.
   setTimeout(function () {

@@ -168,11 +168,8 @@
   flex-shrink: 0;
 }
 .terminal-tab-add:hover { color: var(--text); }
-.terminal-tab-bar { position: relative; }
 .terminal-container-picker {
-  position: absolute;
-  bottom: 100%;
-  right: 4px;
+  position: fixed;
   min-width: 220px;
   max-height: 240px;
   overflow-y: auto;
@@ -180,7 +177,7 @@
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: var(--shadow-lg);
-  z-index: 20;
+  z-index: 100;
   padding: 4px 0;
 }
 .terminal-container-picker__item {
