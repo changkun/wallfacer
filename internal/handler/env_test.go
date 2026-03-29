@@ -882,3 +882,28 @@ func TestUpdateEnvConfig_SandboxFastFalse(t *testing.T) {
 		t.Errorf("expected 204, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestIsAuthError(t *testing.T) {
+	tests := []struct {
+		result, lastTestResult string
+		want                   bool
+	}{
+		{"", "pass", false},
+		{"timeout", "fail", false},
+		{"401 unauthorized", "fail", true},
+		{"", "401", true},
+		{"invalid token provided", "", true},
+		{"Error: authentication failed", "", true},
+		{"permission denied", "", true},
+		{"403 Forbidden", "fail", true},
+		{"expired_token", "", true},
+		{"invalid_api_key", "", true},
+		{"network error", "fail", false},
+	}
+	for _, tt := range tests {
+		got := isAuthError(tt.result, tt.lastTestResult)
+		if got != tt.want {
+			t.Errorf("isAuthError(%q, %q) = %v; want %v", tt.result, tt.lastTestResult, got, tt.want)
+		}
+	}
+}

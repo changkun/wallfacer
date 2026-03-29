@@ -126,12 +126,13 @@ type envConfigResponse struct {
 // sandboxTestResponse is the JSON body returned after running a sandbox
 // smoke-check via POST /api/env/test.
 type sandboxTestResponse struct {
-	TaskID         string       `json:"task_id"`
-	Sandbox        sandbox.Type `json:"sandbox"`
-	Status         string       `json:"status"`
-	LastTestResult string       `json:"last_test_result,omitempty"`
-	Result         string       `json:"result,omitempty"`
-	StopReason     string       `json:"stop_reason,omitempty"`
+	TaskID          string       `json:"task_id"`
+	Sandbox         sandbox.Type `json:"sandbox"`
+	Status          string       `json:"status"`
+	LastTestResult  string       `json:"last_test_result,omitempty"`
+	Result          string       `json:"result,omitempty"`
+	StopReason      string       `json:"stop_reason,omitempty"`
+	ReauthAvailable bool         `json:"reauth_available,omitempty"`
 }
 
 // sandboxTestRequest is the JSON body accepted by POST /api/env/test.
@@ -339,6 +340,13 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	passed := strings.EqualFold(updated.LastTestResult, "pass") &&
 		(updated.Status == store.TaskStatusDone || updated.Status == store.TaskStatusWaiting)
 	h.setSandboxTestPassed(sb, passed)
+
+	// Detect auth errors and offer re-auth when OAuth is available.
+	if !passed {
+		resp.ReauthAvailable = isAuthError(resp.Result, resp.LastTestResult) &&
+			isOAuthAvailable(sb, h.envFile)
+	}
+
 	httpjson.Write(w, http.StatusOK, resp)
 }
 
@@ -659,4 +667,37 @@ func reqBoolString(v *bool) *string {
 		s = "true"
 	}
 	return &s
+}
+
+// isAuthError checks if the test output contains authentication error indicators.
+func isAuthError(result, lastTestResult string) bool {
+	combined := strings.ToLower(result + " " + lastTestResult)
+	for _, pattern := range []string{
+		"unauthorized", "401", "403",
+		"invalid token", "invalid_token", "invalid api key", "invalid_api_key",
+		"expired token", "expired_token",
+		"authentication", "permission denied",
+	} {
+		if strings.Contains(combined, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// isOAuthAvailable returns true if the sandbox type supports OAuth sign-in
+// and no custom base URL is configured (custom endpoints won't use standard OAuth).
+func isOAuthAvailable(sb sandbox.Type, envFile string) bool {
+	cfg, err := envconfig.Parse(envFile)
+	if err != nil {
+		return false
+	}
+	switch sb {
+	case sandbox.Claude:
+		return cfg.BaseURL == ""
+	case sandbox.Codex:
+		return cfg.OpenAIBaseURL == ""
+	default:
+		return false
+	}
 }
