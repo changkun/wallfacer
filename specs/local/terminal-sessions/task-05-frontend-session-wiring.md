@@ -1,6 +1,6 @@
 # Task 5: Frontend Session Wiring
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 3, Task 4
 **Phase:** Frontend integration
 **Effort:** Large

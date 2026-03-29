@@ -42,7 +42,7 @@ Add a tab bar above the terminal panel supporting multiple concurrent shell sess
 | 2 | [Relay dispatcher](terminal-sessions/task-02-relay-dispatcher.md) | 1 | Medium | Done |
 | 3 | [Session control messages](terminal-sessions/task-03-session-messages.md) | 2 | Small | Done |
 | 4 | [Tab bar UI](terminal-sessions/task-04-tab-bar-ui.md) | — | Medium | Done |
-| 5 | [Frontend session wiring](terminal-sessions/task-05-frontend-session-wiring.md) | 3, 4 | Large | Todo |
+| 5 | [Frontend session wiring](terminal-sessions/task-05-frontend-session-wiring.md) | 3, 4 | Large | Done |
 | 6 | [Documentation](terminal-sessions/task-06-docs.md) | 5 | Small | Todo |
 
 ```mermaid
