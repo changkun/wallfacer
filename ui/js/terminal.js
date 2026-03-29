@@ -55,6 +55,7 @@ function initTerminal() {
     fontSize: 13,
     fontFamily: '"SF Mono", Menlo, Monaco, "Courier New", monospace',
     theme: _buildTermTheme(),
+    macOptionIsMeta: true,
   });
 
   _fitAddon = new FitAddon.FitAddon();
@@ -227,6 +228,9 @@ function connectTerminal() {
     if (event.code !== 1000) {
       _term.write("\r\n\x1b[33mDisconnected. Reconnecting...\x1b[0m\r\n");
       _scheduleReconnect();
+    } else {
+      // Clean close (all sessions ended) — hide the terminal panel.
+      _hideTermPanel();
     }
   };
 
@@ -268,6 +272,17 @@ function _scheduleReconnect() {
     // Exponential backoff: 1s → 2s → 4s → ... → 30s max.
     _termReconnectDelay = Math.min(_termReconnectDelay * 2, 30000);
   }, _termReconnectDelay);
+}
+
+function _hideTermPanel() {
+  var panel = document.getElementById("status-bar-panel");
+  var handle = document.getElementById("status-bar-panel-resize");
+  var btn = document.getElementById("status-bar-terminal-btn");
+  var tabBar = document.getElementById("terminal-tab-bar");
+  if (panel) panel.classList.add("hidden");
+  if (handle) handle.classList.add("hidden");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+  if (tabBar) tabBar.hidden = true;
 }
 
 // --- Session message handlers ---
@@ -321,6 +336,7 @@ function _handleSessionSwitched(id) {
         _term.write(buf[i]);
       }
     }
+    _term.focus();
   }
 }
 
