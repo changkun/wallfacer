@@ -439,6 +439,7 @@ function _fetchTestLogs(id, retryDelay, seq) {
     document.getElementById("modal-test-logs").innerHTML = "";
   }
   let needsReset = isReconnect;
+  let receivedData = false;
   const delay = retryDelay || 1000;
   const decoder = new TextDecoder();
   // For completed tasks use phase=test to serve only test-agent turns (those
@@ -459,8 +460,9 @@ function _fetchTestLogs(id, retryDelay, seq) {
       (task.status !== "in_progress" && task.status !== "committing")
     )
       return;
-    const nextDelay = Math.min(delay * 2, 15000);
-    setTimeout(() => _fetchTestLogs(id, nextDelay, seq), delay);
+    const nextDelay = receivedData ? Math.min(delay * 2, 15000) : 1000;
+    const waitMs = receivedData ? delay : 1000;
+    setTimeout(() => _fetchTestLogs(id, nextDelay, seq), waitMs);
   }
 
   fetch(withAuthToken(url), {
@@ -483,6 +485,7 @@ function _fetchTestLogs(id, retryDelay, seq) {
               reconnect();
               return;
             }
+            receivedData = true;
             if (needsReset) {
               needsReset = false;
               testRawLogBuffer = "";
@@ -527,6 +530,7 @@ function _fetchLogs(id, retryDelay, seq) {
     _renderedLogQuery = "";
   }
   let needsReset = isReconnect;
+  let receivedData = false;
   const delay = retryDelay || 1000;
   const decoder = new TextDecoder();
   const url = `/api/tasks/${id}/logs?raw=true`;
@@ -541,8 +545,12 @@ function _fetchLogs(id, retryDelay, seq) {
       (task.status !== "in_progress" && task.status !== "committing")
     )
       return;
-    const nextDelay = Math.min(delay * 2, 15000);
-    setTimeout(() => _fetchLogs(id, nextDelay, seq), delay);
+    // Use exponential backoff only after we have received real data (stream
+    // dropped mid-flight). Before any data arrives the container is likely
+    // still starting — poll at a short fixed interval so logs appear promptly.
+    const nextDelay = receivedData ? Math.min(delay * 2, 15000) : 1000;
+    const waitMs = receivedData ? delay : 1000;
+    setTimeout(() => _fetchLogs(id, nextDelay, seq), waitMs);
   }
 
   fetch(withAuthToken(url), {
@@ -565,6 +573,7 @@ function _fetchLogs(id, retryDelay, seq) {
               reconnect();
               return;
             }
+            receivedData = true;
             // On reconnect, reset the buffer on the first chunk so the server's
             // full re-send replaces stale data without a visible empty gap.
             if (needsReset) {
