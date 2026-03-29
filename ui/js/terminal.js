@@ -157,6 +157,16 @@ function initTerminal() {
     }).observe(canvas);
   }
 
+  // Re-apply terminal theme when light/dark mode changes.
+  if (typeof MutationObserver !== "undefined") {
+    new MutationObserver(function () {
+      if (_term) _term.options.theme = _buildTermTheme();
+    }).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+  }
+
   // Wire the "+" button to the tab-add callback.
   // Prevent mousedown from stealing focus from xterm.
   var addBtn = document.getElementById("terminal-tab-add");
