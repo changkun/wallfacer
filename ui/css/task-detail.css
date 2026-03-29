@@ -513,6 +513,10 @@ pre {
   font-size: 14px;
   color: var(--text-secondary);
 }
+#modal-logs-section,
+#modal-test-logs-section {
+  overflow: hidden;
+}
 .logs-block {
   background: #1a1917;
   border-radius: 8px;
