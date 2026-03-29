@@ -12,7 +12,13 @@
   class="status-bar-panel hidden"
   role="region"
   aria-label="Terminal panel"
-></div>
+>
+  <div id="terminal-tab-bar" class="terminal-tab-bar" hidden>
+    <div id="terminal-tab-list"></div>
+    <button id="terminal-tab-add" class="terminal-tab-add" title="New session" aria-label="New terminal session">+</button>
+  </div>
+  <div id="terminal-canvas"></div>
+</div>
 <div
   id="status-bar-panel-resize"
   class="status-bar-panel-resize hidden"

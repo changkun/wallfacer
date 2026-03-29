@@ -5,6 +5,10 @@ var _fitAddon = null;
 var _termWs = null;
 var _termReconnectTimer = null;
 var _termReconnectDelay = 1000;
+var _termTabCounter = 0;
+var _onTabClick = function () {};
+var _onTabClose = function () {};
+var _onTabAdd = function () {};
 
 // In desktop mode (Wails), the reverse proxy can't forward WebSocket upgrades.
 // Discover the real server port via /api/desktop-port and connect directly.
@@ -53,9 +57,9 @@ function initTerminal() {
   _fitAddon = new FitAddon.FitAddon();
   _term.loadAddon(_fitAddon);
 
-  var panel = document.getElementById("status-bar-panel");
-  if (panel) {
-    _term.open(panel);
+  var canvas = document.getElementById("terminal-canvas");
+  if (canvas) {
+    _term.open(canvas);
     // Fit after open so dimensions are calculated correctly.
     try {
       _fitAddon.fit();
@@ -64,17 +68,26 @@ function initTerminal() {
     }
   }
 
-  // Re-fit when the panel resizes (drag handle, window resize).
-  if (panel && typeof ResizeObserver !== "undefined") {
+  // Re-fit when the canvas resizes (drag handle, window resize).
+  if (canvas && typeof ResizeObserver !== "undefined") {
+    var panel = document.getElementById("status-bar-panel");
     new ResizeObserver(function () {
-      if (!panel.classList.contains("hidden")) {
+      if (!panel || !panel.classList.contains("hidden")) {
         try {
           _fitAddon.fit();
         } catch (_) {
           /* ignore */
         }
       }
-    }).observe(panel);
+    }).observe(canvas);
+  }
+
+  // Wire the "+" button to the tab-add callback.
+  var addBtn = document.getElementById("terminal-tab-add");
+  if (addBtn) {
+    addBtn.addEventListener("click", function () {
+      _onTabAdd();
+    });
   }
 
   // Wire terminal events once — they check _termWs on each invocation.
@@ -196,7 +209,99 @@ function _scheduleReconnect() {
   }, _termReconnectDelay);
 }
 
+// --- Terminal tab management ---
+
+function _updateTabBarVisibility() {
+  var tabBar = document.getElementById("terminal-tab-bar");
+  var tabList = document.getElementById("terminal-tab-list");
+  if (!tabBar || !tabList) return;
+  tabBar.hidden = tabList.children.length === 0;
+}
+
+function addTerminalTab(sessionId, label) {
+  var tabList = document.getElementById("terminal-tab-list");
+  if (!tabList) return;
+
+  if (!label) {
+    _termTabCounter++;
+    label = "Shell " + _termTabCounter;
+  }
+
+  var tab = document.createElement("div");
+  tab.className = "terminal-tab";
+  tab.setAttribute("data-session-id", sessionId);
+  tab.setAttribute("aria-selected", "false");
+
+  var labelSpan = document.createElement("span");
+  labelSpan.className = "terminal-tab__label";
+  labelSpan.textContent = label;
+  tab.appendChild(labelSpan);
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "terminal-tab__close";
+  closeBtn.setAttribute("aria-label", "Close session");
+  closeBtn.innerHTML = "\u00d7";
+  closeBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    _onTabClose(sessionId);
+  });
+  tab.appendChild(closeBtn);
+
+  tab.addEventListener("click", function () {
+    _onTabClick(sessionId);
+  });
+
+  tabList.appendChild(tab);
+  _updateTabBarVisibility();
+}
+
+function removeTerminalTab(sessionId) {
+  var tabList = document.getElementById("terminal-tab-list");
+  if (!tabList) return;
+  var tab = tabList.querySelector('[data-session-id="' + sessionId + '"]');
+  if (tab) tab.remove();
+  _updateTabBarVisibility();
+}
+
+function activateTerminalTab(sessionId) {
+  var tabList = document.getElementById("terminal-tab-list");
+  if (!tabList) return;
+  var tabs = tabList.querySelectorAll(".terminal-tab");
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].setAttribute(
+      "aria-selected",
+      tabs[i].getAttribute("data-session-id") === sessionId ? "true" : "false",
+    );
+  }
+}
+
+function renameTerminalTab(sessionId, label) {
+  var tabList = document.getElementById("terminal-tab-list");
+  if (!tabList) return;
+  var tab = tabList.querySelector('[data-session-id="' + sessionId + '"]');
+  if (!tab) return;
+  var labelSpan = tab.querySelector(".terminal-tab__label");
+  if (labelSpan) labelSpan.textContent = label;
+}
+
+function setTabClickHandler(fn) {
+  _onTabClick = fn;
+}
+function setTabCloseHandler(fn) {
+  _onTabClose = fn;
+}
+function setTabAddHandler(fn) {
+  _onTabAdd = fn;
+}
+
 window.initTerminal = initTerminal;
 window.connectTerminal = connectTerminal;
 window.disconnectTerminal = disconnectTerminal;
 window.isTerminalConnected = isTerminalConnected;
+window.addTerminalTab = addTerminalTab;
+window.removeTerminalTab = removeTerminalTab;
+window.activateTerminalTab = activateTerminalTab;
+window.renameTerminalTab = renameTerminalTab;
+window.setTabClickHandler = setTabClickHandler;
+window.setTabCloseHandler = setTabCloseHandler;
+window.setTabAddHandler = setTabAddHandler;

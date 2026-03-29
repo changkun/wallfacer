@@ -10,6 +10,86 @@ import vm from "vm";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const jsDir = join(__dirname, "..");
 
+function makeDom() {
+  // Minimal DOM for terminal tab bar tests.
+  const elements = {};
+
+  const tabList = {
+    _children: [],
+    get children() {
+      return this._children;
+    },
+    appendChild(child) {
+      this._children.push(child);
+    },
+    querySelector(sel) {
+      const match = sel.match(/\[data-session-id="([^"]+)"\]/);
+      if (match) {
+        return this._children.find(
+          (c) => c._attrs && c._attrs["data-session-id"] === match[1],
+        );
+      }
+      return null;
+    },
+    querySelectorAll(sel) {
+      if (sel === ".terminal-tab") return [...this._children];
+      return [];
+    },
+  };
+
+  const tabBar = { hidden: true };
+  const addBtn = { _listeners: {}, addEventListener(ev, fn) { this._listeners[ev] = fn; } };
+  const canvas = {
+    classList: { contains: () => false },
+  };
+  const panel = {
+    classList: { contains: () => false },
+  };
+
+  elements["terminal-tab-list"] = tabList;
+  elements["terminal-tab-bar"] = tabBar;
+  elements["terminal-tab-add"] = addBtn;
+  elements["terminal-canvas"] = canvas;
+  elements["status-bar-panel"] = panel;
+
+  return {
+    getElementById: (id) => elements[id] || null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: () => {},
+    documentElement: { setAttribute: () => {} },
+    readyState: "complete",
+    createElement(tag) {
+      const el = {
+        _tag: tag,
+        _attrs: {},
+        _children: [],
+        _listeners: {},
+        className: "",
+        textContent: "",
+        innerHTML: "",
+        setAttribute(k, v) { this._attrs[k] = v; },
+        getAttribute(k) { return this._attrs[k] || null; },
+        appendChild(child) { this._children.push(child); },
+        addEventListener(ev, fn) { this._listeners[ev] = fn; },
+        querySelector(sel) {
+          return this._children.find((c) => c.className === sel.replace(".", "")) || null;
+        },
+        remove() {
+          // Remove from parent tabList.
+          const idx = tabList._children.indexOf(this);
+          if (idx >= 0) tabList._children.splice(idx, 1);
+        },
+      };
+      return el;
+    },
+    _elements: elements,
+    _tabList: tabList,
+    _tabBar: tabBar,
+    _addBtn: addBtn,
+  };
+}
+
 function makeContext(overrides = {}) {
   const mockTermInstance = {
     loadAddon: vi.fn(),
@@ -43,6 +123,8 @@ function makeContext(overrides = {}) {
     console,
     document: overrides.document || {
       getElementById: (id) => {
+        if (id === "terminal-canvas")
+          return { classList: { contains: () => false } };
         if (id === "status-bar-panel")
           return { classList: { contains: () => false } };
         return null;
@@ -214,5 +296,130 @@ describe("reconnection", () => {
     expect(ctx.setTimeout).toHaveBeenCalledTimes(1);
     const firstDelay = ctx.setTimeout.mock.calls[0][1];
     expect(firstDelay).toBe(1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tab bar
+// ---------------------------------------------------------------------------
+
+describe("tab bar", () => {
+  function makeTabContext() {
+    const dom = makeDom();
+    return loadTerminal(makeContext({ document: dom }));
+  }
+
+  it("addTerminalTab creates element with correct attributes", () => {
+    const ctx = makeTabContext();
+    ctx.addTerminalTab("sess-1");
+    const tabList = ctx.document._tabList;
+    expect(tabList._children.length).toBe(1);
+    const tab = tabList._children[0];
+    expect(tab._attrs["data-session-id"]).toBe("sess-1");
+    expect(tab._attrs["aria-selected"]).toBe("false");
+    const label = tab._children.find(
+      (c) => c.className === "terminal-tab__label",
+    );
+    expect(label).toBeTruthy();
+    expect(label.textContent).toBe("Shell 1");
+  });
+
+  it("addTerminalTab uses custom label when provided", () => {
+    const ctx = makeTabContext();
+    ctx.addTerminalTab("sess-1", "My Shell");
+    const tab = ctx.document._tabList._children[0];
+    const label = tab._children.find(
+      (c) => c.className === "terminal-tab__label",
+    );
+    expect(label.textContent).toBe("My Shell");
+  });
+
+  it("addTerminalTab increments counter for default labels", () => {
+    const ctx = makeTabContext();
+    ctx.addTerminalTab("sess-1");
+    ctx.addTerminalTab("sess-2");
+    const labels = ctx.document._tabList._children.map(
+      (t) =>
+        t._children.find((c) => c.className === "terminal-tab__label")
+          .textContent,
+    );
+    expect(labels).toEqual(["Shell 1", "Shell 2"]);
+  });
+
+  it("removeTerminalTab removes the element", () => {
+    const ctx = makeTabContext();
+    ctx.addTerminalTab("sess-1");
+    ctx.addTerminalTab("sess-2");
+    ctx.removeTerminalTab("sess-1");
+    expect(ctx.document._tabList._children.length).toBe(1);
+    expect(ctx.document._tabList._children[0]._attrs["data-session-id"]).toBe(
+      "sess-2",
+    );
+  });
+
+  it("activateTerminalTab sets aria-selected correctly", () => {
+    const ctx = makeTabContext();
+    ctx.addTerminalTab("sess-1");
+    ctx.addTerminalTab("sess-2");
+    ctx.activateTerminalTab("sess-2");
+    const tabs = ctx.document._tabList._children;
+    expect(tabs[0]._attrs["aria-selected"]).toBe("false");
+    expect(tabs[1]._attrs["aria-selected"]).toBe("true");
+  });
+
+  it("tab bar hidden when no tabs, shown when tabs exist", () => {
+    const ctx = makeTabContext();
+    expect(ctx.document._tabBar.hidden).toBe(true);
+    ctx.addTerminalTab("sess-1");
+    expect(ctx.document._tabBar.hidden).toBe(false);
+    ctx.removeTerminalTab("sess-1");
+    expect(ctx.document._tabBar.hidden).toBe(true);
+  });
+
+  it("renameTerminalTab updates label text", () => {
+    const ctx = makeTabContext();
+    ctx.addTerminalTab("sess-1", "Old");
+    ctx.renameTerminalTab("sess-1", "New");
+    const tab = ctx.document._tabList._children[0];
+    const label = tab._children.find(
+      (c) => c.className === "terminal-tab__label",
+    );
+    expect(label.textContent).toBe("New");
+  });
+
+  it("tab click fires callback with session ID", () => {
+    const ctx = makeTabContext();
+    const clicked = [];
+    ctx.setTabClickHandler((id) => clicked.push(id));
+    ctx.addTerminalTab("sess-1");
+    const tab = ctx.document._tabList._children[0];
+    tab._listeners.click();
+    expect(clicked).toEqual(["sess-1"]);
+  });
+
+  it("close button fires callback with session ID", () => {
+    const ctx = makeTabContext();
+    const closed = [];
+    ctx.setTabCloseHandler((id) => closed.push(id));
+    ctx.addTerminalTab("sess-1");
+    const tab = ctx.document._tabList._children[0];
+    const closeBtn = tab._children.find(
+      (c) => c.className === "terminal-tab__close",
+    );
+    closeBtn._listeners.click({ stopPropagation: () => {} });
+    expect(closed).toEqual(["sess-1"]);
+  });
+
+  it("add button fires callback", () => {
+    const ctx = makeTabContext();
+    let addCalled = false;
+    ctx.setTabAddHandler(() => {
+      addCalled = true;
+    });
+    ctx.initTerminal();
+    // Simulate click on + button.
+    const addBtn = ctx.document._addBtn;
+    if (addBtn._listeners.click) addBtn._listeners.click();
+    expect(addCalled).toBe(true);
   });
 });

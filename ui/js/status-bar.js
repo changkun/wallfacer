@@ -162,9 +162,11 @@ function _showTerminalPanel() {
   var panel = document.getElementById("status-bar-panel");
   var handle = document.getElementById("status-bar-panel-resize");
   var btn = document.getElementById("status-bar-terminal-btn");
+  var tabBar = document.getElementById("terminal-tab-bar");
   if (panel) panel.classList.remove("hidden");
   if (handle) handle.classList.remove("hidden");
   if (btn) btn.setAttribute("aria-expanded", "true");
+  if (tabBar) tabBar.hidden = false;
   if (typeof connectTerminal === "function") connectTerminal();
 }
 
@@ -172,9 +174,11 @@ function _hideTerminalPanel() {
   var panel = document.getElementById("status-bar-panel");
   var handle = document.getElementById("status-bar-panel-resize");
   var btn = document.getElementById("status-bar-terminal-btn");
+  var tabBar = document.getElementById("terminal-tab-bar");
   if (panel) panel.classList.add("hidden");
   if (handle) handle.classList.add("hidden");
   if (btn) btn.setAttribute("aria-expanded", "false");
+  if (tabBar) tabBar.hidden = true;
 }
 
 function _showDepGraphPanel() {

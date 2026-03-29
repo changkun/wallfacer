@@ -119,6 +119,56 @@
 .status-bar-panel.hidden {
   display: none;
 }
+/* Terminal tab bar */
+.terminal-tab-bar {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 0 4px;
+}
+.terminal-tab-bar[hidden] { display: none; }
+#terminal-tab-list { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  white-space: nowrap;
+  user-select: none;
+}
+.terminal-tab[aria-selected="true"] {
+  color: var(--text);
+  background: var(--bg-card, var(--bg));
+}
+.terminal-tab__close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.5;
+}
+.terminal-tab__close:hover { opacity: 1; }
+.terminal-tab-add {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.terminal-tab-add:hover { color: var(--text); }
+#terminal-canvas { flex: 1; overflow: hidden; }
 #status-bar-panel .xterm {
   height: 100%;
   padding: 0 8px;
