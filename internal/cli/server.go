@@ -443,6 +443,7 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 	// Static asset directories served from the embedded filesystem.
 	mux.Handle("GET /css/", http.FileServer(http.FS(uiSub)))
 	mux.Handle("GET /js/", http.FileServer(http.FS(uiSub)))
+	mux.Handle("GET /assets/", http.FileServer(http.FS(uiSub)))
 
 	// Docs API — list and serve embedded documentation.
 	//
