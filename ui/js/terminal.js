@@ -453,7 +453,21 @@ function _handleSessionsList(sessions) {
         : null;
       addTerminalTab(s.id, tabLabel);
     }
-    if (s.active) {
+    if (s.active && _activeSessionId !== s.id) {
+      var prevActive = _activeSessionId;
+      _activeSessionId = s.id;
+      activateTerminalTab(s.id);
+      // Clear xterm and restore the new active session's buffer when switching.
+      if (_term && prevActive) {
+        _term.clear();
+        if (_sessions[s.id]) {
+          var buf = _sessions[s.id].buffer;
+          for (var k = 0; k < buf.length; k++) {
+            _term.write(buf[k]);
+          }
+        }
+      }
+    } else if (s.active) {
       _activeSessionId = s.id;
       activateTerminalTab(s.id);
     }
