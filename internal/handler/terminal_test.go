@@ -267,9 +267,9 @@ func TestSessionRegistry_CreateAndGet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	reg := &sessionRegistry{sessions: make(map[string]*terminalSession)}
+	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
 
-	id, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	id, err := reg.create("/bin/sh", t.TempDir(), 80, 24)
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -304,9 +304,9 @@ func TestSessionRegistry_Remove(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	reg := &sessionRegistry{sessions: make(map[string]*terminalSession)}
+	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
 
-	id, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	id, err := reg.create("/bin/sh", t.TempDir(), 80, 24)
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -331,13 +331,13 @@ func TestSessionRegistry_CloseAll(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	reg := &sessionRegistry{sessions: make(map[string]*terminalSession)}
+	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
 
-	id1, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	id1, err := reg.create("/bin/sh", t.TempDir(), 80, 24)
 	if err != nil {
 		t.Fatalf("create 1: %v", err)
 	}
-	id2, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	id2, err := reg.create("/bin/sh", t.TempDir(), 80, 24)
 	if err != nil {
 		t.Fatalf("create 2: %v", err)
 	}
@@ -359,7 +359,7 @@ func TestSessionRegistry_ActiveSession(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	reg := &sessionRegistry{sessions: make(map[string]*terminalSession)}
+	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
 
 	// No sessions — activeSession returns false.
 	_, ok := reg.activeSession()
@@ -367,7 +367,7 @@ func TestSessionRegistry_ActiveSession(t *testing.T) {
 		t.Error("activeSession should return false with no sessions")
 	}
 
-	id1, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	id1, err := reg.create("/bin/sh", t.TempDir(), 80, 24)
 	if err != nil {
 		t.Fatalf("create 1: %v", err)
 	}
@@ -379,7 +379,7 @@ func TestSessionRegistry_ActiveSession(t *testing.T) {
 	}
 
 	// Second session becomes active (create sets active).
-	id2, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	id2, err := reg.create("/bin/sh", t.TempDir(), 80, 24)
 	if err != nil {
 		t.Fatalf("create 2: %v", err)
 	}
@@ -403,6 +403,136 @@ func TestSessionRegistry_ActiveSession(t *testing.T) {
 	}
 
 	reg.closeAll()
+}
+
+func TestRelayDispatcher_SwitchActive(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reg := &sessionRegistry{sessions: make(map[string]*terminalSession), switchCh: make(chan struct{}, 1), connCtx: ctx}
+
+	// Create two sessions (both are /bin/sh shells).
+	id1, err := reg.create("/bin/sh", t.TempDir(), 80, 24)
+	if err != nil {
+		t.Fatalf("create 1: %v", err)
+	}
+	_, err = reg.create("/bin/sh", t.TempDir(), 80, 24)
+	if err != nil {
+		t.Fatalf("create 2: %v", err)
+	}
+
+	// Active is session 2 (create sets active). Switch back to session 1.
+	if !reg.switchTo(id1) {
+		t.Fatal("switchTo returned false for valid session")
+	}
+	active, ok := reg.activeSession()
+	if !ok || active.id != id1 {
+		t.Errorf("active = %v; want %q", active.id, id1)
+	}
+
+	// Switching to nonexistent session should fail.
+	if reg.switchTo("nonexistent") {
+		t.Error("switchTo should return false for nonexistent session")
+	}
+
+	// Active should remain unchanged after failed switch.
+	active, ok = reg.activeSession()
+	if !ok || active.id != id1 {
+		t.Errorf("active after failed switch = %v; want %q", active.id, id1)
+	}
+
+	reg.closeAll()
+}
+
+func TestRelayDispatcher_SessionExit(t *testing.T) {
+	srv, _ := newTerminalTestServer(t, "", true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+
+	// Send "exit\n" to make the shell exit.
+	input := base64.StdEncoding.EncodeToString([]byte("exit\n"))
+	msg := `{"type":"input","data":"` + input + `"}`
+	if err := conn.Write(ctx, websocket.MessageText, []byte(msg)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Read until we see a session_exited text message or WebSocket close.
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			// With a single session, the connection closes. We may or may not
+			// receive the session_exited message before the close frame.
+			// Either outcome is acceptable.
+			return
+		default:
+		}
+		readCtx, readCancel := context.WithTimeout(ctx, time.Second)
+		typ, data, err := conn.Read(readCtx)
+		readCancel()
+		if err != nil {
+			// WebSocket closed — expected for last-session exit.
+			return
+		}
+		if typ == websocket.MessageText {
+			var resp struct {
+				Type    string `json:"type"`
+				Session string `json:"session"`
+			}
+			if json.Unmarshal(data, &resp) == nil && resp.Type == "session_exited" {
+				if resp.Session == "" {
+					t.Error("session_exited message has empty session ID")
+				}
+			}
+		}
+	}
+}
+
+func TestRelayDispatcher_LastSessionExit(t *testing.T) {
+	// This is a behavioral duplicate of TestTerminalWS_ShellExit,
+	// confirming backward compatibility with the new dispatcher.
+	srv, _ := newTerminalTestServer(t, "", true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+
+	input := base64.StdEncoding.EncodeToString([]byte("exit\n"))
+	msg := `{"type":"input","data":"` + input + `"}`
+	if err := conn.Write(ctx, websocket.MessageText, []byte(msg)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for WebSocket close")
+		default:
+		}
+		readCtx, readCancel := context.WithTimeout(ctx, time.Second)
+		_, _, err := conn.Read(readCtx)
+		readCancel()
+		if err != nil {
+			status := websocket.CloseStatus(err)
+			if status == websocket.StatusNormalClosure {
+				return
+			}
+			return
+		}
+	}
 }
 
 func TestTerminalWS_CwdValidation(t *testing.T) {

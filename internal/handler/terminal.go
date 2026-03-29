@@ -36,13 +36,15 @@ type terminalSession struct {
 type sessionRegistry struct {
 	mu       sync.Mutex
 	sessions map[string]*terminalSession
-	active   string // ID of the currently active session
+	active   string          // ID of the currently active session
+	switchCh chan struct{}    // signaled when active session changes
+	connCtx  context.Context // connection-level context
 }
 
 // create spawns a new PTY-backed shell session and registers it as the active session.
-func (r *sessionRegistry) create(connCtx context.Context, shell, cwd string, cols, rows int) (string, error) {
+func (r *sessionRegistry) create(shell, cwd string, cols, rows int) (string, error) {
 	id := uuid.New().String()
-	ctx, cancel := context.WithCancel(connCtx)
+	ctx, cancel := context.WithCancel(r.connCtx)
 
 	cmd := exec.CommandContext(ctx, shell)
 	cmd.Dir = cwd
@@ -67,7 +69,81 @@ func (r *sessionRegistry) create(connCtx context.Context, shell, cwd string, col
 	r.active = id
 	r.mu.Unlock()
 
+	// Signal the relay to pick up the new active session.
+	r.notifySwitch()
+
 	return id, nil
+}
+
+// switchTo changes the active session and signals the relay dispatcher.
+func (r *sessionRegistry) switchTo(id string) bool {
+	r.mu.Lock()
+	_, ok := r.sessions[id]
+	if !ok {
+		r.mu.Unlock()
+		return false
+	}
+	r.active = id
+	r.mu.Unlock()
+	r.notifySwitch()
+	return true
+}
+
+// notifySwitch sends a non-blocking signal on switchCh.
+func (r *sessionRegistry) notifySwitch() {
+	select {
+	case r.switchCh <- struct{}{}:
+	default:
+	}
+}
+
+// monitorSession waits for a session's shell to exit and handles cleanup.
+func (r *sessionRegistry) monitorSession(sess *terminalSession, connCancel context.CancelFunc, conn *websocket.Conn) {
+	_ = sess.cmd.Wait()
+	close(sess.done)
+	r.handleSessionExit(sess.id, connCancel, conn)
+}
+
+// handleSessionExit removes an exited session and manages the active session fallback.
+// It sends a session_exited message to the client. If the exited session was active
+// and other sessions remain, it switches to one of them. If no sessions remain,
+// it cancels the connection context to close the WebSocket.
+func (r *sessionRegistry) handleSessionExit(id string, connCancel context.CancelFunc, conn *websocket.Conn) {
+	r.mu.Lock()
+	sess, ok := r.sessions[id]
+	if !ok {
+		r.mu.Unlock()
+		return
+	}
+	delete(r.sessions, id)
+	wasActive := r.active == id
+	if wasActive {
+		r.active = ""
+	}
+
+	// Find a fallback session if the active one exited.
+	var fallbackID string
+	if wasActive {
+		for fid := range r.sessions {
+			fallbackID = fid
+			break
+		}
+	}
+	remaining := len(r.sessions)
+	r.mu.Unlock()
+
+	sess.cleanup()
+
+	// Notify the client.
+	msg := `{"type":"session_exited","session":"` + id + `"}`
+	_ = conn.Write(r.connCtx, websocket.MessageText, []byte(msg))
+
+	if wasActive && remaining > 0 {
+		r.switchTo(fallbackID)
+	} else if remaining == 0 {
+		connCancel()
+		_ = conn.Close(websocket.StatusNormalClosure, "shell exited")
+	}
 }
 
 // get retrieves a session by ID.
@@ -155,46 +231,70 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	registry := &sessionRegistry{sessions: make(map[string]*terminalSession)}
+	registry := &sessionRegistry{
+		sessions: make(map[string]*terminalSession),
+		switchCh: make(chan struct{}, 1),
+		connCtx:  connCtx,
+	}
 
-	sessionID, err := registry.create(connCtx, shell, cwd, cols, rows)
+	sessionID, err := registry.create(shell, cwd, cols, rows)
 	if err != nil {
 		logger.Handler.Error("terminal: pty start failed", "error", err)
 		_ = conn.Close(websocket.StatusInternalError, "failed to start shell")
 		return
 	}
 
+	// Start process monitor for the initial session.
 	sess, _ := registry.get(sessionID)
+	go registry.monitorSession(sess, connCancel, conn)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Monitor shell exit.
-	go func() {
-		_ = sess.cmd.Wait()
-		close(sess.done)
-		connCancel()
-		_ = conn.Close(websocket.StatusNormalClosure, "shell exited")
-	}()
-
-	// PTY → WebSocket: relay shell output to the client.
+	// PTY → WebSocket: relay output from the active session.
+	// Outer loop picks up the active session; inner loop reads its PTY.
+	// When switchCh fires or the session's PTY closes, the outer loop
+	// re-resolves the active session.
 	go func() {
 		defer wg.Done()
 		buf := make([]byte, 32*1024)
 		for {
-			n, err := sess.ptmx.Read(buf)
-			if n > 0 {
-				if writeErr := conn.Write(connCtx, websocket.MessageBinary, buf[:n]); writeErr != nil {
+			active, ok := registry.activeSession()
+			if !ok {
+				// No active session — wait for a switch or context cancel.
+				select {
+				case <-registry.switchCh:
+					continue
+				case <-connCtx.Done():
 					return
 				}
 			}
-			if err != nil {
-				return
+
+			// Inner loop: read from the active session's PTY.
+			for {
+				n, err := active.ptmx.Read(buf)
+				if n > 0 {
+					if writeErr := conn.Write(connCtx, websocket.MessageBinary, buf[:n]); writeErr != nil {
+						return
+					}
+				}
+				if err != nil {
+					// PTY closed (session exited) — re-resolve active.
+					break
+				}
+				// Check if a switch was signaled.
+				select {
+				case <-registry.switchCh:
+					// Active session changed — break inner loop to re-resolve.
+					goto nextSession
+				default:
+				}
 			}
+		nextSession:
 		}
 	}()
 
-	// WebSocket → PTY: relay client input to the shell.
+	// WebSocket → PTY: relay client input to the active session.
 	go func() {
 		defer wg.Done()
 		for {
@@ -215,10 +315,14 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					continue
 				}
-				_, _ = sess.ptmx.Write(decoded)
+				if active, ok := registry.activeSession(); ok {
+					_, _ = active.ptmx.Write(decoded)
+				}
 			case "resize":
 				if msg.Cols > 0 && msg.Rows > 0 {
-					_ = pty.Setsize(sess.ptmx, uint16(msg.Rows), uint16(msg.Cols))
+					if active, ok := registry.activeSession(); ok {
+						_ = pty.Setsize(active.ptmx, uint16(msg.Rows), uint16(msg.Cols))
+					}
 				}
 			case "ping":
 				_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"pong"}`))
