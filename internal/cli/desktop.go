@@ -19,6 +19,8 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 
 	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
@@ -125,11 +127,22 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	target, _ := url.Parse(serverURL)
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
+	// App menu: override Cmd+Q (macOS) / Ctrl+Q to route through doShutdown
+	// so the user sees the shutdown overlay instead of a frozen spinner.
+	appMenu := menu.NewMenu()
+	appMenu.Append(menu.AppMenu()) // standard macOS app menu (About, Services, …)
+	appMenu.Append(menu.EditMenu()) // standard Edit menu (Copy, Paste, …)
+	fileMenu := appMenu.AddSubmenu("File")
+	fileMenu.AddText("Quit Wallfacer", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
+		go doShutdown()
+	})
+
 	appOpts := &options.App{
 		Title:             "Wallfacer",
 		Width:             1400,
 		Height:            900,
 		HideWindowOnClose: hideOnClose,
+		Menu:              appMenu,
 		AssetServer: &assetserver.Options{
 			Handler: proxy,
 		},
@@ -138,9 +151,10 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 			logger.Main.Info("desktop window opened")
 		},
 		OnShutdown: func(_ context.Context) {
-			// Cmd+Q / force-quit path: window is already gone, just clean up.
+			// Best-effort cleanup if the app exits without going through
+			// doShutdown (e.g. SIGKILL). Non-blocking: os.Exit from
+			// doShutdown will terminate anyway.
 			tm.Stop()
-			sc.Shutdown()
 		},
 	}
 
