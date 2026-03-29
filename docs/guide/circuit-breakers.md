@@ -9,7 +9,7 @@ and the **container breaker** (runtime-level).
 
 ## Watcher Breakers
 
-Each automation watcher (Promote, Retry, Test, Submit, Tip-sync,
+Each automation watcher (Promote, Retry, Test, Submit, Catch Up,
 Refine) has its own circuit breaker. When a watcher encounters repeated
 errors, its breaker opens and suppresses that watcher while leaving all
 others running.

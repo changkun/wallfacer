@@ -434,10 +434,10 @@ func (h *Handler) AutorefineEnabled() bool { return h.autorefine.Load() }
 // SetAutorefine enables or disables auto-refinement mode.
 func (h *Handler) SetAutorefine(enabled bool) { h.autorefine.Store(enabled) }
 
-// AutosyncEnabled returns whether auto-sync (tip-sync) mode is active.
+// AutosyncEnabled returns whether auto-sync (catch up) mode is active.
 func (h *Handler) AutosyncEnabled() bool { return h.autosync.Load() }
 
-// SetAutosync enables or disables auto-sync (tip-sync) mode.
+// SetAutosync enables or disables auto-sync (catch up) mode.
 func (h *Handler) SetAutosync(enabled bool) { h.autosync.Store(enabled) }
 
 // AutopushEnabled returns whether auto-push mode is active.

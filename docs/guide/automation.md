@@ -30,7 +30,7 @@ header bar. The menu contains a horizontal strip of toggle switches:
 | Ideate | **Ideate** | Recurring brainstorm agent (see [Usage Guide](usage.md)) |
 | Auto-refine | **Refine** | Automatic prompt refinement for backlog tasks |
 | Autopilot | **Implement** | Automatic promotion of backlog tasks to In Progress |
-| Tip-sync | **Tip-sync** | Automatic rebase of waiting tasks |
+| Catch Up | **Catch Up** | Automatic rebase of waiting tasks onto latest branch |
 | Auto-test | **Test** | Automatic test verification of waiting tasks |
 | Auto-submit | **Submit** | Automatic completion of verified waiting tasks |
 | Auto-push | **Push** | Automatic git push after task completion |
@@ -81,7 +81,7 @@ flowchart LR
     end
     Implement -->|agent runs| Waiting
     subgraph Waiting
-        TipSync[Tip-sync] --> Test --> Submit
+        CatchUp[Catch Up] --> Test --> Submit
     end
     Submit --> Done
     Done --> Push
@@ -91,7 +91,7 @@ flowchart LR
 
 1. 🔄 **Refine** -- sharpen prompts for unrefined backlog tasks.
 2. 🤖 **Implement** (Autopilot) -- promote backlog tasks to In Progress.
-3. 🔗 **Tip-sync** -- rebase waiting tasks onto the latest default branch.
+3. 🔗 **Catch Up** -- rebase waiting tasks onto the latest branch to prevent merge conflicts.
 4. 🧪 **Test** -- run the verification agent on waiting tasks.
 5. ✅ **Submit** -- move verified, conflict-free tasks to Done.
 6. 📤 **Push** -- push committed changes to the remote repository.
@@ -156,10 +156,10 @@ Waiting for manual intervention.
 container runtime circuit breaker is open, preventing cascading failures
 when Docker or Podman is temporarily unavailable.
 
-#### 🔗 Tip-sync (Auto-sync)
+#### 🔗 Catch Up (Auto-sync)
 
-When enabled, the tip-sync watcher polls every 30 seconds for waiting
-tasks whose worktrees have fallen behind the default branch. For each
+When enabled, the catch-up watcher polls every 30 seconds for waiting
+tasks whose worktrees have fallen behind the latest branch. For each
 such task, it:
 
 1. Fetches the latest remote refs.
@@ -196,7 +196,7 @@ are unaffected.
 task without a passing test or manual feedback, the auto-resume cycle
 halts. The task remains in Waiting until you intervene.
 
-**Interaction with Tip-sync.** If Tip-sync is also enabled, the
+**Interaction with Catch Up.** If Catch Up is also enabled, the
 auto-tester waits until the task's worktrees are fully up to date before
 triggering a test. This prevents testing against stale code.
 

@@ -647,7 +647,7 @@ var _watcherFriendlyNames = {
   "auto-retry": "Retry",
   "auto-test": "Test",
   "auto-submit": "Submit",
-  "auto-sync": "Tip-sync",
+  "auto-sync": "Catch Up",
   "auto-refine": "Refine",
 };
 
