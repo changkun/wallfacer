@@ -1,6 +1,6 @@
 # Task 11: Speech Bubbles
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 7 (Character)
 **Phase:** Phase 3 (Task State Integration)
 **Effort:** Small
