@@ -263,6 +263,148 @@ func TestTerminalWS_ShellExit(t *testing.T) {
 	}
 }
 
+func TestSessionRegistry_CreateAndGet(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reg := &sessionRegistry{sessions: make(map[string]*terminalSession)}
+
+	id, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if id == "" {
+		t.Fatal("expected non-empty session ID")
+	}
+
+	sess, ok := reg.get(id)
+	if !ok {
+		t.Fatal("session not found after create")
+	}
+	if sess.id != id {
+		t.Errorf("session.id = %q; want %q", sess.id, id)
+	}
+	if sess.ptmx == nil {
+		t.Error("session.ptmx is nil")
+	}
+	if sess.done == nil {
+		t.Error("session.done is nil")
+	}
+
+	// Active session should be the one we just created.
+	active, ok := reg.activeSession()
+	if !ok || active.id != id {
+		t.Errorf("activeSession = %v; want %q", active, id)
+	}
+
+	reg.closeAll()
+}
+
+func TestSessionRegistry_Remove(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reg := &sessionRegistry{sessions: make(map[string]*terminalSession)}
+
+	id, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	reg.remove(id)
+
+	_, ok := reg.get(id)
+	if ok {
+		t.Error("session still found after remove")
+	}
+
+	_, ok = reg.activeSession()
+	if ok {
+		t.Error("active session should be empty after removing the active session")
+	}
+
+	// Removing a nonexistent session should not panic.
+	reg.remove("nonexistent")
+}
+
+func TestSessionRegistry_CloseAll(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reg := &sessionRegistry{sessions: make(map[string]*terminalSession)}
+
+	id1, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	if err != nil {
+		t.Fatalf("create 1: %v", err)
+	}
+	id2, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	if err != nil {
+		t.Fatalf("create 2: %v", err)
+	}
+
+	reg.closeAll()
+
+	if _, ok := reg.get(id1); ok {
+		t.Error("session 1 still found after closeAll")
+	}
+	if _, ok := reg.get(id2); ok {
+		t.Error("session 2 still found after closeAll")
+	}
+	if _, ok := reg.activeSession(); ok {
+		t.Error("active session should be empty after closeAll")
+	}
+}
+
+func TestSessionRegistry_ActiveSession(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reg := &sessionRegistry{sessions: make(map[string]*terminalSession)}
+
+	// No sessions — activeSession returns false.
+	_, ok := reg.activeSession()
+	if ok {
+		t.Error("activeSession should return false with no sessions")
+	}
+
+	id1, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	if err != nil {
+		t.Fatalf("create 1: %v", err)
+	}
+
+	// First session is active.
+	active, ok := reg.activeSession()
+	if !ok || active.id != id1 {
+		t.Errorf("active = %v; want %q", active, id1)
+	}
+
+	// Second session becomes active (create sets active).
+	id2, err := reg.create(ctx, "/bin/sh", t.TempDir(), 80, 24)
+	if err != nil {
+		t.Fatalf("create 2: %v", err)
+	}
+
+	active, ok = reg.activeSession()
+	if !ok || active.id != id2 {
+		t.Errorf("active = %v; want %q", active, id2)
+	}
+
+	// Remove active session — active becomes empty.
+	reg.remove(id2)
+	_, ok = reg.activeSession()
+	if ok {
+		t.Error("activeSession should return false after removing the active session")
+	}
+
+	// First session is still accessible.
+	_, ok = reg.get(id1)
+	if !ok {
+		t.Error("session 1 should still exist")
+	}
+
+	reg.closeAll()
+}
+
 func TestTerminalWS_CwdValidation(t *testing.T) {
 	srv, h := newTerminalTestServer(t, "", true)
 	workspaces := h.currentWorkspaces()

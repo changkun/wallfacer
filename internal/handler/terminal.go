@@ -20,13 +20,103 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pty"
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 )
 
 // terminalSession holds the state for a single PTY-backed shell session.
 type terminalSession struct {
+	id     string
 	ptmx   *os.File
 	cmd    *exec.Cmd
 	cancel context.CancelFunc
+	done   chan struct{} // closed when the shell process exits
+}
+
+// sessionRegistry manages multiple terminal sessions per WebSocket connection.
+type sessionRegistry struct {
+	mu       sync.Mutex
+	sessions map[string]*terminalSession
+	active   string // ID of the currently active session
+}
+
+// create spawns a new PTY-backed shell session and registers it as the active session.
+func (r *sessionRegistry) create(connCtx context.Context, shell, cwd string, cols, rows int) (string, error) {
+	id := uuid.New().String()
+	ctx, cancel := context.WithCancel(connCtx)
+
+	cmd := exec.CommandContext(ctx, shell)
+	cmd.Dir = cwd
+	cmd.Env = os.Environ()
+
+	ptmx, err := pty.StartWithSize(cmd, uint16(rows), uint16(cols))
+	if err != nil {
+		cancel()
+		return "", err
+	}
+
+	sess := &terminalSession{
+		id:     id,
+		ptmx:   ptmx,
+		cmd:    cmd,
+		cancel: cancel,
+		done:   make(chan struct{}),
+	}
+
+	r.mu.Lock()
+	r.sessions[id] = sess
+	r.active = id
+	r.mu.Unlock()
+
+	return id, nil
+}
+
+// get retrieves a session by ID.
+func (r *sessionRegistry) get(id string) (*terminalSession, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	sess, ok := r.sessions[id]
+	return sess, ok
+}
+
+// remove cleans up a session and removes it from the registry.
+func (r *sessionRegistry) remove(id string) {
+	r.mu.Lock()
+	sess, ok := r.sessions[id]
+	if !ok {
+		r.mu.Unlock()
+		return
+	}
+	delete(r.sessions, id)
+	if r.active == id {
+		r.active = ""
+	}
+	r.mu.Unlock()
+
+	sess.cleanup()
+}
+
+// closeAll cleans up all sessions.
+func (r *sessionRegistry) closeAll() {
+	r.mu.Lock()
+	all := make([]*terminalSession, 0, len(r.sessions))
+	for _, s := range r.sessions {
+		all = append(all, s)
+	}
+	r.sessions = make(map[string]*terminalSession)
+	r.active = ""
+	r.mu.Unlock()
+
+	for _, s := range all {
+		s.cleanup()
+	}
+}
+
+// activeSession returns the currently active session.
+func (r *sessionRegistry) activeSession() (*terminalSession, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	sess, ok := r.sessions[r.active]
+	return sess, ok
 }
 
 // HandleTerminalWS upgrades to a WebSocket connection and relays I/O
@@ -54,8 +144,8 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
+	connCtx, connCancel := context.WithCancel(r.Context())
+	defer connCancel()
 
 	shell := os.Getenv("SHELL")
 	if shell == "" {
@@ -65,34 +155,36 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	cmd := exec.CommandContext(ctx, shell)
-	cmd.Dir = cwd
-	cmd.Env = os.Environ()
+	registry := &sessionRegistry{sessions: make(map[string]*terminalSession)}
 
-	ptmx, err := pty.StartWithSize(cmd, uint16(rows), uint16(cols))
+	sessionID, err := registry.create(connCtx, shell, cwd, cols, rows)
 	if err != nil {
 		logger.Handler.Error("terminal: pty start failed", "error", err)
 		_ = conn.Close(websocket.StatusInternalError, "failed to start shell")
 		return
 	}
 
-	sess := &terminalSession{
-		ptmx:   ptmx,
-		cmd:    cmd,
-		cancel: cancel,
-	}
+	sess, _ := registry.get(sessionID)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
+
+	// Monitor shell exit.
+	go func() {
+		_ = sess.cmd.Wait()
+		close(sess.done)
+		connCancel()
+		_ = conn.Close(websocket.StatusNormalClosure, "shell exited")
+	}()
 
 	// PTY → WebSocket: relay shell output to the client.
 	go func() {
 		defer wg.Done()
 		buf := make([]byte, 32*1024)
 		for {
-			n, err := ptmx.Read(buf)
+			n, err := sess.ptmx.Read(buf)
 			if n > 0 {
-				if writeErr := conn.Write(ctx, websocket.MessageBinary, buf[:n]); writeErr != nil {
+				if writeErr := conn.Write(connCtx, websocket.MessageBinary, buf[:n]); writeErr != nil {
 					return
 				}
 			}
@@ -106,7 +198,7 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer wg.Done()
 		for {
-			typ, data, err := conn.Read(ctx)
+			typ, data, err := conn.Read(connCtx)
 			if err != nil {
 				return
 			}
@@ -123,26 +215,19 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					continue
 				}
-				_, _ = ptmx.Write(decoded)
+				_, _ = sess.ptmx.Write(decoded)
 			case "resize":
 				if msg.Cols > 0 && msg.Rows > 0 {
-					_ = pty.Setsize(ptmx, uint16(msg.Rows), uint16(msg.Cols))
+					_ = pty.Setsize(sess.ptmx, uint16(msg.Rows), uint16(msg.Cols))
 				}
 			case "ping":
-				_ = conn.Write(ctx, websocket.MessageText, []byte(`{"type":"pong"}`))
+				_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"pong"}`))
 			}
 		}
 	}()
 
-	// Wait for shell to exit, then clean up.
-	go func() {
-		_ = cmd.Wait()
-		cancel()
-		_ = conn.Close(websocket.StatusNormalClosure, "shell exited")
-	}()
-
 	wg.Wait()
-	sess.cleanup()
+	registry.closeAll()
 }
 
 // terminalMessage is the JSON envelope for client→server messages.
