@@ -1,6 +1,6 @@
 # Task 3: SpriteCache with Placeholder Rendering
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1 (asset scaffolding)
 **Phase:** Phase 1 (Rendering Foundation)
 **Effort:** Medium
