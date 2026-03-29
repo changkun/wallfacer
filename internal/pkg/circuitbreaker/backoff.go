@@ -58,11 +58,9 @@ func (b *BackoffBreaker) RecordFailure() int {
 	defer b.mu.Unlock()
 	b.failures++
 	// Compute exponential backoff: baseDelay * 2^(failures-1), using bit shift.
-	// NOTE: For failure counts >= 64, the shift overflows to 0, producing a
-	// zero backoff that bypasses the maxDelay cap. In practice this is
-	// unreachable because maxDelay caps the value long before 64 failures.
+	// For failure counts >= 64 the shift overflows to 0; clamp to maxDelay.
 	backoff := b.baseDelay * time.Duration(1<<uint(b.failures-1))
-	if backoff > b.maxDelay {
+	if backoff <= 0 || backoff > b.maxDelay {
 		backoff = b.maxDelay
 	}
 	b.openUntil = b.now().Add(backoff)

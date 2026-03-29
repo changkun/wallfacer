@@ -396,6 +396,36 @@ func TestBreaker_AllowDefaultCase(t *testing.T) {
 	}
 }
 
+// TestBackoffBreaker_OverflowCapsAtMaxDelay verifies that the backoff delay is
+// capped at MaxDelay even when the failure count is high enough to cause integer
+// overflow in the bit-shift (failures >= 64 on 64-bit platforms).
+func TestBackoffBreaker_OverflowCapsAtMaxDelay(t *testing.T) {
+	now := time.Now()
+	maxDelay := 50 * time.Millisecond
+	b := NewBackoff(BackoffConfig{
+		BaseDelay: 10 * time.Millisecond,
+		MaxDelay:  maxDelay,
+		Now:       func() time.Time { return now },
+	})
+
+	// Simulate 100 consecutive failures (well past the 64-bit overflow threshold).
+	for range 100 {
+		b.RecordFailure()
+	}
+
+	// The breaker must still be open with backoff capped at maxDelay.
+	if !b.IsOpen() {
+		t.Fatal("breaker should be open after 100 failures")
+	}
+	retryAt, ok := b.RetryAt()
+	if !ok {
+		t.Fatal("RetryAt should return true when breaker is open")
+	}
+	if want := now.Add(maxDelay); retryAt != want {
+		t.Fatalf("retryAt = %v, want capped at %v (delta = %v)", retryAt, want, retryAt.Sub(want))
+	}
+}
+
 // TestBackoffBreaker_RecordSuccessResets verifies that RecordSuccess clears the
 // failure count and closes the breaker.
 func TestBackoffBreaker_RecordSuccessResets(t *testing.T) {
