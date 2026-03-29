@@ -66,6 +66,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  padding-top: 12px;
 }
 .modal-wide .logs-block {
   max-height: none;
