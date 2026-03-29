@@ -243,16 +243,15 @@
 
   // ---- Furniture (clean programmatic rendering) ----
 
-  // Sprite coordinates in office_sheet.png (verified visually)
+  // Sprite coordinates in office_sheet.png
+  // Verified by visual extraction and 4x zoom inspection.
   var SPRITE_MAP = {
-    desk:       { sx: 0,   sy: 112, sw: 32, sh: 16 },  // 2x1 wooden desk surface
-    chair:      { sx: 0,   sy: 128, sw: 16, sh: 16 },  // dark office chair
-    pc:         { sx: 208, sy: 128, sw: 16, sh: 16 },  // monitor
-    sofa:       { sx: 0,   sy: 160, sw: 16, sh: 16 },  // orange sofa piece
-    plant:      { sx: 80,  sy: 128, sw: 16, sh: 32 },  // tall potted plant
-    coffee:     { sx: 160, sy: 208, sw: 16, sh: 16 },  // desk PC printer
-    whiteboard: { sx: 96,  sy: 128, sw: 32, sh: 16 },  // whiteboard
-    bookshelf:  { sx: 112, sy: 208, sw: 16, sh: 32 },  // bookshelf
+    desk:       { sx: 0,   sy: 96,  sw: 32, sh: 32 },  // 2x2 wooden desk with legs
+    chair:      { sx: 64,  sy: 128, sw: 16, sh: 32 },  // office chair with armrest (1x2)
+    pc:         null,                                     // drawn programmatically on desk
+    plant:      { sx: 80,  sy: 128, sw: 16, sh: 32 },  // tall potted plant (1x2)
+    bookshelf:  { sx: 112, sy: 208, sw: 16, sh: 32 },  // bookshelf with items (1x2)
+    whiteboard: { sx: 96,  sy: 128, sw: 32, sh: 16 },  // whiteboard/bulletin board (2x1)
   };
 
   OfficeRenderer.prototype._drawFurnitureItem = function (ctx, f) {
@@ -260,6 +259,22 @@
     var fh = f.height * TILE;
     var fx = f.x * TILE;
     var fy = f.y * TILE;
+
+    // PC/monitor: draw as a small colored screen indicator on the desk
+    if (f.type === "pc") {
+      var isOn = f.state === "on";
+      ctx.fillStyle = isOn ? "#5BA3D9" : "#434C5E";
+      ctx.fillRect(fx + 2, fy + 2, fw - 4, fh - 6);
+      // Screen border
+      ctx.strokeStyle = "#2E3440";
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(fx + 2, fy + 2, fw - 4, fh - 6);
+      // Stand
+      ctx.fillStyle = "#2E3440";
+      ctx.fillRect(fx + fw/2 - 2, fy + fh - 4, 4, 3);
+      ctx.fillRect(fx + fw/2 - 3, fy + fh - 1, 6, 1);
+      return;
+    }
 
     if (this._officeSheet) {
       var sprite = SPRITE_MAP[f.type];

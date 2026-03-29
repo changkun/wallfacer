@@ -116,7 +116,7 @@
   //   row 2: desk + monitor on desk
   //   row 3: character seat (chair behind character)
   //   row 4: floor padding
-  var STATION_W = 3;
+  var STATION_W = 4;
   var STATION_GAP = 1;
   var WALL_PAD = 1;
   var INTERIOR_PAD = 1;
@@ -166,21 +166,21 @@
   }
 
   function placeStation(map, x, y, deskIndex) {
-    // y+2: Desk (2x1) with monitor on right tile
-    map.placeFurniture({ type: DESK, x: x, y: y + 2, width: 2, height: 1, state: null });
-    map.placeFurniture({ type: PC, x: x + 1, y: y + 2, width: 1, height: 1, state: "off" });
-    // y+3: Chair / seat position — character stands here
+    // y+1..y+2: Desk (2x2 with legs)
+    map.placeFurniture({ type: DESK, x: x, y: y + 1, width: 2, height: 2, state: null });
+    // PC screen on top-right of desk
+    map.placeFurniture({ type: PC, x: x + 1, y: y + 1, width: 1, height: 1, state: "off" });
+    // y+3: Seat position (character sits here; chair sprite rendered at y+2..y+3)
     map.placeFurniture({
-      type: CHAIR, x: x, y: y + 3, width: 1, height: 1, state: null,
-      direction: "up", deskIndex: deskIndex,
+      type: CHAIR, x: x + 2, y: y + 2, width: 1, height: 2, state: null,
+      direction: "left", deskIndex: deskIndex,
     });
   }
 
   function placeCommonArea(map, ox, oy) {
-    // Single row of items aligned with desk row
-    map.placeFurniture({ type: PLANT, x: ox, y: oy - 1, width: 1, height: 2, state: null });
-    map.placeFurniture({ type: BOOKSHELF, x: ox + 1, y: oy - 1, width: 1, height: 2, state: null });
-    map.placeFurniture({ type: WHITEBOARD, x: ox, y: oy + 1, width: 2, height: 1, state: null });
+    map.placeFurniture({ type: PLANT, x: ox, y: oy, width: 1, height: 2, state: null });
+    map.placeFurniture({ type: BOOKSHELF, x: ox + 1, y: oy, width: 1, height: 2, state: null });
+    map.placeFurniture({ type: WHITEBOARD, x: ox + 2, y: oy, width: 2, height: 1, state: null });
   }
 
   // ---- Exports ----
