@@ -182,7 +182,7 @@ func (m *Manager) runFlow(flow *Flow, redirectURI string) {
 		client = http.DefaultClient
 	}
 
-	token, err := exchangeToken(client, flow.provider, result.Code, flow.verifier, redirectURI)
+	token, err := exchangeToken(client, flow.provider, result.Code, flow.verifier, redirectURI, flow.state)
 	if err != nil {
 		flow.mu.Lock()
 		flow.status = FlowStatus{State: FlowError, Error: "token exchange failed: " + err.Error()}
@@ -207,18 +207,22 @@ func (m *Manager) runFlow(flow *Flow, redirectURI string) {
 
 // exchangeToken sends the authorization code to the token endpoint and
 // returns the access token (or api_key) from the response.
-func exchangeToken(client *http.Client, provider Provider, code, verifier, redirectURI string) (string, error) {
+func exchangeToken(client *http.Client, provider Provider, code, verifier, redirectURI, state string) (string, error) {
 	var resp *http.Response
 	var err error
 
 	if provider.JSONTokenReq {
-		payload, _ := json.Marshal(map[string]string{
+		body := map[string]string{
 			"grant_type":    "authorization_code",
 			"code":          code,
 			"redirect_uri":  redirectURI,
 			"code_verifier": verifier,
 			"client_id":     provider.ClientID,
-		})
+		}
+		if state != "" {
+			body["state"] = state
+		}
+		payload, _ := json.Marshal(body)
 		logger.Handler.Info("oauth: token exchange request",
 			"url", provider.TokenURL,
 			"redirect_uri", redirectURI,
@@ -226,7 +230,10 @@ func exchangeToken(client *http.Client, provider Provider, code, verifier, redir
 			"code_len", len(code),
 			"verifier_len", len(verifier),
 		)
-		resp, err = client.Post(provider.TokenURL, "application/json", bytes.NewReader(payload))
+		req, _ := http.NewRequest("POST", provider.TokenURL, bytes.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		resp, err = client.Do(req)
 	} else {
 		data := url.Values{
 			"grant_type":    {"authorization_code"},

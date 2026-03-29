@@ -148,7 +148,7 @@ func TestExchangeToken(t *testing.T) {
 	p := testProvider
 	p.TokenURL = ts.URL
 
-	token, err := exchangeToken(http.DefaultClient, p, "test-code", "test-verifier", "http://localhost:9999/callback")
+	token, err := exchangeToken(http.DefaultClient, p, "test-code", "test-verifier", "http://localhost:9999/callback", "test-state")
 	if err != nil {
 		t.Fatalf("exchangeToken: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestExchangeToken_ErrorResponse(t *testing.T) {
 	p := testProvider
 	p.TokenURL = ts.URL
 
-	_, err := exchangeToken(http.DefaultClient, p, "bad-code", "verifier", "http://localhost:9999/callback")
+	_, err := exchangeToken(http.DefaultClient, p, "bad-code", "verifier", "http://localhost:9999/callback", "state")
 	if err == nil {
 		t.Fatal("expected error")
 	}
