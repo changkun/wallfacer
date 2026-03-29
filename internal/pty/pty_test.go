@@ -26,15 +26,19 @@ func TestOpen(t *testing.T) {
 }
 
 func TestStartWithSize(t *testing.T) {
-	cmd := exec.Command("echo", "hello")
+	// Use "read _" to keep the process alive while we read PTY output.
+	// Plain "echo" exits instantly and macOS may return EIO before
+	// delivering the buffered output.
+	cmd := exec.Command("sh", "-c", "echo hello; read _")
 	master, err := StartWithSize(cmd, 24, 80)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = master.Close() }()
 
-	// Read output from master with a deadline so the test doesn't hang.
-	done := make(chan []byte, 1)
+	// Read output from master incrementally; succeed as soon as we see
+	// "hello" so we don't depend on EOF timing.
+	found := make(chan struct{})
 	go func() {
 		var out []byte
 		buf := make([]byte, 1024)
@@ -42,24 +46,23 @@ func TestStartWithSize(t *testing.T) {
 			n, err := master.Read(buf)
 			if n > 0 {
 				out = append(out, buf[:n]...)
+				if bytes.Contains(out, []byte("hello")) {
+					close(found)
+					return
+				}
 			}
 			if err != nil {
-				break
+				return
 			}
 		}
-		done <- out
 	}()
 
 	select {
-	case out := <-done:
-		if !bytes.Contains(out, []byte("hello")) {
-			t.Fatalf("expected 'hello' in output, got %q", out)
-		}
+	case <-found:
+		// success
 	case <-time.After(5 * time.Second):
 		t.Fatal("timed out waiting for output")
 	}
-
-	_ = cmd.Wait()
 }
 
 func TestSetsize(t *testing.T) {
