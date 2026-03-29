@@ -652,9 +652,9 @@ func TestTruncate(t *testing.T) {
 	}{
 		{"short string unchanged", "hello", 10, "hello"},
 		{"exact length unchanged", "hello", 5, "hello"},
-		{"truncated adds ellipsis", "hello world", 5, "hello..."},
+		{"truncated adds ellipsis", "hello world", 5, "hello…"},
 		{"empty string", "", 10, ""},
-		{"max zero", "hello", 0, "..."},
+		{"max zero", "hello", 0, "…"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -749,11 +749,11 @@ func TestGenerateBoardContext_TruncationAndSizeLimit(t *testing.T) {
 			}
 		} else {
 			// (b) Truncation marker must be present when original was longer than cap.
-			if !strings.HasSuffix(bt.Prompt, "...") {
-				t.Errorf("sibling task %s prompt should end with '...', got len=%d", bt.ShortID, len(bt.Prompt))
+			if !strings.HasSuffix(bt.Prompt, "…") {
+				t.Errorf("sibling task %s prompt should end with '…', got len=%d", bt.ShortID, len(bt.Prompt))
 			}
-			if bt.Result == nil || !strings.HasSuffix(*bt.Result, "...") {
-				t.Errorf("sibling task %s result should end with '...'", bt.ShortID)
+			if bt.Result == nil || !strings.HasSuffix(*bt.Result, "…") {
+				t.Errorf("sibling task %s result should end with '…'", bt.ShortID)
 			}
 			// (c) Non-self task Turns must be 0.
 			if bt.Turns != 0 {

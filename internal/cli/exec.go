@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/pkg/sanitize"
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
@@ -169,7 +169,7 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, comman
 	if err != nil {
 		return nil, fmt.Errorf("getwd: %w", err)
 	}
-	base := sanitizeContainerBasename(filepath.Base(cwd))
+	base := sanitize.Base(filepath.Base(cwd))
 	image := resolveSandboxImageForExec(envOrDefault("SANDBOX_IMAGE", defaultSandboxImage()), sb)
 	envFile := envOrDefault("ENV_FILE", filepath.Join(configDir, ".env"))
 	runtimeBin := filepath.Base(runtimePath)
@@ -244,28 +244,6 @@ func resolveSandboxImageForExec(baseImage string, sb sandbox.Type) string {
 	return prefix + "wallfacer-codex" + tag + digest
 }
 
-// sanitizeContainerBasename returns a container-path-safe version of a
-// directory basename. Replaces characters problematic in mount paths (colons,
-// spaces, shell metacharacters) with underscores, preserving unicode
-// letters/digits. Falls back to "workspace" if the result is empty.
-func sanitizeContainerBasename(base string) string {
-	if base == "." || base == "/" || base == "" {
-		return "workspace"
-	}
-	var b strings.Builder
-	for _, r := range base {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' || r == '.' {
-			b.WriteRune(r)
-		} else {
-			b.WriteByte('_')
-		}
-	}
-	result := b.String()
-	if result == "" {
-		return "workspace"
-	}
-	return result
-}
 
 // resolveContainerByPrefix searches the newline-separated output of
 // `<runtime> ps --format {{.Names}}` for a container whose name contains

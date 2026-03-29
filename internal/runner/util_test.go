@@ -25,23 +25,22 @@ func TestTruncate_ExactLength(t *testing.T) {
 
 func TestTruncate_ExceedsLength(t *testing.T) {
 	got := truncate("hello world", 5)
-	if got != "hello..." {
-		t.Errorf("truncate(%q, 5) = %q, want %q", "hello world", got, "hello...")
+	if got != "hello…" {
+		t.Errorf("truncate(%q, 5) = %q, want %q", "hello world", got, "hello…")
 	}
 }
 
 func TestTruncate_SingleChar(t *testing.T) {
 	got := truncate("abc", 1)
-	if got != "a..." {
-		t.Errorf("truncate(%q, 1) = %q, want %q", "abc", got, "a...")
+	if got != "a…" {
+		t.Errorf("truncate(%q, 1) = %q, want %q", "abc", got, "a…")
 	}
 }
 
 func TestTruncate_ZeroLimit(t *testing.T) {
 	got := truncate("abc", 0)
-	// 0 bytes: the string is longer than 0, so truncate at 0 + "..."
-	if got != "..." {
-		t.Errorf("truncate(%q, 0) = %q, want %q", "abc", got, "...")
+	if got != "…" {
+		t.Errorf("truncate(%q, 0) = %q, want %q", "abc", got, "…")
 	}
 }
 

@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"changkun.de/x/wallfacer/internal/pkg/sanitize"
 )
 
 // taskUsage mirrors the JSON shape of store.TaskUsage (cost field only).
@@ -93,13 +95,9 @@ func formatCost(usd float64) string {
 	return fmt.Sprintf("$%.4f", usd)
 }
 
-// truncate returns s truncated to at most n runes, appending "…" when trimmed.
+// truncate is a package-level alias for sanitize.Truncate.
 func truncate(s string, n int) string {
-	runes := []rune(s)
-	if len(runes) <= n {
-		return s
-	}
-	return string(runes[:n]) + "…"
+	return sanitize.Truncate(s, n)
 }
 
 // matchContainers builds a map from task UUID → container name.
