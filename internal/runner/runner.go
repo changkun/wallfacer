@@ -19,6 +19,7 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/keyedmu"
 	"changkun.de/x/wallfacer/internal/pkg/pubsub"
+	"changkun.de/x/wallfacer/internal/pkg/syncmap"
 	"changkun.de/x/wallfacer/internal/pkg/trackedwg"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -52,6 +53,18 @@ func (r *Runner) ContainerName(taskID uuid.UUID) string {
 		}
 	}
 	return ""
+}
+
+// TaskLogReader returns a new liveLogReader for the currently-running turn
+// of the given task. Returns nil when no live log is active (the task is
+// between turns or not running). Each call returns an independent reader
+// positioned at the start of the current turn's output.
+func (r *Runner) TaskLogReader(taskID uuid.UUID) *LiveLogReader {
+	ll, ok := r.liveLogs.Load(taskID)
+	if !ok {
+		return nil
+	}
+	return ll.NewReader()
 }
 
 // RunnerConfig holds all configuration needed to construct a Runner.
@@ -91,19 +104,20 @@ type Runner struct {
 	instructionsPath       string
 	workspaceManager       *workspace.Manager
 	codexAuthPath          string
-	containerNetwork       string                  // --network override; empty = read from env file
-	containerCPUs          string                  // --cpus override; empty = read from env file
-	containerMemory        string                  // --memory override; empty = read from env file
-	promptsMgr             *prompts.Manager        // prompt template manager
-	worktreeMu             sync.Mutex              // serializes all worktree filesystem operations on worktreesDir
-	repoMu                 keyedmu.Map[string]     // per-repo mutex for serializing rebase+merge
-	taskContainers         *containerRegistry      // taskID → container name
-	refineContainers       *containerRegistry      // taskID → refinement container name
-	ideateContainer        *containerRegistry      // singleton: ideation container name
-	oversightMu            keyedmu.Map[string]     // per-task mutex for serializing oversight generation
-	containerCB            *circuitbreaker.Breaker // circuit breaker for container launch operations
-	backend                sandbox.Backend         // pluggable sandbox backend (local podman/docker, future: k8s)
-	backgroundWg           trackedwg.WaitGroup     // tracks fire-and-forget background goroutines
+	containerNetwork       string                           // --network override; empty = read from env file
+	containerCPUs          string                           // --cpus override; empty = read from env file
+	containerMemory        string                           // --memory override; empty = read from env file
+	promptsMgr             *prompts.Manager                 // prompt template manager
+	worktreeMu             sync.Mutex                       // serializes all worktree filesystem operations on worktreesDir
+	repoMu                 keyedmu.Map[string]              // per-repo mutex for serializing rebase+merge
+	taskContainers         *containerRegistry               // taskID → container name
+	refineContainers       *containerRegistry               // taskID → refinement container name
+	ideateContainer        *containerRegistry               // singleton: ideation container name
+	liveLogs               syncmap.Map[uuid.UUID, *liveLog] // live log buffers for in-progress turns
+	oversightMu            keyedmu.Map[string]              // per-task mutex for serializing oversight generation
+	containerCB            *circuitbreaker.Breaker          // circuit breaker for container launch operations
+	backend                sandbox.Backend                  // pluggable sandbox backend (local podman/docker, future: k8s)
+	backgroundWg           trackedwg.WaitGroup              // tracks fire-and-forget background goroutines
 	stopReasonMu           sync.RWMutex
 	onStopReason           func(taskID uuid.UUID, stopReason string)
 	autosubmitFn           func() bool    // returns true when auto-submit is enabled

@@ -29,6 +29,7 @@ type Interface interface {
 	// Container management.
 	ListContainers() ([]sandbox.ContainerInfo, error)
 	ContainerName(taskID uuid.UUID) string
+	TaskLogReader(taskID uuid.UUID) *LiveLogReader
 	RefineContainerName(taskID uuid.UUID) string
 	KillContainer(taskID uuid.UUID)
 	KillRefineContainer(taskID uuid.UUID)

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
@@ -571,9 +572,28 @@ func (r *Runner) runContainer(
 		// Upgrade registry entry with the handle so kill goes through it.
 		r.taskContainers.SetHandle(taskID, handle, nil)
 
-		// Read all output from the handle, then wait for exit.
-		rawStdout, _ := io.ReadAll(handle.Stdout())
-		rawStderr, _ := io.ReadAll(handle.Stderr())
+		// Set up a live log buffer so the streaming handler can serve
+		// output while the container is still running. Both stdout and
+		// stderr are tee'd into the buffer and read concurrently.
+		ll := newLiveLog()
+		r.liveLogs.Store(taskID, ll)
+		defer func() {
+			ll.Close()
+			r.liveLogs.Delete(taskID)
+		}()
+
+		var rawStdout, rawStderr []byte
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			rawStdout, _ = io.ReadAll(io.TeeReader(handle.Stdout(), ll))
+		}()
+		go func() {
+			defer wg.Done()
+			rawStderr, _ = io.ReadAll(io.TeeReader(handle.Stderr(), ll))
+		}()
+		wg.Wait()
 		exitCode, waitErr := handle.Wait()
 		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(activity)})
 

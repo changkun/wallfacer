@@ -13,6 +13,7 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/logpipe"
+	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -213,11 +214,14 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 
-	// Resolve the actual container name. ContainerName checks the in-memory map
-	// first (populated when a container is launched), then falls back to scanning
-	// all wallfacer containers by label — covering both the current slug-based
-	// format and the legacy wallfacer-<uuid> format. If it still returns empty,
-	// the container is already gone (race: task status not yet updated to done).
+	// Prefer the in-process live log reader (works for both worker and
+	// ephemeral containers) over shelling out to `docker logs`.
+	if lr := h.runner.TaskLogReader(id); lr != nil {
+		h.streamLiveLog(w, r, flusher, id, lr)
+		return
+	}
+
+	// Fallback: resolve the container name and shell out to `docker logs -f`.
 	containerName := h.runner.ContainerName(id)
 	if containerName == "" {
 		h.serveStoredLogs(w, r, id)
@@ -230,6 +234,81 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		return
 	}
 	streamLines(w, r, flusher, p)
+}
+
+// streamLiveLog streams output from the in-process live log buffer for the
+// currently running turn. It first sends any stored turn outputs (completed
+// turns from earlier in the execution), then streams the live turn data.
+func (h *Handler) streamLiveLog(w http.ResponseWriter, r *http.Request, flusher http.Flusher, id uuid.UUID, lr *runner.LiveLogReader) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+
+	// Send previously completed turns from disk so the client has the
+	// full history (not just the current turn).
+	h.writeStoredTurns(w, id)
+	flusher.Flush()
+
+	// Stream the current turn's live output via a reader goroutine.
+	ch := make(chan []byte, 4)
+	go func() {
+		defer close(ch)
+		for {
+			data, err := lr.ReadChunk(r.Context())
+			if len(data) > 0 {
+				ch <- data
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	keepalive := time.NewTicker(constants.SSEKeepaliveInterval)
+	defer keepalive.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case data, ok := <-ch:
+			if !ok {
+				return
+			}
+			if _, err := w.Write(data); err != nil {
+				return
+			}
+			flusher.Flush()
+		case <-keepalive.C:
+			if _, err := w.Write([]byte("\n")); err != nil {
+				return
+			}
+			flusher.Flush()
+		}
+	}
+}
+
+// writeStoredTurns writes all previously stored turn outputs to w.
+// It is a non-failing best-effort helper — errors are silently ignored.
+func (h *Handler) writeStoredTurns(w http.ResponseWriter, id uuid.UUID) {
+	keys, err := h.store.ListBlobs(id, "outputs/turn-")
+	if err != nil {
+		return
+	}
+	for _, key := range keys {
+		name := filepath.Base(key)
+		if !strings.HasSuffix(name, ".json") && !strings.HasSuffix(name, ".stderr.txt") {
+			continue
+		}
+		content, readErr := h.store.ReadBlob(id, key)
+		if readErr != nil || len(strings.TrimSpace(string(content))) == 0 {
+			continue
+		}
+		_, _ = w.Write(content)
+		_, _ = fmt.Fprintln(w)
+	}
 }
 
 // StreamRefineLogs streams live container logs for an active sandbox refinement run.

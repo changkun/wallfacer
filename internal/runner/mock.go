@@ -112,6 +112,9 @@ func (m *MockRunner) ContainerName(taskID uuid.UUID) string {
 	return ""
 }
 
+// TaskLogReader returns nil in the mock (no live logs).
+func (m *MockRunner) TaskLogReader(_ uuid.UUID) *LiveLogReader { return nil }
+
 // RefineContainerName returns the container name for a refinement run.
 func (m *MockRunner) RefineContainerName(taskID uuid.UUID) string {
 	if m.RefineContainerNameFn != nil {
