@@ -16,6 +16,7 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -462,14 +463,20 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		if err != nil {
 			base = defBranch
 		}
-		out, diffErr := cmdexec.Git(worktreePath, "diff", base).WithContext(r.Context()).Output()
+		// Exclude instructions files (CLAUDE.md / AGENTS.md) from the diff.
+		// Podman leaves empty mount-point files in the worktree when a file
+		// is bind-mounted into a directory that is itself a bind mount; these
+		// are not real changes and should not appear in task diffs.
+		out, diffErr := cmdexec.Git(worktreePath, "diff", base,
+			"--", ".", ":!"+prompts.ClaudeInstructionsFilename, ":!"+prompts.CodexInstructionsFilename).WithContext(r.Context()).Output()
 		if diffErr != nil {
 			logger.Git.Debug("git diff base failed", "worktree", worktreePath, "error", diffErr)
 		}
 
 		// Include untracked files via --no-index diffs.
 		if untrackedRaw, err := cmdexec.Git(worktreePath,
-			"ls-files", "--others", "--exclude-standard").WithContext(r.Context()).Output(); err == nil {
+			"ls-files", "--others", "--exclude-standard",
+			"--", ".", ":!"+prompts.ClaudeInstructionsFilename, ":!"+prompts.CodexInstructionsFilename).WithContext(r.Context()).Output(); err == nil {
 			for file := range strings.SplitSeq(untrackedRaw, "\n") {
 				if file == "" {
 					continue

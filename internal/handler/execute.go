@@ -589,7 +589,8 @@ func generateWorktreeDiff(worktreePaths map[string]string) string {
 		if err != nil {
 			continue
 		}
-		out, err := cmdexec.Git(worktreePath, "diff", defBranch+"..HEAD").Output()
+		out, err := cmdexec.Git(worktreePath, "diff", defBranch+"..HEAD",
+			"--", ".", ":!"+prompts.ClaudeInstructionsFilename, ":!"+prompts.CodexInstructionsFilename).Output()
 		if err != nil || len(out) == 0 {
 			continue
 		}
