@@ -12,7 +12,7 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/prompts"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 

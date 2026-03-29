@@ -21,7 +21,7 @@ type Snapshot struct {
 
 ### 🔑 Workspace Key Hashing
 
-Each unique combination of workspace directories is identified by a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This is computed by `prompts.InstructionsKey()` (`prompts/instructions.go`):
+Each unique combination of workspace directories is identified by a SHA-256 fingerprint of the sorted, colon-joined absolute paths, truncated to 16 hex characters. This is computed by `prompts.InstructionsKey()` (`internal/prompts/instructions.go`):
 
 ```go
 func Key(workspaces []string) string {
@@ -102,7 +102,7 @@ The filename is derived from the same SHA-256 fingerprint used for workspace sco
 
 ### 📄 Default Template Generation
 
-When `prompts.EnsureInstructions()` is called and no file exists yet, `BuildInstructionsContent()` (`prompts/instructions.go`) assembles the initial content from:
+When `prompts.EnsureInstructions()` is called and no file exists yet, `BuildInstructionsContent()` (`internal/prompts/instructions.go`) assembles the initial content from:
 
 1. **Default template** -- general guidance for agents (complete tasks as described, make focused changes, run tests, write clear commit messages, etc.). Also includes board context documentation explaining `/workspace/.tasks/board.json` and sibling worktree paths.
 
@@ -224,7 +224,7 @@ Watchers (auto-promoter, auto-retrier, etc.) do not directly subscribe to env fi
 
 ### 📦 Embedded Templates
 
-Eight prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`prompts/prompts.go`):
+Eight prompt templates are embedded into the binary at compile time via `go:embed *.tmpl` in the `prompts` package (`internal/prompts/prompts.go`):
 
 | Embedded file | API name | Used for |
 |---|---|---|

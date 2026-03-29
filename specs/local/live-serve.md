@@ -42,7 +42,7 @@ Rather than requiring users to configure build/run commands manually, an agent r
 3. The proposed config is shown in a modal for the user to review and edit.
 4. User confirms → serve session starts.
 
-The discovery agent uses a dedicated system prompt template (`prompts/serve-discover.tmpl`) that instructs it to look for `Makefile`, `package.json`, `go.mod`, `Cargo.toml`, `docker-compose.yml`, etc., and emit structured JSON.
+The discovery agent uses a dedicated system prompt template (`internal/prompts/serve-discover.tmpl`) that instructs it to look for `Makefile`, `package.json`, `go.mod`, `Cargo.toml`, `docker-compose.yml`, etc., and emit structured JSON.
 
 Previously-confirmed configs are cached per workspace fingerprint in `~/.wallfacer/serve-configs/` so the agent step is skipped on repeat runs.
 
@@ -281,7 +281,7 @@ podman run --rm
   -p "<discovery-prompt>" --verbose --output-format stream-json
 ```
 
-The discovery prompt is rendered from `prompts/serve-discover.tmpl` and instructs the agent to:
+The discovery prompt is rendered from `internal/prompts/serve-discover.tmpl` and instructs the agent to:
 1. List and inspect build files (`Makefile`, `package.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `docker-compose.yml`).
 2. Determine the most appropriate build and run commands.
 3. Identify the primary port (if any).
@@ -461,7 +461,7 @@ The fingerprint is computed from the sorted workspace paths (same algorithm as A
 
 | File | Change |
 |------|--------|
-| `prompts/serve-discover.tmpl` (new) | System prompt template for command discovery agent |
+| `internal/prompts/serve-discover.tmpl` (new) | System prompt template for command discovery agent |
 | `internal/runner/serve_discover.go` (new) | `RunDiscovery` — launches short-lived agent, parses JSON output |
 | `internal/runner/serve_discover.go` | Config caching logic (fingerprint → JSON file) |
 | `internal/runner/serve_discover_test.go` (new) | Test JSON extraction from mock agent output |

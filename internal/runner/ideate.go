@@ -16,7 +16,7 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/set"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/prompts"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/prompts"
+	"changkun.de/x/wallfacer/internal/prompts"
 )
 
 func TestBuildRefinementPromptIncludesTaskAgeAndValidityDecision(t *testing.T) {

@@ -14,7 +14,7 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	runnerpkg "changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/prompts"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 

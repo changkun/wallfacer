@@ -285,7 +285,7 @@ Quick-reference for common maintenance tasks. Each entry names the starting file
 | Change workspace switching | `internal/workspace/manager.go` (`Switch()`) |
 | Debug a failing rebase | `internal/gitutil/ops.go` + `internal/gitutil/stash.go` |
 | Understand why a task failed | `data/<key>/<uuid>/traces/` + `outputs/turn-NNNN.json` |
-| Add a new system prompt | `prompts/` dir + `prompts/prompts.go` |
+| Add a new system prompt | `internal/prompts/` dir + `internal/prompts/prompts.go` |
 | Change the UI | `ui/js/` (vanilla JS modules) + `ui/index.html` |
 | Debug startup recovery | `internal/runner/recovery.go` (`RecoverOrphanedTasks()`) |
 | Change pub/sub behaviour | `internal/store/subscribe.go` (`notify()`, `Subscribe()`, `SubscribeWake()`) |

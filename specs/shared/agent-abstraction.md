@@ -2,7 +2,7 @@
 
 **Status:** Investigation / Design
 **Dependencies:** [Sandbox Backends](../foundations/sandbox-backends.md), [Container Reuse](../foundations/container-reuse.md)
-**Scope:** `internal/runner/`, `internal/store/`, `prompts/`
+**Scope:** `internal/runner/`, `internal/store/`, `internal/prompts/`
 
 ## Problem Statement
 
@@ -29,7 +29,7 @@ The runner package hard-codes seven agent roles (implementation, testing, refine
 
 3. **No inter-agent communication.** Agents can only observe each other's results after completion, via the static board manifest (`board.json`). There is no way for two running agents to exchange messages, coordinate, or pipeline results.
 
-4. **Rigid prompt construction.** Prompt templates (`prompts/*.tmpl`) are rendered server-side and injected as the `-p` flag. There is no standard way for an agent to declare its input schema, output schema, or contract with the orchestrator.
+4. **Rigid prompt construction.** Prompt templates (`internal/prompts/*.tmpl`) are rendered server-side and injected as the `-p` flag. There is no standard way for an agent to declare its input schema, output schema, or contract with the orchestrator.
 
 ## Design Goals
 
@@ -47,7 +47,7 @@ Extract the repeated container-launch, usage-tracking, and fallback logic into a
 ```go
 type AgentRole struct {
     Activity      store.SandboxActivity
-    PromptTmpl    string                 // template name in prompts/
+    PromptTmpl    string                 // template name in internal/prompts/
     Timeout       time.Duration
     ReadOnly      bool                   // workspace mount mode
     MountBoard    bool                   // include board.json
@@ -350,7 +350,7 @@ const (
 
 type AgentRole struct {
     Activity    store.SandboxActivity
-    PromptTmpl  string                        // template name in prompts/
+    PromptTmpl  string                        // template name in internal/prompts/
     Timeout     func(*store.Task) time.Duration
     MountMode   MountMode
     MountBoard  bool                          // include board.json + sibling worktrees

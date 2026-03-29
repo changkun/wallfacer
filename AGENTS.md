@@ -88,7 +88,7 @@ Key server files:
 - `internal/metrics/` — Prometheus-compatible metrics
 - `internal/constants/` — Consolidated system parameters: timeouts, intervals, retry counts, size limits, concurrency caps, pagination defaults
 - `internal/sandbox/` — Sandbox type enumeration (Claude, Codex); Windows host path translation for container mounts
-- `prompts/` — System prompt templates (title, commit, refinement, oversight, test, ideation, conflict, instructions) and workspace-level AGENTS.md management (`~/.wallfacer/instructions/`)
+- `internal/prompts/` — System prompt templates (title, commit, refinement, oversight, test, ideation, conflict, instructions) and workspace-level AGENTS.md management (`~/.wallfacer/instructions/`)
 - `ui/index.html` + `ui/js/` — Task board UI (vanilla JS + Tailwind CSS + Sortable.js)
 
 ## API Routes
@@ -243,7 +243,7 @@ See `docs/internals/task-lifecycle.md` for the full state machine, turn loop, an
 - **Workspace AGENTS.md** mounted read-only at `/workspace/AGENTS.md` so Claude Code picks it up automatically
 - **Oversight summaries** generated asynchronously when tasks reach waiting/done/failed
 - **Task refinement** via sandbox agent: refines prompts before execution
-- **System prompt templates** are overridable built-in prompts (`prompts/*.tmpl`); users can customize via the UI or API; includes the workspace instructions template
+- **System prompt templates** are overridable built-in prompts (`internal/prompts/*.tmpl`); users can customize via the UI or API; includes the workspace instructions template
 - **Prompt templates** for reusable task creation patterns
 
 - **Auto-retry** with per-failure-category budget; failed tasks can be automatically retried

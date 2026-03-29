@@ -11,7 +11,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/prompts"
+	"changkun.de/x/wallfacer/internal/prompts"
 )
 
 // newTestHandlerWithPrompts creates a Handler wired with a real prompts.Manager
