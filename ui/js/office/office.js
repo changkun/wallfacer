@@ -47,6 +47,7 @@
     _spriteCache = new window._officeSpriteCache();
     _camera = new window._officeCamera(_canvas.width, _canvas.height);
     _renderer = new window._officeRenderer(_canvas, _spriteCache, _camera);
+    _renderer.loadSprites(); // load LimeZu sprite sheets
     _characterManager = new window._officeCharacterManager(null, []);
     _renderer.setCharacterManager(_characterManager);
 
@@ -112,7 +113,10 @@
     window.addEventListener("resize", function () {
       resizeCanvas();
       if (_camera) _camera.resize(_canvas.width, _canvas.height);
-      if (_renderer) _renderer.invalidateFloorCache();
+      if (_renderer) {
+        _renderer.invalidateFloorCache();
+        if (_visible) _renderer.fitToViewport();
+      }
     });
   }
 
@@ -197,6 +201,7 @@
     if (_camera) _camera.resize(_canvas.width, _canvas.height);
     if (_renderer) {
       _renderer.invalidateFloorCache();
+      _renderer.fitToViewport();
       _renderer.start();
     }
 
