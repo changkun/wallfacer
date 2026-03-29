@@ -2,6 +2,7 @@
 
 **Status:** Draft
 **Date:** 2026-02-21
+**Last reviewed:** 2026-03-29
 
 ---
 
@@ -168,7 +169,7 @@ func (s *Store) AttachmentPath(taskID uuid.UUID, name string) string
 5. Enforce per-task limits (proposed: 20 files max, 10 MB per file, 100 MB total per task).
 6. Acquire the store write lock for the task.json update.
 
-`DataDir()` accessor also needed on `Store` so runner can read the path without importing store internals.
+`DataDir()` accessor already exists on `Store` (`internal/store/store.go:195-197`), so the runner can read the path without importing store internals.
 
 ---
 
