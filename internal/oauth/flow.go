@@ -78,13 +78,17 @@ func (m *Manager) Start(ctx context.Context, provider Provider) (string, error) 
 	// Use Background — the flow outlives the HTTP request that started it.
 	flowCtx, flowCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
-	cb, err := NewCallbackServer(flowCtx)
+	cbPath := provider.CallbackPath
+	if cbPath == "" {
+		cbPath = "/callback"
+	}
+	cb, err := NewCallbackServer(flowCtx, provider.FixedPort, cbPath)
 	if err != nil {
 		flowCancel()
 		return "", fmt.Errorf("start callback server: %w", err)
 	}
 
-	redirectURI := fmt.Sprintf("http://localhost:%d/callback", cb.Port())
+	redirectURI := fmt.Sprintf("http://localhost:%d%s", cb.Port(), cbPath)
 
 	// Build authorization URL.
 	params := url.Values{

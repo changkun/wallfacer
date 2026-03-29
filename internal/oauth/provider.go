@@ -8,6 +8,8 @@ type Provider struct {
 	ClientID     string   // OAuth client ID
 	Scopes       []string // requested scopes (empty if none needed)
 	TokenEnvKey  string   // env var name to write the token to (e.g. "CLAUDE_CODE_OAUTH_TOKEN")
+	FixedPort    int      // fixed callback port (0 = random); some providers require a specific port
+	CallbackPath string   // callback URL path (default "/callback")
 }
 
 // ClaudeProvider is the OAuth configuration for Claude Code.
@@ -20,6 +22,8 @@ var ClaudeProvider = Provider{
 }
 
 // CodexProvider is the OAuth configuration for OpenAI Codex.
+// Uses fixed port 1455 and path /auth/callback to match the redirect URI
+// registered with OpenAI for the Codex CLI client ID.
 var CodexProvider = Provider{
 	Name:         "codex",
 	AuthorizeURL: "https://auth.openai.com/oauth/authorize",
@@ -27,4 +31,6 @@ var CodexProvider = Provider{
 	ClientID:     "app_EMoamEEZ73f0CkXaXp7hrann",
 	Scopes:       []string{"openid", "profile", "email", "offline_access"},
 	TokenEnvKey:  "OPENAI_API_KEY",
+	FixedPort:    1455,
+	CallbackPath: "/auth/callback",
 }

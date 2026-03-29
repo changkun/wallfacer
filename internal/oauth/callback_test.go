@@ -13,7 +13,7 @@ func TestCallbackServer_ReceivesCode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	srv, err := NewCallbackServer(ctx)
+	srv, err := NewCallbackServer(ctx, 0, "")
 	if err != nil {
 		t.Fatalf("NewCallbackServer: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestCallbackServer_ReceivesError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	srv, err := NewCallbackServer(ctx)
+	srv, err := NewCallbackServer(ctx, 0, "")
 	if err != nil {
 		t.Fatalf("NewCallbackServer: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestCallbackServer_Timeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	srv, err := NewCallbackServer(ctx)
+	srv, err := NewCallbackServer(ctx, 0, "")
 	if err != nil {
 		t.Fatalf("NewCallbackServer: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestCallbackServer_Close(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	srv, err := NewCallbackServer(ctx)
+	srv, err := NewCallbackServer(ctx, 0, "")
 	if err != nil {
 		t.Fatalf("NewCallbackServer: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestCallbackServer_BindsLocalhost(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	srv, err := NewCallbackServer(ctx)
+	srv, err := NewCallbackServer(ctx, 0, "")
 	if err != nil {
 		t.Fatalf("NewCallbackServer: %v", err)
 	}

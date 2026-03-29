@@ -30,10 +30,19 @@ type CallbackServer struct {
 // NewCallbackServer binds a listener on 127.0.0.1:0 (random port) and
 // starts an HTTP server that accepts exactly one callback request.
 // The caller should wrap ctx with context.WithTimeout to enforce a deadline.
-func NewCallbackServer(ctx context.Context) (*CallbackServer, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+// NewCallbackServer binds a listener on 127.0.0.1 and starts an HTTP server
+// that accepts exactly one callback request. Use port 0 for a random port,
+// or a specific port (e.g. 1455) when the provider requires a fixed redirect URI.
+// callbackPath sets the handler path (default "/" if empty).
+func NewCallbackServer(ctx context.Context, port int, callbackPath string) (*CallbackServer, error) {
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return nil, fmt.Errorf("oauth callback: bind failed: %w", err)
+		return nil, fmt.Errorf("oauth callback: bind %s failed: %w", addr, err)
+	}
+
+	if callbackPath == "" {
+		callbackPath = "/"
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -50,7 +59,7 @@ func NewCallbackServer(ctx context.Context) (*CallbackServer, error) {
 		ctx:      ctx,
 	}
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(callbackPath, func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		result := CallbackResult{
 			Code:             q.Get("code"),
