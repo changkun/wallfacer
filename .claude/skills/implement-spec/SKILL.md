@@ -17,20 +17,35 @@ of the full spec.
 1. Extract the spec file path (first token of `$ARGUMENTS`).
 2. Read the spec file in full. If the path doesn't exist, check `specs/` for a
    matching filename.
-3. Read `specs/README.md` to understand where this spec sits in the milestone
-   order and what it depends on.
-4. Extract any focus instructions from the remaining tokens.
+3. **Parse YAML frontmatter** — extract structured fields between `---` fences:
+   `title`, `status`, `track`, `depends_on`, `affects`, `effort`, `created`,
+   `updated`, `author`, `dispatched_task_id`. These drive readiness checks and
+   completion updates below.
+4. Read `specs/README.md` to understand where this spec sits in the track
+   organization and dependency graph.
+5. Extract any focus instructions from the remaining tokens.
 
 ## Step 1: Assess readiness
 
 Before writing any code, verify:
 
-1. **Dependencies are met** — if the spec declares dependencies on other
-   milestones, confirm those are implemented by checking the codebase.
-2. **Spec is current** — skim the spec for file paths, function names, and API
+1. **Spec lifecycle gate** — check the frontmatter `status` field:
+   - `validated` → ready to implement. Proceed.
+   - `drafted` → warn the user that the spec has not been reviewed/validated.
+     Ask whether to proceed anyway.
+   - `vague` → stop. The spec is not ready for implementation.
+   - `complete` → already done. Confirm with the user before re-implementing.
+   - `stale` → warn the user the spec may not match reality. Suggest `/refine`
+     first.
+2. **Dependencies are met** — read the `depends_on` list from frontmatter.
+   For each dependency path, read that spec's frontmatter and confirm its
+   `status` is `complete`. If any dependency is not complete, report which
+   ones block this spec and ask the user how to proceed.
+3. **Spec is current** — use the `affects` list from frontmatter to locate the
+   relevant code files. Skim the spec for file paths, function names, and API
    references. If any look stale, update them (or flag to the user) before
    proceeding.
-3. **No conflicts** — run `git status` to confirm the working tree is clean.
+4. **No conflicts** — run `git status` to confirm the working tree is clean.
    If dirty, ask the user how to proceed.
 
 ## Step 2: Build a plan
@@ -113,11 +128,14 @@ After all tasks are implemented:
 After all tasks are implemented (or partially implemented if focus instructions
 were given), update the spec file, related specs, and the epic index:
 
-### 5a. Update the implemented spec
+### 5a. Update the implemented spec frontmatter and body
 
-1. **Set Status** — change the `**Status:**` line to `Done` (or `Partially done`
-   if only focused items were implemented).
-2. **Document deviations** — if the implementation differs from what the spec
+1. **Update frontmatter `status`** — set to `complete` (or leave at `validated`
+   and add a note if only focused items were implemented).
+2. **Update `updated` date** — set to today's date.
+3. **Update `dispatched_task_id`** — if this is a leaf spec dispatched to the
+   kanban board, ensure the task ID is recorded.
+4. **Document deviations** — if the implementation differs from what the spec
    prescribed (different signatures, renamed fields, extra/fewer methods,
    reordered steps, skipped items, etc.), add an `## Implementation notes`
    section at the end of the spec documenting each deviation:
@@ -134,16 +152,19 @@ were given), update the spec file, related specs, and the epic index:
 3. If the implementation changes any dependency relationships, ordering
    rationale, or milestone descriptions, update those too.
 
-### 5c. Update related specs
+### 5c. Update related specs (reverse dependency / impact analysis)
 
 Check whether the implementation affects other specs:
 
-1. If this spec introduces or changes interfaces that downstream specs reference
+1. **Reverse `depends_on` scan** — grep all spec files for `depends_on` entries
+   that reference this spec's path. These are the specs that depend on this one.
+   If this spec is now `complete`, those dependents may be unblocked.
+2. If this spec introduces or changes interfaces that downstream specs reference
    (e.g., new types, new API routes, renamed fields), update those specs to
    reflect the actual implementation.
-2. If another spec's dependency on this one is now satisfied, note that in the
-   dependent spec (e.g., update a prerequisites section).
-3. Only make factual corrections — do not redesign other specs.
+3. If another spec lists this one in `depends_on` and the dependency is now
+   satisfied, note that the dependent is unblocked.
+4. Only make factual corrections — do not redesign other specs.
 
 ### 5d. Commit
 

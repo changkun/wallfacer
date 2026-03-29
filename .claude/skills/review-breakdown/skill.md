@@ -13,38 +13,51 @@ implementation. Catch structural issues that would cause failures mid-execution.
 ## Step 0: Parse arguments
 
 Extract the spec file path or task folder from the first token. If given a spec
-file, locate its task folder (sibling directory with matching name). If given a
-task folder, locate the parent spec.
+file, locate its child spec directory (sibling directory with matching name,
+e.g., `specs/foundations/sandbox-backends/` for `sandbox-backends.md`). If given
+a directory, locate the parent spec (the `.md` file in the containing directory
+whose name matches the directory).
 
 ## Step 1: Load the breakdown
 
-1. Read the parent spec in full.
-2. Read every task file in the task folder (task-01-*.md, task-02-*.md, ...).
-3. Read `specs/README.md` for milestone context and cross-spec dependencies.
+1. Read the parent spec in full. **Parse its YAML frontmatter** to extract
+   `title`, `status`, `track`, `depends_on`, `affects`, `effort`.
+2. Read every child spec file in the subdirectory. **Parse each child's YAML
+   frontmatter** — extract `title`, `status`, `track`, `depends_on`, `affects`,
+   `effort`, `dispatched_task_id`.
+3. Read `specs/README.md` for track context and cross-spec dependencies.
 
 ## Step 2: Check dependency correctness
 
-For each task's `Depends on` field:
+For each child spec's `depends_on` list in its YAML frontmatter:
 
-- Verify referenced task numbers exist.
-- Verify no circular dependencies (topological sort must succeed).
-- Verify dependency direction: if task B modifies a function that task A creates,
-  B must depend on A.
-- Flag missing dependencies: if two tasks modify the same file, check whether
-  they need ordering.
+- Verify every path in `depends_on` resolves to an existing spec file.
+- Verify no self-dependency (a spec cannot list itself in `depends_on`).
+- Verify no circular dependencies in the DAG (topological sort must succeed).
+- Verify dependency direction: if spec B modifies a function that spec A creates,
+  B must depend on A. Cross-reference `affects` lists to catch this.
+- Flag missing dependencies: if two child specs have overlapping `affects` paths,
+  check whether they need ordering.
+- Verify `depends_on` edges that cross subtrees or tracks are intentional and
+  the target spec exists.
 
 Report: list of dependency issues, or "Dependencies: OK".
 
 ## Step 3: Check task sizing
 
-For each task, estimate scope by examining the files listed in "What to do":
+For each child spec, estimate scope by examining the `affects` list from
+frontmatter and the "What to do" section in the body:
 
-- Read each referenced file to check its size and complexity.
-- Flag tasks that reference 6+ files as potentially too large.
-- Flag tasks whose "What to do" has fewer than 3 steps as potentially too small
-  (might be foldable into another task).
-- Flag tasks that create new packages AND refactor existing code (should usually
+- Read each file in `affects` to check its size and complexity.
+- Cross-check `effort` (small/medium/large/xlarge) against actual scope:
+  - `small` with 6+ files in `affects` is suspicious.
+  - `xlarge` with only 1-2 files may be over-estimated.
+- Flag specs whose "What to do" has fewer than 3 steps as potentially too small
+  (might be foldable into a sibling spec).
+- Flag specs that create new packages AND refactor existing code (should usually
   be split).
+- Verify leaf specs are small enough for one agent task (2-5 files, one clear
+  goal) per the spec document model.
 
 Report: list of sizing concerns, or "Sizing: OK".
 
@@ -61,14 +74,15 @@ Report: uncovered spec items and untraceable tasks, or "Coverage: OK".
 
 ## Step 5: Check boundary conflicts
 
-For each pair of tasks that reference the same file:
+For each pair of child specs that have overlapping `affects` paths in their
+frontmatter:
 
 - Check that their "Boundaries" sections don't overlap (both claiming to modify
   the same function or type).
-- Check that the later task's "What to do" accounts for changes made by the
-  earlier task.
-- Flag cases where two independent tasks (no dependency between them) modify the
-  same file — they may conflict during parallel execution.
+- Check that the later spec's "What to do" accounts for changes made by the
+  earlier spec (follow the `depends_on` ordering).
+- Flag cases where two independent specs (no `depends_on` edge between them)
+  share `affects` entries — they may conflict during parallel execution.
 
 Report: list of boundary conflicts, or "Boundaries: OK".
 

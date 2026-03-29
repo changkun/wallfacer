@@ -28,8 +28,21 @@ of removing them per rule 3a).
 
 ## Step 1: Read the spec
 
-Read the spec file identified in Step 0. Parse it into a list of proposed work
-items, features, or changes. For each item, note:
+Read the spec file identified in Step 0. **Parse YAML frontmatter** to extract
+`title`, `status`, `track`, `depends_on`, `affects`, `effort`, `created`,
+`updated`, `author`, `dispatched_task_id`.
+
+Note the current lifecycle state — this guides the refinement:
+- `vague` → focus on fleshing out design, adding detail
+- `drafted` → focus on accuracy, removing done items, updating references
+- `validated` → focus on keeping the spec in sync with implementation reality
+- `complete` → the spec should not normally need refinement; if it does, it may
+  need to move to `stale`
+- `stale` → the primary goal is to refresh the spec; may transition to `drafted`
+  or `validated` after refinement
+
+Parse the body into a list of proposed work items, features, or changes. For
+each item, note:
 - What it proposes (the deliverable or change)
 - Any acceptance criteria or sub-tasks
 - Its stated priority or tier
@@ -80,9 +93,15 @@ Delete items that no longer apply. If the reason for obsolescence is
 non-obvious, add a one-line note explaining why it was removed.
 
 ### 3e. Update metadata
-- Update any "Current State" or "Status" sections
-- Fix file paths, function names, and code references to match the codebase
-- Update priority/effort estimates if the scope has changed
+- **Update frontmatter fields:**
+  - `updated` → set to today's date
+  - `status` → adjust if warranted (e.g., `stale` → `drafted` after refresh,
+    `complete` → `stale` if significant drift found)
+  - `affects` → add or remove paths to match what the spec actually describes
+  - `depends_on` → add or remove entries if dependencies have changed
+  - `effort` → re-estimate if scope changed significantly
+- Fix file paths, function names, and code references in the body to match
+  the codebase
 - Ensure the spec's title and introduction still accurately describe the
   remaining work
 

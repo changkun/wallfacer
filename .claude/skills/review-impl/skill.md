@@ -20,10 +20,14 @@ spec's task breakdown or the commit tagged in the task's status change to "Done"
 
 ## Step 1: Load the requirements
 
-1. Read the spec or task file in full.
+1. Read the spec or task file in full. **Parse YAML frontmatter** to extract
+   `title`, `status`, `track`, `depends_on`, `affects`, `effort`.
 2. Extract acceptance criteria, "What to do" steps, "Tests" requirements, and
-   "Boundaries" constraints.
-3. If reviewing a full spec, read all task files and aggregate requirements.
+   "Boundaries" constraints from the body.
+3. Use the `affects` list from frontmatter as the expected set of files that
+   should be modified by this implementation.
+4. If reviewing a full spec (non-leaf), read all child spec files in the
+   subdirectory and aggregate requirements recursively.
 
 ## Step 2: Load the implementation
 
@@ -45,9 +49,10 @@ Report: checklist of criteria with status.
 
 ## Step 4: Check for unintended changes
 
-Compare files touched in the diff against files listed in the spec/task:
+Compare files touched in the diff against the `affects` list from frontmatter
+and files listed in the spec body's "What to do" section:
 
-- Flag files modified that aren't mentioned in any task's "What to do" section.
+- Flag files modified that aren't in `affects` or mentioned in "What to do".
 - For each unexpected file, read the diff hunk and assess whether the change is:
   - Necessary (e.g., import added by a refactor)
   - Cleanup (formatting, dead code removal)

@@ -16,10 +16,13 @@ Extract the spec file path from the first token.
 
 ## Step 1: Read the spec
 
-1. Read the spec file in full.
-2. Extract all mentioned file paths, package names, type names, function names,
-   and interface names.
-3. Identify the spec's deliverables: what new things it creates, what existing
+1. Read the spec file in full. **Parse YAML frontmatter** to extract `title`,
+   `status`, `track`, `depends_on`, `affects`, `effort`.
+2. Use the `affects` list from frontmatter as the primary set of code files and
+   directories this spec touches.
+3. Extract additional file paths, package names, type names, function names, and
+   interface names mentioned in the spec body.
+4. Identify the spec's deliverables: what new things it creates, what existing
    things it modifies.
 
 ## Step 2: Map the code impact
@@ -52,15 +55,35 @@ For each interface or exported type the spec modifies:
    types.
 4. For each breaking change, list every file that would need updating.
 
-## Step 4: Check spec cross-references
+## Step 4: Check spec cross-references (reverse dependency analysis)
 
-1. Grep all other spec files for references to:
-   - The spec being analyzed (by filename or milestone number).
-   - Types, interfaces, or packages the spec modifies.
-2. For each referencing spec, assess whether it:
-   - Depends on the current shape of what's being changed (needs update).
-   - Merely mentions it in passing (no action needed).
-   - Has assumptions that conflict with the proposed changes.
+Use two complementary approaches:
+
+### 4a. Reverse `depends_on` scan
+Grep all spec files for `depends_on` entries that reference this spec's path.
+These are specs that directly depend on this one. For each:
+- Check its `status` — if `validated` or later, it may be affected by changes.
+- If the dependent is already `complete`, flag it as potentially needing a
+  `stale` review.
+
+### 4b. `affects` overlap scan
+Grep all spec files for `affects` entries that reference the same code paths
+as this spec. Specs with overlapping `affects` may conflict even without an
+explicit `depends_on` edge.
+
+### 4c. Transitive impact
+Follow the reverse `depends_on` graph transitively: if spec A depends on this
+spec, and spec B depends on A, then B is transitively affected. Report both
+direct and transitive dependents.
+
+### 4d. Body reference scan
+Grep all other spec files for references to:
+- The spec being analyzed (by filename).
+- Types, interfaces, or packages the spec modifies.
+For each referencing spec, assess whether it:
+- Depends on the current shape of what's being changed (needs update).
+- Merely mentions it in passing (no action needed).
+- Has assumptions that conflict with the proposed changes.
 
 ## Step 5: Check documentation impact
 

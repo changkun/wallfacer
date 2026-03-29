@@ -17,8 +17,20 @@ Extract the spec file path from the first token of the arguments.
 ## Step 1: Read the spec and context
 
 1. Read the spec file in full.
-2. Read `specs/README.md` to understand milestone ordering and dependencies.
-3. Identify the spec's implementation plan, phases, and any existing task
+2. **Parse YAML frontmatter** — extract `title`, `status`, `track`,
+   `depends_on`, `affects`, `effort`, `created`, `updated`, `author`,
+   `dispatched_task_id` from the `---` fenced block at the top.
+3. **Check lifecycle readiness** — the spec should be `validated` before
+   breaking down. If `status` is `vague` or `drafted`, warn the user that the
+   design may not be stable enough for task decomposition. If `stale`, suggest
+   `/refine` first.
+4. **Check dependencies** — for each path in `depends_on`, read that spec's
+   frontmatter and confirm its `status` is `complete`. Report any incomplete
+   blockers.
+5. Read `specs/README.md` to understand track organization and dependency graph.
+6. Use the `affects` list to identify the primary code files and packages this
+   spec touches.
+7. Identify the spec's implementation plan, phases, and any existing task
    breakdown structure.
 
 ## Step 2: Explore the codebase
@@ -51,21 +63,36 @@ Guidelines for task granularity:
 
 Prefer smaller tasks. If a task feels large, split it further.
 
-## Step 4: Create the task folder and files
+## Step 4: Create the child spec folder and files
 
-1. Create a folder named after the spec (e.g., `specs/03-container-reuse/`)
-2. Create one markdown file per task, numbered sequentially:
-   `task-01-<name>.md`, `task-02-<name>.md`, etc.
+Per the spec document model, breaking down a spec creates child specs in a
+subdirectory named after the parent. For example, breaking down
+`specs/foundations/sandbox-backends.md` creates children in
+`specs/foundations/sandbox-backends/`.
 
-Each task file must follow this template:
+1. Create the subdirectory if it doesn't exist.
+2. Create one markdown file per task, using descriptive names (no numeric
+   prefixes — execution order comes from `depends_on`, not filenames).
 
-```markdown
-# Task N: <Title>
+Each child spec file must have YAML frontmatter and follow this template:
 
-**Status:** Todo
-**Depends on:** <Task numbers or "None">
-**Phase:** <Phase number and name from the spec>
-**Effort:** <Small | Medium | Large>
+````markdown
+---
+title: <Descriptive title>
+status: validated
+track: <same track as parent>
+depends_on:
+  - <relative path to sibling spec, or empty list>
+affects:
+  - <files/directories this task will create or modify>
+effort: <small | medium | large | xlarge>
+created: <today>
+updated: <today>
+author: <from parent spec>
+dispatched_task_id: null
+---
+
+# <Title>
 
 ## Goal
 
@@ -86,43 +113,53 @@ names and what they verify>
 
 <Bulleted list of what NOT to change in this task — helps scope the
 work and prevents task creep>
-```
+````
+
+**Important:** Use `depends_on` with full relative paths from the repo root
+(e.g., `specs/foundations/sandbox-backends/define-interface.md`) to express
+ordering between sibling tasks. Do not use task numbers — the DAG is defined
+by `depends_on` edges.
 
 ## Step 5: Verify the breakdown
 
 Check that:
 - Every item from the spec's implementation plan is covered by at least one task
-- No circular dependencies exist between tasks
+- No circular dependencies exist in the `depends_on` DAG (topological sort must
+  succeed)
 - The dependency graph allows parallel execution where possible
 - Each task's "What to do" section references real file paths and function names
+- All `depends_on` paths resolve to existing spec files
+- Each child spec's `track` matches the parent's `track`
+- Each child spec's `affects` paths are plausible (files exist or will be created)
 
-## Step 6: Document dependencies in the spec
+## Step 6: Document the breakdown in the parent spec
 
 Append a `## Task Breakdown` section to the original spec file (if one does not
-already exist). Include a summary table and a Mermaid dependency graph:
+already exist). Include a summary table showing each child spec's frontmatter
+fields and a Mermaid dependency graph derived from `depends_on`:
 
 ````markdown
 ## Task Breakdown
 
-| # | Task | Depends on | Effort | Status |
-|---|------|-----------|--------|--------|
-| 1 | [Short title](folder/task-01-name.md) | — | Small | Todo |
-| 2 | [Short title](folder/task-02-name.md) | 1 | Medium | Todo |
-| 3 | [Short title](folder/task-03-name.md) | 1 | Small | Todo |
-| 4 | [Short title](folder/task-04-name.md) | 2, 3 | Large | Todo |
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Define interface](sandbox-backends/define-interface.md) | — | small | validated |
+| [Local backend](sandbox-backends/local-backend.md) | define-interface | medium | validated |
+| [Refactor launch](sandbox-backends/runner-migration/refactor-launch.md) | local-backend | small | validated |
 
 ```mermaid
 graph LR
-  1[Task 1: Short title] --> 2[Task 2: Short title]
-  1 --> 3[Task 3: Short title]
-  2 --> 4[Task 4: Short title]
-  3 --> 4
+  A[Define interface] --> B[Local backend]
+  A --> C[Update registry]
+  B --> D[Refactor launch]
+  D --> E[Refactor listing]
+  E --> F[Retire executor]
 ```
 ````
 
-Use relative links from the spec to the task files. Tasks with no dependencies
-should appear as root nodes. The graph makes the critical path and parallelism
-opportunities visible at a glance.
+Use relative links from the parent spec to the child spec files. Specs with no
+`depends_on` entries should appear as root nodes. The graph makes the critical
+path and parallelism opportunities visible at a glance.
 
 If the spec already has a `## Task Breakdown` section, replace its contents with
 the updated table and graph.

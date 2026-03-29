@@ -11,23 +11,27 @@ Finalize the spec at `$ARGUMENTS` after all implementation tasks are done.
 
 ## Step 1: Verify completion
 
-1. Read the spec file. Extract the spec directory path (e.g., `specs/04-file-explorer/` from `specs/04-file-explorer.md`).
-2. If a task directory exists (same name as the spec without `.md`), read all `task-*.md` files and verify every task has `**Status:** Done`.
-3. If any tasks are not done, report them and stop — do not proceed with wrap-up.
-4. Run `make test` to confirm all tests pass. If tests fail, stop.
+1. Read the spec file. **Parse YAML frontmatter** to extract `title`, `status`,
+   `track`, `depends_on`, `affects`, `effort`, `created`, `updated`.
+2. Extract the child spec directory path (sibling directory with the same name
+   as the spec file without `.md`).
+3. If a child spec directory exists, read all child spec files and parse their
+   frontmatter. Verify every leaf spec in the subtree has `status: complete`.
+   (Non-leaf children are complete when all their own leaves are complete.)
+4. If any leaf specs are not `complete`, report them and stop — do not proceed
+   with wrap-up.
+5. Run `make test` to confirm all tests pass. If tests fail, stop.
 
 ## Step 2: Update the parent spec
 
 Read the parent spec file and update it to match the completed-spec style:
 
-### 2a. Status line
+### 2a. Update frontmatter
 
-Change the status line to:
-```
-**Status:** Complete | **Date:** <original-date> → <today>
-```
-
-If the spec already has a date, keep it as the start date. Use today's date as the end date.
+In the YAML frontmatter:
+- Set `status: complete`
+- Set `updated: <today>` (keep `created` unchanged)
+- Verify `dispatched_task_id` is `null` for non-leaf specs
 
 ### 2b. Add Outcome section
 
@@ -57,12 +61,18 @@ If the spec has a File Inventory section, verify it matches the actual files tha
 3. Change the status in the Milestones table (e.g., `**In progress** (N/M tasks done)` → `**Complete**`).
 4. Update the delivers column if the implementation differs from what was originally described.
 
-## Step 4: Check downstream specs
+## Step 4: Check downstream specs (reverse dependency analysis)
 
-Scan other specs for references to the completed spec:
-1. If another spec lists this one as a dependency and the dependency is now satisfied, note that.
-2. If this spec introduced or changed interfaces that other specs reference, verify those references are accurate.
-3. Only make factual corrections — do not redesign other specs.
+Scan all spec files for `depends_on` entries that reference this spec's path:
+1. **Reverse `depends_on` scan** — grep all spec frontmatter for this spec's
+   path in their `depends_on` lists. These are specs that were blocked by this
+   one and are now potentially unblocked.
+2. If this spec introduced or changed interfaces listed in its `affects`, check
+   whether downstream specs reference those same files/packages. Verify their
+   descriptions are still accurate.
+3. If a `stale` spec depends on this one, flag it — the completion may resolve
+   or worsen the staleness.
+4. Only make factual corrections — do not redesign other specs.
 
 ## Step 5: Commit
 
