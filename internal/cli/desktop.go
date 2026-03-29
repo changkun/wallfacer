@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
@@ -69,78 +68,17 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 
 	var tm *TrayManager
 
-	// shutdownOnce ensures the graceful shutdown sequence runs exactly once,
-	// whether triggered by "Quit" in the tray, Cmd+Q, or the window close.
-	var shutdownOnce sync.Once
-	gracefulQuit := func() {
-		shutdownOnce.Do(func() {
-			if wailsCtx == nil {
-				return
-			}
-			// Show the window and inject a shutdown overlay so the user
-			// sees progress instead of a frozen/spinning app.
-			wailsRuntime.WindowShow(wailsCtx)
-			showShutdownOverlay(wailsCtx, "Stopping server…")
-
-			go func() {
-				// 1. Cancel the server context (stops accepting new work).
-				updateShutdownStatus(wailsCtx, "Cancelling background tasks…")
-				sc.Stop()
-
-				// 2. Drain HTTP connections.
-				updateShutdownStatus(wailsCtx, "Draining HTTP connections…")
-				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				if err := sc.Srv.Shutdown(shutdownCtx); err != nil {
-					logger.Main.Error("http server shutdown", "error", err)
-				}
-
-				// 3. Wait for runner background goroutines (the slow part).
-				pending := sc.Runner.PendingGoroutines()
-				if len(pending) > 0 {
-					updateShutdownStatus(wailsCtx,
-						fmt.Sprintf("Waiting for %d background tasks: %s",
-							len(pending), strings.Join(pending, ", ")))
-				} else {
-					updateShutdownStatus(wailsCtx, "Stopping containers…")
-				}
-
-				// Poll pending goroutines and update the overlay.
-				done := make(chan struct{})
-				go func() {
-					sc.Runner.Shutdown()
-					close(done)
-				}()
-
-				ticker := time.NewTicker(1 * time.Second)
-				defer ticker.Stop()
-				for {
-					select {
-					case <-done:
-						logger.Main.Info("shutdown complete")
-						tm.Stop()
-						wailsRuntime.Quit(wailsCtx)
-						return
-					case <-ticker.C:
-						p := sc.Runner.PendingGoroutines()
-						if len(p) > 0 {
-							updateShutdownStatus(wailsCtx,
-								fmt.Sprintf("Waiting for %d tasks: %s",
-									len(p), strings.Join(p, ", ")))
-						}
-					}
-				}
-			}()
-		})
-	}
-
 	tm = NewTrayManager(
 		func() {
 			if wailsCtx != nil {
 				wailsRuntime.WindowShow(wailsCtx)
 			}
 		},
-		gracefulQuit,
+		func() {
+			if wailsCtx != nil {
+				wailsRuntime.Quit(wailsCtx)
+			}
+		},
 		serverURL,
 		sc.ServerAPIKey,
 	)
@@ -163,22 +101,47 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 			wailsCtx = ctx
 			logger.Main.Info("desktop window opened")
 		},
-		OnBeforeClose: func(_ context.Context) bool {
-			if hideOnClose {
-				// Close button hides; Wails handles this via HideWindowOnClose.
-				return false
+		OnShutdown: func(ctx context.Context) {
+			// Show the window (it may be hidden to tray) and inject a
+			// shutdown overlay so the user sees progress.
+			wailsRuntime.WindowShow(ctx)
+			showShutdownOverlay(ctx, "Stopping server…")
+
+			// 1. Cancel the server context (stops accepting new work).
+			updateShutdownStatus(ctx, "Cancelling background tasks…")
+			sc.Stop()
+
+			// 2. Drain HTTP connections.
+			updateShutdownStatus(ctx, "Draining HTTP connections…")
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if err := sc.Srv.Shutdown(shutdownCtx); err != nil {
+				logger.Main.Error("http server shutdown", "error", err)
 			}
-			// On Linux (no hide-on-close), intercept to show shutdown overlay.
-			go gracefulQuit()
-			return true // prevent immediate close; gracefulQuit will call Quit.
-		},
-		OnShutdown: func(_ context.Context) {
-			// If Wails quits without going through gracefulQuit (e.g. the
-			// OS force-kills), do a best-effort cleanup.
-			shutdownOnce.Do(func() {
-				tm.Stop()
-				sc.Shutdown()
-			})
+			cancel()
+
+			// 3. Wait for runner background goroutines (the slow part).
+			done := make(chan struct{})
+			go func() {
+				sc.Runner.Shutdown()
+				close(done)
+			}()
+
+			ticker := time.NewTicker(1 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					tm.Stop()
+					logger.Main.Info("shutdown complete")
+					return
+				case <-ticker.C:
+					if p := sc.Runner.PendingGoroutines(); len(p) > 0 {
+						updateShutdownStatus(ctx,
+							fmt.Sprintf("Waiting for %d tasks: %s",
+								len(p), strings.Join(p, ", ")))
+					}
+				}
+			}
 		},
 	}
 
