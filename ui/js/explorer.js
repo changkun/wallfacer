@@ -179,11 +179,28 @@ function _expandNode(node) {
 
   api(url)
     .then(function (entries) {
-      node.children = _buildChildNodes(
+      var newChildren = _buildChildNodes(
         entries || [],
         node.path,
         node.workspace,
       );
+      // Preserve expanded state and children of existing child nodes so that
+      // the periodic refresh (_refreshExpandedNodes) does not collapse nested
+      // directories that were already expanded.
+      if (node.children) {
+        var oldByPath = {};
+        for (var j = 0; j < node.children.length; j++) {
+          oldByPath[node.children[j].path] = node.children[j];
+        }
+        for (var j = 0; j < newChildren.length; j++) {
+          var prev = oldByPath[newChildren[j].path];
+          if (prev && prev.expanded) {
+            newChildren[j].expanded = true;
+            newChildren[j].children = prev.children;
+          }
+        }
+      }
+      node.children = newChildren;
       node.expanded = true;
       node.loading = false;
       _renderTree();
@@ -195,23 +212,15 @@ function _expandNode(node) {
 }
 
 // Re-fetch children for every expanded directory so newly created (or
-// deleted) files become visible without a full tree reload.  Collects all
-// expanded nodes first, then kicks off parallel fetches — avoids the race
-// where _expandNode replaces children before the recursive walk reaches them.
+// deleted) files become visible without a full tree reload.  Only refreshes
+// root-level expanded nodes; nested expanded state is preserved by the merge
+// logic inside _expandNode.
 function _refreshExpandedNodes() {
-  var queue = [];
-  function collect(nodes) {
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i];
-      if (n.expanded && n.type === "dir") {
-        queue.push(n);
-        if (n.children) collect(n.children);
-      }
+  for (var i = 0; i < _explorerRoots.length; i++) {
+    var n = _explorerRoots[i];
+    if (n.expanded && n.type === "dir") {
+      _expandNode(n);
     }
-  }
-  collect(_explorerRoots);
-  for (var i = 0; i < queue.length; i++) {
-    _expandNode(queue[i]);
   }
 }
 
@@ -1076,6 +1085,14 @@ window._classifyFileResponse = _classifyFileResponse;
 window._relativePath = _relativePath;
 window._isEditDirty = _isEditDirty;
 window._getFileIcon = _getFileIcon;
+window._expandNode = _expandNode;
+window._refreshExpandedNodes = _refreshExpandedNodes;
+window._getExplorerRoots = function () {
+  return _explorerRoots;
+};
+window._setExplorerRoots = function (roots) {
+  _explorerRoots = roots;
+};
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", _initExplorer);

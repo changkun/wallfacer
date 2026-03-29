@@ -543,6 +543,98 @@ describe("_toggleMarkdownView", () => {
   });
 });
 
+describe("_expandNode preserves nested expanded state", () => {
+  it("does not collapse expanded children when parent is re-expanded", async () => {
+    // Simulate: root → child dir (expanded) → grandchild file.
+    // When _expandNode is called on root (as during refresh), the child's
+    // expanded state and children must be preserved.
+    let apiResponse = [];
+    const { win, registry } = makeContext({
+      workspaces: ["/ws"],
+      apiResponse: [{ name: "sub", type: "dir" }],
+    });
+
+    // Build a tree manually: root with an expanded child.
+    const grandchild = {
+      path: "/ws/sub/file.txt",
+      name: "file.txt",
+      type: "file",
+      workspace: "/ws",
+      expanded: false,
+      children: null,
+      loading: false,
+    };
+    const child = {
+      path: "/ws/sub",
+      name: "sub",
+      type: "dir",
+      workspace: "/ws",
+      expanded: true,
+      children: [grandchild],
+      loading: false,
+    };
+    const root = {
+      path: "/ws",
+      name: "ws",
+      type: "dir",
+      workspace: "/ws",
+      expanded: true,
+      children: [child],
+      loading: false,
+    };
+    win._setExplorerRoots([root]);
+
+    // _expandNode on root should preserve child's expanded state.
+    win._expandNode(root);
+    // Wait for the async api call to resolve.
+    await new Promise((r) => setTimeout(r, 10));
+
+    const roots = win._getExplorerRoots();
+    expect(roots[0].children).toHaveLength(1);
+    const newChild = roots[0].children[0];
+    expect(newChild.path).toBe("/ws/sub");
+    expect(newChild.expanded).toBe(true);
+    expect(newChild.children).toEqual([grandchild]);
+  });
+
+  it("does not carry over expanded state for removed children", async () => {
+    // If a child directory was expanded but no longer exists in the API
+    // response, it should not appear in the new children.
+    const { win } = makeContext({
+      workspaces: ["/ws"],
+      apiResponse: [{ name: "other", type: "dir" }],
+    });
+
+    const child = {
+      path: "/ws/deleted",
+      name: "deleted",
+      type: "dir",
+      workspace: "/ws",
+      expanded: true,
+      children: [],
+      loading: false,
+    };
+    const root = {
+      path: "/ws",
+      name: "ws",
+      type: "dir",
+      workspace: "/ws",
+      expanded: true,
+      children: [child],
+      loading: false,
+    };
+    win._setExplorerRoots([root]);
+
+    win._expandNode(root);
+    await new Promise((r) => setTimeout(r, 10));
+
+    const roots = win._getExplorerRoots();
+    expect(roots[0].children).toHaveLength(1);
+    expect(roots[0].children[0].name).toBe("other");
+    expect(roots[0].children[0].expanded).toBe(false);
+  });
+});
+
 describe("explorer init", () => {
   it("loads roots when panel was previously open", () => {
     const { store } = makeContext({
