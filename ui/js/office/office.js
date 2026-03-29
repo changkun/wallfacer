@@ -32,6 +32,12 @@
     _characterManager = new window._officeCharacterManager(null, []);
     _renderer.setCharacterManager(_characterManager);
 
+    // Interaction layer
+    if (window._officeInteraction) {
+      var interaction = new window._officeInteraction(_canvas, _camera, _characterManager);
+      _renderer.setInteraction(interaction);
+    }
+
     // Attach pan/zoom input
     window._officeAttachInputHandlers(_canvas, _camera, function () {
       if (_currentLayout) {

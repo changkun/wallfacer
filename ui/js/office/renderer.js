@@ -30,6 +30,7 @@
     this._spriteCache = spriteCache;
     this._camera = camera;
     this._characterManager = null;
+    this._interaction = null;
 
     this._tileMap = null;
     this._furniture = [];
@@ -97,6 +98,9 @@
     // Overlay pass: speech bubbles (always on top)
     this._drawBubbles(ctx);
 
+    // Selection outline
+    this._drawSelection(ctx);
+
     ctx.restore();
 
     this._rafId = requestAnimationFrame(this._boundRender);
@@ -131,6 +135,10 @@
 
   OfficeRenderer.prototype.setCharacterManager = function (mgr) {
     this._characterManager = mgr;
+  };
+
+  OfficeRenderer.prototype.setInteraction = function (interaction) {
+    this._interaction = interaction;
   };
 
   OfficeRenderer.prototype._drawScene = function (ctx) {
@@ -243,6 +251,22 @@
       ctx.arc(dotX, dotY, 1.5, 0, Math.PI * 2);
       ctx.fill();
     }
+  };
+
+  OfficeRenderer.prototype._drawSelection = function (ctx) {
+    if (!this._interaction || !this._characterManager) return;
+    var selId = this._interaction.getSelectedId();
+    if (!selId) return;
+
+    var ch = this._characterManager.getCharacterByTaskId(selId);
+    if (!ch || ch.dead) return;
+
+    var px = ch.x * TILE;
+    var py = ch.y * TILE;
+
+    ctx.strokeStyle = "#FFF";
+    ctx.lineWidth = 1 / this._camera.zoom; // 1px regardless of zoom
+    ctx.strokeRect(px - 1, py - 1, TILE + 2, TILE + 2);
   };
 
   OfficeRenderer.prototype._drawBubbles = function (ctx) {
