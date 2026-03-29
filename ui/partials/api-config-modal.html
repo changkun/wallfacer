@@ -96,6 +96,13 @@
                 (takes precedence if both are set). Leave blank to keep the
                 current value.
               </div>
+              <button
+                id="claude-oauth-signin-btn"
+                class="btn btn-sm"
+                style="margin-top: 6px; font-size: 12px"
+                onclick="startOAuthFlow('claude')"
+              >Sign in with Claude</button>
+              <span id="claude-oauth-status" style="font-size: 11px; color: var(--text-muted); margin-left: 8px"></span>
             </div>
 
             <div>
@@ -299,6 +306,13 @@
                 Optional for Codex tasks when host `~/.codex/auth.json` is
                 mounted. Leave blank to keep the current value.
               </div>
+              <button
+                id="codex-oauth-signin-btn"
+                class="btn btn-sm"
+                style="margin-top: 6px; font-size: 12px"
+                onclick="startOAuthFlow('codex')"
+              >Sign in with OpenAI</button>
+              <span id="codex-oauth-status" style="font-size: 11px; color: var(--text-muted); margin-left: 8px"></span>
             </div>
 
             <div>

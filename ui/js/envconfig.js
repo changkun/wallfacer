@@ -441,6 +441,21 @@ async function loadEnvConfig() {
   safeSetValue("env-codex-test-status", (el) => {
     el.textContent = "";
   });
+
+  // Update OAuth sign-in button visibility based on base URLs.
+  _updateOAuthButtonVisibility();
+
+  // Add input listeners for dynamic visibility (only once).
+  var claudeBase = document.getElementById("env-claude-base-url");
+  if (claudeBase && claudeBase.addEventListener && !claudeBase._oauthListenerAdded) {
+    claudeBase.addEventListener("input", _updateOAuthButtonVisibility);
+    claudeBase._oauthListenerAdded = true;
+  }
+  var openaiBase = document.getElementById("env-openai-base-url");
+  if (openaiBase && openaiBase.addEventListener && !openaiBase._oauthListenerAdded) {
+    openaiBase.addEventListener("input", _updateOAuthButtonVisibility);
+    openaiBase._oauthListenerAdded = true;
+  }
 }
 
 function closeEnvConfigEditor() {
@@ -467,5 +482,113 @@ async function saveEnvConfig() {
     setTimeout(() => showEnvConfigEditor(null), 600);
   } catch (e) {
     statusEl.textContent = "Error: " + e.message;
+  }
+}
+
+// --- OAuth Sign-In ---
+
+var _oauthPollers = {};
+
+async function startOAuthFlow(provider) {
+  var btn = document.getElementById(provider + "-oauth-signin-btn");
+  var status = document.getElementById(provider + "-oauth-status");
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = "Starting...";
+
+  try {
+    var url = Routes.auth.start().replace("{provider}", provider);
+    var result = await api(url, { method: "POST" });
+    if (!result.authorize_url) {
+      if (status) status.textContent = "Error: no authorize URL returned";
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    // Open the authorize URL in a new tab.
+    if (
+      typeof window.runtime !== "undefined" &&
+      window.runtime.BrowserOpenURL
+    ) {
+      window.runtime.BrowserOpenURL(result.authorize_url);
+    } else {
+      window.open(result.authorize_url, "_blank");
+    }
+
+    if (status) status.textContent = "Waiting for browser...";
+
+    // Poll for completion.
+    _startOAuthPolling(provider);
+  } catch (e) {
+    if (status) status.textContent = "Error: " + e.message;
+    if (btn) btn.disabled = false;
+  }
+}
+
+function _startOAuthPolling(provider) {
+  // Clear any existing poller.
+  if (_oauthPollers[provider]) {
+    clearInterval(_oauthPollers[provider]);
+  }
+
+  var pollCount = 0;
+  var maxPolls = 150; // 5 minutes at 2s intervals
+
+  _oauthPollers[provider] = setInterval(async function () {
+    pollCount++;
+    if (pollCount > maxPolls) {
+      _stopOAuthPolling(provider, "Timed out waiting for authorization.");
+      return;
+    }
+
+    try {
+      var url = Routes.auth.status().replace("{provider}", provider);
+      var result = await api(url);
+      if (result.state === "success") {
+        _stopOAuthPolling(provider, "");
+        var status = document.getElementById(provider + "-oauth-status");
+        if (status) status.textContent = "Signed in!";
+        // Refresh the env config display to show the new token.
+        loadEnvConfig();
+        // Clear success message after a few seconds.
+        setTimeout(function () {
+          if (status) status.textContent = "";
+        }, 3000);
+      } else if (result.state === "error") {
+        _stopOAuthPolling(provider, result.error || "Authorization failed.");
+      }
+    } catch (e) {
+      // Network error — keep polling, it might recover.
+    }
+  }, 2000);
+}
+
+function _stopOAuthPolling(provider, errorMessage) {
+  if (_oauthPollers[provider]) {
+    clearInterval(_oauthPollers[provider]);
+    delete _oauthPollers[provider];
+  }
+  var btn = document.getElementById(provider + "-oauth-signin-btn");
+  var status = document.getElementById(provider + "-oauth-status");
+  if (btn) btn.disabled = false;
+  if (status && errorMessage) status.textContent = errorMessage;
+}
+
+function cancelOAuthFlow(provider) {
+  var url = Routes.auth.cancel().replace("{provider}", provider);
+  api(url, { method: "POST" }).catch(function () {});
+  _stopOAuthPolling(provider, "Cancelled.");
+}
+
+function _updateOAuthButtonVisibility() {
+  var claudeBaseUrl = document.getElementById("env-claude-base-url");
+  var claudeBtn = document.getElementById("claude-oauth-signin-btn");
+  if (claudeBtn && claudeBaseUrl) {
+    claudeBtn.style.display = claudeBaseUrl.value ? "none" : "";
+  }
+
+  var openaiBaseUrl = document.getElementById("env-openai-base-url");
+  var codexBtn = document.getElementById("codex-oauth-signin-btn");
+  if (codexBtn && openaiBaseUrl) {
+    codexBtn.style.display = openaiBaseUrl.value ? "none" : "";
   }
 }
