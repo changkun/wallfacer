@@ -1,6 +1,6 @@
 # Task 1: PKCE Utilities
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Core OAuth infrastructure
 **Effort:** Small
