@@ -25,3 +25,6 @@ var TrayAttention2x []byte
 
 //go:embed tray.ico
 var TrayICO []byte
+
+//go:embed appicon.png
+var AppIcon []byte

@@ -19,6 +19,9 @@ func platformTraySetup(showWindow func()) {
 	systray.SetOnTapped(showWindow)
 }
 
+// installDockReopenHandler is a no-op on Windows (no dock icon reopen concept).
+func installDockReopenHandler(func()) {}
+
 // Windows tray behavior notes:
 //
 // - Balloon notification: fyne.io/systray does not support Windows balloon

@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"changkun.de/x/wallfacer/assets/icons"
 	"changkun.de/x/wallfacer/internal/logger"
 
 	"github.com/wailsapp/wails/v2"
@@ -127,12 +128,18 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	target, _ := url.Parse(serverURL)
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
-	// App menu: override Cmd+Q (macOS) / Ctrl+Q to route through doShutdown
-	// so the user sees the shutdown overlay instead of a frozen spinner.
+	// App menu: override Cmd+W to hide the window (not quit), and
+	// Cmd+Q to route through doShutdown so the user sees the shutdown overlay.
 	appMenu := menu.NewMenu()
 	appMenu.Append(menu.AppMenu()) // standard macOS app menu (About, Services, …)
 	appMenu.Append(menu.EditMenu()) // standard Edit menu (Copy, Paste, …)
 	fileMenu := appMenu.AddSubmenu("File")
+	fileMenu.AddText("Close Window", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
+		if wailsCtx != nil {
+			wailsRuntime.WindowHide(wailsCtx)
+		}
+	})
+	fileMenu.AddSeparator()
 	fileMenu.AddText("Quit Wallfacer", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
 		go doShutdown()
 	})
@@ -148,6 +155,9 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 		},
 		OnStartup: func(ctx context.Context) {
 			wailsCtx = ctx
+			installDockReopenHandler(func() {
+				wailsRuntime.WindowShow(ctx)
+			})
 			logger.Main.Info("desktop window opened")
 		},
 		OnShutdown: func(_ context.Context) {
@@ -161,6 +171,11 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	if runtime.GOOS == "darwin" {
 		appOpts.Mac = &mac.Options{
 			TitleBar: mac.TitleBarHiddenInset(),
+			About: &mac.AboutInfo{
+				Title:   "Wallfacer",
+				Message: "Task-board runner for AI agents",
+				Icon:    icons.AppIcon,
+			},
 		}
 		appOpts.CSSDragProperty = "--wails-draggable"
 		appOpts.CSSDragValue = "drag"

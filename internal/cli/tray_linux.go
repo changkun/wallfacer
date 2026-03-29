@@ -13,6 +13,9 @@ func platformTraySetup(showWindow func()) {
 	systray.SetOnTapped(showWindow)
 }
 
+// installDockReopenHandler is a no-op on Linux.
+func installDockReopenHandler(func()) {}
+
 // Linux tray behavior notes:
 //
 // - GNOME: System tray icons require the AppIndicator/KStatusNotifierItem

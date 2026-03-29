@@ -179,14 +179,15 @@ func (tm *TrayManager) poll() {
 		return
 	}
 
-	// Update icon.
+	// Update icon. Use SetTemplateIcon for all states so macOS auto-adapts
+	// the icon color for both light and dark menu bars.
 	state := iconState(data.TasksByStatus)
 	if state != tm.lastIconState {
 		switch state {
 		case "active":
-			systray.SetIcon(icons.TrayActive)
+			systray.SetTemplateIcon(icons.TrayActive, icons.TrayActive)
 		case "attention":
-			systray.SetIcon(icons.TrayAttention)
+			systray.SetTemplateIcon(icons.TrayAttention, icons.TrayAttention)
 		default:
 			systray.SetTemplateIcon(icons.Tray, icons.Tray)
 		}
