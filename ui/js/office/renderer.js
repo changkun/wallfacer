@@ -201,25 +201,45 @@
   OfficeRenderer.prototype._drawCharacter = function (ctx, info) {
     var px = info.x * TILE;
     var py = info.y * TILE;
+    var effect = info.effect;
 
-    // Placeholder: colored circle
-    ctx.fillStyle = CHARACTER_COLOR;
-    ctx.beginPath();
-    ctx.arc(px + TILE / 2, py + TILE / 2, TILE / 2 - 1, 0, Math.PI * 2);
-    ctx.fill();
+    if (effect && !effect.isComplete()) {
+      // Draw with matrix effect: per-row alpha + green trail
+      for (var row = 0; row < TILE; row++) {
+        var alpha = effect.getAlphaMask(0, row);
+        if (alpha > 0) {
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = CHARACTER_COLOR;
+          ctx.fillRect(px, py + row, TILE, 1);
+        }
+        var trail = effect.getTrailColor(0, row);
+        if (trail) {
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = trail;
+          ctx.fillRect(px, py + row, TILE, 1);
+        }
+      }
+      ctx.globalAlpha = 1;
+    } else {
+      // Normal rendering: placeholder colored circle
+      ctx.fillStyle = CHARACTER_COLOR;
+      ctx.beginPath();
+      ctx.arc(px + TILE / 2, py + TILE / 2, TILE / 2 - 1, 0, Math.PI * 2);
+      ctx.fill();
 
-    // Direction indicator: small dot
-    ctx.fillStyle = "#FFF";
-    ctx.beginPath();
-    var dotX = px + TILE / 2;
-    var dotY = py + TILE / 2;
-    var off = TILE / 3;
-    if (info.direction === 0) dotY += off; // down
-    else if (info.direction === 1) dotX -= off; // left
-    else if (info.direction === 2) dotX += off; // right
-    else if (info.direction === 3) dotY -= off; // up
-    ctx.arc(dotX, dotY, 1.5, 0, Math.PI * 2);
-    ctx.fill();
+      // Direction indicator: small dot
+      ctx.fillStyle = "#FFF";
+      ctx.beginPath();
+      var dotX = px + TILE / 2;
+      var dotY = py + TILE / 2;
+      var off = TILE / 3;
+      if (info.direction === 0) dotY += off; // down
+      else if (info.direction === 1) dotX -= off; // left
+      else if (info.direction === 2) dotX += off; // right
+      else if (info.direction === 3) dotY -= off; // up
+      ctx.arc(dotX, dotY, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
   };
 
   // ---- Exports ----

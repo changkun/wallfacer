@@ -57,6 +57,12 @@
     this._animTimer = 0;
     this._animType = "idle"; // idle, walk, typing, reading
 
+    // Spawn/despawn effect
+    this._effect = null;
+    if (typeof window._officeMatrixEffect === "function") {
+      this._effect = new window._officeMatrixEffect("spawn", 16, 16);
+    }
+
     // Walk path
     this._path = null;
     this._pathIndex = 0;
@@ -88,7 +94,9 @@
     switch (this.state) {
       case SPAWN:
         this._stateTimer += dt;
+        if (this._effect) this._effect.update(dt);
         if (this._stateTimer >= SPAWN_DURATION) {
+          this._effect = null;
           this._setState(IDLE);
         }
         break;
@@ -134,6 +142,7 @@
 
       case DESPAWN:
         this._stateTimer += dt;
+        if (this._effect) this._effect.update(dt);
         if (this._stateTimer >= DESPAWN_DURATION) {
           this.dead = true;
         }
@@ -237,6 +246,9 @@
         break;
       case "cancelled":
         this._setState(DESPAWN);
+        if (typeof window._officeMatrixEffect === "function") {
+          this._effect = new window._officeMatrixEffect("despawn", 16, 16);
+        }
         break;
     }
   };
@@ -284,6 +296,7 @@
       direction: this.direction,
       state: this.state,
       animType: this._animType,
+      effect: this._effect,
     };
   };
 
