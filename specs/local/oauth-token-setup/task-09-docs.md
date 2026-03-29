@@ -1,9 +1,21 @@
-# Task 9: Documentation
+---
+title: Documentation
+status: complete
+track: local
+depends_on:
+  - specs/local/oauth-token-setup/task-04-auth-handler-routes.md
+  - specs/local/oauth-token-setup/task-05-ui-sign-in.md
+  - specs/local/oauth-token-setup/task-07-reauth-flag.md
+  - specs/local/oauth-token-setup/task-08-first-launch-reauth-ui.md
+affects: []
+effort: small
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Todo
-**Depends on:** 4, 5, 7, 8
-**Phase:** Documentation
-**Effort:** Small
+# Task 9: Documentation
 
 ## Goal
 

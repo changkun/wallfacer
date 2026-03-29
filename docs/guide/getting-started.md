@@ -34,15 +34,19 @@ The sandbox image (`ghcr.io/changkun/wallfacer:latest`) is pulled automatically 
 
 Open **Settings → Sandbox** in the browser and enter your credential:
 
-**Option A — OAuth token (Claude Pro or Max subscription)**
+**Option A — Sign in with Claude (easiest)**
+
+Click **Sign in with Claude** in the Settings panel. Your browser opens to authenticate, and the token is stored automatically.
+
+**Option B — OAuth token (manual paste)**
 
 Paste your OAuth token into `CLAUDE_CODE_OAUTH_TOKEN`. To obtain a token, run `claude setup-token` in the `claude` CLI ([claude.ai/download](https://claude.ai/download) or `npm install -g @anthropic-ai/claude-code`).
 
-**Option B — Anthropic API key**
+**Option C — Anthropic API key**
 
 Paste your API key into `ANTHROPIC_API_KEY`. Generate one at [console.anthropic.com](https://console.anthropic.com/) → API Keys. Keys start with `sk-ant-...`.
 
-You only need one of the two. Changes take effect on the next task without a server restart.
+You only need one of the three. Changes take effect on the next task without a server restart.
 
 > You can also edit `~/.wallfacer/.env` directly if you prefer.
 

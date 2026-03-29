@@ -21,9 +21,14 @@ Open the Settings modal by clicking the gear icon in the top-right corner of the
 At minimum, you need one of these credentials configured in **Settings > Sandbox**:
 
 **Claude configuration:**
-- OAuth Token (`CLAUDE_CODE_OAUTH_TOKEN`) -- from `claude setup-token`; takes precedence when both credentials are set
+- **Sign in with Claude** button -- starts an OAuth flow: opens your browser to authenticate, then stores the token automatically. This is the easiest way to set up credentials.
+- OAuth Token (`CLAUDE_CODE_OAUTH_TOKEN`) -- alternatively, paste a token from `claude setup-token`; takes precedence when both credentials are set
 - API Key (`ANTHROPIC_API_KEY`) -- direct key from console.anthropic.com
-- **Test** button -- runs a quick sandbox connectivity check to verify your credentials work
+- **Test** button -- runs a quick sandbox connectivity check to verify your credentials work. If the test detects an invalid or expired token and OAuth is available, a **Sign in again** button appears inline.
+
+**Codex configuration:** similarly, use the **Sign in with OpenAI** button for OAuth or paste an API key manually.
+
+The sign-in buttons are hidden when a custom base URL is configured (custom endpoints don't use standard OAuth). On first launch with no credentials for any provider, a prompt guides you to set up credentials.
 
 All changes are written to `~/.wallfacer/.env` and take effect on the next task run. Leave token fields blank to preserve the existing value.
 

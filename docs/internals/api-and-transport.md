@@ -98,6 +98,10 @@ All routes are canonically defined in `internal/apicontract/routes.go`.
 | `GET /api/explorer/tree` | List one level of a workspace directory |
 | `GET /api/explorer/file` | Read file contents from a workspace |
 | `PUT /api/explorer/file` | Write file contents to a workspace |
+| **OAuth authentication** | |
+| `POST /api/auth/{provider}/start` | Start OAuth flow; returns `{authorize_url}` |
+| `GET /api/auth/{provider}/status` | Poll flow status; returns `{state, error?}` |
+| `POST /api/auth/{provider}/cancel` | Cancel an in-progress flow |
 | **Admin** | |
 | `POST /api/admin/rebuild-index` | Rebuild the in-memory search index from disk |
 | **Refinement agent** | |
