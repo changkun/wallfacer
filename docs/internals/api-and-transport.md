@@ -243,9 +243,43 @@ Not SSE in the strict sense — this endpoint streams raw `text/plain` output. I
 
 `GET /api/terminal/ws` is the project's only WebSocket endpoint. It provides an interactive host shell via a PTY relay. Unlike the REST routes defined in `internal/apicontract/routes.go`, this endpoint is registered directly in `BuildMux` (`internal/cli/server.go`) because WebSocket upgrades don't follow REST request/response semantics.
 
-The handler (`internal/handler/terminal.go`) spawns a shell process attached to a PTY (`internal/pty/`) and relays I/O bidirectionally: binary PTY output flows server→client, and JSON-encoded input/resize/ping messages flow client→server. The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable).
+The handler (`internal/handler/terminal.go`) manages multiple concurrent shell sessions per WebSocket connection via a `sessionRegistry`. On connect, one session is auto-created. The relay dispatcher routes PTY output from the active session to the client and directs client input to the active session's PTY. Session switching re-resolves the active session without reconnecting.
 
-Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers.
+The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `false` to disable). Authentication uses `?token=` query parameter (same mechanism as SSE paths), since the browser `WebSocket` constructor cannot set custom headers.
+
+### Message Protocol
+
+**Client → Server (JSON text frames):**
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `input` | `data` (base64) | Terminal input bytes |
+| `resize` | `cols`, `rows` | Resize the active session's PTY |
+| `ping` | — | Keep-alive; server responds with `pong` |
+| `create_session` | — | Spawn a new shell session |
+| `switch_session` | `session` (ID) | Switch the active session |
+| `close_session` | `session` (ID) | Close and remove a session |
+
+**Server → Client (JSON text frames):**
+
+| Type | Fields | Description |
+|------|--------|-------------|
+| `pong` | — | Keep-alive response |
+| `sessions` | `sessions` (array of `{id, active}`) | Full session list; sent on connect and after any session change |
+| `session_created` | `session` (ID) | New session spawned |
+| `session_switched` | `session` (ID) | Active session changed |
+| `session_closed` | `session` (ID) | Session removed |
+| `session_exited` | `session` (ID) | Session's shell process exited |
+| `error` | `data` (string) | Error message (e.g., invalid session ID) |
+
+**Server → Client (binary frames):** Raw PTY output from the active session.
+
+### Architecture
+
+- **`sessionRegistry`** (`terminal.go`): manages `map[string]*terminalSession`, tracks the active session, and provides `create`, `switchTo`, `remove`, `closeAll`, and `activeSession` methods. A `switchCh` channel signals the relay dispatcher when the active session changes.
+- **`relayDispatcher`**: the PTY→WS goroutine re-resolves the active session on each switch signal. The WS→PTY goroutine resolves `activeSession()` per message.
+- **`monitorSession`**: per-session goroutine that waits for shell exit, then calls `handleSessionExit` which removes the session, sends `session_exited`, and auto-switches to a fallback or closes the WebSocket.
+- **Frontend** (`ui/js/terminal.js`): tab bar UI with per-session output buffering (~100KB cap). On `session_switched`, xterm is cleared and the target session's buffer is replayed.
 
 ## 🐳 Container Runtime
 

@@ -20,7 +20,7 @@ Local Product                          Cloud Platform
   ○ File/Image Attachments               ○ K8s Sandbox Backend
   ○ Host Mounts                          ○ Cloud Infrastructure
   ○ File Panel Viewer                    ○ Multi-Tenant (capstone)
-  ○ Terminal Sessions                    ○ Tenant API
+  ✅ Terminal Sessions                    ○ Tenant API
   ○ Container Exec
   ○ Oversight Risk Scoring             Shared Design
   ○ Visual Verification                  ○ Authentication
@@ -63,7 +63,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [file-attachments.md](local/file-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
 | [host-mounts.md](local/host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
 | [file-panel-viewer.md](local/file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview |
-| [terminal-sessions.md](local/terminal-sessions.md) | Not started | Multiple concurrent terminal sessions with tab bar |
+| [terminal-sessions.md](local/terminal-sessions.md) | **Complete** | Multiple concurrent terminal sessions with tab bar |
 | [terminal-container-exec.md](local/terminal-container-exec.md) | Not started | Attach to running task containers from the terminal panel |
 | [oversight-risk-scoring.md](local/oversight-risk-scoring.md) | Not started | Real-time agent action risk assessment |
 | [visual-verification.md](local/visual-verification.md) | Not started | Visual verification for UI changes |

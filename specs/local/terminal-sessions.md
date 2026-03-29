@@ -1,6 +1,6 @@
 # Terminal: Multiple Sessions with Tabs
 
-**Status:** Not started
+**Status:** Done
 **Date:** 2026-03-28
 
 ---
@@ -43,7 +43,7 @@ Add a tab bar above the terminal panel supporting multiple concurrent shell sess
 | 3 | [Session control messages](terminal-sessions/task-03-session-messages.md) | 2 | Small | Done |
 | 4 | [Tab bar UI](terminal-sessions/task-04-tab-bar-ui.md) | — | Medium | Done |
 | 5 | [Frontend session wiring](terminal-sessions/task-05-frontend-session-wiring.md) | 3, 4 | Large | Done |
-| 6 | [Documentation](terminal-sessions/task-06-docs.md) | 5 | Small | Todo |
+| 6 | [Documentation](terminal-sessions/task-06-docs.md) | 5 | Small | Done |
 
 ```mermaid
 graph LR

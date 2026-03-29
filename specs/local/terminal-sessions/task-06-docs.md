@@ -1,6 +1,6 @@
 # Task 6: Documentation
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 5
 **Phase:** Documentation
 **Effort:** Small
