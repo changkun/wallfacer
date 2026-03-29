@@ -431,10 +431,14 @@ function _fetchTestLogs(id, retryDelay, seq) {
   if (!_isCurrentModalSeq(seq)) return;
   if (testLogsAbort) testLogsAbort.abort();
   testLogsAbort = new AbortController();
-  // Always clear the buffer — the server re-sends all logs from the start, so
-  // keeping stale data would produce duplicates in pretty mode.
-  testRawLogBuffer = "";
-  document.getElementById("modal-test-logs").innerHTML = "";
+  // For reconnects, defer the buffer clear until the first chunk arrives so
+  // existing logs remain visible during the reconnect delay.
+  const isReconnect = !!retryDelay;
+  if (!isReconnect) {
+    testRawLogBuffer = "";
+    document.getElementById("modal-test-logs").innerHTML = "";
+  }
+  let needsReset = isReconnect;
   const delay = retryDelay || 1000;
   const decoder = new TextDecoder();
   // For completed tasks use phase=test to serve only test-agent turns (those
@@ -479,6 +483,10 @@ function _fetchTestLogs(id, retryDelay, seq) {
               reconnect();
               return;
             }
+            if (needsReset) {
+              needsReset = false;
+              testRawLogBuffer = "";
+            }
             testRawLogBuffer += decoder.decode(value, { stream: true });
             scheduleTestLogRender();
             read();
@@ -507,13 +515,18 @@ function _fetchLogs(id, retryDelay, seq) {
   if (!_isCurrentModalSeq(seq)) return;
   if (logsAbort) logsAbort.abort();
   logsAbort = new AbortController();
-  // Always clear the buffer — the server re-sends all logs from the start, so
-  // keeping stale data would produce duplicates in pretty mode.
-  rawLogBuffer = "";
-  document.getElementById("modal-logs").innerHTML = "";
-  _renderedLogLen = 0;
-  _renderedLogMode = "";
-  _renderedLogQuery = "";
+  // For reconnects (retryDelay > 0) we defer the buffer clear until the first
+  // chunk of the new stream arrives. This keeps the existing logs visible
+  // during the reconnect delay instead of flashing an empty panel.
+  const isReconnect = !!retryDelay;
+  if (!isReconnect) {
+    rawLogBuffer = "";
+    document.getElementById("modal-logs").innerHTML = "";
+    _renderedLogLen = 0;
+    _renderedLogMode = "";
+    _renderedLogQuery = "";
+  }
+  let needsReset = isReconnect;
   const delay = retryDelay || 1000;
   const decoder = new TextDecoder();
   const url = `/api/tasks/${id}/logs?raw=true`;
@@ -551,6 +564,15 @@ function _fetchLogs(id, retryDelay, seq) {
             if (done) {
               reconnect();
               return;
+            }
+            // On reconnect, reset the buffer on the first chunk so the server's
+            // full re-send replaces stale data without a visible empty gap.
+            if (needsReset) {
+              needsReset = false;
+              rawLogBuffer = "";
+              _renderedLogLen = 0;
+              _renderedLogMode = "";
+              _renderedLogQuery = "";
             }
             rawLogBuffer += decoder.decode(value, { stream: true });
             scheduleLogRender();

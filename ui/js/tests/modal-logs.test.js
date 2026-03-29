@@ -590,7 +590,7 @@ describe("renderLogs append-only", () => {
     expect(elements["modal-logs"].children.length).toBe(3);
   });
 
-  it("clears buffer on reconnect to avoid duplicates", () => {
+  it("preserves buffer on reconnect until first chunk arrives", () => {
     // Simulate initial _fetchLogs call (retryDelay=null): buffer is cleared.
     vm.runInContext('_modalState.taskId = "task-1"', ctx);
     vm.runInContext('logsMode = "pretty"', ctx);
@@ -601,23 +601,56 @@ describe("renderLogs append-only", () => {
     expect(renderedLen).toBe("line1\nline2\nline3".length);
 
     // Simulate reconnect: _fetchLogs is called with retryDelay (non-null).
-    // The fix clears rawLogBuffer so the server's re-sent logs don't duplicate.
+    // The buffer is preserved so existing logs stay visible during reconnect.
     ctx._fetchLogs("task-1", 2000, 0);
 
-    // After _fetchLogs clears the buffer, rawLogBuffer must be empty and the
-    // render cursor must be reset to 0 so the next render is a full rebuild.
+    // After a reconnect _fetchLogs, the buffer is preserved until the first
+    // chunk of the new stream arrives — logs remain visible during the delay.
+    expect(vm.runInContext("rawLogBuffer", ctx)).toBe("line1\nline2\nline3");
+    expect(vm.runInContext("_renderedLogLen", ctx)).toBe(
+      "line1\nline2\nline3".length,
+    );
+    expect(elements["modal-logs"].children.length).toBe(3);
+  });
+
+  it("clears buffer on initial fetch", () => {
+    vm.runInContext('_modalState.taskId = "task-1"', ctx);
+    vm.runInContext('logsMode = "pretty"', ctx);
+    vm.runInContext('rawLogBuffer = "line1\\nline2\\nline3"', ctx);
+    ctx.renderLogs();
+    expect(elements["modal-logs"].children.length).toBe(3);
+
+    // Initial fetch (retryDelay=null): buffer is cleared immediately.
+    ctx._fetchLogs("task-1", null, 0);
+
     expect(vm.runInContext("rawLogBuffer", ctx)).toBe("");
     expect(vm.runInContext("_renderedLogLen", ctx)).toBe(0);
     expect(elements["modal-logs"].innerHTML).toBe("");
   });
 
-  it("clears test buffer on reconnect to avoid duplicates", () => {
+  it("preserves test buffer on reconnect until first chunk arrives", () => {
     vm.runInContext('_modalState.taskId = "task-1"', ctx);
     vm.runInContext('testRawLogBuffer = "test-line1\\ntest-line2"', ctx);
     ctx.renderTestLogs();
     expect(elements["modal-test-logs"].innerHTML).toContain("test-line1");
 
+    // Reconnect (retryDelay non-null): buffer preserved.
     ctx._fetchTestLogs("task-1", 2000, 0);
+
+    expect(vm.runInContext("testRawLogBuffer", ctx)).toBe(
+      "test-line1\ntest-line2",
+    );
+    expect(elements["modal-test-logs"].innerHTML).toContain("test-line1");
+  });
+
+  it("clears test buffer on initial fetch", () => {
+    vm.runInContext('_modalState.taskId = "task-1"', ctx);
+    vm.runInContext('testRawLogBuffer = "test-line1\\ntest-line2"', ctx);
+    ctx.renderTestLogs();
+    expect(elements["modal-test-logs"].innerHTML).toContain("test-line1");
+
+    // Initial fetch (retryDelay=null): buffer cleared immediately.
+    ctx._fetchTestLogs("task-1", null, 0);
 
     expect(vm.runInContext("testRawLogBuffer", ctx)).toBe("");
     expect(elements["modal-test-logs"].innerHTML).toBe("");
