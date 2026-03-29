@@ -13,6 +13,7 @@ import (
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
+	"changkun.de/x/wallfacer/internal/oauth"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/lazyval"
@@ -130,7 +131,9 @@ type Handler struct {
 	// affect the user-controlled toggle flags.
 	breakers map[string]*watcherBreaker
 
-	diffCache          *diffCache
+	oauthManager *oauth.Manager
+
+	diffCache *diffCache
 	commitsBehindCache *commitsBehindCache
 	fileIndex          *fileIndex
 	pulls              *pullTracker
@@ -205,6 +208,9 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 			"auto-refine":  newWatcherBreaker(),
 		},
 	}
+	oauthMgr := oauth.NewManager()
+	oauthMgr.TokenWriter = newOAuthTokenWriter(h.envFile)
+	h.oauthManager = oauthMgr
 	h.cachedMaxParallel = lazyval.New(func() int {
 		cfg, err := envconfig.Parse(h.envFile)
 		if err != nil || cfg.MaxParallelTasks <= 0 {

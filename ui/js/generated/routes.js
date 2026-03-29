@@ -246,6 +246,21 @@ var Routes = {
     },
   },
 
+  auth: {
+    // POST /api/auth/{provider}/start
+    start: function () {
+      return "/api/auth/{provider}/start";
+    },
+    // GET /api/auth/{provider}/status
+    status: function () {
+      return "/api/auth/{provider}/status";
+    },
+    // POST /api/auth/{provider}/cancel
+    cancel: function () {
+      return "/api/auth/{provider}/cancel";
+    },
+  },
+
   tasks: {
     // GET /api/tasks
     list: function () {

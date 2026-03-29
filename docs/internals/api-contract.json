@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 82,
+  "route_count": 85,
   "routes": [
     {
       "method": "GET",
@@ -698,6 +698,33 @@
       "description": "Write file contents to a workspace.",
       "tags": [
         "explorer"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/auth/{provider}/start",
+      "name": "StartOAuth",
+      "description": "Start an OAuth authorization flow for the given provider (claude or codex).",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/auth/{provider}/status",
+      "name": "OAuthStatus",
+      "description": "Poll the current status of an OAuth flow for the given provider.",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/auth/{provider}/cancel",
+      "name": "CancelOAuth",
+      "description": "Cancel an in-progress OAuth flow for the given provider.",
+      "tags": [
+        "auth"
       ]
     },
     {

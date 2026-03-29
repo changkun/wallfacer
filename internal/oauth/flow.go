@@ -75,7 +75,8 @@ func (m *Manager) Start(ctx context.Context, provider Provider) (string, error) 
 		return "", fmt.Errorf("generate state: %w", err)
 	}
 
-	flowCtx, flowCancel := context.WithTimeout(ctx, 5*time.Minute)
+	// Use Background — the flow outlives the HTTP request that started it.
+	flowCtx, flowCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 
 	cb, err := NewCallbackServer(flowCtx)
 	if err != nil {
