@@ -1,9 +1,7 @@
 package httpjson
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -242,20 +240,3 @@ func TestWrite_EncodingError(t *testing.T) {
 	}
 }
 
-// limitedResponseWriter is a writer that fails after writing n bytes.
-type limitedResponseWriter struct {
-	http.ResponseWriter
-	buf     bytes.Buffer
-	limit   int
-	headers http.Header
-	code    int
-}
-
-func (l *limitedResponseWriter) Header() http.Header  { return l.headers }
-func (l *limitedResponseWriter) WriteHeader(code int) { l.code = code }
-func (l *limitedResponseWriter) Write(p []byte) (int, error) {
-	if l.buf.Len()+len(p) > l.limit {
-		return 0, io.ErrShortWrite
-	}
-	return l.buf.Write(p)
-}

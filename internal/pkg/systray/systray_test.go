@@ -47,7 +47,7 @@ func TestMenuItemClicked(t *testing.T) {
 
 // TestMenuItemClickedDropsWhenFull verifies that a second click does not
 // block when the channel buffer (capacity 1) is already occupied.
-func TestMenuItemClickedDropsWhenFull(t *testing.T) {
+func TestMenuItemClickedDropsWhenFull(_ *testing.T) {
 	id := nextID.Add(1)
 	item := &MenuItem{ClickedCh: make(chan struct{}, 1), id: id}
 	menuItemsLock.Lock()
@@ -67,7 +67,7 @@ func TestMenuItemClickedDropsWhenFull(t *testing.T) {
 
 // TestMenuItemClickedInvalidID verifies that clicking a non-existent menu
 // item ID is silently ignored (no panic, no channel send).
-func TestMenuItemClickedInvalidID(t *testing.T) {
+func TestMenuItemClickedInvalidID(_ *testing.T) {
 	menuItemClicked(999999)
 }
 
@@ -91,7 +91,7 @@ func TestTrayTapped(t *testing.T) {
 
 // TestTrayTappedNil verifies that trayTapped is a no-op when no callback
 // is registered (does not panic on nil function).
-func TestTrayTappedNil(t *testing.T) {
+func TestTrayTappedNil(_ *testing.T) {
 	tappedMu.Lock()
 	onTapped = nil
 	tappedMu.Unlock()

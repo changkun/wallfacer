@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	_ "image/png"
+	_ "image/png" // register PNG decoder for pngToARGB
 	"os"
 	"sync"
 
@@ -43,13 +43,13 @@ type linuxMenuItem struct {
 
 type sniHandler struct{}
 
-func (sniHandler) Activate(x, y int32) *dbus.Error {
+func (sniHandler) Activate(_, _ int32) *dbus.Error {
 	go trayTapped()
 	return nil
 }
 
-func (sniHandler) SecondaryActivate(x, y int32) *dbus.Error { return nil }
-func (sniHandler) Scroll(delta int32, orientation string) *dbus.Error {
+func (sniHandler) SecondaryActivate(_, _ int32) *dbus.Error { return nil }
+func (sniHandler) Scroll(_ int32, _ string) *dbus.Error {
 	return nil
 }
 
@@ -72,7 +72,7 @@ type toolTipVal struct {
 	Desc     string
 }
 
-func (sniPropsHandler) Get(iface, prop string) (dbus.Variant, *dbus.Error) {
+func (sniPropsHandler) Get(_, prop string) (dbus.Variant, *dbus.Error) {
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 	v, ok := sniAllProps()[prop]
@@ -82,7 +82,7 @@ func (sniPropsHandler) Get(iface, prop string) (dbus.Variant, *dbus.Error) {
 	return v, nil
 }
 
-func (sniPropsHandler) GetAll(iface string) (map[string]dbus.Variant, *dbus.Error) {
+func (sniPropsHandler) GetAll(_ string) (map[string]dbus.Variant, *dbus.Error) {
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 	return sniAllProps(), nil
@@ -125,7 +125,7 @@ type menuLayout struct {
 	V2 []dbus.Variant
 }
 
-func (dbusMenuHandler) GetLayout(parentID, recursionDepth int32, propertyNames []string) (uint32, menuLayout, *dbus.Error) {
+func (dbusMenuHandler) GetLayout(parentID, _ int32, _ []string) (uint32, menuLayout, *dbus.Error) {
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
@@ -172,7 +172,7 @@ type dbusMenuEvent struct {
 	Timestamp uint32
 }
 
-func (dbusMenuHandler) Event(id int32, eventID string, data dbus.Variant, timestamp uint32) *dbus.Error {
+func (dbusMenuHandler) Event(id int32, eventID string, _ dbus.Variant, _ uint32) *dbus.Error {
 	if eventID == "clicked" {
 		go menuItemClicked(uint32(id))
 	}
@@ -189,18 +189,18 @@ func (dbusMenuHandler) EventGroup(events []dbusMenuEvent) ([]int32, *dbus.Error)
 }
 
 func (dbusMenuHandler) AboutToShow(int32) (bool, *dbus.Error) { return false, nil }
-func (dbusMenuHandler) AboutToShowGroup(ids []int32) ([]int32, []int32, *dbus.Error) {
+func (dbusMenuHandler) AboutToShowGroup(_ []int32) ([]int32, []int32, *dbus.Error) {
 	return nil, nil, nil
 }
 
-func (dbusMenuHandler) GetGroupProperties(ids []int32, propertyNames []string) ([]struct {
+func (dbusMenuHandler) GetGroupProperties(_ []int32, _ []string) ([]struct {
 	V0 int32
 	V1 map[string]dbus.Variant
 }, *dbus.Error) {
 	return nil, nil
 }
 
-func (dbusMenuHandler) GetProperty(id int32, name string) (dbus.Variant, *dbus.Error) {
+func (dbusMenuHandler) GetProperty(_ int32, _ string) (dbus.Variant, *dbus.Error) {
 	return dbus.Variant{}, nil
 }
 
@@ -246,15 +246,15 @@ func nativeStart() {
 	instance.conn = conn
 	instance.busName = fmt.Sprintf("org.kde.StatusNotifierItem-%d-1", os.Getpid())
 
-	conn.RequestName(instance.busName, dbus.NameFlagDoNotQueue)
+	_, _ = conn.RequestName(instance.busName, dbus.NameFlagDoNotQueue)
 
 	// Export StatusNotifierItem interface and properties.
-	conn.Export(sniHandler{}, "/StatusNotifierItem", "org.kde.StatusNotifierItem")
-	conn.Export(sniPropsHandler{}, "/StatusNotifierItem", "org.freedesktop.DBus.Properties")
+	_ = conn.Export(sniHandler{}, "/StatusNotifierItem", "org.kde.StatusNotifierItem")
+	_ = conn.Export(sniPropsHandler{}, "/StatusNotifierItem", "org.freedesktop.DBus.Properties")
 
 	// Export DBusMenu interface and properties.
-	conn.Export(dbusMenuHandler{}, "/StatusNotifierItem/menu", "com.canonical.dbusmenu")
-	conn.Export(menuPropsHandler{}, "/StatusNotifierItem/menu", "org.freedesktop.DBus.Properties")
+	_ = conn.Export(dbusMenuHandler{}, "/StatusNotifierItem/menu", "com.canonical.dbusmenu")
+	_ = conn.Export(menuPropsHandler{}, "/StatusNotifierItem/menu", "org.freedesktop.DBus.Properties")
 
 	// Introspection for StatusNotifierItem.
 	sniIntro := introspect.Node{
@@ -353,7 +353,7 @@ func nativeSetIcon(data []byte, _ bool) {
 	instance.mu.Unlock()
 
 	if conn != nil {
-		conn.Emit("/StatusNotifierItem", "org.kde.StatusNotifierItem.NewIcon")
+		_ = conn.Emit("/StatusNotifierItem", "org.kde.StatusNotifierItem.NewIcon")
 	}
 }
 
@@ -364,7 +364,7 @@ func nativeSetTooltip(s string) {
 	instance.mu.Unlock()
 
 	if conn != nil {
-		conn.Emit("/StatusNotifierItem", "org.kde.StatusNotifierItem.NewToolTip")
+		_ = conn.Emit("/StatusNotifierItem", "org.kde.StatusNotifierItem.NewToolTip")
 	}
 }
 
@@ -438,7 +438,7 @@ func nativeQuit() {
 	instance.conn = nil
 	instance.mu.Unlock()
 	if conn != nil {
-		conn.Close()
+		_ = conn.Close()
 	}
 }
 
@@ -456,7 +456,7 @@ func emitMenuUpdate() {
 	rev := instance.menuRev
 	instance.mu.Unlock()
 	if conn != nil {
-		conn.Emit("/StatusNotifierItem/menu", "com.canonical.dbusmenu.LayoutUpdated", rev, int32(0))
+		_ = conn.Emit("/StatusNotifierItem/menu", "com.canonical.dbusmenu.LayoutUpdated", rev, int32(0))
 	}
 }
 

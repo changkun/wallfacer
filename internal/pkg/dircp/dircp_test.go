@@ -3,6 +3,7 @@ package dircp
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -46,6 +47,9 @@ func TestCopyDirectoryTree(t *testing.T) {
 
 // TestCopyPreservesPermissions verifies that file permissions are preserved.
 func TestCopyPreservesPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission bits are not meaningful on Windows")
+	}
 	src := t.TempDir()
 	dst := t.TempDir()
 

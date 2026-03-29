@@ -55,7 +55,7 @@ func SetIcon(iconBytes []byte) {
 
 // SetTemplateIcon sets a macOS template icon that adapts to the menu bar
 // appearance. On other platforms this behaves the same as SetIcon.
-func SetTemplateIcon(templateIconBytes, regularIconBytes []byte) {
+func SetTemplateIcon(templateIconBytes, _ []byte) {
 	nativeSetIcon(templateIconBytes, true)
 }
 

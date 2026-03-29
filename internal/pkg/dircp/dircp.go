@@ -7,7 +7,6 @@
 package dircp
 
 import (
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -22,10 +21,8 @@ import (
 func Copy(src, dst string) error {
 	if runtime.GOOS != "windows" {
 		cmd := exec.Command("cp", "-a", src+"/.", dst)
-		if out, err := cmd.CombinedOutput(); err == nil {
+		if err := cmd.Run(); err == nil {
 			return nil
-		} else {
-			_ = fmt.Sprintf("%v: %s", err, out) // consumed by caller if needed
 		}
 	}
 	return CopyGo(src, dst)
