@@ -74,7 +74,9 @@
       alpha: this._alpha,
       pulseScale:
         this.type === BUBBLE_FAILED
-          ? 1 + Math.sin(this._pulseTimer * PULSE_SPEED * Math.PI * 2) * PULSE_AMOUNT
+          ? 1 +
+            Math.sin(this._pulseTimer * PULSE_SPEED * Math.PI * 2) *
+              PULSE_AMOUNT
           : 1,
     };
   };

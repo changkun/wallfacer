@@ -203,7 +203,9 @@ describe("office coordinator", () => {
     // Toggle button should be visible
     expect(elements["office-toggle"].classList.contains("hidden")).toBe(false);
     // Canvas + SR summary + minimap should be appended to container
-    expect(elements["office-container"].children.length).toBeGreaterThanOrEqual(1);
+    expect(elements["office-container"].children.length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 
   it("showOffice hides board and shows office-container", () => {

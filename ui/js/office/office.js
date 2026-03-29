@@ -53,7 +53,11 @@
 
     // Interaction layer
     if (window._officeInteraction) {
-      var interaction = new window._officeInteraction(_canvas, _camera, _characterManager);
+      var interaction = new window._officeInteraction(
+        _canvas,
+        _camera,
+        _characterManager,
+      );
       _renderer.setInteraction(interaction);
     }
 
@@ -74,7 +78,7 @@
       if (_currentLayout) {
         _camera.clamp(
           _currentLayout.tileMap.width * window._officeTileSize,
-          _currentLayout.tileMap.height * window._officeTileSize
+          _currentLayout.tileMap.height * window._officeTileSize,
         );
       }
     });
@@ -134,14 +138,11 @@
       _renderer.setLayout(
         _currentLayout.tileMap,
         _currentLayout.furniture,
-        _currentLayout.seats
+        _currentLayout.seats,
       );
     }
     if (_characterManager) {
-      _characterManager.setLayout(
-        _currentLayout.tileMap,
-        _currentLayout.seats
-      );
+      _characterManager.setLayout(_currentLayout.tileMap, _currentLayout.seats);
     }
   }
 
@@ -167,10 +168,7 @@
 
   function _applySync(activeTasks) {
     // Expand layout if needed
-    if (
-      _currentLayout &&
-      activeTasks.length > _currentLayout.seats.length
-    ) {
+    if (_currentLayout && activeTasks.length > _currentLayout.seats.length) {
       updateLayout(activeTasks.length);
     }
     _characterManager.syncTasks(activeTasks);

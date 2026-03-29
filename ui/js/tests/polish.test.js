@@ -14,7 +14,10 @@ const jsDir = join(__dirname, "..");
 function makeCameraContext() {
   const windowObj = {};
   const ctx = vm.createContext({ window: windowObj, Math, Object, console });
-  vm.runInContext(readFileSync(join(jsDir, "office", "camera.js"), "utf-8"), ctx);
+  vm.runInContext(
+    readFileSync(join(jsDir, "office", "camera.js"), "utf-8"),
+    ctx,
+  );
   return windowObj;
 }
 
@@ -257,7 +260,9 @@ describe("View preference", () => {
   });
 
   it("auto-shows office when preference is true", () => {
-    const ctx = makeOfficeContext({ storage: { "wallfacer-office-view": "true" } });
+    const ctx = makeOfficeContext({
+      storage: { "wallfacer-office-view": "true" },
+    });
     initCtx(ctx);
     // In dev mode, _autoShowFromPref is called synchronously
     expect(ctx.windowObj._officeIsVisible()).toBe(true);
@@ -274,9 +279,7 @@ describe("Minimap", () => {
     // Default layout has 6 desks, below threshold
     // Minimap exists but should not be visible
     // We test via the sync path
-    windowObj._officeSyncTasks([
-      { id: "a", status: "backlog" },
-    ]);
+    windowObj._officeSyncTasks([{ id: "a", status: "backlog" }]);
     // 6 seats < 20 threshold → minimap hidden (canvas display=none)
   });
 

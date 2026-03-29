@@ -228,9 +228,7 @@ describe("office SSE integration", () => {
 
     // Status change
     ctx._taskChangeListeners[0]([{ id: "a", status: "in_progress" }]);
-    expect(
-      ch.state === "walk_to_desk" || ch.state === "working",
-    ).toBe(true);
+    expect(ch.state === "walk_to_desk" || ch.state === "working").toBe(true);
   });
 
   it("task deleted triggers DESPAWN", () => {

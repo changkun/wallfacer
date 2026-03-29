@@ -168,10 +168,7 @@
 
     // Place common area at bottom
     var commonY =
-      originY +
-      clusterRows * CLUSTER_H +
-      (clusterRows - 1) * CLUSTER_GAP_Y +
-      1;
+      originY + clusterRows * CLUSTER_H + (clusterRows - 1) * CLUSTER_GAP_Y + 1;
     placeCommonArea(map, originX, commonY, interiorW);
 
     return {

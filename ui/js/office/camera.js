@@ -173,12 +173,16 @@
       }
     });
 
-    canvas.addEventListener("wheel", function (e) {
-      e.preventDefault();
-      var dir = e.deltaY < 0 ? 1 : -1;
-      camera.setZoom(camera.zoom + dir);
-      if (onChange) onChange();
-    }, { passive: false });
+    canvas.addEventListener(
+      "wheel",
+      function (e) {
+        e.preventDefault();
+        var dir = e.deltaY < 0 ? 1 : -1;
+        camera.setZoom(camera.zoom + dir);
+        if (onChange) onChange();
+      },
+      { passive: false },
+    );
   }
 
   function pinchDistance(pointers) {

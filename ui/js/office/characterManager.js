@@ -83,7 +83,9 @@
     var overflow = this._seats.length > 0 ? this._seats.length - 1 : 0;
     this._deskAssignments[taskId] = overflow;
     this._saveAssignments();
-    return this._seats[overflow] || { x: 1, y: 1, direction: "down", deskIndex: 0 };
+    return (
+      this._seats[overflow] || { x: 1, y: 1, direction: "down", deskIndex: 0 }
+    );
   };
 
   CharacterManager.prototype.pruneStaleAssignments = function (validIds) {
@@ -168,10 +170,7 @@
 
   CharacterManager.prototype._saveAssignments = function () {
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(this._deskAssignments)
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this._deskAssignments));
     } catch (e) {
       // localStorage full or unavailable — silently ignore
     }

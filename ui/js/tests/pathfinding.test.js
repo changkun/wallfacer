@@ -14,10 +14,7 @@ function makeContext() {
   const tileMapSrc = readFileSync(join(jsDir, "office", "tileMap.js"), "utf-8");
   vm.runInContext(tileMapSrc, ctx);
 
-  const pfSrc = readFileSync(
-    join(jsDir, "office", "pathfinding.js"),
-    "utf-8",
-  );
+  const pfSrc = readFileSync(join(jsDir, "office", "pathfinding.js"), "utf-8");
   vm.runInContext(pfSrc, ctx);
 
   return windowObj;

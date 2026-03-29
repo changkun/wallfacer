@@ -399,8 +399,7 @@
     var dirName = dirs[info.direction] || "down";
 
     var animDef = anims[animName] || anims.idle;
-    var dirDef =
-      animDef[dirName] ||
+    var dirDef = animDef[dirName] ||
       animDef.down || { megaRow: 0, col: 0, frames: 1 };
 
     var frameIdx = info.frameIndex % dirDef.frames;

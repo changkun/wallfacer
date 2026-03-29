@@ -32,8 +32,7 @@
 
         if (nkey in visited) continue;
 
-        var passable =
-          tileMap.isPassable(nx, ny) || (extra && extra.has(nkey));
+        var passable = tileMap.isPassable(nx, ny) || (extra && extra.has(nkey));
         if (!passable) continue;
 
         visited[nkey] = cur;

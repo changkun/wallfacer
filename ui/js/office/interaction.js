@@ -152,9 +152,7 @@
       var bx = d.x * TILE - 11 / 2 + 8;
       var by = d.y * TILE - bubbleH - 2;
       if (wx >= bx && wx <= bx + 11 && wy >= by && wy <= by + bubbleH) {
-        return this._mgr.getCharacterByTaskId(
-          this._findTaskIdByDrawInfo(d),
-        );
+        return this._mgr.getCharacterByTaskId(this._findTaskIdByDrawInfo(d));
       }
     }
     return null;
@@ -246,7 +244,11 @@
 
   // ---- Tooltip ----
 
-  OfficeInteraction.prototype._showTooltipForCharacter = function (ch, clientX, clientY) {
+  OfficeInteraction.prototype._showTooltipForCharacter = function (
+    ch,
+    clientX,
+    clientY,
+  ) {
     if (!this._tooltip) {
       this._tooltip = document.createElement("div");
       this._tooltip.id = "office-tooltip";

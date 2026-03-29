@@ -93,7 +93,14 @@ function makeContext() {
     vm.runInContext(readFileSync(join(jsDir, f), "utf-8"), ctx);
   }
 
-  return { windowObj, canvas, canvasEvents, docEvents, openModalCalls, tooltipEl };
+  return {
+    windowObj,
+    canvas,
+    canvasEvents,
+    docEvents,
+    openModalCalls,
+    tooltipEl,
+  };
 }
 
 function fire(events, type, data) {
@@ -106,7 +113,10 @@ function setupInteraction() {
 
   // Create a layout and manager with characters
   const layout = windowObj._officeGenerateLayout(6);
-  const mgr = new windowObj._officeCharacterManager(layout.tileMap, layout.seats);
+  const mgr = new windowObj._officeCharacterManager(
+    layout.tileMap,
+    layout.seats,
+  );
   mgr.syncTasks([
     { id: "task-a", status: "backlog" },
     { id: "task-b", status: "backlog" },
@@ -157,13 +167,29 @@ describe("OfficeInteraction", () => {
     // First select
     const px = chA.x * 16 + 8;
     const py = chA.y * 16 + 8;
-    fire(canvasEvents, "pointerdown", { clientX: px, clientY: py, pointerType: "mouse" });
-    fire(canvasEvents, "pointerup", { clientX: px, clientY: py, pointerType: "mouse" });
+    fire(canvasEvents, "pointerdown", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
+    fire(canvasEvents, "pointerup", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
     expect(interaction.getSelectedId()).toBe("task-a");
 
     // Click empty space
-    fire(canvasEvents, "pointerdown", { clientX: 1, clientY: 1, pointerType: "mouse" });
-    fire(canvasEvents, "pointerup", { clientX: 1, clientY: 1, pointerType: "mouse" });
+    fire(canvasEvents, "pointerdown", {
+      clientX: 1,
+      clientY: 1,
+      pointerType: "mouse",
+    });
+    fire(canvasEvents, "pointerup", {
+      clientX: 1,
+      clientY: 1,
+      pointerType: "mouse",
+    });
     expect(interaction.getSelectedId()).toBeNull();
   });
 
@@ -174,26 +200,51 @@ describe("OfficeInteraction", () => {
     const py = chA.y * 16 + 8;
 
     // First click
-    fire(canvasEvents, "pointerdown", { clientX: px, clientY: py, pointerType: "mouse" });
-    fire(canvasEvents, "pointerup", { clientX: px, clientY: py, pointerType: "mouse" });
+    fire(canvasEvents, "pointerdown", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
+    fire(canvasEvents, "pointerup", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
 
     // Second click (double-tap)
-    fire(canvasEvents, "pointerdown", { clientX: px, clientY: py, pointerType: "mouse" });
-    fire(canvasEvents, "pointerup", { clientX: px, clientY: py, pointerType: "mouse" });
+    fire(canvasEvents, "pointerdown", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
+    fire(canvasEvents, "pointerup", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
 
     expect(openModalCalls).toContain("task-a");
   });
 
   it("Escape key clears selection", () => {
-    const { interaction, canvasEvents, docEvents, chA, windowObj } = setupInteraction();
+    const { interaction, canvasEvents, docEvents, chA, windowObj } =
+      setupInteraction();
 
     // Mock _officeIsVisible
     windowObj._officeIsVisible = () => true;
 
     const px = chA.x * 16 + 8;
     const py = chA.y * 16 + 8;
-    fire(canvasEvents, "pointerdown", { clientX: px, clientY: py, pointerType: "mouse" });
-    fire(canvasEvents, "pointerup", { clientX: px, clientY: py, pointerType: "mouse" });
+    fire(canvasEvents, "pointerdown", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
+    fire(canvasEvents, "pointerup", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
     expect(interaction.getSelectedId()).toBe("task-a");
 
     fire(docEvents, "keydown", { key: "Escape" });
@@ -220,7 +271,11 @@ describe("OfficeInteraction", () => {
     const px = chA.x * 16 + 8;
     const py = chA.y * 16 + 8;
 
-    fire(canvasEvents, "pointerdown", { clientX: px, clientY: py, pointerType: "mouse" });
+    fire(canvasEvents, "pointerdown", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
     // Move significantly
     fire(canvasEvents, "pointermove", {
       clientX: px + 20,
@@ -242,7 +297,11 @@ describe("OfficeInteraction", () => {
     const px = chA.x * 16 + 8;
     const py = chA.y * 16 + 8;
 
-    fire(canvasEvents, "pointerdown", { clientX: px, clientY: py, pointerType: "mouse" });
+    fire(canvasEvents, "pointerdown", {
+      clientX: px,
+      clientY: py,
+      pointerType: "mouse",
+    });
     // Move less than threshold
     fire(canvasEvents, "pointermove", {
       clientX: px + 2,

@@ -47,15 +47,21 @@ function makeMockCtx() {
     font: "",
     textAlign: "",
     textBaseline: "",
-    beginPath() { calls.push({ op: "beginPath" }); },
+    beginPath() {
+      calls.push({ op: "beginPath" });
+    },
     closePath() {},
     arc() {},
     arcTo() {},
     moveTo() {},
     lineTo() {},
-    fill() { calls.push({ op: "fill" }); },
+    fill() {
+      calls.push({ op: "fill" });
+    },
     stroke() {},
-    strokeRect(...args) { calls.push({ op: "strokeRect", args }); },
+    strokeRect(...args) {
+      calls.push({ op: "strokeRect", args });
+    },
   };
 }
 
@@ -134,7 +140,11 @@ describe("OfficeRenderer", () => {
     const { windowObj, canvasEl } = makeContext();
     const spriteCache = {};
     const camera = { x: 0, y: 0, zoom: 3 };
-    const renderer = new windowObj._officeRenderer(canvasEl, spriteCache, camera);
+    const renderer = new windowObj._officeRenderer(
+      canvasEl,
+      spriteCache,
+      camera,
+    );
     expect(renderer).toBeDefined();
   });
 
