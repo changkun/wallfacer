@@ -101,7 +101,7 @@ describe("initTerminal", () => {
     ctx.initTerminal();
     expect(ctx.Terminal).toHaveBeenCalledOnce();
     const args = ctx.Terminal.mock.calls[0][0];
-    expect(args.theme.background).toBe("#1e1e1e");
+    expect(args.theme.background).toBe("#1a1917");
     expect(args.theme.foreground).toBe("#cccccc");
     expect(args.theme.cursor).toBe("#4e8cff");
   });

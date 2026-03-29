@@ -32,7 +32,7 @@ function _getCSSVar(name) {
  */
 function _buildTermTheme() {
   return {
-    background: _getCSSVar("--bg-card") || "#272420",
+    background: _getCSSVar("--bg") || "#1a1917",
     foreground: _getCSSVar("--text") || "#cccccc",
     cursor: _getCSSVar("--accent") || "#4e8cff",
     selectionBackground: "rgba(78,140,255,0.3)",

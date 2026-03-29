@@ -1,3 +1,17 @@
+<!-- Terminal panel (above status bar, pops up from its top edge) -->
+<div
+  id="status-bar-panel"
+  class="status-bar-panel hidden"
+  role="region"
+  aria-label="Terminal panel"
+></div>
+<div
+  id="status-bar-panel-resize"
+  class="status-bar-panel-resize hidden"
+  role="separator"
+  aria-orientation="horizontal"
+  aria-label="Resize terminal panel"
+></div>
 <!-- Status bar (hidden on mobile; mobile uses #mobile-col-nav) -->
 <footer
   id="status-bar"
@@ -63,7 +77,7 @@
       id="status-bar-depgraph-btn"
       class="status-bar-btn"
       onclick="toggleDependencyGraph()"
-      title="Toggle dependency graph (&#96; to cycle)"
+      title="Toggle dependency graph (Ctrl+&#96; to cycle)"
       aria-expanded="false"
     >
       Dep Graph
@@ -72,25 +86,11 @@
       id="status-bar-terminal-btn"
       class="status-bar-btn"
       onclick="toggleTerminalPanel()"
-      title="Toggle terminal panel (&#96; to cycle)"
+      title="Toggle terminal panel (Ctrl+&#96; to cycle)"
       aria-expanded="false"
       aria-controls="status-bar-panel"
     >
-      Terminal <kbd class="status-bar-kbd">&#96;</kbd>
+      Terminal <kbd class="status-bar-kbd">&#94;&#96;</kbd>
     </button>
   </div>
 </footer>
-<!-- Terminal stub panel (populated by future PRs) -->
-<div
-  id="status-bar-panel-resize"
-  class="status-bar-panel-resize hidden"
-  role="separator"
-  aria-orientation="horizontal"
-  aria-label="Resize terminal panel"
-></div>
-<div
-  id="status-bar-panel"
-  class="status-bar-panel hidden"
-  role="region"
-  aria-label="Terminal panel"
-></div>

@@ -3,16 +3,11 @@
 // workspace, in-progress count, waiting count, and a stub terminal panel.
 
 function initStatusBar() {
-  // Keyboard shortcut: backtick cycles bottom panels:
+  // Keyboard shortcut: Ctrl+` cycles bottom panels:
   //   nothing open → terminal → dep graph → close (all hidden)
   document.addEventListener("keydown", function (e) {
-    if (e.key !== "`") return;
-    var tag = document.activeElement && document.activeElement.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-    var ce =
-      document.activeElement &&
-      document.activeElement.getAttribute("contenteditable");
-    if (ce !== null && ce !== "false") return;
+    if (e.key !== "`" || !e.ctrlKey) return;
+    if (e.metaKey || e.altKey || e.shiftKey) return;
     e.preventDefault();
     _cycleBottomPanel();
   });

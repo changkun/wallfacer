@@ -98,7 +98,7 @@
   height: 4px;
   cursor: ns-resize;
   background: transparent;
-  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   transition: background 0.15s;
 }
 .status-bar-panel-resize:hover,
@@ -111,7 +111,7 @@
 .status-bar-panel {
   flex-shrink: 0;
   height: 260px;
-  background: var(--bg-card);
+  background: var(--bg);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -121,14 +121,15 @@
 }
 #status-bar-panel .xterm {
   height: 100%;
-  background: var(--bg-card);
+  padding: 0 8px;
+  background: var(--bg);
 }
 #status-bar-panel .xterm-viewport {
   overflow-y: auto;
-  background: var(--bg-card) !important;
+  background: var(--bg) !important;
 }
 #status-bar-panel .xterm-screen {
-  background: var(--bg-card);
+  background: var(--bg);
 }
 .terminal-reconnecting {
   position: absolute;
@@ -136,7 +137,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-card);
+  background: var(--bg);
   opacity: 0.85;
   color: var(--text-secondary);
   font-size: 0.875rem;
