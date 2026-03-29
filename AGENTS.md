@@ -12,7 +12,7 @@ For detailed documentation see `docs/`. The user manual is at `docs/guide/usage.
 
 Design specs live in `specs/`, organized by track:
 - `specs/foundations/` — completed abstraction interfaces (sandbox, storage, container reuse, file explorer, terminal)
-- `specs/local/` — local product and UX (epic coordination, desktop app, attachments, terminal extensions, enhancements)
+- `specs/local/` — local product and UX (spec coordination, desktop app, attachments, terminal extensions, enhancements)
 - `specs/cloud/` — cloud platform (tenant filesystem, K8s sandbox, multi-tenant, tenant API)
 - `specs/shared/` — cross-track specs (authentication, agent abstraction, native sandboxes, overlay snapshots)
 

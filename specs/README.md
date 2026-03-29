@@ -15,7 +15,7 @@ Foundations (complete)
   ✅ Host Terminal
 
 Local Product                          Cloud Platform
-  ○ Epic Coordination                    ○ Cloud Deployment (overview)
+  ○ Spec Coordination                    ○ Cloud Deployment (overview)
   ✅ Desktop App                          ○ Tenant Filesystem
   ○ File/Image Attachments               ○ K8s Sandbox Backend
   ○ Host Mounts                          ○ Cloud Infrastructure
@@ -54,7 +54,10 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [epic-coordination.md](local/epic-coordination.md) | Not started | Planner tasks (spec → tasks), dependency-aware board.json, gate tasks, epic progress tracking |
+| [spec-coordination.md](local/spec-coordination.md) | Not started | Umbrella: recursive spec tree model, dispatch workflow, cross-task context |
+| ↳ [spec-document-model.md](local/spec-document-model.md) | Not started | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
+| ↳ [spec-drift-detection.md](local/spec-drift-detection.md) | Not started | Drift detection, propagation through spec tree, `affects` field |
+| ↳ [spec-planning-ux.md](local/spec-planning-ux.md) | Not started | Spec explorer, chat-driven iteration, dispatch workflow, progress tracking |
 | [desktop-app.md](local/desktop-app.md) | **Complete** | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
 | [file-attachments.md](local/file-attachments.md) | Not started | Drag-and-drop file and image attachments for task prompts |
 | [host-mounts.md](local/host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
@@ -70,7 +73,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 ### Local product dependencies
 
 ```
-File Explorer (done) ──▶ Epic Coordination
+File Explorer (done) ──▶ Spec Coordination
                      ──▶ File Attachments
                      ──▶ Host Mounts
                      ──▶ File Panel Viewer
