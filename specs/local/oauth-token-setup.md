@@ -127,6 +127,49 @@ OpenAI Codex
 - The manual paste input remains fully functional — sign-in is an alternative, not a replacement.
 - If a custom `ANTHROPIC_BASE_URL` or `OPENAI_BASE_URL` is set, the sign-in button is hidden (custom endpoints won't use the standard OAuth providers).
 
+### First Launch & Missing Credentials
+
+When the app starts with no tokens configured (empty `~/.wallfacer/.env` or missing credential keys), the user should be guided toward the OAuth sign-in flow instead of requiring them to figure out where to get tokens.
+
+**Detection:** On startup, the server already loads `~/.wallfacer/.env` via `envconfig.Parse()`. If neither `CLAUDE_CODE_OAUTH_TOKEN` nor `ANTHROPIC_API_KEY` is set (and similarly for `OPENAI_API_KEY`), the `GET /api/env` response already reflects empty values.
+
+**UI behavior:**
+
+- When the Settings API Configuration panel loads and detects no credentials for a provider, the token input shows a placeholder hint: **"No token configured"** and the **"Sign in"** button is visually emphasized (e.g., primary color instead of secondary) to draw attention.
+- On first app launch (desktop or browser), if no credentials are configured for any provider, the Settings panel can auto-open or show a toast: **"Set up your API credentials to get started"** with a link to Settings.
+- The `wallfacer doctor` CLI command should report missing credentials with a note that they can be set via the Settings UI sign-in flow.
+
+**Desktop app integration:**
+
+Since the desktop app (via Wails) is now shipped, the OAuth flow must work correctly within the native WebView:
+
+- **Browser launch:** The "Sign in" button must open the OAuth authorization URL in the system's default browser (not the Wails WebView), since OAuth providers may block embedded WebViews. Use `wails.Runtime.BrowserOpenURL()` in desktop mode, `window.open()` in browser mode.
+- **Callback return:** After the user completes authentication in the system browser, the callback hits `http://localhost:{port}/callback` on the ephemeral listener. The Wails WebView polls `/api/auth/{provider}/status` as usual and updates when the token is received. The system browser tab shows the success page.
+- **First-launch flow in desktop mode:** When the desktop app starts with no credentials, the first-launch hint described above appears in the Wails WebView window. The user clicks "Sign in", the system browser opens for OAuth, and the token flows back to the app seamlessly.
+
+### Invalid Token Detection & Re-authentication
+
+When existing tokens are invalid or expired, the system should detect this and guide users to re-authenticate via the OAuth sign-in flow rather than leaving them to debug opaque failures.
+
+**Detection points:**
+
+- **`POST /api/env/test`** — The existing credential test endpoint already validates tokens by running a test container. When this returns an authentication error (401/403 from the provider), the response should include a `reauth_available: true` flag for providers that support OAuth sign-in.
+- **Task execution failure** — When a task fails during execution due to an authentication error (detected from container exit code or output), the task's error event should include a `reauth_available` flag. The UI can then show a "Sign in again" action alongside the error.
+
+**UI behavior:**
+
+- In the Settings API Configuration panel, if a stored token fails validation (via the "Test" button or background check), show an inline warning: **"Token invalid or expired"** with a **"Sign in again"** button that triggers the OAuth flow.
+- On the task board, if a task fails with an auth error, the task card's error message includes a **"Re-authenticate"** link that opens the Settings panel with the relevant provider's sign-in flow highlighted.
+- After a successful re-authentication, any tasks that failed due to auth errors can be retried with the new token.
+
+**Flow:**
+
+1. User clicks "Test" in Settings or a task fails with auth error.
+2. System detects the error is authentication-related (401, 403, "invalid token", "expired token" patterns).
+3. UI displays the error with a "Sign in again" call-to-action (only when OAuth sign-in is available for that provider — i.e., no custom base URL set).
+4. User clicks "Sign in again" → standard OAuth flow triggers.
+5. On success, token is updated in `.env` and UI refreshes.
+
 ### Error Handling
 
 - If the callback listener fails to start (port unavailable), return an error to the frontend.
@@ -148,8 +191,10 @@ OpenAI Codex
 
 - `internal/apicontract/routes.go` — Register new auth routes
 - `internal/handler/handler.go` — Wire auth handler with dependencies
-- `ui/partials/api-config-modal.html` — Add sign-in buttons
-- `ui/js/envconfig.js` — Sign-in button click handlers, polling logic
+- `internal/handler/env.go` — Extend `POST /api/env/test` response with `reauth_available` flag on auth errors
+- `internal/cli/desktop.go` — Use `BrowserOpenURL` for OAuth authorization URLs in desktop mode
+- `ui/partials/api-config-modal.html` — Add sign-in buttons, first-launch hints, re-auth warnings
+- `ui/js/envconfig.js` — Sign-in button click handlers, polling logic, invalid-token detection, first-launch emphasis
 
 ### Not in scope
 
@@ -168,3 +213,7 @@ OpenAI Codex
 - Test concurrent flow cancellation: start a flow, start another for the same provider, verify the first is cancelled.
 - Test UI: sign-in button disabled when custom base URL is set.
 - Frontend test: polling stops on success/error/cancel.
+- Test first-launch detection: when no credentials are configured, UI emphasizes sign-in buttons.
+- Test invalid token response: `POST /api/env/test` returns `reauth_available: true` on 401/403 auth errors.
+- Test re-auth flow: after token validation fails, "Sign in again" triggers a new OAuth flow and updates the stored token.
+- Test desktop browser launch: OAuth authorization URL opens in system browser (not WebView) when running in desktop mode.
