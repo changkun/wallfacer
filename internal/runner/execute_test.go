@@ -1896,9 +1896,9 @@ func TestMockSessionIDPassedToResume(t *testing.T) {
 	}
 	r.Run(task.ID, "do the task", "", false)
 
-	calls := mock.RunArgsCalls()
+	calls := filterTaskCalls(mock.RunArgsCalls())
 	if len(calls) != 2 {
-		t.Fatalf("expected 2 RunArgs calls, got %d", len(calls))
+		t.Fatalf("expected 2 task RunArgs calls, got %d", len(calls))
 	}
 
 	// Turn 2 args must contain "--resume" followed by the session ID.
