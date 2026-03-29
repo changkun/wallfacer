@@ -1,6 +1,6 @@
 # Task 7: Env Test Reauth Flag
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Server integration
 **Effort:** Small
