@@ -1,6 +1,6 @@
 # Task 4: Camera
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Phase 1 (Rendering Foundation)
 **Effort:** Small
