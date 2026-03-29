@@ -1674,6 +1674,20 @@ func setupRunnerWithMockBackend(t testing.TB, workspaces []string, mock *MockSan
 	return s, r
 }
 
+// filterTaskCalls returns only Launch calls for task execution containers,
+// excluding oversight, title, and other background agent containers.
+func filterTaskCalls(calls []ContainerCall) []ContainerCall {
+	var filtered []ContainerCall
+	for _, c := range calls {
+		if strings.HasPrefix(c.Name, "wallfacer-oversight-") ||
+			strings.HasPrefix(c.Name, "wallfacer-title-") {
+			continue
+		}
+		filtered = append(filtered, c)
+	}
+	return filtered
+}
+
 // TestMockMaxTokensAutoContinue verifies that stop_reason="max_tokens" on turn 1
 // triggers an auto-continue and the task completes after stop_reason="end_turn"
 // on turn 2. Two RunArgs calls must be recorded.
@@ -1704,9 +1718,9 @@ func TestMockMaxTokensAutoContinue(t *testing.T) {
 	if updated.Turns < 2 {
 		t.Fatalf("expected at least 2 turns, got %d", updated.Turns)
 	}
-	calls := mock.RunArgsCalls()
+	calls := filterTaskCalls(mock.RunArgsCalls())
 	if len(calls) != 2 {
-		t.Fatalf("expected exactly 2 RunArgs calls, got %d", len(calls))
+		t.Fatalf("expected exactly 2 task RunArgs calls, got %d", len(calls))
 	}
 }
 
@@ -1740,9 +1754,9 @@ func TestMockPauseTurnAutoContinue(t *testing.T) {
 	if updated.Turns < 2 {
 		t.Fatalf("expected at least 2 turns after pause_turn auto-continue, got %d", updated.Turns)
 	}
-	calls := mock.RunArgsCalls()
+	calls := filterTaskCalls(mock.RunArgsCalls())
 	if len(calls) != 2 {
-		t.Fatalf("expected exactly 2 RunArgs calls, got %d", len(calls))
+		t.Fatalf("expected exactly 2 task RunArgs calls, got %d", len(calls))
 	}
 }
 
