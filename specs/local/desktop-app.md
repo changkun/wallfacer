@@ -1,6 +1,6 @@
 # Native Desktop App
 
-**Status:** Complete | **Date:** 2026-02-21
+**Status:** Complete | **Date:** 2026-02-21 → 2026-03-29
 
 ## Goal
 
@@ -177,15 +177,15 @@ Would run the Go binary as a child process. Adds ~150 MB for bundled Chromium, i
 
 | # | Task | Depends on | Effort | Status |
 |---|------|-----------|--------|--------|
-| 1 | [Wails dependency & scaffold](desktop-app/task-01-wails-dependency.md) | — | Small | Todo |
-| 2 | [Desktop subcommand & Wails window](desktop-app/task-02-wails-window.md) | 1 | Medium | Todo |
-| 3 | [System tray — static skeleton](desktop-app/task-03-tray-skeleton.md) | 2 | Medium | Todo |
-| 4 | [System tray — health polling & dynamic state](desktop-app/task-04-tray-health-polling.md) | 3 | Medium | Todo |
-| 5 | [System tray — automation toggles](desktop-app/task-05-tray-toggles.md) | 4 | Medium | Todo |
-| 6 | [System tray — cost & stats display](desktop-app/task-06-tray-cost-display.md) | 4 | Small | Todo |
-| 7 | [Platform-specific behaviors](desktop-app/task-07-platform-behaviors.md) | 3 | Medium | Todo |
-| 8 | [App icons & build packaging](desktop-app/task-08-icons-packaging.md) | 2, 7 | Medium | Todo |
-| 9 | [CI builds & release distribution](desktop-app/task-09-ci-distribution.md) | 8 | Large | Todo |
+| 1 | [Wails dependency & scaffold](desktop-app/task-01-wails-dependency.md) | — | Small | Done |
+| 2 | [Desktop subcommand & Wails window](desktop-app/task-02-wails-window.md) | 1 | Medium | Done |
+| 3 | [System tray — static skeleton](desktop-app/task-03-tray-skeleton.md) | 2 | Medium | Done |
+| 4 | [System tray — health polling & dynamic state](desktop-app/task-04-tray-health-polling.md) | 3 | Medium | Done |
+| 5 | [System tray — automation toggles](desktop-app/task-05-tray-toggles.md) | 4 | Medium | Done |
+| 6 | [System tray — cost & stats display](desktop-app/task-06-tray-cost-display.md) | 4 | Small | Done |
+| 7 | [Platform-specific behaviors](desktop-app/task-07-platform-behaviors.md) | 3 | Medium | Done |
+| 8 | [App icons & build packaging](desktop-app/task-08-icons-packaging.md) | 2, 7 | Medium | Done |
+| 9 | [CI builds & release distribution](desktop-app/task-09-ci-distribution.md) | 8 | Large | Done |
 
 ```mermaid
 graph LR
@@ -199,3 +199,39 @@ graph LR
   7 --> 8
   8 --> 9[Task 9: CI & distribution]
 ```
+
+---
+
+## Outcome
+
+Wallfacer now ships as a native desktop application on macOS (.app), Windows (.exe), and Linux. The `wallfacer desktop` subcommand (or double-clicking the .app) starts the HTTP server in the background and opens a native WebView window. A persistent system tray icon provides at-a-glance status, automation toggles, cost display, and graceful shutdown with a progress overlay.
+
+### What Shipped
+
+- **Desktop subcommand** with build-tag-gated (`//go:build desktop`) Wails integration; default `go build` remains CGo-free
+- **Shared `initServer()` helper** extracted from `RunServer()` so both CLI and desktop modes reuse the same server initialization
+- **System tray** via `fyne.io/systray` with: status counts (in-progress, waiting, backlog), automation toggles (autopilot, auto-test, auto-submit, auto-sync), cost display (today + total), uptime, and dynamic icon state (idle/active/attention)
+- **Platform-specific behaviors**: macOS TitleBarHiddenInset with CSS drag region, hide-on-close to tray, Cmd+Q override via app menu; Windows frameless window with .ico tray icon; Linux GNOME AppIndicator note
+- **Graceful shutdown overlay** with live progress updates (pending goroutine names) shown from both tray Quit and Cmd+Q
+- **App icons**: 1024px master PNG, macOS .icns, Windows .ico (16/32/48/256), tray icons (idle/active/attention at 1x and 2x) — brick wall motif matching the frontend header
+- **Build packaging**: `wails.json`, `build/darwin/Info.plist`, `build/windows/` manifest and version info; Makefile targets (`build-desktop`, `build-desktop-darwin/windows/linux`); Wails CLI tracked as `go.mod` tool dependency
+- **CI workflow**: `.github/workflows/release-desktop.yml` with 3-platform matrix, optional macOS code signing + notarization, optional Windows Authenticode signing, secret guards for forks
+- **Tests**: `TestInitServer`, `TestRunDesktopStub`, `TestTrayManagerNew`, `TestIconState` (9 cases), `TestFormatTooltip`, `TestFormatDuration`, `TestPollHealthResponse`, `TestPollHealthWithAPIKey`, `TestParseConfigToggles`, `TestToggleSendsCorrectPayload`, `TestToggleFailurePreservesState`, `TestParseStatsResponse`, `TestExtractTodayCostMissing`, `TestFormatCostShort`, `TestStatsErrorFallback`, `TestHideOnCloseLogic`, `TestAppIconFilesExist`, `TestWailsJSONExists`
+
+### Design Evolution
+
+1. **Reverse proxy instead of Wails AssetServer.Assets** — The spec prescribed `URL: "http://localhost:<port>"` on `options.App`, but Wails v2 has no URL field. Used `httputil.NewSingleHostReverseProxy` as the `AssetServer.Handler` instead. This proxies all HTTP/SSE requests while preserving Wails WebView integration (frameless window, CSS drag).
+
+2. **Direct WebSocket for terminal** — The Wails AssetServer `ResponseWriter` does not implement `http.Hijacker`, so WebSocket upgrades cannot go through the reverse proxy. The terminal JS discovers the real server port via `GET /api/desktop-port` (only present in desktop mode) and connects `ws://localhost:<port>` directly.
+
+3. **`fyne.io/systray` instead of Wails systray API** — Wails v2 has no public systray API (the `TrayMenu` type exists internally but isn't exposed). Used `fyne.io/systray` with `RunWithExternalLoop` to coexist with the Wails event loop.
+
+4. **Cmd+Q via app menu override** — Wails' `OnShutdown` fires after the window is destroyed, making `WindowExecJS` ineffective for showing the shutdown overlay. Added a custom Wails `Menu` with Cmd+Q bound to `doShutdown()` where the window is still alive.
+
+5. **`DefaultSubcommand()` for Finder launch** — macOS launches `.app` binaries without arguments. Added build-tag-gated `DefaultSubcommand()` that returns `"desktop"` (desktop builds) or prints usage and exits (CLI builds).
+
+6. **CSRF skip in desktop mode** — The Wails WebView origin (`wails://wails.localhost`) doesn't match the server's `localhost:<port>`, causing CSRF validation to reject mutating requests. Desktop mode sets `SkipCSRF: true` since all requests come from the local WebView.
+
+7. **Windows balloon notification skipped** — `fyne.io/systray` does not support Windows balloon/toast notifications. The tray icon appearance provides sufficient indication.
+
+8. **macOS dock icon click skipped** — Wails v2 has no public API for `applicationShouldHandleReopen`. Users reopen via "Open Dashboard" in the tray menu or left-click on the tray icon.
