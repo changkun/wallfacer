@@ -15,6 +15,7 @@ import (
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -112,18 +113,18 @@ func workspaceMutationBlockingTasks(ctx context.Context, s *store.Store, workspa
 func (h *Handler) refuseWorkspaceMutationIfBlocked(w http.ResponseWriter, r *http.Request, workspace, action string) bool {
 	s, ok := h.currentStore()
 	if !ok || s == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
 		return true
 	}
 	blocking, err := workspaceMutationBlockingTasks(r.Context(), s, workspace)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		httpjson.Write(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return true
 	}
 	if len(blocking) == 0 {
 		return false
 	}
-	writeJSON(w, http.StatusConflict, workspaceMutationConflictResponse{
+	httpjson.Write(w, http.StatusConflict, workspaceMutationConflictResponse{
 		Error:         fmt.Sprintf("cannot %s workspace while tasks still depend on its local git state", action),
 		Workspace:     workspace,
 		BlockingTasks: blocking,
@@ -133,7 +134,7 @@ func (h *Handler) refuseWorkspaceMutationIfBlocked(w http.ResponseWriter, r *htt
 
 // GitStatus returns git status for every configured workspace.
 func (h *Handler) GitStatus(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, collectWorkspaceStatuses(h.currentWorkspaces()))
+	httpjson.Write(w, http.StatusOK, collectWorkspaceStatuses(h.currentWorkspaces()))
 }
 
 // GitStatusStream streams git status for all workspaces as SSE (5-second poll).
@@ -202,7 +203,7 @@ func (h *Handler) GitStatusStream(w http.ResponseWriter, r *http.Request) {
 // 400 error if it is not. Returns true when the caller should proceed.
 func requireGitRepo(w http.ResponseWriter, workspace string) bool {
 	if !gitutil.IsGitRepo(workspace) {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
+		httpjson.Write(w, http.StatusBadRequest, map[string]string{
 			"error": filepath.Base(workspace) + " is not a git repository",
 		})
 		return false
@@ -212,10 +213,10 @@ func requireGitRepo(w http.ResponseWriter, workspace string) bool {
 
 // GitPush runs `git push` for the requested workspace.
 func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Workspace string `json:"workspace"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -235,15 +236,15 @@ func (h *Handler) GitPush(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"output": out})
+	httpjson.Write(w, http.StatusOK, map[string]string{"output": out})
 }
 
 // GitSyncWorkspace fetches from remote and rebases the current branch onto its upstream.
 func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Workspace string `json:"workspace"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -280,15 +281,15 @@ func (h *Handler) GitSyncWorkspace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"output": out})
+	httpjson.Write(w, http.StatusOK, map[string]string{"output": out})
 }
 
 // GitRebaseOnMain fetches the remote default branch and rebases the current branch onto it.
 func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Workspace string `json:"workspace"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -328,7 +329,7 @@ func (h *Handler) GitRebaseOnMain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"output": out})
+	httpjson.Write(w, http.StatusOK, map[string]string{"output": out})
 }
 
 // TaskDiff returns the git diff for a task's worktrees versus the default branch.
@@ -342,7 +343,7 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 	if len(task.WorktreePaths) == 0 {
-		writeJSON(w, http.StatusOK, map[string]any{"diff": "", "behind_counts": map[string]int{}})
+		httpjson.Write(w, http.StatusOK, map[string]any{"diff": "", "behind_counts": map[string]int{}})
 		return
 	}
 
@@ -566,7 +567,7 @@ func (h *Handler) GitBranches(w http.ResponseWriter, r *http.Request) {
 		current = curOut
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpjson.Write(w, http.StatusOK, map[string]any{
 		"branches": branches,
 		"current":  current,
 	})
@@ -574,11 +575,11 @@ func (h *Handler) GitBranches(w http.ResponseWriter, r *http.Request) {
 
 // GitCheckout switches the active branch for a workspace.
 func (h *Handler) GitCheckout(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Workspace string `json:"workspace"`
 		Branch    string `json:"branch"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -607,16 +608,16 @@ func (h *Handler) GitCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"branch": req.Branch})
+	httpjson.Write(w, http.StatusOK, map[string]string{"branch": req.Branch})
 }
 
 // GitCreateBranch creates a new branch in the workspace and checks it out.
 func (h *Handler) GitCreateBranch(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Workspace string `json:"workspace"`
 		Branch    string `json:"branch"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -645,15 +646,15 @@ func (h *Handler) GitCreateBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"branch": req.Branch})
+	httpjson.Write(w, http.StatusOK, map[string]string{"branch": req.Branch})
 }
 
 // OpenFolder opens a workspace directory in the OS file manager (Finder on macOS, xdg-open on Linux).
 func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Path string `json:"path"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -677,7 +678,7 @@ func (h *Handler) OpenFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // isAllowedWorkspace checks that the workspace path is one the server was started with.

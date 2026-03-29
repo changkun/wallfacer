@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -20,7 +21,7 @@ func oversizedBody(fieldName string, size int) io.Reader {
 }
 
 // assertBodyTooLarge verifies that the response is a 413 with the expected
-// JSON error body from decodeJSONBody's MaxBytesError handling.
+// JSON error body from httpjson.DecodeBody's MaxBytesError handling.
 func assertBodyTooLarge(t *testing.T, w *httptest.ResponseRecorder) {
 	t.Helper()
 	if w.Code != http.StatusRequestEntityTooLarge {
@@ -201,11 +202,11 @@ func TestDecodeJSONBody_Returns413ForMaxBytesError(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/", oversizedBody("x", 100))
 	r.Body = http.MaxBytesReader(w, r.Body, 10)
 
-	var v struct {
+	_, ok := httpjson.DecodeBody[struct {
 		X string `json:"x"`
-	}
-	if ok := decodeJSONBody(w, r, &v); ok {
-		t.Fatal("expected decodeJSONBody to fail")
+	}](w, r)
+	if ok {
+		t.Fatal("expected DecodeBody to fail")
 	}
 
 	assertBodyTooLarge(t, w)

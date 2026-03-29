@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -221,5 +222,5 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, aggregateStats(tasks, h.store.LoadSummary))
+	httpjson.Write(w, http.StatusOK, aggregateStats(tasks, h.store.LoadSummary))
 }

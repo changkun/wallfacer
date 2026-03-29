@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -88,7 +89,7 @@ func TestPauseAllAutomation_OpensWatcherBreaker(t *testing.T) {
 // TestWriteJSON_SetsContentType verifies that writeJSON sets the correct content type.
 func TestWriteJSON_SetsContentType(t *testing.T) {
 	w := httptest.NewRecorder()
-	writeJSON(w, http.StatusOK, map[string]string{"key": "value"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"key": "value"})
 
 	ct := w.Header().Get("Content-Type")
 	if !strings.Contains(ct, "application/json") {
@@ -108,7 +109,7 @@ func TestWriteJSON_SetsStatusCode(t *testing.T) {
 	}
 	for _, tc := range tests {
 		w := httptest.NewRecorder()
-		writeJSON(w, tc.code, map[string]string{})
+		httpjson.Write(w, tc.code, map[string]string{})
 		if w.Code != tc.code {
 			t.Errorf("expected status %d, got %d", tc.code, w.Code)
 		}
@@ -118,7 +119,7 @@ func TestWriteJSON_SetsStatusCode(t *testing.T) {
 func TestWriteJSON_EncodesValue(t *testing.T) {
 	w := httptest.NewRecorder()
 	data := map[string]any{"count": 42, "name": "test"}
-	writeJSON(w, http.StatusOK, data)
+	httpjson.Write(w, http.StatusOK, data)
 
 	var decoded map[string]any
 	if err := json.NewDecoder(w.Body).Decode(&decoded); err != nil {
@@ -134,7 +135,7 @@ func TestWriteJSON_EncodesValue(t *testing.T) {
 
 func TestWriteJSON_EncodesSlice(t *testing.T) {
 	w := httptest.NewRecorder()
-	writeJSON(w, http.StatusOK, []string{"a", "b", "c"})
+	httpjson.Write(w, http.StatusOK, []string{"a", "b", "c"})
 
 	var decoded []string
 	if err := json.NewDecoder(w.Body).Decode(&decoded); err != nil {

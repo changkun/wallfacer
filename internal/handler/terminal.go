@@ -17,6 +17,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pty"
 	"github.com/coder/websocket"
 )
@@ -35,7 +36,7 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	if h.envFile != "" {
 		cfg, err := envconfig.Parse(h.envFile)
 		if err == nil && !cfg.TerminalEnabled {
-			writeJSON(w, http.StatusForbidden, map[string]string{"error": "terminal disabled"})
+			httpjson.Write(w, http.StatusForbidden, map[string]string{"error": "terminal disabled"})
 			return
 		}
 	}

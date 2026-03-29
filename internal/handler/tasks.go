@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -33,7 +34,7 @@ func (h *Handler) SearchTasks(w http.ResponseWriter, r *http.Request) {
 	if results == nil {
 		results = []store.TaskSearchResult{}
 	}
-	writeJSON(w, http.StatusOK, results)
+	httpjson.Write(w, http.StatusOK, results)
 }
 
 // ListSummaries returns all immutable task summaries (one per completed task).
@@ -49,7 +50,7 @@ func (h *Handler) ListSummaries(w http.ResponseWriter, _ *http.Request) {
 	if summaries == nil {
 		summaries = []store.TaskSummary{}
 	}
-	writeJSON(w, http.StatusOK, summaries)
+	httpjson.Write(w, http.StatusOK, summaries)
 }
 
 // ListTasks returns all tasks, optionally including archived ones.
@@ -114,7 +115,7 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 			resp.AfterCursor = page[0].ID.String()
 			resp.BeforeCursor = page[len(page)-1].ID.String()
 		}
-		writeJSON(w, http.StatusOK, resp)
+		httpjson.Write(w, http.StatusOK, resp)
 		return
 	}
 	tasks, err := h.store.ListTasks(r.Context(), includeArchived)
@@ -133,7 +134,7 @@ func (h *Handler) ListTasks(w http.ResponseWriter, r *http.Request) {
 		}
 		tasks = filterByFailureCategory(tasks, category)
 	}
-	writeJSON(w, http.StatusOK, tasks)
+	httpjson.Write(w, http.StatusOK, tasks)
 }
 
 // filterByFailureCategory returns only those tasks whose FailureCategory
@@ -150,7 +151,7 @@ func filterByFailureCategory(tasks []store.Task, cat store.FailureCategory) []st
 
 // CreateTask creates a new task in backlog status.
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Prompt             string                                 `json:"prompt"`
 		Goal               string                                 `json:"goal"`
 		Timeout            int                                    `json:"timeout"`
@@ -165,8 +166,8 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		ScheduledAt        *time.Time                             `json:"scheduled_at,omitempty"`
 		CustomPassPatterns []string                               `json:"custom_pass_patterns,omitempty"`
 		CustomFailPatterns []string                               `json:"custom_fail_patterns,omitempty"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 	if strings.TrimSpace(req.Prompt) == "" && req.Kind != store.TaskKindIdeaAgent {
@@ -210,7 +211,7 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		h.runner.GenerateTitleBackground(task.ID, task.Prompt)
 	}
 
-	writeJSON(w, http.StatusCreated, task)
+	httpjson.Write(w, http.StatusCreated, task)
 }
 
 // batchTaskInput describes a single task in a BatchCreateTasks request.
@@ -238,8 +239,8 @@ type batchCreateRequest struct {
 // If validation fails the store is untouched and the handler returns 400 or 422.
 // On success it returns 201 Created with tasks (in input order) and ref_to_id.
 func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
-	var req batchCreateRequest
-	if !decodeJSONBody(w, r, &req) {
+	req, ok := httpjson.DecodeBody[batchCreateRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -361,7 +362,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 				cycleRefs = append(cycleRefs, ref)
 			}
 		}
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+		httpjson.Write(w, http.StatusUnprocessableEntity, map[string]any{
 			"error": "cycle detected",
 			"cycle": cycleRefs,
 		})
@@ -401,7 +402,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 				if ref == "" {
 					ref = fmt.Sprintf("<index %d>", i)
 				}
-				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+				httpjson.Write(w, http.StatusUnprocessableEntity, map[string]any{
 					"error": fmt.Sprintf("ref %q: dependency task not found: %s", ref, dep),
 				})
 				return
@@ -448,7 +449,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 				if ref == "" {
 					ref = fmt.Sprintf("<index %d>", i)
 				}
-				writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+				httpjson.Write(w, http.StatusUnprocessableEntity, map[string]any{
 					"error": fmt.Sprintf("ref %q: dependency would create a cycle", ref),
 				})
 				return
@@ -521,7 +522,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 		refToIDStr[ref] = id.String()
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]any{
+	httpjson.Write(w, http.StatusCreated, map[string]any{
 		"tasks":     finalTasks,
 		"ref_to_id": refToIDStr,
 	})
@@ -529,7 +530,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 
 // UpdateTask handles PATCH requests: status transitions, position, prompt, etc.
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Status            *store.TaskStatus                       `json:"status"`
 		Position          *int                                    `json:"position"`
 		Prompt            *string                                 `json:"prompt"`
@@ -550,8 +551,8 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		ScheduledAt        json.RawMessage `json:"scheduled_at"`
 		CustomPassPatterns []string        `json:"custom_pass_patterns,omitempty"`
 		CustomFailPatterns []string        `json:"custom_fail_patterns,omitempty"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -725,7 +726,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			writeJSON(w, http.StatusOK, updated)
+			httpjson.Write(w, http.StatusOK, updated)
 			return
 		}
 		// Enforce concurrency limit for manual backlog → in_progress transitions.
@@ -746,7 +747,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			writeJSON(w, http.StatusOK, updated)
+			httpjson.Write(w, http.StatusOK, updated)
 			return
 		}
 
@@ -765,7 +766,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			writeJSON(w, http.StatusOK, updated)
+			httpjson.Write(w, http.StatusOK, updated)
 			return
 		}
 
@@ -795,17 +796,17 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, updated)
+	httpjson.Write(w, http.StatusOK, updated)
 }
 
 // DeleteTask soft-deletes a task by writing a tombstone. The task data is
 // retained on disk for the configured retention period so it can be restored.
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	var req struct {
-		Reason string `json:"reason"`
-	}
 	// reason is optional; an empty or absent body is fine.
-	if !decodeOptionalJSONBody(w, r, &req) {
+	req, ok := httpjson.DecodeOptionalBody[struct {
+		Reason string `json:"reason"`
+	}](w, r)
+	if !ok {
 		return
 	}
 	if task, err := h.store.GetTask(r.Context(), id); err == nil && len(task.WorktreePaths) > 0 {
@@ -828,7 +829,7 @@ func (h *Handler) ListDeletedTasks(w http.ResponseWriter, r *http.Request) {
 	if tasks == nil {
 		tasks = []store.Task{}
 	}
-	writeJSON(w, http.StatusOK, tasks)
+	httpjson.Write(w, http.StatusOK, tasks)
 }
 
 // RestoreTask removes the tombstone from a soft-deleted task, making it active again.

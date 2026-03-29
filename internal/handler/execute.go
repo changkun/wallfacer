@@ -12,9 +12,10 @@ import (
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/prompts"
 	runnerpkg "changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 
@@ -112,10 +113,10 @@ func httpErrorf(code int, format string, args ...any) error {
 
 // SubmitFeedback resumes a waiting task with user-provided feedback.
 func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Message string `json:"message"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 	if strings.TrimSpace(req.Message) == "" {
@@ -162,7 +163,7 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request, id uuid
 	}
 	promoteMu.Unlock()
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
 
 // resumeWaitingTaskWithFeedbackLocked transitions a waiting task back to
@@ -289,7 +290,7 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 		}
 		h.insertEventOrLog(r.Context(), id, store.EventTypeStateChange,
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerUser, nil))
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
 
@@ -328,7 +329,7 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request, id uuid.U
 			store.NewStateChangeData(store.TaskStatusWaiting, store.TaskStatusDone, store.TriggerUser, nil))
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // CancelTask cancels a task in backlog, in_progress, waiting, or failed state.
@@ -391,16 +392,16 @@ func (h *Handler) CancelTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		h.runner.CleanupWorktrees(id, task.WorktreePaths, task.BranchName)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
 
 // ResumeTask resumes a failed task using its existing session.
 func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	var req struct {
-		Timeout *int `json:"timeout"`
-	}
 	// Body is optional — empty body is accepted; present body is decoded strictly.
-	if !decodeOptionalJSONBody(w, r, &req) {
+	req, ok := httpjson.DecodeOptionalBody[struct {
+		Timeout *int `json:"timeout"`
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -436,7 +437,7 @@ func (h *Handler) ResumeTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 
 	h.runner.RunBackground(id, "continue", *task.SessionID, false)
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
 
 // ArchiveAllDone archives all done and cancelled tasks in one operation.
@@ -454,7 +455,7 @@ func (h *Handler) ArchiveAllDone(w http.ResponseWriter, r *http.Request) {
 			"trigger": string(store.TriggerUser),
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"archived": len(archived)})
+	httpjson.Write(w, http.StatusOK, map[string]any{"archived": len(archived)})
 }
 
 // ArchiveTask archives a done task.
@@ -478,7 +479,7 @@ func (h *Handler) ArchiveTask(w http.ResponseWriter, r *http.Request, id uuid.UU
 		"to":      "archived",
 		"trigger": string(store.TriggerUser),
 	})
-	writeJSON(w, http.StatusOK, map[string]string{"status": "archived"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "archived"})
 }
 
 // UnarchiveTask restores an archived task.
@@ -495,7 +496,7 @@ func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.
 		"to":      "unarchived",
 		"trigger": string(store.TriggerUser),
 	})
-	writeJSON(w, http.StatusOK, map[string]string{"status": "unarchived"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "unarchived"})
 }
 
 // TestTask runs a verification agent on the same task to check its acceptance criteria.
@@ -503,11 +504,11 @@ func (h *Handler) UnarchiveTask(w http.ResponseWriter, r *http.Request, id uuid.
 // can distinguish a test run from normal work. On end_turn the runner moves it back to
 // "waiting" (instead of "done") and records a pass/fail verdict.
 func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	var req struct {
-		Criteria string `json:"criteria"`
-	}
 	// Body is optional — empty body is accepted; present body is decoded strictly.
-	if !decodeOptionalJSONBody(w, r, &req) {
+	req, ok := httpjson.DecodeOptionalBody[struct {
+		Criteria string `json:"criteria"`
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -557,7 +558,7 @@ func (h *Handler) TestTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 	// Run the test agent in a fresh session so it doesn't continue the implementation session.
 	h.runner.RunBackground(id, testPrompt, "", false)
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "testing"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "testing"})
 }
 
 // buildTestPrompt constructs a prompt for the test verification agent.
@@ -613,7 +614,7 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 		return
 	}
 	if task.Status == store.TaskStatusInProgress {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "already_syncing"})
+		httpjson.Write(w, http.StatusOK, map[string]string{"status": "already_syncing"})
 		return
 	}
 	if task.Status != store.TaskStatusWaiting && task.Status != store.TaskStatusFailed {
@@ -657,5 +658,5 @@ func (h *Handler) SyncTask(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 			h.commitsBehindCache.invalidate(repoPath, worktreePath)
 		}
 	})
-	writeJSON(w, http.StatusOK, map[string]string{"status": "syncing"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "syncing"})
 }

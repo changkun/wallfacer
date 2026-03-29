@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/prompts"
 )
 
@@ -11,46 +12,46 @@ import (
 func (h *Handler) GetInstructions(w http.ResponseWriter, _ *http.Request) {
 	path := h.currentInstructionsPath()
 	if path == "" {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
 		return
 	}
 	content, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			writeJSON(w, http.StatusOK, map[string]string{"content": ""})
+			httpjson.Write(w, http.StatusOK, map[string]string{"content": ""})
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"content": string(content)})
+	httpjson.Write(w, http.StatusOK, map[string]string{"content": string(content)})
 }
 
 // UpdateInstructions replaces the workspace AGENTS.md with the provided content.
 func (h *Handler) UpdateInstructions(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Content string `json:"content"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 	path := h.currentInstructionsPath()
 	if path == "" {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
 		return
 	}
 	if err := os.WriteFile(path, []byte(req.Content), 0644); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // ReinitInstructions rebuilds the workspace AGENTS.md from defaults and repo files.
 func (h *Handler) ReinitInstructions(w http.ResponseWriter, _ *http.Request) {
 	path := h.currentInstructionsPath()
 	if path == "" {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
 		return
 	}
 	path, err := prompts.ReinitInstructions(h.configDir, h.currentWorkspaces())
@@ -63,5 +64,5 @@ func (h *Handler) ReinitInstructions(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"content": string(content)})
+	httpjson.Write(w, http.StatusOK, map[string]string{"content": string(content)})
 }

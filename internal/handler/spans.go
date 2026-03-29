@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -26,5 +27,5 @@ func (h *Handler) GetTaskSpans(w http.ResponseWriter, r *http.Request, id uuid.U
 	if spans == nil {
 		spans = []store.SpanResult{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"spans": spans})
+	httpjson.Write(w, http.StatusOK, map[string]any{"spans": spans})
 }

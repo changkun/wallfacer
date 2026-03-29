@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
 
 // systemPromptResponse is the JSON shape for a single system prompt template.
@@ -33,7 +35,7 @@ func (h *Handler) ListSystemPrompts(w http.ResponseWriter, _ *http.Request) {
 			Content:     content,
 		})
 	}
-	writeJSON(w, http.StatusOK, result)
+	httpjson.Write(w, http.StatusOK, result)
 }
 
 // GetSystemPrompt returns a single built-in prompt template by name.
@@ -50,7 +52,7 @@ func (h *Handler) GetSystemPrompt(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, systemPromptResponse{
+	httpjson.Write(w, http.StatusOK, systemPromptResponse{
 		Name:        name,
 		HasOverride: hasOverride,
 		Content:     content,
@@ -62,10 +64,10 @@ func (h *Handler) GetSystemPrompt(w http.ResponseWriter, r *http.Request) {
 // returns 422 with the parse error as the body.
 func (h *Handler) UpdateSystemPrompt(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Content string `json:"content"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 	mgr := h.runner.Prompts()
@@ -86,7 +88,7 @@ func (h *Handler) UpdateSystemPrompt(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // DeleteSystemPrompt removes the user override for the named built-in prompt
@@ -106,7 +108,7 @@ func (h *Handler) DeleteSystemPrompt(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // isUnknownTemplateName reports whether the error was produced by an unknown

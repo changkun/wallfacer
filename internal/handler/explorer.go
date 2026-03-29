@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
 
 // maxFileWriteSize is the maximum content size accepted by ExplorerWriteFile.
@@ -113,7 +114,7 @@ func (h *Handler) ExplorerTree(w http.ResponseWriter, r *http.Request) {
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 
-	writeJSON(w, http.StatusOK, result)
+	httpjson.Write(w, http.StatusOK, result)
 }
 
 // isBinaryContent reports whether data contains a null byte, indicating
@@ -174,7 +175,7 @@ func (h *Handler) ExplorerReadFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-File-Size", strconv.FormatInt(size, 10))
 
 	if size > constants.ExplorerMaxFileSize {
-		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{
+		httpjson.Write(w, http.StatusRequestEntityTooLarge, map[string]any{
 			"error": "file too large",
 			"size":  size,
 			"max":   constants.ExplorerMaxFileSize,
@@ -200,7 +201,7 @@ func (h *Handler) ExplorerReadFile(w http.ResponseWriter, r *http.Request) {
 
 	if isBinaryContent(head) {
 		w.Header().Set("X-File-Binary", "true")
-		writeJSON(w, http.StatusOK, map[string]any{
+		httpjson.Write(w, http.StatusOK, map[string]any{
 			"binary": true,
 			"size":   size,
 		})
@@ -224,12 +225,12 @@ func isGitPath(p string) bool {
 // temp-file + rename. It rejects paths inside .git directories, content
 // exceeding 2 MB, and paths whose parent directory does not exist.
 func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Path      string `json:"path"`
 		Workspace string `json:"workspace"`
 		Content   string `json:"content"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -244,7 +245,7 @@ func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Content) > maxFileWriteSize {
-		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{
+		httpjson.Write(w, http.StatusRequestEntityTooLarge, map[string]string{
 			"error": "content exceeds " + strconv.Itoa(maxFileWriteSize) + " byte limit",
 		})
 		return
@@ -304,7 +305,7 @@ func (h *Handler) ExplorerWriteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpjson.Write(w, http.StatusOK, map[string]any{
 		"status": "ok",
 		"size":   len(data),
 	})

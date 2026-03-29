@@ -7,6 +7,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/watcher"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -150,7 +151,7 @@ func (h *Handler) TriggerIdeation(w http.ResponseWriter, r *http.Request) {
 	if task != nil {
 		resp["task_id"] = task.ID.String()
 	}
-	writeJSON(w, http.StatusAccepted, resp)
+	httpjson.Write(w, http.StatusAccepted, resp)
 }
 
 // CancelIdeation handles DELETE /api/ideate.
@@ -184,7 +185,7 @@ func (h *Handler) CancelIdeation(w http.ResponseWriter, r *http.Request) {
 			cancelled = true
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"cancelled": cancelled})
+	httpjson.Write(w, http.StatusOK, map[string]any{"cancelled": cancelled})
 }
 
 // GetIdeationStatus handles GET /api/ideate.
@@ -206,5 +207,5 @@ func (h *Handler) GetIdeationStatus(w http.ResponseWriter, r *http.Request) {
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["next_run_at"] = nextRun
 	}
-	writeJSON(w, http.StatusOK, resp)
+	httpjson.Write(w, http.StatusOK, resp)
 }

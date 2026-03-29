@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/pkg/atomicfile"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"github.com/google/uuid"
 )
 
@@ -69,17 +70,17 @@ func (h *Handler) ListTemplates(w http.ResponseWriter, _ *http.Request) {
 	slices.SortFunc(templates, func(a, b PromptTemplate) int {
 		return b.CreatedAt.Compare(a.CreatedAt)
 	})
-	writeJSON(w, http.StatusOK, templates)
+	httpjson.Write(w, http.StatusOK, templates)
 }
 
 // CreateTemplate handles POST /api/templates.
 // Expects JSON body {name, body}; returns 201 with the created template.
 func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Name string `json:"name"`
 		Body string `json:"body"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 	if req.Name == "" || req.Body == "" {
@@ -106,7 +107,7 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusCreated, tmpl)
+	httpjson.Write(w, http.StatusCreated, tmpl)
 }
 
 // DeleteTemplate handles DELETE /api/templates/{id}.

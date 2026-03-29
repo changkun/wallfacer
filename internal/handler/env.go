@@ -13,6 +13,7 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
@@ -176,7 +177,7 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 	if archivedTasksPerPage <= 0 {
 		archivedTasksPerPage = constants.DefaultArchivedTasksPerPage
 	}
-	writeJSON(w, http.StatusOK, envConfigResponse{
+	httpjson.Write(w, http.StatusOK, envConfigResponse{
 		OAuthToken:           envconfig.MaskToken(cfg.OAuthToken),
 		APIKey:               envconfig.MaskToken(cfg.APIKey),
 		BaseURL:              cfg.BaseURL,
@@ -206,8 +207,8 @@ func (h *Handler) GetEnvConfig(w http.ResponseWriter, _ *http.Request) {
 //
 // This is used by the settings modal "Test" button for each sandbox block.
 func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
-	var req sandboxTestRequest
-	if !decodeJSONBody(w, r, &req) {
+	req, ok := httpjson.DecodeBody[sandboxTestRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -245,7 +246,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tempEnvFile, err := h.buildTestEnvFile(&req)
+	tempEnvFile, err := h.buildTestEnvFile(req)
 	if err != nil {
 		http.Error(w, "failed to prepare test env: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -338,7 +339,7 @@ func (h *Handler) TestSandbox(w http.ResponseWriter, r *http.Request) {
 	passed := strings.EqualFold(updated.LastTestResult, "pass") &&
 		(updated.Status == store.TaskStatusDone || updated.Status == store.TaskStatusWaiting)
 	h.setSandboxTestPassed(sb, passed)
-	writeJSON(w, http.StatusOK, resp)
+	httpjson.Write(w, http.StatusOK, resp)
 }
 
 // buildTestEnvFile creates a temporary .env file by copying the current env
@@ -449,7 +450,7 @@ func testCodexImage(baseImage string) string {
 // For token fields (oauth_token, api_key, openai_api_key), an empty value is treated
 // as "no change" to prevent accidental token deletion.
 func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		OAuthToken           *string                                `json:"oauth_token"`
 		APIKey               *string                                `json:"api_key"`
 		BaseURL              *string                                `json:"base_url"`
@@ -472,8 +473,8 @@ func (h *Handler) UpdateEnvConfig(w http.ResponseWriter, r *http.Request) {
 		ContainerCPUs        *string                                `json:"container_cpus"`
 		ContainerMemory      *string                                `json:"container_memory"`
 		TerminalEnabled      *bool                                  `json:"terminal_enabled"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 

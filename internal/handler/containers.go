@@ -1,6 +1,10 @@
 package handler
 
-import "net/http"
+import (
+	"net/http"
+
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+)
 
 // GetContainers returns the list of wallfacer sandbox containers visible to the
 // container runtime, mimicking `docker ps -a --filter name=wallfacer`.
@@ -9,7 +13,7 @@ import "net/http"
 func (h *Handler) GetContainers(w http.ResponseWriter, r *http.Request) {
 	containers, err := h.runner.ListContainers()
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		httpjson.Write(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -40,5 +44,5 @@ func (h *Handler) GetContainers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, containers)
+	httpjson.Write(w, http.StatusOK, containers)
 }

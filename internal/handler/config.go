@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/envconfig"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
-	"changkun.de/x/wallfacer/internal/prompts"
 )
 
 // ssrfHardenedTransport returns an http.Transport that re-checks the resolved
@@ -275,12 +276,12 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 			cfg = &parsed
 		}
 	}
-	writeJSON(w, http.StatusOK, h.buildConfigResponse(r.Context(), cfg))
+	httpjson.Write(w, http.StatusOK, h.buildConfigResponse(r.Context(), cfg))
 }
 
 // UpdateConfig handles PUT /api/config to update server-level settings.
 func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Autopilot            *bool             `json:"autopilot"`
 		Autorefine           *bool             `json:"autorefine"`
 		Autotest             *bool             `json:"autotest"`
@@ -291,8 +292,8 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		IdeationInterval     *int              `json:"ideation_interval"`      // minutes; 0 = run immediately on completion
 		IdeationExploitRatio *float64          `json:"ideation_exploit_ratio"` // 0.0–1.0; fraction of exploitation ideas
 		WorkspaceGroups      []workspace.Group `json:"workspace_groups"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 	if req.WorkspaceGroups != nil {
@@ -365,5 +366,5 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if nextRun := h.IdeationNextRun(); !nextRun.IsZero() {
 		resp["ideation_next_run"] = nextRun
 	}
-	writeJSON(w, http.StatusOK, resp)
+	httpjson.Write(w, http.StatusOK, resp)
 }

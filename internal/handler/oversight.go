@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -30,7 +31,7 @@ func (h *Handler) GetOversight(w http.ResponseWriter, r *http.Request, id uuid.U
 		return
 	}
 
-	writeJSON(w, http.StatusOK, oversightResponse{
+	httpjson.Write(w, http.StatusOK, oversightResponse{
 		TaskOversight: *oversight,
 		PhaseCount:    len(oversight.Phases),
 	})
@@ -51,7 +52,7 @@ func (h *Handler) GetTestOversight(w http.ResponseWriter, r *http.Request, id uu
 		return
 	}
 
-	writeJSON(w, http.StatusOK, oversight)
+	httpjson.Write(w, http.StatusOK, oversight)
 }
 
 // GenerateMissingOversight triggers background oversight generation for completed
@@ -107,7 +108,7 @@ func (h *Handler) GenerateMissingOversight(w http.ResponseWriter, r *http.Reques
 		go h.runner.GenerateOversight(t.ID)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpjson.Write(w, http.StatusOK, map[string]any{
 		"queued":                  len(eligible),
 		"total_without_oversight": total,
 		"task_ids":                taskIDs,

@@ -2,10 +2,7 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"slices"
 	"sync"
@@ -17,12 +14,13 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/lazyval"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"changkun.de/x/wallfacer/internal/workspace"
-	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 
@@ -258,7 +256,7 @@ func (h *Handler) currentStore() (*store.Store, bool) {
 func (h *Handler) requireStore(w http.ResponseWriter) (*store.Store, bool) {
 	s, ok := h.currentStore()
 	if !ok || s == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+		httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
 		return nil, false
 	}
 	return s, true
@@ -354,7 +352,7 @@ func (h *Handler) hasStore() bool {
 func (h *Handler) RequireStoreMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !h.hasStore() {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
+			httpjson.Write(w, http.StatusServiceUnavailable, map[string]string{"error": "no workspaces configured"})
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -551,65 +549,5 @@ func (h *Handler) cancelIdeationTimerLocked() {
 		h.ideationTimer.Stop()
 		h.ideationTimer = nil
 		h.ideationNextRun = time.Time{}
-	}
-}
-
-// decodeJSONBody decodes the JSON request body into v. It rejects unknown
-// fields and trailing tokens after the first JSON object, writing a 400
-// response on any error.
-func decodeJSONBody(w http.ResponseWriter, r *http.Request, v any) bool {
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
-			return false
-		}
-		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
-		return false
-	}
-	if dec.More() {
-		http.Error(w, "invalid JSON: unexpected trailing content", http.StatusBadRequest)
-		return false
-	}
-	return true
-}
-
-// decodeOptionalJSONBody decodes the JSON request body into v when a body is
-// present. An absent or empty body is silently accepted and leaves v
-// unchanged. When a body is present the same strict rules apply as
-// decodeJSONBody: unknown fields and trailing tokens are rejected with a 400.
-func decodeOptionalJSONBody(w http.ResponseWriter, r *http.Request, v any) bool {
-	if r == nil || r.Body == nil {
-		return true
-	}
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
-		if errors.Is(err, io.EOF) {
-			return true // empty body — treat as no body provided
-		}
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "request body too large"})
-			return false
-		}
-		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
-		return false
-	}
-	if dec.More() {
-		http.Error(w, "invalid JSON: unexpected trailing content", http.StatusBadRequest)
-		return false
-	}
-	return true
-}
-
-// writeJSON serialises v as JSON and writes it with the given HTTP status code.
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		logger.Handler.Error("write json", "error", err)
 	}
 }

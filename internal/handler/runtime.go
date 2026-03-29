@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 )
@@ -66,7 +67,7 @@ func (h *Handler) GetRuntimeStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, runtimeStatusResponse{
+	httpjson.Write(w, http.StatusOK, runtimeStatusResponse{
 		Goroutines:       goroutines,
 		GoGoroutineCount: runtime.NumGoroutine(),
 		GoHeapAllocBytes: m.HeapAlloc,

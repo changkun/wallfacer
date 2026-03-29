@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -22,7 +23,7 @@ func (h *Handler) GetTurnUsage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, records)
+	httpjson.Write(w, http.StatusOK, records)
 }
 
 // eventsPageResponse is the JSON envelope returned when pagination params are present.
@@ -71,7 +72,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID
 		if events == nil {
 			events = []store.TaskEvent{}
 		}
-		writeJSON(w, http.StatusOK, events)
+		httpjson.Write(w, http.StatusOK, events)
 		return
 	}
 
@@ -129,7 +130,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request, id uuid.UUID
 	if events == nil {
 		events = []store.TaskEvent{}
 	}
-	writeJSON(w, http.StatusOK, eventsPageResponse{
+	httpjson.Write(w, http.StatusOK, eventsPageResponse{
 		Events:        events,
 		NextAfter:     page.NextAfter,
 		HasMore:       page.HasMore,
@@ -206,7 +207,7 @@ func (h *Handler) GenerateMissingTitles(w http.ResponseWriter, r *http.Request) 
 		h.runner.GenerateTitleBackground(t.ID, t.Prompt)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpjson.Write(w, http.StatusOK, map[string]any{
 		"queued":              len(untitled),
 		"total_without_title": total,
 		"task_ids":            taskIDs,

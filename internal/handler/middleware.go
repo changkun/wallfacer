@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
 
 // Convenience aliases so callers can write handler.BodyLimitDefault etc.
@@ -59,7 +60,7 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 			}
 			parsed, err := url.Parse(raw)
 			if err != nil || parsed.Host == "" || parsed.Host != allowedHost {
-				writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden: invalid origin"})
+				httpjson.Write(w, http.StatusForbidden, map[string]string{"error": "forbidden: invalid origin"})
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -92,7 +93,7 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 			}
 			if isSSEPath(r.URL.Path) {
 				if r.URL.Query().Get("token") != key {
-					writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+					httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 					return
 				}
 				next.ServeHTTP(w, r)
@@ -100,7 +101,7 @@ func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 			}
 			auth := strings.TrimSpace(r.Header.Get("Authorization"))
 			if auth != "Bearer "+key {
-				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				httpjson.Write(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 				return
 			}
 			next.ServeHTTP(w, r)

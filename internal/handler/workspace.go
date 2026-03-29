@@ -9,6 +9,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/gitutil"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
 
 // workspaceBrowseEntry describes a single directory entry returned by
@@ -60,7 +61,7 @@ func (h *Handler) BrowseWorkspaces(w http.ResponseWriter, r *http.Request) {
 	slices.SortFunc(resp, func(a, b workspaceBrowseEntry) int {
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpjson.Write(w, http.StatusOK, map[string]any{
 		"path":    path,
 		"entries": resp,
 	})
@@ -68,11 +69,11 @@ func (h *Handler) BrowseWorkspaces(w http.ResponseWriter, r *http.Request) {
 
 // MkdirWorkspace creates a new directory under an absolute host path.
 func (h *Handler) MkdirWorkspace(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Path string `json:"path"`
 		Name string `json:"name"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 	if !filepath.IsAbs(req.Path) {
@@ -98,16 +99,16 @@ func (h *Handler) MkdirWorkspace(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"path": target})
+	httpjson.Write(w, http.StatusCreated, map[string]string{"path": target})
 }
 
 // RenameWorkspace renames a directory at an absolute host path.
 func (h *Handler) RenameWorkspace(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Path string `json:"path"`
 		Name string `json:"name"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 	if !filepath.IsAbs(req.Path) {
@@ -132,15 +133,15 @@ func (h *Handler) RenameWorkspace(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"path": target})
+	httpjson.Write(w, http.StatusOK, map[string]string{"path": target})
 }
 
 // UpdateWorkspaces switches the active workspace set.
 func (h *Handler) UpdateWorkspaces(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Workspaces []string `json:"workspaces"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -160,5 +161,5 @@ func (h *Handler) UpdateWorkspaces(w http.ResponseWriter, r *http.Request) {
 			cfg = &parsed
 		}
 	}
-	writeJSON(w, http.StatusOK, h.buildConfigResponse(r.Context(), cfg))
+	httpjson.Write(w, http.StatusOK, h.buildConfigResponse(r.Context(), cfg))
 }

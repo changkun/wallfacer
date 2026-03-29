@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/sandbox"
 )
 
@@ -164,7 +165,7 @@ func (h *Handler) GetImageStatus(w http.ResponseWriter, _ *http.Request) {
 		h.inspectImage(cmd, sandbox.Codex, codexImage),
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpjson.Write(w, http.StatusOK, map[string]any{
 		"images":            images,
 		"container_runtime": cmd,
 	})
@@ -198,10 +199,10 @@ func (h *Handler) inspectImage(cmd string, sb sandbox.Type, image string) imageS
 
 // DeleteImage removes a cached sandbox image.
 func (h *Handler) DeleteImage(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Sandbox string `json:"sandbox"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -223,15 +224,15 @@ func (h *Handler) DeleteImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, out, http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"removed": image})
+	httpjson.Write(w, http.StatusOK, map[string]string{"removed": image})
 }
 
 // PullImage starts an async image pull.
 func (h *Handler) PullImage(w http.ResponseWriter, r *http.Request) {
-	var req struct {
+	req, ok := httpjson.DecodeBody[struct {
 		Sandbox string `json:"sandbox"`
-	}
-	if !decodeJSONBody(w, r, &req) {
+	}](w, r)
+	if !ok {
 		return
 	}
 
@@ -254,7 +255,7 @@ func (h *Handler) PullImage(w http.ResponseWriter, r *http.Request) {
 
 	// Deduplicate: return existing active pull.
 	if existing := h.pulls.activeForImage(image); existing != nil {
-		writeJSON(w, http.StatusOK, map[string]string{"pull_id": existing.ID})
+		httpjson.Write(w, http.StatusOK, map[string]string{"pull_id": existing.ID})
 		return
 	}
 
@@ -269,7 +270,7 @@ func (h *Handler) PullImage(w http.ResponseWriter, r *http.Request) {
 
 	go h.runPull(r.Context(), cmd, p)
 
-	writeJSON(w, http.StatusAccepted, map[string]string{"pull_id": p.ID})
+	httpjson.Write(w, http.StatusAccepted, map[string]string{"pull_id": p.ID})
 }
 
 // runPull executes the container pull and streams output lines to the pull tracker.

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -112,7 +113,7 @@ func (h *Handler) BoardManifest(w http.ResponseWriter, r *http.Request) {
 	}
 	b, _ := json.MarshalIndent(manifest, "", "  ")
 	const maxBytes = 64 * 1024
-	writeJSON(w, http.StatusOK, boardManifestResponse{
+	httpjson.Write(w, http.StatusOK, boardManifestResponse{
 		Manifest:  manifest,
 		SizeBytes: len(b),
 		SizeWarn:  len(b) > maxBytes,
@@ -135,7 +136,7 @@ func (h *Handler) TaskBoardManifest(w http.ResponseWriter, r *http.Request, id u
 	}
 	b, _ := json.MarshalIndent(manifest, "", "  ")
 	const maxBytes = 64 * 1024
-	writeJSON(w, http.StatusOK, boardManifestResponse{
+	httpjson.Write(w, http.StatusOK, boardManifestResponse{
 		Manifest:  manifest,
 		SizeBytes: len(b),
 		SizeWarn:  len(b) > maxBytes,
@@ -150,7 +151,7 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 	defer h.spanCache.mu.Unlock()
 
 	if h.spanCache.resp != nil && time.Now().Before(h.spanCache.expiresAt) {
-		writeJSON(w, http.StatusOK, h.spanCache.resp)
+		httpjson.Write(w, http.StatusOK, h.spanCache.resp)
 		return
 	}
 
@@ -260,7 +261,7 @@ func (h *Handler) GetSpanStats(w http.ResponseWriter, r *http.Request) {
 	}
 	h.spanCache.resp = resp
 	h.spanCache.expiresAt = time.Now().Add(60 * time.Second)
-	writeJSON(w, http.StatusOK, resp)
+	httpjson.Write(w, http.StatusOK, resp)
 }
 
 // Health returns a lightweight operational health snapshot:
@@ -298,5 +299,5 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 		},
 		UptimeSeconds: time.Since(h.startTime).Seconds(),
 	}
-	writeJSON(w, http.StatusOK, resp)
+	httpjson.Write(w, http.StatusOK, resp)
 }

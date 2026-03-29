@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
 
 // skipDirs lists directory names that should never be traversed during file listing.
@@ -42,5 +43,5 @@ func (h *Handler) GetFiles(w http.ResponseWriter, _ *http.Request) {
 		files = append(files, wsFiles...)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"files": files})
+	httpjson.Write(w, http.StatusOK, map[string]any{"files": files})
 }

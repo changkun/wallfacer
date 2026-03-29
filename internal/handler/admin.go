@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 )
 
 // rebuildIndexResponse is the JSON shape returned by POST /api/admin/rebuild-index.
@@ -20,5 +21,5 @@ func (h *Handler) RebuildIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Handler.Info("search index rebuild complete", "repaired", repaired)
-	writeJSON(w, http.StatusOK, rebuildIndexResponse{Repaired: repaired})
+	httpjson.Write(w, http.StatusOK, rebuildIndexResponse{Repaired: repaired})
 }

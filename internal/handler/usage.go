@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 )
 
@@ -73,5 +74,5 @@ func (h *Handler) GetUsageStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	httpjson.Write(w, http.StatusOK, resp)
 }

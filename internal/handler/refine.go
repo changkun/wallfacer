@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
 )
@@ -30,9 +31,9 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		return
 	}
 
-	var req StartRefinementRequest
 	// Body is optional — empty body is accepted; present body is decoded strictly.
-	if !decodeOptionalJSONBody(w, r, &req) {
+	req, ok := httpjson.DecodeOptionalBody[StartRefinementRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -59,7 +60,7 @@ func (h *Handler) StartRefinement(w http.ResponseWriter, r *http.Request, id uui
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusAccepted, updated)
+	httpjson.Write(w, http.StatusAccepted, updated)
 }
 
 // CancelRefinement stops a running sandbox refinement by killing the container.
@@ -91,7 +92,7 @@ func (h *Handler) CancelRefinement(w http.ResponseWriter, r *http.Request, id uu
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, updated)
+	httpjson.Write(w, http.StatusOK, updated)
 }
 
 // RefineDismiss clears a completed refinement result without applying it.
@@ -124,7 +125,7 @@ func (h *Handler) RefineDismiss(w http.ResponseWriter, r *http.Request, id uuid.
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, updated)
+	httpjson.Write(w, http.StatusOK, updated)
 }
 
 // RefineApplyRequest is the body for POST /api/tasks/{id}/refine/apply.
@@ -147,8 +148,8 @@ func (h *Handler) RefineApply(w http.ResponseWriter, r *http.Request, id uuid.UU
 		return
 	}
 
-	var req RefineApplyRequest
-	if !decodeJSONBody(w, r, &req) {
+	req, ok := httpjson.DecodeBody[RefineApplyRequest](w, r)
+	if !ok {
 		return
 	}
 	if strings.TrimSpace(req.Prompt) == "" {
@@ -187,5 +188,5 @@ func (h *Handler) RefineApply(w http.ResponseWriter, r *http.Request, id uuid.UU
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, http.StatusOK, updated)
+	httpjson.Write(w, http.StatusOK, updated)
 }
