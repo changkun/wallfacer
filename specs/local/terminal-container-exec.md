@@ -23,22 +23,21 @@ Add a container exec terminal mode that spawns `podman exec -it <container> bash
 
 ## Design
 
-### Container exec WebSocket handler
+### Extend session creation for container exec
 
-Add a new WebSocket endpoint (e.g., `/api/terminal/container/ws?container=<id>&token=<key>`) that:
+The existing `sessionRegistry.create(shell, cwd, cols, rows)` in `internal/handler/terminal.go` spawns a host shell via PTY. Extend it (or add a sibling method like `createContainerExec`) to spawn `podman exec -it <container> bash` instead. The per-session reader goroutine, `outputCh` channel, relay dispatcher, and process monitor all work unchanged — only the command spawned differs.
 
-- Accepts a container ID parameter identifying the target container.
-- Spawns `podman exec -it <container> bash` via PTY (using `internal/pty/`) instead of a host shell.
-- Reuses the same JSON message protocol as the host terminal (`input`, `resize`, `ping` message types, binary output frames).
-- Dispatches the spawn mechanism via `SandboxBackend` so different backends use different exec commands (see Cloud Deployment below).
-
-The host terminal handler (`internal/handler/terminal.go`) serves as the implementation template — the only difference is what command is spawned.
+Add a `container` field to the `create_session` WebSocket message:
+```json
+{"type":"create_session","container":"<container-id>"}
+```
+When `container` is set, spawn `podman exec -it <container> bash` via PTY instead of a host shell. When absent, spawn a host shell as before (backward-compatible). Dispatch the exec command via `SandboxBackend` so different backends use different exec mechanisms (see Cloud Deployment below).
 
 ### Container selector UI
 
 - Dropdown populated from `GET /api/containers` (already implemented in `internal/handler/containers.go`).
 - Shows container name and associated task title.
-- Selecting a container opens a new "Container Shell" tab (requires terminal session tab infrastructure from [terminal-sessions.md](terminal-sessions.md)).
+- Selecting a container sends `{"type":"create_session","container":"<id>"}`, which opens a new tab labeled with the task title (e.g., "Task: fix-auth @ 3b616d1e").
 
 ### Cloud Deployment
 
