@@ -12,7 +12,7 @@ import (
 	"changkun.de/x/wallfacer/assets/icons"
 	"changkun.de/x/wallfacer/internal/logger"
 
-	"fyne.io/systray"
+	"changkun.de/x/wallfacer/internal/pkg/systray"
 )
 
 const (

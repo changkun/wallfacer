@@ -2,11 +2,11 @@
 
 package cli
 
-import "fyne.io/systray"
+import "changkun.de/x/wallfacer/internal/pkg/systray"
 
 // platformTraySetup performs Linux-specific tray initialization.
 // On Linux, left-click typically opens the menu (same as right-click),
-// which is the default fyne.io/systray behavior — no override needed.
+// which is the default systray behavior — no override needed.
 func platformTraySetup(showWindow func()) {
 	// On Linux, left-click on the tray icon shows the window for
 	// consistency with macOS/Windows behavior.
