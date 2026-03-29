@@ -118,6 +118,11 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 			}
 		},
 		func() { go doShutdown() },
+		func() {
+			if wailsCtx != nil {
+				wailsRuntime.WindowExecJS(wailsCtx, "if(typeof fetchConfig==='function')fetchConfig()")
+			}
+		},
 		serverURL,
 		sc.ServerAPIKey,
 	)

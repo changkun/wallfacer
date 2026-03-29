@@ -36,8 +36,6 @@ static void installDockHandler(void) {
 */
 import "C"
 
-import "fyne.io/systray"
-
 var dockReopenFn func()
 
 //export goDockReopenCallback
@@ -55,10 +53,11 @@ func installDockReopenHandler(showWindow func()) {
 }
 
 // platformTraySetup performs macOS-specific tray initialization.
-// On macOS, left-click on the tray icon opens the menu (default behavior).
-// SetOnTapped is used to show the window as well, providing a quick shortcut.
+// On macOS, both left-click and right-click open the menu (default behavior).
+// We do not register SetOnTapped so that left-click shows the menu
+// instead of directly opening the window.
 func platformTraySetup(showWindow func()) {
-	systray.SetOnTapped(showWindow)
+	// No SetOnTapped — left-click should show the tray menu, not the window.
 }
 
 // macOS tray behavior notes:

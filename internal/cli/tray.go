@@ -26,6 +26,7 @@ const (
 type TrayManager struct {
 	showWindow func()
 	quit       func()
+	notifyUI   func() // called after tray toggles config so the UI can refresh
 	serverURL  string
 	apiKey     string
 	httpClient *http.Client
@@ -58,10 +59,11 @@ type TrayManager struct {
 // clicks "Open Dashboard"; quit is called when the user clicks "Quit".
 // serverURL is the base URL of the running HTTP server (e.g., "http://localhost:8080").
 // apiKey is the optional WALLFACER_SERVER_API_KEY for authentication.
-func NewTrayManager(showWindow, quit func(), serverURL, apiKey string) *TrayManager {
+func NewTrayManager(showWindow, quit, notifyUI func(), serverURL, apiKey string) *TrayManager {
 	return &TrayManager{
 		showWindow: showWindow,
 		quit:       quit,
+		notifyUI:   notifyUI,
 		serverURL:  serverURL,
 		apiKey:     apiKey,
 		httpClient: &http.Client{Timeout: 3 * time.Second},
@@ -105,10 +107,10 @@ func (tm *TrayManager) onReady() {
 	tm.mBacklog.Disable()
 	systray.AddSeparator()
 
-	tm.mAutopilot = systray.AddMenuItemCheckbox("Autopilot", "Toggle autopilot", false)
-	tm.mAutotest = systray.AddMenuItemCheckbox("Auto-test", "Toggle auto-test", false)
-	tm.mAutosubmit = systray.AddMenuItemCheckbox("Auto-submit", "Toggle auto-submit", false)
-	tm.mAutosync = systray.AddMenuItemCheckbox("Auto-sync", "Toggle auto-sync", false)
+	tm.mAutopilot = systray.AddMenuItemCheckbox("Implement", "Toggle autopilot", false)
+	tm.mAutotest = systray.AddMenuItemCheckbox("Test", "Toggle auto-test", false)
+	tm.mAutosubmit = systray.AddMenuItemCheckbox("Submit", "Toggle auto-submit", false)
+	tm.mAutosync = systray.AddMenuItemCheckbox("Catch Up", "Automatically rebase waiting tasks onto the latest branch to prevent merge conflicts", false)
 	systray.AddSeparator()
 
 	tm.mCost = systray.AddMenuItem("Today: — · Total: —", "")
@@ -341,6 +343,9 @@ func (tm *TrayManager) handleToggle(field string, item *systray.MenuItem) {
 		return
 	}
 	setChecked(item, newValue)
+	if tm.notifyUI != nil {
+		tm.notifyUI()
+	}
 }
 
 // statsData is the subset of the /api/stats response we care about.
