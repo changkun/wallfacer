@@ -1,6 +1,6 @@
 # Task 4: Auth HTTP Handlers and Route Registration
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 3
 **Phase:** Server integration
 **Effort:** Medium
