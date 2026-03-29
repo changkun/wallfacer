@@ -399,6 +399,15 @@ function _scheduleReconnect() {
   }, _termReconnectDelay);
 }
 
+function _clearTermScreen() {
+  if (!_term) return;
+  // Clear scrollback, then clear visible screen and reset cursor.
+  // _term.clear() only clears scrollback; the ANSI sequence clears
+  // the visible viewport so no stale content remains.
+  _term.clear();
+  _term.write("\x1b[2J\x1b[H");
+}
+
 function _deferTermFocus() {
   setTimeout(function () {
     if (_term) _term.focus();
@@ -459,7 +468,7 @@ function _handleSessionsList(sessions) {
       activateTerminalTab(s.id);
       // Clear xterm and restore the new active session's buffer when switching.
       if (_term && prevActive) {
-        _term.clear();
+        _clearTermScreen();
         if (_sessions[s.id]) {
           var buf = _sessions[s.id].buffer;
           for (var k = 0; k < buf.length; k++) {
@@ -480,7 +489,7 @@ function _handleSessionSwitched(id) {
   activateTerminalTab(id);
   // Restore the target session's buffer.
   if (_term) {
-    _term.clear();
+    _clearTermScreen();
     if (_sessions[id]) {
       var buf = _sessions[id].buffer;
       for (var i = 0; i < buf.length; i++) {
