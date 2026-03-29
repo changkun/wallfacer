@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -22,9 +24,6 @@ import (
 )
 
 // RunDesktop launches the native desktop window backed by the wallfacer HTTP server.
-// The HTTP server starts in a background goroutine and a Wails WebView
-// proxies all requests to it. A system tray icon provides
-// "Open Dashboard" and "Quit" actions.
 func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	fs := flag.NewFlagSet("desktop", flag.ExitOnError)
 
@@ -67,7 +66,6 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	// wailsCtx is set by OnStartup and used by the tray to show/focus the window.
 	var wailsCtx context.Context
 
-	// Set up the system tray before wails.Run so it is ready when the app starts.
 	tm := NewTrayManager(
 		func() {
 			if wailsCtx != nil {
@@ -86,15 +84,11 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 
 	hideOnClose := runtime.GOOS == "darwin" || runtime.GOOS == "windows"
 
-	// Minimal asset handler for the initial Wails page. OnDomReady navigates
-	// to the real HTTP server so all transports (HTTP, SSE, WebSocket) work
-	// natively without a proxy layer.
-	serverHost := fmt.Sprintf("localhost:%d", sc.ActualPort)
-	loadingPage := fmt.Sprintf(`<!doctype html><html><body style="background:#1e293b"></body></html>`)
-	initialHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, loadingPage)
-	})
+	// Reverse proxy for HTTP/SSE. WebSocket upgrades can't go through the
+	// Wails AssetServer (no Hijacker), so terminal.js connects directly to
+	// the real server port via /api/desktop-port.
+	target, _ := url.Parse(serverURL)
+	proxy := httputil.NewSingleHostReverseProxy(target)
 
 	appOpts := &options.App{
 		Title:             "Wallfacer",
@@ -102,19 +96,11 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 		Height:            900,
 		HideWindowOnClose: hideOnClose,
 		AssetServer: &assetserver.Options{
-			Handler: initialHandler,
+			Handler: proxy,
 		},
 		OnStartup: func(ctx context.Context) {
 			wailsCtx = ctx
 			logger.Main.Info("desktop window opened")
-		},
-		OnDomReady: func(ctx context.Context) {
-			// Navigate to the real server only if not already there.
-			// This prevents an infinite redirect loop since OnDomReady
-			// fires after every navigation.
-			js := fmt.Sprintf(`if (location.host !== %q) { location.href = %q; }`,
-				serverHost, serverURL)
-			wailsRuntime.WindowExecJS(ctx, js)
 		},
 		OnShutdown: func(_ context.Context) {
 			tm.Stop()
@@ -123,7 +109,16 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	}
 
 	if runtime.GOOS == "darwin" {
-		appOpts.Mac = &mac.Options{}
+		appOpts.Mac = &mac.Options{
+			TitleBar: mac.TitleBarHiddenInset(),
+		}
+		appOpts.CSSDragProperty = "--wails-draggable"
+		appOpts.CSSDragValue = "drag"
+	}
+	if runtime.GOOS == "windows" {
+		appOpts.Frameless = true
+		appOpts.CSSDragProperty = "--wails-draggable"
+		appOpts.CSSDragValue = "drag"
 	}
 
 	return wails.Run(appOpts)

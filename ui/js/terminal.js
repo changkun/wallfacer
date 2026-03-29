@@ -6,6 +6,20 @@ var _termWs = null;
 var _termReconnectTimer = null;
 var _termReconnectDelay = 1000;
 
+// In desktop mode (Wails), the reverse proxy can't forward WebSocket upgrades.
+// Discover the real server port via /api/desktop-port and connect directly.
+var _desktopServerHost = (function () {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/api/desktop-port", false);
+    xhr.send();
+    if (xhr.status === 200 && xhr.responseText) {
+      return "localhost:" + xhr.responseText.trim();
+    }
+  } catch (_) {}
+  return null;
+})();
+
 function _getCSSVar(name) {
   return getComputedStyle(document.documentElement)
     .getPropertyValue(name)
@@ -100,8 +114,15 @@ function connectTerminal() {
 
   var cols = _term.cols || 80;
   var rows = _term.rows || 24;
-  var proto = location.protocol === "https:" ? "wss:" : "ws:";
-  var url = proto + "//" + location.host + "/api/terminal/ws";
+  // In desktop mode, connect WebSocket directly to the real server since the
+  // Wails reverse proxy cannot forward WebSocket upgrades.
+  var wsHost = _desktopServerHost || location.host;
+  var proto = _desktopServerHost
+    ? "ws:"
+    : location.protocol === "https:"
+      ? "wss:"
+      : "ws:";
+  var url = proto + "//" + wsHost + "/api/terminal/ws";
   url += "?cols=" + cols + "&rows=" + rows;
   var token =
     typeof getWallfacerToken === "function" ? getWallfacerToken() : "";
