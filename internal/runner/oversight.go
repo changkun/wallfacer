@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
+	"io"
 	"slices"
 	"strings"
 	"time"
@@ -12,7 +12,6 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
-	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -691,7 +690,8 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	defer cancel()
 
 	containerName := "wallfacer-oversight-" + taskID.String()[:8]
-	_ = cmdexec.New(r.command, "rm", "-f", containerName).Run()
+	r.taskContainers.Set(taskID, containerName)
+	defer r.taskContainers.Delete(taskID)
 
 	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	if err != nil {
@@ -718,14 +718,22 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 			spec.Cmd = append(spec.Cmd, "--model", model)
 		}
 
-		args := spec.Build()
-
 		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(agent)})
 
-		stdout, stderr, runErr := cmdexec.New(r.command, args...).WithContext(runCtx).Capture()
+		handle, launchErr := r.backend.Launch(runCtx, spec)
+		if launchErr != nil {
+			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
+			return oversightRunResult{err: fmt.Errorf("launch oversight container: %w", launchErr), model: model, sb: selectedSandbox}
+		}
+		r.taskContainers.SetHandle(taskID, handle, nil)
+
+		rawStdout, _ := io.ReadAll(handle.Stdout())
+		rawStderr, _ := io.ReadAll(handle.Stderr())
+		exitCode, _ := handle.Wait()
 		_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
 
 		if runCtx.Err() != nil {
+			_ = handle.Kill()
 			return oversightRunResult{
 				err:   fmt.Errorf("container terminated: %w", runCtx.Err()),
 				model: model,
@@ -733,11 +741,11 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 			}
 		}
 
-		raw := strings.TrimSpace(string(stdout))
+		raw := strings.TrimSpace(string(rawStdout))
 		if raw == "" {
-			if runErr != nil {
+			if exitCode != 0 {
 				return oversightRunResult{
-					err:   fmt.Errorf("container: %w (stderr: %s)", runErr, truncate(string(stderr), 300)),
+					err:   fmt.Errorf("container exited with code %d: stderr=%s", exitCode, truncate(string(rawStderr), 300)),
 					model: model,
 					sb:    selectedSandbox,
 				}
@@ -747,23 +755,18 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 
 		output, err := parseOutput(raw)
 		if err != nil {
-			if runErr != nil {
+			if exitCode != 0 {
 				return oversightRunResult{
-					err:   fmt.Errorf("container: %w (stderr: %s stdout: %s)", runErr, truncate(string(stderr), 300), truncate(raw, 300)),
+					err:   fmt.Errorf("container exited with code %d: stderr=%s stdout=%s", exitCode, truncate(string(rawStderr), 300), truncate(raw, 300)),
 					model: model,
 					sb:    selectedSandbox,
 				}
 			}
 			return oversightRunResult{err: fmt.Errorf("parse output: %w", err), model: model, sb: selectedSandbox}
 		}
-		if runErr != nil {
-			if exitErr, ok := runErr.(*exec.ExitError); ok {
-				logger.Runner.Warn("oversight: container exited non-zero but produced valid output",
-					"task", taskID, "agent", agent, "code", exitErr.ExitCode(), "sandbox", selectedSandbox, "model", model)
-			} else {
-				logger.Runner.Warn("oversight: container error but produced valid output",
-					"task", taskID, "agent", agent, "error", runErr, "sandbox", selectedSandbox, "model", model)
-			}
+		if exitCode != 0 {
+			logger.Runner.Warn("oversight: container exited non-zero but produced valid output",
+				"task", taskID, "agent", agent, "code", exitCode, "sandbox", selectedSandbox, "model", model)
 		}
 		output.ActualSandbox = selectedSandbox
 		return oversightRunResult{output: output, model: model, sb: selectedSandbox}
