@@ -106,26 +106,55 @@ function _updateWorkspace() {
   el.style.display = label ? "" : "none";
 }
 
-// Cycle: nothing → terminal → dep graph → close
-// When terminal is disabled, skip the terminal step.
+// Cycle: nothing → terminal → dep graph → office → close
 function _cycleBottomPanel() {
   var termPanel = document.getElementById("status-bar-panel");
   var termOpen = termPanel && !termPanel.classList.contains("hidden");
   var depOpen = !!window.depGraphEnabled;
+  var officePanel = document.getElementById("office-container");
+  var officeOpen = officePanel && !officePanel.classList.contains("hidden");
   var termAvailable = typeof terminalEnabled !== "undefined" && terminalEnabled;
+  var officeAvailable = typeof _officeAssetAvailable === "function" && _officeAssetAvailable();
 
-  if (!termOpen && !depOpen) {
-    if (termAvailable) {
-      _showTerminalPanel();
-    } else {
-      _showDepGraphPanel();
-    }
-  } else if (termOpen && !depOpen) {
+  if (!termOpen && !depOpen && !officeOpen) {
+    if (termAvailable) { _showTerminalPanel(); }
+    else { _showDepGraphPanel(); }
+  } else if (termOpen) {
     _hideTerminalPanel();
     _showDepGraphPanel();
+  } else if (depOpen) {
+    _hideDepGraphPanel();
+    if (officeAvailable) { _showOfficePanel(); }
   } else {
+    _hideOfficePanel();
+  }
+}
+
+function _showOfficePanel() {
+  var panel = document.getElementById("office-container");
+  var btn = document.getElementById("status-bar-office-btn");
+  if (panel) panel.classList.remove("hidden");
+  if (btn) btn.setAttribute("aria-expanded", "true");
+  if (typeof _officeShow === "function") _officeShow();
+}
+
+function _hideOfficePanel() {
+  var panel = document.getElementById("office-container");
+  var btn = document.getElementById("status-bar-office-btn");
+  if (panel) panel.classList.add("hidden");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+  if (typeof _officeHide === "function") _officeHide();
+}
+
+function toggleOfficePanel() {
+  var panel = document.getElementById("office-container");
+  if (!panel) return;
+  if (panel.classList.contains("hidden")) {
     _hideTerminalPanel();
     _hideDepGraphPanel();
+    _showOfficePanel();
+  } else {
+    _hideOfficePanel();
   }
 }
 
@@ -254,6 +283,7 @@ function applyTerminalVisibility() {
 window.initStatusBar = initStatusBar;
 window.updateStatusBar = updateStatusBar;
 window.toggleTerminalPanel = toggleTerminalPanel;
+window.toggleOfficePanel = toggleOfficePanel;
 window.applyTerminalVisibility = applyTerminalVisibility;
 
 if (document.readyState === "loading") {

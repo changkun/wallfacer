@@ -86,26 +86,23 @@
     // Generate initial empty layout
     updateLayout(0);
 
-    // Detect assets and show toggle button accordingly
-    var btn = document.getElementById("office-toggle");
+    // Detect assets and show status bar office button
     var devMode =
       typeof location !== "undefined" &&
       location.search &&
       location.search.indexOf("office=dev") !== -1;
 
-    if (btn) {
-      btn.addEventListener("click", toggleOffice);
-      if (devMode) {
-        btn.classList.remove("hidden");
-        _autoShowFromPref();
-      } else if (typeof window._officeDetectAssets === "function") {
-        window._officeDetectAssets().then(function (available) {
-          if (available) {
-            btn.classList.remove("hidden");
-            _autoShowFromPref();
-          }
-        });
-      }
+    if (devMode) {
+      _showOfficeBtn();
+    } else if (typeof window._officeDetectAssets === "function") {
+      window._officeDetectAssets().then(function (available) {
+        if (available) _showOfficeBtn();
+      });
+    }
+
+    function _showOfficeBtn() {
+      var btn = document.getElementById("status-bar-office-btn");
+      if (btn) btn.classList.remove("hidden");
     }
 
     // Register for task state changes from SSE
@@ -188,10 +185,6 @@
   }
 
   function showOffice() {
-    var board = document.getElementById("board");
-    var container = document.getElementById("office-container");
-    if (board) board.style.display = "none";
-    if (container) container.style.display = "block";
     _visible = true;
 
     // Resize canvas now that container is visible
@@ -213,42 +206,19 @@
     _lastUpdateTime = performance.now();
     _startUpdateLoop();
 
-    var btn = document.getElementById("office-toggle");
-    if (btn) btn.textContent = "Board";
+
   }
 
   function hideOffice() {
-    var board = document.getElementById("board");
-    var container = document.getElementById("office-container");
-    if (board) board.style.display = "";
-    if (container) container.style.display = "none";
     _visible = false;
 
     if (_renderer) _renderer.stop();
     _stopUpdateLoop();
 
-    var btn = document.getElementById("office-toggle");
-    if (btn) btn.textContent = "Office";
+
   }
 
-  function toggleOffice() {
-    if (_visible) {
-      hideOffice();
-    } else {
-      showOffice();
-    }
-    try {
-      localStorage.setItem(VIEW_PREF_KEY, _visible ? "true" : "false");
-    } catch (e) {}
-  }
 
-  function _autoShowFromPref() {
-    try {
-      if (localStorage.getItem(VIEW_PREF_KEY) === "true") {
-        showOffice();
-      }
-    } catch (e) {}
-  }
 
   function isOfficeVisible() {
     return _visible;
@@ -312,7 +282,6 @@
   window._officeHide = hideOffice;
   window._officeIsVisible = isOfficeVisible;
   window._officeUpdateLayout = updateLayout;
-  window._officeToggle = toggleOffice;
   window._officeSyncTasks = syncTasks;
   window._officeGetCharacterManager = function () {
     return _characterManager;

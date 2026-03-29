@@ -73,8 +73,8 @@ function makeContext() {
 
   makeElement("office-container");
   makeElement("board", "main");
-  const toggleBtn = makeElement("office-toggle", "button");
-  toggleBtn.classList.add("hidden");
+  const officeBtn = makeElement("status-bar-office-btn", "button");
+  officeBtn.classList.add("hidden");
 
   const document = {
     getElementById(id) {
@@ -201,7 +201,7 @@ describe("office coordinator", () => {
     dcl.forEach((fn) => fn());
 
     // Toggle button should be visible
-    expect(elements["office-toggle"].classList.contains("hidden")).toBe(false);
+    expect(elements["status-bar-office-btn"].classList.contains("hidden")).toBe(false);
     // Canvas + SR summary + minimap should be appended to container
     expect(elements["office-container"].children.length).toBeGreaterThanOrEqual(
       1,
@@ -215,8 +215,7 @@ describe("office coordinator", () => {
 
     windowObj._officeShow();
 
-    expect(elements["board"].style.display).toBe("none");
-    expect(elements["office-container"].style.display).toBe("block");
+    // Board stays visible (bottom panel mode)
     expect(windowObj._officeIsVisible()).toBe(true);
   });
 
@@ -228,8 +227,6 @@ describe("office coordinator", () => {
     windowObj._officeShow();
     windowObj._officeHide();
 
-    expect(elements["board"].style.display).toBe("");
-    expect(elements["office-container"].style.display).toBe("none");
     expect(windowObj._officeIsVisible()).toBe(false);
   });
 
@@ -238,14 +235,12 @@ describe("office coordinator", () => {
     const dcl = eventListeners["document"]?.["DOMContentLoaded"];
     dcl.forEach((fn) => fn());
 
-    // Simulate click
-    windowObj._officeToggle();
+    // Show then hide
+    windowObj._officeShow();
     expect(windowObj._officeIsVisible()).toBe(true);
-    expect(elements["office-toggle"].textContent).toBe("Board");
 
-    windowObj._officeToggle();
+    windowObj._officeHide();
     expect(windowObj._officeIsVisible()).toBe(false);
-    expect(elements["office-toggle"].textContent).toBe("Office");
   });
 
   it("updateLayout changes the renderer layout", () => {

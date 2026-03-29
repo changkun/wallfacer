@@ -1,3 +1,11 @@
+<!-- Office panel (above status bar) -->
+<div
+  id="office-container"
+  class="status-bar-panel hidden"
+  role="region"
+  aria-label="Pixel office view"
+  style="position:relative;"
+></div>
 <!-- Terminal panel (above status bar, pops up from its top edge) -->
 <div
   id="status-bar-panel"
@@ -73,6 +81,15 @@
     </span>
   </div>
   <div class="status-bar__right">
+    <button
+      id="status-bar-office-btn"
+      class="status-bar-btn hidden"
+      onclick="toggleOfficePanel()"
+      title="Toggle office view"
+      aria-expanded="false"
+    >
+      Office
+    </button>
     <button
       id="status-bar-depgraph-btn"
       class="status-bar-btn"

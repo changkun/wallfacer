@@ -247,25 +247,22 @@ function initCtx(ctx) {
 }
 
 describe("View preference", () => {
-  it("toggle stores preference in localStorage", () => {
+  it("show and hide work correctly", () => {
     const ctx = makeOfficeContext();
     initCtx(ctx);
-    const { windowObj, storage } = ctx;
+    const { windowObj } = ctx;
 
-    windowObj._officeToggle(); // show
-    expect(storage["wallfacer-office-view"]).toBe("true");
+    windowObj._officeShow();
+    expect(windowObj._officeIsVisible()).toBe(true);
 
-    windowObj._officeToggle(); // hide
-    expect(storage["wallfacer-office-view"]).toBe("false");
+    windowObj._officeHide();
+    expect(windowObj._officeIsVisible()).toBe(false);
   });
 
-  it("auto-shows office when preference is true", () => {
-    const ctx = makeOfficeContext({
-      storage: { "wallfacer-office-view": "true" },
-    });
+  it("starts hidden by default", () => {
+    const ctx = makeOfficeContext();
     initCtx(ctx);
-    // In dev mode, _autoShowFromPref is called synchronously
-    expect(ctx.windowObj._officeIsVisible()).toBe(true);
+    expect(ctx.windowObj._officeIsVisible()).toBe(false);
   });
 });
 
