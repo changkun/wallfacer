@@ -78,7 +78,8 @@ Key server files:
 - `main.go` — Tiny entry point: embed FS declarations and subcommand dispatch
 - `internal/cli/` — CLI subcommand implementations (server, exec, status, env) and shared helpers
 - `internal/apicontract/` — Single source of truth for all HTTP API routes; generates `ui/js/generated/routes.js`
-- `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream, execute, files, oversight, refine, ideate, templates, stats, admin, workspace, runtime)
+- `internal/handler/` — HTTP API handlers (one file per concern: tasks, env, config, git, instructions, containers, stream, execute, files, oversight, refine, ideate, templates, stats, admin, workspace, runtime, auth)
+- `internal/oauth/` — OAuth 2.0 PKCE flow engine, ephemeral callback server, provider configs (Claude, Codex), token exchange
 - `internal/runner/` — Container orchestration via `os/exec`; task execution loop; commit pipeline; usage tracking; worktree sync; title generation; oversight; refinement; ideation; auto-retry; circuit breaker
 - `internal/store/` — Per-task directory persistence, data models (Task, TaskUsage, TurnUsageRecord, TaskEvent, TaskOversight, TaskSummary, Tombstone, RetryRecord, FailureCategory), event sourcing, soft delete, search index; see `docs/internals/data-and-storage.md` for full data model documentation
 - `internal/envconfig/` — `.env` file parsing and atomic update; exposes `Parse` and `Update` for the handler and runner
@@ -203,6 +204,11 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 
 ### Terminal
 - `GET /api/terminal/ws` — WebSocket: interactive host shell and container exec with multi-session tab support (not in apicontract; requires `?token=` auth). `create_session` accepts optional `container` field to exec into a running task container. See `docs/internals/api-and-transport.md` for full protocol.
+
+### OAuth Authentication
+- `POST /api/auth/{provider}/start` — Start OAuth flow for `claude` or `codex`; returns `{authorize_url}`
+- `GET /api/auth/{provider}/status` — Poll flow status; returns `{state: "pending"|"success"|"error"}`
+- `POST /api/auth/{provider}/cancel` — Cancel an in-progress OAuth flow
 
 ### Admin
 - `POST /api/admin/rebuild-index` — Rebuild the in-memory search index from disk
