@@ -1,6 +1,6 @@
 # Task 6: Pathfinding
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 2 (TileMap)
 **Phase:** Phase 2 (Character System)
 **Effort:** Small

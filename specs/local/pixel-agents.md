@@ -398,7 +398,7 @@ Replace placeholder sprites with LimeZu art assets.
 | 3 | [SpriteCache with placeholders](pixel-agents/task-03-sprite-cache.md) | 1 | Medium | Done |
 | 4 | [Camera](pixel-agents/task-04-camera.md) | — | Small | Done |
 | 5 | [Renderer and view toggle](pixel-agents/task-05-renderer-and-view-toggle.md) | 2, 3, 4 | Large | Done |
-| 6 | [Pathfinding](pixel-agents/task-06-pathfinding.md) | 2 | Small | Todo |
+| 6 | [Pathfinding](pixel-agents/task-06-pathfinding.md) | 2 | Small | Done |
 | 7 | [Character state machine and animation](pixel-agents/task-07-character-state-machine.md) | 3, 6 | Medium | Todo |
 | 8 | [CharacterManager and desk persistence](pixel-agents/task-08-character-manager.md) | 2, 7 | Medium | Todo |
 | 9 | [SSE task state integration](pixel-agents/task-09-sse-integration.md) | 5, 8 | Medium | Todo |
