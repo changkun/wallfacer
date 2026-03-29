@@ -20,7 +20,7 @@ func TestTrayManagerNew(t *testing.T) {
 	showFn := func() { called = true }
 	quitFn := func() {}
 
-	tm := NewTrayManager(showFn, quitFn, nil,"http://localhost:1234", "")
+	tm := NewTrayManager(showFn, quitFn, nil, "http://localhost:1234", "")
 	if tm == nil {
 		t.Fatal("expected non-nil TrayManager")
 	}
@@ -150,7 +150,7 @@ func TestPollHealthResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tm := NewTrayManager(func() {}, func() {}, nil,srv.URL, "")
+	tm := NewTrayManager(func() {}, func() {}, nil, srv.URL, "")
 	data, err := tm.fetchHealth()
 	if err != nil {
 		t.Fatalf("fetchHealth() error: %v", err)
@@ -185,14 +185,14 @@ func TestPollHealthWithAPIKey(t *testing.T) {
 	defer srv.Close()
 
 	// Without key — should fail.
-	tm := NewTrayManager(func() {}, func() {}, nil,srv.URL, "")
+	tm := NewTrayManager(func() {}, func() {}, nil, srv.URL, "")
 	_, err := tm.fetchHealth()
 	if err == nil {
 		t.Fatal("expected error without API key")
 	}
 
 	// With key — should succeed.
-	tm = NewTrayManager(func() {}, func() {}, nil,srv.URL, "test-key")
+	tm = NewTrayManager(func() {}, func() {}, nil, srv.URL, "test-key")
 	data, err := tm.fetchHealth()
 	if err != nil {
 		t.Fatalf("fetchHealth() with key error: %v", err)
@@ -219,7 +219,7 @@ func TestParseConfigToggles(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tm := NewTrayManager(func() {}, func() {}, nil,srv.URL, "")
+	tm := NewTrayManager(func() {}, func() {}, nil, srv.URL, "")
 	cfg, err := tm.fetchConfig()
 	if err != nil {
 		t.Fatalf("fetchConfig() error: %v", err)
@@ -253,7 +253,7 @@ func TestToggleSendsCorrectPayload(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tm := NewTrayManager(func() {}, func() {}, nil,srv.URL, "")
+	tm := NewTrayManager(func() {}, func() {}, nil, srv.URL, "")
 	if err := tm.toggleConfig("autopilot", false); err != nil {
 		t.Fatalf("toggleConfig error: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestToggleFailurePreservesState(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tm := NewTrayManager(func() {}, func() {}, nil,srv.URL, "")
+	tm := NewTrayManager(func() {}, func() {}, nil, srv.URL, "")
 	err := tm.toggleConfig("autopilot", true)
 	if err == nil {
 		t.Fatal("expected error from failing PUT")
@@ -301,7 +301,7 @@ func TestParseStatsResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tm := NewTrayManager(func() {}, func() {}, nil,srv.URL, "")
+	tm := NewTrayManager(func() {}, func() {}, nil, srv.URL, "")
 	data, err := tm.fetchStats()
 	if err != nil {
 		t.Fatalf("fetchStats() error: %v", err)
@@ -356,7 +356,7 @@ func TestStatsErrorFallback(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tm := NewTrayManager(func() {}, func() {}, nil,srv.URL, "")
+	tm := NewTrayManager(func() {}, func() {}, nil, srv.URL, "")
 	_, err := tm.fetchStats()
 	if err == nil {
 		t.Fatal("expected error from failing stats endpoint")

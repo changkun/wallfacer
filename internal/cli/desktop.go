@@ -136,7 +136,7 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	// App menu: override Cmd+W to hide the window (not quit), and
 	// Cmd+Q to route through doShutdown so the user sees the shutdown overlay.
 	appMenu := menu.NewMenu()
-	appMenu.Append(menu.AppMenu()) // standard macOS app menu (About, Services, …)
+	appMenu.Append(menu.AppMenu())  // standard macOS app menu (About, Services, …)
 	appMenu.Append(menu.EditMenu()) // standard Edit menu (Copy, Paste, …)
 	fileMenu := appMenu.AddSubmenu("File")
 	fileMenu.AddText("Close Window", keys.CmdOrCtrl("w"), func(_ *menu.CallbackData) {
