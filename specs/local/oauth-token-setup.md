@@ -7,7 +7,7 @@ affects:
   - internal/oauth/
   - internal/handler/auth.go
   - internal/apicontract/routes.go
-  - ui/partials/api-config-modal.html
+  - ui/partials/settings-tab-sandbox.html
   - ui/js/envconfig.js
 effort: large
 created: 2026-03-28
@@ -264,15 +264,15 @@ Browser-based OAuth sign-in is fully implemented for both Claude and Codex. User
 
 | # | Task | Depends on | Effort | Status |
 |---|------|-----------|--------|--------|
-| 1 | [PKCE Utilities](oauth-token-setup/task-01-pkce-utilities.md) | — | Small | Todo |
-| 2 | [Ephemeral Callback Server](oauth-token-setup/task-02-callback-server.md) | 1 | Medium | Todo |
-| 3 | [Flow Engine & Provider Configs](oauth-token-setup/task-03-flow-engine.md) | 1, 2 | Medium | Todo |
-| 4 | [Auth HTTP Handlers & Routes](oauth-token-setup/task-04-auth-handler-routes.md) | 3 | Medium | Todo |
-| 5 | [UI Sign-In Buttons & Polling](oauth-token-setup/task-05-ui-sign-in.md) | 4 | Medium | Todo |
-| 6 | [Desktop Browser Launch](oauth-token-setup/task-06-desktop-browser.md) | 5 | Small | Todo |
-| 7 | [Env Test Reauth Flag](oauth-token-setup/task-07-reauth-flag.md) | — | Small | Todo |
-| 8 | [First-Launch Hints & Re-Auth UI](oauth-token-setup/task-08-first-launch-reauth-ui.md) | 5, 7 | Medium | Todo |
-| 9 | [Documentation](oauth-token-setup/task-09-docs.md) | 4, 5, 7, 8 | Small | Todo |
+| 1 | [PKCE Utilities](oauth-token-setup/task-01-pkce-utilities.md) | — | Small | Done |
+| 2 | [Ephemeral Callback Server](oauth-token-setup/task-02-callback-server.md) | 1 | Medium | Done |
+| 3 | [Flow Engine & Provider Configs](oauth-token-setup/task-03-flow-engine.md) | 1, 2 | Medium | Done |
+| 4 | [Auth HTTP Handlers & Routes](oauth-token-setup/task-04-auth-handler-routes.md) | 3 | Medium | Done |
+| 5 | [UI Sign-In Buttons & Polling](oauth-token-setup/task-05-ui-sign-in.md) | 4 | Medium | Done |
+| 6 | [Desktop Browser Launch](oauth-token-setup/task-06-desktop-browser.md) | 5 | Small | Done |
+| 7 | [Env Test Reauth Flag](oauth-token-setup/task-07-reauth-flag.md) | — | Small | Done |
+| 8 | [First-Launch Hints & Re-Auth UI](oauth-token-setup/task-08-first-launch-reauth-ui.md) | 5, 7 | Medium | Done |
+| 9 | [Documentation](oauth-token-setup/task-09-docs.md) | 4, 5, 7, 8 | Small | Done |
 
 ```mermaid
 graph LR
