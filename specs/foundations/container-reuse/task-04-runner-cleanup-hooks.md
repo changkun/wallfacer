@@ -1,9 +1,20 @@
-# Task 4: Runner Worker Cleanup on Task Completion
+---
+title: "Runner Worker Cleanup on Task Completion"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/container-reuse/task-03-launch-routing.md
+affects:
+  - internal/runner/execute.go
+  - internal/sandbox/backend.go
+effort: medium
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 3
-**Phase:** 2 (Worker Lifecycle Management)
-**Effort:** Medium
+# Task 4: Runner Worker Cleanup on Task Completion
 
 ## Goal
 

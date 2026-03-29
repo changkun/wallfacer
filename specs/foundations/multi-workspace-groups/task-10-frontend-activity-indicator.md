@@ -1,9 +1,19 @@
-# Task 10: Frontend Per-Group Task Count Badges
+---
+title: "Frontend Per-Group Task Count Badges"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/multi-workspace-groups/task-09-config-active-groups.md
+affects:
+  - ui/js/workspace.js
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 9
-**Phase:** 4 (Frontend)
-**Effort:** Small
+# Task 10: Frontend Per-Group Task Count Badges
 
 ## Goal
 

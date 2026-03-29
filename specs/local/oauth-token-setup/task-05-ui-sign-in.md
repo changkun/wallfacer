@@ -1,9 +1,18 @@
-# Task 5: UI Sign-In Buttons and Polling
+---
+title: UI Sign-In Buttons and Polling
+status: complete
+track: local
+depends_on:
+  - specs/local/oauth-token-setup/task-04-auth-handler-routes.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** 4
-**Phase:** Frontend integration
-**Effort:** Medium
+# Task 5: UI Sign-In Buttons and Polling
 
 ## Goal
 

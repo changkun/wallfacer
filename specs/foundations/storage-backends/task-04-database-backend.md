@@ -1,8 +1,19 @@
-# Task 4: Implement DatabaseBackend (PostgreSQL)
+---
+title: "Implement DatabaseBackend (PostgreSQL)"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/storage-backends/task-02-filesystem-backend.md
+affects:
+  - internal/store/backend_db.go
+effort: large
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started
-**Depends on:** Task 2
-**Effort:** Large
+# Task 4: Implement DatabaseBackend (PostgreSQL)
 
 ## Goal
 

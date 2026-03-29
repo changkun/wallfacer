@@ -1,9 +1,18 @@
-# Task 4: Auth HTTP Handlers and Route Registration
+---
+title: Auth HTTP Handlers and Route Registration
+status: complete
+track: local
+depends_on:
+  - specs/local/oauth-token-setup/task-03-flow-engine.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** 3
-**Phase:** Server integration
-**Effort:** Medium
+# Task 4: Auth HTTP Handlers and Route Registration
 
 ## Goal
 

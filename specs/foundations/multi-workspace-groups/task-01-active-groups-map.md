@@ -1,9 +1,18 @@
-# Task 1: Add activeGroups Map to Manager
+---
+title: "Add activeGroups Map to Manager"
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/workspace/manager.go
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** 1 (Multi-Store Manager)
-**Effort:** Small
+# Task 1: Add activeGroups Map to Manager
 
 ## Goal
 

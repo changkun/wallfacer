@@ -1,8 +1,19 @@
-# Task 1: Extract StorageBackend Interface
+---
+title: "Extract StorageBackend Interface"
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/store/backend.go
+  - internal/store/store.go
+effort: medium
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Effort:** Medium
+# Task 1: Extract StorageBackend Interface
 
 ## Goal
 

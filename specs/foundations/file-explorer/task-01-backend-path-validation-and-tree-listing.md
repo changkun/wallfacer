@@ -1,9 +1,19 @@
-# Task 1: Backend Path Validation and Tree Listing
+---
+title: "Backend Path Validation and Tree Listing"
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/handler/explorer.go
+  - internal/apicontract/routes.go
+effort: medium
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** Phase 1 — Read-Only Browsing + Preview
-**Effort:** Medium
+# Task 1: Backend Path Validation and Tree Listing
 
 ## Goal
 

@@ -1,9 +1,21 @@
-# Task 3: Frontend Panel Shell
+---
+title: "Frontend Panel Shell"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/file-explorer/task-01-backend-path-validation-and-tree-listing.md
+affects:
+  - ui/partials/explorer-panel.html
+  - ui/css/explorer.css
+  - ui/js/explorer.js
+effort: medium
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 1 (routes must exist in generated routes.js)
-**Phase:** Phase 1 — Read-Only Browsing + Preview
-**Effort:** Medium
+# Task 3: Frontend Panel Shell
 
 ## Goal
 

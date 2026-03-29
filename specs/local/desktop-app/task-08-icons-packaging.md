@@ -1,9 +1,19 @@
-# Task 8: App Icons and Build Packaging
+---
+title: App Icons and Build Packaging
+status: complete
+track: local
+depends_on:
+  - specs/local/desktop-app/task-02-wails-window.md
+  - specs/local/desktop-app/task-07-platform-behaviors.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 2, Task 7
-**Phase:** Packaging
-**Effort:** Medium
+# Task 8: App Icons and Build Packaging
 
 ## Goal
 

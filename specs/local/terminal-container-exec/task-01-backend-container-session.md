@@ -1,9 +1,17 @@
-# Task 1: Backend Container Session Creation
+---
+title: Backend Container Session Creation
+status: complete
+track: local
+depends_on: []
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** Backend
-**Effort:** Medium
+# Task 1: Backend Container Session Creation
 
 ## Goal
 

@@ -1,6 +1,20 @@
-# Multiple Concurrent Workspace Groups
+---
+title: Multiple Concurrent Workspace Groups
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/workspace/
+  - internal/runner/
+  - internal/handler/
+effort: xlarge
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Complete | **Date:** 2026-03-27
+# Multiple Concurrent Workspace Groups
 
 ## Problem
 

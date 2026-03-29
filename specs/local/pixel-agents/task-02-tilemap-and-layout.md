@@ -1,9 +1,17 @@
-# Task 2: TileMap and Layout Algorithm
+---
+title: TileMap and Layout Algorithm
+status: complete
+track: local
+depends_on: []
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** Phase 1 (Rendering Foundation)
-**Effort:** Medium
+# Task 2: TileMap and Layout Algorithm
 
 ## Goal
 

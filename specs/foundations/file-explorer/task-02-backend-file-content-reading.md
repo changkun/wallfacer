@@ -1,9 +1,19 @@
-# Task 2: Backend File Content Reading
+---
+title: "Backend File Content Reading"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/file-explorer/task-01-backend-path-validation-and-tree-listing.md
+affects:
+  - internal/handler/explorer.go
+effort: medium
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 1
-**Phase:** Phase 1 — Read-Only Browsing + Preview
-**Effort:** Medium
+# Task 2: Backend File Content Reading
 
 ## Goal
 

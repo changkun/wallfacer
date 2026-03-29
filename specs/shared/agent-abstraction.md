@@ -1,8 +1,17 @@
-# Agent Role Abstraction & Multi-Agent Communication
+---
+title: Agent Role Abstraction & Multi-Agent Communication
+status: drafted
+track: shared
+depends_on: []
+affects: [internal/runner/, internal/store/, internal/prompts/]
+effort: xlarge
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Investigation / Design
-**Dependencies:** [Sandbox Backends](../foundations/sandbox-backends.md), [Container Reuse](../foundations/container-reuse.md)
-**Scope:** `internal/runner/`, `internal/store/`, `internal/prompts/`
+# Agent Role Abstraction & Multi-Agent Communication
 
 ## Problem Statement
 

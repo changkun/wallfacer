@@ -1,6 +1,18 @@
-# Pluggable Storage Backends
+---
+title: Pluggable Storage Backends
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/store/
+effort: large
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Enablers complete (tasks 1–3); cloud backends deferred | **Date:** 2026-03-23
+# Pluggable Storage Backends
 
 ## Problem
 

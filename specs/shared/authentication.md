@@ -1,6 +1,17 @@
-# Authentication & Identity
+---
+title: Authentication & Identity
+status: drafted
+track: shared
+depends_on: []
+affects: [internal/auth/, internal/handler/, ui/]
+effort: large
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Date:** 2026-03-28
+# Authentication & Identity
 
 ## Problem
 

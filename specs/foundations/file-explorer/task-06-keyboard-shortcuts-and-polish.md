@@ -1,9 +1,20 @@
-# Task 6: Keyboard Shortcuts and Polish
+---
+title: "Keyboard Shortcuts and Polish"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/file-explorer/task-04-frontend-tree-component.md
+  - specs/foundations/file-explorer/task-05-frontend-file-preview-modal.md
+affects:
+  - ui/js/events.js
+effort: small
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 4, Task 5
-**Phase:** Phase 1 — Read-Only Browsing + Preview
-**Effort:** Small
+# Task 6: Keyboard Shortcuts and Polish
 
 ## Goal
 

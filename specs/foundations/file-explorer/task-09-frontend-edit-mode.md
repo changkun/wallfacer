@@ -1,9 +1,20 @@
-# Task 9: Frontend Edit Mode
+---
+title: "Frontend Edit Mode"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/file-explorer/task-05-frontend-file-preview-modal.md
+  - specs/foundations/file-explorer/task-08-backend-file-writing.md
+affects:
+  - ui/js/explorer.js
+effort: medium
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 5, Task 8
-**Phase:** Phase 2 — File Editing + Saving
-**Effort:** Medium
+# Task 9: Frontend Edit Mode
 
 ## Goal
 

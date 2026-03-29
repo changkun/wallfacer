@@ -1,7 +1,23 @@
-# Spec Planning UX
+---
+title: Spec Planning UX
+status: drafted
+track: local
+depends_on:
+  - specs/local/spec-coordination.md
+  - specs/foundations/file-explorer.md
+  - specs/foundations/host-terminal.md
+affects:
+  - ui/js/
+  - ui/index.html
+  - internal/handler/explorer.go
+effort: xlarge
+created: 2026-03-29
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Parent spec:** [spec-coordination.md](spec-coordination.md)
-**Date:** 2026-03-29
+# Spec Planning UX
 
 Depends on [spec-document-model.md](spec-document-model.md).
 

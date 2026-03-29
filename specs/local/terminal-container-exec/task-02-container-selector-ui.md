@@ -1,9 +1,18 @@
-# Task 2: Container Selector UI
+---
+title: Container Selector UI
+status: complete
+track: local
+depends_on:
+  - specs/local/terminal-container-exec/task-01-backend-container-session.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 1
-**Phase:** Frontend
-**Effort:** Medium
+# Task 2: Container Selector UI
 
 ## Goal
 

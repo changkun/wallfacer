@@ -1,9 +1,19 @@
-# Task 5: Frontend Session Wiring
+---
+title: Frontend Session Wiring
+status: complete
+track: local
+depends_on:
+  - specs/local/terminal-sessions/task-03-session-messages.md
+  - specs/local/terminal-sessions/task-04-tab-bar-ui.md
+affects: []
+effort: large
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 3, Task 4
-**Phase:** Frontend integration
-**Effort:** Large
+# Task 5: Frontend Session Wiring
 
 ## Goal
 

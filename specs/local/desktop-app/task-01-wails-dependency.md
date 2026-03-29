@@ -1,9 +1,17 @@
-# Task 1: Add Wails v2 Dependency and Project Scaffold
+---
+title: Add Wails v2 Dependency and Project Scaffold
+status: complete
+track: local
+depends_on: []
+affects: []
+effort: small
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** Setup
-**Effort:** Small
+# Task 1: Add Wails v2 Dependency and Project Scaffold
 
 ## Goal
 

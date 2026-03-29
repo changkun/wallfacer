@@ -1,9 +1,19 @@
-# Task 5: Verify Auxiliary Agents Through Per-Task Worker
+---
+title: "Verify Auxiliary Agents Through Per-Task Worker"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/container-reuse/task-03-launch-routing.md
+affects:
+  - internal/runner/container.go
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 3
-**Phase:** 2 (Worker Lifecycle Management)
-**Effort:** Small
+# Task 5: Verify Auxiliary Agents Through Per-Task Worker
 
 ## Goal
 

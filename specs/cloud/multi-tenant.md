@@ -1,6 +1,20 @@
-# Cloud Multi-Tenant
+---
+title: Cloud Multi-Tenant
+status: drafted
+track: cloud
+depends_on:
+  - specs/cloud/k8s-sandbox.md
+  - specs/cloud/cloud-infrastructure.md
+  - specs/shared/authentication.md
+affects: [internal/handler/, internal/runner/, internal/store/]
+effort: xlarge
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Date:** 2026-03-23
+# Cloud Multi-Tenant
 
 ## Problem
 

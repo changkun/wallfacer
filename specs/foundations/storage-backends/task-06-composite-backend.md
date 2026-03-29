@@ -1,8 +1,20 @@
-# Task 6: Implement CompositeBackend
+---
+title: "Implement CompositeBackend"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/storage-backends/task-04-database-backend.md
+  - specs/foundations/storage-backends/task-05-object-storage-backend.md
+affects:
+  - internal/store/backend_composite.go
+effort: small
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started
-**Depends on:** Task 4, Task 5
-**Effort:** Small
+# Task 6: Implement CompositeBackend
 
 ## Goal
 

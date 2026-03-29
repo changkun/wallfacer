@@ -1,6 +1,20 @@
-# Terminal: Container Exec Integration
+---
+title: "Terminal: Container Exec Integration"
+status: complete
+track: local
+depends_on:
+  - specs/local/terminal-sessions.md
+affects:
+  - internal/handler/terminal.go
+  - ui/js/terminal.js
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Complete | **Date:** 2026-03-28 → 2026-03-30
+# Terminal: Container Exec Integration
 
 ---
 

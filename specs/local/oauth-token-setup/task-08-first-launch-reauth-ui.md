@@ -1,9 +1,19 @@
-# Task 8: First-Launch Hints and Re-Auth UI
+---
+title: First-Launch Hints and Re-Auth UI
+status: complete
+track: local
+depends_on:
+  - specs/local/oauth-token-setup/task-05-ui-sign-in.md
+  - specs/local/oauth-token-setup/task-07-reauth-flag.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** 5, 7
-**Phase:** Frontend polish
-**Effort:** Medium
+# Task 8: First-Launch Hints and Re-Auth UI
 
 ## Goal
 

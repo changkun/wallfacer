@@ -1,9 +1,20 @@
-# Task 12: Preview Syntax Highlighting and Markdown Rendering
+---
+title: "Preview Syntax Highlighting and Markdown Rendering"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/file-explorer/task-05-frontend-file-preview-modal.md
+affects:
+  - ui/css/diffs.css
+  - ui/js/explorer.js
+effort: small
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 5
-**Phase:** Phase 1 — Read-Only Browsing + Preview
-**Effort:** Small
+# Task 12: Preview Syntax Highlighting and Markdown Rendering
 
 ## Goal
 

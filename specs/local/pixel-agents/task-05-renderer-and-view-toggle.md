@@ -1,9 +1,20 @@
-# Task 5: Renderer and View Toggle
+---
+title: Renderer and View Toggle
+status: complete
+track: local
+depends_on:
+  - specs/local/pixel-agents/task-02-tilemap-and-layout.md
+  - specs/local/pixel-agents/task-03-sprite-cache.md
+  - specs/local/pixel-agents/task-04-camera.md
+affects: []
+effort: large
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 2 (TileMap), Task 3 (SpriteCache), Task 4 (Camera)
-**Phase:** Phase 1 (Rendering Foundation)
-**Effort:** Large
+# Task 5: Renderer and View Toggle
 
 ## Goal
 

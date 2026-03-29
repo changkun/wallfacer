@@ -1,9 +1,19 @@
-# Task 2: Modify Switch() for Multi-Store Lifecycle
+---
+title: "Modify Switch() for Multi-Store Lifecycle"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/multi-workspace-groups/task-01-active-groups-map.md
+affects:
+  - internal/workspace/manager.go
+effort: medium
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 1
-**Phase:** 1 (Multi-Store Manager)
-**Effort:** Medium
+# Task 2: Modify Switch() for Multi-Store Lifecycle
 
 ## Goal
 

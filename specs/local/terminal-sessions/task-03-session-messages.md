@@ -1,9 +1,18 @@
-# Task 3: Session Control WebSocket Messages
+---
+title: Session Control WebSocket Messages
+status: complete
+track: local
+depends_on:
+  - specs/local/terminal-sessions/task-02-relay-dispatcher.md
+affects: []
+effort: small
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 2
-**Phase:** Backend protocol
-**Effort:** Small
+# Task 3: Session Control WebSocket Messages
 
 ## Goal
 

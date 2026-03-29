@@ -1,8 +1,21 @@
-# Inline File Panel Viewer
+---
+title: Inline File Panel Viewer
+status: drafted
+track: local
+depends_on:
+  - specs/foundations/file-explorer.md
+affects:
+  - ui/js/explorer.js
+  - ui/index.html
+  - ui/css/styles.css
+effort: large
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started
-**Date:** 2026-03-28
-**Depends on:** [File Explorer](../foundations/file-explorer.md)
+# Inline File Panel Viewer
 
 ---
 

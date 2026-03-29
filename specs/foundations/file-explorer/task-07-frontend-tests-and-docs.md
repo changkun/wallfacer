@@ -1,9 +1,21 @@
-# Task 7: Frontend Tests and Documentation
+---
+title: "Frontend Tests and Documentation"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/file-explorer/task-05-frontend-file-preview-modal.md
+  - specs/foundations/file-explorer/task-06-keyboard-shortcuts-and-polish.md
+affects:
+  - ui/js/tests/explorer.test.js
+  - docs/guide/board-and-tasks.md
+effort: medium
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 5, Task 6
-**Phase:** Phase 1 — Read-Only Browsing + Preview
-**Effort:** Medium
+# Task 7: Frontend Tests and Documentation
 
 ## Goal
 

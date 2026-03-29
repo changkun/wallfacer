@@ -1,7 +1,20 @@
-# Sandbox Reuse
+---
+title: Sandbox Reuse
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/sandbox-backends.md
+affects:
+  - internal/sandbox/
+  - internal/runner/
+effort: xlarge
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Complete (core) | **Date:** 2026-03-27
-**Depends on:** [Pluggable Sandbox Backends](sandbox-backends.md) — complete
+# Sandbox Reuse
 
 ## Problem
 

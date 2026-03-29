@@ -1,9 +1,18 @@
-# Task 6: Desktop Browser Launch Integration
+---
+title: Desktop Browser Launch Integration
+status: complete
+track: local
+depends_on:
+  - specs/local/oauth-token-setup/task-05-ui-sign-in.md
+affects: []
+effort: small
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** 5
-**Phase:** Desktop integration
-**Effort:** Small
+# Task 6: Desktop Browser Launch Integration
 
 ## Goal
 

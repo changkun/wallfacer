@@ -1,9 +1,18 @@
-# Task 11: Speech Bubbles
+---
+title: Speech Bubbles
+status: complete
+track: local
+depends_on:
+  - specs/local/pixel-agents/task-07-character-state-machine.md
+affects: []
+effort: small
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 7 (Character)
-**Phase:** Phase 3 (Task State Integration)
-**Effort:** Small
+# Task 11: Speech Bubbles
 
 ## Goal
 

@@ -1,7 +1,18 @@
-# Overlay Snapshots & CRIU Checkpoint/Restore
+---
+title: Overlay Snapshots & CRIU Checkpoint/Restore
+status: drafted
+track: shared
+depends_on:
+  - specs/foundations/sandbox-backends.md
+affects: [internal/sandbox/]
+effort: xlarge
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started
-**Depends on:** [Container Reuse](../foundations/container-reuse.md) — complete
+# Overlay Snapshots & CRIU Checkpoint/Restore
 
 ## Problem
 

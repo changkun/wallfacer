@@ -1,6 +1,23 @@
-# Native Desktop App
+---
+title: Native Desktop App
+status: complete
+track: local
+depends_on:
+  - specs/foundations/file-explorer.md
+  - specs/foundations/host-terminal.md
+affects:
+  - internal/cli/desktop.go
+  - internal/cli/tray.go
+  - build/
+  - wails.json
+effort: large
+created: 2026-02-21
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Complete | **Date:** 2026-02-21 → 2026-03-29
+# Native Desktop App
 
 ## Goal
 

@@ -1,6 +1,19 @@
-# Tenant Filesystem
+---
+title: Tenant Filesystem
+status: drafted
+track: cloud
+depends_on:
+  - specs/foundations/sandbox-backends.md
+  - specs/foundations/storage-backends.md
+affects: [internal/workspace/, internal/runner/, internal/store/]
+effort: xlarge
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started | **Date:** 2026-03-28
+# Tenant Filesystem
 
 ## Problem
 

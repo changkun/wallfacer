@@ -1,9 +1,19 @@
-# Task 3: Track Task-to-Group Mapping in Runner
+---
+title: "Track Task-to-Group Mapping in Runner"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/multi-workspace-groups/task-01-active-groups-map.md
+affects:
+  - internal/runner/runner.go
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 1
-**Phase:** 2 (Runner Multi-Store Awareness)
-**Effort:** Small
+# Task 3: Track Task-to-Group Mapping in Runner
 
 ## Goal
 

@@ -1,9 +1,18 @@
-# Task 10: Phase 2 Tests and Documentation
+---
+title: "Phase 2 Tests and Documentation"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/file-explorer/task-09-frontend-edit-mode.md
+affects: []
+effort: small
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 9
-**Phase:** Phase 2 — File Editing + Saving
-**Effort:** Small
+# Task 10: Phase 2 Tests and Documentation
 
 ## Goal
 

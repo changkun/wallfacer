@@ -1,7 +1,24 @@
-# Per-Task Read-Only Host Mounts
+---
+title: Per-Task Read-Only Host Mounts
+status: drafted
+track: local
+depends_on:
+  - specs/foundations/file-explorer.md
+affects:
+  - internal/store/models.go
+  - internal/runner/container.go
+  - internal/runner/execute.go
+  - internal/handler/tasks.go
+  - internal/handler/workspace.go
+  - ui/js/tasks.js
+effort: medium
+created: 2026-03-25
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Draft
-**Date:** 2026-03-25
+# Per-Task Read-Only Host Mounts
 
 ---
 

@@ -1,8 +1,24 @@
-# Plan: File & Image Drag-and-Drop Attachments for Task Prompts
+---
+title: "File & Image Drag-and-Drop Attachments for Task Prompts"
+status: drafted
+track: local
+depends_on:
+  - specs/foundations/file-explorer.md
+affects:
+  - internal/store/models.go
+  - internal/handler/tasks.go
+  - internal/runner/container.go
+  - internal/runner/execute.go
+  - ui/index.html
+  - ui/js/tasks.js
+effort: medium
+created: 2026-02-21
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Draft
-**Date:** 2026-02-21
-**Last reviewed:** 2026-03-29
+# Plan: File & Image Drag-and-Drop Attachments for Task Prompts
 
 ---
 

@@ -1,9 +1,18 @@
-# Task 3: SpriteCache with Placeholder Rendering
+---
+title: SpriteCache with Placeholder Rendering
+status: complete
+track: local
+depends_on:
+  - specs/local/pixel-agents/task-01-asset-scaffolding.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 1 (asset scaffolding)
-**Phase:** Phase 1 (Rendering Foundation)
-**Effort:** Medium
+# Task 3: SpriteCache with Placeholder Rendering
 
 ## Goal
 

@@ -1,7 +1,23 @@
-# Live Serve — Build and Run Developed Software from Wallfacer
+---
+title: "Live Serve — Build and Run Developed Software from Wallfacer"
+status: drafted
+track: local
+depends_on: []
+affects:
+  - internal/store/models.go
+  - internal/runner/serve.go
+  - internal/handler/serve.go
+  - internal/prompts/serve-discover.tmpl
+  - internal/apicontract/routes.go
+  - ui/js/serve.js
+effort: large
+created: 2026-03-25
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Draft
-**Date:** 2026-03-25
+# Live Serve — Build and Run Developed Software from Wallfacer
 
 ---
 

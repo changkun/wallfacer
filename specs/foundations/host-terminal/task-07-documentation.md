@@ -1,9 +1,20 @@
-# Task 7: Documentation
+---
+title: "Documentation"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/host-terminal/task-04-backend-terminal-handler.md
+  - specs/foundations/host-terminal/task-06-statusbar-integration.md
+affects:
+  - docs/guide/configuration.md
+effort: small
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** 4, 6
-**Phase:** Phase 1 — Single Terminal Session
-**Effort:** Small
+# Task 7: Documentation
 
 ## Goal
 

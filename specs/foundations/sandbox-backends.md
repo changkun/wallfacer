@@ -1,6 +1,18 @@
-# Pluggable Sandbox Backends
+---
+title: Pluggable Sandbox Backends
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/sandbox/
+effort: large
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Complete | **Date:** 2026-03-23 → 2026-03-26
+# Pluggable Sandbox Backends
 
 ## Problem
 

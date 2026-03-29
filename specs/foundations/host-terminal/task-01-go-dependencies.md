@@ -1,9 +1,19 @@
-# Task 1: Add WebSocket Dependency and Inline PTY Helper
+---
+title: "Add WebSocket Dependency and Inline PTY Helper"
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/pty/
+  - go.mod
+effort: small
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** Phase 1 — Single Terminal Session
-**Effort:** Small
+# Task 1: Add WebSocket Dependency and Inline PTY Helper
 
 ## Goal
 

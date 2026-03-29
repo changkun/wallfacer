@@ -1,6 +1,18 @@
-# Native Containerization: Linux
+---
+title: "Native Containerization: Linux"
+status: drafted
+track: shared
+depends_on:
+  - specs/foundations/sandbox-backends.md
+affects: [internal/sandbox/]
+effort: large
+created: 2026-03-13
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Date:** 2026-03-13
+# Native Containerization: Linux
 
 ## Problem
 

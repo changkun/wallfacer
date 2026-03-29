@@ -1,8 +1,22 @@
-# OAuth Token Setup
+---
+title: OAuth Token Setup
+status: drafted
+track: local
+depends_on: []
+affects:
+  - internal/oauth/
+  - internal/handler/auth.go
+  - internal/apicontract/routes.go
+  - ui/partials/api-config-modal.html
+  - ui/js/envconfig.js
+effort: large
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started
-**Track:** Local Product
-**Dependencies:** None (standalone improvement to existing Settings UI)
+# OAuth Token Setup
 
 ## Problem
 

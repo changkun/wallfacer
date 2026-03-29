@@ -1,6 +1,18 @@
-# Tenant API
+---
+title: Tenant API
+status: drafted
+track: cloud
+depends_on:
+  - specs/cloud/multi-tenant.md
+affects: [internal/handler/tenantapi/]
+effort: large
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started | **Date:** 2026-03-28
+# Tenant API
 
 ## Problem
 

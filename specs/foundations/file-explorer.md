@@ -1,6 +1,20 @@
-# Plan: File Explorer Panel
+---
+title: File Explorer Panel
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/handler/explorer.go
+  - ui/js/explorer.js
+  - ui/css/explorer.css
+effort: xlarge
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Complete | **Date:** 2026-03-22 → 2026-03-28
+# Plan: File Explorer Panel
 
 ---
 

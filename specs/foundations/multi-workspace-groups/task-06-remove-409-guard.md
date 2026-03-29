@@ -1,9 +1,20 @@
-# Task 6: Remove 409 Blocking Check in UpdateWorkspaces
+---
+title: "Remove 409 Blocking Check in UpdateWorkspaces"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/multi-workspace-groups/task-02-modify-switch.md
+  - specs/foundations/multi-workspace-groups/task-05-run-uses-taskstore.md
+affects:
+  - internal/handler/workspace.go
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 2, Task 5
-**Phase:** 3 (Handler Changes)
-**Effort:** Small
+# Task 6: Remove 409 Blocking Check in UpdateWorkspaces
 
 ## Goal
 

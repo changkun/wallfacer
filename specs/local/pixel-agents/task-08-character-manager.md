@@ -1,9 +1,19 @@
-# Task 8: CharacterManager and Desk Persistence
+---
+title: CharacterManager and Desk Persistence
+status: complete
+track: local
+depends_on:
+  - specs/local/pixel-agents/task-02-tilemap-and-layout.md
+  - specs/local/pixel-agents/task-07-character-state-machine.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 2 (TileMap), Task 7 (Character)
-**Phase:** Phase 2 (Character System)
-**Effort:** Medium
+# Task 8: CharacterManager and Desk Persistence
 
 ## Goal
 

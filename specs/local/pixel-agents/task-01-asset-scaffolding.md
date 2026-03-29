@@ -1,9 +1,17 @@
-# Task 1: Asset Scaffolding
+---
+title: Asset Scaffolding
+status: complete
+track: local
+depends_on: []
+affects: []
+effort: small
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** Phase 5 (Art Integration) — pulled forward as prerequisite
-**Effort:** Small
+# Task 1: Asset Scaffolding
 
 ## Goal
 

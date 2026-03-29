@@ -1,7 +1,20 @@
-# Terminal UI — Full TUI Mode for Wallfacer
+---
+title: "Terminal UI — Full TUI Mode for Wallfacer"
+status: drafted
+track: local
+depends_on: []
+affects:
+  - internal/tui/
+  - internal/cli/tui.go
+  - main.go
+effort: xlarge
+created: 2026-03-30
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Draft
-**Date:** 2026-03-30
+# Terminal UI — Full TUI Mode for Wallfacer
 
 ---
 

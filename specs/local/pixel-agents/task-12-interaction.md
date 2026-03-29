@@ -1,9 +1,19 @@
-# Task 12: Interaction and Modal Integration
+---
+title: Interaction and Modal Integration
+status: complete
+track: local
+depends_on:
+  - specs/local/pixel-agents/task-05-renderer-and-view-toggle.md
+  - specs/local/pixel-agents/task-08-character-manager.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 5 (Renderer + view toggle), Task 8 (CharacterManager)
-**Phase:** Phase 4 (Interaction)
-**Effort:** Medium
+# Task 12: Interaction and Modal Integration
 
 ## Goal
 

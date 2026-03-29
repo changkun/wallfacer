@@ -1,7 +1,21 @@
-# Spec Drift Detection
+---
+title: Spec Drift Detection
+status: drafted
+track: local
+depends_on:
+  - specs/local/spec-coordination.md
+affects:
+  - internal/runner/drift.go
+  - internal/store/
+  - internal/handler/explorer.go
+effort: large
+created: 2026-03-29
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Parent spec:** [spec-coordination.md](spec-coordination.md)
-**Date:** 2026-03-29
+# Spec Drift Detection
 
 Depends on the lifecycle model in [spec-document-model.md](spec-document-model.md).
 

@@ -1,7 +1,26 @@
-# Oversight Risk Scoring — Real-Time Agent Action Risk Assessment
+---
+title: "Oversight Risk Scoring — Real-Time Agent Action Risk Assessment"
+status: drafted
+track: local
+depends_on: []
+affects:
+  - internal/risk/
+  - internal/store/models.go
+  - internal/store/risk.go
+  - internal/runner/risk.go
+  - internal/runner/risk_hook.go
+  - internal/handler/risk.go
+  - internal/apicontract/routes.go
+  - ui/js/render.js
+  - ui/js/modal.js
+effort: large
+created: 2026-03-21
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Draft
-**Date:** 2026-03-21
+# Oversight Risk Scoring — Real-Time Agent Action Risk Assessment
 
 ---
 

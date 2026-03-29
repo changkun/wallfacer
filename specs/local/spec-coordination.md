@@ -1,6 +1,20 @@
-# Spec Coordination Layer
+---
+title: Spec Coordination Layer
+status: drafted
+track: local
+depends_on:
+  - specs/foundations/file-explorer.md
+affects:
+  - internal/handler/explorer.go
+  - internal/store/
+effort: xlarge
+created: 2026-03-29
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Date:** 2026-03-29
+# Spec Coordination Layer
 
 ## Problem
 

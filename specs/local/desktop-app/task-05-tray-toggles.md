@@ -1,9 +1,18 @@
-# Task 5: System Tray — Automation Toggles
+---
+title: System Tray -- Automation Toggles
+status: complete
+track: local
+depends_on:
+  - specs/local/desktop-app/task-04-tray-health-polling.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 4
-**Phase:** System tray
-**Effort:** Medium
+# Task 5: System Tray — Automation Toggles
 
 ## Goal
 

@@ -1,9 +1,20 @@
-# Task 5: Frontend File Preview Modal
+---
+title: "Frontend File Preview Modal"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/file-explorer/task-02-backend-file-content-reading.md
+  - specs/foundations/file-explorer/task-04-frontend-tree-component.md
+affects:
+  - ui/js/explorer.js
+effort: medium
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 2, Task 4
-**Phase:** Phase 1 — Read-Only Browsing + Preview
-**Effort:** Medium
+# Task 5: Frontend File Preview Modal
 
 ## Goal
 

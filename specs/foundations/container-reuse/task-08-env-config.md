@@ -1,9 +1,19 @@
-# Task 8: Configuration and Documentation
+---
+title: "Configuration and Documentation"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/container-reuse/task-03-launch-routing.md
+affects:
+  - internal/envconfig/
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 3
-**Phase:** 3 (Robustness)
-**Effort:** Small
+# Task 8: Configuration and Documentation
 
 ## Goal
 

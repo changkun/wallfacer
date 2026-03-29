@@ -1,9 +1,22 @@
-# Task 6: Status Bar Integration and Visibility Gate
+---
+title: "Status Bar Integration and Visibility Gate"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/host-terminal/task-02-envconfig-terminal-enabled.md
+  - specs/foundations/host-terminal/task-04-backend-terminal-handler.md
+  - specs/foundations/host-terminal/task-05-frontend-terminal-js.md
+affects:
+  - ui/js/status-bar.js
+  - ui/css/status-bar.css
+effort: medium
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** 2, 4, 5
-**Phase:** Phase 1 — Single Terminal Session
-**Effort:** Medium
+# Task 6: Status Bar Integration and Visibility Gate
 
 ## Goal
 

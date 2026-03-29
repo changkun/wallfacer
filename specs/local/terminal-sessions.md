@@ -1,6 +1,22 @@
-# Terminal: Multiple Sessions with Tabs
+---
+title: "Terminal: Multiple Sessions with Tabs"
+status: complete
+track: local
+depends_on:
+  - specs/foundations/host-terminal.md
+affects:
+  - internal/handler/terminal.go
+  - ui/js/terminal.js
+  - ui/partials/status-bar.html
+  - ui/css/status-bar.css
+effort: large
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Complete | **Date:** 2026-03-28 → 2026-03-29
+# Terminal: Multiple Sessions with Tabs
 
 ---
 

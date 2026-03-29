@@ -1,9 +1,17 @@
-# Task 7: Env Test Reauth Flag
+---
+title: Env Test Reauth Flag
+status: complete
+track: local
+depends_on: []
+affects: []
+effort: small
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** Server integration
-**Effort:** Small
+# Task 7: Env Test Reauth Flag
 
 ## Goal
 

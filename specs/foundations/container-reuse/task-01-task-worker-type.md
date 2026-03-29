@@ -1,9 +1,18 @@
-# Task 1: Add taskWorker Type
+---
+title: "Add taskWorker Type"
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/sandbox/worker.go
+effort: medium
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** 1 (Per-Task Worker Foundation)
-**Effort:** Medium
+# Task 1: Add taskWorker Type
 
 ## Goal
 

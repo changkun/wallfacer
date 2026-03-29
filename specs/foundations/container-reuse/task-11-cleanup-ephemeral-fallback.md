@@ -1,9 +1,27 @@
-# Task 11: Remove Ephemeral Fallback and WALLFACER_TASK_WORKERS Flag
+---
+title: "Remove Ephemeral Fallback and WALLFACER_TASK_WORKERS Flag"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/container-reuse/task-01-task-worker-type.md
+  - specs/foundations/container-reuse/task-02-create-args-from-spec.md
+  - specs/foundations/container-reuse/task-03-launch-routing.md
+  - specs/foundations/container-reuse/task-04-runner-cleanup-hooks.md
+  - specs/foundations/container-reuse/task-05-aux-agents-via-worker.md
+  - specs/foundations/container-reuse/task-06-health-check-recovery.md
+  - specs/foundations/container-reuse/task-07-lifecycle-metrics.md
+  - specs/foundations/container-reuse/task-08-env-config.md
+affects:
+  - internal/sandbox/local.go
+  - internal/envconfig/
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Todo
-**Depends on:** Tasks 1-8 verified in production
-**Phase:** 4 (Cleanup)
-**Effort:** Small
+# Task 11: Remove Ephemeral Fallback and WALLFACER_TASK_WORKERS Flag
 
 ## Goal
 

@@ -1,9 +1,19 @@
-# Task 5: Frontend Terminal Module
+---
+title: "Frontend Terminal Module"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/host-terminal/task-03-vendor-xtermjs.md
+affects:
+  - ui/js/terminal.js
+effort: medium
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** 3
-**Phase:** Phase 1 — Single Terminal Session
-**Effort:** Medium
+# Task 5: Frontend Terminal Module
 
 ## Goal
 

@@ -1,8 +1,21 @@
-# Task 2: Implement FilesystemBackend
+---
+title: "Implement FilesystemBackend"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/storage-backends/task-01-extract-interface.md
+affects:
+  - internal/store/backend_fs.go
+  - internal/store/io.go
+  - internal/store/store.go
+effort: large
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 1
-**Effort:** Large
+# Task 2: Implement FilesystemBackend
 
 ## Goal
 

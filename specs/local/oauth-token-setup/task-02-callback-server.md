@@ -1,9 +1,18 @@
-# Task 2: Ephemeral Callback Server
+---
+title: Ephemeral Callback Server
+status: complete
+track: local
+depends_on:
+  - specs/local/oauth-token-setup/task-01-pkce-utilities.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** 1
-**Phase:** Core OAuth infrastructure
-**Effort:** Medium
+# Task 2: Ephemeral Callback Server
 
 ## Goal
 

@@ -1,9 +1,19 @@
-# Task 14: Polish — Preferences, Minimap, Accessibility
+---
+title: Polish -- Preferences, Minimap, Accessibility
+status: complete
+track: local
+depends_on:
+  - specs/local/pixel-agents/task-05-renderer-and-view-toggle.md
+  - specs/local/pixel-agents/task-12-interaction.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 5 (Renderer + view toggle), Task 12 (Interaction)
-**Phase:** Phase 6 (Polish and Persistence)
-**Effort:** Medium
+# Task 14: Polish — Preferences, Minimap, Accessibility
 
 ## Goal
 

@@ -1,9 +1,19 @@
-# Task 7: Character State Machine and Animation
+---
+title: Character State Machine and Animation
+status: complete
+track: local
+depends_on:
+  - specs/local/pixel-agents/task-03-sprite-cache.md
+  - specs/local/pixel-agents/task-06-pathfinding.md
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 3 (SpriteCache), Task 6 (Pathfinding)
-**Phase:** Phase 2 (Character System)
-**Effort:** Medium
+# Task 7: Character State Machine and Animation
 
 ## Goal
 

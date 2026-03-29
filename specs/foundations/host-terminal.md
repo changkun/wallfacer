@@ -1,6 +1,20 @@
-# Plan: Host Shell Terminal Panel
+---
+title: Host Shell Terminal Panel
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - internal/handler/terminal.go
+  - internal/pty/
+  - ui/js/terminal.js
+effort: large
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Complete | **Date:** 2026-03-22 → 2026-03-28
+# Plan: Host Shell Terminal Panel
 
 ---
 

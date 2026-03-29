@@ -1,6 +1,20 @@
-# Rebrand Module Path to latere.ai
+---
+title: Rebrand Module Path to latere.ai
+status: drafted
+track: local
+depends_on: []
+affects:
+  - go.mod
+  - Makefile
+  - "**/*.go"
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started | **Date:** 2026-03-28
+# Rebrand Module Path to latere.ai
 
 ## Goal
 

@@ -1,9 +1,18 @@
-# Task 6: System Tray — Cost and Stats Display
+---
+title: System Tray -- Cost and Stats Display
+status: complete
+track: local
+depends_on:
+  - specs/local/desktop-app/task-04-tray-health-polling.md
+affects: []
+effort: small
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 4
-**Phase:** System tray
-**Effort:** Small
+# Task 6: System Tray — Cost and Stats Display
 
 ## Goal
 

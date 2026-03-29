@@ -1,8 +1,20 @@
-# Plan: Pixel Agent Avatars
+---
+title: Pixel Agent Avatars
+status: complete
+track: local
+depends_on: []
+affects:
+  - ui/js/office/
+  - ui/assets/office/
+  - ui/index.html
+effort: xlarge
+created: 2026-03-29
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Date:** 2026-03-29
-**Last reviewed:** 2026-03-29
+# Plan: Pixel Agent Avatars
 
 ---
 

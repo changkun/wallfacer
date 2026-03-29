@@ -1,8 +1,19 @@
-# Task 8: Cloud-Native Search
+---
+title: "Cloud-Native Search"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/storage-backends/task-04-database-backend.md
+affects:
+  - internal/store/
+effort: medium
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started
-**Depends on:** Task 4
-**Effort:** Medium
+# Task 8: Cloud-Native Search
 
 ## Goal
 

@@ -1,9 +1,22 @@
-# Task 4: Backend Terminal WebSocket Handler
+---
+title: "Backend Terminal WebSocket Handler"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/host-terminal/task-01-go-dependencies.md
+  - specs/foundations/host-terminal/task-02-envconfig-terminal-enabled.md
+affects:
+  - internal/handler/terminal.go
+  - internal/cli/server.go
+  - internal/handler/middleware.go
+effort: large
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** 1, 2
-**Phase:** Phase 1 — Single Terminal Session
-**Effort:** Large
+# Task 4: Backend Terminal WebSocket Handler
 
 ## Goal
 

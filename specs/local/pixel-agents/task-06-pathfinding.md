@@ -1,9 +1,18 @@
-# Task 6: Pathfinding
+---
+title: Pathfinding
+status: complete
+track: local
+depends_on:
+  - specs/local/pixel-agents/task-02-tilemap-and-layout.md
+affects: []
+effort: small
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 2 (TileMap)
-**Phase:** Phase 2 (Character System)
-**Effort:** Small
+# Task 6: Pathfinding
 
 ## Goal
 

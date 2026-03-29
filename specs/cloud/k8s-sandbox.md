@@ -1,6 +1,19 @@
-# K8s Sandbox Backend
+---
+title: K8s Sandbox Backend
+status: drafted
+track: cloud
+depends_on:
+  - specs/cloud/tenant-filesystem.md
+  - specs/foundations/sandbox-backends.md
+affects: [internal/sandbox/]
+effort: xlarge
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started | **Date:** 2026-03-28
+# K8s Sandbox Backend
 
 ## Problem
 

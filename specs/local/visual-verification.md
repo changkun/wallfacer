@@ -1,3 +1,18 @@
+---
+title: Visual Verification for UI Changes
+status: drafted
+track: local
+depends_on: []
+affects:
+  - playwright.config.ts
+  - ui/tests/visual/
+effort: medium
+created: 2026-03-21
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
+
 # Plan: Visual Verification for UI Changes
 
 ## Problem

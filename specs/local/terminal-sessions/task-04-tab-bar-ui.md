@@ -1,9 +1,17 @@
-# Task 4: Tab Bar UI
+---
+title: Tab Bar UI
+status: complete
+track: local
+depends_on: []
+affects: []
+effort: medium
+created: 2026-03-28
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** Frontend UI
-**Effort:** Medium
+# Task 4: Tab Bar UI
 
 ## Goal
 

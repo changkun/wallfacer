@@ -1,8 +1,19 @@
-# Task 7: Add `wallfacer migrate` Command
+---
+title: "Add wallfacer migrate Command"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/storage-backends/task-06-composite-backend.md
+affects:
+  - internal/cli/
+effort: medium
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started
-**Depends on:** Task 6
-**Effort:** Medium
+# Task 7: Add `wallfacer migrate` Command
 
 ## Goal
 

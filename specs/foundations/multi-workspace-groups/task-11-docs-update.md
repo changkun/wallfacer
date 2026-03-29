@@ -1,9 +1,27 @@
-# Task 11: Documentation Update
+---
+title: "Documentation Update"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/multi-workspace-groups/task-01-active-groups-map.md
+  - specs/foundations/multi-workspace-groups/task-02-modify-switch.md
+  - specs/foundations/multi-workspace-groups/task-03-runner-task-ws-key.md
+  - specs/foundations/multi-workspace-groups/task-04-runbackground-lifecycle.md
+  - specs/foundations/multi-workspace-groups/task-05-run-uses-taskstore.md
+  - specs/foundations/multi-workspace-groups/task-06-remove-409-guard.md
+  - specs/foundations/multi-workspace-groups/task-07-watcher-resubscribe.md
+  - specs/foundations/multi-workspace-groups/task-08-watcher-multi-store-iteration.md
+  - specs/foundations/multi-workspace-groups/task-09-config-active-groups.md
+  - specs/foundations/multi-workspace-groups/task-10-frontend-activity-indicator.md
+affects: []
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Tasks 1-10
-**Phase:** 5 (Documentation)
-**Effort:** Small
+# Task 11: Documentation Update
 
 ## Goal
 

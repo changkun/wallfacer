@@ -1,9 +1,20 @@
-# Task 5: Replace r.store with taskStore() in Execution Path
+---
+title: "Replace r.store with taskStore() in Execution Path"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/multi-workspace-groups/task-03-runner-task-ws-key.md
+  - specs/foundations/multi-workspace-groups/task-04-runbackground-lifecycle.md
+affects:
+  - internal/runner/
+effort: large
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 3, Task 4
-**Phase:** 2 (Runner Multi-Store Awareness)
-**Effort:** Large
+# Task 5: Replace r.store with taskStore() in Execution Path
 
 ## Goal
 

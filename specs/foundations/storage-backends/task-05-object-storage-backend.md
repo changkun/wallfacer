@@ -1,8 +1,19 @@
-# Task 5: Implement ObjectStorageBackend (S3/GCS)
+---
+title: "Implement ObjectStorageBackend (S3/GCS)"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/storage-backends/task-02-filesystem-backend.md
+affects:
+  - internal/store/backend_blob.go
+effort: medium
+created: 2026-03-23
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Not started
-**Depends on:** Task 2
-**Effort:** Medium
+# Task 5: Implement ObjectStorageBackend (S3/GCS)
 
 ## Goal
 

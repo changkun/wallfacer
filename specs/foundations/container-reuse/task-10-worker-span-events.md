@@ -1,9 +1,20 @@
-# Task 10: Worker Lifecycle Stats in Settings Panel
+---
+title: "Worker Lifecycle Stats in Settings Panel"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/container-reuse/task-07-lifecycle-metrics.md
+affects:
+  - internal/handler/debug.go
+  - ui/js/status-bar.js
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done (fully implemented)
-**Depends on:** Task 7
-**Phase:** 3 (Robustness)
-**Effort:** Small
+# Task 10: Worker Lifecycle Stats in Settings Panel
 
 ## Goal
 

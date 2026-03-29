@@ -1,9 +1,19 @@
-# Task 3: Vendor xterm.js Assets
+---
+title: "Vendor xterm.js Assets"
+status: complete
+track: foundations
+depends_on: []
+affects:
+  - ui/js/vendor/
+  - ui/css/vendor/
+effort: small
+created: 2026-03-22
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** None
-**Phase:** Phase 1 — Single Terminal Session
-**Effort:** Small
+# Task 3: Vendor xterm.js Assets
 
 ## Goal
 

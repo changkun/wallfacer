@@ -1,9 +1,20 @@
-# Task 6: Health Check and Graceful Fallback
+---
+title: "Health Check and Graceful Fallback"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/container-reuse/task-03-launch-routing.md
+affects:
+  - internal/sandbox/worker.go
+  - internal/sandbox/local.go
+effort: medium
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 3
-**Phase:** 3 (Robustness)
-**Effort:** Medium
+# Task 6: Health Check and Graceful Fallback
 
 ## Goal
 

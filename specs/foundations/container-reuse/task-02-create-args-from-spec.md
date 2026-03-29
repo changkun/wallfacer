@@ -1,9 +1,19 @@
-# Task 2: Build Worker Create Args from ContainerSpec
+---
+title: "Build Worker Create Args from ContainerSpec"
+status: complete
+track: foundations
+depends_on:
+  - specs/foundations/container-reuse/task-01-task-worker-type.md
+affects:
+  - internal/sandbox/spec.go
+effort: small
+created: 2026-03-27
+updated: 2026-03-30
+author: changkun
+dispatched_task_id: null
+---
 
-**Status:** Done
-**Depends on:** Task 1
-**Phase:** 1 (Per-Task Worker Foundation)
-**Effort:** Small
+# Task 2: Build Worker Create Args from ContainerSpec
 
 ## Goal
 
