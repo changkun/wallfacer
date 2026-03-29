@@ -87,8 +87,8 @@ func TestStartOAuth_ReturnsAuthorizeURL(t *testing.T) {
 	if result.AuthorizeURL == "" {
 		t.Error("authorize_url is empty")
 	}
-	if !contains(result.AuthorizeURL, "platform.claude.com") {
-		t.Errorf("authorize_url = %q; want to contain 'platform.claude.com'", result.AuthorizeURL)
+	if !contains(result.AuthorizeURL, "claude.ai") {
+		t.Errorf("authorize_url = %q; want to contain 'claude.ai'", result.AuthorizeURL)
 	}
 }
 

@@ -1,6 +1,6 @@
 ---
 title: OAuth Token Setup
-status: drafted
+status: complete
 track: local
 depends_on: []
 affects:
@@ -196,19 +196,19 @@ When existing tokens are invalid or expired, the system should detect this and g
 ### New files
 
 - `internal/handler/auth.go` — HTTP handlers for `/api/auth/{provider}/*` endpoints
-- `internal/oauth/` — OAuth flow orchestration (PKCE generation, callback listener, token exchange)
-  - `internal/oauth/oauth.go` — Shared PKCE + callback server logic
-  - `internal/oauth/claude.go` — Claude-specific provider config
-  - `internal/oauth/codex.go` — Codex-specific provider config
+- `internal/oauth/pkce.go` — PKCE code verifier, S256 challenge, state generation
+- `internal/oauth/callback.go` — Ephemeral localhost callback server
+- `internal/oauth/flow.go` — Flow engine, token exchange, manager
+- `internal/oauth/provider.go` — Claude and Codex provider configurations
 
 ### Modified files
 
 - `internal/apicontract/routes.go` — Register new auth routes
-- `internal/handler/handler.go` — Wire auth handler with dependencies
-- `internal/handler/env.go` — Extend `POST /api/env/test` response with `reauth_available` flag on auth errors
-- `internal/cli/desktop.go` — Use `BrowserOpenURL` for OAuth authorization URLs in desktop mode
-- `ui/partials/api-config-modal.html` — Add sign-in buttons, first-launch hints, re-auth warnings
-- `ui/js/envconfig.js` — Sign-in button click handlers, polling logic, invalid-token detection, first-launch emphasis
+- `internal/handler/handler.go` — Wire `oauth.Manager` into Handler
+- `internal/handler/env.go` — Extend `POST /api/env/test` response with `reauth_available` flag
+- `internal/cli/server.go` — Register auth handlers in BuildMux
+- `ui/partials/settings-tab-sandbox.html` — Add sign-in buttons, first-launch hints
+- `ui/js/envconfig.js` — Sign-in flow, polling, cancel, reauth prompt, first-launch emphasis
 
 ### Not in scope
 
@@ -231,6 +231,34 @@ When existing tokens are invalid or expired, the system should detect this and g
 - Test invalid token response: `POST /api/env/test` returns `reauth_available: true` on 401/403 auth errors.
 - Test re-auth flow: after token validation fails, "Sign in again" triggers a new OAuth flow and updates the stored token.
 - Test desktop browser launch: OAuth authorization URL opens in system browser (not WebView) when running in desktop mode.
+
+## Outcome
+
+Browser-based OAuth sign-in is fully implemented for both Claude and Codex. Users click "Sign in" in Settings, authenticate in their browser, and the token is stored automatically — replacing the manual copy-paste workflow.
+
+### What Shipped
+
+- **`internal/oauth/` package** (4 files): PKCE utilities (RFC 7636 verified), ephemeral callback server (`127.0.0.1` with fixed or random port), flow engine with per-provider state machine (start/poll/cancel), provider configs for Claude and Codex
+- **3 API routes** (`internal/handler/auth.go`): `POST /api/auth/{provider}/start`, `GET /api/auth/{provider}/status`, `POST /api/auth/{provider}/cancel`
+- **Reauth detection** (`internal/handler/env.go`): `reauth_available` flag on sandbox test response when auth errors are detected and OAuth is available
+- **UI** (`settings-tab-sandbox.html`, `envconfig.js`): sign-in buttons (accent for Claude, black for Codex), 2-second polling with cancel link, first-launch hints with emphasized buttons and toast, inline "Sign in again" on auth errors, buttons hidden when custom base URL is set
+- **Desktop support**: Wails `BrowserOpenURL` integration
+- **17 backend tests** (oauth package) + **5 auth handler tests** + **1 reauth test**
+- **Docs**: configuration.md, getting-started.md, api-and-transport.md, CLAUDE.md all updated
+
+### Design Evolution
+
+1. **Claude OAuth endpoint changed.** The spec used `platform.claude.com/oauth/authorize` with the Claude Code CLI metadata client ID. This didn't work for third-party redirect URIs. Changed to `claude.ai/oauth/authorize` with client ID `9d1c250a-e61b-44d9-88ed-5944d1962f5e` and fixed port 53692, matching the Pi coding agent's working implementation.
+
+2. **Claude token exchange requires JSON body with state.** The spec assumed standard form-encoded token exchange. Claude's endpoint returns 400 for form-encoded bodies and requires a `state` field in the JSON body plus an `Accept: application/json` header.
+
+3. **Codex OAuth requires fixed port 1455.** The spec used random ports. OpenAI only accepts redirect URIs matching the registered app (`http://localhost:1455/auth/callback`). Added `FixedPort` and `CallbackPath` fields to the Provider struct.
+
+4. **Flow context uses `context.Background()`.** The spec's `Start` method accepted `ctx` from the HTTP request. The flow's 5-minute timeout was derived from it, causing the flow to die when the request handler returned. Fixed by using `context.Background()` for the flow lifetime.
+
+5. **Buttons placed in `settings-tab-sandbox.html`.** The spec referenced `api-config-modal.html` which is not used by the Settings modal. The actual Settings > Sandbox tab uses `settings-tab-sandbox.html`.
+
+6. **Task 6 (desktop browser launch) implemented in task 5.** The Wails `BrowserOpenURL` check was included directly in `startOAuthFlow()` during task 5, making task 6 a no-op.
 
 ## Task Breakdown
 
