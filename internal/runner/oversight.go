@@ -690,8 +690,10 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 	defer cancel()
 
 	containerName := "wallfacer-oversight-" + taskID.String()[:8]
-	r.taskContainers.Set(taskID, containerName)
-	defer r.taskContainers.Delete(taskID)
+	// Note: oversight intentionally does NOT register in r.taskContainers.
+	// That registry is used by StreamLogs to locate the main execution
+	// container; writing here would replace the implementation logs with
+	// oversight container output.
 
 	task, err := r.taskStore(taskID).GetTask(r.shutdownCtx, taskID)
 	if err != nil {
@@ -725,8 +727,6 @@ func (r *Runner) runOversightAgent(taskID uuid.UUID, agent store.SandboxActivity
 			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(agent)})
 			return oversightRunResult{err: fmt.Errorf("launch oversight container: %w", launchErr), model: model, sb: selectedSandbox}
 		}
-		r.taskContainers.SetHandle(taskID, handle, nil)
-
 		rawStdout, _ := io.ReadAll(handle.Stdout())
 		rawStderr, _ := io.ReadAll(handle.Stderr())
 		exitCode, _ := handle.Wait()

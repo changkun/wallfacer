@@ -383,8 +383,9 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 	defer cancel()
 
 	containerName := "wallfacer-commit-" + taskID.String()[:8]
-	r.taskContainers.Set(taskID, containerName)
-	defer r.taskContainers.Delete(taskID)
+	// Note: commit intentionally does NOT register in r.taskContainers.
+	// That registry is used by StreamLogs to locate the main execution
+	// container; writing here would replace the implementation logs.
 	commitPrompt := r.promptsMgr.CommitMessage(prompts.CommitData{
 		Prompt:    prompt,
 		DiffStat:  diffStat,
@@ -404,8 +405,6 @@ func (r *Runner) generateCommitMessage(ctx context.Context, taskID uuid.UUID, pr
 			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityCommitMessage)})
 			return nil, fmt.Errorf("launch commit message container: %w", launchErr)
 		}
-		r.taskContainers.SetHandle(taskID, handle, nil)
-
 		rawStdout, _ := io.ReadAll(handle.Stdout())
 		rawStderr, _ := io.ReadAll(handle.Stderr())
 		exitCode, _ := handle.Wait()

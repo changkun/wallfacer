@@ -33,8 +33,9 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 	titlePrompt := r.promptsMgr.Title(prompt)
 
 	containerName := "wallfacer-title-" + taskID.String()[:8]
-	r.taskContainers.Set(taskID, containerName)
-	defer r.taskContainers.Delete(taskID)
+	// Note: title intentionally does NOT register in r.taskContainers.
+	// That registry is used by StreamLogs to locate the main execution
+	// container; writing here would replace the implementation logs.
 
 	// runWithSandbox executes the title container with the given sandbox,
 	// returning the parsed output (or nil) and any error.
@@ -58,8 +59,6 @@ func (r *Runner) GenerateTitle(taskID uuid.UUID, prompt string) {
 			_ = r.taskStore(taskID).InsertEvent(r.shutdownCtx, taskID, store.EventTypeSpanEnd, store.SpanData{Phase: "container_run", Label: string(store.SandboxActivityTitle)})
 			return titleResult{err: fmt.Errorf("launch title container: %w", launchErr), model: mdl, sb: selected}
 		}
-		r.taskContainers.SetHandle(taskID, handle, nil)
-
 		rawStdout, _ := io.ReadAll(handle.Stdout())
 		rawStderr, _ := io.ReadAll(handle.Stderr())
 		exitCode, _ := handle.Wait()

@@ -461,8 +461,9 @@ func TestCommitPipelineEmitsStageRebaseMergeCleanupSpans(t *testing.T) {
 
 // TestGenerateCommitMessageRespectsCallerContext verifies that
 // generateCommitMessage returns promptly when the caller-supplied context is
-// cancelled, and that while it is running the container name is registered in
-// r.taskContainers so that KillContainer can locate it.
+// cancelled. The commit container is intentionally not registered in
+// r.taskContainers (to avoid overwriting the main execution container entry
+// used by StreamLogs), so cancellation relies on exec.CommandContext.
 func TestGenerateCommitMessageRespectsCallerContext(t *testing.T) {
 	cmd := fakeBlockingCmd(t)
 	runner := runnerWithCmd(t, cmd)
@@ -480,18 +481,8 @@ func TestGenerateCommitMessageRespectsCallerContext(t *testing.T) {
 		done <- result{msg, err}
 	}()
 
-	// Poll until the container name appears in the registry, confirming
-	// registration happened before the container starts blocking.
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if _, ok := runner.taskContainers.Get(taskID); ok {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if _, ok := runner.taskContainers.Get(taskID); !ok {
-		t.Fatal("container was not registered in taskContainers while generateCommitMessage was running")
-	}
+	// Give the goroutine a moment to start.
+	time.Sleep(200 * time.Millisecond)
 
 	// Cancel the context — the blocking container should be terminated.
 	cancel()
@@ -503,11 +494,6 @@ func TestGenerateCommitMessageRespectsCallerContext(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("generateCommitMessage did not return within 3s after context cancellation — caller ctx not respected")
-	}
-
-	// After return the registry entry must have been cleaned up.
-	if _, ok := runner.taskContainers.Get(taskID); ok {
-		t.Error("container entry was not removed from taskContainers after generateCommitMessage returned")
 	}
 }
 
