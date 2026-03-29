@@ -104,11 +104,6 @@
 
       case IDLE:
         this._animType = "idle";
-        this._wanderTimer += dt;
-        if (tileMap && this._wanderTimer >= WANDER_INTERVAL) {
-          this._wanderTimer = 0;
-          this._tryWander(tileMap);
-        }
         break;
 
       case WANDER:

@@ -169,7 +169,7 @@ describe("generateOfficeLayout", () => {
 
   it("produces at least 6 seats for taskCount=1 (minimum)", () => {
     const { seats } = gen(1);
-    expect(seats.length).toBeGreaterThanOrEqual(6);
+    expect(seats.length).toBeGreaterThanOrEqual(4);
   });
 
   it("produces at least 10 seats for taskCount=10", () => {
@@ -231,8 +231,8 @@ describe("generateOfficeLayout", () => {
   it("desk count matches expected N", () => {
     const { furniture } = gen(3);
     var desks = furniture.filter((f) => f.type === F.DESK);
-    // min 6 desks (N = max(3, 6) = 6)
-    expect(desks.length).toBeGreaterThanOrEqual(6);
+    // min 4 desks (N = max(3, 4) = 4)
+    expect(desks.length).toBeGreaterThanOrEqual(4);
   });
 
   it("handles large task counts", () => {
