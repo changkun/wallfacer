@@ -1,6 +1,6 @@
 # Task 5: UI Sign-In Buttons and Polling
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 4
 **Phase:** Frontend integration
 **Effort:** Medium
