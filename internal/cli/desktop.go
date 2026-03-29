@@ -66,19 +66,55 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 
 	var wailsCtx context.Context
 
-	var tm *TrayManager
+	// doShutdown shows the overlay, performs graceful shutdown, and exits.
+	// Called from the tray "Quit" button where the window is still alive.
+	doShutdown := func() {
+		if wailsCtx != nil {
+			wailsRuntime.WindowShow(wailsCtx)
+			showShutdownOverlay(wailsCtx, "Stopping server…")
+		}
 
+		sc.Stop()
+		if wailsCtx != nil {
+			updateShutdownStatus(wailsCtx, "Draining HTTP connections…")
+		}
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := sc.Srv.Shutdown(shutdownCtx); err != nil {
+			logger.Main.Error("http server shutdown", "error", err)
+		}
+		cancel()
+
+		done := make(chan struct{})
+		go func() { sc.Runner.Shutdown(); close(done) }()
+
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				logger.Main.Info("shutdown complete")
+				os.Exit(0)
+			case <-ticker.C:
+				if wailsCtx == nil {
+					continue
+				}
+				if p := sc.Runner.PendingGoroutines(); len(p) > 0 {
+					updateShutdownStatus(wailsCtx,
+						fmt.Sprintf("Waiting for %d tasks: %s",
+							len(p), strings.Join(p, ", ")))
+				}
+			}
+		}
+	}
+
+	var tm *TrayManager
 	tm = NewTrayManager(
 		func() {
 			if wailsCtx != nil {
 				wailsRuntime.WindowShow(wailsCtx)
 			}
 		},
-		func() {
-			if wailsCtx != nil {
-				wailsRuntime.Quit(wailsCtx)
-			}
-		},
+		func() { go doShutdown() },
 		serverURL,
 		sc.ServerAPIKey,
 	)
@@ -101,47 +137,10 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 			wailsCtx = ctx
 			logger.Main.Info("desktop window opened")
 		},
-		OnShutdown: func(ctx context.Context) {
-			// Show the window (it may be hidden to tray) and inject a
-			// shutdown overlay so the user sees progress.
-			wailsRuntime.WindowShow(ctx)
-			showShutdownOverlay(ctx, "Stopping server…")
-
-			// 1. Cancel the server context (stops accepting new work).
-			updateShutdownStatus(ctx, "Cancelling background tasks…")
-			sc.Stop()
-
-			// 2. Drain HTTP connections.
-			updateShutdownStatus(ctx, "Draining HTTP connections…")
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			if err := sc.Srv.Shutdown(shutdownCtx); err != nil {
-				logger.Main.Error("http server shutdown", "error", err)
-			}
-			cancel()
-
-			// 3. Wait for runner background goroutines (the slow part).
-			done := make(chan struct{})
-			go func() {
-				sc.Runner.Shutdown()
-				close(done)
-			}()
-
-			ticker := time.NewTicker(1 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-done:
-					tm.Stop()
-					logger.Main.Info("shutdown complete")
-					return
-				case <-ticker.C:
-					if p := sc.Runner.PendingGoroutines(); len(p) > 0 {
-						updateShutdownStatus(ctx,
-							fmt.Sprintf("Waiting for %d tasks: %s",
-								len(p), strings.Join(p, ", ")))
-					}
-				}
-			}
+		OnShutdown: func(_ context.Context) {
+			// Cmd+Q / force-quit path: window is already gone, just clean up.
+			tm.Stop()
+			sc.Shutdown()
 		},
 	}
 
