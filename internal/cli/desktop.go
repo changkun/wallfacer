@@ -13,6 +13,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"sync"
+	"time"
 
 	"changkun.de/x/wallfacer/internal/logger"
 
@@ -49,10 +52,9 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 		ContainerCmd: *containerCmd,
 		SandboxImage: *sandboxImage,
 		EnvFile:      *envFile,
-		SkipCSRF:     true, // Desktop WebView origin doesn't match localhost.
+		SkipCSRF:     true,
 	}, uiFS, docsFS)
 
-	// Start the HTTP server in the background.
 	go func() {
 		if err := sc.Srv.Serve(sc.Ln); err != nil && err != http.ErrServerClosed {
 			logger.Main.Error("http server", "error", err)
@@ -63,20 +65,82 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 
 	serverURL := fmt.Sprintf("http://localhost:%d", sc.ActualPort)
 
-	// wailsCtx is set by OnStartup and used by the tray to show/focus the window.
 	var wailsCtx context.Context
 
-	tm := NewTrayManager(
+	var tm *TrayManager
+
+	// shutdownOnce ensures the graceful shutdown sequence runs exactly once,
+	// whether triggered by "Quit" in the tray, Cmd+Q, or the window close.
+	var shutdownOnce sync.Once
+	gracefulQuit := func() {
+		shutdownOnce.Do(func() {
+			if wailsCtx == nil {
+				return
+			}
+			// Show the window and inject a shutdown overlay so the user
+			// sees progress instead of a frozen/spinning app.
+			wailsRuntime.WindowShow(wailsCtx)
+			showShutdownOverlay(wailsCtx, "Stopping server…")
+
+			go func() {
+				// 1. Cancel the server context (stops accepting new work).
+				updateShutdownStatus(wailsCtx, "Cancelling background tasks…")
+				sc.Stop()
+
+				// 2. Drain HTTP connections.
+				updateShutdownStatus(wailsCtx, "Draining HTTP connections…")
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := sc.Srv.Shutdown(shutdownCtx); err != nil {
+					logger.Main.Error("http server shutdown", "error", err)
+				}
+
+				// 3. Wait for runner background goroutines (the slow part).
+				pending := sc.Runner.PendingGoroutines()
+				if len(pending) > 0 {
+					updateShutdownStatus(wailsCtx,
+						fmt.Sprintf("Waiting for %d background tasks: %s",
+							len(pending), strings.Join(pending, ", ")))
+				} else {
+					updateShutdownStatus(wailsCtx, "Stopping containers…")
+				}
+
+				// Poll pending goroutines and update the overlay.
+				done := make(chan struct{})
+				go func() {
+					sc.Runner.Shutdown()
+					close(done)
+				}()
+
+				ticker := time.NewTicker(1 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-done:
+						logger.Main.Info("shutdown complete")
+						tm.Stop()
+						wailsRuntime.Quit(wailsCtx)
+						return
+					case <-ticker.C:
+						p := sc.Runner.PendingGoroutines()
+						if len(p) > 0 {
+							updateShutdownStatus(wailsCtx,
+								fmt.Sprintf("Waiting for %d tasks: %s",
+									len(p), strings.Join(p, ", ")))
+						}
+					}
+				}
+			}()
+		})
+	}
+
+	tm = NewTrayManager(
 		func() {
 			if wailsCtx != nil {
 				wailsRuntime.WindowShow(wailsCtx)
 			}
 		},
-		func() {
-			if wailsCtx != nil {
-				wailsRuntime.Quit(wailsCtx)
-			}
-		},
+		gracefulQuit,
 		serverURL,
 		sc.ServerAPIKey,
 	)
@@ -84,9 +148,6 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 
 	hideOnClose := runtime.GOOS == "darwin" || runtime.GOOS == "windows"
 
-	// Reverse proxy for HTTP/SSE. WebSocket upgrades can't go through the
-	// Wails AssetServer (no Hijacker), so terminal.js connects directly to
-	// the real server port via /api/desktop-port.
 	target, _ := url.Parse(serverURL)
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
@@ -102,9 +163,22 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 			wailsCtx = ctx
 			logger.Main.Info("desktop window opened")
 		},
+		OnBeforeClose: func(_ context.Context) bool {
+			if hideOnClose {
+				// Close button hides; Wails handles this via HideWindowOnClose.
+				return false
+			}
+			// On Linux (no hide-on-close), intercept to show shutdown overlay.
+			go gracefulQuit()
+			return true // prevent immediate close; gracefulQuit will call Quit.
+		},
 		OnShutdown: func(_ context.Context) {
-			tm.Stop()
-			sc.Shutdown()
+			// If Wails quits without going through gracefulQuit (e.g. the
+			// OS force-kills), do a best-effort cleanup.
+			shutdownOnce.Do(func() {
+				tm.Stop()
+				sc.Shutdown()
+			})
 		},
 	}
 
@@ -122,4 +196,37 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	}
 
 	return wails.Run(appOpts)
+}
+
+// showShutdownOverlay injects a fullscreen overlay into the WebView.
+func showShutdownOverlay(ctx context.Context, msg string) {
+	js := fmt.Sprintf(`(function(){
+  if(document.getElementById('wf-shutdown-overlay'))return;
+  var d=document.createElement('div');
+  d.id='wf-shutdown-overlay';
+  d.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(15,23,42,0.92);color:#e2e8f0;font-family:Inter,system-ui,sans-serif;-webkit-app-region:drag';
+  d.innerHTML='<div style="font-size:18px;font-weight:600;margin-bottom:12px">Shutting down…</div>'
+    +'<div id="wf-shutdown-status" style="font-size:13px;color:#94a3b8;max-width:420px;text-align:center;line-height:1.5">%s</div>'
+    +'<div style="margin-top:20px;width:32px;height:32px;border:3px solid #334155;border-top-color:#60a5fa;border-radius:50%%;animation:wf-spin 0.8s linear infinite"></div>';
+  var s=document.createElement('style');
+  s.textContent='@keyframes wf-spin{to{transform:rotate(360deg)}}';
+  document.head.appendChild(s);
+  document.body.appendChild(d);
+})()`, escapeJS(msg))
+	wailsRuntime.WindowExecJS(ctx, js)
+}
+
+// updateShutdownStatus updates the status text in the shutdown overlay.
+func updateShutdownStatus(ctx context.Context, msg string) {
+	js := fmt.Sprintf(`(function(){
+  var el=document.getElementById('wf-shutdown-status');
+  if(el)el.textContent=%q;
+})()`, msg)
+	wailsRuntime.WindowExecJS(ctx, js)
+}
+
+// escapeJS escapes a string for safe embedding in a JS string literal.
+func escapeJS(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `'`, `\'`, `"`, `\"`, "\n", `\n`, "\r", `\r`)
+	return r.Replace(s)
 }
