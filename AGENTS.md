@@ -202,7 +202,7 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `PUT /api/explorer/file` — Write file contents to a workspace
 
 ### Terminal
-- `GET /api/terminal/ws` — WebSocket: interactive host shell with multi-session tab support (not in apicontract; requires `?token=` auth). Client messages: `input`, `resize`, `ping`, `create_session`, `switch_session`, `close_session`. Server messages: `pong`, `sessions`, `session_created`, `session_switched`, `session_closed`, `session_exited`, `error`. See `docs/internals/api-and-transport.md` for full protocol.
+- `GET /api/terminal/ws` — WebSocket: interactive host shell and container exec with multi-session tab support (not in apicontract; requires `?token=` auth). `create_session` accepts optional `container` field to exec into a running task container. See `docs/internals/api-and-transport.md` for full protocol.
 
 ### Admin
 - `POST /api/admin/rebuild-index` — Rebuild the in-memory search index from disk
