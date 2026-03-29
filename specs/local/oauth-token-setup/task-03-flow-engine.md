@@ -1,6 +1,6 @@
 # Task 3: OAuth Flow Engine and Provider Configs
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 1, 2
 **Phase:** Core OAuth infrastructure
 **Effort:** Medium
