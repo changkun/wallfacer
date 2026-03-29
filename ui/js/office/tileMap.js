@@ -164,11 +164,10 @@
 
   function placeStation(map, x, y, deskIndex) {
     // Row layout (top to bottom):
-    // y+0: PC on desk
-    // y+1: Desk (2 wide)
+    // y+0..y+1: Desk (2x2) with PC on top-right tile
     // y+2: Chair (facing up toward desk)
+    map.placeFurniture({ type: DESK, x: x, y: y, width: 2, height: 2, state: null });
     map.placeFurniture({ type: PC, x: x + 1, y: y, width: 1, height: 1, state: "off" });
-    map.placeFurniture({ type: DESK, x: x, y: y + 1, width: 2, height: 1, state: null });
     map.placeFurniture({
       type: CHAIR, x: x, y: y + 2, width: 1, height: 1, state: null,
       direction: "up", deskIndex: deskIndex,
@@ -176,12 +175,14 @@
   }
 
   function placeCommonArea(map, ox, oy) {
-    // Vertical stack: sofa at top, plant + coffee below, bookshelf at bottom
-    map.placeFurniture({ type: SOFA, x: ox, y: oy, width: 2, height: 1, state: null });
-    map.placeFurniture({ type: PLANT, x: ox + 2, y: oy, width: 1, height: 1, state: null });
-    map.placeFurniture({ type: COFFEE, x: ox + 3, y: oy, width: 1, height: 1, state: null });
-    map.placeFurniture({ type: WHITEBOARD, x: ox, y: oy + 1, width: 2, height: 1, state: null });
-    map.placeFurniture({ type: BOOKSHELF, x: ox + 2, y: oy + 1, width: 1, height: 1, state: null });
+    // Plant (1x2 tall potted plant)
+    map.placeFurniture({ type: PLANT, x: ox, y: oy, width: 1, height: 2, state: null });
+    // Bookshelf (1x2 tall)
+    map.placeFurniture({ type: BOOKSHELF, x: ox + 1, y: oy, width: 1, height: 2, state: null });
+    // Whiteboard (2x1 wide)
+    map.placeFurniture({ type: WHITEBOARD, x: ox + 2, y: oy, width: 2, height: 1, state: null });
+    // Coffee machine (1x1)
+    map.placeFurniture({ type: COFFEE, x: ox + 2, y: oy + 1, width: 1, height: 1, state: null });
   }
 
   // ---- Exports ----

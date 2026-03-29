@@ -47,11 +47,17 @@
     this._boundRender = this.render.bind(this);
 
     // Loaded sprite sheet images
+    this._officeSheet = null;
     this._charSheets = [];
   }
 
   OfficeRenderer.prototype.loadSprites = function () {
     var self = this;
+    // Load office furniture sheet
+    var officeImg = new Image();
+    officeImg.onload = function () { self._officeSheet = officeImg; self._floorDirty = true; };
+    officeImg.src = "/assets/office/furniture/office_sheet.png";
+
     for (var i = 0; i < 20; i++) {
       (function (idx) {
         var img = new Image();
@@ -237,117 +243,41 @@
 
   // ---- Furniture (clean programmatic rendering) ----
 
+  // Sprite coordinates in office_sheet.png (verified visually)
+  var SPRITE_MAP = {
+    desk:       { sx: 0,   sy: 96,  sw: 32, sh: 32 },  // 2x2 wooden desk
+    chair:      { sx: 0,   sy: 128, sw: 16, sh: 16 },  // dark office chair
+    pc:         { sx: 208, sy: 128, sw: 16, sh: 16 },  // monitor
+    sofa:       { sx: 0,   sy: 160, sw: 16, sh: 16 },  // orange sofa piece
+    plant:      { sx: 80,  sy: 128, sw: 16, sh: 32 },  // tall potted plant
+    coffee:     { sx: 160, sy: 208, sw: 16, sh: 16 },  // desk PC printer
+    whiteboard: { sx: 96,  sy: 128, sw: 32, sh: 16 },  // whiteboard
+    bookshelf:  { sx: 112, sy: 208, sw: 16, sh: 32 },  // bookshelf
+  };
+
   OfficeRenderer.prototype._drawFurnitureItem = function (ctx, f) {
     var fw = f.width * TILE;
     var fh = f.height * TILE;
     var fx = f.x * TILE;
     var fy = f.y * TILE;
+
+    if (this._officeSheet) {
+      var sprite = SPRITE_MAP[f.type];
+      if (sprite) {
+        ctx.drawImage(
+          this._officeSheet,
+          sprite.sx, sprite.sy, sprite.sw, sprite.sh,
+          fx, fy, fw, fh,
+        );
+        return;
+      }
+    }
+
+    // Placeholder fallback
     var style = FURNITURE_STYLE[f.type];
     if (!style) style = { fill: "#888", stroke: "#666" };
-
-    // Rounded rectangle body
-    var r = 1.5;
     ctx.fillStyle = style.fill;
-    ctx.strokeStyle = style.stroke;
-    ctx.lineWidth = 0.5;
-    _roundRect(ctx, fx + 0.5, fy + 0.5, fw - 1, fh - 1, r);
-    ctx.fill();
-    ctx.stroke();
-
-    // Type-specific details
-    if (f.type === "desk") {
-      // Wood grain lines
-      ctx.strokeStyle = "rgba(0,0,0,0.12)";
-      ctx.lineWidth = 0.3;
-      for (var i = 3; i < fw - 2; i += 4) {
-        ctx.beginPath();
-        ctx.moveTo(fx + i, fy + 2);
-        ctx.lineTo(fx + i, fy + fh - 2);
-        ctx.stroke();
-      }
-    } else if (f.type === "pc") {
-      // Screen
-      var isOn = f.state === "on";
-      ctx.fillStyle = isOn ? "#88C0D0" : "#434C5E";
-      ctx.fillRect(fx + 2, fy + 1, fw - 4, fh - 5);
-      // Screen glow when on
-      if (isOn) {
-        ctx.fillStyle = "rgba(136,192,208,0.3)";
-        ctx.fillRect(fx, fy + fh - 3, fw, 3);
-      }
-      // Stand
-      ctx.fillStyle = style.stroke;
-      ctx.fillRect(fx + fw / 2 - 1, fy + fh - 3, 2, 2);
-      ctx.fillRect(fx + fw / 2 - 2, fy + fh - 1, 4, 1);
-    } else if (f.type === "chair") {
-      // Seat circle
-      ctx.fillStyle = style.fill;
-      ctx.beginPath();
-      ctx.arc(fx + fw / 2, fy + fh / 2, fw / 2 - 1.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = style.stroke;
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-    } else if (f.type === "plant") {
-      // Pot
-      ctx.fillStyle = "#8B4513";
-      ctx.fillRect(fx + 3, fy + fh - 5, fw - 6, 5);
-      // Leaves
-      ctx.fillStyle = "#4CAF50";
-      ctx.beginPath();
-      ctx.arc(fx + fw / 2, fy + fh / 2 - 2, fw / 2 - 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#66BB6A";
-      ctx.beginPath();
-      ctx.arc(fx + fw / 2 - 1, fy + fh / 2 - 3, fw / 3, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (f.type === "coffee") {
-      // Machine body
-      ctx.fillStyle = "#5D4037";
-      ctx.fillRect(fx + 2, fy + 2, fw - 4, fh - 2);
-      // Red indicator
-      ctx.fillStyle = "#E53935";
-      ctx.fillRect(fx + 3, fy + 3, 2, 2);
-    } else if (f.type === "whiteboard") {
-      // White surface
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(fx + 1, fy + 1, fw - 2, fh - 4);
-      // Border
-      ctx.strokeStyle = "#B0BEC5";
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(fx + 1, fy + 1, fw - 2, fh - 4);
-      // Marker scribbles
-      ctx.strokeStyle = "rgba(41,98,255,0.3)";
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(fx + 3, fy + 4);
-      ctx.lineTo(fx + fw - 4, fy + 4);
-      ctx.moveTo(fx + 3, fy + 6);
-      ctx.lineTo(fx + fw / 2, fy + 6);
-      ctx.stroke();
-    } else if (f.type === "bookshelf") {
-      // Shelves
-      for (var s = 0; s < 3; s++) {
-        var sy = fy + 2 + s * (fh / 3);
-        ctx.fillStyle = "#6D4C41";
-        ctx.fillRect(fx + 1, sy + fh / 3 - 2, fw - 2, 1);
-        // Books
-        var colors = ["#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA"];
-        for (var b = 0; b < 3; b++) {
-          ctx.fillStyle = colors[(s * 3 + b) % colors.length];
-          ctx.fillRect(fx + 2 + b * 4, sy, 3, fh / 3 - 3);
-        }
-      }
-    } else if (f.type === "sofa") {
-      // Cushion
-      ctx.fillStyle = "#9575CD";
-      _roundRect(ctx, fx + 1, fy + 2, fw - 2, fh - 4, 2);
-      ctx.fill();
-      // Armrests
-      ctx.fillStyle = "#7E57C2";
-      ctx.fillRect(fx, fy + 1, 2, fh - 2);
-      ctx.fillRect(fx + fw - 2, fy + 1, 2, fh - 2);
-    }
+    ctx.fillRect(fx, fy, fw, fh);
   };
 
   function _roundRect(ctx, x, y, w, h, r) {

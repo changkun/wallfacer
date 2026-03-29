@@ -213,11 +213,11 @@ describe("generateOfficeLayout", () => {
     }
   });
 
-  it("common area has at least sofa and plant", () => {
-    const { furniture } = gen(6);
+  it("common area has plant and bookshelf", () => {
+    const { furniture } = gen(4);
     const types = furniture.map((f) => f.type);
-    expect(types).toContain(F.SOFA);
     expect(types).toContain(F.PLANT);
+    expect(types).toContain(F.BOOKSHELF);
   });
 
   it("common area includes coffee, whiteboard, and bookshelf", () => {
