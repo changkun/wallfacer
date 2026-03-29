@@ -75,6 +75,7 @@ function createContext(options = {}) {
     sortArchivedByUpdatedDesc: (items) => items,
     trimArchivedWindow: () => {},
     scheduleRender: vi.fn(),
+    notifyTaskChangeListeners: vi.fn(),
     announceBoardStatus: vi.fn(),
     getTaskAccessibleTitle: (task) => task.title || task.prompt || task.id,
     formatTaskStatusLabel: (status) => String(status || "").replace(/_/g, " "),

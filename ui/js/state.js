@@ -86,5 +86,21 @@ let backlogSortMode =
     ? "impact"
     : "manual";
 
+// Task change listeners — lightweight observer for modules (e.g. office view)
+// that need to react to task list changes without coupling to the SSE handlers.
+let _taskChangeListeners = [];
+function registerTaskChangeListener(fn) {
+  _taskChangeListeners.push(fn);
+}
+function notifyTaskChangeListeners() {
+  for (var i = 0; i < _taskChangeListeners.length; i++) {
+    try {
+      _taskChangeListeners[i](tasks);
+    } catch (e) {
+      console.error("task change listener error:", e);
+    }
+  }
+}
+
 // Deep-link hash handling: true once the initial URL hash has been processed.
 let _hashHandled = false;

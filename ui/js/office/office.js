@@ -8,6 +8,8 @@
   var _canvas = null;
   var _currentLayout = null;
   var _characterManager = null;
+  var _pendingTasks = null; // buffered task list when office is hidden
+  var _lastUpdateTime = 0;
 
   function initOffice() {
     var container = document.getElementById("office-container");
@@ -50,6 +52,11 @@
       btn.addEventListener("click", toggleOffice);
     }
 
+    // Register for task state changes from SSE
+    if (typeof registerTaskChangeListener === "function") {
+      registerTaskChangeListener(officeSync);
+    }
+
     // Handle window resize
     window.addEventListener("resize", function () {
       resizeCanvas();
@@ -83,13 +90,39 @@
     }
   }
 
-  function syncTasks(tasks) {
+  function officeSync(taskList) {
     if (!_characterManager) return;
-    // Ensure layout has enough seats
-    if (_currentLayout && tasks.length > _currentLayout.seats.length) {
-      updateLayout(tasks.length);
+
+    // Filter to non-archived tasks
+    var activeTasks = [];
+    for (var i = 0; i < taskList.length; i++) {
+      if (!taskList[i].archived) {
+        activeTasks.push(taskList[i]);
+      }
     }
-    _characterManager.syncTasks(tasks);
+
+    if (!_visible) {
+      // Buffer for when office becomes visible
+      _pendingTasks = activeTasks;
+      return;
+    }
+
+    _applySync(activeTasks);
+  }
+
+  function _applySync(activeTasks) {
+    // Expand layout if needed
+    if (
+      _currentLayout &&
+      activeTasks.length > _currentLayout.seats.length
+    ) {
+      updateLayout(activeTasks.length);
+    }
+    _characterManager.syncTasks(activeTasks);
+  }
+
+  function syncTasks(taskList) {
+    officeSync(taskList);
   }
 
   function showOffice() {
@@ -107,6 +140,16 @@
       _renderer.start();
     }
 
+    // Apply buffered task updates
+    if (_pendingTasks) {
+      _applySync(_pendingTasks);
+      _pendingTasks = null;
+    }
+
+    // Start character update loop
+    _lastUpdateTime = performance.now();
+    _startUpdateLoop();
+
     var btn = document.getElementById("office-toggle");
     if (btn) btn.textContent = "Board";
   }
@@ -119,6 +162,7 @@
     _visible = false;
 
     if (_renderer) _renderer.stop();
+    _stopUpdateLoop();
 
     var btn = document.getElementById("office-toggle");
     if (btn) btn.textContent = "Office";
@@ -134,6 +178,26 @@
 
   function isOfficeVisible() {
     return _visible;
+  }
+
+  var _updateRafId = null;
+  function _startUpdateLoop() {
+    if (_updateRafId !== null) return;
+    _lastUpdateTime = performance.now();
+    function tick(now) {
+      var dt = (now - _lastUpdateTime) / 1000;
+      _lastUpdateTime = now;
+      if (dt > 0.1) dt = 0.1; // cap dt to avoid large jumps
+      if (_characterManager) _characterManager.updateAll(dt);
+      _updateRafId = requestAnimationFrame(tick);
+    }
+    _updateRafId = requestAnimationFrame(tick);
+  }
+  function _stopUpdateLoop() {
+    if (_updateRafId !== null) {
+      cancelAnimationFrame(_updateRafId);
+      _updateRafId = null;
+    }
   }
 
   document.addEventListener("DOMContentLoaded", initOffice);

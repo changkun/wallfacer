@@ -172,6 +172,7 @@ function _handleTasksSnapshot(data, lastEventId) {
       resetArchivedWindow(false);
     }
     scheduleRender();
+    notifyTaskChangeListeners();
     _handleInitialHash();
   } catch (err) {
     console.error("tasks SSE snapshot parse error:", err);
@@ -201,6 +202,7 @@ function _handleTaskUpdated(data, lastEventId) {
     if (task.archived) {
       if (!showArchived) invalidateDiffBehindCounts(task.id);
       scheduleRender();
+      notifyTaskChangeListeners();
       return;
     }
     if (
@@ -217,6 +219,7 @@ function _handleTaskUpdated(data, lastEventId) {
     }
     invalidateDiffBehindCounts(task.id);
     scheduleRender();
+    notifyTaskChangeListeners();
     if (
       typeof getOpenModalTaskId === "function" &&
       typeof renderModalDependencies === "function"
@@ -259,6 +262,7 @@ function _handleTaskDeleted(data, lastEventId) {
     tasks = next.tasks;
     archivedTasks = next.archivedTasks;
     scheduleRender();
+    notifyTaskChangeListeners();
     if (
       typeof getOpenModalTaskId === "function" &&
       typeof renderModalDependencies === "function"

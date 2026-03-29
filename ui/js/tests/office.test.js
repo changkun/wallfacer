@@ -149,6 +149,8 @@ function makeContext() {
     Set,
     JSON,
     Promise,
+    performance: { now: () => Date.now() },
+    registerTaskChangeListener() {},
     requestAnimationFrame() {
       return 1;
     },
