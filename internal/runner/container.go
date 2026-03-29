@@ -13,9 +13,9 @@ import (
 
 	"changkun.de/x/wallfacer/internal/envconfig"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 
@@ -149,9 +149,11 @@ func (r *Runner) buildContainerSpecForSandbox(
 	}
 
 	// Mount workspace-level instructions file based on sandbox convention:
-	// - Claude sandbox expects /workspace/CLAUDE.md
-	// - Codex sandbox expects /workspace/AGENTS.md
-	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb)
+	// - Claude sandbox expects CLAUDE.md
+	// - Codex sandbox expects AGENTS.md
+	// For single workspace, mount inside the repo directory so that the
+	// agent stays anchored to the repo root rather than /workspace/.
+	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb, basenames)
 
 	// Board context: mount board.json read-only at /workspace/.tasks/.
 	if boardDir != "" {
@@ -214,9 +216,12 @@ func instructionsFilenameForSandbox(sb sandbox.Type) string {
 
 // appendInstructionsMount adds the workspace-level instructions file as a
 // read-only bind mount (CLAUDE.md for claude, AGENTS.md for codex).
+// When there is exactly one workspace, the file is mounted inside that
+// workspace directory (e.g. /workspace/<repo>/CLAUDE.md) so the agent
+// stays anchored to the repo root. For multiple workspaces the file is
+// mounted at /workspace/ so it is accessible from the common root.
 // It is a no-op when instructionsPath is empty or does not exist on the host.
-// Both buildContainerArgsForSandbox and buildIdeationContainerArgs share this logic.
-func (r *Runner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb sandbox.Type) []sandbox.VolumeMount {
+func (r *Runner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb sandbox.Type, basenames []string) []sandbox.VolumeMount {
 	instrPath := r.currentInstructionsPath()
 	if instrPath == "" {
 		return volumes
@@ -224,9 +229,14 @@ func (r *Runner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb sandb
 	if _, err := os.Stat(instrPath); err != nil {
 		return volumes
 	}
+	filename := instructionsFilenameForSandbox(sb)
+	containerPath := "/workspace/" + filename
+	if len(basenames) == 1 {
+		containerPath = "/workspace/" + basenames[0] + "/" + filename
+	}
 	return append(volumes, sandbox.VolumeMount{
 		Host:      instrPath,
-		Container: "/workspace/" + instructionsFilenameForSandbox(sb),
+		Container: containerPath,
 		Options:   mountOpts("z", "ro"),
 	})
 }
@@ -566,7 +576,7 @@ func (r *Runner) runContainer(
 			spec.Labels["wallfacer.task.activity"] = string(activity)
 		}
 
-		logger.Runner.Debug("exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox)
+		logger.Runner.Debug("exec", "cmd", spec.Runtime, "name", spec.Name, "sandbox", selectedSandbox, "workdir", spec.WorkDir, "volumes", len(spec.Volumes))
 		_ = r.taskStore(taskID).InsertEvent(ctx, taskID, store.EventTypeSpanStart, store.SpanData{Phase: "container_run", Label: string(activity)})
 
 		handle, launchErr := r.backend.Launch(ctx, spec)

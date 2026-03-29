@@ -4,15 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 
@@ -143,16 +142,7 @@ func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, mod
 		}
 	}
 
-	instrPath := r.currentInstructionsPath()
-	if instrPath != "" {
-		if _, err := os.Stat(instrPath); err == nil {
-			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
-				Host:      instrPath,
-				Container: "/workspace/" + instructionsFilenameForSandbox(sb),
-				Options:   mountOpts("z", "ro"),
-			})
-		}
-	}
+	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb, basenames)
 
 	workdir := "/workspace"
 	if len(basenames) == 1 {

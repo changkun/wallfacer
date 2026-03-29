@@ -203,11 +203,11 @@ func TestContainerArgsCLAUDEMDMountIsReadOnly(t *testing.T) {
 	t.Fatal("CLAUDE.md --mount not found in args")
 }
 
-// TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace verifies that when
-// there is exactly one workspace, CLAUDE.md is still mounted at /workspace/CLAUDE.md
-// (not inside the workspace subdirectory), so the repo's own CLAUDE.md is not
-// shadowed and can be read directly via the path reference in the instructions.
-func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
+// TestContainerArgsSingleWorkspaceMountsCLAUDEMDInsideRepo verifies that when
+// there is exactly one workspace, CLAUDE.md is mounted inside the repo directory
+// (/workspace/<repo>/CLAUDE.md) so the agent stays anchored to the repo root
+// rather than treating /workspace/ as the project root.
+func TestContainerArgsSingleWorkspaceMountsCLAUDEMDInsideRepo(t *testing.T) {
 	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
 	if err := os.WriteFile(instructionsFile, []byte("# test instructions\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -230,16 +230,16 @@ func TestContainerArgsSingleWorkspaceMountsCLAUDEMDAtWorkspace(t *testing.T) {
 	t.Cleanup(func() { runner.Shutdown() })
 	args := runner.buildContainerArgs("test-container", "", "do something", "", nil, "", nil, "")
 
-	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
+	basename := filepath.Base(ws)
+	expectedMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/" + basename + "/CLAUDE.md," + expectedBuildROSuffix()
 	if !containsConsecutive(args, "--mount", expectedMount) {
-		t.Fatalf("single workspace: CLAUDE.md should be mounted at /workspace/CLAUDE.md; got args: %v", args)
+		t.Fatalf("single workspace: CLAUDE.md should be mounted at /workspace/%s/CLAUDE.md; got args: %v", basename, args)
 	}
 
-	// Must NOT be mounted inside the workspace subdirectory.
-	basename := filepath.Base(ws)
-	wrongMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/" + basename + "/CLAUDE.md," + expectedBuildROSuffix()
-	if containsConsecutive(args, "--mount", wrongMount) {
-		t.Fatalf("single workspace: CLAUDE.md should NOT be at /workspace/%s/CLAUDE.md", basename)
+	// Must NOT be mounted at the workspace root.
+	rootMount := "type=bind,src=" + hostPath(instructionsFile, "podman") + ",dst=/workspace/CLAUDE.md," + expectedBuildROSuffix()
+	if containsConsecutive(args, "--mount", rootMount) {
+		t.Fatalf("single workspace: CLAUDE.md should NOT be at /workspace/CLAUDE.md")
 	}
 }
 

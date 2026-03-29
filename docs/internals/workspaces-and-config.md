@@ -117,10 +117,14 @@ When `prompts.EnsureInstructions()` is called and no file exists yet, `BuildInst
 ### 📂 Mount Path
 
 The instructions file is mounted read-only into every task container. The mount filename depends on the sandbox type:
-- **Claude sandbox**: `/workspace/CLAUDE.md` (legacy filename that Claude Code auto-discovers)
-- **Codex sandbox**: `/workspace/AGENTS.md`
+- **Claude sandbox**: `CLAUDE.md` (legacy filename that Claude Code auto-discovers)
+- **Codex sandbox**: `AGENTS.md`
 
-This is handled by `appendInstructionsMount()` in `container.go`, which selects the filename via `instructionsFilenameForSandbox()`.
+The mount **location** depends on the number of workspaces:
+- **Single workspace**: Mounted inside the repo directory (e.g. `/workspace/<repo>/CLAUDE.md`) so the agent stays anchored to the repo root.
+- **Multiple workspaces**: Mounted at `/workspace/CLAUDE.md` (the common root) so it is accessible from any repo.
+
+This is handled by `appendInstructionsMount()` in `container.go`, which selects the filename via `instructionsFilenameForSandbox()` and the mount directory based on the basenames slice.
 
 ## 📦 Sandbox Type System
 

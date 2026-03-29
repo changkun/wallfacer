@@ -14,9 +14,9 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/set"
+	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
-	"changkun.de/x/wallfacer/internal/prompts"
 	"github.com/google/uuid"
 )
 
@@ -323,7 +323,7 @@ func (r *Runner) buildIdeationContainerSpec(containerName, prompt string, sb san
 		}
 	}
 
-	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb)
+	spec.Volumes = r.appendInstructionsMount(spec.Volumes, sb, basenames)
 
 	spec.WorkDir = workdirForBasenames(basenames)
 	spec.Cmd = buildAgentCmd(prompt, model)

@@ -447,6 +447,39 @@ func TestBuildIdeationContainerArgsSingleWorkspaceReadOnly(t *testing.T) {
 	}
 }
 
+// TestBuildIdeationContainerArgsSingleWorkspaceInstructionsInsideRepo verifies
+// that for a single workspace, the instructions file (CLAUDE.md / AGENTS.md)
+// is mounted inside the repo directory rather than at /workspace/ root, so the
+// agent stays anchored to the repo.
+func TestBuildIdeationContainerArgsSingleWorkspaceInstructionsInsideRepo(t *testing.T) {
+	ws := t.TempDir()
+	basename := filepath.Base(ws)
+	instrPath := filepath.Join(t.TempDir(), "CLAUDE.md")
+	if err := os.WriteFile(instrPath, []byte("# Instructions"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	r := newRunnerForArgTest(t, RunnerConfig{
+		Command:          "podman",
+		SandboxImage:     "wallfacer:latest",
+		Workspaces:       []string{ws},
+		InstructionsPath: instrPath,
+	})
+	args := r.buildIdeationContainerArgs("ideate-test", "prompt", "claude")
+
+	// Instructions must be mounted inside the repo, not at /workspace/ root.
+	wantInside := "dst=/workspace/" + basename + "/CLAUDE.md,"
+	wantRoot := "dst=/workspace/CLAUDE.md,"
+	foundInside := argsContainSubstring(args, wantInside)
+	foundRoot := argsContainSubstring(args, wantRoot)
+	if !foundInside {
+		t.Errorf("expected instructions mount inside repo (%q); args: %v", wantInside, args)
+	}
+	if foundRoot {
+		t.Errorf("instructions must not be mounted at workspace root (%q); args: %v", wantRoot, args)
+	}
+}
+
 // TestBuildIdeationContainerArgsClaudeVsCodex verifies that running ideation
 // with claude vs codex sandboxes produces the correct sandbox image while
 // keeping all other flags identical.
@@ -622,11 +655,12 @@ func TestAppendInstructionsMount(t *testing.T) {
 		name            string
 		cfgFn           func(t *testing.T) RunnerConfig
 		sandbox         string
+		basenames       []string
 		wantMountSuffix string // substring expected in the -v value
 		wantNone        bool   // when true, no instructions -v should be added
 	}{
 		{
-			name: "claude sandbox: mounts as CLAUDE.md",
+			name: "claude sandbox multi-workspace: mounts at /workspace/CLAUDE.md",
 			cfgFn: func(t *testing.T) RunnerConfig {
 				p := filepath.Join(t.TempDir(), "CLAUDE.md")
 				if err := os.WriteFile(p, []byte("# Instructions"), 0644); err != nil {
@@ -635,10 +669,24 @@ func TestAppendInstructionsMount(t *testing.T) {
 				return RunnerConfig{Command: "podman", SandboxImage: "img", InstructionsPath: p}
 			},
 			sandbox:         "claude",
+			basenames:       []string{"repo-a", "repo-b"},
 			wantMountSuffix: "/workspace/CLAUDE.md:" + expectedMountOpts("z", "ro"),
 		},
 		{
-			name: "codex sandbox: mounts as AGENTS.md",
+			name: "claude sandbox single-workspace: mounts inside repo",
+			cfgFn: func(t *testing.T) RunnerConfig {
+				p := filepath.Join(t.TempDir(), "CLAUDE.md")
+				if err := os.WriteFile(p, []byte("# Instructions"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				return RunnerConfig{Command: "podman", SandboxImage: "img", InstructionsPath: p}
+			},
+			sandbox:         "claude",
+			basenames:       []string{"myrepo"},
+			wantMountSuffix: "/workspace/myrepo/CLAUDE.md:" + expectedMountOpts("z", "ro"),
+		},
+		{
+			name: "codex sandbox single-workspace: mounts inside repo",
 			cfgFn: func(t *testing.T) RunnerConfig {
 				p := filepath.Join(t.TempDir(), "AGENTS.md")
 				if err := os.WriteFile(p, []byte("# Instructions"), 0644); err != nil {
@@ -647,6 +695,20 @@ func TestAppendInstructionsMount(t *testing.T) {
 				return RunnerConfig{Command: "podman", SandboxImage: "img", InstructionsPath: p}
 			},
 			sandbox:         "codex",
+			basenames:       []string{"myrepo"},
+			wantMountSuffix: "/workspace/myrepo/AGENTS.md:" + expectedMountOpts("z", "ro"),
+		},
+		{
+			name: "codex sandbox multi-workspace: mounts at /workspace/AGENTS.md",
+			cfgFn: func(t *testing.T) RunnerConfig {
+				p := filepath.Join(t.TempDir(), "AGENTS.md")
+				if err := os.WriteFile(p, []byte("# Instructions"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				return RunnerConfig{Command: "podman", SandboxImage: "img", InstructionsPath: p}
+			},
+			sandbox:         "codex",
+			basenames:       nil,
 			wantMountSuffix: "/workspace/AGENTS.md:" + expectedMountOpts("z", "ro"),
 		},
 		{
@@ -674,7 +736,7 @@ func TestAppendInstructionsMount(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRunnerForArgTest(t, tc.cfgFn(t))
 			initial := []sandbox.VolumeMount{{Host: "claude-config", Container: "/home/claude/.claude", Named: true}}
-			result := r.appendInstructionsMount(initial, sandbox.Normalize(tc.sandbox))
+			result := r.appendInstructionsMount(initial, sandbox.Normalize(tc.sandbox), tc.basenames)
 
 			if tc.wantNone {
 				if len(result) != len(initial) {
@@ -711,7 +773,7 @@ func TestAppendInstructionsMountReadOnly(t *testing.T) {
 				SandboxImage:     "img",
 				InstructionsPath: p,
 			})
-			result := r.appendInstructionsMount(nil, sandbox.Normalize(sb))
+			result := r.appendInstructionsMount(nil, sandbox.Normalize(sb), nil)
 			if len(result) != 1 {
 				t.Fatalf("expected 1 mount; got %d", len(result))
 			}
