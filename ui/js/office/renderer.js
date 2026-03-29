@@ -13,14 +13,14 @@
   var CHARACTER_COLOR = "#4A90D9";
 
   var FURNITURE_STYLE = {
-    desk:       { fill: "#B8956A", stroke: "#8B7355", label: "" },
-    chair:      { fill: "#6B5B4F", stroke: "#4A3C32", label: "" },
-    pc:         { fill: "#3B4252", stroke: "#2E3440", label: "" },
-    sofa:       { fill: "#7B68AE", stroke: "#5B4E8A", label: "" },
-    plant:      { fill: "#4CAF50", stroke: "#388E3C", label: "" },
-    coffee:     { fill: "#795548", stroke: "#5D4037", label: "" },
+    desk: { fill: "#B8956A", stroke: "#8B7355", label: "" },
+    chair: { fill: "#6B5B4F", stroke: "#4A3C32", label: "" },
+    pc: { fill: "#3B4252", stroke: "#2E3440", label: "" },
+    sofa: { fill: "#7B68AE", stroke: "#5B4E8A", label: "" },
+    plant: { fill: "#4CAF50", stroke: "#388E3C", label: "" },
+    coffee: { fill: "#795548", stroke: "#5D4037", label: "" },
     whiteboard: { fill: "#ECEFF4", stroke: "#D8DEE9", label: "" },
-    bookshelf:  { fill: "#A0522D", stroke: "#8B4513", label: "" },
+    bookshelf: { fill: "#A0522D", stroke: "#8B4513", label: "" },
   };
 
   // ---- OfficeRenderer ----
@@ -55,7 +55,9 @@
     for (var i = 0; i < 20; i++) {
       (function (idx) {
         var img = new Image();
-        img.onload = function () { self._charSheets[idx] = img; };
+        img.onload = function () {
+          self._charSheets[idx] = img;
+        };
         var num = idx < 10 ? "0" + idx : "" + idx;
         img.src = "/assets/office/characters/char_" + num + ".png";
       })(i);
@@ -114,10 +116,7 @@
     }
 
     ctx.save();
-    ctx.translate(
-      Math.round(-cam.x * zoom),
-      Math.round(-cam.y * zoom)
-    );
+    ctx.translate(Math.round(-cam.x * zoom), Math.round(-cam.y * zoom));
     ctx.scale(zoom, zoom);
 
     this._drawFloor(ctx);
@@ -200,9 +199,12 @@
       var f = this._furniture[i];
       drawables.push({
         _isChar: false,
-        x: f.x, y: f.y,
-        width: f.width || 1, height: f.height || 1,
-        type: f.type, state: f.state,
+        x: f.x,
+        y: f.y,
+        width: f.width || 1,
+        height: f.height || 1,
+        type: f.type,
+        state: f.state,
       });
     }
 
@@ -211,15 +213,17 @@
       for (var c = 0; c < chars.length; c++) {
         drawables.push({
           _isChar: true,
-          x: chars[c].x, y: chars[c].y,
-          width: 1, height: 1,
+          x: chars[c].x,
+          y: chars[c].y,
+          width: 1,
+          height: 1,
           _charInfo: chars[c],
         });
       }
     }
 
     drawables.sort(function (a, b) {
-      return (a.y + a.height) - (b.y + b.height);
+      return a.y + a.height - (b.y + b.height);
     });
 
     for (var d = 0; d < drawables.length; d++) {
@@ -382,26 +386,48 @@
     }
   };
 
-  OfficeRenderer.prototype._drawCharacterSprite = function (ctx, info, px, py, sheet, anims) {
+  OfficeRenderer.prototype._drawCharacterSprite = function (
+    ctx,
+    info,
+    px,
+    py,
+    sheet,
+    anims,
+  ) {
     var animName = info.animType || "idle";
     var dirs = ["down", "up", "left", "right"];
     var dirName = dirs[info.direction] || "down";
 
     var animDef = anims[animName] || anims.idle;
-    var dirDef = animDef[dirName] || animDef.down || { row: 0, col: 0, frames: 1 };
+    var dirDef =
+      animDef[dirName] ||
+      animDef.down || { megaRow: 0, col: 0, frames: 1 };
 
     var frameIdx = info.frameIndex % dirDef.frames;
     var srcCol = dirDef.col + frameIdx;
-    var srcRow = dirDef.row;
+    var charH = anims._frameH || 32;
+    var srcY = (dirDef.megaRow || 0) * charH;
 
+    // Draw 16x32 sprite, offset up by 16px so feet align with tile
     ctx.drawImage(
       sheet,
-      srcCol * TILE, srcRow * TILE, TILE, TILE,
-      px, py, TILE, TILE,
+      srcCol * TILE,
+      srcY,
+      TILE,
+      charH,
+      px,
+      py - TILE,
+      TILE,
+      charH,
     );
   };
 
-  OfficeRenderer.prototype._drawCharacterPlaceholder = function (ctx, info, px, py) {
+  OfficeRenderer.prototype._drawCharacterPlaceholder = function (
+    ctx,
+    info,
+    px,
+    py,
+  ) {
     // Body
     ctx.fillStyle = CHARACTER_COLOR;
     ctx.beginPath();
@@ -410,7 +436,9 @@
     // Eye dot (direction indicator)
     ctx.fillStyle = "#FFF";
     ctx.beginPath();
-    var dx = px + TILE / 2, dy = py + TILE / 2, off = TILE / 3;
+    var dx = px + TILE / 2,
+      dy = py + TILE / 2,
+      off = TILE / 3;
     if (info.direction === 0) dy += off;
     else if (info.direction === 1) dx -= off;
     else if (info.direction === 2) dx += off;
@@ -419,7 +447,13 @@
     ctx.fill();
   };
 
-  OfficeRenderer.prototype._drawCharacterWithEffect = function (ctx, info, px, py, effect) {
+  OfficeRenderer.prototype._drawCharacterWithEffect = function (
+    ctx,
+    info,
+    px,
+    py,
+    effect,
+  ) {
     for (var row = 0; row < TILE; row++) {
       var alpha = effect.getAlphaMask(0, row);
       if (alpha > 0) {

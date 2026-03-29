@@ -161,6 +161,10 @@
   };
 
   Character.prototype._setState = function (newState) {
+    // Clear stale spawn/despawn effect when leaving those states
+    if (this.state !== newState && newState !== DESPAWN) {
+      this._effect = null;
+    }
     this.state = newState;
     this._stateTimer = 0;
     this._animFrame = 0;
@@ -176,7 +180,7 @@
       Math.round(this.x),
       Math.round(this.y),
       target.x,
-      target.y
+      target.y,
     );
     if (path && path.length > 1) {
       this._path = path;
@@ -221,9 +225,17 @@
   // ---- Task status mapping ----
 
   Character.prototype.setTaskStatus = function (status, tileMap) {
+    // Clear stale spawn effect — it should only persist while in SPAWN state
+    if (this.state !== SPAWN && this._effect && this._effect.type === "spawn") {
+      this._effect = null;
+    }
     switch (status) {
       case "backlog":
-        if (this.state !== IDLE && this.state !== WANDER && this.state !== SPAWN) {
+        if (
+          this.state !== IDLE &&
+          this.state !== WANDER &&
+          this.state !== SPAWN
+        ) {
           this._setState(IDLE);
         }
         this._dismissBubble();
@@ -270,7 +282,10 @@
       this._setState(WORKING);
       return;
     }
-    if (Math.round(this.x) === this.seat.x && Math.round(this.y) === this.seat.y) {
+    if (
+      Math.round(this.x) === this.seat.x &&
+      Math.round(this.y) === this.seat.y
+    ) {
       this._setState(WORKING);
       return;
     }
@@ -282,7 +297,7 @@
         Math.round(this.y),
         this.seat.x,
         this.seat.y,
-        extra
+        extra,
       );
       if (path && path.length > 1) {
         this._path = path;

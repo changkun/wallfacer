@@ -91,7 +91,11 @@
     this._cache = {};
   }
 
-  SpriteCache.prototype.loadSpriteSheet = function (url, frameWidth, frameHeight) {
+  SpriteCache.prototype.loadSpriteSheet = function (
+    url,
+    frameWidth,
+    frameHeight,
+  ) {
     return new Promise(function (resolve) {
       var img = new Image();
       img.onload = function () {
@@ -117,73 +121,71 @@
     this._cache = {};
   };
 
-  SpriteCache.prototype.rasterizeFrame = function (spriteSheet, frameIndex, zoom) {
+  SpriteCache.prototype.rasterizeFrame = function (
+    spriteSheet,
+    frameIndex,
+    zoom,
+  ) {
     var rect = spriteSheet.frame(frameIndex);
     var w = rect.sw * zoom;
     var h = rect.sh * zoom;
     var oc = new OffscreenCanvas(w, h);
     var ctx = oc.getContext("2d");
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(spriteSheet.image, rect.sx, rect.sy, rect.sw, rect.sh, 0, 0, w, h);
+    ctx.drawImage(
+      spriteSheet.image,
+      rect.sx,
+      rect.sy,
+      rect.sw,
+      rect.sh,
+      0,
+      0,
+      w,
+      h,
+    );
     return oc;
   };
 
   // ---- LimeZu sprite definitions ----
-  // Character sheets: 896×656 px, 16×16 frame grid (56 cols × 41 rows).
-  // Layout from Spritesheet_animations_GUIDE.png.
-  // Each direction block: down, up, left, right in that order within a row span.
+  // Character sheets: 896×656 px. Characters are 16×32 px (1 tile wide, 2 tall).
+  // Sheet uses "mega-rows" of 32px height. Each frame is 16px wide.
+  // MR0 (y=0):   4 idle-down frames
+  // MR1 (y=32):  24 walk frames: down(0-5), up(6-11), left(12-17), right(18-23)
+  var CHAR_FRAME_H = 32;
 
   var CHARACTER_ANIMS = {
+    _frameH: 32,
     idle: {
-      // Row 0: 4 idle frames per direction (only 1 used for idle stance).
-      down:  { row: 0, col: 0, frames: 1 },
-      up:    { row: 0, col: 1, frames: 1 },
-      left:  { row: 0, col: 2, frames: 1 },
-      right: { row: 0, col: 3, frames: 1 },
+      down: { megaRow: 0, col: 0, frames: 1 },
+      up: { megaRow: 0, col: 1, frames: 1 },
+      left: { megaRow: 0, col: 2, frames: 1 },
+      right: { megaRow: 0, col: 3, frames: 1 },
     },
     walk: {
-      // Rows 1–2: walk animation. 6 frames per direction.
-      // Down starts at (0,1), up at (6,1), left at (12,1), right at (18,1).
-      down:  { row: 1, col: 0,  frames: 6 },
-      up:    { row: 1, col: 6,  frames: 6 },
-      left:  { row: 1, col: 12, frames: 6 },
-      right: { row: 1, col: 18, frames: 6 },
-    },
-    sit: {
-      // Row 3: sit-down transition, ~4 frames per direction.
-      down:  { row: 3, col: 0,  frames: 4 },
-      up:    { row: 3, col: 4,  frames: 4 },
-      left:  { row: 3, col: 8,  frames: 4 },
-      right: { row: 3, col: 12, frames: 4 },
-    },
-    sitting_idle: {
-      // Rows 5–6: sitting idle. 1 frame per direction.
-      down:  { row: 5, col: 0, frames: 1 },
-      up:    { row: 5, col: 1, frames: 1 },
-      left:  { row: 5, col: 2, frames: 1 },
-      right: { row: 5, col: 3, frames: 1 },
+      down: { megaRow: 1, col: 0, frames: 6 },
+      up: { megaRow: 1, col: 6, frames: 6 },
+      left: { megaRow: 1, col: 12, frames: 6 },
+      right: { megaRow: 1, col: 18, frames: 6 },
     },
     typing: {
-      // Rows 8–10: desk/typing animations. Multiple frames with furniture overlay.
-      // Using the character-only frames from the sitting-at-desk rows.
-      down:  { row: 8, col: 0,  frames: 4 },
-      up:    { row: 8, col: 4,  frames: 4 },
-      left:  { row: 8, col: 8,  frames: 4 },
-      right: { row: 8, col: 12, frames: 4 },
+      down: { megaRow: 0, col: 0, frames: 1 },
+      up: { megaRow: 0, col: 1, frames: 1 },
+      left: { megaRow: 0, col: 2, frames: 1 },
+      right: { megaRow: 0, col: 3, frames: 1 },
     },
   };
 
   // Furniture sheet: office_sheet.png, 256×848 px, 16px grid (16 cols × 53 rows).
   // Pixel regions for individual furniture items within the sheet.
   var FURNITURE_DEFS = {
-    desk:       { sx: 0,   sy: 0,   sw: 32, sh: 16, frames: 1 },
-    chair:      { sx: 0,   sy: 16,  sw: 16, sh: 16, frames: 1 },
-    pc:         { sx: 32,  sy: 0,   sw: 16, sh: 16, frames: 2 },  // off, on
-    sofa:       { sx: 0,   sy: 32,  sw: 32, sh: 16, frames: 1 },
-    plant:      { sx: 48,  sy: 0,   sw: 16, sh: 16, frames: 1 },
-    coffee:     { sx: 64,  sy: 0,   sw: 16, sh: 16, frames: 1 },
-    whiteboard: { sx: 0,   sy: 48,  sw: 32, sh: 16, frames: 1 },
-    bookshelf:  { sx: 64,  sy: 16,  sw: 16, sh: 32, frames: 1 },
+    desk: { sx: 0, sy: 0, sw: 32, sh: 16, frames: 1 },
+    chair: { sx: 0, sy: 16, sw: 16, sh: 16, frames: 1 },
+    pc: { sx: 32, sy: 0, sw: 16, sh: 16, frames: 2 }, // off, on
+    sofa: { sx: 0, sy: 32, sw: 32, sh: 16, frames: 1 },
+    plant: { sx: 48, sy: 0, sw: 16, sh: 16, frames: 1 },
+    coffee: { sx: 64, sy: 0, sw: 16, sh: 16, frames: 1 },
+    whiteboard: { sx: 0, sy: 48, sw: 32, sh: 16, frames: 1 },
+    bookshelf: { sx: 64, sy: 16, sw: 16, sh: 32, frames: 1 },
   };
 
   // Tile sheet regions.
@@ -191,7 +193,10 @@
   // Using column 0 (neutral beige office floor), rows 0–2 for 3 tile variants.
   var TILE_DEFS = {
     floor: {
-      sx: 0, sy: 0, sw: 48, sh: 48, // 3×3 tile pattern block
+      sx: 0,
+      sy: 0,
+      sw: 48,
+      sh: 48, // 3×3 tile pattern block
       variants: 3, // number of 16px tile variants in the block
     },
     // wall.png (512×640): auto-tile column groups.
@@ -199,7 +204,10 @@
     //   top-left, top, top-right, left, center, right,
     //   bottom-left, bottom, bottom-right (3×3 arrangement)
     wall: {
-      sx: 0, sy: 0, sw: 48, sh: 48, // 3×3 auto-tile group
+      sx: 0,
+      sy: 0,
+      sw: 48,
+      sh: 48, // 3×3 auto-tile group
     },
   };
 

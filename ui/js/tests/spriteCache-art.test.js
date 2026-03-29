@@ -83,13 +83,12 @@ describe("CHARACTER_ANIMS", () => {
     expect(anims.walk.right.frames).toBe(6);
   });
 
-  it("typing defines frames for 4 directions (rows 7-10 region)", () => {
+  it("typing defines frames for 4 directions", () => {
     expect(anims.typing.down).toBeDefined();
     expect(anims.typing.up).toBeDefined();
     expect(anims.typing.left).toBeDefined();
     expect(anims.typing.right).toBeDefined();
-    // Typing row should be >= 7
-    expect(anims.typing.down.row).toBeGreaterThanOrEqual(7);
+    expect(anims.typing.down.megaRow).toBeDefined();
   });
 
   it("idle defines 1 frame per direction", () => {
@@ -103,7 +102,7 @@ describe("CHARACTER_ANIMS", () => {
       const dirs = Object.keys(anims[name]);
       for (const dir of dirs) {
         const entry = anims[name][dir];
-        expect(typeof entry.row).toBe("number");
+        expect(typeof entry.megaRow).toBe("number");
         expect(typeof entry.col).toBe("number");
         expect(typeof entry.frames).toBe("number");
         expect(entry.frames).toBeGreaterThan(0);
