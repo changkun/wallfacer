@@ -210,6 +210,7 @@ function toggleTerminalPanel() {
   var isHidden = panel.classList.contains("hidden");
   if (isHidden) {
     _hideDepGraphPanel();
+    _hideOfficePanel();
     _showTerminalPanel();
   } else {
     _hideTerminalPanel();
