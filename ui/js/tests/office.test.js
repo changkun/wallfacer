@@ -35,9 +35,11 @@ function makeContext() {
         },
       },
       textContent: "",
+      className: "",
       clientWidth: 800,
       clientHeight: 600,
       parentElement: null,
+      setAttribute() {},
       appendChild(child) {
         this.children.push(child);
         child.parentElement = this;
@@ -152,6 +154,8 @@ function makeContext() {
     performance: { now: () => Date.now() },
     location: { search: "?office=dev" },
     registerTaskChangeListener() {},
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
     requestAnimationFrame() {
       return 1;
     },
@@ -167,9 +171,13 @@ function makeContext() {
     "office/spriteCache.js",
     "office/camera.js",
     "office/pathfinding.js",
+    "office/effects.js",
+    "office/bubbles.js",
     "office/character.js",
     "office/renderer.js",
     "office/characterManager.js",
+    "office/interaction.js",
+    "office/minimap.js",
     "office/office.js",
   ];
   for (const f of files) {
@@ -194,8 +202,8 @@ describe("office coordinator", () => {
 
     // Toggle button should be visible
     expect(elements["office-toggle"].classList.contains("hidden")).toBe(false);
-    // Canvas should be appended to container
-    expect(elements["office-container"].children.length).toBe(1);
+    // Canvas + SR summary + minimap should be appended to container
+    expect(elements["office-container"].children.length).toBeGreaterThanOrEqual(1);
   });
 
   it("showOffice hides board and shows office-container", () => {

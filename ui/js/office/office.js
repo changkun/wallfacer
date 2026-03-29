@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  var VIEW_PREF_KEY = "wallfacer-office-view";
+  var SR_DEBOUNCE_MS = 2000;
+
   var _visible = false;
   var _renderer = null;
   var _camera = null;
@@ -8,8 +11,11 @@
   var _canvas = null;
   var _currentLayout = null;
   var _characterManager = null;
+  var _minimap = null;
   var _pendingTasks = null; // buffered task list when office is hidden
   var _lastUpdateTime = 0;
+  var _srSummaryEl = null;
+  var _srDebounceTimer = null;
 
   function initOffice() {
     var container = document.getElementById("office-container");
@@ -21,7 +27,19 @@
     _canvas.style.height = "100%";
     _canvas.style.display = "block";
     _canvas.style.touchAction = "none"; // prevent browser pan/zoom
+    _canvas.setAttribute("role", "img");
+    _canvas.setAttribute(
+      "aria-label",
+      "Pixel office view showing task agent characters",
+    );
     container.appendChild(_canvas);
+
+    // Screen-reader summary
+    _srSummaryEl = document.createElement("div");
+    _srSummaryEl.id = "office-sr-summary";
+    _srSummaryEl.className = "sr-only";
+    _srSummaryEl.setAttribute("aria-live", "polite");
+    container.appendChild(_srSummaryEl);
 
     // Size canvas to container
     resizeCanvas();
@@ -36,6 +54,18 @@
     if (window._officeInteraction) {
       var interaction = new window._officeInteraction(_canvas, _camera, _characterManager);
       _renderer.setInteraction(interaction);
+    }
+
+    // Minimap
+    if (window._officeMinimap) {
+      _minimap = new window._officeMinimap(container, _camera, function () {
+        if (_currentLayout) {
+          _camera.clamp(
+            _currentLayout.tileMap.width * window._officeTileSize,
+            _currentLayout.tileMap.height * window._officeTileSize,
+          );
+        }
+      });
     }
 
     // Attach pan/zoom input
@@ -62,10 +92,12 @@
       btn.addEventListener("click", toggleOffice);
       if (devMode) {
         btn.classList.remove("hidden");
+        _autoShowFromPref();
       } else if (typeof window._officeDetectAssets === "function") {
         window._officeDetectAssets().then(function (available) {
           if (available) {
             btn.classList.remove("hidden");
+            _autoShowFromPref();
           }
         });
       }
@@ -138,6 +170,15 @@
       updateLayout(activeTasks.length);
     }
     _characterManager.syncTasks(activeTasks);
+
+    // Update minimap visibility
+    if (_minimap && _currentLayout) {
+      _minimap.updateVisibility(_currentLayout.seats.length);
+      _minimap.setLayout(_currentLayout.tileMap, _currentLayout.furniture);
+    }
+
+    // Update SR summary (debounced)
+    _scheduleSRUpdate(activeTasks);
   }
 
   function syncTasks(taskList) {
@@ -193,6 +234,17 @@
     } else {
       showOffice();
     }
+    try {
+      localStorage.setItem(VIEW_PREF_KEY, _visible ? "true" : "false");
+    } catch (e) {}
+  }
+
+  function _autoShowFromPref() {
+    try {
+      if (localStorage.getItem(VIEW_PREF_KEY) === "true") {
+        showOffice();
+      }
+    } catch (e) {}
   }
 
   function isOfficeVisible() {
@@ -208,6 +260,10 @@
       _lastUpdateTime = now;
       if (dt > 0.1) dt = 0.1; // cap dt to avoid large jumps
       if (_characterManager) _characterManager.updateAll(dt);
+      if (_camera && _camera.updateFollow) _camera.updateFollow();
+      if (_minimap && _characterManager) {
+        _minimap.update(now, _characterManager.getDrawables());
+      }
       _updateRafId = requestAnimationFrame(tick);
     }
     _updateRafId = requestAnimationFrame(tick);
@@ -217,6 +273,31 @@
       cancelAnimationFrame(_updateRafId);
       _updateRafId = null;
     }
+  }
+
+  function _scheduleSRUpdate(activeTasks) {
+    if (!_srSummaryEl) return;
+    if (_srDebounceTimer) clearTimeout(_srDebounceTimer);
+    _srDebounceTimer = setTimeout(function () {
+      _updateSRSummary(activeTasks);
+    }, SR_DEBOUNCE_MS);
+  }
+
+  function _updateSRSummary(activeTasks) {
+    if (!_srSummaryEl) return;
+    if (!activeTasks || activeTasks.length === 0) {
+      _srSummaryEl.textContent = "No tasks in office view.";
+      return;
+    }
+    var parts = [];
+    for (var i = 0; i < activeTasks.length; i++) {
+      var t = activeTasks[i];
+      var name = (t.title || t.prompt || t.id).substring(0, 25);
+      var status = (t.status || "unknown").replace(/_/g, " ");
+      parts.push('"' + name + '" ' + status);
+    }
+    _srSummaryEl.textContent =
+      activeTasks.length + " tasks: " + parts.join(", ");
   }
 
   document.addEventListener("DOMContentLoaded", initOffice);

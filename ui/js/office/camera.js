@@ -69,6 +69,37 @@
     this._canvasH = canvasHeight;
   };
 
+  // ---- Camera follow ----
+
+  Camera.prototype.followTarget = function (worldX, worldY) {
+    this._followX = worldX - this._canvasW / 2 / this.zoom;
+    this._followY = worldY - this._canvasH / 2 / this.zoom;
+    this._following = true;
+  };
+
+  Camera.prototype.cancelFollow = function () {
+    this._following = false;
+  };
+
+  Camera.prototype.isFollowing = function () {
+    return !!this._following;
+  };
+
+  Camera.prototype.updateFollow = function () {
+    if (!this._following) return;
+    var lerpFactor = 0.1;
+    this.x += (this._followX - this.x) * lerpFactor;
+    this.y += (this._followY - this.y) * lerpFactor;
+    // Stop when close enough
+    var dx = Math.abs(this._followX - this.x);
+    var dy = Math.abs(this._followY - this.y);
+    if (dx < 0.5 && dy < 0.5) {
+      this.x = this._followX;
+      this.y = this._followY;
+      this._following = false;
+    }
+  };
+
   // ---- Input handling ----
 
   function attachInputHandlers(canvas, camera, onChange) {
@@ -105,6 +136,7 @@
         var dx = e.clientX - lastPanX;
         var dy = e.clientY - lastPanY;
         camera.pan(dx, dy);
+        camera.cancelFollow();
         lastPanX = e.clientX;
         lastPanY = e.clientY;
         if (onChange) onChange();

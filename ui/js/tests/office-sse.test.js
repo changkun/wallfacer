@@ -31,9 +31,11 @@ function makeContext() {
         },
       },
       textContent: "",
+      className: "",
       clientWidth: 800,
       clientHeight: 600,
       parentElement: null,
+      setAttribute() {},
       appendChild(child) {
         this.children.push(child);
         child.parentElement = this;
@@ -140,6 +142,9 @@ function makeContext() {
     JSON,
     Promise,
     performance: { now: () => Date.now() },
+    location: { search: "?office=dev" },
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
     requestAnimationFrame() {
       return 1;
     },
@@ -159,9 +164,13 @@ function makeContext() {
     "office/spriteCache.js",
     "office/camera.js",
     "office/pathfinding.js",
+    "office/effects.js",
+    "office/bubbles.js",
     "office/character.js",
     "office/renderer.js",
     "office/characterManager.js",
+    "office/interaction.js",
+    "office/minimap.js",
     "office/office.js",
   ];
   for (const f of files) {
