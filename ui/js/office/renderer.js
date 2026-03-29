@@ -243,15 +243,14 @@
 
   // ---- Furniture (clean programmatic rendering) ----
 
-  // Sprite coordinates in office_sheet.png
-  // Verified by visual extraction and 4x zoom inspection.
+  // Sprite coordinates in office_sheet.png (verified at 5x zoom)
   var SPRITE_MAP = {
-    desk:       { sx: 0,   sy: 96,  sw: 32, sh: 32 },  // 2x2 wooden desk with legs
+    desk:       { sx: 0,   sy: 96,  sw: 32, sh: 32 },  // 2x2 desk with legs
     chair:      { sx: 64,  sy: 128, sw: 16, sh: 32 },  // office chair with armrest (1x2)
-    pc:         null,                                     // drawn programmatically on desk
-    plant:      { sx: 80,  sy: 128, sw: 16, sh: 32 },  // tall potted plant (1x2)
+    pc:         null,                                     // drawn programmatically
+    sofa:       { sx: 0,   sy: 320, sw: 32, sh: 32 },  // grey couch (2x2)
+    plant:      { sx: 96,  sy: 112, sw: 16, sh: 16 },  // small green bush (1x1)
     bookshelf:  { sx: 112, sy: 208, sw: 16, sh: 32 },  // bookshelf with items (1x2)
-    whiteboard: { sx: 96,  sy: 128, sw: 32, sh: 16 },  // whiteboard/bulletin board (2x1)
   };
 
   OfficeRenderer.prototype._drawFurnitureItem = function (ctx, f) {

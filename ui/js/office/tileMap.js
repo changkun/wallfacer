@@ -178,9 +178,12 @@
   }
 
   function placeCommonArea(map, ox, oy) {
-    map.placeFurniture({ type: PLANT, x: ox, y: oy, width: 1, height: 2, state: null });
-    map.placeFurniture({ type: BOOKSHELF, x: ox + 1, y: oy, width: 1, height: 2, state: null });
-    map.placeFurniture({ type: WHITEBOARD, x: ox + 2, y: oy, width: 2, height: 1, state: null });
+    // Sofa (2x2 grey couch)
+    map.placeFurniture({ type: SOFA, x: ox, y: oy - 1, width: 2, height: 2, state: null });
+    // Bookshelf (1x2 tall)
+    map.placeFurniture({ type: BOOKSHELF, x: ox + 2, y: oy - 1, width: 1, height: 2, state: null });
+    // Small plant (1x1)
+    map.placeFurniture({ type: PLANT, x: ox, y: oy + 1, width: 1, height: 1, state: null });
   }
 
   // ---- Exports ----
