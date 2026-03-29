@@ -217,3 +217,33 @@ When existing tokens are invalid or expired, the system should detect this and g
 - Test invalid token response: `POST /api/env/test` returns `reauth_available: true` on 401/403 auth errors.
 - Test re-auth flow: after token validation fails, "Sign in again" triggers a new OAuth flow and updates the stored token.
 - Test desktop browser launch: OAuth authorization URL opens in system browser (not WebView) when running in desktop mode.
+
+## Task Breakdown
+
+| # | Task | Depends on | Effort | Status |
+|---|------|-----------|--------|--------|
+| 1 | [PKCE Utilities](oauth-token-setup/task-01-pkce-utilities.md) | — | Small | Todo |
+| 2 | [Ephemeral Callback Server](oauth-token-setup/task-02-callback-server.md) | 1 | Medium | Todo |
+| 3 | [Flow Engine & Provider Configs](oauth-token-setup/task-03-flow-engine.md) | 1, 2 | Medium | Todo |
+| 4 | [Auth HTTP Handlers & Routes](oauth-token-setup/task-04-auth-handler-routes.md) | 3 | Medium | Todo |
+| 5 | [UI Sign-In Buttons & Polling](oauth-token-setup/task-05-ui-sign-in.md) | 4 | Medium | Todo |
+| 6 | [Desktop Browser Launch](oauth-token-setup/task-06-desktop-browser.md) | 5 | Small | Todo |
+| 7 | [Env Test Reauth Flag](oauth-token-setup/task-07-reauth-flag.md) | — | Small | Todo |
+| 8 | [First-Launch Hints & Re-Auth UI](oauth-token-setup/task-08-first-launch-reauth-ui.md) | 5, 7 | Medium | Todo |
+| 9 | [Documentation](oauth-token-setup/task-09-docs.md) | 4, 5, 7, 8 | Small | Todo |
+
+```mermaid
+graph LR
+  1[Task 1: PKCE Utilities] --> 2[Task 2: Callback Server]
+  1 --> 3[Task 3: Flow Engine]
+  2 --> 3
+  3 --> 4[Task 4: Auth Handlers & Routes]
+  4 --> 5[Task 5: UI Sign-In]
+  5 --> 6[Task 6: Desktop Browser]
+  5 --> 8[Task 8: First-Launch & Re-Auth UI]
+  7[Task 7: Reauth Flag] --> 8
+  4 --> 9[Task 9: Docs]
+  5 --> 9
+  7 --> 9
+  8 --> 9
+```
