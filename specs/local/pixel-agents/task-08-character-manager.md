@@ -1,6 +1,6 @@
 # Task 8: CharacterManager and Desk Persistence
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 2 (TileMap), Task 7 (Character)
 **Phase:** Phase 2 (Character System)
 **Effort:** Medium
