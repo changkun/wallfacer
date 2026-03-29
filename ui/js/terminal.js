@@ -179,6 +179,17 @@ function initTerminal() {
     });
   }
 
+  // Wire the container picker button.
+  var containerBtn = document.getElementById("terminal-container-btn");
+  if (containerBtn) {
+    containerBtn.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+    });
+    containerBtn.addEventListener("click", function () {
+      _showContainerPicker();
+    });
+  }
+
   // Wire tab callbacks to send WebSocket session messages.
   // Each callback defers _term.focus() to the next frame so the browser's
   // click-focus handling finishes first and our focus call wins.
@@ -435,7 +446,12 @@ function _handleSessionsList(sessions) {
     var s = sessions[j];
     if (!_sessions[s.id]) {
       _sessions[s.id] = { buffer: [] };
-      addTerminalTab(s.id);
+      var tabLabel = s.container
+        ? s.container.length > 24
+          ? s.container.slice(0, 24) + "\u2026"
+          : s.container
+        : null;
+      addTerminalTab(s.id, tabLabel);
     }
     if (s.active) {
       _activeSessionId = s.id;
@@ -472,6 +488,115 @@ function _handleSessionExited(id) {
   }
   removeTerminalTab(id);
   delete _sessions[id];
+}
+
+// --- Container picker ---
+
+var _containerPickerEl = null;
+
+function _showContainerPicker() {
+  // Toggle off if already open.
+  if (_containerPickerEl) {
+    _dismissContainerPicker();
+    return;
+  }
+
+  var containerUrl =
+    typeof routes !== "undefined" && routes.containers
+      ? routes.containers.list()
+      : "/api/containers";
+  var token =
+    typeof getWallfacerToken === "function" ? getWallfacerToken() : "";
+  var headers = {};
+  if (token) headers["Authorization"] = "Bearer " + token;
+
+  fetch(containerUrl, { headers: headers })
+    .then(function (resp) {
+      return resp.json();
+    })
+    .then(function (containers) {
+      _renderContainerPicker(containers || []);
+    })
+    .catch(function () {
+      _renderContainerPicker([]);
+    });
+}
+
+function _renderContainerPicker(containers) {
+  _dismissContainerPicker();
+
+  var picker = document.createElement("div");
+  picker.className = "terminal-container-picker";
+
+  var running = containers.filter(function (c) {
+    return c.state === "running";
+  });
+
+  if (running.length === 0) {
+    var empty = document.createElement("div");
+    empty.className = "terminal-container-picker__empty";
+    empty.textContent = "No running containers";
+    picker.appendChild(empty);
+  } else {
+    for (var i = 0; i < running.length; i++) {
+      var c = running[i];
+      var item = document.createElement("button");
+      item.className = "terminal-container-picker__item";
+      var label = c.task_title || c.name;
+      if (c.id) label += " @ " + c.id.slice(0, 8);
+      item.textContent = label;
+      item.setAttribute("data-container-name", c.name);
+      item.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+      });
+      (function (name) {
+        item.addEventListener("click", function () {
+          _dismissContainerPicker();
+          if (_termWs && _termWs.readyState === WebSocket.OPEN) {
+            _termWs.send(
+              JSON.stringify({ type: "create_session", container: name }),
+            );
+          }
+          _deferTermFocus();
+        });
+      })(c.name);
+      picker.appendChild(item);
+    }
+  }
+
+  var tabBar = document.getElementById("terminal-tab-bar");
+  if (tabBar) {
+    tabBar.appendChild(picker);
+    _containerPickerEl = picker;
+  }
+
+  // Dismiss on click outside or Escape.
+  setTimeout(function () {
+    document.addEventListener("mousedown", _onPickerOutsideClick);
+    document.addEventListener("keydown", _onPickerEscape);
+  }, 0);
+}
+
+function _dismissContainerPicker() {
+  if (_containerPickerEl) {
+    _containerPickerEl.remove();
+    _containerPickerEl = null;
+  }
+  document.removeEventListener("mousedown", _onPickerOutsideClick);
+  document.removeEventListener("keydown", _onPickerEscape);
+}
+
+function _onPickerOutsideClick(e) {
+  if (_containerPickerEl && !_containerPickerEl.contains(e.target)) {
+    _dismissContainerPicker();
+  }
+}
+
+function _onPickerEscape(e) {
+  if (e.key === "Escape") {
+    _dismissContainerPicker();
+    _deferTermFocus();
+  }
 }
 
 // --- Terminal tab management ---
