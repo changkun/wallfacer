@@ -1,6 +1,6 @@
 ---
 title: Spec Tree Builder
-status: validated
+status: complete
 track: local
 depends_on:
   - specs/local/spec-document-model/spec-model-types.md
@@ -82,3 +82,9 @@ Use `t.TempDir()` to create test directory structures with small spec files.
 - Do NOT implement validation rules.
 - Do NOT implement progress tracking or impact analysis.
 - Do NOT skip files that fail to parse — collect parse errors and return them alongside the tree.
+
+## Implementation notes
+
+- **Type names avoid stutter**: `SpecNode` -> `Node`, `SpecTree` -> `Tree` (consistent with model.go deviation). Methods `Node()` renamed to `NodeAt()` to avoid collision with the type name.
+- **`Tree.Errs` field added**: Parse errors are collected in `Tree.Errs` as specified in the boundaries ("collect parse errors and return them alongside the tree").
+- **Orphan directory children**: When an orphan directory is found (no matching `.md`), its children are scanned and attached to the orphan's parent rather than being lost. Their depth matches what it would be if the orphan `.md` existed.
