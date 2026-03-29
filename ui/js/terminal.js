@@ -87,33 +87,37 @@ function initTerminal() {
   }
 
   // Wire the "+" button to the tab-add callback.
+  // Prevent mousedown from stealing focus from xterm.
   var addBtn = document.getElementById("terminal-tab-add");
   if (addBtn) {
+    addBtn.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+    });
     addBtn.addEventListener("click", function () {
       _onTabAdd();
     });
   }
 
   // Wire tab callbacks to send WebSocket session messages.
-  // Each callback refocuses xterm after sending, since clicking a tab/button
-  // moves browser focus away from xterm's internal textarea.
+  // Each callback defers _term.focus() to the next frame so the browser's
+  // click-focus handling finishes first and our focus call wins.
   setTabClickHandler(function (id) {
     if (_termWs && _termWs.readyState === WebSocket.OPEN) {
       _termWs.send(JSON.stringify({ type: "switch_session", session: id }));
     }
-    if (_term) _term.focus();
+    _deferTermFocus();
   });
   setTabCloseHandler(function (id) {
     if (_termWs && _termWs.readyState === WebSocket.OPEN) {
       _termWs.send(JSON.stringify({ type: "close_session", session: id }));
     }
-    if (_term) _term.focus();
+    _deferTermFocus();
   });
   setTabAddHandler(function () {
     if (_termWs && _termWs.readyState === WebSocket.OPEN) {
       _termWs.send(JSON.stringify({ type: "create_session" }));
     }
-    if (_term) _term.focus();
+    _deferTermFocus();
   });
 
   // Intercept Cmd+Backspace on macOS and send Ctrl+U (kill line backward).
@@ -303,6 +307,12 @@ function _scheduleReconnect() {
   }, _termReconnectDelay);
 }
 
+function _deferTermFocus() {
+  setTimeout(function () {
+    if (_term) _term.focus();
+  }, 0);
+}
+
 function _hideTermPanel() {
   var panel = document.getElementById("status-bar-panel");
   var handle = document.getElementById("status-bar-panel-resize");
@@ -351,7 +361,7 @@ function _handleSessionsList(sessions) {
       activateTerminalTab(s.id);
     }
   }
-  if (_term && _activeSessionId) _term.focus();
+  if (_activeSessionId) _deferTermFocus();
 }
 
 function _handleSessionSwitched(id) {
@@ -366,7 +376,7 @@ function _handleSessionSwitched(id) {
         _term.write(buf[i]);
       }
     }
-    _term.focus();
+    _deferTermFocus();
   }
 }
 
@@ -405,6 +415,10 @@ function addTerminalTab(sessionId, label) {
   tab.className = "terminal-tab";
   tab.setAttribute("data-session-id", sessionId);
   tab.setAttribute("aria-selected", "false");
+  // Prevent tab clicks from stealing focus from xterm.
+  tab.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+  });
 
   var labelSpan = document.createElement("span");
   labelSpan.className = "terminal-tab__label";
