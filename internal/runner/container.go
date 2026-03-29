@@ -109,9 +109,11 @@ func (r *Runner) buildContainerSpecForSandbox(
 	}
 
 	// Mount workspaces, substituting per-task worktree paths where available.
+	// Read under storeMu to avoid racing with applyWorkspaceSnapshot.
+	workspaces := r.currentWorkspaces()
 	var basenames []string
-	if len(r.workspaces) > 0 {
-		for _, ws := range r.workspaces {
+	if len(workspaces) > 0 {
+		for _, ws := range workspaces {
 			ws = strings.TrimSpace(ws)
 			if ws == "" {
 				continue
@@ -214,14 +216,15 @@ func instructionsFilenameForSandbox(sb sandbox.Type) string {
 // It is a no-op when instructionsPath is empty or does not exist on the host.
 // Both buildContainerArgsForSandbox and buildIdeationContainerArgs share this logic.
 func (r *Runner) appendInstructionsMount(volumes []sandbox.VolumeMount, sb sandbox.Type) []sandbox.VolumeMount {
-	if r.instructionsPath == "" {
+	instrPath := r.currentInstructionsPath()
+	if instrPath == "" {
 		return volumes
 	}
-	if _, err := os.Stat(r.instructionsPath); err != nil {
+	if _, err := os.Stat(instrPath); err != nil {
 		return volumes
 	}
 	return append(volumes, sandbox.VolumeMount{
-		Host:      r.instructionsPath,
+		Host:      instrPath,
 		Container: "/workspace/" + instructionsFilenameForSandbox(sb),
 		Options:   mountOpts("z", "ro"),
 	})

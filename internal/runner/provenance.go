@@ -46,8 +46,9 @@ func (r *Runner) captureExecutionEnvironment(task store.Task) store.ExecutionEnv
 	}
 
 	// Instructions hash: SHA-256 of the workspace CLAUDE.md file content.
-	if r.instructionsPath != "" {
-		data, err := os.ReadFile(r.instructionsPath)
+	instrPath := r.currentInstructionsPath()
+	if instrPath != "" {
+		data, err := os.ReadFile(instrPath)
 		if err == nil {
 			sum := sha256.Sum256(data)
 			env.InstructionsHash = hex.EncodeToString(sum[:])

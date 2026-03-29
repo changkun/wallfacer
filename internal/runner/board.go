@@ -138,8 +138,9 @@ func (r *Runner) generateBoardContextAndMounts(selfTaskID uuid.UUID, mountWorktr
 	}
 	// If the self task has no worktrees (e.g. backlog), fall back to the
 	// runner's configured workspace list so board context is still useful.
-	if selfWorkspaces.Len() == 0 && len(r.workspaces) > 0 {
-		for _, ws := range r.workspaces {
+	workspaces := r.currentWorkspaces()
+	if selfWorkspaces.Len() == 0 && len(workspaces) > 0 {
+		for _, ws := range workspaces {
 			ws = strings.TrimSpace(ws)
 			if ws != "" {
 				selfWorkspaces.Add(ws)

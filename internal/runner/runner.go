@@ -445,6 +445,25 @@ func (r *Runner) currentWSKey() string {
 	return r.wsKey
 }
 
+// currentWorkspaces returns the runner's workspace paths under a read lock.
+// The slice may change when workspaces are switched at runtime via
+// applyWorkspaceSnapshot, so callers outside storeMu must use this accessor
+// instead of reading r.workspaces directly.
+func (r *Runner) currentWorkspaces() []string {
+	r.storeMu.RLock()
+	defer r.storeMu.RUnlock()
+	return r.workspaces
+}
+
+// currentInstructionsPath returns the runner's instructions file path under
+// a read lock. Like currentWorkspaces, this is updated by
+// applyWorkspaceSnapshot and must not be read without the lock.
+func (r *Runner) currentInstructionsPath() string {
+	r.storeMu.RLock()
+	defer r.storeMu.RUnlock()
+	return r.instructionsPath
+}
+
 // taskStore returns the store for the workspace group that owns the given task.
 // It first checks the task-to-group mapping, then falls back to the currently
 // viewed store if the mapping is missing or the group is no longer active.
@@ -583,7 +602,7 @@ func (r *Runner) InstructionsPath() string {
 	if r.workspaceManager != nil {
 		return r.workspaceManager.InstructionsPath()
 	}
-	return r.instructionsPath
+	return r.currentInstructionsPath()
 }
 
 // Prompts returns the prompt template Manager used by this runner.
@@ -641,14 +660,18 @@ func (r *Runner) HostCodexAuthStatus(now time.Time) (bool, string) {
 }
 
 // Workspaces returns the list of configured workspace paths.
+// When a workspace manager is present, it delegates to the manager (which
+// has its own lock). Otherwise it reads the runner's field under storeMu
+// to avoid racing with applyWorkspaceSnapshot.
 func (r *Runner) Workspaces() []string {
 	if r.workspaceManager != nil {
 		return r.workspaceManager.Workspaces()
 	}
-	if len(r.workspaces) == 0 {
+	ws := r.currentWorkspaces()
+	if len(ws) == 0 {
 		return nil
 	}
-	return r.workspaces
+	return ws
 }
 
 // hostCodexAuthPath validates and returns the host Codex auth cache directory

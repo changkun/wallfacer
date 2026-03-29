@@ -490,6 +490,102 @@ func TestBuildContainerArgs_SiblingMounts(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Data race regression: workspace mounts survive concurrent snapshot updates
+// ---------------------------------------------------------------------------
+
+// TestBuildContainerArgs_WorkspaceMountsAfterSnapshotUpdate verifies that
+// buildContainerArgs always sees the current workspace list, even when
+// applyWorkspaceSnapshot is called concurrently. Before the fix, the
+// container spec builder read r.workspaces without storeMu, which could
+// produce zero workspace mounts during a workspace switch.
+func TestBuildContainerArgs_WorkspaceMountsAfterSnapshotUpdate(t *testing.T) {
+	ws1 := t.TempDir()
+	ws2 := t.TempDir()
+	instructionsFile := filepath.Join(t.TempDir(), "instructions.md")
+	if err := os.WriteFile(instructionsFile, []byte("# test\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dataDir := t.TempDir()
+	s, err := store.NewFileStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	// Start with ws1 only.
+	runner := NewRunner(s, RunnerConfig{
+		Command:          "podman",
+		SandboxImage:     "wallfacer:latest",
+		InstructionsPath: instructionsFile,
+		Workspaces:       []string{ws1},
+	})
+	t.Cleanup(func() { runner.Shutdown() })
+
+	// Concurrently update workspace snapshot while building container args.
+	// Without the fix (unprotected r.workspaces read), the race detector
+	// would flag this and the args could sporadically miss workspace mounts.
+	dataDir2 := t.TempDir()
+	s2, err := store.NewFileStore(dataDir2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s2.Close() })
+
+	var wg sync.WaitGroup
+	const iterations = 50
+
+	// Writer: repeatedly switch between workspace sets.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := range iterations {
+			if i%2 == 0 {
+				runner.applyWorkspaceSnapshot(workspace.Snapshot{
+					Store:            s2,
+					Key:              "two-ws",
+					Workspaces:       []string{ws1, ws2},
+					InstructionsPath: instructionsFile,
+				})
+			} else {
+				runner.applyWorkspaceSnapshot(workspace.Snapshot{
+					Store:            s,
+					Key:              "one-ws",
+					Workspaces:       []string{ws1},
+					InstructionsPath: instructionsFile,
+				})
+			}
+		}
+	}()
+
+	// Reader: build container args and verify workspace mounts are never empty.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for range iterations {
+			args := runner.buildContainerArgs("test", "", "prompt", "", nil, "", nil, "")
+
+			// Count workspace mounts by looking for /workspace/<basename> patterns.
+			mountCount := 0
+			for _, a := range args {
+				if strings.HasPrefix(a, "type=bind,") && strings.Contains(a, "dst=/workspace/") {
+					// Exclude /workspace/CLAUDE.md — that's the instructions mount.
+					if !strings.Contains(a, "CLAUDE.md") && !strings.Contains(a, ".tasks") {
+						mountCount++
+					}
+				}
+			}
+			if mountCount == 0 {
+				t.Errorf("container args have zero workspace mounts; args: %v", args)
+				return
+			}
+		}
+	}()
+
+	wg.Wait()
+}
+
+// ---------------------------------------------------------------------------
 // Worktree management
 // ---------------------------------------------------------------------------
 

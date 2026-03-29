@@ -301,9 +301,10 @@ func (r *Runner) buildIdeationContainerSpec(containerName, prompt string, sb san
 	model := r.modelFromEnvForSandbox(sb)
 	spec := r.buildBaseContainerSpec(containerName, model, sb)
 
+	workspaces := r.currentWorkspaces()
 	var basenames []string
-	if len(r.workspaces) > 0 {
-		for _, ws := range r.workspaces {
+	if len(workspaces) > 0 {
+		for _, ws := range workspaces {
 			ws = strings.TrimSpace(ws)
 			if ws == "" {
 				continue

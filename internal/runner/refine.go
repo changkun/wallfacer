@@ -121,9 +121,10 @@ func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, mod
 	})
 	spec.Volumes = r.appendCodexAuthMount(spec.Volumes, sb)
 
+	workspaces := r.currentWorkspaces()
 	var basenames []string
-	if len(r.workspaces) > 0 {
-		for _, ws := range r.workspaces {
+	if len(workspaces) > 0 {
+		for _, ws := range workspaces {
 			ws = strings.TrimSpace(ws)
 			if ws == "" {
 				continue
@@ -139,10 +140,11 @@ func (r *Runner) buildRefinementContainerSpec(containerName, taskID, prompt, mod
 		}
 	}
 
-	if r.instructionsPath != "" {
-		if _, err := os.Stat(r.instructionsPath); err == nil {
+	instrPath := r.currentInstructionsPath()
+	if instrPath != "" {
+		if _, err := os.Stat(instrPath); err == nil {
 			spec.Volumes = append(spec.Volumes, sandbox.VolumeMount{
-				Host:      r.instructionsPath,
+				Host:      instrPath,
 				Container: "/workspace/" + instructionsFilenameForSandbox(sb),
 				Options:   mountOpts("z", "ro"),
 			})

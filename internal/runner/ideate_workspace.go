@@ -520,7 +520,7 @@ func (r *Runner) runWorkspaceGitCommand(parentCtx context.Context, workspace str
 // configured on the runner.
 func (r *Runner) workspacesForRunner() []string {
 	var ws []string
-	for _, raw := range r.workspaces {
+	for _, raw := range r.currentWorkspaces() {
 		clean := strings.TrimSpace(raw)
 		if clean == "" {
 			continue
