@@ -401,7 +401,7 @@ Replace placeholder sprites with LimeZu art assets.
 | 6 | [Pathfinding](pixel-agents/task-06-pathfinding.md) | 2 | Small | Done |
 | 7 | [Character state machine and animation](pixel-agents/task-07-character-state-machine.md) | 3, 6 | Medium | Done |
 | 8 | [CharacterManager and desk persistence](pixel-agents/task-08-character-manager.md) | 2, 7 | Medium | Done |
-| 9 | [SSE task state integration](pixel-agents/task-09-sse-integration.md) | 5, 8 | Medium | Todo |
+| 9 | [SSE task state integration](pixel-agents/task-09-sse-integration.md) | 5, 8 | Medium | Done |
 | 10 | [Spawn and despawn effects](pixel-agents/task-10-spawn-despawn-effects.md) | 7 | Small | Todo |
 | 11 | [Speech bubbles](pixel-agents/task-11-speech-bubbles.md) | 7 | Small | Todo |
 | 12 | [Interaction and modal integration](pixel-agents/task-12-interaction.md) | 5, 8 | Medium | Todo |
