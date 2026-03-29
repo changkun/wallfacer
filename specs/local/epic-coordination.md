@@ -257,6 +257,367 @@ This gives the agent a compact overview ("I'm in phase 2 of 4, phase 1 is fully 
 
 ---
 
+## Spec Document Model
+
+Specs are the primary planning artifacts in Wallfacer. This section formalizes their properties, lifecycle, layering, and cross-spec consistency guarantees.
+
+### Spec Properties
+
+Every spec document (design spec or implementation task spec) carries structured frontmatter. Derived from real usage patterns in `specs/local/desktop-app/` and `specs/foundations/file-explorer/`:
+
+**Design spec properties:**
+
+```yaml
+---
+title: Sandbox Backends
+status: validated          # vague | drafted | validated | implementing | complete | stale
+track: foundations         # foundations | local | cloud | shared
+depends_on:                # list of spec slugs this spec requires
+  - storage-backends
+blocks:                    # specs that cannot proceed until this is complete
+  - container-reuse
+  - k8s-sandbox
+effort: large              # small | medium | large | xlarge
+created: 2026-01-15
+updated: 2026-03-28
+author: changkun
+implementation_spec_dir: specs/foundations/sandbox-backends/  # path to task specs (if any)
+---
+```
+
+**Implementation task spec properties:**
+
+```yaml
+---
+title: "Define SandboxBackend interface"
+status: done               # draft | ready | dispatched | done | stale
+parent_spec: specs/foundations/sandbox-backends.md
+phase: 1
+depends_on:                # task spec slugs within the same parent
+  - []
+effort: small              # small | medium | large
+created: 2026-02-10
+updated: 2026-03-01
+dispatched_task_id: null   # UUID of the kanban task, set when dispatched
+---
+```
+
+**Property semantics:**
+
+| Property | Design spec | Task spec | Purpose |
+|----------|-------------|-----------|---------|
+| `status` | Lifecycle state (see below) | Task-level state | Tracks progress at appropriate granularity |
+| `depends_on` | Other design specs by slug | Sibling task specs | Ordering and blocking |
+| `blocks` | Downstream specs | — | Impact propagation (drift detection) |
+| `effort` | T-shirt size for the whole spec | T-shirt size for one task | Planning and capacity estimation |
+| `created` / `updated` | When written / last modified | When written / last modified | Staleness detection |
+| `parent_spec` | — | Link to design spec | Traceability from task to motivation |
+| `dispatched_task_id` | — | UUID link to kanban board | Connects spec world to execution world |
+
+### Spec Lifecycle
+
+A spec's state has **two independent dimensions**: design maturity (how well-understood the design is) and implementation progress (how much has been built). These are orthogonal — a spec can be `validated` in design while its implementation is `not_started`, or `implementing` while the design has gone `stale` due to upstream changes.
+
+#### Dimension 1: Design Maturity
+
+```
+                  ┌──────────┐
+                  │          │
+                  ▼          │
+vague ──▶ drafted ──▶ validated ──▶ complete
+            │          │    ▲          │
+            │          │    │          │
+            ▼          ▼    │          ▼
+          stale      stale  └───── stale
+```
+
+| State | Meaning | Transitions |
+|-------|---------|-------------|
+| **vague** | Initial idea. Problem statement exists but design is incomplete or hand-wavy. No implementation tasks defined. | → `drafted` (design details added) |
+| **drafted** | Design is written with enough detail for review: motivation, high-level approach, key decisions, UX sketches. May still have open questions. | → `validated` (reviewed and approved for implementation) · → `stale` (superseded or abandoned) |
+| **validated** | Design is reviewed, approved, and ready for implementation task decomposition. Open questions resolved. Cross-spec impacts assessed. | → `complete` (all tasks done, design matches reality) · → `stale` (invalidated by external change or implementation delta) |
+| **complete** | All implementation tasks are done. The spec has been updated to describe what was *actually* built, not just what was *planned*. | → `stale` (if a later spec modifies the interfaces this spec established) |
+| **stale** | The spec's design no longer matches reality. Either the codebase has diverged, a dependency changed, or implementation revealed a significant delta from the design. Requires human review before being trusted. | → `drafted` (refreshed with current state) · → `validated` (re-validated after review) |
+
+#### Dimension 2: Implementation State
+
+| State | Meaning |
+|-------|---------|
+| **not_started** | No task specs dispatched. Design may still be in progress. |
+| **in_progress** | At least one task spec dispatched to the kanban board. Execution underway. |
+| **done** | All task specs completed and verified (gate passed). |
+
+These two dimensions combine in a matrix:
+
+```
+                    not_started     in_progress      done
+                 ┌───────────────┬────────────────┬────────────┐
+  vague          │ typical start │ —              │ —          │
+  drafted        │ design phase  │ premature      │ —          │
+  validated      │ ready to go   │ normal exec    │ wrapping up│
+  complete       │ —             │ —              │ finished   │
+  stale          │ needs review  │ ⚠ exec on      │ ⚠ done but │
+                 │               │   stale design │   drifted  │
+                 └───────────────┴────────────────┴────────────┘
+```
+
+The dangerous cell is `stale × in_progress`: tasks are executing against a design that no longer matches reality. The system should surface this prominently (see Drift Detection).
+
+#### Stale: the critical state
+
+`stale` is the most important state in the model because it's the one that catches real problems:
+
+- A spec that was `validated` but then an upstream dependency changed its interfaces → `stale`
+- A spec that was `complete` but a later spec modified the code it describes → `stale`
+- A spec where implementation diverged significantly from the design → `stale`
+
+**Stale granularity** is an open design question:
+
+| Granularity | Pros | Cons |
+|-------------|------|------|
+| **Whole spec** | Simple to implement and reason about. One badge, one action needed. | Information loss — the user doesn't know *which part* is stale. May trigger unnecessary re-review of sections that are fine. |
+| **Per-section** | Precise — "the interface section is stale but the UX section is fine." Lets the user focus review effort. | Requires parsing spec structure, maintaining section-level checksums or mappings. Higher maintenance cost. |
+| **Per-assertion** | Most precise — "the assumption that `Launch()` returns synchronously is stale." | Impractical to automate. Requires semantic understanding of natural language claims. |
+
+**Recommended approach:** Start with whole-spec staleness (mark the entire document). Add per-section granularity later if the number of specs grows large enough that whole-spec review becomes burdensome. Per-assertion granularity is deferred to model capability improvements.
+
+#### Lifecycle rules
+
+- A spec should not enter `in_progress` implementation without its design being `validated`. This prevents executing against a half-baked design. The system enforces this by blocking task dispatch from specs that are `vague` or `drafted`.
+- When a spec's implementation reaches `done`, the design dimension should transition to `complete` — but only after the spec document is updated to reflect what was actually built (not just what was planned). If there's a significant delta, the spec goes to `stale` first.
+- `stale` is not a dead end — it signals "this document needs human attention before being trusted."
+- A `stale × in_progress` combination triggers a prominent warning in both the spec explorer and the epic progress panel.
+
+### Operation Regimes
+
+Not all specs need the same level of human involvement. The system supports two operation regimes, determined by the **certainty level** of the design — not by who physically writes the text.
+
+| Regime | Certainty | Human role | Agent role | Transition signal |
+|--------|-----------|------------|------------|-------------------|
+| **Human-driven** | Low. The idea is vague, the approach is uncertain, there are open design questions. | Idea provider + steering. Gives fuzzy directives ("I want something like X"), reviews agent output, clarifies ambiguity, makes judgment calls. | Expander + structurer. Takes vague input, proposes structure, drafts sections, asks clarifying questions. | Design maturity reaches `validated` |
+| **Agent-driven** | High. The design is clear, acceptance criteria are defined, interfaces are specified. | Reviewer. Monitors execution, provides feedback on waiting tasks, intervenes when drift is detected. | Executor. Decomposes validated spec into tasks, executes them, reports results. | Manual override, or design goes `stale` (drops back to human-driven) |
+
+**Key insight:** Even in the human-driven regime, the human is not writing specs line-by-line. The human provides ideas and direction; the agent drafts, structures, and expands. The difference is the *frequency of human steering* — in human-driven mode, the agent proposes and the human accepts/rejects/redirects at every step. In agent-driven mode, the human approves once and monitors.
+
+**Regime transitions:**
+
+```
+Human-driven ──▶ Agent-driven
+  when: spec reaches "validated" and human explicitly approves for execution
+  signal: human clicks "Approve for implementation" or dispatches first task
+
+Agent-driven ──▶ Human-driven
+  when: drift detected, or execution reveals the design was wrong
+  signal: spec goes stale, or human manually pauses the epic
+```
+
+The regime is not a hard system mode — it's an emergent property of how the human and agent interact. But the system can infer it from spec maturity state and surface appropriate UX: in human-driven mode, the chat stream is primary; in agent-driven mode, the board and progress panel are primary.
+
+**Open question:** Whether a third intermediate regime is needed (e.g., "supervised execution" where the agent executes but pauses for human approval at each phase gate). Currently the per-phase approval mechanism in P3/Stage 3 effectively provides this, so it may not need a separate regime label.
+
+### Two-Layer Document Model
+
+Specs operate at two abstraction layers that serve different audiences and evolve at different rates:
+
+| Layer | Document type | Focus | Content | Audience | Lifecycle |
+|-------|--------------|-------|---------|----------|-----------|
+| **Design** | `specs/<track>/<name>.md` | Strategy, motivation, architecture | Why we're building this, problem statement, design decisions, UX, cross-cutting concerns, risk areas | Human planner | vague → drafted → validated → complete |
+| **Implementation** | `specs/<track>/<name>/task-NN-<slug>.md` | Concrete execution steps | Which files to change, functions to add, acceptance criteria, test plan, dependency wiring | Agent executor | draft → ready → dispatched → done |
+
+**Relationship between layers:**
+
+```
+Design Spec                          Implementation Task Specs
+┌─────────────────────────┐          ┌──────────────────────────────┐
+│ sandbox-backends.md      │          │ sandbox-backends/             │
+│                          │  breaks  │   task-01-define-interface.md │
+│ ## Problem               │  down    │   task-02-local-backend.md   │
+│ ## Design                │ ──────▶  │   task-03-refactor-runner.md │
+│ ## UX                    │          │   task-04-move-listing.md    │
+│ ## Cross-Cutting         │          │   task-05-retire-executor.md │
+│                          │  feeds   │   task-06-gate-verify.md     │
+│ (updated with impl notes)│ ◀──────  │   (completion notes)         │
+└─────────────────────────┘          └──────────────────────────────┘
+```
+
+- **Break down** (design → implementation): The planner agent or human decomposes a design spec into task specs. Each task spec references its `parent_spec`. The design spec's `implementation_spec_dir` points to the task spec directory.
+- **Feed back** (implementation → design): When task execution reveals unexpected constraints (e.g., an interface needs an extra method), the design spec is updated with implementation notes. This keeps the design spec as a living record of what was *actually* built, not just what was *planned*.
+
+**Conventions for task spec files:**
+
+Task specs live in a subdirectory named after their parent design spec. Files are named `task-NN-<slug>.md` where NN is a sequence number for reading order (not execution order — execution order is determined by `depends_on`). This matches the existing convention in `specs/local/desktop-app/` and `specs/foundations/file-explorer/`.
+
+#### Spec Relationship Graph: Tree vs DAG
+
+The parent-child relationship between design specs and their task specs forms a tree. But design specs relate to *each other* via `depends_on` and `blocks` edges, forming a **DAG** (directed acyclic graph).
+
+```
+                    Design Spec DAG
+    ┌─────────────────┐        ┌─────────────────┐
+    │ sandbox-backends │───────▶│ container-reuse  │
+    └────────┬────────┘        └────────┬────────┘
+             │ breaks down               │ breaks down
+    ┌────────┴────────┐        ┌────────┴────────┐
+    │ task-01-iface   │        │ task-01-workers  │
+    │ task-02-local   │        │ task-02-pool     │
+    │ task-03-runner  │        └─────────────────┘
+    └─────────────────┘
+         │
+         │ cross-spec impact: task-03 changed
+         │ board.go, which container-reuse assumes
+         ▼
+    container-reuse goes stale
+```
+
+**Why this matters for drift propagation:** In a strict tree, drift only flows parent ↔ child. In the DAG, drift propagates across `blocks` edges between design specs. When `sandbox-backends` completes and its implementation differs from the plan, `container-reuse` (which depends on it) needs to be checked — even though they're siblings, not parent-child.
+
+**Bidirectional propagation within the tree:**
+
+- **Downward** (design → tasks): Parent spec modified → child task specs may be invalidated. If the parent's interface section changes, task specs that reference those interfaces become stale.
+- **Upward** (tasks → design): Task execution reveals unexpected constraints → parent spec should be updated. If three out of five tasks needed extra methods on the interface, the design spec's interface description is wrong and should be corrected.
+
+**Forward propagation across the DAG:**
+
+- **Through `blocks` edges**: Completed spec A's actual implementation differs from spec B's assumptions (where B depends on A) → B goes stale.
+
+**Open question:** Can a task spec belong to multiple design specs? In practice this is rare (a task usually serves one purpose), but cross-cutting implementation work (e.g., "add metrics to all handlers") could span multiple epics. The current model doesn't support this — a task spec has one `parent_spec`. If needed, the workaround is to create a separate cross-cutting design spec that owns the cross-cutting tasks.
+
+### Drift Detection and Propagation
+
+When implementing a spec reveals divergence from the original design — or when a completed spec's interfaces are modified by a later spec — the system needs to detect and surface this.
+
+#### What is drift?
+
+Drift occurs when the actual state of the codebase no longer matches what a spec describes. Three categories:
+
+| Drift type | Cause | Example |
+|------------|-------|---------|
+| **Implementation drift** | Task execution diverges from its task spec | Task spec says "add 3 methods to SandboxBackend", but the agent added 4 because it discovered a missing capability |
+| **Design drift** | Completed implementation doesn't match the design spec | Design spec describes a two-method interface, but implementation needed five methods |
+| **Cascade drift** | A downstream spec's assumptions are invalidated by an upstream spec's implementation | `container-reuse.md` assumes `SandboxBackend.Launch()` returns a handle synchronously, but the actual implementation returns a channel |
+
+#### Detection mechanisms
+
+**1. Post-task drift check (automatic)**
+
+When a task reaches `done`, the system compares the task's diff against its task spec:
+
+- Extract the file list from the task spec's "What to do" section
+- Compare against the files actually modified (from `git diff`)
+- Flag discrepancies: files modified that weren't mentioned, files mentioned that weren't touched, significantly more changes than expected
+
+This produces a **drift report** stored alongside the task's oversight summary. The drift report is informational — it surfaces in the epic progress panel as a warning icon (⚠) but does not block execution.
+
+```
+Drift Report — task-03-refactor-runner
+  Expected files: runner.go, execute.go, container.go (3 files)
+  Actual files:   runner.go, execute.go, container.go, board.go, models.go (5 files)
+  Unexpected:     board.go (board context generation changed), models.go (new field added)
+  Assessment:     Moderate drift — 2 unexpected files touched
+```
+
+**2. Cross-spec impact analysis (on completion)**
+
+When a design spec enters `complete`, scan its `blocks` list. For each downstream spec:
+
+- Check if the downstream spec references interfaces, types, or behaviors defined by the completed spec
+- Compare the completed spec's actual implementation (from task results and current codebase) against the downstream spec's assumptions
+- If assumptions are invalidated, mark the downstream spec as potentially stale
+
+This is a lightweight heuristic, not a proof — it surfaces candidates for human review rather than making automated decisions.
+
+**3. Staleness detection (periodic)**
+
+A background check (triggered on workspace load or manually via the spec explorer) scans all `complete` specs:
+
+- For each spec, check if the files it describes have been modified since `updated`
+- If significant changes are detected (via `git log --since`), flag the spec as a staleness candidate
+- Surface in the spec explorer with a stale indicator badge
+
+#### Propagation chain
+
+When drift is detected, the system propagates awareness through the dependency graph:
+
+```
+sandbox-backends.md (complete, drift detected)
+  │
+  ├─ blocks: container-reuse.md (validated)
+  │    → Mark as "upstream drift" — banner: "sandbox-backends changed,
+  │      review assumptions before implementing"
+  │
+  └─ blocks: k8s-sandbox.md (drafted)
+       → Mark as "upstream drift" — same banner
+```
+
+**Propagation rules:**
+
+- Drift warnings propagate forward through `blocks` edges only (not backward through `depends_on`)
+- A `complete` spec with drift triggers warnings on all specs that list it in `depends_on`
+- Warnings are advisory — they appear in the spec explorer and epic progress panel but do not block task dispatch
+- A human must explicitly acknowledge drift (by updating the affected spec or dismissing the warning) before the warning clears
+- When a human updates a downstream spec to account for upstream drift, the warning clears and the downstream spec's `updated` timestamp advances
+
+**UI for drift:**
+
+In the spec explorer:
+```
+specs/
+  ✅ sandbox-backends.md          ⚠ drift detected
+  ✅ storage-backends.md
+  ⏳ container-reuse.md           ⚠ upstream drift (sandbox-backends)
+  📝 k8s-sandbox.md               ⚠ upstream drift (sandbox-backends)
+  📝 epic-coordination.md
+```
+
+Status icons: ✅ complete, ⏳ implementing, ✔ validated, 📝 drafted, 💭 vague, ⚠ stale
+
+In the epic progress panel, drift warnings appear as a section within the phase card:
+
+```
+── Phase 1: Interface Extraction ──    5/7 tasks done
+⚠ Drift: task-03-refactor-runner modified 2 unexpected files (board.go, models.go)
+⚠ Downstream impact: container-reuse.md may need review
+```
+
+#### Implementation
+
+| File | Change |
+|---|---|
+| `internal/runner/drift.go` (new) | `CheckTaskDrift(taskID)` — compare task spec expectations vs actual diff; `CheckSpecStaleness(specPath)` — git log check |
+| `internal/store/` | `SaveDriftReport(taskID, report)` / `GetDriftReport(taskID)` |
+| `internal/handler/explorer.go` | Extend tree listing to parse spec frontmatter, surface status and drift badges |
+| `prompts/drift.tmpl` (new) | System prompt for the drift analysis agent (optional: use an agent to assess semantic drift beyond file-list comparison) |
+
+#### Codebase Index Strategy for Drift Detection
+
+Drift detection requires understanding whether code changes semantically affect a spec's assumptions — not just whether files were modified. Three approaches, in order of infrastructure investment:
+
+| Approach | Description | Pros | Cons |
+|----------|-------------|------|------|
+| **A: Full dump** | Dump file tree + file summaries into agent context. Agent does semantic comparison. | Simple to implement. No new infrastructure. | Doesn't scale. Most info is noise for any given spec. Context window waste. |
+| **B: Two-layer index** | Layer 1: static structural index (file tree + module responsibility summaries), incrementally updated after each task. Layer 2: spec-to-code mapping (`affects: [internal/sandbox/, internal/runner/execute.go]` in spec frontmatter). Drift detection follows layer 2 edges. | Precise. Enables targeted checks. Spec-to-code mapping is useful beyond drift (impact analysis, spec navigation). | Requires building and maintaining index infrastructure. Layer 1 needs update logic. |
+| **C: Model capability** | With 1M+ context windows, feed the agent the full spec + all relevant source files and let it assess drift semantically. No custom index. | Zero infrastructure. Leverages improving model capability. Quality improves automatically as models improve. | Expensive per invocation. May hit context limits on very large codebases. Relies on model quality for correctness. |
+
+**Current recommendation:** Start with approach C for drift *assessment* (the agent reads spec + affected files and judges whether drift is meaningful). Add approach B's layer 2 (spec-to-code mapping via `affects` field in frontmatter) regardless — it's cheap to maintain and valuable for multiple purposes:
+
+```yaml
+---
+title: Sandbox Backends
+affects:                    # packages and files this spec describes
+  - internal/sandbox/
+  - internal/runner/execute.go
+  - internal/runner/container.go
+---
+```
+
+The `affects` field serves as the "edge" for targeted drift checks: when a task modifies files listed in another spec's `affects`, that spec is a candidate for staleness review. This is the minimal index that makes drift detection tractable without building full infrastructure.
+
+**Bootstrap strategy:** At current scale (~20 specs, ~140K LOC), `affects` fields can be populated manually. As spec count grows, the planner agent can propose `affects` values during spec creation, and the system can validate them against actual task diffs.
+
+**Deferred:** Layer 1 of approach B (structural index with module summaries). This becomes valuable when the codebase exceeds what a model can hold in context, but at current scale approach C is sufficient.
+
+---
+
 ## Implementation Order
 
 Each phase is independently shippable:
@@ -696,14 +1057,9 @@ The agent parses this format to extract tasks for board creation and updates che
 
 #### Two-Layer Document Model: Specs vs Task Specs
 
-Specs and the tasks derived from them serve different purposes and should live at different abstraction levels:
+See **[Spec Document Model → Two-Layer Document Model](#two-layer-document-model)** for the formal definition of the two layers, their properties, lifecycle states, and the conventions for task spec files.
 
-| Layer | Focus | Content | Audience |
-|-------|-------|---------|----------|
-| **Spec** (strategy) | Vision, goals, constraints, architecture decisions | Why we're building this, what success looks like, key design choices, cross-cutting concerns, risk areas | Human planner |
-| **Task spec** (implementation) | Concrete implementation steps | Which files to change, what functions to add, acceptance criteria, test plan, dependency wiring | Agent executor |
-
-A spec like `01-sandbox-backends.md` says *"extract a `SandboxBackend` interface so we can swap container runtimes"* — it explains the motivation, the interface shape, and the migration strategy. A task spec derived from it says *"create `internal/sandbox/backend.go` with `Launch`, `ListContainers`, `Stop` methods; ensure backward compat with existing `os/exec` path; add tests in `backend_test.go`"* — it's an actionable work order.
+In short: a design spec (`specs/<track>/<name>.md`) captures strategy and motivation; implementation task specs (`specs/<track>/<name>/task-NN-<slug>.md`) capture concrete execution steps. The design spec feeds downward via decomposition; task completion feeds back upward via implementation notes and drift detection.
 
 **The UI should support decomposition as a first-class operation:**
 
@@ -997,7 +1353,7 @@ Here's how a human drives the cloud move using this system:
    └─ Each milestone builds on the stable foundation of completed milestones
 ```
 
-The human's role is **editorial, not operational**: they write specs, review plans, provide directional feedback, and decide when to proceed. The system handles decomposition, scheduling, execution, and verification.
+The human's role is **idea provider and steering**, not spec writer or operator. The human describes what they want; the system (via agents) drafts, structures, and decomposes. The human reviews, redirects, and approves. The system handles scheduling, execution, and verification. Specs are the system's intermediate representation — visible and editable by the human, but not produced by them.
 
 ---
 
@@ -1094,3 +1450,163 @@ This means the file explorer panel from [file-explorer.md](../foundations/file-e
 The envisioned workflow: the user opens a spec in the focused markdown view, iterates on it via a chat stream (the planner agent proposes changes, the user reviews in the markdown view), then breaks the finalized spec into kanban tasks that appear in the existing board. The spec file itself gets updated as tasks execute and reveal new information — closing the loop between planning and execution.
 
 **Implementation order:** File explorer Phase 1 (read-only) → Epic coordination P1-P2 (planner + board context) → File explorer Phase 2 (editing) → Epic coordination UX (chat-driven spec iteration).
+
+---
+
+## Design Philosophy: Spec-Centric, Not Spec-Writing
+
+A critical distinction: the system is **spec-centric** (specs are the central organizing artifact) but **not spec-writing** (the human is not expected to write specs). The human's role is idea provider and steering; the agent drafts, structures, and iterates on specs based on the human's direction.
+
+This means:
+- The user never faces a blank spec template. They describe an idea in natural language, and the agent proposes a structured spec.
+- The spec is the system's **intermediate representation** — a shared artifact that both human and agent can read, understand, and modify.
+- The spec is visible and editable by the human, but the human is not responsible for producing it from scratch.
+
+**Comparison with spec-writing tools:** Tools like Kiro require the user to write specs in a prescribed format. Wallfacer inverts this — the user provides ideas, the system produces specs. The user's cognitive load is review and steering, not authoring.
+
+**Trust and familiarity tension:** If the human doesn't write the spec, they have lower familiarity with its contents. But the spec still serves as the "design document" that the human needs to understand and trust before approving execution. This creates a tension:
+
+- **Lower authorship** → lower familiarity → harder to review
+- **Structured format** → easier to scan → partially compensates
+- **Iterative chat refinement** → human steers the content → builds familiarity through dialogue rather than writing
+
+The system mitigates this by making spec review an active dialogue (the chat stream) rather than passive reading. The human doesn't read a 500-line spec top to bottom — they ask questions, request changes, and build understanding through interaction.
+
+**Open question:** When the agent generates a spec with errors, is the human's review burden higher or lower compared to a spec they wrote themselves? Writing builds deep familiarity but is slow; reviewing builds surface familiarity but is fast. The answer likely depends on spec complexity and the human's domain expertise. This may need real usage data to resolve.
+
+---
+
+## Information Input as Core Value
+
+Model capabilities are a variable — they improve over time. Orchestration logic is replaceable — better patterns emerge. But **information acquisition and injection is a permanent bottleneck.** Regardless of how capable the model becomes, garbage in, garbage out doesn't disappear.
+
+Two categories of information input:
+
+### Internal Information (Human → System)
+
+New ideas, brainstorming insights, product direction changes, domain knowledge that isn't in the codebase. This information is:
+- **Unstructured**: arrives as natural language, often vague or incomplete
+- **Context-dependent**: its meaning depends on the current state of the project
+- **High-impact**: a single idea can invalidate multiple specs
+
+The system needs to help the human do **contextualization** (where does this idea fit in the spec graph?) and **impact assessment** (what existing work does this affect?).
+
+**UX challenge:** The friction of capturing ideas must be extremely low (otherwise the human doesn't bother), but the contextualization quality must be high (otherwise the idea lands in the wrong place or its implications are missed).
+
+**Possible input entry points:**
+
+| Entry point | Friction | Contextualization | Best for |
+|-------------|----------|-------------------|----------|
+| **Chat stream** (in spec mode) | Low — type and send | High — agent has spec context | Ideas related to the current spec |
+| **Quick capture / inbox** | Very low — one-line input, no context selection | Low — agent must infer context | Drive-by thoughts, ideas that don't fit the current focus |
+| **Structured form** (new spec dialog) | Medium — fill in fields | Medium — fields provide structure | Well-formed feature requests |
+| **Annotation** (highlight text + comment) | Low — inline with reading | High — attached to specific content | Reactions to existing spec content |
+
+The chat stream is the primary input channel. Quick capture is a stretch goal for ideas that arrive outside of a focused spec session. The system should route captured ideas to the appropriate spec (or flag them as needing a new spec) based on semantic similarity.
+
+### External Information (World → System)
+
+API documentation, library references, competitor analysis, standards. This is relatively well-served by existing tool ecosystems (MCP, web search, file reading). The system should make it easy to attach external references to specs and tasks, but the hard problem is internal information, not external.
+
+### Why This Matters for Design
+
+Information input shapes every other design decision:
+- **Drift detection** is ultimately about noticing that internal information (the human's latest thinking) has diverged from the system's model (the spec). The better the system captures evolving ideas, the less drift accumulates.
+- **Operation regimes** are driven by information quality: when the human's input is vague, the system needs more interactive clarification (human-driven). When the input is precise, the system can execute autonomously (agent-driven).
+- **Spec lifecycle transitions** are triggered by information events: a new idea moves a spec from `complete` to `stale`; a validation conversation moves it from `drafted` to `validated`.
+
+---
+
+## UI: Three-Mode Framework
+
+The epic coordination UX naturally organizes into three observation modes of the same underlying spec DAG. Each mode serves a distinct cognitive task:
+
+```
+┌────────┐      ┌────────┐      ┌────────┐
+│  Map   │ ◀──▶ │  Spec  │ ◀──▶ │ Board  │
+│  Mode  │      │  Mode  │      │  Mode  │
+└────────┘      └────────┘      └────────┘
+ Global view     Single spec     Task execution
+ Dependencies    Iteration       Monitoring
+ Impact analysis Chat + edit     Kanban
+```
+
+### Map Mode (Global Dependency Graph)
+
+A zoomed-out view of the entire spec DAG. Nodes are design specs, edges are `depends_on`/`blocks` relationships. Node color/icon reflects design maturity and implementation state. Drift warnings appear as edge decorations.
+
+**Cognitive task:** "Where are we? What's blocked? What's at risk?"
+
+**Key interactions:**
+- Click a node → switch to Spec Mode for that spec
+- Hover a node → tooltip with status summary (design maturity, implementation state, cost, task count)
+- Highlight a node → show its upstream and downstream dependencies
+- Filter by track (foundations, local, cloud, shared)
+- Filter by state (show only stale, show only implementing)
+
+### Spec Mode (Single Spec Iteration + Chat)
+
+The split-pane view described in [Design Option: Spec-Centric Planning View](#design-option-spec-centric-planning-view). Spec explorer on the left, focused markdown view in the center, chat stream on the right.
+
+**Cognitive task:** "What does this spec say? Is it right? What should change?"
+
+This is where both operation regimes live:
+- **Human-driven**: frequent chat interaction, agent proposes changes, human steers
+- **Agent-driven**: human reviews completed work, provides feedback only when needed
+
+### Board Mode (Task Execution)
+
+The existing kanban board with epic filter bar, phase dividers, and progress panel from the [Board Integration](#board-integration) section.
+
+**Cognitive task:** "What's running? What's stuck? What needs attention?"
+
+### Mode Switching
+
+Switching between modes should be **zero-cost** — a single click or keyboard shortcut, with the context preserved. If the user is viewing `sandbox-backends.md` in Spec Mode and switches to Board Mode, the board should auto-filter to the `epic:sandbox-backends` tag. If they click a task in Board Mode and switch to Spec Mode, the spec explorer should navigate to that task's parent spec.
+
+**Implementation:** The three modes share state (selected spec, selected epic, selected task). Mode switching changes the view but not the selection. The header bar has three mode tabs: `[Map] [Spec] [Board]`.
+
+### Open Problem: Cross-Spec Cognitive Management
+
+The three-mode framework handles single-spec focus well, but struggles with **cross-spec awareness**. When spec count exceeds what a human can hold in working memory (~7-10 specs), the human loses global coherence:
+
+- Map Mode shows the graph structure but not the content
+- Spec Mode shows one spec's content but not the global picture
+- Board Mode shows task-level progress but not design-level coherence
+
+**No clean solution exists for this.** Possible mitigations:
+
+1. **Context panel** anchored to the current spec, showing summaries of related specs (dependencies, blocked-by, recently changed). Risk: becomes VS Code-style tab overload.
+2. **Digest generation**: periodic agent-generated summary of global spec state ("3 specs are stale, 2 have active drift warnings, sandbox-backends completed but container-reuse hasn't been updated yet"). Risk: summary quality depends on agent capability.
+3. **Notification feed**: surface important state changes (staleness, drift, completion) as a timeline. The user stays in Spec Mode but sees a stream of "things you should know about other specs." Risk: alert fatigue.
+4. **Rely on human strategy**: accept that the human can't hold everything in mind. The system's job is to *surface problems when they matter* (e.g., warn about stale dependencies when the user is about to dispatch tasks), not to maintain global awareness continuously.
+
+Option 4 is the most realistic for now. The system should be **reactive** (warn when it matters) rather than **proactive** (maintain continuous global awareness). The human can always switch to Map Mode for a global check, but the default is focused work with targeted warnings.
+
+---
+
+## Open Problems
+
+Three fundamental tensions that this spec does not fully resolve:
+
+### 1. Drift Detection Investment Timing
+
+Building drift detection infrastructure now may be premature — model capabilities are improving rapidly and may make custom index infrastructure obsolete. But deferring entirely risks losing control as spec count grows.
+
+**Current stance:** Invest minimally in structure (the `affects` field in spec frontmatter for spec-to-code mapping) and rely on model capability (approach C) for semantic assessment. Re-evaluate when spec count exceeds ~50 or codebase exceeds ~500K LOC. The `affects` field is cheap to maintain and useful beyond drift detection (impact analysis, spec navigation), so it's a safe investment regardless of model trajectory.
+
+### 2. Cross-Spec Cognitive Management
+
+When the number of specs exceeds human working memory capacity, how does the human maintain correct global understanding without reading every spec? Map Mode helps with structure but not content. Digest summaries help with content but may be unreliable.
+
+**Current stance:** Reactive warnings (surface problems when they become actionable) rather than proactive awareness (maintain continuous global picture). The system warns you about stale dependencies when you're about to dispatch tasks, not as a background notification. Accept that the human will periodically need to do a "global review" pass in Map Mode, and make that pass efficient with good filtering and status indicators.
+
+### 3. Agent-Generated Spec Trust
+
+If the human doesn't write specs, they have lower familiarity with spec content. But specs serve as the authoritative design document — the human needs to understand and trust them to make good approval decisions.
+
+**Current stance:** Build familiarity through interactive dialogue (the chat stream) rather than authoring. The human doesn't read specs passively — they interrogate them ("why did you choose this interface shape?", "what happens if we change X?"). This active review builds understanding without requiring the human to have written the content.
+
+**Risk:** If the agent generates a spec with a subtle error (e.g., an incorrect assumption about an existing interface), the human may not catch it during review because they didn't write it. The mitigation is gate tasks: even if a spec is wrong, the gate catches the failure at implementation time. The cost is wasted execution, not shipped bugs.
+
+**Validation needed:** Whether review burden for agent-generated specs is higher or lower than for human-written specs in practice. This likely varies by spec complexity and human domain expertise. Real usage data is needed.
