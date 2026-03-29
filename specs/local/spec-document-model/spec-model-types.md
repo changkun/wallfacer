@@ -1,6 +1,6 @@
 ---
 title: Spec Model Types and YAML Parsing
-status: validated
+status: complete
 track: local
 depends_on: []
 affects:
@@ -80,3 +80,8 @@ Define the core Go types for spec documents and implement YAML frontmatter parsi
 - Do NOT implement lifecycle transition rules.
 - Do NOT add HTTP handlers or CLI commands.
 - Do NOT create a store or persistence layer for specs — specs are read from the filesystem.
+
+## Implementation notes
+
+- **Type names changed to avoid stutter**: The spec prescribed `SpecStatus`, `SpecTrack`, `SpecEffort` but Go convention (enforced by the revive linter) says type names in a package should not repeat the package name. Renamed to `Status`, `Track`, `Effort` — used as `spec.Status`, `spec.Track`, `spec.Effort` externally.
+- **Added `ParseBytes` function**: Not in the original spec, but added for testability — allows parsing without writing to disk. `ParseFile` delegates to it.
