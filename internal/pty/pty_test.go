@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+// TestOpen verifies that Open returns two valid file descriptors
+// (master and slave) without error.
 func TestOpen(t *testing.T) {
 	master, slave, err := Open()
 	if err != nil {
@@ -25,6 +27,9 @@ func TestOpen(t *testing.T) {
 	}
 }
 
+// TestStartWithSize verifies that a command started on a PTY produces
+// readable output on the master side. The child runs "echo hello" followed
+// by "read _" to keep it alive long enough for the master to consume output.
 func TestStartWithSize(t *testing.T) {
 	// Use "read _" to keep the process alive while we read PTY output.
 	// Plain "echo" exits instantly and macOS may return EIO before
@@ -65,6 +70,8 @@ func TestStartWithSize(t *testing.T) {
 	}
 }
 
+// TestSetsize verifies that Setsize does not return an error when called
+// on a valid PTY master with reasonable dimensions.
 func TestSetsize(t *testing.T) {
 	master, slave, err := Open()
 	if err != nil {

@@ -13,8 +13,9 @@
 // and [changkun.de/x/wallfacer/internal/sandbox] for sandbox type parsing.
 // Consumed by [workspace] (env file path management), [runner] (container settings),
 // [handler] (serve/update env configuration), and [cli] (build container commands).
-// When adding a new .env variable, add the field to [Config], update [Parse] and
-// [ToEnvMap], then update the corresponding handler and documentation.
+// When adding a new .env variable, add the field to [Config], update [Parse],
+// add the key to knownKeys, and add the corresponding field to [Updates],
+// then update the handler and documentation.
 //
 // # Usage
 //

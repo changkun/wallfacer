@@ -12,7 +12,8 @@ import (
 )
 
 // logCaptureHandler is a minimal slog.Handler that records every log record
-// so tests can assert on structured log output without writing to stdout.
+// in memory so tests can assert on structured log output without writing to
+// stdout. All methods are thread-safe via mu.
 type logCaptureHandler struct {
 	mu      sync.Mutex
 	records []slog.Record

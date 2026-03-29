@@ -18,6 +18,9 @@ func (s *Store) CriticalPathScore(id uuid.UUID) int {
 	}
 
 	// Build reverse adjacency map: for each task, which tasks depend on it.
+	// The forward graph is "A depends on B" (A.DependsOn contains B);
+	// the reverse graph is "B is depended on by A" — needed because we
+	// are computing the longest downstream chain from id.
 	reverseAdj := make(map[uuid.UUID][]uuid.UUID)
 	for _, t := range s.tasks {
 		for _, depStr := range t.DependsOn {

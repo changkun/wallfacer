@@ -147,9 +147,10 @@ func (s *Store) StartRefinementJobIfIdle(_ context.Context, id uuid.UUID, job *R
 				return ErrRefinementAlreadyRunning
 			}
 			// Guard against fast failure/completion races: if a runner-sourced
-			// job just finished (within the recent-complete window) and has
-			// a result or error, treat it as still in-flight to prevent a
-			// duplicate start before the UI has had time to observe the outcome.
+			// job just finished within the recent-complete window and produced
+			// a result or error, treat it as in-flight. Without this guard,
+			// a UI-triggered start could race with a runner failure that
+			// completes between the UI's "is idle?" check and its start call.
 			if t.CurrentRefinement.Source == "runner" && (status == RefinementJobStatusFailed || status == RefinementJobStatusDone) {
 				elapsed := time.Since(t.UpdatedAt)
 				if elapsed >= 0 && elapsed < constants.RefinementRecentCompleteWindow && (t.CurrentRefinement.Error != "" || t.CurrentRefinement.Result != "") {
@@ -289,7 +290,8 @@ func buildSnippet(src string, idx, matchLen int) string {
 		end = len(src)
 		suffix = ""
 	}
-	// Align to UTF-8 rune boundaries.
+	// Align to UTF-8 rune boundaries so we don't split multi-byte characters
+	// (e.g. CJK, emoji) at the snippet edges.
 	for start > 0 && !utf8.RuneStart(src[start]) {
 		start--
 	}
@@ -343,6 +345,8 @@ func (s *Store) RecordFetchFailure(_ context.Context, id uuid.UUID, msg string) 
 // proceed normally. It is a no-op (does not write to disk) when no failure
 // is currently recorded.
 func (s *Store) ClearFetchFailure(_ context.Context, id uuid.UUID) error {
+	// Fast-path read lock: skip the write if no failure is recorded.
+	// This avoids unnecessary disk writes on every successful fetch.
 	s.mu.RLock()
 	t, ok := s.tasks[id]
 	if !ok || (t.LastFetchError == "" && t.LastFetchErrorAt == nil) {

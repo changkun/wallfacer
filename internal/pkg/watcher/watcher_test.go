@@ -8,8 +8,9 @@ import (
 	"time"
 )
 
-// mockWakeSource is a test WakeSource backed by a buffered channel.
-// It tracks subscribe/unsubscribe call counts for assertions.
+// mockWakeSource is a test double for [WakeSource] backed by a buffered
+// channel. It tracks subscribe/unsubscribe call counts for verifying
+// that the watcher cleans up its subscription on context cancellation.
 type mockWakeSource struct {
 	ch           chan struct{}
 	mu           sync.Mutex
@@ -264,7 +265,8 @@ func TestWatcher_SettleDelayCancelledDuringSettle(t *testing.T) {
 	}
 }
 
-// waitFor polls pred at short intervals, failing the test after a timeout.
+// waitFor polls pred at 1ms intervals, failing the test after 2s.
+// Used instead of time.Sleep to avoid flakiness from fixed delays.
 func waitFor(t *testing.T, pred func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)

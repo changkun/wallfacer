@@ -12,11 +12,15 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 )
 
+// oversizedBody creates a JSON reader with a single field whose value is a
+// string of the given size, used to trigger MaxBytesReader 413 responses.
 func oversizedBody(fieldName string, size int) io.Reader {
 	padding := strings.Repeat("a", size)
 	return strings.NewReader(`{"` + fieldName + `":"` + padding + `"}`)
 }
 
+// assertBodyTooLarge verifies that the response is a 413 with the expected
+// JSON error body from decodeJSONBody's MaxBytesError handling.
 func assertBodyTooLarge(t *testing.T, w *httptest.ResponseRecorder) {
 	t.Helper()
 	if w.Code != http.StatusRequestEntityTooLarge {
@@ -32,6 +36,8 @@ func assertBodyTooLarge(t *testing.T, w *httptest.ResponseRecorder) {
 	}
 }
 
+// TestCreateTask_BodyTooLarge verifies that CreateTask returns 413 when the
+// request body exceeds the default body size limit.
 func TestCreateTask_BodyTooLarge(t *testing.T) {
 	h := newTestHandler(t)
 	w := httptest.NewRecorder()
@@ -43,6 +49,8 @@ func TestCreateTask_BodyTooLarge(t *testing.T) {
 	assertBodyTooLarge(t, w)
 }
 
+// TestCSRFMiddleware validates the CSRF middleware's Origin/Referer checking
+// across safe methods, matching/mismatching origins, and absent headers.
 func TestCSRFMiddleware(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -89,6 +97,8 @@ func TestCSRFMiddleware(t *testing.T) {
 	}
 }
 
+// TestBearerAuthMiddleware validates bearer-token auth across public routes,
+// SSE query-token paths, and standard Authorization header paths.
 func TestBearerAuthMiddleware(t *testing.T) {
 	tests := []struct {
 		name    string

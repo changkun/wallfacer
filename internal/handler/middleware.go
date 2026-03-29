@@ -9,6 +9,8 @@ import (
 )
 
 // Convenience aliases so callers can write handler.BodyLimitDefault etc.
+// These re-export constants used by MaxBytesMiddleware to enforce per-route
+// request body size limits.
 const (
 	BodyLimitDefault      = constants.BodyLimitDefault
 	BodyLimitInstructions = constants.BodyLimitInstructions
@@ -26,10 +28,15 @@ func MaxBytesMiddleware(limit int64) func(http.Handler) http.Handler {
 }
 
 // CSRFMiddleware validates the Origin/Referer header against the expected host.
+// Safe methods (GET, HEAD, OPTIONS) are always allowed. State-changing methods
+// require the Origin or Referer header to match the server's host:port. When
+// neither header is present the request is allowed through — this covers API
+// clients and tools that don't send browser-style origin headers.
 func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 	allowedHost := strings.TrimSpace(serverHostPort)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Safe methods never need CSRF protection.
 			switch r.Method {
 			case http.MethodGet, http.MethodHead, http.MethodOptions:
 				next.ServeHTTP(w, r)
@@ -41,6 +48,7 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 			}
 			origin := strings.TrimSpace(r.Header.Get("Origin"))
 			referer := strings.TrimSpace(r.Header.Get("Referer"))
+			// Allow requests without Origin/Referer (non-browser clients).
 			if origin == "" && referer == "" {
 				next.ServeHTTP(w, r)
 				return
@@ -60,9 +68,14 @@ func CSRFMiddleware(serverHostPort string) func(http.Handler) http.Handler {
 }
 
 // BearerAuthMiddleware enforces bearer-token authentication on non-SSE routes.
+// SSE and WebSocket paths use a ?token= query parameter instead of the
+// Authorization header because EventSource and WebSocket APIs do not support
+// custom request headers. The root path (GET /) is always public so the
+// browser can load the UI shell.
 func BearerAuthMiddleware(apiKey string) func(http.Handler) http.Handler {
 	key := strings.TrimSpace(apiKey)
 	if key == "" {
+		// No API key configured — authentication is disabled.
 		return func(next http.Handler) http.Handler { return next }
 	}
 	isSSEPath := func(path string) bool {

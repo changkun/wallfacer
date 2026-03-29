@@ -111,11 +111,12 @@ func (h *Handler) DeleteSystemPrompt(w http.ResponseWriter, r *http.Request) {
 
 // isUnknownTemplateName reports whether the error was produced by an unknown
 // template name lookup (e.g. prompts.Content returned "unknown template name").
+// This relies on string matching because the prompts package uses fmt.Errorf
+// rather than a sentinel error type. If the prompts package changes its error
+// format, this function must be updated.
 func isUnknownTemplateName(err error) bool {
 	if err == nil {
 		return false
 	}
-	// The prompts package uses fmt.Errorf("unknown template name %q", ...) which
-	// is not a typed error, so we match by string prefix.
 	return strings.HasPrefix(err.Error(), "unknown template name")
 }

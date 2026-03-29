@@ -114,6 +114,8 @@ func TestDefaultBranch(t *testing.T) {
 	})
 }
 
+// TestGetCommitHashForRef validates ref resolution across branches, invalid refs,
+// and non-git directories.
 func TestGetCommitHashForRef(t *testing.T) {
 	t.Run("returns main HEAD when on different branch", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -155,6 +157,7 @@ func TestGetCommitHashForRef(t *testing.T) {
 	})
 }
 
+// TestGetCommitHash validates HEAD hash retrieval for valid and non-git paths.
 func TestGetCommitHash(t *testing.T) {
 	t.Run("valid repo returns 40-char SHA", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -174,6 +177,7 @@ func TestGetCommitHash(t *testing.T) {
 	})
 }
 
+// TestHasCommits validates commit detection for repos with commits and non-git dirs.
 func TestHasCommits(t *testing.T) {
 	t.Run("repo with commits returns true", func(t *testing.T) {
 		repo := setupRepo(t)

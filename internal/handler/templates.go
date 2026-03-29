@@ -14,7 +14,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// PromptTemplate is a named reusable prompt fragment.
+// PromptTemplate is a named reusable prompt fragment that users can save and
+// insert into task prompts. Persisted as a JSON array in templates.json within
+// the config directory.
 type PromptTemplate struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -23,6 +25,8 @@ type PromptTemplate struct {
 }
 
 // templatesMu protects all reads and writes to the templates.json file.
+// It is a package-level mutex (rather than per-handler) because the
+// templates.json file is shared across all handler instances.
 var templatesMu sync.RWMutex
 
 // templatesPath returns the filesystem path to the templates.json file.

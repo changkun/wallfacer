@@ -2,6 +2,8 @@ package systray
 
 import "testing"
 
+// TestMenuItemCheckedState verifies that the Checked() accessor reflects
+// direct mutations of the checked field (bypassing native calls).
 func TestMenuItemCheckedState(t *testing.T) {
 	item := &MenuItem{ClickedCh: make(chan struct{}, 1)}
 	if item.Checked() {
@@ -21,6 +23,8 @@ func TestMenuItemCheckedState(t *testing.T) {
 	}
 }
 
+// TestMenuItemClicked verifies that menuItemClicked dispatches a signal
+// to the correct item's ClickedCh channel.
 func TestMenuItemClicked(t *testing.T) {
 	id := nextID.Add(1)
 	item := &MenuItem{ClickedCh: make(chan struct{}, 1), id: id}
@@ -41,6 +45,8 @@ func TestMenuItemClicked(t *testing.T) {
 	}
 }
 
+// TestMenuItemClickedDropsWhenFull verifies that a second click does not
+// block when the channel buffer (capacity 1) is already occupied.
 func TestMenuItemClickedDropsWhenFull(t *testing.T) {
 	id := nextID.Add(1)
 	item := &MenuItem{ClickedCh: make(chan struct{}, 1), id: id}
@@ -59,11 +65,13 @@ func TestMenuItemClickedDropsWhenFull(t *testing.T) {
 	menuItemClicked(id)
 }
 
+// TestMenuItemClickedInvalidID verifies that clicking a non-existent menu
+// item ID is silently ignored (no panic, no channel send).
 func TestMenuItemClickedInvalidID(t *testing.T) {
-	// Should not panic.
 	menuItemClicked(999999)
 }
 
+// TestTrayTapped verifies that trayTapped invokes the registered onTapped callback.
 func TestTrayTapped(t *testing.T) {
 	called := false
 	tappedMu.Lock()
@@ -81,10 +89,11 @@ func TestTrayTapped(t *testing.T) {
 	}
 }
 
+// TestTrayTappedNil verifies that trayTapped is a no-op when no callback
+// is registered (does not panic on nil function).
 func TestTrayTappedNil(t *testing.T) {
 	tappedMu.Lock()
 	onTapped = nil
 	tappedMu.Unlock()
-	// Should not panic.
 	trayTapped()
 }

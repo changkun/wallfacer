@@ -100,10 +100,13 @@ func (tx *Tx) RunContext(ctx context.Context) error {
 
 func (tx *Tx) run(ctx context.Context) error {
 	var stepErr *StepError
-	failedAt := -1
+	failedAt := -1 // -1 means no failure; set to the failing step index to trigger rollback
 
+	// Execute forward steps sequentially, stopping at the first failure.
 	for i, step := range tx.steps {
 		cmd := step.cmd
+		// Inherit the caller's context only when the step doesn't have its own,
+		// so per-step timeouts are preserved.
 		if cmd.ctx == nil {
 			cmd = cmd.WithContext(ctx)
 		}

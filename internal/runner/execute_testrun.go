@@ -18,10 +18,11 @@ func (r *Runner) finalizeTestRun(
 	task store.Task,
 	result string,
 ) {
+	// Parse the test agent's output to determine pass/fail. When no verdict
+	// is detectable, default to "fail" to prevent auto-submit from promoting
+	// a potentially broken task to done without human review.
 	verdict := parseTestVerdict(result, task.CustomPassPatterns, task.CustomFailPatterns)
 	if verdict == "" {
-		// No clear verdict detected; treat as fail so the task is not
-		// auto-submitted without explicit confirmation.
 		verdict = "fail"
 	}
 	_ = r.taskStore(taskID).UpdateTaskTestRun(ctx, taskID, false, verdict)

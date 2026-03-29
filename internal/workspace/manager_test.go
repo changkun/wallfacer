@@ -130,6 +130,8 @@ func newTestManager(t *testing.T) (*Manager, string) {
 
 // --- Switch tests ---
 
+// TestSwitch_ToValidWorkspace verifies that switching to a valid directory
+// creates a store, instructions file, and populates the snapshot.
 func TestSwitch_ToValidWorkspace(t *testing.T) {
 	m, _ := newTestManager(t)
 	ws := t.TempDir()
@@ -149,6 +151,8 @@ func TestSwitch_ToValidWorkspace(t *testing.T) {
 	}
 }
 
+// TestSwitch_ToEmptyWorkspaces verifies that switching to an empty set clears
+// workspaces and instructions while still maintaining a store.
 func TestSwitch_ToEmptyWorkspaces(t *testing.T) {
 	m, _ := newTestManager(t)
 	ws := t.TempDir()
@@ -168,6 +172,7 @@ func TestSwitch_ToEmptyWorkspaces(t *testing.T) {
 	}
 }
 
+// TestSwitch_InvalidPath_NonAbsolute verifies that relative paths are rejected.
 func TestSwitch_InvalidPath_NonAbsolute(t *testing.T) {
 	m, _ := newTestManager(t)
 	_, err := m.Switch([]string{"relative/path"})
@@ -176,6 +181,7 @@ func TestSwitch_InvalidPath_NonAbsolute(t *testing.T) {
 	}
 }
 
+// TestSwitch_InvalidPath_NonExistent verifies that non-existent paths are rejected.
 func TestSwitch_InvalidPath_NonExistent(t *testing.T) {
 	m, _ := newTestManager(t)
 	_, err := m.Switch([]string{"/nonexistent/workspace/path"})
@@ -184,6 +190,7 @@ func TestSwitch_InvalidPath_NonExistent(t *testing.T) {
 	}
 }
 
+// TestSwitch_DeduplicatesPaths verifies that duplicate paths are collapsed.
 func TestSwitch_DeduplicatesPaths(t *testing.T) {
 	m, _ := newTestManager(t)
 	ws := t.TempDir()
@@ -197,6 +204,7 @@ func TestSwitch_DeduplicatesPaths(t *testing.T) {
 	}
 }
 
+// TestSwitch_IncrementsGeneration verifies the generation counter advances on switch.
 func TestSwitch_IncrementsGeneration(t *testing.T) {
 	m, _ := newTestManager(t)
 	initial := m.Snapshot()

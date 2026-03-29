@@ -256,6 +256,7 @@ func RunStatus(_ string, args []string) {
 	}
 
 	// Watch mode: clear screen and redraw every 2 seconds until Ctrl-C.
+	// Uses ANSI escape codes rather than ncurses for zero-dependency output.
 	for {
 		fmt.Print("\033[H\033[2J") // ANSI: move cursor to home + clear entire screen
 		render()

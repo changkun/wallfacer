@@ -23,15 +23,15 @@ type MenuItem struct {
 }
 
 var (
-	menuItems     = make(map[uint32]*MenuItem)
-	menuItemsLock sync.RWMutex
-	nextID        atomic.Uint32
+	menuItems     = make(map[uint32]*MenuItem) // maps menu item IDs to their MenuItem structs
+	menuItemsLock sync.RWMutex                 // guards menuItems
+	nextID        atomic.Uint32                // monotonic counter for unique menu item IDs
 
-	readyCb func()
-	exitCb  func()
+	readyCb func() // called once the tray icon is initialized
+	exitCb  func() // called when the tray is torn down
 
-	onTapped func()
-	tappedMu sync.Mutex
+	onTapped func()     // left-click callback; nil means open menu instead
+	tappedMu sync.Mutex // guards onTapped
 )
 
 // RunWithExternalLoop initializes the system tray for use with an external
@@ -160,6 +160,9 @@ func (item *MenuItem) Checked() bool {
 }
 
 // menuItemClicked is called by platform code when a menu item is clicked.
+// It sends a non-blocking signal on the item's ClickedCh. If the channel
+// is already full (capacity 1), the click is silently dropped to avoid
+// blocking the platform event thread.
 func menuItemClicked(id uint32) {
 	menuItemsLock.RLock()
 	item, ok := menuItems[id]

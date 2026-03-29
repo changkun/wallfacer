@@ -14,12 +14,16 @@ import (
 // partially-written file. The temporary file is cleaned up on failure.
 func Write(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
+	// Create the temp file in the same directory as the target so that
+	// os.Rename is guaranteed to be an atomic same-filesystem operation.
 	f, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
 		return err
 	}
 	tmp := f.Name()
 
+	// Write and close are separate steps; check both errors independently
+	// since Close can flush buffered data and fail on its own.
 	_, writeErr := f.Write(data)
 	closeErr := f.Close()
 	if writeErr != nil {
@@ -30,6 +34,8 @@ func Write(path string, data []byte, perm os.FileMode) error {
 		_ = os.Remove(tmp)
 		return closeErr
 	}
+	// Set permissions before rename so the target is never visible with
+	// the wrong mode (CreateTemp uses 0600 by default).
 	if err := os.Chmod(tmp, perm); err != nil {
 		_ = os.Remove(tmp)
 		return err

@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestStashIfDirty validates stash creation for clean, untracked, and modified states.
 func TestStashIfDirty(t *testing.T) {
 	t.Run("clean tree returns false", func(t *testing.T) {
 		if StashIfDirty(setupRepo(t)) {
@@ -30,6 +31,8 @@ func TestStashIfDirty(t *testing.T) {
 	})
 }
 
+// TestStashPop validates stash restoration, error on empty stash list, and that
+// a conflicting pop preserves the stash entry while cleaning the worktree.
 func TestStashPop(t *testing.T) {
 	t.Run("restores stashed file", func(t *testing.T) {
 		repo := setupRepo(t)

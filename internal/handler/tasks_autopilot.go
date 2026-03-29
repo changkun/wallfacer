@@ -78,7 +78,10 @@ func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.Re
 }
 
 // promoteMu serialises auto-promotion so two simultaneous state changes
-// cannot both promote a task, exceeding the concurrency limit.
+// cannot both promote a task, exceeding the concurrency limit. It is shared
+// across tryAutoPromote, tryAutoTest, tryAutoSubmit, SubmitFeedback,
+// ResumeTask, SyncTask, and checkAndSyncWaitingTasks — any code path that
+// transitions a task to in_progress or committing.
 var promoteMu sync.Mutex
 
 // StartAutoPromoter subscribes to store change notifications and automatically
@@ -197,6 +200,7 @@ func taskReachableInAdj(adj map[uuid.UUID][]uuid.UUID, start, target uuid.UUID) 
 
 // autoPromoteCandidate holds a task eligible for auto-promotion and whether it
 // is a resume (waiting task with failed-test feedback) vs a fresh backlog promote.
+// Populated by Phase 1 and consumed by Phase 2 of the two-phase protocol.
 type autoPromoteCandidate struct {
 	task     store.Task
 	store    *store.Store // the store that owns this task

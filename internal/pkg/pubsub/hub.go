@@ -105,7 +105,6 @@ func (h *Hub[T]) Publish(value T) {
 	}
 	h.replayMu.Unlock()
 
-	// Fan out to live subscribers.
 	// Fan out to live subscribers. Non-blocking send: if a subscriber's
 	// channel is full, close it and mark for eviction to prevent a slow
 	// consumer from blocking all publishers.
@@ -169,6 +168,8 @@ func (h *Hub[T]) Unsubscribe(id int) {
 	ch, ok := h.subscribers[id]
 	delete(h.subscribers, id)
 	h.subMu.Unlock()
+	// Drain any buffered items so that a concurrent Publish racing with
+	// this Unsubscribe does not block on a full channel that nobody reads.
 	if ok {
 		for {
 			select {
@@ -216,9 +217,12 @@ func (h *Hub[T]) Since(seq int64) ([]Sequenced[T], bool) {
 		return nil, false
 	}
 
+	// If the oldest buffered entry is beyond seq+1, there are entries
+	// the caller missed that have already been evicted from the ring.
+	// Signal a gap so the caller falls back to a full snapshot.
 	oldest := h.replayBuf[0].Seq
 	if oldest > seq+1 {
-		return nil, true // gap too old
+		return nil, true
 	}
 
 	// Binary search for first entry with Seq > seq.

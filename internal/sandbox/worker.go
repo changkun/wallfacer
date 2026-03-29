@@ -119,8 +119,8 @@ func (w *taskWorker) exec(ctx context.Context, cmd []string) (Handle, error) {
 	}
 
 	lh.state.Store(int32(StateRunning))
-	// Return an execHandle so Kill only kills the exec process,
-	// not the worker container.
+	// Return an execHandle (not localHandle) so Kill only terminates the
+	// exec process, leaving the worker container alive for subsequent turns.
 	return &execHandle{localHandle: lh}, nil
 }
 

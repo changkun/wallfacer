@@ -225,8 +225,11 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	if envCfg, err := envconfig.Parse(r.EnvFile()); err == nil {
 		h.autopush.Store(envCfg.AutoPushEnabled)
 	}
+	// Initialise handler state from the current workspace snapshot.
 	h.applySnapshot(wsMgr.Snapshot())
 	if wsMgr != nil {
+		// Subscribe to workspace changes so that when the user switches workspace
+		// groups, the handler's store/workspaces fields are updated asynchronously.
 		_, ch := wsMgr.Subscribe()
 		go func() {
 			for snap := range ch {
@@ -472,8 +475,9 @@ func (h *Handler) openWatcherBreaker(watcherName string, taskID *uuid.UUID, reas
 }
 
 // pauseAllAutomation opens the circuit breaker for the watcher that failed.
-// It no longer disables all board-level toggles; the circuit breaker is a
-// transient, auto-healing layer that suppresses only the affected watcher.
+// Despite the name (kept for backward compatibility), it no longer disables
+// all board-level toggles; the circuit breaker is a transient, auto-healing
+// layer that suppresses only the affected watcher.
 func (h *Handler) pauseAllAutomation(taskID *uuid.UUID, watcher, reason string) bool {
 	return h.openWatcherBreaker(watcher, taskID, reason)
 }

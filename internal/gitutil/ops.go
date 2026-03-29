@@ -106,14 +106,21 @@ func hasRebaseOrMergeState(worktreePath string) (bool, error) {
 
 // clearConflictedPaths removes unmerged markers introduced by stale conflict
 // states while preserving tracked content. This is a no-op when nothing is
-// blocked.
+// blocked. It uses an escalating strategy: each subsequent command is more
+// destructive, but also more likely to succeed in pathological states.
 func clearConflictedPaths(worktreePath string) error {
+	// Attempt 1: reset --merge undoes a conflicted merge while keeping
+	// unrelated uncommitted changes. Fails when both staged and unstaged
+	// changes exist for the same file (index != HEAD and worktree != index).
 	if err := cmdexec.Git(worktreePath, "reset", "--merge").Run(); err == nil {
 		return nil
 	}
+	// Attempt 2: restore from HEAD clears both the index and worktree for all
+	// files. Handles the staged+unstaged case that reset --merge rejects.
 	if err := cmdexec.Git(worktreePath, "restore", "--staged", "--worktree", "--source=HEAD", "--", ".").Run(); err == nil {
 		return nil
 	}
+	// Attempt 3: hard reset as a last resort. Discards all local modifications.
 	if err := cmdexec.Git(worktreePath, "reset", "--hard", "HEAD").Run(); err == nil {
 		return nil
 	}
@@ -133,6 +140,9 @@ func FFMerge(repoPath, branchName string) error {
 	// does not fail with "Your local changes would be overwritten".
 	stashed := StashIfDirty(repoPath)
 
+	// Build a transactional command sequence: checkout the default branch,
+	// then fast-forward merge. Deferred stash pop runs after the sequence
+	// regardless of success, restoring the user's uncommitted changes.
 	tx := cmdexec.NewTx()
 	if stashed {
 		tx.Defer(cmdexec.Git(repoPath, "stash", "pop"))
@@ -143,8 +153,8 @@ func FFMerge(repoPath, branchName string) error {
 	if txErr := tx.Run(); txErr != nil {
 		te, ok := txErr.(*cmdexec.TxError)
 		if !ok || te.Step == nil {
-			// Only defer errors — stash pop failed on success path.
-			// Log but don't fail the merge itself.
+			// TxError without a Step means only deferred commands (stash pop)
+			// failed. The merge itself succeeded, so log and return nil.
 			slog.Default().With("component", "git").Debug("ff-merge defer error", "repo", repoPath, "error", txErr)
 			return nil
 		}
@@ -184,6 +194,9 @@ func CommitsBehind(repoPath, worktreePath string) (int, error) {
 // and refs/remotes/origin/. This handles detached-HEAD repos where the local
 // branch may not exist but the remote tracking ref is still available.
 func defaultBranchCommitHash(repoPath, defBranch string) (string, error) {
+	// Try progressively more qualified ref names. In a normal checkout the
+	// bare name suffices, but in detached-HEAD repos the local branch may be
+	// absent while the remote tracking ref still exists.
 	candidates := []string{
 		defBranch,
 		"refs/heads/" + defBranch,
@@ -240,6 +253,8 @@ func BranchTipCommit(repoPath, branch string) (hash, subject string, ts time.Tim
 		err = fmt.Errorf("branch %s not found or has no commits in %s", branch, repoPath)
 		return
 	}
+	// Parse the pipe-delimited format: "<hash>|<subject>|<ISO8601 timestamp>".
+	// SplitN with limit 3 ensures subjects containing "|" are not mangled.
 	parts := strings.SplitN(line, "|", 3)
 	if len(parts) != 3 {
 		err = fmt.Errorf("unexpected git log output %q in %s", line, repoPath)
@@ -280,6 +295,8 @@ func HasConflicts(worktreePath string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("git status in %s: %w", worktreePath, err)
 	}
+	// Scan each line of porcelain output for unmerged status codes. Lines
+	// shorter than 2 characters are blank separators and are skipped.
 	for line := range strings.SplitSeq(out, "\n") {
 		if len(line) < 2 {
 			continue

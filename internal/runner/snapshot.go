@@ -57,9 +57,11 @@ func setupNonGitSnapshot(ws, snapshotPath string) error {
 // added for change tracking. Uses rsync when available (handles deletions);
 // falls back to a Go-native copy which covers new/modified files only.
 func extractSnapshotToWorkspace(snapshotPath, targetPath string) error {
-	// rsync handles new, modified, AND deleted files correctly.
+	// rsync handles new, modified, AND deleted files correctly via --delete.
 	// --checksum is needed because files may have the same size and mtime
 	// but different content (e.g. macOS openrsync skips them otherwise).
+	// The trailing "/" on both paths is critical: it means "copy contents of
+	// snapshotPath into targetPath" rather than creating a subdirectory.
 	if _, err := exec.LookPath("rsync"); err == nil {
 		out, err := cmdexec.New(
 			"rsync", "-a", "--checksum", "--delete", "--exclude=.git",

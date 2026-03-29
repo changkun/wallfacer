@@ -40,6 +40,8 @@ func TestTrayManagerNew(t *testing.T) {
 	}
 }
 
+// TestIconState verifies the priority ordering of tray icon states:
+// attention (waiting/failed) beats active (in_progress/committing) beats idle.
 func TestIconState(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -66,6 +68,8 @@ func TestIconState(t *testing.T) {
 	}
 }
 
+// TestFormatTooltip verifies tooltip text generation for idle, active, and
+// active-with-cost scenarios.
 func TestFormatTooltip(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -113,6 +117,7 @@ func TestFormatTooltip(t *testing.T) {
 	}
 }
 
+// TestFormatDuration verifies human-readable duration formatting from seconds.
 func TestFormatDuration(t *testing.T) {
 	tests := []struct {
 		seconds float64
@@ -132,6 +137,8 @@ func TestFormatDuration(t *testing.T) {
 	}
 }
 
+// TestPollHealthResponse verifies that fetchHealth correctly parses the
+// /api/debug/health JSON response into task counts and uptime.
 func TestPollHealthResponse(t *testing.T) {
 	// Mock server returning a health response.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -169,6 +176,8 @@ func TestPollHealthResponse(t *testing.T) {
 	}
 }
 
+// TestPollHealthWithAPIKey verifies that fetchHealth sends the Authorization
+// header when an API key is configured, and fails without it.
 func TestPollHealthWithAPIKey(t *testing.T) {
 	// Server that requires an API key.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -202,6 +211,9 @@ func TestPollHealthWithAPIKey(t *testing.T) {
 	}
 }
 
+// TestParseConfigToggles verifies that fetchConfig correctly extracts the
+// autopilot, autotest, autosubmit, and autosync toggles while ignoring
+// unrelated config fields.
 func TestParseConfigToggles(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := map[string]any{
@@ -238,6 +250,8 @@ func TestParseConfigToggles(t *testing.T) {
 	}
 }
 
+// TestToggleSendsCorrectPayload verifies that toggleConfig sends a PUT request
+// with exactly one JSON field matching the toggled setting.
 func TestToggleSendsCorrectPayload(t *testing.T) {
 	var gotBody string
 	var gotMethod string
@@ -273,6 +287,8 @@ func TestToggleSendsCorrectPayload(t *testing.T) {
 	}
 }
 
+// TestToggleFailurePreservesState verifies that a server error from toggleConfig
+// is returned as an error (so the caller knows not to flip the local state).
 func TestToggleFailurePreservesState(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -286,6 +302,8 @@ func TestToggleFailurePreservesState(t *testing.T) {
 	}
 }
 
+// TestParseStatsResponse verifies that fetchStats parses total cost and
+// extractTodayCost correctly identifies today's entry from the daily_usage array.
 func TestParseStatsResponse(t *testing.T) {
 	today := time.Now().Format("2006-01-02")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -315,6 +333,8 @@ func TestParseStatsResponse(t *testing.T) {
 	}
 }
 
+// TestExtractTodayCostMissing verifies that extractTodayCost returns 0 when
+// today's date is not present in the daily_usage array.
 func TestExtractTodayCostMissing(t *testing.T) {
 	data := &statsData{
 		TotalCostUSD: 100,
@@ -331,6 +351,7 @@ func TestExtractTodayCostMissing(t *testing.T) {
 	}
 }
 
+// TestFormatCostShort validates 2-decimal-place dollar formatting for the tray.
 func TestFormatCostShort(t *testing.T) {
 	tests := []struct {
 		input float64
@@ -350,6 +371,8 @@ func TestFormatCostShort(t *testing.T) {
 	}
 }
 
+// TestStatsErrorFallback verifies that a failing stats endpoint returns an
+// error and leaves costValid as false.
 func TestStatsErrorFallback(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "server error", http.StatusInternalServerError)
@@ -367,6 +390,8 @@ func TestStatsErrorFallback(t *testing.T) {
 	}
 }
 
+// TestHideOnCloseLogic verifies per-platform close behavior: macOS and Windows
+// hide to tray on close; Linux actually closes.
 func TestHideOnCloseLogic(t *testing.T) {
 	// Verify the hide-on-close logic: on macOS and Windows the OnBeforeClose
 	// callback should return true (prevent close), on Linux it should return false.
@@ -388,6 +413,8 @@ func TestHideOnCloseLogic(t *testing.T) {
 	}
 }
 
+// TestPlatformTraySetup is a compile-time check that platformTraySetup exists
+// and is callable; actual systray behavior requires a display server.
 func TestPlatformTraySetup(t *testing.T) {
 	// Verify platformTraySetup doesn't panic when called with a nil-safe callback.
 	// This can't fully test systray behavior (requires display server) but
@@ -401,6 +428,8 @@ func TestPlatformTraySetup(t *testing.T) {
 	_ = called
 }
 
+// TestAppIconFilesExist verifies that all required app icon files (PNG for
+// Linux, ICO for Windows, ICNS for macOS) are present and non-empty.
 func TestAppIconFilesExist(t *testing.T) {
 	root := repoRoot(t)
 	icons := []string{
@@ -421,6 +450,8 @@ func TestAppIconFilesExist(t *testing.T) {
 	}
 }
 
+// TestWailsJSONExists verifies that the wails.json config file is present
+// (required for the desktop build).
 func TestWailsJSONExists(t *testing.T) {
 	root := repoRoot(t)
 	path := filepath.Join(root, "wails.json")

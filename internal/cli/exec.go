@@ -91,13 +91,16 @@ func RunExec(configDir string, args []string) {
 	}
 
 	// Replace the current process with the container exec so the terminal
-	// (PTY, signals, window-resize) is fully inherited.
+	// (PTY, signals, window-resize) is fully inherited. On Unix this is a
+	// true execve(2); on Windows it spawns a child process (see execve_*.go).
 	if err := execReplace(runtimePath, execArgs); err != nil {
 		// execReplace only fails when the OS cannot exec the binary itself
 		// (e.g. ENOENT or EACCES on runtimePath). If the default "bash" was
 		// used, retry with "sh" before giving up — some minimal images only
 		// ship sh.
 		if len(cfg.command) == 1 && cfg.command[0] == "bash" {
+			// Three-index slice ensures append allocates a new backing array
+			// rather than mutating execArgs in place.
 			shArgs := append(execArgs[:len(execArgs)-1:len(execArgs)-1], "sh") //nolint:gocritic // intentionally assigned to new slice
 			if err2 := execReplace(runtimePath, shArgs); err2 != nil {
 				fmt.Fprintf(os.Stderr, "wallfacer exec: %v\n", err2)
@@ -111,6 +114,11 @@ func RunExec(configDir string, args []string) {
 
 // parseExecConfig interprets the positional arguments to determine exec mode
 // (task vs sandbox), validates the arguments, and returns the configuration.
+//
+// Argument grammar:
+//
+//	<task-id-prefix>                     → task mode
+//	--sandbox <claude|codex> [command…]  → sandbox mode
 func parseExecConfig(positional, command []string) (*execConfig, error) {
 	cfg := &execConfig{mode: execModeTask, command: command}
 	for i := 0; i < len(positional); i++ {
@@ -120,6 +128,7 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 			}
 			cfg.mode = execModeSandbox
 			cfg.sandbox = sandbox.Normalize(positional[i+1])
+			// Any arguments after --sandbox <type> become the in-container command.
 			if i+2 < len(positional) {
 				cfg.command = append(cfg.command[:0], positional[i+2:]...)
 			}
@@ -141,6 +150,8 @@ func parseExecConfig(positional, command []string) (*execConfig, error) {
 			return nil, fmt.Errorf("missing task-id-prefix")
 		}
 		cfg.prefix = strings.TrimSpace(positional[0])
+		// Require at least 8 hex characters to avoid ambiguous matches against
+		// the wallfacer-<slug>-<uuid-prefix> container naming convention.
 		if len(cfg.prefix) < 8 {
 			return nil, fmt.Errorf("task ID prefix must be at least 8 characters (got %q)", cfg.prefix)
 		}
@@ -171,6 +182,8 @@ func buildSandboxExecArgs(runtimePath, configDir string, sb sandbox.Type, comman
 		args = append(args, "-v", "claude-config:/home/claude/.claude")
 	}
 	if sb == sandbox.Codex {
+		// Mount the host's ~/.codex directory (read-only) into the container so
+		// the Codex CLI can authenticate without re-login.
 		if home, err := os.UserHomeDir(); err == nil && strings.TrimSpace(home) != "" {
 			codexPath := filepath.Join(home, ".codex")
 			if info, err := os.Stat(filepath.Join(codexPath, "auth.json")); err == nil && !info.IsDir() {

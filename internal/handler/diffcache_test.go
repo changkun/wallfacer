@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TestNewDiffCache verifies that the constructor returns a non-nil cache.
 func TestNewDiffCache(t *testing.T) {
 	c := newDiffCache()
 	if c == nil {
@@ -17,6 +18,7 @@ func TestNewDiffCache(t *testing.T) {
 	}
 }
 
+// TestDiffCacheGetMiss verifies that get returns (zero, false) for an unknown key.
 func TestDiffCacheGetMiss(t *testing.T) {
 	c := newDiffCache()
 	entry, ok := c.get(uuid.New())
@@ -28,6 +30,7 @@ func TestDiffCacheGetMiss(t *testing.T) {
 	}
 }
 
+// TestDiffCacheSetGetImmutable verifies round-trip set/get for immutable (permanent) entries.
 func TestDiffCacheSetGetImmutable(t *testing.T) {
 	c := newDiffCache()
 	id := uuid.New()
@@ -53,6 +56,9 @@ func TestDiffCacheSetGetImmutable(t *testing.T) {
 	}
 }
 
+// TestDiffCacheImmutableNeverExpires verifies that permanent entries survive
+// far past the TTL (simulated 100 years), ensuring done/cancelled task diffs
+// are cached indefinitely.
 func TestDiffCacheImmutableNeverExpires(t *testing.T) {
 	now := time.Now()
 	clock := func() time.Time { return now }
@@ -79,6 +85,8 @@ func TestDiffCacheImmutableNeverExpires(t *testing.T) {
 	}
 }
 
+// TestDiffCacheTTLExpiryDirect verifies that volatile (non-immutable) entries
+// expire after the configured TTL.
 func TestDiffCacheTTLExpiryDirect(t *testing.T) {
 	now := time.Now()
 	clock := func() time.Time { return now }
@@ -106,6 +114,8 @@ func TestDiffCacheTTLExpiryDirect(t *testing.T) {
 	}
 }
 
+// TestDiffCacheTTLNotYetExpired verifies that volatile entries are still
+// returned just before the TTL elapses.
 func TestDiffCacheTTLNotYetExpired(t *testing.T) {
 	now := time.Now()
 	clock := func() time.Time { return now }
@@ -166,6 +176,8 @@ func TestDiffCacheInvalidateIsolation(t *testing.T) {
 	}
 }
 
+// TestDiffETag verifies that diffETag is deterministic, produces 16-char output,
+// and yields different tags for different payloads.
 func TestDiffETag(t *testing.T) {
 	payload := []byte(`{"diff":"test payload"}`)
 
@@ -186,6 +198,8 @@ func TestDiffETag(t *testing.T) {
 	}
 }
 
+// TestDiffCacheLRUEviction verifies that the cache evicts the oldest immutable
+// entry when MaxImmutableDiffEntries is exceeded.
 func TestDiffCacheLRUEviction(t *testing.T) {
 	c := newDiffCache()
 
@@ -226,6 +240,8 @@ func TestDiffCacheLRUResetOnDuplicateSet(t *testing.T) {
 	}
 }
 
+// TestDiffCacheConcurrentAccess exercises concurrent set/get/invalidate calls
+// to verify there are no data races (detected by -race).
 func TestDiffCacheConcurrentAccess(_ *testing.T) {
 	c := newDiffCache()
 	id := uuid.New()

@@ -20,6 +20,8 @@ func score[Node comparable](id Node, children func(Node) []Node, memo map[Node]i
 		return 1 // cycle guard
 	}
 	visiting[id] = true
+	// Reset on return so sibling branches can still traverse this node via
+	// a different path without triggering the cycle guard.
 	defer func() { visiting[id] = false }()
 
 	// Find the child with the longest downstream chain.

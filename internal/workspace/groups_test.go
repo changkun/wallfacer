@@ -84,6 +84,7 @@ func TestNormalizeGroups_RemovesGroupsWithNoValidWorkspaces(t *testing.T) {
 	}
 }
 
+// TestNormalizeGroups_EmptyInput verifies nil and empty-slice inputs return nil.
 func TestNormalizeGroups_EmptyInput(t *testing.T) {
 	result := NormalizeGroups(nil)
 	if result != nil {
@@ -109,6 +110,8 @@ func TestLoadGroups_MissingFile_ReturnsNilNil(t *testing.T) {
 	}
 }
 
+// TestLoadGroups_MissingDirectory_ReturnsNilNil verifies graceful handling when
+// the entire config directory does not exist.
 func TestLoadGroups_MissingDirectory_ReturnsNilNil(t *testing.T) {
 	configDir := t.TempDir() + "/nonexistent"
 	groups, err := LoadGroups(configDir)
@@ -161,6 +164,8 @@ func TestSaveGroups_AtomicWrite(t *testing.T) {
 	}
 }
 
+// TestNormalizeGroups_SortsPaths verifies that workspace paths within a group
+// are sorted lexicographically after normalization.
 func TestNormalizeGroups_SortsPaths(t *testing.T) {
 	// normalizeGroupPaths sorts paths; verify NormalizeGroups preserves this.
 	wsA := t.TempDir()
@@ -180,6 +185,7 @@ func TestNormalizeGroups_SortsPaths(t *testing.T) {
 	}
 }
 
+// TestNormalizeGroups_MultiGroup verifies that distinct groups are preserved.
 func TestNormalizeGroups_MultiGroup(t *testing.T) {
 	wsA := t.TempDir()
 	wsB := t.TempDir()
@@ -195,6 +201,8 @@ func TestNormalizeGroups_MultiGroup(t *testing.T) {
 	}
 }
 
+// TestUpsertGroup_NewGroup_AddedToFront verifies that a previously unseen
+// group is prepended to the list.
 func TestUpsertGroup_NewGroup_AddedToFront(t *testing.T) {
 	configDir := t.TempDir()
 	wsA := t.TempDir()
@@ -222,6 +230,8 @@ func TestUpsertGroup_NewGroup_AddedToFront(t *testing.T) {
 	}
 }
 
+// TestNormalizeGroups_PreservesName verifies that user-assigned group names
+// survive normalization.
 func TestNormalizeGroups_PreservesName(t *testing.T) {
 	wsA := t.TempDir()
 
@@ -271,6 +281,8 @@ func TestUpsertGroup_PreservesExistingName(t *testing.T) {
 	}
 }
 
+// TestSaveGroups_RoundTrip_WithName verifies that named groups survive a
+// save-then-load cycle.
 func TestSaveGroups_RoundTrip_WithName(t *testing.T) {
 	configDir := t.TempDir()
 	wsA := t.TempDir()

@@ -17,13 +17,16 @@ func normalizeSandbox(s string) sandbox.Type {
 }
 
 // sandboxUsable reports whether the given sandbox type can accept tasks.
-// For Codex it checks host auth, API key presence, and prior test pass.
+// For Claude, it is always usable. For Codex, the check follows a priority
+// chain: host auth (~/.codex/auth.json) > OPENAI_API_KEY > prior test pass.
 // Returns (usable, reason) where reason explains why it is not usable.
 func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 	s := sb.OrDefault()
+	// Claude sandbox is always usable (uses local OAuth or API key from env).
 	if s != sandbox.Codex {
 		return true, ""
 	}
+	// Check 1: host-level Codex auth cache (highest priority — no API key needed).
 	hasHostAuth := false
 	hostAuthReason := ""
 	if h.runner != nil {
@@ -32,6 +35,7 @@ func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 	if hasHostAuth {
 		return true, ""
 	}
+	// Check 2: explicit OPENAI_API_KEY in the env file.
 	hasAPIKey := false
 	if h.envFile != "" {
 		cfg, err := envconfig.Parse(h.envFile)
@@ -47,6 +51,7 @@ func (h *Handler) sandboxUsable(sb sandbox.Type) (bool, string) {
 		}
 		return false, reason
 	}
+	// Check 3: API key present but not yet validated — require a smoke test first.
 	if !h.sandboxTestPassedState(sandbox.Codex) {
 		return false, "Codex unavailable: run Settings -> API Configuration -> Test (Codex) first."
 	}

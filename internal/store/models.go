@@ -133,7 +133,6 @@ type SandboxActivity string
 const (
 	// SandboxActivityImplementation is the main implementation phase.
 	SandboxActivityImplementation SandboxActivity = "implementation"
-	// SandboxActivityTesting is the test-execution phase.
 	// SandboxActivityTesting is the automated test-execution phase.
 	SandboxActivityTesting SandboxActivity = "testing"
 	// SandboxActivityRefinement is the prompt-refinement phase.
@@ -148,7 +147,8 @@ const (
 	SandboxActivityIdeaAgent SandboxActivity = "idea_agent"
 
 	// SandboxActivityTest is a usage-attribution-only activity (not used for sandbox routing).
-	SandboxActivityTest          SandboxActivity = "test"
+	SandboxActivityTest SandboxActivity = "test"
+	// SandboxActivityOversightTest is a usage-attribution-only activity for test oversight generation.
 	SandboxActivityOversightTest SandboxActivity = "oversight-test"
 )
 
@@ -166,15 +166,15 @@ var SandboxActivities = []SandboxActivity{
 // TaskStatus represents the lifecycle state of a task.
 type TaskStatus string
 
-// TaskStatus constants.
+// TaskStatus constants. See allowedTransitions for the full state machine.
 const (
-	TaskStatusBacklog    TaskStatus = "backlog"
-	TaskStatusInProgress TaskStatus = "in_progress"
-	TaskStatusWaiting    TaskStatus = "waiting"
-	TaskStatusCommitting TaskStatus = "committing"
-	TaskStatusDone       TaskStatus = "done"
-	TaskStatusFailed     TaskStatus = "failed"
-	TaskStatusCancelled  TaskStatus = "cancelled"
+	TaskStatusBacklog    TaskStatus = "backlog"     // initial state; not yet started
+	TaskStatusInProgress TaskStatus = "in_progress" // agent is running in a container
+	TaskStatusWaiting    TaskStatus = "waiting"     // agent stopped, waiting for user feedback
+	TaskStatusCommitting TaskStatus = "committing"  // commit pipeline running (merge, push)
+	TaskStatusDone       TaskStatus = "done"        // completed successfully
+	TaskStatusFailed     TaskStatus = "failed"      // execution failed; eligible for retry
+	TaskStatusCancelled  TaskStatus = "cancelled"   // user-cancelled; can be retried to backlog
 )
 
 // FailureCategory identifies the root cause of a task failure.
@@ -478,20 +478,21 @@ const (
 	EventTypeSpanEnd     EventType = "span_end"
 )
 
-// Trigger identifies what caused a state_change event.
+// Trigger identifies what caused a state_change event. Used in the Data payload
+// of EventTypeStateChange events for audit trail attribution.
 type Trigger string
 
 // Trigger constants.
 const (
-	TriggerUser        Trigger = "user"
-	TriggerAutoPromote Trigger = "auto_promote"
-	TriggerAutoRetry   Trigger = "auto_retry"
-	TriggerAutoTest    Trigger = "auto_test"
-	TriggerAutoSubmit  Trigger = "auto_submit"
-	TriggerFeedback    Trigger = "feedback"
-	TriggerSync        Trigger = "sync"
-	TriggerRecovery    Trigger = "recovery"
-	TriggerSystem      Trigger = "system"
+	TriggerUser        Trigger = "user"         // explicit user action (UI button, API call)
+	TriggerAutoPromote Trigger = "auto_promote" // auto-promoter moved task from backlog
+	TriggerAutoRetry   Trigger = "auto_retry"   // auto-retrier re-queued a failed task
+	TriggerAutoTest    Trigger = "auto_test"    // auto-tester initiated a test run
+	TriggerAutoSubmit  Trigger = "auto_submit"  // auto-submitter marked a waiting task as done
+	TriggerFeedback    Trigger = "feedback"     // user feedback resumed a waiting task
+	TriggerSync        Trigger = "sync"         // worktree sync/rebase operation
+	TriggerRecovery    Trigger = "recovery"     // server startup recovery of orphaned tasks
+	TriggerSystem      Trigger = "system"       // internal system action
 )
 
 // NewStateChangeData builds the canonical payload for a state_change event.

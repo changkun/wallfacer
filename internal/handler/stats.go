@@ -55,9 +55,10 @@ type DayStat struct {
 //
 // loadSummary is an optional function that loads a TaskSummary for a given task
 // ID. When non-nil and a summary exists for a done task, the summary's
-// ByActivity and TotalCostUSD are used in place of the live task fields,
-// keeping the hot path for completed tasks out of task.json. Pass nil to
-// always use the live Task struct (backward-compatible fallback, used in tests).
+// ByActivity and TotalCostUSD are used in place of the live task fields. This
+// avoids reading task.json for completed tasks on the hot path; summary.json
+// is a small, immutable, separately cached file. Pass nil to always use the
+// live Task struct (backward-compatible fallback, used in tests).
 func aggregateStats(tasks []store.Task, loadSummary func(id uuid.UUID) (*store.TaskSummary, error)) StatsResponse {
 	resp := StatsResponse{
 		ByStatus:          make(map[store.TaskStatus]UsageStat),

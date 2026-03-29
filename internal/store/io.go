@@ -30,7 +30,10 @@ func (s *Store) pruneTaskPayload(t *Task) {
 func (s *Store) saveTask(id uuid.UUID, task *Task) error {
 	_ = id // task.ID is authoritative; id kept for call-site clarity
 	task.SchemaVersion = constants.CurrentTaskSchemaVersion
-	pruned := *task // shallow copy; in-memory slices are not modified
+	// Shallow copy: pruning operates on the copy's slice headers so the
+	// in-memory task retains its full-length slices while the disk copy
+	// is bounded. Slice elements are not mutated, so sharing is safe.
+	pruned := *task
 	s.pruneTaskPayload(&pruned)
 	return s.backend.SaveTask(&pruned)
 }
@@ -55,6 +58,8 @@ func (s *Store) truncateTurnData(data []byte) ([]byte, int) {
 		cutoff = s.maxTurnOutputBytes
 	}
 
+	// Append a JSON sentinel line so consumers can detect truncation
+	// without comparing against the expected length.
 	sentinel := fmt.Sprintf(
 		`{"type":"system","subtype":"truncation_notice","total_bytes":%d,"truncated_at":%d}`,
 		originalLen, cutoff,
@@ -138,6 +143,8 @@ func (s *Store) LoadSummary(id uuid.UUID) (*TaskSummary, error) {
 }
 
 // jsonUnmarshal is a thin wrapper around json.Unmarshal used internally.
+// It exists to provide a consistent call site for JSON parsing across the
+// store package, making it easy to swap in a different decoder if needed.
 func jsonUnmarshal(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }

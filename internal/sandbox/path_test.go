@@ -2,6 +2,8 @@ package sandbox
 
 import "testing"
 
+// TestTranslateWindowsPath_DockerDriveLetter verifies that Windows drive-letter
+// paths are translated to Docker Desktop's /c/ mount convention.
 func TestTranslateWindowsPath_DockerDriveLetter(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -44,6 +46,8 @@ func TestTranslateWindowsPath_DockerDriveLetter(t *testing.T) {
 	}
 }
 
+// TestTranslateWindowsPath_PodmanDriveLetter verifies that Windows drive-letter
+// paths are translated to Podman's /mnt/c/ mount convention.
 func TestTranslateWindowsPath_PodmanDriveLetter(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -80,6 +84,8 @@ func TestTranslateWindowsPath_PodmanDriveLetter(t *testing.T) {
 	}
 }
 
+// TestTranslateWindowsPath_NonDrivePaths verifies that non-drive-letter paths
+// (unix, UNC, relative) pass through with only backslash normalization.
 func TestTranslateWindowsPath_NonDrivePaths(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -122,6 +128,8 @@ func TestTranslateWindowsPath_NonDrivePaths(t *testing.T) {
 	}
 }
 
+// TestTranslateWindowsPath_EdgeCases covers spaces, unicode, mixed separators,
+// empty strings, and single-character inputs.
 func TestTranslateWindowsPath_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -170,6 +178,8 @@ func TestTranslateWindowsPath_EdgeCases(t *testing.T) {
 	}
 }
 
+// TestIsPodman verifies detection of Podman runtime from various binary paths
+// on both Unix and Windows-style paths.
 func TestIsPodman(t *testing.T) {
 	tests := []struct {
 		runtime string
@@ -194,6 +204,8 @@ func TestIsPodman(t *testing.T) {
 	}
 }
 
+// TestHasDriveLetter verifies detection of Windows drive letters (C:, d:, Z:)
+// and rejection of non-drive prefixes (/, \\, relative, numeric).
 func TestHasDriveLetter(t *testing.T) {
 	tests := []struct {
 		path string

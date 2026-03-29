@@ -18,10 +18,13 @@ import (
 	"changkun.de/x/wallfacer/internal/store"
 )
 
+// fallbackCodexSandboxImage is used when the base Claude image is empty or
+// unrecognised, ensuring Codex always has a usable image name.
 const fallbackCodexSandboxImage = "wallfacer-codex:latest"
 
 // privateIPNets lists networks blocked for SSRF prevention: RFC 1918 private
-// ranges, loopback (IPv4 and IPv6), and link-local ranges.
+// ranges, loopback (IPv4 and IPv6), and link-local ranges. Populated once at
+// init to avoid repeated CIDR parsing on every validateBaseURL call.
 var privateIPNets []*net.IPNet
 
 func init() {

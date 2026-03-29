@@ -259,7 +259,9 @@ func (h *Histogram) Observe(labels map[string]string, value float64) {
 		}
 		h.obs[key] = cell
 	}
-	// Cumulative: increment all buckets whose upper bound >= value.
+	// Prometheus histograms use cumulative buckets: each bucket counts all
+	// observations <= its upper bound. We increment every bucket whose bound
+	// is >= the observed value, plus the implicit +Inf bucket (always incremented).
 	for i, bound := range h.buckets {
 		if value <= bound {
 			cell.counts[i]++
@@ -303,9 +305,10 @@ func (h *Histogram) writeTo(w io.Writer) {
 // helpers
 // ---------------------------------------------------------------------------
 
-// canonicalLabelKey returns a stable string key for a label set by sorting
-// key names and joining them. The separator \x00 cannot appear in label names
-// or values per the Prometheus data model.
+// canonicalLabelKey returns a deterministic string key for a label set by
+// sorting key names and joining them with \x00 separators. The null byte
+// cannot appear in Prometheus label names or values, so it is a safe delimiter
+// that prevents collisions between distinct label combinations.
 func canonicalLabelKey(labels map[string]string) string {
 	if len(labels) == 0 {
 		return ""
@@ -346,6 +349,7 @@ func writeMetricLine(w io.Writer, name string, labels map[string]string, value f
 
 // escapeLabel escapes special characters in label values per the Prometheus
 // text format specification: backslash, double-quote, and newline.
+// Order matters: backslash must be escaped first to avoid double-escaping.
 func escapeLabel(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)
@@ -369,6 +373,7 @@ func formatMetricValue(v float64) string {
 }
 
 // formatFloat formats a finite bucket boundary for the "le" label.
+// It delegates to formatMetricValue, which uses %g to avoid trailing zeros.
 func formatFloat(v float64) string {
 	return formatMetricValue(v)
 }

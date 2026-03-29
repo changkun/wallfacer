@@ -20,11 +20,16 @@ void tray_quit(void);
 import "C"
 import "unsafe"
 
+// goMenuItemClicked is the cgo-exported callback invoked by the Objective-C
+// NSMenu action handler when a menu item is selected.
+//
 //export goMenuItemClicked
 func goMenuItemClicked(itemID C.int) {
 	menuItemClicked(uint32(itemID))
 }
 
+// nativeStart initializes the NSStatusItem via Objective-C and fires readyCb
+// on a separate goroutine so the caller is not blocked by AppKit setup.
 func nativeStart() {
 	C.tray_init()
 	if readyCb != nil {
@@ -32,6 +37,7 @@ func nativeStart() {
 	}
 }
 
+// nativeEnd is a no-op on macOS; the NSStatusItem is released by tray_quit.
 func nativeEnd() {}
 
 func nativeSetIcon(data []byte, isTemplate bool) {
@@ -96,4 +102,6 @@ func nativeQuit() {
 	C.tray_quit()
 }
 
+// nativeSetOnTapped is a no-op on macOS; left-click always opens the menu
+// because NSStatusItem does not distinguish left/right click natively.
 func nativeSetOnTapped(_ bool) {}

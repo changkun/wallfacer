@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+// TestRunDesktopStub verifies that the non-desktop build returns a clear error
+// message indicating the feature requires the -tags desktop build flag.
 func TestRunDesktopStub(t *testing.T) {
 	err := RunDesktop("", nil, nil, nil)
 	if err == nil {

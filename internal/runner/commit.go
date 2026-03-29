@@ -298,8 +298,10 @@ func (r *Runner) hostStageAndCommit(ctx context.Context, taskID uuid.UUID, workt
 	}
 
 	// Second pass: commit each worktree with the generated message.
-	// Use global git identity to prevent sandbox-set local configs from
-	// overriding the host user's author information.
+	// Use global git identity (via -c overrides) to prevent sandbox-set
+	// local configs from overriding the host user's author information.
+	// The sandbox container may have set user.name/email in the worktree's
+	// .git/config; -c flags take precedence over all config levels.
 	var gitConfigOverrides []string
 	if n, err := cmdexec.New("git", "config", "--global", "user.name").WithContext(ctx).Output(); err == nil && n != "" {
 		gitConfigOverrides = append(gitConfigOverrides, "-c", "user.name="+n)

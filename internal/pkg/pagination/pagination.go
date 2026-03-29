@@ -34,7 +34,7 @@ func Paginate[T any](
 		limit = maxLimit
 	}
 
-	var result []T
+	var result []T // lazily allocated on first match; nil-checked below for JSON
 	totalFiltered := 0
 
 	// Single pass: skip items at or before the cursor, apply filter, then

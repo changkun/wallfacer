@@ -783,6 +783,7 @@ func TestUpdateWorkspaces_ClearsWithEmpty(t *testing.T) {
 	}
 }
 
+// TestParseTerminalEnabledDefaultsToTrue verifies that TerminalEnabled is true when the key is absent.
 func TestParseTerminalEnabledDefaultsToTrue(t *testing.T) {
 	path := writeEnvFile(t, "CLAUDE_CODE_OAUTH_TOKEN=tok\n")
 	cfg, err := envconfig.Parse(path)
@@ -794,6 +795,7 @@ func TestParseTerminalEnabledDefaultsToTrue(t *testing.T) {
 	}
 }
 
+// TestParseTerminalEnabledFalse verifies that TerminalEnabled is false when explicitly set to "false".
 func TestParseTerminalEnabledFalse(t *testing.T) {
 	path := writeEnvFile(t, "WALLFACER_TERMINAL_ENABLED=false\n")
 	cfg, err := envconfig.Parse(path)

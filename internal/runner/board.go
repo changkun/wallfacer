@@ -340,6 +340,8 @@ func writeBoardDir(data []byte, baseDir string) (string, error) {
 // writes the board manifest in a single streaming pass without constructing an
 // intermediate BoardManifest value. It returns the directory path and the
 // number of bytes written. The caller must defer os.RemoveAll(dir) on success.
+// This streaming approach avoids allocating the full JSON byte slice in memory
+// for boards with many tasks, keeping heap pressure proportional to one task.
 func streamBoardJSON(ctx context.Context, st *store.Store, selfTaskID uuid.UUID, mountWorktrees bool) (dir string, written int64, err error) {
 	dir, err = os.MkdirTemp("", "wallfacer-board-*")
 	if err != nil {

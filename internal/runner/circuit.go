@@ -26,6 +26,8 @@ func isContainerRuntimeError(err error) bool {
 	}
 
 	// Non-exit error: check the message for daemon/binary unavailability.
+	// Manual ASCII lowercase avoids importing strings to keep this file's
+	// dependency surface minimal (it is called on every container error).
 	msg := err.Error()
 	lower := make([]byte, len(msg))
 	for i := 0; i < len(msg); i++ {

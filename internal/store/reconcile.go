@@ -23,6 +23,9 @@ func (s *Store) RebuildSearchIndex(ctx context.Context) (int, error) {
 		if err := ctx.Err(); err != nil {
 			return repaired, err
 		}
+		// Per-task processing uses short lock holds: a read lock to snapshot
+		// the task pointer, then unlocked disk I/O for oversight, then a
+		// write lock only to update the index entry.
 		s.mu.RLock()
 		task, ok := s.tasks[id]
 		s.mu.RUnlock()

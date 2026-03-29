@@ -11,6 +11,9 @@ import (
 	"unsafe"
 )
 
+// winsize mirrors the kernel's struct winsize used by TIOCSWINSZ.
+// X and Y are pixel dimensions; they are unused here but must be
+// present to match the kernel struct layout.
 type winsize struct {
 	Row uint16
 	Col uint16
@@ -41,10 +44,12 @@ func StartWithSize(cmd *exec.Cmd, rows, cols uint16) (*os.File, error) {
 	cmd.Stdin = slave
 	cmd.Stdout = slave
 	cmd.Stderr = slave
+	// Start a new session and make the slave the controlling terminal.
+	// Ctty=0 refers to the child's fd 0 (stdin), which is the slave PTY.
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setsid:  true,
 		Setctty: true,
-		Ctty:    0, // child fd 0 = stdin = slave PTY
+		Ctty:    0,
 	}
 
 	if err := Setsize(master, rows, cols); err != nil {

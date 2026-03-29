@@ -152,8 +152,10 @@ type terminalMessage struct {
 	Rows int    `json:"rows,omitempty"`
 }
 
-// cleanup sends SIGHUP to the shell process group, waits briefly, then
-// force-kills if still alive.
+// cleanup sends SIGHUP to the shell process group (graceful hangup signal),
+// waits up to 2 seconds for the process to exit, then sends SIGKILL if
+// still alive. The negative PID targets the entire process group so child
+// processes spawned by the shell are also terminated.
 func (s *terminalSession) cleanup() {
 	s.cancel()
 	if s.cmd.Process != nil {
@@ -198,7 +200,8 @@ func (h *Handler) resolveTerminalCwd(cwd string) string {
 	return os.TempDir()
 }
 
-// hasPrefix is a simple string prefix check.
+// hasPrefix is a simple string prefix check. It avoids importing strings
+// for a single call site in resolveTerminalCwd.
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }

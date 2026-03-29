@@ -49,8 +49,9 @@ func (s *Store) InsertEvent(_ context.Context, taskID uuid.UUID, eventType Event
 // GetEvents returns a copy of all events for a task in order.
 // If events have not been loaded yet (lazy loading for terminal tasks),
 // this method upgrades from a read lock to a write lock, loads the events,
-// then downgrades back to a read lock. The lock gap between RUnlock and
-// Lock is safe because ensureEventsLoadedLocked is idempotent.
+// then downgrades back to a read lock. The brief window between RUnlock
+// and Lock where s.mu is unheld is safe because ensureEventsLoadedLocked
+// is idempotent — a concurrent goroutine loading the same events is harmless.
 func (s *Store) GetEvents(_ context.Context, taskID uuid.UUID) ([]TaskEvent, error) {
 	s.mu.RLock()
 	if !s.eventsLoaded[taskID] {
@@ -105,6 +106,8 @@ func (s *Store) GetEventsPage(_ context.Context, taskID uuid.UUID, afterID int64
 		}
 	}
 
+	// Paginate using event ID as the cursor key.
+	// Default page size is 200, hard max is 1000.
 	p := pagination.Paginate(
 		s.events[taskID],
 		func(ev TaskEvent) int64 { return ev.ID },
@@ -152,6 +155,8 @@ func ComputeSpans(events []TaskEvent) ([]SpanResult, error) {
 		}
 		key := spanKey{phase: data.Phase, label: data.Label}
 		if ev.EventType == EventTypeSpanStart {
+			// If the same phase+label starts again before ending, the
+			// previous start is overwritten (most recent start wins).
 			startTimes[key] = ev.CreatedAt
 		} else {
 			if startedAt, ok := startTimes[key]; ok {

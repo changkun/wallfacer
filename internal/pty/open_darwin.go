@@ -38,6 +38,8 @@ func Open() (master, slave *os.File, err error) {
 		return nil, nil, fmt.Errorf("pty: TIOCPTYUNLK: %w", errno)
 	}
 
+	// Retrieve the slave device path (e.g. /dev/ttys003) via TIOCPTYGNAME.
+	// The ioctl writes a null-terminated C string into the buffer.
 	var name [128]byte
 	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd,
 		ioctlTIOCPTYGNAME, uintptr(unsafe.Pointer(&name[0]))); errno != 0 {
@@ -45,6 +47,7 @@ func Open() (master, slave *os.File, err error) {
 		return nil, nil, fmt.Errorf("pty: TIOCPTYGNAME: %w", errno)
 	}
 
+	// Find the null terminator to extract the path string.
 	end := 0
 	for end < len(name) && name[end] != 0 {
 		end++

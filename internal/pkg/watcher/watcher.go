@@ -42,7 +42,8 @@ type Config struct {
 }
 
 // Start launches a background goroutine running the configured event loop.
-// The goroutine exits when ctx is cancelled.
+// The goroutine exits when ctx is cancelled. Start returns immediately;
+// the caller must cancel ctx to stop the watcher.
 func Start(ctx context.Context, cfg Config) {
 	go run(ctx, cfg)
 }

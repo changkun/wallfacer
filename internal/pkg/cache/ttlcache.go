@@ -98,6 +98,9 @@ func (c *TTLCache[K, V]) SetPermanent(key K, value V) {
 			delete(c.entries, oldest)
 		}
 	}
+	// Write (or overwrite) the entry unconditionally. This is outside the
+	// if-!exists block so that updating an existing permanent entry refreshes
+	// its value without re-triggering eviction.
 	c.entries[key] = entry[V]{
 		value:     value,
 		permanent: true,

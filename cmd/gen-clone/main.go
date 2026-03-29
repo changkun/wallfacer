@@ -25,6 +25,9 @@ const (
 	outputFile = "tasks_clone_gen.go"
 )
 
+// main parses the Task struct from models.go, classifies each field by its
+// clone strategy (shallow copy, slices.Clone, maps.Clone, or pointer deref),
+// and writes the deepCloneTask function to tasks_clone_gen.go.
 func main() {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, inputFile, nil, 0)
@@ -115,11 +118,11 @@ func main() {
 					ops = append(ops, fieldOp{"slice", name, ""})
 				}
 			case *ast.MapType:
-				_ = t // silence unused-variable warning; the type assertion is only for matching
+				_ = t // the type assertion variable is unused; we only need the type match
 				needMaps = true
 				ops = append(ops, fieldOp{"map", name, ""})
 			case *ast.StarExpr:
-				_ = t // silence unused-variable warning; the type assertion is only for matching
+				_ = t // the type assertion variable is unused; we only need the type match
 				// Each pointer field gets an explicit nil-guard + dereference copy
 				// so the caller gets a fully independent Task value.
 				ops = append(ops, fieldOp{"ptr", name, lowerFirst(name)})
@@ -157,7 +160,10 @@ func main() {
 	buf.WriteString("\t}\n\n")
 	buf.WriteString("\tcp := *t\n")
 
-	// Emit slice assignments.
+	// Emit clone assignments in three passes (slices, maps, pointers) to
+	// group related operations and produce readable generated code.
+
+	// Pass 1: Emit slice assignments.
 	for _, op := range ops {
 		switch op.kind {
 		case "slice":
@@ -167,14 +173,14 @@ func main() {
 		}
 	}
 
-	// Emit map assignments.
+	// Pass 2: Emit map assignments.
 	for _, op := range ops {
 		if op.kind == "map" {
 			fmt.Fprintf(&buf, "\tcp.%s = maps.Clone(t.%s)\n", op.name, op.name)
 		}
 	}
 
-	// Emit pointer nil-guard + copy blocks.
+	// Pass 3: Emit pointer nil-guard + dereference-copy blocks.
 	buf.WriteString("\n")
 	for _, op := range ops {
 		if op.kind != "ptr" {

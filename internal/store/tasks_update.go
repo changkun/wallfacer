@@ -44,9 +44,9 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 		// Terminal state reached: compact event trace files in the background.
 		// Capture the highest sequence number from in-memory state while we
 		// still hold the store lock, so the goroutine only compacts events
-		// that belong to the session that just finished. If the task is
-		// immediately retried, new events (higher seqs) will be left as
-		// numbered files and picked up by the next compaction cycle.
+		// that belong to the session that just finished. This bounded
+		// compaction prevents a race where an immediate retry would have
+		// new-session events bundled into the previous session's compact file.
 		maxSeq := int64(s.nextSeq[id] - 1)
 		s.compactWg.Add(1)
 		go func(taskID uuid.UUID, maxSeq int64) {
@@ -281,7 +281,11 @@ func (s *Store) AreDependenciesSatisfied(_ context.Context, id uuid.UUID) (bool,
 		}
 		dep, ok := s.tasks[depID]
 		if !ok {
-			return false, nil // deleted dependency → unsatisfied (conservative)
+			// Dependency was deleted or purged. Treat as unsatisfied to
+			// prevent silent unblocking. In normal operation, DeleteTask
+			// cleans up orphaned dependency references, so this path only
+			// fires for race conditions or data corruption.
+			return false, nil
 		}
 		if dep.Status != TaskStatusDone {
 			return false, nil
@@ -444,7 +448,8 @@ func (s *Store) ResetTaskForRetry(_ context.Context, id uuid.UUID, newPrompt str
 		return fmt.Errorf("task not found: %s", id)
 	}
 
-	// Snapshot the current run's outcome before resetting fields.
+	// Snapshot the current run's outcome into a RetryRecord before resetting
+	// fields. This preserves a condensed audit trail of each lifecycle.
 	// Result is truncated to 2000 chars to keep the RetryHistory entries bounded.
 	result := ""
 	if t.Result != nil {

@@ -32,6 +32,8 @@ func (w *WaitGroup) Add(label string) {
 }
 
 // Done decrements the wait group counter and removes label from pending.
+// The label must match a previous [Add] call. When the count for a label
+// drops to zero, the entry is deleted to keep Pending output clean.
 func (w *WaitGroup) Done(label string) {
 	w.mu.Lock()
 	w.pending[label]--

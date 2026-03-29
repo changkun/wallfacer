@@ -42,12 +42,16 @@ var (
 )
 
 const (
+	// Standard Windows messages.
 	wmClose   = 0x0010
 	wmDestroy = 0x0002
 	wmCommand = 0x0111
-	wmApp     = 0x8000
-	wmTray    = wmApp + 1
-	wmRunOp   = wmApp + 2
+
+	// Application-defined messages. wmTray receives Shell_NotifyIcon callbacks;
+	// wmRunOp is posted to drain the deferred operation queue on the UI thread.
+	wmApp   = 0x8000
+	wmTray  = wmApp + 1
+	wmRunOp = wmApp + 2
 
 	wmLButtonUp = 0x0202
 	wmRButtonUp = 0x0205
@@ -152,6 +156,9 @@ var (
 	wmTaskbarCreated uintptr
 )
 
+// nativeStart creates a hidden message-only window on a dedicated OS thread
+// (required by Win32) and registers the Shell_NotifyIcon. All subsequent
+// native operations are marshalled to this thread via postOp + wmRunOp.
 func nativeStart() {
 	go func() {
 		runtime.LockOSThread()
@@ -220,9 +227,13 @@ func nativeStart() {
 	}()
 }
 
+// wndProc is the Win32 window procedure for the hidden tray window.
+// It handles tray icon callbacks (wmTray), menu item clicks (wmCommand),
+// deferred operation dispatch (wmRunOp), and explorer.exe restart recovery.
 func wndProc(hwnd, message, wParam, lParam uintptr) uintptr {
 	switch message {
 	case wmTray:
+		// lParam low word contains the mouse message that triggered the callback.
 		switch lParam & 0xFFFF {
 		case wmLButtonUp:
 			tappedMu.Lock()
@@ -261,6 +272,8 @@ func wndProc(hwnd, message, wParam, lParam uintptr) uintptr {
 		pPostQuitMessage.Call(0)
 		return 0
 	default:
+		// When explorer.exe restarts (e.g. after a crash), it broadcasts
+		// "TaskbarCreated". Re-add our icon so it reappears in the tray.
 		if message == wmTaskbarCreated && wmTaskbarCreated != 0 {
 			pShellNotifyIcon.Call(nimAdd, uintptr(unsafe.Pointer(&winNID)))
 			return 0
@@ -278,6 +291,10 @@ func showPopupMenu() {
 		uintptr(pt.x), uintptr(pt.y), winHWND, 0)
 }
 
+// postOp enqueues fn for execution on the Windows message loop thread.
+// If the window is already created, it posts a wmRunOp message to wake the
+// loop. Otherwise the ops accumulate and are flushed once nativeStart
+// finishes creating the hidden window.
 func postOp(fn func()) {
 	winOpsMu.Lock()
 	winOps = append(winOps, fn)
@@ -312,6 +329,8 @@ func nativeSetIcon(data []byte, _ bool) {
 	})
 }
 
+// loadICO writes ICO data to a temp file and loads it via LoadImage.
+// Win32 LoadImage requires a file path; there is no in-memory alternative.
 func loadICO(data []byte) (uintptr, error) {
 	f, err := os.CreateTemp("", "wallfacer-*.ico")
 	if err != nil {

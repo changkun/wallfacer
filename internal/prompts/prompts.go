@@ -24,7 +24,7 @@ import (
 )
 
 //go:embed *.tmpl
-var fs embed.FS
+var fs embed.FS // embedded template filesystem, compiled into the binary
 
 // embeddedTmpl holds the parsed set of all *.tmpl files embedded in the binary.
 // It is populated once during init and shared (read-only) by all Manager instances.
@@ -305,7 +305,9 @@ func (m *Manager) Validate(apiName, content string) error {
 	return nil
 }
 
-// --- Data structs (unchanged public API) ---
+// --- Data structs ---
+// These types define the template context for each prompt. Field names must
+// match the {{.FieldName}} references in the corresponding *.tmpl files.
 
 // RefinementData holds template variables for the refinement prompt.
 type RefinementData struct {

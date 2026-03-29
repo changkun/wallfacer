@@ -12,8 +12,9 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 )
 
-// Version is set at build time via -ldflags. When empty (dev build),
-// the binary pulls the :latest sandbox image.
+// Version is set at build time via -ldflags (e.g. -X cli.Version=1.2.3).
+// When empty (dev build), the binary pulls the :latest sandbox image and
+// the doctor subcommand displays "dev" as the version string.
 var Version = ""
 
 // sandboxImageBase is the registry path for the published sandbox image.
@@ -29,7 +30,8 @@ func defaultSandboxImage() string {
 	return sandboxImageBase + ":latest"
 }
 
-// fallbackSandboxImage is used when the remote image cannot be pulled.
+// fallbackSandboxImage is the locally-built image name used when the
+// remote registry image cannot be pulled (e.g. no network, auth failure).
 const fallbackSandboxImage = "wallfacer:latest"
 
 // ConfigDir returns the default wallfacer configuration directory.

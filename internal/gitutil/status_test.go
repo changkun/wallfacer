@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// TestWorkspaceStatus validates git status inspection across plain directories,
+// repos without remotes, repos with upstream tracking, and ahead/behind counts.
 func TestWorkspaceStatus(t *testing.T) {
 	t.Run("plain directory is not a git repo", func(t *testing.T) {
 		dir := t.TempDir()

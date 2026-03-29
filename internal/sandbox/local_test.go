@@ -8,6 +8,8 @@ import (
 	"changkun.de/x/wallfacer/internal/metrics"
 )
 
+// TestLaunchEphemeralWhenDisabled verifies that when task workers are disabled,
+// Launch always creates an ephemeral container even when a task ID label is present.
 func TestLaunchEphemeralWhenDisabled(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
@@ -45,6 +47,8 @@ func TestLaunchEphemeralWhenDisabled(t *testing.T) {
 	}
 }
 
+// TestLaunchEphemeralWithoutTaskID verifies that Launch creates an ephemeral
+// container when no wallfacer.task.id label is set, even with workers enabled.
 func TestLaunchEphemeralWithoutTaskID(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
@@ -81,6 +85,8 @@ func TestLaunchEphemeralWithoutTaskID(t *testing.T) {
 	}
 }
 
+// TestLaunchCreatesWorker verifies that Launch creates a persistent worker
+// container when task workers are enabled and a task ID label is present.
 func TestLaunchCreatesWorker(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
@@ -121,6 +127,8 @@ func TestLaunchCreatesWorker(t *testing.T) {
 	b.StopTaskWorker(taskID)
 }
 
+// TestLaunchReusesWorker verifies that consecutive Launch calls for the same
+// task ID reuse the same worker container instead of creating a new one.
 func TestLaunchReusesWorker(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
@@ -166,6 +174,8 @@ func TestLaunchReusesWorker(t *testing.T) {
 	b.StopTaskWorker(taskID)
 }
 
+// TestWorkerMetricsRecorded verifies that worker lifecycle events (creates,
+// execs, fallbacks) are tracked in the Prometheus-compatible metrics registry.
 func TestWorkerMetricsRecorded(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
@@ -203,6 +213,8 @@ func TestWorkerMetricsRecorded(t *testing.T) {
 	}
 }
 
+// TestStopTaskWorker verifies that StopTaskWorker removes the worker from the
+// internal map and that calling it again is a safe no-op.
 func TestStopTaskWorker(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)

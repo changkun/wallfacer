@@ -25,7 +25,9 @@ func main() {
 	if len(os.Args) >= 2 {
 		subcmd = os.Args[1]
 	}
-	// macOS passes -psn_... when launching from Finder; treat as no subcommand.
+	// macOS passes -psn_<pid> (process serial number) when launching a .app
+	// bundle from Finder. Strip any dash-prefixed arg that isn't a help flag
+	// so the app falls through to the default subcommand (desktop mode).
 	if len(subcmd) > 0 && subcmd[0] == '-' && subcmd != "-help" && subcmd != "--help" && subcmd != "-h" {
 		subcmd = ""
 	}

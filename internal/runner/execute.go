@@ -18,6 +18,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// Compiled regex patterns for test verdict extraction. These are evaluated in
+// priority order by parseTestVerdict: markdown bold markers first, then
+// explicit labeled patterns, then content-level heuristics, then LLM-style
+// inference. Adding a new pattern here requires updating the corresponding
+// section in inferPassFromContent or parseTestVerdictFromLine.
 var (
 	// verdictLabelPattern detects explicit labeled verdict lines such as:
 	// "Result: PASS", "Verdict: FAILED", "Status - Pass", etc.
@@ -143,7 +148,9 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 
 	// Guard: if this goroutine returns without explicitly setting the task
 	// status (panic, early error), move to "failed" so the task doesn't
-	// stay stuck in "in_progress" forever.
+	// stay stuck in "in_progress" forever. Every exit path in the turn loop
+	// must set statusSet=true before returning; the defer only fires when
+	// an unexpected code path (e.g. panic recovery) skips the explicit transition.
 	statusSet := false
 	defer func() {
 		if p := recover(); p != nil {
@@ -338,7 +345,7 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 	// It is kept separate from sessionID which holds the implementation session.
 	var testSessionID string
 
-	// The agent's -p --resume mode reports per-invocation totals for both
+	// NOTE: The agent's -p --resume mode reports per-invocation totals for both
 	// cost (total_cost_usd) and usage tokens — they are NOT session-cumulative.
 	// Each container invocation's values represent only that invocation's
 	// consumption, so we accumulate them directly without delta subtraction.
@@ -581,6 +588,10 @@ func (r *Runner) Run(taskID uuid.UUID, prompt, sessionID string, resumedFromWait
 			return
 		}
 
+		// Route the agent's stop_reason to the appropriate state transition.
+		// "end_turn" means the agent finished normally; "max_tokens"/"pause_turn"
+		// mean it hit a limit and should auto-continue; empty/unknown means it
+		// needs user feedback.
 		switch output.StopReason {
 		case "end_turn":
 			statusSet = true

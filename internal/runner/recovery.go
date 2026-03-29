@@ -208,6 +208,8 @@ func monitorContainerUntilStoppedWithConfig(ctx context.Context, s *store.Store,
 
 	// storeCtx is intentionally decoupled from the monitor lifetime so that
 	// store writes always complete even when ctx is cancelled or timed out.
+	// Using context.Background() here prevents a server shutdown from
+	// aborting the final status transition that moves the task to waiting.
 	storeCtx := context.Background()
 
 	transitionToWaiting := func() {

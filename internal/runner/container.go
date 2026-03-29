@@ -308,6 +308,8 @@ func (r *Runner) buildBaseContainerSpec(containerName, model string, sb sandbox.
 // entrypointForSandbox returns the entrypoint script path for the given
 // sandbox type. This is needed because podman exec does not invoke the
 // image ENTRYPOINT automatically; worker containers must prepend it.
+// Both sandbox types currently use the same path; the switch exists to
+// make future divergence explicit without requiring a code restructure.
 func entrypointForSandbox(sb sandbox.Type) string {
 	switch sb {
 	case sandbox.Codex:
@@ -549,6 +551,10 @@ func (r *Runner) runContainer(
 		logger.Runner.Warn("runContainer: get task", "task", taskID, "error", err)
 	}
 
+	// runWithSandbox encapsulates the full launch-read-parse cycle for a
+	// single sandbox type. It is called once with the configured sandbox,
+	// and possibly a second time with Codex if a token/rate limit is detected
+	// (claude→codex fallback).
 	runWithSandbox := func(selectedSandbox sandbox.Type) (*agentOutput, []byte, []byte, error) {
 		// Refuse to launch if the container runtime is known-unavailable.
 		if !r.containerCB.Allow() {
@@ -652,6 +658,9 @@ func (r *Runner) runContainer(
 		return output, rawStdout, rawStderr, nil
 	}
 
+	// Primary attempt with the configured sandbox, followed by automatic
+	// claude→codex fallback on token/rate limit errors (checked twice:
+	// once for launch/exec errors, once for is_error in the parsed output).
 	output, rawStdout, rawStderr, err := runWithSandbox(sb)
 	if err != nil {
 		if sb == sandbox.Claude && isLikelyTokenLimitError(err.Error(), string(rawStderr)) {

@@ -24,7 +24,8 @@ func New[T comparable](load func() T) *Value[T] {
 }
 
 // Get returns the cached value, calling the load function if the cache is
-// invalid. Concurrent callers block until the first caller finishes loading.
+// invalid. Concurrent callers serialize on the mutex, so only the first
+// caller invokes load; subsequent callers see the cached result.
 func (v *Value[T]) Get() T {
 	v.mu.Lock()
 	defer v.mu.Unlock()

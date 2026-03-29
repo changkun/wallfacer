@@ -24,7 +24,8 @@ func Open() (master, slave *os.File, err error) {
 		return nil, nil, fmt.Errorf("pty: open /dev/ptmx: %w", err)
 	}
 
-	// Unlock the slave.
+	// Unlock the slave side. TIOCSPTLCK with a zero value clears the lock
+	// so the slave device (/dev/pts/N) can be opened.
 	var unlock int32
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, m.Fd(),
 		ioctlTIOCSPTLCK, uintptr(unsafe.Pointer(&unlock)))

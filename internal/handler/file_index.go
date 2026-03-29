@@ -18,11 +18,12 @@ type fileCacheEntry struct {
 	rootMTime time.Time // mtime of the workspace root dir at index build time
 }
 
-// fileIndex is a per-workspace cache for file listings. Each entry is
-// considered fresh as long as neither the TTL has elapsed nor the workspace
-// root directory mtime has advanced. On staleness the current (possibly
-// outdated) list is returned immediately while a background goroutine rebuilds
-// the entry.
+// fileIndex is a per-workspace cache for file listings used by the @ mention
+// autocomplete endpoint. Each entry is considered fresh as long as neither the
+// TTL has elapsed nor the workspace root directory mtime has advanced.
+// On staleness the current (possibly outdated) list is returned immediately
+// while a background goroutine rebuilds the entry. This "serve stale, refresh
+// async" pattern keeps GetFiles latency constant regardless of workspace size.
 type fileIndex struct {
 	mu         sync.RWMutex
 	entries    map[string]fileCacheEntry

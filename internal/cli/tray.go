@@ -121,7 +121,8 @@ func (tm *TrayManager) onReady() {
 
 	mQuit := systray.AddMenuItem("Quit", "Quit Wallfacer")
 
-	// Click handler goroutine.
+	// Click handler goroutine: multiplexes channel receives from all menu
+	// items. Each select case maps a click to the corresponding action.
 	go func() {
 		for {
 			select {
@@ -144,7 +145,10 @@ func (tm *TrayManager) onReady() {
 		}
 	}()
 
-	// Poll loop goroutine.
+	// Poll loop goroutine: periodically fetches server health, config toggles,
+	// and cost stats to keep the tray menu and icon state current. Health and
+	// config are polled at trayPollInterval (5s); stats at trayStatsPollInterval
+	// (30s) since cost data changes slowly.
 	go func() {
 		tm.poll()       // initial health poll
 		tm.pollConfig() // initial config poll
@@ -182,7 +186,8 @@ func (tm *TrayManager) poll() {
 	}
 
 	// Update icon. Use SetTemplateIcon for all states so macOS auto-adapts
-	// the icon color for both light and dark menu bars.
+	// the icon color for both light and dark menu bars. Only update on state
+	// transition to avoid redundant CGO calls.
 	state := iconState(data.TasksByStatus)
 	if state != tm.lastIconState {
 		switch state {
@@ -203,7 +208,8 @@ func (tm *TrayManager) poll() {
 	}
 	systray.SetTooltip(formatTooltip(data.TasksByStatus, data.UptimeSeconds, costStr))
 
-	// Update menu labels.
+	// Update menu labels. "In Progress" includes committing tasks (still
+	// running); "Waiting" includes failed tasks (both need user attention).
 	inProgress := data.TasksByStatus["in_progress"] + data.TasksByStatus["committing"]
 	waiting := data.TasksByStatus["waiting"] + data.TasksByStatus["failed"]
 	backlog := data.TasksByStatus["backlog"]
@@ -243,6 +249,8 @@ func (tm *TrayManager) fetchHealth() (*healthData, error) {
 }
 
 // iconState returns the icon variant name based on task status counts.
+// Priority: attention (waiting/failed) > active (in_progress/committing) > idle.
+// Attention takes precedence because it signals that user action is needed.
 func iconState(tasksByStatus map[string]int) string {
 	if tasksByStatus["waiting"] > 0 || tasksByStatus["failed"] > 0 {
 		return "attention"
@@ -334,8 +342,8 @@ func (tm *TrayManager) fetchConfig() (*configData, error) {
 }
 
 // handleToggle sends a PUT /api/config to invert the given toggle.
-// On success, the menu item's check state is updated. On failure, the
-// state is left unchanged.
+// The local check state is only updated after a successful server response
+// (not optimistically) to avoid UI/server state divergence on error.
 func (tm *TrayManager) handleToggle(field string, item *systray.MenuItem) {
 	newValue := !item.Checked()
 	if err := tm.toggleConfig(field, newValue); err != nil {

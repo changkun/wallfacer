@@ -92,6 +92,8 @@ func (b *Breaker) Allow() bool {
 }
 
 // RecordSuccess resets the failure counter and closes the circuit.
+// State is set before failures so that concurrent Allow calls see Closed
+// immediately, even if the failure counter is momentarily stale.
 func (b *Breaker) RecordSuccess() {
 	b.state.Swap(int32(Closed))
 	b.failures.Store(0)

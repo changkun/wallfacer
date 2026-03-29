@@ -14,7 +14,8 @@ func (s *Store) turnUsagePath(taskID uuid.UUID) string {
 
 // AppendTurnUsage appends a single TurnUsageRecord to the task's JSONL log.
 // The file is created on first write. Each line is a complete JSON object.
-// No store lock is taken because filesystem appends < 4KB are atomic on Linux.
+// No store lock is taken because each append is a single small write (<4KB)
+// which is atomic on common Linux filesystems (ext4, btrfs).
 func (s *Store) AppendTurnUsage(taskID uuid.UUID, rec TurnUsageRecord) error {
 	return ndjson.AppendFile(s.turnUsagePath(taskID), rec)
 }

@@ -55,7 +55,11 @@ func Init(format string) {
 }
 
 // Fatal prints a user-friendly error to stderr and exits with code 1.
+// It accepts slog-style key-value pairs; if an "error" key is present,
+// its value is appended to the message for context.
 func Fatal(msg string, args ...any) {
+	// Walk the key-value pairs looking for a key named "error" to extract
+	// a human-readable error detail, matching the slog convention.
 	var errVal string
 	for i := 0; i+1 < len(args); i += 2 {
 		if k, ok := args[i].(string); ok && k == "error" {
@@ -116,10 +120,14 @@ func isColorEnabled(w io.Writer) bool {
 	if err != nil {
 		return false
 	}
+	// ModeCharDevice distinguishes real terminals (TTYs) from regular files
+	// and pipes, so colors are only emitted to interactive sessions.
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
-// clone returns a shallow copy with an independent preAttrs slice (copy-on-write).
+// clone returns a shallow copy with an independent preAttrs slice.
+// The three-index slice expression caps capacity so that subsequent appends
+// to the clone allocate a new backing array rather than mutating the original.
 func (h *prettyHandler) clone() *prettyHandler {
 	return &prettyHandler{
 		w:        h.w,
@@ -261,14 +269,15 @@ func prettyValue(v slog.Value) string {
 	return s
 }
 
-// isUUID reports whether s has the canonical UUID string format (36 chars).
+// isUUID reports whether s has the canonical UUID string format
+// (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx, 36 chars with hyphens at fixed positions).
 func isUUID(s string) bool {
 	if len(s) != 36 {
 		return false
 	}
 	for i, r := range s {
 		switch i {
-		case 8, 13, 18, 23:
+		case 8, 13, 18, 23: // Positions of the four hyphens in a UUID.
 			if r != '-' {
 				return false
 			}

@@ -28,7 +28,10 @@ func newLiveLog() *liveLog {
 }
 
 // Write appends p to the buffer and wakes all blocked readers.
-// It is safe to call from multiple goroutines.
+// It is safe to call from multiple goroutines. The wake mechanism uses a
+// close-and-replace pattern: the current notify channel is closed (waking
+// all readers blocked in ReadChunk), then replaced with a fresh channel
+// for the next wait cycle. This avoids maintaining a subscriber list.
 func (l *liveLog) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	l.buf = append(l.buf, p...)

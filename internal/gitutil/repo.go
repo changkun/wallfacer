@@ -41,8 +41,10 @@ func parseConflictedFiles(output string) []string {
 	return files
 }
 
-// IsRebaseNeedsMergeOutput reports if git output likely indicates the repo is
-// stuck in or blocked by an active/previous rebase or merge state.
+// IsRebaseNeedsMergeOutput reports whether git output indicates the repo is
+// stuck in or blocked by an active/previous rebase or merge state. It checks
+// two categories: explicit interrupted-operation states (e.g. "rebase in progress")
+// and dirty-index/worktree conditions that prevent a new rebase from starting.
 func IsRebaseNeedsMergeOutput(s string) bool {
 	ls := strings.ToLower(s)
 	return isRebaseBlockedByConflictOrState(ls) ||
@@ -127,6 +129,8 @@ func RemoteDefaultBranch(repoPath string) string {
 			return branch
 		}
 	}
+	// origin/HEAD may not be set (e.g. manually added remotes). Probe the
+	// two most common default branch names to give a best-effort answer.
 	if cmdexec.Git(repoPath, "rev-parse", "--verify", "origin/main").Run() == nil {
 		return "main"
 	}

@@ -14,6 +14,9 @@ import (
 // captureExecutionEnvironment snapshots the runtime environment at the start of
 // a task execution. The returned record is persisted via UpdateTaskEnvironment
 // so that reproducibility auditing can identify what changed between runs.
+// Individual field capture failures (missing env file, unavailable image digest)
+// are silently tolerated: the environment is best-effort metadata that must
+// never prevent a task from executing.
 func (r *Runner) captureExecutionEnvironment(task store.Task) store.ExecutionEnvironment {
 	env := store.ExecutionEnvironment{
 		RecordedAt: time.Now(),

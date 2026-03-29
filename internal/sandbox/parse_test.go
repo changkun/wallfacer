@@ -167,6 +167,8 @@ func TestContainerSpecBuild(t *testing.T) {
 	}
 }
 
+// TestBuildCreate verifies that BuildCreate produces a "create" command with a
+// sleep entrypoint, no --rm flag, and no agent command args.
 func TestBuildCreate(t *testing.T) {
 	spec := ContainerSpec{
 		Runtime: "podman",
@@ -217,6 +219,8 @@ func TestBuildCreate(t *testing.T) {
 	}
 }
 
+// TestBuildCreatePreservesAllMounts verifies that BuildCreate includes all
+// volume mounts (named and bind) from the spec while still omitting Cmd.
 func TestBuildCreatePreservesAllMounts(t *testing.T) {
 	spec := ContainerSpec{
 		Runtime: "podman",
@@ -247,6 +251,8 @@ func TestBuildCreatePreservesAllMounts(t *testing.T) {
 	}
 }
 
+// TestBuildExec verifies that BuildExec produces an "exec" command with the
+// container name followed by the command arguments.
 func TestBuildExec(t *testing.T) {
 	args := BuildExec("wallfacer-task-abc", []string{"/usr/local/bin/entrypoint.sh", "-p", "hello"})
 	if len(args) != 5 {

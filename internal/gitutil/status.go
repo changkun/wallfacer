@@ -8,17 +8,18 @@ import (
 )
 
 // WorkspaceGitStatus holds the git state for a single workspace directory.
+// It is serialized to JSON for the UI's git status panel.
 type WorkspaceGitStatus struct {
 	Path            string `json:"path"`
-	Name            string `json:"name"`
-	IsGitRepo       bool   `json:"is_git_repo"`
-	Branch          string `json:"branch,omitempty"`
+	Name            string `json:"name"`              // basename of Path, for display
+	IsGitRepo       bool   `json:"is_git_repo"`       // false for non-git directories
+	Branch          string `json:"branch,omitempty"`   // currently checked-out branch; empty for detached HEAD
 	RemoteURL       string `json:"remote_url,omitempty"`
-	HasRemote       bool   `json:"has_remote"`
-	AheadCount      int    `json:"ahead_count"`
-	BehindCount     int    `json:"behind_count"`
-	MainBranch      string `json:"main_branch,omitempty"`
-	BehindMainCount int    `json:"behind_main_count"`
+	HasRemote       bool   `json:"has_remote"`         // true if the current branch has an upstream tracking branch
+	AheadCount      int    `json:"ahead_count"`        // local commits not yet pushed to upstream
+	BehindCount     int    `json:"behind_count"`       // upstream commits not yet pulled
+	MainBranch      string `json:"main_branch,omitempty"` // remote default branch (e.g. "main")
+	BehindMainCount int    `json:"behind_main_count"`  // commits behind the remote's default branch
 }
 
 // WorkspaceStatus inspects a directory and returns its git status.

@@ -37,6 +37,8 @@ func ensureTestImage(t *testing.T, runtime string) {
 	}
 }
 
+// TestTaskWorkerEnsureRunning verifies that ensureRunning creates and starts
+// the container on first call and is idempotent on subsequent calls.
 func TestTaskWorkerEnsureRunning(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
@@ -63,6 +65,8 @@ func TestTaskWorkerEnsureRunning(t *testing.T) {
 	}
 }
 
+// TestTaskWorkerExec verifies that exec runs a command inside the worker
+// container and returns its stdout output with a zero exit code.
 func TestTaskWorkerExec(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
@@ -98,6 +102,8 @@ func TestTaskWorkerExec(t *testing.T) {
 	}
 }
 
+// TestTaskWorkerStop verifies that stop removes the container and marks the
+// worker as not alive.
 func TestTaskWorkerStop(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
@@ -130,6 +136,8 @@ func TestTaskWorkerStop(t *testing.T) {
 	}
 }
 
+// TestTaskWorkerExecAfterStop verifies that exec auto-recovers after the
+// worker container has been stopped, recreating the container transparently.
 func TestTaskWorkerExecAfterStop(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)
@@ -169,6 +177,9 @@ func TestTaskWorkerExecAfterStop(t *testing.T) {
 	}
 }
 
+// TestExecHandleKillDoesNotRemoveContainer verifies that killing an exec handle
+// only terminates the exec process while leaving the worker container running
+// for future invocations.
 func TestExecHandleKillDoesNotRemoveContainer(t *testing.T) {
 	rt := containerRuntime(t)
 	ensureTestImage(t, rt)

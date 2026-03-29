@@ -5,8 +5,8 @@
 // execution in an isolated sandbox container, and results are inspected when done.
 //
 // This package embeds the frontend UI assets and documentation filesystem into the
-// binary via go:embed, then dispatches to CLI subcommands (run, status, doctor, exec)
-// implemented in [changkun.de/x/wallfacer/internal/cli].
+// binary via go:embed, then dispatches to CLI subcommands (run, desktop, status,
+// doctor, exec) implemented in [changkun.de/x/wallfacer/internal/cli].
 //
 // # Connected packages
 //
@@ -18,6 +18,7 @@
 //
 //	wallfacer              # Print help
 //	wallfacer run          # Start server, restore last workspace group
+//	wallfacer desktop      # Start as native desktop app (requires desktop build tag)
 //	wallfacer doctor       # Check prerequisites and config
 //	wallfacer status       # Print board state to terminal
 //	wallfacer exec <id>    # Attach to running task container

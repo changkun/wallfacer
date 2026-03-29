@@ -58,6 +58,9 @@ type Config struct {
 }
 
 // knownKeys is the ordered list of keys managed by this package.
+// This order determines where newly-appended keys appear in the file.
+// Note: ANTHROPIC_AUTH_TOKEN is intentionally omitted — it is read-only
+// (parsed but never written by Update) because it is managed externally.
 var knownKeys = []string{
 	"CLAUDE_CODE_OAUTH_TOKEN",
 	"ANTHROPIC_API_KEY",
@@ -101,7 +104,9 @@ func Parse(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	// SandboxFast, TaskWorkers, and TerminalEnabled default to true; only an explicit "false" disables them.
+	// SandboxFast, TaskWorkers, and TerminalEnabled default to true; only an
+	// explicit "false" value in the file disables them. This opt-out semantic
+	// means missing keys preserve the safer default (features enabled).
 	cfg := Config{SandboxFast: true, TaskWorkers: true, TerminalEnabled: true}
 	for line := range strings.SplitSeq(string(raw), "\n") {
 		k, v, ok := parseEnvLine(line)
@@ -395,8 +400,11 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 	var impl, test, refine, title, oversight, commit, idea *string
 	var defaultSandboxValue *string
 	if sandboxByActivity != nil {
-		// Start with all activity pointers set to empty strings, which means "clear".
-		// Only activities present in the map will be overwritten with actual values below.
+		// Two-phase approach: start with all activity pointers set to empty strings,
+		// which means "clear the line from the file". Then overwrite only the
+		// activities present in the caller's map with their actual values.
+		// This ensures that omitted activities are actively removed rather than
+		// silently left stale.
 		emptyImpl, emptyTest, emptyRefine := "", "", ""
 		emptyTitle, emptyOversight, emptyCommit, emptyIdea := "", "", "", ""
 		impl, test, refine = &emptyImpl, &emptyTest, &emptyRefine
@@ -437,6 +445,8 @@ func UpdateSandboxSettings(path string, defaultSandbox *sandbox.Type, sandboxByA
 		defaultSandboxValue = &s
 	}
 
+	// Read the file early so we can pass the raw bytes to updateRawWithUpdates.
+	// This avoids a double-read that would otherwise happen via updateFile.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read env file: %w", err)
@@ -535,9 +545,9 @@ func unquote(v string) string {
 	return v
 }
 
-// isBlankRemovable returns true for lines that are empty or whitespace-only
-// and were not originally blank comment/separator lines. We track this by
-// checking whether the original content was literally "".
+// isBlankRemovable returns true for lines that consist only of whitespace.
+// These lines are removed during the cleanup phase of updateRawWithUpdates
+// to prevent gaps left by cleared keys from accumulating across updates.
 func isBlankRemovable(l string) bool {
 	return strings.TrimSpace(l) == ""
 }

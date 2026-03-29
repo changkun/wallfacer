@@ -7,8 +7,9 @@ import (
 
 // resubscribingWakeSource implements watcher.WakeSource by forwarding wake
 // signals from the currently viewed store, automatically re-subscribing
-// when the workspace group changes. This ensures autopilot watchers receive
-// wake signals even after the user switches workspace groups.
+// when the workspace group changes. Without this adapter, autopilot watchers
+// would stop receiving task-change notifications after a workspace switch
+// because the underlying store (and its pub/sub hub) is replaced.
 type resubscribingWakeSource struct {
 	wakeCh chan struct{} // capacity-1 output channel forwarded to the watcher
 	done   chan struct{} // closed by UnsubscribeWake to stop the goroutine

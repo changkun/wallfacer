@@ -8,9 +8,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// singletonKey is the fixed key used by SetSingleton/GetSingleton/DeleteSingleton.
-// uuid.Nil (all-zeros) is safe because real task UUIDs are always randomly generated
-// via crypto/rand and will never be all-zeros in practice.
+// singletonKey is the fixed key used by SetSingleton/GetSingleton/DeleteSingleton
+// on the ideateContainer registry. uuid.Nil (all-zeros) is safe because real
+// task UUIDs are always randomly generated via crypto/rand and will never
+// collide with the zero value in practice. This avoids needing a separate
+// sync.Mutex + string field for the single ideation container.
 var singletonKey = uuid.Nil
 
 // containerEntry stores a container name, an optional sandbox.Handle, and an

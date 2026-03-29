@@ -64,6 +64,9 @@ func CreateWorktree(repoPath, worktreePath, branchName string) error {
 // since the caller specifies an explicit base commit rather than preserving
 // existing branch state.
 func CreateWorktreeAt(repoPath, worktreePath, branchName, baseCommit string) error {
+	// First attempt: create a new branch at baseCommit. If the branch already
+	// exists (from a previous incomplete run), delete it and retry because the
+	// caller wants a fresh branch rooted at a specific commit, not the old state.
 	out, err := cmdexec.Git(repoPath, "worktree", "add", "-b", branchName, worktreePath, baseCommit).Combined()
 	if err != nil && strings.Contains(out, "already exists") {
 		if delErr := cmdexec.Git(repoPath, "branch", "-D", branchName).Run(); delErr != nil {
@@ -72,6 +75,9 @@ func CreateWorktreeAt(repoPath, worktreePath, branchName, baseCommit string) err
 		out, err = cmdexec.Git(repoPath, "worktree", "add", "-b", branchName, worktreePath, baseCommit).Combined()
 	}
 	if err != nil {
+		// Final fallback: if the branch-delete-and-retry path also failed
+		// (e.g. race condition or stale worktree tracking), force-attach to
+		// the existing branch.
 		if strings.Contains(out, "already exists") ||
 			strings.Contains(out, "already registered worktree") {
 			out2, err2 := cmdexec.Git(repoPath, "worktree", "add", "--force", worktreePath, branchName).Combined()

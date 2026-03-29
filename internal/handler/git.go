@@ -402,7 +402,9 @@ func (h *Handler) TaskDiff(w http.ResponseWriter, r *http.Request, id uuid.UUID)
 			}
 			continue
 		}
-		// If the worktree directory no longer exists, fall back to stored commit hashes.
+		// If the worktree directory no longer exists (cleaned up after done/cancel),
+		// fall back to stored commit hashes or branch names to reconstruct the diff.
+		// Priority: base..commit hash > git show commit > merge-base..branch > default..branch.
 		if _, statErr := os.Stat(worktreePath); statErr != nil {
 			commitHash := task.CommitHashes[repoPath]
 			var out string

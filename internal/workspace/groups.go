@@ -48,7 +48,8 @@ func SaveGroups(configDir string, groups []Group) error {
 	return atomicfile.WriteJSON(path, NormalizeGroups(groups), 0o644)
 }
 
-// UpsertGroup adds or promotes a workspace group to the front of the list.
+// UpsertGroup adds or promotes a workspace group to the front of the list,
+// implementing most-recently-used (MRU) ordering for session restore.
 // If the group already exists (matching by GroupKey), it is moved to position 0
 // with its name preserved. If it does not exist, a new unnamed group is prepended.
 func UpsertGroup(configDir string, workspaces []string) error {
@@ -122,9 +123,10 @@ func normalizeGroupPaths(paths []string) []string {
 	return out
 }
 
-// GroupKey returns a canonical key for a set of workspace paths.
+// GroupKey returns a canonical, deterministic key for a set of workspace paths.
 // Paths must be pre-sorted (as done by normalizeGroupPaths) so that the same
 // set of workspaces always produces the same key regardless of input order.
+// The key uses newline as separator because it cannot appear in filesystem paths.
 func GroupKey(paths []string) string {
 	return strings.Join(paths, "\n")
 }

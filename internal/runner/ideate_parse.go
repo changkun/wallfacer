@@ -32,8 +32,10 @@ func normalizeIdeationPriority(value string) string {
 
 // normalizeIdeationImpact ensures priority and impact_score are consistent.
 // When one is missing, it derives the other: impact_score maps to priority
-// bands (>=80 high, >=72 medium, else low) and vice versa. Also trims
-// whitespace from text fields.
+// bands (>=80 high, >=72 medium, else low) and vice versa. The thresholds
+// are intentionally asymmetric (85/72/35 vs 80/72) so that a round-trip
+// through normalize does not shift a borderline score to a different band.
+// Also trims whitespace from text fields.
 func normalizeIdeationImpact(idea *IdeateResult) {
 	idea.Priority = normalizeIdeationPriority(idea.Priority)
 	if idea.ImpactScore < 0 {

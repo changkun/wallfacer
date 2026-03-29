@@ -41,9 +41,11 @@ func (r *Runner) ScanMissingTaskWorktrees(ctx context.Context) ([]store.Task, er
 					missing = append(missing, task)
 					break // one missing path is enough to flag the task
 				} else if statErr == nil && !gitutil.IsGitRepo(path) {
-					// Directory exists but .git link is broken (e.g. container
-					// deleted the .git file). Remove the broken directory so
-					// ensureTaskWorktrees can recreate it cleanly.
+					// Directory exists but .git link is broken — this happens
+					// when the container agent deletes or corrupts the .git
+					// file inside the worktree. Remove the broken directory
+					// so ensureTaskWorktrees can recreate it cleanly from
+					// the task branch (preserving committed work).
 					logger.Runner.Warn("worktree health: directory exists but is not a valid git repo, removing",
 						"task", task.ID, "path", path)
 					_ = os.RemoveAll(path)

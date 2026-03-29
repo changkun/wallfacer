@@ -14,7 +14,8 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 )
 
-// maxFileWriteSize is the maximum content size accepted by ExplorerWriteFile (2 MB).
+// maxFileWriteSize is the maximum content size accepted by ExplorerWriteFile.
+// Set to 2 MB to prevent accidental or malicious large writes through the API.
 const maxFileWriteSize = 2 << 20
 
 // explorerEntry is a single directory or file entry returned by ExplorerTree.
@@ -26,8 +27,10 @@ type explorerEntry struct {
 }
 
 // isWithinWorkspace resolves symlinks and cleans both paths, then verifies
-// that requestedPath is equal to or a child of workspace. Returns the
-// cleaned, resolved path or an error if the path escapes the workspace.
+// that requestedPath is equal to or a child of workspace. This is the primary
+// path-traversal guard for the file explorer: all read/write/tree operations
+// pass through this function to ensure user input cannot escape the workspace.
+// Returns the cleaned, resolved path or an error if the path escapes the workspace.
 func isWithinWorkspace(requestedPath, workspace string) (string, error) {
 	resolvedWS, err := filepath.EvalSymlinks(workspace)
 	if err != nil {

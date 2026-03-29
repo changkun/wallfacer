@@ -68,6 +68,9 @@ func (r *Runner) RunRefinement(taskID uuid.UUID, userInstructions string) {
 	logger.Runner.Info("refinement complete", "task", taskID)
 }
 
+// buildRefinementPrompt constructs the refinement agent prompt from the task's
+// metadata, user instructions, and the current date. The task's age in days is
+// included so the agent can gauge urgency.
 func (r *Runner) buildRefinementPrompt(task *store.Task, userInstructions string, now time.Time) string {
 	const dateLayout = "2006-01-02"
 	ageDays := int(now.Sub(task.CreatedAt).Hours() / 24)

@@ -23,7 +23,10 @@ import (
 // exploreScore returns a value in [0, 1] representing how exploratory the
 // ideation agent should be for a given round. Combines a sine wave with a
 // ~6-round cycle with random jitter so that successive brainstorm runs
-// naturally oscillate between exploitation and exploration.
+// naturally oscillate between exploitation and exploration. The sine-based
+// cycle prevents the agent from settling into a fixed exploitation ratio:
+// early rounds emphasize novel ideas, later rounds refine proven categories,
+// and the jitter prevents predictable patterns across restarts.
 func exploreScore(round int) float64 {
 	wave := (math.Sin(float64(round)*2*math.Pi/6-math.Pi/2) + 1) / 2
 	jitter := (rand.Float64() - 0.5) * 0.4

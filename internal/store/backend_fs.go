@@ -128,6 +128,7 @@ func (b *FilesystemBackend) LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, er
 		return nil, 0, err
 	}
 
+	// Phase 1: Read the compact file which contains events from previous sessions.
 	compactPath := filepath.Join(tracesDir, "compact.ndjson")
 	events, err := ndjson.ReadFile[TaskEvent](compactPath,
 		ndjson.WithBufferSize(64*1024, 1024*1024),
@@ -148,7 +149,8 @@ func (b *FilesystemBackend) LoadEvents(taskID uuid.UUID) ([]TaskEvent, int64, er
 		}
 	}
 
-	// Merge in numbered trace files whose sequence exceeds the compact boundary.
+	// Phase 2: Merge in numbered trace files whose sequence exceeds the compact
+	// boundary. These are events written after the last compaction.
 	maxSeq := compactMaxID
 	for _, te := range traceEntries {
 		if te.IsDir() {
@@ -266,9 +268,10 @@ func (b *FilesystemBackend) DeleteBlob(taskID uuid.UUID, key string) error {
 // Keys are returned relative to the task directory (e.g., "outputs/turn-0001.json").
 // A prefix ending in "/" lists all files in that subdirectory.
 func (b *FilesystemBackend) ListBlobs(taskID uuid.UUID, prefix string) ([]string, error) {
-	// Split prefix into directory and filename prefix parts.
-	// "outputs/turn-" → dir="outputs", filePrefix="turn-"
-	// "outputs/"      → dir="outputs", filePrefix=""
+	// Split prefix into directory and filename prefix parts so we can
+	// ReadDir on the parent and filter by name prefix. Examples:
+	//   "outputs/turn-" → dir="outputs", filePrefix="turn-"
+	//   "outputs/"      → dir="outputs", filePrefix="" (list all)
 	var dirPart, filePrefix string
 	if strings.HasSuffix(prefix, "/") {
 		dirPart = strings.TrimSuffix(prefix, "/")

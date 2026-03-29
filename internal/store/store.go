@@ -65,6 +65,7 @@ type Store struct {
 	searchIndex map[uuid.UUID]indexedTaskText
 
 	// hub is the generic pub/sub hub for task change notifications.
+	// Every mutation that persists a task also calls hub.Publish via notify().
 	hub *pubsub.Hub[TaskDelta]
 
 	// Payload pruning limits. A value of 0 disables pruning for that field.
@@ -85,6 +86,8 @@ type Store struct {
 	// eventsLoaded tracks which tasks have had their events loaded into
 	// memory. Tasks in terminal states (done, failed, cancelled) skip
 	// event loading at startup and are loaded lazily on first access.
+	// This avoids reading potentially large trace files for completed
+	// tasks that are unlikely to be queried during normal operation.
 	eventsLoaded map[uuid.UUID]bool
 }
 
@@ -208,6 +211,8 @@ func (s *Store) loadAll() error {
 		id := task.ID
 
 		// Check for a tombstone marker; if present this task is soft-deleted.
+		// Soft-deleted tasks are kept in s.deleted (not s.tasks) so they are
+		// excluded from ListTasks but can still be restored or purged.
 		if tombRaw, err := s.backend.ReadBlob(id, "tombstone.json"); err == nil {
 			var tomb Tombstone
 			if jsonUnmarshal(tombRaw, &tomb) == nil {

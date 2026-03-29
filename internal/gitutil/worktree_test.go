@@ -6,6 +6,9 @@ import (
 	"testing"
 )
 
+// TestCreateWorktree validates worktree creation, reuse of existing branches,
+// recovery from externally deleted directories, and preservation of commits
+// when worktree tracking is lost.
 func TestCreateWorktree(t *testing.T) {
 	t.Run("creates fresh worktree and branch", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -89,6 +92,8 @@ func TestCreateWorktree(t *testing.T) {
 	})
 }
 
+// TestRemoveWorktree validates removal of worktrees and branches, including
+// graceful handling when the path was never registered or was deleted externally.
 func TestRemoveWorktree(t *testing.T) {
 	t.Run("removes existing worktree and branch", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -125,6 +130,8 @@ func TestRemoveWorktree(t *testing.T) {
 	})
 }
 
+// TestCreateWorktreeAt validates worktree creation at a specific base commit,
+// including recovery when the branch already exists from a previous incomplete run.
 func TestCreateWorktreeAt(t *testing.T) {
 	t.Run("creates worktree at specific commit", func(t *testing.T) {
 		repo := setupRepo(t)
@@ -161,6 +168,7 @@ func TestCreateWorktreeAt(t *testing.T) {
 	})
 }
 
+// TestResolveHead validates HEAD hash resolution for valid repos and non-git dirs.
 func TestResolveHead(t *testing.T) {
 	t.Run("returns 40-char hash for valid repo", func(t *testing.T) {
 		repo := setupRepo(t)

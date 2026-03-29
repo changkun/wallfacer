@@ -17,6 +17,7 @@ func (m *Map[K, V]) Store(key K, val V) {
 }
 
 // Load returns the value stored under key and whether it was found.
+// Returns the zero value of V when the key is absent.
 func (m *Map[K, V]) Load(key K) (V, bool) {
 	v, ok := m.m.Load(key)
 	if !ok {

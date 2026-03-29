@@ -312,9 +312,10 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Topological sort on batch-internal edges (Kahn's algorithm) to detect
-	//    internal cycles and compute creation order.
+	//    internal cycles and compute creation order. Tasks are created in this
+	//    order so that a task's dependencies always exist before the task itself.
 	inDegree := make([]int, n)
-	// batchAdj[i] holds the indices of tasks that depend on task i.
+	// batchAdj[i] holds the indices of tasks that depend on task i (forward edges).
 	batchAdj := make([][]int, n)
 	for i, t := range req.Tasks {
 		for _, dep := range t.DependsOnRefs {
@@ -324,12 +325,14 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Seed the queue with tasks that have no batch-internal dependencies.
 	queue := make([]int, 0, n)
 	for i := 0; i < n; i++ {
 		if inDegree[i] == 0 {
 			queue = append(queue, i)
 		}
 	}
+	// Process: when a task is emitted, decrement its dependents' in-degree.
 	topoOrder := make([]int, 0, n)
 	for len(queue) > 0 {
 		curr := queue[0]
@@ -342,6 +345,7 @@ func (h *Handler) BatchCreateTasks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// If not all tasks were emitted, the remaining ones form a cycle.
 	if len(topoOrder) != n {
 		processed := make(map[int]bool, len(topoOrder))
 		for _, idx := range topoOrder {

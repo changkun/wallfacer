@@ -18,8 +18,10 @@ import (
 
 // ssrfHardenedTransport returns an http.Transport that re-checks the resolved
 // IP address against private/loopback/link-local ranges immediately before
-// opening the TCP connection, providing defense-in-depth against DNS-rebinding
-// attacks even when validateBaseURL already approved the hostname.
+// opening the TCP connection. This is defense-in-depth against DNS-rebinding
+// attacks: even if validateBaseURL approved the hostname at configuration time,
+// a subsequent DNS change could point it to a private IP. By re-resolving and
+// checking at connect time, the attack window is closed.
 func ssrfHardenedTransport() *http.Transport {
 	dialer := &net.Dialer{
 		Timeout: 30 * time.Second,

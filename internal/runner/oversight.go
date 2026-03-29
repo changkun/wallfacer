@@ -321,6 +321,12 @@ type ndjsonItem struct {
 }
 
 // parseTurnActivity extracts tool calls and text snippets from a raw turn NDJSON file.
+// The function handles two NDJSON formats:
+//   - Claude format: {"type":"assistant","message":{"content":[...]}} messages
+//   - Codex format: {"type":"item.started"/"item.completed","item":{...}} events
+//
+// seenCodexCommands deduplicates Codex items that emit both started and completed
+// events for the same command ID.
 func parseTurnActivity(raw []byte, turnNum int) turnActivity {
 	act := turnActivity{Turn: turnNum}
 	seenCodexCommands := map[string]bool{}

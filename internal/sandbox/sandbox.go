@@ -36,6 +36,8 @@ func Parse(value string) (Type, bool) {
 }
 
 // Normalize returns the canonical lowercase Type, even for unknown values.
+// Unknown values are lowercased rather than rejected so they can be stored
+// as-is, allowing forward compatibility when new sandbox types are added.
 func Normalize(value string) Type {
 	if parsed, ok := Parse(value); ok {
 		return parsed

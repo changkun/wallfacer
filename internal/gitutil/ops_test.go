@@ -166,6 +166,8 @@ func TestCommitsBehind(t *testing.T) {
 	})
 }
 
+// TestHasCommitsAheadOf validates ahead-of detection for same commit, diverged
+// branches, and non-git paths.
 func TestHasCommitsAheadOf(t *testing.T) {
 	t.Run("false when at same commit", func(t *testing.T) {
 		repo := setupRepo(t)

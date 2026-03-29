@@ -70,7 +70,8 @@ func copyTask(t *Task) *Task {
 }
 
 // cloneTaskDelta deep-copies a TaskDelta for the pub/sub hub's replay buffer
-// and subscriber fan-out.
+// and subscriber fan-out. Without this, a subscriber mutating the received
+// Task pointer would corrupt the replay buffer and other subscribers' views.
 func cloneTaskDelta(td TaskDelta) TaskDelta {
 	clone := td
 	if td.Task != nil {

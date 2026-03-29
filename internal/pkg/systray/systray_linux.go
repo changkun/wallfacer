@@ -12,19 +12,23 @@ import (
 	"github.com/godbus/dbus/v5/introspect"
 )
 
+// instance holds all mutable state for the Linux D-Bus system tray.
+// All fields are protected by mu except conn (set once during nativeStart).
 var instance struct {
 	conn      *dbus.Conn
-	busName   string
+	busName   string // unique D-Bus name, e.g. org.kde.StatusNotifierItem-<pid>-1
 	iconW     int32
 	iconH     int32
-	iconARGB  []byte
+	iconARGB  []byte           // ARGB pixel data for IconPixmap property
 	tooltip   string
-	items     []linuxMenuItem
-	menuRev   uint32
+	items     []linuxMenuItem  // ordered menu entries
+	menuRev   uint32           // incremented on every menu mutation; signals LayoutUpdated
 	mu        sync.Mutex
-	hasTapped bool
+	hasTapped bool             // true when a left-click callback is registered
 }
 
+// linuxMenuItem is the Go-side representation of a single menu entry,
+// mirrored to D-Bus clients via GetLayout.
 type linuxMenuItem struct {
 	id        int32
 	label     string
@@ -35,6 +39,7 @@ type linuxMenuItem struct {
 }
 
 // --- StatusNotifierItem D-Bus interface ---
+// sniHandler implements the org.kde.StatusNotifierItem D-Bus methods.
 
 type sniHandler struct{}
 
@@ -49,14 +54,17 @@ func (sniHandler) Scroll(delta int32, orientation string) *dbus.Error {
 }
 
 // --- StatusNotifierItem Properties ---
+// sniPropsHandler implements org.freedesktop.DBus.Properties for the SNI object.
 
 type sniPropsHandler struct{}
 
+// iconPX matches the D-Bus struct (iiay) expected by the IconPixmap property.
 type iconPX struct {
 	W, H int32
-	Data []byte
+	Data []byte // ARGB pixel data, network byte order
 }
 
+// toolTipVal matches the D-Bus struct (sa(iiay)ss) for the ToolTip property.
 type toolTipVal struct {
 	IconName string
 	IconPix  []iconPX
@@ -105,9 +113,12 @@ func sniAllProps() map[string]dbus.Variant {
 }
 
 // --- DBusMenu interface ---
+// dbusMenuHandler implements com.canonical.dbusmenu for the tray's dropdown menu.
 
 type dbusMenuHandler struct{}
 
+// menuLayout matches the DBusMenu layout struct (ia{sv}av): item ID,
+// properties map, and child items.
 type menuLayout struct {
 	V0 int32
 	V1 map[string]dbus.Variant
@@ -118,6 +129,7 @@ func (dbusMenuHandler) GetLayout(parentID, recursionDepth int32, propertyNames [
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
+	// Only the root (parentID=0) has children; submenus are not supported.
 	if parentID != 0 {
 		return instance.menuRev, menuLayout{V0: parentID, V1: map[string]dbus.Variant{}, V2: []dbus.Variant{}}, nil
 	}
@@ -323,6 +335,8 @@ func nativeStart() {
 
 func nativeEnd() {}
 
+// nativeSetIcon converts PNG data to ARGB pixel format and updates the
+// StatusNotifierItem icon. The isTemplate parameter is ignored on Linux.
 func nativeSetIcon(data []byte, _ bool) {
 	if len(data) == 0 {
 		return
@@ -434,6 +448,8 @@ func nativeSetOnTapped(hasTapped bool) {
 	instance.mu.Unlock()
 }
 
+// emitMenuUpdate emits the com.canonical.dbusmenu.LayoutUpdated signal so
+// desktop environments (KDE, GNOME+AppIndicator) refresh the popup menu.
 func emitMenuUpdate() {
 	instance.mu.Lock()
 	conn := instance.conn
@@ -445,7 +461,8 @@ func emitMenuUpdate() {
 }
 
 // pngToARGB decodes a PNG image into ARGB pixel format for the
-// StatusNotifierItem IconPixmap property.
+// StatusNotifierItem IconPixmap property. The output byte order is
+// ARGB (alpha first), which the D-Bus spec requires in network byte order.
 func pngToARGB(data []byte) (w, h int32, argb []byte, err error) {
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
@@ -456,6 +473,7 @@ func pngToARGB(data []byte) (w, h int32, argb []byte, err error) {
 	argb = make([]byte, width*height*4)
 	for y := range height {
 		for x := range width {
+			// RGBA() returns pre-multiplied 16-bit values; shift to 8-bit.
 			r, g, b, a := img.At(x+bounds.Min.X, y+bounds.Min.Y).RGBA()
 			off := (y*width + x) * 4
 			argb[off+0] = byte(a >> 8)

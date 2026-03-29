@@ -38,7 +38,9 @@ type imageStatus struct {
 	Created string       `json:"created,omitempty"`
 }
 
-// pullTracker manages active and recently completed image pulls.
+// pullTracker manages active and recently completed image pulls. It deduplicates
+// concurrent pull requests for the same image and retains completed pulls for a
+// short period so the SSE stream endpoint can serve final status to late-joining clients.
 type pullTracker struct {
 	mu    sync.Mutex
 	pulls map[string]*imagePull
@@ -128,7 +130,8 @@ func parsePullLine(line string, prevLayersDone int) pullProgress {
 }
 
 // scanLinesOrCR is a bufio.SplitFunc that splits on \n, \r\n, or \r.
-// This handles container runtimes that use \r for in-place progress updates.
+// Podman and Docker use bare \r for in-place progress updates (e.g. layer
+// download percentages), so the standard bufio.ScanLines misses those boundaries.
 func scanLinesOrCR(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil

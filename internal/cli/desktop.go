@@ -69,8 +69,9 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 
 	var wailsCtx context.Context
 
-	// doShutdown shows the overlay, performs graceful shutdown, and exits.
-	// Called from the tray "Quit" button where the window is still alive.
+	// doShutdown shows a fullscreen overlay in the WebView, performs graceful
+	// shutdown (HTTP drain → runner goroutine drain), and terminates the process.
+	// Called from the tray "Quit" button or Cmd+Q menu item.
 	doShutdown := func() {
 		if wailsCtx != nil {
 			wailsRuntime.WindowShow(wailsCtx)
@@ -87,6 +88,9 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 		}
 		cancel()
 
+		// Wait for all background runner goroutines (in-progress tasks, title
+		// generation, oversight) to finish. Update the overlay text every second
+		// so the user knows what's still draining.
 		done := make(chan struct{})
 		go func() { sc.Runner.Shutdown(); close(done) }()
 
@@ -128,8 +132,12 @@ func RunDesktop(configDir string, args []string, uiFS, docsFS fs.FS) error {
 	)
 	tm.Start()
 
+	// On macOS and Windows, closing the window hides it to the tray rather
+	// than quitting the app (standard platform convention). Linux closes.
 	hideOnClose := runtime.GOOS == "darwin" || runtime.GOOS == "windows"
 
+	// All WebView requests are reverse-proxied to the local HTTP server.
+	// This lets Wails serve the UI without duplicating routing logic.
 	target, _ := url.Parse(serverURL)
 	proxy := httputil.NewSingleHostReverseProxy(target)
 

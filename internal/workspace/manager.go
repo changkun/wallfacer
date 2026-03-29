@@ -16,13 +16,14 @@ import (
 )
 
 // Snapshot holds the immutable state of a workspace configuration at a point in time.
+// Callers receive copies (via cloneSnapshot) so they cannot mutate manager internals.
 type Snapshot struct {
-	Workspaces       []string
-	Store            *store.Store
-	InstructionsPath string
-	ScopedDataDir    string
-	Key              string
-	Generation       uint64
+	Workspaces       []string     // sorted, deduplicated absolute paths
+	Store            *store.Store // scoped task store for this workspace set (may be shared across snapshots)
+	InstructionsPath string       // path to the merged AGENTS.md; empty when Workspaces is empty
+	ScopedDataDir    string       // per-workspace-key data directory under the global data dir
+	Key              string       // deterministic key derived from sorted workspace paths (via prompts.InstructionsKey)
+	Generation       uint64       // monotonically increasing counter; incremented on each successful Switch
 }
 
 // activeGroup tracks a workspace group whose store is still open, either
@@ -54,14 +55,18 @@ type pendingSwap struct {
 }
 
 // Manager coordinates workspace switching, store lifecycle, and change subscriptions.
+//
+// Lock ordering: mu must be acquired before subsMu. The two locks are kept
+// separate so that publishing to subscribers (which only needs subsMu) does not
+// block concurrent Snapshot reads (which only need mu.RLock).
 type Manager struct {
-	configDir string
-	dataDir   string
-	envFile   string
+	configDir string // ~/.wallfacer/ — workspace groups and instructions live here
+	dataDir   string // per-workspace scoped data directories
+	envFile   string // .env file path for persisting WALLFACER_WORKSPACES
 
-	mu           sync.RWMutex // guards current, nextGen, and activeGroups
-	current      Snapshot     // the currently "viewed" workspace group
-	nextGen      uint64
+	mu           sync.RWMutex           // guards current, nextGen, and activeGroups
+	current      Snapshot               // the currently "viewed" workspace group
+	nextGen      uint64                 // next generation counter to assign
 	activeGroups map[string]*activeGroup // key = Snapshot.Key; groups with open stores
 
 	subsMu    sync.Mutex // guards subs and nextSubID; separate from mu to avoid lock ordering issues
@@ -90,9 +95,9 @@ func NewManager(configDir, dataDir, envFile string, initial []string) (*Manager,
 	return m, nil
 }
 
-// startupWorkspaces determines the initial workspace set. If initial is
-// non-nil (even if empty), it is used as-is. Otherwise the most recently used
-// workspace group is restored from disk, enabling session persistence.
+// startupWorkspaces determines the initial workspace set. The nil vs empty-slice
+// distinction is intentional: nil means "restore last session" (load from disk),
+// while an empty slice means "start with no workspaces" (suppress restore).
 func (m *Manager) startupWorkspaces(initial []string) []string {
 	if initial != nil {
 		return initial
@@ -104,7 +109,9 @@ func (m *Manager) startupWorkspaces(initial []string) []string {
 	return cloneStrings(groups[0].Workspaces)
 }
 
-// NewStatic creates a Manager with a fixed workspace set, useful for testing.
+// NewStatic creates a Manager with a fixed workspace set that cannot be switched.
+// It bypasses path validation, instructions setup, and env persistence — useful
+// for testing and for CLI subcommands that operate on a known workspace.
 func NewStatic(store *store.Store, workspaces []string, instructionsPath string) *Manager {
 	m := &Manager{
 		subs:         make(map[int]chan Snapshot),
@@ -281,12 +288,14 @@ func (m *Manager) Switch(paths []string) (Snapshot, error) {
 	}
 
 	// All external effects succeeded: atomically install the new snapshot
-	// and update activeGroups.
+	// and update activeGroups. The write lock ensures no concurrent reader
+	// sees a partially updated state (e.g. current.Store pointing to the
+	// previous group while current.Key already identifies the new one).
 	m.mu.Lock()
 	m.nextGen++
 	swap.next.Generation = m.nextGen
 	swap.next.Workspaces = validated
-	swap.previous = m.current // capture actual current under write lock
+	swap.previous = m.current // capture actual current under write lock (not the earlier RLock copy)
 	m.current = swap.next
 
 	// Update activeGroups: add/update the new group's entry.
@@ -363,8 +372,9 @@ func (m *Manager) ActiveGroupKeys() []string {
 }
 
 // IncrementTaskCount marks a new running task in the given workspace group.
-// The atomic increment is safe under RLock since activeGroup.taskCount is an
-// atomic.Int32.
+// RLock suffices because activeGroup.taskCount is an atomic.Int32, and the
+// activeGroups map entry is only deleted by DecrementAndCleanup (under write lock)
+// which waits until the count reaches zero first.
 func (m *Manager) IncrementTaskCount(key string) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -389,8 +399,10 @@ func (m *Manager) DecrementAndCleanup(key string) {
 	if newCount > 0 {
 		return
 	}
-	// Count reached zero. Clean up if this is not the viewed group AND
-	// the store has no non-terminal tasks (waiting, in_progress, committing).
+	// Count reached zero. Clean up if this is not the viewed group AND the
+	// store has no non-terminal tasks. The write lock here is critical: it
+	// prevents a race where IncrementTaskCount (under RLock) could bump the
+	// count between our decrement and the delete below.
 	if key != m.current.Key && !storeHasActiveTasks(ag.snapshot.Store) {
 		if ag.snapshot.Store != nil {
 			ag.snapshot.Store.Close()

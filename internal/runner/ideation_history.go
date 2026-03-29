@@ -32,6 +32,9 @@ type HistoryEntry struct {
 }
 
 // IdeationHistory is an append-only log of idea outcomes stored as JSONL.
+// It records both accepted and rejected ideas so that future brainstorm
+// runs can avoid proposing duplicates of recently rejected titles. Entries
+// older than ideationHistoryTTL are pruned on load.
 type IdeationHistory struct {
 	path    string
 	entries []HistoryEntry

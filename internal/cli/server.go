@@ -38,6 +38,7 @@ type IndexViewData struct {
 }
 
 // ServerConfig holds the parsed flag values shared by RunServer and RunDesktop.
+// Each field corresponds to a CLI flag or environment variable override.
 type ServerConfig struct {
 	LogFormat    string
 	Addr         string
@@ -86,6 +87,9 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	logger.Init(cfg.LogFormat)
 	initConfigDir(configDir, cfg.EnvFile)
 
+	// Workspaces start empty; the manager restores the last active set from
+	// the persisted env file (WALLFACER_WORKSPACES). Users configure them
+	// later via the Settings UI or PUT /api/workspaces.
 	var workspaces []string
 	wsMgr, err := workspace.NewManager(configDir, cfg.DataDir, cfg.EnvFile, workspaces)
 	if err != nil {
@@ -153,13 +157,22 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 
 	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
 
+	// Recover tasks that were in_progress when the server last crashed or
+	// was killed. They are moved back to backlog so the auto-promoter can
+	// re-schedule them.
 	if s != nil {
 		runner.RecoverOrphanedTasks(ctx, s, r)
 	}
+	// Background goroutines for worktree maintenance: GC removes stale
+	// worktrees from completed/cancelled tasks; health watcher detects and
+	// repairs corrupted worktree checkouts.
 	go r.StartWorktreeGC(ctx)
 	go r.StartWorktreeHealthWatcher(ctx)
 
 	h := handler.NewHandler(s, r, configDir, workspaces, reg)
+	// Safety valve: disable autopilot if any task hits the max_tokens limit,
+	// which indicates context window exhaustion — continuing blindly would
+	// waste budget without progress.
 	r.SetStopReasonHandler(func(_ uuid.UUID, stopReason string) {
 		if stopReason == "max_tokens" {
 			h.SetAutopilot(false)
@@ -280,6 +293,9 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		"Total number of autonomous actions taken by autopilot watchers, by watcher and outcome.",
 	)
 
+	// Bind the listening socket. If the requested port is taken (e.g. another
+	// wallfacer instance), fall back to an OS-assigned free port so the server
+	// still starts rather than failing outright.
 	host, _, _ := net.SplitHostPort(cfg.Addr)
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
@@ -296,8 +312,9 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	mux := BuildMux(h, reg, IndexViewData{ServerAPIKey: envCfg.ServerAPIKey}, uiFS, docsFS)
 
 	if cfg.SkipCSRF {
-		// Desktop mode: expose the real server port so the frontend can
-		// connect WebSockets directly (Wails proxy can't forward upgrades).
+		// Desktop mode: the Wails asset server reverse-proxies HTTP requests
+		// but cannot forward WebSocket upgrades. Expose the real server port
+		// so the frontend JS can open WebSocket connections directly.
 		portStr := strconv.Itoa(actualPort)
 		mux.HandleFunc("GET /api/desktop-port", func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/plain")
@@ -305,6 +322,9 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		})
 	}
 
+	// Middleware stack (outermost first): logging → CSRF → bearer auth → mux.
+	// Desktop mode skips CSRF because requests originate from the local WebView
+	// (same-origin checks are not meaningful).
 	srvHandler := handler.BearerAuthMiddleware(envCfg.ServerAPIKey)(mux)
 	if !cfg.SkipCSRF {
 		srvHandler = handler.CSRFMiddleware(actualHostPort)(srvHandler)
@@ -731,6 +751,8 @@ func BuildMux(h *handler.Handler, reg *metrics.Registry, indexData IndexViewData
 		"RefineDismiss":    withID(h.RefineDismiss),
 	}
 
+	// bodyLimits restricts request body size for write endpoints. Routes
+	// not listed here have no MaxBytesReader applied (e.g. GET, SSE, WebSocket).
 	bodyLimits := map[string]int64{
 		// Server configuration.
 		"UpdateConfig": handler.BodyLimitDefault,

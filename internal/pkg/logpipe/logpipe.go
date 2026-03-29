@@ -54,10 +54,15 @@ func Start(cmd *exec.Cmd, opts ...Option) (*Pipe, error) {
 		o(&cfg)
 	}
 
+	// Use an io.Pipe so the scanner goroutine reads from pr while the
+	// subprocess writes to pw. This decouples subprocess I/O from the
+	// line-by-line consumption rate.
 	pr, pw := io.Pipe()
 	cmd.Stdout = pw
 
 	// Handle stderr: merge into stdout or drain separately.
+	// When not merging, stderr must still be consumed to prevent the
+	// subprocess from blocking on a full pipe buffer.
 	var stderrPW *io.PipeWriter
 	if cfg.mergeStderr {
 		cmd.Stderr = pw
@@ -88,7 +93,11 @@ func Start(cmd *exec.Cmd, opts ...Option) (*Pipe, error) {
 		done:  make(chan struct{}),
 	}
 
-	// Close pipe write ends when the subprocess exits.
+	// Wait for the subprocess in a background goroutine and close the
+	// write ends of the pipes. This unblocks the scanner (pr reads EOF)
+	// and the stderr drainer. The wait goroutine must run independently
+	// of the scanner goroutine to avoid deadlock: the scanner blocks on
+	// pr.Read, which only returns EOF when pw is closed.
 	go func() {
 		_ = cmd.Wait()
 		_ = pw.Close()
@@ -97,7 +106,8 @@ func Start(cmd *exec.Cmd, opts ...Option) (*Pipe, error) {
 		}
 	}()
 
-	// Scan stdout lines into the channel.
+	// Scan stdout lines into the channel. Closing both p.lines and p.done
+	// signals consumers that all output has been delivered.
 	go func() {
 		defer close(p.lines)
 		defer close(p.done)

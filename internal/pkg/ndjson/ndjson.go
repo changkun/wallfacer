@@ -86,6 +86,9 @@ func readAll[T any](rc io.ReadCloser, cfg *config) ([]T, error) {
 		results = append(results, v)
 	}
 
+	// Check scanner error before close error: a scan failure (e.g. token
+	// too long) is the more actionable diagnostic. However, close errors
+	// take precedence here because a failed close may mean data was lost.
 	scanErr := scanner.Err()
 	if err := rc.Close(); err != nil {
 		return nil, err
@@ -158,8 +161,9 @@ func readFunc[T any](rc io.ReadCloser, fn func(T) bool, cfg config) error {
 
 // AppendFile atomically appends a single JSON-encoded record followed by
 // a newline to path. The file is created if it does not exist. The write
-// uses O_APPEND so concurrent appends of records under 4 KB are atomic
-// on Linux.
+// uses O_APPEND so concurrent appends of complete records are atomic on
+// Linux for writes under PIPE_BUF (4 KB). Larger records may interleave
+// with concurrent writers.
 func AppendFile[T any](path string, record T) error {
 	data, err := json.Marshal(record)
 	if err != nil {
@@ -174,7 +178,8 @@ func AppendFile[T any](path string, record T) error {
 	return appendTo(f, data)
 }
 
-// appendTo writes data+newline to wc and closes it.
+// appendTo writes data+newline to wc and closes it. On write error, wc
+// is still closed to avoid leaking file descriptors.
 func appendTo(wc io.WriteCloser, data []byte) error {
 	if _, err := wc.Write(append(data, '\n')); err != nil {
 		_ = wc.Close()

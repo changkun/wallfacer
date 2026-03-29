@@ -78,6 +78,8 @@ func migrateTaskJSON(raw []byte, fileModTime time.Time) (Task, bool, error) {
 	}
 
 	// (4) Backfill AutoRetryBudget for tasks created before schema version 2.
+	// Only transient/infrastructure failures get a budget; agent_error and
+	// timeout are not retried automatically because they are likely to recur.
 	if task.AutoRetryBudget == nil {
 		task.AutoRetryBudget = map[FailureCategory]int{
 			FailureCategoryContainerCrash: 2,

@@ -124,16 +124,19 @@ type Runner struct {
 	ideationExploitRatioFn func() float64 // returns the current exploitation ratio (0–1)
 
 	// Board context cache: avoids redundant store.ListTasks calls on every turn
-	// when no task has changed since the last generation.
+	// when no task has changed since the last generation. Keyed by
+	// (boardChangeSeq, selfTaskID): a cache hit means no store mutation
+	// occurred and the requesting task hasn't changed, so the serialized
+	// board.json and sibling mount map can be reused as-is.
 	boardCache struct {
 		mu         sync.Mutex
-		seq        uint64
-		selfTaskID uuid.UUID
-		json       []byte
-		mounts     map[string]map[string]string
+		seq        uint64                       // snapshot of boardChangeSeq at generation time
+		selfTaskID uuid.UUID                    // which task the cached result was built for
+		json       []byte                       // serialized board.json
+		mounts     map[string]map[string]string // shortID → (repoPath → worktreePath)
 	}
 	boardChangeSeq      atomic.Uint64  // incremented on every store notification
-	shutdownCh          chan struct{}  // closed by Shutdown to stop the subscription goroutine
+	shutdownCh          chan struct{}   // closed by Shutdown to stop the subscription goroutine
 	shutdownOnce        sync.Once      // ensures Shutdown runs at most once
 	boardSubscriptionWg sync.WaitGroup // tracks the board-cache-invalidator goroutine only
 	shutdownCtx         context.Context
@@ -346,7 +349,10 @@ func (r *Runner) GenerateTitleBackground(taskID uuid.UUID, prompt string) {
 	})
 }
 
-// NewRunner constructs a Runner from the given store and config.
+// NewRunner constructs a Runner from the given store and config. The returned
+// Runner is ready for use: it has an initialised circuit breaker, sandbox
+// backend, and a background goroutine watching for store mutations to
+// invalidate the board context cache. Call Shutdown() to drain background work.
 func NewRunner(s *store.Store, cfg RunnerConfig) *Runner {
 	mgr := cfg.Prompts
 	if mgr == nil {

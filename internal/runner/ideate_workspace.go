@@ -194,8 +194,10 @@ func isBoostedPath(path string) bool {
 }
 
 // effectiveScore returns the weighted score for a signal entry. Boosted paths
-// receive a 2× multiplier to rank them above vendor or artifact paths with
-// equal raw counts.
+// (core source directories and test files) receive a 2x multiplier to rank them
+// above vendor or artifact paths with equal raw commit/marker counts. This
+// ensures that a file in internal/ with 5 commits outranks a file in dist/
+// with 5 commits in the ideation prompt's hotspot list.
 func effectiveScore(score int, boosted bool) int {
 	if boosted {
 		return score * 2

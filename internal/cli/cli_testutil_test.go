@@ -1,3 +1,6 @@
+// Shared test utilities for the cli package. These helpers resolve the
+// repository root and provide an fs.FS suitable for BuildMux, which
+// expects "ui/" and "docs/" subtrees.
 package cli
 
 import (

@@ -158,6 +158,9 @@ func (s *Store) CreateTaskWithOptions(_ context.Context, opts TaskCreateOptions)
 	defer s.mu.Unlock()
 
 	// Compute top-of-backlog position under the lock.
+	// New tasks get position = (minimum existing backlog position) - 1 so
+	// they appear at the top of the backlog column in the UI. When no
+	// backlog tasks exist, position defaults to 0.
 	minPos := 0
 	hasBacklog := false
 	for _, t := range s.tasks {
@@ -347,7 +350,9 @@ func (s *Store) RestoreTask(_ context.Context, id uuid.UUID) error {
 	}
 	s.mu.RUnlock()
 
-	// Disk I/O and CPU work outside the write lock.
+	// Disk I/O and CPU work outside the write lock. Loading oversight text
+	// can be slow for tasks with large oversight files, so keeping this
+	// outside the lock avoids blocking all concurrent readers.
 	oversightRaw, _ := s.LoadOversightText(id)
 	entry := buildIndexEntry(t, oversightRaw)
 
