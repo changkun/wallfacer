@@ -38,7 +38,7 @@ Add a tab bar above the terminal panel supporting multiple concurrent shell sess
 
 | # | Task | Depends on | Effort | Status |
 |---|------|-----------|--------|--------|
-| 1 | [Session registry](terminal-sessions/task-01-session-registry.md) | — | Medium | Todo |
+| 1 | [Session registry](terminal-sessions/task-01-session-registry.md) | — | Medium | Done |
 | 2 | [Relay dispatcher](terminal-sessions/task-02-relay-dispatcher.md) | 1 | Medium | Todo |
 | 3 | [Session control messages](terminal-sessions/task-03-session-messages.md) | 2 | Small | Todo |
 | 4 | [Tab bar UI](terminal-sessions/task-04-tab-bar-ui.md) | — | Medium | Todo |

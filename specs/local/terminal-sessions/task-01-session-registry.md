@@ -1,6 +1,6 @@
 # Task 1: Backend Session Registry
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Backend infrastructure
 **Effort:** Medium
