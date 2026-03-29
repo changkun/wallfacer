@@ -80,11 +80,11 @@ File Explorer (done) ──▶ Spec Coordination
                      ──▶ Host Mounts
                      ──▶ File Panel Viewer
 
-Host Terminal (done) ──▶ Terminal Sessions ──▶ Container Exec
+Host Terminal (done) ──▶ Terminal Sessions (done) ──▶ Container Exec (done)
 
-File Explorer + Host Terminal ──▶ Desktop App (ships with all local UX built in)
+File Explorer + Host Terminal ──▶ Desktop App (done)
 
-Independent: Oversight Risk Scoring, Visual Verification, Live Serve, OAuth Token Setup, Pixel Agent Avatars
+Independent: Oversight Risk Scoring, Visual Verification, Live Serve, OAuth Token Setup, Pixel Agent Avatars (done)
 ```
 
 ---
@@ -169,11 +169,11 @@ How the three tracks connect through shared design and foundations.
                      │
  ═══ Local Product ══╪════════════════════════════════════════════════════
                      │
- Epic Coordination ──┤   Terminal Sessions ──▶ Container Exec
+ Epic Coordination ──┤   Terminal Sessions (done) ──▶ Container Exec (done)
  File Attachments    │   Oversight Risk Scoring
  Host Mounts         │   Visual Verification
  File Panel Viewer   │   Live Serve
- Desktop App ────────┘
+ Desktop App (done)──┘
                      │
  ═══ Cloud Platform ═╪════════════════════════════════════════════════════
                      │
@@ -189,8 +189,8 @@ How the three tracks connect through shared design and foundations.
 
 **Within local product:**
 - Epic coordination can start now (file explorer done, no blockers).
-- Terminal extensions are sequential: sessions first, then container exec.
-- Desktop app ships after local UX features are built.
+- Terminal extensions complete: sessions and container exec both shipped.
+- Desktop app is complete.
 - Oversight, visual verification, live serve are independent — start anytime.
 
 **Within cloud platform:**
