@@ -1,6 +1,6 @@
 # Task 8: First-Launch Hints and Re-Auth UI
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 5, 7
 **Phase:** Frontend polish
 **Effort:** Medium
