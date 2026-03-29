@@ -1,6 +1,6 @@
 # Task 4: Tab Bar UI
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** None
 **Phase:** Frontend UI
 **Effort:** Medium
