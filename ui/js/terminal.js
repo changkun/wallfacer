@@ -428,7 +428,11 @@ function addTerminalTab(sessionId, label) {
   var closeBtn = document.createElement("button");
   closeBtn.className = "terminal-tab__close";
   closeBtn.setAttribute("aria-label", "Close session");
+  closeBtn.setAttribute("tabindex", "-1");
   closeBtn.innerHTML = "\u00d7";
+  closeBtn.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+  });
   closeBtn.addEventListener("click", function (e) {
     e.stopPropagation();
     _onTabClose(sessionId);

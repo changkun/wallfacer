@@ -25,11 +25,12 @@ import (
 
 // terminalSession holds the state for a single PTY-backed shell session.
 type terminalSession struct {
-	id     string
-	ptmx   *os.File
-	cmd    *exec.Cmd
-	cancel context.CancelFunc
-	done   chan struct{} // closed when the shell process exits
+	id       string
+	ptmx     *os.File
+	cmd      *exec.Cmd
+	cancel   context.CancelFunc
+	done     chan struct{} // closed when the shell process exits
+	outputCh chan []byte   // PTY output pumped by a reader goroutine
 }
 
 // sessionRegistry manages multiple terminal sessions per WebSocket connection.
@@ -56,13 +57,37 @@ func (r *sessionRegistry) create(shell, cwd string, cols, rows int) (string, err
 		return "", err
 	}
 
+	outputCh := make(chan []byte, 64)
 	sess := &terminalSession{
-		id:     id,
-		ptmx:   ptmx,
-		cmd:    cmd,
-		cancel: cancel,
-		done:   make(chan struct{}),
+		id:       id,
+		ptmx:     ptmx,
+		cmd:      cmd,
+		cancel:   cancel,
+		done:     make(chan struct{}),
+		outputCh: outputCh,
 	}
+
+	// Reader goroutine: pump PTY output into the channel.
+	// Runs for the lifetime of the session. Closes outputCh when PTY closes.
+	go func() {
+		defer close(outputCh)
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := ptmx.Read(buf)
+			if n > 0 {
+				data := make([]byte, n)
+				copy(data, buf[:n])
+				select {
+				case outputCh <- data:
+				case <-ctx.Done():
+					return
+				}
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
 
 	r.mu.Lock()
 	r.sessions[id] = sess
@@ -255,45 +280,56 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	wg.Add(2)
 
 	// PTY → WebSocket: relay output from the active session.
-	// Outer loop picks up the active session; inner loop reads its PTY.
-	// When switchCh fires or the session's PTY closes, the outer loop
-	// re-resolves the active session.
+	// Each session gets a reader goroutine that pumps PTY data into a channel.
+	// The relay goroutine selects on the active session's channel plus switchCh.
 	go func() {
 		defer wg.Done()
-		buf := make([]byte, 32*1024)
-		for {
-			active, ok := registry.activeSession()
+		var activeCh <-chan []byte
+		var activeID string
+
+		resolveActive := func() {
+			sess, ok := registry.activeSession()
 			if !ok {
-				// No active session — wait for a switch or context cancel.
+				activeCh = nil
+				activeID = ""
+				return
+			}
+			if sess.id == activeID {
+				return // already reading from this session
+			}
+			activeID = sess.id
+			activeCh = sess.outputCh
+		}
+
+		resolveActive()
+		for {
+			if activeCh == nil {
 				select {
 				case <-registry.switchCh:
+					resolveActive()
 					continue
 				case <-connCtx.Done():
 					return
 				}
 			}
 
-			// Inner loop: read from the active session's PTY.
-			for {
-				n, err := active.ptmx.Read(buf)
-				if n > 0 {
-					if writeErr := conn.Write(connCtx, websocket.MessageBinary, buf[:n]); writeErr != nil {
-						return
-					}
+			select {
+			case data, ok := <-activeCh:
+				if !ok {
+					// Session's PTY closed — re-resolve.
+					activeCh = nil
+					activeID = ""
+					resolveActive()
+					continue
 				}
-				if err != nil {
-					// PTY closed (session exited) — re-resolve active.
-					break
+				if writeErr := conn.Write(connCtx, websocket.MessageBinary, data); writeErr != nil {
+					return
 				}
-				// Check if a switch was signaled.
-				select {
-				case <-registry.switchCh:
-					// Active session changed — break inner loop to re-resolve.
-					goto nextSession
-				default:
-				}
+			case <-registry.switchCh:
+				resolveActive()
+			case <-connCtx.Done():
+				return
 			}
-		nextSession:
 		}
 	}()
 
