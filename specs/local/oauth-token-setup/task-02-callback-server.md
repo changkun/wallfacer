@@ -1,6 +1,6 @@
 # Task 2: Ephemeral Callback Server
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** 1
 **Phase:** Core OAuth infrastructure
 **Effort:** Medium
