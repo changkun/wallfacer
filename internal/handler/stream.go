@@ -222,13 +222,16 @@ func (h *Handler) StreamLogs(w http.ResponseWriter, r *http.Request, id uuid.UUI
 	}
 
 	// Fallback: resolve the container name and shell out to `docker logs -f`.
+	// Do not pipe cmd.Stderr into the response: errors from the log command
+	// itself (e.g. "no such container" when the container was already removed
+	// or not yet started) would be forwarded verbatim to the client.
 	containerName := h.runner.ContainerName(id)
 	if containerName == "" {
 		h.serveStoredLogs(w, r, id)
 		return
 	}
 	cmd := exec.CommandContext(r.Context(), h.runner.Command(), "logs", "-f", "--tail", "100", containerName)
-	p, err := logpipe.Start(cmd, logpipe.MergeStderr())
+	p, err := logpipe.Start(cmd)
 	if err != nil {
 		http.Error(w, "failed to start log stream", http.StatusInternalServerError)
 		return
