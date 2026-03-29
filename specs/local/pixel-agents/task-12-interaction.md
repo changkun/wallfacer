@@ -1,6 +1,6 @@
 # Task 12: Interaction and Modal Integration
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 5 (Renderer + view toggle), Task 8 (CharacterManager)
 **Phase:** Phase 4 (Interaction)
 **Effort:** Medium
