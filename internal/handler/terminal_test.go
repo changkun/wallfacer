@@ -535,6 +535,323 @@ func TestRelayDispatcher_LastSessionExit(t *testing.T) {
 	}
 }
 
+// readTextMessage reads WebSocket messages until a text message matching the
+// given type is found, or the deadline expires.
+func readTextMessage(t *testing.T, conn *websocket.Conn, ctx context.Context, msgType string, timeout time.Duration) json.RawMessage {
+	t.Helper()
+	deadline := time.After(timeout)
+	for {
+		select {
+		case <-deadline:
+			t.Fatalf("timed out waiting for %q message", msgType)
+		default:
+		}
+		readCtx, readCancel := context.WithTimeout(ctx, time.Second)
+		typ, data, err := conn.Read(readCtx)
+		readCancel()
+		if err != nil {
+			if readCtx.Err() != nil {
+				continue
+			}
+			t.Fatalf("read: %v", err)
+		}
+		if typ != websocket.MessageText {
+			continue
+		}
+		var envelope struct {
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(data, &envelope) == nil && envelope.Type == msgType {
+			return json.RawMessage(data)
+		}
+	}
+}
+
+func TestTerminalWS_CreateSession(t *testing.T) {
+	srv, _ := newTerminalTestServer(t, "", true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
+
+	// Read the initial sessions list.
+	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	var sessionsMsg struct {
+		Sessions []sessionInfo `json:"sessions"`
+	}
+	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
+		t.Fatalf("unmarshal sessions: %v", err)
+	}
+	if len(sessionsMsg.Sessions) != 1 {
+		t.Fatalf("initial sessions count = %d; want 1", len(sessionsMsg.Sessions))
+	}
+
+	// Send create_session.
+	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"create_session"}`)); err != nil {
+		t.Fatalf("write create_session: %v", err)
+	}
+
+	// Expect session_created response.
+	raw = readTextMessage(t, conn, ctx, "session_created", 3*time.Second)
+	var created struct {
+		Session string `json:"session"`
+	}
+	if err := json.Unmarshal(raw, &created); err != nil {
+		t.Fatalf("unmarshal session_created: %v", err)
+	}
+	if created.Session == "" {
+		t.Error("session_created has empty session ID")
+	}
+
+	// Expect updated sessions list with 2 sessions.
+	raw = readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
+		t.Fatalf("unmarshal sessions: %v", err)
+	}
+	if len(sessionsMsg.Sessions) != 2 {
+		t.Fatalf("sessions count after create = %d; want 2", len(sessionsMsg.Sessions))
+	}
+
+	// Verify input goes to the new session (it should be functional).
+	input := base64.StdEncoding.EncodeToString([]byte("echo sessiontest\n"))
+	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"input","data":"`+input+`"}`)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+}
+
+func TestTerminalWS_SwitchSession(t *testing.T) {
+	srv, _ := newTerminalTestServer(t, "", true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
+
+	// Read initial sessions list to get the first session ID.
+	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	var sessionsMsg struct {
+		Sessions []sessionInfo `json:"sessions"`
+	}
+	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	firstID := sessionsMsg.Sessions[0].ID
+
+	// Create a second session.
+	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"create_session"}`)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	readTextMessage(t, conn, ctx, "session_created", 3*time.Second)
+	readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+
+	// Switch back to the first session.
+	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"switch_session","session":"`+firstID+`"}`)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Expect session_switched response.
+	raw = readTextMessage(t, conn, ctx, "session_switched", 3*time.Second)
+	var switched struct {
+		Session string `json:"session"`
+	}
+	if err := json.Unmarshal(raw, &switched); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if switched.Session != firstID {
+		t.Errorf("switched session = %q; want %q", switched.Session, firstID)
+	}
+
+	// Expect updated sessions list.
+	raw = readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	// Verify first session is active.
+	for _, s := range sessionsMsg.Sessions {
+		if s.ID == firstID && !s.Active {
+			t.Error("first session should be active after switch")
+		}
+	}
+}
+
+func TestTerminalWS_SwitchInvalidSession(t *testing.T) {
+	srv, _ := newTerminalTestServer(t, "", true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
+
+	// Read initial sessions list.
+	readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+
+	// Switch to nonexistent session.
+	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"switch_session","session":"nonexistent"}`)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Expect error response.
+	raw := readTextMessage(t, conn, ctx, "error", 3*time.Second)
+	var errMsg struct {
+		Data string `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &errMsg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !strings.Contains(errMsg.Data, "nonexistent") {
+		t.Errorf("error data = %q; want to contain 'nonexistent'", errMsg.Data)
+	}
+}
+
+func TestTerminalWS_CloseSession(t *testing.T) {
+	srv, _ := newTerminalTestServer(t, "", true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
+
+	// Read initial sessions.
+	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	var sessionsMsg struct {
+		Sessions []sessionInfo `json:"sessions"`
+	}
+	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	firstID := sessionsMsg.Sessions[0].ID
+
+	// Create a second session.
+	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"create_session"}`)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	readTextMessage(t, conn, ctx, "session_created", 3*time.Second)
+	readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+
+	// Close the first (non-active) session.
+	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"close_session","session":"`+firstID+`"}`)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Expect session_closed response.
+	raw = readTextMessage(t, conn, ctx, "session_closed", 3*time.Second)
+	var closed struct {
+		Session string `json:"session"`
+	}
+	if err := json.Unmarshal(raw, &closed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if closed.Session != firstID {
+		t.Errorf("closed session = %q; want %q", closed.Session, firstID)
+	}
+
+	// Expect sessions list with 1 remaining session.
+	raw = readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(sessionsMsg.Sessions) != 1 {
+		t.Fatalf("sessions count after close = %d; want 1", len(sessionsMsg.Sessions))
+	}
+}
+
+func TestTerminalWS_CloseLastSession(t *testing.T) {
+	srv, _ := newTerminalTestServer(t, "", true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+
+	// Read initial sessions to get the session ID.
+	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	var sessionsMsg struct {
+		Sessions []sessionInfo `json:"sessions"`
+	}
+	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	onlyID := sessionsMsg.Sessions[0].ID
+
+	// Close the only session.
+	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"close_session","session":"`+onlyID+`"}`)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Expect WebSocket to close.
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for WebSocket close")
+		default:
+		}
+		readCtx, readCancel := context.WithTimeout(ctx, time.Second)
+		_, _, err := conn.Read(readCtx)
+		readCancel()
+		if err != nil {
+			return // WebSocket closed — success.
+		}
+	}
+}
+
+func TestTerminalWS_SessionsList(t *testing.T) {
+	srv, _ := newTerminalTestServer(t, "", true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/api/terminal/ws"
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
+
+	// Initial sessions list should have 1 session marked active.
+	raw := readTextMessage(t, conn, ctx, "sessions", 3*time.Second)
+	var sessionsMsg struct {
+		Sessions []sessionInfo `json:"sessions"`
+	}
+	if err := json.Unmarshal(raw, &sessionsMsg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(sessionsMsg.Sessions) != 1 {
+		t.Fatalf("initial sessions = %d; want 1", len(sessionsMsg.Sessions))
+	}
+	if !sessionsMsg.Sessions[0].Active {
+		t.Error("initial session should be active")
+	}
+	if sessionsMsg.Sessions[0].ID == "" {
+		t.Error("initial session should have non-empty ID")
+	}
+}
+
 func TestTerminalWS_CwdValidation(t *testing.T) {
 	srv, h := newTerminalTestServer(t, "", true)
 	workspaces := h.currentWorkspaces()

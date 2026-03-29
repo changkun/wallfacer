@@ -248,6 +248,9 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	sess, _ := registry.get(sessionID)
 	go registry.monitorSession(sess, connCancel, conn)
 
+	// Send initial sessions list to the client.
+	registry.sendSessionsList(conn)
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -326,6 +329,52 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 				}
 			case "ping":
 				_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"pong"}`))
+			case "create_session":
+				newID, err := registry.create(shell, cwd, cols, rows)
+				if err != nil {
+					_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"error","data":"failed to create session"}`))
+					continue
+				}
+				newSess, _ := registry.get(newID)
+				go registry.monitorSession(newSess, connCancel, conn)
+				_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"session_created","session":"`+newID+`"}`))
+				registry.sendSessionsList(conn)
+			case "switch_session":
+				if !registry.switchTo(msg.Session) {
+					_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"error","data":"session not found: `+msg.Session+`"}`))
+					continue
+				}
+				_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"session_switched","session":"`+msg.Session+`"}`))
+				registry.sendSessionsList(conn)
+			case "close_session":
+				if _, ok := registry.get(msg.Session); !ok {
+					_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"error","data":"session not found: `+msg.Session+`"}`))
+					continue
+				}
+				registry.remove(msg.Session)
+				_ = conn.Write(connCtx, websocket.MessageText, []byte(`{"type":"session_closed","session":"`+msg.Session+`"}`))
+
+				// If the closed session was active, pick a fallback.
+				if _, ok := registry.activeSession(); !ok {
+					// No active session — try to find one.
+					registry.mu.Lock()
+					var fallback string
+					for fid := range registry.sessions {
+						fallback = fid
+						break
+					}
+					remaining := len(registry.sessions)
+					registry.mu.Unlock()
+
+					if remaining > 0 {
+						registry.switchTo(fallback)
+					} else {
+						connCancel()
+						_ = conn.Close(websocket.StatusNormalClosure, "all sessions closed")
+						return
+					}
+				}
+				registry.sendSessionsList(conn)
 			}
 		}
 	}()
@@ -336,10 +385,36 @@ func (h *Handler) HandleTerminalWS(w http.ResponseWriter, r *http.Request) {
 
 // terminalMessage is the JSON envelope for client→server messages.
 type terminalMessage struct {
-	Type string `json:"type"`
-	Data string `json:"data,omitempty"`
-	Cols int    `json:"cols,omitempty"`
-	Rows int    `json:"rows,omitempty"`
+	Type    string `json:"type"`
+	Data    string `json:"data,omitempty"`
+	Cols    int    `json:"cols,omitempty"`
+	Rows    int    `json:"rows,omitempty"`
+	Session string `json:"session,omitempty"`
+}
+
+// sessionInfo describes a session in the sessions list message.
+type sessionInfo struct {
+	ID     string `json:"id"`
+	Active bool   `json:"active"`
+}
+
+// sendSessionsList sends the current sessions list to the client.
+func (r *sessionRegistry) sendSessionsList(conn *websocket.Conn) {
+	r.mu.Lock()
+	infos := make([]sessionInfo, 0, len(r.sessions))
+	for id := range r.sessions {
+		infos = append(infos, sessionInfo{ID: id, Active: id == r.active})
+	}
+	r.mu.Unlock()
+
+	payload, err := json.Marshal(struct {
+		Type     string        `json:"type"`
+		Sessions []sessionInfo `json:"sessions"`
+	}{Type: "sessions", Sessions: infos})
+	if err != nil {
+		return
+	}
+	_ = conn.Write(r.connCtx, websocket.MessageText, payload)
 }
 
 // cleanup sends SIGHUP to the shell process group (graceful hangup signal),
