@@ -108,29 +108,32 @@
   //
   // PCs are placed on the desk tiles closest to the gap.
 
-  // Layout: single horizontal row of workstations with common area on left.
-  // Each workstation = desk(2w) + PC(1w on desk) + chair(1w) = 3 tiles wide.
-  // Workstations are arranged in a single row facing down.
-  var STATION_W = 3; // chair + desk(2) 
-  var STATION_GAP = 1; // gap between stations
+  // Layout: horizontal row of workstations. Each station is 3 tiles wide.
+  // The character (16x32) is drawn with feet at tile bottom, head extends up.
+  // Layout rows (from top):
+  //   row 0: head room (empty floor for character heads)
+  //   row 1: head room 2 (for 32px character sprites)
+  //   row 2: desk + monitor on desk
+  //   row 3: character seat (chair behind character)
+  //   row 4: floor padding
+  var STATION_W = 3;
+  var STATION_GAP = 1;
   var WALL_PAD = 1;
   var INTERIOR_PAD = 1;
-  var COMMON_W = 4; // common area width on left (sofa, plant, etc.)
+  var COMMON_W = 3;
 
   function generateOfficeLayout(taskCount) {
     var N = Math.max(taskCount, 4);
 
-    // Interior: common area on left + stations in a row
     var stationsW = N * STATION_W + (N - 1) * STATION_GAP;
-    var interiorW = COMMON_W + 1 + stationsW; // +1 gap between common and stations
-    var interiorH = 5; // head room + desk(2h) + chair + floor below
+    var interiorW = COMMON_W + 1 + stationsW;
+    var interiorH = 5; // 2 head room + desk + seat + floor
 
     var totalW = interiorW + 2 * (WALL_PAD + INTERIOR_PAD);
     var totalH = interiorH + 2 * (WALL_PAD + INTERIOR_PAD);
 
     var map = new TileMap(totalW, totalH);
 
-    // Fill walls and floor
     for (var y = 0; y < totalH; y++) {
       for (var x = 0; x < totalW; x++) {
         if (x < WALL_PAD || x >= totalW - WALL_PAD ||
@@ -145,14 +148,14 @@
     var ox = WALL_PAD + INTERIOR_PAD;
     var oy = WALL_PAD + INTERIOR_PAD;
 
-    // Common area on the left (shifted down 1 for character head room)
-    placeCommonArea(map, ox, oy + 1);
+    // Common area on the left
+    placeCommonArea(map, ox, oy + 2);
 
-    // Workstations in a row, starting after common area
+    // Workstations: desk at row 2, seat at row 3
     var stationX = ox + COMMON_W + 1;
     for (var i = 0; i < N; i++) {
       var sx = stationX + i * (STATION_W + STATION_GAP);
-      placeStation(map, sx, oy + 1, i);
+      placeStation(map, sx, oy, i);
     }
 
     return {
@@ -163,27 +166,21 @@
   }
 
   function placeStation(map, x, y, deskIndex) {
-    // Row layout (top to bottom):
-    // y+0: PC/monitor (1x1) — visually behind the desk
-    // y+1: Desk (2x1) — single row desk
-    // y+2: Chair (facing up toward desk)
-    map.placeFurniture({ type: PC, x: x, y: y, width: 1, height: 1, state: "off" });
-    map.placeFurniture({ type: DESK, x: x, y: y + 1, width: 2, height: 1, state: null });
+    // y+2: Desk (2x1) with monitor on right tile
+    map.placeFurniture({ type: DESK, x: x, y: y + 2, width: 2, height: 1, state: null });
+    map.placeFurniture({ type: PC, x: x + 1, y: y + 2, width: 1, height: 1, state: "off" });
+    // y+3: Chair / seat position — character stands here
     map.placeFurniture({
-      type: CHAIR, x: x, y: y + 2, width: 1, height: 1, state: null,
+      type: CHAIR, x: x, y: y + 3, width: 1, height: 1, state: null,
       direction: "up", deskIndex: deskIndex,
     });
   }
 
   function placeCommonArea(map, ox, oy) {
-    // Plant (1x2 tall potted plant)
-    map.placeFurniture({ type: PLANT, x: ox, y: oy, width: 1, height: 2, state: null });
-    // Bookshelf (1x2 tall)
-    map.placeFurniture({ type: BOOKSHELF, x: ox + 1, y: oy, width: 1, height: 2, state: null });
-    // Whiteboard (2x1 wide)
-    map.placeFurniture({ type: WHITEBOARD, x: ox + 2, y: oy, width: 2, height: 1, state: null });
-    // Coffee machine (1x1)
-    map.placeFurniture({ type: COFFEE, x: ox + 2, y: oy + 1, width: 1, height: 1, state: null });
+    // Single row of items aligned with desk row
+    map.placeFurniture({ type: PLANT, x: ox, y: oy - 1, width: 1, height: 2, state: null });
+    map.placeFurniture({ type: BOOKSHELF, x: ox + 1, y: oy - 1, width: 1, height: 2, state: null });
+    map.placeFurniture({ type: WHITEBOARD, x: ox, y: oy + 1, width: 2, height: 1, state: null });
   }
 
   // ---- Exports ----

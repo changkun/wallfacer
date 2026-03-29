@@ -61,7 +61,7 @@
     // Spawn/despawn effect
     this._effect = null;
     if (typeof window._officeMatrixEffect === "function") {
-      this._effect = new window._officeMatrixEffect("spawn", 16, 16);
+      this._effect = new window._officeMatrixEffect("spawn", 16, 32);
     }
 
     // Walk path
@@ -266,7 +266,7 @@
       case "cancelled":
         this._setState(DESPAWN);
         if (typeof window._officeMatrixEffect === "function") {
-          this._effect = new window._officeMatrixEffect("despawn", 16, 16);
+          this._effect = new window._officeMatrixEffect("despawn", 16, 32);
         }
         break;
     }

@@ -337,17 +337,11 @@
     var charH = anims._frameH || 32;
     var srcY = (dirDef.megaRow || 0) * charH;
 
-    // Draw 16x32 sprite, offset up by 16px so feet align with tile
+    // Draw 16x32 sprite: feet at bottom of tile, head extends upward
     ctx.drawImage(
       sheet,
-      srcCol * TILE,
-      srcY,
-      TILE,
-      charH,
-      px,
-      py - TILE,
-      TILE,
-      charH,
+      srcCol * TILE, srcY, TILE, charH,
+      px, py + TILE - charH, TILE, charH,
     );
   };
 
