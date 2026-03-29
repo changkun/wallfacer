@@ -46,7 +46,9 @@
 .modal-wide #modal-right {
   flex: 3;
   min-width: 0;
-  overflow-y: auto;
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .modal-wide #modal-backlog-right {
   flex: 3;
@@ -58,6 +60,13 @@
 .modal-wide #modal-backlog-right.hidden {
   display: none;
 }
+.modal-wide #modal-right > div:not(.right-panel-tabs) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
 .modal-wide .logs-block {
-  max-height: calc(95vh - 200px);
+  max-height: none;
 }

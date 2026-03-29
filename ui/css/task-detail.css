@@ -2,12 +2,10 @@
 .right-panel-tabs {
   display: flex;
   gap: 2px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   border-bottom: 1px solid var(--border);
   padding-bottom: 0;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  flex-shrink: 0;
   background: var(--bg-card);
 }
 .right-tab {
@@ -516,6 +514,10 @@ pre {
 #modal-logs-section,
 #modal-test-logs-section {
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 .logs-block {
   background: #1a1917;
@@ -523,7 +525,8 @@ pre {
   padding: 16px;
   font-size: 12px;
   color: #cdd1d6;
-  max-height: 384px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   font-family: "SF Mono", "Fira Code", monospace;
 }
