@@ -1,6 +1,6 @@
 # Task 2: Relay Dispatcher
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** Backend infrastructure
 **Effort:** Medium
