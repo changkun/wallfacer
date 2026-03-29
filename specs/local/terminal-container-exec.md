@@ -5,21 +5,40 @@
 
 ---
 
+## Current State
+
+- **Host terminal** is complete: `/api/terminal/ws` WebSocket handler in `internal/handler/terminal.go`, xterm.js client in `ui/js/terminal.js`, PTY spawning via `internal/pty/`. Single-session only.
+- **`GET /api/containers`** exists in `internal/handler/containers.go` — returns `[]sandbox.ContainerInfo` (ID, Name, TaskID, TaskTitle, Image, State, Status, CreatedAt) for running wallfacer sandbox containers.
+- **CLI `wallfacer exec`** (`internal/cli/exec.go`) attaches to containers via `podman exec -it` with `syscall.Exec()` process replacement. Not available from the web UI.
+- **`SandboxBackend` interface** (`internal/sandbox/backend.go`) defines `Launch` and `List` methods with a local implementation. The terminal handler does not use this interface.
+- **Terminal sessions** ([terminal-sessions.md](terminal-sessions.md)) is not started — no tab infrastructure exists yet.
+
 ## Problem
 
-The host terminal ([host-terminal.md](../foundations/host-terminal.md)) runs a shell on the host machine. To inspect or debug a running task container, users must use `wallfacer exec <task-id>` from a separate terminal. A "Container Shell" tab type that attaches to running task containers would eliminate this context switch.
+The host terminal runs a shell on the host machine. To inspect or debug a running task container, users must use `wallfacer exec <task-id>` from a separate terminal. A "Container Shell" tab type that attaches to running task containers would eliminate this context switch.
 
 ## Goal
 
 Add a container exec terminal mode that spawns `podman exec -it <container> bash` instead of a host shell, selectable from a dropdown of running containers.
 
-## Design Sketch
+## Design
 
-- **"Container Shell" tab type** in the terminal panel (alongside host shell tabs from [terminal-sessions.md](terminal-sessions.md)).
-- **Container selector** dropdown populated from `GET /api/containers`.
-- Spawns `podman exec -it <container> bash` via PTY instead of a host shell.
-- Same WebSocket relay protocol as the host terminal.
-- Replaces `wallfacer exec` CLI for many use cases.
+### Container exec WebSocket handler
+
+Add a new WebSocket endpoint (e.g., `/api/terminal/container/ws?container=<id>&token=<key>`) that:
+
+- Accepts a container ID parameter identifying the target container.
+- Spawns `podman exec -it <container> bash` via PTY (using `internal/pty/`) instead of a host shell.
+- Reuses the same JSON message protocol as the host terminal (`input`, `resize`, `ping` message types, binary output frames).
+- Dispatches the spawn mechanism via `SandboxBackend` so different backends use different exec commands (see Cloud Deployment below).
+
+The host terminal handler (`internal/handler/terminal.go`) serves as the implementation template — the only difference is what command is spawned.
+
+### Container selector UI
+
+- Dropdown populated from `GET /api/containers` (already implemented in `internal/handler/containers.go`).
+- Shows container name and associated task title.
+- Selecting a container opens a new "Container Shell" tab (requires terminal session tab infrastructure from [terminal-sessions.md](terminal-sessions.md)).
 
 ### Cloud Deployment
 
@@ -36,4 +55,4 @@ The WebSocket protocol and xterm.js frontend are backend-agnostic — only the P
 ## Dependencies
 
 - Requires host terminal (complete).
-- Ideally after [terminal-sessions.md](terminal-sessions.md) (tab infrastructure).
+- Ideally after [terminal-sessions.md](terminal-sessions.md) (tab infrastructure) — container shell tabs need the session/tab registry to coexist with host shell tabs.
