@@ -21,7 +21,7 @@ Local Product                          Cloud Platform
   ○ Host Mounts                          ○ Cloud Infrastructure
   ○ File Panel Viewer                    ○ Multi-Tenant (capstone)
   ✅ Terminal Sessions                    ○ Tenant API
-  ○ Container Exec
+  ✅ Container Exec
   ○ Oversight Risk Scoring             Shared Design
   ○ Visual Verification                  ○ Authentication
   ○ OAuth Token Setup                    ○ Agent Abstraction
@@ -64,7 +64,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | [host-mounts.md](local/host-mounts.md) | Not started | Per-task read-only host filesystem mounts into sandbox containers |
 | [file-panel-viewer.md](local/file-panel-viewer.md) | Not started | VS Code-style inline file panel with tabs, multi-modal preview |
 | [terminal-sessions.md](local/terminal-sessions.md) | **Complete** | Multiple concurrent terminal sessions with tab bar |
-| [terminal-container-exec.md](local/terminal-container-exec.md) | Not started | Attach to running task containers from the terminal panel |
+| [terminal-container-exec.md](local/terminal-container-exec.md) | **Complete** | Attach to running task containers from the terminal panel |
 | [oversight-risk-scoring.md](local/oversight-risk-scoring.md) | Not started | Real-time agent action risk assessment |
 | [visual-verification.md](local/visual-verification.md) | Not started | Visual verification for UI changes |
 | [live-serve.md](local/live-serve.md) | Not started | Build and run developed software from within Wallfacer |

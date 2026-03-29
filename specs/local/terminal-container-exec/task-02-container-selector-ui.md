@@ -1,6 +1,6 @@
 # Task 2: Container Selector UI
 
-**Status:** Todo
+**Status:** Done
 **Depends on:** Task 1
 **Phase:** Frontend
 **Effort:** Medium

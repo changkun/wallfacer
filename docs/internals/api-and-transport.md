@@ -256,7 +256,7 @@ The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `fa
 | `input` | `data` (base64) | Terminal input bytes |
 | `resize` | `cols`, `rows` | Resize the active session's PTY |
 | `ping` | — | Keep-alive; server responds with `pong` |
-| `create_session` | — | Spawn a new shell session |
+| `create_session` | `container` (name, optional) | Spawn a new shell session. If `container` is set, spawns `<runtime> exec -it <container> bash` instead of a host shell. |
 | `switch_session` | `session` (ID) | Switch the active session |
 | `close_session` | `session` (ID) | Close and remove a session |
 
@@ -265,7 +265,7 @@ The feature is gated on `WALLFACER_TERMINAL_ENABLED` (default `true`; set to `fa
 | Type | Fields | Description |
 |------|--------|-------------|
 | `pong` | — | Keep-alive response |
-| `sessions` | `sessions` (array of `{id, active}`) | Full session list; sent on connect and after any session change |
+| `sessions` | `sessions` (array of `{id, active, container?}`) | Full session list; sent on connect and after any session change. `container` is set for exec sessions. |
 | `session_created` | `session` (ID) | New session spawned |
 | `session_switched` | `session` (ID) | Active session changed |
 | `session_closed` | `session` (ID) | Session removed |
