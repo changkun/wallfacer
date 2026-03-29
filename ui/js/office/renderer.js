@@ -245,7 +245,7 @@
 
   // Sprite coordinates in office_sheet.png (verified visually)
   var SPRITE_MAP = {
-    desk:       { sx: 0,   sy: 96,  sw: 32, sh: 32 },  // 2x2 wooden desk
+    desk:       { sx: 0,   sy: 112, sw: 32, sh: 16 },  // 2x1 wooden desk surface
     chair:      { sx: 0,   sy: 128, sw: 16, sh: 16 },  // dark office chair
     pc:         { sx: 208, sy: 128, sw: 16, sh: 16 },  // monitor
     sofa:       { sx: 0,   sy: 160, sw: 16, sh: 16 },  // orange sofa piece

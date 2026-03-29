@@ -163,15 +163,15 @@ describe("clamp", () => {
     expect(cam.y).toBeCloseTo(200 - 200 / 3);
   });
 
-  it("allows full range when world fits in viewport", () => {
+  it("centers when world fits in viewport", () => {
     const { windowObj } = makeContext();
     const cam = new windowObj._officeCamera(300, 200);
     cam.zoom = 3;
-    // viewW = 100 > worldWidth 50 → maxX = 0
+    // viewW = 100 > worldWidth 50 → center at (50-100)/2 = -25
     cam.x = 10;
     cam.clamp(50, 50);
-    expect(cam.x).toBe(0);
-    expect(cam.y).toBe(0);
+    expect(cam.x).toBe(-25);
+    expect(cam.y).toBeCloseTo((50 - 200/3) / 2);
   });
 });
 
@@ -188,8 +188,8 @@ describe("resize", () => {
     // and clamp uses new viewport size
     cam.x = 999;
     cam.clamp(100, 100);
-    // viewW = 600/3 = 200, maxX = max(0, 100-200) = 0
-    expect(cam.x).toBe(0);
+    // viewW = 600/3 = 200 > 100 → centers at (100-200)/2 = -50
+    expect(cam.x).toBe(-50);
   });
 });
 

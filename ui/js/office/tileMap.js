@@ -123,7 +123,7 @@
     // Interior: common area on left + stations in a row
     var stationsW = N * STATION_W + (N - 1) * STATION_GAP;
     var interiorW = COMMON_W + 1 + stationsW; // +1 gap between common and stations
-    var interiorH = 4; // 1 row of PC + desk + chair + 1 floor row below
+    var interiorH = 5; // head room + desk(2h) + chair + floor below
 
     var totalW = interiorW + 2 * (WALL_PAD + INTERIOR_PAD);
     var totalH = interiorH + 2 * (WALL_PAD + INTERIOR_PAD);
@@ -145,14 +145,14 @@
     var ox = WALL_PAD + INTERIOR_PAD;
     var oy = WALL_PAD + INTERIOR_PAD;
 
-    // Common area on the left
-    placeCommonArea(map, ox, oy);
+    // Common area on the left (shifted down 1 for character head room)
+    placeCommonArea(map, ox, oy + 1);
 
     // Workstations in a row, starting after common area
     var stationX = ox + COMMON_W + 1;
     for (var i = 0; i < N; i++) {
       var sx = stationX + i * (STATION_W + STATION_GAP);
-      placeStation(map, sx, oy, i);
+      placeStation(map, sx, oy + 1, i);
     }
 
     return {
@@ -164,10 +164,11 @@
 
   function placeStation(map, x, y, deskIndex) {
     // Row layout (top to bottom):
-    // y+0..y+1: Desk (2x2) with PC on top-right tile
+    // y+0: PC/monitor (1x1) — visually behind the desk
+    // y+1: Desk (2x1) — single row desk
     // y+2: Chair (facing up toward desk)
-    map.placeFurniture({ type: DESK, x: x, y: y, width: 2, height: 2, state: null });
-    map.placeFurniture({ type: PC, x: x + 1, y: y, width: 1, height: 1, state: "off" });
+    map.placeFurniture({ type: PC, x: x, y: y, width: 1, height: 1, state: "off" });
+    map.placeFurniture({ type: DESK, x: x, y: y + 1, width: 2, height: 1, state: null });
     map.placeFurniture({
       type: CHAIR, x: x, y: y + 2, width: 1, height: 1, state: null,
       direction: "up", deskIndex: deskIndex,
