@@ -94,6 +94,9 @@
     // Collect drawables (furniture + characters), z-sort, and draw
     this._drawScene(ctx);
 
+    // Overlay pass: speech bubbles (always on top)
+    this._drawBubbles(ctx);
+
     ctx.restore();
 
     this._rafId = requestAnimationFrame(this._boundRender);
@@ -239,6 +242,20 @@
       else if (info.direction === 3) dotY -= off; // up
       ctx.arc(dotX, dotY, 1.5, 0, Math.PI * 2);
       ctx.fill();
+    }
+  };
+
+  OfficeRenderer.prototype._drawBubbles = function (ctx) {
+    if (!this._characterManager) return;
+    var drawBubble = window._officeDrawBubble;
+    if (!drawBubble) return;
+
+    var chars = this._characterManager.getDrawables();
+    for (var i = 0; i < chars.length; i++) {
+      var ch = chars[i];
+      if (ch.bubble && ch.bubble.visible) {
+        drawBubble(ctx, ch.x * TILE, ch.y * TILE, ch.bubble, this._camera.zoom);
+      }
     }
   };
 

@@ -47,6 +47,7 @@
     this.state = SPAWN;
     this.dead = false;
     this.bubbleType = null; // "amber" or "red" when in SPEECH_BUBBLE
+    this.bubble = null; // SpeechBubble instance
 
     // Timers
     this._stateTimer = 0;
@@ -138,6 +139,7 @@
 
       case SPEECH_BUBBLE:
         this._animType = "idle";
+        if (this.bubble) this.bubble.update(dt);
         break;
 
       case DESPAWN:
@@ -224,25 +226,35 @@
         if (this.state !== IDLE && this.state !== WANDER && this.state !== SPAWN) {
           this._setState(IDLE);
         }
+        this._dismissBubble();
         break;
       case "in_progress":
+        if (this.state !== WORKING && this.state !== WALK_TO_DESK) {
+          this._walkToDesk(tileMap);
+        }
+        this._dismissBubble();
+        break;
       case "committing":
         if (this.state !== WORKING && this.state !== WALK_TO_DESK) {
           this._walkToDesk(tileMap);
         }
+        this._createBubble("committing");
         break;
       case "waiting":
         this._setState(SPEECH_BUBBLE);
         this.bubbleType = "amber";
+        this._createBubble("waiting");
         break;
       case "failed":
         this._setState(SPEECH_BUBBLE);
         this.bubbleType = "red";
+        this._createBubble("failed");
         break;
       case "done":
         if (this.state !== IDLE) {
           this._setState(IDLE);
         }
+        this._dismissBubble();
         break;
       case "cancelled":
         this._setState(DESPAWN);
@@ -285,6 +297,21 @@
     this._animFrame = 0;
   };
 
+  // ---- Bubble helpers ----
+
+  Character.prototype._createBubble = function (type) {
+    if (typeof window._officeSpeechBubble === "function") {
+      this.bubble = new window._officeSpeechBubble(type);
+    }
+  };
+
+  Character.prototype._dismissBubble = function () {
+    if (this.bubble) {
+      this.bubble.dismiss();
+      this.bubble = null;
+    }
+  };
+
   // ---- Draw info ----
 
   Character.prototype.getDrawInfo = function () {
@@ -297,6 +324,7 @@
       state: this.state,
       animType: this._animType,
       effect: this._effect,
+      bubble: this.bubble ? this.bubble.getDrawInfo() : null,
     };
   };
 
