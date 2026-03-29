@@ -220,11 +220,11 @@ describe("generateOfficeLayout", () => {
     expect(types).toContain(F.BOOKSHELF);
   });
 
-  it("common area includes whiteboard and bookshelf", () => {
+  it("common area includes sofa and bookshelf", () => {
     const { furniture } = gen(6);
     const types = furniture.map((f) => f.type);
     
-    expect(types).toContain(F.WHITEBOARD);
+    expect(types).toContain(F.SOFA);
     expect(types).toContain(F.BOOKSHELF);
   });
 
