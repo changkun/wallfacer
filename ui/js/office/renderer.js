@@ -21,12 +21,15 @@
 
   // ---- OfficeRenderer ----
 
+  var CHARACTER_COLOR = "#4A90D9";
+
   function OfficeRenderer(canvas, spriteCache, camera) {
     this._canvas = canvas;
     this._ctx = canvas.getContext("2d");
     this._ctx.imageSmoothingEnabled = false;
     this._spriteCache = spriteCache;
     this._camera = camera;
+    this._characterManager = null;
 
     this._tileMap = null;
     this._furniture = [];
@@ -88,8 +91,8 @@
     // Draw floor layer (cached)
     this._drawFloor(ctx);
 
-    // Collect drawables, z-sort, and draw
-    this._drawFurniture(ctx);
+    // Collect drawables (furniture + characters), z-sort, and draw
+    this._drawScene(ctx);
 
     ctx.restore();
 
@@ -123,41 +126,100 @@
     ctx.drawImage(this._floorCanvas, 0, 0);
   };
 
-  OfficeRenderer.prototype._drawFurniture = function (ctx) {
+  OfficeRenderer.prototype.setCharacterManager = function (mgr) {
+    this._characterManager = mgr;
+  };
+
+  OfficeRenderer.prototype._drawScene = function (ctx) {
     var drawables = this._drawables;
     drawables.length = 0;
 
+    // Add furniture
     for (var i = 0; i < this._furniture.length; i++) {
-      drawables.push(this._furniture[i]);
+      var f = this._furniture[i];
+      drawables.push({
+        _isChar: false,
+        x: f.x,
+        y: f.y,
+        width: f.width || 1,
+        height: f.height || 1,
+        type: f.type,
+      });
+    }
+
+    // Add characters
+    if (this._characterManager) {
+      var chars = this._characterManager.getDrawables();
+      for (var c = 0; c < chars.length; c++) {
+        var ch = chars[c];
+        drawables.push({
+          _isChar: true,
+          x: ch.x,
+          y: ch.y,
+          width: 1,
+          height: 1,
+          _charInfo: ch,
+        });
+      }
     }
 
     // Z-sort by bottom edge (y + height) ascending
     drawables.sort(function (a, b) {
-      var aBottom = a.y + (a.height || 1);
-      var bBottom = b.y + (b.height || 1);
+      var aBottom = a.y + a.height;
+      var bBottom = b.y + b.height;
       return aBottom - bBottom;
     });
 
     for (var d = 0; d < drawables.length; d++) {
-      var f = drawables[d];
-      var fw = (f.width || 1) * TILE;
-      var fh = (f.height || 1) * TILE;
-      var fx = f.x * TILE;
-      var fy = f.y * TILE;
-
-      // Placeholder rendering: colored rectangle with type label
-      var color = FURNITURE_COLORS[f.type] || "#999";
-      ctx.fillStyle = color;
-      ctx.fillRect(fx, fy, fw, fh);
-
-      // Tiny label for identification
-      ctx.fillStyle = "#FFF";
-      ctx.font = "3px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      var label = f.type.charAt(0).toUpperCase();
-      ctx.fillText(label, fx + fw / 2, fy + fh / 2);
+      var item = drawables[d];
+      if (item._isChar) {
+        this._drawCharacter(ctx, item._charInfo);
+      } else {
+        this._drawFurnitureItem(ctx, item);
+      }
     }
+  };
+
+  OfficeRenderer.prototype._drawFurnitureItem = function (ctx, f) {
+    var fw = f.width * TILE;
+    var fh = f.height * TILE;
+    var fx = f.x * TILE;
+    var fy = f.y * TILE;
+
+    var color = FURNITURE_COLORS[f.type] || "#999";
+    ctx.fillStyle = color;
+    ctx.fillRect(fx, fy, fw, fh);
+
+    ctx.fillStyle = "#FFF";
+    ctx.font = "3px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    var label = f.type.charAt(0).toUpperCase();
+    ctx.fillText(label, fx + fw / 2, fy + fh / 2);
+  };
+
+  OfficeRenderer.prototype._drawCharacter = function (ctx, info) {
+    var px = info.x * TILE;
+    var py = info.y * TILE;
+
+    // Placeholder: colored circle
+    ctx.fillStyle = CHARACTER_COLOR;
+    ctx.beginPath();
+    ctx.arc(px + TILE / 2, py + TILE / 2, TILE / 2 - 1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Direction indicator: small dot
+    ctx.fillStyle = "#FFF";
+    ctx.beginPath();
+    var dotX = px + TILE / 2;
+    var dotY = py + TILE / 2;
+    var off = TILE / 3;
+    if (info.direction === 0) dotY += off; // down
+    else if (info.direction === 1) dotX -= off; // left
+    else if (info.direction === 2) dotX += off; // right
+    else if (info.direction === 3) dotY -= off; // up
+    ctx.arc(dotX, dotY, 1.5, 0, Math.PI * 2);
+    ctx.fill();
   };
 
   // ---- Exports ----

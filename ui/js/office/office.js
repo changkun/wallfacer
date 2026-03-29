@@ -7,6 +7,7 @@
   var _spriteCache = null;
   var _canvas = null;
   var _currentLayout = null;
+  var _characterManager = null;
 
   function initOffice() {
     var container = document.getElementById("office-container");
@@ -26,6 +27,8 @@
     _spriteCache = new window._officeSpriteCache();
     _camera = new window._officeCamera(_canvas.width, _canvas.height);
     _renderer = new window._officeRenderer(_canvas, _spriteCache, _camera);
+    _characterManager = new window._officeCharacterManager(null, []);
+    _renderer.setCharacterManager(_characterManager);
 
     // Attach pan/zoom input
     window._officeAttachInputHandlers(_canvas, _camera, function () {
@@ -72,6 +75,21 @@
         _currentLayout.seats
       );
     }
+    if (_characterManager) {
+      _characterManager.setLayout(
+        _currentLayout.tileMap,
+        _currentLayout.seats
+      );
+    }
+  }
+
+  function syncTasks(tasks) {
+    if (!_characterManager) return;
+    // Ensure layout has enough seats
+    if (_currentLayout && tasks.length > _currentLayout.seats.length) {
+      updateLayout(tasks.length);
+    }
+    _characterManager.syncTasks(tasks);
   }
 
   function showOffice() {
@@ -128,4 +146,8 @@
   window._officeIsVisible = isOfficeVisible;
   window._officeUpdateLayout = updateLayout;
   window._officeToggle = toggleOffice;
+  window._officeSyncTasks = syncTasks;
+  window._officeGetCharacterManager = function () {
+    return _characterManager;
+  };
 })();

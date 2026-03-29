@@ -134,6 +134,20 @@ function makeContext() {
       }
       set src(v) {}
     },
+    localStorage: {
+      _data: {},
+      getItem(k) {
+        return this._data[k] || null;
+      },
+      setItem(k, v) {
+        this._data[k] = v;
+      },
+      removeItem(k) {
+        delete this._data[k];
+      },
+    },
+    Set,
+    JSON,
     Promise,
     requestAnimationFrame() {
       return 1;
@@ -149,7 +163,10 @@ function makeContext() {
     "office/tileMap.js",
     "office/spriteCache.js",
     "office/camera.js",
+    "office/pathfinding.js",
+    "office/character.js",
     "office/renderer.js",
+    "office/characterManager.js",
     "office/office.js",
   ];
   for (const f of files) {
