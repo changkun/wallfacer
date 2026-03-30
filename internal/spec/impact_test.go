@@ -3,26 +3,28 @@ package spec
 import (
 	"slices"
 	"testing"
+
+	"changkun.de/x/wallfacer/internal/pkg/dag"
 )
 
-func TestBuildReverseIndex_Simple(t *testing.T) {
+func TestReverseIndex_Simple(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
 		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/b.md"}},
 		"local/b.md": {Status: StatusValidated, Track: TrackLocal},
 	})
-	rev := BuildReverseIndex(tree)
+	rev := dag.ReverseEdges(Adjacency(tree))
 	if !slices.Contains(rev["local/b.md"], "local/a.md") {
 		t.Errorf("reverse index for b.md = %v, want [local/a.md]", rev["local/b.md"])
 	}
 }
 
-func TestBuildReverseIndex_Multiple(t *testing.T) {
+func TestReverseIndex_Multiple(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
 		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/b.md", "local/c.md"}},
 		"local/b.md": {Status: StatusValidated, Track: TrackLocal},
 		"local/c.md": {Status: StatusValidated, Track: TrackLocal},
 	})
-	rev := BuildReverseIndex(tree)
+	rev := dag.ReverseEdges(Adjacency(tree))
 	if !slices.Contains(rev["local/b.md"], "local/a.md") {
 		t.Error("b.md should have a.md as dependent")
 	}
@@ -31,24 +33,24 @@ func TestBuildReverseIndex_Multiple(t *testing.T) {
 	}
 }
 
-func TestBuildReverseIndex_SharedDep(t *testing.T) {
+func TestReverseIndex_SharedDep(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
 		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/c.md"}},
 		"local/b.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/c.md"}},
 		"local/c.md": {Status: StatusValidated, Track: TrackLocal},
 	})
-	rev := BuildReverseIndex(tree)
+	rev := dag.ReverseEdges(Adjacency(tree))
 	deps := rev["local/c.md"]
 	if len(deps) != 2 {
 		t.Fatalf("c.md dependents = %v, want 2 entries", deps)
 	}
 }
 
-func TestBuildReverseIndex_NoDeps(t *testing.T) {
+func TestReverseIndex_NoDeps(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
 		"local/a.md": {Status: StatusValidated, Track: TrackLocal},
 	})
-	rev := BuildReverseIndex(tree)
+	rev := dag.ReverseEdges(Adjacency(tree))
 	if len(rev["local/a.md"]) != 0 {
 		t.Errorf("a.md should have no dependents, got %v", rev["local/a.md"])
 	}

@@ -1,30 +1,33 @@
 package spec
 
+import (
+	"changkun.de/x/wallfacer/internal/pkg/dag"
+)
+
 // Impact describes the direct and transitive dependents of a spec.
 type Impact struct {
 	Direct     []string // spec paths that directly depend on the target
 	Transitive []string // spec paths reachable transitively (excluding direct)
 }
 
-// BuildReverseIndex inverts all depends_on edges in the tree.
-// Returns a map from spec path to the list of specs that depend on it.
-func BuildReverseIndex(tree *Tree) map[string][]string {
-	reverse := make(map[string][]string)
+// Adjacency builds a forward adjacency map (spec path → its depends_on targets)
+// from the tree. This is the input format for the dag package operations.
+func Adjacency(tree *Tree) map[string][]string {
+	adj := make(map[string][]string, len(tree.All))
 	for path, node := range tree.All {
-		if node.Spec == nil {
-			continue
-		}
-		for _, dep := range node.Spec.DependsOn {
-			reverse[dep] = append(reverse[dep], path)
+		if node.Spec != nil {
+			adj[path] = node.Spec.DependsOn
+		} else {
+			adj[path] = nil
 		}
 	}
-	return reverse
+	return adj
 }
 
 // ComputeImpact computes the direct and transitive dependents of a spec.
 // For non-leaf specs, impact includes dependents of any leaf in the subtree.
 func ComputeImpact(tree *Tree, specPath string) *Impact {
-	reverse := BuildReverseIndex(tree)
+	reverse := dag.ReverseEdges(Adjacency(tree))
 
 	// Collect seed paths: the spec itself plus all subtree leaves for non-leaf specs.
 	seeds := []string{specPath}
@@ -44,26 +47,11 @@ func ComputeImpact(tree *Tree, specPath string) *Impact {
 
 	// BFS from direct dependents to find transitive dependents.
 	transitiveSet := make(map[string]bool)
-	queue := make([]string, 0, len(directSet))
 	for d := range directSet {
-		queue = append(queue, d)
-	}
-
-	visited := make(map[string]bool)
-	for d := range directSet {
-		visited[d] = true
-	}
-
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		for _, next := range reverse[cur] {
-			if next == specPath || visited[next] {
-				continue
+		for r := range dag.Reachable(reverse, d) {
+			if !directSet[r] && r != specPath {
+				transitiveSet[r] = true
 			}
-			visited[next] = true
-			transitiveSet[next] = true
-			queue = append(queue, next)
 		}
 	}
 
@@ -98,7 +86,7 @@ func collectLeafPaths(node *Node, paths *[]string) {
 // given that completedPath just reached complete status. Only returns specs
 // that are not themselves already complete.
 func UnblockedSpecs(tree *Tree, completedPath string) []*Node {
-	reverse := BuildReverseIndex(tree)
+	reverse := dag.ReverseEdges(Adjacency(tree))
 	var unblocked []*Node
 
 	for _, dependent := range reverse[completedPath] {

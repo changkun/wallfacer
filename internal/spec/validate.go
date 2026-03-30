@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"changkun.de/x/wallfacer/internal/pkg/dag"
 )
 
 // Severity classifies a validation result.
@@ -185,60 +187,17 @@ func ValidateTree(tree *Tree, repoRoot string) []Result {
 	return results
 }
 
-// checkDAGAcyclic verifies the depends_on graph has no cycles using DFS coloring.
+// checkDAGAcyclic verifies the depends_on graph has no cycles.
 func checkDAGAcyclic(tree *Tree) []Result {
-	type color int
-	const (
-		white color = iota // unvisited
-		gray               // in-progress
-		black              // done
-	)
-
-	colors := make(map[string]color)
-	parent := make(map[string]string) // for cycle path reconstruction
-
+	cycles := dag.DetectCycles(Adjacency(tree))
 	var results []Result
-
-	var dfs func(path string)
-	dfs = func(path string) {
-		colors[path] = gray
-		node, ok := tree.All[path]
-		if !ok || node.Spec == nil {
-			colors[path] = black
-			return
-		}
-		for _, dep := range node.Spec.DependsOn {
-			switch colors[dep] {
-			case white:
-				parent[dep] = path
-				dfs(dep)
-			case gray:
-				// Back edge — cycle detected. Reconstruct path.
-				cycle := []string{dep, path}
-				cur := path
-				for cur != dep {
-					cur = parent[cur]
-					cycle = append(cycle, cur)
-				}
-				// Reverse to get forward order.
-				for i, j := 0, len(cycle)-1; i < j; i, j = i+1, j-1 {
-					cycle[i], cycle[j] = cycle[j], cycle[i]
-				}
-				results = append(results, Result{
-					Path:     path,
-					Severity: SeverityError,
-					Rule:     "dag-acyclic",
-					Message:  fmt.Sprintf("dependency cycle: %s", strings.Join(cycle, " -> ")),
-				})
-			}
-		}
-		colors[path] = black
-	}
-
-	for path := range tree.All {
-		if colors[path] == white {
-			dfs(path)
-		}
+	for _, cycle := range cycles {
+		results = append(results, Result{
+			Path:     cycle[0],
+			Severity: SeverityError,
+			Rule:     "dag-acyclic",
+			Message:  fmt.Sprintf("dependency cycle: %s", strings.Join(cycle, " -> ")),
+		})
 	}
 	return results
 }
@@ -313,16 +272,7 @@ func hasIncompleteLeaf(node *Node) bool {
 
 // checkStalePropagation warns when a stale spec has validated dependents.
 func checkStalePropagation(tree *Tree) []Result {
-	// Build reverse index: spec path -> list of dependents.
-	reverse := make(map[string][]string)
-	for path, node := range tree.All {
-		if node.Spec == nil {
-			continue
-		}
-		for _, dep := range node.Spec.DependsOn {
-			reverse[dep] = append(reverse[dep], path)
-		}
-	}
+	reverse := dag.ReverseEdges(Adjacency(tree))
 
 	var results []Result
 	for path, node := range tree.All {
