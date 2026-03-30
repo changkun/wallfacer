@@ -1,7 +1,6 @@
 ---
 title: First-Launch Hints and Re-Auth UI
 status: complete
-track: local
 depends_on:
   - specs/local/oauth-token-setup/task-05-ui-sign-in.md
   - specs/local/oauth-token-setup/task-07-reauth-flag.md

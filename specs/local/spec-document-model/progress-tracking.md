@@ -1,7 +1,6 @@
 ---
 title: Progress Tracking
 status: complete
-track: local
 depends_on:
   - specs/local/spec-document-model/spec-tree-builder.md
 affects:

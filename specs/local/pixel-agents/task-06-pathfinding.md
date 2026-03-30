@@ -1,7 +1,6 @@
 ---
 title: Pathfinding
 status: complete
-track: local
 depends_on:
   - specs/local/pixel-agents/task-02-tilemap-and-layout.md
 affects: []

@@ -1,7 +1,6 @@
 ---
 title: Pluggable Sandbox Backends
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/sandbox/

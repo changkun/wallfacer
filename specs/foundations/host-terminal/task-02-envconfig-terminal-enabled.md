@@ -1,7 +1,6 @@
 ---
 title: "Add TerminalEnabled to Envconfig and Config Response"
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/envconfig/envconfig.go

@@ -1,7 +1,6 @@
 ---
 title: "Worker Lifecycle Stats in Settings Panel"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/container-reuse/task-07-lifecycle-metrics.md
 affects:

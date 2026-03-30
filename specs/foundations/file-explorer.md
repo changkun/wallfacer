@@ -1,7 +1,6 @@
 ---
 title: File Explorer Panel
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/handler/explorer.go

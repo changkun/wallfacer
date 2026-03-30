@@ -1,7 +1,6 @@
 ---
 title: System Tray -- Static Skeleton
 status: complete
-track: local
 depends_on:
   - specs/local/desktop-app/task-02-wails-window.md
 affects: []

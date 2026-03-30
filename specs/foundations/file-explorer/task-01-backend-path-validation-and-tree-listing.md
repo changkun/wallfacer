@@ -1,7 +1,6 @@
 ---
 title: "Backend Path Validation and Tree Listing"
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/handler/explorer.go

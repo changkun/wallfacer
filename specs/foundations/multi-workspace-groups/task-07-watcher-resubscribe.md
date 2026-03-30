@@ -1,7 +1,6 @@
 ---
 title: "Watcher Store Re-subscription on Workspace Change"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/multi-workspace-groups/task-01-active-groups-map.md
 affects:

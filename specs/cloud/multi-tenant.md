@@ -1,7 +1,6 @@
 ---
 title: Cloud Multi-Tenant
 status: drafted
-track: cloud
 depends_on:
   - specs/cloud/k8s-sandbox.md
   - specs/cloud/cloud-infrastructure.md

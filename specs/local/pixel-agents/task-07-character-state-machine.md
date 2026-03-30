@@ -1,7 +1,6 @@
 ---
 title: Character State Machine and Animation
 status: complete
-track: local
 depends_on:
   - specs/local/pixel-agents/task-03-sprite-cache.md
   - specs/local/pixel-agents/task-06-pathfinding.md

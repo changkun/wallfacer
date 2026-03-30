@@ -1,7 +1,6 @@
 ---
 title: "Documentation"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/host-terminal/task-04-backend-terminal-handler.md
   - specs/foundations/host-terminal/task-06-statusbar-integration.md

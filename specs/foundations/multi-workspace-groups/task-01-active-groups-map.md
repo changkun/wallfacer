@@ -1,7 +1,6 @@
 ---
 title: "Add activeGroups Map to Manager"
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/workspace/manager.go

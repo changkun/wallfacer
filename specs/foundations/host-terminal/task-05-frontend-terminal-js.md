@@ -1,7 +1,6 @@
 ---
 title: "Frontend Terminal Module"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/host-terminal/task-03-vendor-xtermjs.md
 affects:

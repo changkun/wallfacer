@@ -1,7 +1,6 @@
 ---
 title: Polish -- Preferences, Minimap, Accessibility
 status: complete
-track: local
 depends_on:
   - specs/local/pixel-agents/task-05-renderer-and-view-toggle.md
   - specs/local/pixel-agents/task-12-interaction.md

@@ -1,7 +1,6 @@
 ---
 title: Pixel Agent Avatars
 status: complete
-track: local
 depends_on: []
 affects:
   - ui/js/office/

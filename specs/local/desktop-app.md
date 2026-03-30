@@ -1,7 +1,6 @@
 ---
 title: Native Desktop App
 status: complete
-track: local
 depends_on:
   - specs/foundations/file-explorer.md
   - specs/foundations/host-terminal.md

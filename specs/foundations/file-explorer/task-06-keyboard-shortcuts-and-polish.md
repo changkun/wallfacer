@@ -1,7 +1,6 @@
 ---
 title: "Keyboard Shortcuts and Polish"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/file-explorer/task-04-frontend-tree-component.md
   - specs/foundations/file-explorer/task-05-frontend-file-preview-modal.md

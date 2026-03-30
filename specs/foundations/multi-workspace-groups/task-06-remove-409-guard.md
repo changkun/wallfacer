@@ -1,7 +1,6 @@
 ---
 title: "Remove 409 Blocking Check in UpdateWorkspaces"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/multi-workspace-groups/task-02-modify-switch.md
   - specs/foundations/multi-workspace-groups/task-05-run-uses-taskstore.md

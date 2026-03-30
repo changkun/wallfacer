@@ -1,7 +1,6 @@
 ---
 title: Inline File Panel Viewer
 status: drafted
-track: local
 depends_on:
   - specs/foundations/file-explorer.md
 affects:

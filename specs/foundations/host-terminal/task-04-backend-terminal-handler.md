@@ -1,7 +1,6 @@
 ---
 title: "Backend Terminal WebSocket Handler"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/host-terminal/task-01-go-dependencies.md
   - specs/foundations/host-terminal/task-02-envconfig-terminal-enabled.md

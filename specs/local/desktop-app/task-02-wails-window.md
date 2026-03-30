@@ -1,7 +1,6 @@
 ---
 title: Desktop Subcommand with Wails Window
 status: complete
-track: local
 depends_on:
   - specs/local/desktop-app/task-01-wails-dependency.md
 affects: []

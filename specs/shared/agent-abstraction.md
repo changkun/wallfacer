@@ -1,7 +1,6 @@
 ---
 title: Agent Role Abstraction & Multi-Agent Communication
 status: drafted
-track: shared
 depends_on: []
 affects: [internal/runner/, internal/store/, internal/prompts/]
 effort: xlarge

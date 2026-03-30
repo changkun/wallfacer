@@ -1,7 +1,6 @@
 ---
 title: Spec Lifecycle Transitions
 status: complete
-track: local
 depends_on:
   - specs/local/spec-document-model/spec-model-types.md
 affects:

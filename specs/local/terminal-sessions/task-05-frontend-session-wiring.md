@@ -1,7 +1,6 @@
 ---
 title: Frontend Session Wiring
 status: complete
-track: local
 depends_on:
   - specs/local/terminal-sessions/task-03-session-messages.md
   - specs/local/terminal-sessions/task-04-tab-bar-ui.md

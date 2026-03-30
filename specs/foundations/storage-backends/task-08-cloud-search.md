@@ -1,7 +1,6 @@
 ---
 title: "Cloud-Native Search"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/storage-backends/task-04-database-backend.md
 affects:

@@ -1,7 +1,6 @@
 ---
 title: Visual Verification for UI Changes
 status: drafted
-track: local
 depends_on: []
 affects:
   - playwright.config.ts

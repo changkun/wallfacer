@@ -1,7 +1,6 @@
 ---
 title: "Terminal UI — Full TUI Mode for Wallfacer"
 status: drafted
-track: local
 depends_on: []
 affects:
   - internal/tui/

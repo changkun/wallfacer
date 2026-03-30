@@ -1,7 +1,6 @@
 ---
 title: Documentation
 status: complete
-track: local
 depends_on:
   - specs/local/terminal-sessions/task-05-frontend-session-wiring.md
 affects: []

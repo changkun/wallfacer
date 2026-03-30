@@ -1,7 +1,6 @@
 ---
 title: "Preview Syntax Highlighting and Markdown Rendering"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/file-explorer/task-05-frontend-file-preview-modal.md
 affects:

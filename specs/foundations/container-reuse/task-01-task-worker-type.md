@@ -1,7 +1,6 @@
 ---
 title: "Add taskWorker Type"
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/sandbox/worker.go

@@ -1,7 +1,6 @@
 ---
 title: Speech Bubbles
 status: complete
-track: local
 depends_on:
   - specs/local/pixel-agents/task-07-character-state-machine.md
 affects: []

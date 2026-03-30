@@ -1,7 +1,6 @@
 ---
 title: Add Wails v2 Dependency and Project Scaffold
 status: complete
-track: local
 depends_on: []
 affects: []
 effort: small

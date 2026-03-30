@@ -1,7 +1,6 @@
 ---
 title: "Expose Per-Group Task Counts in Config API"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/multi-workspace-groups/task-01-active-groups-map.md
 affects:

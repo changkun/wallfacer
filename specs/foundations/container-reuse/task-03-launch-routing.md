@@ -1,7 +1,6 @@
 ---
 title: "Wire LocalBackend.Launch() to Route Through Per-Task Workers"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/container-reuse/task-01-task-worker-type.md
   - specs/foundations/container-reuse/task-02-create-args-from-spec.md

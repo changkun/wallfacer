@@ -1,7 +1,6 @@
 ---
 title: Session Control WebSocket Messages
 status: complete
-track: local
 depends_on:
   - specs/local/terminal-sessions/task-02-relay-dispatcher.md
 affects: []

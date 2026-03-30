@@ -1,7 +1,6 @@
 ---
 title: "Build Worker Create Args from ContainerSpec"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/container-reuse/task-01-task-worker-type.md
 affects:

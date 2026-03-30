@@ -1,7 +1,6 @@
 ---
 title: "Native Containerization: Windows"
 status: drafted
-track: shared
 depends_on:
   - specs/foundations/sandbox-backends.md
   - specs/foundations/windows-support.md

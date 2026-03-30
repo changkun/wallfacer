@@ -1,7 +1,6 @@
 ---
 title: Documentation
 status: complete
-track: local
 depends_on:
   - specs/local/oauth-token-setup/task-04-auth-handler-routes.md
   - specs/local/oauth-token-setup/task-05-ui-sign-in.md

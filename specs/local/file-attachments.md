@@ -1,7 +1,6 @@
 ---
 title: "File & Image Drag-and-Drop Attachments for Task Prompts"
 status: drafted
-track: local
 depends_on:
   - specs/foundations/file-explorer.md
 affects:

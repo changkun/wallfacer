@@ -1,7 +1,6 @@
 ---
 title: UI Sign-In Buttons and Polling
 status: complete
-track: local
 depends_on:
   - specs/local/oauth-token-setup/task-04-auth-handler-routes.md
 affects: []

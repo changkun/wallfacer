@@ -1,7 +1,6 @@
 ---
 title: Documentation
 status: complete
-track: local
 depends_on:
   - specs/local/terminal-container-exec/task-02-container-selector-ui.md
 affects: []

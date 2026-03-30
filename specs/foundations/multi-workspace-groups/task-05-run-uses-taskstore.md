@@ -1,7 +1,6 @@
 ---
 title: "Replace r.store with taskStore() in Execution Path"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/multi-workspace-groups/task-03-runner-task-ws-key.md
   - specs/foundations/multi-workspace-groups/task-04-runbackground-lifecycle.md

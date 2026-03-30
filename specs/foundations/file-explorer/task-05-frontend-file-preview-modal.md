@@ -1,7 +1,6 @@
 ---
 title: "Frontend File Preview Modal"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/file-explorer/task-02-backend-file-content-reading.md
   - specs/foundations/file-explorer/task-04-frontend-tree-component.md

@@ -1,7 +1,6 @@
 ---
 title: "Validation Barrier — User-Defined Test Criteria for Tasks"
 status: drafted
-track: local
 depends_on: []
 affects:
   - internal/store/models.go

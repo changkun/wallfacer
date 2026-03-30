@@ -1,7 +1,6 @@
 ---
 title: SSE Task State Integration
 status: complete
-track: local
 depends_on:
   - specs/local/pixel-agents/task-05-renderer-and-view-toggle.md
   - specs/local/pixel-agents/task-08-character-manager.md

@@ -1,7 +1,6 @@
 ---
 title: K8s Sandbox Backend
 status: drafted
-track: cloud
 depends_on:
   - specs/cloud/tenant-filesystem.md
   - specs/foundations/sandbox-backends.md

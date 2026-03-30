@@ -1,7 +1,6 @@
 ---
 title: Cloud Infrastructure
 status: drafted
-track: cloud
 depends_on: []
 affects: [deploy/]
 effort: xlarge

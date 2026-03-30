@@ -1,7 +1,6 @@
 ---
 title: Spec Coordination Layer
 status: drafted
-track: local
 depends_on:
   - specs/foundations/file-explorer.md
 affects:

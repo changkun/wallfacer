@@ -1,7 +1,6 @@
 ---
 title: OAuth Token Setup
 status: complete
-track: local
 depends_on: []
 affects:
   - internal/oauth/

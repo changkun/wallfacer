@@ -1,7 +1,6 @@
 ---
 title: "Worker Lifecycle Timing Metrics"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/container-reuse/task-03-launch-routing.md
 affects:

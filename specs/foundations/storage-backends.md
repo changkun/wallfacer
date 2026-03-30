@@ -1,7 +1,6 @@
 ---
 title: Pluggable Storage Backends
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/store/

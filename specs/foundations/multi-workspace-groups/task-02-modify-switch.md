@@ -1,7 +1,6 @@
 ---
 title: "Modify Switch() for Multi-Store Lifecycle"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/multi-workspace-groups/task-01-active-groups-map.md
 affects:

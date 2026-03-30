@@ -1,7 +1,6 @@
 ---
 title: CI Builds and Release Distribution
 status: complete
-track: local
 depends_on:
   - specs/local/desktop-app/task-08-icons-packaging.md
 affects: []

@@ -1,7 +1,6 @@
 ---
 title: "Status Bar Integration and Visibility Gate"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/host-terminal/task-02-envconfig-terminal-enabled.md
   - specs/foundations/host-terminal/task-04-backend-terminal-handler.md

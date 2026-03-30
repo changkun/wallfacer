@@ -1,7 +1,6 @@
 ---
 title: "Implement ObjectStorageBackend (S3/GCS)"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/storage-backends/task-02-filesystem-backend.md
 affects:

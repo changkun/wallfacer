@@ -1,7 +1,6 @@
 ---
 title: Spec Planning UX
 status: drafted
-track: local
 depends_on:
   - specs/local/spec-coordination.md
   - specs/foundations/file-explorer.md

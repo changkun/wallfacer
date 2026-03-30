@@ -1,7 +1,6 @@
 ---
 title: CharacterManager and Desk Persistence
 status: complete
-track: local
 depends_on:
   - specs/local/pixel-agents/task-02-tilemap-and-layout.md
   - specs/local/pixel-agents/task-07-character-state-machine.md

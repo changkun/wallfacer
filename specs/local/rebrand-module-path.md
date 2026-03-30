@@ -1,7 +1,6 @@
 ---
 title: Rebrand Module Path to latere.ai
 status: drafted
-track: local
 depends_on: []
 affects:
   - go.mod

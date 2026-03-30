@@ -1,7 +1,6 @@
 ---
 title: Container Selector UI
 status: complete
-track: local
 depends_on:
   - specs/local/terminal-container-exec/task-01-backend-container-session.md
 affects: []

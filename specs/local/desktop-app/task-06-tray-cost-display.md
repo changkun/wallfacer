@@ -1,7 +1,6 @@
 ---
 title: System Tray -- Cost and Stats Display
 status: complete
-track: local
 depends_on:
   - specs/local/desktop-app/task-04-tray-health-polling.md
 affects: []

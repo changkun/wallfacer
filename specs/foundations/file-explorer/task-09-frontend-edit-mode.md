@@ -1,7 +1,6 @@
 ---
 title: "Frontend Edit Mode"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/file-explorer/task-05-frontend-file-preview-modal.md
   - specs/foundations/file-explorer/task-08-backend-file-writing.md

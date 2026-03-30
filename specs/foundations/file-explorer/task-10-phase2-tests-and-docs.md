@@ -1,7 +1,6 @@
 ---
 title: "Phase 2 Tests and Documentation"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/file-explorer/task-09-frontend-edit-mode.md
 affects: []

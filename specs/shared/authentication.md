@@ -1,7 +1,6 @@
 ---
 title: Authentication & Identity
 status: drafted
-track: shared
 depends_on: []
 affects: [internal/auth/, internal/handler/, ui/]
 effort: large

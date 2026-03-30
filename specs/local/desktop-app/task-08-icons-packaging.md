@@ -1,7 +1,6 @@
 ---
 title: App Icons and Build Packaging
 status: complete
-track: local
 depends_on:
   - specs/local/desktop-app/task-02-wails-window.md
   - specs/local/desktop-app/task-07-platform-behaviors.md

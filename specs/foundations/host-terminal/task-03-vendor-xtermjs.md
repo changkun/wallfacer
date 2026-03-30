@@ -1,7 +1,6 @@
 ---
 title: "Vendor xterm.js Assets"
 status: complete
-track: foundations
 depends_on: []
 affects:
   - ui/js/vendor/

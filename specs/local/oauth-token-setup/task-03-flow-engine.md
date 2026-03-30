@@ -1,7 +1,6 @@
 ---
 title: OAuth Flow Engine and Provider Configs
 status: complete
-track: local
 depends_on:
   - specs/local/oauth-token-setup/task-01-pkce-utilities.md
   - specs/local/oauth-token-setup/task-02-callback-server.md

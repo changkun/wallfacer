@@ -1,7 +1,6 @@
 ---
 title: Cloud Deployment
 status: drafted
-track: cloud
 depends_on: []
 affects: [deploy/]
 effort: large

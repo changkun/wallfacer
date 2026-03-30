@@ -1,7 +1,6 @@
 ---
 title: "Implement DatabaseBackend (PostgreSQL)"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/storage-backends/task-02-filesystem-backend.md
 affects:

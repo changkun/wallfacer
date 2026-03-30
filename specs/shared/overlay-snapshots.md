@@ -1,7 +1,6 @@
 ---
 title: Overlay Snapshots & CRIU Checkpoint/Restore
 status: drafted
-track: shared
 depends_on:
   - specs/foundations/sandbox-backends.md
 affects: [internal/sandbox/]

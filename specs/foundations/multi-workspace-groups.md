@@ -1,7 +1,6 @@
 ---
 title: Multiple Concurrent Workspace Groups
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/workspace/

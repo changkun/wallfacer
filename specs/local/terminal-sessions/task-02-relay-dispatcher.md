@@ -1,7 +1,6 @@
 ---
 title: Relay Dispatcher
 status: complete
-track: local
 depends_on:
   - specs/local/terminal-sessions/task-01-session-registry.md
 affects: []

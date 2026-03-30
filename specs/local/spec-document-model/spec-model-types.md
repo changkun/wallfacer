@@ -1,7 +1,6 @@
 ---
 title: Spec Model Types and YAML Parsing
 status: complete
-track: local
 depends_on: []
 affects:
   - internal/spec/

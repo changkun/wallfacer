@@ -1,7 +1,6 @@
 ---
 title: "Frontend Per-Group Task Count Badges"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/multi-workspace-groups/task-09-config-active-groups.md
 affects:

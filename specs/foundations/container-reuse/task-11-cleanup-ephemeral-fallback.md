@@ -1,7 +1,6 @@
 ---
 title: "Remove Ephemeral Fallback and WALLFACER_TASK_WORKERS Flag"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/container-reuse/task-01-task-worker-type.md
   - specs/foundations/container-reuse/task-02-create-args-from-spec.md

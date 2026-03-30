@@ -1,7 +1,6 @@
 ---
 title: "Implement FilesystemBackend"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/storage-backends/task-01-extract-interface.md
 affects:

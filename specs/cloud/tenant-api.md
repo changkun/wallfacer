@@ -1,7 +1,6 @@
 ---
 title: Tenant API
 status: drafted
-track: cloud
 depends_on:
   - specs/cloud/multi-tenant.md
 affects: [internal/handler/tenantapi/]

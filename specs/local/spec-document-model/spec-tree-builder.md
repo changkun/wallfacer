@@ -1,7 +1,6 @@
 ---
 title: Spec Tree Builder
 status: complete
-track: local
 depends_on:
   - specs/local/spec-document-model/spec-model-types.md
 affects:

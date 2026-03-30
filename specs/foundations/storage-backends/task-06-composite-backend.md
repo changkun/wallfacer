@@ -1,7 +1,6 @@
 ---
 title: "Implement CompositeBackend"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/storage-backends/task-04-database-backend.md
   - specs/foundations/storage-backends/task-05-object-storage-backend.md

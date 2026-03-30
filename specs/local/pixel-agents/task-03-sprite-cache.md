@@ -1,7 +1,6 @@
 ---
 title: SpriteCache with Placeholder Rendering
 status: complete
-track: local
 depends_on:
   - specs/local/pixel-agents/task-01-asset-scaffolding.md
 affects: []

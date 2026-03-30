@@ -1,7 +1,6 @@
 ---
 title: "Frontend Tree Component"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/file-explorer/task-01-backend-path-validation-and-tree-listing.md
   - specs/foundations/file-explorer/task-03-frontend-panel-shell.md

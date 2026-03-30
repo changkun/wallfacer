@@ -1,7 +1,6 @@
 ---
 title: Host Shell Terminal Panel
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/handler/terminal.go

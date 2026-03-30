@@ -1,7 +1,6 @@
 ---
 title: Auth HTTP Handlers and Route Registration
 status: complete
-track: local
 depends_on:
   - specs/local/oauth-token-setup/task-03-flow-engine.md
 affects: []

@@ -1,7 +1,6 @@
 ---
 title: Tenant Filesystem
 status: drafted
-track: cloud
 depends_on:
   - specs/foundations/sandbox-backends.md
   - specs/foundations/storage-backends.md

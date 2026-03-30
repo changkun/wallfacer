@@ -1,7 +1,6 @@
 ---
 title: Platform-Specific Tray and Window Behaviors
 status: complete
-track: local
 depends_on:
   - specs/local/desktop-app/task-03-tray-skeleton.md
 affects: []

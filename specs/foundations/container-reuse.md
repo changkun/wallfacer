@@ -1,7 +1,6 @@
 ---
 title: Sandbox Reuse
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/sandbox-backends.md
 affects:

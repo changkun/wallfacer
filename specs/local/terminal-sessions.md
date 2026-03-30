@@ -1,7 +1,6 @@
 ---
 title: "Terminal: Multiple Sessions with Tabs"
 status: complete
-track: local
 depends_on:
   - specs/foundations/host-terminal.md
 affects:

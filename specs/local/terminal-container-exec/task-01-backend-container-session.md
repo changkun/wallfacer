@@ -1,7 +1,6 @@
 ---
 title: Backend Container Session Creation
 status: complete
-track: local
 depends_on: []
 affects: []
 effort: medium

@@ -1,7 +1,6 @@
 ---
 title: "Native Containerization: Linux"
 status: drafted
-track: shared
 depends_on:
   - specs/foundations/sandbox-backends.md
 affects: [internal/sandbox/]

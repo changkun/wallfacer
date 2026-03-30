@@ -1,7 +1,6 @@
 ---
 title: "Extract StorageBackend Interface"
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/store/backend.go

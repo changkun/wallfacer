@@ -1,7 +1,6 @@
 ---
 title: "Live Serve — Build and Run Developed Software from Wallfacer"
 status: drafted
-track: local
 depends_on: []
 affects:
   - internal/store/models.go

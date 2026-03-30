@@ -1,7 +1,6 @@
 ---
 title: Art Integration and Asset Detection
 status: complete
-track: local
 depends_on:
   - specs/local/pixel-agents/task-03-sprite-cache.md
 affects: []

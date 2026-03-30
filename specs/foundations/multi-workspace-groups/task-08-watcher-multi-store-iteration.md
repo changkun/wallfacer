@@ -1,7 +1,6 @@
 ---
 title: "Watcher Multi-Store Task Iteration"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/multi-workspace-groups/task-01-active-groups-map.md
   - specs/foundations/multi-workspace-groups/task-07-watcher-resubscribe.md

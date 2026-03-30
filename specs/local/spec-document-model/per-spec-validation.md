@@ -1,7 +1,6 @@
 ---
 title: Per-Spec Validation
 status: complete
-track: local
 depends_on:
   - specs/local/spec-document-model/spec-model-types.md
   - specs/local/spec-document-model/spec-lifecycle.md

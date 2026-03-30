@@ -1,7 +1,6 @@
 ---
 title: "Terminal: Container Exec Integration"
 status: complete
-track: local
 depends_on:
   - specs/local/terminal-sessions.md
 affects:

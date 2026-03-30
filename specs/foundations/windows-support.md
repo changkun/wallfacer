@@ -1,7 +1,6 @@
 ---
 title: Windows Support — Tier 2 (Native Windows Host)
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/sandbox-backends.md
 affects:

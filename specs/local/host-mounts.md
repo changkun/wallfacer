@@ -1,7 +1,6 @@
 ---
 title: Per-Task Read-Only Host Mounts
 status: drafted
-track: local
 depends_on:
   - specs/foundations/file-explorer.md
 affects:

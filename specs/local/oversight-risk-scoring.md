@@ -1,7 +1,6 @@
 ---
 title: "Oversight Risk Scoring — Real-Time Agent Action Risk Assessment"
 status: drafted
-track: local
 depends_on: []
 affects:
   - internal/risk/

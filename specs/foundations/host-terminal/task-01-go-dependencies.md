@@ -1,7 +1,6 @@
 ---
 title: "Add WebSocket Dependency and Inline PTY Helper"
 status: complete
-track: foundations
 depends_on: []
 affects:
   - internal/pty/

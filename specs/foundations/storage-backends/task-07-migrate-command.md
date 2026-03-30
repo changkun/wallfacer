@@ -1,7 +1,6 @@
 ---
 title: "Add wallfacer migrate Command"
 status: complete
-track: foundations
 depends_on:
   - specs/foundations/storage-backends/task-06-composite-backend.md
 affects:

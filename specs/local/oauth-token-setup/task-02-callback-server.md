@@ -1,7 +1,6 @@
 ---
 title: Ephemeral Callback Server
 status: complete
-track: local
 depends_on:
   - specs/local/oauth-token-setup/task-01-pkce-utilities.md
 affects: []

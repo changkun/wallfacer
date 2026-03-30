@@ -1,7 +1,6 @@
 ---
 title: Asset Scaffolding
 status: complete
-track: local
 depends_on: []
 affects: []
 effort: small

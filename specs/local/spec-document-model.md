@@ -1,7 +1,6 @@
 ---
 title: Spec Document Model
 status: drafted
-track: local
 depends_on:
   - specs/local/spec-coordination.md
 affects: []

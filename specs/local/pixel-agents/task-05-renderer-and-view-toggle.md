@@ -1,7 +1,6 @@
 ---
 title: Renderer and View Toggle
 status: complete
-track: local
 depends_on:
   - specs/local/pixel-agents/task-02-tilemap-and-layout.md
   - specs/local/pixel-agents/task-03-sprite-cache.md
