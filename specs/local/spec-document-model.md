@@ -1,9 +1,13 @@
 ---
 title: Spec Document Model
-status: drafted
+status: complete
 depends_on:
   - specs/local/spec-coordination.md
-affects: []
+affects:
+  - internal/spec/
+  - internal/pkg/dag/
+  - internal/pkg/tree/
+  - internal/pkg/statemachine/
 effort: large
 created: 2026-03-29
 updated: 2026-03-30
@@ -283,6 +287,25 @@ Not all specs need the same level of human involvement. Two regimes, determined 
 The regime is not a system mode — it's an emergent property of how the human and agent interact. The system infers it from spec maturity: `vague`/`drafted` specs are human-driven; `validated` specs can be agent-driven.
 
 **Transition:** Human-driven → agent-driven when spec reaches `validated` and human approves. Agent-driven → human-driven when drift is detected or execution reveals the design was wrong.
+
+---
+
+## Outcome
+
+The spec document model is fully implemented as `internal/spec/`, providing types, parsing, tree building, validation, progress tracking, and impact analysis for spec documents. During implementation, three generic data structure packages were extracted to `internal/pkg/` and adopted by existing code (store, sandbox).
+
+### What Shipped
+
+- **`internal/spec/`** — 7 source files (model, parse, lifecycle, tree, validate, progress, impact) with 7 corresponding test files
+- **`internal/pkg/dag/`** — generic DAG operations (`ReverseEdges`, `DetectCycles`, `Reachable`), 14 tests. Replaces duplicated cycle detection and reverse-index logic in spec and store
+- **`internal/pkg/tree/`** — generic tree data structure (`Tree[K,V]`, `Node[K,V]`, `Add`, `NodeAt`, `Leaves`, `Walk` with `iter.Seq`), 10 tests
+- **`internal/pkg/statemachine/`** — generic state machine (`Machine[S].Validate`, `.CanTransition`, `.Allowed`), 7 tests. Now used by spec lifecycle, task status transitions, and sandbox backend state
+- **Sandbox state enforcement** — `internal/sandbox/backend.go` now validates lifecycle transitions via CAS instead of raw `atomic.Store`
+- **Track removed from frontmatter** — derived from filesystem path across all 134 spec files
+
+### Design Evolution
+
+See the Design Decisions section below for the 6 numbered deviations from the original spec design.
 
 ---
 

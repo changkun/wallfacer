@@ -58,7 +58,7 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 | Spec | Status | Delivers |
 |------|--------|----------|
 | [spec-coordination.md](local/spec-coordination.md) | Not started | Umbrella: recursive spec tree model, dispatch workflow, cross-task context |
-| ↳ [spec-document-model.md](local/spec-document-model.md) | Not started | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
+| ↳ [spec-document-model.md](local/spec-document-model.md) | **Complete** | Spec properties, lifecycle, tree structure, validation, progress, impact analysis |
 | ↳ [spec-drift-detection.md](local/spec-drift-detection.md) | Not started | Drift detection, propagation through spec tree, `affects` field |
 | ↳ [spec-planning-ux.md](local/spec-planning-ux.md) | Not started | Spec explorer, chat-driven iteration, dispatch workflow, progress tracking |
 | [desktop-app.md](local/desktop-app.md) | **Complete** | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
