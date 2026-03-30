@@ -119,13 +119,13 @@ func TestProgress_String(t *testing.T) {
 
 func TestTreeProgress_FullTree(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/parent.md":          {Status: StatusValidated, Track: TrackLocal},
-		"local/parent/a.md":        {Status: StatusComplete, Track: TrackLocal},
-		"local/parent/b.md":        {Status: StatusValidated, Track: TrackLocal},
-		"local/parent/mid.md":      {Status: StatusValidated, Track: TrackLocal},
-		"local/parent/mid/c.md":    {Status: StatusComplete, Track: TrackLocal},
-		"local/parent/mid/d.md":    {Status: StatusDrafted, Track: TrackLocal},
-		"local/standalone.md":      {Status: StatusComplete, Track: TrackLocal},
+		"local/parent.md":          {Status: StatusValidated, Track: "local"},
+		"local/parent/a.md":        {Status: StatusComplete, Track: "local"},
+		"local/parent/b.md":        {Status: StatusValidated, Track: "local"},
+		"local/parent/mid.md":      {Status: StatusValidated, Track: "local"},
+		"local/parent/mid/c.md":    {Status: StatusComplete, Track: "local"},
+		"local/parent/mid/d.md":    {Status: StatusDrafted, Track: "local"},
+		"local/standalone.md":      {Status: StatusComplete, Track: "local"},
 	})
 
 	progress := TreeProgress(tree)

@@ -9,8 +9,8 @@ import (
 
 func TestReverseIndex_Simple(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/b.md"}},
-		"local/b.md": {Status: StatusValidated, Track: TrackLocal},
+		"local/a.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/b.md"}},
+		"local/b.md": {Status: StatusValidated, Track: "local"},
 	})
 	rev := dag.ReverseEdges(Adjacency(tree))
 	if !slices.Contains(rev["local/b.md"], "local/a.md") {
@@ -20,9 +20,9 @@ func TestReverseIndex_Simple(t *testing.T) {
 
 func TestReverseIndex_Multiple(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/b.md", "local/c.md"}},
-		"local/b.md": {Status: StatusValidated, Track: TrackLocal},
-		"local/c.md": {Status: StatusValidated, Track: TrackLocal},
+		"local/a.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/b.md", "local/c.md"}},
+		"local/b.md": {Status: StatusValidated, Track: "local"},
+		"local/c.md": {Status: StatusValidated, Track: "local"},
 	})
 	rev := dag.ReverseEdges(Adjacency(tree))
 	if !slices.Contains(rev["local/b.md"], "local/a.md") {
@@ -35,9 +35,9 @@ func TestReverseIndex_Multiple(t *testing.T) {
 
 func TestReverseIndex_SharedDep(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/c.md"}},
-		"local/b.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/c.md"}},
-		"local/c.md": {Status: StatusValidated, Track: TrackLocal},
+		"local/a.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/c.md"}},
+		"local/b.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/c.md"}},
+		"local/c.md": {Status: StatusValidated, Track: "local"},
 	})
 	rev := dag.ReverseEdges(Adjacency(tree))
 	deps := rev["local/c.md"]
@@ -48,7 +48,7 @@ func TestReverseIndex_SharedDep(t *testing.T) {
 
 func TestReverseIndex_NoDeps(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, Track: TrackLocal},
+		"local/a.md": {Status: StatusValidated, Track: "local"},
 	})
 	rev := dag.ReverseEdges(Adjacency(tree))
 	if len(rev["local/a.md"]) != 0 {
@@ -58,8 +58,8 @@ func TestReverseIndex_NoDeps(t *testing.T) {
 
 func TestComputeImpact_DirectOnly(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/b.md"}},
-		"local/b.md": {Status: StatusValidated, Track: TrackLocal},
+		"local/a.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/b.md"}},
+		"local/b.md": {Status: StatusValidated, Track: "local"},
 	})
 	impact := ComputeImpact(tree, "local/b.md")
 	if len(impact.Direct) != 1 || impact.Direct[0] != "local/a.md" {
@@ -73,9 +73,9 @@ func TestComputeImpact_DirectOnly(t *testing.T) {
 func TestComputeImpact_Transitive(t *testing.T) {
 	// A -> B -> C. Impact of C: direct=[B], transitive=[A].
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/b.md"}},
-		"local/b.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/c.md"}},
-		"local/c.md": {Status: StatusValidated, Track: TrackLocal},
+		"local/a.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/b.md"}},
+		"local/b.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/c.md"}},
+		"local/c.md": {Status: StatusValidated, Track: "local"},
 	})
 	impact := ComputeImpact(tree, "local/c.md")
 	if !slices.Contains(impact.Direct, "local/b.md") {
@@ -89,10 +89,10 @@ func TestComputeImpact_Transitive(t *testing.T) {
 func TestComputeImpact_Diamond(t *testing.T) {
 	// A -> C, B -> C, D -> A, D -> B. Impact of C: direct=[A, B], transitive=[D].
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/c.md"}},
-		"local/b.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/c.md"}},
-		"local/c.md": {Status: StatusValidated, Track: TrackLocal},
-		"local/d.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/a.md", "local/b.md"}},
+		"local/a.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/c.md"}},
+		"local/b.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/c.md"}},
+		"local/c.md": {Status: StatusValidated, Track: "local"},
+		"local/d.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/a.md", "local/b.md"}},
 	})
 	impact := ComputeImpact(tree, "local/c.md")
 	if len(impact.Direct) != 2 {
@@ -105,8 +105,8 @@ func TestComputeImpact_Diamond(t *testing.T) {
 
 func TestComputeImpact_CrossTree(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"cloud/x.md":  {Status: StatusValidated, Track: TrackCloud, DependsOn: []string{"local/y.md"}},
-		"local/y.md":  {Status: StatusValidated, Track: TrackLocal},
+		"cloud/x.md":  {Status: StatusValidated, Track: "cloud", DependsOn: []string{"local/y.md"}},
+		"local/y.md":  {Status: StatusValidated, Track: "local"},
 	})
 	impact := ComputeImpact(tree, "local/y.md")
 	if !slices.Contains(impact.Direct, "cloud/x.md") {
@@ -118,9 +118,9 @@ func TestComputeImpact_NonLeaf(t *testing.T) {
 	// parent.md has child.md. ext.md depends on child.md.
 	// Impact of parent.md should include ext.md (via child).
 	tree := buildTestTree(map[string]*Spec{
-		"local/parent.md":       {Status: StatusValidated, Track: TrackLocal},
-		"local/parent/child.md": {Status: StatusValidated, Track: TrackLocal},
-		"local/ext.md":          {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/parent/child.md"}},
+		"local/parent.md":       {Status: StatusValidated, Track: "local"},
+		"local/parent/child.md": {Status: StatusValidated, Track: "local"},
+		"local/ext.md":          {Status: StatusValidated, Track: "local", DependsOn: []string{"local/parent/child.md"}},
 	})
 	impact := ComputeImpact(tree, "local/parent.md")
 	if !slices.Contains(impact.Direct, "local/ext.md") {
@@ -130,7 +130,7 @@ func TestComputeImpact_NonLeaf(t *testing.T) {
 
 func TestComputeImpact_NoImpact(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/lonely.md": {Status: StatusValidated, Track: TrackLocal},
+		"local/lonely.md": {Status: StatusValidated, Track: "local"},
 	})
 	impact := ComputeImpact(tree, "local/lonely.md")
 	if len(impact.Direct) != 0 || len(impact.Transitive) != 0 {
@@ -140,7 +140,7 @@ func TestComputeImpact_NoImpact(t *testing.T) {
 
 func TestComputeImpact_MissingTarget(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/nonexistent.md"}},
+		"local/a.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/nonexistent.md"}},
 	})
 	// Should not panic.
 	impact := ComputeImpact(tree, "local/nonexistent.md")
@@ -151,8 +151,8 @@ func TestComputeImpact_MissingTarget(t *testing.T) {
 
 func TestUnblockedSpecs_Simple(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusComplete, Track: TrackLocal},
-		"local/b.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/a.md"}},
+		"local/a.md": {Status: StatusComplete, Track: "local"},
+		"local/b.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/a.md"}},
 	})
 	unblocked := UnblockedSpecs(tree, "local/a.md")
 	if len(unblocked) != 1 || unblocked[0].Key != "local/b.md" {
@@ -167,9 +167,9 @@ func TestUnblockedSpecs_Simple(t *testing.T) {
 func TestUnblockedSpecs_MultiDep(t *testing.T) {
 	// C depends on A and B. Only A complete -> C not unblocked.
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusComplete, Track: TrackLocal},
-		"local/b.md": {Status: StatusValidated, Track: TrackLocal},
-		"local/c.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/a.md", "local/b.md"}},
+		"local/a.md": {Status: StatusComplete, Track: "local"},
+		"local/b.md": {Status: StatusValidated, Track: "local"},
+		"local/c.md": {Status: StatusValidated, Track: "local", DependsOn: []string{"local/a.md", "local/b.md"}},
 	})
 	unblocked := UnblockedSpecs(tree, "local/a.md")
 	if len(unblocked) != 0 {
@@ -186,8 +186,8 @@ func TestUnblockedSpecs_MultiDep(t *testing.T) {
 
 func TestUnblockedSpecs_AlreadyComplete(t *testing.T) {
 	tree := buildTestTree(map[string]*Spec{
-		"local/a.md": {Status: StatusComplete, Track: TrackLocal},
-		"local/b.md": {Status: StatusComplete, Track: TrackLocal, DependsOn: []string{"local/a.md"}},
+		"local/a.md": {Status: StatusComplete, Track: "local"},
+		"local/b.md": {Status: StatusComplete, Track: "local", DependsOn: []string{"local/a.md"}},
 	})
 	unblocked := UnblockedSpecs(tree, "local/a.md")
 	if len(unblocked) != 0 {

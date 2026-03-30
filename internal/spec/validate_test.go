@@ -11,7 +11,7 @@ func newTestSpec(path string) *Spec {
 	return &Spec{
 		Title:   "Test Spec",
 		Status:  StatusValidated,
-		Track:   TrackLocal,
+		Track:   "local",
 		Effort:  EffortSmall,
 		Created: Date{time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
 		Updated: Date{time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
@@ -78,14 +78,6 @@ func TestValidateSpec_InvalidStatus(t *testing.T) {
 	}
 }
 
-func TestValidateSpec_InvalidTrack(t *testing.T) {
-	s := newTestSpec("local/test.md")
-	s.Track = "bogus"
-	results := ValidateSpec(s, "", true)
-	if !hasRule(results, "valid-track", SeverityError) {
-		t.Error("expected valid-track error")
-	}
-}
 
 func TestValidateSpec_InvalidEffort(t *testing.T) {
 	s := newTestSpec("local/test.md")
@@ -98,7 +90,7 @@ func TestValidateSpec_InvalidEffort(t *testing.T) {
 
 func TestValidateSpec_TrackMismatch(t *testing.T) {
 	s := newTestSpec("foundations/test.md")
-	s.Track = TrackLocal
+	s.Track = "local"
 	results := ValidateSpec(s, "", true)
 	if !hasRule(results, "track-matches-path", SeverityError) {
 		t.Error("expected track-matches-path error")
@@ -107,7 +99,7 @@ func TestValidateSpec_TrackMismatch(t *testing.T) {
 
 func TestValidateSpec_TrackMatchesPath(t *testing.T) {
 	s := newTestSpec("local/test.md")
-	s.Track = TrackLocal
+	s.Track = "local"
 	results := ValidateSpec(s, "", true)
 	if hasRule(results, "track-matches-path", SeverityError) {
 		t.Error("unexpected track-matches-path error")
@@ -226,19 +218,19 @@ func TestValidateSpec_AllRulesRun(t *testing.T) {
 	}
 	results := ValidateSpec(s, "", true)
 
-	// Should have at least: required-fields (title, effort skipped since invalid,
-	// created, updated, author), valid-status, valid-track, valid-effort.
+	// Should have at least: required-fields (title, created, updated, author),
+	// valid-status, valid-effort.
 	rules := map[string]bool{}
 	for _, r := range results {
 		rules[r.Rule] = true
 	}
-	expected := []string{"required-fields", "valid-status", "valid-track", "valid-effort"}
+	expected := []string{"required-fields", "valid-status", "valid-effort"}
 	for _, rule := range expected {
 		if !rules[rule] {
 			t.Errorf("expected rule %q to fire", rule)
 		}
 	}
-	if len(results) < 4 {
-		t.Errorf("expected at least 4 results, got %d", len(results))
+	if len(results) < 3 {
+		t.Errorf("expected at least 3 results, got %d", len(results))
 	}
 }

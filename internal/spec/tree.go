@@ -19,7 +19,7 @@ type Tree struct {
 }
 
 // ByTrack returns root nodes belonging to the given track.
-func (t *Tree) ByTrack(track Track) []*Node {
+func (t *Tree) ByTrack(track string) []*Node {
 	var nodes []*Node
 	for _, r := range t.Roots {
 		if r.Value != nil && r.Value.Track == track {

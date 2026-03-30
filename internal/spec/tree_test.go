@@ -128,17 +128,17 @@ func TestBuildTree_MultipleTracks(t *testing.T) {
 		t.Fatalf("BuildTree: %v", err)
 	}
 
-	if len(tree.ByTrack(TrackFoundations)) != 1 {
-		t.Errorf("foundations roots = %d, want 1", len(tree.ByTrack(TrackFoundations)))
+	if len(tree.ByTrack("foundations")) != 1 {
+		t.Errorf("foundations roots = %d, want 1", len(tree.ByTrack("foundations")))
 	}
-	if len(tree.ByTrack(TrackLocal)) != 1 {
-		t.Errorf("local roots = %d, want 1", len(tree.ByTrack(TrackLocal)))
+	if len(tree.ByTrack("local")) != 1 {
+		t.Errorf("local roots = %d, want 1", len(tree.ByTrack("local")))
 	}
-	if len(tree.ByTrack(TrackCloud)) != 1 {
-		t.Errorf("cloud roots = %d, want 1", len(tree.ByTrack(TrackCloud)))
+	if len(tree.ByTrack("cloud")) != 1 {
+		t.Errorf("cloud roots = %d, want 1", len(tree.ByTrack("cloud")))
 	}
-	if len(tree.ByTrack(TrackShared)) != 0 {
-		t.Errorf("shared roots = %d, want 0", len(tree.ByTrack(TrackShared)))
+	if len(tree.ByTrack("shared")) != 0 {
+		t.Errorf("shared roots = %d, want 0", len(tree.ByTrack("shared")))
 	}
 }
 

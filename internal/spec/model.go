@@ -20,17 +20,6 @@ const (
 	StatusStale     Status = "stale"     // no longer matches reality
 )
 
-// Track identifies which roadmap track a spec belongs to.
-type Track string
-
-// Track constants for roadmap organization.
-const (
-	TrackFoundations Track = "foundations" // abstraction interfaces
-	TrackLocal       Track = "local"       // local product and UX
-	TrackCloud       Track = "cloud"       // cloud platform
-	TrackShared      Track = "shared"      // cross-track specs
-)
-
 // Effort is a rough size estimate for a spec's implementation work.
 type Effort string
 
@@ -64,7 +53,7 @@ func (d *Date) UnmarshalYAML(value *yaml.Node) error {
 type Spec struct {
 	Title            string  `yaml:"title"`
 	Status           Status  `yaml:"status"`
-	Track            Track   `yaml:"track"`
+	Track            string  `yaml:"track"`
 	DependsOn        []string `yaml:"depends_on"`
 	Affects          []string `yaml:"affects"`
 	Effort           Effort  `yaml:"effort"`

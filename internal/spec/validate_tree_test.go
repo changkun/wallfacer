@@ -42,7 +42,7 @@ func baseSpec() *Spec {
 	return &Spec{
 		Title:   "Test",
 		Status:  StatusValidated,
-		Track:   TrackLocal,
+		Track:   "local",
 		Effort:  EffortSmall,
 		Created: Date{time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
 		Updated: Date{time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
@@ -53,9 +53,9 @@ func baseSpec() *Spec {
 
 func TestValidateTree_Valid(t *testing.T) {
 	a := baseSpec()
-	a.Track = TrackLocal
+	a.Track = "local"
 	b := baseSpec()
-	b.Track = TrackLocal
+	b.Track = "local"
 	b.DependsOn = []string{"local/a.md"}
 
 	tree := buildTestTree(map[string]*Spec{
@@ -209,7 +209,7 @@ func TestValidateTree_StalePropagate(t *testing.T) {
 func TestValidateTree_TrackConsistency(t *testing.T) {
 	// Track mismatch is caught by per-spec track-matches-path rule.
 	s := baseSpec()
-	s.Track = TrackCloud // but path is local/
+	s.Track = "cloud" // but path is local/
 
 	tree := buildTestTree(map[string]*Spec{
 		"local/test.md": s,

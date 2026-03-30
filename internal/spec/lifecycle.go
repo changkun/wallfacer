@@ -18,11 +18,6 @@ func ValidStatuses() []Status {
 	return []Status{StatusVague, StatusDrafted, StatusValidated, StatusComplete, StatusStale}
 }
 
-// ValidTracks returns all valid spec track values.
-func ValidTracks() []Track {
-	return []Track{TrackFoundations, TrackLocal, TrackCloud, TrackShared}
-}
-
 // ValidEfforts returns all valid spec effort values.
 func ValidEfforts() []Effort {
 	return []Effort{EffortSmall, EffortMedium, EffortLarge, EffortXLarge}

@@ -82,20 +82,6 @@ func TestValidStatuses(t *testing.T) {
 	}
 }
 
-func TestValidTracks(t *testing.T) {
-	tracks := ValidTracks()
-	if len(tracks) != 4 {
-		t.Fatalf("len(ValidTracks()) = %d, want 4", len(tracks))
-	}
-	want := map[Track]bool{
-		TrackFoundations: true, TrackLocal: true, TrackCloud: true, TrackShared: true,
-	}
-	for _, tr := range tracks {
-		if !want[tr] {
-			t.Errorf("unexpected track %q", tr)
-		}
-	}
-}
 
 func TestValidEfforts(t *testing.T) {
 	efforts := ValidEfforts()

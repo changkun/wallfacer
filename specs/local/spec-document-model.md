@@ -26,7 +26,7 @@ Every spec document carries structured frontmatter:
 ---
 title: Sandbox Backends
 status: validated          # vague | drafted | validated | complete | stale
-track: foundations         # foundations | local | cloud | shared
+track: foundations         # free-form string; must match directory name under specs/
 depends_on:                # specs this one requires (DAG edges — can point anywhere)
   - specs/foundations/storage-backends.md
 affects:                   # packages and files this spec describes
@@ -105,7 +105,7 @@ A spec validator checks structural correctness of spec documents. It runs on ind
 |------|----------|-------------|
 | **Required fields** | error | `title`, `status`, `track`, `effort`, `created`, `updated`, `author` must be present |
 | **Valid status** | error | `status` must be one of: `vague`, `drafted`, `validated`, `complete`, `stale` |
-| **Valid track** | error | `track` must match the spec's filesystem location (`specs/<track>/...`) |
+| **Track matches path** | error | `track` must match the spec's filesystem location (`specs/<track>/...`). Track is a free-form string, not an enum — new tracks are created by adding directories under `specs/` |
 | **Valid effort** | error | `effort` must be one of: `small`, `medium`, `large`, `xlarge` |
 | **Date format** | error | `created` and `updated` must be valid ISO dates; `updated` ≥ `created` |
 | **Dispatch consistency** | error | Non-leaf specs must have `dispatched_task_id: null`. Leaf specs may have null or a valid UUID |
@@ -123,7 +123,7 @@ A spec validator checks structural correctness of spec documents. It runs on ind
 | **No orphan specs** | warning | A `<name>.md` file with a `<name>/` subdirectory should have at least one child spec in it |
 | **Status consistency** | warning | A `complete` non-leaf spec should not have incomplete leaves in its subtree |
 | **Stale propagation** | warning | If a spec is `stale`, dependents that are still `validated` should be flagged for review |
-| **Track consistency** | warning | All specs in `specs/<track>/` should have `track: <track>` in frontmatter |
+| **Track consistency** | — | Covered by per-spec "Track matches path" rule; no additional tree-level check needed |
 | **Unique dispatches** | error | No two specs may share the same `dispatched_task_id` |
 
 ### When to Run
