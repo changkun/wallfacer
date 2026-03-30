@@ -1,6 +1,6 @@
 ---
 title: Planning Sandbox Lifecycle
-status: drafted
+status: validated
 depends_on: []
 affects:
   - internal/sandbox/
@@ -67,3 +67,27 @@ The `ContainerSpec` in `internal/sandbox/spec.go` already supports arbitrary vol
 - `internal/sandbox/spec.go` — planning-specific `ContainerSpec` configuration (mount restrictions)
 - `internal/runner/` — either extended with planning support or a new `internal/planner/` created alongside
 - `internal/handler/` — new handler endpoints for entering/leaving spec mode, attaching to planning sandbox
+
+## Design Decision
+
+**Option B — Separate PlanningRunner** (`internal/planner/`). The planning lifecycle (long-lived, workspace-scoped, interactive) is fundamentally different from task lifecycle (turn-based, task-scoped, fire-and-forget). A separate package avoids bloating the runner with planning-specific logic while reusing the `sandbox.Backend` interface for container operations.
+
+The planner uses the worker container pattern (long-lived container + `podman exec` per round) but keys on workspace fingerprint instead of task UUID. It follows the ideation singleton pattern for container registry management.
+
+Mount configuration: full workspace read-only + `specs/` read-write override. Same sandbox image as task containers. Same resource limits initially (can be differentiated later via env config).
+
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Add SandboxActivityPlanning constant](planning-sandbox/planning-activity.md) | — | small | validated |
+| [Create planner package with container lifecycle](planning-sandbox/planner-core.md) | planning-activity | large | validated |
+| [Planning sandbox API endpoints](planning-sandbox/planning-api.md) | planner-core | medium | validated |
+| [Wire planner into server lifecycle](planning-sandbox/planning-server-wiring.md) | planning-api | small | validated |
+
+```mermaid
+graph LR
+  A[Planning activity constant] --> B[Planner core package]
+  B --> C[Planning API endpoints]
+  C --> D[Server lifecycle wiring]
+```
