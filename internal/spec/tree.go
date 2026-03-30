@@ -5,46 +5,24 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	gentree "changkun.de/x/wallfacer/internal/pkg/tree"
 )
 
-// Node represents a spec document within the spec tree.
-type Node struct {
-	Spec     *Spec   // parsed spec document
-	Parent   *Node   // nil for root-level specs
-	Children []*Node // child specs from subdirectory
-	IsLeaf   bool    // true if no children
-	Depth    int     // 0 for root-level specs
-}
+// Node is a spec document within the spec tree.
+type Node = gentree.Node[string, *Spec]
 
 // Tree holds the complete spec tree built from the filesystem.
 type Tree struct {
-	Roots []*Node            // top-level specs (depth 0)
-	All   map[string]*Node   // all nodes indexed by relative path
-	Errs  []error            // parse errors collected during tree building
-}
-
-// NodeAt looks up a node by its relative path.
-func (t *Tree) NodeAt(path string) (*Node, bool) {
-	n, ok := t.All[path]
-	return n, ok
-}
-
-// Leaves returns all leaf nodes in the tree.
-func (t *Tree) Leaves() []*Node {
-	var leaves []*Node
-	for _, n := range t.All {
-		if n.IsLeaf {
-			leaves = append(leaves, n)
-		}
-	}
-	return leaves
+	*gentree.Tree[string, *Spec]
+	Errs []error // parse errors collected during tree building
 }
 
 // ByTrack returns root nodes belonging to the given track.
 func (t *Tree) ByTrack(track Track) []*Node {
 	var nodes []*Node
 	for _, r := range t.Roots {
-		if r.Spec != nil && r.Spec.Track == track {
+		if r.Value != nil && r.Value.Track == track {
 			nodes = append(nodes, r)
 		}
 	}
@@ -55,9 +33,7 @@ func (t *Tree) ByTrack(track Track) []*Node {
 // The specsDir should be the path to the top-level specs/ directory.
 // Parse errors are collected in Tree.Errs rather than aborting the build.
 func BuildTree(specsDir string) (*Tree, error) {
-	tree := &Tree{
-		All: make(map[string]*Node),
-	}
+	tree := &Tree{Tree: gentree.New[string, *Spec]()}
 
 	entries, err := os.ReadDir(specsDir)
 	if err != nil {
@@ -72,26 +48,21 @@ func BuildTree(specsDir string) (*Tree, error) {
 			continue
 		}
 		trackDir := filepath.Join(specsDir, entry.Name())
-		roots, errs := scanDir(trackDir, specsDir, nil, 0)
-		tree.Roots = append(tree.Roots, roots...)
+		errs := scanDir(tree, trackDir, specsDir, nil)
 		tree.Errs = append(tree.Errs, errs...)
-		for _, r := range roots {
-			indexNodes(tree.All, r)
-		}
 	}
 
 	return tree, nil
 }
 
 // scanDir scans a directory for .md spec files, recursing into matching
-// subdirectories for child specs. parent is nil for root-level specs.
-func scanDir(dir, specsDir string, parent *Node, depth int) ([]*Node, []error) {
+// subdirectories for child specs.
+func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, []error{fmt.Errorf("read dir %s: %w", dir, err)}
+		return []error{fmt.Errorf("read dir %s: %w", dir, err)}
 	}
 
-	var nodes []*Node
 	var errs []error
 
 	// First pass: collect .md files.
@@ -107,7 +78,6 @@ func scanDir(dir, specsDir string, parent *Node, depth int) ([]*Node, []error) {
 	// Second pass: build nodes from .md files and check for child directories.
 	for base, mdPath := range mdFiles {
 		relPath, _ := filepath.Rel(specsDir, mdPath)
-		// Normalize to forward slashes for consistent keys.
 		relPath = filepath.ToSlash(relPath)
 
 		s, parseErr := ParseFile(mdPath)
@@ -117,25 +87,14 @@ func scanDir(dir, specsDir string, parent *Node, depth int) ([]*Node, []error) {
 		}
 		s.Path = relPath
 
-		node := &Node{
-			Spec:   s,
-			Parent: parent,
-			Depth:  depth,
-			IsLeaf: true,
-		}
+		tree.Add(relPath, s, parentKey)
 
 		// Check for matching subdirectory.
 		childDir := filepath.Join(dir, base)
 		if info, statErr := os.Stat(childDir); statErr == nil && info.IsDir() {
-			children, childErrs := scanDir(childDir, specsDir, node, depth+1)
+			childErrs := scanDir(tree, childDir, specsDir, &relPath)
 			errs = append(errs, childErrs...)
-			if len(children) > 0 {
-				node.Children = children
-				node.IsLeaf = false
-			}
 		}
-
-		nodes = append(nodes, node)
 	}
 
 	// Third pass: find orphan directories (no matching .md file) and still
@@ -148,20 +107,9 @@ func scanDir(dir, specsDir string, parent *Node, depth int) ([]*Node, []error) {
 			continue
 		}
 		childDir := filepath.Join(dir, e.Name())
-		children, childErrs := scanDir(childDir, specsDir, parent, depth)
-		nodes = append(nodes, children...)
+		childErrs := scanDir(tree, childDir, specsDir, parentKey)
 		errs = append(errs, childErrs...)
 	}
 
-	return nodes, errs
-}
-
-// indexNodes recursively adds a node and all its children to the index map.
-func indexNodes(index map[string]*Node, node *Node) {
-	if node.Spec != nil {
-		index[node.Spec.Path] = node
-	}
-	for _, child := range node.Children {
-		indexNodes(index, child)
-	}
+	return errs
 }

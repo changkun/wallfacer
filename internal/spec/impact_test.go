@@ -155,10 +155,10 @@ func TestUnblockedSpecs_Simple(t *testing.T) {
 		"local/b.md": {Status: StatusValidated, Track: TrackLocal, DependsOn: []string{"local/a.md"}},
 	})
 	unblocked := UnblockedSpecs(tree, "local/a.md")
-	if len(unblocked) != 1 || unblocked[0].Spec.Path != "local/b.md" {
+	if len(unblocked) != 1 || unblocked[0].Key != "local/b.md" {
 		paths := make([]string, len(unblocked))
 		for i, n := range unblocked {
-			paths[i] = n.Spec.Path
+			paths[i] = n.Key
 		}
 		t.Errorf("unblocked = %v, want [local/b.md]", paths)
 	}
@@ -177,7 +177,7 @@ func TestUnblockedSpecs_MultiDep(t *testing.T) {
 	}
 
 	// Now make B complete too.
-	tree.All["local/b.md"].Spec.Status = StatusComplete
+	tree.All["local/b.md"].Value.Status = StatusComplete
 	unblocked = UnblockedSpecs(tree, "local/b.md")
 	if len(unblocked) != 1 {
 		t.Error("C should be unblocked when both A and B are complete")

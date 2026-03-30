@@ -46,8 +46,8 @@ func TestBuildTree_SingleSpec(t *testing.T) {
 	if root.Depth != 0 {
 		t.Errorf("Depth = %d, want 0", root.Depth)
 	}
-	if root.Spec.Title != "Solo" {
-		t.Errorf("Title = %q, want %q", root.Spec.Title, "Solo")
+	if root.Value.Title != "Solo" {
+		t.Errorf("Title = %q, want %q", root.Value.Title, "Solo")
 	}
 }
 
@@ -106,10 +106,10 @@ func TestBuildTree_DeepNesting(t *testing.T) {
 	if c.Depth != 2 {
 		t.Errorf("c.Depth = %d, want 2", c.Depth)
 	}
-	if c.Parent == nil || c.Parent.Spec.Title != "B" {
+	if c.Parent == nil || c.Parent.Value.Title != "B" {
 		t.Error("c.Parent should be B")
 	}
-	if c.Parent.Parent == nil || c.Parent.Parent.Spec.Title != "A" {
+	if c.Parent.Parent == nil || c.Parent.Parent.Value.Title != "A" {
 		t.Error("c.Parent.Parent should be A")
 	}
 	if c.Parent.Parent.Parent != nil {
@@ -203,14 +203,15 @@ func TestBuildTree_Leaves(t *testing.T) {
 		t.Fatalf("BuildTree: %v", err)
 	}
 
-	leaves := tree.Leaves()
-	if len(leaves) != 3 {
-		t.Fatalf("Leaves() = %d, want 3", len(leaves))
-	}
-	for _, l := range leaves {
+	count := 0
+	for l := range tree.Leaves() {
 		if !l.IsLeaf {
-			t.Errorf("Leaves() returned non-leaf: %s", l.Spec.Path)
+			t.Errorf("Leaves() returned non-leaf: %s", l.Key)
 		}
+		count++
+	}
+	if count != 3 {
+		t.Fatalf("Leaves() = %d, want 3", count)
 	}
 }
 
@@ -229,8 +230,8 @@ func TestBuildTree_OrphanDirectory(t *testing.T) {
 	if !ok {
 		t.Fatal("orphan child not found in tree")
 	}
-	if child.Spec.Title != "Child" {
-		t.Errorf("Title = %q, want %q", child.Spec.Title, "Child")
+	if child.Value.Title != "Child" {
+		t.Errorf("Title = %q, want %q", child.Value.Title, "Child")
 	}
 }
 

@@ -26,7 +26,7 @@ func (p Progress) String() string {
 // Non-leaf nodes sum the progress of all children.
 func NodeProgress(node *Node) Progress {
 	if node.IsLeaf {
-		if node.Spec != nil && node.Spec.Status == StatusComplete {
+		if node.Value != nil && node.Value.Status == StatusComplete {
 			return Progress{Complete: 1, Total: 1}
 		}
 		return Progress{Complete: 0, Total: 1}

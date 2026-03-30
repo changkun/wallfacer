@@ -171,8 +171,8 @@ func ValidateTree(tree *Tree, repoRoot string) []Result {
 
 	// Per-spec validation for each node.
 	for _, node := range tree.All {
-		if node.Spec != nil {
-			results = append(results, ValidateSpec(node.Spec, repoRoot, node.IsLeaf)...)
+		if node.Value != nil {
+			results = append(results, ValidateSpec(node.Value, repoRoot, node.IsLeaf)...)
 		}
 	}
 
@@ -243,12 +243,12 @@ func checkOrphanDirectories(tree *Tree, repoRoot string) []Result {
 func checkStatusConsistency(tree *Tree) []Result {
 	var results []Result
 	for _, node := range tree.All {
-		if node.IsLeaf || node.Spec == nil || node.Spec.Status != StatusComplete {
+		if node.IsLeaf || node.Value == nil || node.Value.Status != StatusComplete {
 			continue
 		}
 		if hasIncompleteLeaf(node) {
 			results = append(results, Result{
-				Path:     node.Spec.Path,
+				Path:     node.Value.Path,
 				Severity: SeverityWarning,
 				Rule:     "status-consistency",
 				Message:  "complete non-leaf spec has incomplete leaves in subtree",
@@ -260,7 +260,7 @@ func checkStatusConsistency(tree *Tree) []Result {
 
 func hasIncompleteLeaf(node *Node) bool {
 	if node.IsLeaf {
-		return node.Spec != nil && node.Spec.Status != StatusComplete
+		return node.Value != nil && node.Value.Status != StatusComplete
 	}
 	for _, child := range node.Children {
 		if hasIncompleteLeaf(child) {
@@ -276,15 +276,15 @@ func checkStalePropagation(tree *Tree) []Result {
 
 	var results []Result
 	for path, node := range tree.All {
-		if node.Spec == nil || node.Spec.Status != StatusStale {
+		if node.Value == nil || node.Value.Status != StatusStale {
 			continue
 		}
 		for _, dependent := range reverse[path] {
 			depNode, ok := tree.All[dependent]
-			if !ok || depNode.Spec == nil {
+			if !ok || depNode.Value == nil {
 				continue
 			}
-			if depNode.Spec.Status == StatusValidated {
+			if depNode.Value.Status == StatusValidated {
 				results = append(results, Result{
 					Path:     dependent,
 					Severity: SeverityWarning,
@@ -308,10 +308,10 @@ func checkUniqueDispatches(tree *Tree) []Result {
 	seen := make(map[string]string) // dispatch ID -> first spec path
 	var results []Result
 	for path, node := range tree.All {
-		if node.Spec == nil || node.Spec.DispatchedTaskID == nil {
+		if node.Value == nil || node.Value.DispatchedTaskID == nil {
 			continue
 		}
-		id := *node.Spec.DispatchedTaskID
+		id := *node.Value.DispatchedTaskID
 		if first, ok := seen[id]; ok {
 			results = append(results, Result{
 				Path:     path,

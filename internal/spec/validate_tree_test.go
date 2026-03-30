@@ -3,47 +3,38 @@ package spec
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
+
+	gentree "changkun.de/x/wallfacer/internal/pkg/tree"
 )
 
 // buildTestTree creates a Tree from a map of path -> Spec for testing.
+// Paths determine parent-child: "local/parent/child.md" is a child of
+// "local/parent.md" if it exists. Insertion order is sorted so parents
+// are added before children.
 func buildTestTree(specs map[string]*Spec) *Tree {
-	tree := &Tree{All: make(map[string]*Node)}
-	nodes := make(map[string]*Node)
+	tree := &Tree{Tree: gentree.New[string, *Spec]()}
 
-	// Create all nodes.
-	for path, s := range specs {
-		s.Path = path
-		nodes[path] = &Node{Spec: s, IsLeaf: true}
+	// Sort paths so parents (shorter) come before children.
+	paths := make([]string, 0, len(specs))
+	for p := range specs {
+		paths = append(paths, p)
 	}
+	slices.Sort(paths)
 
-	// Wire parent-child from directory structure.
-	for path, node := range nodes {
+	for _, path := range paths {
+		s := specs[path]
+		s.Path = path
 		dir := filepath.Dir(filepath.ToSlash(path))
 		parentPath := dir + ".md"
-		if parent, ok := nodes[parentPath]; ok && parentPath != path {
-			node.Parent = parent
-			parent.Children = append(parent.Children, node)
-			parent.IsLeaf = false
+		if _, ok := tree.NodeAt(parentPath); ok && parentPath != path {
+			tree.Add(path, s, &parentPath)
 		} else {
-			tree.Roots = append(tree.Roots, node)
-		}
-		tree.All[path] = node
-	}
-
-	// Set depth.
-	var setDepth func(n *Node, d int)
-	setDepth = func(n *Node, d int) {
-		n.Depth = d
-		for _, c := range n.Children {
-			setDepth(c, d+1)
+			tree.Add(path, s, nil)
 		}
 	}
-	for _, r := range tree.Roots {
-		setDepth(r, 0)
-	}
-
 	return tree
 }
 
@@ -279,7 +270,7 @@ func TestValidateTree_IncludesPerSpecErrors(t *testing.T) {
 }
 
 func TestValidateTree_EmptyTree(t *testing.T) {
-	tree := &Tree{All: make(map[string]*Node)}
+	tree := &Tree{Tree: gentree.New[string, *Spec]()}
 	results := ValidateTree(tree, "")
 	if len(results) != 0 {
 		t.Errorf("expected no results for empty tree, got %d", len(results))

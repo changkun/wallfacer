@@ -6,7 +6,7 @@ import (
 
 func leafNode(status Status) *Node {
 	return &Node{
-		Spec:   &Spec{Status: status},
+		Value:   &Spec{Status: status},
 		IsLeaf: true,
 	}
 }
@@ -27,7 +27,7 @@ func TestNodeProgress_Leaf_Incomplete(t *testing.T) {
 
 func TestNodeProgress_NonLeaf_AllComplete(t *testing.T) {
 	parent := &Node{
-		Spec:   &Spec{Status: StatusValidated},
+		Value:   &Spec{Status: StatusValidated},
 		IsLeaf: false,
 		Children: []*Node{
 			leafNode(StatusComplete),
@@ -43,7 +43,7 @@ func TestNodeProgress_NonLeaf_AllComplete(t *testing.T) {
 
 func TestNodeProgress_NonLeaf_Mixed(t *testing.T) {
 	parent := &Node{
-		Spec:   &Spec{Status: StatusValidated},
+		Value:   &Spec{Status: StatusValidated},
 		IsLeaf: false,
 		Children: []*Node{
 			leafNode(StatusComplete),
@@ -60,7 +60,7 @@ func TestNodeProgress_NonLeaf_Mixed(t *testing.T) {
 func TestNodeProgress_DeepNesting(t *testing.T) {
 	// Grandparent has 1 leaf child + 1 non-leaf child with 2 leaves.
 	mid := &Node{
-		Spec:   &Spec{Status: StatusValidated},
+		Value:   &Spec{Status: StatusValidated},
 		IsLeaf: false,
 		Children: []*Node{
 			leafNode(StatusComplete),
@@ -68,7 +68,7 @@ func TestNodeProgress_DeepNesting(t *testing.T) {
 		},
 	}
 	grandparent := &Node{
-		Spec:   &Spec{Status: StatusValidated},
+		Value:   &Spec{Status: StatusValidated},
 		IsLeaf: false,
 		Children: []*Node{
 			leafNode(StatusComplete),
@@ -83,7 +83,7 @@ func TestNodeProgress_DeepNesting(t *testing.T) {
 
 func TestNodeProgress_NoChildren(t *testing.T) {
 	node := &Node{
-		Spec:   &Spec{Status: StatusValidated},
+		Value:   &Spec{Status: StatusValidated},
 		IsLeaf: false, // non-leaf but no children (edge case)
 	}
 	p := NodeProgress(node)

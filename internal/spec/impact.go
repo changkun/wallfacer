@@ -15,8 +15,8 @@ type Impact struct {
 func Adjacency(tree *Tree) map[string][]string {
 	adj := make(map[string][]string, len(tree.All))
 	for path, node := range tree.All {
-		if node.Spec != nil {
-			adj[path] = node.Spec.DependsOn
+		if node.Value != nil {
+			adj[path] = node.Value.DependsOn
 		} else {
 			adj[path] = nil
 		}
@@ -71,11 +71,11 @@ func ComputeImpact(tree *Tree, specPath string) *Impact {
 // collectLeafPaths appends all leaf spec paths in the subtree to paths.
 func collectLeafPaths(node *Node, paths *[]string) {
 	for _, child := range node.Children {
-		if child.Spec == nil {
+		if child.Value == nil {
 			continue
 		}
 		if child.IsLeaf {
-			*paths = append(*paths, child.Spec.Path)
+			*paths = append(*paths, child.Key)
 		} else {
 			collectLeafPaths(child, paths)
 		}
@@ -91,10 +91,10 @@ func UnblockedSpecs(tree *Tree, completedPath string) []*Node {
 
 	for _, dependent := range reverse[completedPath] {
 		node, ok := tree.All[dependent]
-		if !ok || node.Spec == nil {
+		if !ok || node.Value == nil {
 			continue
 		}
-		if node.Spec.Status == StatusComplete {
+		if node.Value.Status == StatusComplete {
 			continue
 		}
 		if allDepsComplete(tree, node) {
@@ -106,12 +106,12 @@ func UnblockedSpecs(tree *Tree, completedPath string) []*Node {
 
 // allDepsComplete checks whether all depends_on targets of a node are complete.
 func allDepsComplete(tree *Tree, node *Node) bool {
-	for _, dep := range node.Spec.DependsOn {
+	for _, dep := range node.Value.DependsOn {
 		depNode, ok := tree.All[dep]
-		if !ok || depNode.Spec == nil {
+		if !ok || depNode.Value == nil {
 			continue // missing target — skip (validation catches this)
 		}
-		if depNode.Spec.Status != StatusComplete {
+		if depNode.Value.Status != StatusComplete {
 			return false
 		}
 	}
