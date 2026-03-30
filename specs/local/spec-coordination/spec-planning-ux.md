@@ -297,6 +297,7 @@ When spec count exceeds human working memory (~7-10 specs), the user loses globa
 1. **Tree collapsing** — only expand the subtree you're working on. Completed subtrees collapse to a single green checkmark.
 2. **Status filtering** — show only specs in a particular state (stale, in-progress, not started).
 3. **Reactive warnings** — surface problems when they matter (e.g., drift warnings when about to dispatch), not as background noise.
+4. **Dependency minimap** — a small graph visualization (below the explorer or as a toggleable overlay) showing the focused spec's upstream dependencies and downstream dependents. Nodes are specs, edges are `depends_on` relationships. The focused spec is highlighted; upstream specs (what this depends on) fan out to the left or top, downstream specs (what depends on this) fan out to the right or bottom. Clicking a node in the minimap navigates to that spec. Node color encodes status (green = complete, yellow = in-progress, gray = not started, red = stale/blocked). This gives the user a local neighborhood view of the dependency graph without requiring them to hold the full tree in their head — they see "what feeds into this spec" and "what this spec unblocks" at a glance. The minimap only renders the immediate neighborhood (1-2 hops) to stay readable; a "expand" action could show the full transitive closure if needed.
 
 ### Entry-Point Document Staleness
 
@@ -317,120 +318,105 @@ When spec count exceeds human working memory (~7-10 specs), the user loses globa
 - Pro: Preserves full human authorship. No generator to maintain. Works for any document format.
 - Con: Doesn't fix the problem, only nags. The human still does the manual update. "Blocking" may be too aggressive for a README update.
 
-**Option D — Agent-assisted update.** On spec completion, the chat stream proposes a README diff: "spec-document-model is now complete. Here's an updated README reflecting the new status and deliverables." The user reviews and applies with one click, or edits before applying.
+**Option D — Proactive agent update.** On spec completion, the agent automatically updates the entry-point document — at minimum, advancing status fields (e.g., marking a spec from `validated` to `complete`, or flagging dependent specs as `stale`). For larger changes (rewriting rationale, updating deliverables), the agent writes the update directly and surfaces it for human review in the chat stream: "spec-document-model completed — I've updated the README status table and flagged two downstream specs as potentially stale. Review the changes?" The user can accept, edit, or revert.
 
-- Pro: Human stays in the loop but doesn't have to remember or do the work. The agent has full context (spec content, what shipped, design decisions) to write a good update. No rigid template — the agent adapts to whatever README format exists.
-- Con: Requires the agent to understand README conventions. Quality depends on prompt engineering. Still manual (user must click "apply").
+- Pro: The agent handles the bookkeeping proactively — the human doesn't have to remember or initiate the update. Status fields stay accurate without human intervention. The agent has full context (spec content, what shipped, design decisions) to write good prose updates. No rigid template — the agent adapts to whatever README format exists.
+- Con: Requires the agent to understand README conventions. Quality of prose updates depends on prompt engineering. The user must still review non-trivial changes (but status-only updates can be fully automatic).
 
-These options aren't mutually exclusive. A likely combination: **B + D** — generate the structured sections (tables, status quo block), and have the agent propose updates to free-form sections (rationale, dependency graph annotations) via chat.
+**Decision: Option D.** The agent should proactively update entry-point documents on spec status changes. Mechanical updates (status field changes, marking downstream specs as stale) happen automatically without requiring human approval. Prose-level updates (rationale, deliverables, dependency graph annotations) are written by the agent and surfaced for review. This eliminates drift for the common case (status tracking) while keeping the human in the loop for substantive content changes.
 
 ### Specs Folder Location and Conflicts
 
-The spec system assumes a `specs/` directory exists in the workspace. Several unresolved questions:
+**Decision: `specs/` in each repo root.** Specs are version-controlled alongside the code they describe. PRs can include both spec changes and implementation. Only markdown files (`.md`) are considered — non-markdown files (`.yaml`, `.json`, `.openapi`, etc.) in the same directory are always ignored.
 
-**Where should the specs folder live?**
+**Coexisting with existing `specs/` content.** If a project already uses `specs/` for RFCs, ADRs, OpenAPI docs, or other purposes, Wallfacer only manages markdown files that have valid Wallfacer frontmatter (the full schema: `status`, `depends_on`, `affects`, `effort`, etc.). Existing markdown files without this frontmatter are left alone. On first entering spec mode in a repo with existing `specs/` content, the system offers to auto-convert: "Found 12 markdown files without Wallfacer frontmatter. Convert them to managed specs?" The user can select which files to convert — each gets frontmatter added with sensible defaults (`status: drafted`, empty `depends_on` and `affects`). Files the user declines to convert remain unmanaged and invisible to the spec explorer.
 
-- **Option A — Workspace root (`<repo>/specs/`).** Specs are version-controlled alongside the code they describe. PRs can include both spec changes and implementation. Natural for single-repo projects.
-- **Option B — Wallfacer data directory (`~/.wallfacer/specs/<fingerprint>/`).** Specs live outside the repo, keyed by workspace fingerprint (same scheme as AGENTS.md). Doesn't pollute the repo. Works for multi-repo workspace groups where no single repo owns the specs.
-- **Option C — User-configurable.** A setting (`WALLFACER_SPECS_DIR` or per-workspace config) points to the specs root. Defaults to option A if the directory exists, otherwise option B.
+**Bootstrap (no `specs/` folder).** On first entering spec mode, prompt once: "No specs directory found. Create one at `<repo>/specs/`?" One-time friction, explicit consent. After creation, the directory starts with a minimal README.
 
-**What if the project already has a `specs/` directory?**
+**Multi-repo workspace groups.** Each repo in a workspace group has its own `specs/` directory with its own spec tree. The spec explorer merges all repos' spec trees into a unified view, grouped by repo. The result is a **spec forest** — multiple independent trees (one per repo), not a single unified DAG.
 
-Some projects use `specs/` for OpenAPI specs, RFCs, ADRs, or other purposes. Wallfacer's spec frontmatter schema (status, depends_on, affects, effort, etc.) would conflict with or pollute existing content.
+Cross-repo dependencies are expressed using repo-qualified paths in `depends_on` (e.g., `api/specs/foundations/auth-endpoint.md`). The `affects` field similarly uses repo-prefixed paths (`api/internal/handler/foo.go`, `frontend/src/api.ts`). The repo prefix matches the workspace mount basename — this is already how `/workspace/AGENTS.md` informs agents about the multi-repo layout.
 
-- **Option A — Namespaced directory.** Use `.wallfacer/specs/` or `wallfacer-specs/` instead of bare `specs/`. Avoids all conflicts but looks foreign.
-- **Option B — Coexist with detection.** Scan the existing `specs/` directory. Files with valid Wallfacer frontmatter are managed specs; everything else is ignored. Risk: false positives if existing files happen to have similar YAML fields.
-- **Option C — Explicit init.** `wallfacer specs init` creates the specs directory (prompting for location if `specs/` already exists). The chosen path is stored in workspace config. No implicit detection.
-
-**Multi-repo workspace groups — where do cross-repo specs live?**
-
-A workspace group can mount multiple repos (e.g., `~/api`, `~/frontend`, `~/infra`). A spec may span repos ("add a new API endpoint and consume it in the frontend"). Questions:
-
-- **One specs tree or many?** Each repo could have its own `specs/` with its own tree, or there could be a single unified tree that covers the whole workspace group. Per-repo trees are simpler but can't express cross-repo dependencies. A unified tree needs a home outside any single repo.
-- **If unified, where?** The wallfacer data directory (`~/.wallfacer/specs/<fingerprint>/`) is the natural candidate — it's already keyed by workspace group. But then specs aren't version-controlled with the code they describe, and PRs can't include spec changes.
-- **Hybrid?** Per-repo `specs/` for repo-scoped work, plus a wallfacer-managed cross-repo layer for specs that span boundaries. The spec explorer would merge both views. Adds complexity — two sources of truth, potential conflicts in `depends_on` paths.
-- **`affects` paths across repos.** Currently `affects` lists paths relative to the repo root. With multiple repos, paths need qualifying (`api/internal/handler/foo.go` vs `frontend/src/api.ts`). The workspace mount names could serve as prefixes, but this couples specs to workspace config.
-
-**Leaning toward `.wallfacer/` as canonical home.** This solves multi-repo cleanly and avoids polluting repos. But it detaches specs from the code they describe — specs aren't in PRs, aren't reviewed alongside implementation, and aren't portable if someone clones the repo without wallfacer.
-
-A sync mechanism could bridge this: wallfacer writes a read-only `specs/` mirror into each repo (or a configurable subset), regenerated on spec change. The mirror could be full copies or stubs (frontmatter + link back to wallfacer). This gives repos a version-controlled snapshot without the repo owning the source of truth. Open sub-questions:
-
-- Should sync be opt-in per repo, or automatic?
-- Full spec copies vs summary stubs vs a single `specs.json` manifest?
-- Should synced files be `.gitignore`d (pure local cache) or committed (visible in PRs)?
-- If committed, who resolves conflicts when someone edits the synced copy directly?
-
-No clear winner yet. The single-repo case (option A above) should ship first; multi-repo support can layer on top once the model is proven.
-
-**What if the project has no specs folder?**
-
-First time the user enters spec mode, the system needs to bootstrap. Options:
-
-- **Auto-create on first use.** Entering spec mode creates the specs directory (at the configured location) with a minimal README. Low friction but surprising if the user was just exploring.
-- **Prompt once.** "No specs directory found. Create one at `<repo>/specs/`?" with option to choose a different path. One-time friction, explicit consent.
-- **Require explicit init.** Spec mode is grayed out until the user runs init. Most explicit, most friction.
+The spec graph across a workspace group is technically a **multi-graph forest**: each repo's specs form a DAG, and cross-repo `depends_on` edges connect nodes across trees. The spec explorer and dependency minimap render this naturally — cross-repo edges appear as connections between repo-grouped subtrees. Cycle detection operates across the full forest, not per-repo.
 
 ### Concurrent Edits
 
-The user might edit a spec file in their editor while the planning agent is modifying it in the sandbox. Who wins?
+**Decision: on-disk is authoritative, conflicts surface as git-style markers.**
 
-- If the sandbox operates directly on the workspace (no worktree), there's a write race between the agent and the user's editor. The last save wins, and one side's changes are silently lost.
-- If the sandbox uses a worktree (like task execution), the agent's changes are isolated but then need merging back — adding friction to what should be a tight iteration loop.
-- A middle ground: the sandbox works directly on the workspace, but the UI detects external file changes (via fsnotify) and warns before the agent overwrites. Or the agent always reads before writing, treating the on-disk version as authoritative.
+The planning sandbox operates directly on the workspace filesystem (no worktree isolation). The agent always reads the current on-disk version of a file before modifying it, so it immediately observes any user edits that have been saved. This means the user can edit a spec in their editor, save it, and the agent's next read picks up the changes — no sync lag.
 
-Related: what happens if the user edits a spec via the file explorer (board mode) while a planning session is active?
+The conflict case arises when the user has **unsaved edits** in their editor while the agent writes to the same file:
+
+1. The agent writes its changes to disk (it read the last-saved version, which was authoritative at read time).
+2. The UI detects the file change via `fsnotify` and compares the on-disk content against the user's unsaved buffer.
+3. If the regions don't overlap, the editor can silently reload (or prompt to reload).
+4. If the regions conflict, the UI inserts git-style conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) into the file, showing both the user's unsaved version and the agent's version. The user must resolve the conflict before the file is considered clean — same mental model as a git merge conflict.
+
+This applies equally to edits made via an external editor, the focused markdown view, or the file explorer in board mode. The conflict resolution flow is always the same: git-style markers, user resolves, save.
 
 ### Chat Session Persistence
 
-Is the planning conversation per-spec or global?
+**Decision: global session, persistent across spec mode sessions.**
 
-- **Per-spec:** Switching specs starts a fresh conversation. The agent loses cross-spec reasoning context (e.g., "make this spec consistent with the one we just discussed"). But conversations stay focused and short.
-- **Global:** One continuous thread across all spec work. The agent retains context across specs but the conversation becomes long and unfocused. Token costs grow.
-- **Hybrid:** Global session with spec-scoped focus. The agent always has the full conversation history but the UI visually groups messages by which spec was focused. Switching specs doesn't clear context but does shift the agent's attention.
+One continuous conversation thread covers all spec work. Switching the focused spec in the explorer does not clear or fork the conversation — the agent retains full cross-spec reasoning context (e.g., "make this spec consistent with the one we just discussed"). The UI visually indicates which spec was focused at each point in the conversation for readability, but the underlying thread is continuous.
 
-Also: does conversation history persist across spec mode sessions (close and reopen)? If ephemeral, the user loses planning rationale. If persistent, where is it stored — in the sandbox, in wallfacer data, or as a file in the specs directory?
+The conversation persists across spec mode sessions (close and reopen). Planning rationale, design decisions, and iteration history are preserved. Storage location: the wallfacer data directory (`~/.wallfacer/`), keyed by workspace fingerprint — same lifetime as the planning sandbox.
+
+**Agent codebase access.** The agent can read the full workspace codebase, not just specs — it needs to understand existing implementations when drafting specs. The spec explorer defaults to showing only the `specs/` folder, but a **"Show workspace files" toggle** (checkbox in the explorer header) expands the tree to include the full workspace file tree. This lets the user browse and reference code files without leaving spec mode. The agent's read access is always full-workspace regardless of this toggle — the toggle only controls what the explorer UI displays.
 
 ### Undo and Rollback
 
-The sandbox execution model gives the agent full write access with no permission prompts. This is fast but raises the cost of mistakes. If the agent breaks a spec into 5 children and the user doesn't like the split, recovery options:
+**Decision: implicit per-round snapshots with undo stack.**
 
-- **Manual git:** `git checkout -- specs/` or selective `git restore`. Works but requires git fluency and breaks the flow.
-- **Undo button:** Reverts the last agent action (or last N actions). Requires the system to track agent write operations as discrete transactions — each chat response that modifies files is one undoable unit.
-- **Snapshot-based:** The system takes a git stash or lightweight snapshot before each agent action. Undo pops the snapshot. Cheap, composable, uses existing git infrastructure.
+Before the agent executes any file writes in response to a user message, the system takes a lightweight snapshot of the affected files (git stash or copy-based). Each chat round (one user message → one agent response that modifies files) is one undoable unit. A single user message like "break this into sub-specs and update the parent" may produce many file writes — all of them are captured in one snapshot and revert as one unit.
 
-The undo granularity matters: is it per-file, per-chat-message, or per-user-request? A single user message ("break this into sub-specs and update the parent") might produce many file writes that should undo as one unit.
+The UI shows an **Undo button** on each agent response that modified files. Clicking it reverts all file changes from that round by restoring the snapshot. Multiple undos walk back through the snapshot stack in reverse order. The undo stack is bounded (e.g., last 50 rounds) and persists with the planning session.
+
+Rounds where the agent only reads files or responds with text (no file writes) do not create snapshots. The snapshot only covers files under `specs/` that the agent actually modified — it's not a full workspace snapshot.
 
 ### Planning Cost Budget
 
-The planning agent reads the codebase to draft specs — scanning files, understanding architecture, checking existing implementations. For large repos this could burn significant tokens before any implementation starts.
+**Decision: costs are tracked and distributed per spec file.**
 
-- Is planning budgeted separately from execution? Or does the planning sandbox share the same cost model as any task (per-turn usage tracking, cost limits)?
-- Should there be a planning-specific budget cap (e.g., `WALLFACER_PLANNING_MAX_COST`)?
-- How does the user reason about planning cost vs execution cost? A spec that costs $2 to draft but saves $20 in misdirected execution is a good trade — but the user needs visibility into this.
+Each chat round's token usage is attributed to the spec file(s) the agent modified during that round. If a round modifies multiple specs, the cost is split proportionally (e.g., by token count spent on each file's reads and writes). If a round only reads files or produces text without modifying any spec, the cost is attributed to the currently focused spec.
 
-The existing usage tracking and cost dashboard could extend to planning sessions, showing planning cost alongside execution cost per spec subtree.
+The cost dashboard extends to show planning cost per spec alongside execution cost. Each spec's focused view displays both:
+
+- **Planning cost** — tokens spent drafting, iterating, and refining this spec
+- **Execution cost** — tokens spent by dispatched tasks implementing this spec
+
+Non-leaf specs aggregate both planning and execution costs from their entire subtree. This gives the user visibility into the total investment per spec branch — a spec subtree that cost $3 to plan and $15 to execute is easy to reason about.
+
+Planning shares the same cost model and usage tracking infrastructure as task execution. No separate budget cap — the existing per-session cost limits apply to the planning sandbox the same way they apply to task workers.
 
 ### Dispatch Granularity Judgment
 
-Leaf specs should be "small enough for one agent task" — the spec-document-model says 2-5 files, one clear goal. But this is subjective and the user may not know the codebase well enough to judge.
+**Decision: the user decides breakdown granularity; the spec type implies dispatch readiness.**
 
-- **Agent hint:** When viewing a leaf spec, the agent could analyze the `affects` paths and estimate scope: "this spec touches 12 files across 4 packages — consider splitting." Based on file count, package spread, or lines of code in affected files.
-- **Validator rule:** A soft warning if `affects` lists more than N files or spans more than M packages. Not a hard block — some large-scope leaves are legitimate (e.g., a mechanical rename across many files).
-- **Purely human judgment:** The agent proposes breakdowns when asked, but doesn't proactively flag size. Keeps the system simple.
+When a user breaks down a spec, they choose whether each child is:
+
+- An **implementation spec** (leaf) — concrete, scoped to a single agent task, ready for dispatch. These have the full leaf spec structure: goal, what to change, acceptance criteria.
+- A **design spec** (non-leaf) — still needs further iteration and breakdown before any part of it is dispatchable.
+
+This distinction is implicit in the spec's structure: specs with children are design specs; specs without children are implementation specs. Only implementation specs (leaves) show the dispatch button. The user doesn't need to explicitly label a spec as "ready" — if it's a leaf with `validated` status, it's dispatchable.
+
+The agent does not proactively flag specs as too large or suggest breakdowns. It proposes breakdowns when asked. The user is in control of when to stop breaking down and when to dispatch.
 
 ### Spec Templates
 
-The board has prompt templates for task creation. Should spec mode have analogous templates for common spec patterns?
+**Decision: no static templates. The agent has skills for common spec formats.**
 
-Examples: "API endpoint" (route, handler, tests, docs), "refactor" (motivation, before/after, migration path), "bug fix" (repro, root cause, fix, regression test), "migration" (schema changes, data migration, rollback plan).
+Static templates (pre-filled section headings and placeholders) add rigidity without value — the agent drafts specs from scratch via chat and adapts to context better than a fixed template can.
 
-- Templates could pre-fill the spec body with section headings and placeholder text, similar to GitHub issue templates.
-- The agent could suggest a template based on the user's natural language description ("I want to add a new endpoint" → offer the API endpoint template).
-- Or templates are unnecessary — the agent drafts specs from scratch via chat, and imposing a template adds rigidity without value.
+Instead, the planning agent has **spec-creation skills** — built-in knowledge of common spec patterns (API endpoint, refactor, bug fix, migration, etc.) that it applies when relevant. When the user says "I want to add a new endpoint," the agent drafts a spec with the appropriate structure (route, handler, tests, docs) without the user needing to select a template. The agent infers the format from the user's description and the codebase context. The user can always ask the agent to restructure a spec differently.
 
 ### Agent-Generated Spec Trust
 
-If the user doesn't write specs, they have lower familiarity with content. Mitigations:
+**Decision: structured summaries on demand.**
+
+If the user doesn't write specs, they have lower familiarity with content. The primary mitigation is a **"Summarize" action** in the focused view that asks the agent to produce a structured summary of the spec's key points under a user-chosen word limit (e.g., 50, 100, 200 words). The summary is displayed inline above the full spec body — not a replacement, but a scannable overview. This lets the user quickly verify the spec captures the right intent without reading every paragraph.
+
+Additional mitigations:
 
 - Build familiarity through interactive chat dialogue, not passive reading
 - Verification specs catch implementation failures
