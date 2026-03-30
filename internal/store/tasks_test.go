@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
@@ -395,10 +396,10 @@ func TestUpdateTaskStatus_NotFound(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ValidateTransition / state machine enforcement
+// TaskMachine / state machine enforcement
 // ─────────────────────────────────────────────────────────────────────────────
 
-func TestValidateTransition_ValidTransitions(t *testing.T) {
+func TestTaskMachine_ValidTransitions(t *testing.T) {
 	valid := []struct{ from, to TaskStatus }{
 		{TaskStatusBacklog, TaskStatusInProgress},
 		{TaskStatusInProgress, TaskStatusBacklog},
@@ -416,13 +417,13 @@ func TestValidateTransition_ValidTransitions(t *testing.T) {
 		{TaskStatusCancelled, TaskStatusBacklog},
 	}
 	for _, tc := range valid {
-		if err := ValidateTransition(tc.from, tc.to); err != nil {
-			t.Errorf("ValidateTransition(%q, %q) = %v, want nil", tc.from, tc.to, err)
+		if err := TaskMachine.Validate(tc.from, tc.to); err != nil {
+			t.Errorf("TaskMachine.Validate(%q, %q) = %v, want nil", tc.from, tc.to, err)
 		}
 	}
 }
 
-func TestValidateTransition_InvalidTransitions(t *testing.T) {
+func TestTaskMachine_InvalidTransitions(t *testing.T) {
 	cases := []struct{ from, to TaskStatus }{
 		{TaskStatusDone, TaskStatusInProgress},
 		{TaskStatusCommitting, TaskStatusBacklog},
@@ -432,12 +433,12 @@ func TestValidateTransition_InvalidTransitions(t *testing.T) {
 		{TaskStatusCancelled, TaskStatusInProgress},
 	}
 	for _, tc := range cases {
-		err := ValidateTransition(tc.from, tc.to)
+		err := TaskMachine.Validate(tc.from, tc.to)
 		if err == nil {
-			t.Errorf("ValidateTransition(%q, %q) = nil, want error", tc.from, tc.to)
+			t.Errorf("TaskMachine.Validate(%q, %q) = nil, want error", tc.from, tc.to)
 			continue
 		}
-		if !errors.Is(err, ErrInvalidTransition) {
+		if !errors.Is(err, statemachine.ErrInvalidTransition) {
 			t.Errorf("error = %v, want wrapping ErrInvalidTransition", err)
 		}
 	}
@@ -451,7 +452,7 @@ func TestUpdateTaskStatus_RejectsInvalidTransition(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid transition backlog → done")
 	}
-	if !errors.Is(err, ErrInvalidTransition) {
+	if !errors.Is(err, statemachine.ErrInvalidTransition) {
 		t.Errorf("error = %v, want ErrInvalidTransition", err)
 	}
 }

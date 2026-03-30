@@ -12,6 +12,7 @@ import (
 
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
+	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -771,7 +772,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request, id uuid.UUI
 		}
 
 		if err := h.store.UpdateTaskStatus(r.Context(), id, newStatus); err != nil {
-			if errors.Is(err, store.ErrInvalidTransition) {
+			if errors.Is(err, statemachine.ErrInvalidTransition) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 			} else {
 				http.Error(w, err.Error(), http.StatusInternalServerError)

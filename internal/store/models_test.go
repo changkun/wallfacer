@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+
+	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 )
 
 // allStatuses lists every defined TaskStatus for exhaustive negative-case coverage.
@@ -17,7 +19,7 @@ var allStatuses = []TaskStatus{
 	TaskStatusCancelled,
 }
 
-func TestValidateTransition(t *testing.T) {
+func TestTaskMachine_Validate(t *testing.T) {
 	// valid transitions derived from allowedTransitions map.
 	valid := []struct {
 		from, to TaskStatus
@@ -38,17 +40,17 @@ func TestValidateTransition(t *testing.T) {
 	}
 
 	for _, tc := range valid {
-		if err := ValidateTransition(tc.from, tc.to); err != nil {
-			t.Errorf("ValidateTransition(%s, %s): expected nil, got %v", tc.from, tc.to, err)
+		if err := TaskMachine.Validate(tc.from, tc.to); err != nil {
+			t.Errorf("TaskMachine.Validate(%s, %s): expected nil, got %v", tc.from, tc.to, err)
 		}
 	}
 
 	// invalid: every status → itself, plus a sampling of known-bad edges.
 	for _, s := range allStatuses {
-		if err := ValidateTransition(s, s); err == nil {
-			t.Errorf("ValidateTransition(%s, %s): expected error for self-transition, got nil", s, s)
-		} else if !errors.Is(err, ErrInvalidTransition) {
-			t.Errorf("ValidateTransition(%s, %s): error should wrap ErrInvalidTransition, got %v", s, s, err)
+		if err := TaskMachine.Validate(s, s); err == nil {
+			t.Errorf("TaskMachine.Validate(%s, %s): expected error for self-transition, got nil", s, s)
+		} else if !errors.Is(err, statemachine.ErrInvalidTransition) {
+			t.Errorf("TaskMachine.Validate(%s, %s): error should wrap statemachine.ErrInvalidTransition, got %v", s, s, err)
 		}
 	}
 
@@ -66,10 +68,10 @@ func TestValidateTransition(t *testing.T) {
 		{TaskStatusCancelled, TaskStatusDone},
 	}
 	for _, tc := range illegal {
-		if err := ValidateTransition(tc.from, tc.to); err == nil {
-			t.Errorf("ValidateTransition(%s, %s): expected error, got nil", tc.from, tc.to)
-		} else if !errors.Is(err, ErrInvalidTransition) {
-			t.Errorf("ValidateTransition(%s, %s): error should wrap ErrInvalidTransition, got %v", tc.from, tc.to, err)
+		if err := TaskMachine.Validate(tc.from, tc.to); err == nil {
+			t.Errorf("TaskMachine.Validate(%s, %s): expected error, got nil", tc.from, tc.to)
+		} else if !errors.Is(err, statemachine.ErrInvalidTransition) {
+			t.Errorf("TaskMachine.Validate(%s, %s): error should wrap statemachine.ErrInvalidTransition, got %v", tc.from, tc.to, err)
 		}
 	}
 }

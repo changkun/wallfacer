@@ -20,7 +20,7 @@ func (s *Store) UpdateTaskStatus(_ context.Context, id uuid.UUID, status TaskSta
 	if !ok {
 		return fmt.Errorf("task not found: %s", id)
 	}
-	if err := ValidateTransition(t.Status, status); err != nil {
+	if err := TaskMachine.Validate(t.Status, status); err != nil {
 		return err
 	}
 	s.removeFromStatusIndex(t.Status, id)

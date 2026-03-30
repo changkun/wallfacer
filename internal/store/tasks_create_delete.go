@@ -434,7 +434,7 @@ func (s *Store) PurgeExpiredTombstones(retentionDays int) {
 }
 
 // UpdateTaskStatus sets a task's status field, enforcing the state machine.
-// Returns ErrInvalidTransition if the requested transition is not allowed.
+// Returns statemachine.ErrInvalidTransition if the requested transition is not allowed.
 // When transitioning to TaskStatusDone, a summary.json is written atomically
 // before subscribers are notified, so the file is always present by the time
 // any observer sees the done state.

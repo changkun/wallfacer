@@ -14,6 +14,7 @@ import (
 	"changkun.de/x/wallfacer/internal/constants"
 	"changkun.de/x/wallfacer/internal/gitutil"
 	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 	"changkun.de/x/wallfacer/internal/pkg/watcher"
 	"changkun.de/x/wallfacer/internal/store"
 	"github.com/google/uuid"
@@ -67,7 +68,7 @@ func (h *Handler) checkConcurrencyAndUpdateStatus(ctx context.Context, w http.Re
 		return false
 	}
 	if err := h.store.UpdateTaskStatus(ctx, id, newStatus); err != nil {
-		if errors.Is(err, store.ErrInvalidTransition) {
+		if errors.Is(err, statemachine.ErrInvalidTransition) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
