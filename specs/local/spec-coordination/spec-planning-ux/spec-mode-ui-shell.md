@@ -1,6 +1,6 @@
 ---
 title: Spec Mode UI Shell
-status: drafted
+status: validated
 depends_on: []
 affects:
   - ui/index.html
@@ -71,3 +71,27 @@ Mode switching needs to swap the main content area (board vs. spec mode panes) w
 - `ui/js/state.js` — current mode state, focused spec path
 - New `ui/js/spec-mode.js` or similar — spec mode orchestrator
 - `ui/js/status-bar.js` — mode indicator in footer
+
+## Design Decision
+
+**Option C — Hybrid: shared shell, swapped content.** The header, status bar, and bottom panels (terminal, dep graph, office) are always present. The main content area swaps between the board grid and the spec mode three-pane container. The explorer sidebar is shared — it switches its root between workspace files and the spec tree based on mode, with a "Show workspace files" toggle in spec mode.
+
+Deep-linking uses `#spec/<path>` format (alongside existing `#<task-id>/<tab>`). Keyboard shortcuts are mode-scoped: `S` toggles globally, `Enter`/`D`/`B` only fire in spec mode.
+
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Mode state and header tabs](spec-mode-ui-shell/mode-state-and-switching.md) | — | small | validated |
+| [Three-pane layout](spec-mode-ui-shell/spec-mode-layout.md) | mode-state-and-switching | medium | validated |
+| [Focused markdown view](spec-mode-ui-shell/focused-markdown-view.md) | spec-mode-layout | medium | validated |
+| [Deep-linking and keyboard shortcuts](spec-mode-ui-shell/spec-mode-deep-linking.md) | focused-markdown-view | small | validated |
+| [Pane resize handle](spec-mode-ui-shell/pane-resize.md) | spec-mode-layout | small | validated |
+
+```mermaid
+graph LR
+  A[Mode state & tabs] --> B[Three-pane layout]
+  B --> C[Focused markdown view]
+  B --> E[Pane resize]
+  C --> D[Deep-linking & shortcuts]
+```

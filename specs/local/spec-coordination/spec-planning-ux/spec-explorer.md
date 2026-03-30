@@ -1,6 +1,6 @@
 ---
 title: Spec Explorer & Dependency Minimap
-status: drafted
+status: validated
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
 affects:
@@ -95,3 +95,29 @@ The spec system (`internal/spec/`) already provides:
 - `ui/js/explorer.js` — spec-aware rendering, status badges, progress indicators, or a new `spec-explorer.js`
 - `ui/js/` — new minimap component (SVG/canvas renderer)
 - `ui/index.html` — minimap container element
+
+## Design Decisions
+
+**Spec tree data: Option B — Dedicated spec tree API.** `GET /api/specs/tree` returns the full tree in one response, pre-built via `spec.BuildTree()`. Progress and dependency edges included. When "Show workspace files" is toggled, workspace files fall back to the existing explorer API (Option C hybrid).
+
+**Minimap: Option Z — Custom minimal renderer.** A purpose-built SVG renderer for the 1-hop dependency neighborhood. No layout library dependency. Nodes are colored rectangles, edges are lines, click-to-navigate. Tiny and fast.
+
+**Spec tree updates:** Polling (3-second interval, same as existing explorer). SSE can be added later if the lag is noticeable during active planning.
+
+## Task Breakdown
+
+| Child spec | Depends on | Effort | Status |
+|------------|-----------|--------|--------|
+| [Spec tree API endpoint](spec-explorer/spec-tree-api.md) | — | medium | validated |
+| [Spec tree renderer with status badges](spec-explorer/spec-tree-renderer.md) | spec-tree-api, mode-state-and-switching | medium | validated |
+| [Status filtering](spec-explorer/status-filtering.md) | spec-tree-renderer | small | validated |
+| [Dependency minimap renderer](spec-explorer/dependency-minimap.md) | spec-tree-renderer | medium | validated |
+| [Multi-select for batch dispatch](spec-explorer/multi-select-dispatch.md) | spec-tree-renderer | small | validated |
+
+```mermaid
+graph LR
+  A[Spec tree API] --> B[Spec tree renderer]
+  B --> C[Status filtering]
+  B --> D[Dependency minimap]
+  B --> E[Multi-select dispatch]
+```
