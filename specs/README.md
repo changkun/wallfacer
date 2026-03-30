@@ -15,7 +15,7 @@ Foundations (complete)
   ✅ Host Terminal
 
 Local Product                          Cloud Platform
-  ○ Spec Coordination                    ○ Cloud Deployment (overview)
+  ◐ Spec Coordination                    ○ Cloud Deployment (overview)
   ✅ Desktop App                          ○ Tenant Filesystem
   ○ File/Image Attachments               ○ K8s Sandbox Backend
   ○ Host Mounts                          ○ Cloud Infrastructure
@@ -57,8 +57,8 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 
 | Spec | Status | Delivers |
 |------|--------|----------|
-| [spec-coordination.md](local/spec-coordination.md) | Not started | Umbrella: recursive spec tree model, dispatch workflow, cross-task context |
-| ↳ [spec-document-model.md](local/spec-coordination/spec-document-model.md) | **Complete** | Spec properties, lifecycle, tree structure, validation, progress, impact analysis |
+| [spec-coordination.md](local/spec-coordination.md) | In progress | Umbrella: recursive spec tree model, dispatch workflow, cross-task context |
+| ↳ [spec-document-model.md](local/spec-coordination/spec-document-model.md) | **Complete** | Spec frontmatter schema, filesystem-derived tree, `depends_on` DAG, five-state lifecycle, per-spec and cross-spec validation, recursive progress tracking, impact analysis. Extracted `internal/pkg/dag/`, `internal/pkg/tree/`, `internal/pkg/statemachine/` |
 | ↳ [spec-drift-detection.md](local/spec-coordination/spec-drift-detection.md) | Not started | Drift detection, propagation through spec tree, `affects` field |
 | ↳ [spec-planning-ux.md](local/spec-coordination/spec-planning-ux.md) | Not started | Spec explorer, chat-driven iteration, dispatch workflow, progress tracking |
 | [desktop-app.md](local/desktop-app.md) | **Complete** | Wails native wrapper (macOS .app, Windows .exe, Linux binary) |
@@ -147,7 +147,7 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 **Authentication** is the clearest cross-track spec. A single-host deployment gets real login instead of a bearer token. The cloud track needs it as a prerequisite for multi-tenant. Implementing it once serves both.
 
-**Agent abstraction** refactors `internal/runner/` — the execution engine that both tracks use. Without it, every new agent role requires touching 6+ files with duplicated launch/parse/usage logic. Both tracks add new roles (cloud adds K8s-aware agents, local product adds planning/gate agents from epic coordination).
+**Agent abstraction** refactors `internal/runner/` — the execution engine that both tracks use. Without it, every new agent role requires touching 6+ files with duplicated launch/parse/usage logic. Both tracks add new roles (cloud adds K8s-aware agents, local product adds planning/gate agents from spec coordination).
 
 **Native sandboxes** are alternatives to the container-based `LocalBackend`. They eliminate the Docker/Podman dependency for local deployments and the desktop app.
 
@@ -173,7 +173,7 @@ How the three tracks connect through shared design and foundations.
                      │
  ═══ Local Product ══╪════════════════════════════════════════════════════
                      │
- Epic Coordination ──┤   Terminal Sessions (done) ──▶ Container Exec (done)
+ Spec Coordination ──┤   Terminal Sessions (done) ──▶ Container Exec (done)
  File Attachments    │   Oversight Risk Scoring
  Host Mounts         │   Visual Verification
  File Panel Viewer   │   Live Serve
@@ -192,7 +192,7 @@ How the three tracks connect through shared design and foundations.
 ## Ordering Rationale
 
 **Within local product:**
-- Epic coordination can start now (file explorer done, no blockers).
+- Spec coordination is in progress (document model complete; drift detection and planning UX remain).
 - Terminal extensions complete: sessions and container exec both shipped.
 - Desktop app is complete.
 - Oversight, visual verification, live serve are independent — start anytime.
