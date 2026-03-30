@@ -1,6 +1,6 @@
 ---
 title: Impact Analysis
-status: validated
+status: complete
 track: local
 depends_on:
   - specs/local/spec-document-model/spec-tree-builder.md

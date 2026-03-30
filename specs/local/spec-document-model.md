@@ -300,7 +300,7 @@ The regime is not a system mode — it's an emergent property of how the human a
 | [Per-spec validation](spec-document-model/per-spec-validation.md) | spec-model-types, spec-lifecycle | medium | complete |
 | [Cross-spec validation](spec-document-model/cross-spec-validation.md) | spec-tree-builder, per-spec-validation | medium | complete |
 | [Progress tracking](spec-document-model/progress-tracking.md) | spec-tree-builder | small | complete |
-| [Impact analysis](spec-document-model/impact-analysis.md) | spec-tree-builder | medium | validated |
+| [Impact analysis](spec-document-model/impact-analysis.md) | spec-tree-builder | medium | complete |
 
 ```mermaid
 graph LR
