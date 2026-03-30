@@ -27,6 +27,7 @@ func buildTestTree(specs map[string]*Spec) *Tree {
 	for _, path := range paths {
 		s := specs[path]
 		s.Path = path
+		s.Track = trackFromPath(path)
 		dir := filepath.Dir(filepath.ToSlash(path))
 		parentPath := dir + ".md"
 		if _, ok := tree.NodeAt(parentPath); ok && parentPath != path {
@@ -40,10 +41,9 @@ func buildTestTree(specs map[string]*Spec) *Tree {
 
 func baseSpec() *Spec {
 	return &Spec{
-		Title:   "Test",
-		Status:  StatusValidated,
-		Track:   "local",
-		Effort:  EffortSmall,
+		Title:  "Test",
+		Status: StatusValidated,
+		Effort: EffortSmall,
 		Created: Date{time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
 		Updated: Date{time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
 		Author:  "test",
@@ -206,20 +206,6 @@ func TestValidateTree_StalePropagate(t *testing.T) {
 	}
 }
 
-func TestValidateTree_TrackConsistency(t *testing.T) {
-	// Track mismatch is caught by per-spec track-matches-path rule.
-	s := baseSpec()
-	s.Track = "cloud" // but path is local/
-
-	tree := buildTestTree(map[string]*Spec{
-		"local/test.md": s,
-	})
-	results := ValidateTree(tree, "")
-
-	if !hasRule(results, "track-matches-path", SeverityError) {
-		t.Error("expected track-matches-path error from per-spec validation")
-	}
-}
 
 func TestValidateTree_UniqueDispatches(t *testing.T) {
 	id := "550e8400-e29b-41d4-a716-446655440000"

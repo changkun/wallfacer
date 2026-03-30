@@ -86,6 +86,7 @@ func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
 			continue
 		}
 		s.Path = relPath
+		s.Track = trackFromPath(relPath)
 
 		tree.Add(relPath, s, parentKey)
 

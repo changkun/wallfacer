@@ -35,7 +35,6 @@ func ValidateSpec(s *Spec, repoRoot string, isLeaf bool) []Result {
 
 	results = append(results, checkRequiredFields(s)...)
 	results = append(results, checkValidEnums(s)...)
-	results = append(results, checkTrackMatchesPath(s)...)
 	results = append(results, checkDateOrdering(s)...)
 	results = append(results, checkNoSelfDependency(s)...)
 	results = append(results, checkDispatchConsistency(s, isLeaf)...)
@@ -54,10 +53,7 @@ func checkRequiredFields(s *Spec) []Result {
 	if s.Status == "" {
 		results = append(results, Result{s.Path, SeverityError, "required-fields", "status is required"})
 	}
-	if s.Track == "" {
-		results = append(results, Result{s.Path, SeverityError, "required-fields", "track is required"})
-	}
-	if s.Effort == "" {
+if s.Effort == "" {
 		results = append(results, Result{s.Path, SeverityError, "required-fields", "effort is required"})
 	}
 	if s.Created.IsZero() {
@@ -85,22 +81,6 @@ if s.Effort != "" && !slices.Contains(ValidEfforts(), s.Effort) {
 	return results
 }
 
-func checkTrackMatchesPath(s *Spec) []Result {
-	if s.Track == "" || s.Path == "" {
-		return nil
-	}
-	// Path should start with "<track>/" (relative to specs dir).
-	parts := strings.SplitN(filepath.ToSlash(s.Path), "/", 2)
-	if len(parts) < 2 {
-		return nil
-	}
-	pathTrack := parts[0]
-	if pathTrack != string(s.Track) {
-		return []Result{{s.Path, SeverityError, "track-matches-path",
-			fmt.Sprintf("track %q does not match path prefix %q", s.Track, pathTrack)}}
-	}
-	return nil
-}
 
 func checkDateOrdering(s *Spec) []Result {
 	if s.Created.IsZero() || s.Updated.IsZero() {
@@ -177,7 +157,6 @@ func ValidateTree(tree *Tree, repoRoot string) []Result {
 	results = append(results, checkOrphanDirectories(tree, repoRoot)...)
 	results = append(results, checkStatusConsistency(tree)...)
 	results = append(results, checkStalePropagation(tree)...)
-	results = append(results, checkTrackConsistency(tree)...)
 	results = append(results, checkUniqueDispatches(tree)...)
 
 	return results
@@ -293,11 +272,6 @@ func checkStalePropagation(tree *Tree) []Result {
 	return results
 }
 
-// checkTrackConsistency is handled by per-spec checkTrackMatchesPath — no
-// additional tree-level logic needed beyond what per-spec validation covers.
-func checkTrackConsistency(_ *Tree) []Result {
-	return nil
-}
 
 // checkUniqueDispatches ensures no two specs share the same dispatched_task_id.
 func checkUniqueDispatches(tree *Tree) []Result {

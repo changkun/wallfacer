@@ -69,3 +69,13 @@ func ParseBytes(data []byte, path string) (*Spec, error) {
 
 	return &s, nil
 }
+
+// trackFromPath extracts the track (first directory component) from a
+// spec's relative path. E.g., "local/foo/bar.md" → "local".
+func trackFromPath(path string) string {
+	parts := strings.SplitN(path, "/", 2)
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[0]
+}

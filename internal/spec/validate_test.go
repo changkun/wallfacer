@@ -9,10 +9,9 @@ import (
 
 func newTestSpec(path string) *Spec {
 	return &Spec{
-		Title:   "Test Spec",
-		Status:  StatusValidated,
-		Track:   "local",
-		Effort:  EffortSmall,
+		Title:  "Test Spec",
+		Status: StatusValidated,
+		Effort: EffortSmall,
 		Created: Date{time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
 		Updated: Date{time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
 		Author:  "test",
@@ -88,23 +87,6 @@ func TestValidateSpec_InvalidEffort(t *testing.T) {
 	}
 }
 
-func TestValidateSpec_TrackMismatch(t *testing.T) {
-	s := newTestSpec("foundations/test.md")
-	s.Track = "local"
-	results := ValidateSpec(s, "", true)
-	if !hasRule(results, "track-matches-path", SeverityError) {
-		t.Error("expected track-matches-path error")
-	}
-}
-
-func TestValidateSpec_TrackMatchesPath(t *testing.T) {
-	s := newTestSpec("local/test.md")
-	s.Track = "local"
-	results := ValidateSpec(s, "", true)
-	if hasRule(results, "track-matches-path", SeverityError) {
-		t.Error("unexpected track-matches-path error")
-	}
-}
 
 func TestValidateSpec_DateOrdering(t *testing.T) {
 	s := newTestSpec("local/test.md")
@@ -210,7 +192,6 @@ func TestValidateSpec_AllRulesRun(t *testing.T) {
 	s := &Spec{
 		Title:   "",
 		Status:  "invalid",
-		Track:   "invalid",
 		Effort:  "invalid",
 		Author:  "",
 		Path:    "local/test.md",

@@ -51,18 +51,18 @@ func (d *Date) UnmarshalYAML(value *yaml.Node) error {
 
 // Spec represents a parsed spec document with its YAML frontmatter and body.
 type Spec struct {
-	Title            string  `yaml:"title"`
-	Status           Status  `yaml:"status"`
-	Track            string  `yaml:"track"`
+	Title            string   `yaml:"title"`
+	Status           Status   `yaml:"status"`
 	DependsOn        []string `yaml:"depends_on"`
 	Affects          []string `yaml:"affects"`
-	Effort           Effort  `yaml:"effort"`
-	Created          Date    `yaml:"created"`
-	Updated          Date    `yaml:"updated"`
-	Author           string  `yaml:"author"`
-	DispatchedTaskID *string `yaml:"dispatched_task_id"`
+	Effort           Effort   `yaml:"effort"`
+	Created          Date     `yaml:"created"`
+	Updated          Date     `yaml:"updated"`
+	Author           string   `yaml:"author"`
+	DispatchedTaskID *string  `yaml:"dispatched_task_id"`
 
 	// Derived fields (not from YAML).
-	Path string `yaml:"-"` // relative path from repo root
-	Body string `yaml:"-"` // markdown content below frontmatter
+	Path  string `yaml:"-"` // relative path from repo root
+	Track string `yaml:"-"` // first directory component of Path (e.g., "local")
+	Body  string `yaml:"-"` // markdown content below frontmatter
 }

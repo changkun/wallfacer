@@ -51,9 +51,6 @@ func TestParseFile_ValidSpec(t *testing.T) {
 	if s.Status != StatusValidated {
 		t.Errorf("Status = %q, want %q", s.Status, StatusValidated)
 	}
-	if s.Track != "foundations" {
-		t.Errorf("Track = %q, want %q", s.Track, "foundations")
-	}
 	if len(s.DependsOn) != 1 || s.DependsOn[0] != "specs/foundations/storage-backends.md" {
 		t.Errorf("DependsOn = %v, want [specs/foundations/storage-backends.md]", s.DependsOn)
 	}
@@ -99,24 +96,6 @@ func TestParseFile_AllStatuses(t *testing.T) {
 	}
 }
 
-func TestParseFile_AllTracks(t *testing.T) {
-	tracks := []string{"foundations", "local", "cloud", "shared"}
-	dir := t.TempDir()
-
-	for _, track := range tracks {
-		t.Run(track, func(t *testing.T) {
-			content := "---\ntitle: Test\nstatus: drafted\ntrack: " + track + "\neffort: small\ncreated: 2026-01-01\nupdated: 2026-01-01\nauthor: test\ndispatched_task_id: null\n---\n"
-			path := writeSpec(t, dir, "track-"+track+".md", content)
-			s, err := ParseFile(path)
-			if err != nil {
-				t.Fatalf("ParseFile: %v", err)
-			}
-			if s.Track != track {
-				t.Errorf("Track = %q, want %q", s.Track, track)
-			}
-		})
-	}
-}
 
 func TestParseFile_AllEfforts(t *testing.T) {
 	efforts := []Effort{EffortSmall, EffortMedium, EffortLarge, EffortXLarge}
