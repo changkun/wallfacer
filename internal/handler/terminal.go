@@ -26,7 +26,7 @@ import (
 // terminalSession holds the state for a single PTY-backed shell session.
 type terminalSession struct {
 	id        string
-	container string       // container name; empty for host shell sessions
+	container string // container name; empty for host shell sessions
 	ptmx      *os.File
 	cmd       *exec.Cmd
 	cancel    context.CancelFunc
@@ -39,7 +39,7 @@ type sessionRegistry struct {
 	mu       sync.Mutex
 	sessions map[string]*terminalSession
 	active   string          // ID of the currently active session
-	switchCh chan struct{}    // signaled when active session changes
+	switchCh chan struct{}   // signaled when active session changes
 	connCtx  context.Context // connection-level context
 	runtime  string          // container runtime path (podman/docker)
 }

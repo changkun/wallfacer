@@ -171,7 +171,7 @@ describe("clamp", () => {
     cam.x = 10;
     cam.clamp(50, 50);
     expect(cam.x).toBe(-25);
-    expect(cam.y).toBeCloseTo((50 - 200/3) / 2);
+    expect(cam.y).toBeCloseTo((50 - 200 / 3) / 2);
   });
 });
 

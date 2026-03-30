@@ -12,9 +12,9 @@ import (
 type entry[K comparable, V any] struct {
 	key       K
 	value     V
-	permanent bool           // permanent entries never expire by TTL
-	expiresAt time.Time      // zero for permanent entries
-	elem      *list.Element  // position in LRU list (nil for non-permanent)
+	permanent bool          // permanent entries never expire by TTL
+	expiresAt time.Time     // zero for permanent entries
+	elem      *list.Element // position in LRU list (nil for non-permanent)
 }
 
 // TTLCache is a generic thread-safe key-value cache with per-entry expiration.

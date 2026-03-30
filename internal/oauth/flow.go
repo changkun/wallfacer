@@ -64,7 +64,7 @@ func NewManager() *Manager {
 // Start begins an OAuth flow for the given provider. If a flow is already
 // in progress for this provider, it is cancelled first. Returns the
 // authorization URL the user should open in their browser.
-func (m *Manager) Start(ctx context.Context, provider Provider) (string, error) {
+func (m *Manager) Start(_ context.Context, provider Provider) (string, error) {
 	m.Cancel(provider.Name)
 
 	verifier, err := GenerateCodeVerifier()

@@ -463,12 +463,20 @@ async function loadEnvConfig() {
 
   // Add input listeners for dynamic visibility (only once).
   var claudeBase = document.getElementById("env-claude-base-url");
-  if (claudeBase && claudeBase.addEventListener && !claudeBase._oauthListenerAdded) {
+  if (
+    claudeBase &&
+    claudeBase.addEventListener &&
+    !claudeBase._oauthListenerAdded
+  ) {
     claudeBase.addEventListener("input", _updateOAuthButtonVisibility);
     claudeBase._oauthListenerAdded = true;
   }
   var openaiBase = document.getElementById("env-openai-base-url");
-  if (openaiBase && openaiBase.addEventListener && !openaiBase._oauthListenerAdded) {
+  if (
+    openaiBase &&
+    openaiBase.addEventListener &&
+    !openaiBase._oauthListenerAdded
+  ) {
     openaiBase.addEventListener("input", _updateOAuthButtonVisibility);
     openaiBase._oauthListenerAdded = true;
   }
@@ -609,8 +617,7 @@ function _updateFirstLaunchHints(cfg) {
   var claudeHasKey = cfg.api_key && cfg.api_key !== "(not set)";
   var claudeHasCreds = claudeHasToken || claudeHasKey;
 
-  var codexHasKey =
-    cfg.openai_api_key && cfg.openai_api_key !== "(not set)";
+  var codexHasKey = cfg.openai_api_key && cfg.openai_api_key !== "(not set)";
 
   // Emphasize sign-in buttons when no credentials exist.
   var claudeBtn = document.getElementById("claude-oauth-signin-btn");

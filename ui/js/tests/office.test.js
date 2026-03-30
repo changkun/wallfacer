@@ -201,7 +201,9 @@ describe("office coordinator", () => {
     dcl.forEach((fn) => fn());
 
     // Toggle button should be visible
-    expect(elements["status-bar-office-btn"].classList.contains("hidden")).toBe(false);
+    expect(elements["status-bar-office-btn"].classList.contains("hidden")).toBe(
+      false,
+    );
     // Canvas + SR summary + minimap should be appended to container
     expect(elements["office-container"].children.length).toBeGreaterThanOrEqual(
       1,

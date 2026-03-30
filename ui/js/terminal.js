@@ -86,9 +86,7 @@ function _buildTermTheme() {
     background: bg,
     foreground: fg,
     cursor: _getCSSVar("--accent") || "#d97757",
-    selectionBackground: isLight
-      ? "rgba(0,0,0,0.15)"
-      : "rgba(78,140,255,0.3)",
+    selectionBackground: isLight ? "rgba(0,0,0,0.15)" : "rgba(78,140,255,0.3)",
     black: ansi.black,
     red: ansi.red,
     green: ansi.green,
@@ -114,7 +112,7 @@ function _isLightColor(hex) {
   var g = parseInt(hex.substring(2, 4), 16);
   var b = parseInt(hex.substring(4, 6), 16);
   // Relative luminance threshold.
-  return (0.299 * r + 0.587 * g + 0.114 * b) > 128;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 128;
 }
 
 function initTerminal() {

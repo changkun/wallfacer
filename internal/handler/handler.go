@@ -133,7 +133,7 @@ type Handler struct {
 
 	oauthManager *oauth.Manager
 
-	diffCache *diffCache
+	diffCache          *diffCache
 	commitsBehindCache *commitsBehindCache
 	fileIndex          *fileIndex
 	pulls              *pullTracker

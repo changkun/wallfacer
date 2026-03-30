@@ -136,8 +136,12 @@
 
     for (var y = 0; y < totalH; y++) {
       for (var x = 0; x < totalW; x++) {
-        if (x < WALL_PAD || x >= totalW - WALL_PAD ||
-            y < WALL_PAD || y >= totalH - WALL_PAD) {
+        if (
+          x < WALL_PAD ||
+          x >= totalW - WALL_PAD ||
+          y < WALL_PAD ||
+          y >= totalH - WALL_PAD
+        ) {
           map.setTile(x, y, WALL);
         } else {
           map.setTile(x, y, FLOOR);
@@ -167,23 +171,64 @@
 
   function placeStation(map, x, y, deskIndex) {
     // y+1..y+2: Desk (2x2 with legs)
-    map.placeFurniture({ type: DESK, x: x, y: y + 1, width: 2, height: 2, state: null });
+    map.placeFurniture({
+      type: DESK,
+      x: x,
+      y: y + 1,
+      width: 2,
+      height: 2,
+      state: null,
+    });
     // PC screen on top-right of desk
-    map.placeFurniture({ type: PC, x: x + 1, y: y + 1, width: 1, height: 1, state: "off" });
+    map.placeFurniture({
+      type: PC,
+      x: x + 1,
+      y: y + 1,
+      width: 1,
+      height: 1,
+      state: "off",
+    });
     // y+3: Seat position (character sits here; chair sprite rendered at y+2..y+3)
     map.placeFurniture({
-      type: CHAIR, x: x + 2, y: y + 2, width: 1, height: 2, state: null,
-      direction: "left", deskIndex: deskIndex,
+      type: CHAIR,
+      x: x + 2,
+      y: y + 2,
+      width: 1,
+      height: 2,
+      state: null,
+      direction: "left",
+      deskIndex: deskIndex,
     });
   }
 
   function placeCommonArea(map, ox, oy) {
     // Sofa (2x2 grey couch)
-    map.placeFurniture({ type: SOFA, x: ox, y: oy - 1, width: 2, height: 2, state: null });
+    map.placeFurniture({
+      type: SOFA,
+      x: ox,
+      y: oy - 1,
+      width: 2,
+      height: 2,
+      state: null,
+    });
     // Bookshelf (1x2 tall)
-    map.placeFurniture({ type: BOOKSHELF, x: ox + 2, y: oy - 1, width: 1, height: 2, state: null });
+    map.placeFurniture({
+      type: BOOKSHELF,
+      x: ox + 2,
+      y: oy - 1,
+      width: 1,
+      height: 2,
+      state: null,
+    });
     // Small plant (1x1)
-    map.placeFurniture({ type: PLANT, x: ox, y: oy + 1, width: 1, height: 1, state: null });
+    map.placeFurniture({
+      type: PLANT,
+      x: ox,
+      y: oy + 1,
+      width: 1,
+      height: 1,
+      state: null,
+    });
   }
 
   // ---- Exports ----

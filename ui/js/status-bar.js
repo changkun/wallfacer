@@ -114,17 +114,23 @@ function _cycleBottomPanel() {
   var officePanel = document.getElementById("office-container");
   var officeOpen = officePanel && !officePanel.classList.contains("hidden");
   var termAvailable = typeof terminalEnabled !== "undefined" && terminalEnabled;
-  var officeAvailable = typeof _officeAssetAvailable === "function" && _officeAssetAvailable();
+  var officeAvailable =
+    typeof _officeAssetAvailable === "function" && _officeAssetAvailable();
 
   if (!termOpen && !depOpen && !officeOpen) {
-    if (termAvailable) { _showTerminalPanel(); }
-    else { _showDepGraphPanel(); }
+    if (termAvailable) {
+      _showTerminalPanel();
+    } else {
+      _showDepGraphPanel();
+    }
   } else if (termOpen) {
     _hideTerminalPanel();
     _showDepGraphPanel();
   } else if (depOpen) {
     _hideDepGraphPanel();
-    if (officeAvailable) { _showOfficePanel(); }
+    if (officeAvailable) {
+      _showOfficePanel();
+    }
   } else {
     _hideOfficePanel();
   }

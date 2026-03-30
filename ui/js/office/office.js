@@ -205,8 +205,6 @@
     // Start character update loop
     _lastUpdateTime = performance.now();
     _startUpdateLoop();
-
-
   }
 
   function hideOffice() {
@@ -214,11 +212,7 @@
 
     if (_renderer) _renderer.stop();
     _stopUpdateLoop();
-
-
   }
-
-
 
   function isOfficeVisible() {
     return _visible;

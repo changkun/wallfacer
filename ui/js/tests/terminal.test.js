@@ -38,7 +38,12 @@ function makeDom() {
   };
 
   const tabBar = { hidden: true };
-  const addBtn = { _listeners: {}, addEventListener(ev, fn) { this._listeners[ev] = fn; } };
+  const addBtn = {
+    _listeners: {},
+    addEventListener(ev, fn) {
+      this._listeners[ev] = fn;
+    },
+  };
   const canvas = {
     classList: { contains: () => false },
   };
@@ -68,12 +73,23 @@ function makeDom() {
         className: "",
         textContent: "",
         innerHTML: "",
-        setAttribute(k, v) { this._attrs[k] = v; },
-        getAttribute(k) { return this._attrs[k] || null; },
-        appendChild(child) { this._children.push(child); },
-        addEventListener(ev, fn) { this._listeners[ev] = fn; },
+        setAttribute(k, v) {
+          this._attrs[k] = v;
+        },
+        getAttribute(k) {
+          return this._attrs[k] || null;
+        },
+        appendChild(child) {
+          this._children.push(child);
+        },
+        addEventListener(ev, fn) {
+          this._listeners[ev] = fn;
+        },
         querySelector(sel) {
-          return this._children.find((c) => c.className === sel.replace(".", "")) || null;
+          return (
+            this._children.find((c) => c.className === sel.replace(".", "")) ||
+            null
+          );
         },
         remove() {
           // Remove from parent tabList.
@@ -551,7 +567,9 @@ describe("session wiring", () => {
     // Check that "Session ended" was written.
     const writeCalls = ctx._mockTermInstance.write.mock.calls;
     const lastWrite = writeCalls[writeCalls.length - 1][0];
-    expect(typeof lastWrite === "string" && lastWrite.includes("Session ended")).toBe(true);
+    expect(
+      typeof lastWrite === "string" && lastWrite.includes("Session ended"),
+    ).toBe(true);
   });
 
   it("session_closed removes tab", () => {
@@ -609,7 +627,9 @@ describe("container sessions", () => {
     onmessage({
       data: JSON.stringify({
         type: "sessions",
-        sessions: [{ id: "s1", active: true, container: "wallfacer-worker-abc123" }],
+        sessions: [
+          { id: "s1", active: true, container: "wallfacer-worker-abc123" },
+        ],
       }),
     });
     const tabs = ctx.document._tabList._children;
@@ -641,7 +661,13 @@ describe("container sessions", () => {
     onmessage({
       data: JSON.stringify({
         type: "sessions",
-        sessions: [{ id: "s1", active: true, container: "wallfacer-worker-very-long-container-name-here" }],
+        sessions: [
+          {
+            id: "s1",
+            active: true,
+            container: "wallfacer-worker-very-long-container-name-here",
+          },
+        ],
       }),
     });
     const label = ctx.document._tabList._children[0]._children.find(
@@ -655,9 +681,13 @@ describe("container sessions", () => {
     ctx._mockWs.readyState = 1;
     // Simulate what the picker click handler does.
     ctx._mockWs.send(
-      JSON.stringify({ type: "create_session", container: "wallfacer-worker-abc" }),
+      JSON.stringify({
+        type: "create_session",
+        container: "wallfacer-worker-abc",
+      }),
     );
-    const lastCall = ctx._mockWs.send.mock.calls[ctx._mockWs.send.mock.calls.length - 1][0];
+    const lastCall =
+      ctx._mockWs.send.mock.calls[ctx._mockWs.send.mock.calls.length - 1][0];
     const parsed = JSON.parse(lastCall);
     expect(parsed.type).toBe("create_session");
     expect(parsed.container).toBe("wallfacer-worker-abc");
