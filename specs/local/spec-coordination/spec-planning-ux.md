@@ -370,6 +370,64 @@ First time the user enters spec mode, the system needs to bootstrap. Options:
 - **Prompt once.** "No specs directory found. Create one at `<repo>/specs/`?" with option to choose a different path. One-time friction, explicit consent.
 - **Require explicit init.** Spec mode is grayed out until the user runs init. Most explicit, most friction.
 
+### Concurrent Edits
+
+The user might edit a spec file in their editor while the planning agent is modifying it in the sandbox. Who wins?
+
+- If the sandbox operates directly on the workspace (no worktree), there's a write race between the agent and the user's editor. The last save wins, and one side's changes are silently lost.
+- If the sandbox uses a worktree (like task execution), the agent's changes are isolated but then need merging back — adding friction to what should be a tight iteration loop.
+- A middle ground: the sandbox works directly on the workspace, but the UI detects external file changes (via fsnotify) and warns before the agent overwrites. Or the agent always reads before writing, treating the on-disk version as authoritative.
+
+Related: what happens if the user edits a spec via the file explorer (board mode) while a planning session is active?
+
+### Chat Session Persistence
+
+Is the planning conversation per-spec or global?
+
+- **Per-spec:** Switching specs starts a fresh conversation. The agent loses cross-spec reasoning context (e.g., "make this spec consistent with the one we just discussed"). But conversations stay focused and short.
+- **Global:** One continuous thread across all spec work. The agent retains context across specs but the conversation becomes long and unfocused. Token costs grow.
+- **Hybrid:** Global session with spec-scoped focus. The agent always has the full conversation history but the UI visually groups messages by which spec was focused. Switching specs doesn't clear context but does shift the agent's attention.
+
+Also: does conversation history persist across spec mode sessions (close and reopen)? If ephemeral, the user loses planning rationale. If persistent, where is it stored — in the sandbox, in wallfacer data, or as a file in the specs directory?
+
+### Undo and Rollback
+
+The sandbox execution model gives the agent full write access with no permission prompts. This is fast but raises the cost of mistakes. If the agent breaks a spec into 5 children and the user doesn't like the split, recovery options:
+
+- **Manual git:** `git checkout -- specs/` or selective `git restore`. Works but requires git fluency and breaks the flow.
+- **Undo button:** Reverts the last agent action (or last N actions). Requires the system to track agent write operations as discrete transactions — each chat response that modifies files is one undoable unit.
+- **Snapshot-based:** The system takes a git stash or lightweight snapshot before each agent action. Undo pops the snapshot. Cheap, composable, uses existing git infrastructure.
+
+The undo granularity matters: is it per-file, per-chat-message, or per-user-request? A single user message ("break this into sub-specs and update the parent") might produce many file writes that should undo as one unit.
+
+### Planning Cost Budget
+
+The planning agent reads the codebase to draft specs — scanning files, understanding architecture, checking existing implementations. For large repos this could burn significant tokens before any implementation starts.
+
+- Is planning budgeted separately from execution? Or does the planning sandbox share the same cost model as any task (per-turn usage tracking, cost limits)?
+- Should there be a planning-specific budget cap (e.g., `WALLFACER_PLANNING_MAX_COST`)?
+- How does the user reason about planning cost vs execution cost? A spec that costs $2 to draft but saves $20 in misdirected execution is a good trade — but the user needs visibility into this.
+
+The existing usage tracking and cost dashboard could extend to planning sessions, showing planning cost alongside execution cost per spec subtree.
+
+### Dispatch Granularity Judgment
+
+Leaf specs should be "small enough for one agent task" — the spec-document-model says 2-5 files, one clear goal. But this is subjective and the user may not know the codebase well enough to judge.
+
+- **Agent hint:** When viewing a leaf spec, the agent could analyze the `affects` paths and estimate scope: "this spec touches 12 files across 4 packages — consider splitting." Based on file count, package spread, or lines of code in affected files.
+- **Validator rule:** A soft warning if `affects` lists more than N files or spans more than M packages. Not a hard block — some large-scope leaves are legitimate (e.g., a mechanical rename across many files).
+- **Purely human judgment:** The agent proposes breakdowns when asked, but doesn't proactively flag size. Keeps the system simple.
+
+### Spec Templates
+
+The board has prompt templates for task creation. Should spec mode have analogous templates for common spec patterns?
+
+Examples: "API endpoint" (route, handler, tests, docs), "refactor" (motivation, before/after, migration path), "bug fix" (repro, root cause, fix, regression test), "migration" (schema changes, data migration, rollback plan).
+
+- Templates could pre-fill the spec body with section headings and placeholder text, similar to GitHub issue templates.
+- The agent could suggest a template based on the user's natural language description ("I want to add a new endpoint" → offer the API endpoint template).
+- Or templates are unnecessary — the agent drafts specs from scratch via chat, and imposing a template adds rigidity without value.
+
 ### Agent-Generated Spec Trust
 
 If the user doesn't write specs, they have lower familiarity with content. Mitigations:
