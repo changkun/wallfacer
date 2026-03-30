@@ -399,11 +399,25 @@ func TestUpdateTaskStatus_NotFound(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestValidateTransition_ValidTransitions(t *testing.T) {
-	for from, tos := range allowedTransitions {
-		for _, to := range tos {
-			if err := ValidateTransition(from, to); err != nil {
-				t.Errorf("ValidateTransition(%q, %q) = %v, want nil", from, to, err)
-			}
+	valid := []struct{ from, to TaskStatus }{
+		{TaskStatusBacklog, TaskStatusInProgress},
+		{TaskStatusInProgress, TaskStatusBacklog},
+		{TaskStatusInProgress, TaskStatusWaiting},
+		{TaskStatusInProgress, TaskStatusFailed},
+		{TaskStatusInProgress, TaskStatusCancelled},
+		{TaskStatusCommitting, TaskStatusDone},
+		{TaskStatusCommitting, TaskStatusFailed},
+		{TaskStatusWaiting, TaskStatusInProgress},
+		{TaskStatusWaiting, TaskStatusCommitting},
+		{TaskStatusWaiting, TaskStatusCancelled},
+		{TaskStatusFailed, TaskStatusBacklog},
+		{TaskStatusFailed, TaskStatusCancelled},
+		{TaskStatusDone, TaskStatusCancelled},
+		{TaskStatusCancelled, TaskStatusBacklog},
+	}
+	for _, tc := range valid {
+		if err := ValidateTransition(tc.from, tc.to); err != nil {
+			t.Errorf("ValidateTransition(%q, %q) = %v, want nil", tc.from, tc.to, err)
 		}
 	}
 }

@@ -1,30 +1,25 @@
 package spec
 
 import (
-	"errors"
-	"fmt"
-	"slices"
+	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 )
 
 // ErrInvalidTransition is returned when a status transition is not allowed.
-var ErrInvalidTransition = errors.New("invalid spec status transition")
+var ErrInvalidTransition = statemachine.ErrInvalidTransition
 
-// allowedTransitions defines the spec lifecycle state machine.
-var allowedTransitions = map[Status][]Status{
+// specMachine is the spec lifecycle state machine.
+var specMachine = statemachine.New(map[Status][]Status{
 	StatusVague:     {StatusDrafted},
 	StatusDrafted:   {StatusValidated, StatusStale},
 	StatusValidated: {StatusComplete, StatusStale},
 	StatusComplete:  {StatusStale},
 	StatusStale:     {StatusDrafted, StatusValidated},
-}
+})
 
 // ValidateTransition checks whether transitioning from one status to another
 // is allowed by the spec lifecycle state machine.
 func ValidateTransition(from, to Status) error {
-	if slices.Contains(allowedTransitions[from], to) {
-		return nil
-	}
-	return fmt.Errorf("%w: %s → %s", ErrInvalidTransition, from, to)
+	return specMachine.Validate(from, to)
 }
 
 // ValidStatuses returns all valid spec status values.

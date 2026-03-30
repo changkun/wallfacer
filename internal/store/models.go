@@ -2,13 +2,12 @@ package store
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
 
 	"changkun.de/x/wallfacer/internal/constants"
+	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 	"changkun.de/x/wallfacer/internal/sandbox"
 	"github.com/google/uuid"
 )
@@ -210,11 +209,11 @@ func ParseFailureCategory(raw string) (FailureCategory, bool) {
 
 // ErrInvalidTransition is returned by UpdateTaskStatus when the requested
 // status change is not permitted by the task state machine.
-var ErrInvalidTransition = errors.New("invalid transition")
+var ErrInvalidTransition = statemachine.ErrInvalidTransition
 
-// allowedTransitions encodes the complete task state machine. Only transitions
+// taskMachine encodes the complete task state machine. Only transitions
 // present in this map are accepted by UpdateTaskStatus; all others are rejected.
-var allowedTransitions = map[TaskStatus][]TaskStatus{
+var taskMachine = statemachine.New(map[TaskStatus][]TaskStatus{
 	TaskStatusBacklog:    {TaskStatusInProgress},
 	TaskStatusInProgress: {TaskStatusBacklog, TaskStatusWaiting, TaskStatusFailed, TaskStatusCancelled},
 	TaskStatusCommitting: {TaskStatusDone, TaskStatusFailed},
@@ -222,28 +221,25 @@ var allowedTransitions = map[TaskStatus][]TaskStatus{
 	TaskStatusFailed:     {TaskStatusBacklog, TaskStatusCancelled},
 	TaskStatusDone:       {TaskStatusCancelled},
 	TaskStatusCancelled:  {TaskStatusBacklog},
-}
+})
 
 // ValidateTransition returns nil if transitioning from `from` to `to` is
 // permitted by the task state machine, or a descriptive error wrapping
 // ErrInvalidTransition if it is not.
 func ValidateTransition(from, to TaskStatus) error {
-	if slices.Contains(allowedTransitions[from], to) {
-		return nil
-	}
-	return fmt.Errorf("%w: %s → %s", ErrInvalidTransition, from, to)
+	return taskMachine.Validate(from, to)
 }
 
 // CanTransitionTo reports whether transitioning from s to next is permitted
 // by the task state machine.
 func (s TaskStatus) CanTransitionTo(next TaskStatus) bool {
-	return ValidateTransition(s, next) == nil
+	return taskMachine.CanTransition(s, next)
 }
 
 // AllowedTransitions returns the list of states reachable from s.
 // Returns nil if s has no outgoing transitions (e.g. terminal or unknown state).
 func (s TaskStatus) AllowedTransitions() []TaskStatus {
-	return allowedTransitions[s]
+	return taskMachine.Allowed(s)
 }
 
 // PayloadLimits holds the effective pruning limits for the three
