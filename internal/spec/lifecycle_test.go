@@ -3,9 +3,11 @@ package spec
 import (
 	"errors"
 	"testing"
+
+	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 )
 
-func TestValidateTransition_AllValid(t *testing.T) {
+func TestStatusMachine_AllValid(t *testing.T) {
 	valid := []struct {
 		from, to Status
 	}{
@@ -19,13 +21,13 @@ func TestValidateTransition_AllValid(t *testing.T) {
 		{StatusStale, StatusValidated},
 	}
 	for _, tc := range valid {
-		if err := ValidateTransition(tc.from, tc.to); err != nil {
-			t.Errorf("ValidateTransition(%s, %s): expected nil, got %v", tc.from, tc.to, err)
+		if err := StatusMachine.Validate(tc.from, tc.to); err != nil {
+			t.Errorf("Validate(%s, %s): expected nil, got %v", tc.from, tc.to, err)
 		}
 	}
 }
 
-func TestValidateTransition_AllInvalid(t *testing.T) {
+func TestStatusMachine_AllInvalid(t *testing.T) {
 	invalid := []struct {
 		from, to Status
 	}{
@@ -43,23 +45,23 @@ func TestValidateTransition_AllInvalid(t *testing.T) {
 		{StatusStale, StatusComplete},
 	}
 	for _, tc := range invalid {
-		if err := ValidateTransition(tc.from, tc.to); err == nil {
-			t.Errorf("ValidateTransition(%s, %s): expected error, got nil", tc.from, tc.to)
+		if err := StatusMachine.Validate(tc.from, tc.to); err == nil {
+			t.Errorf("Validate(%s, %s): expected error, got nil", tc.from, tc.to)
 		}
 	}
 }
 
-func TestValidateTransition_SameStatus(t *testing.T) {
+func TestStatusMachine_SameStatus(t *testing.T) {
 	for _, s := range ValidStatuses() {
-		if err := ValidateTransition(s, s); err == nil {
-			t.Errorf("ValidateTransition(%s, %s): expected error for same-to-same", s, s)
+		if err := StatusMachine.Validate(s, s); err == nil {
+			t.Errorf("Validate(%s, %s): expected error for same-to-same", s, s)
 		}
 	}
 }
 
-func TestValidateTransition_ErrorWrapping(t *testing.T) {
-	err := ValidateTransition(StatusVague, StatusComplete)
-	if !errors.Is(err, ErrInvalidTransition) {
+func TestStatusMachine_ErrorWrapping(t *testing.T) {
+	err := StatusMachine.Validate(StatusVague, StatusComplete)
+	if !errors.Is(err, statemachine.ErrInvalidTransition) {
 		t.Errorf("error should wrap ErrInvalidTransition, got %v", err)
 	}
 }
