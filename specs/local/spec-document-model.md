@@ -286,6 +286,68 @@ The regime is not a system mode — it's an emergent property of how the human a
 
 ---
 
+## Design Decisions
+
+Decisions made during implementation that deviate from or extend the original design.
+
+### 1. Track derived from filesystem, not frontmatter
+
+**Original design:** `track` was a required YAML frontmatter field with a fixed enum (`foundations | local | cloud | shared`). A `valid-track` rule validated the enum, and `track-matches-path` ensured consistency with the directory.
+
+**Decision:** Remove `track` from frontmatter entirely. Derive it from the first directory component under `specs/` (e.g., `specs/local/foo.md` → track `local`).
+
+**Why:** The track field was redundant with the directory structure and hardcoded to Wallfacer's own roadmap. For a general-purpose planning tool, tracks should be user-defined — creating a directory creates a track. Removing the field eliminates a class of drift (frontmatter vs filesystem disagreement) and removes maintenance burden (134 spec files no longer carry a redundant field). The `valid-track`, `track-matches-path`, and `track-consistency` validation rules were all removed since they validated a field that no longer exists.
+
+### 2. Type names avoid Go stutter
+
+**Original design:** Types named `SpecStatus`, `SpecTrack`, `SpecEffort`, `SpecNode`, `SpecTree`.
+
+**Decision:** Renamed to `Status`, `Track`, `Effort`, `Node`, `Tree` — used as `spec.Status`, `spec.Node` externally.
+
+**Why:** Go convention (enforced by the `revive` linter) says type names in a package should not repeat the package name.
+
+### 3. Generic data structures extracted to `internal/pkg/`
+
+**Original design:** All graph, tree, and state machine logic lived in `internal/spec/`.
+
+**Decision:** Extracted three reusable packages:
+- `internal/pkg/dag/` — `ReverseEdges`, `DetectCycles`, `Reachable` (generic DAG operations)
+- `internal/pkg/statemachine/` — `Machine[S].Validate`, `.CanTransition`, `.Allowed` (generic state machine)
+- `internal/pkg/tree/` — `Tree[K,V]`, `Node[K,V]`, `Add`, `NodeAt`, `Leaves`, `Walk` with `iter.Seq`
+
+**Why:** The spec package duplicated algorithms already used elsewhere in the codebase:
+- Cycle detection duplicated `internal/pkg/dagscorer/`
+- State machine validation duplicated `internal/store/models.go` (`ValidateTransition`)
+- Reverse index building was duplicated within spec itself (impact.go and validate.go)
+
+Extracting these as generic packages with `comparable` type parameters eliminated duplication across spec, store, and sandbox packages. The sandbox backend also adopted the state machine for lifecycle transition enforcement via CAS.
+
+### 4. `Node` is a type alias, `Tree` is an embedding
+
+**Original design:** `Node` and `Tree` were spec-specific struct types.
+
+**Decision:** `Node` is a type alias for `tree.Node[string, *Spec]`. `Tree` embeds `*tree.Tree[string, *Spec]` and adds `Errs []error` and `ByTrack()`.
+
+**Why:** The generic tree handles parent-child wiring, depth, leaf detection, indexing, and iteration. Spec-specific concerns (filesystem scanning, parse error collection, track filtering) stay in the spec package. Using a type alias for `Node` avoids requiring callers to change field access patterns (`node.Value` instead of `node.Spec` is the only change, since `Value` is the generic field name).
+
+### 5. `ParseBytes` added alongside `ParseFile`
+
+**Original design:** Only `ParseFile(path string)` specified.
+
+**Decision:** Added `ParseBytes(data []byte, path string)` — `ParseFile` delegates to it.
+
+**Why:** Enables testing without writing to disk. The path argument is stored on the returned Spec for identification but not accessed on the filesystem.
+
+### 6. Date format validated at parse time, not validation time
+
+**Original design:** A `date-format` validation rule checked date fields.
+
+**Decision:** Date format validation happens in `Date.UnmarshalYAML` during parsing. Invalid dates cause parse failure before validation runs. The `required-fields` rule catches missing/zero dates.
+
+**Why:** A spec with an invalid date format cannot be parsed into a `Spec` struct at all — the YAML unmarshaler rejects it. A separate validation rule would never fire.
+
+---
+
 ## Task Breakdown
 
 | Child spec | Depends on | Effort | Status |
