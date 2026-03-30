@@ -1,6 +1,6 @@
 ---
 title: Cross-Spec Validation
-status: validated
+status: complete
 track: local
 depends_on:
   - specs/local/spec-document-model/spec-tree-builder.md
@@ -68,3 +68,8 @@ Use `t.TempDir()` to build complete test directory structures with multiple spec
 - Do NOT implement the validation CLI command or HTTP handler (that's in spec-planning-ux).
 - Do NOT implement progress tracking or impact analysis — those are separate tasks.
 - Do NOT modify the SpecTree or SpecNode types.
+
+## Implementation notes
+
+- **`track-consistency` delegates to per-spec rule**: The spec listed `track-consistency` as a cross-spec rule, but this is already fully covered by the per-spec `track-matches-path` rule (which compares `track` frontmatter to the spec's filesystem path). The cross-spec `checkTrackConsistency` is a no-op that documents this delegation.
+- **`no-orphan-specs` rule merged with `no-orphan-directories`**: The spec defined both rules, but "orphan spec" (`.md` with empty subdirectory) is just a normal leaf spec — not an error or warning. The implementation only checks `no-orphan-directories` (subdirectory without parent `.md`), which is the actionable case.

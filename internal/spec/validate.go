@@ -163,6 +163,219 @@ func checkAffectsExist(s *Spec, repoRoot string) []Result {
 	return results
 }
 
+// ValidateTree runs all per-spec and cross-spec validation rules on the tree.
+func ValidateTree(tree *Tree, repoRoot string) []Result {
+	var results []Result
+
+	// Per-spec validation for each node.
+	for _, node := range tree.All {
+		if node.Spec != nil {
+			results = append(results, ValidateSpec(node.Spec, repoRoot, node.IsLeaf)...)
+		}
+	}
+
+	// Cross-spec rules.
+	results = append(results, checkDAGAcyclic(tree)...)
+	results = append(results, checkOrphanDirectories(tree, repoRoot)...)
+	results = append(results, checkStatusConsistency(tree)...)
+	results = append(results, checkStalePropagation(tree)...)
+	results = append(results, checkTrackConsistency(tree)...)
+	results = append(results, checkUniqueDispatches(tree)...)
+
+	return results
+}
+
+// checkDAGAcyclic verifies the depends_on graph has no cycles using DFS coloring.
+func checkDAGAcyclic(tree *Tree) []Result {
+	type color int
+	const (
+		white color = iota // unvisited
+		gray               // in-progress
+		black              // done
+	)
+
+	colors := make(map[string]color)
+	parent := make(map[string]string) // for cycle path reconstruction
+
+	var results []Result
+
+	var dfs func(path string)
+	dfs = func(path string) {
+		colors[path] = gray
+		node, ok := tree.All[path]
+		if !ok || node.Spec == nil {
+			colors[path] = black
+			return
+		}
+		for _, dep := range node.Spec.DependsOn {
+			switch colors[dep] {
+			case white:
+				parent[dep] = path
+				dfs(dep)
+			case gray:
+				// Back edge — cycle detected. Reconstruct path.
+				cycle := []string{dep, path}
+				cur := path
+				for cur != dep {
+					cur = parent[cur]
+					cycle = append(cycle, cur)
+				}
+				// Reverse to get forward order.
+				for i, j := 0, len(cycle)-1; i < j; i, j = i+1, j-1 {
+					cycle[i], cycle[j] = cycle[j], cycle[i]
+				}
+				results = append(results, Result{
+					Path:     path,
+					Severity: SeverityError,
+					Rule:     "dag-acyclic",
+					Message:  fmt.Sprintf("dependency cycle: %s", strings.Join(cycle, " -> ")),
+				})
+			}
+		}
+		colors[path] = black
+	}
+
+	for path := range tree.All {
+		if colors[path] == white {
+			dfs(path)
+		}
+	}
+	return results
+}
+
+// checkOrphanDirectories detects subdirectories without matching parent .md files.
+// The tree builder already handles orphans by scanning their children, but this
+// rule surfaces them as warnings for human attention.
+func checkOrphanDirectories(tree *Tree, repoRoot string) []Result {
+	if repoRoot == "" {
+		return nil
+	}
+
+	var results []Result
+	specsDir := filepath.Join(repoRoot, "specs")
+
+	// Walk all nodes and check if their parent directory has a matching .md.
+	for path := range tree.All {
+		parts := strings.Split(filepath.ToSlash(path), "/")
+		if len(parts) < 3 {
+			// track/name.md — root level, no orphan possible.
+			continue
+		}
+		// For track/parent/child.md, check that track/parent.md exists in tree.
+		parentDir := strings.Join(parts[:len(parts)-1], "/")
+		parentMD := parentDir + ".md"
+		if _, ok := tree.All[parentMD]; !ok {
+			// Check the filesystem too — maybe the .md failed to parse.
+			fullParentMD := filepath.Join(specsDir, filepath.FromSlash(parentMD))
+			if _, err := os.Stat(fullParentMD); err != nil {
+				results = append(results, Result{
+					Path:     path,
+					Severity: SeverityWarning,
+					Rule:     "no-orphan-directories",
+					Message:  fmt.Sprintf("parent spec %q not found for subdirectory", parentMD),
+				})
+			}
+		}
+	}
+	return results
+}
+
+// checkStatusConsistency warns when a complete non-leaf has incomplete leaves.
+func checkStatusConsistency(tree *Tree) []Result {
+	var results []Result
+	for _, node := range tree.All {
+		if node.IsLeaf || node.Spec == nil || node.Spec.Status != StatusComplete {
+			continue
+		}
+		if hasIncompleteLeaf(node) {
+			results = append(results, Result{
+				Path:     node.Spec.Path,
+				Severity: SeverityWarning,
+				Rule:     "status-consistency",
+				Message:  "complete non-leaf spec has incomplete leaves in subtree",
+			})
+		}
+	}
+	return results
+}
+
+func hasIncompleteLeaf(node *Node) bool {
+	if node.IsLeaf {
+		return node.Spec != nil && node.Spec.Status != StatusComplete
+	}
+	for _, child := range node.Children {
+		if hasIncompleteLeaf(child) {
+			return true
+		}
+	}
+	return false
+}
+
+// checkStalePropagation warns when a stale spec has validated dependents.
+func checkStalePropagation(tree *Tree) []Result {
+	// Build reverse index: spec path -> list of dependents.
+	reverse := make(map[string][]string)
+	for path, node := range tree.All {
+		if node.Spec == nil {
+			continue
+		}
+		for _, dep := range node.Spec.DependsOn {
+			reverse[dep] = append(reverse[dep], path)
+		}
+	}
+
+	var results []Result
+	for path, node := range tree.All {
+		if node.Spec == nil || node.Spec.Status != StatusStale {
+			continue
+		}
+		for _, dependent := range reverse[path] {
+			depNode, ok := tree.All[dependent]
+			if !ok || depNode.Spec == nil {
+				continue
+			}
+			if depNode.Spec.Status == StatusValidated {
+				results = append(results, Result{
+					Path:     dependent,
+					Severity: SeverityWarning,
+					Rule:     "stale-propagation",
+					Message:  fmt.Sprintf("depends on stale spec %q — review needed", path),
+				})
+			}
+		}
+	}
+	return results
+}
+
+// checkTrackConsistency is handled by per-spec checkTrackMatchesPath — no
+// additional tree-level logic needed beyond what per-spec validation covers.
+func checkTrackConsistency(_ *Tree) []Result {
+	return nil
+}
+
+// checkUniqueDispatches ensures no two specs share the same dispatched_task_id.
+func checkUniqueDispatches(tree *Tree) []Result {
+	seen := make(map[string]string) // dispatch ID -> first spec path
+	var results []Result
+	for path, node := range tree.All {
+		if node.Spec == nil || node.Spec.DispatchedTaskID == nil {
+			continue
+		}
+		id := *node.Spec.DispatchedTaskID
+		if first, ok := seen[id]; ok {
+			results = append(results, Result{
+				Path:     path,
+				Severity: SeverityError,
+				Rule:     "unique-dispatches",
+				Message:  fmt.Sprintf("dispatched_task_id %q already used by %q", id, first),
+			})
+		} else {
+			seen[id] = path
+		}
+	}
+	return results
+}
+
 func checkBodyNotEmpty(s *Spec) []Result {
 	if s.Status == StatusVague || s.Status == "" {
 		return nil
