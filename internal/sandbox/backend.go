@@ -3,6 +3,10 @@ package sandbox
 import (
 	"context"
 	"io"
+	"sync/atomic"
+
+	"changkun.de/x/wallfacer/internal/logger"
+	"changkun.de/x/wallfacer/internal/pkg/statemachine"
 )
 
 // BackendState represents the lifecycle state of a sandbox container.
@@ -35,6 +39,34 @@ func (s BackendState) String() string {
 		return "failed"
 	default:
 		return "unknown"
+	}
+}
+
+// StateMachine defines the valid lifecycle transitions for sandbox containers.
+var StateMachine = statemachine.New(map[BackendState][]BackendState{
+	StateCreating:  {StateRunning, StateFailed},
+	StateRunning:   {StateStreaming, StateStopping, StateStopped, StateFailed},
+	StateStreaming: {StateStopping, StateStopped, StateFailed},
+	StateStopping:  {StateStopped},
+	StateStopped:   {},
+	StateFailed:    {},
+})
+
+// transition atomically validates and applies a state change using
+// compare-and-swap. If the transition is invalid, the state is left
+// unchanged and the violation is logged.
+func transition(state *atomic.Int32, to BackendState) {
+	for {
+		from := BackendState(state.Load())
+		if err := StateMachine.Validate(from, to); err != nil {
+			logger.Runner.Warn("invalid sandbox state transition",
+				"from", from, "to", to, "error", err)
+			return
+		}
+		if state.CompareAndSwap(int32(from), int32(to)) {
+			return
+		}
+		// State changed between Load and CAS — retry with new state.
 	}
 }
 

@@ -124,14 +124,14 @@ func (w *taskWorker) exec(ctx context.Context, cmd []string, workDir string) (Ha
 		stderr:  stderr,
 		command: w.command,
 	}
-	lh.state.Store(int32(StateCreating))
+	transition(&lh.state, StateCreating)
 
 	if err := c.Start(); err != nil {
-		lh.state.Store(int32(StateFailed))
+		transition(&lh.state, StateFailed)
 		return nil, fmt.Errorf("exec start: %w", err)
 	}
 
-	lh.state.Store(int32(StateRunning))
+	transition(&lh.state, StateRunning)
 	// Return an execHandle (not localHandle) so Kill only terminates the
 	// exec process, leaving the worker container alive for subsequent turns.
 	return &execHandle{localHandle: lh}, nil
@@ -165,7 +165,7 @@ type execHandle struct {
 // Kill terminates the exec process without removing the worker container.
 // The worker container stays alive for subsequent exec calls.
 func (h *execHandle) Kill() error {
-	h.state.Store(int32(StateStopping))
+	transition(&h.state, StateStopping)
 
 	// Kill the exec process only — not the worker container.
 	if h.cmd.Process != nil {
@@ -174,7 +174,7 @@ func (h *execHandle) Kill() error {
 		}
 	}
 
-	h.state.Store(int32(StateStopped))
+	transition(&h.state, StateStopped)
 	return nil
 }
 

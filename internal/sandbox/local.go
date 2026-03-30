@@ -161,14 +161,14 @@ func (b *LocalBackend) launchEphemeral(ctx context.Context, spec ContainerSpec) 
 		stderr:  stderr,
 		command: b.command,
 	}
-	h.state.Store(int32(StateCreating))
+	transition(&h.state, StateCreating)
 
 	if err := cmd.Start(); err != nil {
-		h.state.Store(int32(StateFailed))
+		transition(&h.state, StateFailed)
 		return nil, fmt.Errorf("start container: %w", err)
 	}
 
-	h.state.Store(int32(StateRunning))
+	transition(&h.state, StateRunning)
 	return h, nil
 }
 
@@ -280,13 +280,13 @@ func (h *localHandle) Wait() (int, error) {
 	err := h.cmd.Wait()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			h.state.Store(int32(StateStopped))
+			transition(&h.state, StateStopped)
 			return exitErr.ExitCode(), nil
 		}
-		h.state.Store(int32(StateFailed))
+		transition(&h.state, StateFailed)
 		return -1, err
 	}
-	h.state.Store(int32(StateStopped))
+	transition(&h.state, StateStopped)
 	return 0, nil
 }
 
@@ -294,7 +294,7 @@ func (h *localHandle) Wait() (int, error) {
 // then force-removes to clean up. Errors from kill/rm are logged but not
 // returned, since the goal is best-effort cleanup.
 func (h *localHandle) Kill() error {
-	h.state.Store(int32(StateStopping))
+	transition(&h.state, StateStopping)
 
 	if err := cmdexec.New(h.command, "kill", h.name).Run(); err != nil {
 		logger.Runner.Debug("kill container", "name", h.name, "error", err)
@@ -303,7 +303,7 @@ func (h *localHandle) Kill() error {
 		logger.Runner.Debug("remove container", "name", h.name, "error", err)
 	}
 
-	h.state.Store(int32(StateStopped))
+	transition(&h.state, StateStopped)
 	return nil
 }
 
