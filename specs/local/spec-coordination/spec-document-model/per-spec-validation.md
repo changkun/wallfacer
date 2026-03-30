@@ -2,8 +2,8 @@
 title: Per-Spec Validation
 status: complete
 depends_on:
-  - specs/local/spec-document-model/spec-model-types.md
-  - specs/local/spec-document-model/spec-lifecycle.md
+  - specs/local/spec-coordination/spec-document-model/spec-model-types.md
+  - specs/local/spec-coordination/spec-document-model/spec-lifecycle.md
 affects:
   - internal/spec/
 effort: medium

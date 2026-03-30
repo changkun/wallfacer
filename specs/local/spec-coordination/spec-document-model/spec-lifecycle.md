@@ -2,7 +2,7 @@
 title: Spec Lifecycle Transitions
 status: complete
 depends_on:
-  - specs/local/spec-document-model/spec-model-types.md
+  - specs/local/spec-coordination/spec-document-model/spec-model-types.md
 affects:
   - internal/spec/
 effort: small

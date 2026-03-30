@@ -109,9 +109,9 @@ The kanban board stays flat — it shows dispatched leaf specs as tasks. All str
 
 | Spec | Focus |
 |------|-------|
-| [spec-document-model.md](spec-document-model.md) | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
-| [spec-drift-detection.md](spec-drift-detection.md) | Drift detection and propagation through the spec tree |
-| [spec-planning-ux.md](spec-planning-ux.md) | Planning UX: spec explorer, chat-driven iteration, dispatch workflow |
+| [spec-document-model.md](spec-coordination/spec-document-model.md) | Spec properties, lifecycle, tree structure, leaf vs non-leaf semantics |
+| [spec-drift-detection.md](spec-coordination/spec-drift-detection.md) | Drift detection and propagation through the spec tree |
+| [spec-planning-ux.md](spec-coordination/spec-planning-ux.md) | Planning UX: spec explorer, chat-driven iteration, dispatch workflow |
 
 ---
 

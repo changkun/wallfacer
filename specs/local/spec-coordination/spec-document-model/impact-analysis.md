@@ -2,7 +2,7 @@
 title: Impact Analysis
 status: complete
 depends_on:
-  - specs/local/spec-document-model/spec-tree-builder.md
+  - specs/local/spec-coordination/spec-document-model/spec-tree-builder.md
 affects:
   - internal/spec/
 effort: medium

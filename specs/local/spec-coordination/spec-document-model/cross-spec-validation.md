@@ -2,8 +2,8 @@
 title: Cross-Spec Validation
 status: complete
 depends_on:
-  - specs/local/spec-document-model/spec-tree-builder.md
-  - specs/local/spec-document-model/per-spec-validation.md
+  - specs/local/spec-coordination/spec-document-model/spec-tree-builder.md
+  - specs/local/spec-coordination/spec-document-model/per-spec-validation.md
 affects:
   - internal/spec/
 effort: medium
