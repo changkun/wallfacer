@@ -284,6 +284,32 @@ When spec count exceeds human working memory (~7-10 specs), the user loses globa
 2. **Status filtering** — show only specs in a particular state (stale, in-progress, not started).
 3. **Reactive warnings** — surface problems when they matter (e.g., drift warnings when about to dispatch), not as background noise.
 
+### Entry-Point Document Staleness
+
+`specs/README.md` is a hand-maintained index: status table, dependency graph, ordering rationale. When a spec completes, the README silently drifts — wrong status, stale "Delivers" column, outdated rationale — until someone notices. This is the general problem of derived documents that summarize spec state but aren't part of the spec tree themselves.
+
+**Option A — Generated README.** The README is fully generated from spec frontmatter and a template. `make specs-readme` or a post-completion hook rebuilds it. The template defines the table layout, dependency graph format, and rationale sections. Humans edit the template, not the output.
+
+- Pro: Zero drift by construction. README always matches reality.
+- Con: Loses free-form prose (ordering rationale, scaling strategy discussion). Those sections would need to live elsewhere or be template-embedded. Harder to review in PR diffs since the whole file regenerates.
+
+**Option B — Generated sections, manual prose.** The README has fenced marker comments (`<!-- BEGIN status-table -->` / `<!-- END status-table -->`). A generator rewrites only the marked sections; prose outside markers is untouched. Runs as a post-completion hook or CI check.
+
+- Pro: Keeps free-form rationale sections. Only structured sections (status quo, tables, dependency graph) are generated. Surgical diffs.
+- Con: More complex generator. Marker discipline required — accidentally deleting a marker breaks the update.
+
+**Option C — Staleness check with blocking.** No generation. Instead, when a spec changes status, the system computes whether any entry-point document references that spec with outdated information (status, deliverables). Surfaces a warning in the spec explorer and optionally blocks further dispatches from the same subtree until the entry-point is updated.
+
+- Pro: Preserves full human authorship. No generator to maintain. Works for any document format.
+- Con: Doesn't fix the problem, only nags. The human still does the manual update. "Blocking" may be too aggressive for a README update.
+
+**Option D — Agent-assisted update.** On spec completion, the chat stream proposes a README diff: "spec-document-model is now complete. Here's an updated README reflecting the new status and deliverables." The user reviews and applies with one click, or edits before applying.
+
+- Pro: Human stays in the loop but doesn't have to remember or do the work. The agent has full context (spec content, what shipped, design decisions) to write a good update. No rigid template — the agent adapts to whatever README format exists.
+- Con: Requires the agent to understand README conventions. Quality depends on prompt engineering. Still manual (user must click "apply").
+
+These options aren't mutually exclusive. A likely combination: **B + D** — generate the structured sections (tables, status quo block), and have the agent propose updates to free-form sections (rationale, dependency graph annotations) via chat.
+
 ### Agent-Generated Spec Trust
 
 If the user doesn't write specs, they have lower familiarity with content. Mitigations:
