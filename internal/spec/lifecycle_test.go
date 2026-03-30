@@ -82,7 +82,6 @@ func TestValidStatuses(t *testing.T) {
 	}
 }
 
-
 func TestValidEfforts(t *testing.T) {
 	efforts := ValidEfforts()
 	if len(efforts) != 4 {

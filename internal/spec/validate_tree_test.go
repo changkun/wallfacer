@@ -2,6 +2,7 @@ package spec
 
 import (
 	"os"
+	posixpath "path"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -28,7 +29,7 @@ func buildTestTree(specs map[string]*Spec) *Tree {
 		s := specs[path]
 		s.Path = path
 		s.Track = trackFromPath(path)
-		dir := filepath.Dir(filepath.ToSlash(path))
+		dir := posixpath.Dir(path)
 		parentPath := dir + ".md"
 		if _, ok := tree.NodeAt(parentPath); ok && parentPath != path {
 			tree.Add(path, s, &parentPath)
@@ -41,9 +42,9 @@ func buildTestTree(specs map[string]*Spec) *Tree {
 
 func baseSpec() *Spec {
 	return &Spec{
-		Title:  "Test",
-		Status: StatusValidated,
-		Effort: EffortSmall,
+		Title:   "Test",
+		Status:  StatusValidated,
+		Effort:  EffortSmall,
 		Created: Date{time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
 		Updated: Date{time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
 		Author:  "test",
@@ -205,7 +206,6 @@ func TestValidateTree_StalePropagate(t *testing.T) {
 		t.Error("expected stale-propagation warning")
 	}
 }
-
 
 func TestValidateTree_UniqueDispatches(t *testing.T) {
 	id := "550e8400-e29b-41d4-a716-446655440000"

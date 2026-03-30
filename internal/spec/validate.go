@@ -53,7 +53,7 @@ func checkRequiredFields(s *Spec) []Result {
 	if s.Status == "" {
 		results = append(results, Result{s.Path, SeverityError, "required-fields", "status is required"})
 	}
-if s.Effort == "" {
+	if s.Effort == "" {
 		results = append(results, Result{s.Path, SeverityError, "required-fields", "effort is required"})
 	}
 	if s.Created.IsZero() {
@@ -74,13 +74,12 @@ func checkValidEnums(s *Spec) []Result {
 		results = append(results, Result{s.Path, SeverityError, "valid-status",
 			fmt.Sprintf("invalid status %q", s.Status)})
 	}
-if s.Effort != "" && !slices.Contains(ValidEfforts(), s.Effort) {
+	if s.Effort != "" && !slices.Contains(ValidEfforts(), s.Effort) {
 		results = append(results, Result{s.Path, SeverityError, "valid-effort",
 			fmt.Sprintf("invalid effort %q", s.Effort)})
 	}
 	return results
 }
-
 
 func checkDateOrdering(s *Spec) []Result {
 	if s.Created.IsZero() || s.Updated.IsZero() {
@@ -271,7 +270,6 @@ func checkStalePropagation(tree *Tree) []Result {
 	}
 	return results
 }
-
 
 // checkUniqueDispatches ensures no two specs share the same dispatched_task_id.
 func checkUniqueDispatches(tree *Tree) []Result {

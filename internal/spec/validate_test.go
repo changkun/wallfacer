@@ -9,9 +9,9 @@ import (
 
 func newTestSpec(path string) *Spec {
 	return &Spec{
-		Title:  "Test Spec",
-		Status: StatusValidated,
-		Effort: EffortSmall,
+		Title:   "Test Spec",
+		Status:  StatusValidated,
+		Effort:  EffortSmall,
 		Created: Date{time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
 		Updated: Date{time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
 		Author:  "test",
@@ -77,7 +77,6 @@ func TestValidateSpec_InvalidStatus(t *testing.T) {
 	}
 }
 
-
 func TestValidateSpec_InvalidEffort(t *testing.T) {
 	s := newTestSpec("local/test.md")
 	s.Effort = "bogus"
@@ -86,7 +85,6 @@ func TestValidateSpec_InvalidEffort(t *testing.T) {
 		t.Error("expected valid-effort error")
 	}
 }
-
 
 func TestValidateSpec_DateOrdering(t *testing.T) {
 	s := newTestSpec("local/test.md")
@@ -190,12 +188,12 @@ func TestValidateSpec_VagueEmptyBody(t *testing.T) {
 
 func TestValidateSpec_AllRulesRun(t *testing.T) {
 	s := &Spec{
-		Title:   "",
-		Status:  "invalid",
-		Effort:  "invalid",
-		Author:  "",
-		Path:    "local/test.md",
-		Body:    "",
+		Title:  "",
+		Status: "invalid",
+		Effort: "invalid",
+		Author: "",
+		Path:   "local/test.md",
+		Body:   "",
 	}
 	results := ValidateSpec(s, "", true)
 

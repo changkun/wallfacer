@@ -96,7 +96,6 @@ func TestParseFile_AllStatuses(t *testing.T) {
 	}
 }
 
-
 func TestParseFile_AllEfforts(t *testing.T) {
 	efforts := []Effort{EffortSmall, EffortMedium, EffortLarge, EffortXLarge}
 	dir := t.TempDir()
