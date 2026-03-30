@@ -11,7 +11,7 @@ affects:
   - internal/handler/explorer.go
 effort: xlarge
 created: 2026-03-29
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
@@ -36,6 +36,20 @@ The user's workflow is a loop:
 ```
 
 The UX must support every step of this loop with minimal friction.
+
+---
+
+## Sandbox Execution Model
+
+Spec mode runs inside a sandbox container, same as task execution on the board. Entering spec mode launches (or attaches to) a long-lived planning sandbox. The spec explorer and the chat agent both operate within this sandbox.
+
+**Zero permission prompts.** The chat agent has full read/write access to the specs folder inside the sandbox — no "allow file edit?" dialogs, no approval gates. The agent creates, renames, splits, and edits spec files autonomously. The user steers via chat; the agent executes immediately. This is safe because:
+
+- The sandbox is scoped to spec documents, not production code.
+- Spec files are version-controlled; any change is a `git diff` away from reversal.
+- The agent only modifies files under the specs folder. It can *read* the full workspace (to understand the codebase when drafting specs), but *writes* are confined to specs.
+
+**Lifecycle.** The planning sandbox starts when the user enters spec mode and stays alive across spec mode sessions (same container reuse model as task workers). It is destroyed on explicit teardown or workspace switch.
 
 ---
 
@@ -85,11 +99,11 @@ A split-pane view for planning work:
 +----------+---------------------------+-----------------------+
 ```
 
-**Left pane — Spec Explorer:** Tree rooted at `specs/`. Shows spec files with status badges and recursive progress indicators (e.g., "4/6" counting all leaves in the subtree, not just direct children). Clicking opens in the focused view. Collapsible subtrees at any depth. Reuses file explorer infrastructure.
+**Left pane — Spec Explorer:** Shows *only* the specs folder — not the full workspace file tree. Tree rooted at the specs directory with status badges and recursive progress indicators (e.g., "4/6" counting all leaves in the subtree, not just direct children). Clicking opens in the focused view. Collapsible subtrees at any depth. Reuses file explorer infrastructure but with a fixed root.
 
-**Center pane — Focused Markdown View:** Renders the selected spec as formatted markdown. Live updates when the agent modifies it. Children listed with status. If it's a leaf spec, shows dispatch button.
+**Center pane — Focused Markdown View:** Renders the selected spec as formatted markdown. Live updates when the agent modifies it in the sandbox. Children listed with status. If it's a leaf spec, shows dispatch button.
 
-**Right pane — Chat Stream:** Conversation for iterating on the focused spec. The user types directives; the agent reads the spec + codebase and proposes changes. Changes appear as diffs in the center pane.
+**Right pane — Chat Stream:** Conversation for iterating on the focused spec. The user types directives; the agent executes immediately inside the planning sandbox — no permission prompts. It reads the spec tree and codebase, then writes spec files directly. Changes appear live in the explorer and focused view.
 
 ### Board Mode
 
@@ -309,6 +323,52 @@ When spec count exceeds human working memory (~7-10 specs), the user loses globa
 - Con: Requires the agent to understand README conventions. Quality depends on prompt engineering. Still manual (user must click "apply").
 
 These options aren't mutually exclusive. A likely combination: **B + D** — generate the structured sections (tables, status quo block), and have the agent propose updates to free-form sections (rationale, dependency graph annotations) via chat.
+
+### Specs Folder Location and Conflicts
+
+The spec system assumes a `specs/` directory exists in the workspace. Several unresolved questions:
+
+**Where should the specs folder live?**
+
+- **Option A — Workspace root (`<repo>/specs/`).** Specs are version-controlled alongside the code they describe. PRs can include both spec changes and implementation. Natural for single-repo projects.
+- **Option B — Wallfacer data directory (`~/.wallfacer/specs/<fingerprint>/`).** Specs live outside the repo, keyed by workspace fingerprint (same scheme as AGENTS.md). Doesn't pollute the repo. Works for multi-repo workspace groups where no single repo owns the specs.
+- **Option C — User-configurable.** A setting (`WALLFACER_SPECS_DIR` or per-workspace config) points to the specs root. Defaults to option A if the directory exists, otherwise option B.
+
+**What if the project already has a `specs/` directory?**
+
+Some projects use `specs/` for OpenAPI specs, RFCs, ADRs, or other purposes. Wallfacer's spec frontmatter schema (status, depends_on, affects, effort, etc.) would conflict with or pollute existing content.
+
+- **Option A — Namespaced directory.** Use `.wallfacer/specs/` or `wallfacer-specs/` instead of bare `specs/`. Avoids all conflicts but looks foreign.
+- **Option B — Coexist with detection.** Scan the existing `specs/` directory. Files with valid Wallfacer frontmatter are managed specs; everything else is ignored. Risk: false positives if existing files happen to have similar YAML fields.
+- **Option C — Explicit init.** `wallfacer specs init` creates the specs directory (prompting for location if `specs/` already exists). The chosen path is stored in workspace config. No implicit detection.
+
+**Multi-repo workspace groups — where do cross-repo specs live?**
+
+A workspace group can mount multiple repos (e.g., `~/api`, `~/frontend`, `~/infra`). A spec may span repos ("add a new API endpoint and consume it in the frontend"). Questions:
+
+- **One specs tree or many?** Each repo could have its own `specs/` with its own tree, or there could be a single unified tree that covers the whole workspace group. Per-repo trees are simpler but can't express cross-repo dependencies. A unified tree needs a home outside any single repo.
+- **If unified, where?** The wallfacer data directory (`~/.wallfacer/specs/<fingerprint>/`) is the natural candidate — it's already keyed by workspace group. But then specs aren't version-controlled with the code they describe, and PRs can't include spec changes.
+- **Hybrid?** Per-repo `specs/` for repo-scoped work, plus a wallfacer-managed cross-repo layer for specs that span boundaries. The spec explorer would merge both views. Adds complexity — two sources of truth, potential conflicts in `depends_on` paths.
+- **`affects` paths across repos.** Currently `affects` lists paths relative to the repo root. With multiple repos, paths need qualifying (`api/internal/handler/foo.go` vs `frontend/src/api.ts`). The workspace mount names could serve as prefixes, but this couples specs to workspace config.
+
+**Leaning toward `.wallfacer/` as canonical home.** This solves multi-repo cleanly and avoids polluting repos. But it detaches specs from the code they describe — specs aren't in PRs, aren't reviewed alongside implementation, and aren't portable if someone clones the repo without wallfacer.
+
+A sync mechanism could bridge this: wallfacer writes a read-only `specs/` mirror into each repo (or a configurable subset), regenerated on spec change. The mirror could be full copies or stubs (frontmatter + link back to wallfacer). This gives repos a version-controlled snapshot without the repo owning the source of truth. Open sub-questions:
+
+- Should sync be opt-in per repo, or automatic?
+- Full spec copies vs summary stubs vs a single `specs.json` manifest?
+- Should synced files be `.gitignore`d (pure local cache) or committed (visible in PRs)?
+- If committed, who resolves conflicts when someone edits the synced copy directly?
+
+No clear winner yet. The single-repo case (option A above) should ship first; multi-repo support can layer on top once the model is proven.
+
+**What if the project has no specs folder?**
+
+First time the user enters spec mode, the system needs to bootstrap. Options:
+
+- **Auto-create on first use.** Entering spec mode creates the specs directory (at the configured location) with a minimal README. Low friction but surprising if the user was just exploring.
+- **Prompt once.** "No specs directory found. Create one at `<repo>/specs/`?" with option to choose a different path. One-time friction, explicit consent.
+- **Require explicit init.** Spec mode is grayed out until the user runs init. Most explicit, most friction.
 
 ### Agent-Generated Spec Trust
 
