@@ -421,3 +421,30 @@ Additional mitigations:
 - Build familiarity through interactive chat dialogue, not passive reading
 - Verification specs catch implementation failures
 - The spec is always editable — the user can modify anything before dispatching
+
+---
+
+## Design Breakdown
+
+| # | Sub-design | Design problem | Depends on | Effort | Status |
+|---|-----------|---------------|-----------|--------|--------|
+| 1 | [Planning Sandbox Lifecycle](spec-planning-ux/planning-sandbox.md) | How the long-lived planning container integrates with the sandbox backend infrastructure | — | large | drafted |
+| 2 | [Spec Mode UI Shell](spec-planning-ux/spec-mode-ui-shell.md) | Three-pane layout integration with the existing SPA, mode switching, keyboard routing | — | large | drafted |
+| 3 | [Spec Explorer & Dependency Minimap](spec-planning-ux/spec-explorer.md) | Spec-aware tree rendering with status badges, progress indicators, and dependency graph overlay | spec-mode-ui-shell | large | drafted |
+| 4 | [Planning Chat Agent](spec-planning-ux/planning-chat-agent.md) | Interactive conversational agent model for spec iteration, skills, and session persistence | spec-mode-ui-shell, planning-sandbox | xlarge | drafted |
+| 5 | [Dispatch & Board Integration](spec-planning-ux/dispatch-workflow.md) | Translating validated leaf specs into kanban tasks with bidirectional links and dependency wiring | spec-mode-ui-shell | medium | drafted |
+| 6 | [Undo & Snapshot System](spec-planning-ux/undo-snapshots.md) | Per-round implicit snapshots for reversible agent writes | planning-sandbox | medium | drafted |
+| 7 | [Progress & Cost Tracking](spec-planning-ux/progress-cost-tracking.md) | Recursive progress aggregation and per-spec cost attribution across planning and execution | spec-explorer, planning-sandbox | medium | drafted |
+
+```mermaid
+graph LR
+  A[Planning Sandbox] --> D[Planning Chat Agent]
+  A --> F[Undo & Snapshots]
+  A --> G[Progress & Cost]
+  B[Spec Mode UI Shell] --> C[Spec Explorer & Minimap]
+  B --> D
+  B --> E[Dispatch & Board]
+  C --> G
+```
+
+**Recommended iteration order:** Start with #1 (Planning Sandbox) and #2 (Spec Mode UI Shell) in parallel — they are independent foundations. Then #3 (Spec Explorer) and #5 (Dispatch) can proceed in parallel once the UI shell is designed. #4 (Planning Chat Agent) requires both the sandbox and UI shell. #6 (Undo) depends only on the sandbox design. #7 (Progress & Cost) comes last as it integrates data from the explorer and sandbox.
