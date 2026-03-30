@@ -14,23 +14,21 @@ Foundations (complete)
   ✅ File Explorer
   ✅ Host Terminal
 
-Local Product                          Cloud Platform
-  ◐ Spec Coordination                    ○ Cloud Deployment (overview)
-  ✅ Desktop App                          ○ Tenant Filesystem
-  ○ File/Image Attachments               ○ K8s Sandbox Backend
-  ○ Host Mounts                          ○ Cloud Infrastructure
-  ○ File Panel Viewer                    ○ Multi-Tenant (capstone)
-  ✅ Terminal Sessions                    ○ Tenant API
+Local Product                     Cloud Platform
+  ◐ Spec Coordination               ○ Cloud Deployment (overview)
+  ✅ Desktop App                     ○ Tenant Filesystem
+  ○ File/Image Attachments          ○ K8s Sandbox Backend
+  ○ Host Mounts                     ○ Cloud Infrastructure
+  ○ File Panel Viewer               ○ Multi-Tenant (capstone)
+  ✅ Terminal Sessions               ○ Tenant API
   ✅ Container Exec
-  ○ Oversight Risk Scoring             Shared Design
-  ○ Validation Barrier                   ○ Authentication
-  ○ Visual Verification
-  ✅ OAuth Token Setup                    ○ Agent Abstraction
-  ○ Live Serve
+  ○ Oversight Risk Scoring        Shared Design
+  ○ Validation Barrier              ○ Authentication
+  ○ Visual Verification             ○ Agent Abstraction
+  ✅ OAuth Token Setup              ○ Native Sandboxes (Linux/macOS/Win)
+  ○ Live Serve                      ○ Overlay Snapshots
   ○ Terminal UI (TUI mode)
   ✅ Pixel Agent Avatars
-                                         ○ Native Sandboxes (Linux/macOS/Win)
-                                         ○ Overlay Snapshots
 ```
 
 ---
@@ -78,17 +76,32 @@ Desktop experience and developer workflow improvements. No cloud dependency. Shi
 
 ### Local product dependencies
 
-```
-File Explorer (done) ──▶ Spec Coordination
-                     ──▶ File Attachments
-                     ──▶ Host Mounts
-                     ──▶ File Panel Viewer
+```mermaid
+graph LR
+  FE[File Explorer ✅] --> SC[Spec Coordination ◐]
+  FE --> FA[File Attachments]
+  FE --> HM[Host Mounts]
+  FE --> FPV[File Panel Viewer]
+  HT[Host Terminal ✅] --> TS[Terminal Sessions ✅] --> CE[Container Exec ✅]
+  FE --> DA[Desktop App ✅]
+  HT --> DA
 
-Host Terminal (done) ──▶ Terminal Sessions (done) ──▶ Container Exec (done)
+  ORS[Oversight Risk Scoring]
+  VB[Validation Barrier]
+  VV[Visual Verification]
+  LS[Live Serve]
+  OTS[OAuth Token Setup ✅]
+  TUI[Terminal UI]
+  PA[Pixel Agents ✅]
 
-File Explorer + Host Terminal ──▶ Desktop App (done)
-
-Independent: Oversight Risk Scoring, Validation Barrier, Visual Verification, Live Serve, OAuth Token Setup (done), Terminal UI, Pixel Agent Avatars (done)
+  style FE fill:#d4edda,stroke:#28a745
+  style HT fill:#d4edda,stroke:#28a745
+  style TS fill:#d4edda,stroke:#28a745
+  style CE fill:#d4edda,stroke:#28a745
+  style DA fill:#d4edda,stroke:#28a745
+  style OTS fill:#d4edda,stroke:#28a745
+  style PA fill:#d4edda,stroke:#28a745
+  style SC fill:#fff3cd,stroke:#ffc107
 ```
 
 ---
@@ -108,15 +121,20 @@ Multi-tenant hosted service. Builds on sandbox and storage interfaces.
 
 ### Cloud platform dependencies
 
-```
-Sandbox + Storage Interfaces ──▶ Tenant FS ──▶ K8s Sandbox ──┐
-Storage Interface ──────────▶ Cloud Storage (PG, S3) ────────┤
-Authentication (shared) ─────────────────────────────────────┤
-Cloud Infrastructure (IaC) ──────────────────────────────────┤
-                                                              ▼
-                                                       Multi-Tenant
-                                                              │
-                                                       Tenant API
+```mermaid
+graph LR
+  SBI[Sandbox Interface ✅] --> TFS[Tenant FS]
+  STI[Storage Interface ✅] --> TFS
+  TFS --> K8S[K8s Sandbox]
+  STI --> CS[Cloud Storage]
+  K8S --> MT[Multi-Tenant]
+  CS --> MT
+  AUTH[Authentication] --> MT
+  CI[Cloud Infrastructure] --> MT
+  MT --> TA[Tenant API]
+
+  style SBI fill:#d4edda,stroke:#28a745
+  style STI fill:#d4edda,stroke:#28a745
 ```
 
 ### Scaling strategy
@@ -159,32 +177,74 @@ Specs that serve both tracks. These define interfaces and behaviors that local p
 
 How the three tracks connect through shared design and foundations.
 
-```
- ═══ Foundations (complete) ═══════════════════════════════════════════════
+```mermaid
+graph TB
+  subgraph Foundations [Foundations ✅]
+    SBI[Sandbox Interface]
+    STI[Storage Interface]
+    CR[Container Reuse]
+    FE[File Explorer]
+    MW[Multi-Workspace]
+    HT[Host Terminal]
+  end
 
- Sandbox Interface ──┬── Storage Interface ──── Container Reuse
-                     │                │
- File Explorer ──────┤   Multi-Workspace        Host Terminal
-                     │
- ═══ Shared Design ══╪════════════════════════════════════════════════════
-                     │
- Authentication ─────┤   Agent Abstraction    Overlay Snapshots
- Native Sandboxes    │
-                     │
- ═══ Local Product ══╪════════════════════════════════════════════════════
-                     │
- Spec Coordination ──┤   Terminal Sessions (done) ──▶ Container Exec (done)
- File Attachments    │   Oversight Risk Scoring
- Host Mounts         │   Visual Verification
- File Panel Viewer   │   Live Serve
- Desktop App (done)──┘
-                     │
- ═══ Cloud Platform ═╪════════════════════════════════════════════════════
-                     │
- Tenant FS ──▶ K8s Sandbox ──┐
- Cloud Storage (PG, S3) ────┤
- Authentication (shared) ───┼──▶ Multi-Tenant ──▶ Tenant API
- Cloud Infrastructure ──────┘
+  subgraph Shared [Shared Design]
+    AUTH[Authentication]
+    AA[Agent Abstraction]
+    OS[Overlay Snapshots]
+    NSL[Native Sandbox Linux]
+    NSM[Native Sandbox macOS]
+    NSW[Native Sandbox Windows]
+  end
+
+  subgraph Local [Local Product]
+    SC[Spec Coordination ◐]
+    FA[File Attachments]
+    HM[Host Mounts]
+    FPV[File Panel Viewer]
+    DA[Desktop App ✅]
+    TS[Terminal Sessions ✅]
+    CE[Container Exec ✅]
+    ORS[Oversight Risk Scoring]
+    VB[Validation Barrier]
+    VV[Visual Verification]
+    LS[Live Serve]
+    OTS[OAuth Token Setup ✅]
+    TUI[Terminal UI]
+    PA[Pixel Agents ✅]
+  end
+
+  subgraph Cloud [Cloud Platform]
+    TFS[Tenant FS]
+    K8S[K8s Sandbox]
+    CS[Cloud Storage]
+    CI[Cloud Infrastructure]
+    MT[Multi-Tenant]
+    TA[Tenant API]
+  end
+
+  %% Foundations → Local
+  FE --> SC
+  FE --> FA
+  FE --> HM
+  FE --> FPV
+  FE --> DA
+  HT --> DA
+  HT --> TS --> CE
+
+  %% Foundations → Cloud
+  SBI --> TFS
+  STI --> TFS
+  STI --> CS
+
+  %% Shared → Cloud
+  AUTH --> MT
+
+  %% Cloud internal
+  TFS --> K8S --> MT
+  CS --> MT
+  CI --> MT
+  MT --> TA
 ```
 
 ---
