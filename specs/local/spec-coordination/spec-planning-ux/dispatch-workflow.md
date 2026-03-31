@@ -18,10 +18,11 @@ dispatched_task_id: null
 
 ## Design Problem
 
-How does a validated leaf spec become a kanban task, and how do the two views (spec mode and board mode) stay linked? Dispatch must translate spec content into a task prompt, wire `depends_on` edges from spec dependencies to task dependencies (via `dispatched_task_id`), and maintain bidirectional links so clicking a task navigates to its source spec and vice versa.
+How does a validated spec become a kanban task, and how do the two views (spec mode and board mode) stay linked? Dispatch must translate spec content into a task prompt, wire `depends_on` edges from spec dependencies to task dependencies (via `dispatched_task_id`), and maintain bidirectional links so clicking a task navigates to its source spec and vice versa.
 
 Key constraints:
-- Only leaf specs with `status: validated` are dispatchable
+- **Any validated spec is dispatchable** — both design specs (non-leaf) and implementation specs (leaf). The user decides when a spec is ready for execution, not the system. A design spec dispatched as a task means "the agent should implement this entire design." An implementation spec dispatched as a task means "the agent should make these specific code changes."
+- **Breakdown as an alternative to dispatch.** The focused view offers two actions side by side: **Dispatch** (send to kanban as-is) and **Break Down** (create smaller child specs). Breaking down a design spec invokes `/design-breakdown`; breaking down an implementation spec invokes `/task-breakdown`. The user chooses which action fits — dispatch when the spec is ready for execution, break down when it's too large or needs decomposition first.
 - Dispatch creates a kanban task where `prompt = spec body` and `DependsOn` maps from spec `depends_on` to `dispatched_task_id` of sibling specs
 - Multi-select dispatch (batch) must wire dependencies atomically
 - Undispatch (cancel) clears `dispatched_task_id` and returns spec to `validated`
@@ -74,6 +75,8 @@ The spec system tracks dispatch state via `dispatched_task_id` in frontmatter. W
 2. When multi-dispatching, should the system enforce that all selected specs' dependencies are either also being dispatched or already have `dispatched_task_id` set? Or allow dispatching specs with unresolved dependencies (the kanban task will block on unmet deps)?
 3. How should the spec-to-task link be stored? Options: task label (`wallfacer.spec.path`), task metadata field, or a separate mapping file. The link must survive task archival and soft-delete.
 4. When a dispatched task fails and is retried, does the spec stay linked to the same task UUID or get re-dispatched as a new task?
+5. When dispatching a design spec (non-leaf), should the task prompt include instructions to run `/design-breakdown` or `/task-breakdown` as part of execution? Or should the prompt simply be the spec body and let the agent decide how to approach it?
+6. Should dispatching a non-leaf spec that already has children warn the user? (The children represent an existing breakdown — dispatching the parent as a single task may conflict with or duplicate the children's work.)
 
 ## Affects
 

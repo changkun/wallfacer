@@ -186,10 +186,23 @@ function _loadAndRenderSpec() {
         _buildSpecToc(bodyEl);
       }
 
-      // Show dispatch button only for validated leaf specs (no children).
+      // Show dispatch button for any validated spec (design or implementation).
       if (dispatchBtn) {
         var isValidated = parsed.frontmatter.status === "validated";
         dispatchBtn.classList.toggle("hidden", !isValidated);
+      }
+
+      // Show breakdown button for validated specs that could be decomposed.
+      var breakdownBtn = document.getElementById("spec-summarize-btn");
+      if (breakdownBtn) {
+        var canBreakdown =
+          parsed.frontmatter.status === "validated" ||
+          parsed.frontmatter.status === "drafted";
+        breakdownBtn.textContent = "Break Down";
+        breakdownBtn.classList.toggle("hidden", !canBreakdown);
+        breakdownBtn.onclick = function () {
+          breakDownFocusedSpec();
+        };
       }
     })
     .catch(function (err) {
@@ -283,7 +296,13 @@ function _buildSpecToc(bodyEl) {
     toc.appendChild(link);
   }
 
-  bodyEl.appendChild(toc);
+  // Append to spec-focused-view (not bodyEl) so it stays fixed on scroll.
+  var focusedView = document.getElementById("spec-focused-view");
+  if (focusedView) {
+    focusedView.appendChild(toc);
+  } else {
+    bodyEl.appendChild(toc);
+  }
 }
 
 // _onSpecBodyLinkClick intercepts clicks on markdown links to .md files

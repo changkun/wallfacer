@@ -378,7 +378,7 @@ function _renderSpecNode(node, nodesByPath) {
   }
 
   // Checkbox for validated leaf specs (multi-select dispatch).
-  if (node.is_leaf && spec.status === "validated") {
+  if (spec.status === "validated") {
     var checked = _selectedSpecPaths.has(node.path) ? " checked" : "";
     html +=
       '<input type="checkbox" class="spec-select-checkbox" data-spec-select="' +

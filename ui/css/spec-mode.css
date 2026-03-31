@@ -15,6 +15,7 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .spec-focused-view__header {
@@ -108,19 +109,24 @@
 
 /* Table of contents */
 .spec-toc {
-  position: sticky;
-  top: 0;
-  float: right;
-  max-width: 200px;
-  max-height: calc(100vh - 200px);
+  position: absolute;
+  top: 72px;
+  right: 12px;
+  width: 180px;
+  max-height: calc(100% - 88px);
   overflow-y: auto;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 8px;
-  margin: 0 0 12px 12px;
   font-size: 11px;
-  z-index: 1;
+  z-index: 2;
+  opacity: 0.85;
+  pointer-events: auto;
+}
+
+.spec-toc:hover {
+  opacity: 1;
 }
 
 .spec-toc__title {

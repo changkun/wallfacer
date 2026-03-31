@@ -289,14 +289,14 @@ describe("spec-explorer", () => {
 
   // --- Multi-select tests ---
 
-  it("checkbox rendered for validated leaf specs only", () => {
+  it("checkbox rendered for any validated spec", () => {
     ctx._specExpandedPaths.add("local/foo.md");
     ctx._specTreeData = MOCK_TREE_DATA;
     ctx.renderSpecTree();
     const treeEl = ctx.registry.get("explorer-tree");
-    // Foo is non-leaf (validated but not leaf) — no checkbox.
-    // Bar is leaf but complete — no checkbox.
-    expect(treeEl.innerHTML).not.toContain("spec-select-checkbox");
+    // Foo is validated (non-leaf) — should have checkbox.
+    // Bar is complete — no checkbox.
+    expect(treeEl.innerHTML).toContain("spec-select-checkbox");
   });
 
   it("checkbox rendered for validated leaf", () => {
