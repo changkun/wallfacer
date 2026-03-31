@@ -100,7 +100,16 @@ describe("renderMarkdown", () => {
     const parse = vi.fn().mockReturnValue("MARKED");
     const parseInline = vi.fn().mockReturnValue("INLINE");
     const ctx = makeContext({
-      marked: { parse, parseInline },
+      marked: {
+        parse,
+        parseInline,
+        setOptions: function () {},
+        Renderer: function () {
+          this.code = function () {
+            return "";
+          };
+        },
+      },
     });
     loadScript(ctx, "markdown.js");
     const input = "# title";

@@ -180,6 +180,10 @@ function _loadAndRenderSpec() {
 
       if (bodyEl) {
         bodyEl.innerHTML = renderMarkdown(parsed.body);
+        // Render mermaid diagrams in code blocks.
+        if (typeof renderMermaidBlocks === "function") {
+          renderMermaidBlocks(bodyEl);
+        }
         // Intercept clicks on links to .md files and navigate within spec mode.
         bodyEl.addEventListener("click", _onSpecBodyLinkClick);
         // Build table of contents from rendered headings.
