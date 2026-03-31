@@ -180,10 +180,15 @@ function _loadAndRenderSpec() {
 
       if (bodyEl) {
         bodyEl.innerHTML = renderMarkdown(parsed.body);
-        // Remove the first h1 — it duplicates the title bar.
-        var firstH1 = bodyEl.querySelector("h1");
-        if (firstH1 && firstH1 === bodyEl.firstElementChild) {
-          firstH1.remove();
+        // Remove the leading h1 and hr — they duplicate the title bar.
+        var firstChild = bodyEl.firstElementChild;
+        if (firstChild && firstChild.tagName === "H1") {
+          firstChild.remove();
+        }
+        // Remove leading <hr> after the title (from "---" in markdown).
+        firstChild = bodyEl.firstElementChild;
+        if (firstChild && firstChild.tagName === "HR") {
+          firstChild.remove();
         }
         // Render mermaid diagrams in code blocks.
         if (typeof renderMermaidBlocks === "function") {
