@@ -108,11 +108,31 @@ The spec system (`internal/spec/`) already provides:
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [Spec tree API endpoint](spec-explorer/spec-tree-api.md) | — | medium | validated |
-| [Spec tree renderer with status badges](spec-explorer/spec-tree-renderer.md) | spec-tree-api, mode-state-and-switching | medium | validated |
+| [Spec tree API endpoint](spec-explorer/spec-tree-api.md) | — | medium | complete |
+| [Spec tree renderer with status badges](spec-explorer/spec-tree-renderer.md) | spec-tree-api, mode-state-and-switching | medium | complete |
 | [Status filtering](spec-explorer/status-filtering.md) | spec-tree-renderer | small | complete |
 | [Dependency minimap renderer](spec-explorer/dependency-minimap.md) | spec-tree-renderer | medium | complete |
 | [Multi-select for batch dispatch](spec-explorer/multi-select-dispatch.md) | spec-tree-renderer | small | complete |
+
+## Outcome
+
+The spec explorer and dependency minimap are fully implemented. The explorer renders the spec tree from a dedicated API endpoint, grouped by track with collapsible headers. The minimap shows a 1-hop dependency neighborhood as a draggable SVG canvas.
+
+### What Shipped
+
+- **`GET /api/specs/tree`** — backend endpoint returning the full spec tree with JSON-serialized frontmatter, recursive progress counts, and dependency edges
+- **`internal/spec/serialize.go`** — `SerializeTree()` function, JSON tags on Spec struct, `Date.MarshalJSON()`
+- **`ui/js/spec-explorer.js`** — spec tree renderer with status icons, progress badges, collapsible tracks, status filtering dropdown, "Show workspace files" toggle, multi-select checkboxes on all validated specs
+- **`ui/js/spec-minimap.js`** — custom SVG dependency minimap with draggable canvas, status-colored nodes, click-to-navigate, resize handle with localStorage persistence
+- **19 frontend tests** (spec-explorer) + **8 frontend tests** (spec-minimap) + **3 backend tests** (serialize)
+
+### Design Evolution
+
+1. **Track grouping.** The original spec didn't specify how to group root nodes. All depth-0 specs from different tracks were initially flat, causing a 50+ item list. Added collapsible track headers (cloud, foundations, local, shared) for organization.
+2. **Draggable minimap canvas.** Originally used overflow scrollbars. Changed to click-and-drag panning with `cursor: grab` for a better UX.
+3. **Multi-select on all validated specs.** Originally restricted to validated leaf specs only. Expanded to all validated specs (design and implementation) to match the updated dispatch-workflow design that allows dispatching any validated spec.
+4. **Path normalization.** The `depends_on` field uses repo-root paths (`specs/local/foo.md`) while tree nodes use specs-relative paths (`local/foo.md`). The minimap strips the `specs/` prefix for correct matching.
+5. **Deterministic tree order.** `scanDir` iterated over a Go map, causing random node order on each API call. Fixed by sorting map keys before iteration.
 
 ```mermaid
 graph LR

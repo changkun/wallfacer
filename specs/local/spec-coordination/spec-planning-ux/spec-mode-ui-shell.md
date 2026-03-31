@@ -95,3 +95,22 @@ graph LR
   B --> E[Pane resize]
   C --> D[Deep-linking & shortcuts]
 ```
+
+## Outcome
+
+The spec mode UI shell is fully implemented with a three-pane layout (explorer + focused markdown view + chat stream) that coexists with the board view via mode switching.
+
+### What Shipped
+
+- **`ui/js/spec-mode.js`** — mode state with localStorage persistence, `switchMode()`/`_applyMode()`, focused markdown view with 2-second polling, `#spec/<path>` deep-linking, YAML frontmatter parser, spec link navigation (`.md` links navigate within spec mode), table of contents, design/implementation badge, metadata bar, keyboard shortcuts (`S` toggle, `D` dispatch, `B` break down)
+- **`ui/css/spec-mode.css`** — three-pane layout, status badges with colors, TOC positioning, chat stream, resize handles
+- **`ui/index.html`** — spec mode container with focused view header (title, status, kind, effort, dispatch/breakdown buttons), metadata bar, markdown body, chat stream with input
+- **Header mode tabs** — `[Board]` `[Specs]` in `initial-layout.html`
+- **32 frontend tests** across 5 test files
+
+### Design Evolution
+
+1. **`_applyMode()` extracted from `switchMode()`.** The idempotency guard in `switchMode()` prevented DOM updates when the JS variable already matched localStorage (second tab scenario). Extracted `_applyMode()` for unconditional DOM updates.
+2. **Explorer auto-visibility.** Explorer auto-opens in spec mode and auto-hides in board mode, independent of the `e` key toggle state.
+3. **Workspace switch awareness.** `reloadExplorerTree()` and `_initExplorer()` now check the current mode and load the spec tree instead of workspace files when in spec mode.
+4. **Breakdown button replaces Summarize.** The "Summarize" button was repurposed as "Break Down" — visible for validated and drafted specs, pre-fills the chat with a breakdown directive.
