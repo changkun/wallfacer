@@ -34,7 +34,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
   min-width: 0;
 }
 
@@ -170,11 +169,29 @@
 
 .spec-dispatch-btn,
 .spec-summarize-btn {
-  padding: 4px 10px;
+  padding: 4px 12px;
   font-size: 11px;
+  font-weight: 500;
   border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
   cursor: pointer;
   flex-shrink: 0;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+
+.spec-dispatch-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.spec-summarize-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-muted);
 }
 
 .spec-focused-view__body {
