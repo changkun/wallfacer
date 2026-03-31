@@ -196,3 +196,39 @@ func TestTaskBudgetFieldsRoundTrip(t *testing.T) {
 		t.Error("max_input_tokens should be omitted from JSON when zero (omitempty)")
 	}
 }
+
+func TestSandboxActivityPlanning(t *testing.T) {
+	found := false
+	for _, a := range SandboxActivities {
+		if a == SandboxActivityPlanning {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("SandboxActivityPlanning not in SandboxActivities slice")
+	}
+	if SandboxActivityPlanning != "planning" {
+		t.Errorf("SandboxActivityPlanning = %q, want %q", SandboxActivityPlanning, "planning")
+	}
+}
+
+func TestTaskKindPlanning(t *testing.T) {
+	if TaskKindPlanning != "planning" {
+		t.Errorf("TaskKindPlanning = %q, want %q", TaskKindPlanning, "planning")
+	}
+
+	// Verify it can be set on a Task and round-trips through JSON.
+	task := Task{Kind: TaskKindPlanning}
+	data, err := json.Marshal(task)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	var decoded Task
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if decoded.Kind != TaskKindPlanning {
+		t.Errorf("round-tripped Kind = %q, want %q", decoded.Kind, TaskKindPlanning)
+	}
+}

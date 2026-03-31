@@ -120,6 +120,7 @@ type TaskKind string
 const (
 	TaskKindTask      TaskKind = ""           // default; regular implementation task
 	TaskKindIdeaAgent TaskKind = "idea-agent" // brainstorm / ideation task
+	TaskKindPlanning  TaskKind = "planning"   // spec planning session task
 )
 
 // SandboxActivity identifies which phase of a task a container run belongs to.
@@ -144,6 +145,8 @@ const (
 	SandboxActivityCommitMessage SandboxActivity = "commit_message"
 	// SandboxActivityIdeaAgent is the brainstorm/ideation phase.
 	SandboxActivityIdeaAgent SandboxActivity = "idea_agent"
+	// SandboxActivityPlanning is the spec planning/iteration phase.
+	SandboxActivityPlanning SandboxActivity = "planning"
 
 	// SandboxActivityTest is a usage-attribution-only activity (not used for sandbox routing).
 	SandboxActivityTest SandboxActivity = "test"
@@ -160,6 +163,7 @@ var SandboxActivities = []SandboxActivity{
 	SandboxActivityOversight,
 	SandboxActivityCommitMessage,
 	SandboxActivityIdeaAgent,
+	SandboxActivityPlanning,
 }
 
 // TaskStatus represents the lifecycle state of a task.
