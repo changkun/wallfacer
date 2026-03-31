@@ -1,6 +1,6 @@
 ---
 title: Spec mode deep-linking and keyboard shortcuts
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/spec-mode-ui-shell/focused-markdown-view.md
 affects:
@@ -9,7 +9,7 @@ affects:
   - ui/js/events.js
 effort: small
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
