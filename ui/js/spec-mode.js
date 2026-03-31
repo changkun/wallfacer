@@ -168,9 +168,59 @@ function breakDownFocusedSpec() {
   }
 }
 
+// --- Chat pane resize ---
+
+var _specChatMinWidth = 280;
+var _specChatMaxWidthFraction = 0.5;
+var _specChatStorageKey = "wallfacer-spec-chat-width";
+
+function _initSpecChatResize() {
+  var handle = document.getElementById("spec-chat-resize");
+  var chatPane = document.getElementById("spec-chat-stream");
+  if (!handle || !chatPane) return;
+
+  // Restore persisted width.
+  var stored = localStorage.getItem(_specChatStorageKey);
+  if (stored) {
+    var w = parseInt(stored, 10);
+    if (w >= _specChatMinWidth) chatPane.style.width = w + "px";
+  }
+
+  handle.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    var startX = e.clientX;
+    var startW = chatPane.offsetWidth;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    function onMouseMove(ev) {
+      // Chat is on the right, so dragging left increases width.
+      var delta = startX - ev.clientX;
+      var maxW = Math.floor(window.innerWidth * _specChatMaxWidthFraction);
+      var newW = Math.min(maxW, Math.max(_specChatMinWidth, startW + delta));
+      chatPane.style.width = newW + "px";
+    }
+
+    function onMouseUp() {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      localStorage.setItem(
+        _specChatStorageKey,
+        parseInt(chatPane.style.width, 10),
+      );
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  });
+}
+
 // Restore persisted mode on page load.
 document.addEventListener("DOMContentLoaded", function () {
   if (currentMode === "spec") {
     switchMode("spec");
   }
+  _initSpecChatResize();
 });
