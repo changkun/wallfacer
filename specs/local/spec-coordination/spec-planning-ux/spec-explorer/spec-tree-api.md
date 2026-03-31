@@ -1,6 +1,6 @@
 ---
 title: Spec tree API endpoint
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/handler/
@@ -9,7 +9,7 @@ affects:
   - internal/cli/server.go
 effort: medium
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
