@@ -64,6 +64,13 @@ function focusSpec(specPath, workspace) {
   _startSpecRefreshPoll();
   // Update hash for deep-linking.
   history.replaceState(null, "", "#spec/" + encodeURIComponent(specPath));
+  // Update dependency minimap.
+  if (
+    typeof renderMinimap === "function" &&
+    typeof _specTreeData !== "undefined"
+  ) {
+    renderMinimap(specPath, _specTreeData);
+  }
 }
 
 function getFocusedSpecPath() {

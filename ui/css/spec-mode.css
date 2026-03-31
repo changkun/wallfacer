@@ -196,6 +196,29 @@
   margin-left: auto;
 }
 
+/* ===== Spec Minimap ===== */
+
+.spec-minimap {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 6px 8px;
+}
+
+.spec-minimap__header {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.spec-minimap__svg {
+  display: block;
+  width: 100%;
+  max-height: 200px;
+}
+
 .spec-workspace-files__header {
   padding: 6px 8px;
   font-size: 11px;
