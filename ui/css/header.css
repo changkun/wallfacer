@@ -38,6 +38,38 @@ html.wails-desktop .app-header {
   flex-shrink: 0;
 }
 
+.mode-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.mode-tab {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.12s,
+    background 0.12s;
+}
+
+.mode-tab:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.mode-tab.active {
+  color: var(--text);
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
 .workspace-group-tabs {
   display: flex;
   align-items: flex-end;

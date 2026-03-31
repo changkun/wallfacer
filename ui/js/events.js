@@ -33,7 +33,7 @@ document.getElementById("alert-modal").addEventListener("click", (e) => {
 // Global shortcut: "n" opens the new task form, "?" opens keyboard shortcuts
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key !== "n" && e.key !== "?" && e.key !== "e") return;
+  if (e.key !== "n" && e.key !== "?" && e.key !== "e" && e.key !== "s") return;
   var tag = document.activeElement && document.activeElement.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
   var ce =
@@ -59,6 +59,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "n") showNewTaskForm();
   if (e.key === "?") openKeyboardShortcuts();
   if (e.key === "e") toggleExplorer();
+  if (e.key === "s")
+    switchMode(getCurrentMode() === "board" ? "spec" : "board");
 });
 
 // New task textarea: Ctrl/Cmd+Enter to save, Escape to cancel
