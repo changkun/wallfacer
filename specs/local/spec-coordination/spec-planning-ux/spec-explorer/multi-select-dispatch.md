@@ -1,13 +1,13 @@
 ---
 title: Multi-select for batch dispatch
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/spec-explorer/spec-tree-renderer.md
 affects:
   - ui/js/spec-explorer.js
 effort: small
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---

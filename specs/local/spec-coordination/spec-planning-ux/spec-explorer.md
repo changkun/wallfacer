@@ -1,6 +1,6 @@
 ---
 title: Spec Explorer & Dependency Minimap
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/spec-mode-ui-shell.md
 affects:
@@ -8,7 +8,7 @@ affects:
   - internal/handler/explorer.go
 effort: large
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
@@ -110,9 +110,9 @@ The spec system (`internal/spec/`) already provides:
 |------------|-----------|--------|--------|
 | [Spec tree API endpoint](spec-explorer/spec-tree-api.md) | — | medium | validated |
 | [Spec tree renderer with status badges](spec-explorer/spec-tree-renderer.md) | spec-tree-api, mode-state-and-switching | medium | validated |
-| [Status filtering](spec-explorer/status-filtering.md) | spec-tree-renderer | small | validated |
-| [Dependency minimap renderer](spec-explorer/dependency-minimap.md) | spec-tree-renderer | medium | validated |
-| [Multi-select for batch dispatch](spec-explorer/multi-select-dispatch.md) | spec-tree-renderer | small | validated |
+| [Status filtering](spec-explorer/status-filtering.md) | spec-tree-renderer | small | complete |
+| [Dependency minimap renderer](spec-explorer/dependency-minimap.md) | spec-tree-renderer | medium | complete |
+| [Multi-select for batch dispatch](spec-explorer/multi-select-dispatch.md) | spec-tree-renderer | small | complete |
 
 ```mermaid
 graph LR
