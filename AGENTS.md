@@ -185,6 +185,14 @@ All routes are defined in `internal/apicontract/routes.go`. See `docs/internals/
 - `POST /api/ideate` — Launch brainstorm/ideation agent
 - `DELETE /api/ideate` — Cancel running ideation agent
 
+### Spec Tree
+- `GET /api/specs/tree` — Full spec tree with metadata, progress, and dependency edges
+
+### Planning Sandbox
+- `GET /api/planning` — Get planning sandbox status (running or not)
+- `POST /api/planning` — Start the planning sandbox container (idempotent)
+- `DELETE /api/planning` — Stop the planning sandbox container
+
 ### Usage & Statistics
 - `GET /api/usage` — Aggregated token and cost usage statistics
 - `GET /api/stats` — Task status and workspace cost statistics
