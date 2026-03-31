@@ -1,0 +1,123 @@
+/* ===== Spec Mode Layout ===== */
+
+/* Three-pane container: focused markdown view + resize handle + chat stream */
+.spec-mode-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Center pane: focused markdown view */
+.spec-focused-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.spec-focused-view__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.spec-focused-view__title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.spec-focused-view__status {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.spec-dispatch-btn,
+.spec-summarize-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.spec-focused-view__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Right pane: chat stream */
+.spec-chat-stream {
+  width: 360px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+
+.spec-chat-stream__messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.spec-chat-stream__input {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.spec-chat-input {
+  flex: 1;
+  min-height: 36px;
+  resize: vertical;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.spec-chat-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.spec-chat-send-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+
+/* Resize handle between focused view and chat */
+.spec-chat-resize {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.spec-chat-resize:hover {
+  background: var(--accent);
+}

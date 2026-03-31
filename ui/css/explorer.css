@@ -6,7 +6,8 @@
   flex: 1;
   min-height: 0;
 }
-.board-with-explorer > .board-grid {
+.board-with-explorer > .board-grid,
+.board-with-explorer > .spec-mode-container {
   flex: 1;
   min-width: 0;
 }
