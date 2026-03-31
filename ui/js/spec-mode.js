@@ -46,6 +46,16 @@ function _applyMode(mode) {
   if (typeof switchExplorerRoot === "function") {
     switchExplorerRoot(mode === "spec" ? "specs" : "workspace");
   }
+
+  // Auto-show explorer in spec mode, auto-hide in board mode.
+  var explorerPanel = document.getElementById("explorer-panel");
+  if (explorerPanel) {
+    if (mode === "spec") {
+      explorerPanel.style.display = "";
+    } else {
+      explorerPanel.style.display = "none";
+    }
+  }
 }
 
 // switchMode toggles between board and spec mode. Updates header tabs,
@@ -129,7 +139,52 @@ function _loadAndRenderSpec() {
         statusEl.className = "spec-focused-view__status";
         if (status) statusEl.classList.add("spec-status--" + status);
       }
-      if (bodyEl) bodyEl.innerHTML = renderMarkdown(parsed.body);
+
+      // Determine if this is a design spec (has children) or implementation spec (leaf).
+      var kindEl = document.getElementById("spec-focused-kind");
+      if (kindEl) {
+        var isLeaf = true;
+        if (
+          typeof _specTreeData !== "undefined" &&
+          _specTreeData &&
+          _specTreeData.nodes
+        ) {
+          var treeNode = _specTreeData.nodes.find(function (n) {
+            return n.path === _focusedSpecPath;
+          });
+          if (treeNode) isLeaf = treeNode.is_leaf;
+        }
+        kindEl.textContent = isLeaf ? "implementation" : "design";
+        kindEl.className =
+          "spec-focused-view__kind spec-kind--" + (isLeaf ? "impl" : "design");
+      }
+
+      // Show effort badge.
+      var effortEl = document.getElementById("spec-focused-effort");
+      if (effortEl) {
+        effortEl.textContent = parsed.frontmatter.effort || "";
+      }
+
+      // Show metadata bar: author, dates, depends_on, affects.
+      var metaEl = document.getElementById("spec-focused-meta");
+      if (metaEl) {
+        var parts = [];
+        if (parsed.frontmatter.author)
+          parts.push("Author: " + parsed.frontmatter.author);
+        if (parsed.frontmatter.created)
+          parts.push("Created: " + parsed.frontmatter.created);
+        if (parsed.frontmatter.updated)
+          parts.push("Updated: " + parsed.frontmatter.updated);
+        metaEl.textContent = parts.join(" \u00B7 ");
+      }
+
+      if (bodyEl) {
+        bodyEl.innerHTML = renderMarkdown(parsed.body);
+        // Intercept clicks on links to .md files and navigate within spec mode.
+        bodyEl.addEventListener("click", _onSpecBodyLinkClick);
+        // Build table of contents from rendered headings.
+        _buildSpecToc(bodyEl);
+      }
 
       // Show dispatch button only for validated leaf specs (no children).
       if (dispatchBtn) {
@@ -178,6 +233,92 @@ function parseSpecFrontmatter(text) {
   }
 
   return { frontmatter: fm, body: match[2] };
+}
+
+// _buildSpecToc extracts headings from the rendered markdown body and
+// builds a floating table of contents in the top-right of the focused view.
+function _buildSpecToc(bodyEl) {
+  // Remove existing TOC.
+  var existing = document.getElementById("spec-toc");
+  if (existing) existing.remove();
+
+  var headings = bodyEl.querySelectorAll("h1, h2, h3, h4");
+  if (!headings || headings.length < 2) return;
+
+  var toc = document.createElement("div");
+  toc.id = "spec-toc";
+  toc.className = "spec-toc";
+
+  var tocTitle = document.createElement("div");
+  tocTitle.className = "spec-toc__title";
+  tocTitle.textContent = "Contents";
+  toc.appendChild(tocTitle);
+
+  for (var i = 0; i < headings.length; i++) {
+    var h = headings[i];
+    // Give headings an id if they don't have one.
+    if (!h.id) {
+      h.id =
+        "spec-heading-" +
+        h.textContent
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+    }
+    var level = parseInt(h.tagName.substring(1), 10);
+    var link = document.createElement("a");
+    link.className = "spec-toc__link spec-toc__link--h" + level;
+    link.href = "#" + h.id;
+    link.textContent = h.textContent;
+    link.addEventListener(
+      "click",
+      (function (targetId) {
+        return function (e) {
+          e.preventDefault();
+          var target = document.getElementById(targetId);
+          if (target) target.scrollIntoView({ behavior: "smooth" });
+        };
+      })(h.id),
+    );
+    toc.appendChild(link);
+  }
+
+  bodyEl.appendChild(toc);
+}
+
+// _onSpecBodyLinkClick intercepts clicks on markdown links to .md files
+// and navigates within spec mode instead of following the link.
+function _onSpecBodyLinkClick(e) {
+  var target = e.target;
+  // Walk up to find the <a> element.
+  while (target && target.tagName !== "A") {
+    target = target.parentElement;
+  }
+  if (!target) return;
+
+  var href = target.getAttribute("href");
+  if (!href || !href.endsWith(".md")) return;
+
+  e.preventDefault();
+
+  // Resolve relative paths against the current spec's directory.
+  var basePath = _focusedSpecPath || "";
+  var baseDir = basePath.substring(0, basePath.lastIndexOf("/") + 1);
+
+  // Normalize: resolve "./" and "../" components.
+  var resolved = baseDir + href;
+  var parts = resolved.split("/");
+  var normalized = [];
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i] === "..") {
+      normalized.pop();
+    } else if (parts[i] !== "." && parts[i] !== "") {
+      normalized.push(parts[i]);
+    }
+  }
+  var specPath = normalized.join("/");
+
+  focusSpec(specPath, _focusedSpecWorkspace);
 }
 
 // --- Spec mode keyboard shortcut stubs ---
