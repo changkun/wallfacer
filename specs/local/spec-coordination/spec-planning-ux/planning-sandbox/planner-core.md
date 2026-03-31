@@ -109,6 +109,6 @@ Create `internal/planner/` — the core package that manages the planning sandbo
 
 ## Implementation Notes
 
-- **Own handle types instead of reusing sandbox's**: The spec suggested reusing `sandbox.Handle` interface and `sandbox.transition()`. Since `localHandle`, `execHandle`, and `transition` are all unexported in the sandbox package, the planner defines its own `planningHandle` and `planningExecHandle` types implementing `sandbox.Handle`. State transitions use direct `atomic.Store` instead of the CAS-based `transition()` function.
-- **Config simplified**: The spec proposed passing `sandbox.Backend` to the planner. Since the planner manages its own container lifecycle via `os/exec` (same as the sandbox package's worker pattern), no `Backend` interface is needed — the planner shells out to podman/docker directly using `cmdexec`.
-- **No `Fingerprint` used for container naming**: Container name uses `truncFingerprint()` (first 12 chars) as a suffix, not the full workspace fingerprint.
+- **Delegates to sandbox.Backend**: The planner uses `Backend.Launch()` instead of managing containers directly via `cmdexec`. The ContainerSpec carries a stable `wallfacer.task.id=planning-sandbox` label so `LocalBackend` routes through its worker container mechanism automatically. This means the planner has no custom worker, handle, or exec types — the backend handles all of that. This also ensures cloud backends (K8s) work without changes.
+- **No worker.go**: The original implementation had a custom `planningWorker` with `planningHandle`/`planningExecHandle` types duplicating sandbox internals. These were removed in favor of delegating to the backend.
+- **Container naming**: Container name uses `truncFingerprint()` (first 12 chars) as a suffix.

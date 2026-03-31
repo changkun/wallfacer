@@ -1,6 +1,6 @@
 ---
 title: Wire planner into server lifecycle
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-sandbox/planning-api.md
 affects:
@@ -9,7 +9,7 @@ affects:
   - internal/workspace/
 effort: small
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
