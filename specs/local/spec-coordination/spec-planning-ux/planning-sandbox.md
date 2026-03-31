@@ -1,13 +1,16 @@
 ---
 title: Planning Sandbox Lifecycle
-status: validated
+status: complete
 depends_on: []
 affects:
   - internal/sandbox/
   - internal/runner/
+  - internal/planner/
+  - internal/handler/planning.go
+  - internal/store/models.go
 effort: large
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
@@ -76,14 +79,36 @@ The planner uses the worker container pattern (long-lived container + `podman ex
 
 Mount configuration: full workspace read-only + `specs/` read-write override. Same sandbox image as task containers. Same resource limits initially (can be differentiated later via env config).
 
+## Outcome
+
+The planning sandbox lifecycle is fully implemented as `internal/planner/`, providing a workspace-scoped singleton container that delegates to the `sandbox.Backend` interface for cloud-portable container operations. Three API endpoints (`GET/POST/DELETE /api/planning`) control the sandbox, and the planner is integrated into server startup, shutdown, and workspace switching.
+
+### What Shipped
+
+- **`internal/planner/`** — 3 source files (`planner.go`, `spec.go`, `worker.go` removed in refactor) with container spec building, lifecycle management (Start/Stop/Exec/UpdateWorkspaces), and planning-specific mounts (workspace RO + specs/ RW override)
+- **`internal/store/models.go`** — `SandboxActivityPlanning` and `TaskKindPlanning` constants
+- **`internal/handler/planning.go`** — 3 HTTP endpoints: `GetPlanningStatus`, `StartPlanning`, `StopPlanning`
+- **`internal/runner/`** — `SandboxBackend()` accessor on Runner interface and implementation
+- **`internal/cli/server.go`** — planner creation, shutdown hook, workspace-switch wiring via `applySnapshot`
+- **10 backend tests** across planner (9) and store (2) packages
+- **6 handler tests** for the planning API endpoints
+
+### Design Evolution
+
+1. **Delegates to sandbox.Backend instead of direct cmdexec.** The original implementation managed containers directly via `os/exec` with custom `planningWorker`, `planningHandle`, and `planningExecHandle` types. This was refactored to delegate to `sandbox.Backend.Launch()` with a stable `wallfacer.task.id=planning-sandbox` label, so `LocalBackend` routes through its worker container mechanism automatically. This eliminates duplicated container lifecycle code and ensures K8s backends work without changes.
+
+2. **SetPlanner method instead of constructor parameter.** The spec proposed passing the planner to `NewHandler`. Since the planner is created after the handler in the server initialization sequence, a `SetPlanner(*planner.Planner)` method was added instead, avoiding changes to the `NewHandler` signature and all its callers.
+
+3. **Nil planner safety.** All handler endpoints gracefully handle `h.planner == nil` (status returns `running: false`, start returns 503, stop is a no-op). This means the planner is optional — the server works without it.
+
 ## Task Breakdown
 
 | Child spec | Depends on | Effort | Status |
 |------------|-----------|--------|--------|
-| [Add SandboxActivityPlanning constant](planning-sandbox/planning-activity.md) | — | small | validated |
-| [Create planner package with container lifecycle](planning-sandbox/planner-core.md) | planning-activity | large | validated |
-| [Planning sandbox API endpoints](planning-sandbox/planning-api.md) | planner-core | medium | validated |
-| [Wire planner into server lifecycle](planning-sandbox/planning-server-wiring.md) | planning-api | small | validated |
+| [Add SandboxActivityPlanning constant](planning-sandbox/planning-activity.md) | — | small | complete |
+| [Create planner package with container lifecycle](planning-sandbox/planner-core.md) | planning-activity | large | complete |
+| [Planning sandbox API endpoints](planning-sandbox/planning-api.md) | planner-core | medium | complete |
+| [Wire planner into server lifecycle](planning-sandbox/planning-server-wiring.md) | planning-api | small | complete |
 
 ```mermaid
 graph LR
