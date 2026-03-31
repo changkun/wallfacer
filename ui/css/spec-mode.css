@@ -181,13 +181,6 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.3s;
-}
-
-.spec-focused-view__body:hover {
-  scrollbar-color: var(--text-muted) transparent;
 }
 
 /* GitHub-style markdown rendering for spec body */
@@ -335,12 +328,6 @@
   flex: 1;
   overflow-y: auto;
   padding: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-.spec-chat-stream__messages:hover {
-  scrollbar-color: var(--text-muted) transparent;
 }
 
 .spec-chat-stream__input {
