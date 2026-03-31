@@ -67,6 +67,7 @@ type Interface interface {
 	// Configuration accessors.
 	Command() string
 	SandboxImage() string
+	SandboxBackend() sandbox.Backend
 	WorktreesDir() string
 	TmpDir() string
 	EnvFile() string

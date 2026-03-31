@@ -311,6 +311,11 @@ func (h *Handler) applySnapshot(snap workspace.Snapshot) {
 	h.store = snap.Store
 	h.workspaces = snap.Workspaces
 	h.snapshotMu.Unlock()
+
+	// Update the planner's workspaces when the workspace group changes.
+	if h.planner != nil {
+		h.planner.UpdateWorkspaces(snap.Workspaces, snap.Key)
+	}
 }
 
 // forEachActiveStore calls fn for every active workspace group's store.

@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -45,12 +46,32 @@ func TestPlannerIsRunningWhenNotStarted(t *testing.T) {
 	}
 }
 
+func TestPlannerStartStop(t *testing.T) {
+	p := New(Config{Command: "podman"})
+
+	if err := p.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if !p.IsRunning() {
+		t.Error("IsRunning() = false after Start")
+	}
+
+	p.Stop()
+	if p.IsRunning() {
+		t.Error("IsRunning() = true after Stop")
+	}
+}
+
 func TestPlannerUpdateWorkspaces(t *testing.T) {
 	p := New(Config{
 		Command:     "podman",
 		Workspaces:  []string{"/old/path"},
 		Fingerprint: "old",
 	})
+
+	if err := p.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
 
 	p.UpdateWorkspaces([]string{"/new/path"}, "new")
 	if len(p.workspaces) != 1 || p.workspaces[0] != "/new/path" {
@@ -59,8 +80,25 @@ func TestPlannerUpdateWorkspaces(t *testing.T) {
 	if p.fingerprint != "new" {
 		t.Errorf("fingerprint after update = %q, want %q", p.fingerprint, "new")
 	}
-	if p.worker != nil {
-		t.Error("worker should be nil after UpdateWorkspaces")
+	if p.IsRunning() {
+		t.Error("IsRunning() should be false after UpdateWorkspaces (calls Stop)")
+	}
+}
+
+func TestPlannerExecNotStarted(t *testing.T) {
+	p := New(Config{Command: "podman"})
+	_, err := p.Exec(context.Background(), []string{"echo", "hello"})
+	if err == nil {
+		t.Error("Exec should fail when planner is not started")
+	}
+}
+
+func TestPlannerExecNoBackend(t *testing.T) {
+	p := New(Config{Command: "podman"})
+	_ = p.Start(context.Background())
+	_, err := p.Exec(context.Background(), []string{"echo", "hello"})
+	if err == nil {
+		t.Error("Exec should fail when no backend is configured")
 	}
 }
 
@@ -113,6 +151,14 @@ func TestBuildContainerSpec(t *testing.T) {
 	}
 	if spec.Entrypoint != "/usr/local/bin/entrypoint.sh" {
 		t.Errorf("Entrypoint = %q, want %q", spec.Entrypoint, "/usr/local/bin/entrypoint.sh")
+	}
+
+	// Check labels for backend worker routing.
+	if spec.Labels["wallfacer.task.id"] != planningTaskID {
+		t.Errorf("task.id label = %q, want %q", spec.Labels["wallfacer.task.id"], planningTaskID)
+	}
+	if spec.Labels["wallfacer.task.activity"] != "planning" {
+		t.Errorf("task.activity label = %q, want %q", spec.Labels["wallfacer.task.activity"], "planning")
 	}
 
 	// Check volumes.
@@ -204,7 +250,6 @@ func TestBuildContainerSpecMultiWorkspace(t *testing.T) {
 }
 
 func TestBuildContainerSpecNoSpecsDir(t *testing.T) {
-	// Workspace without specs/ subdirectory.
 	tmpDir := t.TempDir()
 
 	p := New(Config{
@@ -216,7 +261,6 @@ func TestBuildContainerSpecNoSpecsDir(t *testing.T) {
 
 	spec := p.buildContainerSpec("wallfacer-plan-nospecs", sandbox.Claude)
 
-	// Should have workspace RO mount but no specs RW mount.
 	wantRW := mountOpts("z")
 	for _, v := range spec.Volumes {
 		if v.Options == wantRW && !v.Named {

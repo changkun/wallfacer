@@ -635,6 +635,11 @@ func (r *Runner) SandboxImage() string {
 	return r.sandboxImage
 }
 
+// SandboxBackend returns the sandbox backend used for container operations.
+func (r *Runner) SandboxBackend() sandbox.Backend {
+	return r.backend
+}
+
 // HasHostCodexAuth reports whether a usable host Codex auth cache exists.
 func (r *Runner) HasHostCodexAuth() bool {
 	ok, _ := r.HostCodexAuthStatus(time.Now())

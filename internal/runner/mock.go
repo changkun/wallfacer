@@ -203,6 +203,9 @@ func (m *MockRunner) Command() string { return m.Cmd }
 // SandboxImage returns the configured sandbox image.
 func (m *MockRunner) SandboxImage() string { return m.Image }
 
+// SandboxBackend returns nil (mock does not provide a real backend).
+func (m *MockRunner) SandboxBackend() sandbox.Backend { return nil }
+
 // WorktreesDir returns the configured worktrees directory.
 func (m *MockRunner) WorktreesDir() string { return m.WtDir }
 

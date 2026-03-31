@@ -19,6 +19,10 @@ func (p *Planner) buildContainerSpec(containerName string, sb sandbox.Type) sand
 		Runtime: p.command,
 		Name:    containerName,
 		Image:   p.image,
+		Labels: map[string]string{
+			"wallfacer.task.id":       planningTaskID,
+			"wallfacer.task.activity": "planning",
+		},
 	}
 
 	if p.envFile != "" {

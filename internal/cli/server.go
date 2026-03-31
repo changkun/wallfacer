@@ -25,6 +25,7 @@ import (
 	"changkun.de/x/wallfacer/internal/logger"
 	"changkun.de/x/wallfacer/internal/metrics"
 	"changkun.de/x/wallfacer/internal/pkg/cmdexec"
+	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/store"
@@ -55,6 +56,7 @@ type ServerComponents struct {
 	Ln      net.Listener
 	Runner  *runner.Runner
 	Handler *handler.Handler
+	Planner *planner.Planner
 	WsMgr   *workspace.Manager
 	Ctx     context.Context
 	Stop    context.CancelFunc
@@ -74,6 +76,9 @@ func (sc *ServerComponents) Shutdown() {
 	defer cancel()
 	if err := sc.Srv.Shutdown(shutdownCtx); err != nil {
 		logger.Main.Error("http server shutdown", "error", err)
+	}
+	if sc.Planner != nil {
+		sc.Planner.Stop()
 	}
 	sc.Runner.Shutdown()
 	logger.Main.Info("shutdown complete")
@@ -180,6 +185,21 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 	})
 	r.SetAutosubmitFunc(h.AutosubmitEnabled)
 	r.SetIdeationExploitRatioFunc(h.IdeationExploitRatio)
+
+	// Create and wire the planning sandbox manager.
+	p := planner.New(planner.Config{
+		Backend:          r.SandboxBackend(),
+		Command:          cfg.ContainerCmd,
+		Image:            resolvedImage,
+		Workspaces:       workspaces,
+		EnvFile:          cfg.EnvFile,
+		Fingerprint:      snapshot.Key,
+		InstructionsPath: snapshot.InstructionsPath,
+		Network:          envCfg.ContainerNetwork,
+		CPUs:             envCfg.ContainerCPUs,
+		Memory:           envCfg.ContainerMemory,
+	})
+	h.SetPlanner(p)
 
 	h.StartAutoPromoter(ctx)
 	h.StartAutoRetrier(ctx)
@@ -339,6 +359,7 @@ func initServer(configDir string, cfg ServerConfig, uiFS, docsFS fs.FS) *ServerC
 		Ln:           ln,
 		Runner:       r,
 		Handler:      h,
+		Planner:      p,
 		WsMgr:        wsMgr,
 		Ctx:          ctx,
 		Stop:         stop,
