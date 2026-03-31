@@ -121,3 +121,75 @@
 .spec-chat-resize:hover {
   background: var(--accent);
 }
+
+/* ===== Spec Explorer Tree ===== */
+
+.spec-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spec-node:hover {
+  background: var(--bg-hover);
+}
+
+.spec-node--focused {
+  background: var(--bg-card);
+  border-left: 2px solid var(--accent);
+}
+
+.spec-node-toggle {
+  cursor: pointer;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.spec-node-toggle-placeholder {
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.spec-node-icon {
+  flex-shrink: 0;
+}
+
+.spec-node-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.spec-node-progress {
+  color: var(--text-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.spec-explorer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.spec-workspace-files__header {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
