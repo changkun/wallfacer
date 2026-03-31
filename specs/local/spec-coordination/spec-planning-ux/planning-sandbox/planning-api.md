@@ -1,6 +1,6 @@
 ---
 title: Planning sandbox API endpoints
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-sandbox/planner-core.md
 affects:
@@ -9,7 +9,7 @@ affects:
   - internal/cli/server.go
 effort: medium
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
@@ -94,3 +94,8 @@ Add HTTP API endpoints for starting, stopping, and querying the planning sandbox
 - Do NOT implement log streaming for the planning container — that will come with the chat agent.
 - Do NOT add UI elements — that's the spec-mode-ui-shell sub-design spec.
 - Do NOT implement workspace-switch handling — that's the server-wiring task.
+
+## Implementation Notes
+
+- **SetPlanner instead of constructor parameter**: The spec proposed adding `planner` to the Handler constructor. Since the planner is created after the handler in server.go, a `SetPlanner(*planner.Planner)` method was added instead. This avoids changing the `NewHandler` signature and all its callers.
+- **Nil planner safety**: All three handlers gracefully handle `h.planner == nil` — GetPlanningStatus returns `running: false`, StartPlanning returns 503, StopPlanning is a no-op returning `stopped: true`.
