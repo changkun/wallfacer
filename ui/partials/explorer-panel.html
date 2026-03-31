@@ -28,6 +28,15 @@
   <div id="explorer-tree" class="explorer-panel__tree">
     <!-- Tree nodes rendered by JS -->
   </div>
+  <div id="spec-dispatch-bar" class="spec-dispatch-bar hidden">
+    <button
+      id="spec-dispatch-selected-btn"
+      class="spec-dispatch-selected-btn hidden"
+      onclick="dispatchSelectedSpecs()"
+    >
+      Dispatch Selected (0)
+    </button>
+  </div>
   <div id="spec-minimap" class="spec-minimap hidden">
     <div class="spec-minimap__header">Dependencies</div>
     <svg id="spec-minimap-svg" class="spec-minimap__svg"></svg>

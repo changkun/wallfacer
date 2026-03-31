@@ -10,6 +10,8 @@ var _specExpandedPaths = new Set(
 );
 var _explorerRootMode = "workspace"; // "workspace" | "specs"
 var _specStatusFilter = localStorage.getItem("wallfacer-spec-filter") || "all";
+var _selectedSpecPaths = new Set();
+var _lastCheckedSpecIndex = -1;
 
 // Status → icon mapping.
 var _specStatusIcons = {
@@ -56,6 +58,10 @@ function switchExplorerRoot(mode) {
     if (mode === "specs") {
       filterEl.value = _specStatusFilter;
     }
+  }
+  var dispatchBar = document.getElementById("spec-dispatch-bar");
+  if (dispatchBar) {
+    dispatchBar.classList.toggle("hidden", mode !== "specs");
   }
 
   if (mode === "specs") {
@@ -181,6 +187,17 @@ function renderSpecTree() {
   for (var t = 0; t < toggleEls.length; t++) {
     toggleEls[t].addEventListener("click", _onSpecToggleClick);
   }
+
+  // Attach checkbox handlers.
+  var checkboxEls = treeEl.querySelectorAll(".spec-select-checkbox");
+  for (var c = 0; c < checkboxEls.length; c++) {
+    checkboxEls[c].addEventListener("change", _onSpecCheckboxChange);
+    checkboxEls[c].addEventListener("click", function (e) {
+      e.stopPropagation();
+    });
+  }
+
+  _updateDispatchSelectedButton();
 }
 
 function _renderSpecNode(node, nodesByPath) {
@@ -239,6 +256,17 @@ function _renderSpecNode(node, nodesByPath) {
     html += '<span class="spec-node-toggle-placeholder"></span> ';
   }
 
+  // Checkbox for validated leaf specs (multi-select dispatch).
+  if (node.is_leaf && spec.status === "validated") {
+    var checked = _selectedSpecPaths.has(node.path) ? " checked" : "";
+    html +=
+      '<input type="checkbox" class="spec-select-checkbox" data-spec-select="' +
+      escapeHtml(node.path) +
+      '"' +
+      checked +
+      "> ";
+  }
+
   html +=
     '<span class="spec-node-icon">' +
     icon +
@@ -263,8 +291,14 @@ function _renderSpecNode(node, nodesByPath) {
 }
 
 function _onSpecNodeClick(e) {
-  // Don't handle if the toggle arrow was clicked.
+  // Don't handle if the toggle arrow or checkbox was clicked.
   if (e.target.classList && e.target.classList.contains("spec-node-toggle")) {
+    return;
+  }
+  if (
+    e.target.classList &&
+    e.target.classList.contains("spec-select-checkbox")
+  ) {
     return;
   }
   var el = e.currentTarget;
@@ -299,4 +333,68 @@ function _onSpecToggleClick(e) {
     JSON.stringify(Array.from(_specExpandedPaths)),
   );
   renderSpecTree();
+}
+
+// --- Multi-select dispatch ---
+
+function _onSpecCheckboxChange(e) {
+  var path = e.target.getAttribute("data-spec-select");
+  if (!path) return;
+
+  // Shift-click range selection (shiftKey is available on change events
+  // in most browsers; fall back to click listener if not).
+  if (e.shiftKey) {
+    var checkboxes = document.querySelectorAll
+      ? Array.from(document.querySelectorAll(".spec-select-checkbox"))
+      : [];
+    var currentIndex = checkboxes.indexOf(e.target);
+    if (_lastCheckedSpecIndex >= 0 && currentIndex >= 0) {
+      var start = Math.min(_lastCheckedSpecIndex, currentIndex);
+      var end = Math.max(_lastCheckedSpecIndex, currentIndex);
+      for (var i = start; i <= end; i++) {
+        var cbPath = checkboxes[i].getAttribute("data-spec-select");
+        if (cbPath) {
+          if (e.target.checked) {
+            _selectedSpecPaths.add(cbPath);
+          } else {
+            _selectedSpecPaths.delete(cbPath);
+          }
+          checkboxes[i].checked = e.target.checked;
+        }
+      }
+    }
+  }
+
+  if (e.target.checked) {
+    _selectedSpecPaths.add(path);
+  } else {
+    _selectedSpecPaths.delete(path);
+  }
+
+  // Track last checked index for shift-click.
+  var allCheckboxes = document.querySelectorAll
+    ? Array.from(document.querySelectorAll(".spec-select-checkbox"))
+    : [];
+  _lastCheckedSpecIndex = allCheckboxes.indexOf(e.target);
+
+  _updateDispatchSelectedButton();
+}
+
+function _updateDispatchSelectedButton() {
+  var btn = document.getElementById("spec-dispatch-selected-btn");
+  if (!btn) return;
+  var count = _selectedSpecPaths.size;
+  if (count > 0) {
+    btn.classList.remove("hidden");
+    btn.textContent = "Dispatch Selected (" + count + ")";
+  } else {
+    btn.classList.add("hidden");
+  }
+}
+
+// dispatchSelectedSpecs is a stub — actual dispatch logic is wired by
+// the dispatch-workflow spec.
+function dispatchSelectedSpecs() {
+  var paths = Array.from(_selectedSpecPaths);
+  console.log("dispatch selected specs:", paths);
 }

@@ -175,6 +175,25 @@
   margin-left: auto;
 }
 
+.spec-select-checkbox {
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.spec-dispatch-bar {
+  padding: 4px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.spec-dispatch-selected-btn {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 .spec-status-filter {
   font-size: 10px;
   padding: 1px 4px;

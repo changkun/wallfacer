@@ -75,6 +75,8 @@ function makeContext(opts = {}) {
     "explorer-tree",
     "spec-explorer-workspace-toggle",
     "spec-status-filter",
+    "spec-dispatch-bar",
+    "spec-dispatch-selected-btn",
   ];
   for (const id of ids) {
     const el = makeEl("DIV", registry);
@@ -266,5 +268,78 @@ describe("spec-explorer", () => {
     // Foo (validated) is visible because Bar (complete) is a descendant.
     expect(treeEl.innerHTML).toContain("Foo");
     expect(treeEl.innerHTML).toContain("Bar");
+  });
+
+  // --- Multi-select tests ---
+
+  it("checkbox rendered for validated leaf specs only", () => {
+    ctx._specExpandedPaths.add("local/foo.md");
+    ctx._specTreeData = MOCK_TREE_DATA;
+    ctx.renderSpecTree();
+    const treeEl = ctx.registry.get("explorer-tree");
+    // Foo is non-leaf (validated but not leaf) — no checkbox.
+    // Bar is leaf but complete — no checkbox.
+    expect(treeEl.innerHTML).not.toContain("spec-select-checkbox");
+  });
+
+  it("checkbox rendered for validated leaf", () => {
+    const data = {
+      nodes: [
+        {
+          path: "local/leaf.md",
+          spec: { title: "Leaf", status: "validated", depends_on: [] },
+          children: [],
+          is_leaf: true,
+          depth: 0,
+        },
+      ],
+      progress: {},
+    };
+    ctx._specTreeData = data;
+    ctx.renderSpecTree();
+    const treeEl = ctx.registry.get("explorer-tree");
+    expect(treeEl.innerHTML).toContain("spec-select-checkbox");
+  });
+
+  it("selection count updates dispatch button", () => {
+    ctx._selectedSpecPaths.add("local/a.md");
+    ctx._selectedSpecPaths.add("local/b.md");
+    ctx._updateDispatchSelectedButton();
+    const btn = ctx.registry.get("spec-dispatch-selected-btn");
+    expect(btn.textContent).toBe("Dispatch Selected (2)");
+    expect(btn.classList.contains("hidden")).toBe(false);
+  });
+
+  it("dispatch button hidden when no selection", () => {
+    ctx._selectedSpecPaths.clear();
+    ctx._updateDispatchSelectedButton();
+    const btn = ctx.registry.get("spec-dispatch-selected-btn");
+    expect(btn.classList.contains("hidden")).toBe(true);
+  });
+
+  it("selection survives re-render", () => {
+    const data = {
+      nodes: [
+        {
+          path: "local/leaf.md",
+          spec: { title: "Leaf", status: "validated", depends_on: [] },
+          children: [],
+          is_leaf: true,
+          depth: 0,
+        },
+      ],
+      progress: {},
+    };
+    ctx._specTreeData = data;
+    ctx._selectedSpecPaths.add("local/leaf.md");
+    ctx.renderSpecTree();
+    const treeEl = ctx.registry.get("explorer-tree");
+    expect(treeEl.innerHTML).toContain("checked");
+  });
+
+  it("dispatchSelectedSpecs is callable", () => {
+    ctx._selectedSpecPaths.add("local/a.md");
+    // Should not throw.
+    ctx.dispatchSelectedSpecs();
   });
 });
