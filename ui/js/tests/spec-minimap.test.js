@@ -111,14 +111,14 @@ const MOCK_NODES = [
   },
   {
     path: "b.md",
-    spec: { title: "B", status: "validated", depends_on: ["a.md"] },
+    spec: { title: "B", status: "validated", depends_on: ["specs/a.md"] },
     children: [],
     is_leaf: true,
     depth: 0,
   },
   {
     path: "c.md",
-    spec: { title: "C", status: "drafted", depends_on: ["a.md"] },
+    spec: { title: "C", status: "drafted", depends_on: ["specs/a.md"] },
     children: [],
     is_leaf: true,
     depth: 0,

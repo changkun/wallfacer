@@ -10,15 +10,24 @@ var _minimapStatusColors = {
   stale: "#f8d7da",
 };
 
+// _normalizeDep strips the leading "specs/" prefix from a depends_on path
+// so it matches the tree node paths (which are relative to specs/).
+function _normalizeDep(dep) {
+  if (dep.indexOf("specs/") === 0) return dep.substring(6);
+  return dep;
+}
+
 // buildReverseDeps builds a reverse dependency index from the spec tree nodes.
+// Keys and values use normalized paths (relative to specs/).
 function buildReverseDeps(nodes) {
   var reverse = {};
   for (var i = 0; i < nodes.length; i++) {
     var deps = nodes[i].spec && nodes[i].spec.depends_on;
     if (!deps) continue;
     for (var j = 0; j < deps.length; j++) {
-      if (!reverse[deps[j]]) reverse[deps[j]] = [];
-      reverse[deps[j]].push(nodes[i].path);
+      var dep = _normalizeDep(deps[j]);
+      if (!reverse[dep]) reverse[dep] = [];
+      reverse[dep].push(nodes[i].path);
     }
   }
   return reverse;
@@ -49,10 +58,12 @@ function renderMinimap(specPath, treeData) {
 
   var reverseIndex = buildReverseDeps(nodes);
 
-  // Collect 1-hop neighborhood.
-  var upstreamPaths = (focused.spec.depends_on || []).filter(function (p) {
-    return !!nodesByPath[p];
-  });
+  // Collect 1-hop neighborhood. Normalize depends_on paths to match tree keys.
+  var upstreamPaths = (focused.spec.depends_on || [])
+    .map(_normalizeDep)
+    .filter(function (p) {
+      return !!nodesByPath[p];
+    });
   var downstreamPaths = (reverseIndex[specPath] || []).filter(function (p) {
     return !!nodesByPath[p];
   });
