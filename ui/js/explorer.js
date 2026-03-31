@@ -29,15 +29,27 @@ function toggleExplorer() {
   if (btn) btn.setAttribute("aria-expanded", String(isHidden));
 
   if (isHidden) {
-    // Load tree on first open, refresh expanded dirs on subsequent opens.
-    if (!_explorerLoaded) {
-      _loadExplorerRoots();
+    // When in spec mode, delegate to the spec explorer instead of loading
+    // workspace files. This prevents the workspace poll from overwriting
+    // the spec tree.
+    if (typeof getCurrentMode === "function" && getCurrentMode() === "spec") {
+      if (typeof switchExplorerRoot === "function") {
+        switchExplorerRoot("specs");
+      }
     } else {
-      _refreshExpandedNodes();
+      // Load tree on first open, refresh expanded dirs on subsequent opens.
+      if (!_explorerLoaded) {
+        _loadExplorerRoots();
+      } else {
+        _refreshExpandedNodes();
+      }
+      _startExplorerRefreshPoll();
     }
-    _startExplorerRefreshPoll();
   } else {
     _stopExplorerRefreshPoll();
+    if (typeof _stopSpecTreePoll === "function") {
+      _stopSpecTreePoll();
+    }
   }
 }
 

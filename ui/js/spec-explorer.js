@@ -65,6 +65,11 @@ function switchExplorerRoot(mode) {
   }
 
   if (mode === "specs") {
+    // Stop the workspace explorer's refresh poll so it doesn't overwrite
+    // the spec tree with workspace files.
+    if (typeof _stopExplorerRefreshPoll === "function") {
+      _stopExplorerRefreshPoll();
+    }
     loadSpecTree();
     _startSpecTreePoll();
   } else {
