@@ -80,10 +80,13 @@ function getFocusedSpecPath() {
 function _loadAndRenderSpec() {
   if (!_focusedSpecPath || !_focusedSpecWorkspace) return;
 
+  // The spec tree returns paths relative to specs/ (e.g., "local/foo.md").
+  // The explorer file API expects an absolute path within the workspace.
+  var absPath = _focusedSpecWorkspace + "/specs/" + _focusedSpecPath;
   var url =
     Routes.explorer.readFile() +
     "?path=" +
-    encodeURIComponent(_focusedSpecPath) +
+    encodeURIComponent(absPath) +
     "&workspace=" +
     encodeURIComponent(_focusedSpecWorkspace);
 
