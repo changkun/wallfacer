@@ -107,6 +107,21 @@ var Routes = {
     },
   },
 
+  planning: {
+    // GET /api/planning
+    status: function () {
+      return "/api/planning";
+    },
+    // POST /api/planning
+    start: function () {
+      return "/api/planning";
+    },
+    // DELETE /api/planning
+    stop: function () {
+      return "/api/planning";
+    },
+  },
+
   env: {
     // GET /api/env
     get: function () {

@@ -1,6 +1,6 @@
 {
   "generated_from": "internal/apicontract/routes.go",
-  "route_count": 85,
+  "route_count": 88,
   "routes": [
     {
       "method": "GET",
@@ -181,6 +181,33 @@
       "description": "Cancel an in-progress ideation run.",
       "tags": [
         "ideate"
+      ]
+    },
+    {
+      "method": "GET",
+      "pattern": "/api/planning",
+      "name": "GetPlanningStatus",
+      "description": "Get planning sandbox status.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "POST",
+      "pattern": "/api/planning",
+      "name": "StartPlanning",
+      "description": "Start the planning sandbox.",
+      "tags": [
+        "planning"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "pattern": "/api/planning",
+      "name": "StopPlanning",
+      "description": "Stop the planning sandbox.",
+      "tags": [
+        "planning"
       ]
     },
     {

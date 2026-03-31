@@ -17,6 +17,7 @@ import (
 	"changkun.de/x/wallfacer/internal/pkg/circuitbreaker"
 	"changkun.de/x/wallfacer/internal/pkg/httpjson"
 	"changkun.de/x/wallfacer/internal/pkg/lazyval"
+	"changkun.de/x/wallfacer/internal/planner"
 	"changkun.de/x/wallfacer/internal/prompts"
 	"changkun.de/x/wallfacer/internal/runner"
 	"changkun.de/x/wallfacer/internal/sandbox"
@@ -157,6 +158,8 @@ type Handler struct {
 	ideationTimer        *time.Timer
 	ideationExploitRatio float64 // 0.0–1.0; default 0.8 (80% exploitation)
 
+	planner *planner.Planner
+
 	sandboxTestMu     sync.RWMutex
 	sandboxTestPassed map[sandbox.Type]bool
 	// scheduledPromoteMu guards scheduledPromoteTimer, which fires
@@ -243,6 +246,12 @@ func NewHandler(s *store.Store, r runner.Interface, configDir string, workspaces
 	}
 	h.refreshCodexBootstrapAuthState()
 	return h
+}
+
+// SetPlanner sets the planner instance for planning sandbox operations.
+// Called by the server after both the handler and planner are constructed.
+func (h *Handler) SetPlanner(p *planner.Planner) {
+	h.planner = p
 }
 
 // currentStore returns the active store, preferring the workspace manager's

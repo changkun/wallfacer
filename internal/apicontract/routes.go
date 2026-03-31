@@ -179,6 +179,27 @@ var Routes = []Route{
 		Tags:        []string{"ideate"},
 	},
 
+	// --- Planning sandbox ---
+
+	{
+		Method: http.MethodGet, Pattern: "/api/planning", Name: "GetPlanningStatus",
+		JSName:      "status",
+		Description: "Get planning sandbox status.",
+		Tags:        []string{"planning"},
+	},
+	{
+		Method: http.MethodPost, Pattern: "/api/planning", Name: "StartPlanning",
+		JSName:      "start",
+		Description: "Start the planning sandbox.",
+		Tags:        []string{"planning"},
+	},
+	{
+		Method: http.MethodDelete, Pattern: "/api/planning", Name: "StopPlanning",
+		JSName:      "stop",
+		Description: "Stop the planning sandbox.",
+		Tags:        []string{"planning"},
+	},
+
 	// --- Environment configuration ---
 
 	{
