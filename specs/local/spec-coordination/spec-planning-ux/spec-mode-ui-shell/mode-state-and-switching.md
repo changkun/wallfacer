@@ -1,6 +1,6 @@
 ---
 title: Add mode state and header mode tabs
-status: validated
+status: complete
 depends_on: []
 affects:
   - ui/js/state.js
@@ -8,7 +8,7 @@ affects:
   - ui/index.html
 effort: small
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
