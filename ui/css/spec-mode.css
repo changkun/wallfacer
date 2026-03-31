@@ -23,6 +23,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
+  min-height: 40px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
