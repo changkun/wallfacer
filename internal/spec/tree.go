@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	gentree "changkun.de/x/wallfacer/internal/pkg/tree"
@@ -75,8 +76,16 @@ func scanDir(tree *Tree, dir, specsDir string, parentKey *string) []error {
 		mdFiles[base] = filepath.Join(dir, e.Name())
 	}
 
+	// Sort bases for deterministic tree order across calls.
+	bases := make([]string, 0, len(mdFiles))
+	for base := range mdFiles {
+		bases = append(bases, base)
+	}
+	slices.Sort(bases)
+
 	// Second pass: build nodes from .md files and check for child directories.
-	for base, mdPath := range mdFiles {
+	for _, base := range bases {
+		mdPath := mdFiles[base]
 		relPath, _ := filepath.Rel(specsDir, mdPath)
 		relPath = filepath.ToSlash(relPath)
 
