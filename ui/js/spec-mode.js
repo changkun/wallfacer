@@ -13,12 +13,11 @@ function setCurrentMode(mode) {
   localStorage.setItem("wallfacer-mode", mode);
 }
 
-// switchMode toggles between board and spec mode. Updates header tabs,
-// swaps main content visibility, and persists the choice.
-function switchMode(mode) {
-  if (mode === currentMode) return;
-  setCurrentMode(mode);
-
+// _applyMode updates the DOM to reflect the given mode without checking
+// whether the mode has changed. Used both by switchMode (after the
+// idempotency check) and by DOMContentLoaded (to restore persisted mode
+// where the JS variable already matches but the DOM hasn't been touched).
+function _applyMode(mode) {
   // Update header mode tabs.
   var boardTab = document.getElementById("mode-tab-board");
   var specTab = document.getElementById("mode-tab-spec");
@@ -47,6 +46,14 @@ function switchMode(mode) {
   if (typeof switchExplorerRoot === "function") {
     switchExplorerRoot(mode === "spec" ? "specs" : "workspace");
   }
+}
+
+// switchMode toggles between board and spec mode. Updates header tabs,
+// swaps main content visibility, and persists the choice.
+function switchMode(mode) {
+  if (mode === currentMode) return;
+  setCurrentMode(mode);
+  _applyMode(mode);
 }
 
 // --- Focused spec view ---
@@ -227,10 +234,13 @@ function _initSpecChatResize() {
   });
 }
 
-// Restore persisted mode on page load.
+// Restore persisted mode on page load. Uses _applyMode directly (not
+// switchMode) because the JS variable already matches localStorage but
+// the DOM hasn't been updated yet — switchMode's idempotency guard
+// would skip the update.
 document.addEventListener("DOMContentLoaded", function () {
   if (currentMode === "spec") {
-    switchMode("spec");
+    _applyMode("spec");
   }
   _initSpecChatResize();
 });
