@@ -31,9 +31,16 @@ function switchMode(mode) {
   if (board) board.style.display = mode === "board" ? "" : "none";
   if (specView) specView.style.display = mode === "spec" ? "" : "none";
 
-  // Stop spec refresh poll when leaving spec mode.
+  // Stop spec refresh poll and clear hash when leaving spec mode.
   if (mode !== "spec") {
     _stopSpecRefreshPoll();
+    if (
+      typeof location !== "undefined" &&
+      location.hash &&
+      location.hash.indexOf("#spec/") === 0
+    ) {
+      history.replaceState(null, "", location.pathname);
+    }
   }
 
   // Switch explorer root (no-op until spec-explorer is wired).
@@ -55,6 +62,8 @@ function focusSpec(specPath, workspace) {
   _focusedSpecWorkspace = workspace;
   _loadAndRenderSpec();
   _startSpecRefreshPoll();
+  // Update hash for deep-linking.
+  history.replaceState(null, "", "#spec/" + encodeURIComponent(specPath));
 }
 
 function getFocusedSpecPath() {
@@ -138,6 +147,25 @@ function parseSpecFrontmatter(text) {
   }
 
   return { frontmatter: fm, body: match[2] };
+}
+
+// --- Spec mode keyboard shortcut stubs ---
+
+// openSelectedSpec opens the currently selected explorer node in the focused view.
+// No-op until spec explorer is wired.
+function openSelectedSpec() {}
+
+// dispatchFocusedSpec dispatches the focused leaf spec as a kanban task.
+// No-op stub — wired by dispatch-workflow spec.
+function dispatchFocusedSpec() {}
+
+// breakDownFocusedSpec pre-fills the chat input with a breakdown directive.
+function breakDownFocusedSpec() {
+  var input = document.getElementById("spec-chat-input");
+  if (input) {
+    input.value = "Break this into sub-specs";
+    input.focus();
+  }
 }
 
 // Restore persisted mode on page load.

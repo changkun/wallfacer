@@ -15,6 +15,18 @@
 function _handleInitialHash() {
   if (_hashHandled) return;
   _hashHandled = true;
+
+  // Handle spec deep-links: #spec/<path>
+  var specMatch = location.hash.match(/^#spec\/(.+)$/);
+  if (specMatch) {
+    var specPath = decodeURIComponent(specMatch[1]);
+    switchMode("spec");
+    if (activeWorkspaces && activeWorkspaces.length > 0) {
+      focusSpec(specPath, activeWorkspaces[0]);
+    }
+    return;
+  }
+
   const match = location.hash.match(/^#([0-9a-f-]{36})(?:\/([\w-]+))?$/);
   if (!match) return;
   const taskId = match[1];

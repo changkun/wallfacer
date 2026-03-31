@@ -93,6 +93,14 @@ function makeContext() {
         storage.set(k, v);
       },
     },
+    fetch: () => Promise.reject(new Error("stubbed")),
+    Routes: { explorer: { readFile: () => "/api/explorer/file" } },
+    withBearerHeaders: () => ({}),
+    renderMarkdown: (text) => "<p>" + text + "</p>",
+    setInterval: () => 42,
+    clearInterval: () => {},
+    location: { hash: "", pathname: "/" },
+    history: { replaceState: () => {} },
     console,
     registry,
   };

@@ -81,6 +81,8 @@ function makeContext() {
     renderMarkdown: (text) => "<p>" + text + "</p>",
     setInterval: () => 42,
     clearInterval: () => {},
+    location: { hash: "", pathname: "/" },
+    history: { replaceState: () => {} },
     console,
     registry,
   };
