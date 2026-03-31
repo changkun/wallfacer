@@ -23,6 +23,12 @@ var _specStatusIcons = {
 };
 
 function loadSpecTree() {
+  // Show loading indicator while fetching.
+  var treeEl = document.getElementById("explorer-tree");
+  if (treeEl && !_specTreeData) {
+    treeEl.innerHTML = '<div class="spec-loading">Loading specs\u2026</div>';
+  }
+
   fetch(Routes.specs.tree(), { headers: withBearerHeaders() })
     .then(function (r) {
       return r.json();
@@ -33,6 +39,10 @@ function loadSpecTree() {
     })
     .catch(function (err) {
       console.error("spec tree load error:", err);
+      if (treeEl) {
+        treeEl.innerHTML =
+          '<div class="spec-loading">Failed to load specs</div>';
+      }
     });
 }
 

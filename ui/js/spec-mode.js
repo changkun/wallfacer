@@ -67,6 +67,15 @@ var _specRefreshTimer = null;
 function focusSpec(specPath, workspace) {
   _focusedSpecPath = specPath;
   _focusedSpecWorkspace = workspace;
+  _focusedSpecContent = null; // reset so loading indicator shows
+
+  // Show loading state in the focused view.
+  var titleEl = document.getElementById("spec-focused-title");
+  var bodyEl = document.getElementById("spec-focused-body");
+  if (titleEl) titleEl.textContent = specPath;
+  if (bodyEl)
+    bodyEl.innerHTML = '<div class="spec-loading">Loading\u2026</div>';
+
   _loadAndRenderSpec();
   _startSpecRefreshPoll();
   // Update hash for deep-linking.

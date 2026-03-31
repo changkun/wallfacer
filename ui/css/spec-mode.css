@@ -124,6 +124,13 @@
 
 /* ===== Spec Explorer Tree ===== */
 
+.spec-loading {
+  padding: 12px 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
 .spec-track-header {
   display: flex;
   align-items: center;
