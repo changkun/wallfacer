@@ -111,6 +111,9 @@ function renderMinimap(specPath, treeData) {
   var svgNS = "http://www.w3.org/2000/svg";
   svg.innerHTML = "";
 
+  // Set up pan-to-drag on the minimap body.
+  _initMinimapPan(container, svg, totalW, totalH);
+
   // Column x positions.
   var col0x = 0;
   var col1x = nodeW + colGap;
@@ -213,6 +216,73 @@ function _drawMinimapEdge(svg, ns, x1, y1, x2, y2) {
   line.setAttribute("stroke", "#999");
   line.setAttribute("stroke-width", 1);
   svg.appendChild(line);
+}
+
+// --- Minimap pan (drag to scroll) ---
+
+var _minimapPanState = null;
+
+function _initMinimapPan(container, svg, contentW, contentH) {
+  var body = container.querySelector(".spec-minimap__body");
+  if (!body) return;
+
+  // Remove previous handlers if any.
+  if (body._panMouseDown) {
+    body.removeEventListener("mousedown", body._panMouseDown);
+  }
+
+  var panX = 0;
+  var panY = 0;
+
+  body._panMouseDown = function (e) {
+    // Don't pan if clicking on a node (let the click handler fire).
+    if (e.target.tagName === "rect" || e.target.tagName === "text") return;
+
+    e.preventDefault();
+    var startX = e.clientX;
+    var startY = e.clientY;
+    var startPanX = panX;
+    var startPanY = panY;
+
+    function onMouseMove(ev) {
+      panX = startPanX - (ev.clientX - startX);
+      panY = startPanY - (ev.clientY - startY);
+      // Clamp panning so the graph doesn't go fully off-screen.
+      var bodyRect = body.getBoundingClientRect
+        ? body.getBoundingClientRect()
+        : { width: contentW, height: contentH };
+      panX = Math.max(0, Math.min(panX, contentW - bodyRect.width));
+      panY = Math.max(0, Math.min(panY, contentH - bodyRect.height));
+      svg.setAttribute(
+        "viewBox",
+        panX + " " + panY + " " + bodyRect.width + " " + bodyRect.height,
+      );
+    }
+
+    function onMouseUp() {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
+
+  body.addEventListener("mousedown", body._panMouseDown);
+
+  // Initial viewBox: fit to container width, show from origin.
+  var bodyRect = body.getBoundingClientRect
+    ? body.getBoundingClientRect()
+    : { width: contentW, height: contentH };
+  svg.setAttribute("width", "100%");
+  svg.removeAttribute("height");
+  svg.setAttribute(
+    "viewBox",
+    "0 0 " +
+      Math.max(contentW, bodyRect.width) +
+      " " +
+      Math.max(contentH, bodyRect.height),
+  );
 }
 
 // --- Minimap resize ---

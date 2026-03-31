@@ -76,7 +76,20 @@ function makeContext() {
 
   // Create minimap container and SVG.
   const container = makeEl("DIV", "spec-minimap");
+  const bodyEl = makeEl("DIV", null);
+  bodyEl.className = "spec-minimap__body";
+  bodyEl.getBoundingClientRect = () => ({ width: 200, height: 160 });
+  const _bodyListeners = {};
+  bodyEl.addEventListener = (type, fn) => {
+    _bodyListeners[type] = fn;
+  };
+  bodyEl.removeEventListener = () => {};
+  container.querySelector = (sel) => {
+    if (sel === ".spec-minimap__body") return bodyEl;
+    return null;
+  };
   const svgEl = makeSvgEl("svg");
+  svgEl.removeAttribute = () => {};
   registry.set("spec-minimap-svg", svgEl);
   // Resize handle element.
   const resizeEl = makeEl("DIV", "spec-minimap-resize");

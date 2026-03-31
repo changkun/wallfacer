@@ -295,8 +295,13 @@
 
 .spec-minimap__body {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   padding: 4px 8px 6px;
+  cursor: grab;
+}
+
+.spec-minimap__body:active {
+  cursor: grabbing;
 }
 
 .spec-minimap__svg {
