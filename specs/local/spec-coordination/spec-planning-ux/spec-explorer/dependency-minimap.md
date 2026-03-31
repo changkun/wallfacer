@@ -1,6 +1,6 @@
 ---
 title: Dependency minimap renderer
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/spec-explorer/spec-tree-renderer.md
 affects:
@@ -8,7 +8,7 @@ affects:
   - ui/index.html
 effort: medium
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
