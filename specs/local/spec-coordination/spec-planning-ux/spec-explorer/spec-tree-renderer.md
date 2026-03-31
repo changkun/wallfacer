@@ -1,6 +1,6 @@
 ---
 title: Spec tree renderer with status badges
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/spec-explorer/spec-tree-api.md
   - specs/local/spec-coordination/spec-planning-ux/spec-mode-ui-shell/mode-state-and-switching.md
@@ -8,7 +8,7 @@ affects:
   - ui/js/
 effort: medium
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
