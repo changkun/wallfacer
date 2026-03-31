@@ -1,6 +1,6 @@
 ---
 title: Create planner package with container lifecycle
-status: validated
+status: complete
 depends_on:
   - specs/local/spec-coordination/spec-planning-ux/planning-sandbox/planning-activity.md
 affects:
@@ -8,7 +8,7 @@ affects:
   - internal/sandbox/
 effort: large
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-03-31
 author: changkun
 dispatched_task_id: null
 ---
@@ -106,3 +106,9 @@ Create `internal/planner/` — the core package that manages the planning sandbo
 - Do NOT implement conversation management or chat — that's the planning-chat-agent sub-design spec.
 - Do NOT implement usage tracking or cost attribution — that's the progress-cost-tracking sub-design spec.
 - The `planningWorker` struct is internal to the planner package — do not export it or add it to the sandbox package's `WorkerManager` interface.
+
+## Implementation Notes
+
+- **Own handle types instead of reusing sandbox's**: The spec suggested reusing `sandbox.Handle` interface and `sandbox.transition()`. Since `localHandle`, `execHandle`, and `transition` are all unexported in the sandbox package, the planner defines its own `planningHandle` and `planningExecHandle` types implementing `sandbox.Handle`. State transitions use direct `atomic.Store` instead of the CAS-based `transition()` function.
+- **Config simplified**: The spec proposed passing `sandbox.Backend` to the planner. Since the planner manages its own container lifecycle via `os/exec` (same as the sandbox package's worker pattern), no `Backend` interface is needed — the planner shells out to podman/docker directly using `cmdexec`.
+- **No `Fingerprint` used for container naming**: Container name uses `truncFingerprint()` (first 12 chars) as a suffix, not the full workspace fingerprint.
