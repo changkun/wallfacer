@@ -1,6 +1,18 @@
 <aside id="explorer-panel" class="explorer-panel" style="display: none">
   <div class="explorer-panel__header">
     <span class="explorer-panel__title">Explorer</span>
+    <select
+      id="spec-status-filter"
+      class="spec-status-filter hidden"
+      onchange="filterSpecTree(this.value)"
+    >
+      <option value="all">All</option>
+      <option value="drafted">Drafted</option>
+      <option value="validated">Validated</option>
+      <option value="stale">Stale</option>
+      <option value="complete">Complete</option>
+      <option value="incomplete">Not complete</option>
+    </select>
     <label
       id="spec-explorer-workspace-toggle"
       class="spec-explorer-toggle hidden"

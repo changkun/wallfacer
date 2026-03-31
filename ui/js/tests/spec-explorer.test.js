@@ -71,7 +71,11 @@ function makeContext(opts = {}) {
   const registry = new Map();
   const storage = new Map();
 
-  const ids = ["explorer-tree", "spec-explorer-workspace-toggle"];
+  const ids = [
+    "explorer-tree",
+    "spec-explorer-workspace-toggle",
+    "spec-status-filter",
+  ];
   for (const id of ids) {
     const el = makeEl("DIV", registry);
     el.id = id;
@@ -219,6 +223,48 @@ describe("spec-explorer", () => {
     ctx.renderSpecTree();
 
     const treeEl = ctx.registry.get("explorer-tree");
+    expect(treeEl.innerHTML).toContain("Bar");
+  });
+
+  it("filterSpecTree by drafted hides non-matching nodes", () => {
+    ctx._specTreeData = MOCK_TREE_DATA;
+    ctx.filterSpecTree("drafted");
+    const treeEl = ctx.registry.get("explorer-tree");
+    // Neither Foo (validated) nor Bar (complete) match "drafted".
+    expect(treeEl.innerHTML).not.toContain("Foo");
+    expect(treeEl.innerHTML).not.toContain("Bar");
+  });
+
+  it("filterSpecTree 'all' shows everything", () => {
+    ctx._specTreeData = MOCK_TREE_DATA;
+    ctx.filterSpecTree("drafted");
+    ctx.filterSpecTree("all");
+    const treeEl = ctx.registry.get("explorer-tree");
+    expect(treeEl.innerHTML).toContain("Foo");
+  });
+
+  it("filterSpecTree 'incomplete' hides complete nodes", () => {
+    ctx._specExpandedPaths.add("local/foo.md");
+    ctx._specTreeData = MOCK_TREE_DATA;
+    ctx.filterSpecTree("incomplete");
+    const treeEl = ctx.registry.get("explorer-tree");
+    // Foo (validated) should be visible, Bar (complete) should not.
+    expect(treeEl.innerHTML).toContain("Foo");
+    expect(treeEl.innerHTML).not.toContain("Bar");
+  });
+
+  it("filterSpecTree persists to localStorage", () => {
+    ctx.filterSpecTree("stale");
+    expect(ctx.storage.get("wallfacer-spec-filter")).toBe("stale");
+  });
+
+  it("ancestor is visible when descendant matches filter", () => {
+    ctx._specExpandedPaths.add("local/foo.md");
+    ctx._specTreeData = MOCK_TREE_DATA;
+    ctx.filterSpecTree("complete");
+    const treeEl = ctx.registry.get("explorer-tree");
+    // Foo (validated) is visible because Bar (complete) is a descendant.
+    expect(treeEl.innerHTML).toContain("Foo");
     expect(treeEl.innerHTML).toContain("Bar");
   });
 });

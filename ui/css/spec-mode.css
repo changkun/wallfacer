@@ -175,6 +175,17 @@
   margin-left: auto;
 }
 
+.spec-status-filter {
+  font-size: 10px;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  margin-left: auto;
+}
+
 .spec-explorer-toggle {
   display: flex;
   align-items: center;

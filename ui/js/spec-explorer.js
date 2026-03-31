@@ -9,6 +9,7 @@ var _specExpandedPaths = new Set(
   JSON.parse(localStorage.getItem("wallfacer-spec-expanded") || "[]"),
 );
 var _explorerRootMode = "workspace"; // "workspace" | "specs"
+var _specStatusFilter = localStorage.getItem("wallfacer-spec-filter") || "all";
 
 // Status → icon mapping.
 var _specStatusIcons = {
@@ -44,10 +45,17 @@ function switchExplorerRoot(mode) {
 
   _stopSpecTreePoll();
 
-  // Show/hide the "Show workspace files" toggle.
+  // Show/hide the "Show workspace files" toggle and status filter.
   var toggle = document.getElementById("spec-explorer-workspace-toggle");
   if (toggle) {
     toggle.classList.toggle("hidden", mode !== "specs");
+  }
+  var filterEl = document.getElementById("spec-status-filter");
+  if (filterEl) {
+    filterEl.classList.toggle("hidden", mode !== "specs");
+    if (mode === "specs") {
+      filterEl.value = _specStatusFilter;
+    }
   }
 
   if (mode === "specs") {
@@ -98,6 +106,43 @@ function _stopSpecTreePoll() {
   }
 }
 
+// filterSpecTree sets the status filter and re-renders.
+function filterSpecTree(filter) {
+  _specStatusFilter = filter;
+  localStorage.setItem("wallfacer-spec-filter", filter);
+  renderSpecTree();
+}
+
+// _nodeMatchesFilter checks if a node or any of its descendants match
+// the current status filter. Non-leaf nodes are visible if any descendant matches.
+function _nodeMatchesFilter(node, nodesByPath) {
+  if (_specStatusFilter === "all") return true;
+
+  var spec = node.spec;
+  if (!spec) return false;
+
+  var status = spec.status;
+  var match = false;
+
+  if (_specStatusFilter === "incomplete") {
+    match = status !== "complete";
+  } else {
+    match = status === _specStatusFilter;
+  }
+
+  // Leaf nodes: match directly.
+  if (node.is_leaf) return match;
+
+  // Non-leaf: visible if self matches or any descendant matches.
+  if (match) return true;
+  var children = node.children || [];
+  for (var i = 0; i < children.length; i++) {
+    var child = nodesByPath[children[i]];
+    if (child && _nodeMatchesFilter(child, nodesByPath)) return true;
+  }
+  return false;
+}
+
 // renderSpecTree renders the spec tree into the explorer-tree container.
 function renderSpecTree() {
   var treeEl = document.getElementById("explorer-tree");
@@ -139,6 +184,8 @@ function renderSpecTree() {
 }
 
 function _renderSpecNode(node, nodesByPath) {
+  if (!_nodeMatchesFilter(node, nodesByPath)) return "";
+
   var spec = node.spec;
   if (!spec) return "";
 
